@@ -26,7 +26,7 @@ enum class ThrowMsgKind : uint8_t {
   // Decorators:
   DecoratorInvalidReturnType,
 #ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
-  UsingWithoutDispose
+  DisposeNotCallable
 #endif
 };
 

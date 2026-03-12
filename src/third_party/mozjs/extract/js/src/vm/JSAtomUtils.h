@@ -15,6 +15,7 @@
 #include "gc/MaybeRooted.h"
 #include "js/TypeDecls.h"
 #include "js/Utility.h"
+#include "vm/StringType.h"
 
 namespace js {
 
@@ -81,7 +82,16 @@ extern JSAtom* PermanentlyAtomizeCharsNonStaticValidLength(
 extern JSAtom* AtomizeUTF8Chars(JSContext* cx, const char* utf8Chars,
                                 size_t utf8ByteLength);
 
-extern JSAtom* AtomizeString(JSContext* cx, JSString* str);
+extern JSAtom* AtomizeStringSlow(JSContext* cx, JSString* str);
+
+MOZ_ALWAYS_INLINE JSAtom* AtomizeString(JSContext* cx, JSString* str) {
+  // Inlined fast path for atoms. This covers ~71% of calls to this function on
+  // Speedometer 3.
+  if (str->isAtom()) {
+    return &str->asAtom();
+  }
+  return AtomizeStringSlow(cx, str);
+}
 
 template <AllowGC allowGC>
 extern JSAtom* ToAtom(JSContext* cx,
@@ -93,10 +103,6 @@ extern JSAtom* ToAtom(JSContext* cx,
  * This function does not GC.
  */
 extern bool PinAtom(JSContext* cx, JSAtom* atom);
-
-#ifdef ENABLE_RECORD_TUPLE
-extern bool EnsureAtomized(JSContext* cx, MutableHandleValue v, bool* updated);
-#endif
 
 extern JS::Handle<PropertyName*> ClassName(JSProtoKey key, JSContext* cx);
 

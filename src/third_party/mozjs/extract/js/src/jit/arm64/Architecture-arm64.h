@@ -133,9 +133,9 @@ class Registers {
     xzr = 31,
     sp = 31,  // Special: both stack pointer and a zero register.
   };
-  typedef uint8_t Code;
-  typedef uint32_t Encoding;
-  typedef uint32_t SetType;
+  using Code = uint8_t;
+  using Encoding = uint32_t;
+  using SetType = uint32_t;
 
   static const Code Invalid = 0xFF;
 
@@ -216,7 +216,7 @@ class Registers {
 };
 
 // Smallest integer type that can hold a register bitmask.
-typedef uint32_t PackedRegisterMask;
+using PackedRegisterMask = uint32_t;
 
 template <typename T>
 class TypedRegisterSet;
@@ -424,9 +424,9 @@ class FloatRegisters {
   };
 
   // Eight bits: (invalid << 7) | (kind << 5) | encoding
-  typedef uint8_t Code;
-  typedef FPRegisterID Encoding;
-  typedef Bitset128 SetType;
+  using Code = uint8_t;
+  using Encoding = FPRegisterID;
+  using SetType = Bitset128;
 
   enum Kind : uint8_t { Single, Double, Simd128, NumTypes };
 
@@ -491,10 +491,10 @@ class FloatRegisters {
               (1 << FloatRegisters::s12) | (1 << FloatRegisters::s13) |
               (1 << FloatRegisters::s14) | (1 << FloatRegisters::s15));
 
+  // Note: only the bottom 64 bits of v8-v15 will be preserved.
   static constexpr SetType NonVolatileMask =
       (NonVolatileSingleMask << ShiftSingle) |
-      (NonVolatileSingleMask << ShiftDouble) |
-      (NonVolatileSingleMask << ShiftSimd128);
+      (NonVolatileSingleMask << ShiftDouble);
 
   static constexpr SetType VolatileMask = AllMask & ~NonVolatileMask;
 
@@ -561,10 +561,10 @@ static const uint32_t StackAlignment = 8;
 static const uint32_t NativeFrameSize = 8;
 
 struct FloatRegister {
-  typedef FloatRegisters Codes;
-  typedef Codes::Code Code;
-  typedef Codes::Encoding Encoding;
-  typedef Codes::SetType SetType;
+  using Codes = FloatRegisters;
+  using Code = Codes::Code;
+  using Encoding = Codes::Encoding;
+  using SetType = Codes::SetType;
 
   static uint32_t SetSize(SetType x) {
     static_assert(sizeof(SetType) == 16, "SetType must be 128 bits");
@@ -594,7 +594,7 @@ struct FloatRegister {
   uint8_t kind_;      // Double, Single, Simd128
   bool invalid_;
 
-  typedef Codes::Kind Kind;
+  using Kind = Codes::Kind;
 
  public:
   constexpr FloatRegister(Encoding encoding, Kind kind)

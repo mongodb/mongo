@@ -290,7 +290,7 @@ class IterableUnwindInfo {
         : mInfo(aInfo),
           mIndex(aIndex),
           mSlotsCount(aSlotsCount),
-          mIsValid(aIsValid){};
+          mIsValid(aIsValid) {};
 
     UnwindInfo& mInfo;
     uint8_t mIndex;

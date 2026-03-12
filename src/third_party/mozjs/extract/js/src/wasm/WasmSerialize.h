@@ -180,6 +180,7 @@ struct Coder<MODE_DECODE> {
   const uint8_t* end_;
 
   CoderResult readBytes(void* dest, size_t length);
+  CoderResult readBytesRef(size_t length, const uint8_t** bytesBegin);
 };
 
 // Macros to help types declare friendship with a coding function

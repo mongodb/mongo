@@ -14,7 +14,7 @@
  *  - ArenaList
  *  - FreeLists
  *  - ArenaLists
- *  - TenuredChunk
+ *  - ArenaChunk
  *  - ChunkPool
  */
 
@@ -23,6 +23,7 @@
 #include "gc/GCLock.h"
 #include "gc/Memory.h"
 #include "jit/Assembler.h"
+#include "threading/Thread.h"
 #include "vm/BigIntType.h"
 #include "vm/RegExpShared.h"
 #include "vm/Scope.h"
@@ -92,6 +93,31 @@ const uint8_t Arena::ThingsPerArena[] = {
 #undef EXPAND_THINGS_PER_ARENA
 };
 
+bool Arena::allocated() const {
+#if defined(DEBUG) && defined(MOZ_VALGRIND)
+  // In debug builds, valgrind complains about the access to `allocKind` even
+  // though it is legitimate, so temporarily disable reporting of addressing
+  // errors in that range.  Note this doesn't change the state of the address
+  // range, as tracked by valgrind, so subsequent checking against its state is
+  // unaffected.  See bug 1932412.
+  VALGRIND_DISABLE_ADDR_ERROR_REPORTING_IN_RANGE(&allocKind, sizeof(void*));
+#endif
+
+  size_t arenaIndex = ArenaChunk::arenaIndex(this);
+  size_t pageIndex = ArenaChunk::arenaToPageIndex(arenaIndex);
+  bool result = !chunk()->decommittedPages[pageIndex] &&
+                !chunk()->freeCommittedArenas[arenaIndex] &&
+                IsValidAllocKind(allocKind);
+  MOZ_ASSERT_IF(result, zone_);
+  MOZ_ASSERT_IF(result, (uintptr_t(zone_) & 7) == 0);
+
+#if defined(DEBUG) && defined(MOZ_VALGRIND)
+  // Reenable error reporting for the range we just said to ignore.
+  VALGRIND_ENABLE_ADDR_ERROR_REPORTING_IN_RANGE(&allocKind, sizeof(void*));
+#endif
+  return result;
+}
+
 void Arena::unmarkAll() {
   MarkBitmapWord* arenaBits = chunk()->markBits.arenaBits(this);
   for (size_t i = 0; i < ArenaBitmapWords; i++) {
@@ -140,6 +166,13 @@ void Arena::staticAsserts() {
                 "We haven't defined all offsets.");
   static_assert(std::size(ThingsPerArena) == AllocKindCount,
                 "We haven't defined all counts.");
+  static_assert(ArenaZoneOffset == offsetof(Arena, zone_),
+                "The hardcoded API zone offset must match the actual offset.");
+  static_assert(sizeof(Arena) == ArenaSize,
+                "ArenaSize must match the actual size of the Arena structure.");
+  static_assert(
+      offsetof(Arena, data) == ArenaHeaderSize,
+      "ArenaHeaderSize must match the actual size of the header fields.");
 }
 
 /* static */
@@ -155,33 +188,19 @@ void Arena::checkLookupTables() {
 
 #ifdef DEBUG
 void js::gc::ArenaList::dump() {
-  fprintf(stderr, "ArenaList %p:", this);
-  if (cursorp_ == &head_) {
-    fprintf(stderr, " *");
-  }
-  for (Arena* arena = head(); arena; arena = arena->next) {
-    fprintf(stderr, " %p", arena);
-    if (cursorp_ == &arena->next) {
-      fprintf(stderr, " *");
+  fprintf(stderr, "ArenaList %p:\n", this);
+  for (auto arena = iter(); !arena.done(); arena.next()) {
+    fprintf(stderr, "  %p %zu", arena.get(), arena->countFreeCells());
+    if (arena->isEmpty()) {
+      fprintf(stderr, " (empty)");
     }
+    if (arena->isFull()) {
+      fprintf(stderr, " (full)");
+    }
+    fprintf(stderr, "\n");
   }
-  fprintf(stderr, "\n");
 }
 #endif
-
-Arena* ArenaList::removeRemainingArenas(Arena** arenap) {
-  // This is only ever called to remove arenas that are after the cursor, so
-  // we don't need to update it.
-#ifdef DEBUG
-  for (Arena* arena = *arenap; arena; arena = arena->next) {
-    MOZ_ASSERT(cursorp_ != &arena->next);
-  }
-#endif
-  Arena* remainingArenas = *arenap;
-  *arenap = nullptr;
-  check();
-  return remainingArenas;
-}
 
 AutoGatherSweptArenas::AutoGatherSweptArenas(JS::Zone* zone, AllocKind kind) {
   GCRuntime& gc = zone->runtimeFromMainThread()->gc;
@@ -196,13 +215,13 @@ AutoGatherSweptArenas::AutoGatherSweptArenas(JS::Zone* zone, AllocKind kind) {
 }
 
 AutoGatherSweptArenas::~AutoGatherSweptArenas() {
-  if (sortedList) {
-    sortedList->restoreFromArenaList(linked, bucketLastPointers);
+  if (!sortedList) {
+    MOZ_ASSERT(linked.isEmpty());
+    return;
   }
-  linked.clear();
-}
 
-Arena* AutoGatherSweptArenas::sweptArenas() const { return linked.head(); }
+  sortedList->restoreFromArenaList(linked, bucketLastPointers);
+}
 
 FreeLists::FreeLists() {
   for (auto i : AllAllocKinds()) {
@@ -220,20 +239,6 @@ ArenaLists::ArenaLists(Zone* zone)
   }
 }
 
-void ReleaseArenas(JSRuntime* rt, Arena* arena, const AutoLockGC& lock) {
-  Arena* next;
-  for (; arena; arena = next) {
-    next = arena->next;
-    rt->gc.releaseArena(arena, lock);
-  }
-}
-
-void ReleaseArenaList(JSRuntime* rt, ArenaList& arenaList,
-                      const AutoLockGC& lock) {
-  ReleaseArenas(rt, arenaList.head(), lock);
-  arenaList.clear();
-}
-
 ArenaLists::~ArenaLists() {
   AutoLockGC lock(runtime());
 
@@ -243,10 +248,10 @@ ArenaLists::~ArenaLists() {
      * the background finalization is disabled.
      */
     MOZ_ASSERT(concurrentUse(i) == ConcurrentUse::None);
-    ReleaseArenaList(runtime(), arenaList(i), lock);
+    runtime()->gc.releaseArenaList(arenaList(i), lock);
   }
 
-  ReleaseArenas(runtime(), savedEmptyArenas, lock);
+  runtime()->gc.releaseArenas(savedEmptyArenas, lock);
 }
 
 void ArenaLists::moveArenasToCollectingLists() {
@@ -260,8 +265,7 @@ void ArenaLists::moveArenasToCollectingLists() {
 
 void ArenaLists::mergeArenasFromCollectingLists() {
   for (AllocKind kind : AllAllocKinds()) {
-    collectingArenaList(kind).insertListWithCursorAtEnd(arenaList(kind));
-    arenaList(kind) = std::move(collectingArenaList(kind));
+    arenaList(kind).prepend(std::move(collectingArenaList(kind)));
     MOZ_ASSERT(collectingArenaList(kind).isEmpty());
   }
 }
@@ -312,12 +316,12 @@ void ArenaLists::checkNoArenasToUpdateForKind(AllocKind kind) {
 #endif
 }
 
-inline bool TenuredChunk::canDecommitPage(size_t pageIndex) const {
+inline bool ArenaChunk::canDecommitPage(size_t pageIndex) const {
   if (decommittedPages[pageIndex]) {
     return false;
   }
 
-  size_t arenaIndex = pageIndex * ArenasPerPage;
+  size_t arenaIndex = pageToArenaIndex(pageIndex);
   for (size_t i = 0; i < ArenasPerPage; i++) {
     if (!freeCommittedArenas[arenaIndex + i]) {
       return false;
@@ -327,89 +331,89 @@ inline bool TenuredChunk::canDecommitPage(size_t pageIndex) const {
   return true;
 }
 
-void TenuredChunk::decommitFreeArenas(GCRuntime* gc, const bool& cancel,
-                                      AutoLockGC& lock) {
+void ArenaChunk::decommitFreeArenas(GCRuntime* gc, const bool& cancel,
+                                    AutoLockGC& lock) {
   MOZ_ASSERT(DecommitEnabled());
+  MOZ_ASSERT(!info.isCurrentChunk);
 
   for (size_t i = 0; i < PagesPerChunk; i++) {
     if (cancel) {
       break;
     }
 
-    if (canDecommitPage(i) && !decommitOneFreePage(gc, i, lock)) {
+    if (!canDecommitPage(i)) {
+      continue;
+    }
+
+    if (!decommitOneFreePage(gc, i, lock)) {
+      break;
+    }
+
+    {
+      // Give main thread a chance to take the lock.
+      AutoUnlockGC unlock(lock);
+      ThisThread::SleepMilliseconds(0);
+    }
+
+    // Re-check whether the chunk is being used for allocation after releasing
+    // the lock.
+    if (info.isCurrentChunk) {
       break;
     }
   }
 }
 
-void TenuredChunk::recycleArena(Arena* arena, SortedArenaList& dest,
-                                size_t thingsPerArena) {
-  arena->setAsFullyUnused();
-  dest.insertAt(arena, thingsPerArena);
-}
+void ArenaChunk::releaseArena(GCRuntime* gc, Arena* arena,
+                              const AutoLockGC& lock) {
+  if (info.isCurrentChunk) {
+    // The main thread is allocating out of this chunk without holding the
+    // lock. Don't touch any data structures it is using but add the arena to a
+    // pending set. This will be merged back by mergePendingFreeArenas.
+    auto& bitmap = gc->pendingFreeCommittedArenas.ref();
+    MOZ_ASSERT(!bitmap[arenaIndex(arena)]);
+    bitmap[arenaIndex(arena)] = true;
+    return;
+  }
 
-void TenuredChunk::releaseArena(GCRuntime* gc, Arena* arena,
-                                const AutoLockGC& lock) {
   MOZ_ASSERT(!arena->allocated());
   MOZ_ASSERT(!freeCommittedArenas[arenaIndex(arena)]);
 
   freeCommittedArenas[arenaIndex(arena)] = true;
-  ++info.numArenasFreeCommitted;
-  ++info.numArenasFree;
-  gc->updateOnArenaFree();
+  updateFreeCountsAfterFree(gc, 1, true, lock);
 
   verify();
-
-  updateChunkListAfterFree(gc, 1, lock);
 }
 
-bool TenuredChunk::decommitOneFreePage(GCRuntime* gc, size_t pageIndex,
-                                       AutoLockGC& lock) {
+bool ArenaChunk::decommitOneFreePage(GCRuntime* gc, size_t pageIndex,
+                                     const AutoLockGC& lock) {
   MOZ_ASSERT(DecommitEnabled());
   MOZ_ASSERT(canDecommitPage(pageIndex));
+  MOZ_ASSERT(info.numArenasFree >= info.numArenasFreeCommitted);
   MOZ_ASSERT(info.numArenasFreeCommitted >= ArenasPerPage);
 
-  // Temporarily mark the page as allocated while we decommit.
+  if (oom::ShouldFailWithOOM()) {
+    return false;
+  }
+
+  if (!MarkPagesUnusedSoft(pageAddress(pageIndex), PageSize)) {
+    return false;
+  }
+
+  // Mark the page as decommited.
+  decommittedPages[pageIndex] = true;
   for (size_t i = 0; i < ArenasPerPage; i++) {
-    size_t arenaIndex = pageIndex * ArenasPerPage + i;
+    size_t arenaIndex = pageToArenaIndex(pageIndex) + i;
     MOZ_ASSERT(freeCommittedArenas[arenaIndex]);
     freeCommittedArenas[arenaIndex] = false;
   }
   info.numArenasFreeCommitted -= ArenasPerPage;
-  info.numArenasFree -= ArenasPerPage;
-  updateChunkListAfterAlloc(gc, lock);
 
   verify();
 
-  bool ok;
-  {
-    AutoUnlockGC unlock(lock);
-    ok = !oom::ShouldFailWithOOM() &&
-         MarkPagesUnusedSoft(pageAddress(pageIndex), PageSize);
-  }
-
-  // Mark the page as decommited if successful or restore the original free
-  // state.
-  if (ok) {
-    decommittedPages[pageIndex] = true;
-  } else {
-    for (size_t i = 0; i < ArenasPerPage; i++) {
-      size_t arenaIndex = pageIndex * ArenasPerPage + i;
-      MOZ_ASSERT(!freeCommittedArenas[arenaIndex]);
-      freeCommittedArenas[arenaIndex] = true;
-    }
-    info.numArenasFreeCommitted += ArenasPerPage;
-  }
-
-  info.numArenasFree += ArenasPerPage;
-  updateChunkListAfterFree(gc, ArenasPerPage, lock);
-
-  verify();
-
-  return ok;
+  return true;
 }
 
-void TenuredChunk::decommitFreeArenasWithoutUnlocking(const AutoLockGC& lock) {
+void ArenaChunk::decommitFreeArenasWithoutUnlocking(const AutoLockGC& lock) {
   MOZ_ASSERT(DecommitEnabled());
 
   for (size_t i = 0; i < PagesPerChunk; i++) {
@@ -427,7 +431,7 @@ void TenuredChunk::decommitFreeArenasWithoutUnlocking(const AutoLockGC& lock) {
 
     decommittedPages[i] = true;
     for (size_t j = 0; j < ArenasPerPage; ++j) {
-      size_t arenaIndex = i * ArenasPerPage + j;
+      size_t arenaIndex = pageToArenaIndex(i) + j;
       MOZ_ASSERT(freeCommittedArenas[arenaIndex]);
       freeCommittedArenas[arenaIndex] = false;
     }
@@ -437,29 +441,138 @@ void TenuredChunk::decommitFreeArenasWithoutUnlocking(const AutoLockGC& lock) {
   verify();
 }
 
-void TenuredChunk::updateChunkListAfterAlloc(GCRuntime* gc,
-                                             const AutoLockGC& lock) {
-  if (MOZ_UNLIKELY(!hasAvailableArenas())) {
+void ArenaChunk::updateFreeCountsAfterAlloc(GCRuntime* gc,
+                                            size_t numArenasAlloced,
+                                            const AutoLockGC& lock) {
+  MOZ_ASSERT(!info.isCurrentChunk);
+  MOZ_ASSERT(numArenasAlloced > 0);
+
+  bool wasEmpty = isEmpty();
+
+  MOZ_ASSERT(info.numArenasFree >= numArenasAlloced);
+  MOZ_ASSERT(info.numArenasFreeCommitted >= numArenasAlloced);
+  info.numArenasFreeCommitted -= numArenasAlloced;
+  info.numArenasFree -= numArenasAlloced;
+
+  if (MOZ_UNLIKELY(wasEmpty)) {
+    gc->emptyChunks(lock).remove(this);
+    gc->availableChunks(lock).push(this);
+    return;
+  }
+
+  if (MOZ_UNLIKELY(isFull())) {
     gc->availableChunks(lock).remove(this);
     gc->fullChunks(lock).push(this);
+    return;
+  }
+
+  MOZ_ASSERT(gc->availableChunks(lock).contains(this));
+}
+
+void ArenaChunk::updateCurrentChunkAfterAlloc(GCRuntime* gc) {
+  MOZ_ASSERT(info.isCurrentChunk);  // Can access without holding lock.
+  MOZ_ASSERT(gc->isCurrentChunk(this));
+
+  MOZ_ASSERT(info.numArenasFree >= 1);
+  MOZ_ASSERT(info.numArenasFreeCommitted >= 1);
+  info.numArenasFreeCommitted--;
+  info.numArenasFree--;
+
+  if (MOZ_UNLIKELY(isFull())) {
+    AutoLockGC lock(gc);
+    mergePendingFreeArenas(gc, lock);
+    if (isFull()) {
+      gc->clearCurrentChunk(lock);
+    }
   }
 }
 
-void TenuredChunk::updateChunkListAfterFree(GCRuntime* gc, size_t numArenasFree,
-                                            const AutoLockGC& lock) {
-  if (info.numArenasFree == numArenasFree) {
+void ArenaChunk::updateFreeCountsAfterFree(GCRuntime* gc, size_t numArenasFreed,
+                                           bool wasCommitted,
+                                           const AutoLockGC& lock) {
+  MOZ_ASSERT(!info.isCurrentChunk);
+  MOZ_ASSERT(numArenasFreed > 0);
+  MOZ_ASSERT(info.numArenasFree + numArenasFreed <= ArenasPerChunk);
+  MOZ_ASSERT(info.numArenasFreeCommitted + numArenasFreed <= ArenasPerChunk);
+
+  bool wasFull = isFull();
+
+  info.numArenasFree += numArenasFreed;
+  if (wasCommitted) {
+    info.numArenasFreeCommitted += numArenasFreed;
+  }
+
+  if (MOZ_UNLIKELY(wasFull)) {
     gc->fullChunks(lock).remove(this);
     gc->availableChunks(lock).push(this);
-  } else if (!unused()) {
-    MOZ_ASSERT(gc->availableChunks(lock).contains(this));
-  } else {
-    MOZ_ASSERT(unused());
+    return;
+  }
+
+  if (MOZ_UNLIKELY(isEmpty())) {
     gc->availableChunks(lock).remove(this);
     gc->recycleChunk(this, lock);
+    return;
   }
+
+  MOZ_ASSERT(gc->availableChunks(lock).contains(this));
 }
 
-TenuredChunk* ChunkPool::pop() {
+void GCRuntime::setCurrentChunk(ArenaChunk* chunk, const AutoLockGC& lock) {
+  MOZ_ASSERT(!currentChunk_);
+  MOZ_ASSERT(pendingFreeCommittedArenas.ref().IsEmpty());
+  MOZ_ASSERT(chunk);
+  MOZ_ASSERT(!chunk->info.isCurrentChunk);
+
+  currentChunk_ = chunk;
+  chunk->info.isCurrentChunk = true;  // Lock needed here.
+}
+
+void GCRuntime::clearCurrentChunk(const AutoLockGC& lock) {
+  MOZ_ASSERT(CurrentThreadCanAccessRuntime(rt));
+
+  ArenaChunk* chunk = currentChunk_;
+  if (!chunk) {
+    return;
+  }
+
+  chunk->mergePendingFreeArenas(this, lock);
+
+  MOZ_ASSERT(chunk->info.isCurrentChunk);
+  chunk->info.isCurrentChunk = false;  // Lock needed here.
+  currentChunk_ = nullptr;
+
+  if (chunk->isFull()) {
+    fullChunks(lock).push(chunk);
+    return;
+  }
+
+  if (chunk->isEmpty()) {
+    emptyChunks(lock).push(chunk);
+    return;
+  }
+
+  MOZ_ASSERT(chunk->hasAvailableArenas());
+  availableChunks(lock).push(chunk);
+}
+
+void ArenaChunk::mergePendingFreeArenas(GCRuntime* gc, const AutoLockGC& lock) {
+  MOZ_ASSERT(info.isCurrentChunk);
+
+  auto& bitmap = gc->pendingFreeCommittedArenas.ref();
+  if (bitmap.IsEmpty()) {
+    return;
+  }
+
+  MOZ_ASSERT((freeCommittedArenas & bitmap).IsEmpty());
+  size_t count = bitmap.Count();
+  freeCommittedArenas |= bitmap;
+  bitmap.ResetAll();
+
+  info.numArenasFree += count;
+  info.numArenasFreeCommitted += count;
+}
+
+ArenaChunk* ChunkPool::pop() {
   MOZ_ASSERT(bool(head_) == bool(count_));
   if (!count_) {
     return nullptr;
@@ -467,7 +580,7 @@ TenuredChunk* ChunkPool::pop() {
   return remove(head_);
 }
 
-void ChunkPool::push(TenuredChunk* chunk) {
+void ChunkPool::push(ArenaChunk* chunk) {
   MOZ_ASSERT(!chunk->info.next);
   MOZ_ASSERT(!chunk->info.prev);
 
@@ -479,7 +592,7 @@ void ChunkPool::push(TenuredChunk* chunk) {
   ++count_;
 }
 
-TenuredChunk* ChunkPool::remove(TenuredChunk* chunk) {
+ArenaChunk* ChunkPool::remove(ArenaChunk* chunk) {
   MOZ_ASSERT(count_ > 0);
   MOZ_ASSERT(contains(chunk));
 
@@ -507,8 +620,8 @@ void ChunkPool::sort() {
     head_ = mergeSort(head(), count());
 
     // Fixup prev pointers.
-    TenuredChunk* prev = nullptr;
-    for (TenuredChunk* cur = head_; cur; cur = cur->info.next) {
+    ArenaChunk* prev = nullptr;
+    for (ArenaChunk* cur = head_; cur; cur = cur->info.next) {
       cur->info.prev = prev;
       prev = cur;
     }
@@ -518,7 +631,7 @@ void ChunkPool::sort() {
   MOZ_ASSERT(isSorted());
 }
 
-TenuredChunk* ChunkPool::mergeSort(TenuredChunk* list, size_t count) {
+ArenaChunk* ChunkPool::mergeSort(ArenaChunk* list, size_t count) {
   MOZ_ASSERT(bool(list) == bool(count));
 
   if (count < 2) {
@@ -528,10 +641,10 @@ TenuredChunk* ChunkPool::mergeSort(TenuredChunk* list, size_t count) {
   size_t half = count / 2;
 
   // Split;
-  TenuredChunk* front = list;
-  TenuredChunk* back;
+  ArenaChunk* front = list;
+  ArenaChunk* back;
   {
-    TenuredChunk* cur = list;
+    ArenaChunk* cur = list;
     for (size_t i = 0; i < half - 1; i++) {
       MOZ_ASSERT(cur);
       cur = cur->info.next;
@@ -545,7 +658,7 @@ TenuredChunk* ChunkPool::mergeSort(TenuredChunk* list, size_t count) {
 
   // Merge
   list = nullptr;
-  TenuredChunk** cur = &list;
+  ArenaChunk** cur = &list;
   while (front || back) {
     if (!front) {
       *cur = back;
@@ -574,7 +687,7 @@ TenuredChunk* ChunkPool::mergeSort(TenuredChunk* list, size_t count) {
 
 bool ChunkPool::isSorted() const {
   uint32_t last = 1;
-  for (TenuredChunk* cursor = head_; cursor; cursor = cursor->info.next) {
+  for (ArenaChunk* cursor = head_; cursor; cursor = cursor->info.next) {
     if (cursor->info.numArenasFree < last) {
       return false;
     }
@@ -585,9 +698,9 @@ bool ChunkPool::isSorted() const {
 
 #ifdef DEBUG
 
-bool ChunkPool::contains(TenuredChunk* chunk) const {
+bool ChunkPool::contains(ArenaChunk* chunk) const {
   verify();
-  for (TenuredChunk* cursor = head_; cursor; cursor = cursor->info.next) {
+  for (ArenaChunk* cursor = head_; cursor; cursor = cursor->info.next) {
     if (cursor == chunk) {
       return true;
     }
@@ -598,7 +711,7 @@ bool ChunkPool::contains(TenuredChunk* chunk) const {
 bool ChunkPool::verify() const {
   MOZ_ASSERT(bool(head_) == bool(count_));
   uint32_t count = 0;
-  for (TenuredChunk* cursor = head_; cursor;
+  for (ArenaChunk* cursor = head_; cursor;
        cursor = cursor->info.next, ++count) {
     MOZ_ASSERT_IF(cursor->info.prev, cursor->info.prev->info.next == cursor);
     MOZ_ASSERT_IF(cursor->info.next, cursor->info.next->info.prev == cursor);
@@ -608,19 +721,20 @@ bool ChunkPool::verify() const {
 }
 
 void ChunkPool::verifyChunks() const {
-  for (TenuredChunk* chunk = head_; chunk; chunk = chunk->info.next) {
+  for (ArenaChunk* chunk = head_; chunk; chunk = chunk->info.next) {
     chunk->verify();
+    MOZ_ASSERT(!chunk->info.isCurrentChunk);
   }
 }
 
-void TenuredChunk::verify() const {
+void ArenaChunk::verify() const {
   // Check the mark bits for each arena are aligned to the cache line size.
-  static_assert((offsetof(TenuredChunk, arenas) % ArenaSize) == 0);
+  static_assert((offsetof(ArenaChunk, arenas) % ArenaSize) == 0);
   constexpr size_t CellBytesPerMarkByte = CellBytesPerMarkBit * 8;
   static_assert((ArenaSize % CellBytesPerMarkByte) == 0);
   constexpr size_t MarkBytesPerArena = ArenaSize / CellBytesPerMarkByte;
   static_assert((MarkBytesPerArena % TypicalCacheLineSize) == 0);
-  static_assert((offsetof(TenuredChunk, markBits) % TypicalCacheLineSize) == 0);
+  static_assert((offsetof(ArenaChunk, markBits) % TypicalCacheLineSize) == 0);
 
   MOZ_ASSERT(info.numArenasFree <= ArenasPerChunk);
   MOZ_ASSERT(info.numArenasFreeCommitted <= info.numArenasFree);
@@ -633,8 +747,8 @@ void TenuredChunk::verify() const {
   MOZ_ASSERT(freeCommittedCount == info.numArenasFreeCommitted);
 
   for (size_t i = 0; i < ArenasPerChunk; ++i) {
-    MOZ_ASSERT(!(decommittedPages[pageIndex(i)] && freeCommittedArenas[i]));
-    MOZ_ASSERT_IF(freeCommittedArenas[i], !arenas[i].allocated());
+    MOZ_ASSERT(
+        !(decommittedPages[arenaToPageIndex(i)] && freeCommittedArenas[i]));
   }
 }
 

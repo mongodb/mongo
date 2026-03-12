@@ -94,7 +94,7 @@ class SparseBitmap {
   // are in |other|.
   static size_t wordIntersectCount(size_t blockWord, const DenseBitmap& other) {
     long count = other.numWords() - blockWord;
-    return std::min<size_t>((size_t)WordsInBlock, std::max<long>(count, 0));
+    return static_cast<size_t>(std::clamp(count, 0l, (long)WordsInBlock));
   }
 
   BitBlock& createBlock(Data::AddPtr p, size_t blockId,

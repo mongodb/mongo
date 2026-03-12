@@ -15,7 +15,6 @@ namespace js {
 namespace jit {
 
 class CodeGeneratorARM;
-class OutOfLineBailout;
 class OutOfLineTableSwitch;
 
 using OutOfLineWasmTruncateCheck =
@@ -25,7 +24,8 @@ class CodeGeneratorARM : public CodeGeneratorShared {
   friend class MoveResolverARM;
 
  protected:
-  CodeGeneratorARM(MIRGenerator* gen, LIRGraph* graph, MacroAssembler* masm);
+  CodeGeneratorARM(MIRGenerator* gen, LIRGraph* graph, MacroAssembler* masm,
+                   const wasm::CodeMetadata* wasmCodeMeta);
 
   NonAssertingLabel deoptLabel_;
 
@@ -74,37 +74,13 @@ class CodeGeneratorARM : public CodeGeneratorShared {
   void emitBranch(Assembler::Condition cond, MBasicBlock* ifTrue,
                   MBasicBlock* ifFalse);
 
-  void testNullEmitBranch(Assembler::Condition cond, const ValueOperand& value,
-                          MBasicBlock* ifTrue, MBasicBlock* ifFalse) {
-    cond = masm.testNull(cond, value);
-    emitBranch(cond, ifTrue, ifFalse);
-  }
-  void testUndefinedEmitBranch(Assembler::Condition cond,
-                               const ValueOperand& value, MBasicBlock* ifTrue,
-                               MBasicBlock* ifFalse) {
-    cond = masm.testUndefined(cond, value);
-    emitBranch(cond, ifTrue, ifFalse);
-  }
-  void testObjectEmitBranch(Assembler::Condition cond,
-                            const ValueOperand& value, MBasicBlock* ifTrue,
-                            MBasicBlock* ifFalse) {
-    cond = masm.testObject(cond, value);
-    emitBranch(cond, ifTrue, ifFalse);
-  }
-  void testZeroEmitBranch(Assembler::Condition cond, Register reg,
-                          MBasicBlock* ifTrue, MBasicBlock* ifFalse) {
-    MOZ_ASSERT(cond == Assembler::Equal || cond == Assembler::NotEqual);
-    masm.cmpPtr(reg, ImmWord(0));
-    emitBranch(cond, ifTrue, ifFalse);
-  }
-
   void emitTableSwitchDispatch(MTableSwitch* mir, Register index,
                                Register base);
 
-  void emitBigIntDiv(LBigIntDiv* ins, Register dividend, Register divisor,
-                     Register output, Label* fail);
-  void emitBigIntMod(LBigIntMod* ins, Register dividend, Register divisor,
-                     Register output, Label* fail);
+  void emitBigIntPtrDiv(LBigIntPtrDiv* ins, Register dividend, Register divisor,
+                        Register output);
+  void emitBigIntPtrMod(LBigIntPtrMod* ins, Register dividend, Register divisor,
+                        Register output);
 
   template <typename T>
   void emitWasmLoad(T* ins);
@@ -115,13 +91,7 @@ class CodeGeneratorARM : public CodeGeneratorShared {
   template <typename T>
   void emitWasmUnalignedStore(T* ins);
 
-  ValueOperand ToValue(LInstruction* ins, size_t pos);
-  ValueOperand ToTempValue(LInstruction* ins, size_t pos);
-
-  Register64 ToOperandOrRegister64(const LInt64Allocation input);
-
-  // Functions for LTestVAndBranch.
-  void splitTagForTest(const ValueOperand& value, ScratchTagScope& tag);
+  Register64 ToOperandOrRegister64(const LInt64Allocation& input);
 
   void divICommon(MDiv* mir, Register lhs, Register rhs, Register output,
                   LSnapshot* snapshot, Label& done);
@@ -144,27 +114,13 @@ class CodeGeneratorARM : public CodeGeneratorShared {
                                   Register flagTemp);
 
  public:
-  void visitOutOfLineBailout(OutOfLineBailout* ool);
+  void emitBailoutOOL(LSnapshot* snapshot);
+
   void visitOutOfLineTableSwitch(OutOfLineTableSwitch* ool);
   void visitOutOfLineWasmTruncateCheck(OutOfLineWasmTruncateCheck* ool);
 };
 
-typedef CodeGeneratorARM CodeGeneratorSpecific;
-
-// An out-of-line bailout thunk.
-class OutOfLineBailout : public OutOfLineCodeBase<CodeGeneratorARM> {
- protected:  // Silence Clang warning.
-  LSnapshot* snapshot_;
-  uint32_t frameSize_;
-
- public:
-  OutOfLineBailout(LSnapshot* snapshot, uint32_t frameSize)
-      : snapshot_(snapshot), frameSize_(frameSize) {}
-
-  void accept(CodeGeneratorARM* codegen) override;
-
-  LSnapshot* snapshot() const { return snapshot_; }
-};
+using CodeGeneratorSpecific = CodeGeneratorARM;
 
 }  // namespace jit
 }  // namespace js

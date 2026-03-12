@@ -25,7 +25,9 @@ enum class ABIType {
   // A 32-bit floating point number
   Float32 = 0x4,
   // A 64-bit floating point number
-  Float64 = 0x5
+  Float64 = 0x5,
+  // No result
+  Void = 0x6,
 };
 
 const size_t ABITypeArgShift = 0x3;

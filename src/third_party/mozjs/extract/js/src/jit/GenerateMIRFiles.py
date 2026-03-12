@@ -5,8 +5,9 @@
 # This script generates jit/MIROpsGenerated.h (list of MIR instructions)
 # from MIROps.yaml, as well as MIR op definitions.
 
+import io
+
 import buildconfig
-import six
 import yaml
 from mozbuild.preprocessor import Preprocessor
 
@@ -41,7 +42,7 @@ def load_yaml(yaml_path):
     # the YAML file.
     pp = Preprocessor()
     pp.context.update(buildconfig.defines["ALLDEFINES"])
-    pp.out = six.StringIO()
+    pp.out = io.StringIO()
     pp.do_filter("substitution")
     pp.do_include(yaml_path)
     contents = pp.out.getvalue()
@@ -53,6 +54,7 @@ type_policies = {
     "Value": "BoxPolicy",
     "Int32": "UnboxedInt32Policy",
     "BigInt": "BigIntPolicy",
+    "IntPtr": "IntPtrPolicy",
     "Boolean": "BooleanPolicy",
     "Double": "DoublePolicy",
     "String": "StringPolicy",
@@ -65,13 +67,13 @@ def decide_type_policy(types, no_type_policy):
         return "public NoTypePolicy::Data"
 
     if len(types) == 1:
-        return "public {}<0>::Data".format(type_policies[types[0]])
+        return f"public {type_policies[types[0]]}<0>::Data"
 
     type_num = 0
     mixed_type_policies = []
     for mir_type in types:
         policy = type_policies[mir_type]
-        mixed_type_policies.append("{}<{}>".format(policy, type_num))
+        mixed_type_policies.append(f"{policy}<{type_num}>")
         type_num += 1
 
     return "public MixPolicy<{}>::Data".format(", ".join(mixed_type_policies))
@@ -165,7 +167,7 @@ def gen_mir_class(
             # ops type policy.
             mir_types.append(operands[oper_name])
             # Collecting named operands for defining accessors.
-            named_operands.append("({}, {})".format(current_oper_num, oper_name))
+            named_operands.append(f"({current_oper_num}, {oper_name})")
             current_oper_num += 1
         type_policy = decide_type_policy(mir_types, no_type_policy)
 
@@ -177,7 +179,7 @@ def gen_mir_class(
     if base_class != "MNullaryInstruction":
         assert type_policy
         type_policy = ", " + type_policy
-    code = "class {} : public {}{} {{\\\n".format(class_name, base_class, type_policy)
+    code = f"class {class_name} : public {base_class}{type_policy} {{\\\n"
 
     # Arguments to class constructor that require accessors.
     mir_args = []
@@ -206,13 +208,13 @@ def gen_mir_class(
     if movable:
         code += "    setMovable();\\\n"
     if result:
-        code += "    setResultType(MIRType::{});\\\n".format(result)
+        code += f"    setResultType(MIRType::{result});\\\n"
     code += "  }\\\n public:\\\n"
     if arguments:
         for arg_name in arguments:
             code += "  " + arguments[arg_name] + " " + arg_name + "() const { "
             code += "return " + arg_name + "_; }\\\n"
-    code += "  INSTRUCTION_HEADER({})\\\n".format(name)
+    code += f"  INSTRUCTION_HEADER({name})\\\n"
     code += "  TRIVIAL_NEW_WRAPPERS\\\n"
     if named_operands:
         code += "  NAMED_OPERANDS({})\\\n".format(", ".join(named_operands))
@@ -300,7 +302,7 @@ def generate_mir_header(c_out, yaml_path):
     for op in data:
         name = op["name"]
 
-        ops_items.append("_({})".format(name))
+        ops_items.append(f"_({name})")
 
         gen_boilerplate = op.get("gen_boilerplate", True)
         assert isinstance(gen_boilerplate, bool)

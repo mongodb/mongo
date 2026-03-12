@@ -28,17 +28,15 @@ class MacroAssemblerX86Shared : public Assembler {
 
  public:
 #ifdef JS_CODEGEN_X64
-  typedef X86Encoding::JmpSrc UsesItem;
+  using UsesItem = X86Encoding::JmpSrc;
 #else
-  typedef CodeOffset UsesItem;
+  using UsesItem = CodeOffset;
 #endif
 
-  typedef Vector<UsesItem, 0, SystemAllocPolicy> UsesVector;
+  using UsesVector = Vector<UsesItem, 0, SystemAllocPolicy>;
   static_assert(sizeof(UsesItem) == 4);
 
  protected:
-  // For Double, Float and SimdData, make the move ctors explicit so that MSVC
-  // knows what to use instead of copying these data structures.
   template <class T>
   struct Constant {
     using Pod = T;
@@ -47,9 +45,10 @@ class MacroAssemblerX86Shared : public Assembler {
     UsesVector uses;
 
     explicit Constant(const T& value) : value(value) {}
-    Constant(Constant<T>&& other)
-        : value(other.value), uses(std::move(other.uses)) {}
-    explicit Constant(const Constant<T>&) = delete;
+
+    // Allow move operations, but not copying.
+    Constant(Constant<T>&&) = default;
+    Constant(const Constant<T>&) = delete;
   };
 
   // Containers use SystemAllocPolicy since wasm releases memory after each
@@ -57,14 +56,14 @@ class MacroAssemblerX86Shared : public Assembler {
   // are compiled.
   using Double = Constant<double>;
   Vector<Double, 0, SystemAllocPolicy> doubles_;
-  typedef HashMap<double, size_t, DefaultHasher<double>, SystemAllocPolicy>
-      DoubleMap;
+  using DoubleMap =
+      HashMap<double, size_t, DefaultHasher<double>, SystemAllocPolicy>;
   DoubleMap doubleMap_;
 
   using Float = Constant<float>;
   Vector<Float, 0, SystemAllocPolicy> floats_;
-  typedef HashMap<float, size_t, DefaultHasher<float>, SystemAllocPolicy>
-      FloatMap;
+  using FloatMap =
+      HashMap<float, size_t, DefaultHasher<float>, SystemAllocPolicy>;
   FloatMap floatMap_;
 
   struct SimdData : public Constant<SimdConstant> {
@@ -75,8 +74,8 @@ class MacroAssemblerX86Shared : public Assembler {
   };
 
   Vector<SimdData, 0, SystemAllocPolicy> simds_;
-  typedef HashMap<SimdConstant, size_t, SimdConstant, SystemAllocPolicy>
-      SimdMap;
+  using SimdMap =
+      HashMap<SimdConstant, size_t, SimdConstant, SystemAllocPolicy>;
   SimdMap simdMap_;
 
   template <class T, class Map>
@@ -398,6 +397,37 @@ class MacroAssemblerX86Shared : public Assembler {
     vcvtsd2ss(src, dest, dest);
   }
 
+  void convertDoubleToFloat16(FloatRegister src, FloatRegister dest) {
+    MOZ_CRASH("Not supported for this target");
+  }
+  void convertFloat16ToDouble(FloatRegister src, FloatRegister dest) {
+    convertFloat16ToFloat32(src, dest);
+    convertFloat32ToDouble(dest, dest);
+  }
+  void convertFloat32ToFloat16(FloatRegister src, FloatRegister dest) {
+    vcvtps2ph(src, dest);
+  }
+  void convertFloat16ToFloat32(FloatRegister src, FloatRegister dest) {
+    // Zero extend word to quadword. This ensures all high words in the result
+    // are zeroed after vcvtph2ps.
+    vpmovzxwq(Operand(src), dest);
+
+    // Convert Float16 to Float32.
+    vcvtph2ps(dest, dest);
+  }
+  void convertInt32ToFloat16(Register src, FloatRegister dest) {
+    // Clear the output register first to break dependencies; see above;
+    //
+    // This also ensures all high words in the result are zeroed.
+    zeroFloat32(dest);
+
+    // Convert Int32 to Float32.
+    vcvtsi2ss(src, dest, dest);
+
+    // Convert Float32 to Float16.
+    vcvtps2ph(dest, dest);
+  }
+
   void loadInt32x4(const Address& addr, FloatRegister dest) {
     vmovdqa(Operand(addr), dest);
   }
@@ -589,23 +619,8 @@ class MacroAssemblerX86Shared : public Assembler {
 
   // SIMD inline methods private to the implementation, that appear to be used.
 
-  template <class T, class Reg>
-  inline void loadScalar(const Operand& src, Reg dest);
-  template <class T, class Reg>
-  inline void storeScalar(Reg src, const Address& dest);
-  template <class T>
-  inline void loadAlignedVector(const Address& src, FloatRegister dest);
-  template <class T>
-  inline void storeAlignedVector(FloatRegister src, const Address& dest);
-
-  void loadAlignedSimd128Int(const Address& src, FloatRegister dest) {
-    vmovdqa(Operand(src), dest);
-  }
   void loadAlignedSimd128Int(const Operand& src, FloatRegister dest) {
     vmovdqa(src, dest);
-  }
-  void storeAlignedSimd128Int(FloatRegister src, const Address& dest) {
-    vmovdqa(src, Operand(dest));
   }
   void moveSimd128Int(FloatRegister src, FloatRegister dest) {
     if (src != dest) {
@@ -752,22 +767,6 @@ class MacroAssemblerX86Shared : public Assembler {
   void moveHighPairToLowPairFloat32(FloatRegister src, FloatRegister dest) {
     vmovhlps(src, dest, dest);
   }
-  void moveFloatAsDouble(Register src, FloatRegister dest) {
-    vmovd(src, dest);
-    vcvtss2sd(dest, dest, dest);
-  }
-  void loadFloatAsDouble(const Address& src, FloatRegister dest) {
-    vmovss(src, dest);
-    vcvtss2sd(dest, dest, dest);
-  }
-  void loadFloatAsDouble(const BaseIndex& src, FloatRegister dest) {
-    vmovss(src, dest);
-    vcvtss2sd(dest, dest, dest);
-  }
-  void loadFloatAsDouble(const Operand& src, FloatRegister dest) {
-    loadFloat32(src, dest);
-    vcvtss2sd(dest, dest, dest);
-  }
   FaultingCodeOffset loadFloat32(const Address& src, FloatRegister dest) {
     FaultingCodeOffset fco = FaultingCodeOffset(currentOffset());
     vmovss(src, dest);
@@ -793,6 +792,25 @@ class MacroAssemblerX86Shared : public Assembler {
   void moveFloat32(FloatRegister src, FloatRegister dest) {
     // Use vmovaps instead of vmovss to avoid dependencies.
     vmovaps(src, dest);
+  }
+
+  FaultingCodeOffset loadFloat16(const Address& addr, FloatRegister dest,
+                                 Register scratch) {
+    auto fco = load16ZeroExtend(addr, scratch);
+
+    // Move from GPR to FloatRegister.
+    vmovd(scratch, dest);
+
+    return fco;
+  }
+  FaultingCodeOffset loadFloat16(const BaseIndex& src, FloatRegister dest,
+                                 Register scratch) {
+    auto fco = load16ZeroExtend(src, scratch);
+
+    // Move from GPR to FloatRegister.
+    vmovd(scratch, dest);
+
+    return fco;
   }
 
   // Checks whether a double is representable as a 32-bit integer. If so, the
@@ -902,13 +920,71 @@ class MacroAssemblerX86Shared : public Assembler {
     movzbl(source, dest);
   }
 
-  void emitSet(Assembler::Condition cond, Register dest,
+ private:
+  template <typename T>
+  static bool aliasesEmitSetRegister(T src, Register dest) {
+    if constexpr (std::is_base_of_v<Register, T>) {
+      return src == dest;
+    } else if constexpr (std::is_base_of_v<Address, T>) {
+      return src.base == dest;
+    } else if constexpr (std::is_base_of_v<BaseIndex, T>) {
+      return src.base == dest || src.index == dest;
+    } else if constexpr (std::is_base_of_v<ValueOperand, T>) {
+      return src.aliases(dest);
+    } else {
+      // Immediates don't contain any registers that might alias `dest`.
+      static_assert(
+          std::is_base_of_v<Imm32, T> || std::is_base_of_v<Imm64, T> ||
+              std::is_base_of_v<ImmPtr, T> || std::is_base_of_v<ImmGCPtr, T> ||
+              std::is_base_of_v<ImmWord, T>,
+          "unhandled operand");
+      return false;
+    }
+  }
+
+ public:
+  bool maybeEmitSetZeroByteRegister(Register dest) {
+    // `setCC` only writes into the low 8-bits of the register, so it has to be
+    // followed by `movzbl` to extend i8 to i32. This can cause a register stall
+    // due to the partial register write performed by `setCC`. If possible zero
+    // the output before the comparison to avoid this case.
+    if (AllocatableGeneralRegisterSet(Registers::SingleByteRegs).has(dest)) {
+      xorl(dest, dest);
+      return true;
+    }
+    return false;
+  }
+
+  template <typename T>
+  bool maybeEmitSetZeroByteRegister(T src, Register dest) {
+    // Can't zero the output register if it aliases the input.
+    if (!aliasesEmitSetRegister(src, dest)) {
+      return maybeEmitSetZeroByteRegister(dest);
+    }
+    return false;
+  }
+
+  template <typename T1, typename T2>
+  bool maybeEmitSetZeroByteRegister(T1 lhs, T2 rhs, Register dest) {
+    // Can't zero the output register if it aliases an input.
+    if (!aliasesEmitSetRegister(lhs, dest) &&
+        !aliasesEmitSetRegister(rhs, dest)) {
+      return maybeEmitSetZeroByteRegister(dest);
+    }
+    return false;
+  }
+
+  void emitSet(Assembler::Condition cond, Register dest, bool destIsZero,
                Assembler::NaNCond ifNaN = Assembler::NaN_HandledByCond) {
     if (AllocatableGeneralRegisterSet(Registers::SingleByteRegs).has(dest)) {
       // If the register we're defining is a single byte register,
       // take advantage of the setCC instruction
       setCC(cond, dest);
-      movzbl(dest, dest);
+
+      // Extend i8 to i32 if the register wasn't previously zeroed.
+      if (!destIsZero) {
+        movzbl(dest, dest);
+      }
 
       if (ifNaN != Assembler::NaN_HandledByCond) {
         Label noNaN;
@@ -939,21 +1015,6 @@ class MacroAssemblerX86Shared : public Assembler {
     }
   }
 
-  void emitSetRegisterIf(AssemblerX86Shared::Condition cond, Register dest) {
-    if (AllocatableGeneralRegisterSet(Registers::SingleByteRegs).has(dest)) {
-      // If the register we're defining is a single byte register,
-      // take advantage of the setCC instruction
-      setCC(cond, dest);
-      movzbl(dest, dest);
-    } else {
-      Label end;
-      movl(Imm32(1), dest);
-      j(cond, &end);
-      mov(ImmWord(0), dest);
-      bind(&end);
-    }
-  }
-
   // Emit a JMP that can be toggled to a CMP. See ToggleToJmp(), ToggleToCmp().
   CodeOffset toggledJump(Label* label) {
     CodeOffset offset(size());
@@ -975,74 +1036,6 @@ class MacroAssemblerX86Shared : public Assembler {
  protected:
   bool buildOOLFakeExitFrame(void* fakeReturnAddr);
 };
-
-// Specialize for float to use movaps. Use movdqa for everything else.
-template <>
-inline void MacroAssemblerX86Shared::loadAlignedVector<float>(
-    const Address& src, FloatRegister dest) {
-  loadAlignedSimd128Float(src, dest);
-}
-
-template <typename T>
-inline void MacroAssemblerX86Shared::loadAlignedVector(const Address& src,
-                                                       FloatRegister dest) {
-  loadAlignedSimd128Int(src, dest);
-}
-
-// Specialize for float to use movaps. Use movdqa for everything else.
-template <>
-inline void MacroAssemblerX86Shared::storeAlignedVector<float>(
-    FloatRegister src, const Address& dest) {
-  storeAlignedSimd128Float(src, dest);
-}
-
-template <typename T>
-inline void MacroAssemblerX86Shared::storeAlignedVector(FloatRegister src,
-                                                        const Address& dest) {
-  storeAlignedSimd128Int(src, dest);
-}
-
-template <>
-inline void MacroAssemblerX86Shared::loadScalar<int8_t>(const Operand& src,
-                                                        Register dest) {
-  load8ZeroExtend(src, dest);
-}
-template <>
-inline void MacroAssemblerX86Shared::loadScalar<int16_t>(const Operand& src,
-                                                         Register dest) {
-  load16ZeroExtend(src, dest);
-}
-template <>
-inline void MacroAssemblerX86Shared::loadScalar<int32_t>(const Operand& src,
-                                                         Register dest) {
-  load32(src, dest);
-}
-template <>
-inline void MacroAssemblerX86Shared::loadScalar<float>(const Operand& src,
-                                                       FloatRegister dest) {
-  loadFloat32(src, dest);
-}
-
-template <>
-inline void MacroAssemblerX86Shared::storeScalar<int8_t>(Register src,
-                                                         const Address& dest) {
-  store8(src, dest);
-}
-template <>
-inline void MacroAssemblerX86Shared::storeScalar<int16_t>(Register src,
-                                                          const Address& dest) {
-  store16(src, dest);
-}
-template <>
-inline void MacroAssemblerX86Shared::storeScalar<int32_t>(Register src,
-                                                          const Address& dest) {
-  store32(src, dest);
-}
-template <>
-inline void MacroAssemblerX86Shared::storeScalar<float>(FloatRegister src,
-                                                        const Address& dest) {
-  vmovss(src, dest);
-}
 
 }  // namespace jit
 }  // namespace js

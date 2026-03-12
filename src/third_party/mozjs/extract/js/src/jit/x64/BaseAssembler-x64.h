@@ -1186,7 +1186,7 @@ class BaseAssemblerX64 : public BaseAssembler {
     m_formatter.legacySSEPrefix(ty);
     m_formatter.twoByteRipOp(opcode, 0, reg);
     JmpSrc label(m_formatter.size());
-    spew("%-11s " MEM_o32r ", %s", legacySSEOpName(name),
+    spew("%-11s" MEM_o32r ", %s", legacySSEOpName(name),
          ADDR_o32r(label.offset()), XMMRegName(reg));
     return label;
   }

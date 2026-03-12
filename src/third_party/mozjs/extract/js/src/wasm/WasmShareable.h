@@ -26,8 +26,6 @@
 namespace js {
 namespace wasm {
 
-using mozilla::MallocSizeOf;
-
 // This reusable base class factors out the logic for a resource that is shared
 // by multiple instances/modules but should only be counted once when computing
 // about:memory stats.
@@ -39,7 +37,7 @@ template <class T>
 struct ShareableBase : AtomicRefCounted<T> {
   using SeenSet = wasm::SeenSet<T>;
 
-  size_t sizeOfIncludingThisIfNotSeen(MallocSizeOf mallocSizeOf,
+  size_t sizeOfIncludingThisIfNotSeen(mozilla::MallocSizeOf mallocSizeOf,
                                       SeenSet* seen) const {
     const T* self = static_cast<const T*>(this);
     typename SeenSet::AddPtr p = seen->lookupForAdd(self);
@@ -54,25 +52,63 @@ struct ShareableBase : AtomicRefCounted<T> {
 
 // ShareableBytes is a reference-counted Vector of bytes.
 
-struct ShareableBytes : ShareableBase<ShareableBytes> {
-  // Vector is 'final', so instead make Vector a member and add boilerplate.
-  Bytes bytes;
+// Vector is 'final' and cannot be inherited to combine with ShareableBase, so
+// we need to define a wrapper class with boilerplate methods.
+template <typename T, size_t MinInlineCapacity, class AllocPolicy>
+struct ShareableVector
+    : public ShareableBase<ShareableVector<T, MinInlineCapacity, AllocPolicy>> {
+  using VecT = mozilla::Vector<T, MinInlineCapacity, AllocPolicy>;
 
-  ShareableBytes() = default;
-  explicit ShareableBytes(Bytes&& bytes) : bytes(std::move(bytes)) {}
-  size_t sizeOfExcludingThis(MallocSizeOf mallocSizeOf) const {
-    return bytes.sizeOfExcludingThis(mallocSizeOf);
+  VecT vector;
+
+  size_t length() const { return vector.length(); }
+  bool empty() const { return vector.empty(); }
+  T* begin() { return vector.begin(); }
+  T* end() { return vector.end(); }
+  const T* begin() const { return vector.begin(); }
+  const T* end() const { return vector.end(); }
+  mozilla::Span<const T> span() const {
+    return mozilla::Span<const T>(begin(), end());
   }
-  const uint8_t* begin() const { return bytes.begin(); }
-  const uint8_t* end() const { return bytes.end(); }
-  size_t length() const { return bytes.length(); }
-  bool append(const uint8_t* start, size_t len) {
-    return bytes.append(start, len);
+  size_t sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf) const {
+    return vector.sizeOfExcludingThis(mallocSizeOf);
+  }
+  bool append(const T* start, size_t len) { return vector.append(start, len); }
+  bool appendAll(const VecT& other) { return vector.appendAll(other); }
+  void shrinkTo(size_t len) { return vector.shrinkTo(len); }
+
+  ShareableVector() = default;
+  explicit ShareableVector(VecT&& vector) : vector(std::move(vector)) {}
+
+  static const ShareableVector* fromSpan(mozilla::Span<const T> span) {
+    ShareableVector* vector = js_new<ShareableVector>();
+    if (!vector) {
+      return nullptr;
+    }
+
+    // If we succeed in allocating the vector but fail to append something to
+    // it, we need to delete this vector before returning.
+    if (!vector->append(span.data(), span.size())) {
+      js_free(vector);
+      return nullptr;
+    }
+
+    return vector;
   }
 };
 
+using ShareableBytes = ShareableVector<uint8_t, 0, SystemAllocPolicy>;
 using MutableBytes = RefPtr<ShareableBytes>;
 using SharedBytes = RefPtr<const ShareableBytes>;
+
+struct ShareableChars : public ShareableBase<ShareableChars> {
+  UniqueChars chars;
+
+  ShareableChars() = default;
+  explicit ShareableChars(UniqueChars&& chars) : chars(std::move(chars)) {}
+};
+
+using SharedChars = RefPtr<const ShareableChars>;
 
 }  // namespace wasm
 }  // namespace js

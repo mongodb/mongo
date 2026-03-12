@@ -7,14 +7,22 @@
 #ifndef gc_Memory_h
 #define gc_Memory_h
 
+#include "mozilla/Atomics.h"
+
 #include <stddef.h>
 
 namespace js {
 namespace gc {
 
+extern mozilla::Atomic<size_t, mozilla::Relaxed> gMappedMemorySizeBytes;
+extern mozilla::Atomic<uint64_t, mozilla::Relaxed> gMappedMemoryOperations;
+
 // Sanity check that our compiled configuration matches the currently
 // running instance and initialize any runtime data needed for allocation.
 void InitMemorySubsystem();
+
+// Assert that memory use as recorded RecordMemoryAlloc/Free balances.
+void CheckMemorySubsystemOnShutDown();
 
 // The page size as reported by the operating system.
 size_t SystemPageSize();
@@ -32,14 +40,26 @@ size_t VirtualMemoryLimit();
 // range. On these platforms we allocate at random addresses.
 bool UsingScattershotAllocator();
 
+// Whether to stall and retry memory allocation on failure. Only supported on
+// Windows when built with jemalloc.
+enum class StallAndRetry : bool {
+  No = false,
+  Yes = true,
+};
+
 // Allocate or deallocate pages from the system with the given alignment.
 // Pages will be read/write-able.
-void* MapAlignedPages(size_t length, size_t alignment);
+void* MapAlignedPages(size_t length, size_t alignment,
+                      StallAndRetry stallAndRetry = StallAndRetry::No);
 void UnmapPages(void* region, size_t length);
 
-// We can only decommit unused pages if the page size is less than or equal to
-// the hardcoded Arena size for the running process.
+// We only decommit unused pages if the system page size is the same as the
+// hardcoded page size for the build.
 bool DecommitEnabled();
+
+// Disable decommit for testing purposes. This must be called before
+// InitMemorySubsystem.
+void DisableDecommit();
 
 // Tell the OS that the given pages are not in use, so they should not be
 // written to a paging file. This may be a no-op on some platforms.
@@ -77,6 +97,10 @@ void* TestMapAlignedPagesLastDitch(size_t length, size_t alignment);
 void ProtectPages(void* region, size_t length);
 void MakePagesReadOnly(void* region, size_t length);
 void UnprotectPages(void* region, size_t length);
+
+// Track mapped memory so we can report it to the profiler.
+void RecordMemoryAlloc(size_t bytes);
+void RecordMemoryFree(size_t bytes);
 
 }  // namespace gc
 }  // namespace js

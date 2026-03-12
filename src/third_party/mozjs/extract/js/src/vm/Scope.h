@@ -21,7 +21,7 @@
 
 #include "builtin/ModuleObject.h"  // ModuleObject, Handle<ModuleObject*>
 #include "frontend/ParserAtom.h"   // frontend::TaggedParserAtomIndex
-#include "gc/Barrier.h"            // HeapPtr
+#include "gc/Barrier.h"            // GCPtr
 #include "gc/Cell.h"               // TenuredCellWithNonGCPointer
 #include "js/GCPolicyAPI.h"        // GCPolicy, IgnoreGCPolicy
 #include "js/HeapAPI.h"            // CellFlagBitsReservedForGC
@@ -332,10 +332,10 @@ class Scope : public gc::TenuredCellWithNonGCPointer<BaseScopeData> {
 
   // If there are any aliased bindings, the shape for the
   // EnvironmentObject. Otherwise nullptr.
-  const HeapPtr<SharedShape*> environmentShape_;
+  const GCPtr<SharedShape*> environmentShape_;
 
   // The enclosing scope or nullptr.
-  HeapPtr<Scope*> enclosingScope_;
+  GCPtr<Scope*> enclosingScope_;
 
   Scope(ScopeKind kind, Scope* enclosing, SharedShape* environmentShape)
       : TenuredCellWithNonGCPointer(nullptr),
@@ -715,7 +715,7 @@ class FunctionScope : public Scope {
     // The canonical function of the scope, as during a scope walk we
     // often query properties of the JSFunction (e.g., is the function an
     // arrow).
-    HeapPtr<JSFunction*> canonicalFunction = {};
+    GCPtr<JSFunction*> canonicalFunction = {};
 
     explicit RuntimeData(size_t length) { PoisonNames(this, length); }
     RuntimeData() = delete;
@@ -1017,7 +1017,7 @@ class ModuleScope : public Scope {
       : public AbstractBaseScopeData<JSAtom> {
     SlotInfo slotInfo;
     // The module of the scope.
-    HeapPtr<ModuleObject*> module = {};
+    GCPtr<ModuleObject*> module = {};
 
     explicit RuntimeData(size_t length);
     RuntimeData() = delete;
@@ -1078,7 +1078,7 @@ class WasmInstanceScope : public Scope {
       : public AbstractBaseScopeData<JSAtom> {
     SlotInfo slotInfo;
     // The wasm instance of the scope.
-    HeapPtr<WasmInstanceObject*> instance = {};
+    GCPtr<WasmInstanceObject*> instance = {};
 
     explicit RuntimeData(size_t length);
     RuntimeData() = delete;
@@ -1226,6 +1226,11 @@ class BaseAbstractBindingIter {
   //          synthetic - [syntheticStart, privateMethodStart)
   //    private methods = [privateMethodStart, length)
   //
+  // If ENABLE_EXPLICIT_RESOURCE_MANAGEMENT is set, the consts range is split
+  // into the following:
+  //             consts - [constStart, usingStart)
+  //             usings - [usingStart, syntheticStart)
+  //
   // Access method when not closed over:
   //
   //            imports - name
@@ -1252,6 +1257,9 @@ class BaseAbstractBindingIter {
   MOZ_INIT_OUTSIDE_CTOR uint32_t varStart_;
   MOZ_INIT_OUTSIDE_CTOR uint32_t letStart_;
   MOZ_INIT_OUTSIDE_CTOR uint32_t constStart_;
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+  MOZ_INIT_OUTSIDE_CTOR uint32_t usingStart_;
+#endif
   MOZ_INIT_OUTSIDE_CTOR uint32_t syntheticStart_;
   MOZ_INIT_OUTSIDE_CTOR uint32_t privateMethodStart_;
   MOZ_INIT_OUTSIDE_CTOR uint32_t length_;
@@ -1283,6 +1291,9 @@ class BaseAbstractBindingIter {
 
   void init(uint32_t positionalFormalStart, uint32_t nonPositionalFormalStart,
             uint32_t varStart, uint32_t letStart, uint32_t constStart,
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+            uint32_t usingStart,
+#endif
             uint32_t syntheticStart, uint32_t privateMethodStart, uint8_t flags,
             uint32_t firstFrameSlot, uint32_t firstEnvironmentSlot,
             mozilla::Span<AbstractBindingName<NameT>> names) {
@@ -1291,6 +1302,9 @@ class BaseAbstractBindingIter {
     varStart_ = varStart;
     letStart_ = letStart;
     constStart_ = constStart;
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+    usingStart_ = usingStart;
+#endif
     syntheticStart_ = syntheticStart;
     privateMethodStart_ = privateMethodStart;
     length_ = names.size();
@@ -1481,10 +1495,20 @@ class BaseAbstractBindingIter {
     if (index_ < constStart_) {
       return BindingKind::Let;
     }
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+    if (index_ < usingStart_) {
+      return isNamedLambda() ? BindingKind::NamedLambdaCallee
+                             : BindingKind::Const;
+    }
+    if (index_ < syntheticStart_) {
+      return BindingKind::Using;
+    }
+#else
     if (index_ < syntheticStart_) {
       return isNamedLambda() ? BindingKind::NamedLambdaCallee
                              : BindingKind::Const;
     }
+#endif
     if (index_ < privateMethodStart_) {
       return BindingKind::Synthetic;
     }

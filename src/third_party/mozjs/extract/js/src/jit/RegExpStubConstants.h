@@ -12,6 +12,7 @@
 
 #include "irregexp/RegExpTypes.h"
 #include "vm/MatchPairs.h"
+#include "vm/RegExpObject.h"
 
 namespace js {
 namespace jit {

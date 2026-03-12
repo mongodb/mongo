@@ -365,7 +365,7 @@ class extent_type<dynamic_extent> {
  * Subspan etc.
  */
 template <class ElementType, size_t Extent /* = dynamic_extent */>
-class Span {
+class MOZ_GSL_POINTER Span {
  public:
   // constants and types
   using element_type = ElementType;
@@ -405,12 +405,14 @@ class Span {
   /**
    * Constructor for pointer and length.
    */
-  constexpr Span(pointer aPtr, index_type aLength) : storage_(aPtr, aLength) {}
+  constexpr Span(pointer aPtr MOZ_LIFETIME_BOUND, index_type aLength)
+      : storage_(aPtr, aLength) {}
 
   /**
    * Constructor for start pointer and pointer past end.
    */
-  constexpr Span(pointer aStartPtr, pointer aEndPtr)
+  constexpr Span(pointer aStartPtr MOZ_LIFETIME_BOUND,
+                 pointer aEndPtr MOZ_LIFETIME_BOUND)
       : storage_(aStartPtr, std::distance(aStartPtr, aEndPtr)) {}
 
   /**
@@ -438,7 +440,7 @@ class Span {
    * Constructor for C array.
    */
   template <size_t N>
-  constexpr MOZ_IMPLICIT Span(element_type (&aArr)[N])
+  constexpr MOZ_IMPLICIT Span(element_type (&aArr MOZ_LIFETIME_BOUND)[N])
       : storage_(&aArr[0], span_details::extent_type<N>()) {}
 
   // Implicit constructors for char* and char16_t* pointers are deleted in order
@@ -463,7 +465,8 @@ class Span {
    */
   template <size_t N,
             class ArrayElementType = std::remove_const_t<element_type>>
-  constexpr MOZ_IMPLICIT Span(std::array<ArrayElementType, N>& aArr)
+  constexpr MOZ_IMPLICIT Span(
+      std::array<ArrayElementType, N>& aArr MOZ_LIFETIME_BOUND)
       : storage_(&aArr[0], span_details::extent_type<N>()) {}
 
   /**
@@ -471,7 +474,8 @@ class Span {
    */
   template <size_t N>
   constexpr MOZ_IMPLICIT Span(
-      const std::array<std::remove_const_t<element_type>, N>& aArr)
+      const std::array<std::remove_const_t<element_type>, N>& aArr
+          MOZ_LIFETIME_BOUND)
       : storage_(&aArr[0], span_details::extent_type<N>()) {}
 
   /**
@@ -479,7 +483,8 @@ class Span {
    */
   template <size_t N,
             class ArrayElementType = std::remove_const_t<element_type>>
-  constexpr MOZ_IMPLICIT Span(mozilla::Array<ArrayElementType, N>& aArr)
+  constexpr MOZ_IMPLICIT Span(
+      mozilla::Array<ArrayElementType, N>& aArr MOZ_LIFETIME_BOUND)
       : storage_(&aArr[0], span_details::extent_type<N>()) {}
 
   /**
@@ -487,7 +492,8 @@ class Span {
    */
   template <size_t N>
   constexpr MOZ_IMPLICIT Span(
-      const mozilla::Array<std::remove_const_t<element_type>, N>& aArr)
+      const mozilla::Array<std::remove_const_t<element_type>, N>& aArr
+          MOZ_LIFETIME_BOUND)
       : storage_(&aArr[0], span_details::extent_type<N>()) {}
 
   /**
@@ -496,15 +502,17 @@ class Span {
   template <size_t N, class Enum,
             class ArrayElementType = std::remove_const_t<element_type>>
   constexpr MOZ_IMPLICIT Span(
-      mozilla::EnumeratedArray<Enum, ArrayElementType, N>& aArr)
+      mozilla::EnumeratedArray<Enum, ArrayElementType, N>& aArr
+          MOZ_LIFETIME_BOUND)
       : storage_(&aArr[Enum(0)], span_details::extent_type<N>()) {}
 
   /**
    * Constructor for const mozilla::EnumeratedArray.
    */
   template <size_t N, class Enum>
-  constexpr MOZ_IMPLICIT Span(const mozilla::EnumeratedArray<
-                              Enum, std::remove_const_t<element_type>, N>& aArr)
+  constexpr MOZ_IMPLICIT Span(
+      const mozilla::EnumeratedArray<Enum, std::remove_const_t<element_type>,
+                                     N>& aArr MOZ_LIFETIME_BOUND)
       : storage_(&aArr[Enum(0)], span_details::extent_type<N>()) {}
 
   /**
@@ -512,7 +520,8 @@ class Span {
    */
   template <class ArrayElementType = std::add_pointer<element_type>,
             class DeleterType>
-  constexpr Span(const mozilla::UniquePtr<ArrayElementType, DeleterType>& aPtr,
+  constexpr Span(const mozilla::UniquePtr<ArrayElementType, DeleterType>& aPtr
+                     MOZ_LIFETIME_BOUND,
                  index_type aLength)
       : storage_(aPtr.get(), aLength) {}
 

@@ -516,7 +516,7 @@ class BumpChunk : public SingleLinkedListElement<BumpChunk> {
   // This function is the only way to allocate and construct a chunk. It
   // returns a UniquePtr to the newly allocated chunk.  The size given as
   // argument includes the space needed for the header of the chunk.
-  static UniquePtr<BumpChunk> newWithCapacity(size_t size);
+  static UniquePtr<BumpChunk> newWithCapacity(size_t size, arena_id_t arena);
 
   // Report allocation.
   size_t sizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf) const {
@@ -699,6 +699,17 @@ class LifoAlloc {
   // now-unused, or transferred (which followed their own growth patterns).
   size_t smallAllocsSize_;
 
+  // Arena to use for the allocations from this LifoAlloc. This is typically
+  // MallocArena for main-thread-focused LifoAllocs and BackgroundMallocArena
+  // for background-thread-focused LifoAllocs.
+  // If you are unsure at the time of authorship whether this LifoAlloc will be
+  // mostly on or mostly off the main thread, just take a guess, and that
+  // will be fine. There should be no serious consequences for getting this
+  // wrong unless your system is very hot and makes heavy use of its LifoAlloc.
+  // In that case, run both options through a try run of Speedometer 3 or
+  // whatever is most current and pick whichever performs better.
+  arena_id_t arena_;
+
 #if defined(DEBUG) || defined(JS_OOM_BREAKPOINT)
   bool fallibleScope_;
 #endif
@@ -766,8 +777,9 @@ class LifoAlloc {
   [[nodiscard]] bool ensureUnusedApproximateColdPath(size_t n, size_t total);
 
  public:
-  explicit LifoAlloc(size_t defaultChunkSize)
-      : peakSize_(0)
+  LifoAlloc(size_t defaultChunkSize, arena_id_t arena)
+      : peakSize_(0),
+        arena_(arena)
 #if defined(DEBUG) || defined(JS_OOM_BREAKPOINT)
         ,
         fallibleScope_(true)
@@ -800,9 +812,8 @@ class LifoAlloc {
   // Frees all held memory.
   void freeAll();
 
-  static const unsigned HUGE_ALLOCATION = 50 * 1024 * 1024;
   void freeAllIfHugeAndUnused() {
-    if (markCount == 0 && curSize_ > HUGE_ALLOCATION) {
+    if (markCount == 0 && isHuge()) {
       freeAll();
     }
   }
@@ -987,6 +998,9 @@ class LifoAlloc {
     MOZ_ASSERT_IF(!oversize_.empty(), !oversize_.last()->empty());
     return empty && oversize_.empty();
   }
+
+  static const unsigned HUGE_ALLOCATION = 50 * 1024 * 1024;
+  bool isHuge() const { return curSize_ > HUGE_ALLOCATION; }
 
   // Return the number of bytes remaining to allocate in the current chunk.
   // e.g. How many bytes we can allocate before needing a new block.

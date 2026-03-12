@@ -36,6 +36,10 @@ class WeakMapObject : public WeakCollectionObject {
   static const JSClass class_;
   static const JSClass protoClass_;
 
+  [[nodiscard]] static bool has(JSContext* cx, unsigned argc, Value* vp);
+  [[nodiscard]] static bool get(JSContext* cx, unsigned argc, Value* vp);
+  [[nodiscard]] static bool set(JSContext* cx, unsigned argc, Value* vp);
+
  private:
   static const ClassSpec classSpec_;
 
@@ -44,20 +48,27 @@ class WeakMapObject : public WeakCollectionObject {
 
   [[nodiscard]] static bool construct(JSContext* cx, unsigned argc, Value* vp);
 
+  [[nodiscard]] static bool tryOptimizeCtorWithIterable(
+      JSContext* cx, Handle<WeakMapObject*> obj, Handle<Value> iterableVal,
+      bool* optimized);
+
   [[nodiscard]] static MOZ_ALWAYS_INLINE bool is(HandleValue v);
 
   [[nodiscard]] static MOZ_ALWAYS_INLINE bool has_impl(JSContext* cx,
                                                        const CallArgs& args);
-  [[nodiscard]] static bool has(JSContext* cx, unsigned argc, Value* vp);
   [[nodiscard]] static MOZ_ALWAYS_INLINE bool get_impl(JSContext* cx,
                                                        const CallArgs& args);
-  [[nodiscard]] static bool get(JSContext* cx, unsigned argc, Value* vp);
   [[nodiscard]] static MOZ_ALWAYS_INLINE bool delete_impl(JSContext* cx,
                                                           const CallArgs& args);
   [[nodiscard]] static bool delete_(JSContext* cx, unsigned argc, Value* vp);
   [[nodiscard]] static MOZ_ALWAYS_INLINE bool set_impl(JSContext* cx,
                                                        const CallArgs& args);
-  [[nodiscard]] static bool set(JSContext* cx, unsigned argc, Value* vp);
+#ifdef NIGHTLY_BUILD
+  [[nodiscard]] static MOZ_ALWAYS_INLINE bool getOrInsert_impl(
+      JSContext* cx, const CallArgs& args);
+  [[nodiscard]] static bool getOrInsert(JSContext* cx, unsigned argc,
+                                        Value* vp);
+#endif  // #ifdef NIGHTLY_BUILD
 };
 
 }  // namespace js

@@ -92,7 +92,13 @@ class MOZ_STACK_CLASS ForOfEmitter {
 
  public:
 #ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
-  enum class HasUsingDeclarationInHead { No, Yes };
+  enum class HeadUsingDeclarationKind { None, Sync, Async };
+
+ private:
+  HeadUsingDeclarationKind usingDeclarationInHead_ =
+      HeadUsingDeclarationKind::None;
+
+ public:
 #endif
 
   ForOfEmitter(BytecodeEmitter* bce,
@@ -100,7 +106,7 @@ class MOZ_STACK_CLASS ForOfEmitter {
                SelfHostedIter selfHostedIter, IteratorKind iterKind
 #ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
                ,
-               HasUsingDeclarationInHead hasUsingDeclarationInHead
+               HeadUsingDeclarationKind usingDeclarationInHead
 #endif
   );
 

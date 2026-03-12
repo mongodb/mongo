@@ -346,7 +346,9 @@ const JSClassOps GeneratorObject::classOps_ = {
 static const JSFunctionSpec generator_methods[] = {
     JS_SELF_HOSTED_FN("next", "GeneratorNext", 1, 0),
     JS_SELF_HOSTED_FN("throw", "GeneratorThrow", 1, 0),
-    JS_SELF_HOSTED_FN("return", "GeneratorReturn", 1, 0), JS_FS_END};
+    JS_SELF_HOSTED_FN("return", "GeneratorReturn", 1, 0),
+    JS_FS_END,
+};
 
 JSObject* js::NewTenuredObjectWithFunctionPrototype(
     JSContext* cx, Handle<GlobalObject*> global) {
@@ -422,10 +424,15 @@ static const ClassSpec GeneratorFunctionClassSpec = {
     nullptr,
     nullptr,
     GeneratorFunctionClassFinish,
-    ClassSpec::DontDefineConstructor};
+    ClassSpec::DontDefineConstructor,
+};
 
 const JSClass js::GeneratorFunctionClass = {
-    "GeneratorFunction", 0, JS_NULL_CLASS_OPS, &GeneratorFunctionClassSpec};
+    "GeneratorFunction",
+    0,
+    JS_NULL_CLASS_OPS,
+    &GeneratorFunctionClassSpec,
+};
 
 const Value& AbstractGeneratorObject::getUnaliasedLocal(uint32_t slot) const {
   MOZ_ASSERT(isSuspended());

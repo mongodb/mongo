@@ -24,9 +24,11 @@
 #include "wasm/WasmBuiltinModuleGenerated.h"
 
 namespace js {
+class JitFrameIter;
 namespace jit {
+class AutoMarkJitCodeWritableForThread;
 struct ResumeFromException;
-}
+}  // namespace jit
 namespace wasm {
 
 class WasmFrameIter;
@@ -68,7 +70,10 @@ enum class SymbolicAddress {
   LogD,
   PowD,
   ATan2D,
+  ArrayMemMove,
+  ArrayRefsMove,
   HandleDebugTrap,
+  HandleRequestTierUp,
   HandleThrow,
   HandleTrap,
   ReportV128JSCall,
@@ -126,9 +131,9 @@ enum class SymbolicAddress {
   TableSet,
   TableSize,
   RefFunc,
-  PostBarrier,
-  PostBarrierPrecise,
-  PostBarrierPreciseWithOffset,
+  PostBarrierEdge,
+  PostBarrierEdgePrecise,
+  PostBarrierWholeCell,
   ExceptionNew,
   ThrowException,
   StructNewIL_true,
@@ -232,6 +237,8 @@ extern const SymbolicAddressSignature SASigExpD;
 extern const SymbolicAddressSignature SASigLogD;
 extern const SymbolicAddressSignature SASigPowD;
 extern const SymbolicAddressSignature SASigATan2D;
+extern const SymbolicAddressSignature SASigArrayMemMove;
+extern const SymbolicAddressSignature SASigArrayRefsMove;
 extern const SymbolicAddressSignature SASigMemoryGrowM32;
 extern const SymbolicAddressSignature SASigMemoryGrowM64;
 extern const SymbolicAddressSignature SASigMemorySizeM32;
@@ -267,9 +274,9 @@ extern const SymbolicAddressSignature SASigTableInit;
 extern const SymbolicAddressSignature SASigTableSet;
 extern const SymbolicAddressSignature SASigTableSize;
 extern const SymbolicAddressSignature SASigRefFunc;
-extern const SymbolicAddressSignature SASigPostBarrier;
-extern const SymbolicAddressSignature SASigPostBarrierPrecise;
-extern const SymbolicAddressSignature SASigPostBarrierPreciseWithOffset;
+extern const SymbolicAddressSignature SASigPostBarrierEdge;
+extern const SymbolicAddressSignature SASigPostBarrierEdgePrecise;
+extern const SymbolicAddressSignature SASigPostBarrierWholeCell;
 extern const SymbolicAddressSignature SASigExceptionNew;
 extern const SymbolicAddressSignature SASigThrowException;
 extern const SymbolicAddressSignature SASigStructNewIL_true;
@@ -303,7 +310,7 @@ bool NeedsBuiltinThunk(SymbolicAddress sym);
 // CodeRange is relative to.
 
 bool LookupBuiltinThunk(void* pc, const CodeRange** codeRange,
-                        uint8_t** codeBase);
+                        const uint8_t** codeBase);
 
 // EnsureBuiltinThunksInitialized() must be called, and must succeed, before
 // SymbolicAddressTarget() or MaybeGetBuiltinThunk(). This function creates all
@@ -312,9 +319,11 @@ bool LookupBuiltinThunk(void* pc, const CodeRange** codeRange,
 // executable code has been released.
 
 bool EnsureBuiltinThunksInitialized();
+bool EnsureBuiltinThunksInitialized(
+    jit::AutoMarkJitCodeWritableForThread& writable);
 
-void HandleThrow(JSContext* cx, WasmFrameIter& iter,
-                 jit::ResumeFromException* rfe);
+void HandleExceptionWasm(JSContext* cx, JitFrameIter& iter,
+                         jit::ResumeFromException* rfe);
 
 void* SymbolicAddressTarget(SymbolicAddress sym);
 

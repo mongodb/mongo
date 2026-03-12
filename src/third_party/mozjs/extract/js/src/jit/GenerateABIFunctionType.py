@@ -1,5 +1,6 @@
+import io
+
 import buildconfig
-import six
 import yaml
 from mozbuild.preprocessor import Preprocessor
 
@@ -34,7 +35,7 @@ def load_yaml(yaml_path):
     # the YAML file.
     pp = Preprocessor()
     pp.context.update(buildconfig.defines["ALLDEFINES"])
-    pp.out = six.StringIO()
+    pp.out = io.StringIO()
     pp.do_filter("substitution")
     pp.do_include(yaml_path)
     contents = pp.out.getvalue()
@@ -52,6 +53,8 @@ def cpp_arg_type(arg_type):
         return "float"
     elif arg_type == "Float64":
         return "double"
+    elif arg_type == "Void":
+        return "void"
     else:
         raise ValueError(arg_type)
 
@@ -188,20 +191,23 @@ def arm32_simulator_dispatch(func_types):
         hard_fp_args = arm32_hard_fp_args(func_type)
         soft_fp_args = arm32_soft_fp_args(func_type)
         ret = func_type["ret"]
+        has_ret = ret != "Void"
+        ret_setter = "ret = " if has_ret else ""
 
         contents += f"case js::jit::Args_{func_type_name(func_type)}: {{\\\n"
         contents += f"  auto target = reinterpret_cast<Prototype_{func_type_name(func_type)}>(external);\\\n"
-        contents += f"  {cpp_arg_type(ret)} ret;\\\n"
+        if has_ret:
+            contents += f"  {cpp_arg_type(ret)} ret;\\\n"
         if func_type_has_floats(func_type):
-            contents += "  if (UseHardFpABI()) {\\\n"
-            contents += f"    ret = target({hard_fp_args});\\\n"
+            contents += "  if (ARMFlags::UseHardFpABI()) {\\\n"
+            contents += f"    {ret_setter}target({hard_fp_args});\\\n"
             contents += "  } else {\\\n"
-            contents += f"    ret = target({soft_fp_args});\\\n"
+            contents += f"    {ret_setter}target({soft_fp_args});\\\n"
             contents += "  }\\\n"
         else:
             # No float args means we don't need to check the float ABI and
             # either generated args will do.
-            contents += f"  ret = target({soft_fp_args});\\\n"
+            contents += f"  {ret_setter}target({soft_fp_args});\\\n"
         contents += "  scratchVolatileRegisters((void*)target);\\\n"
         if ret == "General" or ret == "Int32" or ret == "Int64":
             contents += "  setCallResult(ret);\\\n"
@@ -273,8 +279,11 @@ def arm64_simulator_dispatch(func_types):
         args = arm64_args(func_type)
         contents += f"case js::jit::Args_{func_type_name(func_type)}: {{\\\n"
         contents += f"  auto target = reinterpret_cast<Prototype_{func_type_name(func_type)}>(nativeFn);\\\n"
-        contents += f"  auto ret = target({args});\\\n"
         ret = func_type["ret"]
+        if ret == "Void":
+            contents += f"  target({args});\\\n"
+        else:
+            contents += f"  auto ret = target({args});\\\n"
         if ret == "General":
             contents += "  setGPR64Result(ret);\\\n"
         elif ret == "Int32":
@@ -349,8 +358,11 @@ def loongarch64_simulator_dispatch(func_types):
         args = loongarch64_args(func_type)
         contents += f"case js::jit::Args_{func_type_name(func_type)}: {{\\\n"
         contents += f"  auto target = reinterpret_cast<Prototype_{func_type_name(func_type)}>(nativeFn);\\\n"
-        contents += f"  auto ret = target({args});\\\n"
         ret = func_type["ret"]
+        if ret == "Void":
+            contents += f"  target({args});\\\n"
+        else:
+            contents += f"  auto ret = target({args});\\\n"
         if ret == "General":
             contents += "  setCallResult(ret);\\\n"
         elif ret == "Int32":
@@ -424,8 +436,11 @@ def mips64_simulator_dispatch(func_types):
         args = mips64_args(func_type)
         contents += f"case js::jit::Args_{func_type_name(func_type)}: {{\\\n"
         contents += f"  auto target = reinterpret_cast<Prototype_{func_type_name(func_type)}>(nativeFn);\\\n"
-        contents += f"  auto ret = target({args});\\\n"
         ret = func_type["ret"]
+        if ret == "Void":
+            contents += f"  target({args});\\\n"
+        else:
+            contents += f"  auto ret = target({args});\\\n"
         if ret == "General":
             contents += "  setCallResult(ret);\\\n"
         elif ret == "Int32":

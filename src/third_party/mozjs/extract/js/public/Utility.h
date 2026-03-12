@@ -43,6 +43,16 @@ extern MOZ_NORETURN MOZ_COLD JS_PUBLIC_API void JS_Assert(const char* s,
 #  include "jscustomallocator.h"
 #else
 
+/*
+ * MONGODB MODIFICATION: These functions are implemented by jscustomallocator
+ * This logic is unused when running Without JS_USE_CUSTOM_ALLOCATOR
+ */
+namespace mongo {
+namespace sm {
+JS_PUBLIC_API void check_oom_on_mmap_allocation(size_t bytes);
+}  // namespace sm
+}  // namespace mongo
+
 namespace js {
 
 /*
@@ -54,20 +64,22 @@ namespace js {
  * adding new thread types.
  */
 enum ThreadType {
-  THREAD_TYPE_NONE = 0,              // 0
-  THREAD_TYPE_MAIN,                  // 1
-  THREAD_TYPE_WASM_COMPILE_TIER1,    // 2
-  THREAD_TYPE_WASM_COMPILE_TIER2,    // 3
-  THREAD_TYPE_ION,                   // 4
-  THREAD_TYPE_COMPRESS,              // 5
-  THREAD_TYPE_GCPARALLEL,            // 6
-  THREAD_TYPE_PROMISE_TASK,          // 7
-  THREAD_TYPE_ION_FREE,              // 8
-  THREAD_TYPE_WASM_GENERATOR_TIER2,  // 9
-  THREAD_TYPE_WORKER,                // 10
-  THREAD_TYPE_DELAZIFY,              // 11
-  THREAD_TYPE_DELAZIFY_FREE,         // 12
-  THREAD_TYPE_MAX                    // Used to check shell function arguments
+  THREAD_TYPE_NONE = 0,                       // 0
+  THREAD_TYPE_MAIN,                           // 1
+  THREAD_TYPE_WASM_COMPILE_TIER1,             // 2
+  THREAD_TYPE_WASM_COMPILE_TIER2,             // 3
+  THREAD_TYPE_BASELINE,                       // 4
+  THREAD_TYPE_ION,                            // 5
+  THREAD_TYPE_COMPRESS,                       // 6
+  THREAD_TYPE_GCPARALLEL,                     // 7
+  THREAD_TYPE_PROMISE_TASK,                   // 8
+  THREAD_TYPE_ION_FREE,                       // 9
+  THREAD_TYPE_WASM_GENERATOR_COMPLETE_TIER2,  // 10
+  THREAD_TYPE_WASM_COMPILE_PARTIAL_TIER2,     // 11
+  THREAD_TYPE_WORKER,                         // 12
+  THREAD_TYPE_DELAZIFY,                       // 13
+  THREAD_TYPE_DELAZIFY_FREE,                  // 14
+  THREAD_TYPE_MAX  // Used to check shell function arguments
 };
 
 namespace oom {
@@ -86,7 +98,7 @@ namespace oom {
 // Define the range of threads tested by simulated OOM testing and the
 // like. Testing worker threads is not supported.
 const ThreadType FirstThreadTypeToTest = THREAD_TYPE_MAIN;
-const ThreadType LastThreadTypeToTest = THREAD_TYPE_WASM_GENERATOR_TIER2;
+const ThreadType LastThreadTypeToTest = THREAD_TYPE_WASM_COMPILE_PARTIAL_TIER2;
 
 extern bool InitThreadType(void);
 extern void SetThreadType(ThreadType);
@@ -95,7 +107,7 @@ extern JS_PUBLIC_API uint32_t GetThreadType(void);
 #  else
 
 inline bool InitThreadType(void) { return true; }
-inline void SetThreadType(ThreadType t){};
+inline void SetThreadType(ThreadType t) {};
 inline uint32_t GetThreadType(void) { return 0; }
 inline uint32_t GetAllocationThreadType(void) { return 0; }
 inline uint32_t GetStackCheckThreadType(void) { return 0; }
@@ -352,7 +364,21 @@ struct MOZ_RAII JS_PUBLIC_DATA AutoEnterOOMUnsafeRegion {
 
 namespace js {
 
+// The following two arenas require a little bit of clarification. We have
+// observed that, particularly on devices with heterogeneous CPU architectures
+// where background work can run on significantly slower cores than main thread
+// work, the lock contention in the allocator can be a big problem for the
+// main thread. So we introduced an arena for background allocations which can
+// reduce that contention.
+//
+// The general rule for these is: if it's easy to determine at the time of
+// authorship that an allocation will be *off* the main thread, use the
+// BackgroundMallocArena, and vice versa. If it is hard to determine, just make
+// a guess, and that will be fine. Do not spend too much time on this, and
+// don't do anything fancy at runtime to try to determine which to use.
 extern JS_PUBLIC_DATA arena_id_t MallocArena;
+extern JS_PUBLIC_DATA arena_id_t BackgroundMallocArena;
+
 extern JS_PUBLIC_DATA arena_id_t ArrayBufferContentsArena;
 extern JS_PUBLIC_DATA arena_id_t StringBufferArena;
 

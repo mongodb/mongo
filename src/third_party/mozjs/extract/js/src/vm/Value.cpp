@@ -181,15 +181,6 @@ void JS::Value::dumpFields(js::JSONPrinter& json) const {
         json.property("type", "bigint");
         toBigInt()->dumpFields(json);
         break;
-#  ifdef ENABLE_RECORD_TUPLE
-      case JSVAL_TAG_EXTENDED_PRIMITIVE: {
-        json.property("type", "extended primitive");
-        JSObject* obj = &toExtendedPrimitive();
-        json.property("class", obj->getClass()->name);
-        json.formatProperty("address", "(JSObject*)0x%p", obj);
-        break;
-      }
-#  endif
       case JSVAL_TAG_OBJECT:
         json.property("type", "object");
         toObject().dumpFields(json);
@@ -254,11 +245,6 @@ void JS::Value::dumpStringContent(js::GenericPrinter& out) const {
       case JSVAL_TAG_BIGINT:
         toBigInt()->dumpStringContent(out);
         break;
-#  ifdef ENABLE_RECORD_TUPLE
-      case JSVAL_TAG_EXTENDED_PRIMITIVE:
-        toExtendedPrimitive().dumpStringContent(out);
-        break;
-#  endif
       case JSVAL_TAG_OBJECT:
         toObject().dumpStringContent(out);
         break;

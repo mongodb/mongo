@@ -24,7 +24,7 @@ class MoveEmitterNone {
   void setScratchRegister(Register) { MOZ_CRASH(); }
 };
 
-typedef MoveEmitterNone MoveEmitter;
+using MoveEmitter = MoveEmitterNone;
 
 }  // namespace jit
 }  // namespace js

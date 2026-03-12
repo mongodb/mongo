@@ -542,6 +542,19 @@
     MACRO(StrictEq, strict_eq, "===", 1, 2, 1, JOF_BYTE|JOF_IC) \
     MACRO(StrictNe, strict_ne, "!==", 1, 2, 1, JOF_BYTE|JOF_IC) \
     /*
+     * A compound opcode for strict equality comparisons with constant
+     * operands. example: `val === null`, `val !== true`. Takes in a single
+     * operand which encodes the type of the constant and a payload
+     * if applicable.
+     *
+     *   Category: Expressions
+     *   Type: Other expressions
+     *   Operands: ConstantCompareOperand operand
+     *   Stack: val => (val OP constant)
+     */ \
+    MACRO(StrictConstantEq, strict_constant_eq, NULL, 3, 1, 1, JOF_UINT16) \
+    MACRO(StrictConstantNe, strict_constant_ne, NULL, 3, 1, 1, JOF_UINT16) \
+    /*
      * Relative operators (`<`, `>`, `<=`, `>=`).
      *
      * Pop two values, compare them, and push the boolean result. The
@@ -849,16 +862,16 @@
      *   Operands:
      *   Stack: => import.meta
      */ \
-    MACRO(ImportMeta, import_meta, NULL, 1, 0, 1, JOF_BYTE) \
+    MACRO(ImportMeta, import_meta, NULL, 1, 0, 1, JOF_BYTE|JOF_IC) \
     /*
      * Create and push a new object with no properties.
      *
      *   Category: Objects
      *   Type: Creating objects
-     *   Operands:
+     *   Operands: uint8_t propertyCount
      *   Stack: => obj
      */ \
-    MACRO(NewInit, new_init, NULL, 1, 0, 1, JOF_BYTE|JOF_IC) \
+    MACRO(NewInit, new_init, NULL, 2, 0, 1, JOF_UINT8|JOF_IC) \
     /*
      * Create and push a new object of a predetermined shape.
      *
@@ -966,7 +979,7 @@
      * `*[Symbol.iterator]() {}`.
      *
      * `JSOp::InitHiddenElem` is the same but defines a non-enumerable property,
-     * for class methods.
+     * for class methods and private fields.
      * `JSOp::InitLockedElem` is the same but defines a non-enumerable, non-writable, non-configurable property,
      * for private class methods.
      *
@@ -1594,94 +1607,6 @@
      */ \
     MACRO(RegExp, reg_exp, NULL, 5, 0, 1, JOF_REGEXP) \
     /*
-     * Initialize a new record, preallocating `length` memory slots. `length` can still grow
-     * if needed, for example when using the spread operator.
-     *
-     * Implements: [RecordLiteral Evaluation][1] step 1.
-     *
-     * [1]: https://tc39.es/proposal-record-tuple/#sec-record-initializer-runtime-semantics-evaluation
-     *
-     *   Category: Compound primitives
-     *   Type: Record literals
-     *   Operands: uint32_t length
-     *   Stack: => rval
-     */ \
-    IF_RECORD_TUPLE(MACRO(InitRecord, init_record, NULL, 5, 0, 1, JOF_UINT32)) \
-    /*
-     * Add the last element in the stack to the preceding tuple.
-     *
-     * Implements: [AddPropertyIntoRecordEntriesList][1].
-     *
-     * [1]: https://tc39.es/proposal-record-tuple/#sec-addpropertyintorecordentrieslist
-     *
-     *   Category: Compound primitives
-     *   Type: Record literals
-     *   Operands:
-     *   Stack: record, key, value => record
-     */ \
-    IF_RECORD_TUPLE(MACRO(AddRecordProperty, add_record_property, NULL, 1, 3, 1, JOF_BYTE)) \
-    /*
-     * Add the last element in the stack to the preceding tuple.
-     *
-     * Implements: [RecordPropertyDefinitionEvaluation][1] for
-     *   RecordPropertyDefinition : ... AssignmentExpression
-     *
-     * [1]: https://tc39.es/proposal-record-tuple/#sec-addpropertyintorecordentrieslist
-     *
-     *   Category: Compound primitives
-     *   Type: Record literals
-     *   Operands:
-     *   Stack: record, value => record
-     */ \
-    IF_RECORD_TUPLE(MACRO(AddRecordSpread, add_record_spread, NULL, 1, 2, 1, JOF_BYTE)) \
-    /*
-     * Mark a record as "initialized", going from "write-only" mode to
-     * "read-only" mode.
-     *
-     *   Category: Compound primitives
-     *   Type: Record literals
-     *   Operands:
-     *   Stack: record => record
-     */ \
-    IF_RECORD_TUPLE(MACRO(FinishRecord, finish_record, NULL, 1, 1, 1, JOF_BYTE)) \
-    /*
-     * Initialize a new tuple, preallocating `length` memory slots. `length` can still grow
-     * if needed, for example when using the spread operator.
-     *
-     * Implements: [TupleLiteral Evaluation][1] step 1.
-     *
-     * [1]: https://tc39.es/proposal-record-tuple/#sec-tuple-initializer-runtime-semantics-evaluation
-     *
-     *   Category: Compound primitives
-     *   Type: Tuple literals
-     *   Operands: uint32_t length
-     *   Stack: => rval
-     */ \
-    IF_RECORD_TUPLE(MACRO(InitTuple, init_tuple, NULL, 5, 0, 1, JOF_UINT32)) \
-    /*
-     * Add the last element in the stack to the preceding tuple.
-     *
-     * Implements: [AddValueToTupleSequenceList][1].
-     *
-     * [1]: https://tc39.es/proposal-record-tuple/#sec-addvaluetotuplesequencelist
-     *
-     *   Category: Compound primitives
-     *   Type: Tuple literals
-     *   Operands:
-     *   Stack: tuple, element => tuple
-     */ \
-    IF_RECORD_TUPLE(MACRO(AddTupleElement, add_tuple_element, NULL, 1, 2, 1, JOF_BYTE)) \
-    /*
-     * Mark a tuple as "initialized", going from "write-only" mode to
-     * "read-only" mode.
-     *
-     *   Category: Compound primitives
-     *   Type: Tuple literals
-     *   Operands:
-     *   Stack: tuple => tuple
-     */ \
-    IF_RECORD_TUPLE(MACRO(FinishTuple, finish_tuple, NULL, 1, 1, 1, JOF_BYTE)) \
-    /*
      * Push a new function object.
      *
      * The new function inherits the current environment chain.
@@ -1700,7 +1625,7 @@
      *   Operands: uint32_t funcIndex
      *   Stack: => fn
      */ \
-    MACRO(Lambda, lambda, NULL, 5, 0, 1, JOF_OBJECT|JOF_USES_ENV) \
+    MACRO(Lambda, lambda, NULL, 5, 0, 1, JOF_OBJECT|JOF_USES_ENV|JOF_IC) \
     /*
      * Set the name of a function.
      *
@@ -1775,7 +1700,7 @@
      *   Operands: uint8_t kind
      *   Stack: => %BuiltinObject%
      */ \
-    MACRO(BuiltinObject, builtin_object, NULL, 2, 0, 1, JOF_UINT8) \
+    MACRO(BuiltinObject, builtin_object, NULL, 2, 0, 1, JOF_UINT8|JOF_IC) \
     /*
      * Invoke `callee` with `this` and `args`, and push the return value. Throw
      * a TypeError if `callee` isn't a function.
@@ -1905,28 +1830,22 @@
     MACRO(StrictSpreadEval, strict_spread_eval, NULL, 1, 3, 1, JOF_BYTE|JOF_INVOKE|JOF_SPREAD|JOF_CHECKSTRICT|JOF_IC) \
     /*
      * Push the implicit `this` value for an unqualified function call, like
-     * `foo()`. `nameIndex` gives the name of the function we're calling.
+     * `foo()`.
      *
      * The result is always `undefined` except when the name refers to a `with`
      * binding.  For example, in `with (date) { getFullYear(); }`, the
      * implicit `this` passed to `getFullYear` is `date`, not `undefined`.
      *
-     * This walks the run-time environment chain looking for the environment
-     * record that contains the function. If the function call definitely
-     * refers to a local binding, use `JSOp::Undefined`.
-     *
-     * Implements: [EvaluateCall][1] step 1.b. But not entirely correctly.
-     * See [bug 1166408][2].
+     * Implements: [EvaluateCall][1] step 1.b.
      *
      * [1]: https://tc39.es/ecma262/#sec-evaluatecall
-     * [2]: https://bugzilla.mozilla.org/show_bug.cgi?id=1166408
      *
      *   Category: Functions
      *   Type: Calls
-     *   Operands: uint32_t nameIndex
-     *   Stack: => this
+     *   Operands:
+     *   Stack: env => this
      */ \
-    MACRO(ImplicitThis, implicit_this, "", 5, 0, 1, JOF_ATOM|JOF_USES_ENV) \
+    MACRO(ImplicitThis, implicit_this, "", 1, 1, 1, JOF_BYTE) \
     /*
      * Push the call site object for a tagged template call.
      *
@@ -2639,6 +2558,19 @@
      */ \
     MACRO(ThrowWithStack, throw_with_stack, NULL, 1, 2, 0, JOF_BYTE) \
     /*
+     * Create a suppressed error object and push it on the stack.
+     *
+     * Implements: [DisposeResources ( disposeCapability, completion )][1], step 3.e.iii.1.a-f.
+     *
+     * [1] https://arai-a.github.io/ecma262-compare/?pr=3000&id=sec-disposeresources
+     *
+     *   Category: Control flow
+     *   Type: Exceptions
+     *   Operands:
+     *   Stack: error, suppressed => suppressedError
+     */ \
+    IF_EXPLICIT_RESOURCE_MANAGEMENT(MACRO(CreateSuppressedError, create_suppressed_error, NULL, 1, 2, 1, JOF_BYTE)) \
+    /*
      * Create and throw an Error object.
      *
      * Sometimes we know at emit time that an operation always throws. For
@@ -2849,18 +2781,29 @@
     /*
      * Look up a name on the global lexical environment's chain and push the
      * environment which contains a binding for that name. If no such binding
-     * exists, push the global lexical environment.
+     * exists, push the top-most variables object, which is the global object.
      *
      *   Category: Variables and scopes
      *   Type: Looking up bindings
      *   Operands: uint32_t nameIndex
      *   Stack: => global
      */ \
-    MACRO(BindGName, bind_g_name, NULL, 5, 0, 1, JOF_ATOM|JOF_GNAME|JOF_IC) \
+    MACRO(BindUnqualifiedGName, bind_unqualified_g_name, NULL, 5, 0, 1, JOF_ATOM|JOF_GNAME|JOF_IC) \
+    /*
+     * Look up an unqualified name on the environment chain and push the
+     * environment which contains a binding for that name. If no such binding
+     * exists, push the first variables object along the environment chain.
+     *
+     *   Category: Variables and scopes
+     *   Type: Looking up bindings
+     *   Operands: uint32_t nameIndex
+     *   Stack: => env
+     */ \
+    MACRO(BindUnqualifiedName, bind_unqualified_name, NULL, 5, 0, 1, JOF_ATOM|JOF_IC|JOF_USES_ENV) \
     /*
      * Look up a name on the environment chain and push the environment which
      * contains a binding for that name. If no such binding exists, push the
-     * global lexical environment.
+     * global object.
      *
      *   Category: Variables and scopes
      *   Type: Looking up bindings
@@ -3016,21 +2959,24 @@
      *   Operands: uint32_t nameIndex
      *   Stack: => val
      */ \
-    MACRO(GetImport, get_import, NULL, 5, 0, 1, JOF_ATOM) \
+    MACRO(GetImport, get_import, NULL, 5, 0, 1, JOF_ATOM|JOF_IC) \
     /*
      * Get the value of a binding from the environment `env`. If the name is
      * not bound in `env`, throw a ReferenceError.
      *
      * `env` must be an environment currently on the environment chain, pushed
-     * by `JSOp::BindName` or `JSOp::BindVar`.
+     * by `JSOp::BindName`, `JSOp::BindUnqualifiedName`, or `JSOp::BindVar`.
      *
-     * Note: `JSOp::BindName` and `JSOp::GetBoundName` are the two halves of the
-     * `JSOp::GetName` operation: finding and reading a variable. This
-     * decomposed version is needed to implement the compound assignment and
-     * increment/decrement operators, which get and then set a variable. The
-     * spec says the variable lookup is done only once. If we did the lookup
+     * Note: `JSOp::Bind(Unqualified)Name` and `JSOp::GetBoundName` are the two
+     * halves of the `JSOp::GetName` operation: finding and reading a variable.
+     * This decomposed version is needed to implement:
+     * 1. The call operator, which gets a variable and its this-environment.
+     * 2. The compound assignment and increment/decrement operators, which get
+     *    and then set a variable.
+     * The spec says the variable lookup is done only once. If we did the lookup
      * twice, there would be observable bugs, thanks to dynamic scoping. We
-     * could set the wrong variable or call proxy traps incorrectly.
+     * could get the wrong this-environment resp. variable or call proxy traps
+     * incorrectly.
      *
      * Implements: [GetValue][1] steps 4 and 6.
      *
@@ -3093,19 +3039,19 @@
      * This can call setters and/or proxy traps.
      *
      * `env` must be an environment currently on the environment chain,
-     * pushed by `JSOp::BindName` or `JSOp::BindVar`.
+     * pushed by `JSOp::BindUnqualifiedName` or `JSOp::BindVar`.
      *
      * This is the fallback `Set` instruction that handles all unoptimized
      * cases. Optimized instructions follow.
      *
      * Implements: [PutValue][1] steps 5 and 7 for unoptimized bindings.
      *
-     * Note: `JSOp::BindName` and `JSOp::SetName` are the two halves of simple
-     * assignment: finding and setting a variable. They are two separate
-     * instructions because, per spec, the "finding" part happens before
-     * evaluating the right-hand side of the assignment, and the "setting" part
-     * after. Optimized cases don't need a `Bind` instruction because the
-     * "finding" is done statically.
+     * Note: `JSOp::BindUnqualifiedName` and `JSOp::SetName` are the two halves
+     * of simple assignment: finding and setting a variable. They are two
+     * separate instructions because, per spec, the "finding" part happens
+     * before evaluating the right-hand side of the assignment, and the
+     * "setting" part after. Optimized cases don't need a `Bind` instruction
+     * because the "finding" is done statically.
      *
      * [1]: https://tc39.es/ecma262/#sec-putvalue
      *
@@ -3132,7 +3078,7 @@
     MACRO(StrictSetName, strict_set_name, NULL, 5, 2, 1, JOF_ATOM|JOF_PROPSET|JOF_CHECKSTRICT|JOF_IC|JOF_USES_ENV) \
     /*
      * Like `JSOp::SetName`, but for assigning to globals. `env` must be an
-     * environment pushed by `JSOp::BindGName`.
+     * environment pushed by `JSOp::BindUnqualifiedGName`.
      *
      *   Category: Variables and scopes
      *   Type: Setting binding values
@@ -3142,7 +3088,7 @@
     MACRO(SetGName, set_g_name, NULL, 5, 2, 1, JOF_ATOM|JOF_PROPSET|JOF_GNAME|JOF_CHECKSLOPPY|JOF_IC) \
     /*
      * Like `JSOp::StrictSetGName`, but for assigning to globals. `env` must be
-     * an environment pushed by `JSOp::BindGName`.
+     * an environment pushed by `JSOp::BindUnqualifiedGName`.
      *
      *   Category: Variables and scopes
      *   Type: Setting binding values
@@ -3357,10 +3303,11 @@
      *
      * Operations that may need to consult a WithEnvironment can't be correctly
      * implemented using optimized instructions like `JSOp::GetLocal`. A script
-     * must use the deoptimized `JSOp::GetName`, `BindName`, `SetName`, and
-     * `DelName` instead. Since those instructions don't work correctly with
-     * optimized locals and arguments, all bindings in scopes enclosing a
-     * `with` statement are marked as "aliased" and deoptimized too.
+     * must use the deoptimized `JSOp::GetName`, `BindUnqualifiedName`,
+     * `BindName`,`SetName`, and `DelName` instead. Since those instructions
+     * don't work correctly with optimized locals and arguments, all bindings in
+     * scopes enclosing a `with` statement are marked as "aliased" and
+     * deoptimized too.
      *
      * See `JSOp::PushLexicalEnv` for the fine print.
      *
@@ -3388,33 +3335,34 @@
      */ \
     MACRO(LeaveWith, leave_with, NULL, 1, 0, 0, JOF_BYTE) \
     /*
-     * Append the object on the stack as a disposable to be disposed on
+     * Append the object and method on the stack as a disposable to be disposed on
      * to the current lexical environment object.
      *
-     * Implements: [AddDisposableResource ( disposeCapability, V, hint [ , method ] )][1], step 3
+     * Implements: [AddDisposableResource ( disposeCapability, V, hint [ , method ] )][1], steps 3-4.
      *
      * [1] https://arai-a.github.io/ecma262-compare/?pr=3000&id=sec-adddisposableresource
      *
      *   Category: Variables and scopes
      *   Type: Entering and leaving environments
-     *   Operands:
-     *   Stack: v => v
+     *   Operands: UsingHint hint
+     *   Stack: v, method, needsClosure =>
      */ \
-    IF_EXPLICIT_RESOURCE_MANAGEMENT(MACRO(AddDisposable, add_disposable, NULL, 1, 1, 1, JOF_BYTE)) \
+    IF_EXPLICIT_RESOURCE_MANAGEMENT(MACRO(AddDisposable, add_disposable, NULL, 2, 3, 0, JOF_UINT8|JOF_USES_ENV)) \
     /*
-     * Retrieve the disposable objects from the currenct lexical environment object
-     * and dispose them.
-     *
-     * Implements: [DisposeResources ( disposeCapability, completion )][1], step 1-4
-     *
-     * [1] https://arai-a.github.io/ecma262-compare/?pr=3000&id=sec-disposeresources
+     * Get the dispose capability of the present environment object.
+     * In case the dispose capability of the environment
+     * has already been cleared or if no disposables have been
+     * pushed to the capability, it shall push undefined as the dispose
+     * capability. After extracting a non-empty dispose
+     * capability, the dispose capability is cleared from the present
+     * environment object by setting it to undefined value.
      *
      *   Category: Variables and scopes
      *   Type: Entering and leaving environments
      *   Operands:
-     *   Stack: =>
+     *   Stack: => disposeCapability
      */ \
-    IF_EXPLICIT_RESOURCE_MANAGEMENT(MACRO(DisposeDisposables, dispose_disposables, NULL, 1, 0, 0, JOF_BYTE)) \
+    IF_EXPLICIT_RESOURCE_MANAGEMENT(MACRO(TakeDisposeCapability, take_dispose_capability, NULL, 1, 0, 1, JOF_BYTE|JOF_USES_ENV)) \
     /*
      * Push the current VariableEnvironment (the environment on the environment
      * chain designated to receive new variables).
@@ -3679,13 +3627,9 @@
 
 #ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
 #  define FOR_EACH_TRAILING_UNUSED_OPCODE(MACRO) \
-    IF_RECORD_TUPLE(/* empty */, MACRO(238))     \
-    IF_RECORD_TUPLE(/* empty */, MACRO(239))     \
-    IF_RECORD_TUPLE(/* empty */, MACRO(240))     \
-    IF_RECORD_TUPLE(/* empty */, MACRO(241))     \
-    IF_RECORD_TUPLE(/* empty */, MACRO(242))     \
-    IF_RECORD_TUPLE(/* empty */, MACRO(243))     \
-    IF_RECORD_TUPLE(/* empty */, MACRO(244))     \
+    MACRO(242)                                   \
+    MACRO(243)                                   \
+    MACRO(244)                                   \
     MACRO(245)                                   \
     MACRO(246)                                   \
     MACRO(247)                                   \
@@ -3699,13 +3643,10 @@
     MACRO(255)
 #else
 #  define FOR_EACH_TRAILING_UNUSED_OPCODE(MACRO) \
-    IF_RECORD_TUPLE(/* empty */, MACRO(236))     \
-    IF_RECORD_TUPLE(/* empty */, MACRO(237))     \
-    IF_RECORD_TUPLE(/* empty */, MACRO(238))     \
-    IF_RECORD_TUPLE(/* empty */, MACRO(239))     \
-    IF_RECORD_TUPLE(/* empty */, MACRO(240))     \
-    IF_RECORD_TUPLE(/* empty */, MACRO(241))     \
-    IF_RECORD_TUPLE(/* empty */, MACRO(242))     \
+    MACRO(239)                                   \
+    MACRO(240)                                   \
+    MACRO(241)                                   \
+    MACRO(242)                                   \
     MACRO(243)                                   \
     MACRO(244)                                   \
     MACRO(245)                                   \

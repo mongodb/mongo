@@ -6,37 +6,68 @@
 
 #include "builtin/ParseRecordObject.h"
 
+#include "jsapi.h"  // JS_ValueToId, JS_IdToValue
+#include "builtin/Object.h"
+#include "vm/PlainObject.h"
+
 #include "vm/JSObject-inl.h"  // NewBuiltinClassInstance
 
 using namespace js;
 
 // https://tc39.es/proposal-json-parse-with-source/#sec-json-parse-record
 
-ParseRecordObject::ParseRecordObject()
-    : parseNode(nullptr), key(JS::PropertyKey::Void()) {}
+const JSClass ParseRecordObject::class_ = {
+    "ParseRecordObject",
+    JSCLASS_HAS_RESERVED_SLOTS(SlotCount),
+};
 
-ParseRecordObject::ParseRecordObject(Handle<js::JSONParseNode*> parseNode,
-                                     const Value& val)
-    : parseNode(parseNode), key(JS::PropertyKey::Void()), value(val) {}
+/* static */
+ParseRecordObject* ParseRecordObject::create(JSContext* cx, const Value& val) {
+  Rooted<JSONParseNode*> parseNode(cx);
+  return ParseRecordObject::create(cx, parseNode, val);
+}
 
-bool ParseRecordObject::addEntries(JSContext* cx, EntryMap&& appendEntries) {
-  if (!entries) {
-    entries = js::MakeUnique<EntryMap>(std::move(appendEntries));
-    return !!entries;
+/* static */
+ParseRecordObject* ParseRecordObject::create(JSContext* cx,
+                                             Handle<JSONParseNode*> parseNode,
+                                             const Value& val) {
+  Rooted<ParseRecordObject*> obj(
+      cx, NewObjectWithGivenProto<ParseRecordObject>(cx, nullptr));
+  if (!obj) {
+    return nullptr;
   }
-  for (auto iter = appendEntries.iter(); !iter.done(); iter.next()) {
-    if (!entries->put(iter.get().key(), std::move(iter.get().value()))) {
-      return false;
-    }
+
+  if (parseNode) {
+    obj->initSlot(ParseNodeSlot, StringValue(parseNode));
   }
+  obj->initSlot(ValueSlot, val);
+  return obj;
+}
+
+JS::PropertyKey ParseRecordObject::getKey(JSContext* cx) const {
+  Rooted<Value> slot(cx, getSlot(KeySlot));
+  Rooted<JS::PropertyKey> key(cx);
+  MOZ_ALWAYS_TRUE(JS_ValueToId(cx, slot, &key));
+  return key;
+};
+
+bool ParseRecordObject::setKey(JSContext* cx, const JS::PropertyKey& key) {
+  Rooted<Value> val(cx);
+  if (!JS_IdToValue(cx, key, &val)) {
+    return false;
+  }
+  setSlot(KeySlot, val);
   return true;
 }
 
-void ParseRecordObject::trace(JSTracer* trc) {
-  JS::TraceRoot(trc, &parseNode, "ParseRecordObject parse node");
-  JS::TraceRoot(trc, &key, "ParseRecordObject key");
-  JS::TraceRoot(trc, &value, "ParseRecordObject value");
-  if (entries) {
-    entries->trace(trc);
+void ParseRecordObject::setEntries(JSContext* cx, Handle<EntryMap*> entries) {
+  setSlot(EntriesSlot, ObjectValue(*entries));
+}
+
+void ParseRecordObject::getEntries(JSContext* cx,
+                                   MutableHandle<EntryMap*> entries) {
+  const Value& entryVal = getSlot(EntriesSlot);
+  if (entryVal.isObject()) {
+    entries.set(&entryVal.toObject());
   }
 }

@@ -47,7 +47,7 @@ namespace jit {
 
 class JitRuntime;
 
-// During Ion compilation we need access to various bits of the current
+// During offthread compilation we need access to various bits of the current
 // compartment, runtime and so forth. However, since compilation can run off
 // thread while the main thread is mutating the VM, this access needs
 // to be restricted. The classes below give the compiler an interface to access
@@ -65,8 +65,7 @@ class CompileRuntime {
 
   const JitRuntime* jitRuntime();
 
-  // Compilation does not occur off thread when the Gecko Profiler is enabled.
-  GeckoProfilerRuntime& geckoProfiler();
+  const GeckoProfilerRuntime& geckoProfiler();
 
   bool hadOutOfMemory();
   bool profilingScripts();
@@ -78,8 +77,11 @@ class CompileRuntime {
   const JSClass* maybeWindowProxyClass();
 
   const void* mainContextPtr();
+  const void* addressOfJitActivation();
   const void* addressOfJitStackLimit();
   const void* addressOfInterruptBits();
+  const void* addressOfInlinedICScript();
+  const void* addressOfRealm();
   const void* addressOfZone();
   const void* addressOfMegamorphicCache();
   const void* addressOfMegamorphicSetPropCache();
@@ -88,6 +90,8 @@ class CompileRuntime {
 
   bool hasSeenObjectEmulateUndefinedFuseIntact();
   const void* addressOfHasSeenObjectEmulateUndefinedFuse();
+
+  bool hasSeenArrayExceedsInt32LengthFuseIntact();
 
 #ifdef DEBUG
   const void* addressOfIonBailAfterCounter();
@@ -108,8 +112,6 @@ class CompileZone {
  public:
   static CompileZone* get(JS::Zone* zone);
 
-  const JitZone* jitZone();
-
   CompileRuntime* runtime();
   bool isAtomsZone();
 
@@ -128,6 +130,7 @@ class CompileZone {
 
   gc::AllocSite* catchAllAllocSite(JS::TraceKind traceKind,
                                    gc::CatchAllAllocSite siteKind);
+  gc::AllocSite* tenuringAllocSite();
 
   bool hasRealmWithAllocMetadataBuilder();
 };

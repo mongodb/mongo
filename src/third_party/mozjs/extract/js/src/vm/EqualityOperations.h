@@ -26,6 +26,9 @@ struct JS_PUBLIC_API JSContext;
 
 namespace js {
 
+extern bool ConstantStrictEqual(JSContext* cx, JS::Handle<JS::Value> val,
+                                uint16_t operand, bool* equal);
+
 /** Computes |lval === rval|. */
 extern bool StrictlyEqual(JSContext* cx, JS::Handle<JS::Value> lval,
                           JS::Handle<JS::Value> rval, bool* equal);
@@ -40,14 +43,6 @@ extern bool LooselyEqual(JSContext* cx, JS::Handle<JS::Value> lval,
  */
 extern bool SameValue(JSContext* cx, JS::Handle<JS::Value> v1,
                       JS::Handle<JS::Value> v2, bool* same);
-
-#ifdef ENABLE_RECORD_TUPLE
-/**
- * Computes |SameValue(v1, v2)|, but it expects that strings, records and
- * tuples are all linear.
- */
-extern bool SameValueZeroLinear(const JS::Value& lval, const JS::Value& rval);
-#endif
 
 /**
  * Computes |SameValueZero(v1, v2)| -- strict equality except that NaNs are

@@ -24,7 +24,7 @@
 
 #include <intrin.h>
 #include <limits>
-#include <windef.h>
+#include "util/WindowsWrapper.h"
 
 #include "mozilla/Assertions.h"
 #include "mozilla/Types.h"
@@ -50,6 +50,10 @@ inline void js::jit::AtomicOperations::fenceSeqCst() {
   // instruction on x86-64.
   static volatile LONG barrier = 0;
   (void*)InterlockedExchange(&barrier, 0);
+}
+
+inline void js::jit::AtomicOperations::pause() {
+  YieldProcessor();
 }
 
 template <typename T>

@@ -245,7 +245,6 @@ class FrameIter {
   FrameIter(JSContext* cx, DebuggerEvalOption, JSPrincipals*);
   FrameIter(const FrameIter& iter);
   MOZ_IMPLICIT FrameIter(const Data& data);
-  MOZ_IMPLICIT FrameIter(AbstractFramePtr frame);
 
   bool done() const { return data_.state_ == DONE; }
 
@@ -383,6 +382,11 @@ class FrameIter {
 
   bool inPrologue() const;
 
+  const wasm::WasmFrameIter& wasmFrame() const {
+    return data_.jitFrames_.asWasm();
+  }
+  wasm::WasmFrameIter& wasmFrame() { return data_.jitFrames_.asWasm(); }
+
  private:
   Data data_;
   jit::InlineFrameIterator ionInlineFrames_;
@@ -390,12 +394,8 @@ class FrameIter {
   const jit::JSJitFrameIter& jsJitFrame() const {
     return data_.jitFrames_.asJSJit();
   }
-  const wasm::WasmFrameIter& wasmFrame() const {
-    return data_.jitFrames_.asWasm();
-  }
 
   jit::JSJitFrameIter& jsJitFrame() { return data_.jitFrames_.asJSJit(); }
-  wasm::WasmFrameIter& wasmFrame() { return data_.jitFrames_.asWasm(); }
 
   bool isIonScripted() const {
     return isJSJit() && jsJitFrame().isIonScripted();

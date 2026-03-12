@@ -8,6 +8,7 @@
 
 #include "jit/IonAnalysis.h"
 #include "jit/JitSpewer.h"
+#include "jit/MIR-wasm.h"
 #include "jit/MIR.h"
 #include "jit/MIRGenerator.h"
 #include "jit/MIRGraph.h"
@@ -25,14 +26,14 @@ class EmulateStateOf {
  private:
   using BlockState = typename MemoryView::BlockState;
 
-  MIRGenerator* mir_;
+  const MIRGenerator* mir_;
   MIRGraph& graph_;
 
   // Block state at the entrance of all basic blocks.
   Vector<BlockState*, 8, SystemAllocPolicy> states_;
 
  public:
-  EmulateStateOf(MIRGenerator* mir, MIRGraph& graph)
+  EmulateStateOf(const MIRGenerator* mir, MIRGraph& graph)
       : mir_(mir), graph_(graph) {}
 
   bool run(MemoryView& view);
@@ -426,7 +427,7 @@ class ObjectMemoryView : public MDefinitionVisitorDefaultNoop {
   ObjectMemoryView(TempAllocator& alloc, MInstruction* obj);
 
   MBasicBlock* startingBlock();
-  bool initStartingState(BlockState** pState);
+  bool initStartingState(BlockState** outState);
 
   void setEntryBlockState(BlockState* state);
   bool mergeIntoSuccessorState(MBasicBlock* curr, MBasicBlock* succ,
@@ -489,7 +490,7 @@ ObjectMemoryView::ObjectMemoryView(TempAllocator& alloc, MInstruction* obj)
 
 MBasicBlock* ObjectMemoryView::startingBlock() { return startBlock_; }
 
-bool ObjectMemoryView::initStartingState(BlockState** pState) {
+bool ObjectMemoryView::initStartingState(BlockState** outState) {
   // Uninitialized slots have an "undefined" value.
   undefinedVal_ = MConstant::New(alloc_, UndefinedValue());
   startBlock_->insertBefore(obj_, undefinedVal_);
@@ -509,7 +510,7 @@ bool ObjectMemoryView::initStartingState(BlockState** pState) {
   // Hold out of resume point until it is visited.
   state->setInWorklist();
 
-  *pState = state;
+  *outState = state;
   return true;
 }
 
@@ -1782,7 +1783,7 @@ static inline bool IsOptimizableArgumentsInstruction(MInstruction* ins) {
 
 class ArgumentsReplacer : public MDefinitionVisitorDefaultNoop {
  private:
-  MIRGenerator* mir_;
+  const MIRGenerator* mir_;
   MIRGraph& graph_;
   MInstruction* args_;
 
@@ -1814,7 +1815,8 @@ class ArgumentsReplacer : public MDefinitionVisitorDefaultNoop {
   bool oom() const { return oom_; }
 
  public:
-  ArgumentsReplacer(MIRGenerator* mir, MIRGraph& graph, MInstruction* args)
+  ArgumentsReplacer(const MIRGenerator* mir, MIRGraph& graph,
+                    MInstruction* args)
       : mir_(mir), graph_(graph), args_(args) {
     MOZ_ASSERT(IsOptimizableArgumentsInstruction(args_));
   }
@@ -2550,7 +2552,7 @@ static inline bool IsOptimizableRestInstruction(MInstruction* ins) {
 
 class RestReplacer : public MDefinitionVisitorDefaultNoop {
  private:
-  MIRGenerator* mir_;
+  const MIRGenerator* mir_;
   MIRGraph& graph_;
   MInstruction* rest_;
 
@@ -2576,7 +2578,7 @@ class RestReplacer : public MDefinitionVisitorDefaultNoop {
   bool escapes(MElements* ins);
 
  public:
-  RestReplacer(MIRGenerator* mir, MIRGraph& graph, MInstruction* rest)
+  RestReplacer(const MIRGenerator* mir, MIRGraph& graph, MInstruction* rest)
       : mir_(mir), graph_(graph), rest_(rest) {
     MOZ_ASSERT(IsOptimizableRestInstruction(rest_));
   }
@@ -3011,11 +3013,373 @@ void RestReplacer::visitConstructArray(MConstructArray* ins) {
   discardInstruction(ins, elements);
 }
 
-bool ScalarReplacement(MIRGenerator* mir, MIRGraph& graph) {
+// WebAssembly only supports scalar replacement of structs with only inline
+// data for now.
+static inline bool IsOptimizableWasmStructInstruction(MInstruction* ins) {
+  return ins->isWasmNewStructObject() &&
+         !ins->toWasmNewStructObject()->isOutline();
+}
+
+class WasmStructMemoryView : public MDefinitionVisitorDefaultNoop {
+ public:
+  using BlockState = MWasmStructState;
+  static const char phaseName[];
+
+ private:
+  TempAllocator& alloc_;
+  MInstruction* struct_;
+  MConstant* undefinedVal_;
+  MBasicBlock* startBlock_;
+  BlockState* state_;
+
+  bool oom_;
+
+ public:
+  WasmStructMemoryView(TempAllocator& alloc, MInstruction* wasmStruct);
+
+  MBasicBlock* startingBlock();
+  bool initStartingState(BlockState** pState);
+
+  void setEntryBlockState(BlockState* state);
+  bool mergeIntoSuccessorState(MBasicBlock* curr, MBasicBlock* succ,
+                               BlockState** pSuccState);
+
+#ifdef DEBUG
+  void assertSuccess();
+#else
+  void assertSuccess() {}
+#endif
+
+  bool oom() const { return oom_; }
+
+ public:
+  void visitResumePoint(MResumePoint* rp);
+  void visitPhi(MPhi* ins);
+  void visitWasmStoreField(MWasmStoreField* ins);
+  void visitWasmStoreFieldRef(MWasmStoreFieldRef* ins);
+  void visitWasmLoadField(MWasmLoadField* ins);
+  void visitWasmPostWriteBarrierWholeCell(MWasmPostWriteBarrierWholeCell* ins);
+};
+
+void WasmStructMemoryView::setEntryBlockState(BlockState* state) {
+  state_ = state;
+}
+
+#ifdef DEBUG
+void WasmStructMemoryView::assertSuccess() {
+  // Make sure that the undefined value used as a placeholder is not used.
+  MOZ_ASSERT(!undefinedVal_->hasUses());
+
+  // Make sure that the MWasmNewStruct instruction is not used anymore.
+  MOZ_ASSERT(!struct_->hasUses());
+}
+#endif
+
+MBasicBlock* WasmStructMemoryView::startingBlock() { return startBlock_; }
+
+bool WasmStructMemoryView::initStartingState(BlockState** pState) {
+  // We need this undefined value to initialize phi inputs if we create some
+  // later.
+  undefinedVal_ = MConstant::New(alloc_, UndefinedValue());
+
+  // Create a new block state and insert at it at the location of the new
+  // struct.
+  BlockState* state = BlockState::New(alloc_, struct_);
+  if (!state || !state->init()) {
+    return false;
+  }
+
+  *pState = state;
+  return true;
+}
+
+// Return true if all phi operands are equal to |newStruct|.
+static bool WasmStructPhiOperandsEqualTo(MPhi* phi, MInstruction* newStruct) {
+  MOZ_ASSERT(IsOptimizableWasmStructInstruction(newStruct));
+
+  for (size_t i = 0; i < phi->numOperands(); i++) {
+    if (!PhiOperandEqualTo(phi->getOperand(i), newStruct)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+void WasmStructMemoryView::visitPhi(MPhi* ins) {
+  // Skip phis on other objects.
+  if (!WasmStructPhiOperandsEqualTo(ins, struct_)) {
+    return;
+  }
+
+  // Replace the phi by its object.
+  ins->replaceAllUsesWith(struct_);
+
+  // Remove original instruction.
+  ins->block()->discardPhi(ins);
+}
+
+// We need to define this method for the pass to work,
+// but we don't have resume points in wasm.
+void WasmStructMemoryView::visitResumePoint(MResumePoint* rp) {}
+
+void WasmStructMemoryView::visitWasmStoreField(MWasmStoreField* ins) {
+  // Skip stores made on other structs.
+  MDefinition* base = ins->base();
+  if (base != struct_) {
+    return;
+  }
+
+  // Clone the state and update the field value.
+  state_ = BlockState::Copy(alloc_, state_);
+  if (!state_) {
+    oom_ = true;
+    return;
+  }
+
+  // Update the state
+  state_->setField(ins->structFieldIndex().value(), ins->value());
+
+  // Remove original instruction.
+  ins->block()->discard(ins);
+}
+
+void WasmStructMemoryView::visitWasmStoreFieldRef(MWasmStoreFieldRef* ins) {
+  // Skip stores made on other structs.
+  MDefinition* base = ins->base();
+  if (base != struct_) {
+    return;
+  }
+
+  // Clone the state and update the field value.
+  state_ = BlockState::Copy(alloc_, state_);
+  if (!state_) {
+    oom_ = true;
+    return;
+  }
+
+  // Update the state
+  state_->setField(ins->structFieldIndex().value(), ins->value());
+
+  // Remove original instruction.
+  ins->block()->discard(ins);
+}
+
+void WasmStructMemoryView::visitWasmLoadField(MWasmLoadField* ins) {
+  // Skip loads made on other structs.
+  MDefinition* base = ins->base();
+  if (base != struct_) {
+    return;
+  }
+
+  MDefinition* value = state_->getField(ins->structFieldIndex().value());
+
+  // Replace load by the field value.
+  ins->replaceAllUsesWith(value);
+
+  // Remove original instruction.
+  ins->block()->discard(ins);
+}
+
+void WasmStructMemoryView::visitWasmPostWriteBarrierWholeCell(
+    MWasmPostWriteBarrierWholeCell* ins) {
+  // Skip loads made on other objects.
+  if (ins->object() != struct_) {
+    return;
+  }
+
+  // Remove original instruction.
+  ins->block()->discard(ins);
+}
+
+bool WasmStructMemoryView::mergeIntoSuccessorState(MBasicBlock* curr,
+                                                   MBasicBlock* succ,
+                                                   BlockState** pSuccState) {
+  BlockState* succState = *pSuccState;
+
+  // When a block has no state yet, create an empty one for the
+  // successor.
+  if (!succState) {
+    // If the successor is not dominated then the struct cannot flow
+    // in this basic block without a Phi.  We know that no Phi exist
+    // in non-dominated successors as the conservative escaped
+    // analysis fails otherwise.  Such condition can succeed if the
+    // successor is a join at the end of a if-block and the struct
+    // only exists within the branch.
+    if (!startBlock_->dominates(succ)) {
+      return true;
+    }
+
+    // If there is only one predecessor, carry over the last state of the
+    // block to the successor. As the block state is immutable, if the
+    // current block has multiple successors, they will share the same entry
+    // state.
+    if (succ->numPredecessors() <= 1 || !state_->numFields()) {
+      *pSuccState = state_;
+      return true;
+    }
+
+    // If we have multiple predecessors, then we allocate one Phi node for
+    // each predecessor, and create a new block state which only has phi
+    // nodes. These would later be removed by the removal of redundant phi
+    // nodes.
+    succState = BlockState::Copy(alloc_, state_);
+    if (!succState) {
+      return false;
+    }
+
+    size_t numPreds = succ->numPredecessors();
+    for (size_t index = 0; index < state_->numFields(); index++) {
+      MPhi* phi = MPhi::New(alloc_.fallible());
+      if (!phi || !phi->reserveLength(numPreds)) {
+        return false;
+      }
+
+      // Fill the input of the successors Phi with undefined
+      // values, and each block later fills the Phi inputs.
+      for (size_t p = 0; p < numPreds; p++) {
+        phi->addInput(undefinedVal_);
+      }
+
+      // Add Phi in the list of Phis of the basic block.
+      succ->addPhi(phi);
+
+      // Set the result type of this phi depending on the previous fields.
+      phi->setResultType(succState->getField(index)->type());
+      succState->setField(index, phi);
+    }
+
+    *pSuccState = succState;
+  }
+
+  MOZ_ASSERT_IF(succ == startBlock_, startBlock_->isLoopHeader());
+  if (succ->numPredecessors() > 1 && succState->numFields() &&
+      succ != startBlock_) {
+    // We need to re-compute successorWithPhis as the previous EliminatePhis
+    // phase might have removed all the Phis from the successor block.
+    size_t currIndex;
+    MOZ_ASSERT(!succ->phisEmpty());
+    if (curr->successorWithPhis()) {
+      MOZ_ASSERT(curr->successorWithPhis() == succ);
+      currIndex = curr->positionInPhiSuccessor();
+    } else {
+      currIndex = succ->indexForPredecessor(curr);
+      curr->setSuccessorWithPhis(succ, currIndex);
+    }
+    MOZ_ASSERT(succ->getPredecessor(currIndex) == curr);
+
+    // Copy the current element states to the index of current block in all
+    // the Phi created during the first visit of the successor.
+    for (size_t index = 0; index < state_->numFields(); index++) {
+      MPhi* phi = succState->getField(index)->toPhi();
+      phi->replaceOperand(currIndex, state_->getField(index));
+    }
+  }
+
+  return true;
+}
+
+// Returns False if the wasm struct is not escaped and if it is optimizable by
+// ScalarReplacementOfStruct.
+static bool IsWasmStructEscaped(MDefinition* ins, MInstruction* newStruct) {
+  MOZ_ASSERT(ins->type() == MIRType::WasmAnyRef);
+  MOZ_ASSERT(IsOptimizableWasmStructInstruction(newStruct));
+
+  JitSpewDef(JitSpew_Escape, "Check wasm struct\n", ins);
+  JitSpewIndent spewIndent(JitSpew_Escape);
+
+  // Don't do scalar replacement on big structs.
+  if (newStruct->isWasmNewStructObject()) {
+    if (newStruct->toWasmNewStructObject()->structType().fields_.length() >
+        wasm::MaxFieldsScalarReplacementStructs) {
+      JitSpew(JitSpew_Escape, "struct too big for scalar replacement\n");
+      return true;
+    }
+  }
+
+  // We don't support defaultable structs for now.
+  if (newStruct->isWasmNewStructObject() &&
+      newStruct->toWasmNewStructObject()->zeroFields()) {
+    JitSpew(JitSpew_Escape, "Struct is created with new_default\n");
+    return true;
+  }
+
+  // Check if the struct is escaped. If the object is not the first argument
+  // of either a known Store / Load, then we consider it as escaped. This is a
+  // cheap and conservative escape analysis.
+  for (MUseIterator i(ins->usesBegin()); i != ins->usesEnd(); i++) {
+    MNode* consumer = (*i)->consumer();
+
+    if (!consumer->isDefinition()) {
+      JitSpew(JitSpew_Escape, "Wasm struct is escaped");
+      return true;
+    }
+
+    MDefinition* def = consumer->toDefinition();
+    switch (def->op()) {
+      // This instruction can only store primitive types.
+      // Another struct won't be able to escape through it.
+      case MDefinition::Opcode::WasmStoreField: {
+        break;
+      }
+      case MDefinition::Opcode::WasmStoreFieldRef: {
+        // Escaped if it's stored into another struct.
+        if (def->toWasmStoreFieldRef()->value() == newStruct) {
+          JitSpewDef(JitSpew_Escape, "is escaped by\n", def);
+          return true;
+        }
+        break;
+      }
+      // Not escaped if we load into a field of this struct.
+      case MDefinition::Opcode::WasmLoadField: {
+        break;
+      }
+      // Handle phis.
+      case MDefinition::Opcode::Phi: {
+        auto* phi = def->toPhi();
+        if (!WasmStructPhiOperandsEqualTo(phi, newStruct)) {
+          JitSpewDef(JitSpew_Escape, "has different phi operands\n", def);
+          return true;
+        }
+        if (IsWasmStructEscaped(phi, newStruct)) {
+          JitSpewDef(JitSpew_Escape, "is indirectly escaped by\n", def);
+          return true;
+        }
+        break;
+      }
+
+      case MDefinition::Opcode::WasmPostWriteBarrierWholeCell: {
+        break;
+      }
+
+      // By default, we consider the struct as escaped.
+      default:
+        JitSpewDef(JitSpew_Escape, "is escaped by\n", def);
+        return true;
+    }
+  }
+
+  JitSpew(JitSpew_Escape, "Struct is not escaped");
+  return false;
+}
+
+/* static */ const char WasmStructMemoryView::phaseName[] =
+    "Scalar Replacement of wasm structs";
+
+WasmStructMemoryView::WasmStructMemoryView(TempAllocator& alloc,
+                                           MInstruction* wasmStruct)
+    : alloc_(alloc),
+      struct_(wasmStruct),
+      undefinedVal_(nullptr),
+      startBlock_(wasmStruct->block()),
+      state_(nullptr),
+      oom_(false) {}
+
+bool ScalarReplacement(const MIRGenerator* mir, MIRGraph& graph) {
   JitSpew(JitSpew_Escape, "Begin (ScalarReplacement)");
 
   EmulateStateOf<ObjectMemoryView> replaceObject(mir, graph);
   EmulateStateOf<ArrayMemoryView> replaceArray(mir, graph);
+  EmulateStateOf<WasmStructMemoryView> replaceWasmStructs(mir, graph);
   bool addedPhi = false;
 
   for (ReversePostorderIterator block = graph.rpoBegin();
@@ -3066,6 +3430,17 @@ bool ScalarReplacement(MIRGenerator* mir, MIRGraph& graph) {
         if (!replacer.run()) {
           return false;
         }
+        continue;
+      }
+
+      if (IsOptimizableWasmStructInstruction(*ins) &&
+          !IsWasmStructEscaped(*ins, *ins)) {
+        WasmStructMemoryView view(graph.alloc(), *ins);
+        if (!replaceWasmStructs.run(view)) {
+          return false;
+        }
+        view.assertSuccess();
+        addedPhi = true;
         continue;
       }
     }

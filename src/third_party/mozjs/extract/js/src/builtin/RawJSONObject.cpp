@@ -11,20 +11,25 @@
 
 using namespace js;
 
-const JSClass RawJSONObject::class_ = {"RawJSON",
-                                       JSCLASS_HAS_RESERVED_SLOTS(SlotCount)};
+const JSClass RawJSONObject::class_ = {
+    "RawJSON",
+    JSCLASS_HAS_RESERVED_SLOTS(SlotCount),
+};
 
 /* static */
 RawJSONObject* RawJSONObject::create(JSContext* cx,
                                      Handle<JSString*> jsonString) {
+  // https://tc39.es/proposal-json-parse-with-source/#sec-json.rawjson
+  // Step 5
   Rooted<RawJSONObject*> obj(
       cx, NewObjectWithGivenProto<RawJSONObject>(cx, nullptr));
   if (!obj) {
     return nullptr;
   }
+  // Step 6
   Rooted<PropertyKey> id(cx, NameToId(cx->names().rawJSON));
   Rooted<Value> jsonStringVal(cx, StringValue(jsonString));
-  if (!NativeDefineDataProperty(cx, obj, id, jsonStringVal, 0)) {
+  if (!NativeDefineDataProperty(cx, obj, id, jsonStringVal, JSPROP_ENUMERATE)) {
     return nullptr;
   }
   return obj;

@@ -40,7 +40,8 @@ using namespace js;
     "StencilObject",
     JSCLASS_HAS_RESERVED_SLOTS(StencilObject::ReservedSlots) |
         JSCLASS_BACKGROUND_FINALIZE,
-    &StencilObject::classOps_};
+    &StencilObject::classOps_,
+};
 
 bool StencilObject::hasStencil() const {
   // The stencil may not be present yet if we GC during initialization.
@@ -89,7 +90,8 @@ JS::Stencil* StencilObject::stencil() const {
     "StencilXDRBufferObject",
     JSCLASS_HAS_RESERVED_SLOTS(StencilXDRBufferObject::ReservedSlots) |
         JSCLASS_BACKGROUND_FINALIZE,
-    &StencilXDRBufferObject::classOps_};
+    &StencilXDRBufferObject::classOps_,
+};
 
 bool StencilXDRBufferObject::hasBuffer() const {
   // The stencil may not be present yet if we GC during initialization.

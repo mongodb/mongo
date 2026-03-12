@@ -20,6 +20,7 @@ ABIArg ABIArgGenerator::next(MIRType type) {
     case MIRType::Float32:
     case MIRType::Pointer:
     case MIRType::WasmAnyRef:
+    case MIRType::WasmArrayData:
     case MIRType::StackResults:
       current_ = ABIArg(stackOffset_);
       stackOffset_ += sizeof(uint32_t);

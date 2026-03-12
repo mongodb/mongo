@@ -26,6 +26,8 @@
 
 #include "mozilla/DebugOnly.h"
 
+#include <cstring>
+
 #include "jit/arm64/vixl/Debugger-vixl.h"
 #include "jit/arm64/vixl/MozCachingDecoder.h"
 #include "jit/arm64/vixl/Simulator-vixl.h"
@@ -53,6 +55,9 @@ Simulator::Simulator(Decoder* decoder, FILE* stream)
   , stack_limit_(nullptr)
   , decoder_(nullptr)
   , oom_(false)
+  , single_stepping_(false)
+  , single_step_callback_(nullptr)
+  , single_step_callback_arg_(nullptr)
 {
     this->init(decoder, stream);
 
@@ -517,6 +522,13 @@ Simulator::VisitCallRedirection(const Instruction* instr)
   DebugOnly<int64_t> x29 = xreg(29);
   DebugOnly<int64_t> savedSP = get_sp();
 
+#ifdef DEBUG
+  qreg_t qregs[kNumberOfCalleeSavedFPRegisters] = {};
+  for (unsigned i = 0; i < kNumberOfCalleeSavedFPRegisters; i++) {
+    qregs[i] = qreg(kFirstCalleeSavedFPRegisterIndex + i);
+  }
+#endif
+
   // Get the SP for reading stack arguments
   int64_t* sp = reinterpret_cast<int64_t*>(get_sp());
   // Remember LR for returning from the "call".
@@ -545,12 +557,20 @@ Simulator::VisitCallRedirection(const Instruction* instr)
   float s3 = sreg(3);
   float s4 = sreg(4);
 
+  if (single_stepping_) {
+    single_step_callback_(single_step_callback_arg_, this, nullptr);
+  }
+
   // Dispatch the call and set the return value.
   switch (redir->type()) {
     ABI_FUNCTION_TYPE_ARM64_SIM_DISPATCH
 
     default:
       MOZ_CRASH("Unknown function type.");
+  }
+
+  if (single_stepping_) {
+    single_step_callback_(single_step_callback_arg_, this, nullptr);
   }
 
   // Nuke the volatile registers. x0-x7 are used as result registers, but except
@@ -575,6 +595,37 @@ Simulator::VisitCallRedirection(const Instruction* instr)
 
   // Assert that the stack is unchanged.
   VIXL_ASSERT(savedSP == get_sp());
+
+  constexpr qreg_t code_feed_1bad_data = {
+      0xc0, 0xde, 0xfe, 0xed, 0x1b, 0xad, 0xda, 0x7a,
+      0xc0, 0xde, 0xfe, 0xed, 0x1b, 0xad, 0xda, 0x7a,
+  };
+
+  // v0-v7 are used as argument and result registers. We're currently only using
+  // v0 as an output register, so clobber the remaining registers.
+  for (unsigned i = 1; i < kFirstCalleeSavedFPRegisterIndex; i++) {
+    set_qreg(i, code_feed_1bad_data);
+  }
+
+  // Bottom 64 bits of v8-v15 are callee preserved.
+  for (unsigned i = 0; i < kNumberOfCalleeSavedFPRegisters; i++) {
+    qreg_t r = qreg(kFirstCalleeSavedFPRegisterIndex + i);
+
+    // Assert callee-saved register halves are unchanged.
+    VIXL_ASSERT(std::memcmp(&r.val, &qregs[i].val, sizeof(int64_t)) == 0);
+
+    // Clobber high 64 bits.
+    std::memcpy(&r.val[sizeof(int64_t)], &code_feed_1bad_data.val,
+                sizeof(int64_t));
+    set_qreg(kFirstCalleeSavedFPRegisterIndex + i, r);
+  }
+
+  // v16-v31 are temporary registers and caller preserved.
+  constexpr unsigned kFirstTempFPRegisterIndex =
+      kFirstCalleeSavedFPRegisterIndex + kNumberOfCalleeSavedFPRegisters;
+  for (unsigned i = kFirstTempFPRegisterIndex; i < kNumberOfVRegisters; i++) {
+    set_qreg(i, code_feed_1bad_data);
+  }
 
   // Simulate a return.
   set_lr(savedLR);

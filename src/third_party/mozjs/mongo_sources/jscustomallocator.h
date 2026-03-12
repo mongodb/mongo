@@ -30,15 +30,20 @@
 #include <cstdlib>
 #include <cstring>
 
-#include <jstypes.h>
-
 #include "jscustomallocator_oom.h"
+#include <jstypes.h>
 
 namespace mongo {
 namespace sm {
+JS_PUBLIC_API void reset(size_t max_bytes, bool track_mmap);
 JS_PUBLIC_API size_t get_total_bytes();
-JS_PUBLIC_API void reset(size_t max_bytes);
 JS_PUBLIC_API size_t get_max_bytes();
+
+JS_PUBLIC_API void check_oom_on_mmap_allocation(size_t bytes);
+
+size_t get_malloc_bytes();
+size_t get_mmap_bytes();
+void signal_oom();
 }  // namespace sm
 }  // namespace mongo
 
@@ -60,6 +65,7 @@ JS_PUBLIC_API void* js_arena_realloc(arena_id_t arena, void* p, size_t bytes);
 namespace js {
 
 extern JS_PUBLIC_DATA arena_id_t MallocArena;
+extern JS_PUBLIC_DATA arena_id_t BackgroundMallocArena;
 extern JS_PUBLIC_DATA arena_id_t ArrayBufferContentsArena;
 extern JS_PUBLIC_DATA arena_id_t StringBufferArena;
 

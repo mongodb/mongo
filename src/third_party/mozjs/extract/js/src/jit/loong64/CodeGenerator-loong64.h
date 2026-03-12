@@ -14,7 +14,6 @@ namespace js {
 namespace jit {
 
 class CodeGeneratorLOONG64;
-class OutOfLineBailout;
 class OutOfLineTableSwitch;
 
 using OutOfLineWasmTruncateCheck =
@@ -24,8 +23,8 @@ class CodeGeneratorLOONG64 : public CodeGeneratorShared {
   friend class MoveResolverLA;
 
  protected:
-  CodeGeneratorLOONG64(MIRGenerator* gen, LIRGraph* graph,
-                       MacroAssembler* masm);
+  CodeGeneratorLOONG64(MIRGenerator* gen, LIRGraph* graph, MacroAssembler* masm,
+                       const wasm::CodeMetadata* wasmCodeMeta);
 
   NonAssertingLabel deoptLabel_;
 
@@ -34,9 +33,9 @@ class CodeGeneratorLOONG64 : public CodeGeneratorShared {
   Operand ToOperand(const LDefinition* def);
 
 #ifdef JS_PUNBOX64
-  Operand ToOperandOrRegister64(const LInt64Allocation input);
+  Operand ToOperandOrRegister64(const LInt64Allocation& input);
 #else
-  Register64 ToOperandOrRegister64(const LInt64Allocation input);
+  Register64 ToOperandOrRegister64(const LInt64Allocation& input);
 #endif
 
   MoveOperand toMoveOperand(LAllocation a) const;
@@ -111,10 +110,6 @@ class CodeGeneratorLOONG64 : public CodeGeneratorShared {
       jumpToBlock(mirTrue);
     }
   }
-  void testZeroEmitBranch(Assembler::Condition cond, Register reg,
-                          MBasicBlock* ifTrue, MBasicBlock* ifFalse) {
-    emitBranch(reg, Imm32(0), cond, ifTrue, ifFalse);
-  }
 
   void emitTableSwitchDispatch(MTableSwitch* mir, Register index,
                                Register base);
@@ -143,65 +138,22 @@ class CodeGeneratorLOONG64 : public CodeGeneratorShared {
 
  public:
   // Out of line visitors.
-  void visitOutOfLineBailout(OutOfLineBailout* ool);
   void visitOutOfLineTableSwitch(OutOfLineTableSwitch* ool);
   void visitOutOfLineWasmTruncateCheck(OutOfLineWasmTruncateCheck* ool);
 
  protected:
-  void testNullEmitBranch(Assembler::Condition cond, const ValueOperand& value,
-                          MBasicBlock* ifTrue, MBasicBlock* ifFalse) {
-    MOZ_ASSERT(value.valueReg() != SecondScratchReg);
-    masm.splitTag(value.valueReg(), SecondScratchReg);
-    emitBranch(SecondScratchReg, ImmTag(JSVAL_TAG_NULL), cond, ifTrue, ifFalse);
-  }
-  void testUndefinedEmitBranch(Assembler::Condition cond,
-                               const ValueOperand& value, MBasicBlock* ifTrue,
-                               MBasicBlock* ifFalse) {
-    MOZ_ASSERT(value.valueReg() != SecondScratchReg);
-    masm.splitTag(value.valueReg(), SecondScratchReg);
-    emitBranch(SecondScratchReg, ImmTag(JSVAL_TAG_UNDEFINED), cond, ifTrue,
-               ifFalse);
-  }
-  void testObjectEmitBranch(Assembler::Condition cond,
-                            const ValueOperand& value, MBasicBlock* ifTrue,
-                            MBasicBlock* ifFalse) {
-    MOZ_ASSERT(value.valueReg() != SecondScratchReg);
-    masm.splitTag(value.valueReg(), SecondScratchReg);
-    emitBranch(SecondScratchReg, ImmTag(JSVAL_TAG_OBJECT), cond, ifTrue,
-               ifFalse);
-  }
-
-  void emitBigIntDiv(LBigIntDiv* ins, Register dividend, Register divisor,
-                     Register output, Label* fail);
-  void emitBigIntMod(LBigIntMod* ins, Register dividend, Register divisor,
-                     Register output, Label* fail);
+  void emitBigIntPtrDiv(LBigIntPtrDiv* ins, Register dividend, Register divisor,
+                        Register output);
+  void emitBigIntPtrMod(LBigIntPtrMod* ins, Register dividend, Register divisor,
+                        Register output);
 
   template <typename T>
   void emitWasmLoadI64(T* ins);
   template <typename T>
   void emitWasmStoreI64(T* ins);
-
-  ValueOperand ToValue(LInstruction* ins, size_t pos);
-  ValueOperand ToTempValue(LInstruction* ins, size_t pos);
-
-  // Functions for LTestVAndBranch.
-  void splitTagForTest(const ValueOperand& value, ScratchTagScope& tag);
 };
 
 typedef CodeGeneratorLOONG64 CodeGeneratorSpecific;
-
-// An out-of-line bailout thunk.
-class OutOfLineBailout : public OutOfLineCodeBase<CodeGeneratorLOONG64> {
- protected:
-  LSnapshot* snapshot_;
-
- public:
-  OutOfLineBailout(LSnapshot* snapshot) : snapshot_(snapshot) {}
-
-  void accept(CodeGeneratorLOONG64* codegen) override;
-
-  LSnapshot* snapshot() const { return snapshot_; }
-};
 
 }  // namespace jit
 }  // namespace js

@@ -63,7 +63,7 @@ static HashNumber HashStringIgnoreCaseASCII(const Char* s, size_t length) {
 }
 
 js::intl::SharedIntlData::TimeZoneHasher::Lookup::Lookup(
-    JSLinearString* timeZone)
+    const JSLinearString* timeZone)
     : js::intl::SharedIntlData::LinearStringLookup(timeZone) {
   if (isLatin1) {
     hash = HashStringIgnoreCaseASCII(latin1Chars, length);
@@ -285,7 +285,8 @@ js::intl::SharedIntlData::availableTimeZonesIteration(JSContext* cx) {
   return availableTimeZones.iter();
 }
 
-js::intl::SharedIntlData::LocaleHasher::Lookup::Lookup(JSLinearString* locale)
+js::intl::SharedIntlData::LocaleHasher::Lookup::Lookup(
+    const JSLinearString* locale)
     : js::intl::SharedIntlData::LinearStringLookup(locale) {
   if (isLatin1) {
     hash = mozilla::HashString(latin1Chars, length);
@@ -530,6 +531,7 @@ bool js::intl::SharedIntlData::isSupportedLocale(JSContext* cx,
       return true;
     case SupportedLocaleKind::DateTimeFormat:
     case SupportedLocaleKind::DisplayNames:
+    case SupportedLocaleKind::DurationFormat:
     case SupportedLocaleKind::ListFormat:
     case SupportedLocaleKind::NumberFormat:
     case SupportedLocaleKind::PluralRules:
@@ -554,6 +556,7 @@ js::ArrayObject* js::intl::SharedIntlData::availableLocalesOf(
       break;
     case SupportedLocaleKind::DateTimeFormat:
     case SupportedLocaleKind::DisplayNames:
+    case SupportedLocaleKind::DurationFormat:
     case SupportedLocaleKind::ListFormat:
     case SupportedLocaleKind::NumberFormat:
     case SupportedLocaleKind::PluralRules:

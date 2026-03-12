@@ -279,7 +279,7 @@ static_assert(PAYLOAD_INFO_SHIFT == 0);
 
 #ifdef JS_NUNBOX32
 static inline NunboxPartKind AllocationToPartKind(const LAllocation& a) {
-  if (a.isRegister()) {
+  if (a.isGeneralReg()) {
     return Part_Reg;
   }
   if (a.isStackSlot()) {
@@ -312,58 +312,97 @@ static MOZ_ALWAYS_INLINE bool CanEncodeInfoInHeader(const LAllocation& a,
 void SafepointWriter::writeNunboxParts(LSafepoint* safepoint) {
   LSafepoint::NunboxList& entries = safepoint->nunboxParts();
 
-#  ifdef JS_JITSPEW
-  if (JitSpewEnabled(JitSpew_Safepoints)) {
-    for (uint32_t i = 0; i < entries.length(); i++) {
-      SafepointNunboxEntry& entry = entries[i];
-      if (entry.type.isUse() || entry.payload.isUse()) {
-        continue;
-      }
-      JitSpewHeader(JitSpew_Safepoints);
-      Fprinter& out = JitSpewPrinter();
-      out.printf("    nunbox (type in ");
-      DumpNunboxPart(entry.type);
-      out.printf(", payload in ");
-      DumpNunboxPart(entry.payload);
-      out.printf(")\n");
-    }
-  }
-#  endif
+  // This function assumes Values have `payloadVreg == typeVreg + 1`.
+  static_assert(VREG_TYPE_OFFSET == 0);
+  static_assert(VREG_DATA_OFFSET == 1);
 
-  // Safepoints are permitted to have partially filled in entries for nunboxes,
-  // provided that only the type is live and not the payload. Omit these from
-  // the written safepoint.
+  // Sort the entries by vreg in ascending order to simplify the code below and
+  // to avoid quadratic behavior. If there are multiple entries for the same
+  // vreg, we also sort them by the LAllocation bits to ensure we get the same
+  // order for different `std::sort` implementations.
+  auto compareEntries = [](auto a, auto b) -> bool {
+    if (a.vreg() != b.vreg()) {
+      return a.vreg() < b.vreg();
+    }
+    MOZ_ASSERT(a.isType() == b.isType());
+    return a.alloc().asRawBits() < b.alloc().asRawBits();
+  };
+  std::sort(entries.begin(), entries.end(), compareEntries);
+
+  // We need to write an entry for Values where we have both a type half and a
+  // payload half. If the type part has vreg `x`, then the corresponding payload
+  // part must have vreg `x + 1`. Because we sorted the vector by vreg, we'll
+  // always see the type parts of a Value before its payload parts when we
+  // iterate over the entries.
+  //
+  // If there are multiple allocations for the payload half, we need to include
+  // all of them. This is important for Generational and Compacting GC because
+  // they can change the payload part when moving GC things in memory.
+  //
+  // However if there are multiple allocations for the type half, it doesn't
+  // matter which one we pick because the GC never changes the Value's type tag.
+  //
+  // For example, if the vector contains the following data:
+  //
+  //   (isType: true,  vreg: 0, allocation: eax)
+  //   (isType: true,  vreg: 0, allocation: stackslot0)
+  //   (isType: false, vreg: 1, allocation: ebx)
+  //   (isType: false, vreg: 1, allocation: stackslot4)
+  //
+  // We need to write the following (type, payload) entries:
+  //
+  //   (eax or stackslot0, ebx)
+  //   (eax or stackslot0, stackslot4)
+  //
+  // With the Backtracking allocator it's possible that we only have the type
+  // half or the payload half (when the allocator uses a longer range than
+  // strictly necessary for one of the spill bundles). We ignore these entries
+  // because the Value is effectively dead in this case.
 
   size_t pos = stream_.length();
   stream_.writeUnsigned(entries.length());
 
   size_t count = 0;
-  for (size_t i = 0; i < entries.length(); i++) {
-    SafepointNunboxEntry& entry = entries[i];
-
-    if (entry.payload.isUse()) {
-      // No allocation associated with the payload.
+  mozilla::Maybe<SafepointNunboxEntry> lastTypeEntry;
+  for (SafepointNunboxEntry entry : entries) {
+    if (entry.isType()) {
+      lastTypeEntry = mozilla::Some(entry);
       continue;
     }
 
-    if (entry.type.isUse()) {
-      // No allocation associated with the type. Look for another
-      // safepoint entry with an allocation for the type.
-      entry.type = safepoint->findTypeAllocation(entry.typeVreg);
-      if (entry.type.isUse()) {
-        continue;
-      }
+    // Ignore payload parts without a corresponding type part.
+    SafepointNunboxEntry payloadEntry = entry;
+    if (lastTypeEntry.isNothing() ||
+        lastTypeEntry->vreg() + 1 != payloadEntry.vreg()) {
+      continue;
     }
+
+    SafepointNunboxEntry typeEntry = *lastTypeEntry;
+    MOZ_ASSERT(typeEntry.isType());
+    MOZ_ASSERT(!payloadEntry.isType());
+
+#  ifdef JS_JITSPEW
+    if (JitSpewEnabled(JitSpew_Safepoints)) {
+      JitSpewHeader(JitSpew_Safepoints);
+      Fprinter& out = JitSpewPrinter();
+      out.printf("    nunbox (type in ");
+      DumpNunboxPart(typeEntry.alloc());
+      out.printf(", payload in ");
+      DumpNunboxPart(payloadEntry.alloc());
+      out.printf(")\n");
+    }
+#  endif
 
     count++;
 
     uint16_t header = 0;
 
-    header |= (AllocationToPartKind(entry.type) << TYPE_KIND_SHIFT);
-    header |= (AllocationToPartKind(entry.payload) << PAYLOAD_KIND_SHIFT);
+    header |= (AllocationToPartKind(typeEntry.alloc()) << TYPE_KIND_SHIFT);
+    header |=
+        (AllocationToPartKind(payloadEntry.alloc()) << PAYLOAD_KIND_SHIFT);
 
     uint32_t typeVal;
-    bool typeExtra = !CanEncodeInfoInHeader(entry.type, &typeVal);
+    bool typeExtra = !CanEncodeInfoInHeader(typeEntry.alloc(), &typeVal);
     if (!typeExtra) {
       header |= (typeVal << TYPE_INFO_SHIFT);
     } else {
@@ -371,7 +410,8 @@ void SafepointWriter::writeNunboxParts(LSafepoint* safepoint) {
     }
 
     uint32_t payloadVal;
-    bool payloadExtra = !CanEncodeInfoInHeader(entry.payload, &payloadVal);
+    bool payloadExtra =
+        !CanEncodeInfoInHeader(payloadEntry.alloc(), &payloadVal);
     if (!payloadExtra) {
       header |= (payloadVal << PAYLOAD_INFO_SHIFT);
     } else {
@@ -541,7 +581,7 @@ static inline LAllocation PartFromStream(CompactBufferReader& stream,
   }
 
   if (kind == Part_Stack) {
-    return LStackSlot(info);
+    return LStackSlot(info, LStackSlot::Word);
   }
 
   MOZ_ASSERT(kind == Part_Arg);

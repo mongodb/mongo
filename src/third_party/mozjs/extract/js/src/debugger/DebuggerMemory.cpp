@@ -37,9 +37,6 @@
 
 using namespace js;
 
-using mozilla::Maybe;
-using mozilla::Nothing;
-
 /* static */
 DebuggerMemory* DebuggerMemory::create(JSContext* cx, Debugger* dbg) {
   Value memoryProtoValue =
@@ -71,7 +68,9 @@ bool DebuggerMemory::construct(JSContext* cx, unsigned argc, Value* vp) {
 }
 
 /* static */ const JSClass DebuggerMemory::class_ = {
-    "Memory", JSCLASS_HAS_RESERVED_SLOTS(JSSLOT_COUNT)};
+    "Memory",
+    JSCLASS_HAS_RESERVED_SLOTS(JSSLOT_COUNT),
+};
 
 /* static */
 DebuggerMemory* DebuggerMemory::checkThis(JSContext* cx, CallArgs& args) {
@@ -434,8 +433,11 @@ bool DebuggerMemory::CallData::takeCensus() {
     JS_DEBUG_PSG("allocationsLogOverflowed", getAllocationsLogOverflowed),
     JS_DEBUG_PSGS("onGarbageCollection", getOnGarbageCollection,
                   setOnGarbageCollection),
-    JS_PS_END};
+    JS_PS_END,
+};
 
 /* static */ const JSFunctionSpec DebuggerMemory::methods[] = {
     JS_DEBUG_FN("drainAllocationsLog", drainAllocationsLog, 0),
-    JS_DEBUG_FN("takeCensus", takeCensus, 0), JS_FS_END};
+    JS_DEBUG_FN("takeCensus", takeCensus, 0),
+    JS_FS_END,
+};

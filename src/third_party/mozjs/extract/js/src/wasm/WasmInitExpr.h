@@ -29,13 +29,13 @@ namespace js {
 namespace wasm {
 
 class Decoder;
-struct ModuleEnvironment;
+struct CodeMetadata;
 
 // Validates a constant expression. Returns an optional literal value if the
 // final value was from a simple instruction such as i32.const.
-[[nodiscard]] bool DecodeConstantExpression(Decoder& d, ModuleEnvironment* env,
+[[nodiscard]] bool DecodeConstantExpression(Decoder& d, CodeMetadata* codeMeta,
                                             ValType expected,
-                                            Maybe<LitVal>* literal);
+                                            mozilla::Maybe<LitVal>* literal);
 
 enum class InitExprKind {
   None,
@@ -55,11 +55,11 @@ enum class InitExprKind {
 
 class InitExpr {
   InitExprKind kind_;
-  // The bytecode for this constant expression if this is not a literal.
+  // The bytecode for this constant expression.
   Bytes bytecode_;
-  // The value if this is a literal.
+  // The value, only if this is a literal.
   LitVal literal_;
-  // The value type of this constant expression in either case.
+  // The value type of this constant expression.
   ValType type_;
 
  public:
@@ -73,7 +73,7 @@ class InitExpr {
   // Decode and validate a constant expression given at the current
   // position of the decoder. Upon failure, the decoder contains the failure
   // message or else the failure was an OOM.
-  static bool decodeAndValidate(Decoder& d, ModuleEnvironment* env,
+  static bool decodeAndValidate(Decoder& d, CodeMetadata* codeMeta,
                                 ValType expected, InitExpr* expr);
 
   // Decode and evaluate a constant expression at the current position of the
@@ -84,8 +84,8 @@ class InitExpr {
       JSContext* cx, Handle<WasmInstanceObject*> instanceObj, Decoder& d,
       ValType expectedType, MutableHandleVal result);
 
-  // Evaluate the constant expresssion with the given context. This may only
-  // fail due to an OOM, as all InitExpr's are required to have been validated.
+  // Evaluate the constant expression with the given context. This may only fail
+  // due to an OOM, as all InitExpr's are required to have been validated.
   bool evaluate(JSContext* cx, Handle<WasmInstanceObject*> instanceObj,
                 MutableHandleVal result) const;
 
@@ -99,6 +99,9 @@ class InitExpr {
 
   // Get the type of the resulting value of this expression.
   ValType type() const { return type_; }
+
+  // Return the raw bytecode for the expression.
+  const Bytes& bytecode() const { return bytecode_; }
 
   // Allow moving, but not implicit copying
   InitExpr(const InitExpr&) = delete;

@@ -50,6 +50,12 @@ struct BytecodeInfo {
 class BytecodeAnalysis {
   JSScript* script_;
   Vector<BytecodeInfo, 0, JitAllocPolicy> infos_;
+  bool disableIon_ = false;
+  bool disableInlining_ = false;
+
+  void disableIon() { disableIon_ = true; }
+  bool ionDisabled() const { return disableIon_; }
+  void disableInlining() { disableInlining_ = true; }
 
  public:
   explicit BytecodeAnalysis(TempAllocator& alloc, JSScript* script);
@@ -71,6 +77,9 @@ class BytecodeAnalysis {
   }
 
   void checkWarpSupport(JSOp op);
+
+  bool isIonDisabled() const { return disableIon_; }
+  bool isInliningDisabled() const { return disableInlining_; }
 };
 
 // Whether this script uses the frame's environment chain. The result is cached

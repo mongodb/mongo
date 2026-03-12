@@ -66,6 +66,7 @@ const uint8_t JS_FREED_HEAP_PTR_PATTERN = 0x6B;
 const uint8_t JS_FREED_CHUNK_PATTERN = 0x8B;
 const uint8_t JS_FREED_ARENA_PATTERN = 0x9B;
 const uint8_t JS_FRESH_MARK_STACK_PATTERN = 0x9F;
+const uint8_t JS_FREED_BUFFER_PATTERN = 0xAB;
 const uint8_t JS_RESET_VALUE_PATTERN = 0xBB;
 const uint8_t JS_POISONED_JSSCRIPT_DATA_PATTERN = 0xDB;
 const uint8_t JS_OOB_PARSE_NODE_PATTERN = 0xFF;
@@ -85,7 +86,7 @@ const uint8_t JS_SCOPE_DATA_TRAILING_NAMES_PATTERN = 0xCC;
 #  define JS_SWEPT_CODE_PATTERN 0xED  // IN instruction, crashes in user mode.
 #elif defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_ARM64)
 #  define JS_SWEPT_CODE_PATTERN 0xA3  // undefined instruction
-#elif defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
+#elif defined(JS_CODEGEN_MIPS64)
 #  define JS_SWEPT_CODE_PATTERN 0x01  // undefined instruction
 #elif defined(JS_CODEGEN_LOONG64)
 #  define JS_SWEPT_CODE_PATTERN 0x01  // undefined instruction

@@ -8,6 +8,8 @@
 #define builtin_intl_DateTimeFormat_h
 
 #include "builtin/SelfHostingDefines.h"
+#include "builtin/temporal/Calendar.h"
+#include "builtin/temporal/TimeZone.h"
 #include "js/Class.h"
 #include "vm/NativeObject.h"
 
@@ -18,6 +20,17 @@ class DateIntervalFormat;
 
 namespace js {
 
+enum class DateTimeValueKind {
+  Number,
+  TemporalDate,
+  TemporalTime,
+  TemporalDateTime,
+  TemporalYearMonth,
+  TemporalMonthDay,
+  TemporalZonedDateTime,
+  TemporalInstant,
+};
+
 class DateTimeFormatObject : public NativeObject {
  public:
   static const JSClass class_;
@@ -26,7 +39,10 @@ class DateTimeFormatObject : public NativeObject {
   static constexpr uint32_t INTERNALS_SLOT = 0;
   static constexpr uint32_t DATE_FORMAT_SLOT = 1;
   static constexpr uint32_t DATE_INTERVAL_FORMAT_SLOT = 2;
-  static constexpr uint32_t SLOT_COUNT = 3;
+  static constexpr uint32_t DATE_TIME_VALUE_KIND_SLOT = 3;
+  static constexpr uint32_t CALENDAR_SLOT = 4;
+  static constexpr uint32_t TIMEZONE_SLOT = 5;
+  static constexpr uint32_t SLOT_COUNT = 6;
 
   static_assert(INTERNALS_SLOT == INTL_INTERNALS_OBJECT_SLOT,
                 "INTERNALS_SLOT must match self-hosting define for internals "
@@ -62,6 +78,45 @@ class DateTimeFormatObject : public NativeObject {
       mozilla::intl::DateIntervalFormat* dateIntervalFormat) {
     setFixedSlot(DATE_INTERVAL_FORMAT_SLOT, PrivateValue(dateIntervalFormat));
   }
+
+  DateTimeValueKind getDateTimeValueKind() const {
+    const auto& slot = getFixedSlot(DATE_TIME_VALUE_KIND_SLOT);
+    if (slot.isUndefined()) {
+      return DateTimeValueKind::Number;
+    }
+    return static_cast<DateTimeValueKind>(slot.toInt32());
+  }
+
+  void setDateTimeValueKind(DateTimeValueKind kind) {
+    setFixedSlot(DATE_TIME_VALUE_KIND_SLOT,
+                 Int32Value(static_cast<int32_t>(kind)));
+  }
+
+  temporal::CalendarValue getCalendar() const {
+    const auto& slot = getFixedSlot(CALENDAR_SLOT);
+    if (slot.isUndefined()) {
+      return temporal::CalendarValue();
+    }
+    return temporal::CalendarValue(slot);
+  }
+
+  void setCalendar(const temporal::CalendarValue& calendar) {
+    setFixedSlot(CALENDAR_SLOT, calendar.toSlotValue());
+  }
+
+  temporal::TimeZoneValue getTimeZone() const {
+    const auto& slot = getFixedSlot(TIMEZONE_SLOT);
+    if (slot.isUndefined()) {
+      return temporal::TimeZoneValue();
+    }
+    return temporal::TimeZoneValue(slot);
+  }
+
+  void setTimeZone(const temporal::TimeZoneValue& timeZone) {
+    setFixedSlot(TIMEZONE_SLOT, timeZone.toSlotValue());
+  }
+
+  void maybeClearCache(DateTimeValueKind kind);
 
  private:
   static const JSClassOps classOps_;
@@ -183,6 +238,15 @@ class DateTimeFormatObject : public NativeObject {
 [[nodiscard]] extern bool intl_resolveDateTimeFormatComponents(JSContext* cx,
                                                                unsigned argc,
                                                                JS::Value* vp);
+
+/**
+ * Shared `toLocaleString` implementation for Temporal objects.
+ */
+[[nodiscard]] extern bool TemporalObjectToLocaleString(
+    JSContext* cx, const JS::CallArgs& args, JS::Handle<JSString*> required,
+    JS::Handle<JSString*> defaults,
+    JS::Handle<JS::Value> toLocaleStringTimeZone = JS::UndefinedHandleValue);
+
 }  // namespace js
 
 #endif /* builtin_intl_DateTimeFormat_h */

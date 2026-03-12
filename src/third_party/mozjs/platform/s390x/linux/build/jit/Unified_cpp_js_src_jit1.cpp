@@ -8,6 +8,15 @@
 #error "jit/BaselineCodeGen.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
+#include "jit/BaselineCompileTask.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "jit/BaselineCompileTask.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "jit/BaselineCompileTask.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
 #include "jit/BaselineDebugModeOSR.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
 #error "jit/BaselineDebugModeOSR.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
@@ -42,14 +51,5 @@
 #endif
 #ifdef INITGUID
 #error "jit/BaselineIC.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "jit/BaselineJIT.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/BaselineJIT.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "jit/BaselineJIT.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

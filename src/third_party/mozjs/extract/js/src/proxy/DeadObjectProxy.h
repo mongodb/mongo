@@ -19,9 +19,10 @@ enum DeadObjectProxyFlags {
   DeadObjectProxyIsBackgroundFinalized = 1 << 2
 };
 
-class DeadObjectProxy : public BaseProxyHandler {
+class DeadObjectProxy : public NurseryAllocableProxyHandler {
  public:
-  explicit constexpr DeadObjectProxy() : BaseProxyHandler(&family) {}
+  explicit constexpr DeadObjectProxy()
+      : NurseryAllocableProxyHandler(&family) {}
 
   /* Standard internal methods. */
   virtual bool getOwnPropertyDescriptor(

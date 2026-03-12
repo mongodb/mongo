@@ -55,21 +55,28 @@ class IonScript;
 class JitScript;
 class JitZone;
 
-// Magic BaselineScript value indicating Baseline compilation has been disabled.
-static constexpr uintptr_t BaselineDisabledScript = 0x1;
+// Magic values indicating compilation has been disabled or the script
+// is already scheduled for background compilation.
+static constexpr uintptr_t DisabledScript = 0x1;
+static constexpr uintptr_t QueuedScript = 0x3;
+static constexpr uintptr_t CompilingScript = 0x5;
+
+static constexpr uint32_t SpecialScriptBit = 0x1;
+static_assert((DisabledScript & SpecialScriptBit) != 0);
+static_assert((QueuedScript & SpecialScriptBit) != 0);
+static_assert((CompilingScript & SpecialScriptBit) != 0);
 
 static BaselineScript* const BaselineDisabledScriptPtr =
-    reinterpret_cast<BaselineScript*>(BaselineDisabledScript);
-
-// Magic IonScript values indicating Ion compilation has been disabled or the
-// script is being Ion-compiled off-thread.
-static constexpr uintptr_t IonDisabledScript = 0x1;
-static constexpr uintptr_t IonCompilingScript = 0x2;
+    reinterpret_cast<BaselineScript*>(DisabledScript);
+static BaselineScript* const BaselineQueuedScriptPtr =
+    reinterpret_cast<BaselineScript*>(DisabledScript);
+static BaselineScript* const BaselineCompilingScriptPtr =
+    reinterpret_cast<BaselineScript*>(CompilingScript);
 
 static IonScript* const IonDisabledScriptPtr =
-    reinterpret_cast<IonScript*>(IonDisabledScript);
+    reinterpret_cast<IonScript*>(DisabledScript);
 static IonScript* const IonCompilingScriptPtr =
-    reinterpret_cast<IonScript*>(IonCompilingScript);
+    reinterpret_cast<IonScript*>(CompilingScript);
 
 /* [SMDOC] ICScript Lifetimes
  *
@@ -173,6 +180,10 @@ class alignas(uintptr_t) ICScript final : public TrailingArray<ICScript> {
     return numElements<ICEntry>(icEntriesOffset(), fallbackStubsOffset());
   }
 
+  static constexpr Offset offsetOfEnvAllocSite() {
+    return offsetof(ICScript, envAllocSite_);
+  }
+
   ICEntry* interpreterICEntryFromPCOffset(uint32_t pcOffset);
 
   ICEntry& icEntryFromPCOffset(uint32_t pcOffset);
@@ -193,6 +204,9 @@ class alignas(uintptr_t) ICScript final : public TrailingArray<ICScript> {
   void resetActive() { active_ = false; }
 
   gc::AllocSite* getOrCreateAllocSite(JSScript* outerScript, uint32_t pcOffset);
+
+  void ensureEnvAllocSite(JSScript* outerScript);
+  gc::AllocSite* maybeEnvAllocSite() const { return envAllocSite_; }
 
   void prepareForDestruction(Zone* zone);
 
@@ -222,8 +236,11 @@ class alignas(uintptr_t) ICScript final : public TrailingArray<ICScript> {
 
   // List of allocation sites referred to by ICs in this script.
   static constexpr size_t AllocSiteChunkSize = 256;
-  LifoAlloc allocSitesSpace_{AllocSiteChunkSize};
+  LifoAlloc allocSitesSpace_{AllocSiteChunkSize, js::BackgroundMallocArena};
   Vector<gc::AllocSite*, 0, SystemAllocPolicy> allocSites_;
+
+  // Optional alloc site to use when allocating environment chain objects.
+  gc::AllocSite* envAllocSite_ = nullptr;
 
   // Number of times this copy of the script has been called or has had
   // backedges taken.  Reset if the script's JIT code is forcibly discarded.
@@ -319,8 +336,9 @@ class alignas(uintptr_t) JitScript final
 
   HeapPtr<JSScript*> owningScript_;
 
-  // Baseline code for the script. Either nullptr, BaselineDisabledScriptPtr or
-  // a valid BaselineScript*.
+  // Baseline code for the script. Either nullptr, BaselineDisabledScriptPtr,
+  // BaselineQueuedScriptPtr, BaselineCompilingScriptPtr,
+  // or a valid BaselineScript*.
   GCStructPtr<BaselineScript*> baselineScript_;
 
   // Ion code for this script. Either nullptr, IonDisabledScriptPtr,
@@ -334,12 +352,12 @@ class alignas(uintptr_t) JitScript final
   // first time the Baseline JIT compiles this script.
   mozilla::Maybe<HeapPtr<EnvironmentObject*>> templateEnv_;
 
+  // The size of this allocation.
+  Offset endOffset_ = 0;
+
   // Analysis data computed lazily the first time this script is compiled or
   // inlined by WarpBuilder.
   mozilla::Maybe<bool> usesEnvironmentChain_;
-
-  // The size of this allocation.
-  Offset endOffset_ = 0;
 
   struct Flags {
     // True if this script entered Ion via OSR at a loop header.
@@ -451,6 +469,9 @@ class alignas(uintptr_t) JitScript final
 
   EnvironmentObject* templateEnvironment() const { return templateEnv_.ref(); }
 
+  std::pair<CallObject*, NamedLambdaObject*> functionEnvironmentTemplates(
+      JSFunction* fun) const;
+
   bool usesEnvironmentChain() const { return *usesEnvironmentChain_; }
 
   bool resetAllocSites(bool resetNurserySites, bool resetPretenuredSites);
@@ -458,6 +479,8 @@ class alignas(uintptr_t) JitScript final
 
   void updateLastICStubCounter() { warmUpCountAtLastICStub_ = warmUpCount(); }
   uint32_t warmUpCountAtLastICStub() const { return warmUpCountAtLastICStub_; }
+
+  bool hasEnvAllocSite() const { return icScript_.envAllocSite_; }
 
  private:
   // Methods to set baselineScript_ to a BaselineScript*, nullptr, or
@@ -469,7 +492,10 @@ class alignas(uintptr_t) JitScript final
  public:
   // Methods for getting/setting/clearing a BaselineScript*.
   bool hasBaselineScript() const {
-    bool res = baselineScript_ && baselineScript_ != BaselineDisabledScriptPtr;
+    bool res = baselineScript_ &&
+               baselineScript_ != BaselineDisabledScriptPtr &&
+               baselineScript_ != BaselineQueuedScriptPtr &&
+               baselineScript_ != BaselineCompilingScriptPtr;
     MOZ_ASSERT_IF(!res, !hasIonScript());
     return res;
   }
@@ -487,6 +513,24 @@ class alignas(uintptr_t) JitScript final
     BaselineScript* baseline = baselineScript();
     setBaselineScriptImpl(gcx, script, nullptr);
     return baseline;
+  }
+  bool isBaselineQueued() const {
+    return baselineScript_ == BaselineQueuedScriptPtr;
+  }
+  void clearIsBaselineQueued(JSScript* script) {
+    MOZ_ASSERT(isBaselineQueued());
+    setBaselineScriptImpl(script, nullptr);
+  }
+  bool isBaselineCompiling() const {
+    return baselineScript_ == BaselineCompilingScriptPtr;
+  }
+  void setIsBaselineCompiling(JSScript* script) {
+    MOZ_ASSERT(baselineScript_ == nullptr);
+    setBaselineScriptImpl(script, BaselineCompilingScriptPtr);
+  }
+  void clearIsBaselineCompiling(JSScript* script) {
+    MOZ_ASSERT(isBaselineCompiling());
+    setBaselineScriptImpl(script, nullptr);
   }
 
  private:
@@ -563,6 +607,12 @@ class alignas(uintptr_t) JitScript final
     }
   }
 #endif
+
+  inline void clearFailedICHash() {
+#ifdef DEBUG
+    failedICHash_.reset();
+#endif
+  }
 };
 
 // Ensures no JitScripts are purged in the current zone.

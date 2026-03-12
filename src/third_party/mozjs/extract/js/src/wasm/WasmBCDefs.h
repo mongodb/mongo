@@ -22,10 +22,6 @@
 #ifndef wasm_wasm_baseline_defs_h
 #define wasm_wasm_baseline_defs_h
 
-#include "mozilla/MathAlgorithms.h"
-#include "mozilla/Maybe.h"
-#include "mozilla/ScopeExit.h"
-
 #include <algorithm>
 #include <utility>
 
@@ -65,13 +61,6 @@
 #include "wasm/WasmSignalHandlers.h"
 #include "wasm/WasmStubs.h"
 #include "wasm/WasmValidate.h"
-
-using mozilla::DebugOnly;
-using mozilla::FloorLog2;
-using mozilla::IsPowerOfTwo;
-using mozilla::Maybe;
-using mozilla::Nothing;
-using mozilla::Some;
 
 namespace js {
 namespace wasm {

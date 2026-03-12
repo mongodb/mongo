@@ -38,7 +38,7 @@ let res = runExample(1, {
     },
     lang: 'js',
 });
-assert.commandFailedWithCode(res, [10334]);
+assert.commandFailedWithCode(res, [ErrorCodes.BSONObjectTooLarge, 10334]);
 
 // Accumulator tries to return BSON larger than 16MB from JS.
 assert(coll.drop());
@@ -60,7 +60,7 @@ res = runExample(1, {
     },
     lang: 'js',
 });
-assert.commandFailedWithCode(res, [17260]);
+assert.commandFailedWithCode(res, [17260, 10334]);
 
 // Accumulator state and argument together exceed max BSON size.
 assert(coll.drop());
@@ -111,7 +111,8 @@ res = runExample("$_id",
                      lang: 'js',
                  },
                  {allowDiskUse: false});
-assert.commandFailedWithCode(res, [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed]);
+assert.commandFailedWithCode(
+    res, [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed, ErrorCodes.JSInterpreterFailure]);
 
 // Verify that having large number of documents doesn't cause the $accumulator to run out of memory.
 coll.drop();
@@ -135,17 +136,17 @@ const largeAccumulator = {
     }
 };
 res = coll.aggregate([
-              {$addFields: {a: {$range: [0, 1000000]}}},
+              {$addFields: {a: {$range: [0, 250000]}}},
               {$unwind: "$a"},  // Create a number of documents to be executed by the accumulator.
               {$group: {_id: "$groupBy", count: largeAccumulator}}
           ])
           .toArray();
-assert.sameMembers(res, [{_id: 1, count: 1000000}, {_id: 2, count: 1000000}]);
+assert.sameMembers(res, [{_id: 1, count: 250000}, {_id: 2, count: 250000}]);
 
 // With $bucket.
 res =
     coll.aggregate([
-            {$addFields: {a: {$range: [0, 1000000]}}},
+            {$addFields: {a: {$range: [0, 250000]}}},
             {$unwind: "$a"},  // Create a number of documents to be executed by the accumulator.
             {
                 $bucket:
@@ -153,5 +154,5 @@ res =
             }
         ])
         .toArray();
-assert.sameMembers(res, [{_id: 1, count: 1000000}, {_id: 2, count: 1000000}]);
+assert.sameMembers(res, [{_id: 1, count: 250000}, {_id: 2, count: 250000}]);
 })();

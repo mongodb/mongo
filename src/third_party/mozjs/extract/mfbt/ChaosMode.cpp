@@ -10,8 +10,8 @@ namespace mozilla {
 
 namespace detail {
 
-Atomic<uint32_t, SequentiallyConsistent> gChaosModeCounter(0);
-ChaosFeature gChaosFeatures = None;
+Atomic<uint32_t, Relaxed> gChaosModeCounter(0);
+ChaosFeature gChaosFeatures = ChaosFeature::Any;
 
 } /* namespace detail */
 } /* namespace mozilla */

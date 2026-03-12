@@ -81,6 +81,8 @@ class JS_PUBLIC_API Sprinter;
 
 namespace jit {
 
+namespace x86_shared {
+
 // AllocPolicy for AssemblerBuffer. OOMs when trying to allocate more than
 // MaxCodeBytesPerProcess bytes. Use private inheritance to make sure we
 // explicitly have to expose SystemAllocPolicy methods.
@@ -213,6 +215,8 @@ class AssemblerBuffer {
   mozilla::Vector<unsigned char, 256, AssemblerBufferAllocPolicy> m_buffer;
   bool m_oom;
 };
+
+}  // namespace x86_shared
 
 class GenericAssembler {
 #ifdef JS_JITSPEW

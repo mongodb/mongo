@@ -19,16 +19,12 @@
 
 #ifdef __cplusplus
 #  include <algorithm>
+#  include <array>
 #  include <type_traits>
 
 #  include "mozilla/Alignment.h"
 
 namespace mozilla {
-
-template <typename T, size_t Length>
-class Array;
-template <typename IndexType, typename ValueType, size_t Size>
-class EnumeratedArray;
 
 /*
  * Safely subtract two pointers when it is known that aEnd >= aBegin, yielding a
@@ -46,47 +42,6 @@ template <class T>
 MOZ_ALWAYS_INLINE size_t PointerRangeSize(T* aBegin, T* aEnd) {
   MOZ_ASSERT(aEnd >= aBegin);
   return (size_t(aEnd) - size_t(aBegin)) / sizeof(T);
-}
-
-/*
- * Compute the length of an array with constant length.  (Use of this method
- * with a non-array pointer will not compile.)
- *
- * Beware of the implicit trailing '\0' when using this with string constants.
- */
-template <typename T, size_t N>
-constexpr size_t ArrayLength(T (&aArr)[N]) {
-  return N;
-}
-
-template <typename T, size_t N>
-constexpr size_t ArrayLength(const Array<T, N>& aArr) {
-  return N;
-}
-
-template <typename E, typename T, size_t N>
-constexpr size_t ArrayLength(const EnumeratedArray<E, T, N>& aArr) {
-  return N;
-}
-
-/*
- * Compute the address one past the last element of a constant-length array.
- *
- * Beware of the implicit trailing '\0' when using this with string constants.
- */
-template <typename T, size_t N>
-constexpr T* ArrayEnd(T (&aArr)[N]) {
-  return aArr + ArrayLength(aArr);
-}
-
-template <typename T, size_t N>
-constexpr T* ArrayEnd(Array<T, N>& aArr) {
-  return &aArr[0] + ArrayLength(aArr);
-}
-
-template <typename T, size_t N>
-constexpr const T* ArrayEnd(const Array<T, N>& aArr) {
-  return &aArr[0] + ArrayLength(aArr);
 }
 
 /**
@@ -108,7 +63,7 @@ namespace detail {
 template <typename AlignType, typename Pointee, typename = void>
 struct AlignedChecker {
   static void test(const Pointee* aPtr) {
-    MOZ_ASSERT((uintptr_t(aPtr) % MOZ_ALIGNOF(AlignType)) == 0,
+    MOZ_ASSERT((uintptr_t(aPtr) % alignof(AlignType)) == 0,
                "performing a range-check with a misaligned pointer");
   }
 };
@@ -158,31 +113,8 @@ inline bool IsInRange(const T* aPtr, uintptr_t aBegin, uintptr_t aEnd) {
                    reinterpret_cast<const T*>(aEnd));
 }
 
-namespace detail {
-
-/*
- * Helper for the MOZ_ARRAY_LENGTH() macro to make the length a typesafe
- * compile-time constant even on compilers lacking constexpr support.
- */
-template <typename T, size_t N>
-char (&ArrayLengthHelper(T (&array)[N]))[N];
-
-} /* namespace detail */
-
 } /* namespace mozilla */
 
 #endif /* __cplusplus */
-
-/*
- * MOZ_ARRAY_LENGTH() is an alternative to mozilla::ArrayLength() for C files
- * that can't use C++ template functions and for static_assert() calls that
- * can't call ArrayLength() when it is not a C++11 constexpr function.
- */
-#ifdef __cplusplus
-#  define MOZ_ARRAY_LENGTH(array) \
-    sizeof(mozilla::detail::ArrayLengthHelper(array))
-#else
-#  define MOZ_ARRAY_LENGTH(array) (sizeof(array) / sizeof((array)[0]))
-#endif
 
 #endif /* mozilla_ArrayUtils_h */

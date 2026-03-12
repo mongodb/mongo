@@ -38,7 +38,7 @@ class ParallelWorker : public GCParallelTask {
 
   ParallelWorker(GCRuntime* gc, gcstats::PhaseKind phaseKind, GCUse use,
                  WorkFunc func, WorkItemIterator& work,
-                 const SliceBudget& budget, AutoLockHelperThreadState& lock)
+                 const JS::SliceBudget& budget, AutoLockHelperThreadState& lock)
       : GCParallelTask(gc, phaseKind, use),
         func_(func),
         work_(work),
@@ -79,7 +79,7 @@ class ParallelWorker : public GCParallelTask {
   HelperThreadLockData<WorkItemIterator&> work_;
 
   // The budget that determines how long to run for.
-  SliceBudget budget_;
+  JS::SliceBudget budget_;
 
   // The next work item to process.
   WorkItem item_;
@@ -97,7 +97,7 @@ class MOZ_RAII AutoRunParallelWork {
 
   AutoRunParallelWork(GCRuntime* gc, WorkFunc func,
                       gcstats::PhaseKind phaseKind, GCUse use,
-                      WorkItemIterator& work, const SliceBudget& budget,
+                      WorkItemIterator& work, const JS::SliceBudget& budget,
                       AutoLockHelperThreadState& lock)
       : gc(gc), phaseKind(phaseKind), lock(lock), tasksStarted(0) {
     size_t workerCount = gc->parallelWorkerCount();

@@ -1134,10 +1134,10 @@ bool BaseCompiler::popConstPositivePowerOfTwo(int32_t* c, uint_fast8_t* power,
     return false;
   }
   *c = v.i32val();
-  if (*c <= cutoff || !IsPowerOfTwo(static_cast<uint32_t>(*c))) {
+  if (*c <= cutoff || !mozilla::IsPowerOfTwo(static_cast<uint32_t>(*c))) {
     return false;
   }
-  *power = FloorLog2(*c);
+  *power = mozilla::FloorLog2(*c);
   stk_.popBack();
   return true;
 }
@@ -1149,10 +1149,10 @@ bool BaseCompiler::popConstPositivePowerOfTwo(int64_t* c, uint_fast8_t* power,
     return false;
   }
   *c = v.i64val();
-  if (*c <= cutoff || !IsPowerOfTwo(static_cast<uint64_t>(*c))) {
+  if (*c <= cutoff || !mozilla::IsPowerOfTwo(static_cast<uint64_t>(*c))) {
     return false;
   }
-  *power = FloorLog2(*c);
+  *power = mozilla::FloorLog2(*c);
   stk_.popBack();
   return true;
 }
@@ -1200,12 +1200,12 @@ RegI64 BaseCompiler::popI64ToSpecific(RegI64 specific) {
   return popI64(specific);
 }
 
-RegI64 BaseCompiler::popIndexToInt64(IndexType indexType) {
-  if (indexType == IndexType::I64) {
+RegI64 BaseCompiler::popAddressToInt64(AddressType addressType) {
+  if (addressType == AddressType::I64) {
     return popI64();
   }
 
-  MOZ_ASSERT(indexType == IndexType::I32);
+  MOZ_ASSERT(addressType == AddressType::I32);
 #ifdef JS_64BIT
   return RegI64(Register64(popI32()));
 #else
@@ -1214,6 +1214,31 @@ RegI64 BaseCompiler::popIndexToInt64(IndexType indexType) {
   masm.xor32(highPart, highPart);
   return RegI64(Register64(highPart, lowPart));
 #endif
+}
+
+RegI32 BaseCompiler::popTableAddressToClampedInt32(AddressType addressType) {
+  if (addressType == AddressType::I32) {
+    return popI32();
+  }
+
+#ifdef ENABLE_WASM_MEMORY64
+  MOZ_ASSERT(addressType == AddressType::I64);
+  RegI64 val = popI64();
+  RegI32 clamped = narrowI64(val);
+  masm.wasmClampTable64Address(val, clamped);
+  return clamped;
+#else
+  MOZ_CRASH("got i64 table address without memory64 enabled");
+#endif
+}
+
+void BaseCompiler::replaceTableAddressWithClampedInt32(
+    AddressType addressType) {
+  if (addressType == AddressType::I32) {
+    return;
+  }
+
+  pushI32(popTableAddressToClampedInt32(addressType));
 }
 
 #ifdef JS_CODEGEN_ARM

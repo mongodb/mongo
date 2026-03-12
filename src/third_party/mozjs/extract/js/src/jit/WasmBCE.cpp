@@ -13,9 +13,8 @@
 using namespace js;
 using namespace js::jit;
 
-typedef js::HashMap<uint32_t, MDefinition*, DefaultHasher<uint32_t>,
-                    SystemAllocPolicy>
-    LastSeenMap;
+using LastSeenMap = js::HashMap<uint32_t, MDefinition*, DefaultHasher<uint32_t>,
+                                SystemAllocPolicy>;
 
 // The Wasm Bounds Check Elimination (BCE) pass looks for bounds checks
 // on SSA values that have already been checked. (in the same block or in a
@@ -29,7 +28,7 @@ typedef js::HashMap<uint32_t, MDefinition*, DefaultHasher<uint32_t>,
 // check, but a set of checks that together dominate a redundant check?
 //
 // TODO (dbounov): Generalize to constant additions relative to one base
-bool jit::EliminateBoundsChecks(MIRGenerator* mir, MIRGraph& graph) {
+bool jit::EliminateBoundsChecks(const MIRGenerator* mir, MIRGraph& graph) {
   JitSpew(JitSpew_WasmBCE, "Begin");
   // Map for dominating block where a given definition was checked
   LastSeenMap lastSeen;

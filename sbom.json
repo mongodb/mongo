@@ -71,7 +71,7 @@
   "components": [
     {
       "type": "library",
-      "bom-ref": "pkg:deb/debian/firefox-esr@128.11.0esr-1?arch=source",
+      "bom-ref": "pkg:deb/debian/firefox-esr@140.7.0esr-1?arch=source",
       "supplier": {
         "name": "Mozilla Corporation",
         "url": [
@@ -81,7 +81,7 @@
       "author": "Mozilla Corporation",
       "group": "mozilla",
       "name": "Mozilla Firefox ESR",
-      "version": "128.11.0esr",
+      "version": "140.7.0esr",
       "description": "The C++-only SpiderMonkey component of FireFox ESR used by MongoDB.",
       "licenses": [
         {
@@ -91,8 +91,8 @@
         }
       ],
       "copyright": "Mozilla Corporation",
-      "cpe": "cpe:2.3:a:mozilla:firefox:128.11.0:*:*:*:esr:*:*:*",
-      "purl": "pkg:deb/debian/firefox-esr@128.11.0esr-1?arch=source",
+      "cpe": "cpe:2.3:a:mozilla:firefox:140.7.0:*:*:*:esr:*:*:*",
+      "purl": "pkg:deb/debian/firefox-esr@140.7.0esr-1?arch=source",
       "externalReferences": [
         {
           "url": "https://github.com/mozilla-firefox/firefox.git",
@@ -2088,7 +2088,7 @@
     {
       "ref": "pkg:github/mongodb/mongo@v7.0",
       "dependsOn": [
-        "pkg:deb/debian/firefox-esr@128.11.0esr-1?arch=source",
+        "pkg:deb/debian/firefox-esr@140.7.0esr-1?arch=source",
         "pkg:generic/intel/IntelRDFPMathLib@2.0.1",
         "pkg:generic/unicode-org/unicode@8.0.0",
         "pkg:generic/valgrind/valgrind@093bef43d69236287ccc748591c9560a71181b0a",
@@ -2128,7 +2128,7 @@
       ]
     },
     {
-      "ref": "pkg:deb/debian/firefox-esr@128.11.0esr-1?arch=source",
+      "ref": "pkg:deb/debian/firefox-esr@140.7.0esr-1?arch=source",
       "dependsOn": []
     },
     {

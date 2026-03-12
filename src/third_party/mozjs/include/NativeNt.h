@@ -554,7 +554,7 @@ class MOZ_RAII PEHeaders final {
     WORD wLength;
     WORD wValueLength;
     WORD wType;
-    WCHAR szKey[16];  // ArrayLength(L"VS_VERSION_INFO")
+    WCHAR szKey[16];  // std::size(L"VS_VERSION_INFO")
     // Additional data goes here, aligned on a 4-byte boundary
   };
 
@@ -913,6 +913,12 @@ class MOZ_RAII PEHeaders final {
                                     IMAGE_SCN_MEM_READ);
   }
 
+  // There may be other data sections in the binary besides .data
+  Maybe<Span<const uint8_t>> GetDataSectionInfo() const {
+    return FindSection(".data", IMAGE_SCN_CNT_INITIALIZED_DATA |
+                                    IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE);
+  }
+
   static bool IsValid(PIMAGE_IMPORT_DESCRIPTOR aImpDesc) {
     return aImpDesc && aImpDesc->OriginalFirstThunk != 0;
   }
@@ -1024,8 +1030,8 @@ class MOZ_RAII PEHeaders final {
 
     const wchar_t kVersionInfoKey[] = L"VS_VERSION_INFO";
     if (::RtlCompareMemory(aVerInfo->szKey, kVersionInfoKey,
-                           ArrayLength(kVersionInfoKey)) !=
-        ArrayLength(kVersionInfoKey)) {
+                           std::size(kVersionInfoKey)) !=
+        std::size(kVersionInfoKey)) {
       return nullptr;
     }
 

@@ -678,6 +678,8 @@ irintl(long double x)
 #ifdef DEBUG
 #if defined(__amd64__) || defined(__i386__)
 #define	breakpoint()	asm("int $3")
+#elif defined(__wasm__)
+#define breakpoint()    __builtin_trap()
 #else
 #include <signal.h>
 

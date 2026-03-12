@@ -24,6 +24,9 @@ namespace jit {
     JSContext* cx, const DebugAPI::ExecutionObservableSet& obs,
     DebugAPI::IsObserving observing);
 
+[[nodiscard]] bool RecompileBaselineScriptForDebugMode(
+    JSContext* cx, JSScript* script, DebugAPI::IsObserving observing);
+
 }  // namespace jit
 }  // namespace js
 

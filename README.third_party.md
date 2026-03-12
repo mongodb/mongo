@@ -33,7 +33,7 @@ a notice will be included in
 | [JSON-Schema-Test-Suite]                             | MIT                               | 728066f9c5c258ba3b1804a22a5b998f2ec77ec0 |                      |                                 |
 | [LibTomCrypt]                                        | Unlicense                         | 1.18.2                                   | ✗                    | ✗                               |
 | [MongoDB C Driver]                                   | Apache-2.0                        | 1.27.6                                   | ✗                    | ✗                               |
-| [Mozilla Firefox ESR]                                | MPL-2.0                           | 128.11.0esr                              |                      | ✗                               |
+| [Mozilla Firefox ESR]                                | MPL-2.0                           | 140.7.0esr                               |                      | ✗                               |
 | [MurmurHash3]                                        | Public Domain                     | a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb |                      | ✗                               |
 | [PCRE2 - Perl-Compatible Regular Expressions]        | BSD-3-Clause WITH PCRE2-exception | 10.40                                    |                      | ✗                               |
 | [Protobuf]                                           | BSD-3-Clause                      | 3.19.5                                   |                      | ✗                               |

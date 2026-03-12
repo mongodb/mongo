@@ -41,10 +41,6 @@ namespace wasm {
 class ArgTypeVector;
 class BytecodeOffset;
 
-using jit::Label;
-using jit::MIRType;
-using jit::Register;
-
 // Definitions for stackmaps.
 
 using ExitStubMapVector = Vector<bool, 32, SystemAllocPolicy>;
@@ -250,100 +246,68 @@ struct StackMap final {
 // This is the expected size for a map that covers 32 or fewer words.
 static_assert(sizeof(StackMap) == 12, "wasm::StackMap has unexpected size");
 
+// A map from an offset relative to the beginning of a code block to a StackMap
+using StackMapHashMap =
+    HashMap<uint32_t, StackMap*, DefaultHasher<uint32_t>, SystemAllocPolicy>;
+
 class StackMaps {
- public:
-  // A Maplet holds a single code-address-to-map binding.  Note that the
-  // code address is the lowest address of the instruction immediately
-  // following the instruction of interest, not of the instruction of
-  // interest itself.  In practice (at least for the Wasm Baseline compiler)
-  // this means that |nextInsnAddr| points either immediately after a call
-  // instruction, after a trap instruction or after a no-op.
-  struct Maplet {
-    const uint8_t* nextInsnAddr;
-    StackMap* map;
-    Maplet(const uint8_t* nextInsnAddr, StackMap* map)
-        : nextInsnAddr(nextInsnAddr), map(map) {}
-    void offsetBy(uintptr_t delta) { nextInsnAddr += delta; }
-    bool operator<(const Maplet& other) const {
-      return uintptr_t(nextInsnAddr) < uintptr_t(other.nextInsnAddr);
-    }
-  };
-
  private:
-  bool sorted_;
-  Vector<Maplet, 0, SystemAllocPolicy> mapping_;
+  // Map for finding a stack map at a specific code offset.
+  StackMapHashMap mapping_;
 
  public:
-  StackMaps() : sorted_(false) {}
+  StackMaps() {}
   ~StackMaps() {
-    for (auto& maplet : mapping_) {
-      maplet.map->destroy();
-      maplet.map = nullptr;
-    }
-  }
-  [[nodiscard]] bool add(const uint8_t* nextInsnAddr, StackMap* map) {
-    MOZ_ASSERT(!sorted_);
-    return mapping_.append(Maplet(nextInsnAddr, map));
-  }
-  [[nodiscard]] bool add(const Maplet& maplet) {
-    return add(maplet.nextInsnAddr, maplet.map);
-  }
-  void clear() {
-    for (auto& maplet : mapping_) {
-      maplet.nextInsnAddr = nullptr;
-      maplet.map = nullptr;
+    for (auto iter = mapping_.modIter(); !iter.done(); iter.next()) {
+      StackMap* stackmap = iter.getMutable().value();
+      stackmap->destroy();
     }
     mapping_.clear();
   }
-  bool empty() const { return mapping_.empty(); }
-  size_t length() const { return mapping_.length(); }
-  Maplet* getRef(size_t i) { return &mapping_[i]; }
-  Maplet get(size_t i) const { return mapping_[i]; }
-  Maplet move(size_t i) {
-    Maplet m = mapping_[i];
-    mapping_[i].map = nullptr;
-    return m;
-  }
-  void offsetBy(uintptr_t delta) {
-    for (auto& maplet : mapping_) maplet.offsetBy(delta);
-  }
-  void finishAndSort() {
-    MOZ_ASSERT(!sorted_);
-    std::sort(mapping_.begin(), mapping_.end());
-    sorted_ = true;
-  }
-  void finishAlreadySorted() {
-    MOZ_ASSERT(!sorted_);
-    MOZ_ASSERT(std::is_sorted(mapping_.begin(), mapping_.end()));
-    sorted_ = true;
-  }
-  const StackMap* findMap(const uint8_t* nextInsnAddr) const {
-    struct Comparator {
-      int operator()(Maplet aVal) const {
-        if (uintptr_t(mTarget) < uintptr_t(aVal.nextInsnAddr)) {
-          return -1;
-        }
-        if (uintptr_t(mTarget) > uintptr_t(aVal.nextInsnAddr)) {
-          return 1;
-        }
-        return 0;
-      }
-      explicit Comparator(const uint8_t* aTarget) : mTarget(aTarget) {}
-      const uint8_t* mTarget;
-    };
 
-    size_t result;
-    if (mozilla::BinarySearchIf(mapping_, 0, mapping_.length(),
-                                Comparator(nextInsnAddr), &result)) {
-      return mapping_[result].map;
+  [[nodiscard]] bool add(uint32_t codeOffset, StackMap* map) {
+    return mapping_.put(codeOffset, map);
+  }
+  void clear() { mapping_.clear(); }
+  bool empty() const { return mapping_.empty(); }
+  // Return the number of stack maps contained in this.
+  size_t length() const { return mapping_.count(); }
+
+  // Add all the stack maps from the other collection to this collection.
+  // Apply an optional offset while adding the stack maps.
+  [[nodiscard]] bool appendAll(StackMaps& other, uint32_t offsetInModule) {
+    // Reserve space for the new mappings so that we don't have to handle
+    // failure in the loop below.
+    if (!mapping_.reserve(mapping_.count() + other.mapping_.count())) {
+      return false;
     }
 
-    return nullptr;
+    for (auto iter = other.mapping_.modIter(); !iter.done(); iter.next()) {
+      uint32_t newOffset = iter.get().key() + offsetInModule;
+      StackMap* stackMap = iter.get().value();
+      mapping_.putNewInfallible(newOffset, stackMap);
+    }
+
+    other.mapping_.clear();
+    return true;
   }
 
-  size_t sizeOfExcludingThis(MallocSizeOf mallocSizeOf) const {
-    return mapping_.sizeOfExcludingThis(mallocSizeOf);
+  const StackMap* lookup(uint32_t codeOffset) const {
+    auto ptr = mapping_.readonlyThreadsafeLookup(codeOffset);
+    if (!ptr) {
+      return nullptr;
+    }
+
+    return ptr->value();
   }
+
+  size_t sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf) const {
+    return mapping_.shallowSizeOfExcludingThis(mallocSizeOf);
+  }
+
+  void checkInvariants(const uint8_t* base) const;
+
+  WASM_DECLARE_FRIEND_SERIALIZE(StackMaps);
 };
 
 // Supporting code for creation of stackmaps.
@@ -375,14 +339,14 @@ static inline size_t StackArgAreaSizeUnaligned(
   // presented in some type that has methods length() and operator[].  So we
   // have to wrap up |saSig|'s array of types in this API-matching class.
   class MOZ_STACK_CLASS ItemsAndLength {
-    const MIRType* items_;
+    const jit::MIRType* items_;
     size_t length_;
 
    public:
-    ItemsAndLength(const MIRType* items, size_t length)
+    ItemsAndLength(const jit::MIRType* items, size_t length)
         : items_(items), length_(length) {}
     size_t length() const { return length_; }
-    MIRType operator[](size_t i) const { return items_[i]; }
+    jit::MIRType operator[](size_t i) const { return items_[i]; }
   };
 
   // Assert, at least crudely, that we're not accidentally going to run off
@@ -390,7 +354,8 @@ static inline size_t StackArgAreaSizeUnaligned(
   // iterating.
   MOZ_ASSERT(saSig.numArgs <
              sizeof(saSig.argTypes) / sizeof(saSig.argTypes[0]));
-  MOZ_ASSERT(saSig.argTypes[saSig.numArgs] == MIRType::None /*the end marker*/);
+  MOZ_ASSERT(saSig.argTypes[saSig.numArgs] ==
+             jit::MIRType::None /*the end marker*/);
 
   ItemsAndLength itemsAndLength(saSig.argTypes, saSig.numArgs);
   return StackArgAreaSizeUnaligned(itemsAndLength);
@@ -460,14 +425,15 @@ static inline size_t AlignStackArgAreaSize(size_t unalignedSize) {
 //
 // It is OK for `instance` and `scratch` to be the same register.
 //
-// If `trapOffset` is non-null, then metadata to catch a null access and emit
+// If `trapSiteDesc` is something, then metadata to catch a null access and emit
 // a null pointer exception will be emitted. This will only catch a null access
 // due to an incremental GC being in progress, the write that follows this
 // pre-barrier guard must also be guarded against null.
 template <class Addr>
-void EmitWasmPreBarrierGuard(jit::MacroAssembler& masm, Register instance,
-                             Register scratch, Addr addr, Label* skipBarrier,
-                             BytecodeOffset* trapOffset);
+void EmitWasmPreBarrierGuard(jit::MacroAssembler& masm, jit::Register instance,
+                             jit::Register scratch, Addr addr,
+                             jit::Label* skipBarrier,
+                             MaybeTrapSiteDesc trapSiteDesc);
 
 // Before storing a GC pointer value in memory, call out-of-line prebarrier
 // code. This assumes `PreBarrierReg` contains the address that will be updated.
@@ -477,15 +443,17 @@ void EmitWasmPreBarrierGuard(jit::MacroAssembler& masm, Register instance,
 //
 // It is OK for `instance` and `scratch` to be the same register.
 void EmitWasmPreBarrierCallImmediate(jit::MacroAssembler& masm,
-                                     Register instance, Register scratch,
-                                     Register valueAddr, size_t valueOffset);
+                                     jit::Register instance,
+                                     jit::Register scratch,
+                                     jit::Register valueAddr,
+                                     size_t valueOffset);
 // The equivalent of EmitWasmPreBarrierCallImmediate, but for a jit::BaseIndex.
 // Will clobber `scratch1` and `scratch2`.
 //
 // It is OK for `instance` and `scratch1` to be the same register.
-void EmitWasmPreBarrierCallIndex(jit::MacroAssembler& masm, Register instance,
-                                 Register scratch1, Register scratch2,
-                                 jit::BaseIndex addr);
+void EmitWasmPreBarrierCallIndex(jit::MacroAssembler& masm,
+                                 jit::Register instance, jit::Register scratch1,
+                                 jit::Register scratch2, jit::BaseIndex addr);
 
 // After storing a GC pointer value in memory, skip to `skipBarrier` if a
 // postbarrier is not needed.  If the location being set is in an heap-allocated
@@ -494,11 +462,21 @@ void EmitWasmPreBarrierCallIndex(jit::MacroAssembler& masm, Register instance,
 // will use other available scratch registers.
 //
 // `otherScratch` cannot be a designated scratch register.
-
 void EmitWasmPostBarrierGuard(jit::MacroAssembler& masm,
-                              const mozilla::Maybe<Register>& object,
-                              Register otherScratch, Register setValue,
-                              Label* skipBarrier);
+                              const mozilla::Maybe<jit::Register>& object,
+                              jit::Register otherScratch,
+                              jit::Register setValue, jit::Label* skipBarrier);
+
+// Before calling Instance::postBarrierWholeCell, we can check the object
+// against the store buffer's last element cache, skipping the post barrier if
+// that object had already been barriered.
+//
+// `instance` and `temp` can be the same register; if so, instance will be
+// clobbered, otherwise instance will be preserved.
+void CheckWholeCellLastElementCache(jit::MacroAssembler& masm,
+                                    jit::Register instance,
+                                    jit::Register object, jit::Register temp,
+                                    jit::Label* skipBarrier);
 
 #ifdef DEBUG
 // Check (approximately) whether `nextPC` is a valid code address for a

@@ -32,12 +32,16 @@ class NotNull;
 /** Set the contents of |aT| to 0. */
 template <typename T>
 static MOZ_ALWAYS_INLINE void PodZero(T* aT) {
+  static_assert(std::is_trivially_copyable_v<T>,
+                "PodZero requires trivially copyable types");
   memset(aT, 0, sizeof(T));
 }
 
 /** Set the contents of |aNElem| elements starting at |aT| to 0. */
 template <typename T>
 static MOZ_ALWAYS_INLINE void PodZero(T* aT, size_t aNElem) {
+  static_assert(std::is_trivially_copyable_v<T>,
+                "PodZero requires trivially copyable types");
   /*
    * This function is often called with 'aNElem' small; we use an inline loop
    * instead of calling 'memset' with a non-constant length.  The compiler
@@ -69,24 +73,16 @@ static void PodZero(T (&aT)[N], size_t aNElem) = delete;
 /** Set the contents of the array |aT| to zero. */
 template <class T, size_t N>
 static MOZ_ALWAYS_INLINE void PodArrayZero(T (&aT)[N]) {
+  static_assert(std::is_trivially_copyable_v<T>,
+                "PodArrayZero requires trivially copyable types");
   memset(aT, 0, N * sizeof(T));
 }
 
 template <typename T, size_t N>
 static MOZ_ALWAYS_INLINE void PodArrayZero(Array<T, N>& aArr) {
+  static_assert(std::is_trivially_copyable_v<T>,
+                "PodArrayZero requires trivially copyable types");
   memset(&aArr[0], 0, N * sizeof(T));
-}
-
-/**
- * Assign |*aSrc| to |*aDst|.  The locations must not be the same and must not
- * overlap.
- */
-template <typename T>
-static MOZ_ALWAYS_INLINE void PodAssign(T* aDst, const T* aSrc) {
-  MOZ_ASSERT(aDst + 1 <= aSrc || aSrc + 1 <= aDst,
-             "destination and source must not overlap");
-  memcpy(reinterpret_cast<char*>(aDst), reinterpret_cast<const char*>(aSrc),
-         sizeof(T));
 }
 
 /**
@@ -95,24 +91,32 @@ static MOZ_ALWAYS_INLINE void PodAssign(T* aDst, const T* aSrc) {
  */
 template <typename T>
 static MOZ_ALWAYS_INLINE void PodCopy(T* aDst, const T* aSrc, size_t aNElem) {
+  static_assert(std::is_trivially_copyable_v<T>,
+                "PodCopy requires trivially copyable types");
   MOZ_ASSERT(aDst + aNElem <= aSrc || aSrc + aNElem <= aDst,
              "destination and source must not overlap");
+
+// Linux memcpy for small sizes seems slower than on other
+// platforms. So we use a loop for small sizes there only.
+//
+// See Bug 1967062 for details.
+#if defined(XP_LINUX)
   if (aNElem < 128) {
-    /*
-     * Avoid using operator= in this loop, as it may have been
-     * intentionally deleted by the POD type.
-     */
     for (const T* srcend = aSrc + aNElem; aSrc < srcend; aSrc++, aDst++) {
-      PodAssign(aDst, aSrc);
+      *aDst = *aSrc;
     }
-  } else {
-    memcpy(aDst, aSrc, aNElem * sizeof(T));
+    return;
   }
+#endif
+
+  memcpy(aDst, aSrc, aNElem * sizeof(T));
 }
 
 template <typename T>
 static MOZ_ALWAYS_INLINE void PodCopy(volatile T* aDst, const volatile T* aSrc,
                                       size_t aNElem) {
+  static_assert(std::is_trivially_copyable_v<T>,
+                "PodCopy requires trivially copyable types");
   MOZ_ASSERT(aDst + aNElem <= aSrc || aSrc + aNElem <= aDst,
              "destination and source must not overlap");
 
@@ -145,6 +149,8 @@ static MOZ_ALWAYS_INLINE void PodArrayCopy(T (&aDst)[N], const T (&aSrc)[N]) {
  */
 template <typename T>
 static MOZ_ALWAYS_INLINE void PodMove(T* aDst, const T* aSrc, size_t aNElem) {
+  static_assert(std::is_trivially_copyable_v<T>,
+                "PodMove requires trivially copyable types");
   MOZ_ASSERT(aNElem <= SIZE_MAX / sizeof(T),
              "trying to move an impossible number of elements");
   memmove(aDst, aSrc, aNElem * sizeof(T));

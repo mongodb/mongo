@@ -20,7 +20,7 @@ UNIFIED_SOURCES += [
     "Identifier.cpp",
     "NativeStack.cpp",
     "Printf.cpp",
-    "StringBuffer.cpp",
+    "StringBuilder.cpp",
     "StructuredSpewer.cpp",
     "Text.cpp",
     "Unicode.cpp",

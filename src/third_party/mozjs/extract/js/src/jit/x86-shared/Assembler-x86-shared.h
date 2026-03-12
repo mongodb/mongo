@@ -7,9 +7,12 @@
 #ifndef jit_x86_shared_Assembler_x86_shared_h
 #define jit_x86_shared_Assembler_x86_shared_h
 
+#include "mozilla/MathAlgorithms.h"
+
 #include <cstddef>
 
 #include "jit/shared/Assembler-shared.h"
+#include "jit/shared/IonAssemblerBuffer.h"  // jit::BufferOffset
 
 #if defined(JS_CODEGEN_X86)
 #  include "jit/x86/BaseAssembler-x86.h"
@@ -19,6 +22,7 @@
 #  error "Unknown architecture!"
 #endif
 #include "jit/CompactBuffer.h"
+#include "jit/ProcessExecutableMemory.h"
 #include "wasm/WasmTypeDecls.h"
 
 namespace js {
@@ -161,10 +165,6 @@ class Operand {
   }
 };
 
-inline Imm32 Imm64::firstHalf() const { return low(); }
-
-inline Imm32 Imm64::secondHalf() const { return hi(); }
-
 class CPUInfo {
  public:
   // As the SSE's were introduced in order, the presence of a later SSE implies
@@ -210,6 +210,7 @@ class CPUInfo {
   static bool lzcntPresent;
   static bool fmaPresent;
   static bool avx2Present;
+  static bool f16cPresent;
 
   static void SetMaxEnabledSSEVersion(SSEVersion v) {
     if (maxEnabledSSEVersion == UnknownSSE) {
@@ -237,6 +238,7 @@ class CPUInfo {
   static bool IsLZCNTPresent() { return lzcntPresent; }
   static bool IsFMAPresent() { return fmaPresent; }
   static bool IsAVX2Present() { return avx2Present; }
+  static bool IsF16CPresent() { return f16cPresent; }
 
   static bool FlagsHaveBeenComputed() { return maxSSEVersion != UnknownSSE; }
 
@@ -271,6 +273,8 @@ class CPUInfo {
   }
   static void SetAVXEnabled() {
     MOZ_ASSERT(!FlagsHaveBeenComputed());
+    MOZ_ASSERT(maxEnabledSSEVersion == UnknownSSE,
+               "Can't enable AVX when SSE has been restricted");
     avxEnabled = true;
   }
 };
@@ -1003,6 +1007,20 @@ class AssemblerX86Shared : public AssemblerShared {
     return j;
   }
 
+  void bind(Label* label, JmpDst dst) {
+    if (label->used()) {
+      bool more;
+      JmpSrc jmp(label->offset());
+      do {
+        JmpSrc next;
+        more = masm.nextJump(jmp, &next);
+        masm.linkJump(jmp, dst);
+        jmp = next;
+      } while (more);
+    }
+    label->bind(dst.offset());
+  }
+
  public:
   void nop() {
     MOZ_ASSERT(hasCreator());
@@ -1038,21 +1056,11 @@ class AssemblerX86Shared : public AssemblerShared {
     }
   }
   void cmpEAX(Label* label) { cmpSrc(label); }
-  void bind(Label* label) {
-    JmpDst dst(masm.label());
-    if (label->used()) {
-      bool more;
-      JmpSrc jmp(label->offset());
-      do {
-        JmpSrc next;
-        more = masm.nextJump(jmp, &next);
-        masm.linkJump(jmp, dst);
-        jmp = next;
-      } while (more);
-    }
-    label->bind(dst.offset());
-  }
+  void bind(Label* label) { bind(label, JmpDst(masm.label())); }
   void bind(CodeLabel* label) { label->target()->bind(currentOffset()); }
+  void bind(Label* label, BufferOffset targetOffset) {
+    bind(label, JmpDst(targetOffset.getOffset()));
+  }
   uint32_t currentOffset() { return masm.label().offset(); }
 
   // Re-routes pending jumps to a new label.
@@ -1141,6 +1149,11 @@ class AssemblerX86Shared : public AssemblerShared {
     unsigned char* code = masm.data();
     X86Encoding::SetRel32(code + farJump.offset(), code + targetOffset);
   }
+  static void patchFarJump(uint8_t* farJump, uint8_t* target) {
+    MOZ_RELEASE_ASSERT(mozilla::Abs(target - farJump) <=
+                       (intptr_t)jit::MaxCodeBytesPerProcess);
+    X86Encoding::SetRel32(farJump, target);
+  }
 
   // This is for patching during code generation, not after.
   void patchAddl(CodeOffset offset, int32_t n) {
@@ -1172,10 +1185,13 @@ class AssemblerX86Shared : public AssemblerShared {
   static bool HasBMI1() { return CPUInfo::IsBMI1Present(); }
   static bool HasBMI2() { return CPUInfo::IsBMI2Present(); }
   static bool HasLZCNT() { return CPUInfo::IsLZCNTPresent(); }
+  static bool HasF16C() { return CPUInfo::IsF16CPresent(); }
   static bool SupportsFloatingPoint() { return CPUInfo::IsSSE2Present(); }
   static bool SupportsUnalignedAccesses() { return true; }
   static bool SupportsFastUnalignedFPAccesses() { return true; }
   static bool SupportsWasmSimd() { return CPUInfo::IsSSE41Present(); }
+  static bool SupportsFloat64To16() { return false; }
+  static bool SupportsFloat32To16() { return CPUInfo::IsF16CPresent(); }
   static bool HasAVX() { return CPUInfo::IsAVXPresent(); }
   static bool HasAVX2() { return CPUInfo::IsAVX2Present(); }
   static bool HasFMA() { return CPUInfo::IsFMAPresent(); }
@@ -1392,17 +1408,15 @@ class AssemblerX86Shared : public AssemblerShared {
   void subl(Imm32 imm, Register dest) {
     masm.subl_ir(imm.value, dest.encoding());
   }
-  void subl(Imm32 imm, const Operand& op) {
+  size_t subl(Imm32 imm, const Operand& op) {
     switch (op.kind()) {
       case Operand::REG:
-        masm.subl_ir(imm.value, op.reg());
-        break;
+        return masm.subl_ir(imm.value, op.reg());
       case Operand::MEM_REG_DISP:
-        masm.subl_im(imm.value, op.disp(), op.base());
-        break;
+        return masm.subl_im(imm.value, op.disp(), op.base());
       case Operand::MEM_SCALE:
-        masm.subl_im(imm.value, op.disp(), op.base(), op.index(), op.scale());
-        break;
+        return masm.subl_im(imm.value, op.disp(), op.base(), op.index(),
+                            op.scale());
       default:
         MOZ_CRASH("unexpected operand kind");
     }
@@ -2555,6 +2569,14 @@ class AssemblerX86Shared : public AssemblerShared {
   }
   void vcvtpd2ps(FloatRegister src, FloatRegister dest) {
     masm.vcvtpd2ps_rr(src.encoding(), dest.encoding());
+  }
+  void vcvtph2ps(FloatRegister src, FloatRegister dest) {
+    MOZ_ASSERT(HasF16C());
+    masm.vcvtph2ps_rr(src.encoding(), dest.encoding());
+  }
+  void vcvtps2ph(FloatRegister src, FloatRegister dest) {
+    MOZ_ASSERT(HasF16C());
+    masm.vcvtps2ph_rr(src.encoding(), dest.encoding());
   }
   void vmovmskpd(FloatRegister src, Register dest) {
     MOZ_ASSERT(HasSSE2());
@@ -4822,6 +4844,18 @@ class AssemblerX86Shared : public AssemblerShared {
         MOZ_CRASH("unexpected operand kind");
     }
   }
+
+  void vpsignd(const Operand& src1, FloatRegister src0, FloatRegister dest) {
+    MOZ_ASSERT(HasSSSE3());
+    switch (src1.kind()) {
+      case Operand::FPREG:
+        masm.vpsignd_rr(src1.fpu(), src0.encoding(), dest.encoding());
+        break;
+      default:
+        MOZ_CRASH("unexpected operand kind");
+    }
+  }
+
   void vfmadd231ps(FloatRegister src1, FloatRegister src0, FloatRegister dest) {
     MOZ_ASSERT(HasFMA());
     masm.vfmadd231ps_rrr(src1.encoding(), src0.encoding(), dest.encoding());

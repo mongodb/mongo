@@ -118,7 +118,6 @@ inline bool JS_IsInitialized(void) {
 namespace JS {
 
 // Reference to a sequence of bytes.
-// TODO: This type should be Span<cont uint8_t> (Bug 1709135)
 using SelfHostedCache = mozilla::Span<const uint8_t>;
 
 // Callback function used to copy the SelfHosted content to memory or to disk.

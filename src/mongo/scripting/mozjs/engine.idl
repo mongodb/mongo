@@ -48,3 +48,12 @@ server_parameters:
         cpp_vartype: AtomicWord<int>
         cpp_varname: gJSHeapLimitMB
         default: 1100
+        redact: false
+
+    jsUseLegacyMemoryTracking:
+        description: "fallback to use legacy memory tracking"
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gJSUseLegacyMemoryTracking
+        default: false
+        redact: false

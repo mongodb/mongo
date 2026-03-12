@@ -215,10 +215,13 @@ static const JSFunctionSpec reflect_methods[] = {
     JS_FN("preventExtensions", Reflect_preventExtensions, 1, 0),
     JS_FN("set", Reflect_set, 3, 0),
     JS_FN("setPrototypeOf", Reflect_setPrototypeOf, 2, 0),
-    JS_FS_END};
+    JS_FS_END,
+};
 
 static const JSPropertySpec reflect_properties[] = {
-    JS_STRING_SYM_PS(toStringTag, "Reflect", JSPROP_READONLY), JS_PS_END};
+    JS_STRING_SYM_PS(toStringTag, "Reflect", JSPROP_READONLY),
+    JS_PS_END,
+};
 
 /*** Setup ******************************************************************/
 
@@ -227,8 +230,16 @@ static JSObject* CreateReflectObject(JSContext* cx, JSProtoKey key) {
   return NewPlainObjectWithProto(cx, proto, TenuredObject);
 }
 
-static const ClassSpec ReflectClassSpec = {CreateReflectObject, nullptr,
-                                           reflect_methods, reflect_properties};
+static const ClassSpec ReflectClassSpec = {
+    CreateReflectObject,
+    nullptr,
+    reflect_methods,
+    reflect_properties,
+};
 
-const JSClass js::ReflectClass = {"Reflect", 0, JS_NULL_CLASS_OPS,
-                                  &ReflectClassSpec};
+const JSClass js::ReflectClass = {
+    "Reflect",
+    0,
+    JS_NULL_CLASS_OPS,
+    &ReflectClassSpec,
+};

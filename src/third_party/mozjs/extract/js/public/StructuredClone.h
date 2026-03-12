@@ -10,6 +10,7 @@
 #include "mozilla/Attributes.h"
 #include "mozilla/BufferList.h"
 #include "mozilla/MemoryReporting.h"
+#include "mozilla/StringBuffer.h"
 
 #include <stdint.h>
 #include <utility>
@@ -153,6 +154,13 @@ enum class StructuredCloneScope : uint32_t {
    * When reading, this means: Do not accept pointers.
    */
   DifferentProcess,
+
+  /**
+   * Values greater than this are temporary markers used when the actual scope
+   * is not yet known. The allowed scope will be resolved by the time
+   * readHeader() is complete.
+   */
+  LastResolvedScope = DifferentProcess,
 
   /**
    * Handle a backwards-compatibility case with IndexedDB (bug 1434308): when
@@ -311,6 +319,11 @@ typedef void (*StructuredCloneErrorOp)(JSContext* cx, uint32_t errorid,
  * If this readTransfer() hook is called and produces an object, then the
  * read() hook will *not* be called for the same object, since the main data
  * will only contain a backreference to the already-read object.
+ *
+ * The clone buffer will relinquish ownership of this Transferable if and only
+ * if this hook returns true -- as in, the freeTransfer hook will not be called
+ * on this entry if this hook returns true, but it will still be called if it
+ * returns false.
  */
 typedef bool (*ReadTransferStructuredCloneOp)(
     JSContext* cx, JSStructuredCloneReader* r,
@@ -351,11 +364,13 @@ typedef bool (*TransferStructuredCloneOp)(JSContext* cx,
  *    encountered later and the incomplete serialization is discarded.
  *
  * 2. During deserialization: before an object is Transferred to, an error
- *    is encountered and the incompletely deserialized clone is discarded.
+ *    is encountered and the incompletely deserialized clone is discarded. This
+ *    will happen with internally-implemented Transferables as well as those
+ *    where the readTransfer hook returns false.
  *
  * 3. Serialized data that includes Transferring is never deserialized (eg when
  *    the receiver disappears before reading in the message), and the clone data
- * is destroyed.
+ *    is destroyed.
  *
  */
 typedef void (*FreeTransferStructuredCloneOp)(
@@ -468,6 +483,10 @@ class MOZ_NON_MEMMOVABLE JS_PUBLIC_API JSStructuredCloneData {
   OwnTransferablePolicy ownTransferables_ =
       OwnTransferablePolicy::NoTransferables;
   js::SharedArrayRawBufferRefs refsHeld_;
+
+  using StringBuffers =
+      js::Vector<RefPtr<mozilla::StringBuffer>, 4, js::SystemAllocPolicy>;
+  StringBuffers stringBufferRefsHeld_;
 
   friend struct JSStructuredCloneWriter;
   friend class JS_PUBLIC_API JSAutoStructuredCloneBuffer;

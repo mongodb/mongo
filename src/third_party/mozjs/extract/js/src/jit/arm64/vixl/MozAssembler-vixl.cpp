@@ -385,6 +385,9 @@ void Assembler::ldr(Instruction* at, const CPURegister& rt, int imm19) {
   Emit(at, op | ImmLLiteral(imm19) | Rt(rt));
 }
 
+void Assembler::ldrsw(Instruction* at, const CPURegister& rt, int imm19) {
+  Emit(at, LDRSW_x_lit | ImmLLiteral(imm19) | Rt(rt));
+}
 
 BufferOffset Assembler::hint(SystemHint code) {
   return Emit(HINT | ImmHint(code));

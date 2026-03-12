@@ -63,12 +63,40 @@ SimSystemRegister SimSystemRegister::DefaultValueFor(SystemRegister id) {
   }
 }
 
+void Simulator::enable_single_stepping(SingleStepCallback cb, void* arg) {
+  single_stepping_ = true;
+  single_step_callback_ = cb;
+  single_step_callback_arg_ = arg;
+  single_step_callback_(single_step_callback_arg_, this, (void*)get_pc());
+}
+
+void Simulator::disable_single_stepping() {
+  if (!single_stepping_) {
+    return;
+  }
+  single_step_callback_(single_step_callback_arg_, this, (void*)get_pc());
+  single_stepping_ = false;
+  single_step_callback_ = nullptr;
+  single_step_callback_arg_ = nullptr;
+}
 
 void Simulator::Run() {
+  if (single_stepping_) {
+    single_step_callback_(single_step_callback_arg_, this, nullptr);
+  }
+
   pc_modified_ = false;
   while (pc_ != kEndOfSimAddress) {
+    if (single_stepping_) {
+      single_step_callback_(single_step_callback_arg_, this, (void*)pc_);
+    }
+
     ExecuteInstruction();
     LogAllWrittenRegisters();
+  }
+
+  if (single_stepping_) {
+    single_step_callback_(single_step_callback_arg_, this, nullptr);
   }
 }
 
@@ -2544,7 +2572,7 @@ void Simulator::VisitFPDataProcessing1Source(const Instruction* instr) {
       set_sreg(fd, FPToFloat(RawbitsToFloat16(hreg(fn)), ReadDN()));
       return;
     case FCVT_dh:
-      set_dreg(fd, FPToDouble(hreg(fn), ReadDN()));
+      set_dreg(fd, FPToDouble(RawbitsToFloat16(hreg(fn)), ReadDN()));
       return;
     case FCVT_hd:
       set_hreg(fd, Float16ToRawbits(FPToFloat16(dreg(fn), FPTieEven, ReadDN())));

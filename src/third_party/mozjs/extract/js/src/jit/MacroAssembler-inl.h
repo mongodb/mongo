@@ -18,7 +18,6 @@
 #include "jit/JitFrames.h"
 #include "jit/JSJitFrameIter.h"
 #include "js/Prefs.h"
-#include "util/DifferentialTesting.h"
 #include "vm/BigIntType.h"
 #include "vm/JSObject.h"
 #include "vm/ProxyObject.h"
@@ -35,8 +34,6 @@
 #  include "jit/arm/MacroAssembler-arm-inl.h"
 #elif defined(JS_CODEGEN_ARM64)
 #  include "jit/arm64/MacroAssembler-arm64-inl.h"
-#elif defined(JS_CODEGEN_MIPS32)
-#  include "jit/mips32/MacroAssembler-mips32-inl.h"
 #elif defined(JS_CODEGEN_MIPS64)
 #  include "jit/mips64/MacroAssembler-mips64-inl.h"
 #elif defined(JS_CODEGEN_LOONG64)
@@ -191,7 +188,11 @@ ABIFunctionType MacroAssembler::signature() const {
     case Args_Double_None:
     case Args_Int_Double:
     case Args_Float32_Float32:
+    case Args_Float32_Float64:
+    case Args_Float32_General:
+    case Args_Float32_Int32:
     case Args_Int_Float32:
+    case Args_Int32_Float32:
     case Args_Double_Double:
     case Args_Double_Int:
     case Args_Double_DoubleInt:
@@ -279,10 +280,7 @@ void MacroAssembler::PushFrameDescriptorForJitCall(FrameType type,
 void MacroAssembler::pushFrameDescriptorForJitCall(FrameType type,
                                                    Register argc,
                                                    Register scratch) {
-  if (argc != scratch) {
-    mov(argc, scratch);
-  }
-  lshift32(Imm32(NUMACTUALARGS_SHIFT), scratch);
+  lshift32(Imm32(NUMACTUALARGS_SHIFT), argc, scratch);
   or32(Imm32(int32_t(type)), scratch);
   push(scratch);
 }
@@ -409,8 +407,12 @@ void MacroAssembler::addPtr(ImmPtr imm, Register dest) {
 // ===============================================================
 // Branch functions
 
-template <class L>
-void MacroAssembler::branchIfFalseBool(Register reg, L label) {
+void MacroAssembler::branchTest64(Condition cond, Register64 lhs,
+                                  Register64 rhs, Label* success, Label* fail) {
+  branchTest64(cond, lhs, rhs, InvalidReg, success, fail);
+}
+
+void MacroAssembler::branchIfFalseBool(Register reg, Label* label) {
   // Note that C++ bool is only 1 byte, so ignore the higher-order bits.
   branchTest32(Assembler::Zero, reg, Imm32(0xFF), label);
 }
@@ -418,6 +420,16 @@ void MacroAssembler::branchIfFalseBool(Register reg, L label) {
 void MacroAssembler::branchIfTrueBool(Register reg, Label* label) {
   // Note that C++ bool is only 1 byte, so ignore the higher-order bits.
   branchTest32(Assembler::NonZero, reg, Imm32(0xFF), label);
+}
+
+void MacroAssembler::branchIfNotNullOrUndefined(ValueOperand val,
+                                                Label* label) {
+  Label nullOrUndefined;
+  ScratchTagScope tag(*this, val);
+  splitTagForTest(val, tag);
+  branchTestNull(Assembler::Equal, tag, &nullOrUndefined);
+  branchTestUndefined(Assembler::NotEqual, tag, label);
+  bind(&nullOrUndefined);
 }
 
 void MacroAssembler::branchIfRope(Register str, Label* label) {
@@ -540,22 +552,23 @@ void MacroAssembler::branchIfObjectEmulatesUndefined(Register objReg,
   MOZ_ASSERT(objReg != scratch);
 
   Label done;
-  if (JS::Prefs::use_emulates_undefined_fuse()) {
-    loadPtr(AbsoluteAddress(
-                runtime()->addressOfHasSeenObjectEmulateUndefinedFuse()),
-            scratch);
-    branchPtr(Assembler::Equal, scratch, ImmPtr(nullptr), &done);
-  }
 
-  // The branches to out-of-line code here implement a conservative version
-  // of the JSObject::isWrapper test performed in EmulatesUndefined.
+  loadPtr(
+      AbsoluteAddress(runtime()->addressOfHasSeenObjectEmulateUndefinedFuse()),
+      scratch);
+  branchPtr(Assembler::Equal, scratch, ImmPtr(nullptr), &done);
+
   loadObjClassUnsafe(objReg, scratch);
-
-  branchTestClassIsProxy(true, scratch, slowCheck);
 
   Address flags(scratch, JSClass::offsetOfFlags());
   branchTest32(Assembler::NonZero, flags, Imm32(JSCLASS_EMULATES_UNDEFINED),
                label);
+
+  // Call into C++ if the object is a wrapper.
+  branchTestClassIsProxy(false, scratch, &done);
+  branchTestProxyHandlerFamily(Assembler::Equal, objReg, scratch,
+                               &Wrapper::family, slowCheck);
+
   bind(&done);
 }
 
@@ -898,13 +911,6 @@ void MacroAssembler::canonicalizeFloat(FloatRegister reg) {
   bind(&notNaN);
 }
 
-void MacroAssembler::canonicalizeFloatIfDeterministic(FloatRegister reg) {
-  // See the comment in TypedArrayObjectTemplate::getElement.
-  if (js::SupportDifferentialTesting()) {
-    canonicalizeFloat(reg);
-  }
-}
-
 void MacroAssembler::canonicalizeDouble(FloatRegister reg) {
   Label notNaN;
   branchDouble(DoubleOrdered, reg, reg, &notNaN);
@@ -912,43 +918,13 @@ void MacroAssembler::canonicalizeDouble(FloatRegister reg) {
   bind(&notNaN);
 }
 
-void MacroAssembler::canonicalizeDoubleIfDeterministic(FloatRegister reg) {
-  // See the comment in TypedArrayObjectTemplate::getElement.
-  if (js::SupportDifferentialTesting()) {
-    canonicalizeDouble(reg);
-  }
-}
-
 // ========================================================================
 // Memory access primitives.
-template <class T>
-FaultingCodeOffset MacroAssembler::storeDouble(FloatRegister src,
-                                               const T& dest) {
-  canonicalizeDoubleIfDeterministic(src);
-  return storeUncanonicalizedDouble(src, dest);
-}
-
-template FaultingCodeOffset MacroAssembler::storeDouble(FloatRegister src,
-                                                        const Address& dest);
-template FaultingCodeOffset MacroAssembler::storeDouble(FloatRegister src,
-                                                        const BaseIndex& dest);
 
 template <class T>
 void MacroAssembler::boxDouble(FloatRegister src, const T& dest) {
   storeDouble(src, dest);
 }
-
-template <class T>
-FaultingCodeOffset MacroAssembler::storeFloat32(FloatRegister src,
-                                                const T& dest) {
-  canonicalizeFloatIfDeterministic(src);
-  return storeUncanonicalizedFloat32(src, dest);
-}
-
-template FaultingCodeOffset MacroAssembler::storeFloat32(FloatRegister src,
-                                                         const Address& dest);
-template FaultingCodeOffset MacroAssembler::storeFloat32(FloatRegister src,
-                                                         const BaseIndex& dest);
 
 template <typename T>
 void MacroAssembler::fallibleUnboxInt32(const T& src, Register dest,
@@ -993,6 +969,26 @@ void MacroAssembler::fallibleUnboxBigInt(const T& src, Register dest,
 //}}} check_macroassembler_style
 // ===============================================================
 
+void MacroAssembler::ensureDouble(const ValueOperand& source,
+                                  FloatRegister dest, Label* failure) {
+  Label isDouble, done;
+
+  {
+    ScratchTagScope tag(*this, source);
+    splitTagForTest(source, tag);
+    branchTestDouble(Assembler::Equal, tag, &isDouble);
+    branchTestInt32(Assembler::NotEqual, tag, failure);
+  }
+
+  convertInt32ToDouble(source.payloadOrValueReg(), dest);
+  jump(&done);
+
+  bind(&isDouble);
+  unboxDouble(source, dest);
+
+  bind(&done);
+}
+
 #ifndef JS_CODEGEN_ARM64
 
 template <typename T>
@@ -1030,6 +1026,10 @@ void MacroAssembler::loadObjClassUnsafe(Register obj, Register dest) {
   loadPtr(Address(obj, JSObject::offsetOfShape()), dest);
   loadPtr(Address(dest, Shape::offsetOfBaseShape()), dest);
   loadPtr(Address(dest, BaseShape::offsetOfClasp()), dest);
+}
+
+void MacroAssembler::loadObjShapeUnsafe(Register obj, Register dest) {
+  loadPtr(Address(obj, JSObject::offsetOfShape()), dest);
 }
 
 template <typename EmitPreBarrier>

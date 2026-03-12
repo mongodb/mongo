@@ -53,7 +53,7 @@ class BitArray {
   WordT map[numSlots];
 
  public:
-  constexpr BitArray() : map(){};
+  constexpr BitArray() : map() {};
 
   void clear(bool value) {
     memset(map, value ? 0xFF : 0, sizeof(map));

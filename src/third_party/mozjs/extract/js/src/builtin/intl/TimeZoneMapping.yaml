@@ -1,0 +1,157 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# Provide mapping from time zone identifiers to region codes for time zones
+# which aren't listed in tzdata's zone.tab file.
+
+Africa/Timbuktu: ML
+Africa/Asmera: ER
+
+America/Argentina/ComodRivadavia: AR
+America/Atka: US
+America/Buenos_Aires: AR
+America/Catamarca: AR
+America/Coral_Harbour: CA
+America/Cordoba: AR
+America/Ensenada: MX
+America/Fort_Wayne: US
+America/Godthab: GL
+America/Indianapolis: US
+America/Jujuy: AR
+America/Knox_IN: US
+America/Louisville: US
+America/Mendoza: AR
+America/Montreal: CA
+America/Nipigon: CA
+America/Pangnirtung: CA
+America/Porto_Acre: BR
+America/Rainy_River: CA
+America/Rosario: AR
+America/Santa_Isabel: MX
+America/Shiprock: US
+America/Thunder_Bay: CA
+America/Virgin: VI
+America/Yellowknife: CA
+
+Antarctica/South_Pole: AQ
+
+Asia/Choibalsan: MN
+Asia/Chongqing: CN
+Asia/Harbin: CN
+Asia/Kashgar: CN
+Asia/Tel_Aviv: IL
+Asia/Ashkhabad: TM
+Asia/Calcutta: IN
+Asia/Chungking: CN
+Asia/Dacca: BD
+Asia/Istanbul: TR
+Asia/Katmandu: NP
+Asia/Macao: MO
+Asia/Rangoon: MM
+Asia/Saigon: VN
+Asia/Thimbu: BT
+Asia/Ujung_Pandang: ID
+Asia/Ulan_Bator: MN
+
+Atlantic/Jan_Mayen: SJ
+Atlantic/Faeroe: FO
+
+Australia/ACT: AU
+Australia/LHI: AU
+Australia/NSW: AU
+Australia/Canberra: AU
+Australia/Currie: AU
+Australia/North: AU
+Australia/Queensland: AU
+Australia/South: AU
+Australia/Tasmania: AU
+Australia/Victoria: AU
+Australia/West: AU
+Australia/Yancowinna: AU
+
+Europe/Belfast: GB
+Europe/Tiraspol: MD
+Europe/Uzhgorod: UA
+Europe/Zaporozhye: UA
+Europe/Kiev: UA
+Europe/Nicosia: CY
+
+Pacific/Samoa: AS
+Pacific/Enderbury: KI
+Pacific/Johnston: US
+Pacific/Yap: FM
+Pacific/Ponape: FM
+Pacific/Truk: FM
+
+Brazil/Acre: BR
+Brazil/DeNoronha: BR
+Brazil/East: BR
+Brazil/West: BR
+
+Canada/Atlantic: CA
+Canada/Central: CA
+Canada/Eastern: CA
+Canada/Mountain: CA
+Canada/Newfoundland: CA
+Canada/Pacific: CA
+Canada/Saskatchewan: CA
+Canada/Yukon: CA
+
+Chile/Continental: CL
+Chile/EasterIsland: CL
+
+Mexico/BajaNorte: MX
+Mexico/BajaSur: MX
+Mexico/General: MX
+
+US/Alaska: US
+US/Aleutian: US
+US/Arizona: US
+US/Central: US
+US/East-Indiana: US
+US/Eastern: US
+US/Hawaii: US
+US/Indiana-Starke: US
+US/Michigan: US
+US/Mountain: US
+US/Pacific: US
+US/Samoa: AS
+
+CET: BE
+EET: GR
+MET: BE
+WET: PT
+
+CST6CDT: US
+EST5EDT: US
+EST: PA
+HST: US
+MST7MDT: US
+MST: US
+PST8PDT: US
+
+Cuba: CU
+Egypt: EG
+Eire: IE
+GB: GB
+GB-Eire: GB
+Hongkong: HK
+Iceland: IS
+Iran: IR
+Israel: IL
+Jamaica: JM
+Japan: JP
+Kwajalein: MH
+Libya: LY
+NZ: NZ
+NZ-CHAT: NZ
+Navajo: US
+PRC: CN
+Poland: PL
+Portugal: PT
+ROC: TW
+ROK: KR
+Singapore: SG
+Turkey: TR
+W-SU: RU

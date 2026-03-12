@@ -478,6 +478,14 @@ const char16_t* SIMD::memchr16(const char16_t* ptr, char16_t value,
   return memchr16SSE2(ptr, value, length);
 }
 
+const uint32_t* SIMD::memchr32(const uint32_t* ptr, uint32_t value,
+                               size_t length) {
+  if (SupportsAVX2()) {
+    return memchr32AVX2(ptr, value, length);
+  }
+  return FindInBufferNaive<uint32_t>(ptr, value, length);
+}
+
 const uint64_t* SIMD::memchr64(const uint64_t* ptr, uint64_t value,
                                size_t length) {
   if (SupportsAVX2()) {
@@ -522,6 +530,11 @@ const char16_t* SIMD::memchr16(const char16_t* ptr, char16_t value,
 const char16_t* SIMD::memchr16SSE2(const char16_t* ptr, char16_t value,
                                    size_t length) {
   return memchr16(ptr, value, length);
+}
+
+const uint32_t* SIMD::memchr32(const uint32_t* ptr, uint32_t value,
+                               size_t length) {
+  return FindInBufferNaive<uint32_t>(ptr, value, length);
 }
 
 const uint64_t* SIMD::memchr64(const uint64_t* ptr, uint64_t value,

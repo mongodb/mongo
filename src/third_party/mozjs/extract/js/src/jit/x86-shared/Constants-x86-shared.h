@@ -282,7 +282,7 @@ enum ConditionCmp {
   ConditionCmp_GE = 0xD,
 };
 
-// Rounding modes for ROUNDSS / ROUNDSD.
+// Rounding modes for ROUNDSS / ROUNDSD / VCVTPS2PH.
 enum RoundingMode {
   RoundToNearest = 0x0,
   RoundDown = 0x1,

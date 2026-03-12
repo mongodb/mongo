@@ -38,7 +38,7 @@ struct MemoryDesc;
 // of size `initialCommittedSize`.  Both arguments denote bytes and must be
 // multiples of the page size, with `initialCommittedSize` <= `mappedSize`.
 // Returns nullptr on failure.
-void* MapBufferMemory(wasm::IndexType, size_t mappedSize,
+void* MapBufferMemory(wasm::AddressType, size_t mappedSize,
                       size_t initialCommittedSize);
 
 // Commit additional memory in an existing mapping.  `dataEnd` must be the
@@ -47,17 +47,10 @@ void* MapBufferMemory(wasm::IndexType, size_t mappedSize,
 // size.  Returns false on failure.
 bool CommitBufferMemory(void* dataEnd, size_t delta);
 
-// Extend an existing mapping by adding uncommited pages to it.  `dataStart`
-// must be the pointer to the start of the existing mapping, `mappedSize` the
-// size of the existing mapping, and `newMappedSize` the size of the extended
-// mapping (sizes in bytes), with `mappedSize` <= `newMappedSize`.  Both sizes
-// must be divisible by the page size.  Returns false on failure.
-bool ExtendBufferMapping(void* dataStart, size_t mappedSize,
-                         size_t newMappedSize);
-
 // Remove an existing mapping.  `dataStart` must be the pointer to the start of
 // the mapping, and `mappedSize` the size of that mapping.
-void UnmapBufferMemory(wasm::IndexType t, void* dataStart, size_t mappedSize);
+void UnmapBufferMemory(wasm::AddressType t, void* dataStart, size_t mappedSize,
+                       size_t committedSize);
 
 // Return the number of bytes currently reserved for WebAssembly memory
 uint64_t WasmReservedBytes();
@@ -130,7 +123,7 @@ uint64_t WasmReservedBytes();
 
 class ArrayBufferObjectMaybeShared;
 
-wasm::IndexType WasmArrayBufferIndexType(
+wasm::AddressType WasmArrayBufferAddressType(
     const ArrayBufferObjectMaybeShared* buf);
 wasm::Pages WasmArrayBufferPages(const ArrayBufferObjectMaybeShared* buf);
 wasm::Pages WasmArrayBufferClampedMaxPages(
@@ -152,8 +145,8 @@ class ArrayBufferObjectMaybeShared : public NativeObject {
   // Note: the eventual goal is to remove this from ArrayBuffer and have
   // (Shared)ArrayBuffers alias memory owned by some wasm::Memory object.
 
-  wasm::IndexType wasmIndexType() const {
-    return WasmArrayBufferIndexType(this);
+  wasm::AddressType wasmAddressType() const {
+    return WasmArrayBufferAddressType(this);
   }
   wasm::Pages wasmPages() const { return WasmArrayBufferPages(this); }
   wasm::Pages wasmClampedMaxPages() const {
@@ -190,6 +183,7 @@ class ArrayBufferObject : public ArrayBufferObjectMaybeShared {
   static bool maxByteLengthGetterImpl(JSContext* cx, const CallArgs& args);
   static bool resizableGetterImpl(JSContext* cx, const CallArgs& args);
   static bool detachedGetterImpl(JSContext* cx, const CallArgs& args);
+  static bool sliceImpl(JSContext* cx, const CallArgs& args);
   static bool resizeImpl(JSContext* cx, const CallArgs& args);
   static bool transferImpl(JSContext* cx, const CallArgs& args);
   static bool transferToFixedLengthImpl(JSContext* cx, const CallArgs& args);
@@ -429,6 +423,8 @@ class ArrayBufferObject : public ArrayBufferObjectMaybeShared {
 
   static bool fun_isView(JSContext* cx, unsigned argc, Value* vp);
 
+  static bool slice(JSContext* cx, unsigned argc, Value* vp);
+
   static bool resize(JSContext* cx, unsigned argc, Value* vp);
 
   static bool transfer(JSContext* cx, unsigned argc, Value* vp);
@@ -473,6 +469,13 @@ class ArrayBufferObject : public ArrayBufferObjectMaybeShared {
   static ArrayBufferObject* createFromNewRawBuffer(JSContext* cx,
                                                    WasmArrayRawBuffer* buffer,
                                                    size_t initialSize);
+
+  // Create an ArrayBufferObject object (resizable or fixed-length) based
+  // on the existing donor object. The |buffer| will be removed from the
+  // latter, and its ownership will be assumed by the new object.
+  template <typename ArrayBufferType>
+  static ArrayBufferType* createFromWasmObject(
+      JSContext* cx, Handle<ArrayBufferObject*> donor);
 
   static void copyData(ArrayBufferObject* toBuffer, size_t toIndex,
                        ArrayBufferObject* fromBuffer, size_t fromIndex,
@@ -584,16 +587,16 @@ class ArrayBufferObject : public ArrayBufferObjectMaybeShared {
 
   size_t wasmMappedSize() const;
 
-  wasm::IndexType wasmIndexType() const;
+  wasm::AddressType wasmAddressType() const;
   wasm::Pages wasmPages() const;
   wasm::Pages wasmClampedMaxPages() const;
   mozilla::Maybe<wasm::Pages> wasmSourceMaxPages() const;
 
   [[nodiscard]] static ArrayBufferObject* wasmGrowToPagesInPlace(
-      wasm::IndexType t, wasm::Pages newPages,
+      wasm::AddressType t, wasm::Pages newPages,
       Handle<ArrayBufferObject*> oldBuf, JSContext* cx);
   [[nodiscard]] static ArrayBufferObject* wasmMovingGrowToPages(
-      wasm::IndexType t, wasm::Pages newPages,
+      wasm::AddressType t, wasm::Pages newPages,
       Handle<ArrayBufferObject*> oldBuf, JSContext* cx);
   static void wasmDiscard(Handle<ArrayBufferObject*> buf, uint64_t byteOffset,
                           uint64_t byteLength);
@@ -612,6 +615,11 @@ class ArrayBufferObject : public ArrayBufferObjectMaybeShared {
    * for resizable buffers.
    */
   inline size_t maxByteLength() const;
+
+  size_t wasmClampedMaxByteLength() const {
+    MOZ_ASSERT(isWasm());
+    return wasmClampedMaxPages().byteLength();
+  }
 
   size_t associatedBytes() const;
 
@@ -760,7 +768,7 @@ size_t ArrayBufferObject::maxByteLength() const {
 }
 
 // Create a buffer for a wasm memory, whose type is determined by
-// memory.indexType().
+// memory.addressType().
 ArrayBufferObjectMaybeShared* CreateWasmBuffer(JSContext* cx,
                                                const wasm::MemoryDesc& memory);
 
@@ -857,28 +865,30 @@ class MutableWrappedPtrOperations<InnerViewTable, Wrapper>
 };
 
 class WasmArrayRawBuffer {
-  wasm::IndexType indexType_;
+  wasm::AddressType addressType_;
   wasm::Pages clampedMaxPages_;
   mozilla::Maybe<wasm::Pages> sourceMaxPages_;
-  size_t mappedSize_;  // Not including the header page
+  size_t mappedSize_;  // See comment on mappedSize().
   size_t length_;
 
  protected:
-  WasmArrayRawBuffer(wasm::IndexType indexType, uint8_t* buffer,
+  WasmArrayRawBuffer(wasm::AddressType addressType, uint8_t* buffer,
                      wasm::Pages clampedMaxPages,
                      const mozilla::Maybe<wasm::Pages>& sourceMaxPages,
                      size_t mappedSize, size_t length)
-      : indexType_(indexType),
+      : addressType_(addressType),
         clampedMaxPages_(clampedMaxPages),
         sourceMaxPages_(sourceMaxPages),
         mappedSize_(mappedSize),
         length_(length) {
+    // Assert that this WasmArrayRawBuffer was allocated in the correct place
+    // relative to its data.
     MOZ_ASSERT(buffer == dataPointer());
   }
 
  public:
   static WasmArrayRawBuffer* AllocateWasm(
-      wasm::IndexType indexType, wasm::Pages initialPages,
+      wasm::AddressType addressType, wasm::Pages initialPages,
       wasm::Pages clampedMaxPages,
       const mozilla::Maybe<wasm::Pages>& sourceMaxPages,
       const mozilla::Maybe<size_t>& mappedSize);
@@ -899,29 +909,58 @@ class WasmArrayRawBuffer {
                                                  sizeof(WasmArrayRawBuffer));
   }
 
-  wasm::IndexType indexType() const { return indexType_; }
+  wasm::AddressType addressType() const { return addressType_; }
 
   uint8_t* basePointer() { return dataPointer() - gc::SystemPageSize(); }
 
+  /*
+   * The actual mmapped size. Access in the range [0, mappedSize) will either
+   * succeed, or be handled by the wasm signal handlers. The mapped size will be
+   * aligned to the system allocation granularity such that we can
+   * optimistically map other regions following it, in order to reduce copies
+   * when growing memory.
+   *
+   * Note that this does NOT include the header page in which this buffer itself
+   * is allocated.
+   */
   size_t mappedSize() const { return mappedSize_; }
 
+  /*
+   * The wasm-visible current length of the buffer in bytes. Accesses in the
+   * range [0, byteLength) will succeed. May only increase.
+   *
+   * For more info see "WASM Linear Memory structure" in ArrayBufferObject.cpp.
+   */
   size_t byteLength() const { return length_; }
 
   wasm::Pages pages() const {
     return wasm::Pages::fromByteLengthExact(length_);
   }
 
+  /*
+   * The maximum size on how far the byteLength can grow in pages. This value
+   * respects implementation limits and is always representable as a byte
+   * length. Every memory has a clampedMaxSize, even if no maximum was specified
+   * in source. When a memory has no sourceMaxSize, the clampedMaxSize will be
+   * the maximum amount of memory that can be grown to while still respecting
+   * implementation limits.
+   *
+   * For more info see "WASM Linear Memory structure" in ArrayBufferObject.cpp.
+   */
   wasm::Pages clampedMaxPages() const { return clampedMaxPages_; }
 
+  /*
+   * The optional declared limit on how far byteLength can grow in pages. This
+   * is the unmodified maximum size from the source module or JS-API invocation.
+   * This may not be representable in byte lengths, nor feasible for a module to
+   * actually grow to due to implementation limits. It is used for correct
+   * linking checks and js-types reflection.
+   *
+   * For more info see "WASM Linear Memory structure" in ArrayBufferObject.cpp.
+   */
   mozilla::Maybe<wasm::Pages> sourceMaxPages() const { return sourceMaxPages_; }
 
   [[nodiscard]] bool growToPagesInPlace(wasm::Pages newPages);
-
-  [[nodiscard]] bool extendMappedSize(wasm::Pages maxPages);
-
-  // Try and grow the mapped region of memory. Does not change current size.
-  // Does not move memory if no space to grow.
-  void tryGrowMaxPagesInPlace(wasm::Pages deltaMaxPages);
 
   // Discard a region of memory, zeroing the pages and releasing physical memory
   // back to the operating system. byteOffset and byteLen must be wasm page

@@ -52,6 +52,20 @@ static inline int32_t ToInt32(const LAllocation* a) {
   MOZ_CRASH("this is not a constant!");
 }
 
+static inline intptr_t ToIntPtr(const LAllocation* a) {
+  if (a->isConstantValue()) {
+    const MConstant* cst = a->toConstant();
+    if (cst->type() == MIRType::Int32) {
+      return cst->toInt32();
+    }
+    return cst->toIntPtr();
+  }
+  if (a->isConstantIndex()) {
+    return a->toConstantIndex()->index();
+  }
+  MOZ_CRASH("this is not a constant!");
+}
+
 static inline int64_t ToInt64(const LAllocation* a) {
   if (a->isConstantValue()) {
     return a->toConstant()->toInt64();
@@ -112,6 +126,15 @@ static inline Register64 ToOutRegister64(LInstruction* ins) {
 #endif
 }
 
+static inline bool IsRegister64(const LInt64Allocation& a) {
+#if JS_BITS_PER_WORD == 32
+  MOZ_ASSERT(a.low().isGeneralReg() == a.high().isGeneralReg());
+  return a.low().isGeneralReg();
+#else
+  return a.value().isGeneralReg();
+#endif
+}
+
 static inline Register64 ToRegister64(const LInt64Allocation& a) {
 #if JS_BITS_PER_WORD == 32
   return Register64(ToRegister(a.high()), ToRegister(a.low()));
@@ -145,10 +168,6 @@ static inline Register64 ToTempRegister64OrInvalid(
 
 static inline Register ToTempUnboxRegister(const LDefinition* def) {
   return ToTempRegisterOrInvalid(def);
-}
-
-static inline Register ToRegisterOrInvalid(const LDefinition* a) {
-  return a ? ToRegister(a) : InvalidReg;
 }
 
 static inline FloatRegister ToFloatRegister(const LAllocation& a) {
@@ -199,12 +218,11 @@ static inline ValueOperand ToOutValue(LInstruction* ins) {
 #endif
 }
 
-static inline ValueOperand GetTempValue(Register type, Register payload) {
+static inline ValueOperand ToValue(const LBoxAllocation& a) {
 #if defined(JS_NUNBOX32)
-  return ValueOperand(type, payload);
+  return ValueOperand(ToRegister(a.type()), ToRegister(a.payload()));
 #elif defined(JS_PUNBOX64)
-  (void)type;
-  return ValueOperand(payload);
+  return ValueOperand(ToRegister(a.value()));
 #else
 #  error "Unknown"
 #endif
@@ -278,6 +296,17 @@ Address CodeGeneratorShared::ToAddress(const LAllocation& a) const {
 template <BaseRegForAddress Base>
 Address CodeGeneratorShared::ToAddress(const LAllocation* a) const {
   return ToAddress<Base>(*a);
+}
+
+template <BaseRegForAddress Base>
+Address CodeGeneratorShared::ToAddress(const LInt64Allocation& a) const {
+#if JS_BITS_PER_WORD == 32
+  Address low = ToAddress<Base>(a.low());
+  MOZ_ASSERT(HighWord(low) == ToAddress<Base>(a.high()));
+  return low;
+#else
+  return ToAddress<Base>(a.value());
+#endif
 }
 
 // static

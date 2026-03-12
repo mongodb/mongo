@@ -1,11 +1,20 @@
 #define MOZ_UNIFIED_BUILD
-#include "vm/PIC.cpp"
+#include "vm/ObjectWithStashedPointer.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/PIC.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/ObjectWithStashedPointer.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/PIC.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/ObjectWithStashedPointer.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "vm/OffThreadPromiseRuntimeState.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "vm/OffThreadPromiseRuntimeState.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "vm/OffThreadPromiseRuntimeState.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
 #include "vm/PlainObject.cpp"
@@ -42,14 +51,5 @@
 #endif
 #ifdef INITGUID
 #error "vm/Probes.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "vm/PromiseLookup.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/PromiseLookup.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "vm/PromiseLookup.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

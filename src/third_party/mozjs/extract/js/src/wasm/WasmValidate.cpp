@@ -26,6 +26,7 @@
 #include "js/String.h"  // JS::MaxStringLength
 #include "vm/JSContext.h"
 #include "vm/Realm.h"
+#include "wasm/WasmDump.h"
 #include "wasm/WasmInitExpr.h"
 #include "wasm/WasmOpIter.h"
 #include "wasm/WasmTypeDecls.h"
@@ -36,52 +37,11 @@ using namespace js::wasm;
 
 using mozilla::AsChars;
 using mozilla::CheckedInt;
-using mozilla::CheckedInt32;
 using mozilla::IsUtf8;
+using mozilla::Maybe;
+using mozilla::Nothing;
+using mozilla::Some;
 using mozilla::Span;
-
-// Module environment helpers.
-
-bool ModuleEnvironment::addDefinedFunc(
-    ValTypeVector&& params, ValTypeVector&& results, bool declareForRef,
-    Maybe<CacheableName>&& optionalExportedName) {
-  uint32_t typeIndex = types->length();
-  FuncType funcType(std::move(params), std::move(results));
-  if (!types->addType(std::move(funcType))) {
-    return false;
-  }
-
-  FuncDesc funcDesc = FuncDesc(&(*types)[typeIndex].funcType(), typeIndex);
-  uint32_t funcIndex = funcs.length();
-  if (!funcs.append(funcDesc)) {
-    return false;
-  }
-  if (declareForRef) {
-    declareFuncExported(funcIndex, true, true);
-  }
-  if (optionalExportedName.isSome()) {
-    if (!exports.emplaceBack(std::move(optionalExportedName.ref()), funcIndex,
-                             DefinitionKind::Function)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-bool ModuleEnvironment::addImportedFunc(ValTypeVector&& params,
-                                        ValTypeVector&& results,
-                                        CacheableName&& importModName,
-                                        CacheableName&& importFieldName) {
-  MOZ_ASSERT(numFuncImports == funcs.length());
-  if (!addDefinedFunc(std::move(params), std::move(results), false,
-                      mozilla::Nothing())) {
-    return false;
-  }
-  numFuncImports++;
-  return imports.emplaceBack(std::move(importModName),
-                             std::move(importFieldName),
-                             DefinitionKind::Function);
-}
 
 // Misc helpers.
 
@@ -133,7 +93,7 @@ bool wasm::EncodeLocalEntries(Encoder& e, const ValTypeVector& locals) {
 }
 
 bool wasm::DecodeLocalEntriesWithParams(Decoder& d,
-                                        const ModuleEnvironment& env,
+                                        const CodeMetadata& codeMeta,
                                         uint32_t funcIndex,
                                         ValTypeVector* locals) {
   uint32_t numLocalEntries;
@@ -141,7 +101,7 @@ bool wasm::DecodeLocalEntriesWithParams(Decoder& d,
     return d.fail("failed to read number of local entries");
   }
 
-  if (!locals->appendAll(env.funcs[funcIndex].type->args())) {
+  if (!locals->appendAll(codeMeta.getFuncType(funcIndex).args())) {
     return false;
   }
 
@@ -156,7 +116,7 @@ bool wasm::DecodeLocalEntriesWithParams(Decoder& d,
     }
 
     ValType type;
-    if (!d.readValType(*env.types, env.features, &type)) {
+    if (!d.readValType(*codeMeta.types, codeMeta.features(), &type)) {
       return false;
     }
 
@@ -184,19 +144,44 @@ bool wasm::DecodeValidatedLocalEntries(const TypeContext& types, Decoder& d,
   return true;
 }
 
-bool wasm::CheckIsSubtypeOf(Decoder& d, const ModuleEnvironment& env,
+bool wasm::CheckIsSubtypeOf(Decoder& d, const CodeMetadata& codeMeta,
+                            size_t opcodeOffset, ResultType subType,
+                            ResultType superType) {
+  if (subType.length() != superType.length()) {
+    UniqueChars error(
+        JS_smprintf("type mismatch: expected %zu values, got %zu values",
+                    superType.length(), subType.length()));
+    if (!error) {
+      return false;
+    }
+    MOZ_ASSERT(!ResultType::isSubTypeOf(subType, superType));
+    return d.fail(opcodeOffset, error.get());
+  }
+  for (uint32_t i = 0; i < subType.length(); i++) {
+    StorageType sub = subType[i].storageType();
+    StorageType super = superType[i].storageType();
+    if (!CheckIsSubtypeOf(d, codeMeta, opcodeOffset, sub, super)) {
+      MOZ_ASSERT(!ResultType::isSubTypeOf(subType, superType));
+      return false;
+    }
+  }
+  MOZ_ASSERT(ResultType::isSubTypeOf(subType, superType));
+  return true;
+}
+
+bool wasm::CheckIsSubtypeOf(Decoder& d, const CodeMetadata& codeMeta,
                             size_t opcodeOffset, StorageType subType,
                             StorageType superType) {
   if (StorageType::isSubTypeOf(subType, superType)) {
     return true;
   }
 
-  UniqueChars subText = ToString(subType, env.types);
+  UniqueChars subText = ToString(subType, codeMeta.types);
   if (!subText) {
     return false;
   }
 
-  UniqueChars superText = ToString(superType, env.types);
+  UniqueChars superText = ToString(superType, codeMeta.types);
   if (!superText) {
     return false;
   }
@@ -213,182 +198,295 @@ bool wasm::CheckIsSubtypeOf(Decoder& d, const ModuleEnvironment& env,
 
 // Function body validation.
 
-static bool DecodeFunctionBodyExprs(const ModuleEnvironment& env,
-                                    uint32_t funcIndex,
-                                    const ValTypeVector& locals,
-                                    const uint8_t* bodyEnd, Decoder* d) {
-  ValidatingOpIter iter(env, *d);
-
-  if (!iter.startFunction(funcIndex, locals)) {
-    return false;
-  }
-
-#define CHECK(c)          \
-  if (!(c)) return false; \
-  break
-
+template <class T>
+bool wasm::ValidateOps(ValidatingOpIter& iter, T& dumper,
+                       const CodeMetadata& codeMeta) {
   while (true) {
     OpBytes op;
     if (!iter.readOp(&op)) {
       return false;
     }
 
+    // End instructions get handled differently since we don't actually want to
+    // dump the final `end`. Also, Else instructions need to have their
+    // indentation managed when dumping.
+    if (op.b0 != uint16_t(Op::End)) {
+      if (op.b0 == uint64_t(Op::Else)) {
+        dumper.endScope();
+      }
+      dumper.dumpOpBegin(op);
+      if (op.b0 == uint64_t(Op::Else)) {
+        dumper.startScope();
+      }
+    }
+
     Nothing nothing;
     NothingVector nothings{};
-    ResultType unusedType;
+    BlockType blockType;
+    ResultType resultType;
 
     switch (op.b0) {
       case uint16_t(Op::End): {
         LabelKind unusedKind;
-        if (!iter.readEnd(&unusedKind, &unusedType, &nothings, &nothings)) {
+        if (!iter.readEnd(&unusedKind, &resultType, &nothings, &nothings)) {
           return false;
         }
         iter.popEnd();
         if (iter.controlStackEmpty()) {
-          return iter.endFunction(bodyEnd);
+          return true;
+        }
+
+        // Only dump `end` if it was not the final `end` of the expression.
+        dumper.endScope();
+        dumper.dumpOpBegin(op);
+
+        break;
+      }
+      case uint16_t(Op::Nop): {
+        if (!iter.readNop()) {
+          return false;
         }
         break;
       }
-      case uint16_t(Op::Nop):
-        CHECK(iter.readNop());
-      case uint16_t(Op::Drop):
-        CHECK(iter.readDrop());
+      case uint16_t(Op::Drop): {
+        if (!iter.readDrop()) {
+          return false;
+        }
+        break;
+      }
       case uint16_t(Op::Call): {
-        uint32_t unusedIndex;
+        uint32_t funcIndex;
         NothingVector unusedArgs{};
-        CHECK(iter.readCall(&unusedIndex, &unusedArgs));
+        if (!iter.readCall(&funcIndex, &unusedArgs)) {
+          return false;
+        }
+        dumper.dumpFuncIndex(funcIndex);
+        break;
       }
       case uint16_t(Op::CallIndirect): {
-        uint32_t unusedIndex, unusedIndex2;
+        uint32_t funcTypeIndex, tableIndex;
         NothingVector unusedArgs{};
-        CHECK(iter.readCallIndirect(&unusedIndex, &unusedIndex2, &nothing,
-                                    &unusedArgs));
-      }
-#ifdef ENABLE_WASM_TAIL_CALLS
-      case uint16_t(Op::ReturnCall): {
-        if (!env.tailCallsEnabled()) {
-          return iter.unrecognizedOpcode(&op);
+        if (!iter.readCallIndirect(&funcTypeIndex, &tableIndex, &nothing,
+                                   &unusedArgs)) {
+          return false;
         }
-        uint32_t unusedIndex;
+        dumper.dumpTableIndex(tableIndex);
+        dumper.dumpTypeIndex(funcTypeIndex, /*asTypeUse=*/true);
+        break;
+      }
+      case uint16_t(Op::ReturnCall): {
+        uint32_t funcIndex;
         NothingVector unusedArgs{};
-        CHECK(iter.readReturnCall(&unusedIndex, &unusedArgs));
+        if (!iter.readReturnCall(&funcIndex, &unusedArgs)) {
+          return false;
+        }
+        dumper.dumpFuncIndex(funcIndex);
+        break;
       }
       case uint16_t(Op::ReturnCallIndirect): {
-        if (!env.tailCallsEnabled()) {
-          return iter.unrecognizedOpcode(&op);
-        }
-        uint32_t unusedIndex, unusedIndex2;
+        uint32_t funcTypeIndex, tableIndex;
         NothingVector unusedArgs{};
-        CHECK(iter.readReturnCallIndirect(&unusedIndex, &unusedIndex2, &nothing,
-                                          &unusedArgs));
+        if (!iter.readReturnCallIndirect(&funcTypeIndex, &tableIndex, &nothing,
+                                         &unusedArgs)) {
+          return false;
+        }
+        dumper.dumpTableIndex(tableIndex);
+        dumper.dumpTypeIndex(funcTypeIndex, /*asTypeUse=*/true);
+        break;
       }
-#endif
-#ifdef ENABLE_WASM_GC
       case uint16_t(Op::CallRef): {
-        if (!env.gcEnabled()) {
-          return iter.unrecognizedOpcode(&op);
-        }
-        const FuncType* unusedType;
+        uint32_t funcTypeIndex;
         NothingVector unusedArgs{};
-        CHECK(iter.readCallRef(&unusedType, &nothing, &unusedArgs));
+        if (!iter.readCallRef(&funcTypeIndex, &nothing, &unusedArgs)) {
+          return false;
+        }
+        dumper.dumpTypeIndex(funcTypeIndex);
+        break;
       }
-#  ifdef ENABLE_WASM_TAIL_CALLS
       case uint16_t(Op::ReturnCallRef): {
-        if (!env.gcEnabled() || !env.tailCallsEnabled()) {
-          return iter.unrecognizedOpcode(&op);
-        }
-        const FuncType* unusedType;
+        uint32_t funcTypeIndex;
         NothingVector unusedArgs{};
-        CHECK(iter.readReturnCallRef(&unusedType, &nothing, &unusedArgs));
+        if (!iter.readReturnCallRef(&funcTypeIndex, &nothing, &unusedArgs)) {
+          return false;
+        }
+        dumper.dumpTypeIndex(funcTypeIndex);
+        break;
       }
-#  endif
-#endif
       case uint16_t(Op::I32Const): {
-        int32_t unused;
-        CHECK(iter.readI32Const(&unused));
+        int32_t constant;
+        if (!iter.readI32Const(&constant)) {
+          return false;
+        }
+        dumper.dumpI32Const(constant);
+        break;
       }
       case uint16_t(Op::I64Const): {
-        int64_t unused;
-        CHECK(iter.readI64Const(&unused));
+        int64_t constant;
+        if (!iter.readI64Const(&constant)) {
+          return false;
+        }
+        dumper.dumpI64Const(constant);
+        break;
       }
       case uint16_t(Op::F32Const): {
-        float unused;
-        CHECK(iter.readF32Const(&unused));
+        float constant;
+        if (!iter.readF32Const(&constant)) {
+          return false;
+        }
+        dumper.dumpF32Const(constant);
+        break;
       }
       case uint16_t(Op::F64Const): {
-        double unused;
-        CHECK(iter.readF64Const(&unused));
+        double constant;
+        if (!iter.readF64Const(&constant)) {
+          return false;
+        }
+        dumper.dumpF64Const(constant);
+        break;
       }
       case uint16_t(Op::LocalGet): {
-        uint32_t unused;
-        CHECK(iter.readGetLocal(locals, &unused));
+        uint32_t localIndex;
+        if (!iter.readGetLocal(&localIndex)) {
+          return false;
+        }
+        dumper.dumpLocalIndex(localIndex);
+        break;
       }
       case uint16_t(Op::LocalSet): {
-        uint32_t unused;
-        CHECK(iter.readSetLocal(locals, &unused, &nothing));
+        uint32_t localIndex;
+        if (!iter.readSetLocal(&localIndex, &nothing)) {
+          return false;
+        }
+        dumper.dumpLocalIndex(localIndex);
+        break;
       }
       case uint16_t(Op::LocalTee): {
-        uint32_t unused;
-        CHECK(iter.readTeeLocal(locals, &unused, &nothing));
+        uint32_t localIndex;
+        if (!iter.readTeeLocal(&localIndex, &nothing)) {
+          return false;
+        }
+        dumper.dumpLocalIndex(localIndex);
+        break;
       }
       case uint16_t(Op::GlobalGet): {
-        uint32_t unused;
-        CHECK(iter.readGetGlobal(&unused));
+        uint32_t globalIndex;
+        if (!iter.readGetGlobal(&globalIndex)) {
+          return false;
+        }
+        dumper.dumpGlobalIndex(globalIndex);
+        break;
       }
       case uint16_t(Op::GlobalSet): {
-        uint32_t unused;
-        CHECK(iter.readSetGlobal(&unused, &nothing));
+        uint32_t globalIndex;
+        if (!iter.readSetGlobal(&globalIndex, &nothing)) {
+          return false;
+        }
+        dumper.dumpGlobalIndex(globalIndex);
+        break;
       }
       case uint16_t(Op::TableGet): {
-        uint32_t unusedTableIndex;
-        CHECK(iter.readTableGet(&unusedTableIndex, &nothing));
+        uint32_t tableIndex;
+        if (!iter.readTableGet(&tableIndex, &nothing)) {
+          return false;
+        }
+        dumper.dumpTableIndex(tableIndex);
+        break;
       }
       case uint16_t(Op::TableSet): {
-        uint32_t unusedTableIndex;
-        CHECK(iter.readTableSet(&unusedTableIndex, &nothing, &nothing));
+        uint32_t tableIndex;
+        if (!iter.readTableSet(&tableIndex, &nothing, &nothing)) {
+          return false;
+        }
+        dumper.dumpTableIndex(tableIndex);
+        break;
       }
       case uint16_t(Op::SelectNumeric): {
         StackType unused;
-        CHECK(iter.readSelect(/*typed*/ false, &unused, &nothing, &nothing,
-                              &nothing));
+        if (!iter.readSelect(/*typed*/ false, &unused, &nothing, &nothing,
+                             &nothing)) {
+          return false;
+        }
+        break;
       }
       case uint16_t(Op::SelectTyped): {
-        StackType unused;
-        CHECK(iter.readSelect(/*typed*/ true, &unused, &nothing, &nothing,
-                              &nothing));
+        StackType type;
+        if (!iter.readSelect(/*typed*/ true, &type, &nothing, &nothing,
+                             &nothing)) {
+          return false;
+        }
+        dumper.dumpValType(type.valType());
+        break;
       }
-      case uint16_t(Op::Block):
-        CHECK(iter.readBlock(&unusedType));
-      case uint16_t(Op::Loop):
-        CHECK(iter.readLoop(&unusedType));
-      case uint16_t(Op::If):
-        CHECK(iter.readIf(&unusedType, &nothing));
-      case uint16_t(Op::Else):
-        CHECK(iter.readElse(&unusedType, &unusedType, &nothings));
+      case uint16_t(Op::Block): {
+        if (!iter.readBlock(&blockType)) {
+          return false;
+        }
+        dumper.dumpBlockType(blockType);
+        dumper.startScope();
+        break;
+      }
+      case uint16_t(Op::Loop): {
+        if (!iter.readLoop(&blockType)) {
+          return false;
+        }
+        dumper.dumpBlockType(blockType);
+        dumper.startScope();
+        break;
+      }
+      case uint16_t(Op::If): {
+        if (!iter.readIf(&blockType, &nothing)) {
+          return false;
+        }
+        dumper.dumpBlockType(blockType);
+        dumper.startScope();
+        break;
+      }
+      case uint16_t(Op::Else): {
+        if (!iter.readElse(&resultType, &resultType, &nothings)) {
+          return false;
+        }
+        break;
+      }
       case uint16_t(Op::I32Clz):
       case uint16_t(Op::I32Ctz):
-      case uint16_t(Op::I32Popcnt):
-        CHECK(iter.readUnary(ValType::I32, &nothing));
+      case uint16_t(Op::I32Popcnt): {
+        if (!iter.readUnary(ValType::I32, &nothing)) {
+          return false;
+        }
+        break;
+      }
       case uint16_t(Op::I64Clz):
       case uint16_t(Op::I64Ctz):
-      case uint16_t(Op::I64Popcnt):
-        CHECK(iter.readUnary(ValType::I64, &nothing));
+      case uint16_t(Op::I64Popcnt): {
+        if (!iter.readUnary(ValType::I64, &nothing)) {
+          return false;
+        }
+        break;
+      }
       case uint16_t(Op::F32Abs):
       case uint16_t(Op::F32Neg):
       case uint16_t(Op::F32Ceil):
       case uint16_t(Op::F32Floor):
       case uint16_t(Op::F32Sqrt):
       case uint16_t(Op::F32Trunc):
-      case uint16_t(Op::F32Nearest):
-        CHECK(iter.readUnary(ValType::F32, &nothing));
+      case uint16_t(Op::F32Nearest): {
+        if (!iter.readUnary(ValType::F32, &nothing)) {
+          return false;
+        }
+        break;
+      }
       case uint16_t(Op::F64Abs):
       case uint16_t(Op::F64Neg):
       case uint16_t(Op::F64Ceil):
       case uint16_t(Op::F64Floor):
       case uint16_t(Op::F64Sqrt):
       case uint16_t(Op::F64Trunc):
-      case uint16_t(Op::F64Nearest):
-        CHECK(iter.readUnary(ValType::F64, &nothing));
+      case uint16_t(Op::F64Nearest): {
+        if (!iter.readUnary(ValType::F64, &nothing)) {
+          return false;
+        }
+        break;
+      }
       case uint16_t(Op::I32Add):
       case uint16_t(Op::I32Sub):
       case uint16_t(Op::I32Mul):
@@ -403,8 +501,12 @@ static bool DecodeFunctionBodyExprs(const ModuleEnvironment& env,
       case uint16_t(Op::I32ShrS):
       case uint16_t(Op::I32ShrU):
       case uint16_t(Op::I32Rotl):
-      case uint16_t(Op::I32Rotr):
-        CHECK(iter.readBinary(ValType::I32, &nothing, &nothing));
+      case uint16_t(Op::I32Rotr): {
+        if (!iter.readBinary(ValType::I32, &nothing, &nothing)) {
+          return false;
+        }
+        break;
+      }
       case uint16_t(Op::I64Add):
       case uint16_t(Op::I64Sub):
       case uint16_t(Op::I64Mul):
@@ -419,24 +521,36 @@ static bool DecodeFunctionBodyExprs(const ModuleEnvironment& env,
       case uint16_t(Op::I64ShrS):
       case uint16_t(Op::I64ShrU):
       case uint16_t(Op::I64Rotl):
-      case uint16_t(Op::I64Rotr):
-        CHECK(iter.readBinary(ValType::I64, &nothing, &nothing));
+      case uint16_t(Op::I64Rotr): {
+        if (!iter.readBinary(ValType::I64, &nothing, &nothing)) {
+          return false;
+        }
+        break;
+      }
       case uint16_t(Op::F32Add):
       case uint16_t(Op::F32Sub):
       case uint16_t(Op::F32Mul):
       case uint16_t(Op::F32Div):
       case uint16_t(Op::F32Min):
       case uint16_t(Op::F32Max):
-      case uint16_t(Op::F32CopySign):
-        CHECK(iter.readBinary(ValType::F32, &nothing, &nothing));
+      case uint16_t(Op::F32CopySign): {
+        if (!iter.readBinary(ValType::F32, &nothing, &nothing)) {
+          return false;
+        }
+        break;
+      }
       case uint16_t(Op::F64Add):
       case uint16_t(Op::F64Sub):
       case uint16_t(Op::F64Mul):
       case uint16_t(Op::F64Div):
       case uint16_t(Op::F64Min):
       case uint16_t(Op::F64Max):
-      case uint16_t(Op::F64CopySign):
-        CHECK(iter.readBinary(ValType::F64, &nothing, &nothing));
+      case uint16_t(Op::F64CopySign): {
+        if (!iter.readBinary(ValType::F64, &nothing, &nothing)) {
+          return false;
+        }
+        break;
+      }
       case uint16_t(Op::I32Eq):
       case uint16_t(Op::I32Ne):
       case uint16_t(Op::I32LtS):
@@ -446,8 +560,12 @@ static bool DecodeFunctionBodyExprs(const ModuleEnvironment& env,
       case uint16_t(Op::I32GtS):
       case uint16_t(Op::I32GtU):
       case uint16_t(Op::I32GeS):
-      case uint16_t(Op::I32GeU):
-        CHECK(iter.readComparison(ValType::I32, &nothing, &nothing));
+      case uint16_t(Op::I32GeU): {
+        if (!iter.readComparison(ValType::I32, &nothing, &nothing)) {
+          return false;
+        }
+        break;
+      }
       case uint16_t(Op::I64Eq):
       case uint16_t(Op::I64Ne):
       case uint16_t(Op::I64LtS):
@@ -457,374 +575,714 @@ static bool DecodeFunctionBodyExprs(const ModuleEnvironment& env,
       case uint16_t(Op::I64GtS):
       case uint16_t(Op::I64GtU):
       case uint16_t(Op::I64GeS):
-      case uint16_t(Op::I64GeU):
-        CHECK(iter.readComparison(ValType::I64, &nothing, &nothing));
+      case uint16_t(Op::I64GeU): {
+        if (!iter.readComparison(ValType::I64, &nothing, &nothing)) {
+          return false;
+        }
+        break;
+      }
       case uint16_t(Op::F32Eq):
       case uint16_t(Op::F32Ne):
       case uint16_t(Op::F32Lt):
       case uint16_t(Op::F32Le):
       case uint16_t(Op::F32Gt):
-      case uint16_t(Op::F32Ge):
-        CHECK(iter.readComparison(ValType::F32, &nothing, &nothing));
+      case uint16_t(Op::F32Ge): {
+        if (!iter.readComparison(ValType::F32, &nothing, &nothing)) {
+          return false;
+        }
+        break;
+      }
       case uint16_t(Op::F64Eq):
       case uint16_t(Op::F64Ne):
       case uint16_t(Op::F64Lt):
       case uint16_t(Op::F64Le):
       case uint16_t(Op::F64Gt):
-      case uint16_t(Op::F64Ge):
-        CHECK(iter.readComparison(ValType::F64, &nothing, &nothing));
-      case uint16_t(Op::I32Eqz):
-        CHECK(iter.readConversion(ValType::I32, ValType::I32, &nothing));
+      case uint16_t(Op::F64Ge): {
+        if (!iter.readComparison(ValType::F64, &nothing, &nothing)) {
+          return false;
+        }
+        break;
+      }
+      case uint16_t(Op::I32Eqz): {
+        if (!iter.readConversion(ValType::I32, ValType::I32, &nothing)) {
+          return false;
+        }
+        break;
+      }
       case uint16_t(Op::I64Eqz):
-      case uint16_t(Op::I32WrapI64):
-        CHECK(iter.readConversion(ValType::I64, ValType::I32, &nothing));
+      case uint16_t(Op::I32WrapI64): {
+        if (!iter.readConversion(ValType::I64, ValType::I32, &nothing)) {
+          return false;
+        }
+        break;
+      }
       case uint16_t(Op::I32TruncF32S):
       case uint16_t(Op::I32TruncF32U):
-      case uint16_t(Op::I32ReinterpretF32):
-        CHECK(iter.readConversion(ValType::F32, ValType::I32, &nothing));
+      case uint16_t(Op::I32ReinterpretF32): {
+        if (!iter.readConversion(ValType::F32, ValType::I32, &nothing)) {
+          return false;
+        }
+        break;
+      }
       case uint16_t(Op::I32TruncF64S):
-      case uint16_t(Op::I32TruncF64U):
-        CHECK(iter.readConversion(ValType::F64, ValType::I32, &nothing));
+      case uint16_t(Op::I32TruncF64U): {
+        if (!iter.readConversion(ValType::F64, ValType::I32, &nothing)) {
+          return false;
+        }
+        break;
+      }
       case uint16_t(Op::I64ExtendI32S):
-      case uint16_t(Op::I64ExtendI32U):
-        CHECK(iter.readConversion(ValType::I32, ValType::I64, &nothing));
+      case uint16_t(Op::I64ExtendI32U): {
+        if (!iter.readConversion(ValType::I32, ValType::I64, &nothing)) {
+          return false;
+        }
+        break;
+      }
       case uint16_t(Op::I64TruncF32S):
-      case uint16_t(Op::I64TruncF32U):
-        CHECK(iter.readConversion(ValType::F32, ValType::I64, &nothing));
+      case uint16_t(Op::I64TruncF32U): {
+        if (!iter.readConversion(ValType::F32, ValType::I64, &nothing)) {
+          return false;
+        }
+        break;
+      }
       case uint16_t(Op::I64TruncF64S):
       case uint16_t(Op::I64TruncF64U):
-      case uint16_t(Op::I64ReinterpretF64):
-        CHECK(iter.readConversion(ValType::F64, ValType::I64, &nothing));
+      case uint16_t(Op::I64ReinterpretF64): {
+        if (!iter.readConversion(ValType::F64, ValType::I64, &nothing)) {
+          return false;
+        }
+        break;
+      }
       case uint16_t(Op::F32ConvertI32S):
       case uint16_t(Op::F32ConvertI32U):
-      case uint16_t(Op::F32ReinterpretI32):
-        CHECK(iter.readConversion(ValType::I32, ValType::F32, &nothing));
+      case uint16_t(Op::F32ReinterpretI32): {
+        if (!iter.readConversion(ValType::I32, ValType::F32, &nothing)) {
+          return false;
+        }
+        break;
+      }
       case uint16_t(Op::F32ConvertI64S):
-      case uint16_t(Op::F32ConvertI64U):
-        CHECK(iter.readConversion(ValType::I64, ValType::F32, &nothing));
-      case uint16_t(Op::F32DemoteF64):
-        CHECK(iter.readConversion(ValType::F64, ValType::F32, &nothing));
+      case uint16_t(Op::F32ConvertI64U): {
+        if (!iter.readConversion(ValType::I64, ValType::F32, &nothing)) {
+          return false;
+        }
+        break;
+      }
+      case uint16_t(Op::F32DemoteF64): {
+        if (!iter.readConversion(ValType::F64, ValType::F32, &nothing)) {
+          return false;
+        }
+        break;
+      }
       case uint16_t(Op::F64ConvertI32S):
-      case uint16_t(Op::F64ConvertI32U):
-        CHECK(iter.readConversion(ValType::I32, ValType::F64, &nothing));
+      case uint16_t(Op::F64ConvertI32U): {
+        if (!iter.readConversion(ValType::I32, ValType::F64, &nothing)) {
+          return false;
+        }
+        break;
+      }
       case uint16_t(Op::F64ConvertI64S):
       case uint16_t(Op::F64ConvertI64U):
-      case uint16_t(Op::F64ReinterpretI64):
-        CHECK(iter.readConversion(ValType::I64, ValType::F64, &nothing));
-      case uint16_t(Op::F64PromoteF32):
-        CHECK(iter.readConversion(ValType::F32, ValType::F64, &nothing));
+      case uint16_t(Op::F64ReinterpretI64): {
+        if (!iter.readConversion(ValType::I64, ValType::F64, &nothing)) {
+          return false;
+        }
+        break;
+      }
+      case uint16_t(Op::F64PromoteF32): {
+        if (!iter.readConversion(ValType::F32, ValType::F64, &nothing)) {
+          return false;
+        }
+        break;
+      }
       case uint16_t(Op::I32Extend8S):
-      case uint16_t(Op::I32Extend16S):
-        CHECK(iter.readConversion(ValType::I32, ValType::I32, &nothing));
+      case uint16_t(Op::I32Extend16S): {
+        if (!iter.readConversion(ValType::I32, ValType::I32, &nothing)) {
+          return false;
+        }
+        break;
+      }
       case uint16_t(Op::I64Extend8S):
       case uint16_t(Op::I64Extend16S):
-      case uint16_t(Op::I64Extend32S):
-        CHECK(iter.readConversion(ValType::I64, ValType::I64, &nothing));
+      case uint16_t(Op::I64Extend32S): {
+        if (!iter.readConversion(ValType::I64, ValType::I64, &nothing)) {
+          return false;
+        }
+        break;
+      }
       case uint16_t(Op::I32Load8S):
       case uint16_t(Op::I32Load8U): {
         LinearMemoryAddress<Nothing> addr;
-        CHECK(iter.readLoad(ValType::I32, 1, &addr));
+        if (!iter.readLoad(ValType::I32, 1, &addr)) {
+          return false;
+        }
+        dumper.dumpLinearMemoryAddress(addr);
+        break;
       }
       case uint16_t(Op::I32Load16S):
       case uint16_t(Op::I32Load16U): {
         LinearMemoryAddress<Nothing> addr;
-        CHECK(iter.readLoad(ValType::I32, 2, &addr));
+        if (!iter.readLoad(ValType::I32, 2, &addr)) {
+          return false;
+        }
+        dumper.dumpLinearMemoryAddress(addr);
+        break;
       }
       case uint16_t(Op::I32Load): {
         LinearMemoryAddress<Nothing> addr;
-        CHECK(iter.readLoad(ValType::I32, 4, &addr));
+        if (!iter.readLoad(ValType::I32, 4, &addr)) {
+          return false;
+        }
+        dumper.dumpLinearMemoryAddress(addr);
+        break;
       }
       case uint16_t(Op::I64Load8S):
       case uint16_t(Op::I64Load8U): {
         LinearMemoryAddress<Nothing> addr;
-        CHECK(iter.readLoad(ValType::I64, 1, &addr));
+        if (!iter.readLoad(ValType::I64, 1, &addr)) {
+          return false;
+        }
+        dumper.dumpLinearMemoryAddress(addr);
+        break;
       }
       case uint16_t(Op::I64Load16S):
       case uint16_t(Op::I64Load16U): {
         LinearMemoryAddress<Nothing> addr;
-        CHECK(iter.readLoad(ValType::I64, 2, &addr));
+        if (!iter.readLoad(ValType::I64, 2, &addr)) {
+          return false;
+        }
+        dumper.dumpLinearMemoryAddress(addr);
+        break;
       }
       case uint16_t(Op::I64Load32S):
       case uint16_t(Op::I64Load32U): {
         LinearMemoryAddress<Nothing> addr;
-        CHECK(iter.readLoad(ValType::I64, 4, &addr));
+        if (!iter.readLoad(ValType::I64, 4, &addr)) {
+          return false;
+        }
+        dumper.dumpLinearMemoryAddress(addr);
+        break;
       }
       case uint16_t(Op::I64Load): {
         LinearMemoryAddress<Nothing> addr;
-        CHECK(iter.readLoad(ValType::I64, 8, &addr));
+        if (!iter.readLoad(ValType::I64, 8, &addr)) {
+          return false;
+        }
+        dumper.dumpLinearMemoryAddress(addr);
+        break;
       }
       case uint16_t(Op::F32Load): {
         LinearMemoryAddress<Nothing> addr;
-        CHECK(iter.readLoad(ValType::F32, 4, &addr));
+        if (!iter.readLoad(ValType::F32, 4, &addr)) {
+          return false;
+        }
+        dumper.dumpLinearMemoryAddress(addr);
+        break;
       }
       case uint16_t(Op::F64Load): {
         LinearMemoryAddress<Nothing> addr;
-        CHECK(iter.readLoad(ValType::F64, 8, &addr));
+        if (!iter.readLoad(ValType::F64, 8, &addr)) {
+          return false;
+        }
+        dumper.dumpLinearMemoryAddress(addr);
+        break;
       }
       case uint16_t(Op::I32Store8): {
         LinearMemoryAddress<Nothing> addr;
-        CHECK(iter.readStore(ValType::I32, 1, &addr, &nothing));
+        if (!iter.readStore(ValType::I32, 1, &addr, &nothing)) {
+          return false;
+        }
+        dumper.dumpLinearMemoryAddress(addr);
+        break;
       }
       case uint16_t(Op::I32Store16): {
         LinearMemoryAddress<Nothing> addr;
-        CHECK(iter.readStore(ValType::I32, 2, &addr, &nothing));
+        if (!iter.readStore(ValType::I32, 2, &addr, &nothing)) {
+          return false;
+        }
+        dumper.dumpLinearMemoryAddress(addr);
+        break;
       }
       case uint16_t(Op::I32Store): {
         LinearMemoryAddress<Nothing> addr;
-        CHECK(iter.readStore(ValType::I32, 4, &addr, &nothing));
+        if (!iter.readStore(ValType::I32, 4, &addr, &nothing)) {
+          return false;
+        }
+        dumper.dumpLinearMemoryAddress(addr);
+        break;
       }
       case uint16_t(Op::I64Store8): {
         LinearMemoryAddress<Nothing> addr;
-        CHECK(iter.readStore(ValType::I64, 1, &addr, &nothing));
+        if (!iter.readStore(ValType::I64, 1, &addr, &nothing)) {
+          return false;
+        }
+        dumper.dumpLinearMemoryAddress(addr);
+        break;
       }
       case uint16_t(Op::I64Store16): {
         LinearMemoryAddress<Nothing> addr;
-        CHECK(iter.readStore(ValType::I64, 2, &addr, &nothing));
+        if (!iter.readStore(ValType::I64, 2, &addr, &nothing)) {
+          return false;
+        }
+        dumper.dumpLinearMemoryAddress(addr);
+        break;
       }
       case uint16_t(Op::I64Store32): {
         LinearMemoryAddress<Nothing> addr;
-        CHECK(iter.readStore(ValType::I64, 4, &addr, &nothing));
+        if (!iter.readStore(ValType::I64, 4, &addr, &nothing)) {
+          return false;
+        }
+        dumper.dumpLinearMemoryAddress(addr);
+        break;
       }
       case uint16_t(Op::I64Store): {
         LinearMemoryAddress<Nothing> addr;
-        CHECK(iter.readStore(ValType::I64, 8, &addr, &nothing));
+        if (!iter.readStore(ValType::I64, 8, &addr, &nothing)) {
+          return false;
+        }
+        dumper.dumpLinearMemoryAddress(addr);
+        break;
       }
       case uint16_t(Op::F32Store): {
         LinearMemoryAddress<Nothing> addr;
-        CHECK(iter.readStore(ValType::F32, 4, &addr, &nothing));
+        if (!iter.readStore(ValType::F32, 4, &addr, &nothing)) {
+          return false;
+        }
+        dumper.dumpLinearMemoryAddress(addr);
+        break;
       }
       case uint16_t(Op::F64Store): {
         LinearMemoryAddress<Nothing> addr;
-        CHECK(iter.readStore(ValType::F64, 8, &addr, &nothing));
+        if (!iter.readStore(ValType::F64, 8, &addr, &nothing)) {
+          return false;
+        }
+        dumper.dumpLinearMemoryAddress(addr);
+        break;
       }
       case uint16_t(Op::MemoryGrow): {
         uint32_t memoryIndex;
-        CHECK(iter.readMemoryGrow(&memoryIndex, &nothing));
+        if (!iter.readMemoryGrow(&memoryIndex, &nothing)) {
+          return false;
+        }
+        dumper.dumpMemoryIndex(memoryIndex);
+        break;
       }
       case uint16_t(Op::MemorySize): {
         uint32_t memoryIndex;
-        CHECK(iter.readMemorySize(&memoryIndex));
+        if (!iter.readMemorySize(&memoryIndex)) {
+          return false;
+        }
+        dumper.dumpMemoryIndex(memoryIndex);
+        break;
       }
       case uint16_t(Op::Br): {
-        uint32_t unusedDepth;
-        CHECK(iter.readBr(&unusedDepth, &unusedType, &nothings));
+        uint32_t depth;
+        if (!iter.readBr(&depth, &resultType, &nothings)) {
+          return false;
+        }
+        dumper.dumpBlockDepth(depth);
+        break;
       }
       case uint16_t(Op::BrIf): {
-        uint32_t unusedDepth;
-        CHECK(iter.readBrIf(&unusedDepth, &unusedType, &nothings, &nothing));
+        uint32_t depth;
+        if (!iter.readBrIf(&depth, &resultType, &nothings, &nothing)) {
+          return false;
+        }
+        dumper.dumpBlockDepth(depth);
+        break;
       }
       case uint16_t(Op::BrTable): {
-        Uint32Vector unusedDepths;
-        uint32_t unusedDefault;
-        CHECK(iter.readBrTable(&unusedDepths, &unusedDefault, &unusedType,
-                               &nothings, &nothing));
-      }
-      case uint16_t(Op::Return):
-        CHECK(iter.readReturn(&nothings));
-      case uint16_t(Op::Unreachable):
-        CHECK(iter.readUnreachable());
-#ifdef ENABLE_WASM_GC
-      case uint16_t(Op::GcPrefix): {
-        if (!env.gcEnabled()) {
-          return iter.unrecognizedOpcode(&op);
+        Uint32Vector depths;
+        uint32_t defaultDepth;
+        if (!iter.readBrTable(&depths, &defaultDepth, &resultType, &nothings,
+                              &nothing)) {
+          return false;
         }
+        dumper.dumpBlockDepths(depths);
+        dumper.dumpBlockDepth(defaultDepth);
+        break;
+      }
+      case uint16_t(Op::Return): {
+        if (!iter.readReturn(&nothings)) {
+          return false;
+        }
+        break;
+      }
+      case uint16_t(Op::Unreachable): {
+        if (!iter.readUnreachable()) {
+          return false;
+        }
+        break;
+      }
+      case uint16_t(Op::GcPrefix): {
         switch (op.b1) {
           case uint32_t(GcOp::StructNew): {
-            uint32_t unusedUint;
+            uint32_t typeIndex;
             NothingVector unusedArgs{};
-            CHECK(iter.readStructNew(&unusedUint, &unusedArgs));
+            if (!iter.readStructNew(&typeIndex, &unusedArgs)) {
+              return false;
+            }
+            dumper.dumpTypeIndex(typeIndex);
+            break;
           }
           case uint32_t(GcOp::StructNewDefault): {
-            uint32_t unusedUint;
-            CHECK(iter.readStructNewDefault(&unusedUint));
+            uint32_t typeIndex;
+            if (!iter.readStructNewDefault(&typeIndex)) {
+              return false;
+            }
+            dumper.dumpTypeIndex(typeIndex);
+            break;
           }
           case uint32_t(GcOp::StructGet): {
-            uint32_t unusedUint1, unusedUint2;
-            CHECK(iter.readStructGet(&unusedUint1, &unusedUint2,
-                                     FieldWideningOp::None, &nothing));
+            uint32_t typeIndex, fieldIndex;
+            if (!iter.readStructGet(&typeIndex, &fieldIndex,
+                                    FieldWideningOp::None, &nothing)) {
+              return false;
+            }
+            dumper.dumpTypeIndex(typeIndex);
+            dumper.dumpFieldIndex(fieldIndex);
+            break;
           }
           case uint32_t(GcOp::StructGetS): {
-            uint32_t unusedUint1, unusedUint2;
-            CHECK(iter.readStructGet(&unusedUint1, &unusedUint2,
-                                     FieldWideningOp::Signed, &nothing));
+            uint32_t typeIndex, fieldIndex;
+            if (!iter.readStructGet(&typeIndex, &fieldIndex,
+                                    FieldWideningOp::Signed, &nothing)) {
+              return false;
+            }
+            dumper.dumpTypeIndex(typeIndex);
+            dumper.dumpFieldIndex(fieldIndex);
+            break;
           }
           case uint32_t(GcOp::StructGetU): {
-            uint32_t unusedUint1, unusedUint2;
-            CHECK(iter.readStructGet(&unusedUint1, &unusedUint2,
-                                     FieldWideningOp::Unsigned, &nothing));
+            uint32_t typeIndex, fieldIndex;
+            if (!iter.readStructGet(&typeIndex, &fieldIndex,
+                                    FieldWideningOp::Unsigned, &nothing)) {
+              return false;
+            }
+            dumper.dumpTypeIndex(typeIndex);
+            dumper.dumpFieldIndex(fieldIndex);
+            break;
           }
           case uint32_t(GcOp::StructSet): {
-            uint32_t unusedUint1, unusedUint2;
-            CHECK(iter.readStructSet(&unusedUint1, &unusedUint2, &nothing,
-                                     &nothing));
+            uint32_t typeIndex, fieldIndex;
+            if (!iter.readStructSet(&typeIndex, &fieldIndex, &nothing,
+                                    &nothing)) {
+              return false;
+            }
+            dumper.dumpTypeIndex(typeIndex);
+            dumper.dumpFieldIndex(fieldIndex);
+            break;
           }
           case uint32_t(GcOp::ArrayNew): {
-            uint32_t unusedUint;
-            CHECK(iter.readArrayNew(&unusedUint, &nothing, &nothing));
+            uint32_t typeIndex;
+            if (!iter.readArrayNew(&typeIndex, &nothing, &nothing)) {
+              return false;
+            }
+            dumper.dumpTypeIndex(typeIndex);
+            break;
           }
           case uint32_t(GcOp::ArrayNewFixed): {
-            uint32_t unusedUint1, unusedUint2;
-            CHECK(
-                iter.readArrayNewFixed(&unusedUint1, &unusedUint2, &nothings));
+            uint32_t typeIndex, numElements;
+            if (!iter.readArrayNewFixed(&typeIndex, &numElements, &nothings)) {
+              return false;
+            }
+            dumper.dumpTypeIndex(typeIndex);
+            dumper.dumpNumElements(numElements);
+            break;
           }
           case uint32_t(GcOp::ArrayNewDefault): {
-            uint32_t unusedUint;
-            CHECK(iter.readArrayNewDefault(&unusedUint, &nothing));
+            uint32_t typeIndex;
+            if (!iter.readArrayNewDefault(&typeIndex, &nothing)) {
+              return false;
+            }
+            dumper.dumpTypeIndex(typeIndex);
+            break;
           }
           case uint32_t(GcOp::ArrayNewData): {
-            uint32_t unusedUint1, unusedUint2;
-            CHECK(iter.readArrayNewData(&unusedUint1, &unusedUint2, &nothing,
-                                        &nothing));
+            uint32_t typeIndex, dataIndex;
+            if (!iter.readArrayNewData(&typeIndex, &dataIndex, &nothing,
+                                       &nothing)) {
+              return false;
+            }
+            dumper.dumpTypeIndex(typeIndex);
+            dumper.dumpDataIndex(dataIndex);
+            break;
           }
           case uint32_t(GcOp::ArrayNewElem): {
-            uint32_t unusedUint1, unusedUint2;
-            CHECK(iter.readArrayNewElem(&unusedUint1, &unusedUint2, &nothing,
-                                        &nothing));
+            uint32_t typeIndex, elemIndex;
+            if (!iter.readArrayNewElem(&typeIndex, &elemIndex, &nothing,
+                                       &nothing)) {
+              return false;
+            }
+            dumper.dumpTypeIndex(typeIndex);
+            dumper.dumpElemIndex(elemIndex);
+            break;
           }
           case uint32_t(GcOp::ArrayInitData): {
-            uint32_t unusedUint1, unusedUint2;
-            CHECK(iter.readArrayInitData(&unusedUint1, &unusedUint2, &nothing,
-                                         &nothing, &nothing, &nothing));
+            uint32_t typeIndex, dataIndex;
+            if (!iter.readArrayInitData(&typeIndex, &dataIndex, &nothing,
+                                        &nothing, &nothing, &nothing)) {
+              return false;
+            }
+            dumper.dumpTypeIndex(typeIndex);
+            dumper.dumpDataIndex(dataIndex);
+            break;
           }
           case uint32_t(GcOp::ArrayInitElem): {
-            uint32_t unusedUint1, unusedUint2;
-            CHECK(iter.readArrayInitElem(&unusedUint1, &unusedUint2, &nothing,
-                                         &nothing, &nothing, &nothing));
+            uint32_t typeIndex, elemIndex;
+            if (!iter.readArrayInitElem(&typeIndex, &elemIndex, &nothing,
+                                        &nothing, &nothing, &nothing)) {
+              return false;
+            }
+            dumper.dumpTypeIndex(typeIndex);
+            dumper.dumpElemIndex(elemIndex);
+            break;
           }
           case uint32_t(GcOp::ArrayGet): {
-            uint32_t unusedUint1;
-            CHECK(iter.readArrayGet(&unusedUint1, FieldWideningOp::None,
-                                    &nothing, &nothing));
+            uint32_t typeIndex;
+            if (!iter.readArrayGet(&typeIndex, FieldWideningOp::None, &nothing,
+                                   &nothing)) {
+              return false;
+            }
+            dumper.dumpTypeIndex(typeIndex);
+            break;
           }
           case uint32_t(GcOp::ArrayGetS): {
-            uint32_t unusedUint1;
-            CHECK(iter.readArrayGet(&unusedUint1, FieldWideningOp::Signed,
-                                    &nothing, &nothing));
+            uint32_t typeIndex;
+            if (!iter.readArrayGet(&typeIndex, FieldWideningOp::Signed,
+                                   &nothing, &nothing)) {
+              return false;
+            }
+            dumper.dumpTypeIndex(typeIndex);
+            break;
           }
           case uint32_t(GcOp::ArrayGetU): {
-            uint32_t unusedUint1;
-            CHECK(iter.readArrayGet(&unusedUint1, FieldWideningOp::Unsigned,
-                                    &nothing, &nothing));
+            uint32_t typeIndex;
+            if (!iter.readArrayGet(&typeIndex, FieldWideningOp::Unsigned,
+                                   &nothing, &nothing)) {
+              return false;
+            }
+            dumper.dumpTypeIndex(typeIndex);
+            break;
           }
           case uint32_t(GcOp::ArraySet): {
-            uint32_t unusedUint1;
-            CHECK(
-                iter.readArraySet(&unusedUint1, &nothing, &nothing, &nothing));
+            uint32_t typeIndex;
+            if (!iter.readArraySet(&typeIndex, &nothing, &nothing, &nothing)) {
+              return false;
+            }
+            dumper.dumpTypeIndex(typeIndex);
+            break;
           }
           case uint32_t(GcOp::ArrayLen): {
-            CHECK(iter.readArrayLen(&nothing));
+            if (!iter.readArrayLen(&nothing)) {
+              return false;
+            }
+            break;
           }
           case uint32_t(GcOp::ArrayCopy): {
-            int32_t unusedInt;
-            bool unusedBool;
-            CHECK(iter.readArrayCopy(&unusedInt, &unusedBool, &nothing,
-                                     &nothing, &nothing, &nothing, &nothing));
+            uint32_t dstArrayTypeIndex;
+            uint32_t srcArrayTypeIndex;
+            if (!iter.readArrayCopy(&dstArrayTypeIndex, &srcArrayTypeIndex,
+                                    &nothing, &nothing, &nothing, &nothing,
+                                    &nothing)) {
+              return false;
+            }
+            dumper.dumpTypeIndex(dstArrayTypeIndex);
+            dumper.dumpTypeIndex(srcArrayTypeIndex);
+            break;
           }
           case uint32_t(GcOp::ArrayFill): {
-            uint32_t unusedTypeIndex;
-            CHECK(iter.readArrayFill(&unusedTypeIndex, &nothing, &nothing,
-                                     &nothing, &nothing));
+            uint32_t typeIndex;
+            if (!iter.readArrayFill(&typeIndex, &nothing, &nothing, &nothing,
+                                    &nothing)) {
+              return false;
+            }
+            dumper.dumpTypeIndex(typeIndex);
+            break;
           }
           case uint32_t(GcOp::RefI31): {
-            CHECK(iter.readConversion(ValType::I32,
-                                      ValType(RefType::i31().asNonNullable()),
-                                      &nothing));
+            if (!iter.readConversion(ValType::I32,
+                                     ValType(RefType::i31().asNonNullable()),
+                                     &nothing)) {
+              return false;
+            }
+            break;
           }
           case uint32_t(GcOp::I31GetS): {
-            CHECK(iter.readConversion(ValType(RefType::i31()), ValType::I32,
-                                      &nothing));
+            if (!iter.readConversion(ValType(RefType::i31()), ValType::I32,
+                                     &nothing)) {
+              return false;
+            }
+            break;
           }
           case uint32_t(GcOp::I31GetU): {
-            CHECK(iter.readConversion(ValType(RefType::i31()), ValType::I32,
-                                      &nothing));
+            if (!iter.readConversion(ValType(RefType::i31()), ValType::I32,
+                                     &nothing)) {
+              return false;
+            }
+            break;
           }
           case uint16_t(GcOp::RefTest): {
-            RefType unusedSourceType;
-            RefType unusedDestType;
-            CHECK(iter.readRefTest(false, &unusedSourceType, &unusedDestType,
-                                   &nothing));
+            RefType srcType;
+            RefType destType;
+            if (!iter.readRefTest(false, &srcType, &destType, &nothing)) {
+              return false;
+            }
+            dumper.dumpRefType(destType);
+            break;
           }
           case uint16_t(GcOp::RefTestNull): {
-            RefType unusedSourceType;
-            RefType unusedDestType;
-            CHECK(iter.readRefTest(true, &unusedSourceType, &unusedDestType,
-                                   &nothing));
+            RefType srcType;
+            RefType destType;
+            if (!iter.readRefTest(true, &srcType, &destType, &nothing)) {
+              return false;
+            }
+            dumper.dumpRefType(srcType);
+            dumper.dumpRefType(destType);
+            break;
           }
           case uint16_t(GcOp::RefCast): {
-            RefType unusedSourceType;
-            RefType unusedDestType;
-            CHECK(iter.readRefCast(false, &unusedSourceType, &unusedDestType,
-                                   &nothing));
+            RefType srcType;
+            RefType destType;
+            if (!iter.readRefCast(false, &srcType, &destType, &nothing)) {
+              return false;
+            }
+            dumper.dumpRefType(destType);
+            break;
           }
           case uint16_t(GcOp::RefCastNull): {
-            RefType unusedSourceType;
-            RefType unusedDestType;
-            CHECK(iter.readRefCast(true, &unusedSourceType, &unusedDestType,
-                                   &nothing));
+            RefType srcType;
+            RefType destType;
+            if (!iter.readRefCast(true, &srcType, &destType, &nothing)) {
+              return false;
+            }
+            dumper.dumpRefType(destType);
+            break;
           }
           case uint16_t(GcOp::BrOnCast): {
-            uint32_t unusedRelativeDepth;
-            RefType unusedSourceType;
-            RefType unusedDestType;
-            CHECK(iter.readBrOnCast(true, &unusedRelativeDepth,
-                                    &unusedSourceType, &unusedDestType,
-                                    &unusedType, &nothings));
+            uint32_t relativeDepth;
+            RefType srcType;
+            RefType destType;
+            if (!iter.readBrOnCast(true, &relativeDepth, &srcType, &destType,
+                                   &resultType, &nothings)) {
+              return false;
+            }
+            dumper.dumpBlockDepth(relativeDepth);
+            dumper.dumpRefType(srcType);
+            dumper.dumpRefType(destType);
+            break;
           }
           case uint16_t(GcOp::BrOnCastFail): {
-            uint32_t unusedRelativeDepth;
-            RefType unusedSourceType;
-            RefType unusedDestType;
-            CHECK(iter.readBrOnCast(false, &unusedRelativeDepth,
-                                    &unusedSourceType, &unusedDestType,
-                                    &unusedType, &nothings));
+            uint32_t relativeDepth;
+            RefType srcType;
+            RefType destType;
+            if (!iter.readBrOnCast(false, &relativeDepth, &srcType, &destType,
+                                   &resultType, &nothings)) {
+              return false;
+            }
+            dumper.dumpBlockDepth(relativeDepth);
+            dumper.dumpRefType(srcType);
+            dumper.dumpRefType(destType);
+            break;
           }
           case uint16_t(GcOp::AnyConvertExtern): {
-            CHECK(iter.readRefConversion(RefType::extern_(), RefType::any(),
-                                         &nothing));
+            if (!iter.readRefConversion(RefType::extern_(), RefType::any(),
+                                        &nothing)) {
+              return false;
+            }
+            break;
           }
           case uint16_t(GcOp::ExternConvertAny): {
-            CHECK(iter.readRefConversion(RefType::any(), RefType::extern_(),
-                                         &nothing));
+            if (!iter.readRefConversion(RefType::any(), RefType::extern_(),
+                                        &nothing)) {
+              return false;
+            }
+            break;
           }
           default:
             return iter.unrecognizedOpcode(&op);
         }
         break;
       }
-#endif
 
 #ifdef ENABLE_WASM_SIMD
       case uint16_t(Op::SimdPrefix): {
-        if (!env.simdAvailable()) {
+        if (!codeMeta.simdAvailable()) {
           return iter.unrecognizedOpcode(&op);
         }
-        uint32_t noIndex;
+        uint32_t laneIndex;
         switch (op.b1) {
           case uint32_t(SimdOp::I8x16ExtractLaneS):
-          case uint32_t(SimdOp::I8x16ExtractLaneU):
-            CHECK(iter.readExtractLane(ValType::I32, 16, &noIndex, &nothing));
+          case uint32_t(SimdOp::I8x16ExtractLaneU): {
+            if (!iter.readExtractLane(ValType::I32, 16, &laneIndex, &nothing)) {
+              return false;
+            }
+            dumper.dumpLaneIndex(laneIndex);
+            break;
+          }
           case uint32_t(SimdOp::I16x8ExtractLaneS):
-          case uint32_t(SimdOp::I16x8ExtractLaneU):
-            CHECK(iter.readExtractLane(ValType::I32, 8, &noIndex, &nothing));
-          case uint32_t(SimdOp::I32x4ExtractLane):
-            CHECK(iter.readExtractLane(ValType::I32, 4, &noIndex, &nothing));
-          case uint32_t(SimdOp::I64x2ExtractLane):
-            CHECK(iter.readExtractLane(ValType::I64, 2, &noIndex, &nothing));
-          case uint32_t(SimdOp::F32x4ExtractLane):
-            CHECK(iter.readExtractLane(ValType::F32, 4, &noIndex, &nothing));
-          case uint32_t(SimdOp::F64x2ExtractLane):
-            CHECK(iter.readExtractLane(ValType::F64, 2, &noIndex, &nothing));
+          case uint32_t(SimdOp::I16x8ExtractLaneU): {
+            if (!iter.readExtractLane(ValType::I32, 8, &laneIndex, &nothing)) {
+              return false;
+            }
+            dumper.dumpLaneIndex(laneIndex);
+            break;
+          }
+          case uint32_t(SimdOp::I32x4ExtractLane): {
+            if (!iter.readExtractLane(ValType::I32, 4, &laneIndex, &nothing)) {
+              return false;
+            }
+            dumper.dumpLaneIndex(laneIndex);
+            break;
+          }
+          case uint32_t(SimdOp::I64x2ExtractLane): {
+            if (!iter.readExtractLane(ValType::I64, 2, &laneIndex, &nothing)) {
+              return false;
+            }
+            dumper.dumpLaneIndex(laneIndex);
+            break;
+          }
+          case uint32_t(SimdOp::F32x4ExtractLane): {
+            if (!iter.readExtractLane(ValType::F32, 4, &laneIndex, &nothing)) {
+              return false;
+            }
+            dumper.dumpLaneIndex(laneIndex);
+            break;
+          }
+          case uint32_t(SimdOp::F64x2ExtractLane): {
+            if (!iter.readExtractLane(ValType::F64, 2, &laneIndex, &nothing)) {
+              return false;
+            }
+            dumper.dumpLaneIndex(laneIndex);
+            break;
+          }
 
           case uint32_t(SimdOp::I8x16Splat):
           case uint32_t(SimdOp::I16x8Splat):
-          case uint32_t(SimdOp::I32x4Splat):
-            CHECK(iter.readConversion(ValType::I32, ValType::V128, &nothing));
-          case uint32_t(SimdOp::I64x2Splat):
-            CHECK(iter.readConversion(ValType::I64, ValType::V128, &nothing));
-          case uint32_t(SimdOp::F32x4Splat):
-            CHECK(iter.readConversion(ValType::F32, ValType::V128, &nothing));
-          case uint32_t(SimdOp::F64x2Splat):
-            CHECK(iter.readConversion(ValType::F64, ValType::V128, &nothing));
+          case uint32_t(SimdOp::I32x4Splat): {
+            if (!iter.readConversion(ValType::I32, ValType::V128, &nothing)) {
+              return false;
+            }
+            break;
+          }
+          case uint32_t(SimdOp::I64x2Splat): {
+            if (!iter.readConversion(ValType::I64, ValType::V128, &nothing)) {
+              return false;
+            }
+            break;
+          }
+          case uint32_t(SimdOp::F32x4Splat): {
+            if (!iter.readConversion(ValType::F32, ValType::V128, &nothing)) {
+              return false;
+            }
+            break;
+          }
+          case uint32_t(SimdOp::F64x2Splat): {
+            if (!iter.readConversion(ValType::F64, ValType::V128, &nothing)) {
+              return false;
+            }
+            break;
+          }
 
           case uint32_t(SimdOp::V128AnyTrue):
           case uint32_t(SimdOp::I8x16AllTrue):
@@ -834,27 +1292,61 @@ static bool DecodeFunctionBodyExprs(const ModuleEnvironment& env,
           case uint32_t(SimdOp::I8x16Bitmask):
           case uint32_t(SimdOp::I16x8Bitmask):
           case uint32_t(SimdOp::I32x4Bitmask):
-          case uint32_t(SimdOp::I64x2Bitmask):
-            CHECK(iter.readConversion(ValType::V128, ValType::I32, &nothing));
+          case uint32_t(SimdOp::I64x2Bitmask): {
+            if (!iter.readConversion(ValType::V128, ValType::I32, &nothing)) {
+              return false;
+            }
+            break;
+          }
 
-          case uint32_t(SimdOp::I8x16ReplaceLane):
-            CHECK(iter.readReplaceLane(ValType::I32, 16, &noIndex, &nothing,
-                                       &nothing));
-          case uint32_t(SimdOp::I16x8ReplaceLane):
-            CHECK(iter.readReplaceLane(ValType::I32, 8, &noIndex, &nothing,
-                                       &nothing));
-          case uint32_t(SimdOp::I32x4ReplaceLane):
-            CHECK(iter.readReplaceLane(ValType::I32, 4, &noIndex, &nothing,
-                                       &nothing));
-          case uint32_t(SimdOp::I64x2ReplaceLane):
-            CHECK(iter.readReplaceLane(ValType::I64, 2, &noIndex, &nothing,
-                                       &nothing));
-          case uint32_t(SimdOp::F32x4ReplaceLane):
-            CHECK(iter.readReplaceLane(ValType::F32, 4, &noIndex, &nothing,
-                                       &nothing));
-          case uint32_t(SimdOp::F64x2ReplaceLane):
-            CHECK(iter.readReplaceLane(ValType::F64, 2, &noIndex, &nothing,
-                                       &nothing));
+          case uint32_t(SimdOp::I8x16ReplaceLane): {
+            if (!iter.readReplaceLane(ValType::I32, 16, &laneIndex, &nothing,
+                                      &nothing)) {
+              return false;
+            }
+            dumper.dumpLaneIndex(laneIndex);
+            break;
+          }
+          case uint32_t(SimdOp::I16x8ReplaceLane): {
+            if (!iter.readReplaceLane(ValType::I32, 8, &laneIndex, &nothing,
+                                      &nothing)) {
+              return false;
+            }
+            dumper.dumpLaneIndex(laneIndex);
+            break;
+          }
+          case uint32_t(SimdOp::I32x4ReplaceLane): {
+            if (!iter.readReplaceLane(ValType::I32, 4, &laneIndex, &nothing,
+                                      &nothing)) {
+              return false;
+            }
+            dumper.dumpLaneIndex(laneIndex);
+            break;
+          }
+          case uint32_t(SimdOp::I64x2ReplaceLane): {
+            if (!iter.readReplaceLane(ValType::I64, 2, &laneIndex, &nothing,
+                                      &nothing)) {
+              return false;
+            }
+            dumper.dumpLaneIndex(laneIndex);
+            break;
+          }
+          case uint32_t(SimdOp::F32x4ReplaceLane): {
+            if (!iter.readReplaceLane(ValType::F32, 4, &laneIndex, &nothing,
+                                      &nothing)) {
+              return false;
+            }
+            dumper.dumpLaneIndex(laneIndex);
+            break;
+          }
+          case uint32_t(SimdOp::F64x2ReplaceLane): {
+            if (!iter.readReplaceLane(ValType::F64, 2, &laneIndex, &nothing,
+                                      &nothing)) {
+              return false;
+            }
+            dumper.dumpLaneIndex(laneIndex);
+            break;
+          }
 
           case uint32_t(SimdOp::I8x16Eq):
           case uint32_t(SimdOp::I8x16Ne):
@@ -975,8 +1467,12 @@ static bool DecodeFunctionBodyExprs(const ModuleEnvironment& env,
           case uint32_t(SimdOp::I64x2ExtmulHighI32x4S):
           case uint32_t(SimdOp::I64x2ExtmulLowI32x4U):
           case uint32_t(SimdOp::I64x2ExtmulHighI32x4U):
-          case uint32_t(SimdOp::I16x8Q15MulrSatS):
-            CHECK(iter.readBinary(ValType::V128, &nothing, &nothing));
+          case uint32_t(SimdOp::I16x8Q15MulrSatS): {
+            if (!iter.readBinary(ValType::V128, &nothing, &nothing)) {
+              return false;
+            }
+            break;
+          }
 
           case uint32_t(SimdOp::I8x16Neg):
           case uint32_t(SimdOp::I16x8Neg):
@@ -1027,8 +1523,12 @@ static bool DecodeFunctionBodyExprs(const ModuleEnvironment& env,
           case uint32_t(SimdOp::I16x8ExtaddPairwiseI8x16S):
           case uint32_t(SimdOp::I16x8ExtaddPairwiseI8x16U):
           case uint32_t(SimdOp::I32x4ExtaddPairwiseI16x8S):
-          case uint32_t(SimdOp::I32x4ExtaddPairwiseI16x8U):
-            CHECK(iter.readUnary(ValType::V128, &nothing));
+          case uint32_t(SimdOp::I32x4ExtaddPairwiseI16x8U): {
+            if (!iter.readUnary(ValType::V128, &nothing)) {
+              return false;
+            }
+            break;
+          }
 
           case uint32_t(SimdOp::I8x16Shl):
           case uint32_t(SimdOp::I8x16ShrS):
@@ -1041,119 +1541,219 @@ static bool DecodeFunctionBodyExprs(const ModuleEnvironment& env,
           case uint32_t(SimdOp::I32x4ShrU):
           case uint32_t(SimdOp::I64x2Shl):
           case uint32_t(SimdOp::I64x2ShrS):
-          case uint32_t(SimdOp::I64x2ShrU):
-            CHECK(iter.readVectorShift(&nothing, &nothing));
+          case uint32_t(SimdOp::I64x2ShrU): {
+            if (!iter.readVectorShift(&nothing, &nothing)) {
+              return false;
+            }
+            break;
+          }
 
-          case uint32_t(SimdOp::V128Bitselect):
-            CHECK(
-                iter.readTernary(ValType::V128, &nothing, &nothing, &nothing));
+          case uint32_t(SimdOp::V128Bitselect): {
+            if (!iter.readTernary(ValType::V128, &nothing, &nothing,
+                                  &nothing)) {
+              return false;
+            }
+            break;
+          }
 
           case uint32_t(SimdOp::I8x16Shuffle): {
             V128 mask;
-            CHECK(iter.readVectorShuffle(&nothing, &nothing, &mask));
+            if (!iter.readVectorShuffle(&nothing, &nothing, &mask)) {
+              return false;
+            }
+            dumper.dumpVectorMask(mask);
+            break;
           }
 
           case uint32_t(SimdOp::V128Const): {
-            V128 noVector;
-            CHECK(iter.readV128Const(&noVector));
+            V128 constant;
+            if (!iter.readV128Const(&constant)) {
+              return false;
+            }
+            dumper.dumpV128Const(constant);
+            break;
           }
 
           case uint32_t(SimdOp::V128Load): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readLoad(ValType::V128, 16, &addr));
+            if (!iter.readLoad(ValType::V128, 16, &addr)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
 
           case uint32_t(SimdOp::V128Load8Splat): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readLoadSplat(1, &addr));
+            if (!iter.readLoadSplat(1, &addr)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
 
           case uint32_t(SimdOp::V128Load16Splat): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readLoadSplat(2, &addr));
+            if (!iter.readLoadSplat(2, &addr)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
 
           case uint32_t(SimdOp::V128Load32Splat): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readLoadSplat(4, &addr));
+            if (!iter.readLoadSplat(4, &addr)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
 
           case uint32_t(SimdOp::V128Load64Splat): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readLoadSplat(8, &addr));
+            if (!iter.readLoadSplat(8, &addr)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
 
           case uint32_t(SimdOp::V128Load8x8S):
           case uint32_t(SimdOp::V128Load8x8U): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readLoadExtend(&addr));
+            if (!iter.readLoadExtend(&addr)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
 
           case uint32_t(SimdOp::V128Load16x4S):
           case uint32_t(SimdOp::V128Load16x4U): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readLoadExtend(&addr));
+            if (!iter.readLoadExtend(&addr)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
 
           case uint32_t(SimdOp::V128Load32x2S):
           case uint32_t(SimdOp::V128Load32x2U): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readLoadExtend(&addr));
+            if (!iter.readLoadExtend(&addr)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
 
           case uint32_t(SimdOp::V128Store): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readStore(ValType::V128, 16, &addr, &nothing));
+            if (!iter.readStore(ValType::V128, 16, &addr, &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
 
           case uint32_t(SimdOp::V128Load32Zero): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readLoadSplat(4, &addr));
+            if (!iter.readLoadSplat(4, &addr)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
 
           case uint32_t(SimdOp::V128Load64Zero): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readLoadSplat(8, &addr));
+            if (!iter.readLoadSplat(8, &addr)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
 
           case uint32_t(SimdOp::V128Load8Lane): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readLoadLane(1, &addr, &noIndex, &nothing));
+            if (!iter.readLoadLane(1, &addr, &laneIndex, &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            dumper.dumpLaneIndex(laneIndex);
+            break;
           }
 
           case uint32_t(SimdOp::V128Load16Lane): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readLoadLane(2, &addr, &noIndex, &nothing));
+            if (!iter.readLoadLane(2, &addr, &laneIndex, &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            dumper.dumpLaneIndex(laneIndex);
+            break;
           }
 
           case uint32_t(SimdOp::V128Load32Lane): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readLoadLane(4, &addr, &noIndex, &nothing));
+            if (!iter.readLoadLane(4, &addr, &laneIndex, &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            dumper.dumpLaneIndex(laneIndex);
+            break;
           }
 
           case uint32_t(SimdOp::V128Load64Lane): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readLoadLane(8, &addr, &noIndex, &nothing));
+            if (!iter.readLoadLane(8, &addr, &laneIndex, &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            dumper.dumpLaneIndex(laneIndex);
+            break;
           }
 
           case uint32_t(SimdOp::V128Store8Lane): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readStoreLane(1, &addr, &noIndex, &nothing));
+            if (!iter.readStoreLane(1, &addr, &laneIndex, &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            dumper.dumpLaneIndex(laneIndex);
+            break;
           }
 
           case uint32_t(SimdOp::V128Store16Lane): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readStoreLane(2, &addr, &noIndex, &nothing));
+            if (!iter.readStoreLane(2, &addr, &laneIndex, &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            dumper.dumpLaneIndex(laneIndex);
+            break;
           }
 
           case uint32_t(SimdOp::V128Store32Lane): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readStoreLane(4, &addr, &noIndex, &nothing));
+            if (!iter.readStoreLane(4, &addr, &laneIndex, &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            dumper.dumpLaneIndex(laneIndex);
+            break;
           }
 
           case uint32_t(SimdOp::V128Store64Lane): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readStoreLane(8, &addr, &noIndex, &nothing));
+            if (!iter.readStoreLane(8, &addr, &laneIndex, &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            dumper.dumpLaneIndex(laneIndex);
+            break;
           }
 
 #  ifdef ENABLE_WASM_RELAXED_SIMD
@@ -1165,38 +1765,50 @@ static bool DecodeFunctionBodyExprs(const ModuleEnvironment& env,
           case uint32_t(SimdOp::I16x8RelaxedLaneSelect):
           case uint32_t(SimdOp::I32x4RelaxedLaneSelect):
           case uint32_t(SimdOp::I64x2RelaxedLaneSelect):
-          case uint32_t(SimdOp::I32x4DotI8x16I7x16AddS): {
-            if (!env.v128RelaxedEnabled()) {
+          case uint32_t(SimdOp::I32x4RelaxedDotI8x16I7x16AddS): {
+            if (!codeMeta.v128RelaxedEnabled()) {
               return iter.unrecognizedOpcode(&op);
             }
-            CHECK(
-                iter.readTernary(ValType::V128, &nothing, &nothing, &nothing));
+            if (!iter.readTernary(ValType::V128, &nothing, &nothing,
+                                  &nothing)) {
+              return false;
+            }
+            break;
           }
           case uint32_t(SimdOp::F32x4RelaxedMin):
           case uint32_t(SimdOp::F32x4RelaxedMax):
           case uint32_t(SimdOp::F64x2RelaxedMin):
           case uint32_t(SimdOp::F64x2RelaxedMax):
           case uint32_t(SimdOp::I16x8RelaxedQ15MulrS):
-          case uint32_t(SimdOp::I16x8DotI8x16I7x16S): {
-            if (!env.v128RelaxedEnabled()) {
+          case uint32_t(SimdOp::I16x8RelaxedDotI8x16I7x16S): {
+            if (!codeMeta.v128RelaxedEnabled()) {
               return iter.unrecognizedOpcode(&op);
             }
-            CHECK(iter.readBinary(ValType::V128, &nothing, &nothing));
+            if (!iter.readBinary(ValType::V128, &nothing, &nothing)) {
+              return false;
+            }
+            break;
           }
           case uint32_t(SimdOp::I32x4RelaxedTruncF32x4S):
           case uint32_t(SimdOp::I32x4RelaxedTruncF32x4U):
           case uint32_t(SimdOp::I32x4RelaxedTruncF64x2SZero):
           case uint32_t(SimdOp::I32x4RelaxedTruncF64x2UZero): {
-            if (!env.v128RelaxedEnabled()) {
+            if (!codeMeta.v128RelaxedEnabled()) {
               return iter.unrecognizedOpcode(&op);
             }
-            CHECK(iter.readUnary(ValType::V128, &nothing));
+            if (!iter.readUnary(ValType::V128, &nothing)) {
+              return false;
+            }
+            break;
           }
           case uint32_t(SimdOp::I8x16RelaxedSwizzle): {
-            if (!env.v128RelaxedEnabled()) {
+            if (!codeMeta.v128RelaxedEnabled()) {
               return iter.unrecognizedOpcode(&op);
             }
-            CHECK(iter.readBinary(ValType::V128, &nothing, &nothing));
+            if (!iter.readBinary(ValType::V128, &nothing, &nothing)) {
+              return false;
+            }
+            break;
           }
 #  endif
 
@@ -1210,248 +1822,418 @@ static bool DecodeFunctionBodyExprs(const ModuleEnvironment& env,
       case uint16_t(Op::MiscPrefix): {
         switch (op.b1) {
           case uint32_t(MiscOp::I32TruncSatF32S):
-          case uint32_t(MiscOp::I32TruncSatF32U):
-            CHECK(iter.readConversion(ValType::F32, ValType::I32, &nothing));
+          case uint32_t(MiscOp::I32TruncSatF32U): {
+            if (!iter.readConversion(ValType::F32, ValType::I32, &nothing)) {
+              return false;
+            }
+            break;
+          }
           case uint32_t(MiscOp::I32TruncSatF64S):
-          case uint32_t(MiscOp::I32TruncSatF64U):
-            CHECK(iter.readConversion(ValType::F64, ValType::I32, &nothing));
+          case uint32_t(MiscOp::I32TruncSatF64U): {
+            if (!iter.readConversion(ValType::F64, ValType::I32, &nothing)) {
+              return false;
+            }
+            break;
+          }
           case uint32_t(MiscOp::I64TruncSatF32S):
-          case uint32_t(MiscOp::I64TruncSatF32U):
-            CHECK(iter.readConversion(ValType::F32, ValType::I64, &nothing));
+          case uint32_t(MiscOp::I64TruncSatF32U): {
+            if (!iter.readConversion(ValType::F32, ValType::I64, &nothing)) {
+              return false;
+            }
+            break;
+          }
           case uint32_t(MiscOp::I64TruncSatF64S):
-          case uint32_t(MiscOp::I64TruncSatF64U):
-            CHECK(iter.readConversion(ValType::F64, ValType::I64, &nothing));
+          case uint32_t(MiscOp::I64TruncSatF64U): {
+            if (!iter.readConversion(ValType::F64, ValType::I64, &nothing)) {
+              return false;
+            }
+            break;
+          }
           case uint32_t(MiscOp::MemoryCopy): {
-            uint32_t unusedDestMemIndex;
-            uint32_t unusedSrcMemIndex;
-            CHECK(iter.readMemOrTableCopy(/*isMem=*/true, &unusedDestMemIndex,
-                                          &nothing, &unusedSrcMemIndex,
-                                          &nothing, &nothing));
+            uint32_t destMemIndex;
+            uint32_t srcMemIndex;
+            if (!iter.readMemOrTableCopy(/*isMem=*/true, &destMemIndex,
+                                         &nothing, &srcMemIndex, &nothing,
+                                         &nothing)) {
+              return false;
+            }
+            dumper.dumpMemoryIndex(destMemIndex);
+            dumper.dumpMemoryIndex(srcMemIndex);
+            break;
           }
           case uint32_t(MiscOp::DataDrop): {
-            uint32_t unusedSegIndex;
-            CHECK(iter.readDataOrElemDrop(/*isData=*/true, &unusedSegIndex));
+            uint32_t dataIndex;
+            if (!iter.readDataOrElemDrop(/*isData=*/true, &dataIndex)) {
+              return false;
+            }
+            dumper.dumpDataIndex(dataIndex);
+            break;
           }
           case uint32_t(MiscOp::MemoryFill): {
             uint32_t memoryIndex;
-            CHECK(iter.readMemFill(&memoryIndex, &nothing, &nothing, &nothing));
+            if (!iter.readMemFill(&memoryIndex, &nothing, &nothing, &nothing)) {
+              return false;
+            }
+            dumper.dumpMemoryIndex(memoryIndex);
+            break;
           }
           case uint32_t(MiscOp::MemoryInit): {
-            uint32_t unusedSegIndex;
-            uint32_t unusedMemoryIndex;
-            CHECK(iter.readMemOrTableInit(/*isMem=*/true, &unusedSegIndex,
-                                          &unusedMemoryIndex, &nothing,
-                                          &nothing, &nothing));
+            uint32_t dataIndex;
+            uint32_t memoryIndex;
+            if (!iter.readMemOrTableInit(/*isMem=*/true, &dataIndex,
+                                         &memoryIndex, &nothing, &nothing,
+                                         &nothing)) {
+              return false;
+            }
+            dumper.dumpMemoryIndex(memoryIndex);
+            dumper.dumpDataIndex(dataIndex);
+            break;
           }
           case uint32_t(MiscOp::TableCopy): {
-            uint32_t unusedDestTableIndex;
-            uint32_t unusedSrcTableIndex;
-            CHECK(iter.readMemOrTableCopy(
-                /*isMem=*/false, &unusedDestTableIndex, &nothing,
-                &unusedSrcTableIndex, &nothing, &nothing));
+            uint32_t destTableIndex;
+            uint32_t srcTableIndex;
+            if (!iter.readMemOrTableCopy(
+                    /*isMem=*/false, &destTableIndex, &nothing, &srcTableIndex,
+                    &nothing, &nothing)) {
+              return false;
+            }
+            dumper.dumpTableIndex(destTableIndex);
+            dumper.dumpTableIndex(srcTableIndex);
+            break;
           }
           case uint32_t(MiscOp::ElemDrop): {
-            uint32_t unusedSegIndex;
-            CHECK(iter.readDataOrElemDrop(/*isData=*/false, &unusedSegIndex));
+            uint32_t elemIndex;
+            if (!iter.readDataOrElemDrop(/*isData=*/false, &elemIndex)) {
+              return false;
+            }
+            dumper.dumpElemIndex(elemIndex);
+            break;
           }
           case uint32_t(MiscOp::TableInit): {
-            uint32_t unusedSegIndex;
-            uint32_t unusedTableIndex;
-            CHECK(iter.readMemOrTableInit(/*isMem=*/false, &unusedSegIndex,
-                                          &unusedTableIndex, &nothing, &nothing,
-                                          &nothing));
+            uint32_t elemIndex;
+            uint32_t tableIndex;
+            if (!iter.readMemOrTableInit(/*isMem=*/false, &elemIndex,
+                                         &tableIndex, &nothing, &nothing,
+                                         &nothing)) {
+              return false;
+            }
+            dumper.dumpTableIndex(tableIndex);
+            dumper.dumpElemIndex(elemIndex);
+            break;
           }
           case uint32_t(MiscOp::TableFill): {
-            uint32_t unusedTableIndex;
-            CHECK(iter.readTableFill(&unusedTableIndex, &nothing, &nothing,
-                                     &nothing));
+            uint32_t tableIndex;
+            if (!iter.readTableFill(&tableIndex, &nothing, &nothing,
+                                    &nothing)) {
+              return false;
+            }
+            dumper.dumpTableIndex(tableIndex);
+            break;
           }
 #ifdef ENABLE_WASM_MEMORY_CONTROL
           case uint32_t(MiscOp::MemoryDiscard): {
-            if (!env.memoryControlEnabled()) {
+            if (!codeMeta.memoryControlEnabled()) {
               return iter.unrecognizedOpcode(&op);
             }
-            uint32_t unusedMemoryIndex;
-            CHECK(iter.readMemDiscard(&unusedMemoryIndex, &nothing, &nothing));
+            uint32_t memoryIndex;
+            if (!iter.readMemDiscard(&memoryIndex, &nothing, &nothing)) {
+              return false;
+            }
+            dumper.dumpMemoryIndex(memoryIndex);
+            break;
           }
 #endif
           case uint32_t(MiscOp::TableGrow): {
-            uint32_t unusedTableIndex;
-            CHECK(iter.readTableGrow(&unusedTableIndex, &nothing, &nothing));
+            uint32_t tableIndex;
+            if (!iter.readTableGrow(&tableIndex, &nothing, &nothing)) {
+              return false;
+            }
+            dumper.dumpTableIndex(tableIndex);
+            break;
           }
           case uint32_t(MiscOp::TableSize): {
-            uint32_t unusedTableIndex;
-            CHECK(iter.readTableSize(&unusedTableIndex));
+            uint32_t tableIndex;
+            if (!iter.readTableSize(&tableIndex)) {
+              return false;
+            }
+            dumper.dumpTableIndex(tableIndex);
+            break;
           }
           default:
             return iter.unrecognizedOpcode(&op);
         }
         break;
       }
-#ifdef ENABLE_WASM_GC
       case uint16_t(Op::RefAsNonNull): {
-        if (!env.gcEnabled()) {
-          return iter.unrecognizedOpcode(&op);
+        if (!iter.readRefAsNonNull(&nothing)) {
+          return false;
         }
-        CHECK(iter.readRefAsNonNull(&nothing));
+        break;
       }
       case uint16_t(Op::BrOnNull): {
-        if (!env.gcEnabled()) {
-          return iter.unrecognizedOpcode(&op);
+        uint32_t depth;
+        if (!iter.readBrOnNull(&depth, &resultType, &nothings, &nothing)) {
+          return false;
         }
-        uint32_t unusedDepth;
-        CHECK(
-            iter.readBrOnNull(&unusedDepth, &unusedType, &nothings, &nothing));
+        dumper.dumpBlockDepth(depth);
+        break;
       }
       case uint16_t(Op::BrOnNonNull): {
-        if (!env.gcEnabled()) {
-          return iter.unrecognizedOpcode(&op);
+        uint32_t depth;
+        if (!iter.readBrOnNonNull(&depth, &resultType, &nothings, &nothing)) {
+          return false;
         }
-        uint32_t unusedDepth;
-        CHECK(iter.readBrOnNonNull(&unusedDepth, &unusedType, &nothings,
-                                   &nothing));
+        dumper.dumpBlockDepth(depth);
+        break;
       }
-#endif
-#ifdef ENABLE_WASM_GC
       case uint16_t(Op::RefEq): {
-        if (!env.gcEnabled()) {
-          return iter.unrecognizedOpcode(&op);
+        if (!iter.readComparison(RefType::eq(), &nothing, &nothing)) {
+          return false;
         }
-        CHECK(iter.readComparison(RefType::eq(), &nothing, &nothing));
+        break;
       }
-#endif
       case uint16_t(Op::RefFunc): {
-        uint32_t unusedIndex;
-        CHECK(iter.readRefFunc(&unusedIndex));
+        uint32_t funcIndex;
+        if (!iter.readRefFunc(&funcIndex)) {
+          return false;
+        }
+        dumper.dumpFuncIndex(funcIndex);
+        break;
       }
       case uint16_t(Op::RefNull): {
         RefType type;
-        CHECK(iter.readRefNull(&type));
+        if (!iter.readRefNull(&type)) {
+          return false;
+        }
+        dumper.dumpHeapType(type);
+        break;
       }
       case uint16_t(Op::RefIsNull): {
         Nothing nothing;
-        CHECK(iter.readRefIsNull(&nothing));
+        if (!iter.readRefIsNull(&nothing)) {
+          return false;
+        }
+        break;
       }
-      case uint16_t(Op::Try):
-        CHECK(iter.readTry(&unusedType));
+      case uint16_t(Op::Try): {
+        if (!iter.readTry(&blockType)) {
+          return false;
+        }
+        dumper.dumpBlockType(blockType);
+        break;
+      }
       case uint16_t(Op::Catch): {
         LabelKind unusedKind;
-        uint32_t unusedIndex;
-        CHECK(iter.readCatch(&unusedKind, &unusedIndex, &unusedType,
-                             &unusedType, &nothings));
+        uint32_t tagIndex;
+        if (!iter.readCatch(&unusedKind, &tagIndex, &resultType, &resultType,
+                            &nothings)) {
+          return false;
+        }
+        dumper.dumpTagIndex(tagIndex);
+        break;
       }
       case uint16_t(Op::CatchAll): {
         LabelKind unusedKind;
-        CHECK(iter.readCatchAll(&unusedKind, &unusedType, &unusedType,
-                                &nothings));
+        if (!iter.readCatchAll(&unusedKind, &resultType, &resultType,
+                               &nothings)) {
+          return false;
+        }
+        break;
       }
       case uint16_t(Op::Delegate): {
-        uint32_t unusedDepth;
-        if (!iter.readDelegate(&unusedDepth, &unusedType, &nothings)) {
+        uint32_t depth;
+        if (!iter.readDelegate(&depth, &resultType, &nothings)) {
           return false;
         }
         iter.popDelegate();
+        dumper.dumpBlockDepth(depth);
         break;
       }
       case uint16_t(Op::Throw): {
-        uint32_t unusedIndex;
-        CHECK(iter.readThrow(&unusedIndex, &nothings));
+        uint32_t tagIndex;
+        if (!iter.readThrow(&tagIndex, &nothings)) {
+          return false;
+        }
+        dumper.dumpTagIndex(tagIndex);
+        break;
       }
       case uint16_t(Op::Rethrow): {
-        uint32_t unusedDepth;
-        CHECK(iter.readRethrow(&unusedDepth));
+        uint32_t depth;
+        if (!iter.readRethrow(&depth)) {
+          return false;
+        }
+        dumper.dumpBlockDepth(depth);
+        break;
       }
       case uint16_t(Op::ThrowRef): {
-        if (!env.exnrefEnabled()) {
+        if (!codeMeta.exnrefEnabled()) {
           return iter.unrecognizedOpcode(&op);
         }
-        CHECK(iter.readThrowRef(&nothing));
+        if (!iter.readThrowRef(&nothing)) {
+          return false;
+        }
+        break;
       }
       case uint16_t(Op::TryTable): {
-        if (!env.exnrefEnabled()) {
+        if (!codeMeta.exnrefEnabled()) {
           return iter.unrecognizedOpcode(&op);
         }
         TryTableCatchVector catches;
-        CHECK(iter.readTryTable(&unusedType, &catches));
+        if (!iter.readTryTable(&blockType, &catches)) {
+          return false;
+        }
+        dumper.dumpTryTableCatches(catches);
+        break;
       }
       case uint16_t(Op::ThreadPrefix): {
         // Though thread ops can be used on nonshared memories, we make them
         // unavailable if shared memory has been disabled in the prefs, for
         // maximum predictability and safety and consistency with JS.
-        if (env.sharedMemoryEnabled() == Shareable::False) {
+        if (codeMeta.sharedMemoryEnabled() == Shareable::False) {
           return iter.unrecognizedOpcode(&op);
         }
         switch (op.b1) {
-          case uint32_t(ThreadOp::Wake): {
+          case uint32_t(ThreadOp::Notify): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readWake(&addr, &nothing));
+            if (!iter.readNotify(&addr, &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I32Wait): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readWait(&addr, ValType::I32, 4, &nothing, &nothing));
+            if (!iter.readWait(&addr, ValType::I32, 4, &nothing, &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I64Wait): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readWait(&addr, ValType::I64, 8, &nothing, &nothing));
+            if (!iter.readWait(&addr, ValType::I64, 8, &nothing, &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::Fence): {
-            CHECK(iter.readFence());
+            if (!iter.readFence()) {
+              return false;
+            }
+            break;
           }
           case uint32_t(ThreadOp::I32AtomicLoad): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicLoad(&addr, ValType::I32, 4));
+            if (!iter.readAtomicLoad(&addr, ValType::I32, 4)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I64AtomicLoad): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicLoad(&addr, ValType::I64, 8));
+            if (!iter.readAtomicLoad(&addr, ValType::I64, 8)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I32AtomicLoad8U): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicLoad(&addr, ValType::I32, 1));
+            if (!iter.readAtomicLoad(&addr, ValType::I32, 1)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I32AtomicLoad16U): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicLoad(&addr, ValType::I32, 2));
+            if (!iter.readAtomicLoad(&addr, ValType::I32, 2)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I64AtomicLoad8U): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicLoad(&addr, ValType::I64, 1));
+            if (!iter.readAtomicLoad(&addr, ValType::I64, 1)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I64AtomicLoad16U): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicLoad(&addr, ValType::I64, 2));
+            if (!iter.readAtomicLoad(&addr, ValType::I64, 2)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I64AtomicLoad32U): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicLoad(&addr, ValType::I64, 4));
+            if (!iter.readAtomicLoad(&addr, ValType::I64, 4)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I32AtomicStore): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicStore(&addr, ValType::I32, 4, &nothing));
+            if (!iter.readAtomicStore(&addr, ValType::I32, 4, &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I64AtomicStore): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicStore(&addr, ValType::I64, 8, &nothing));
+            if (!iter.readAtomicStore(&addr, ValType::I64, 8, &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I32AtomicStore8U): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicStore(&addr, ValType::I32, 1, &nothing));
+            if (!iter.readAtomicStore(&addr, ValType::I32, 1, &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I32AtomicStore16U): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicStore(&addr, ValType::I32, 2, &nothing));
+            if (!iter.readAtomicStore(&addr, ValType::I32, 2, &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I64AtomicStore8U): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicStore(&addr, ValType::I64, 1, &nothing));
+            if (!iter.readAtomicStore(&addr, ValType::I64, 1, &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I64AtomicStore16U): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicStore(&addr, ValType::I64, 2, &nothing));
+            if (!iter.readAtomicStore(&addr, ValType::I64, 2, &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I64AtomicStore32U): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicStore(&addr, ValType::I64, 4, &nothing));
+            if (!iter.readAtomicStore(&addr, ValType::I64, 4, &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I32AtomicAdd):
           case uint32_t(ThreadOp::I32AtomicSub):
@@ -1460,7 +2242,11 @@ static bool DecodeFunctionBodyExprs(const ModuleEnvironment& env,
           case uint32_t(ThreadOp::I32AtomicXor):
           case uint32_t(ThreadOp::I32AtomicXchg): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicRMW(&addr, ValType::I32, 4, &nothing));
+            if (!iter.readAtomicRMW(&addr, ValType::I32, 4, &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I64AtomicAdd):
           case uint32_t(ThreadOp::I64AtomicSub):
@@ -1469,7 +2255,11 @@ static bool DecodeFunctionBodyExprs(const ModuleEnvironment& env,
           case uint32_t(ThreadOp::I64AtomicXor):
           case uint32_t(ThreadOp::I64AtomicXchg): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicRMW(&addr, ValType::I64, 8, &nothing));
+            if (!iter.readAtomicRMW(&addr, ValType::I64, 8, &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I32AtomicAdd8U):
           case uint32_t(ThreadOp::I32AtomicSub8U):
@@ -1478,7 +2268,11 @@ static bool DecodeFunctionBodyExprs(const ModuleEnvironment& env,
           case uint32_t(ThreadOp::I32AtomicXor8U):
           case uint32_t(ThreadOp::I32AtomicXchg8U): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicRMW(&addr, ValType::I32, 1, &nothing));
+            if (!iter.readAtomicRMW(&addr, ValType::I32, 1, &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I32AtomicAdd16U):
           case uint32_t(ThreadOp::I32AtomicSub16U):
@@ -1487,7 +2281,11 @@ static bool DecodeFunctionBodyExprs(const ModuleEnvironment& env,
           case uint32_t(ThreadOp::I32AtomicXor16U):
           case uint32_t(ThreadOp::I32AtomicXchg16U): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicRMW(&addr, ValType::I32, 2, &nothing));
+            if (!iter.readAtomicRMW(&addr, ValType::I32, 2, &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I64AtomicAdd8U):
           case uint32_t(ThreadOp::I64AtomicSub8U):
@@ -1496,7 +2294,11 @@ static bool DecodeFunctionBodyExprs(const ModuleEnvironment& env,
           case uint32_t(ThreadOp::I64AtomicXor8U):
           case uint32_t(ThreadOp::I64AtomicXchg8U): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicRMW(&addr, ValType::I64, 1, &nothing));
+            if (!iter.readAtomicRMW(&addr, ValType::I64, 1, &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I64AtomicAdd16U):
           case uint32_t(ThreadOp::I64AtomicSub16U):
@@ -1505,7 +2307,11 @@ static bool DecodeFunctionBodyExprs(const ModuleEnvironment& env,
           case uint32_t(ThreadOp::I64AtomicXor16U):
           case uint32_t(ThreadOp::I64AtomicXchg16U): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicRMW(&addr, ValType::I64, 2, &nothing));
+            if (!iter.readAtomicRMW(&addr, ValType::I64, 2, &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I64AtomicAdd32U):
           case uint32_t(ThreadOp::I64AtomicSub32U):
@@ -1514,42 +2320,74 @@ static bool DecodeFunctionBodyExprs(const ModuleEnvironment& env,
           case uint32_t(ThreadOp::I64AtomicXor32U):
           case uint32_t(ThreadOp::I64AtomicXchg32U): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicRMW(&addr, ValType::I64, 4, &nothing));
+            if (!iter.readAtomicRMW(&addr, ValType::I64, 4, &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I32AtomicCmpXchg): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicCmpXchg(&addr, ValType::I32, 4, &nothing,
-                                         &nothing));
+            if (!iter.readAtomicCmpXchg(&addr, ValType::I32, 4, &nothing,
+                                        &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I64AtomicCmpXchg): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicCmpXchg(&addr, ValType::I64, 8, &nothing,
-                                         &nothing));
+            if (!iter.readAtomicCmpXchg(&addr, ValType::I64, 8, &nothing,
+                                        &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I32AtomicCmpXchg8U): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicCmpXchg(&addr, ValType::I32, 1, &nothing,
-                                         &nothing));
+            if (!iter.readAtomicCmpXchg(&addr, ValType::I32, 1, &nothing,
+                                        &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I32AtomicCmpXchg16U): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicCmpXchg(&addr, ValType::I32, 2, &nothing,
-                                         &nothing));
+            if (!iter.readAtomicCmpXchg(&addr, ValType::I32, 2, &nothing,
+                                        &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I64AtomicCmpXchg8U): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicCmpXchg(&addr, ValType::I64, 1, &nothing,
-                                         &nothing));
+            if (!iter.readAtomicCmpXchg(&addr, ValType::I64, 1, &nothing,
+                                        &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I64AtomicCmpXchg16U): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicCmpXchg(&addr, ValType::I64, 2, &nothing,
-                                         &nothing));
+            if (!iter.readAtomicCmpXchg(&addr, ValType::I64, 2, &nothing,
+                                        &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           case uint32_t(ThreadOp::I64AtomicCmpXchg32U): {
             LinearMemoryAddress<Nothing> addr;
-            CHECK(iter.readAtomicCmpXchg(&addr, ValType::I64, 4, &nothing,
-                                         &nothing));
+            if (!iter.readAtomicCmpXchg(&addr, ValType::I64, 4, &nothing,
+                                        &nothing)) {
+              return false;
+            }
+            dumper.dumpLinearMemoryAddress(addr);
+            break;
           }
           default:
             return iter.unrecognizedOpcode(&op);
@@ -1561,25 +2399,43 @@ static bool DecodeFunctionBodyExprs(const ModuleEnvironment& env,
       default:
         return iter.unrecognizedOpcode(&op);
     }
+
+    dumper.dumpOpEnd();
   }
 
   MOZ_CRASH("unreachable");
-
-#undef CHECK
 }
 
-bool wasm::ValidateFunctionBody(const ModuleEnvironment& env,
+template bool wasm::ValidateOps<NopOpDumper>(ValidatingOpIter& iter,
+                                             NopOpDumper& dumper,
+                                             const CodeMetadata& codeMeta);
+template bool wasm::ValidateOps<OpDumper>(ValidatingOpIter& iter,
+                                          OpDumper& dumper,
+                                          const CodeMetadata& codeMeta);
+
+bool wasm::ValidateFunctionBody(const CodeMetadata& codeMeta,
                                 uint32_t funcIndex, uint32_t bodySize,
                                 Decoder& d) {
   const uint8_t* bodyBegin = d.currentPosition();
+  const uint8_t* bodyEnd = bodyBegin + bodySize;
 
   ValTypeVector locals;
-  if (!DecodeLocalEntriesWithParams(d, env, funcIndex, &locals)) {
+  if (!DecodeLocalEntriesWithParams(d, codeMeta, funcIndex, &locals)) {
     return false;
   }
 
-  return DecodeFunctionBodyExprs(env, funcIndex, locals, bodyBegin + bodySize,
-                                 &d);
+  ValidatingOpIter iter(codeMeta, d, locals);
+  NopOpDumper visitor;
+
+  if (!iter.startFunction(funcIndex)) {
+    return false;
+  }
+
+  if (!ValidateOps(iter, visitor, codeMeta)) {
+    return false;
+  }
+
+  return iter.endFunction(bodyEnd);
 }
 
 // Section macros.
@@ -1603,21 +2459,22 @@ static bool DecodePreamble(Decoder& d) {
   return true;
 }
 
-static bool DecodeValTypeVector(Decoder& d, ModuleEnvironment* env,
+static bool DecodeValTypeVector(Decoder& d, CodeMetadata* codeMeta,
                                 uint32_t count, ValTypeVector* valTypes) {
   if (!valTypes->resize(count)) {
     return false;
   }
 
   for (uint32_t i = 0; i < count; i++) {
-    if (!d.readValType(*env->types, env->features, &(*valTypes)[i])) {
+    if (!d.readValType(*codeMeta->types, codeMeta->features(),
+                       &(*valTypes)[i])) {
       return false;
     }
   }
   return true;
 }
 
-static bool DecodeFuncType(Decoder& d, ModuleEnvironment* env,
+static bool DecodeFuncType(Decoder& d, CodeMetadata* codeMeta,
                            FuncType* funcType) {
   uint32_t numArgs;
   if (!d.readVarU32(&numArgs)) {
@@ -1627,7 +2484,7 @@ static bool DecodeFuncType(Decoder& d, ModuleEnvironment* env,
     return d.fail("too many arguments in signature");
   }
   ValTypeVector args;
-  if (!DecodeValTypeVector(d, env, numArgs, &args)) {
+  if (!DecodeValTypeVector(d, codeMeta, numArgs, &args)) {
     return false;
   }
 
@@ -1639,7 +2496,7 @@ static bool DecodeFuncType(Decoder& d, ModuleEnvironment* env,
     return d.fail("too many returns in signature");
   }
   ValTypeVector results;
-  if (!DecodeValTypeVector(d, env, numResults, &results)) {
+  if (!DecodeValTypeVector(d, codeMeta, numResults, &results)) {
     return false;
   }
 
@@ -1647,12 +2504,8 @@ static bool DecodeFuncType(Decoder& d, ModuleEnvironment* env,
   return true;
 }
 
-static bool DecodeStructType(Decoder& d, ModuleEnvironment* env,
+static bool DecodeStructType(Decoder& d, CodeMetadata* codeMeta,
                              StructType* structType) {
-  if (!env->gcEnabled()) {
-    return d.fail("gc not enabled");
-  }
-
   uint32_t numFields;
   if (!d.readVarU32(&numFields)) {
     return d.fail("Bad number of fields");
@@ -1668,7 +2521,8 @@ static bool DecodeStructType(Decoder& d, ModuleEnvironment* env,
   }
 
   for (uint32_t i = 0; i < numFields; i++) {
-    if (!d.readStorageType(*env->types, env->features, &fields[i].type)) {
+    if (!d.readStorageType(*codeMeta->types, codeMeta->features(),
+                           &fields[i].type)) {
       return false;
     }
 
@@ -1691,14 +2545,11 @@ static bool DecodeStructType(Decoder& d, ModuleEnvironment* env,
   return true;
 }
 
-static bool DecodeArrayType(Decoder& d, ModuleEnvironment* env,
+static bool DecodeArrayType(Decoder& d, CodeMetadata* codeMeta,
                             ArrayType* arrayType) {
-  if (!env->gcEnabled()) {
-    return d.fail("gc not enabled");
-  }
-
   StorageType elementType;
-  if (!d.readStorageType(*env->types, env->features, &elementType)) {
+  if (!d.readStorageType(*codeMeta->types, codeMeta->features(),
+                         &elementType)) {
     return false;
   }
 
@@ -1715,9 +2566,9 @@ static bool DecodeArrayType(Decoder& d, ModuleEnvironment* env,
   return true;
 }
 
-static bool DecodeTypeSection(Decoder& d, ModuleEnvironment* env) {
-  MaybeSectionRange range;
-  if (!d.startSection(SectionId::Type, env, &range, "type")) {
+static bool DecodeTypeSection(Decoder& d, CodeMetadata* codeMeta) {
+  MaybeBytecodeRange range;
+  if (!d.startSection(SectionId::Type, codeMeta, &range, "type")) {
     return false;
   }
   if (!range) {
@@ -1739,28 +2590,32 @@ static bool DecodeTypeSection(Decoder& d, ModuleEnvironment* env) {
        recGroupIndex++) {
     uint32_t recGroupLength = 1;
 
-    // Decode an optional recursion group length, if the GC proposal is
-    // enabled.
-    if (env->gcEnabled()) {
-      uint8_t firstTypeCode;
-      if (!d.peekByte(&firstTypeCode)) {
-        return d.fail("expected type form");
-      }
+    uint8_t firstTypeCode;
+    if (!d.peekByte(&firstTypeCode)) {
+      return d.fail("expected type form");
+    }
 
-      if (firstTypeCode == (uint8_t)TypeCode::RecGroup) {
-        // Skip over the prefix byte that was peeked.
-        d.uncheckedReadFixedU8();
+    if (firstTypeCode == (uint8_t)TypeCode::RecGroup) {
+      // Skip over the prefix byte that was peeked.
+      d.uncheckedReadFixedU8();
 
-        // Read the number of types in this recursion group
-        if (!d.readVarU32(&recGroupLength)) {
-          return d.fail("expected recursion group length");
-        }
+      // Read the number of types in this recursion group
+      if (!d.readVarU32(&recGroupLength)) {
+        return d.fail("expected recursion group length");
       }
+    }
+
+    // Check if we've reached our implementation defined limit of type
+    // definitions.
+    mozilla::CheckedUint32 newNumTypes(codeMeta->types->length());
+    newNumTypes += recGroupLength;
+    if (!newNumTypes.isValid() || newNumTypes.value() > MaxTypes) {
+      return d.fail("too many types");
     }
 
     // Start a recursion group. This will extend the type context with empty
     // type definitions to be filled.
-    MutableRecGroup recGroup = env->types->startRecGroup(recGroupLength);
+    MutableRecGroup recGroup = codeMeta->types->startRecGroup(recGroupLength);
     if (!recGroup) {
       return false;
     }
@@ -1770,13 +2625,10 @@ static bool DecodeTypeSection(Decoder& d, ModuleEnvironment* env) {
     for (uint32_t recGroupTypeIndex = 0; recGroupTypeIndex < recGroupLength;
          recGroupTypeIndex++) {
       uint32_t typeIndex =
-          env->types->length() - recGroupLength + recGroupTypeIndex;
+          codeMeta->types->length() - recGroupLength + recGroupTypeIndex;
 
-      // Check if we've reached our implementation defined limit of type
-      // definitions.
-      if (typeIndex >= MaxTypes) {
-        return d.fail("too many types");
-      }
+      // This is ensured by above
+      MOZ_ASSERT(typeIndex < MaxTypes);
 
       uint8_t form;
       const TypeDef* superTypeDef = nullptr;
@@ -1784,11 +2636,9 @@ static bool DecodeTypeSection(Decoder& d, ModuleEnvironment* env) {
       // By default, all types are final unless the sub keyword is specified.
       bool finalTypeFlag = true;
 
-      // Decode an optional declared super type index, if the GC proposal is
-      // enabled.
-      if (env->gcEnabled() && d.peekByte(&form) &&
-          (form == (uint8_t)TypeCode::SubNoFinalType ||
-           form == (uint8_t)TypeCode::SubFinalType)) {
+      // Decode an optional declared super type index.
+      if (d.peekByte(&form) && (form == (uint8_t)TypeCode::SubNoFinalType ||
+                                form == (uint8_t)TypeCode::SubFinalType)) {
         if (form == (uint8_t)TypeCode::SubNoFinalType) {
           finalTypeFlag = false;
         }
@@ -1819,7 +2669,7 @@ static bool DecodeTypeSection(Decoder& d, ModuleEnvironment* env) {
             return d.fail("invalid super type index");
           }
 
-          superTypeDef = &env->types->type(superTypeDefIndex);
+          superTypeDef = &codeMeta->types->type(superTypeDefIndex);
         }
       }
 
@@ -1832,7 +2682,7 @@ static bool DecodeTypeSection(Decoder& d, ModuleEnvironment* env) {
       switch (form) {
         case uint8_t(TypeCode::Func): {
           FuncType funcType;
-          if (!DecodeFuncType(d, env, &funcType)) {
+          if (!DecodeFuncType(d, codeMeta, &funcType)) {
             return false;
           }
           *typeDef = std::move(funcType);
@@ -1840,7 +2690,7 @@ static bool DecodeTypeSection(Decoder& d, ModuleEnvironment* env) {
         }
         case uint8_t(TypeCode::Struct): {
           StructType structType;
-          if (!DecodeStructType(d, env, &structType)) {
+          if (!DecodeStructType(d, codeMeta, &structType)) {
             return false;
           }
           *typeDef = std::move(structType);
@@ -1848,7 +2698,7 @@ static bool DecodeTypeSection(Decoder& d, ModuleEnvironment* env) {
         }
         case uint8_t(TypeCode::Array): {
           ArrayType arrayType;
-          if (!DecodeArrayType(d, env, &arrayType)) {
+          if (!DecodeArrayType(d, codeMeta, &arrayType)) {
             return false;
           }
           *typeDef = std::move(arrayType);
@@ -1869,8 +2719,8 @@ static bool DecodeTypeSection(Decoder& d, ModuleEnvironment* env) {
       }
 
       if (typeDef->isFuncType()) {
-        typeDef->funcType().initImmediateTypeId(
-            env->gcEnabled(), typeDef->isFinal(), superTypeDef, recGroupLength);
+        typeDef->funcType().initImmediateTypeId(typeDef->isFinal(),
+                                                superTypeDef, recGroupLength);
       }
     }
 
@@ -1889,7 +2739,7 @@ static bool DecodeTypeSection(Decoder& d, ModuleEnvironment* env) {
     }
 
     // Finish the recursion group, which will canonicalize the types.
-    if (!env->types->endRecGroup()) {
+    if (!codeMeta->types->endRecGroup()) {
       return false;
     }
   }
@@ -1945,12 +2795,13 @@ static bool DecodeFuncTypeIndex(Decoder& d, const SharedTypeContext& types,
   return true;
 }
 
-static bool DecodeLimitBound(Decoder& d, IndexType indexType, uint64_t* bound) {
-  if (indexType == IndexType::I64) {
+static bool DecodeLimitBound(Decoder& d, AddressType addressType,
+                             uint64_t* bound) {
+  if (addressType == AddressType::I64) {
     return d.readVarU64(bound);
   }
 
-  // Spec tests assert that we only decode a LEB32 when index type is I32.
+  // Spec tests assert that we only decode a LEB32 when address type is I32.
   uint32_t bound32;
   if (!d.readVarU32(&bound32)) {
     return false;
@@ -1973,7 +2824,7 @@ static bool DecodeLimits(Decoder& d, LimitsKind kind, Limits* limits) {
                    uint32_t(flags & ~uint8_t(mask)));
   }
 
-  // Memory limits may be shared or specify an alternate index type
+  // Memory limits may be shared
   if (kind == LimitsKind::Memory) {
     if ((flags & uint8_t(LimitsFlags::IsShared)) &&
         !(flags & uint8_t(LimitsFlags::HasMaximum))) {
@@ -1983,38 +2834,39 @@ static bool DecodeLimits(Decoder& d, LimitsKind kind, Limits* limits) {
     limits->shared = (flags & uint8_t(LimitsFlags::IsShared))
                          ? Shareable::True
                          : Shareable::False;
-
-#ifdef ENABLE_WASM_MEMORY64
-    limits->indexType =
-        (flags & uint8_t(LimitsFlags::IsI64)) ? IndexType::I64 : IndexType::I32;
-#else
-    limits->indexType = IndexType::I32;
-    if (flags & uint8_t(LimitsFlags::IsI64)) {
-      return d.fail("i64 is not supported for memory limits");
-    }
-#endif
   } else {
     limits->shared = Shareable::False;
-    limits->indexType = IndexType::I32;
   }
 
+#ifdef ENABLE_WASM_MEMORY64
+  limits->addressType = (flags & uint8_t(LimitsFlags::IsI64))
+                            ? AddressType::I64
+                            : AddressType::I32;
+#else
+  limits->addressType = AddressType::I32;
+  if (flags & uint8_t(LimitsFlags::IsI64)) {
+    return d.fail("i64 is not supported for memory or table limits");
+  }
+#endif
+
   uint64_t initial;
-  if (!DecodeLimitBound(d, limits->indexType, &initial)) {
+  if (!DecodeLimitBound(d, limits->addressType, &initial)) {
     return d.fail("expected initial length");
   }
   limits->initial = initial;
 
   if (flags & uint8_t(LimitsFlags::HasMaximum)) {
     uint64_t maximum;
-    if (!DecodeLimitBound(d, limits->indexType, &maximum)) {
+    if (!DecodeLimitBound(d, limits->addressType, &maximum)) {
       return d.fail("expected maximum length");
     }
 
     if (limits->initial > maximum) {
       return d.failf(
-          "memory size minimum must not be greater than maximum; "
+          "%s size minimum must not be greater than maximum; "
           "maximum length %" PRIu64 " is less than initial length %" PRIu64,
-          maximum, limits->initial);
+          kind == LimitsKind::Memory ? "memory" : "table", maximum,
+          limits->initial);
     }
 
     limits->maximum.emplace(maximum);
@@ -2023,13 +2875,24 @@ static bool DecodeLimits(Decoder& d, LimitsKind kind, Limits* limits) {
   return true;
 }
 
-static bool DecodeTableTypeAndLimits(Decoder& d, ModuleEnvironment* env) {
+// Combined decoding for both table types and the augmented form of table types
+// that can include init expressions:
+//
+// https://wasm-dsl.github.io/spectec/core/binary/types.html#table-types
+// https://wasm-dsl.github.io/spectec/core/binary/modules.html#table-section
+//
+// Only defined tables are therefore allowed to have init expressions, not
+// imported tables.
+static bool DecodeTableType(Decoder& d, CodeMetadata* codeMeta, bool isImport) {
   bool initExprPresent = false;
   uint8_t typeCode;
   if (!d.peekByte(&typeCode)) {
     return d.fail("expected type code");
   }
   if (typeCode == (uint8_t)TypeCode::TableHasInitExpr) {
+    if (isImport) {
+      return d.fail("imported tables cannot have initializer expressions");
+    }
     d.uncheckedReadFixedU8();
     uint8_t flags;
     if (!d.readFixedU8(&flags) || flags != 0) {
@@ -2039,7 +2902,7 @@ static bool DecodeTableTypeAndLimits(Decoder& d, ModuleEnvironment* env) {
   }
 
   RefType tableElemType;
-  if (!d.readRefType(*env->types, env->features, &tableElemType)) {
+  if (!d.readRefType(*codeMeta->types, codeMeta->features(), &tableElemType)) {
     return false;
   }
 
@@ -2048,45 +2911,41 @@ static bool DecodeTableTypeAndLimits(Decoder& d, ModuleEnvironment* env) {
     return false;
   }
 
-  // Decoding limits for a table only supports i32
-  MOZ_ASSERT(limits.indexType == IndexType::I32);
+  if (limits.addressType == AddressType::I64 && !codeMeta->memory64Enabled()) {
+    return d.fail("memory64 is disabled");
+  }
 
   // If there's a maximum, check it is in range.  The check to exclude
   // initial > maximum is carried out by the DecodeLimits call above, so
   // we don't repeat it here.
-  if (limits.initial > MaxTableLimitField ||
+  if (limits.initial > MaxTableElemsValidation(limits.addressType) ||
       ((limits.maximum.isSome() &&
-        limits.maximum.value() > MaxTableLimitField))) {
+        limits.maximum.value() >
+            MaxTableElemsValidation(limits.addressType)))) {
     return d.fail("too many table elements");
   }
 
-  if (env->tables.length() >= MaxTables) {
+  if (codeMeta->tables.length() >= MaxTables) {
     return d.fail("too many tables");
-  }
-
-  // The rest of the runtime expects table limits to be within a 32-bit range.
-  static_assert(MaxTableLimitField <= UINT32_MAX, "invariant");
-  uint32_t initialLength = uint32_t(limits.initial);
-  Maybe<uint32_t> maximumLength;
-  if (limits.maximum) {
-    maximumLength = Some(uint32_t(*limits.maximum));
   }
 
   Maybe<InitExpr> initExpr;
   if (initExprPresent) {
     InitExpr initializer;
-    if (!InitExpr::decodeAndValidate(d, env, tableElemType, &initializer)) {
+    if (!InitExpr::decodeAndValidate(d, codeMeta, tableElemType,
+                                     &initializer)) {
       return false;
     }
     initExpr = Some(std::move(initializer));
   } else {
-    if (!tableElemType.isNullable()) {
+    if (!tableElemType.isNullable() && !isImport) {
       return d.fail("table with non-nullable references requires initializer");
     }
   }
 
-  return env->tables.emplaceBack(tableElemType, initialLength, maximumLength,
-                                 std::move(initExpr), /* isAsmJS */ false);
+  return codeMeta->tables.emplaceBack(limits, tableElemType,
+                                      std::move(initExpr),
+                                      /* isAsmJS */ false, isImport);
 }
 
 static bool DecodeGlobalType(Decoder& d, const SharedTypeContext& types,
@@ -2109,13 +2968,13 @@ static bool DecodeGlobalType(Decoder& d, const SharedTypeContext& types,
   return true;
 }
 
-static bool DecodeMemoryTypeAndLimits(Decoder& d, ModuleEnvironment* env,
+static bool DecodeMemoryTypeAndLimits(Decoder& d, CodeMetadata* codeMeta,
                                       MemoryDescVector* memories) {
-  if (!env->features.multiMemory && env->numMemories() == 1) {
+  if (!codeMeta->features().multiMemory && codeMeta->numMemories() == 1) {
     return d.fail("already have default memory");
   }
 
-  if (env->numMemories() >= MaxMemories) {
+  if (codeMeta->numMemories() >= MaxMemories) {
     return d.fail("too many memories");
   }
 
@@ -2124,7 +2983,7 @@ static bool DecodeMemoryTypeAndLimits(Decoder& d, ModuleEnvironment* env,
     return false;
   }
 
-  uint64_t maxField = MaxMemoryLimitField(limits.indexType);
+  uint64_t maxField = MaxMemoryPagesValidation(limits.addressType);
 
   if (limits.initial > maxField) {
     return d.fail("initial memory size too big");
@@ -2135,18 +2994,18 @@ static bool DecodeMemoryTypeAndLimits(Decoder& d, ModuleEnvironment* env,
   }
 
   if (limits.shared == Shareable::True &&
-      env->sharedMemoryEnabled() == Shareable::False) {
+      codeMeta->sharedMemoryEnabled() == Shareable::False) {
     return d.fail("shared memory is disabled");
   }
 
-  if (limits.indexType == IndexType::I64 && !env->memory64Enabled()) {
+  if (limits.addressType == AddressType::I64 && !codeMeta->memory64Enabled()) {
     return d.fail("memory64 is disabled");
   }
 
   return memories->emplaceBack(MemoryDesc(limits));
 }
 
-static bool DecodeTag(Decoder& d, ModuleEnvironment* env, TagKind* tagKind,
+static bool DecodeTag(Decoder& d, CodeMetadata* codeMeta, TagKind* tagKind,
                       uint32_t* funcTypeIndex) {
   uint32_t tagCode;
   if (!d.readVarU32(&tagCode)) {
@@ -2161,19 +3020,20 @@ static bool DecodeTag(Decoder& d, ModuleEnvironment* env, TagKind* tagKind,
   if (!d.readVarU32(funcTypeIndex)) {
     return d.fail("expected function index in tag");
   }
-  if (*funcTypeIndex >= env->numTypes()) {
+  if (*funcTypeIndex >= codeMeta->numTypes()) {
     return d.fail("function type index in tag out of bounds");
   }
-  if (!(*env->types)[*funcTypeIndex].isFuncType()) {
+  if (!(*codeMeta->types)[*funcTypeIndex].isFuncType()) {
     return d.fail("function type index must index a function type");
   }
-  if ((*env->types)[*funcTypeIndex].funcType().results().length() != 0) {
+  if ((*codeMeta->types)[*funcTypeIndex].funcType().results().length() != 0) {
     return d.fail("tag function types must not return anything");
   }
   return true;
 }
 
-static bool DecodeImport(Decoder& d, ModuleEnvironment* env) {
+static bool DecodeImport(Decoder& d, CodeMetadata* codeMeta,
+                         ModuleMetadata* moduleMeta) {
   CacheableName moduleName;
   if (!DecodeName(d, &moduleName)) {
     return d.fail("expected valid import module name");
@@ -2194,27 +3054,25 @@ static bool DecodeImport(Decoder& d, ModuleEnvironment* env) {
   switch (importKind) {
     case DefinitionKind::Function: {
       uint32_t funcTypeIndex;
-      if (!DecodeFuncTypeIndex(d, env->types, &funcTypeIndex)) {
+      if (!DecodeFuncTypeIndex(d, codeMeta->types, &funcTypeIndex)) {
         return false;
       }
-      if (!env->funcs.append(FuncDesc(
-              &env->types->type(funcTypeIndex).funcType(), funcTypeIndex))) {
+      if (!codeMeta->funcs.append(FuncDesc(funcTypeIndex))) {
         return false;
       }
-      if (env->funcs.length() > MaxFuncs) {
+      if (codeMeta->funcs.length() > MaxFuncs) {
         return d.fail("too many functions");
       }
       break;
     }
     case DefinitionKind::Table: {
-      if (!DecodeTableTypeAndLimits(d, env)) {
+      if (!DecodeTableType(d, codeMeta, /*isImport=*/true)) {
         return false;
       }
-      env->tables.back().isImported = true;
       break;
     }
     case DefinitionKind::Memory: {
-      if (!DecodeMemoryTypeAndLimits(d, env, &env->memories)) {
+      if (!DecodeMemoryTypeAndLimits(d, codeMeta, &codeMeta->memories)) {
         return false;
       }
       break;
@@ -2222,14 +3080,15 @@ static bool DecodeImport(Decoder& d, ModuleEnvironment* env) {
     case DefinitionKind::Global: {
       ValType type;
       bool isMutable;
-      if (!DecodeGlobalType(d, env->types, env->features, &type, &isMutable)) {
+      if (!DecodeGlobalType(d, codeMeta->types, codeMeta->features(), &type,
+                            &isMutable)) {
         return false;
       }
-      if (!env->globals.append(
-              GlobalDesc(type, isMutable, env->globals.length()))) {
+      if (!codeMeta->globals.append(
+              GlobalDesc(type, isMutable, codeMeta->globals.length()))) {
         return false;
       }
-      if (env->globals.length() > MaxGlobals) {
+      if (codeMeta->globals.length() > MaxGlobals) {
         return d.fail("too many globals");
       }
       break;
@@ -2237,21 +3096,18 @@ static bool DecodeImport(Decoder& d, ModuleEnvironment* env) {
     case DefinitionKind::Tag: {
       TagKind tagKind;
       uint32_t funcTypeIndex;
-      if (!DecodeTag(d, env, &tagKind, &funcTypeIndex)) {
-        return false;
-      }
-      ValTypeVector args;
-      if (!args.appendAll((*env->types)[funcTypeIndex].funcType().args())) {
+      if (!DecodeTag(d, codeMeta, &tagKind, &funcTypeIndex)) {
         return false;
       }
       MutableTagType tagType = js_new<TagType>();
-      if (!tagType || !tagType->initialize(std::move(args))) {
+      if (!tagType ||
+          !tagType->initialize(&(*codeMeta->types)[funcTypeIndex])) {
         return false;
       }
-      if (!env->tags.emplaceBack(tagKind, tagType)) {
+      if (!codeMeta->tags.emplaceBack(tagKind, tagType)) {
         return false;
       }
-      if (env->tags.length() > MaxTags) {
+      if (codeMeta->tags.length() > MaxTags) {
         return d.fail("too many tags");
       }
       break;
@@ -2260,13 +3116,14 @@ static bool DecodeImport(Decoder& d, ModuleEnvironment* env) {
       return d.fail("unsupported import kind");
   }
 
-  return env->imports.emplaceBack(std::move(moduleName), std::move(fieldName),
-                                  importKind);
+  return moduleMeta->imports.emplaceBack(std::move(moduleName),
+                                         std::move(fieldName), importKind);
 }
 
 static bool CheckImportsAgainstBuiltinModules(Decoder& d,
-                                              ModuleEnvironment* env) {
-  const BuiltinModuleIds& builtinModules = env->features.builtinModules;
+                                              CodeMetadata* codeMeta,
+                                              ModuleMetadata* moduleMeta) {
+  const BuiltinModuleIds& builtinModules = codeMeta->features().builtinModules;
 
   // Skip this pass if there are no builtin modules enabled
   if (builtinModules.hasNone()) {
@@ -2274,13 +3131,15 @@ static bool CheckImportsAgainstBuiltinModules(Decoder& d,
   }
 
   uint32_t importFuncIndex = 0;
-  for (auto& import : env->imports) {
+  uint32_t importGlobalIndex = 0;
+  for (auto& import : moduleMeta->imports) {
     Maybe<BuiltinModuleId> builtinModule =
         ImportMatchesBuiltinModule(import.module.utf8Bytes(), builtinModules);
 
     switch (import.kind) {
       case DefinitionKind::Function: {
-        const FuncDesc& func = env->funcs[importFuncIndex];
+        const FuncDesc& func = codeMeta->funcs[importFuncIndex];
+        uint32_t funcIndex = importFuncIndex;
         importFuncIndex += 1;
 
         // Skip this import if it doesn't refer to a builtin module. We do have
@@ -2290,17 +3149,45 @@ static bool CheckImportsAgainstBuiltinModules(Decoder& d,
         }
 
         // Check if this import refers to a builtin module function
-        Maybe<const BuiltinModuleFunc*> builtinFunc =
-            ImportMatchesBuiltinModuleFunc(import.field.utf8Bytes(),
-                                           *builtinModule);
-        if (!builtinFunc) {
+        const BuiltinModuleFunc* builtinFunc = nullptr;
+        BuiltinModuleFuncId builtinFuncId;
+        if (!ImportMatchesBuiltinModuleFunc(import.field.utf8Bytes(),
+                                            *builtinModule, &builtinFunc,
+                                            &builtinFuncId)) {
           return d.fail("unrecognized builtin module field");
         }
 
-        const TypeDef& importTypeDef = (*env->types)[func.typeIndex];
-        if (!TypeDef::isSubTypeOf((*builtinFunc)->typeDef(), &importTypeDef)) {
-          return d.failf("type mismatch in %s", (*builtinFunc)->exportName());
+        const TypeDef& importTypeDef = (*codeMeta->types)[func.typeIndex];
+        if (!TypeDef::isSubTypeOf(builtinFunc->typeDef(), &importTypeDef)) {
+          return d.failf("type mismatch in %s", builtinFunc->exportName());
         }
+
+        codeMeta->knownFuncImports[funcIndex] = builtinFuncId;
+        break;
+      }
+      case DefinitionKind::Global: {
+        const GlobalDesc& global = codeMeta->globals[importGlobalIndex];
+        importGlobalIndex += 1;
+
+        // Skip this import if it doesn't refer to a builtin module. We do have
+        // to increment the import global index regardless though.
+        if (!builtinModule) {
+          continue;
+        }
+
+        // Only the imported string constants module has globals defined.
+        if (*builtinModule != BuiltinModuleId::JSStringConstants) {
+          return d.fail("unrecognized builtin module field");
+        }
+
+        // All imported globals must match a provided global type of
+        // `(global (ref extern))`.
+        if (global.isMutable() ||
+            !ValType::isSubTypeOf(ValType(RefType::extern_().asNonNullable()),
+                                  global.type())) {
+          return d.failf("type mismatch");
+        }
+
         break;
       }
       default: {
@@ -2315,9 +3202,10 @@ static bool CheckImportsAgainstBuiltinModules(Decoder& d,
   return true;
 }
 
-static bool DecodeImportSection(Decoder& d, ModuleEnvironment* env) {
-  MaybeSectionRange range;
-  if (!d.startSection(SectionId::Import, env, &range, "import")) {
+static bool DecodeImportSection(Decoder& d, CodeMetadata* codeMeta,
+                                ModuleMetadata* moduleMeta) {
+  MaybeBytecodeRange range;
+  if (!d.startSection(SectionId::Import, codeMeta, &range, "import")) {
     return false;
   }
   if (!range) {
@@ -2334,7 +3222,7 @@ static bool DecodeImportSection(Decoder& d, ModuleEnvironment* env) {
   }
 
   for (uint32_t i = 0; i < numImports; i++) {
-    if (!DecodeImport(d, env)) {
+    if (!DecodeImport(d, codeMeta, moduleMeta)) {
       return false;
     }
   }
@@ -2343,14 +3231,17 @@ static bool DecodeImportSection(Decoder& d, ModuleEnvironment* env) {
     return false;
   }
 
-  env->numFuncImports = env->funcs.length();
-  env->numGlobalImports = env->globals.length();
+  codeMeta->numFuncImports = codeMeta->funcs.length();
+  if (!codeMeta->knownFuncImports.resize(codeMeta->numFuncImports)) {
+    return false;
+  }
+  codeMeta->numGlobalImports = codeMeta->globals.length();
   return true;
 }
 
-static bool DecodeFunctionSection(Decoder& d, ModuleEnvironment* env) {
-  MaybeSectionRange range;
-  if (!d.startSection(SectionId::Function, env, &range, "function")) {
+static bool DecodeFunctionSection(Decoder& d, CodeMetadata* codeMeta) {
+  MaybeBytecodeRange range;
+  if (!d.startSection(SectionId::Function, codeMeta, &range, "function")) {
     return false;
   }
   if (!range) {
@@ -2362,31 +3253,30 @@ static bool DecodeFunctionSection(Decoder& d, ModuleEnvironment* env) {
     return d.fail("expected number of function definitions");
   }
 
-  CheckedInt<uint32_t> numFuncs = env->funcs.length();
+  CheckedInt<uint32_t> numFuncs = codeMeta->funcs.length();
   numFuncs += numDefs;
   if (!numFuncs.isValid() || numFuncs.value() > MaxFuncs) {
     return d.fail("too many functions");
   }
 
-  if (!env->funcs.reserve(numFuncs.value())) {
+  if (!codeMeta->funcs.reserve(numFuncs.value())) {
     return false;
   }
 
   for (uint32_t i = 0; i < numDefs; i++) {
     uint32_t funcTypeIndex;
-    if (!DecodeFuncTypeIndex(d, env->types, &funcTypeIndex)) {
+    if (!DecodeFuncTypeIndex(d, codeMeta->types, &funcTypeIndex)) {
       return false;
     }
-    env->funcs.infallibleAppend(
-        FuncDesc(&env->types->type(funcTypeIndex).funcType(), funcTypeIndex));
+    codeMeta->funcs.infallibleAppend(funcTypeIndex);
   }
 
   return d.finishSection(*range, "function");
 }
 
-static bool DecodeTableSection(Decoder& d, ModuleEnvironment* env) {
-  MaybeSectionRange range;
-  if (!d.startSection(SectionId::Table, env, &range, "table")) {
+static bool DecodeTableSection(Decoder& d, CodeMetadata* codeMeta) {
+  MaybeBytecodeRange range;
+  if (!d.startSection(SectionId::Table, codeMeta, &range, "table")) {
     return false;
   }
   if (!range) {
@@ -2399,7 +3289,7 @@ static bool DecodeTableSection(Decoder& d, ModuleEnvironment* env) {
   }
 
   for (uint32_t i = 0; i < numTables; ++i) {
-    if (!DecodeTableTypeAndLimits(d, env)) {
+    if (!DecodeTableType(d, codeMeta, /*isImport=*/false)) {
       return false;
     }
   }
@@ -2407,9 +3297,9 @@ static bool DecodeTableSection(Decoder& d, ModuleEnvironment* env) {
   return d.finishSection(*range, "table");
 }
 
-static bool DecodeMemorySection(Decoder& d, ModuleEnvironment* env) {
-  MaybeSectionRange range;
-  if (!d.startSection(SectionId::Memory, env, &range, "memory")) {
+static bool DecodeMemorySection(Decoder& d, CodeMetadata* codeMeta) {
+  MaybeBytecodeRange range;
+  if (!d.startSection(SectionId::Memory, codeMeta, &range, "memory")) {
     return false;
   }
   if (!range) {
@@ -2421,12 +3311,12 @@ static bool DecodeMemorySection(Decoder& d, ModuleEnvironment* env) {
     return d.fail("failed to read number of memories");
   }
 
-  if (!env->features.multiMemory && numMemories > 1) {
+  if (!codeMeta->features().multiMemory && numMemories > 1) {
     return d.fail("the number of memories must be at most one");
   }
 
   for (uint32_t i = 0; i < numMemories; ++i) {
-    if (!DecodeMemoryTypeAndLimits(d, env, &env->memories)) {
+    if (!DecodeMemoryTypeAndLimits(d, codeMeta, &codeMeta->memories)) {
       return false;
     }
   }
@@ -2434,9 +3324,9 @@ static bool DecodeMemorySection(Decoder& d, ModuleEnvironment* env) {
   return d.finishSection(*range, "memory");
 }
 
-static bool DecodeGlobalSection(Decoder& d, ModuleEnvironment* env) {
-  MaybeSectionRange range;
-  if (!d.startSection(SectionId::Global, env, &range, "global")) {
+static bool DecodeGlobalSection(Decoder& d, CodeMetadata* codeMeta) {
+  MaybeBytecodeRange range;
+  if (!d.startSection(SectionId::Global, codeMeta, &range, "global")) {
     return false;
   }
   if (!range) {
@@ -2448,38 +3338,39 @@ static bool DecodeGlobalSection(Decoder& d, ModuleEnvironment* env) {
     return d.fail("expected number of globals");
   }
 
-  CheckedInt<uint32_t> numGlobals = env->globals.length();
+  CheckedInt<uint32_t> numGlobals = codeMeta->globals.length();
   numGlobals += numDefs;
   if (!numGlobals.isValid() || numGlobals.value() > MaxGlobals) {
     return d.fail("too many globals");
   }
 
-  if (!env->globals.reserve(numGlobals.value())) {
+  if (!codeMeta->globals.reserve(numGlobals.value())) {
     return false;
   }
 
   for (uint32_t i = 0; i < numDefs; i++) {
     ValType type;
     bool isMutable;
-    if (!DecodeGlobalType(d, env->types, env->features, &type, &isMutable)) {
+    if (!DecodeGlobalType(d, codeMeta->types, codeMeta->features(), &type,
+                          &isMutable)) {
       return false;
     }
 
     InitExpr initializer;
-    if (!InitExpr::decodeAndValidate(d, env, type, &initializer)) {
+    if (!InitExpr::decodeAndValidate(d, codeMeta, type, &initializer)) {
       return false;
     }
 
-    env->globals.infallibleAppend(
+    codeMeta->globals.infallibleAppend(
         GlobalDesc(std::move(initializer), isMutable));
   }
 
   return d.finishSection(*range, "global");
 }
 
-static bool DecodeTagSection(Decoder& d, ModuleEnvironment* env) {
-  MaybeSectionRange range;
-  if (!d.startSection(SectionId::Tag, env, &range, "tag")) {
+static bool DecodeTagSection(Decoder& d, CodeMetadata* codeMeta) {
+  MaybeBytecodeRange range;
+  if (!d.startSection(SectionId::Tag, codeMeta, &range, "tag")) {
     return false;
   }
   if (!range) {
@@ -2491,31 +3382,27 @@ static bool DecodeTagSection(Decoder& d, ModuleEnvironment* env) {
     return d.fail("expected number of tags");
   }
 
-  CheckedInt<uint32_t> numTags = env->tags.length();
+  CheckedInt<uint32_t> numTags = codeMeta->tags.length();
   numTags += numDefs;
   if (!numTags.isValid() || numTags.value() > MaxTags) {
     return d.fail("too many tags");
   }
 
-  if (!env->tags.reserve(numTags.value())) {
+  if (!codeMeta->tags.reserve(numTags.value())) {
     return false;
   }
 
   for (uint32_t i = 0; i < numDefs; i++) {
     TagKind tagKind;
     uint32_t funcTypeIndex;
-    if (!DecodeTag(d, env, &tagKind, &funcTypeIndex)) {
-      return false;
-    }
-    ValTypeVector args;
-    if (!args.appendAll((*env->types)[funcTypeIndex].funcType().args())) {
+    if (!DecodeTag(d, codeMeta, &tagKind, &funcTypeIndex)) {
       return false;
     }
     MutableTagType tagType = js_new<TagType>();
-    if (!tagType || !tagType->initialize(std::move(args))) {
+    if (!tagType || !tagType->initialize(&(*codeMeta->types)[funcTypeIndex])) {
       return false;
     }
-    env->tags.infallibleEmplaceBack(tagKind, tagType);
+    codeMeta->tags.infallibleEmplaceBack(tagKind, tagType);
   }
 
   return d.finishSection(*range, "tag");
@@ -2539,7 +3426,8 @@ using NameSet = HashSet<Span<char>, NameHasher, SystemAllocPolicy>;
   return dupSet->add(p, exportName->utf8Bytes());
 }
 
-static bool DecodeExport(Decoder& d, ModuleEnvironment* env, NameSet* dupSet) {
+static bool DecodeExport(Decoder& d, CodeMetadata* codeMeta,
+                         ModuleMetadata* moduleMeta, NameSet* dupSet) {
   CacheableName fieldName;
   if (!DecodeExportName(d, dupSet, &fieldName)) {
     return false;
@@ -2557,14 +3445,14 @@ static bool DecodeExport(Decoder& d, ModuleEnvironment* env, NameSet* dupSet) {
         return d.fail("expected function index");
       }
 
-      if (funcIndex >= env->numFuncs()) {
+      if (funcIndex >= codeMeta->numFuncs()) {
         return d.fail("exported function index out of bounds");
       }
 
-      env->declareFuncExported(funcIndex, /* eager */ true,
-                               /* canRefFunc */ true);
-      return env->exports.emplaceBack(std::move(fieldName), funcIndex,
-                                      DefinitionKind::Function);
+      codeMeta->funcs[funcIndex].declareFuncExported(/* eager */ true,
+                                                     /* canRefFunc */ true);
+      return moduleMeta->exports.emplaceBack(std::move(fieldName), funcIndex,
+                                             DefinitionKind::Function);
     }
     case DefinitionKind::Table: {
       uint32_t tableIndex;
@@ -2572,12 +3460,12 @@ static bool DecodeExport(Decoder& d, ModuleEnvironment* env, NameSet* dupSet) {
         return d.fail("expected table index");
       }
 
-      if (tableIndex >= env->tables.length()) {
+      if (tableIndex >= codeMeta->tables.length()) {
         return d.fail("exported table index out of bounds");
       }
-      env->tables[tableIndex].isExported = true;
-      return env->exports.emplaceBack(std::move(fieldName), tableIndex,
-                                      DefinitionKind::Table);
+      codeMeta->tables[tableIndex].isExported = true;
+      return moduleMeta->exports.emplaceBack(std::move(fieldName), tableIndex,
+                                             DefinitionKind::Table);
     }
     case DefinitionKind::Memory: {
       uint32_t memoryIndex;
@@ -2585,12 +3473,12 @@ static bool DecodeExport(Decoder& d, ModuleEnvironment* env, NameSet* dupSet) {
         return d.fail("expected memory index");
       }
 
-      if (memoryIndex >= env->numMemories()) {
+      if (memoryIndex >= codeMeta->numMemories()) {
         return d.fail("exported memory index out of bounds");
       }
 
-      return env->exports.emplaceBack(std::move(fieldName), memoryIndex,
-                                      DefinitionKind::Memory);
+      return moduleMeta->exports.emplaceBack(std::move(fieldName), memoryIndex,
+                                             DefinitionKind::Memory);
     }
     case DefinitionKind::Global: {
       uint32_t globalIndex;
@@ -2598,28 +3486,28 @@ static bool DecodeExport(Decoder& d, ModuleEnvironment* env, NameSet* dupSet) {
         return d.fail("expected global index");
       }
 
-      if (globalIndex >= env->globals.length()) {
+      if (globalIndex >= codeMeta->globals.length()) {
         return d.fail("exported global index out of bounds");
       }
 
-      GlobalDesc* global = &env->globals[globalIndex];
+      GlobalDesc* global = &codeMeta->globals[globalIndex];
       global->setIsExport();
 
-      return env->exports.emplaceBack(std::move(fieldName), globalIndex,
-                                      DefinitionKind::Global);
+      return moduleMeta->exports.emplaceBack(std::move(fieldName), globalIndex,
+                                             DefinitionKind::Global);
     }
     case DefinitionKind::Tag: {
       uint32_t tagIndex;
       if (!d.readVarU32(&tagIndex)) {
         return d.fail("expected tag index");
       }
-      if (tagIndex >= env->tags.length()) {
+      if (tagIndex >= codeMeta->tags.length()) {
         return d.fail("exported tag index out of bounds");
       }
 
-      env->tags[tagIndex].isExport = true;
-      return env->exports.emplaceBack(std::move(fieldName), tagIndex,
-                                      DefinitionKind::Tag);
+      codeMeta->tags[tagIndex].isExport = true;
+      return moduleMeta->exports.emplaceBack(std::move(fieldName), tagIndex,
+                                             DefinitionKind::Tag);
     }
     default:
       return d.fail("unexpected export kind");
@@ -2628,9 +3516,10 @@ static bool DecodeExport(Decoder& d, ModuleEnvironment* env, NameSet* dupSet) {
   MOZ_CRASH("unreachable");
 }
 
-static bool DecodeExportSection(Decoder& d, ModuleEnvironment* env) {
-  MaybeSectionRange range;
-  if (!d.startSection(SectionId::Export, env, &range, "export")) {
+static bool DecodeExportSection(Decoder& d, CodeMetadata* codeMeta,
+                                ModuleMetadata* moduleMeta) {
+  MaybeBytecodeRange range;
+  if (!d.startSection(SectionId::Export, codeMeta, &range, "export")) {
     return false;
   }
   if (!range) {
@@ -2649,7 +3538,7 @@ static bool DecodeExportSection(Decoder& d, ModuleEnvironment* env) {
   }
 
   for (uint32_t i = 0; i < numExports; i++) {
-    if (!DecodeExport(d, env, &dupSet)) {
+    if (!DecodeExport(d, codeMeta, moduleMeta, &dupSet)) {
       return false;
     }
   }
@@ -2657,9 +3546,10 @@ static bool DecodeExportSection(Decoder& d, ModuleEnvironment* env) {
   return d.finishSection(*range, "export");
 }
 
-static bool DecodeStartSection(Decoder& d, ModuleEnvironment* env) {
-  MaybeSectionRange range;
-  if (!d.startSection(SectionId::Start, env, &range, "start")) {
+static bool DecodeStartSection(Decoder& d, CodeMetadata* codeMeta,
+                               ModuleMetadata* moduleMeta) {
+  MaybeBytecodeRange range;
+  if (!d.startSection(SectionId::Start, codeMeta, &range, "start")) {
     return false;
   }
   if (!range) {
@@ -2671,11 +3561,11 @@ static bool DecodeStartSection(Decoder& d, ModuleEnvironment* env) {
     return d.fail("failed to read start func index");
   }
 
-  if (funcIndex >= env->numFuncs()) {
+  if (funcIndex >= codeMeta->numFuncs()) {
     return d.fail("unknown start function");
   }
 
-  const FuncType& funcType = *env->funcs[funcIndex].type;
+  const FuncType& funcType = codeMeta->getFuncType(funcIndex);
   if (funcType.results().length() > 0) {
     return d.fail("start function must not return anything");
   }
@@ -2684,8 +3574,9 @@ static bool DecodeStartSection(Decoder& d, ModuleEnvironment* env) {
     return d.fail("start function must be nullary");
   }
 
-  env->declareFuncExported(funcIndex, /* eager */ true, /* canFuncRef */ false);
-  env->startFuncIndex = Some(funcIndex);
+  codeMeta->funcs[funcIndex].declareFuncExported(/* eager */ true,
+                                                 /* canFuncRef */ false);
+  codeMeta->startFuncIndex = Some(funcIndex);
 
   return d.finishSection(*range, "start");
 }
@@ -2707,7 +3598,8 @@ static inline ModuleElemSegment::Kind NormalizeElemSegmentKind(
   MOZ_CRASH("unexpected elem segment kind");
 }
 
-static bool DecodeElemSegment(Decoder& d, ModuleEnvironment* env) {
+static bool DecodeElemSegment(Decoder& d, CodeMetadata* codeMeta,
+                              ModuleMetadata* moduleMeta) {
   uint32_t segmentFlags;
   if (!d.readVarU32(&segmentFlags)) {
     return d.fail("expected elem segment flags field");
@@ -2725,7 +3617,7 @@ static bool DecodeElemSegment(Decoder& d, ModuleEnvironment* env) {
 
   if (segmentKind == ElemSegmentKind::Active ||
       segmentKind == ElemSegmentKind::ActiveWithTableIndex) {
-    if (env->tables.length() == 0) {
+    if (codeMeta->tables.length() == 0) {
       return d.fail("active elem segment requires a table");
     }
 
@@ -2734,13 +3626,15 @@ static bool DecodeElemSegment(Decoder& d, ModuleEnvironment* env) {
         !d.readVarU32(&tableIndex)) {
       return d.fail("expected table index");
     }
-    if (tableIndex >= env->tables.length()) {
+    if (tableIndex >= codeMeta->tables.length()) {
       return d.fail("table index out of range for element segment");
     }
     seg.tableIndex = tableIndex;
 
     InitExpr offset;
-    if (!InitExpr::decodeAndValidate(d, env, ValType::I32, &offset)) {
+    if (!InitExpr::decodeAndValidate(
+            d, codeMeta, ToValType(codeMeta->tables[tableIndex].addressType()),
+            &offset)) {
       return false;
     }
     seg.offsetIfActive.emplace(std::move(offset));
@@ -2760,11 +3654,15 @@ static bool DecodeElemSegment(Decoder& d, ModuleEnvironment* env) {
   // the type or definition kind of the payload. `Active` element segments are
   // restricted to MVP behavior, which assumes only function indices.
   if (segmentKind == ElemSegmentKind::Active) {
-    elemType = RefType::func();
+    // Bizarrely, the spec prescribes that the default type is (ref func) when
+    // encoding function indices, and (ref null func) when encoding expressions.
+    elemType = payload == ElemSegmentPayload::Expressions
+                   ? RefType::func()
+                   : RefType::func().asNonNullable();
   } else {
     switch (payload) {
       case ElemSegmentPayload::Expressions: {
-        if (!d.readRefType(*env->types, env->features, &elemType)) {
+        if (!d.readRefType(*codeMeta->types, codeMeta->features(), &elemType)) {
           return false;
         }
       } break;
@@ -2777,7 +3675,7 @@ static bool DecodeElemSegment(Decoder& d, ModuleEnvironment* env) {
         if (elemKind != uint8_t(DefinitionKind::Function)) {
           return d.fail("invalid element kind");
         }
-        elemType = RefType::func();
+        elemType = RefType::func().asNonNullable();
       } break;
     }
   }
@@ -2785,8 +3683,8 @@ static bool DecodeElemSegment(Decoder& d, ModuleEnvironment* env) {
   // For active segments, check if the element type is compatible with the
   // destination table type.
   if (seg.active()) {
-    RefType tblElemType = env->tables[seg.tableIndex].elemType;
-    if (!CheckIsSubtypeOf(d, *env, d.currentOffset(),
+    RefType tblElemType = codeMeta->tables[seg.tableIndex].elemType;
+    if (!CheckIsSubtypeOf(d, *codeMeta, d.currentOffset(),
                           ValType(elemType).storageType(),
                           ValType(tblElemType).storageType())) {
       return false;
@@ -2803,7 +3701,7 @@ static bool DecodeElemSegment(Decoder& d, ModuleEnvironment* env) {
     return d.fail("too many elements in element segment");
   }
 
-  bool isAsmJS = seg.active() && env->tables[seg.tableIndex].isAsmJS;
+  bool isAsmJS = seg.active() && codeMeta->tables[seg.tableIndex].isAsmJS;
 
   switch (payload) {
     case ElemSegmentPayload::Indices: {
@@ -2818,14 +3716,14 @@ static bool DecodeElemSegment(Decoder& d, ModuleEnvironment* env) {
           return d.fail("failed to read element index");
         }
         // The only valid type of index right now is a function index.
-        if (elemIndex >= env->numFuncs()) {
+        if (elemIndex >= codeMeta->numFuncs()) {
           return d.fail("element index out of range");
         }
 
         seg.elemIndices.infallibleAppend(elemIndex);
         if (!isAsmJS) {
-          env->declareFuncExported(elemIndex, /*eager=*/false,
-                                   /*canRefFunc=*/true);
+          codeMeta->funcs[elemIndex].declareFuncExported(/*eager=*/false,
+                                                         /*canRefFunc=*/true);
         }
       }
     } break;
@@ -2835,7 +3733,7 @@ static bool DecodeElemSegment(Decoder& d, ModuleEnvironment* env) {
       seg.elemExpressions.count = numElems;
       for (uint32_t i = 0; i < numElems; i++) {
         Maybe<LitVal> unusedLiteral;
-        if (!DecodeConstantExpression(d, env, elemType, &unusedLiteral)) {
+        if (!DecodeConstantExpression(d, codeMeta, elemType, &unusedLiteral)) {
           return false;
         }
       }
@@ -2846,13 +3744,16 @@ static bool DecodeElemSegment(Decoder& d, ModuleEnvironment* env) {
     } break;
   }
 
-  env->elemSegments.infallibleAppend(std::move(seg));
+  codeMeta->elemSegmentTypes.infallibleAppend(seg.elemType);
+  moduleMeta->elemSegments.infallibleAppend(std::move(seg));
+
   return true;
 }
 
-static bool DecodeElemSection(Decoder& d, ModuleEnvironment* env) {
-  MaybeSectionRange range;
-  if (!d.startSection(SectionId::Elem, env, &range, "elem")) {
+static bool DecodeElemSection(Decoder& d, CodeMetadata* codeMeta,
+                              ModuleMetadata* moduleMeta) {
+  MaybeBytecodeRange range;
+  if (!d.startSection(SectionId::Elem, codeMeta, &range, "elem")) {
     return false;
   }
   if (!range) {
@@ -2868,12 +3769,13 @@ static bool DecodeElemSection(Decoder& d, ModuleEnvironment* env) {
     return d.fail("too many elem segments");
   }
 
-  if (!env->elemSegments.reserve(numSegments)) {
+  if (!moduleMeta->elemSegments.reserve(numSegments) ||
+      !codeMeta->elemSegmentTypes.reserve(numSegments)) {
     return false;
   }
 
   for (uint32_t i = 0; i < numSegments; i++) {
-    if (!DecodeElemSegment(d, env)) {
+    if (!DecodeElemSegment(d, codeMeta, moduleMeta)) {
       return false;
     }
   }
@@ -2881,9 +3783,9 @@ static bool DecodeElemSection(Decoder& d, ModuleEnvironment* env) {
   return d.finishSection(*range, "elem");
 }
 
-static bool DecodeDataCountSection(Decoder& d, ModuleEnvironment* env) {
-  MaybeSectionRange range;
-  if (!d.startSection(SectionId::DataCount, env, &range, "datacount")) {
+static bool DecodeDataCountSection(Decoder& d, CodeMetadata* codeMeta) {
+  MaybeBytecodeRange range;
+  if (!d.startSection(SectionId::DataCount, codeMeta, &range, "datacount")) {
     return false;
   }
   if (!range) {
@@ -2895,13 +3797,13 @@ static bool DecodeDataCountSection(Decoder& d, ModuleEnvironment* env) {
     return d.fail("expected data segment count");
   }
 
-  env->dataCount.emplace(dataCount);
+  codeMeta->dataCount.emplace(dataCount);
 
   return d.finishSection(*range, "datacount");
 }
 
 bool wasm::StartsCodeSection(const uint8_t* begin, const uint8_t* end,
-                             SectionRange* codeSection) {
+                             BytecodeRange* codeSection) {
   UniqueChars unused;
   Decoder d(begin, end, 0, &unused);
 
@@ -2911,17 +3813,21 @@ bool wasm::StartsCodeSection(const uint8_t* begin, const uint8_t* end,
 
   while (!d.done()) {
     uint8_t id;
-    SectionRange range;
+    BytecodeRange range;
     if (!d.readSectionHeader(&id, &range)) {
       return false;
     }
 
     if (id == uint8_t(SectionId::Code)) {
+      if (range.size() > MaxCodeSectionBytes) {
+        return false;
+      }
+
       *codeSection = range;
       return true;
     }
 
-    if (!d.readBytes(range.size)) {
+    if (!d.readBytes(range.size())) {
       return false;
     }
   }
@@ -2930,7 +3836,7 @@ bool wasm::StartsCodeSection(const uint8_t* begin, const uint8_t* end,
 }
 
 #ifdef ENABLE_WASM_BRANCH_HINTING
-static bool ParseBranchHintingSection(Decoder& d, ModuleEnvironment* env) {
+static bool ParseBranchHintingSection(Decoder& d, CodeMetadata* codeMeta) {
   uint32_t functionCount;
   if (!d.readVarU32(&functionCount)) {
     return d.fail("failed to read function count");
@@ -2943,8 +3849,8 @@ static bool ParseBranchHintingSection(Decoder& d, ModuleEnvironment* env) {
     }
 
     // Disallow branch hints on imported functions.
-    if ((functionIndex >= env->funcs.length()) ||
-        (functionIndex < env->numFuncImports)) {
+    if ((functionIndex >= codeMeta->funcs.length()) ||
+        (functionIndex < codeMeta->numFuncImports)) {
       return d.fail("invalid function index in branch hint");
     }
 
@@ -2989,8 +3895,8 @@ static bool ParseBranchHintingSection(Decoder& d, ModuleEnvironment* env) {
     }
 
     // Save this collection in the module
-    if (!env->branchHints.addHintsForFunc(functionIndex,
-                                          std::move(hintVector))) {
+    if (!codeMeta->branchHints.addHintsForFunc(functionIndex,
+                                               std::move(hintVector))) {
       return false;
     }
   }
@@ -2998,9 +3904,9 @@ static bool ParseBranchHintingSection(Decoder& d, ModuleEnvironment* env) {
   return true;
 }
 
-static bool DecodeBranchHintingSection(Decoder& d, ModuleEnvironment* env) {
-  MaybeSectionRange range;
-  if (!d.startCustomSection(BranchHintingSectionName, env, &range)) {
+static bool DecodeBranchHintingSection(Decoder& d, CodeMetadata* codeMeta) {
+  MaybeBytecodeRange range;
+  if (!d.startCustomSection(BranchHintingSectionName, codeMeta, &range)) {
     return false;
   }
   if (!range) {
@@ -3008,86 +3914,94 @@ static bool DecodeBranchHintingSection(Decoder& d, ModuleEnvironment* env) {
   }
 
   // Skip this custom section if errors are encountered during parsing.
-  env->parsedBranchHints = ParseBranchHintingSection(d, env);
+  if (!ParseBranchHintingSection(d, codeMeta)) {
+    codeMeta->branchHints.setFailedAndClear();
+  }
 
-  d.finishCustomSection(BranchHintingSectionName, *range);
+  if (!d.finishCustomSection(BranchHintingSectionName, *range)) {
+    codeMeta->branchHints.setFailedAndClear();
+  }
   return true;
 }
 #endif
 
-bool wasm::DecodeModuleEnvironment(Decoder& d, ModuleEnvironment* env) {
+bool wasm::DecodeModuleEnvironment(Decoder& d, CodeMetadata* codeMeta,
+                                   ModuleMetadata* moduleMeta) {
   if (!DecodePreamble(d)) {
     return false;
   }
 
-  if (!DecodeTypeSection(d, env)) {
+  if (!DecodeTypeSection(d, codeMeta)) {
     return false;
   }
 
-  if (!DecodeImportSection(d, env)) {
+  if (!DecodeImportSection(d, codeMeta, moduleMeta)) {
     return false;
   }
 
   // Eagerly check imports for future link errors against any known builtin
   // module.
-  if (!CheckImportsAgainstBuiltinModules(d, env)) {
+  if (!CheckImportsAgainstBuiltinModules(d, codeMeta, moduleMeta)) {
     return false;
   }
 
-  if (!DecodeFunctionSection(d, env)) {
+  if (!DecodeFunctionSection(d, codeMeta)) {
     return false;
   }
 
-  if (!DecodeTableSection(d, env)) {
+  if (!DecodeTableSection(d, codeMeta)) {
     return false;
   }
 
-  if (!DecodeMemorySection(d, env)) {
+  if (!DecodeMemorySection(d, codeMeta)) {
     return false;
   }
 
-  if (!DecodeTagSection(d, env)) {
+  if (!DecodeTagSection(d, codeMeta)) {
     return false;
   }
 
-  if (!DecodeGlobalSection(d, env)) {
+  if (!DecodeGlobalSection(d, codeMeta)) {
     return false;
   }
 
-  if (!DecodeExportSection(d, env)) {
+  if (!DecodeExportSection(d, codeMeta, moduleMeta)) {
     return false;
   }
 
-  if (!DecodeStartSection(d, env)) {
+  if (!DecodeStartSection(d, codeMeta, moduleMeta)) {
     return false;
   }
 
-  if (!DecodeElemSection(d, env)) {
+  if (!DecodeElemSection(d, codeMeta, moduleMeta)) {
     return false;
   }
 
-  if (!DecodeDataCountSection(d, env)) {
+  if (!DecodeDataCountSection(d, codeMeta)) {
     return false;
   }
 
 #ifdef ENABLE_WASM_BRANCH_HINTING
-  if (env->branchHintingEnabled() && !DecodeBranchHintingSection(d, env)) {
+  if (codeMeta->branchHintingEnabled() &&
+      !DecodeBranchHintingSection(d, codeMeta)) {
     return false;
   }
 #endif
 
-  if (!d.startSection(SectionId::Code, env, &env->codeSection, "code")) {
+  if (!d.startSection(SectionId::Code, codeMeta, &codeMeta->codeSectionRange,
+                      "code")) {
     return false;
   }
 
-  if (env->codeSection && env->codeSection->size > MaxCodeSectionBytes) {
+  if (codeMeta->codeSectionRange &&
+      codeMeta->codeSectionRange->size() > MaxCodeSectionBytes) {
     return d.fail("code section too big");
   }
 
   return true;
 }
 
-static bool DecodeFunctionBody(Decoder& d, const ModuleEnvironment& env,
+static bool DecodeFunctionBody(Decoder& d, const CodeMetadata& codeMeta,
                                uint32_t funcIndex) {
   uint32_t bodySize;
   if (!d.readVarU32(&bodySize)) {
@@ -3102,12 +4016,12 @@ static bool DecodeFunctionBody(Decoder& d, const ModuleEnvironment& env,
     return d.fail("function body length too big");
   }
 
-  return ValidateFunctionBody(env, funcIndex, bodySize, d);
+  return ValidateFunctionBody(codeMeta, funcIndex, bodySize, d);
 }
 
-static bool DecodeCodeSection(Decoder& d, ModuleEnvironment* env) {
-  if (!env->codeSection) {
-    if (env->numFuncDefs() != 0) {
+static bool DecodeCodeSection(Decoder& d, CodeMetadata* codeMeta) {
+  if (!codeMeta->codeSectionRange) {
+    if (codeMeta->numFuncDefs() != 0) {
       return d.fail("expected code section");
     }
     return true;
@@ -3118,27 +4032,29 @@ static bool DecodeCodeSection(Decoder& d, ModuleEnvironment* env) {
     return d.fail("expected function body count");
   }
 
-  if (numFuncDefs != env->numFuncDefs()) {
+  if (numFuncDefs != codeMeta->numFuncDefs()) {
     return d.fail(
         "function body count does not match function signature count");
   }
 
   for (uint32_t funcDefIndex = 0; funcDefIndex < numFuncDefs; funcDefIndex++) {
-    if (!DecodeFunctionBody(d, *env, env->numFuncImports + funcDefIndex)) {
+    if (!DecodeFunctionBody(d, *codeMeta,
+                            codeMeta->numFuncImports + funcDefIndex)) {
       return false;
     }
   }
 
-  return d.finishSection(*env->codeSection, "code");
+  return d.finishSection(*codeMeta->codeSectionRange, "code");
 }
 
-static bool DecodeDataSection(Decoder& d, ModuleEnvironment* env) {
-  MaybeSectionRange range;
-  if (!d.startSection(SectionId::Data, env, &range, "data")) {
+static bool DecodeDataSection(Decoder& d, CodeMetadata* codeMeta,
+                              ModuleMetadata* moduleMeta) {
+  MaybeBytecodeRange range;
+  if (!d.startSection(SectionId::Data, codeMeta, &range, "data")) {
     return false;
   }
   if (!range) {
-    if (env->dataCount.isSome() && *env->dataCount > 0) {
+    if (codeMeta->dataCount.isSome() && *codeMeta->dataCount > 0) {
       return d.fail("number of data segments does not match declared count");
     }
     return true;
@@ -3153,7 +4069,7 @@ static bool DecodeDataSection(Decoder& d, ModuleEnvironment* env) {
     return d.fail("too many data segments");
   }
 
-  if (env->dataCount.isSome() && numSegments != *env->dataCount) {
+  if (codeMeta->dataCount.isSome() && numSegments != *codeMeta->dataCount) {
     return d.fail("number of data segments does not match declared count");
   }
 
@@ -3175,50 +4091,51 @@ static bool DecodeDataSection(Decoder& d, ModuleEnvironment* env) {
     DataSegmentKind initializerKind = DataSegmentKind(initializerKindVal);
 
     if (initializerKind != DataSegmentKind::Passive &&
-        env->numMemories() == 0) {
+        codeMeta->numMemories() == 0) {
       return d.fail("active data segment requires a memory section");
     }
 
-    DataSegmentEnv seg;
+    DataSegmentRange segRange;
     if (initializerKind == DataSegmentKind::ActiveWithMemoryIndex) {
-      if (!d.readVarU32(&seg.memoryIndex)) {
+      if (!d.readVarU32(&segRange.memoryIndex)) {
         return d.fail("expected memory index");
       }
     } else if (initializerKind == DataSegmentKind::Active) {
-      seg.memoryIndex = 0;
+      segRange.memoryIndex = 0;
     } else {
-      seg.memoryIndex = InvalidMemoryIndex;
+      segRange.memoryIndex = InvalidMemoryIndex;
     }
 
     if (initializerKind == DataSegmentKind::Active ||
         initializerKind == DataSegmentKind::ActiveWithMemoryIndex) {
-      if (seg.memoryIndex >= env->numMemories()) {
+      if (segRange.memoryIndex >= codeMeta->numMemories()) {
         return d.fail("invalid memory index");
       }
 
       InitExpr segOffset;
-      ValType exprType = ToValType(env->memories[seg.memoryIndex].indexType());
-      if (!InitExpr::decodeAndValidate(d, env, exprType, &segOffset)) {
+      ValType exprType =
+          ToValType(codeMeta->memories[segRange.memoryIndex].addressType());
+      if (!InitExpr::decodeAndValidate(d, codeMeta, exprType, &segOffset)) {
         return false;
       }
-      seg.offsetIfActive.emplace(std::move(segOffset));
+      segRange.offsetIfActive.emplace(std::move(segOffset));
     }
 
-    if (!d.readVarU32(&seg.length)) {
+    if (!d.readVarU32(&segRange.length)) {
       return d.fail("expected segment size");
     }
 
-    if (seg.length > MaxDataSegmentLengthPages * PageSize) {
+    if (segRange.length > MaxDataSegmentLengthPages * PageSize) {
       return d.fail("segment size too big");
     }
 
-    seg.bytecodeOffset = d.currentOffset();
+    segRange.bytecodeOffset = d.currentOffset();
 
-    if (!d.readBytes(seg.length)) {
+    if (!d.readBytes(segRange.length)) {
       return d.fail("data segment shorter than declared");
     }
 
-    if (!env->dataSegments.append(std::move(seg))) {
+    if (!moduleMeta->dataSegmentRanges.append(std::move(segRange))) {
       return false;
     }
   }
@@ -3227,8 +4144,9 @@ static bool DecodeDataSection(Decoder& d, ModuleEnvironment* env) {
 }
 
 static bool DecodeModuleNameSubsection(Decoder& d,
-                                       const CustomSectionEnv& nameSection,
-                                       ModuleEnvironment* env) {
+                                       const CustomSectionRange& nameSection,
+                                       CodeMetadata* codeMeta,
+                                       ModuleMetadata* moduleMeta) {
   Maybe<uint32_t> endOffset;
   if (!d.startNameSubsection(NameType::Module, &endOffset)) {
     return false;
@@ -3242,9 +4160,9 @@ static bool DecodeModuleNameSubsection(Decoder& d,
     return d.fail("failed to read module name length");
   }
 
-  MOZ_ASSERT(d.currentOffset() >= nameSection.payloadOffset);
+  MOZ_ASSERT(d.currentOffset() >= nameSection.payload.start);
   moduleName.offsetInNamePayload =
-      d.currentOffset() - nameSection.payloadOffset;
+      d.currentOffset() - nameSection.payload.start;
 
   const uint8_t* bytes;
   if (!d.readBytes(moduleName.length, &bytes)) {
@@ -3256,13 +4174,14 @@ static bool DecodeModuleNameSubsection(Decoder& d,
   }
 
   // Only save the module name if the whole subsection validates.
-  env->moduleName.emplace(moduleName);
+  codeMeta->nameSection->moduleName = moduleName;
   return true;
 }
 
 static bool DecodeFunctionNameSubsection(Decoder& d,
-                                         const CustomSectionEnv& nameSection,
-                                         ModuleEnvironment* env) {
+                                         const CustomSectionRange& nameSection,
+                                         CodeMetadata* codeMeta,
+                                         ModuleMetadata* moduleMeta) {
   Maybe<uint32_t> endOffset;
   if (!d.startNameSubsection(NameType::Function, &endOffset)) {
     return false;
@@ -3285,7 +4204,7 @@ static bool DecodeFunctionNameSubsection(Decoder& d,
     }
 
     // Names must refer to real functions and be given in ascending order.
-    if (funcIndex >= env->numFuncs() || funcIndex < funcNames.length()) {
+    if (funcIndex >= codeMeta->numFuncs() || funcIndex < funcNames.length()) {
       return d.fail("invalid function index");
     }
 
@@ -3303,9 +4222,9 @@ static bool DecodeFunctionNameSubsection(Decoder& d,
       return false;
     }
 
-    MOZ_ASSERT(d.currentOffset() >= nameSection.payloadOffset);
+    MOZ_ASSERT(d.currentOffset() >= nameSection.payload.start);
     funcName.offsetInNamePayload =
-        d.currentOffset() - nameSection.payloadOffset;
+        d.currentOffset() - nameSection.payload.start;
 
     if (!d.readBytes(funcName.length)) {
       return d.fail("unable to read function name bytes");
@@ -3318,60 +4237,63 @@ static bool DecodeFunctionNameSubsection(Decoder& d,
     return false;
   }
 
-  // To encourage fully valid function names subsections; only save names if
-  // the entire subsection decoded correctly.
-  env->funcNames = std::move(funcNames);
+  // Only save names if the entire subsection decoded correctly.
+  codeMeta->nameSection->funcNames = std::move(funcNames);
   return true;
 }
 
-static bool DecodeNameSection(Decoder& d, ModuleEnvironment* env) {
-  MaybeSectionRange range;
-  if (!d.startCustomSection(NameSectionName, env, &range)) {
+static bool DecodeNameSection(Decoder& d, CodeMetadata* codeMeta,
+                              ModuleMetadata* moduleMeta) {
+  MaybeBytecodeRange range;
+  if (!d.startCustomSection(NameSectionName, codeMeta, &range)) {
     return false;
   }
   if (!range) {
     return true;
   }
 
-  env->nameCustomSectionIndex = Some(env->customSections.length() - 1);
-  const CustomSectionEnv& nameSection = env->customSections.back();
+  // MONGODB MODIFICATION: Rewrite compound literal syntax not supported by MSVC
+  codeMeta->nameSection.emplace(NameSection{
+      .customSectionIndex =
+          uint32_t(codeMeta->customSectionRanges.length() - 1),
+  });
+  const CustomSectionRange& nameSection = codeMeta->customSectionRanges.back();
 
   // Once started, custom sections do not report validation errors.
 
-  if (!DecodeModuleNameSubsection(d, nameSection, env)) {
+  if (!DecodeModuleNameSubsection(d, nameSection, codeMeta, moduleMeta)) {
     goto finish;
   }
 
-  if (!DecodeFunctionNameSubsection(d, nameSection, env)) {
+  if (!DecodeFunctionNameSubsection(d, nameSection, codeMeta, moduleMeta)) {
     goto finish;
   }
 
-  while (d.currentOffset() < range->end()) {
+  while (d.currentOffset() < range->end) {
     if (!d.skipNameSubsection()) {
       goto finish;
     }
   }
 
 finish:
-  d.finishCustomSection(NameSectionName, *range);
+  if (!d.finishCustomSection(NameSectionName, *range)) {
+    codeMeta->nameSection = mozilla::Nothing();
+  }
   return true;
 }
 
-bool wasm::DecodeModuleTail(Decoder& d, ModuleEnvironment* env) {
-  if (!DecodeDataSection(d, env)) {
+bool wasm::DecodeModuleTail(Decoder& d, CodeMetadata* codeMeta,
+                            ModuleMetadata* moduleMeta) {
+  if (!DecodeDataSection(d, codeMeta, moduleMeta)) {
     return false;
   }
 
-  if (!DecodeNameSection(d, env)) {
+  if (!DecodeNameSection(d, codeMeta, moduleMeta)) {
     return false;
   }
 
   while (!d.done()) {
-    if (!d.skipCustomSection(env)) {
-      if (d.resilientMode()) {
-        d.clearError();
-        return true;
-      }
+    if (!d.skipCustomSection(codeMeta)) {
       return false;
     }
   }
@@ -3381,26 +4303,59 @@ bool wasm::DecodeModuleTail(Decoder& d, ModuleEnvironment* env) {
 
 // Validate algorithm.
 
-bool wasm::Validate(JSContext* cx, const ShareableBytes& bytecode,
+bool wasm::Validate(JSContext* cx, const BytecodeSource& bytecode,
                     const FeatureOptions& options, UniqueChars* error) {
-  Decoder d(bytecode.bytes, 0, error);
-
   FeatureArgs features = FeatureArgs::build(cx, options);
-  ModuleEnvironment env(features);
-  if (!env.init()) {
+  SharedCompileArgs compileArgs = CompileArgs::buildForValidation(features);
+  if (!compileArgs) {
+    return false;
+  }
+  MutableModuleMetadata moduleMeta = js_new<ModuleMetadata>();
+  if (!moduleMeta || !moduleMeta->init(*compileArgs)) {
+    return false;
+  }
+  MutableCodeMetadata codeMeta = moduleMeta->codeMeta;
+
+  Decoder envDecoder(bytecode.envSpan(), bytecode.envRange().start, error);
+  if (!DecodeModuleEnvironment(envDecoder, codeMeta, moduleMeta)) {
     return false;
   }
 
-  if (!DecodeModuleEnvironment(d, &env)) {
-    return false;
-  }
+  if (bytecode.hasCodeSection()) {
+    // DecodeModuleEnvironment will stop and return true if there is an unknown
+    // section before the code section. We must check this and return an error.
+    if (!moduleMeta->codeMeta->codeSectionRange) {
+      envDecoder.fail("unknown section before code section");
+      return false;
+    }
 
-  if (!DecodeCodeSection(d, &env)) {
-    return false;
-  }
+    // Our pre-parse that split the module should ensure that after we've
+    // parsed the environment there are no bytes left.
+    MOZ_RELEASE_ASSERT(envDecoder.done());
 
-  if (!DecodeModuleTail(d, &env)) {
-    return false;
+    Decoder codeDecoder(bytecode.codeSpan(), bytecode.codeRange().start, error);
+    if (!DecodeCodeSection(codeDecoder, codeMeta)) {
+      return false;
+    }
+    // Our pre-parse that split the module should ensure that after we've
+    // parsed the code section there are no bytes left.
+    MOZ_RELEASE_ASSERT(codeDecoder.done());
+
+    Decoder tailDecoder(bytecode.tailSpan(), bytecode.tailRange().start, error);
+    if (!DecodeModuleTail(tailDecoder, codeMeta, moduleMeta)) {
+      return false;
+    }
+    // Decoding the module tail should consume all remaining bytes.
+    MOZ_RELEASE_ASSERT(tailDecoder.done());
+  } else {
+    if (!DecodeCodeSection(envDecoder, codeMeta)) {
+      return false;
+    }
+    if (!DecodeModuleTail(envDecoder, codeMeta, moduleMeta)) {
+      return false;
+    }
+    // Decoding the module tail should consume all remaining bytes.
+    MOZ_RELEASE_ASSERT(envDecoder.done());
   }
 
   MOZ_ASSERT(!*error, "unreported error in decoding");

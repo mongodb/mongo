@@ -7,11 +7,14 @@
 #ifndef gc_Tenuring_h
 #define gc_Tenuring_h
 
+#include "mozilla/EnumeratedArray.h"
+#include "mozilla/HashTable.h"
 #include "mozilla/Maybe.h"
 
 #include "gc/AllocKind.h"
 #include "js/GCAPI.h"
 #include "js/TracingAPI.h"
+#include "js/UniquePtr.h"
 #include "util/Text.h"
 
 namespace js {
@@ -30,6 +33,9 @@ class AllocSite;
 class ArenaCellSet;
 class RelocationOverlay;
 class StringRelocationOverlay;
+#ifdef JS_GC_ZEAL
+class PromotionStats;
+#endif
 
 template <typename Key>
 struct DeduplicationStringHasher {
@@ -68,15 +74,21 @@ class TenuringTracer final : public JSTracer {
   // edge to the remembered set during nursery collection.
   bool promotedToNursery = false;
 
-#define DEFINE_ON_EDGE_METHOD(name, type, _1, _2) \
-  void on##name##Edge(type** thingp, const char* name) override;
-  JS_FOR_EACH_TRACEKIND(DEFINE_ON_EDGE_METHOD)
-#undef DEFINE_ON_EDGE_METHOD
+#ifdef JS_GC_ZEAL
+  UniquePtr<PromotionStats> promotionStats;
+#endif
 
  public:
   TenuringTracer(JSRuntime* rt, Nursery* nursery, bool tenureEverything);
+  ~TenuringTracer();
 
   Nursery& nursery() { return nursery_; }
+
+#ifdef JS_GC_ZEAL
+  void initPromotionReport();
+  void printPromotionReport(JSContext* cx, JS::GCReason reason,
+                            const JS::AutoRequireNoGC& nogc) const;
+#endif
 
   // Promote all live objects and everything they can reach. Called after all
   // roots have been traced.
@@ -98,7 +110,6 @@ class TenuringTracer final : public JSTracer {
   void traceObjectSlots(NativeObject* nobj, uint32_t start, uint32_t end);
   void traceObjectElements(JS::Value* vp, uint32_t count);
   void traceString(JSString* str);
-  void traceBigInt(JS::BigInt* bi);
 
   // Methods to promote a live cell or get the pointer to its new location if
   // that has already happened. The store buffers call these.
@@ -113,18 +124,10 @@ class TenuringTracer final : public JSTracer {
   class AutoPromotedAnyToNursery;
 
  private:
-  MOZ_ALWAYS_INLINE JSObject* onNonForwardedNurseryObject(JSObject* obj);
-  MOZ_ALWAYS_INLINE JSString* onNonForwardedNurseryString(JSString* str);
-  MOZ_ALWAYS_INLINE JS::BigInt* onNonForwardedNurseryBigInt(JS::BigInt* bi);
-
-  // The dependent string chars needs to be relocated if the base which it's
-  // using chars from has been deduplicated.
-  template <typename CharT>
-  void relocateDependentStringChars(JSDependentString* tenuredDependentStr,
-                                    JSLinearString* baseOrRelocOverlay,
-                                    size_t* offset,
-                                    bool* rootBaseNotYetForwarded,
-                                    JSLinearString** rootBase);
+#define DEFINE_ON_EDGE_METHOD(name, type, _1, _2) \
+  void on##name##Edge(type** thingp, const char* name) override;
+  JS_FOR_EACH_TRACEKIND(DEFINE_ON_EDGE_METHOD)
+#undef DEFINE_ON_EDGE_METHOD
 
   inline void insertIntoObjectFixupList(gc::RelocationOverlay* entry);
   inline void insertIntoStringFixupList(gc::StringRelocationOverlay* entry);
@@ -138,6 +141,7 @@ class TenuringTracer final : public JSTracer {
 
   bool shouldTenure(Zone* zone, JS::TraceKind traceKind, Cell* cell);
 
+  MOZ_ALWAYS_INLINE JSObject* promoteObject(JSObject* obj);
   inline JSObject* promotePlainObject(PlainObject* src);
   JSObject* promoteObjectSlow(JSObject* src);
   JSString* promoteString(JSString* src);

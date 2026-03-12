@@ -85,7 +85,7 @@ void ArrayBufferViewObject::notifyBufferMoved(uint8_t* srcBufStart,
 
   if (srcBufStart != dstBufStart) {
     void* data = dstBufStart + dataPointerOffset();
-    getFixedSlotRef(DATA_SLOT).unbarrieredSet(PrivateValue(data));
+    setReservedSlotPrivateUnbarriered(DATA_SLOT, data);
   }
 }
 
@@ -450,7 +450,6 @@ JS_PUBLIC_API JSObject* JS_GetArrayBufferViewBuffer(JSContext* cx,
                                                     bool* isSharedMemory) {
   AssertHeapIsIdle();
   CHECK_THREAD(cx);
-  cx->check(obj);
 
   Rooted<ArrayBufferViewObject*> unwrappedView(
       cx, obj->maybeUnwrapAs<ArrayBufferViewObject>());

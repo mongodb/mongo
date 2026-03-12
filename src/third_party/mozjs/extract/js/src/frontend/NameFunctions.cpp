@@ -14,7 +14,7 @@
 #include "frontend/ParserAtom.h"  // ParserAtomsTable
 #include "frontend/SharedContext.h"
 #include "util/Poison.h"
-#include "util/StringBuffer.h"
+#include "util/StringBuilder.h"
 
 using namespace js;
 using namespace js::frontend;
@@ -40,7 +40,7 @@ class NameResolver : public ParseNodeVisitor<NameResolver> {
 
   // When naming a function, the buffer where the name is built.
   // When we are not under resolveFun, buf_ is empty.
-  StringBuffer buf_;
+  StringBuilder buf_;
 
   /* Test whether a ParseNode represents a function invocation */
   bool isCall(ParseNode* pn) {

@@ -56,7 +56,7 @@ class SharedIntlData {
     JS::AutoCheckCannotGC nogc;
     HashNumber hash = 0;
 
-    explicit LinearStringLookup(JSLinearString* string)
+    explicit LinearStringLookup(const JSLinearString* string)
         : isLatin1(string->hasLatin1Chars()), length(string->length()) {
       if (isLatin1) {
         latin1Chars = string->latin1Chars(nogc);
@@ -101,7 +101,7 @@ class SharedIntlData {
 
   struct TimeZoneHasher {
     struct Lookup : LinearStringLookup {
-      explicit Lookup(JSLinearString* timeZone);
+      explicit Lookup(const JSLinearString* timeZone);
     };
 
     static js::HashNumber hash(const Lookup& lookup) { return lookup.hash; }
@@ -189,7 +189,7 @@ class SharedIntlData {
 
   struct LocaleHasher {
     struct Lookup : LinearStringLookup {
-      explicit Lookup(JSLinearString* locale);
+      explicit Lookup(const JSLinearString* locale);
       Lookup(const char* chars, size_t length);
     };
 
@@ -240,6 +240,7 @@ class SharedIntlData {
     Collator,
     DateTimeFormat,
     DisplayNames,
+    DurationFormat,
     ListFormat,
     NumberFormat,
     PluralRules,

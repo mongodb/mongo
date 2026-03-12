@@ -69,6 +69,7 @@ class AllocSite;
 namespace jit {
 
 class ICScript;
+struct CacheIRAOTStub;
 
 // Class to record CacheIR + some additional metadata for code generation.
 class MOZ_RAII CacheIRWriter : public JS::CustomAutoRooter {
@@ -346,6 +347,10 @@ class MOZ_RAII CacheIRWriter : public JS::CustomAutoRooter {
         lastIndex_(0) {
   }
 
+#ifdef ENABLE_JS_AOT_ICS
+  CacheIRWriter(JSContext* cx, const CacheIRAOTStub& aot);
+#endif
+
   bool tooLarge() const { return tooLarge_; }
   bool oom() const { return buffer_.oom(); }
   bool failed() const { return tooLarge() || oom(); }
@@ -357,6 +362,7 @@ class MOZ_RAII CacheIRWriter : public JS::CustomAutoRooter {
   uint32_t numInstructions() const { return nextInstructionId_; }
 
   size_t numStubFields() const { return stubFields_.length(); }
+  const StubField& stubField(uint32_t i) const { return stubFields_[i]; }
   StubField::Type stubFieldType(uint32_t i) const {
     return stubFields_[i].type();
   }
@@ -387,6 +393,9 @@ class MOZ_RAII CacheIRWriter : public JS::CustomAutoRooter {
       return false;
     }
     return currentInstruction > operandLastUsed_[operandId];
+  }
+  uint32_t operandLastUsed(uint32_t operandId) const {
+    return operandLastUsed_[operandId];
   }
 
   const uint8_t* codeStart() const {
@@ -485,9 +494,8 @@ class MOZ_RAII CacheIRWriter : public JS::CustomAutoRooter {
     guardFunctionScript_(fun, expected, nargsAndFlags);
   }
 
-  ValOperandId loadArgumentFixedSlot(
-      ArgumentKind kind, uint32_t argc,
-      CallFlags flags = CallFlags(CallFlags::Standard)) {
+  ValOperandId loadArgumentFixedSlot(ArgumentKind kind, uint32_t argc,
+                                     CallFlags flags) {
     bool addArgc;
     int32_t slotIndex = GetIndexOfArgument(kind, flags, &addArgc);
     if (addArgc) {
@@ -498,9 +506,8 @@ class MOZ_RAII CacheIRWriter : public JS::CustomAutoRooter {
     return loadArgumentFixedSlot_(slotIndex);
   }
 
-  ValOperandId loadArgumentDynamicSlot(
-      ArgumentKind kind, Int32OperandId argcId,
-      CallFlags flags = CallFlags(CallFlags::Standard)) {
+  ValOperandId loadArgumentDynamicSlot(ArgumentKind kind, Int32OperandId argcId,
+                                       CallFlags flags) {
     bool addArgc;
     int32_t slotIndex = GetIndexOfArgument(kind, flags, &addArgc);
     if (addArgc) {
@@ -567,6 +574,22 @@ class MOZ_RAII CacheIRWriter : public JS::CustomAutoRooter {
     callDOMFunction_(calleeId, argc, thisObjId, flags, argcFixed, redirected);
 #else
     callDOMFunction_(calleeId, argc, thisObjId, flags, argcFixed);
+#endif
+  }
+
+  void callDOMFunctionWithAllocSite(ObjOperandId calleeId, Int32OperandId argc,
+                                    ObjOperandId thisObjId,
+                                    JSFunction* calleeFunc, CallFlags flags,
+                                    uint32_t argcFixed,
+                                    gc::AllocSite* allocSite) {
+#ifdef JS_SIMULATOR
+    void* rawPtr = JS_FUNC_TO_DATA_PTR(void*, calleeFunc->native());
+    void* redirected = Simulator::RedirectNativeFunction(rawPtr, Args_General3);
+    callDOMFunctionWithAllocSite_(calleeId, argc, thisObjId, flags, argcFixed,
+                                  allocSite, redirected);
+#else
+    callDOMFunctionWithAllocSite_(calleeId, argc, thisObjId, flags, argcFixed,
+                                  allocSite);
 #endif
   }
 

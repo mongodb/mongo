@@ -95,8 +95,8 @@ class LCovRealm {
   const char* getScriptName(JSScript* script);
 
  private:
-  typedef mozilla::Vector<LCovSource*, 16, LifoAllocPolicy<Fallible>>
-      LCovSourceVector;
+  using LCovSourceVector =
+      mozilla::Vector<LCovSource*, 16, LifoAllocPolicy<Fallible>>;
 
   // LifoAlloc backend for all temporary allocations needed to stash the
   // strings to be written in the file.
@@ -169,4 +169,4 @@ bool CollectScriptCoverage(JSScript* script, bool finalizing);
 }  // namespace coverage
 }  // namespace js
 
-#endif  // vm_Printer_h
+#endif  // vm_CodeCoverage_h

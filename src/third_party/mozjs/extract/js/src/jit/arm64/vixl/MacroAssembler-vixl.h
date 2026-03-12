@@ -2527,7 +2527,7 @@ class UseScratchRegisterScope {
 
 
   bool IsAvailable(const CPURegister& reg) const;
-
+  bool HasAvailableRegister() const;
 
   // Take a register from the appropriate temps list. It will be returned
   // automatically when the scope ends.

@@ -23,12 +23,15 @@
 
 using namespace mozilla;
 
-JS::PersistentRootedObject gGlobal;
+MOZ_RUNINIT JS::PersistentRootedObject gGlobal;
 JSContext* gCx = nullptr;
 
 static const JSClass* getGlobalClass() {
-  static const JSClass c = {"global", JSCLASS_GLOBAL_FLAGS,
-                            &JS::DefaultGlobalClassOps};
+  static const JSClass c = {
+      "global",
+      JSCLASS_GLOBAL_FLAGS,
+      &JS::DefaultGlobalClassOps,
+  };
   return &c;
 }
 
@@ -73,7 +76,6 @@ static void jsfuzz_uninit(JSContext* cx) {
 
 int main(int argc, char* argv[]) {
   // Override prefs for fuzz-tests.
-  JS::Prefs::setAtStartup_weakrefs(true);
   JS::Prefs::setAtStartup_experimental_weakrefs_expose_cleanupSome(true);
 
   if (!JS_Init()) {

@@ -160,7 +160,7 @@ class GCVector {
   }
 
   size_t sizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf) const {
-    return vector.sizeOfIncludingThis(mallocSizeOf);
+    return mallocSizeOf(this) + sizeOfExcludingThis(mallocSizeOf);
   }
 
   void trace(JSTracer* trc) {

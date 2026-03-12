@@ -8,6 +8,7 @@ Import([
 env = env.Clone()
 env.InjectThirdParty(libraries=['zlib'])
 env.InjectThirdParty(libraries=['icu'])
+env.InjectThirdParty(libraries=['fmt'])
 
 env['CCFLAGS_WERROR'] = []
 
@@ -88,13 +89,18 @@ if env.TargetOSIs('windows'):
 
             # not enough arguments for function-like macro invocation
             '/wd4003',
+
+            # This is needed for constexpr variables defined in headers
+            '/Zc:externConstexpr',
         ], )
 else:
-    env.Append(CXXFLAGS=[
-        '-Wno-non-virtual-dtor',
-        '-Wno-invalid-offsetof',
-        '-Wno-sign-compare',
-    ], )
+    env.Append(
+        CXXFLAGS=[
+            '-Wno-non-virtual-dtor',
+            '-Wno-invalid-offsetof',
+            '-Wno-sign-compare',
+            "-Wno-unused-value",
+        ], )
 
 # js/src, js/public and mfbt are the only required sources right now, that
 # could change in the future
@@ -120,20 +126,23 @@ sources = [
     "extract/js/src/builtin/RegExp.cpp",
     "extract/js/src/vm/ProfilingStack.cpp",
     "extract/js/src/frontend/Parser.cpp",
+    "extract/js/src/gc/Memory.cpp",
     "extract/js/src/gc/StoreBuffer.cpp",
     "extract/js/src/jsmath.cpp",
     "extract/js/src/mfbt/Unified_cpp_mfbt0.cpp",
     "extract/js/src/mfbt/Unified_cpp_mfbt1.cpp",
     "extract/js/src/util/DoubleToString.cpp",
     "extract/js/src/vm/Interpreter.cpp",
-    "extract/mfbt/lz4/lz4.c",
-    "extract/mfbt/lz4/lz4frame.c",
-    "extract/mfbt/lz4/lz4hc.c",
-    "extract/mfbt/lz4/xxhash.c",
+    "extract/js/src/xsum/xsum.cpp",
+    "extract/mozglue/static/lz4/lz4.c",
+    "extract/mozglue/static/lz4/lz4frame.c",
+    "extract/mozglue/static/lz4/lz4hc.c",
+    "extract/mozglue/static/lz4/xxhash.c",
     "extract/mozglue/misc/AutoProfilerLabel.cpp",
     "extract/mozglue/misc/AwakeTimeStamp.cpp",
     "extract/mozglue/misc/Debug.cpp",
     "extract/mozglue/misc/MmapFaultHandler.cpp",
+    "extract/mozglue/misc/Now.cpp",
     "extract/mozglue/misc/Printf.cpp",
     "extract/mozglue/misc/SIMD.cpp",
     "extract/mozglue/misc/StackWalk.cpp",
@@ -144,6 +153,9 @@ sources = [
     "extract/js/src/irregexp/RegExpNativeMacroAssembler.cpp",
     "extract/js/src/wasm/WasmCode-platform.cpp",
 ]
+
+if get_option('spider-monkey-dbg') == "on":
+    sources.append("extract/js/src/util/Utility.cpp")
 
 if env['TARGET_ARCH'] == 'x86_64' and not env.TargetOSIs('windows'):
     env.Append(CCFLAGS=['-mavx2'])
@@ -256,9 +268,13 @@ env.Library(
         'illegal_cyclic_or_unresolved_dependencies_allowlisted',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/third_party/shim_fmt',
         '$BUILD_DIR/third_party/shim_icu',
         '$BUILD_DIR/third_party/shim_zlib',
     ],
+    SYSLIBDEPS=[
+        'mincore',
+    ] if env.TargetOSIs('windows') else [],
 )
 
 #########################

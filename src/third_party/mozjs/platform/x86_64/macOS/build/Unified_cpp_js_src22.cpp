@@ -1,13 +1,4 @@
 #define MOZ_UNIFIED_BUILD
-#include "vm/SymbolType.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/SymbolType.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "vm/SymbolType.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
 #include "vm/TaggedProto.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
 #error "vm/TaggedProto.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
@@ -51,5 +42,14 @@
 #endif
 #ifdef INITGUID
 #error "vm/TypedArrayObject.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "vm/UbiNode.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "vm/UbiNode.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "vm/UbiNode.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

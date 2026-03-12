@@ -14,11 +14,11 @@ class MIRGenerator;
 class MIRGraph;
 
 class EdgeCaseAnalysis {
-  MIRGenerator* mir;
+  const MIRGenerator* mir;
   MIRGraph& graph;
 
  public:
-  EdgeCaseAnalysis(MIRGenerator* mir, MIRGraph& graph);
+  EdgeCaseAnalysis(const MIRGenerator* mir, MIRGraph& graph);
   [[nodiscard]] bool analyzeLate();
 };
 

@@ -7,6 +7,7 @@
 #include "jit/FoldLinearArithConstants.h"
 
 #include "jit/IonAnalysis.h"
+#include "jit/MIR-wasm.h"
 #include "jit/MIR.h"
 #include "jit/MIRGenerator.h"
 #include "jit/MIRGraph.h"
@@ -83,7 +84,7 @@ static void AnalyzeAdd(TempAllocator& alloc, MAdd* add) {
   markNodesAsRecoveredOnBailout(add);
 }
 
-bool FoldLinearArithConstants(MIRGenerator* mir, MIRGraph& graph) {
+bool FoldLinearArithConstants(const MIRGenerator* mir, MIRGraph& graph) {
   JitSpew(JitSpew_FLAC, "Begin");
   for (PostorderIterator block(graph.poBegin()); block != graph.poEnd();
        block++) {

@@ -14,12 +14,7 @@ namespace js {
 namespace jit {
 
 class CodeGeneratorX86Shared;
-class OutOfLineBailout;
-class OutOfLineUndoALUOperation;
-class OutOfLineLoadTypedArrayOutOfBounds;
-class MulNegativeZeroCheck;
 class ModOverflowCheck;
-class ReturnZero;
 class OutOfLineTableSwitch;
 
 using OutOfLineWasmTruncateCheck =
@@ -33,25 +28,8 @@ class CodeGeneratorX86Shared : public CodeGeneratorShared {
 
  protected:
   CodeGeneratorX86Shared(MIRGenerator* gen, LIRGraph* graph,
-                         MacroAssembler* masm);
-
-  // Load a NaN or zero into a register for an out of bounds AsmJS or static
-  // typed array load.
-  class OutOfLineLoadTypedArrayOutOfBounds
-      : public OutOfLineCodeBase<CodeGeneratorX86Shared> {
-    AnyRegister dest_;
-    Scalar::Type viewType_;
-
-   public:
-    OutOfLineLoadTypedArrayOutOfBounds(AnyRegister dest, Scalar::Type viewType)
-        : dest_(dest), viewType_(viewType) {}
-
-    AnyRegister dest() const { return dest_; }
-    Scalar::Type viewType() const { return viewType_; }
-    void accept(CodeGeneratorX86Shared* codegen) override {
-      codegen->visitOutOfLineLoadTypedArrayOutOfBounds(this);
-    }
-  };
+                         MacroAssembler* masm,
+                         const wasm::CodeMetadata* wasmCodeMeta);
 
   NonAssertingLabel deoptLabel_;
 
@@ -60,9 +38,9 @@ class CodeGeneratorX86Shared : public CodeGeneratorShared {
   Operand ToOperand(const LDefinition* def);
 
 #ifdef JS_PUNBOX64
-  Operand ToOperandOrRegister64(const LInt64Allocation input);
+  Operand ToOperandOrRegister64(const LInt64Allocation& input);
 #else
-  Register64 ToOperandOrRegister64(const LInt64Allocation input);
+  Register64 ToOperandOrRegister64(const LInt64Allocation& input);
 #endif
 
   MoveOperand toMoveOperand(LAllocation a) const;
@@ -99,88 +77,31 @@ class CodeGeneratorX86Shared : public CodeGeneratorShared {
     masm.test32(reg, Imm32(0xFF));
     bailoutIf(Assembler::Zero, snapshot);
   }
-  void bailoutCvttsd2si(FloatRegister src, Register dest, LSnapshot* snapshot) {
-    Label bail;
-    masm.truncateDoubleToInt32(src, dest, &bail);
-    bailoutFrom(&bail, snapshot);
-  }
-  void bailoutCvttss2si(FloatRegister src, Register dest, LSnapshot* snapshot) {
-    Label bail;
-    masm.truncateFloat32ToInt32(src, dest, &bail);
-    bailoutFrom(&bail, snapshot);
-  }
 
   bool generateOutOfLineCode();
-
-  void emitCompare(MCompare::CompareType type, const LAllocation* left,
-                   const LAllocation* right);
 
   // Emits a branch that directs control flow to the true block if |cond| is
   // true, and the false block if |cond| is false.
   void emitBranch(Assembler::Condition cond, MBasicBlock* ifTrue,
-                  MBasicBlock* ifFalse,
-                  Assembler::NaNCond ifNaN = Assembler::NaN_HandledByCond);
-  void emitBranch(Assembler::DoubleCondition cond, MBasicBlock* ifTrue,
                   MBasicBlock* ifFalse);
-
-  void testNullEmitBranch(Assembler::Condition cond, const ValueOperand& value,
-                          MBasicBlock* ifTrue, MBasicBlock* ifFalse) {
-    cond = masm.testNull(cond, value);
-    emitBranch(cond, ifTrue, ifFalse);
-  }
-  void testUndefinedEmitBranch(Assembler::Condition cond,
-                               const ValueOperand& value, MBasicBlock* ifTrue,
-                               MBasicBlock* ifFalse) {
-    cond = masm.testUndefined(cond, value);
-    emitBranch(cond, ifTrue, ifFalse);
-  }
-  void testObjectEmitBranch(Assembler::Condition cond,
-                            const ValueOperand& value, MBasicBlock* ifTrue,
-                            MBasicBlock* ifFalse) {
-    cond = masm.testObject(cond, value);
-    emitBranch(cond, ifTrue, ifFalse);
-  }
-
-  void testZeroEmitBranch(Assembler::Condition cond, Register reg,
-                          MBasicBlock* ifTrue, MBasicBlock* ifFalse) {
-    MOZ_ASSERT(cond == Assembler::Equal || cond == Assembler::NotEqual);
-    masm.cmpPtr(reg, ImmWord(0));
-    emitBranch(cond, ifTrue, ifFalse);
-  }
+  void emitBranch(Assembler::DoubleCondition cond, MBasicBlock* ifTrue,
+                  MBasicBlock* ifFalse, Assembler::NaNCond ifNaN);
 
   void emitTableSwitchDispatch(MTableSwitch* mir, Register index,
                                Register base);
 
   void generateInvalidateEpilogue();
 
-  void canonicalizeIfDeterministic(Scalar::Type type, const LAllocation* value);
-
   template <typename T>
   Operand toMemoryAccessOperand(T* lir, int32_t disp);
 
  public:
+  void emitUndoALUOperationOOL(LInstruction* ins);
+
   // Out of line visitors.
-  void visitOutOfLineBailout(OutOfLineBailout* ool);
-  void visitOutOfLineUndoALUOperation(OutOfLineUndoALUOperation* ool);
-  void visitMulNegativeZeroCheck(MulNegativeZeroCheck* ool);
   void visitModOverflowCheck(ModOverflowCheck* ool);
-  void visitReturnZero(ReturnZero* ool);
   void visitOutOfLineTableSwitch(OutOfLineTableSwitch* ool);
-  void visitOutOfLineLoadTypedArrayOutOfBounds(
-      OutOfLineLoadTypedArrayOutOfBounds* ool);
   void visitOutOfLineWasmTruncateCheck(OutOfLineWasmTruncateCheck* ool);
-};
-
-// An out-of-line bailout thunk.
-class OutOfLineBailout : public OutOfLineCodeBase<CodeGeneratorX86Shared> {
-  LSnapshot* snapshot_;
-
- public:
-  explicit OutOfLineBailout(LSnapshot* snapshot) : snapshot_(snapshot) {}
-
-  void accept(CodeGeneratorX86Shared* codegen) override;
-
-  LSnapshot* snapshot() const { return snapshot_; }
 };
 
 }  // namespace jit

@@ -46,20 +46,24 @@
 
 using namespace js;
 
-const JSClassOps DisplayNamesObject::classOps_ = {nullptr, /* addProperty */
-                                                  nullptr, /* delProperty */
-                                                  nullptr, /* enumerate */
-                                                  nullptr, /* newEnumerate */
-                                                  nullptr, /* resolve */
-                                                  nullptr, /* mayResolve */
-                                                  DisplayNamesObject::finalize};
+const JSClassOps DisplayNamesObject::classOps_ = {
+    nullptr, /* addProperty */
+    nullptr, /* delProperty */
+    nullptr, /* enumerate */
+    nullptr, /* newEnumerate */
+    nullptr, /* resolve */
+    nullptr, /* mayResolve */
+    DisplayNamesObject::finalize,
+};
 
 const JSClass DisplayNamesObject::class_ = {
     "Intl.DisplayNames",
     JSCLASS_HAS_RESERVED_SLOTS(DisplayNamesObject::SLOT_COUNT) |
         JSCLASS_HAS_CACHED_PROTO(JSProto_DisplayNames) |
         JSCLASS_FOREGROUND_FINALIZE,
-    &DisplayNamesObject::classOps_, &DisplayNamesObject::classSpec_};
+    &DisplayNamesObject::classOps_,
+    &DisplayNamesObject::classSpec_,
+};
 
 const JSClass& DisplayNamesObject::protoClass_ = PlainObject::class_;
 
@@ -72,17 +76,21 @@ static bool displayNames_toSource(JSContext* cx, unsigned argc, Value* vp) {
 static const JSFunctionSpec displayNames_static_methods[] = {
     JS_SELF_HOSTED_FN("supportedLocalesOf",
                       "Intl_DisplayNames_supportedLocalesOf", 1, 0),
-    JS_FS_END};
+    JS_FS_END,
+};
 
 static const JSFunctionSpec displayNames_methods[] = {
     JS_SELF_HOSTED_FN("of", "Intl_DisplayNames_of", 1, 0),
     JS_SELF_HOSTED_FN("resolvedOptions", "Intl_DisplayNames_resolvedOptions", 0,
                       0),
-    JS_FN("toSource", displayNames_toSource, 0, 0), JS_FS_END};
+    JS_FN("toSource", displayNames_toSource, 0, 0),
+    JS_FS_END,
+};
 
 static const JSPropertySpec displayNames_properties[] = {
     JS_STRING_SYM_PS(toStringTag, "Intl.DisplayNames", JSPROP_READONLY),
-    JS_PS_END};
+    JS_PS_END,
+};
 
 static bool DisplayNames(JSContext* cx, unsigned argc, Value* vp);
 
@@ -94,7 +102,8 @@ const ClassSpec DisplayNamesObject::classSpec_ = {
     displayNames_methods,
     displayNames_properties,
     nullptr,
-    ClassSpec::DontDefineConstructor};
+    ClassSpec::DontDefineConstructor,
+};
 
 enum class DisplayNamesOptions {
   Standard,

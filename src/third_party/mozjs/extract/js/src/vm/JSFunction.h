@@ -146,7 +146,8 @@ class JSFunction : public js::NativeObject {
  public:
   static inline JSFunction* create(JSContext* cx, js::gc::AllocKind kind,
                                    js::gc::Heap heap,
-                                   js::Handle<js::SharedShape*> shape);
+                                   js::Handle<js::SharedShape*> shape,
+                                   js::gc::AllocSite* site = nullptr);
 
   /* Call objects must be created for each invocation of this function. */
   bool needsCallObject() const;
@@ -197,8 +198,15 @@ class JSFunction : public js::NativeObject {
   /* Possible attributes of a native function: */
   bool isAsmJSNative() const { return flags().isAsmJSNative(); }
 
+  // A WebAssembly "Exported Function" is the spec name for the JS function
+  // objects created to wrap wasm functions. This predicate returns false
+  // for asm.js functions which are semantically just normal JS functions
+  // (even if they are implemented via wasm under the hood). The accessor
+  // functions for extracting the instance and func-index of a wasm function
+  // can be used for both wasm and asm.js, however.
   bool isWasm() const { return flags().isWasm(); }
   bool isWasmWithJitEntry() const { return flags().isWasmWithJitEntry(); }
+
   bool isNativeWithJitEntry() const { return flags().isNativeWithJitEntry(); }
   bool isNativeWithoutJitEntry() const {
     return flags().isNativeWithoutJitEntry();
@@ -297,8 +305,8 @@ class JSFunction : public js::NativeObject {
     uint32_t flagsAndArgCount = flagsAndArgCountRaw();
     flagsAndArgCount &= ~FlagsMask;
     flagsAndArgCount |= flags;
-    js::HeapSlot& slot = getFixedSlotRef(FlagsAndArgCountSlot);
-    slot.unbarrieredSet(JS::PrivateUint32Value(flagsAndArgCount));
+    setReservedSlotPrivateUint32Unbarriered(FlagsAndArgCountSlot,
+                                            flagsAndArgCount);
   }
 
   // Make the function constructible.
@@ -309,8 +317,8 @@ class JSFunction : public js::NativeObject {
     uint32_t flagsAndArgCount = flagsAndArgCountRaw();
     flagsAndArgCount &= ~ArgCountMask;
     flagsAndArgCount |= nargs << ArgCountShift;
-    js::HeapSlot& slot = getFixedSlotRef(FlagsAndArgCountSlot);
-    slot.unbarrieredSet(JS::PrivateUint32Value(flagsAndArgCount));
+    setReservedSlotPrivateUint32Unbarriered(FlagsAndArgCountSlot,
+                                            flagsAndArgCount);
   }
 
   void setIsSelfHostedBuiltin() { setFlags(flags().setIsSelfHostedBuiltin()); }
@@ -514,8 +522,8 @@ class JSFunction : public js::NativeObject {
   }
   void setNativeJitInfoOrInterpretedScript(void* ptr) {
     // This always stores a PrivateValue and so doesn't require a barrier.
-    js::HeapSlot& slot = getFixedSlotRef(NativeJitInfoOrInterpretedScriptSlot);
-    slot.unbarrieredSet(JS::PrivateValue(ptr));
+    setReservedSlotPrivateUnbarriered(NativeJitInfoOrInterpretedScriptSlot,
+                                      ptr);
   }
 
  public:
@@ -655,35 +663,6 @@ class JSFunction : public js::NativeObject {
     setNativeJitInfoOrInterpretedScript(const_cast<JSJitInfo*>(data));
   }
 
-  // wasm functions are always natives and either:
-  //  - store a function-index in u.n.extra and can only be called through the
-  //    fun->native() entry point from C++.
-  //  - store a jit-entry code pointer in u.n.extra and can be called by jit
-  //    code directly. C++ callers can still use the fun->native() entry point
-  //    (computing the function index from the jit-entry point).
-  void setWasmFuncIndex(uint32_t funcIndex) {
-    MOZ_ASSERT(isWasm() || isAsmJSNative());
-    MOZ_ASSERT(!isWasmWithJitEntry());
-    MOZ_ASSERT(!nativeJitInfoOrInterpretedScript());
-    // See wasmFuncIndex_ comment for why we set the low bit.
-    uintptr_t tagged = (uintptr_t(funcIndex) << 1) | 1;
-    setNativeJitInfoOrInterpretedScript(reinterpret_cast<void*>(tagged));
-  }
-  uint32_t wasmFuncIndex() const {
-    MOZ_ASSERT(isWasm() || isAsmJSNative());
-    MOZ_ASSERT(!isWasmWithJitEntry());
-    uintptr_t tagged = uintptr_t(nativeJitInfoOrInterpretedScript());
-    MOZ_ASSERT(tagged & 1);
-    return tagged >> 1;
-  }
-  void setWasmJitEntry(void** entry) {
-    MOZ_ASSERT(*entry);
-    MOZ_ASSERT(isWasm());
-    MOZ_ASSERT(!isWasmWithJitEntry());
-    setFlags(flags().setNativeJitEntry());
-    setNativeJitInfoOrInterpretedScript(entry);
-    MOZ_ASSERT(isWasmWithJitEntry());
-  }
   void setTrampolineNativeJitEntry(void** entry) {
     MOZ_ASSERT(*entry);
     MOZ_ASSERT(isBuiltinNative());
@@ -693,15 +672,32 @@ class JSFunction : public js::NativeObject {
     setNativeJitInfoOrInterpretedScript(entry);
     MOZ_ASSERT(isNativeWithJitEntry());
   }
-  void** wasmJitEntry() const {
-    MOZ_ASSERT(isWasmWithJitEntry());
-    return nativeJitEntry();
-  }
   void** nativeJitEntry() const {
     MOZ_ASSERT(isNativeWithJitEntry());
     return static_cast<void**>(nativeJitInfoOrInterpretedScript());
   }
+
+  // wasm functions are always natives and either:
+  //  - store a function-index in u.n.extra and can only be called through the
+  //    fun->native() entry point from C++.
+  //  - store a jit-entry code pointer in u.n.extra and can be called by jit
+  //    code directly. C++ callers can still use the fun->native() entry point
+  //    (computing the function index from the jit-entry point).
+  void initWasm(uint32_t funcIndex, js::wasm::Instance* instance,
+                const js::wasm::SuperTypeVector* superTypeVector,
+                void* uncheckedCallEntry);
+  void initWasmWithJitEntry(void** entry, js::wasm::Instance* instance,
+                            const js::wasm::SuperTypeVector* superTypeVector,
+                            void* uncheckedCallEntry);
+
+  void** wasmJitEntry() const {
+    MOZ_ASSERT(isWasmWithJitEntry());
+    return nativeJitEntry();
+  }
   inline js::wasm::Instance& wasmInstance() const;
+  uint32_t wasmFuncIndex() const;
+  void* wasmUncheckedCallEntry() const;
+  void* wasmCheckedCallEntry() const;
   inline js::wasm::SuperTypeVector& wasmSuperTypeVector() const;
   inline const js::wasm::TypeDef* wasmTypeDef() const;
 
@@ -904,7 +900,9 @@ class FunctionExtended : public JSFunction {
 
 extern JSFunction* CloneFunctionReuseScript(JSContext* cx, HandleFunction fun,
                                             HandleObject enclosingEnv,
-                                            HandleObject proto);
+                                            HandleObject proto,
+                                            gc::Heap heap = gc::Heap::Default,
+                                            gc::AllocSite* site = nullptr);
 
 extern JSFunction* CloneAsmJSModuleFunction(JSContext* cx, HandleFunction fun);
 

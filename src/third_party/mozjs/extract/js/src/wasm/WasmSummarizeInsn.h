@@ -22,7 +22,7 @@ namespace wasm {
 // must be the correct classification for the instruction.  Return
 // `mozilla::Nothing` in case of doubt.
 //
-// This function is only used by ModuleGenerator::finishCodeTier to audit wasm
+// This function is only used by ModuleGenerator::finishCodeBlock to audit wasm
 // trap sites.  So it doesn't need to handle the whole complexity of the
 // machine's instruction set.  It only needs to handle the tiny sub-dialect
 // used by the trappable instructions we actually generate.

@@ -47,7 +47,9 @@ const JSClass LocaleObject::class_ = {
     "Intl.Locale",
     JSCLASS_HAS_RESERVED_SLOTS(LocaleObject::SLOT_COUNT) |
         JSCLASS_HAS_CACHED_PROTO(JSProto_Locale),
-    JS_NULL_CLASS_OPS, &LocaleObject::classSpec_};
+    JS_NULL_CLASS_OPS,
+    &LocaleObject::classSpec_,
+};
 
 const JSClass& LocaleObject::protoClass_ = PlainObject::class_;
 
@@ -74,7 +76,7 @@ struct IndexAndLength {
   size_t index;
   size_t length;
 
-  IndexAndLength(size_t index, size_t length) : index(index), length(length){};
+  IndexAndLength(size_t index, size_t length) : index(index), length(length) {};
 
   template <typename T>
   mozilla::Span<const T> spanOf(const T* ptr) const {
@@ -145,7 +147,7 @@ static LocaleObject* CreateLocaleObject(JSContext* cx, HandleObject prototype,
 }
 
 static inline bool IsValidUnicodeExtensionValue(JSContext* cx,
-                                                JSLinearString* linear,
+                                                const JSLinearString* linear,
                                                 bool* isValid) {
   if (linear->length() == 0) {
     *isValid = false;
@@ -167,7 +169,11 @@ static inline bool IsValidUnicodeExtensionValue(JSContext* cx,
   return true;
 }
 
-/** Iterate through (sep keyword) in a valid, lowercased Unicode extension. */
+/**
+ * Iterate through (sep keyword) in a valid Unicode extension.
+ *
+ * The Unicode extension value is not required to be in canonical case.
+ */
 template <typename CharT>
 class SepKeywordIterator {
   const CharT* iter_;
@@ -193,7 +199,8 @@ class SepKeywordIterator {
                "overall Unicode locale extension or non-leading subtags must "
                "be at least key-sized");
 
-    MOZ_ASSERT((iter_[0] == 'u' && iter_[1] == '-') || iter_[0] == '-');
+    MOZ_ASSERT(((iter_[0] == 'u' || iter_[0] == 'U') && iter_[1] == '-') ||
+               iter_[0] == '-');
 
     while (true) {
       // Skip past '-' so |std::char_traits::find| makes progress. Skipping
@@ -218,9 +225,8 @@ class SepKeywordIterator {
     }
 
     MOZ_ASSERT(iter_[0] == '-');
-    MOZ_ASSERT(mozilla::IsAsciiLowercaseAlpha(iter_[1]) ||
-               mozilla::IsAsciiDigit(iter_[1]));
-    MOZ_ASSERT(mozilla::IsAsciiLowercaseAlpha(iter_[2]));
+    MOZ_ASSERT(mozilla::IsAsciiAlphanumeric(iter_[1]));
+    MOZ_ASSERT(mozilla::IsAsciiAlpha(iter_[2]));
     MOZ_ASSERT_IF(iter_ + SepKeyLength < end_, iter_[SepKeyLength] == '-');
     return iter_;
   }
@@ -550,6 +556,12 @@ static bool Locale(JSContext* cx, unsigned argc, Value* vp) {
     return false;
   }
 
+  if (tag.Language().Length() > 4) {
+    MOZ_ASSERT(cx->global());
+    cx->runtime()->setUseCounter(cx->global(),
+                                 JSUseCounter::LEGACY_LANG_SUBTAG);
+  }
+
   if (auto result = tag.CanonicalizeBaseName(); result.isErr()) {
     if (result.unwrapErr() ==
         mozilla::intl::Locale::CanonicalizationError::DuplicateVariant) {
@@ -797,8 +809,8 @@ static mozilla::Maybe<IndexAndLength> FindUnicodeExtensionType(
                                       size_t(endType - beginType)});
 }
 
-static inline auto FindUnicodeExtensionType(JSLinearString* unicodeExtension,
-                                            UnicodeKey key) {
+static inline auto FindUnicodeExtensionType(
+    const JSLinearString* unicodeExtension, UnicodeKey key) {
   JS::AutoCheckCannotGC nogc;
   return unicodeExtension->hasLatin1Chars()
              ? FindUnicodeExtensionType(
@@ -918,7 +930,7 @@ static BaseNamePartsResult BaseNameParts(const CharT* baseName, size_t length) {
   return {language, script, region};
 }
 
-static inline auto BaseNameParts(JSLinearString* baseName) {
+static inline auto BaseNameParts(const JSLinearString* baseName) {
   JS::AutoCheckCannotGC nogc;
   return baseName->hasLatin1Chars()
              ? BaseNameParts(
@@ -1271,7 +1283,9 @@ static const JSFunctionSpec locale_methods[] = {
     JS_FN("maximize", Locale_maximize, 0, 0),
     JS_FN("minimize", Locale_minimize, 0, 0),
     JS_FN("toString", Locale_toString, 0, 0),
-    JS_FN("toSource", Locale_toSource, 0, 0), JS_FS_END};
+    JS_FN("toSource", Locale_toSource, 0, 0),
+    JS_FS_END,
+};
 
 static const JSPropertySpec locale_properties[] = {
     JS_PSG("baseName", Locale_baseName, 0),
@@ -1285,7 +1299,8 @@ static const JSPropertySpec locale_properties[] = {
     JS_PSG("script", Locale_script, 0),
     JS_PSG("region", Locale_region, 0),
     JS_STRING_SYM_PS(toStringTag, "Intl.Locale", JSPROP_READONLY),
-    JS_PS_END};
+    JS_PS_END,
+};
 
 const ClassSpec LocaleObject::classSpec_ = {
     GenericCreateConstructor<Locale, 1, gc::AllocKind::FUNCTION>,
@@ -1295,7 +1310,8 @@ const ClassSpec LocaleObject::classSpec_ = {
     locale_methods,
     locale_properties,
     nullptr,
-    ClassSpec::DontDefineConstructor};
+    ClassSpec::DontDefineConstructor,
+};
 
 bool js::intl_ValidateAndCanonicalizeLanguageTag(JSContext* cx, unsigned argc,
                                                  Value* vp) {

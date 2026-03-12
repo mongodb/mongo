@@ -47,12 +47,15 @@ __m128i CmpEq128(__m128i a, __m128i b) {
 template <typename TValue>
 __m256i CmpEq256(__m256i a, __m256i b) {
   static_assert(sizeof(TValue) == 1 || sizeof(TValue) == 2 ||
-                sizeof(TValue) == 8);
+                sizeof(TValue) == 4 || sizeof(TValue) == 8);
   if (sizeof(TValue) == 1) {
     return _mm256_cmpeq_epi8(a, b);
   }
   if (sizeof(TValue) == 2) {
     return _mm256_cmpeq_epi16(a, b);
+  }
+  if (sizeof(TValue) == 4) {
+    return _mm256_cmpeq_epi32(a, b);
   }
 
   return _mm256_cmpeq_epi64(a, b);
@@ -156,7 +159,7 @@ const TValue* Check4x32Bytes(__m256i needle, uintptr_t a, uintptr_t b,
 template <typename TValue>
 const TValue* FindInBufferAVX2(const TValue* ptr, TValue value, size_t length) {
   static_assert(sizeof(TValue) == 1 || sizeof(TValue) == 2 ||
-                sizeof(TValue) == 8);
+                sizeof(TValue) == 4 || sizeof(TValue) == 8);
   static_assert(std::is_unsigned<TValue>::value);
 
   // Load our needle into a 32-byte register
@@ -165,6 +168,8 @@ const TValue* FindInBufferAVX2(const TValue* ptr, TValue value, size_t length) {
     needle = _mm256_set1_epi8(value);
   } else if (sizeof(TValue) == 2) {
     needle = _mm256_set1_epi16(value);
+  } else if (sizeof(TValue) == 4) {
+    needle = _mm256_set1_epi32(value);
   } else {
     needle = _mm256_set1_epi64x(value);
   }
@@ -173,7 +178,7 @@ const TValue* FindInBufferAVX2(const TValue* ptr, TValue value, size_t length) {
   uintptr_t cur = reinterpret_cast<uintptr_t>(ptr);
   uintptr_t end = cur + numBytes;
 
-  if (numBytes < 8 || (sizeof(TValue) == 8 && numBytes < 32)) {
+  if (numBytes < 8 || (sizeof(TValue) >= 4 && numBytes < 32)) {
     while (cur < end) {
       if (GetAs<TValue>(cur) == value) {
         return reinterpret_cast<const TValue*>(cur);
@@ -183,7 +188,7 @@ const TValue* FindInBufferAVX2(const TValue* ptr, TValue value, size_t length) {
     return nullptr;
   }
 
-  if constexpr (sizeof(TValue) != 8) {
+  if constexpr (sizeof(TValue) < 4) {
     if (numBytes < 32) {
       __m128i needle_narrow;
       if (sizeof(TValue) == 1) {
@@ -264,6 +269,11 @@ const char16_t* SIMD::memchr16AVX2(const char16_t* ptr, char16_t value,
   return FindInBufferAVX2<char16_t>(ptr, value, length);
 }
 
+const uint32_t* SIMD::memchr32AVX2(const uint32_t* ptr, uint32_t value,
+                                   size_t length) {
+  return FindInBufferAVX2<uint32_t>(ptr, value, length);
+}
+
 const uint64_t* SIMD::memchr64AVX2(const uint64_t* ptr, uint64_t value,
                                    size_t length) {
   return FindInBufferAVX2<uint64_t>(ptr, value, length);
@@ -280,6 +290,11 @@ const char* SIMD::memchr8AVX2(const char* ptr, char value, size_t length) {
 }
 
 const char16_t* SIMD::memchr16AVX2(const char16_t* ptr, char16_t value,
+                                   size_t length) {
+  MOZ_RELEASE_ASSERT(false, "AVX2 not supported in this binary.");
+}
+
+const uint32_t* SIMD::memchr32AVX2(const uint32_t* ptr, uint32_t value,
                                    size_t length) {
   MOZ_RELEASE_ASSERT(false, "AVX2 not supported in this binary.");
 }

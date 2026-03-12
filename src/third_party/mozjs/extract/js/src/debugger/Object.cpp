@@ -100,7 +100,10 @@ const JSClassOps DebuggerObject::classOps_ = {
 };
 
 const JSClass DebuggerObject::class_ = {
-    "Object", JSCLASS_HAS_RESERVED_SLOTS(RESERVED_SLOTS), &classOps_};
+    "Object",
+    JSCLASS_HAS_RESERVED_SLOTS(RESERVED_SLOTS),
+    &classOps_,
+};
 
 void DebuggerObject::trace(JSTracer* trc) {
   // There is a barrier on private pointers, so the Unbarriered marking
@@ -1276,46 +1279,56 @@ bool DebuggerObject::CallData::createSource() {
 
   bool isScriptElement = ToBoolean(v);
 
-  JS::CompileOptions compileOptions(cx);
-  compileOptions.lineno = startLine;
-  compileOptions.column = JS::ColumnNumberOneOrigin(startColumn);
-
-  if (!JS::StringHasLatin1Chars(url)) {
-    JS_ReportErrorASCII(cx, "URL must be a narrow string");
+  if (!JS_GetProperty(cx, options, "forceEnableAsmJS", &v)) {
     return false;
   }
 
-  UniqueChars urlChars = JS_EncodeStringToUTF8(cx, url);
-  if (!urlChars) {
-    return false;
-  }
-  compileOptions.setFile(urlChars.get());
-
-  Vector<char16_t> sourceMapURLChars(cx);
-  if (sourceMapURL) {
-    if (!CopyStringToVector(cx, sourceMapURL, sourceMapURLChars)) {
-      return false;
-    }
-    compileOptions.setSourceMapURL(sourceMapURLChars.begin());
-  }
-
-  if (isScriptElement) {
-    // The introduction type must be a statically allocated string.
-    compileOptions.setIntroductionType("inlineScript");
-  }
-
-  AutoStableStringChars linearChars(cx);
-  if (!linearChars.initTwoByte(cx, text)) {
-    return false;
-  }
-  JS::SourceText<char16_t> srcBuf;
-  if (!srcBuf.initMaybeBorrowed(cx, linearChars)) {
-    return false;
-  }
+  bool forceEnableAsmJS = ToBoolean(v);
 
   RootedScript script(cx);
   {
     AutoRealm ar(cx, referent);
+
+    JS::CompileOptions compileOptions(cx);
+    compileOptions.lineno = startLine;
+    compileOptions.column = JS::ColumnNumberOneOrigin(startColumn);
+    if (forceEnableAsmJS) {
+      compileOptions.setAsmJSOption(JS::AsmJSOption::Enabled);
+    }
+
+    if (!JS::StringHasLatin1Chars(url)) {
+      JS_ReportErrorASCII(cx, "URL must be a narrow string");
+      return false;
+    }
+
+    UniqueChars urlChars = JS_EncodeStringToUTF8(cx, url);
+    if (!urlChars) {
+      return false;
+    }
+    compileOptions.setFile(urlChars.get());
+
+    Vector<char16_t> sourceMapURLChars(cx);
+    if (sourceMapURL) {
+      if (!CopyStringToVector(cx, sourceMapURL, sourceMapURLChars)) {
+        return false;
+      }
+      compileOptions.setSourceMapURL(sourceMapURLChars.begin());
+    }
+
+    if (isScriptElement) {
+      // The introduction type must be a statically allocated string.
+      compileOptions.setIntroductionType("inlineScript");
+    }
+
+    AutoStableStringChars linearChars(cx);
+    if (!linearChars.initTwoByte(cx, text)) {
+      return false;
+    }
+    JS::SourceText<char16_t> srcBuf;
+    if (!srcBuf.initMaybeBorrowed(cx, linearChars)) {
+      return false;
+    }
+
     script = JS::Compile(cx, compileOptions, srcBuf);
     if (!script) {
       return false;
@@ -1516,7 +1529,8 @@ const JSPropertySpec DebuggerObject::properties_[] = {
     JS_DEBUG_PSG("isProxy", isProxyGetter),
     JS_DEBUG_PSG("proxyTarget", proxyTargetGetter),
     JS_DEBUG_PSG("proxyHandler", proxyHandlerGetter),
-    JS_PS_END};
+    JS_PS_END,
+};
 
 const JSPropertySpec DebuggerObject::promiseProperties_[] = {
     JS_DEBUG_PSG("isPromise", isPromiseGetter),
@@ -1529,7 +1543,8 @@ const JSPropertySpec DebuggerObject::promiseProperties_[] = {
     JS_DEBUG_PSG("promiseResolutionSite", promiseResolutionSiteGetter),
     JS_DEBUG_PSG("promiseID", promiseIDGetter),
     JS_DEBUG_PSG("promiseDependentPromises", promiseDependentPromisesGetter),
-    JS_PS_END};
+    JS_PS_END,
+};
 
 const JSFunctionSpec DebuggerObject::methods_[] = {
     JS_DEBUG_FN("isExtensible", isExtensibleMethod, 0),
@@ -1565,7 +1580,8 @@ const JSFunctionSpec DebuggerObject::methods_[] = {
     JS_DEBUG_FN("unsafeDereference", unsafeDereferenceMethod, 0),
     JS_DEBUG_FN("unwrap", unwrapMethod, 0),
     JS_DEBUG_FN("getPromiseReactions", getPromiseReactionsMethod, 0),
-    JS_FS_END};
+    JS_FS_END,
+};
 
 /* static */
 NativeObject* DebuggerObject::initClass(JSContext* cx,

@@ -55,7 +55,7 @@ class MOZ_NON_PARAM JS_PUBLIC_API ProfilingFrameIterator {
   void* endStackAddress_ = nullptr;
   Kind kind_;
 
-  static const unsigned StorageSpace = 8 * sizeof(void*);
+  static const unsigned StorageSpace = 9 * sizeof(void*);
   alignas(void*) unsigned char storage_[StorageSpace];
 
   void* storage() { return storage_; }
@@ -136,6 +136,8 @@ class MOZ_NON_PARAM JS_PUBLIC_API ProfilingFrameIterator {
   //  - is weakly monotonically increasing (may be equal for successive frames)
   //  - will compare greater than newer native and psuedo-stack frame addresses
   //    and less than older native and psuedo-stack frame addresses
+  // The exception is at the point of stack switching between the main stack
+  // and a suspendable one (see WebAssembly JS Promise Integration proposal).
   void* stackAddress() const;
 
   enum FrameKind {

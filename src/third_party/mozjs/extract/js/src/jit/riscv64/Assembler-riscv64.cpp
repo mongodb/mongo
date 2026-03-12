@@ -469,7 +469,8 @@ void Assembler::li_ptr(Register rd, int64_t imm) {
   // Initialize rd with an address
   // Pointers are 48 bits
   // 6 fixed instructions are generated
-  DEBUG_PRINTF("li_ptr(%d, %lx <%ld>)\n", ToNumber(rd), imm, imm);
+  DEBUG_PRINTF("li_ptr(%d, %" PRIx64 " <%" PRId64 ">)\n", ToNumber(rd), imm,
+               imm);
   MOZ_ASSERT((imm & 0xfff0000000000000ll) == 0);
   int64_t a6 = imm & 0x3f;                      // bits 0:5. 6 bits
   int64_t b11 = (imm >> 6) & 0x7ff;             // bits 6:11. 11 bits
@@ -488,7 +489,8 @@ void Assembler::li_ptr(Register rd, int64_t imm) {
 void Assembler::li_constant(Register rd, int64_t imm) {
   m_buffer.enterNoNops();
   m_buffer.assertNoPoolAndNoNops();
-  DEBUG_PRINTF("li_constant(%d, %lx <%ld>)\n", ToNumber(rd), imm, imm);
+  DEBUG_PRINTF("li_constant(%d, %" PRIx64 " <%" PRId64 ">)\n", ToNumber(rd),
+               imm, imm);
   lui(rd, (imm + (1LL << 47) + (1LL << 35) + (1LL << 23) + (1LL << 11)) >>
               48);  // Bits 63:48
   addiw(rd, rd,
@@ -509,6 +511,7 @@ ABIArg ABIArgGenerator::next(MIRType type) {
     case MIRType::Int64:
     case MIRType::Pointer:
     case MIRType::WasmAnyRef:
+    case MIRType::WasmArrayData:
     case MIRType::StackResults: {
       if (intRegIndex_ == NumIntArgRegs) {
         current_ = ABIArg(stackOffset_);
@@ -563,7 +566,7 @@ int Assembler::disassembleInstr(Instr instr, bool enable_spew) {
   return size;
 }
 
-uintptr_t Assembler::target_address_at(Instruction* pc) {
+uint64_t Assembler::target_address_at(Instruction* pc) {
   Instruction* instr0 = pc;
   DEBUG_PRINTF("target_address_at: pc: 0x%p\t", instr0);
   Instruction* instr1 = pc + 1 * kInstrSize;
@@ -590,8 +593,8 @@ uintptr_t Assembler::target_address_at(Instruction* pc) {
     addr <<= 6;
     addr |= (int64_t)instr5->Imm12Value();
 
-    DEBUG_PRINTF("addr: %lx\n", addr);
-    return static_cast<uintptr_t>(addr);
+    DEBUG_PRINTF("addr: %" PRIx64 "\n", addr);
+    return static_cast<uint64_t>(addr);
   }
   // We should never get here, force a bad address if we do.
   MOZ_CRASH("RISC-V  UNREACHABLE");
@@ -650,7 +653,7 @@ uint64_t Assembler::ExtractLoad64Value(Instruction* inst0) {
       MOZ_ASSERT(instr6->Imm12Value() == 12);
       imm <<= 12;
       imm += (int64_t)instr7->Imm12Value();
-      DEBUG_PRINTF("imm:%lx\n", imm);
+      DEBUG_PRINTF("imm:%" PRIx64 "\n", imm);
       return imm;
     } else {
       FLAG_riscv_debug = true;
@@ -689,7 +692,7 @@ uint64_t Assembler::ExtractLoad64Value(Instruction* inst0) {
 }
 
 void Assembler::UpdateLoad64Value(Instruction* pc, uint64_t value) {
-  DEBUG_PRINTF("\tUpdateLoad64Value: pc: %p\tvalue: %lx\n", pc, value);
+  DEBUG_PRINTF("\tUpdateLoad64Value: pc: %p\tvalue: %" PRIx64 "\n", pc, value);
   Instruction* instr1 = pc + 1 * kInstrSize;
   if (IsJal(*reinterpret_cast<Instr*>(pc))) {
     pc = pc + pc->Imm20JValue();
@@ -766,7 +769,8 @@ void Assembler::UpdateLoad64Value(Instruction* pc, uint64_t value) {
 }
 
 void Assembler::set_target_value_at(Instruction* pc, uint64_t target) {
-  DEBUG_PRINTF("\tset_target_value_at: pc: %p\ttarget: %lx\n", pc, target);
+  DEBUG_PRINTF("\tset_target_value_at: pc: %p\ttarget: %" PRIx64 "\n", pc,
+               target);
   uint32_t* p = reinterpret_cast<uint32_t*>(pc);
   MOZ_ASSERT((target & 0xffff000000000000ll) == 0);
 #ifdef DEBUG

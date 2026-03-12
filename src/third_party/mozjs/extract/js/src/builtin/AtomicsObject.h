@@ -13,6 +13,7 @@
 #include "threading/ConditionVariable.h"
 #include "threading/ProtectedData.h"  // js::ThreadData
 #include "vm/NativeObject.h"
+#include "vm/PlainObject.h"
 
 namespace js {
 
@@ -21,6 +22,44 @@ class SharedArrayRawBuffer;
 class AtomicsObject : public NativeObject {
  public:
   static const JSClass class_;
+};
+
+enum class FutexWaiterKind { Sync, Async, ListHead };
+
+class FutexWaiter;
+class SyncFutexWaiter;
+class AsyncFutexWaiter;
+
+class FutexWaiterListNode {
+ private:
+  FutexWaiterListNode* next_ = nullptr;  // Lower priority node in waiter list
+  FutexWaiterListNode* prev_ = nullptr;  // Higher priority node in waiter list
+
+ protected:
+  explicit FutexWaiterListNode(FutexWaiterKind kind) : kind_(kind) {}
+  FutexWaiterKind kind_;
+
+ public:
+  FutexWaiter* toWaiter() {
+    MOZ_ASSERT(kind_ != FutexWaiterKind::ListHead);
+    return reinterpret_cast<FutexWaiter*>(this);
+  }
+
+  FutexWaiterKind kind() const { return kind_; }
+
+  FutexWaiterListNode* next() { return next_; }
+  void setNext(FutexWaiterListNode* next) { next_ = next; }
+  FutexWaiterListNode* prev() { return prev_; }
+  void setPrev(FutexWaiterListNode* prev) { prev_ = prev; }
+};
+
+class FutexWaiterListHead : public FutexWaiterListNode {
+ public:
+  FutexWaiterListHead() : FutexWaiterListNode(FutexWaiterKind::ListHead) {
+    setNext(this);
+    setPrev(this);
+  }
+  ~FutexWaiterListHead();
 };
 
 class FutexThread {
@@ -129,12 +168,29 @@ class FutexThread {
     JSContext* cx, SharedArrayRawBuffer* sarb, size_t byteOffset, int64_t value,
     const mozilla::Maybe<mozilla::TimeDuration>& timeout);
 
+// If the int32_t value at the given address equals `value`, return a result
+// object containing a promise that will be resolved when that address is
+// notified.
+[[nodiscard]] PlainObject* atomics_wait_async_impl(
+    JSContext* cx, SharedArrayRawBuffer* sarb, size_t byteOffset, int32_t value,
+    const mozilla::Maybe<mozilla::TimeDuration>& timeout);
+
+// If the int64_t value at the given address equals `value`, return a result
+// object containing a promise that will be resolved when that address is
+// notified.
+[[nodiscard]] PlainObject* atomics_wait_async_impl(
+    JSContext* cx, SharedArrayRawBuffer* sarb, size_t byteOffset, int64_t value,
+    const mozilla::Maybe<mozilla::TimeDuration>& timeout);
+
 // Notify some waiters on the given address.  If `count` is negative then notify
 // all.  The return value is nonnegative and is the number of waiters woken.  If
 // the number of waiters woken exceeds INT64_MAX then this never returns.  If
-// `count` is nonnegative then the return value is never greater than `count`.
-[[nodiscard]] int64_t atomics_notify_impl(SharedArrayRawBuffer* sarb,
-                                          size_t byteOffset, int64_t count);
+// `count` is nonnegative then the woken out parameter is never greater than
+// `count`.
+[[nodiscard]] bool atomics_notify_impl(JSContext* cx,
+                                       SharedArrayRawBuffer* sarb,
+                                       size_t byteOffset, int64_t count,
+                                       int64_t* woken);
 
 } /* namespace js */
 

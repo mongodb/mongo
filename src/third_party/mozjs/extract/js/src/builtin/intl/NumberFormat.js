@@ -20,11 +20,11 @@ var numberFormatInternalProperties = {
 };
 
 /**
- * 15.1.2 InitializeNumberFormat ( numberFormat, locales, options )
+ * 15.1.1 Intl.NumberFormat ( [ locales [ , options ] ] )
  *
  * Compute an internal properties object from |lazyNumberFormatData|.
  *
- * ES2024 Intl draft rev 74ca7099f103d143431b2ea422ae640c6f43e3e6
+ * ES2025 Intl draft rev 5ea95f8a98d660e94c177d6f5e88c6d2962123b1
  */
 function resolveNumberFormatInternals(lazyNumberFormatData) {
   assert(IsObject(lazyNumberFormatData), "lazy data not an object?");
@@ -35,59 +35,56 @@ function resolveNumberFormatInternals(lazyNumberFormatData) {
 
   // Compute effective locale.
 
-  // Step 9.
-  var localeData = NumberFormat.localeData;
-
-  // Step 10.
+  // Step 11.
   var r = ResolveLocale(
     "NumberFormat",
     lazyNumberFormatData.requestedLocales,
     lazyNumberFormatData.opt,
     NumberFormat.relevantExtensionKeys,
-    localeData
+    NumberFormat.localeData
   );
 
-  // Steps 11-13. (Step 12 is not relevant to our implementation.)
+  // Steps 12-14. (Step 13 is not relevant to our implementation.)
   internalProps.locale = r.locale;
   internalProps.numberingSystem = r.nu;
 
   // Compute formatting options.
 
-  // Step 14. SetNumberFormatUnitOptions, step 4.
+  // Step 15. SetNumberFormatUnitOptions, step 2.
   var style = lazyNumberFormatData.style;
   internalProps.style = style;
 
-  // Step 14. SetNumberFormatUnitOptions, step 14.
+  // Step 15. SetNumberFormatUnitOptions, step 12.
   if (style === "currency") {
     internalProps.currency = lazyNumberFormatData.currency;
     internalProps.currencyDisplay = lazyNumberFormatData.currencyDisplay;
     internalProps.currencySign = lazyNumberFormatData.currencySign;
   }
 
-  // Step 14. SetNumberFormatUnitOptions, step 15.
+  // Step 15. SetNumberFormatUnitOptions, step 13.
   if (style === "unit") {
     internalProps.unit = lazyNumberFormatData.unit;
     internalProps.unitDisplay = lazyNumberFormatData.unitDisplay;
   }
 
-  // Step 19.
+  // Step 18.
   var notation = lazyNumberFormatData.notation;
   internalProps.notation = notation;
 
-  // Step 20. SetNumberFormatDigitOptions, step 6.
+  // Step 21. SetNumberFormatDigitOptions, step 6.
   internalProps.minimumIntegerDigits =
     lazyNumberFormatData.minimumIntegerDigits;
 
-  // Step 20. SetNumberFormatDigitOptions, step 14.
+  // Step 21. SetNumberFormatDigitOptions, step 14.
   internalProps.roundingIncrement = lazyNumberFormatData.roundingIncrement;
 
-  // Step 20. SetNumberFormatDigitOptions, step 15.
+  // Step 21. SetNumberFormatDigitOptions, step 15.
   internalProps.roundingMode = lazyNumberFormatData.roundingMode;
 
-  // Step 20. SetNumberFormatDigitOptions, step 16.
+  // Step 21. SetNumberFormatDigitOptions, step 16.
   internalProps.trailingZeroDisplay = lazyNumberFormatData.trailingZeroDisplay;
 
-  // Step 20. SetNumberFormatDigitOptions, steps 25-26.
+  // Step 21. SetNumberFormatDigitOptions, steps 25-26.
   if ("minimumFractionDigits" in lazyNumberFormatData) {
     // Note: Intl.NumberFormat.prototype.resolvedOptions() exposes the
     // actual presence (versus undefined-ness) of these properties.
@@ -101,7 +98,7 @@ function resolveNumberFormatInternals(lazyNumberFormatData) {
       lazyNumberFormatData.maximumFractionDigits;
   }
 
-  // Step 20. SetNumberFormatDigitOptions, steps 24 and 26.
+  // Step 21. SetNumberFormatDigitOptions, steps 24 and 26.
   if ("minimumSignificantDigits" in lazyNumberFormatData) {
     // Note: Intl.NumberFormat.prototype.resolvedOptions() exposes the
     // actual presence (versus undefined-ness) of these properties.
@@ -115,18 +112,18 @@ function resolveNumberFormatInternals(lazyNumberFormatData) {
       lazyNumberFormatData.maximumSignificantDigits;
   }
 
-  // Step 20. SetNumberFormatDigitOptions, steps 26-30.
+  // Step 21. SetNumberFormatDigitOptions, steps 26-30.
   internalProps.roundingPriority = lazyNumberFormatData.roundingPriority;
 
-  // Step 23.
+  // Step 24.
   if (notation === "compact") {
     internalProps.compactDisplay = lazyNumberFormatData.compactDisplay;
   }
 
-  // Step 28.
+  // Step 29.
   internalProps.useGrouping = lazyNumberFormatData.useGrouping;
 
-  // Step 30.
+  // Step 31.
   internalProps.signDisplay = lazyNumberFormatData.signDisplay;
 
   // The caller is responsible for associating |internalProps| with the right
@@ -579,7 +576,7 @@ function IsSanctionedSimpleUnitIdentifier(unitIdentifier) {
 
 /* eslint-disable complexity */
 /**
- * 15.1.2 InitializeNumberFormat ( numberFormat, locales, options )
+ * 15.1.1 Intl.NumberFormat ( [ locales [ , options ] ] )
  *
  * Initializes an object as a NumberFormat.
  *
@@ -589,7 +586,7 @@ function IsSanctionedSimpleUnitIdentifier(unitIdentifier) {
  * This later work occurs in |resolveNumberFormatInternals|; steps not noted
  * here occur there.
  *
- * ES2024 Intl draft rev 74ca7099f103d143431b2ea422ae640c6f43e3e6
+ * ES2025 Intl draft rev 5ea95f8a98d660e94c177d6f5e88c6d2962123b1
  */
 function InitializeNumberFormat(numberFormat, thisValue, locales, options) {
   assert(
@@ -660,11 +657,11 @@ function InitializeNumberFormat(numberFormat, thisValue, locales, options) {
   // subset of them.
   var lazyNumberFormatData = std_Object_create(null);
 
-  // Step 1.
+  // Step 3.
   var requestedLocales = CanonicalizeLocaleList(locales);
   lazyNumberFormatData.requestedLocales = requestedLocales;
 
-  // Step 2. (Inlined call to CoerceOptionsToObject.)
+  // Step 4. (Inlined call to CoerceOptionsToObject.)
   //
   // If we ever need more speed here at startup, we should try to detect the
   // case where |options === undefined| and then directly use the default
@@ -677,11 +674,11 @@ function InitializeNumberFormat(numberFormat, thisValue, locales, options) {
 
   // Compute options that impact interpretation of locale.
 
-  // Step 3.
+  // Step 5.
   var opt = new_Record();
   lazyNumberFormatData.opt = opt;
 
-  // Steps 4-5.
+  // Steps 6-7.
   var matcher = GetOption(
     options,
     "localeMatcher",
@@ -691,7 +688,7 @@ function InitializeNumberFormat(numberFormat, thisValue, locales, options) {
   );
   opt.localeMatcher = matcher;
 
-  // Step 6.
+  // Step 8.
   var numberingSystem = GetOption(
     options,
     "numberingSystem",
@@ -700,7 +697,7 @@ function InitializeNumberFormat(numberFormat, thisValue, locales, options) {
     undefined
   );
 
-  // Step 7.
+  // Step 9.
   if (numberingSystem !== undefined) {
     numberingSystem = intl_ValidateAndCanonicalizeUnicodeExtensionType(
       numberingSystem,
@@ -709,12 +706,12 @@ function InitializeNumberFormat(numberFormat, thisValue, locales, options) {
     );
   }
 
-  // Step 8.
+  // Step 10.
   opt.nu = numberingSystem;
 
   // Compute formatting options.
 
-  // Step 14. SetNumberFormatUnitOptions, steps 3-4.
+  // Step 15. SetNumberFormatUnitOptions, steps 1-2.
   var style = GetOption(
     options,
     "style",
@@ -724,10 +721,10 @@ function InitializeNumberFormat(numberFormat, thisValue, locales, options) {
   );
   lazyNumberFormatData.style = style;
 
-  // Step 14. SetNumberFormatUnitOptions, step 5.
+  // Step 15. SetNumberFormatUnitOptions, step 3.
   var currency = GetOption(options, "currency", "string", undefined, undefined);
 
-  // Step 14. SetNumberFormatUnitOptions, steps 6-7.
+  // Step 15. SetNumberFormatUnitOptions, steps 4-5.
   if (currency === undefined) {
     if (style === "currency") {
       ThrowTypeError(JSMSG_UNDEFINED_CURRENCY);
@@ -738,7 +735,7 @@ function InitializeNumberFormat(numberFormat, thisValue, locales, options) {
     }
   }
 
-  // Step 14. SetNumberFormatUnitOptions, step 8.
+  // Step 15. SetNumberFormatUnitOptions, step 6.
   var currencyDisplay = GetOption(
     options,
     "currencyDisplay",
@@ -747,7 +744,7 @@ function InitializeNumberFormat(numberFormat, thisValue, locales, options) {
     "symbol"
   );
 
-  // Step 14. SetNumberFormatUnitOptions, step 9.
+  // Step 15. SetNumberFormatUnitOptions, step 7.
   var currencySign = GetOption(
     options,
     "currencySign",
@@ -756,23 +753,23 @@ function InitializeNumberFormat(numberFormat, thisValue, locales, options) {
     "standard"
   );
 
-  // Step 14. SetNumberFormatUnitOptions, step 14. (Reordered)
+  // Step 15. SetNumberFormatUnitOptions, step 12. (Reordered)
   if (style === "currency") {
-    // Step 14. SetNumberFormatUnitOptions, step 14.a.
+    // Step 15. SetNumberFormatUnitOptions, step 12.a.
     currency = toASCIIUpperCase(currency);
     lazyNumberFormatData.currency = currency;
 
-    // Step 14. SetNumberFormatUnitOptions, step 14.b.
+    // Step 15. SetNumberFormatUnitOptions, step 12.b.
     lazyNumberFormatData.currencyDisplay = currencyDisplay;
 
-    // Step 14. SetNumberFormatUnitOptions, step 14.c.
+    // Step 15. SetNumberFormatUnitOptions, step 12.c.
     lazyNumberFormatData.currencySign = currencySign;
   }
 
-  // Step 14. SetNumberFormatUnitOptions, step 10.
+  // Step 15. SetNumberFormatUnitOptions, step 8.
   var unit = GetOption(options, "unit", "string", undefined, undefined);
 
-  // Step 14. SetNumberFormatUnitOptions, steps 11-12.
+  // Step 15. SetNumberFormatUnitOptions, steps 9-10.
   if (unit === undefined) {
     if (style === "unit") {
       ThrowTypeError(JSMSG_UNDEFINED_UNIT);
@@ -783,7 +780,7 @@ function InitializeNumberFormat(numberFormat, thisValue, locales, options) {
     }
   }
 
-  // Step 14. SetNumberFormatUnitOptions, step 13.
+  // Step 15. SetNumberFormatUnitOptions, step 11.
   var unitDisplay = GetOption(
     options,
     "unitDisplay",
@@ -792,24 +789,15 @@ function InitializeNumberFormat(numberFormat, thisValue, locales, options) {
     "short"
   );
 
-  // Step 14. SetNumberFormatUnitOptions, step 15.
+  // Step 15. SetNumberFormatUnitOptions, step 13.
   if (style === "unit") {
     lazyNumberFormatData.unit = unit;
     lazyNumberFormatData.unitDisplay = unitDisplay;
   }
 
-  // Steps 16-17.
-  var mnfdDefault, mxfdDefault;
-  if (style === "currency") {
-    var cDigits = CurrencyDigits(currency);
-    mnfdDefault = cDigits;
-    mxfdDefault = cDigits;
-  } else {
-    mnfdDefault = 0;
-    mxfdDefault = style === "percent" ? 0 : 3;
-  }
+  // Step 16. (Not applicable in our implementation.)
 
-  // Steps 18-19.
+  // Steps 17-18.
   var notation = GetOption(
     options,
     "notation",
@@ -819,7 +807,18 @@ function InitializeNumberFormat(numberFormat, thisValue, locales, options) {
   );
   lazyNumberFormatData.notation = notation;
 
-  // Step 20.
+  // Steps 19-20.
+  var mnfdDefault, mxfdDefault;
+  if (style === "currency" && notation === "standard") {
+    var cDigits = CurrencyDigits(currency);
+    mnfdDefault = cDigits;
+    mxfdDefault = cDigits;
+  } else {
+    mnfdDefault = 0;
+    mxfdDefault = style === "percent" ? 0 : 3;
+  }
+
+  // Step 21.
   SetNumberFormatDigitOptions(
     lazyNumberFormatData,
     options,
@@ -828,7 +827,7 @@ function InitializeNumberFormat(numberFormat, thisValue, locales, options) {
     notation
   );
 
-  // Steps 21 and 23.a.
+  // Steps 22 and 24.a.
   var compactDisplay = GetOption(
     options,
     "compactDisplay",
@@ -840,10 +839,10 @@ function InitializeNumberFormat(numberFormat, thisValue, locales, options) {
     lazyNumberFormatData.compactDisplay = compactDisplay;
   }
 
-  // Steps 22 and 23.b.
+  // Steps 23 and 24.b.
   var defaultUseGrouping = notation !== "compact" ? "auto" : "min2";
 
-  // Steps 24-25.
+  // Steps 25-26.
   var useGrouping = GetStringOrBooleanOption(
     options,
     "useGrouping",
@@ -851,14 +850,14 @@ function InitializeNumberFormat(numberFormat, thisValue, locales, options) {
     defaultUseGrouping
   );
 
-  // Steps 26-27.
+  // Steps 27-28.
   if (useGrouping === "true" || useGrouping === "false") {
     useGrouping = defaultUseGrouping;
   } else if (useGrouping === true) {
     useGrouping = "always";
   }
 
-  // Step 28.
+  // Step 29.
   assert(
     useGrouping === "min2" ||
     useGrouping === "auto" ||
@@ -868,7 +867,7 @@ function InitializeNumberFormat(numberFormat, thisValue, locales, options) {
   );
   lazyNumberFormatData.useGrouping = useGrouping;
 
-  // Steps 29-30.
+  // Steps 30-31.
   var signDisplay = GetOption(
     options,
     "signDisplay",
@@ -878,13 +877,11 @@ function InitializeNumberFormat(numberFormat, thisValue, locales, options) {
   );
   lazyNumberFormatData.signDisplay = signDisplay;
 
-  // Step 31.
-  //
   // We've done everything that must be done now: mark the lazy data as fully
   // computed and install it.
   initializeIntlObject(numberFormat, "NumberFormat", lazyNumberFormatData);
 
-  // 15.1.1 Intl.NumberFormat, step 4. (Inlined call to ChainNumberFormat.)
+  // Step 32. (Inlined call to ChainNumberFormat.)
   if (
     numberFormat !== thisValue &&
     callFunction(
@@ -903,7 +900,7 @@ function InitializeNumberFormat(numberFormat, thisValue, locales, options) {
     return thisValue;
   }
 
-  // 15.1.1 Intl.NumberFormat, step 5.
+  // Step 33.
   return numberFormat;
 }
 /* eslint-enable complexity */

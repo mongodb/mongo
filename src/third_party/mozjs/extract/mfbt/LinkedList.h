@@ -409,13 +409,13 @@ class LinkedListElement {
 template <typename T>
 class LinkedList {
  private:
-  typedef typename detail::LinkedListElementTraits<T> Traits;
-  typedef typename Traits::RawType RawType;
-  typedef typename Traits::ConstRawType ConstRawType;
-  typedef typename Traits::ClientType ClientType;
-  typedef typename Traits::ConstClientType ConstClientType;
-  typedef LinkedListElement<T>* ElementType;
-  typedef const LinkedListElement<T>* ConstElementType;
+  using Traits = typename detail::LinkedListElementTraits<T>;
+  using RawType = typename Traits::RawType;
+  using ConstRawType = typename Traits::ConstRawType;
+  using ClientType = typename Traits::ClientType;
+  using ConstClientType = typename Traits::ConstClientType;
+  using ElementType = LinkedListElement<T>*;
+  using ConstElementType = const LinkedListElement<T>*;
 
   LinkedListElement<T> sentinel;
 
@@ -444,6 +444,9 @@ class LinkedList {
       return mCurrent != aOther.mCurrent;
     }
   };
+
+  using const_iterator = Iterator<ConstRawType, ConstElementType>;
+  using iterator = Iterator<RawType, ElementType>;
 
   LinkedList() : sentinel(LinkedListElement<T>::NodeKind::Sentinel) {}
 
@@ -700,6 +703,11 @@ class LinkedList {
   LinkedList& operator=(const LinkedList<T>& aOther) = delete;
   LinkedList(const LinkedList<T>& aOther) = delete;
 };
+
+template <typename T>
+size_t RangeSizeEstimate(const LinkedList<T>&) {
+  return 0;
+}
 
 template <typename T>
 inline void ImplCycleCollectionUnlink(LinkedList<RefPtr<T>>& aField) {

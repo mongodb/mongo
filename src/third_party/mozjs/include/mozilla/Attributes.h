@@ -449,6 +449,39 @@
 #endif
 
 /**
+ * MOZ_GSL_OWNER indicates that objects of the type this annotation is attached
+ * to own some kind of resources, generally memory.
+ *
+ * See: https://clang.llvm.org/docs/AttributeReference.html#owner
+ */
+#if defined(__clang__) && defined(__has_cpp_attribute)
+#  if __has_cpp_attribute(gsl::Owner)
+#    define MOZ_GSL_OWNER [[gsl::Owner]]
+#  else
+#    define MOZ_GSL_OWNER /* nothing */
+#  endif
+#else
+#  define MOZ_GSL_OWNER /* nothing */
+#endif
+
+/**
+ * MOZ_GSL_POINTER indicates that objects of the type this annotation is
+ * attached to provide a non-owning view on some kind of resources, generally
+ * memory.
+ *
+ * See: https://clang.llvm.org/docs/AttributeReference.html#pointer
+ */
+#if defined(__clang__) && defined(__has_cpp_attribute)
+#  if __has_cpp_attribute(gsl::Pointer)
+#    define MOZ_GSL_POINTER [[gsl::Pointer]]
+#  else
+#    define MOZ_GSL_POINTER /* nothing */
+#  endif
+#else
+#  define MOZ_GSL_POINTER /* nothing */
+#endif
+
+/**
  * MOZ_LIFETIME_BOUND indicates that objects that are referred to by that
  * parameter may also be referred to by the return value of the annotated
  * function (or, for a parameter of a constructor, by the value of the
@@ -463,6 +496,21 @@
 #  endif
 #else
 #  define MOZ_LIFETIME_BOUND /* nothing */
+#endif
+
+/**
+ * MOZ_LIFETIME_CAPTURE_BY(x) indicates that objects that are referred to
+ * by that parameter may also be referred to by x.
+ * See: https://clang.llvm.org/docs/AttributeReference.html#lifetime-capture-by
+ */
+#if defined(__clang__) && defined(__has_cpp_attribute)
+#  if __has_cpp_attribute(clang::lifetime_capture_by)
+#    define MOZ_LIFETIME_CAPTURE_BY(x) [[clang::lifetime_capture_by(x)]]
+#  else
+#    define MOZ_LIFETIME_CAPTURE_BY(x) /* nothing */
+#  endif
+#else
+#  define MOZ_LIFETIME_CAPTURE_BY(x) /* nothing */
 #endif
 
 #ifdef __cplusplus
@@ -618,6 +666,11 @@
  *   expression. If a member of another class uses this class, or if another
  *   class inherits from this class, then it is considered to be a non-heap
  *   class as well, although this attribute need not be provided in such cases.
+ * MOZ_CONSTINIT: pre-C++20 equivalent to `constinit`.
+ * MOZ_RUNINIT: Applies to global variables with runtime initialization.
+ * MOZ_GLOBINIT: Applies to global variables with potential runtime
+ *   initialization (e.g. inside macro or when initialisation status depends on
+ *   template parameter).
  * MOZ_HEAP_CLASS: Applies to all classes. Any class with this annotation is
  *   expected to live on the heap, so it is a compile-time error to use it, or
  *   an array of such objects, as the type of a variable declaration, or as a
@@ -855,12 +908,17 @@
 #    define MOZ_MAY_CALL_AFTER_MUST_RETURN \
       __attribute__((annotate("moz_may_call_after_must_return")))
 #    define MOZ_KNOWN_LIVE __attribute__((annotate("moz_known_live")))
-#    ifndef XGILL_PLUGIN
+#    ifdef MOZ_CLANG_PLUGIN
 #      define MOZ_UNANNOTATED __attribute__((annotate("moz_unannotated")))
 #      define MOZ_ANNOTATED __attribute__((annotate("moz_annotated")))
+#      define MOZ_RUNINIT __attribute__((annotate("moz_global_var")))
+#      define MOZ_GLOBINIT \
+        MOZ_RUNINIT __attribute__((annotate("moz_generated")))
 #    else
 #      define MOZ_UNANNOTATED /* nothing */
 #      define MOZ_ANNOTATED   /* nothing */
+#      define MOZ_RUNINIT     /* nothing */
+#      define MOZ_GLOBINIT    /* nothing */
 #    endif
 
 /*
@@ -868,11 +926,11 @@
  * warning, so use pragmas to disable the warning.
  */
 #    ifdef __clang__
-#      define MOZ_HEAP_ALLOCATOR                                 \
-        _Pragma("clang diagnostic push")                         \
-            _Pragma("clang diagnostic ignored \"-Wgcc-compat\"") \
-                __attribute__((annotate("moz_heap_allocator")))  \
-                _Pragma("clang diagnostic pop")
+#      define MOZ_HEAP_ALLOCATOR                                         \
+        _Pragma("clang diagnostic push")                                 \
+            _Pragma("clang diagnostic ignored \"-Wgcc-compat\"")         \
+                __attribute__((annotate("moz_heap_allocator"))) _Pragma( \
+                    "clang diagnostic pop")
 #    else
 #      define MOZ_HEAP_ALLOCATOR __attribute__((annotate("moz_heap_allocator")))
 #    endif
@@ -882,6 +940,8 @@
 #    define MOZ_CAN_RUN_SCRIPT_BOUNDARY                     /* nothing */
 #    define MOZ_MUST_OVERRIDE                               /* nothing */
 #    define MOZ_STATIC_CLASS                                /* nothing */
+#    define MOZ_RUNINIT                                     /* nothing */
+#    define MOZ_GLOBINIT                                    /* nothing */
 #    define MOZ_STATIC_LOCAL_CLASS                          /* nothing */
 #    define MOZ_STACK_CLASS                                 /* nothing */
 #    define MOZ_NONHEAP_CLASS                               /* nothing */
@@ -1031,6 +1091,19 @@
 #  define MOZ_EMPTY_BASES __declspec(empty_bases)
 #else
 #  define MOZ_EMPTY_BASES
+#endif
+
+/**
+ * Pre- C++20 equivalent to constinit
+ */
+#if defined(__cpp_constinit)
+#  define MOZ_CONSTINIT constinit
+#elif defined(__clang__)
+#  define MOZ_CONSTINIT [[clang::require_constant_initialization]]
+#elif MOZ_GCC_VERSION_AT_LEAST(10, 1, 0)
+#  define MOZ_CONSTINIT __constinit
+#else
+#  define MOZ_CONSTINIT
 #endif
 
 // XXX: GCC somehow does not allow attributes before lambda return types, while

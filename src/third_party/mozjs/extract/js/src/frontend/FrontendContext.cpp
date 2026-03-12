@@ -7,7 +7,7 @@
 #include "frontend/FrontendContext.h"
 
 #ifdef _WIN32
-#  include <windows.h>
+#  include "util/WindowsWrapper.h"
 #  include <process.h>  // GetCurrentThreadId
 #else
 #  include <pthread.h>  // pthread_self
@@ -15,7 +15,8 @@
 
 #include "gc/GC.h"
 #include "js/AllocPolicy.h"  // js::ReportOutOfMemory
-#include "js/friend/StackLimits.h"  // js::ReportOverRecursed, js::MinimumStackLimitMargin
+#include "js/experimental/CompileScript.h"
+#include "js/friend/StackLimits.h"  // js::ReportOverRecursed, js::MinimumStackLimitMargin, js::StackLimitMargin
 #include "js/Modules.h"
 #include "util/DifferentialTesting.h"
 #include "util/NativeStack.h"  // GetNativeStackBase
@@ -66,6 +67,22 @@ void FrontendContext::setStackQuota(JS::NativeStackSize stackSize) {
 #endif
 }
 
+JS_PUBLIC_API void JS::SetNativeStackQuota(JS::FrontendContext* fc,
+                                           JS::NativeStackSize stackSize) {
+  fc->setStackQuota(stackSize);
+}
+
+JS_PUBLIC_API JS::NativeStackSize JS::ThreadStackQuotaForSize(
+    size_t stackSize) {
+  // Set the stack quota to 10% less that the actual size.
+  static constexpr double RatioWithoutMargin = 0.9;
+
+  MOZ_ASSERT(double(stackSize) * (1 - RatioWithoutMargin) >
+             js::MinimumStackLimitMargin);
+
+  return JS::NativeStackSize(double(stackSize) * RatioWithoutMargin);
+}
+
 bool FrontendContext::allocateOwnedPool() {
   MOZ_ASSERT(!nameCollectionPool_);
 
@@ -84,9 +101,17 @@ bool FrontendContext::hadErrors() const {
   return errors_.hadErrors();
 }
 
+JS_PUBLIC_API bool JS::HadFrontendErrors(JS::FrontendContext* fc) {
+  return fc->hadErrors();
+}
+
 void FrontendContext::clearErrors() {
   MOZ_ASSERT(!maybeCx_);
   return errors_.clearErrors();
+}
+
+JS_PUBLIC_API void JS::ClearFrontendErrors(JS::FrontendContext* fc) {
+  fc->clearErrors();
 }
 
 void FrontendContext::clearWarnings() { return errors_.clearWarnings(); }
@@ -200,10 +225,18 @@ bool FrontendContext::convertToRuntimeError(
   return true;
 }
 
+JS_PUBLIC_API bool JS::ConvertFrontendErrorsToRuntimeErrors(
+    JSContext* cx, JS::FrontendContext* fc,
+    const JS::ReadOnlyCompileOptions& options) {
+  return fc->convertToRuntimeError(cx);
+}
+
 #ifdef DEBUG
 static size_t GetTid() {
 #  if defined(_WIN32)
   return size_t(GetCurrentThreadId());
+#  elif defined(__wasm__)
+  return 1;
 #  else
   return size_t(pthread_self());
 #  endif
@@ -268,7 +301,18 @@ FrontendContext* js::NewFrontendContext() {
   return fc.release();
 }
 
+JS_PUBLIC_API FrontendContext* JS::NewFrontendContext() {
+  MOZ_ASSERT(JS::detail::libraryInitState == JS::detail::InitState::Running,
+             "must call JS_Init prior to creating any FrontendContexts");
+
+  return js::NewFrontendContext();
+}
+
 void js::DestroyFrontendContext(FrontendContext* fc) { js_delete_poison(fc); }
+
+JS_PUBLIC_API void JS::DestroyFrontendContext(FrontendContext* fc) {
+  return js::DestroyFrontendContext(fc);
+}
 
 #ifdef DEBUG
 void FrontendContext::checkAndUpdateFrontendContextRecursionLimit(void* sp) {
@@ -303,3 +347,33 @@ void js::CheckAndUpdateFrontendContextRecursionLimit(FrontendContext* fc,
   fc->checkAndUpdateFrontendContextRecursionLimit(sp);
 }
 #endif
+
+JS_PUBLIC_API const JSErrorReport* JS::GetFrontendErrorReport(
+    JS::FrontendContext* fc, const JS::ReadOnlyCompileOptions& options) {
+  if (!fc->maybeError().isSome()) {
+    return nullptr;
+  }
+  return fc->maybeError().ptr();
+}
+
+JS_PUBLIC_API bool JS::HadFrontendOverRecursed(JS::FrontendContext* fc) {
+  return fc->hadOverRecursed();
+}
+
+JS_PUBLIC_API bool JS::HadFrontendOutOfMemory(JS::FrontendContext* fc) {
+  return fc->hadOutOfMemory();
+}
+
+JS_PUBLIC_API bool JS::HadFrontendAllocationOverflow(JS::FrontendContext* fc) {
+  return fc->hadAllocationOverflow();
+}
+
+JS_PUBLIC_API size_t JS::GetFrontendWarningCount(JS::FrontendContext* fc) {
+  return fc->warnings().length();
+}
+
+JS_PUBLIC_API const JSErrorReport* JS::GetFrontendWarningAt(
+    JS::FrontendContext* fc, size_t index,
+    const JS::ReadOnlyCompileOptions& options) {
+  return &fc->warnings()[index];
+}

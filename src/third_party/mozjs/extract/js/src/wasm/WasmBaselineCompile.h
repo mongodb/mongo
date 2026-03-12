@@ -32,7 +32,7 @@ namespace wasm {
 
 // Generate adequate code quickly.
 [[nodiscard]] bool BaselineCompileFunctions(
-    const ModuleEnvironment& moduleEnv, const CompilerEnvironment& compilerEnv,
+    const CodeMetadata& codeMeta, const CompilerEnvironment& compilerEnv,
     LifoAlloc& lifo, const FuncCompileInputVector& inputs, CompiledCode* code,
     UniqueChars* error);
 

@@ -118,37 +118,27 @@ namespace frontend {
 struct CompilationInput;
 struct CompilationStencil;
 struct ExtensibleCompilationStencil;
+struct InitialStencilAndDelazifications;
 struct CompilationGCOutput;
 class ScopeBindingCache;
 
-// Compile a script of the given source using the given options.
-extern already_AddRefed<CompilationStencil> CompileGlobalScriptToStencil(
-    JSContext* maybeCx, FrontendContext* fc, js::LifoAlloc& tempLifoAlloc,
-    CompilationInput& input, ScopeBindingCache* scopeCache,
-    JS::SourceText<char16_t>& srcBuf, ScopeKind scopeKind);
-
-extern already_AddRefed<CompilationStencil> CompileGlobalScriptToStencil(
-    JSContext* maybeCx, FrontendContext* fc, js::LifoAlloc& tempLifoAlloc,
-    CompilationInput& input, ScopeBindingCache* scopeCache,
-    JS::SourceText<mozilla::Utf8Unit>& srcBuf, ScopeKind scopeKind);
-
-extern UniquePtr<ExtensibleCompilationStencil>
-CompileGlobalScriptToExtensibleStencil(JSContext* maybeCx, FrontendContext* fc,
-                                       CompilationInput& input,
-                                       ScopeBindingCache* scopeCache,
-                                       JS::SourceText<char16_t>& srcBuf,
-                                       ScopeKind scopeKind);
-
-extern UniquePtr<ExtensibleCompilationStencil>
-CompileGlobalScriptToExtensibleStencil(
-    JSContext* maybeCx, FrontendContext* fc, CompilationInput& input,
-    ScopeBindingCache* scopeCache, JS::SourceText<mozilla::Utf8Unit>& srcBuf,
-    ScopeKind scopeKind);
+// Compile a script of the given source using the given CompilationInput.
+extern already_AddRefed<CompilationStencil>
+CompileGlobalScriptToStencilWithInput(JSContext* maybeCx, FrontendContext* fc,
+                                      js::LifoAlloc& tempLifoAlloc,
+                                      CompilationInput& input,
+                                      ScopeBindingCache* scopeCache,
+                                      JS::SourceText<mozilla::Utf8Unit>& srcBuf,
+                                      ScopeKind scopeKind);
 
 [[nodiscard]] extern bool InstantiateStencils(JSContext* cx,
                                               CompilationInput& input,
                                               const CompilationStencil& stencil,
                                               CompilationGCOutput& gcOutput);
+
+[[nodiscard]] extern bool InstantiateStencils(
+    JSContext* cx, CompilationInput& input,
+    InitialStencilAndDelazifications& stencils, CompilationGCOutput& gcOutput);
 
 // Perform CompileGlobalScriptToStencil and InstantiateStencils at the
 // same time, skipping some extra copy.
@@ -200,26 +190,6 @@ ModuleObject* CompileModule(JSContext* cx, FrontendContext* fc,
 ModuleObject* CompileModule(JSContext* cx, FrontendContext* fc,
                             const JS::ReadOnlyCompileOptions& options,
                             JS::SourceText<mozilla::Utf8Unit>& srcBuf);
-
-// Parse a module of the given source.  This is an internal API; if you want to
-// compile a module as a user, use CompileModule above.
-already_AddRefed<CompilationStencil> ParseModuleToStencil(
-    JSContext* maybeCx, FrontendContext* fc, js::LifoAlloc& tempLifoAlloc,
-    CompilationInput& input, ScopeBindingCache* scopeCache,
-    JS::SourceText<char16_t>& srcBuf);
-already_AddRefed<CompilationStencil> ParseModuleToStencil(
-    JSContext* maybeCx, FrontendContext* fc, js::LifoAlloc& tempLifoAlloc,
-    CompilationInput& input, ScopeBindingCache* scopeCache,
-    JS::SourceText<mozilla::Utf8Unit>& srcBuf);
-
-UniquePtr<ExtensibleCompilationStencil> ParseModuleToExtensibleStencil(
-    JSContext* cx, FrontendContext* fc, js::LifoAlloc& tempLifoAlloc,
-    CompilationInput& input, ScopeBindingCache* scopeCache,
-    JS::SourceText<char16_t>& srcBuf);
-UniquePtr<ExtensibleCompilationStencil> ParseModuleToExtensibleStencil(
-    JSContext* cx, FrontendContext* fc, js::LifoAlloc& tempLifoAlloc,
-    CompilationInput& input, ScopeBindingCache* scopeCache,
-    JS::SourceText<mozilla::Utf8Unit>& srcBuf);
 
 //
 // Compile a single function. The source in srcBuf must match the ECMA-262
@@ -273,11 +243,15 @@ enum class DelazifyFailureReason {
   Other,
 };
 
-extern already_AddRefed<CompilationStencil> DelazifyCanonicalScriptedFunction(
+// Delazify a function specified by a pair of `context` + `scriptIndex`, and
+// store the delazification stencil into `stencils`, and return a borrowing
+// pointer for the delazification.
+extern const CompilationStencil* DelazifyCanonicalScriptedFunction(
     FrontendContext* fc, js::LifoAlloc& tempLifoAlloc,
     const JS::PrefableCompileOptions& prefableOptions,
     ScopeBindingCache* scopeCache, CompilationStencil& context,
-    ScriptIndex scriptIndex, DelazifyFailureReason* failureReason);
+    ScriptIndex scriptIndex, InitialStencilAndDelazifications* stencils,
+    DelazifyFailureReason* failureReason);
 
 // Certain compile options will disable the syntax parser entirely.
 inline bool CanLazilyParse(const JS::ReadOnlyCompileOptions& options) {

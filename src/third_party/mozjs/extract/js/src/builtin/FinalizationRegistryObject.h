@@ -87,6 +87,7 @@
 #define builtin_FinalizationRegistryObject_h
 
 #include "gc/Barrier.h"
+#include "gc/WeakMap.h"
 #include "js/GCVector.h"
 #include "vm/NativeObject.h"
 
@@ -95,7 +96,6 @@ namespace js {
 class FinalizationRegistryObject;
 class FinalizationRecordObject;
 class FinalizationQueueObject;
-class ObjectWeakMap;
 
 using HandleFinalizationRegistryObject = Handle<FinalizationRegistryObject*>;
 using HandleFinalizationRecordObject = Handle<FinalizationRecordObject*>;
@@ -226,7 +226,7 @@ class FinalizationRegistryObject : public NativeObject {
 class FinalizationQueueObject : public NativeObject {
   enum {
     CleanupCallbackSlot = 0,
-    IncumbentObjectSlot,
+    HostDefinedDataSlot,
     RecordsToBeCleanedUpSlot,
     IsQueuedForCleanupSlot,
     DoCleanupFunctionSlot,
@@ -242,7 +242,7 @@ class FinalizationQueueObject : public NativeObject {
   static const JSClass class_;
 
   JSObject* cleanupCallback() const;
-  JSObject* incumbentObject() const;
+  JSObject* getHostDefinedData() const;
   FinalizationRecordVector* recordsToBeCleanedUp() const;
   bool isQueuedForCleanup() const;
   JSFunction* doCleanupFunction() const;

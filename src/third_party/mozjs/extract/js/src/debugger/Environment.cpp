@@ -65,7 +65,8 @@ const JSClassOps DebuggerEnvironment::classOps_ = {
 const JSClass DebuggerEnvironment::class_ = {
     "Environment",
     JSCLASS_HAS_RESERVED_SLOTS(DebuggerEnvironment::RESERVED_SLOTS),
-    &classOps_};
+    &classOps_,
+};
 
 void DebuggerEnvironment::trace(JSTracer* trc) {
   // There is a barrier on private pointers, so the Unbarriered marking
@@ -366,12 +367,16 @@ const JSPropertySpec DebuggerEnvironment::properties_[] = {
     JS_DEBUG_PSG("calleeScript", calleeScriptGetter),
     JS_DEBUG_PSG("inspectable", inspectableGetter),
     JS_DEBUG_PSG("optimizedOut", optimizedOutGetter),
-    JS_PS_END};
+    JS_PS_END,
+};
 
 const JSFunctionSpec DebuggerEnvironment::methods_[] = {
-    JS_DEBUG_FN("names", namesMethod, 0), JS_DEBUG_FN("find", findMethod, 1),
+    JS_DEBUG_FN("names", namesMethod, 0),
+    JS_DEBUG_FN("find", findMethod, 1),
     JS_DEBUG_FN("getVariable", getVariableMethod, 1),
-    JS_DEBUG_FN("setVariable", setVariableMethod, 2), JS_FS_END};
+    JS_DEBUG_FN("setVariable", setVariableMethod, 2),
+    JS_FS_END,
+};
 
 /* static */
 NativeObject* DebuggerEnvironment::initClass(JSContext* cx,

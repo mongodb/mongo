@@ -1,0 +1,20 @@
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+FINAL_LIBRARY = "js"
+
+# Includes should be relative to parent path
+LOCAL_INCLUDES += ["!..", ".."]
+
+include("../js-config.mozbuild")
+include("../js-cxxflags.mozbuild")
+
+SOURCES += [
+  'xsum.cpp',
+]
+
+# Suppress warnings in third-party code.
+SOURCES['xsum.cpp'].flags += ['-Wno-implicit-fallthrough', '-Wno-format', '-Wno-unused-value']

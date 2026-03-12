@@ -322,7 +322,7 @@ static void HandleExceptionIon(JSContext* cx, const InlineFrameIterator& frame,
           }
 
           *hitBailoutException = true;
-          MOZ_ASSERT(cx->isExceptionPending());
+          MOZ_ASSERT(cx->isExceptionPending() || cx->hadUncatchableException());
         }
         break;
 
@@ -667,7 +667,7 @@ again:
 static JitFrameLayout* GetLastProfilingFrame(ResumeFromException* rfe) {
   switch (rfe->kind) {
     case ExceptionResumeKind::EntryFrame:
-    case ExceptionResumeKind::Wasm:
+    case ExceptionResumeKind::WasmInterpEntry:
     case ExceptionResumeKind::WasmCatch:
       return nullptr;
 
@@ -688,15 +688,10 @@ static JitFrameLayout* GetLastProfilingFrame(ResumeFromException* rfe) {
   return nullptr;
 }
 
-static void HandleExceptionWasm(JSContext* cx, wasm::WasmFrameIter* iter,
-                                ResumeFromException* rfe) {
-  MOZ_ASSERT(cx->activation()->asJit()->hasWasmExitFP());
-  wasm::HandleThrow(cx, *iter, rfe);
-}
-
 void HandleException(ResumeFromException* rfe) {
   JSContext* cx = TlsContext.get();
 
+  cx->realm()->localAllocSite = nullptr;
 #ifdef DEBUG
   if (!IsPortableBaselineInterpreterEnabled()) {
     cx->runtime()->jitRuntime()->clearDisallowArbitraryCode();
@@ -737,20 +732,34 @@ void HandleException(ResumeFromException* rfe) {
 
   JitFrameIter iter(cx->activation()->asJit(),
                     /* mustUnwindActivation = */ true);
+
+  // Live wasm code on the stack is kept alive (in TraceJitActivation) by
+  // marking the instance of every wasm::Frame found by WasmFrameIter.
+  // However, we're going to pop frames while iterating which means that a GC
+  // during this loop could collect the code of frames whose code is still on
+  // the stack.
+  //
+  // This is actually mostly fine: after we return to the Wasm throw stub, we'll
+  // jump to the JIT's exception handling trampoline. However, we must keep the
+  // throw stub alive itself which is owned by the innermost instance.
+  Rooted<WasmInstanceObject*> keepAlive(cx);
+  if (iter.isWasm()) {
+    keepAlive = iter.asWasm().instance()->object();
+  }
+
   CommonFrameLayout* prevJitFrame = nullptr;
   while (!iter.done()) {
     if (iter.isWasm()) {
       prevJitFrame = nullptr;
-      HandleExceptionWasm(cx, &iter.asWasm(), rfe);
+      wasm::HandleExceptionWasm(cx, iter, rfe);
       if (rfe->kind == ExceptionResumeKind::WasmCatch) {
         // Jump to a Wasm try-catch handler.
-        MOZ_ASSERT(!iter.done());
-      } else {
-        // Return to the Wasm entry frame.
-        MOZ_ASSERT(rfe->kind == ExceptionResumeKind::Wasm);
-        MOZ_ASSERT(iter.done());
+        return;
       }
-      return;
+      // We either reached a JS JIT frame or we stopped at the activation's Wasm
+      // interpreter entry frame.
+      MOZ_ASSERT(iter.isJSJit() || (iter.isWasm() && iter.done()));
+      continue;
     }
 
     JSJitFrameIter& frame = iter.asJSJit();
@@ -835,12 +844,22 @@ void HandleException(ResumeFromException* rfe) {
     ++iter;
   }
 
-  // Wasm sets its own value of SP in HandleExceptionWasm.
+  // Return to C++ code by returning to the activation's JS or Wasm entry frame.
   if (iter.isJSJit()) {
     MOZ_ASSERT(rfe->kind == ExceptionResumeKind::EntryFrame);
     rfe->framePointer = iter.asJSJit().current()->callerFramePtr();
     rfe->stackPointer =
         iter.asJSJit().fp() + CommonFrameLayout::offsetOfReturnAddress();
+  } else {
+    MOZ_ASSERT(iter.isWasm());
+    // In case of no handler, exit wasm via ret(). The exception handling
+    // trampoline will return InterpFailInstanceReg in InstanceReg to signal
+    // to the interpreter entry stub to do a failure return.
+    rfe->kind = ExceptionResumeKind::WasmInterpEntry;
+    rfe->framePointer = (uint8_t*)iter.asWasm().unwoundCallerFP();
+    rfe->stackPointer = (uint8_t*)iter.asWasm().unwoundAddressOfReturnAddress();
+    rfe->instance = nullptr;
+    rfe->target = nullptr;
   }
 }
 
@@ -1202,41 +1221,11 @@ static void TraceIonICCallFrame(JSTracer* trc, const JSJitFrameIter& frame) {
   }
 }
 
-#if defined(JS_CODEGEN_ARM64) || defined(JS_CODEGEN_MIPS32)
+#if defined(JS_CODEGEN_ARM64)
 uint8_t* alignDoubleSpill(uint8_t* pointer) {
   uintptr_t address = reinterpret_cast<uintptr_t>(pointer);
   address &= ~(uintptr_t(ABIStackAlignment) - 1);
   return reinterpret_cast<uint8_t*>(address);
-}
-#endif
-
-#ifdef JS_CODEGEN_MIPS32
-static void TraceJitExitFrameCopiedArguments(JSTracer* trc,
-                                             const VMFunctionData* f,
-                                             ExitFooterFrame* footer) {
-  uint8_t* doubleArgs = footer->alignedForABI();
-  if (f->outParam == Type_Handle) {
-    doubleArgs -= sizeof(Value);
-  }
-  doubleArgs -= f->doubleByRefArgs() * sizeof(double);
-
-  for (uint32_t explicitArg = 0; explicitArg < f->explicitArgs; explicitArg++) {
-    if (f->argProperties(explicitArg) == VMFunctionData::DoubleByRef) {
-      // Arguments with double size can only have RootValue type.
-      if (f->argRootType(explicitArg) == VMFunctionData::RootValue) {
-        TraceRoot(trc, reinterpret_cast<Value*>(doubleArgs), "ion-vm-args");
-      } else {
-        MOZ_ASSERT(f->argRootType(explicitArg) == VMFunctionData::RootNone);
-      }
-      doubleArgs += sizeof(double);
-    }
-  }
-}
-#else
-static void TraceJitExitFrameCopiedArguments(JSTracer* trc,
-                                             const VMFunctionData* f,
-                                             ExitFooterFrame* footer) {
-  // This is NO-OP on other platforms.
 }
 #endif
 
@@ -1389,8 +1378,6 @@ static void TraceJitExitFrame(JSTracer* trc, const JSJitFrameIter& frame) {
         break;
     }
   }
-
-  TraceJitExitFrameCopiedArguments(trc, &f, footer);
 }
 
 static void TraceBaselineInterpreterEntryFrame(JSTracer* trc,
@@ -1409,14 +1396,6 @@ static void TraceRectifierFrame(JSTracer* trc, const JSJitFrameIter& frame) {
   // it if we're calling a constructor that returns a primitive value.
   RectifierFrameLayout* layout = (RectifierFrameLayout*)frame.fp();
   TraceRoot(trc, &layout->thisv(), "rectifier-thisv");
-}
-
-static void TraceJSJitToWasmFrame(JSTracer* trc, const JSJitFrameIter& frame) {
-  // This is doing a subset of TraceIonJSFrame, since the callee doesn't
-  // have a script.
-  JitFrameLayout* layout = (JitFrameLayout*)frame.fp();
-  layout->replaceCalleeToken(TraceCalleeToken(trc, layout->calleeToken()));
-  TraceThisAndArguments(trc, frame, layout);
 }
 
 static void TraceTrampolineNativeFrame(JSTracer* trc,
@@ -1489,20 +1468,18 @@ static void TraceJitActivation(JSTracer* trc, JitActivation* activation) {
           // JitFrameIter know the frame above is a wasm frame, handled
           // in the next iteration.
           break;
-        case FrameType::JSJitToWasm:
-          TraceJSJitToWasmFrame(trc, jitFrame);
-          break;
         default:
           MOZ_CRASH("unexpected frame type");
       }
       highestByteVisitedInPrevWasmFrame = 0; /* "unknown" */
     } else {
+      gc::AssertRootMarkingPhase(trc);
       MOZ_ASSERT(frames.isWasm());
       uint8_t* nextPC = frames.resumePCinCurrentFrame();
       MOZ_ASSERT(nextPC != 0);
       wasm::WasmFrameIter& wasmFrameIter = frames.asWasm();
 #ifdef ENABLE_WASM_JSPI
-      if (wasmFrameIter.stackSwitched()) {
+      if (wasmFrameIter.currentFrameStackSwitched()) {
         highestByteVisitedInPrevWasmFrame = 0;
       }
 #endif
@@ -1749,6 +1726,28 @@ bool SnapshotIterator::allocationReadable(const RValueAllocation& alloc,
       return rm == ReadMethod::AlwaysDefault ||
              hasInstructionResult(alloc.index());
 
+    case RValueAllocation::INTPTR_REG:
+      return hasRegister(alloc.reg());
+    case RValueAllocation::INTPTR_STACK:
+    case RValueAllocation::INTPTR_INT32_STACK:
+      return hasStack(alloc.stackOffset());
+
+#if defined(JS_NUNBOX32)
+    case RValueAllocation::INT64_REG_REG:
+      return hasRegister(alloc.reg()) && hasRegister(alloc.reg2());
+    case RValueAllocation::INT64_REG_STACK:
+      return hasRegister(alloc.reg()) && hasStack(alloc.stackOffset2());
+    case RValueAllocation::INT64_STACK_REG:
+      return hasStack(alloc.stackOffset()) && hasRegister(alloc.reg2());
+    case RValueAllocation::INT64_STACK_STACK:
+      return hasStack(alloc.stackOffset()) && hasStack(alloc.stackOffset2());
+#elif defined(JS_PUNBOX64)
+    case RValueAllocation::INT64_REG:
+      return hasRegister(alloc.reg());
+    case RValueAllocation::INT64_STACK:
+      return hasStack(alloc.stackOffset());
+#endif
+
     default:
       return true;
   }
@@ -1769,10 +1768,10 @@ Value SnapshotIterator::allocationValue(const RValueAllocation& alloc,
     case RValueAllocation::DOUBLE_REG:
       return DoubleValue(fromRegister<double>(alloc.fpuReg()));
 
-    case RValueAllocation::ANY_FLOAT_REG:
+    case RValueAllocation::FLOAT32_REG:
       return Float32Value(fromRegister<float>(alloc.fpuReg()));
 
-    case RValueAllocation::ANY_FLOAT_STACK:
+    case RValueAllocation::FLOAT32_STACK:
       return Float32Value(ReadFrameFloat32Slot(fp_, alloc.stackOffset()));
 
     case RValueAllocation::TYPED_REG:
@@ -1841,6 +1840,24 @@ Value SnapshotIterator::allocationValue(const RValueAllocation& alloc,
       MOZ_ASSERT(rm == ReadMethod::AlwaysDefault);
       return ionScript_->getConstant(alloc.index2());
 
+    case RValueAllocation::INTPTR_CST:
+    case RValueAllocation::INTPTR_REG:
+    case RValueAllocation::INTPTR_STACK:
+    case RValueAllocation::INTPTR_INT32_STACK:
+      MOZ_CRASH("Can't read IntPtr as Value");
+
+    case RValueAllocation::INT64_CST:
+#if defined(JS_NUNBOX32)
+    case RValueAllocation::INT64_REG_REG:
+    case RValueAllocation::INT64_REG_STACK:
+    case RValueAllocation::INT64_STACK_REG:
+    case RValueAllocation::INT64_STACK_STACK:
+#elif defined(JS_PUNBOX64)
+    case RValueAllocation::INT64_REG:
+    case RValueAllocation::INT64_STACK:
+#endif
+      MOZ_CRASH("Can't read Int64 as Value");
+
     default:
       MOZ_CRASH("huh?");
   }
@@ -1879,6 +1896,134 @@ bool SnapshotIterator::tryRead(Value* result) {
   return false;
 }
 
+bool SnapshotIterator::readMaybeUnpackedBigInt(JSContext* cx,
+                                               MutableHandle<Value> result) {
+  RValueAllocation alloc = readAllocation();
+  MOZ_ASSERT(allocationReadable(alloc));
+
+  switch (alloc.mode()) {
+    case RValueAllocation::INT64_CST:
+#if defined(JS_NUNBOX32)
+    case RValueAllocation::INT64_REG_REG:
+    case RValueAllocation::INT64_REG_STACK:
+    case RValueAllocation::INT64_STACK_REG:
+    case RValueAllocation::INT64_STACK_STACK:
+#elif defined(JS_PUNBOX64)
+    case RValueAllocation::INT64_REG:
+    case RValueAllocation::INT64_STACK:
+#endif
+    {
+      auto* bigInt = JS::BigInt::createFromInt64(cx, allocationInt64(alloc));
+      if (!bigInt) {
+        return false;
+      }
+      result.setBigInt(bigInt);
+      return true;
+    }
+    case RValueAllocation::INTPTR_CST:
+    case RValueAllocation::INTPTR_REG:
+    case RValueAllocation::INTPTR_STACK:
+    case RValueAllocation::INTPTR_INT32_STACK: {
+      auto* bigInt = JS::BigInt::createFromIntPtr(cx, allocationIntPtr(alloc));
+      if (!bigInt) {
+        return false;
+      }
+      result.setBigInt(bigInt);
+      return true;
+    }
+    default:
+      result.set(allocationValue(alloc));
+      return true;
+  }
+}
+
+int64_t SnapshotIterator::allocationInt64(const RValueAllocation& alloc) {
+  MOZ_ASSERT(allocationReadable(alloc));
+
+  auto fromParts = [](uint32_t hi, uint32_t lo) {
+    return static_cast<int64_t>((static_cast<uint64_t>(hi) << 32) | lo);
+  };
+
+  switch (alloc.mode()) {
+    case RValueAllocation::INT64_CST: {
+      uint32_t lo = ionScript_->getConstant(alloc.index()).toInt32();
+      uint32_t hi = ionScript_->getConstant(alloc.index2()).toInt32();
+      return fromParts(hi, lo);
+    }
+#if defined(JS_NUNBOX32)
+    case RValueAllocation::INT64_REG_REG: {
+      uintptr_t lo = fromRegister(alloc.reg());
+      uintptr_t hi = fromRegister(alloc.reg2());
+      return fromParts(hi, lo);
+    }
+    case RValueAllocation::INT64_REG_STACK: {
+      uintptr_t lo = fromRegister(alloc.reg());
+      uintptr_t hi = fromStack(alloc.stackOffset2());
+      return fromParts(hi, lo);
+    }
+    case RValueAllocation::INT64_STACK_REG: {
+      uintptr_t lo = fromStack(alloc.stackOffset());
+      uintptr_t hi = fromRegister(alloc.reg2());
+      return fromParts(hi, lo);
+    }
+    case RValueAllocation::INT64_STACK_STACK: {
+      uintptr_t lo = fromStack(alloc.stackOffset());
+      uintptr_t hi = fromStack(alloc.stackOffset2());
+      return fromParts(hi, lo);
+    }
+#elif defined(JS_PUNBOX64)
+    case RValueAllocation::INT64_REG: {
+      return static_cast<int64_t>(fromRegister(alloc.reg()));
+    }
+    case RValueAllocation::INT64_STACK: {
+      return static_cast<int64_t>(fromStack(alloc.stackOffset()));
+    }
+#endif
+    default:
+      break;
+  }
+  MOZ_CRASH("invalid int64 allocation");
+}
+
+intptr_t SnapshotIterator::allocationIntPtr(const RValueAllocation& alloc) {
+  MOZ_ASSERT(allocationReadable(alloc));
+  switch (alloc.mode()) {
+    case RValueAllocation::INTPTR_CST: {
+#if !defined(JS_64BIT)
+      int32_t cst = ionScript_->getConstant(alloc.index()).toInt32();
+      return static_cast<intptr_t>(cst);
+#else
+      uint32_t lo = ionScript_->getConstant(alloc.index()).toInt32();
+      uint32_t hi = ionScript_->getConstant(alloc.index2()).toInt32();
+      return static_cast<intptr_t>((static_cast<uint64_t>(hi) << 32) | lo);
+#endif
+    }
+    case RValueAllocation::INTPTR_REG:
+      return static_cast<intptr_t>(fromRegister(alloc.reg()));
+    case RValueAllocation::INTPTR_STACK:
+      return static_cast<intptr_t>(fromStack(alloc.stackOffset()));
+    case RValueAllocation::INTPTR_INT32_STACK:
+      return static_cast<intptr_t>(
+          ReadFrameInt32Slot(fp_, alloc.stackOffset()));
+    default:
+      break;
+  }
+  MOZ_CRASH("invalid intptr allocation");
+}
+
+JS::BigInt* SnapshotIterator::readBigInt(JSContext* cx) {
+  RValueAllocation alloc = readAllocation();
+  switch (alloc.mode()) {
+    case RValueAllocation::INTPTR_CST:
+    case RValueAllocation::INTPTR_REG:
+    case RValueAllocation::INTPTR_STACK:
+    case RValueAllocation::INTPTR_INT32_STACK:
+      return JS::BigInt::createFromIntPtr(cx, allocationIntPtr(alloc));
+    default:
+      return allocationValue(alloc).toBigInt();
+  }
+}
+
 void SnapshotIterator::writeAllocationValuePayload(
     const RValueAllocation& alloc, const Value& v) {
   MOZ_ASSERT(v.isGCThing());
@@ -1891,8 +2036,22 @@ void SnapshotIterator::writeAllocationValuePayload(
     case RValueAllocation::CST_UNDEFINED:
     case RValueAllocation::CST_NULL:
     case RValueAllocation::DOUBLE_REG:
-    case RValueAllocation::ANY_FLOAT_REG:
-    case RValueAllocation::ANY_FLOAT_STACK:
+    case RValueAllocation::FLOAT32_REG:
+    case RValueAllocation::FLOAT32_STACK:
+    case RValueAllocation::INTPTR_CST:
+    case RValueAllocation::INTPTR_REG:
+    case RValueAllocation::INTPTR_STACK:
+    case RValueAllocation::INTPTR_INT32_STACK:
+    case RValueAllocation::INT64_CST:
+#if defined(JS_NUNBOX32)
+    case RValueAllocation::INT64_REG_REG:
+    case RValueAllocation::INT64_REG_STACK:
+    case RValueAllocation::INT64_STACK_REG:
+    case RValueAllocation::INT64_STACK_STACK:
+#elif defined(JS_PUNBOX64)
+    case RValueAllocation::INT64_REG:
+    case RValueAllocation::INT64_STACK:
+#endif
       MOZ_CRASH("Not a GC thing: Unexpected write");
       break;
 

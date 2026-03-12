@@ -43,11 +43,6 @@ ASTDEF(AST_CLASS_EXPR,            "ClassExpression")
 ASTDEF(AST_METAPROPERTY,          "MetaProperty")
 ASTDEF(AST_SUPER,                 "Super")
 ASTDEF(AST_CALL_IMPORT,           "CallImport")
-#ifdef ENABLE_RECORD_TUPLE
-ASTDEF(AST_RECORD_EXPR,           "RecordExpression")
-ASTDEF(AST_TUPLE_EXPR,            "TupleExpression")
-#endif
-
 ASTDEF(AST_EMPTY_STMT,            "EmptyStatement")
 ASTDEF(AST_BLOCK_STMT,            "BlockStatement")
 ASTDEF(AST_EXPR_STMT,             "ExpressionStatement")

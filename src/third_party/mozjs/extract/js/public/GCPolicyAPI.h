@@ -165,6 +165,10 @@ struct GCPolicy<JS::Heap<T>> {
   static bool traceWeak(JSTracer* trc, JS::Heap<T>* thingp) {
     return !*thingp || js::gc::TraceWeakEdge(trc, thingp);
   }
+  static bool needsSweep(JSTracer* trc, const JS::Heap<T>* thingp) {
+    T* thing = const_cast<T*>(thingp->unsafeAddress());
+    return thing && js::gc::EdgeNeedsSweepUnbarrieredSlow(thing);
+  }
 };
 
 // GCPolicy<UniquePtr<T>> forwards the contained pointer to GCPolicy<T>.
@@ -253,6 +257,36 @@ struct GCPolicy<mozilla::Result<V, E>> {
   }
 
   static bool isValid(const mozilla::Result<V, E>& t) { return true; }
+};
+
+template <typename... Fs>
+struct GCPolicy<std::tuple<Fs...>> {
+  using T = std::tuple<Fs...>;
+  static void trace(JSTracer* trc, T* tp, const char* name) {
+    traceFieldsFrom<0>(trc, *tp, name);
+  }
+  static bool isValid(const T& t) { return areFieldsValidFrom<0>(t); }
+
+ private:
+  template <size_t N>
+  static void traceFieldsFrom(JSTracer* trc, T& tuple, const char* name) {
+    if constexpr (N != std::tuple_size_v<T>) {
+      using F = std::tuple_element_t<N, T>;
+      GCPolicy<F>::trace(trc, &std::get<N>(tuple), name);
+      traceFieldsFrom<N + 1>(trc, tuple, name);
+    }
+  }
+
+  template <size_t N>
+  static bool areFieldsValidFrom(const T& tuple) {
+    if constexpr (N != std::tuple_size_v<T>) {
+      using F = std::tuple_element_t<N, T>;
+      return GCPolicy<F>::isValid(std::get<N>(tuple)) &&
+             areFieldsValidFrom<N + 1>(tuple);
+    }
+
+    return true;
+  }
 };
 
 }  // namespace JS

@@ -138,7 +138,7 @@ class nsISupports {
 
 class nsIPrincipal : public nsISupports {
  public:
-  ~nsIPrincipal() override{};
+  ~nsIPrincipal() override {};
 };
 
 struct JSPrincipals {

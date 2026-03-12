@@ -24,43 +24,6 @@ using JS::Rooted;
 using JS::UndefinedValue;
 using JS::Value;
 
-Value ActivationEntryMonitor::asyncStack(JSContext* cx) {
-  Rooted<Value> stack(cx, ObjectOrNullValue(cx->asyncStackForNewActivations()));
-  if (!cx->compartment()->wrap(cx, &stack)) {
-    cx->clearPendingException();
-    return UndefinedValue();
-  }
-  return stack;
-}
-
-void ActivationEntryMonitor::init(JSContext* cx, InterpreterFrame* entryFrame) {
-  // The InterpreterFrame is not yet part of an Activation, so it won't
-  // be traced if we trigger GC here. Suppress GC to avoid this.
-  gc::AutoSuppressGC suppressGC(cx);
-  Rooted<Value> stack(cx, asyncStack(cx));
-  const char* asyncCause = cx->asyncCauseForNewActivations;
-  if (entryFrame->isFunctionFrame()) {
-    entryMonitor_->Entry(cx, &entryFrame->callee(), stack, asyncCause);
-  } else {
-    entryMonitor_->Entry(cx, entryFrame->script(), stack, asyncCause);
-  }
-}
-
-void ActivationEntryMonitor::init(JSContext* cx, jit::CalleeToken entryToken) {
-  // The CalleeToken is not traced at this point and we also don't want
-  // a GC to discard the code we're about to enter, so we suppress GC.
-  gc::AutoSuppressGC suppressGC(cx);
-  RootedValue stack(cx, asyncStack(cx));
-  const char* asyncCause = cx->asyncCauseForNewActivations;
-  if (jit::CalleeTokenIsFunction(entryToken)) {
-    entryMonitor_->Entry(cx_, jit::CalleeTokenToFunction(entryToken), stack,
-                         asyncCause);
-  } else {
-    entryMonitor_->Entry(cx_, jit::CalleeTokenToScript(entryToken), stack,
-                         asyncCause);
-  }
-}
-
 void Activation::registerProfiling() {
   MOZ_ASSERT(isProfiling());
   cx_->profilingActivation_ = this;

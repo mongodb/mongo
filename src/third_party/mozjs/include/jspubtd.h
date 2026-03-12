@@ -43,10 +43,6 @@ enum JSType {
   JSTYPE_BOOLEAN,   /* boolean */
   JSTYPE_SYMBOL,    /* symbol */
   JSTYPE_BIGINT,    /* bigint */
-#ifdef ENABLE_RECORD_TUPLE
-  JSTYPE_RECORD, /* record */
-  JSTYPE_TUPLE,  /* tuple */
-#endif
   JSTYPE_LIMIT
 };
 
@@ -68,12 +64,6 @@ inline const char* JSTypeToString(JSType type) {
       return "symbol";
     case JSTYPE_BIGINT:
       return "bigint";
-#ifdef ENABLE_RECORD_TUPLE
-    case JSTYPE_RECORD:
-      return "record";
-    case JSTYPE_TUPLE:
-      return "tuple";
-#endif
     default:
       MOZ_ASSERT_UNREACHABLE("Unknown JSType");
   }

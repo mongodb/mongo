@@ -23,8 +23,9 @@ WarpBuilderShared::WarpBuilderShared(WarpSnapshot& snapshot,
 bool WarpBuilderShared::resumeAfter(MInstruction* ins, BytecodeLocation loc) {
   // resumeAfter should only be used with effectful instructions. The only
   // exceptions are:
-  // 1. MInt64ToBigInt, which is used to convert the result of a call into Wasm
-  //    code so we attach the resume point to that instead of to the call.
+  // 1. MInt64ToBigInt, which is used to convert the result of either a call
+  //    into Wasm code or loading from a BigIntArray, so we attach the resume
+  //    point to that instead of to the call resp. load.
   // 2. MPostIntPtrConversion which is used after conversion from IntPtr.
   MOZ_ASSERT(ins->isEffectful() || ins->isInt64ToBigInt() ||
              ins->isPostIntPtrConversion());
@@ -79,13 +80,14 @@ MDefinition* WarpBuilderShared::unboxObjectInfallible(MDefinition* def,
 }
 
 MCall* WarpBuilderShared::makeCall(CallInfo& callInfo, bool needsThisCheck,
-                                   WrappedFunction* target, bool isDOMCall) {
+                                   WrappedFunction* target, bool isDOMCall,
+                                   gc::Heap initialHeap) {
   auto addUndefined = [this]() -> MConstant* {
     return constant(UndefinedValue());
   };
 
   return MakeCall(alloc(), addUndefined, callInfo, needsThisCheck, target,
-                  isDOMCall);
+                  isDOMCall, initialHeap);
 }
 
 MInstruction* WarpBuilderShared::makeSpreadCall(CallInfo& callInfo,

@@ -36,6 +36,8 @@ using namespace js::gc;
 
 using mozilla::Maybe;
 
+using JS::SliceBudget;
+
 bool GCRuntime::canRelocateZone(Zone* zone) const {
   return !zone->isAtomsZone();
 }
@@ -134,72 +136,86 @@ static bool ShouldRelocateAllArenas(JS::GCReason reason) {
 }
 
 /*
- * Choose which arenas to relocate all cells from. Return an arena cursor that
- * can be passed to removeRemainingArenas().
+ * Choose which arenas to relocate all cells from.
+ *
+ * Return a pair of arena pointers indicating the arenas to relocate that can be
+ * passed to removeRange(), or null pointers if nothing can be relocated.
  */
-Arena** ArenaList::pickArenasToRelocate(size_t& arenaTotalOut,
-                                        size_t& relocTotalOut) {
+std::pair<Arena*, Arena*> ArenaList::pickArenasToRelocate(
+    AllocKind kind, size_t& arenaTotalOut, size_t& relocTotalOut) {
   // Relocate the greatest number of arenas such that the number of used cells
   // in relocated arenas is less than or equal to the number of free cells in
   // unrelocated arenas. In other words we only relocate cells we can move
   // into existing arenas, and we choose the least full areans to relocate.
   //
-  // This is made easier by the fact that the arena list has been sorted in
-  // descending order of number of used cells, so we will always relocate a
-  // tail of the arena list. All we need to do is find the point at which to
-  // start relocating.
+  // This is made easier by the fact that the start of the arena list has been
+  // sorted in descending order of number of used cells, so we will always
+  // relocate a sublist of the arena list. All we need to do is find the points
+  // at which to start and end relocating.
 
-  check();
-
-  if (isCursorAtEnd()) {
-    return nullptr;
+  if (!hasNonFullArenas()) {
+    // All arenas are full so no compacting is possible.
+    return {nullptr, nullptr};
   }
 
-  Arena** arenap = cursorp_;      // Next arena to consider for relocation.
-  size_t previousFreeCells = 0;   // Count of free cells before arenap.
-  size_t followingUsedCells = 0;  // Count of used cells after arenap.
-  size_t fullArenaCount = 0;      // Number of full arenas (not relocated).
-  size_t nonFullArenaCount =
-      0;  // Number of non-full arenas (considered for relocation).
-  size_t arenaIndex = 0;  // Index of the next arena to consider.
+  // Count non-full and full arenas and total used cells, and find the last
+  // non-full arena.
+  size_t fullArenaCount = 0;     // Number of full arenas (not relocated).
+  size_t nonFullArenaCount = 0;  // Number of non-full arenas to consider.
+  size_t totalUsedCells = 0;     // Total used cells in non-full arenas.
+  Arena* lastNonFullArena = nullptr;
 
-  for (Arena* arena = head_; arena != *cursorp_; arena = arena->next) {
+  Iterator arena = iter();
+  for (; !arena.done(); arena.next()) {
+    if (arena->isFull()) {
+      break;
+    }
+
+    MOZ_ASSERT(!arena->isFull());
+    nonFullArenaCount++;
+    totalUsedCells += arena->countUsedCells();
+    lastNonFullArena = arena.get();
+  }
+  for (; !arena.done(); arena.next()) {
+    // It's likely that the final arena is not full but we ignore that.
     fullArenaCount++;
   }
 
-  for (Arena* arena = *cursorp_; arena; arena = arena->next) {
-    followingUsedCells += arena->countUsedCells();
-    nonFullArenaCount++;
-  }
+  size_t previousFreeCells = 0;  // Total free cells before arena.
+  size_t followingUsedCells =
+      totalUsedCells;  // Total used cells in non full arenas afterwards.
+  size_t relocCount = nonFullArenaCount;  // Number of arenas to relocate.
+  Arena* prev = nullptr;                  // The previous arena considered.
 
-  mozilla::DebugOnly<size_t> lastFreeCells(0);
-  size_t cellsPerArena = Arena::thingsPerArena((*arenap)->getAllocKind());
+  const size_t cellsPerArena = Arena::thingsPerArena(kind);
 
-  while (*arenap) {
-    Arena* arena = *arenap;
+  // Examine the initial part of the list containing non-full arenas.
+  for (arena = iter(); prev != lastNonFullArena;
+       prev = arena.get(), arena.next()) {
     if (followingUsedCells <= previousFreeCells) {
+      // We have found the point where cells in the following non-full arenas
+      // can be relocated into the free space in previous arenas. We're done.
       break;
     }
 
     size_t freeCells = arena->countFreeCells();
+    MOZ_ASSERT(freeCells != 0);
     size_t usedCells = cellsPerArena - freeCells;
     followingUsedCells -= usedCells;
-#ifdef DEBUG
-    MOZ_ASSERT(freeCells >= lastFreeCells);
-    lastFreeCells = freeCells;
-#endif
     previousFreeCells += freeCells;
-    arenap = &arena->next;
-    arenaIndex++;
+    MOZ_ASSERT(relocCount != 0);
+    relocCount--;
   }
 
-  size_t relocCount = nonFullArenaCount - arenaIndex;
-  MOZ_ASSERT(relocCount < nonFullArenaCount);
-  MOZ_ASSERT((relocCount == 0) == (!*arenap));
+  MOZ_ASSERT((relocCount == 0) == (prev == lastNonFullArena));
   arenaTotalOut += fullArenaCount + nonFullArenaCount;
   relocTotalOut += relocCount;
 
-  return arenap;
+  if (relocCount == 0) {
+    return {nullptr, nullptr};
+  }
+
+  return {prev, lastNonFullArena};
 }
 
 #ifdef DEBUG
@@ -259,19 +275,20 @@ static void RelocateCell(Zone* zone, TenuredCell* src, AllocKind thingKind,
   dst->copyMarkBitsFrom(src);
 
   // Poison the source cell contents except for the forwarding flag and pointer
-  // which will be stored in the first word. We can't do this for native object
-  // with fixed elements because this would overwrite the element flags and
-  // these are needed when updating COW elements referred to by other objects.
+  // which will be stored in the first word. We can't do this for buffer
+  // allocations as these can be used as native object dynamic elements and this
+  // would overwrite the elements flags which are needed when updating the
+  // dynamic elements pointer.
 #ifdef DEBUG
-  JSObject* srcObj = IsObjectAllocKind(thingKind)
-                         ? static_cast<JSObject*>(static_cast<Cell*>(src))
-                         : nullptr;
-  bool doNotPoison =
-      srcObj && ((srcObj->is<NativeObject>() &&
-                  srcObj->as<NativeObject>().hasFixedElements()) ||
-                 (srcObj->is<WasmArrayObject>() &&
-                  srcObj->as<WasmArrayObject>().isDataInline()));
-  if (!doNotPoison) {
+  bool poison = true;
+  if (IsObjectAllocKind(thingKind)) {
+    JSObject* srcObj = static_cast<JSObject*>(static_cast<Cell*>(src));
+    poison = !(srcObj->is<WasmArrayObject>() &&
+               srcObj->as<WasmArrayObject>().isDataInline());
+  } else if (IsBufferAllocKind(thingKind)) {
+    poison = false;
+  }
+  if (poison) {
     AlwaysPoison(reinterpret_cast<uint8_t*>(src) + sizeof(uintptr_t),
                  JS_MOVED_TENURED_PATTERN, thingSize - sizeof(uintptr_t),
                  MemCheckKind::MakeNoAccess);
@@ -287,7 +304,7 @@ static void RelocateArena(Arena* arena, SliceBudget& sliceBudget) {
   MOZ_ASSERT(!arena->onDelayedMarkingList());
   MOZ_ASSERT(arena->bufferedCells()->isEmpty());
 
-  Zone* zone = arena->zone;
+  Zone* zone = arena->zone();
 
   AllocKind thingKind = arena->getAllocKind();
   size_t thingSize = arena->getThingSize();
@@ -315,8 +332,6 @@ static void RelocateArena(Arena* arena, SliceBudget& sliceBudget) {
 Arena* ArenaList::relocateArenas(Arena* toRelocate, Arena* relocated,
                                  SliceBudget& sliceBudget,
                                  gcstats::Statistics& stats) {
-  check();
-
   while (Arena* arena = toRelocate) {
     toRelocate = arena->next;
     RelocateArena(arena, sliceBudget);
@@ -325,8 +340,6 @@ Arena* ArenaList::relocateArenas(Arena* toRelocate, Arena* relocated,
     relocated = arena;
     stats.count(gcstats::COUNT_ARENA_RELOCATED);
   }
-
-  check();
 
   return relocated;
 }
@@ -375,33 +388,33 @@ bool ArenaLists::relocateArenas(Arena*& relocatedListOut, JS::GCReason reason,
   clearFreeLists();
 
   if (ShouldRelocateAllArenas(reason)) {
-    zone_->prepareForCompacting();
+    zone_->prepareForMovingGC();
     for (auto kind : allocKindsToRelocate) {
       ArenaList& al = arenaList(kind);
-      Arena* allArenas = al.head();
-      al.clear();
+      Arena* allArenas = al.release();
       relocatedListOut =
           al.relocateArenas(allArenas, relocatedListOut, sliceBudget, stats);
     }
   } else {
     size_t arenaCount = 0;
     size_t relocCount = 0;
-    AllAllocKindArray<Arena**> toRelocate;
+    AllAllocKindArray<std::pair<Arena*, Arena*>> rangeToRelocate;
 
     for (auto kind : allocKindsToRelocate) {
-      toRelocate[kind] =
-          arenaList(kind).pickArenasToRelocate(arenaCount, relocCount);
+      rangeToRelocate[kind] =
+          arenaList(kind).pickArenasToRelocate(kind, arenaCount, relocCount);
     }
 
     if (!ShouldRelocateZone(arenaCount, relocCount, reason)) {
       return false;
     }
 
-    zone_->prepareForCompacting();
+    zone_->prepareForMovingGC();
     for (auto kind : allocKindsToRelocate) {
-      if (toRelocate[kind]) {
+      if (rangeToRelocate[kind].first) {
         ArenaList& al = arenaList(kind);
-        Arena* arenas = al.removeRemainingArenas(toRelocate[kind]);
+        const auto& range = rangeToRelocate[kind];
+        Arena* arenas = al.removeRange(range.first, range.second);
         relocatedListOut =
             al.relocateArenas(arenas, relocatedListOut, sliceBudget, stats);
       }
@@ -419,7 +432,7 @@ bool GCRuntime::relocateArenas(Zone* zone, JS::GCReason reason,
   MOZ_ASSERT(!zone->isPreservingCode());
   MOZ_ASSERT(canRelocateZone(zone));
 
-  js::CancelOffThreadIonCompile(rt, JS::Zone::Compact);
+  js::CancelOffThreadCompile(rt, JS::Zone::Compact);
 
   if (!zone->arenas.relocateArenas(relocatedListOut, reason, sliceBudget,
                                    stats())) {
@@ -432,7 +445,10 @@ bool GCRuntime::relocateArenas(Zone* zone, JS::GCReason reason,
   for (auto kind : CompactingAllocKinds()) {
     ArenaList& al = zone->arenas.arenaList(kind);
     size_t freeCells = 0;
-    for (Arena* arena = al.arenaAfterCursor(); arena; arena = arena->next) {
+    for (auto arena = al.iter(); !arena.done(); arena.next()) {
+      if (arena->isFull()) {
+        break;
+      }
       freeCells += arena->countFreeCells();
     }
     MOZ_ASSERT(freeCells < Arena::thingsPerArena(kind));
@@ -449,14 +465,10 @@ MovingTracer::MovingTracer(JSRuntime* rt)
 template <typename T>
 inline void MovingTracer::onEdge(T** thingp, const char* name) {
   T* thing = *thingp;
-  if (thing->runtimeFromAnyThread() == runtime() && IsForwarded(thing)) {
+  if (IsForwarded(thing)) {
+    MOZ_ASSERT(thing->runtimeFromAnyThread() == runtime());
     *thingp = Forwarded(thing);
   }
-}
-
-void Zone::prepareForCompacting() {
-  JS::GCContext* gcx = runtimeFromMainThread()->gcContext();
-  discardJitCode(gcx);
 }
 
 void GCRuntime::sweepZoneAfterCompacting(MovingTracer* trc, Zone* zone) {
@@ -553,10 +565,12 @@ static size_t UpdateArenaListSegmentPointers(GCRuntime* gc,
   MOZ_ASSERT(arenas.begin);
   MovingTracer trc(gc->rt);
   size_t count = 0;
-  for (Arena* arena = arenas.begin; arena != arenas.end; arena = arena->next) {
+  Arena* arena = arenas.begin;
+  do {
     UpdateArenaPointers(&trc, arena);
     count++;
-  }
+    arena = arena->next;
+  } while (arena != arenas.end);
   return count * 256;
 }
 
@@ -569,10 +583,15 @@ class ArenasToUpdate {
 #endif
 
  public:
-  explicit ArenasToUpdate(Zone* zone);
-  ArenasToUpdate(Zone* zone, const AllocKinds& kinds);
+  ArenasToUpdate(Zone* zone, const AllocKinds& kinds)
+      : kinds(kinds), zone(zone) {
+    settle();
+  }
 
-  bool done() const { return !segmentBegin; }
+  bool done() const {
+    MOZ_ASSERT_IF(!segmentBegin, endOfArenaList);
+    return !segmentBegin;
+  }
 
   ArenaListSegment get() const {
     MOZ_ASSERT(!done());
@@ -582,11 +601,12 @@ class ArenasToUpdate {
   void next();
 
  private:
-  Maybe<AllocKinds> kinds;            // Selects which thing kinds to update.
+  AllocKinds kinds;                   // Selects which thing kinds to update.
   Zone* zone;                         // Zone to process.
   AllocKind kind = AllocKind::FIRST;  // Current alloc kind to process.
   Arena* segmentBegin = nullptr;
   Arena* segmentEnd = nullptr;
+  bool endOfArenaList = true;
 
   static AllocKind nextAllocKind(AllocKind i) {
     return AllocKind(uint8_t(i) + 1);
@@ -596,27 +616,22 @@ class ArenasToUpdate {
   void findSegmentEnd();
 };
 
-ArenasToUpdate::ArenasToUpdate(Zone* zone) : zone(zone) { settle(); }
-
-ArenasToUpdate::ArenasToUpdate(Zone* zone, const AllocKinds& kinds)
-    : kinds(Some(kinds)), zone(zone) {
-  settle();
-}
-
 void ArenasToUpdate::settle() {
   // Called when we have set |kind| to a new kind. Sets |arena| to the next
   // arena or null if there are no more arenas to update.
 
   MOZ_ASSERT(!segmentBegin);
+  MOZ_ASSERT(endOfArenaList);
 
   for (; kind < AllocKind::LIMIT; kind = nextAllocKind(kind)) {
-    if (kinds && !kinds.ref().contains(kind)) {
+    if (!kinds.contains(kind)) {
       continue;
     }
 
     Arena* arena = zone->arenas.getFirstArena(kind);
     if (arena) {
       segmentBegin = arena;
+      endOfArenaList = false;
       findSegmentEnd();
       break;
     }
@@ -625,10 +640,19 @@ void ArenasToUpdate::settle() {
 
 void ArenasToUpdate::findSegmentEnd() {
   // Take up to MaxArenasToProcess arenas from the list starting at
-  // |segmentBegin| and set |segmentEnd|.
+  // |segmentBegin| and set |segmentEnd| and |endOfArenaList|.
+  MOZ_ASSERT(segmentBegin);
+  MOZ_ASSERT(!endOfArenaList);
+
   Arena* arena = segmentBegin;
-  for (size_t i = 0; arena && i < MaxArenasToProcess; i++) {
+  Arena* firstArena = zone->arenas.getFirstArena(kind);
+  for (size_t i = 0; i < MaxArenasToProcess; i++) {
     arena = arena->next;
+    if (arena == firstArena) {
+      // We have reached the end of the circular linked list.
+      endOfArenaList = true;
+      break;
+    }
   }
   segmentEnd = arena;
 }
@@ -636,12 +660,13 @@ void ArenasToUpdate::findSegmentEnd() {
 void ArenasToUpdate::next() {
   MOZ_ASSERT(!done());
 
-  segmentBegin = segmentEnd;
-  if (segmentBegin) {
+  if (!endOfArenaList) {
+    segmentBegin = segmentEnd;
     findSegmentEnd();
     return;
   }
 
+  segmentBegin = nullptr;
   kind = nextAllocKind(kind);
   settle();
 }
@@ -678,25 +703,22 @@ void GCRuntime::updateCellPointers(Zone* zone, AllocKinds kinds) {
 }
 
 // After cells have been relocated any pointers to a cell's old locations must
-// be updated to point to the new location.  This happens by iterating through
+// be updated to point to the new location. This happens by iterating through
 // all cells in heap and tracing their children (non-recursively) to update
 // them.
 //
 // This is complicated by the fact that updating a GC thing sometimes depends on
-// making use of other GC things.  After a moving GC these things may not be in
-// a valid state since they may contain pointers which have not been updated
-// yet.
+// making use of other GC things. After a moving GC these things may not be in a
+// valid state since they may contain pointers which have not been updated yet.
 //
-// The main dependencies are:
+// The main remaining dependency is:
 //
 //   - Updating a JSObject makes use of its shape
-//   - Updating a typed object makes use of its type descriptor object
 //
-// This means we require at least three phases for update:
+// This means we require at least two phases for update:
 //
-//  1) shapes
-//  2) typed object type descriptor objects
-//  3) all other objects
+//  1) a phase including shapes
+//  2) a phase including all JS objects
 //
 // Also, there can be data races calling IsForwarded() on the new location of a
 // cell whose first word is being updated in parallel on another thread. This
@@ -704,7 +726,7 @@ void GCRuntime::updateCellPointers(Zone* zone, AllocKinds kinds) {
 // cell. Otherwise this can be avoided by updating different kinds of cell in
 // different phases.
 //
-// Since we want to minimize the number of phases, arrange kinds into three
+// Since we want to minimize the number of phases, arrange kinds into two
 // arbitrary phases.
 
 static constexpr AllocKinds UpdatePhaseOne{AllocKind::SCRIPT,
@@ -719,31 +741,34 @@ static constexpr AllocKinds UpdatePhaseOne{AllocKind::SCRIPT,
                                            AllocKind::NORMAL_PROP_MAP,
                                            AllocKind::DICT_PROP_MAP};
 
-// UpdatePhaseTwo is typed object descriptor objects.
-
-static constexpr AllocKinds UpdatePhaseThree{AllocKind::FUNCTION,
-                                             AllocKind::FUNCTION_EXTENDED,
-                                             AllocKind::OBJECT0,
-                                             AllocKind::OBJECT0_BACKGROUND,
-                                             AllocKind::OBJECT2,
-                                             AllocKind::OBJECT2_BACKGROUND,
-                                             AllocKind::ARRAYBUFFER4,
-                                             AllocKind::OBJECT4,
-                                             AllocKind::OBJECT4_BACKGROUND,
-                                             AllocKind::ARRAYBUFFER8,
-                                             AllocKind::OBJECT8,
-                                             AllocKind::OBJECT8_BACKGROUND,
-                                             AllocKind::ARRAYBUFFER12,
-                                             AllocKind::OBJECT12,
-                                             AllocKind::OBJECT12_BACKGROUND,
-                                             AllocKind::ARRAYBUFFER16,
-                                             AllocKind::OBJECT16,
-                                             AllocKind::OBJECT16_BACKGROUND};
+static constexpr AllocKinds UpdatePhaseTwo{AllocKind::FUNCTION,
+                                           AllocKind::FUNCTION_EXTENDED,
+                                           AllocKind::OBJECT0,
+                                           AllocKind::OBJECT0_FOREGROUND,
+                                           AllocKind::OBJECT0_BACKGROUND,
+                                           AllocKind::OBJECT2,
+                                           AllocKind::OBJECT2_FOREGROUND,
+                                           AllocKind::OBJECT2_BACKGROUND,
+                                           AllocKind::ARRAYBUFFER4,
+                                           AllocKind::OBJECT4,
+                                           AllocKind::OBJECT4_FOREGROUND,
+                                           AllocKind::OBJECT4_BACKGROUND,
+                                           AllocKind::ARRAYBUFFER8,
+                                           AllocKind::OBJECT8,
+                                           AllocKind::OBJECT8_FOREGROUND,
+                                           AllocKind::OBJECT8_BACKGROUND,
+                                           AllocKind::ARRAYBUFFER12,
+                                           AllocKind::OBJECT12,
+                                           AllocKind::OBJECT12_FOREGROUND,
+                                           AllocKind::OBJECT12_BACKGROUND,
+                                           AllocKind::ARRAYBUFFER16,
+                                           AllocKind::OBJECT16,
+                                           AllocKind::OBJECT16_FOREGROUND,
+                                           AllocKind::OBJECT16_BACKGROUND};
 
 void GCRuntime::updateAllCellPointers(MovingTracer* trc, Zone* zone) {
   updateCellPointers(zone, UpdatePhaseOne);
-
-  updateCellPointers(zone, UpdatePhaseThree);
+  updateCellPointers(zone, UpdatePhaseTwo);
 }
 
 /*
@@ -878,11 +903,19 @@ void GCRuntime::clearRelocatedArenasWithoutUnlocking(Arena* arenaList,
     //  - if they were allocated since the start of the GC.
     bool allArenasRelocated = ShouldRelocateAllArenas(reason);
     bool updateRetainedSize = !allArenasRelocated && !arena->isNewlyCreated();
-    arena->zone->gcHeapSize.removeBytes(ArenaSize, updateRetainedSize,
-                                        heapSize);
+    Zone* zone = arena->zone();
+    if (IsBufferAllocKind(arena->getAllocKind())) {
+      size_t usableBytes = ArenaSize - arena->getFirstThingOffset();
+      zone->mallocHeapSize.removeBytes(usableBytes, updateRetainedSize);
+    } else {
+      zone->gcHeapSize.removeBytes(ArenaSize, updateRetainedSize, heapSize);
+    }
+
+    // There is no atom marking bitmap index to free.
+    MOZ_ASSERT(!zone->isAtomsZone());
 
     // Release the arena but don't return it to the chunk yet.
-    arena->release(lock);
+    arena->release();
   }
 }
 

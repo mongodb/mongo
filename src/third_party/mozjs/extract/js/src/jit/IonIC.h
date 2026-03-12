@@ -10,6 +10,7 @@
 #include "jit/CacheIR.h"
 #include "jit/ICState.h"
 #include "jit/shared/Assembler-shared.h"
+#include "vm/CompletionKind.h"
 
 namespace js {
 namespace jit {

@@ -8,6 +8,7 @@
 
 #include "jit/Lowering.h"
 #include "jit/mips64/Assembler-mips64.h"
+#include "jit/MIR-wasm.h"
 #include "jit/MIR.h"
 
 #include "jit/shared/Lowering-shared-inl.h"
@@ -74,37 +75,22 @@ void LIRGeneratorMIPS64::lowerUModI64(MMod* mod) {
   defineInt64(lir, mod);
 }
 
-void LIRGeneratorMIPS64::lowerBigIntDiv(MBigIntDiv* ins) {
-  auto* lir = new (alloc()) LBigIntDiv(useRegister(ins->lhs()),
-                                       useRegister(ins->rhs()), temp(), temp());
-  define(lir, ins);
-  assignSafepoint(lir, ins);
-}
-
-void LIRGeneratorMIPS64::lowerBigIntMod(MBigIntMod* ins) {
-  auto* lir = new (alloc()) LBigIntMod(useRegister(ins->lhs()),
-                                       useRegister(ins->rhs()), temp(), temp());
-  define(lir, ins);
-  assignSafepoint(lir, ins);
-}
-
 void LIRGeneratorMIPS64::lowerAtomicLoad64(MLoadUnboxedScalar* ins) {
   const LUse elements = useRegister(ins->elements());
   const LAllocation index =
       useRegisterOrIndexConstant(ins->index(), ins->storageType());
 
-  auto* lir = new (alloc()) LAtomicLoad64(elements, index, temp(), tempInt64());
-  define(lir, ins);
-  assignSafepoint(lir, ins);
+  auto* lir = new (alloc()) LAtomicLoad64(elements, index);
+  defineInt64(lir, ins);
 }
 
 void LIRGeneratorMIPS64::lowerAtomicStore64(MStoreUnboxedScalar* ins) {
   LUse elements = useRegister(ins->elements());
   LAllocation index =
       useRegisterOrIndexConstant(ins->index(), ins->writeType());
-  LAllocation value = useRegister(ins->value());
+  LInt64Allocation value = useInt64Register(ins->value());
 
-  add(new (alloc()) LAtomicStore64(elements, index, value, tempInt64()), ins);
+  add(new (alloc()) LAtomicStore64(elements, index, value), ins);
 }
 
 void LIRGenerator::visitBox(MBox* box) {
@@ -129,10 +115,10 @@ void LIRGenerator::visitUnbox(MUnbox* unbox) {
   MDefinition* box = unbox->getOperand(0);
   MOZ_ASSERT(box->type() == MIRType::Value);
 
-  LUnbox* lir;
+  LInstructionHelper<1, BOX_PIECES, 0>* lir;
   if (IsFloatingPointType(unbox->type())) {
-    lir = new (alloc())
-        LUnboxFloatingPoint(useRegisterAtStart(box), unbox->type());
+    MOZ_ASSERT(unbox->type() == MIRType::Double);
+    lir = new (alloc()) LUnboxFloatingPoint(useBoxAtStart(box));
   } else if (unbox->fallible()) {
     // If the unbox is fallible, load the Value in a register first to
     // avoid multiple loads.

@@ -20,6 +20,7 @@ UNIFIED_SOURCES += [
     "BaselineBailouts.cpp",
     "BaselineCacheIRCompiler.cpp",
     "BaselineCodeGen.cpp",
+    "BaselineCompileTask.cpp",
     "BaselineDebugModeOSR.cpp",
     "BaselineFrame.cpp",
     "BaselineFrameInfo.cpp",
@@ -29,12 +30,14 @@ UNIFIED_SOURCES += [
     "BranchHinting.cpp",
     "BytecodeAnalysis.cpp",
     "CacheIR.cpp",
+    "CacheIRAOT.cpp",
     "CacheIRCompiler.cpp",
     "CacheIRHealth.cpp",
     "CacheIRSpewer.cpp",
     "CodeGenerator.cpp",
     "CompileWrappers.cpp",
     "Disassemble.cpp",
+    "DominatorTree.cpp",
     "EdgeCaseAnalysis.cpp",
     "EffectiveAddressAnalysis.cpp",
     "ExecutableAllocator.cpp",
@@ -66,6 +69,7 @@ UNIFIED_SOURCES += [
     "LIR.cpp",
     "Lowering.cpp",
     "MacroAssembler.cpp",
+    "MIR-wasm.cpp",
     "MIR.cpp",
     "MIRGraph.cpp",
     "MoveResolver.cpp",
@@ -85,12 +89,14 @@ UNIFIED_SOURCES += [
     "shared/Disassembler-shared.cpp",
     "shared/Lowering-shared.cpp",
     "ShuffleAnalysis.cpp",
+    "SimpleAllocator.cpp",
     "Sink.cpp",
     "Snapshots.cpp",
     "Trampoline.cpp",
     "TrampolineNatives.cpp",
     "TrialInlining.cpp",
     "TypePolicy.cpp",
+    "UnrollLoops.cpp",
     "ValueNumbering.cpp",
     "VMFunctions.cpp",
     "WarpBuilder.cpp",
@@ -185,7 +191,7 @@ elif CONFIG["JS_CODEGEN_ARM64"]:
             "arm64/vixl/MozSimulator-vixl.cpp",
             "arm64/vixl/Simulator-vixl.cpp",
         ]
-elif CONFIG["JS_CODEGEN_MIPS32"] or CONFIG["JS_CODEGEN_MIPS64"]:
+elif CONFIG["JS_CODEGEN_MIPS64"]:
     UNIFIED_SOURCES += [
         "mips-shared/Architecture-mips-shared.cpp",
         "mips-shared/Assembler-mips-shared.cpp",
@@ -193,31 +199,16 @@ elif CONFIG["JS_CODEGEN_MIPS32"] or CONFIG["JS_CODEGEN_MIPS64"]:
         "mips-shared/Lowering-mips-shared.cpp",
         "mips-shared/MacroAssembler-mips-shared.cpp",
         "mips-shared/MoveEmitter-mips-shared.cpp",
+        "mips64/Architecture-mips64.cpp",
+        "mips64/Assembler-mips64.cpp",
+        "mips64/CodeGenerator-mips64.cpp",
+        "mips64/Lowering-mips64.cpp",
+        "mips64/MacroAssembler-mips64.cpp",
+        "mips64/MoveEmitter-mips64.cpp",
+        "mips64/Trampoline-mips64.cpp",
     ]
-    if CONFIG["JS_CODEGEN_MIPS32"]:
-        UNIFIED_SOURCES += [
-            "mips32/Architecture-mips32.cpp",
-            "mips32/Assembler-mips32.cpp",
-            "mips32/CodeGenerator-mips32.cpp",
-            "mips32/Lowering-mips32.cpp",
-            "mips32/MacroAssembler-mips32.cpp",
-            "mips32/MoveEmitter-mips32.cpp",
-            "mips32/Trampoline-mips32.cpp",
-        ]
-        if CONFIG["JS_SIMULATOR_MIPS32"]:
-            UNIFIED_SOURCES += ["mips32/Simulator-mips32.cpp"]
-    elif CONFIG["JS_CODEGEN_MIPS64"]:
-        UNIFIED_SOURCES += [
-            "mips64/Architecture-mips64.cpp",
-            "mips64/Assembler-mips64.cpp",
-            "mips64/CodeGenerator-mips64.cpp",
-            "mips64/Lowering-mips64.cpp",
-            "mips64/MacroAssembler-mips64.cpp",
-            "mips64/MoveEmitter-mips64.cpp",
-            "mips64/Trampoline-mips64.cpp",
-        ]
-        if CONFIG["JS_SIMULATOR_MIPS64"]:
-            UNIFIED_SOURCES += ["mips64/Simulator-mips64.cpp"]
+    if CONFIG["JS_SIMULATOR_MIPS64"]:
+        UNIFIED_SOURCES += ["mips64/Simulator-mips64.cpp"]
 elif CONFIG["JS_CODEGEN_LOONG64"]:
     UNIFIED_SOURCES += [
         "loong64/Architecture-loong64.cpp",
@@ -283,7 +274,7 @@ GeneratedFile(
     "LIROpsGenerated.h",
     script="GenerateLIRFiles.py",
     entry_point="generate_lir_header",
-    inputs=["LIROps.yaml"],
+    inputs=["LIROps.yaml", "MIROps.yaml"],
 )
 
 # Generate jit/CacheIROpsGenerated.h from jit/CacheIROps.yaml
@@ -300,6 +291,15 @@ GeneratedFile(
     entry_point="generate_atomics_header",
     inputs=[],
 )
+
+if CONFIG["ENABLE_JS_AOT_ICS"]:
+    GeneratedFile(
+        "CacheIRAOTGenerated.h",
+        script="GenerateCacheIRFiles.py",
+        entry_point="generate_aot_ics_header",
+        inputs=["../ics/"],
+        force=True,  # depends on list of files in js/src/ics/; always rebuild
+    )
 
 if CONFIG["FUZZING_INTERFACES"] or CONFIG["FUZZING_JS_FUZZILLI"]:
     include("/tools/fuzzing/libfuzzer-config.mozbuild")

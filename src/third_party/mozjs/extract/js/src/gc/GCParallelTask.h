@@ -127,7 +127,7 @@ class GCParallelTask : private mozilla::LinkedListElement<GCParallelTask>,
 
  protected:
   // A flag to signal a request for early completion of the off-thread task.
-  mozilla::Atomic<bool, mozilla::MemoryOrdering::ReleaseAcquire> cancel_;
+  mozilla::Atomic<bool, mozilla::Relaxed> cancel_;
 
  public:
   explicit GCParallelTask(gc::GCRuntime* gc, gcstats::PhaseKind phaseKind,
@@ -202,6 +202,8 @@ class GCParallelTask : private mozilla::LinkedListElement<GCParallelTask>,
     return state_ == State::Idle || state_ == State::Queued ||
            state_ == State::Dispatched;
   }
+
+  const char* getName() override { return "GCParallelTask"; }
 
  protected:
   // Override this method to provide the task's functionality.
