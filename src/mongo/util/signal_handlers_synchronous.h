@@ -31,6 +31,7 @@
 
 #include "mongo/platform/compiler.h"
 #include "mongo/util/dynamic_catch.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <iosfwd>
@@ -38,6 +39,8 @@
 #include <vector>
 
 #include <boost/optional.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 /**
@@ -64,7 +67,7 @@ void setupSynchronousSignalHandlers();
  * Registers a user-defined callback to be invoked on any signal handler. Clobbers the
  * previously-registered callback.
  */
-void setSynchronousSignalHandlerCallback_forTest(std::function<void()> cb);
+MONGO_MOD_PUBLIC void setSynchronousSignalHandlerCallback_forTest(std::function<void()> cb);
 
 /**
  * Report out of memory error with a stack trace and exit.

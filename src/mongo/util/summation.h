@@ -30,11 +30,13 @@
 #pragma once
 
 #include "mongo/platform/decimal128.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <cmath>
 #include <tuple>
 #include <utility>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

@@ -31,6 +31,9 @@
 
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

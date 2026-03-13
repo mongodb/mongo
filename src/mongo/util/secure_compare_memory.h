@@ -29,7 +29,11 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <cstddef>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

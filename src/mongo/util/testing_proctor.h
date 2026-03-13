@@ -31,10 +31,12 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/static_immortal.h"
 
 #include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 /**

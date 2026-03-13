@@ -34,6 +34,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -46,6 +47,8 @@
 #include <boost/intrusive_ptr.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 namespace allocator_aware {

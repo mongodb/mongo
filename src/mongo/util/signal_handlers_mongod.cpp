@@ -53,7 +53,6 @@
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/signal_win32.h"  // IWYU pragma: keep
 #include "mongo/util/stacktrace.h"
-#include "mongo/util/thread_util.h"
 
 #include <cerrno>
 #include <csignal>

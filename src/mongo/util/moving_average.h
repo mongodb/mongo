@@ -31,10 +31,13 @@
 
 #include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <cmath>
 
 #include <boost/optional.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

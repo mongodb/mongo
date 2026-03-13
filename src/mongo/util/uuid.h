@@ -40,6 +40,7 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <array>
 #include <compare>
@@ -48,6 +49,8 @@
 #include <functional>
 #include <iosfwd>
 #include <string>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

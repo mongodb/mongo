@@ -32,7 +32,10 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit_code.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/testing_proctor.h"
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

@@ -33,8 +33,11 @@
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
 
 #include <MurmurHash3.h>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

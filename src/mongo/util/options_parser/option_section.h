@@ -29,11 +29,14 @@
 
 #pragma once
 #include "mongo/base/status.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/options_parser/option_description.h"
 
 #include <list>
 
 #include <boost/program_options.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 namespace optionenvironment {

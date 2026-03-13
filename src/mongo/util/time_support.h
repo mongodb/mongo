@@ -34,6 +34,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 #include <array>
 #include <chrono>
@@ -42,6 +43,8 @@
 #include <iosfwd>
 #include <limits>
 #include <string>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

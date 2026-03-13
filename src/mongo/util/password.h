@@ -30,9 +30,13 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <string>
 
 #include <boost/program_options.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

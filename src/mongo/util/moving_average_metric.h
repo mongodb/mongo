@@ -30,7 +30,10 @@
 #pragma once
 
 #include "mongo/db/commands/server_status/server_status_metric.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/moving_average.h"
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

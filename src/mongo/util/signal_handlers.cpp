@@ -50,7 +50,7 @@
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/signal_win32.h"  // IWYU pragma: keep
 #include "mongo/util/stacktrace.h"
-#include "mongo/util/thread_util.h"
+#include "mongo/util/stacktrace_details.h"
 
 #include <cerrno>
 #include <csignal>
@@ -318,7 +318,7 @@ private:
 
 boost::optional<int> chooseVictimTid(auto& engine) {
     std::vector<int> tids;
-    iterateTids([&](int tid) { tids.push_back(tid); });
+    stacktrace_details::iterateTids([&](int tid) { tids.push_back(tid); });
     if (tids.empty())
         return {};
     std::uniform_int_distribution<std::size_t> dist{0, tids.size() - 1};
@@ -340,10 +340,10 @@ void signalTestingThread(Milliseconds period) {
                     1,
                     "Signalling thread",
                     "tid"_attr = *victimTid,
-                    "name"_attr = readThreadName(*victimTid),
+                    "name"_attr = stacktrace_details::readThreadName(*victimTid),
                     "sig"_attr = signum,
                     "slept"_attr = sleepDuration);
-        terminateThread(getpid(), *victimTid, signum);
+        stacktrace_details::terminateThread(getpid(), *victimTid, signum);
     }
 }
 #endif  // __linux__

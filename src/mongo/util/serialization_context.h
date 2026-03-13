@@ -28,10 +28,13 @@
  */
 
 #pragma once
+#include "mongo/util/modules.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
 
 #include <boost/optional.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

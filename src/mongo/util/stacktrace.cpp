@@ -55,7 +55,7 @@
 
 
 namespace mongo {
-namespace stack_trace_detail {
+namespace stacktrace_details {
 namespace {
 
 template <size_t base>
@@ -188,7 +188,7 @@ void logBacktraceObject(const BSONObj& bt, StackTraceSink* sink, bool withHumanR
     }
 }
 
-}  // namespace stack_trace_detail
+}  // namespace stacktrace_details
 
 void StackTrace::log(bool withHumanReadable) const {
     if (hasError()) {
@@ -203,7 +203,7 @@ void StackTrace::sink(StackTraceSink* sink, bool withHumanReadable) const {
         *sink << fmt::format("Error collecting stack trace: {}", _error);
     }
 
-    stack_trace_detail::logBacktraceObject(_stacktrace, sink, withHumanReadable);
+    stacktrace_details::logBacktraceObject(_stacktrace, sink, withHumanReadable);
 }
 
 #ifdef MONGO_CONFIG_DEV_STACKTRACE
@@ -221,7 +221,7 @@ void disableDevStackTrace() {
 void printStackTrace(StackTraceSink& sink) {
 #ifdef MONGO_CONFIG_DEV_STACKTRACE
     if (gDevStackTraceEnabled.loadRelaxed()) {
-        stack_trace_detail::printCppTrace(&sink);
+        stacktrace_details::printCppTrace(&sink);
     } else {
         printStructuredStackTrace(sink);
     }
@@ -234,7 +234,7 @@ void printStackTrace(std::ostream& os) {
 #ifdef MONGO_CONFIG_DEV_STACKTRACE
     if (gDevStackTraceEnabled.loadRelaxed()) {
         OstreamStackTraceSink sink{os};
-        stack_trace_detail::printCppTrace(&sink);
+        stacktrace_details::printCppTrace(&sink);
     } else {
         printStructuredStackTrace(os);
     }
@@ -246,7 +246,7 @@ void printStackTrace(std::ostream& os) {
 void printStackTrace() {
 #ifdef MONGO_CONFIG_DEV_STACKTRACE
     if (gDevStackTraceEnabled.loadRelaxed()) {
-        stack_trace_detail::printCppTrace(nullptr);
+        stacktrace_details::printCppTrace(nullptr);
     } else {
         printStructuredStackTrace();
     }

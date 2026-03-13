@@ -29,15 +29,19 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <algorithm>
 #include <cstdint>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
 /**
  * Interface for objects generating ticks that roughly represents the passage of time.
  */
-class TickSource {
+class MONGO_MOD_OPEN TickSource {
 public:
     using Tick = int64_t;
 

@@ -27,63 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/util/thread_util.h"
+#pragma once
+
+#include "mongo/util/modules.h"
+
+#include <functional>
+#include <string>
+
+namespace mongo::stacktrace_details {
 
 #ifdef __linux__
 
-#include "mongo/base/parse_number.h"
+/** Calls `f(tid)` on each thread `tid` in this process except the calling thread. */
+void iterateTids(const std::function<void(int)>& f);
 
-#include <unistd.h>
+/** Returns true if the given tid exists in this process. */
+bool tidExists(int tid);
 
-#include <boost/filesystem/directory.hpp>
-#include <boost/filesystem/fstream.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
+/** Returns the thread name for the given tid. */
+std::string readThreadName(int tid);
 
-namespace mongo {
-namespace {
+/** Wrapper around the gettid system call. */
+int getThreadId();
 
-boost::filesystem::path taskDir() {
-    return boost::filesystem::path("/proc/self/task");
-}
-
-}  // namespace
-
-int getThreadId() {
-    return ::syscall(SYS_gettid);
-}
-
-int terminateThread(int pid, int tid, int sig) {
-    return syscall(SYS_tgkill, pid, tid, sig);
-}
-
-void iterateTids(const std::function<void(int)>& f) {
-    int selfTid = getThreadId();
-    auto iter = boost::filesystem::directory_iterator{taskDir()};
-    for (const auto& entry : iter) {
-        int tid;
-        if (!NumberParser{}(entry.path().filename().string(), &tid).isOK())
-            continue;  // Ignore non-integer names (e.g. "." or "..").
-        if (tid == selfTid)
-            continue;  // skip the current thread
-        f(tid);
-    }
-}
-
-bool tidExists(int tid) {
-    return exists(taskDir() / std::to_string(tid));
-}
-
-std::string readThreadName(int tid) {
-    std::string threadName;
-    try {
-        boost::filesystem::ifstream in(taskDir() / std::to_string(tid) / "comm");
-        std::getline(in, threadName);
-    } catch (...) {
-    }
-    return threadName;
-}
-
-}  // namespace mongo
-
+/** Wrapper around the tgkill system call. */
+int terminateThread(int pid, int tid, int sig);
 #endif  // __linux__
+
+}  // namespace mongo::stacktrace_details

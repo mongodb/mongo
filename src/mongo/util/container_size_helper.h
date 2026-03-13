@@ -29,8 +29,12 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <cstdint>
 #include <vector>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 namespace container_size_helper {

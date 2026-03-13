@@ -30,9 +30,12 @@
 #pragma once
 
 #include "mongo/platform/compiler.h"
+#include "mongo/util/modules.h"
 
 #include <type_traits>
 #include <utility>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

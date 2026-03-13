@@ -28,9 +28,13 @@
  */
 
 #pragma once
+#include "mongo/util/modules.h"
+
 #include <string>
 
 #include <tomcrypt.h>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

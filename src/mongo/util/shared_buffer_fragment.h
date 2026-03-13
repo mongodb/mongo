@@ -29,10 +29,13 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
 #include "mongo/util/shared_buffer.h"
 
 #include <functional>
 #include <vector>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

@@ -17,6 +17,8 @@
 
 // IWYU pragma: private, include "mongo/util/varint.h"
 
+#include "mongo/util/modules.h"
+
 #include <cassert>
 #include <cstdint>
 #include <string>

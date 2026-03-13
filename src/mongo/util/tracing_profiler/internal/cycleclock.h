@@ -30,6 +30,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/config.h"
+#include "mongo/util/modules.h"
 
 #include <absl/base/internal/cycleclock.h>
 

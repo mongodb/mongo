@@ -71,8 +71,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/future.h"
+#include "mongo/util/stacktrace_details.h"
 #include "mongo/util/stacktrace_somap.h"
-#include "mongo/util/thread_util.h"
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
@@ -81,7 +81,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
-namespace stack_trace_detail {
+namespace stacktrace_details {
 
 namespace {
 
@@ -323,7 +323,7 @@ public:
     void action(siginfo_t* si);
 
     void markProcessingThread() {
-        _processingTid.store(getThreadId(), std::memory_order_release);
+        _processingTid.store(stacktrace_details::getThreadId(), std::memory_order_release);
     }
 
     void setSignal(int signal) {
@@ -386,7 +386,7 @@ void State::collectStacks(std::vector<ThreadBacktrace>& messageStorage,
                           std::vector<ThreadBacktrace*>& received,
                           std::vector<int>& missedTids) {
     std::set<int> pendingTids;
-    iterateTids([&](int tid) { pendingTids.insert(tid); });
+    stacktrace_details::iterateTids([&](int tid) { pendingTids.insert(tid); });
     LOGV2(23394, "Preparing to dump thread stacks", "numThreads"_attr = pendingTids.size());
 
     messageStorage.resize(pendingTids.size());
@@ -401,7 +401,7 @@ void State::collectStacks(std::vector<ThreadBacktrace>& messageStorage,
 
     for (auto iter = pendingTids.begin(); iter != pendingTids.end();) {
         errno = 0;
-        if (int r = terminateThread(getpid(), *iter, _signal); r < 0) {
+        if (int r = stacktrace_details::terminateThread(getpid(), *iter, _signal); r < 0) {
             int errsv = errno;
             LOGV2(23395,
                   "Failed to signal thread",
@@ -432,7 +432,7 @@ void State::collectStacks(std::vector<ThreadBacktrace>& messageStorage,
             napMicros = 0;
             // Prune dead threads from the pendingTids set before retrying.
             for (auto iter = pendingTids.begin(); iter != pendingTids.end();) {
-                if (!tidExists(*iter)) {
+                if (!stacktrace_details::tidExists(*iter)) {
                     missedTids.push_back(*iter);
                     iter = pendingTids.erase(iter);
                 } else {
@@ -567,7 +567,7 @@ void State::printToEmitter(AbstractEmitter& emitter) {
     emitter.threadRecordsOpen();
     for (ThreadBacktrace* msg : received) {
         BSONObjBuilder threadRecord;
-        if (auto threadName = readThreadName(msg->tid); !threadName.empty()) {
+        if (auto threadName = stacktrace_details::readThreadName(msg->tid); !threadName.empty()) {
             threadRecord.append("name"_sd, threadName);
         }
         threadRecord.append("tid"_sd, msg->tid);
@@ -601,7 +601,7 @@ void State::action(siginfo_t* si) {
         case SI_QUEUE:
             // Received from outside. Forward to signal processing thread if there is one.
             if (int sigTid = _processingTid.load(std::memory_order_acquire); sigTid != -1)
-                terminateThread(getpid(), sigTid, si->si_signo);
+                stacktrace_details::terminateThread(getpid(), sigTid, si->si_signo);
             break;
         case SI_TKILL:
             // Users should call the toplevel printAllThreadStacks function.
@@ -609,7 +609,7 @@ void State::action(siginfo_t* si) {
             // Received from the signal processing thread.
             // Submit this thread's backtrace to the results stack.
             if (ThreadBacktrace* msg = acquireBacktraceBuffer(); msg != nullptr) {
-                msg->tid = getThreadId();
+                msg->tid = stacktrace_details::getThreadId();
                 msg->size = rawBacktrace(msg->addrs, msg->capacity);
                 postBacktrace(msg);
             }
@@ -646,36 +646,36 @@ void initialize(int signal) {
 
 }  // namespace
 
-}  // namespace stack_trace_detail
+}  // namespace stacktrace_details
 
 
 /*
  * This function should not be called from outside the SignalHandler thread.
  */
 void printAllThreadStacks(StackTraceSink& sink) {
-    stack_trace_detail::stateSingleton->printStacks(sink);
+    stacktrace_details::stateSingleton->printStacks(sink);
 }
 
 /*
  * This function should not be called from outside the SignalHandler thread.
  */
 void printAllThreadStacks() {
-    stack_trace_detail::stateSingleton->printStacks();
+    stacktrace_details::stateSingleton->printStacks();
 }
 
 /**
  * For use by threads other than the SignalHandler thread.
  */
 void printAllThreadStacksBlocking() {
-    stack_trace_detail::stateSingleton->printAllThreadStacksBlocking();
+    stacktrace_details::stateSingleton->printAllThreadStacksBlocking();
 }
 
 void setupStackTraceSignalAction(int signal) {
-    stack_trace_detail::initialize(signal);
+    stacktrace_details::initialize(signal);
 }
 
 void markAsStackTraceProcessingThread() {
-    stack_trace_detail::stateSingleton->markProcessingThread();
+    stacktrace_details::stateSingleton->markProcessingThread();
 }
 
 }  // namespace mongo

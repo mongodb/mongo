@@ -33,14 +33,16 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <map>
 #include <string>
 #include <typeinfo>
 #include <vector>
 
-namespace mongo {
-namespace optionenvironment {
+MONGO_MOD_PUBLIC;
+
+namespace mongo::optionenvironment {
 
 class Constraint;
 class KeyConstraint;
@@ -183,5 +185,4 @@ T Value::as() const {
     return valueType;
 }
 
-}  // namespace optionenvironment
-}  // namespace mongo
+}  // namespace mongo::optionenvironment

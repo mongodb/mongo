@@ -89,7 +89,7 @@
 
 
 namespace mongo {
-namespace stack_trace_detail {
+namespace stacktrace_details {
 namespace {
 
 constexpr size_t kSymbolMax = 512;
@@ -443,14 +443,14 @@ StackTrace getStackTraceImpl(const Options& options) {
 }  // namespace
 
 StackTrace getStructuredStackTrace() {
-    stack_trace_detail::Options options{};
+    stacktrace_details::Options options{};
     options.rawAddress = true;
     return getStackTraceImpl(options);
 }
-}  // namespace stack_trace_detail
+}  // namespace stacktrace_details
 
 void StackTraceAddressMetadata::printTo(StackTraceSink& sink) const {
-    stack_trace_detail::printMetadata(sink, *this);
+    stacktrace_details::printMetadata(sink, *this);
 }
 
 size_t rawBacktrace(void** addrs, size_t capacity) {
@@ -482,12 +482,12 @@ size_t rawBacktrace(void** addrs, size_t capacity) {
 
 const StackTraceAddressMetadata& StackTraceAddressMetadataGenerator::load(void* address) {
     _meta.reset(reinterpret_cast<uintptr_t>(address));
-    stack_trace_detail::mergeDlInfo(_meta);
+    stacktrace_details::mergeDlInfo(_meta);
     return _meta;
 }
 
 void printStructuredStackTrace(StackTraceSink& sink) {
-    stack_trace_detail::Options options{};
+    stacktrace_details::Options options{};
     options.rawAddress = true;
     const bool withHumanReadable = true;
     getStackTraceImpl(options).sink(&sink, withHumanReadable);
@@ -499,7 +499,7 @@ void printStructuredStackTrace(std::ostream& os) {
 }
 
 void printStructuredStackTrace() {
-    stack_trace_detail::Options options{};
+    stacktrace_details::Options options{};
     options.rawAddress = true;
     const bool withHumanReadable = true;
     getStackTraceImpl(options).log(withHumanReadable);

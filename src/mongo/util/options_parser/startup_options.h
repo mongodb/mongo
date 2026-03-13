@@ -29,8 +29,11 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 namespace optionenvironment {

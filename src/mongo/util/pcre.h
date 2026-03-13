@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -39,6 +40,8 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo::pcre {
 
@@ -333,16 +336,15 @@ inline std::error_code make_error_code(Errc e) noexcept {
     return pcreError(static_cast<std::underlying_type_t<Errc>>(e));
 }
 
-namespace detail {
 /**
  * A typesafe wrapper around `uint32_t`, representing the bitfields of PCRE2
  * options. A CRTP base class for the `Options` types.
  */
 template <typename D>
-class Options {
+class BasicOptions {
 public:
-    constexpr Options() noexcept = default;
-    constexpr explicit Options(uint32_t v) noexcept : _v{v} {}
+    constexpr BasicOptions() noexcept = default;
+    constexpr explicit BasicOptions(uint32_t v) noexcept : _v{v} {}
     constexpr explicit operator uint32_t() const noexcept {
         return _v;
     }
@@ -368,18 +370,17 @@ public:
 private:
     uint32_t _v = 0;
 };
-}  // namespace detail
 
 /** The bitfield of Regex compile (constructor) options. */
-class CompileOptions : public detail::Options<CompileOptions> {
+class CompileOptions : public BasicOptions<CompileOptions> {
 public:
-    using detail::Options<CompileOptions>::Options;
+    using BasicOptions<CompileOptions>::BasicOptions;
 };
 
 /** The bitfield of `Regex` match options. */
-class MatchOptions : public detail::Options<MatchOptions> {
+class MatchOptions : public BasicOptions<MatchOptions> {
 public:
-    using detail::Options<MatchOptions>::Options;
+    using BasicOptions<MatchOptions>::BasicOptions;
 };
 
 /**
@@ -387,9 +388,9 @@ public:
  * match options. We model this by making this type implicitly convertible to
  * both `CompileOptions` and `MatchOptions`.
  */
-class CompileAndMatchOptions : public detail::Options<CompileAndMatchOptions> {
+class CompileAndMatchOptions : public BasicOptions<CompileAndMatchOptions> {
 public:
-    using detail::Options<CompileAndMatchOptions>::Options;
+    using BasicOptions<CompileAndMatchOptions>::BasicOptions;
     constexpr operator CompileOptions() const noexcept {
         return CompileOptions{uint32_t{*this}};
     }
@@ -409,7 +410,7 @@ public:
  * It can be assumed that these variables have static constant initialization.
  * That is, they are available for use in static initializers.
  *
- * The options values are given an inilne namespace so they can be brought into
+ * The options values are given an inline namespace so they can be brought into
  * a local scope with a `using namespace pcre::options;` directive.
  */
 inline namespace options {

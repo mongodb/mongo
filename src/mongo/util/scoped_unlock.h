@@ -31,9 +31,11 @@
 
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <mutex>
 
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 /**

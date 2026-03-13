@@ -32,6 +32,7 @@
 #include "mongo/base/static_assert.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/stdx/type_traits.h"
+#include "mongo/util/modules.h"
 
 #include <cmath>
 #include <cstdint>
@@ -42,6 +43,8 @@
 #include <boost/numeric/conversion/converter_policies.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

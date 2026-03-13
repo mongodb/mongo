@@ -29,9 +29,13 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <memory>
 
 #include <kms_message/kms_message.h>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 namespace kms_message_support_detail {

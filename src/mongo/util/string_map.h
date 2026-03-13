@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/stdx/trusted_hasher.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <string>
@@ -41,6 +42,8 @@
 #include <absl/container/flat_hash_set.h>
 #include <absl/hash/hash.h>
 #include <absl/strings/string_view.h>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

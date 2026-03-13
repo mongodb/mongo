@@ -43,6 +43,7 @@
 
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 #include <array>
 #include <cassert>

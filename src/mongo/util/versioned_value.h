@@ -33,9 +33,12 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/rwmutex.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <shared_mutex>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 namespace versioned_value_detail {

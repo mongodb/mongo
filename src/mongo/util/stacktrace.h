@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/synchronized_value.h"
 
 #include <array>
@@ -44,6 +45,8 @@
 #include <iosfwd>
 #include <string>
 #include <utility>
+
+MONGO_MOD_PUBLIC;
 
 /**
  * All-thread backtrace is only implemented on Linux. Even on Linux, it's only AS-safe
@@ -136,7 +139,7 @@ private:
     std::string _error;
 };
 
-namespace stack_trace_detail {
+namespace stacktrace_details {
 /**
  * A utility for uint64_t <=> uppercase hex string conversions. It
  * can be used to produce a StringData.
@@ -248,7 +251,7 @@ private:
 
 StackTrace getStructuredStackTrace();
 
-}  // namespace stack_trace_detail
+}  // namespace stacktrace_details
 
 #ifndef _WIN32
 /**

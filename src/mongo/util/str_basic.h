@@ -37,8 +37,11 @@
 #include "mongo/base/string_data.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
+#include "mongo/util/modules.h"
 
 #include <cstring>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo::str {
 /**

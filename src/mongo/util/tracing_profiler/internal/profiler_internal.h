@@ -34,6 +34,7 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/aligned.h"
 #include "mongo/util/fixed_string.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/tracing_profiler/internal/cycleclock.h"

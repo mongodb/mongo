@@ -30,8 +30,11 @@
 #pragma once
 
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

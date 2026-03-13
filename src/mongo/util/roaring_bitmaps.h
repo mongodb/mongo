@@ -37,9 +37,12 @@
 #undef IS_BIG_ENDIAN
 
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <absl/container/btree_map.h>
 #include <absl/container/flat_hash_set.h>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 /**

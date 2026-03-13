@@ -341,7 +341,7 @@ template <int N>
 StackTrace getTrace() {
     boost::optional<StackTrace> trace;
     stacktrace_test::executeUnderCallstack<N>(
-        [&] { trace = stack_trace_detail::getStructuredStackTrace(); });
+        [&] { trace = stacktrace_details::getStructuredStackTrace(); });
     ASSERT_TRUE(trace.has_value());
     ASSERT_EQ(trace->getError(), std::string{});
     return *trace;
@@ -565,8 +565,8 @@ TEST_F(StackTraceSigAltStackTest, Backtrace) {
 class JsonTest : public unittest::Test {
 public:
     using unittest::Test::Test;
-    using Hex = stack_trace_detail::Hex;
-    using Dec = stack_trace_detail::Dec;
+    using Hex = stacktrace_details::Hex;
+    using Dec = stacktrace_details::Dec;
 };
 
 TEST_F(JsonTest, Hex) {
@@ -726,7 +726,7 @@ TEST_F(PrintAllThreadStacksTest, Go_200_Threads) {
 }
 
 TEST_F(PrintAllThreadStacksTest, SessionBasic) {
-    stack_trace_detail::PrintAllStacksSession session;
+    stacktrace_details::PrintAllStacksSession session;
 
     auto waiter = boost::make_optional(session.waiter());
     stdx::thread producer{[&] {
@@ -738,7 +738,7 @@ TEST_F(PrintAllThreadStacksTest, SessionBasic) {
 
 TEST_F(PrintAllThreadStacksTest, SessionProducerConsumers) {
     synchronized_value<std::string> values;
-    stack_trace_detail::PrintAllStacksSession session;
+    stacktrace_details::PrintAllStacksSession session;
 
     struct PromiseFuture {
         SharedPromise<void> promise;

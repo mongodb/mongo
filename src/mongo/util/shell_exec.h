@@ -31,9 +31,12 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <string>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

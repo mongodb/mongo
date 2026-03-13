@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <array>
@@ -42,6 +43,8 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 class StringListSet {

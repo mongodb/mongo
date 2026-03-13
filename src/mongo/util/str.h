@@ -35,6 +35,14 @@
  * TODO: De-inline.
  */
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/platform/bits.h"
+#include "mongo/util/ctype.h"
+#include "mongo/util/modules.h"
+#include "mongo/util/str_basic.h"  // IWYU pragma: export
+
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
@@ -51,12 +59,7 @@
 #include <strings.h>
 #endif
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/bson/util/builder_fwd.h"
-#include "mongo/platform/bits.h"
-#include "mongo/util/ctype.h"
-#include "mongo/util/str_basic.h"  // IWYU pragma: export
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 namespace str {

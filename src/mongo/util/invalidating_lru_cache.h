@@ -36,6 +36,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/lru_cache.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 
@@ -52,6 +53,8 @@
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
@@ -85,17 +88,8 @@ struct CacheNotCausallyConsistent {
     }
 };
 
-/**
- * Helper for determining if a given type is CacheNotCausallyConsistent or not.
- */
 template <typename T>
-struct isCausallyConsistentImpl : std::true_type {};
-
-template <>
-struct isCausallyConsistentImpl<CacheNotCausallyConsistent> : std::false_type {};
-
-template <class T>
-inline constexpr bool isCausallyConsistent = isCausallyConsistentImpl<T>::value;
+inline constexpr bool isCausallyConsistent = !std::is_same_v<T, CacheNotCausallyConsistent>;
 
 /**
  * Specifies the desired causal consistency for calls to 'get' (and 'acquire', respectively in the
@@ -144,7 +138,7 @@ struct IsTrustedHasher<LruKeyHasher<Key>, Key> : std::true_type {};
  * the lowest possible value for the time.
  */
 template <typename Key, typename Value, typename Time = CacheNotCausallyConsistent>
-class InvalidatingLRUCache {
+class MONGO_MOD_OPEN InvalidatingLRUCache {
     /**
      * Data structure representing the values stored in the cache.
      */

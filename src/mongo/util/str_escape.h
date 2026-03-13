@@ -30,11 +30,14 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <string>
 
 #include <fmt/format.h>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo::str {
 

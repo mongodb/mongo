@@ -29,10 +29,12 @@
 
 #pragma once
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
-#include <utility>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
@@ -95,7 +97,7 @@ private:
     //
     // On weak: atomic.fetch_sub(1)
     //   Decrements state by 1.  If this reduces state to 0, there was no strong arriver.
-    AtomicWord<uint64_t> _state;
+    Atomic<uint64_t> _state;
 };
 
 }  // namespace mongo

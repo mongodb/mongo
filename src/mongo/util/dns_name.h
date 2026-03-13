@@ -34,6 +34,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
@@ -45,6 +46,8 @@
 #include <tuple>
 #include <utility>
 #include <vector>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 namespace dns {

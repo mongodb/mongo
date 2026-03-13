@@ -39,6 +39,7 @@
 #include "mongo/util/represent_as.h"
 
 #include <algorithm>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -2326,7 +2327,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockSize(A
             blockTag == value::TypeTags::valueBlock);
     auto* block = value::getValueBlock(blockVal);
     auto count = block->count();
-    tassert(8141604, "block exceeds maximum length", mongo::detail::inRange<int32_t>(count));
+    tassert(8141604, "block exceeds maximum length", std::in_range<int32_t>(count));
 
     return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(count)};
 }

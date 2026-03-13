@@ -31,6 +31,7 @@
 
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 #include <array>
 #include <compare>
@@ -45,6 +46,8 @@
 #include <vector>
 
 #include <boost/noncopyable.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 namespace dns {

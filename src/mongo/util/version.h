@@ -34,10 +34,13 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/modules.h"
 
 #include <iosfwd>
 #include <string>
 #include <vector>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

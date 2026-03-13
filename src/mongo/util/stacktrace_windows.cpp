@@ -214,7 +214,7 @@ void appendTrace(BSONObjBuilder* bob, const std::vector<TraceItem>& traceList) {
     auto bt = BSONArrayBuilder(bob->subarrayStart("backtrace"));
     for (const auto& item : traceList) {
         auto o = BSONObjBuilder(bt.subobjStart());
-        o.append("a", stack_trace_detail::Hex(item.address));
+        o.append("a", stacktrace_details::Hex(item.address));
         if (!item.module.empty())
             o.append("module", item.module);
         if (!item.source.first.empty()) {
@@ -223,7 +223,7 @@ void appendTrace(BSONObjBuilder* bob, const std::vector<TraceItem>& traceList) {
         }
         if (!item.symbol.first.empty()) {
             o.append("s", item.symbol.first);
-            o.append("s+", stack_trace_detail::Hex(item.symbol.second));
+            o.append("s+", stacktrace_details::Hex(item.symbol.second));
         }
     }
 }
@@ -301,7 +301,7 @@ StackTrace getStackTraceImpl(CONTEXT& context) {
 }
 }  // namespace
 
-namespace stack_trace_detail {
+namespace stacktrace_details {
 StackTrace getStructuredStackTrace() {
     CONTEXT context;
     memset(&context, 0, sizeof(context));
@@ -310,7 +310,7 @@ StackTrace getStructuredStackTrace() {
 
     return getStackTraceImpl(context);
 }
-}  // namespace stack_trace_detail
+}  // namespace stacktrace_details
 
 void printWindowsStackTrace(CONTEXT& context, StackTraceSink& sink) {
     getStackTraceImpl(context).sink(&sink);
@@ -326,7 +326,7 @@ void printWindowsStackTrace(CONTEXT& context) {
 }
 
 void printStructuredStackTrace(StackTraceSink& sink) {
-    stack_trace_detail::getStructuredStackTrace().sink(&sink);
+    stacktrace_details::getStructuredStackTrace().sink(&sink);
 }
 
 void printStructuredStackTrace(std::ostream& os) {
@@ -335,7 +335,7 @@ void printStructuredStackTrace(std::ostream& os) {
 }
 
 void printStructuredStackTrace() {
-    stack_trace_detail::getStructuredStackTrace().log();
+    stacktrace_details::getStructuredStackTrace().log();
 }
 
 }  // namespace mongo

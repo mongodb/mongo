@@ -31,10 +31,13 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
 #include <vector>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

@@ -34,11 +34,14 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/options_parser/value.h"
 
 #include <map>
 #include <string>
 #include <vector>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 namespace optionenvironment {
