@@ -100,7 +100,7 @@ let testSockOptions = function (bindPath, expectSockPath, optDict, bindSep = ","
     }
 
     // When proxyUnixSocketPrefix is set, verify the proxy socket file exists (path matches
-    // makeProxyUnixSockPath) and has permissions 0600. We do not connect over it; proxy listeners
+    // makeProxyUnixSockPath) and has permissions 0660. We do not connect over it; proxy listeners
     // require PROXY protocol.
     let proxyPath = null;
     if (!jsTestOptions().shellGRPC && optDict.proxyUnixSocketPrefix) {
@@ -109,8 +109,8 @@ let testSockOptions = function (bindPath, expectSockPath, optDict, bindSep = ","
         const proxyMode = new Number(getFileMode(proxyPath));
         assert.eq(
             proxyMode,
-            0o600,
-            `Proxy socket ${proxyPath} should have permissions 0600, got ${proxyMode.toString(8)}`,
+            0o660,
+            `Proxy socket ${proxyPath} should have permissions 0660, got ${proxyMode.toString(8)}`,
         );
     }
 

@@ -181,6 +181,16 @@ server_parameters:
         validator: {gte: 536, lt: 16384}
         redact: false
 
+    proxyUnixSocketCheckPermissions:
+        description: >-
+            Check whether the connecting process is running under a specified UID. Closes connection
+            if check fails.
+        set_at: [startup, runtime]
+        cpp_varname: gProxyUnixSocketCheckPermissions
+        cpp_vartype: Atomic<bool>
+        default: true
+        redact: false
+
     preAuthMaximumMessageSizeBytes:
         description: >-
             The maximum size of a message that can be sent before the session is authenticated.

@@ -1,8 +1,7 @@
 /**
  * Verifies that connections over the proxy Unix socket are rejected without a PROXY protocol v2
  * header, and accepted when routed through the proxy protocol server that injects the header.
- * Also exercises peer credential validation failure paths (unauthorized and general failure)
- * and checks the corresponding log entries from asio_transport_layer.cpp (11793400, 11793401).
+ * Also exercises peer credential validation paths.
  *
  * @tags: [
  *   grpc_incompatible,
@@ -18,8 +17,6 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-// ErrorCodes used by proxyUnixDomainSocketPeerCredentialValidationResult failpoint (code numberInt).
-const kUnauthorizedCode = 13;
 const kInternalErrorCode = 1;
 
 function makeProxySocketPath(prefix, port) {
@@ -52,46 +49,70 @@ function testWithVersion(conn, ingressPort, egressPort, proxySocketPath, version
     }
 }
 
-function runPeerCredentialValidationFailureTest(conn, prefix) {
+function runPeerCredentialValidationTest(conn, prefix) {
     const proxySocketPath = makeProxySocketPath(prefix, conn.port);
     assert(fileExists(proxySocketPath), `Expected proxy socket to exist: ${proxySocketPath}`);
 
-    // Unauthorized branch: failpoint returns Unauthorized -> asio_transport_layer logs 11793400.
-    const fpUnauthorized = configureFailPoint(conn, "proxyUnixDomainSocketPeerCredentialValidationOverride", {
-        mode: "alwaysOn",
-        data: {code: kUnauthorizedCode},
-    });
-    const proxyServerUnauth = new ProxyProtocolServer(allocatePort(), conn.port, 2, {
+    const proxyServer = new ProxyProtocolServer(allocatePort(), conn.port, 2, {
         egressUnixSocket: proxySocketPath,
     });
-    proxyServerUnauth.setTLVs([{type: 0xe0, value: "unix-proxy"}]);
-    proxyServerUnauth.start();
-    try {
-        const uriUnauth = `mongodb://127.0.0.1:${proxyServerUnauth.getIngressPort()}`;
-        assert.throws(() => new Mongo(uriUnauth));
-        checkLog.containsRelaxedJson(conn, 11793400, {}, 1, 30 * 1000);
-    } finally {
-        proxyServerUnauth.stop();
-        fpUnauthorized.off();
-    }
+    proxyServer.setTLVs([{type: 0xe0, value: "unix-proxy"}]);
+    proxyServer.start();
 
-    // General check failure branch: failpoint returns InternalError -> asio_transport_layer logs 11793401.
-    const fpInternalError = configureFailPoint(conn, "proxyUnixDomainSocketPeerCredentialValidationOverride", {
-        mode: "alwaysOn",
-        data: {code: kInternalErrorCode},
-    });
-    const proxyServerInternal = new ProxyProtocolServer(allocatePort(), conn.port, 2, {
-        egressUnixSocket: proxySocketPath,
-    });
-    proxyServerInternal.setTLVs([{type: 0xe0, value: "unix-proxy"}]);
-    proxyServerInternal.start();
     try {
-        const uriInternal = `mongodb://127.0.0.1:${proxyServerInternal.getIngressPort()}`;
-        assert.throws(() => new Mongo(uriInternal));
-        checkLog.containsRelaxedJson(conn, 11793401, {}, 1, 30 * 1000);
+        {
+            // Proxy server GID of 1000 should succeed.
+            const fp = configureFailPoint(conn, "proxyUnixDomainSocketPeerCredentialValidationOverride", {
+                mode: "alwaysOn",
+                data: {expectedGid: NumberInt(1000), remoteGid: NumberInt(1000)},
+            });
+            let uri = `mongodb://127.0.0.1:${proxyServer.getIngressPort()}`;
+            new Mongo(uri);
+            fp.off();
+        }
+
+        {
+            // Proxy server GID of 1001 should fail when 1000 is expected.
+            const fp = configureFailPoint(conn, "proxyUnixDomainSocketPeerCredentialValidationOverride", {
+                mode: "alwaysOn",
+                data: {expectedGid: NumberInt(1000), remoteGid: NumberInt(1001)},
+            });
+            let uri = `mongodb://127.0.0.1:${proxyServer.getIngressPort()}`;
+            assert.throws(() => new Mongo(uri));
+            checkLog.containsRelaxedJson(conn, 11793400, {}, 1, 30 * 1000);
+
+            // If proxyUnixSocketCheckPermissions is disabled, connection succeedes.
+            assert.commandWorked(
+                conn.adminCommand({
+                    setParameter: 1,
+                    proxyUnixSocketCheckPermissions: false,
+                }),
+            );
+            new Mongo(uri);
+
+            // Set parameter back to on for next tests.
+            assert.commandWorked(
+                conn.adminCommand({
+                    setParameter: 1,
+                    proxyUnixSocketCheckPermissions: true,
+                }),
+            );
+            fp.off();
+        }
+
+        {
+            // Test failure log if server is unable to validate.
+            const fp = configureFailPoint(conn, "proxyUnixDomainSocketPeerCredentialValidationOverride", {
+                mode: "alwaysOn",
+                data: {code: kInternalErrorCode},
+            });
+            let uri = `mongodb://127.0.0.1:${proxyServer.getIngressPort()}`;
+            assert.throws(() => new Mongo(uri));
+            checkLog.containsRelaxedJson(conn, 11793401, {}, 1, 30 * 1000);
+            fp.off();
+        }
     } finally {
-        proxyServerInternal.stop();
-        fpInternalError.off();
+        proxyServer.stop();
     }
 }
 
@@ -107,8 +128,8 @@ function runTest(conn, prefix) {
     testWithVersion(conn, allocatePort(), conn.port, proxySocketPath, 1, false /* shouldSucceed */);
     testWithVersion(conn, allocatePort(), conn.port, proxySocketPath, 2, true /* shouldSucceed */);
 
-    // Peer credential validation failure paths (logs 11793400 and 11793401 from asio_transport_layer.cpp).
-    runPeerCredentialValidationFailureTest(conn, prefix);
+    // Validate proxyUnixSocketCheckPermissions parameter functionality.
+    runPeerCredentialValidationTest(conn, prefix);
 }
 
 function runMongodTest() {
@@ -117,7 +138,10 @@ function runMongodTest() {
 
     const mongod = MongoRunner.runMongod({
         proxyUnixSocketPrefix: prefix,
-        setParameter: {proxyProtocolTimeoutSecs: 1, logComponentVerbosity: {network: {verbosity: 4}}},
+        setParameter: {
+            proxyProtocolTimeoutSecs: 1,
+            logComponentVerbosity: {network: {verbosity: 4}},
+        },
     });
 
     try {
@@ -137,7 +161,10 @@ function runMongosTest() {
         other: {
             mongosOptions: {
                 proxyUnixSocketPrefix: prefix,
-                setParameter: {proxyProtocolTimeoutSecs: 1, logComponentVerbosity: {network: {verbosity: 4}}},
+                setParameter: {
+                    proxyProtocolTimeoutSecs: 1,
+                    logComponentVerbosity: {network: {verbosity: 4}},
+                },
             },
         },
     });

@@ -120,7 +120,7 @@ using TcpInfoOption = SocketOption<IPPROTO_TCP, TCP_INFO, tcp_info>;
 
 const Seconds kSessionShutdownTimeout{10};
 #ifndef _WIN32
-constexpr int kProxyUnixDomainSocketPerms = S_IRUSR | S_IWUSR;
+constexpr int kProxyUnixDomainSocketPerms = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
 #endif
 
 std::set<mongo::transport::WrappedEndpoint> getEndpoints(
@@ -1674,7 +1674,7 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
                     return;
                 }
                 if (session->isConnectedToProxyUnixSocket() &&
-                    serverGlobalParams.proxySocketCheckPermissions) {
+                    gProxyUnixSocketCheckPermissions.loadRelaxed()) {
                     Status status = session->validateProxyUnixSocketPeerPermissions();
                     if (status.code() == ErrorCodes::Unauthorized) {
                         static logv2::SeveritySuppressor suppressor{Seconds(10),

@@ -395,8 +395,6 @@ Status storeServerOptions(const moe::Environment& params) {
 #ifndef _WIN32
     if (auto key = "net.proxyUnixDomainSocket.pathPrefix"_sd; params.count(key.data()))
         serverGlobalParams.proxySocketPrefix = params[key.data()].as<string>();
-    if (auto key = "net.proxyUnixDomainSocket.checkPermissions"_sd; params.count(key.data()))
-        serverGlobalParams.proxySocketCheckPermissions = params[key.data()].as<bool>();
     if (params.count("net.unixDomainSocket.pathPrefix")) {
         serverGlobalParams.socket = params["net.unixDomainSocket.pathPrefix"].as<string>();
     }
