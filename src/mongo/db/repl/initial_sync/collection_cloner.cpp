@@ -162,7 +162,6 @@ CollectionCloner::CollectionCloner(const NamespaceString& sourceNss,
     invariant(sourceNss.isValid());
     invariant(collectionOptions.uuid);
     _sourceDbAndUuid = NamespaceStringOrUUID(sourceNss.dbName(), *collectionOptions.uuid);
-    _stats.nss = _sourceNss;
 }
 
 BaseCloner::ClonerStages CollectionCloner::getStages() {
@@ -184,13 +183,11 @@ BaseCloner::ClonerStages CollectionCloner::getStages() {
 
 
 void CollectionCloner::preStage() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _stats.start = getSharedData()->getClock()->now();
+    _statsStart.store(getSharedData()->getClock()->now());
 }
 
 void CollectionCloner::postStage() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _stats.end = getSharedData()->getClock()->now();
+    _statsEnd.store(getSharedData()->getClock()->now());
 }
 
 void CollectionCloner::_maybeDropCollectionOnSyncSourceDrop() {
@@ -235,11 +232,12 @@ BaseCloner::AfterStageBehavior CollectionCloner::collStatsStage() {
     BSONObj res;
     getClient()->runCommand(_sourceNss.dbName(), b.obj(), res);
     if (auto status = getStatusFromCommandResult(res); status.isOK()) {
-        _stats.bytesToCopy = res.getField("size").safeNumberLong();
-        if (_stats.bytesToCopy > 0) {
+        auto size = res.getField("size").safeNumberLong();
+        _bytesToCopy.store(size);
+        if (size > 0) {
             // The 'avgObjSize' parameter is only available if 'collStats' returns a 'size' field
             // greater than zero.
-            _stats.avgObjSize = res.getField("avgObjSize").safeNumberLong();
+            _avgObjSize.store(res.getField("avgObjSize").safeNumberLong());
         }
     }
     return kContinueNormally;
@@ -272,10 +270,9 @@ BaseCloner::AfterStageBehavior CollectionCloner::countStage() {
     }
 
     _progressMeter.setTotalWhileRunning(static_cast<unsigned long long>(count));
-    {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        _stats.documentToCopy = count;
-    }
+
+    _documentToCopy.store(count);
+
     return kContinueNormally;
 }
 
@@ -326,11 +323,10 @@ BaseCloner::AfterStageBehavior CollectionCloner::listIndexesStage() {
         }
     }
 
-    {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        _stats.indexes = _readyIndexSpecs.size() + _unfinishedIndexSpecs.size() +
-            (_idIndexSpec.isEmpty() ? 0 : 1);
-    };
+
+    _indexes.store(_readyIndexSpecs.size() + _unfinishedIndexSpecs.size() +
+                   (_idIndexSpec.isEmpty() ? 0 : 1));
+
 
     if (!_idIndexSpec.isEmpty() && _collectionOptions.autoIndexId == CollectionOptions::NO) {
         LOGV2_WARNING(21144,
@@ -503,7 +499,7 @@ void CollectionCloner::handleNextBatch(DBClientCursor& cursor) {
 
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
-        _stats.receivedBatches++;
+        _receivedBatches.fetchAndAddRelaxed(1);
         while (cursor.moreInCurrentBatch()) {
             _documentsToInsert.emplace_back(cursor.nextSafe());
         }
@@ -541,15 +537,15 @@ void CollectionCloner::insertDocumentsCallback(const executor::TaskExecutor::Cal
         std::vector<BSONObj> docs;
         // Increment 'fetchedBatches' even if no documents were inserted to match the number of
         // 'receivedBatches'.
-        ++_stats.fetchedBatches;
+        _fetchedBatches.fetchAndAddRelaxed(1);
         if (_documentsToInsert.size() == 0) {
             LOGV2_WARNING(
                 21145, "insertDocumentsCallback, but no documents to insert", logAttrs(_sourceNss));
             return;
         }
         _documentsToInsert.swap(docs);
-        _stats.documentsCopied += docs.size();
-        _stats.approxBytesCopied = ((long)_stats.documentsCopied) * _stats.avgObjSize;
+        auto copied = _documentsCopied.fetchAndAddRelaxed(docs.size()) + docs.size();
+        _approxBytesCopied.storeRelaxed(static_cast<long long>(copied) * _avgObjSize.load());
         _progressMeter.hit(int(docs.size()));
         invariant(_collLoader);
 
@@ -575,7 +571,7 @@ void CollectionCloner::insertDocumentsCallback(const executor::TaskExecutor::Cal
         },
         [&](const BSONObj& data) {
             return NamespaceStringUtil::parseFailPointData(data, "namespace") == _sourceNss &&
-                static_cast<int>(_stats.documentsCopied) >= data["numDocsToClone"].numberInt();
+                static_cast<int>(_documentsCopied.load()) >= data["numDocsToClone"].numberInt();
         });
 }
 
@@ -587,10 +583,20 @@ bool CollectionCloner::isMyFailPoint(const BSONObj& data) const {
 void CollectionCloner::waitForDatabaseWorkToComplete() {
     _dbWorkTaskRunner.join();
 }
-
 CollectionCloner::Stats CollectionCloner::getStats() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _stats;
+    Stats stats;
+    stats.nss = _sourceNss;  // safe because _sourceNss is only set once, in the constructor
+    stats.start = _statsStart.loadRelaxed();
+    stats.end = _statsEnd.loadRelaxed();
+    stats.documentToCopy = _documentToCopy.loadRelaxed();
+    stats.documentsCopied = _documentsCopied.loadRelaxed();
+    stats.indexes = _indexes.loadRelaxed();
+    stats.fetchedBatches = _fetchedBatches.loadRelaxed();
+    stats.receivedBatches = _receivedBatches.loadRelaxed();
+    stats.bytesToCopy = _bytesToCopy.loadRelaxed();
+    stats.avgObjSize = _avgObjSize.loadRelaxed();
+    stats.approxBytesCopied = _approxBytesCopied.loadRelaxed();
+    return stats;
 }
 
 std::string CollectionCloner::Stats::toString() const {
