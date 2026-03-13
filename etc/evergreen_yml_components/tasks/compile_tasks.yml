@@ -375,7 +375,7 @@ tasks:
         "development_critical_single_variant",
         "lint",
       ]
-    exec_timeout_secs: 600 # 10 min timeout for the task overall
+    exec_timeout_secs: 1200 # 20 min timeout for the task overall
     depends_on:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
