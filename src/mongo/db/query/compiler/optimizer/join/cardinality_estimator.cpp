@@ -273,8 +273,13 @@ cost_based_ranker::CardinalityEstimate JoinCardinalityEstimator::getOrEstimateSu
     return ce;
 }
 
-CardinalityEstimate JoinCardinalityEstimator::getCollCardinality(NodeId node) {
+CardinalityEstimate JoinCardinalityEstimator::getCollCardinality(NodeId node) const {
     return _collCardinalities[node];
 }
+
+SelectivityEstimate JoinCardinalityEstimator::getEdgeSelectivity(EdgeId edge) const {
+    return _edgeSelectivities[edge];
+}
+
 
 }  // namespace mongo::join_ordering

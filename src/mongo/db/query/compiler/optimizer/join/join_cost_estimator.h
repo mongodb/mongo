@@ -72,10 +72,10 @@ public:
     /**
      * Estimate the cost of an indexed nested loop join plan fragment.
      */
-    virtual JoinCostEstimate costINLJFragment(
-        const JoinPlanNode& left,
-        NodeId right,
-        std::shared_ptr<const IndexCatalogEntry> indexProbe) = 0;
+    virtual JoinCostEstimate costINLJFragment(const JoinPlanNode& left,
+                                              NodeId right,
+                                              std::shared_ptr<const IndexCatalogEntry> indexProbe,
+                                              EdgeId edgeId) = 0;
 
     /**
      * Estiamte the cost of a nested loop join plan fragment.

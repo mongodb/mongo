@@ -39,6 +39,7 @@
 namespace mongo::join_ordering {
 
 using cost_based_ranker::CardinalityEstimate;
+using cost_based_ranker::SelectivityEstimate;
 
 /**
  * Contains logic necessary to do selectivity and cardinality estimation for joins.
@@ -84,7 +85,12 @@ public:
      * Returns the cardinality of the collection referenced by the given node. This ignores any
      * single table predicates.
      */
-    CardinalityEstimate getCollCardinality(NodeId node);
+    CardinalityEstimate getCollCardinality(NodeId node) const;
+
+    /**
+     * Returns the selectivity of the given edge.
+     */
+    SelectivityEstimate getEdgeSelectivity(EdgeId edge) const;
 
 protected:
     const JoinReorderingContext& _ctx;

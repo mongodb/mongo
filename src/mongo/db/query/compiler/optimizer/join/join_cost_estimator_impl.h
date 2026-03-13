@@ -54,7 +54,8 @@ public:
                                           const JoinPlanNode& right) override;
     JoinCostEstimate costINLJFragment(const JoinPlanNode& left,
                                       NodeId right,
-                                      std::shared_ptr<const IndexCatalogEntry> indexProbe) override;
+                                      std::shared_ptr<const IndexCatalogEntry> indexProbe,
+                                      EdgeId edgeId) override;
     JoinCostEstimate costNLJFragment(const JoinPlanNode& left, const JoinPlanNode& right) override;
 
 private:

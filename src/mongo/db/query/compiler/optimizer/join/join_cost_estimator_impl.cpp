@@ -145,12 +145,20 @@ JoinCostEstimate JoinCostEstimatorImpl::costHashJoinFragment(const JoinPlanNode&
         numDocsProcessed, numDocsOutput, ioSeq, zeroCE /*numRandIOs*/, leftCost, rightCost);
 }
 
+// The costing formula currently makes two assumptions:
+// 1. The index being used to satisfy the join predicate fully covers the predicate (there is no
+// residual filter for the join predicate). In reality, this is not true, the join predicate is
+// reapplied to handle null/missing equality semantics properly.
+// 2. The index probe does not apply any single table predicates (all single table predicates are
+// residual). This is currently always true because we don't support a probe with any other bounds.
+// TODO SERVER-114883: Remove assumption #2.
 // TODO SERVER-117583: Consider the number of components of the index in the cost. For now, the
 // given index pointer is unused and as a result we return the same cost for all INLJs regardless of
 // the index used.
 JoinCostEstimate JoinCostEstimatorImpl::costINLJFragment(const JoinPlanNode& left,
                                                          NodeId right,
-                                                         std::shared_ptr<const IndexCatalogEntry>) {
+                                                         std::shared_ptr<const IndexCatalogEntry>,
+                                                         EdgeId edgeId) {
     NodeSet leftSubset = getNodeBitset(left);
     NodeSet rightSubset = makeNodeSet(right);
     CardinalityEstimate numDocsOutput =
@@ -168,9 +176,20 @@ JoinCostEstimate JoinCostEstimatorImpl::costINLJFragment(const JoinPlanNode& lef
     auto& rightCollStats =
         _jCtx.catStats.collStats.at(_jCtx.joinGraph.getNode(right).collectionName);
     double numPagesColl = rightCollStats.logicalDataSizeBytes / rightCollStats.pageSizeBytes;
+
+    // The cardinality of the outer side is the number of probes we will perform.
+    double numProbes = leftDocs.toDouble();
+    double rightBaseCard = _cardinalityEstimator.getCollCardinality(right).toDouble();
+    double joinPredSel = _cardinalityEstimator.getEdgeSelectivity(edgeId).toDouble();
+    // The number of documents that the INLJ probes for:
+    // numProbes * (rightBaseCard * joinPredSel)
+    // The latter term, (rightBaseCard * joinPredSel), corresponds to the number of documents that a
+    // single probe will return.
+    double numDocsOutputFromProbe = numProbes * rightBaseCard * joinPredSel;
+
     CardinalityEstimate numRandIOs = CardinalityEstimate{
         CardinalityType{estimateMackertLohmanRandIO(
-            numPagesColl, _jCtx.catStats.numPagesInStorageEngineCache, numDocsOutput.toDouble())},
+            numPagesColl, _jCtx.catStats.numPagesInStorageEngineCache, numDocsOutputFromProbe)},
         EstimationSource::Sampling};
 
     return JoinCostEstimate(numDocsProcessed,

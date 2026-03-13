@@ -44,27 +44,45 @@ public:
         smallNss = NamespaceString::createNamespaceString_forTest("foo");
         largeNss = NamespaceString::createNamespaceString_forTest("bar");
         extremelySmallNss = NamespaceString::createNamespaceString_forTest("baz");
+
         smallNodeId = *graph.addNode(smallNss, makeCanonicalQuery(smallNss), boost::none);
         largeNodeId = *graph.addNode(largeNss, makeCanonicalQuery(largeNss), boost::none);
         unselectiveNodeId = *graph.addNode(largeNss, makeCanonicalQuery(largeNss), boost::none);
         extremelySmallNodeId =
             *graph.addNode(extremelySmallNss, makeCanonicalQuery(extremelySmallNss), boost::none);
+        selectiveNodeId =
+            *graph.addNode(largeNss, makeCanonicalQuery(extremelySmallNss), boost::none);
+
+        graph.addEdge(smallNodeId, unselectiveNodeId, {});
+        graph.addEdge(largeNodeId, unselectiveNodeId, {});
+        graph.addEdge(smallNodeId, largeNodeId, {});
+
         jCtx.emplace(makeContext());
 
         SubsetCardinalities subsetCards{
-            {makeNodeSet(smallNodeId), makeCard(10)},
-            {makeNodeSet(largeNodeId), makeCard(1'000'000)},
-            {makeNodeSet(unselectiveNodeId), makeCard(2'000'000)},
+            {makeNodeSet(smallNodeId), makeCard(100)},
+            {makeNodeSet(largeNodeId), makeCard(10'000)},
+            {makeNodeSet(unselectiveNodeId), makeCard(20'000)},
             {makeNodeSet(extremelySmallNodeId), makeCard(1)},
-            {makeNodeSet(smallNodeId, largeNodeId), makeCard(1)},
-            {makeNodeSet(smallNodeId, unselectiveNodeId), makeCard(100'000)},
-            {makeNodeSet(largeNodeId, unselectiveNodeId), makeCard(100'000)},
+            {makeNodeSet(selectiveNodeId), makeCard(1)},
+            {makeNodeSet(smallNodeId, largeNodeId), makeCard(10)},
+            {makeNodeSet(smallNodeId, unselectiveNodeId), makeCard(1000)},
+            {makeNodeSet(largeNodeId, unselectiveNodeId), makeCard(1000)},
         };
         NodeCardinalities collCards{
-            makeCard(100'000), makeCard(2'000'000), makeCard(2'000'000), makeCard(1)};
-
+            makeCard(1000),         // smallNode
+            makeCard(20'000),       // largeNode
+            makeCard(20'000),       // unselectiveNode
+            makeCard(1),            // extremelySmallNode
+            makeCard(100'000'000),  // selectiveNode
+        };
+        EdgeSelectivities edgeSel{
+            makeSel(1000.0 / (1'000 * 20'000)),   // smallNode <--> unselectiveNode
+            makeSel(1000.0 / (20'000 * 20'000)),  // largeNode <--> unselectiveNode
+            makeSel(1.0 / (1000 * 20'000)),       // smallNode <--> largeId
+        };
         cardEstimator =
-            std::make_unique<FakeJoinCardinalityEstimator>(*jCtx, subsetCards, collCards);
+            std::make_unique<FakeJoinCardinalityEstimator>(*jCtx, subsetCards, edgeSel, collCards);
 
         constexpr double docSizeBytes = 500;
         jCtx->catStats = {
@@ -90,6 +108,12 @@ public:
                                 .enableHJOrderPruning = true});
     }
 
+    EdgeId getEdge(NodeId left, NodeId right) const {
+        const auto& edges = jCtx->joinGraph.getJoinEdges(makeNodeSet(left), makeNodeSet(right));
+        tassert(12062101, "expected exactly 1 edge", edges.size() == 1);
+        return edges[0];
+    }
+
     NamespaceString smallNss;
     NamespaceString largeNss;
     NamespaceString extremelySmallNss;
@@ -97,6 +121,7 @@ public:
     NodeId largeNodeId;
     NodeId unselectiveNodeId;
     NodeId extremelySmallNodeId;
+    NodeId selectiveNodeId;
     boost::optional<JoinReorderingContext> jCtx;
     std::unique_ptr<PlanEnumeratorContext> planEnumCtx;
     std::unique_ptr<JoinCostEstimator> costEstimator;
@@ -122,8 +147,9 @@ TEST_F(JoinCostEstimatorTest, LargerIndexScanHasHigherCost) {
 }
 
 TEST_F(JoinCostEstimatorTest, SelectiveIndexScanHasSmallerCostThanCollScan) {
-    auto collScanCost = planEnumCtx->getJoinCostEstimator()->costCollScanFragment(smallNodeId);
-    auto indexScanCost = planEnumCtx->getJoinCostEstimator()->costIndexScanFragment(smallNodeId);
+    auto collScanCost = planEnumCtx->getJoinCostEstimator()->costCollScanFragment(selectiveNodeId);
+    auto indexScanCost =
+        planEnumCtx->getJoinCostEstimator()->costIndexScanFragment(selectiveNodeId);
     ASSERT_GT(collScanCost, indexScanCost);
 }
 
@@ -171,9 +197,9 @@ TEST_F(JoinCostEstimatorTest, INLJLargerLeftSideHasLargerCost) {
     BaseNode smallBaseNode{.nss = smallNss, .node = smallNodeId, .cost = zeroJoinCost};
     BaseNode largeBaseNode{.nss = largeNss, .node = largeNodeId, .cost = zeroJoinCost};
     auto smallINLJCost = planEnumCtx->getJoinCostEstimator()->costINLJFragment(
-        smallBaseNode, unselectiveNodeId, nullptr);
+        smallBaseNode, unselectiveNodeId, nullptr, getEdge(smallNodeId, unselectiveNodeId));
     auto largeINLJCost = planEnumCtx->getJoinCostEstimator()->costINLJFragment(
-        largeBaseNode, unselectiveNodeId, nullptr);
+        largeBaseNode, unselectiveNodeId, nullptr, getEdge(largeNodeId, unselectiveNodeId));
     ASSERT_GT(largeINLJCost, smallINLJCost);
 }
 
@@ -183,8 +209,8 @@ TEST_F(JoinCostEstimatorTest, INLJLowerCostThanHashJoin) {
     BaseNode smallBaseNode{.nss = smallNss, .node = smallNodeId, .cost = zeroJoinCost};
     BaseNode largeBaseNode{.nss = largeNss, .node = largeNodeId, .cost = zeroJoinCost};
 
-    auto inljCost =
-        planEnumCtx->getJoinCostEstimator()->costINLJFragment(smallBaseNode, largeNodeId, nullptr);
+    auto inljCost = planEnumCtx->getJoinCostEstimator()->costINLJFragment(
+        smallBaseNode, largeNodeId, nullptr, getEdge(smallNodeId, largeNodeId));
     auto hjCost =
         planEnumCtx->getJoinCostEstimator()->costHashJoinFragment(smallBaseNode, largeBaseNode);
 
@@ -198,7 +224,7 @@ TEST_F(JoinCostEstimatorTest, INLJHigherCostThanHashJoin) {
     BaseNode unselectiveBaseNode{.nss = largeNss, .node = unselectiveNodeId, .cost = zeroJoinCost};
 
     auto inljCost = planEnumCtx->getJoinCostEstimator()->costINLJFragment(
-        smallBaseNode, unselectiveNodeId, nullptr);
+        smallBaseNode, unselectiveNodeId, nullptr, getEdge(smallNodeId, unselectiveNodeId));
     auto hjCost = planEnumCtx->getJoinCostEstimator()->costHashJoinFragment(smallBaseNode,
                                                                             unselectiveBaseNode);
 

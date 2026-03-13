@@ -229,8 +229,9 @@ void PlanEnumeratorContext::enumerateINLJPlan(EdgeId edge,
         return;
     }
 
-    auto inljCost =
-        _coster ? _coster->costINLJFragment(_registry.get(leftPlan), rightNodeId, ie) : zeroCost;
+    auto inljCost = _coster
+        ? _coster->costINLJFragment(_registry.get(leftPlan), rightNodeId, ie, edge)
+        : zeroCost;
     bool isBestPlan = isBestPlanSoFar(subset, inljCost);
     if (_mode.mode == PlanEnumerationMode::CHEAPEST && !isBestPlan) {
         // Only build this plan if it is better than what we already have.
