@@ -16,7 +16,6 @@ const dbName = "test";
 const collName = "coll";
 const primary = rst.getPrimary();
 const primaryDB = primary.getDB(dbName);
-const primaryColl = primaryDB.getCollection(collName);
 const secondary = rst.getSecondary();
 
 // TODO(SERVER-109578): Remove this check when the feature flag is removed.
@@ -33,39 +32,46 @@ if (
     quit();
 }
 
-assert.commandWorked(primaryColl.insert({a: 1}));
+function runTest({unique}) {
+    const primaryColl = primaryDB.getCollection(collName);
 
-rst.awaitReplication();
+    assert(primaryColl.drop());
+    assert.commandWorked(primaryColl.insert({a: 1}));
 
-let awaitIndexBuild = IndexBuildTest.startIndexBuild(primary, primaryColl.getFullName(), {a: 1});
-awaitIndexBuild();
+    rst.awaitReplication();
 
-const indexIdent = getUriForIndex(primaryColl, "a_1");
-// Index idents take the form "index-<UUID>".
-const uniqueTag = indexIdent.substring(indexIdent.indexOf("-") + 1);
-const sorterIdent = "internal-sorter-" + uniqueTag;
-const sideWritesIdent = "internal-sideWrites-" + uniqueTag;
-const skippedRecordsTrackerIdent = "internal-skippedRecordsTracker-" + uniqueTag;
-const constraintViolationsIdent = "internal-constraintViolations-" + uniqueTag;
+    const indexOptions = {unique: unique};
+    let awaitIndexBuild = IndexBuildTest.startIndexBuild(primary, primaryColl.getFullName(), {a: 1}, indexOptions);
+    awaitIndexBuild();
 
-checkLog.containsRelaxedJson(primary, 20384, {
-    "indexBuildInfo": {
+    const indexIdent = getUriForIndex(primaryColl, "a_1");
+    // Index idents take the form "index-<UUID>".
+    const uniqueTag = indexIdent.substring(indexIdent.indexOf("-") + 1);
+    const sorterIdent = "internal-sorter-" + uniqueTag;
+    const sideWritesIdent = "internal-sideWrites-" + uniqueTag;
+    const skippedRecordsTrackerIdent = "internal-skippedRecordsTracker-" + uniqueTag;
+    const constraintViolationsIdent = "internal-constraintViolations-" + uniqueTag;
+
+    const expectedIndexBuildInfo = {
         "indexIdent": indexIdent,
         "sorterIdent": sorterIdent,
         "sideWritesIdent": sideWritesIdent,
         "skippedRecordsTrackerIdent": skippedRecordsTrackerIdent,
-        "constraintViolationsTrackerIdent": constraintViolationsIdent,
-    },
-});
+    };
+    if (unique) {
+        expectedIndexBuildInfo["constraintViolationsTrackerIdent"] = constraintViolationsIdent;
+    }
 
-checkLog.containsRelaxedJson(secondary, 20384, {
-    "indexBuildInfo": {
-        "indexIdent": indexIdent,
-        "sorterIdent": sorterIdent,
-        "sideWritesIdent": sideWritesIdent,
-        "skippedRecordsTrackerIdent": skippedRecordsTrackerIdent,
-        "constraintViolationsTrackerIdent": constraintViolationsIdent,
-    },
-});
+    checkLog.containsRelaxedJson(primary, 20384, {
+        "indexBuildInfo": expectedIndexBuildInfo,
+    });
+
+    checkLog.containsRelaxedJson(secondary, 20384, {
+        "indexBuildInfo": expectedIndexBuildInfo,
+    });
+}
+
+runTest({unique: false});
+runTest({unique: true});
 
 rst.stopSet();
