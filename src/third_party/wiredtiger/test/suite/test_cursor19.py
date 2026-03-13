@@ -50,16 +50,20 @@ class test_cursor19(wttest.WiredTigerTestCase):
 
     def verify_value(self, version_cursor, expected_start_ts, expected_start_durable_ts, expected_stop_ts, expected_stop_durable_ts, expected_type, expected_prepare_state, expected_flags, expected_location, expected_value):
         values = version_cursor.get_values()
-        # Ignore the transaction ids from the value in the verification
+        # Ignore the transaction ids from the value in the verification.
+        # Format: start_txn(0), start_ts(1), start_durable_ts(2), start_prepare_ts(3),
+        #   start_prepared_id(4), stop_txn(5), stop_ts(6), stop_durable_ts(7),
+        #   stop_prepare_ts(8), stop_prepared_id(9), type(10), prepare(11),
+        #   flags(12), location(13), value(14)
         self.assertEqual(values[1], expected_start_ts)
         self.assertEqual(values[2], expected_start_durable_ts)
-        self.assertEqual(values[4], expected_stop_ts)
-        self.assertEqual(values[5], expected_stop_durable_ts)
-        self.assertEqual(values[6], expected_type)
-        self.assertEqual(values[7], expected_prepare_state)
-        self.assertEqual(values[8], expected_flags)
-        self.assertEqual(values[9], expected_location)
-        self.assertEqual(values[10], expected_value)
+        self.assertEqual(values[6], expected_stop_ts)
+        self.assertEqual(values[7], expected_stop_durable_ts)
+        self.assertEqual(values[10], expected_type)
+        self.assertEqual(values[11], expected_prepare_state)
+        self.assertEqual(values[12], expected_flags)
+        self.assertEqual(values[13], expected_location)
+        self.assertEqual(values[14], expected_value)
 
     def test_modify(self):
         self.create()

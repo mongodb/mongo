@@ -76,6 +76,10 @@ class test_layered53(wttest.WiredTigerTestCase):
         # Advance the checkpoint on the follower.
         self.disagg_advance_checkpoint(self.conn_follow)
 
+        # Check the last checkpoint timestamp in the follower
+        self.assertTimestampsEqual(self.conn_follow.query_timestamp('get=last_checkpoint'),
+                                   self.timestamp_str(checkpoint_timestamp))
+
         # Advance the stable timestamp on the leader without dirtying anything, check that we indeed
         # created a checkpoint.
         self.conn.set_timestamp(f"stable_timestamp={self.timestamp_str(20)}")
@@ -85,6 +89,10 @@ class test_layered53(wttest.WiredTigerTestCase):
 
         # Advance the checkpoint on the follower.
         self.disagg_advance_checkpoint(self.conn_follow)
+
+        # Check the last checkpoint timestamp in the follower
+        self.assertTimestampsEqual(self.conn_follow.query_timestamp('get=last_checkpoint'),
+                                   self.timestamp_str(checkpoint_timestamp))
 
         # Check that the follower cannot do the same thing.
         cursor = self.session_follow.open_cursor(uri, None, None)
@@ -98,6 +106,8 @@ class test_layered53(wttest.WiredTigerTestCase):
         self.session_follow.checkpoint()
         _, _, checkpoint_timestamp, _ = self.disagg_get_complete_checkpoint_ext()
         self.assertEqual(checkpoint_timestamp, 20)
+        self.assertTimestampsEqual(self.conn_follow.query_timestamp('get=last_checkpoint'),
+                                   self.timestamp_str(checkpoint_timestamp))
 
         # Idempotence check: advancing the follower again should *not* change state.
         # It should simply log that the same checkpoint is being picked up again.

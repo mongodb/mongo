@@ -169,7 +169,8 @@ class test_layered_cursor01(wttest.WiredTigerTestCase):
 
     def check_cursor_ops(self):
         # Get the table expected content and turn it to an array of (key, value) tuples
-        table = self.oplog.get_table_snapshot(self.table_oplog_id)
+        # Sort by keys as strings (lexicographic order: "1", "10", "11", "2", "21", ...)
+        table = sorted(self.oplog.get_table_snapshot(self.table_oplog_id).items(), key=lambda x: x[0])
 
         # Check on the beginning, 25%, 50%, 75%, 100%.
         positions_to_check = [0, len(table) // 4, len(table) // 2, (3 * len(table)) // 4]

@@ -537,12 +537,6 @@ class Cell(object):
                 else:
                     l = b.read_long_length()
 
-                # Delta pages use the value_format 'uB'. Since we explicitly set the 'u' config we
-                # store an extra variable length encoded size byte to indicate the size of this
-                # value. In this case this is the real value length we're interested in. The 'B'
-                # byte is stored at the end.
-                if is_delta:
-                    l = b.read_packed_uint64()
                 cell.is_value = True
             elif cell.cell_type == CellType.WT_CELL_KEY:
                 # 64 is WT_CELL_SIZE_ADJUST. If the size was less than that, we would have used the
@@ -592,8 +586,9 @@ class Cell(object):
             assert(False)
 
         if is_delta and cell.cell_type == CellType.WT_CELL_VALUE:
-            cell.data = b.read(l)
+            # Delta leaf value format is 'Bu'. Delta flag byte first (B), then raw value bytes (u).
             cell.delta_flag = b.read_uint8()
+            cell.data = b.read(l - 1)
         else:
             cell.data = b.read(l)
         return cell

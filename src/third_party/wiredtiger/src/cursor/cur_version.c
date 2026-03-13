@@ -9,10 +9,11 @@
 #include "wt_internal.h"
 
 /*
- * Format: txn ID, start ts, start durable ts, stop txn ID, stop ts, stop durable ts, type, prepare,
- * flags, location, value.
+ * Format: txn ID, start ts, start durable ts, start prepare ts, start prepared id, stop txn ID,
+ * stop ts, stop durable ts, stop prepare ts, stop prepared id, type, prepare, flags, location,
+ * value.
  */
-#define WT_CURVERSION_METADATA_FORMAT WT_UNCHECKED_STRING(QQQQQQBBBB)
+#define WT_CURVERSION_METADATA_FORMAT WT_UNCHECKED_STRING(QQQQQQQQQQBBBB)
 
 /*
  * __curversion_set_key --
@@ -168,7 +169,7 @@ __curversion_next_single_key(WT_CURSOR *cursor)
     WT_UPDATE *first_globally_visible, *next_upd, *tombstone, *upd;
     wt_timestamp_t durable_start_ts, durable_stop_ts, stop_prepare_ts, stop_ts;
     size_t max_memsize;
-    uint64_t hs_upd_type, raw, stop_txn;
+    uint64_t hs_upd_type, raw, stop_prepared_id, stop_txn;
     uint8_t *p, prepare_state;
     bool stop_prepared, upd_found, version_prepared;
 
@@ -219,6 +220,7 @@ __curversion_next_single_key(WT_CURSOR *cursor)
                 version_cursor->upd_durable_stop_ts = upd->upd_durable_ts;
                 version_cursor->upd_stop_ts = upd->upd_start_ts;
                 version_cursor->upd_stop_prepare_ts = upd->prepare_ts;
+                version_cursor->upd_stop_prepared_id = upd->prepared_id;
                 version_cursor->upd_stop_prepared = version_prepared;
 
                 /* No need to check the next update if the tombstone is globally visible. */
@@ -256,16 +258,19 @@ __curversion_next_single_key(WT_CURSOR *cursor)
                  */
                 WT_ERR(__curversion_set_value_with_format(cursor, WT_CURVERSION_METADATA_FORMAT,
                   upd->txnid, version_prepared ? upd->prepare_ts : upd->upd_start_ts,
-                  upd->upd_durable_ts, version_cursor->upd_stop_txnid,
+                  upd->upd_durable_ts, upd->prepare_ts, upd->prepared_id,
+                  version_cursor->upd_stop_txnid,
                   version_cursor->upd_stop_prepared ? version_cursor->upd_stop_prepare_ts :
                                                       version_cursor->upd_stop_ts,
-                  version_cursor->upd_durable_stop_ts, upd->type, version_prepared, upd->flags,
+                  version_cursor->upd_durable_stop_ts, version_cursor->upd_stop_prepare_ts,
+                  version_cursor->upd_stop_prepared_id, upd->type, version_prepared, upd->flags,
                   WT_CURVERSION_UPDATE_CHAIN));
 
                 version_cursor->upd_stop_txnid = upd->txnid;
                 version_cursor->upd_durable_stop_ts = upd->upd_durable_ts;
                 version_cursor->upd_stop_ts = upd->upd_start_ts;
                 version_cursor->upd_stop_prepare_ts = upd->prepare_ts;
+                version_cursor->upd_stop_prepared_id = upd->prepared_id;
                 version_cursor->upd_stop_prepared = version_prepared;
 
                 upd_found = true;
@@ -369,6 +374,7 @@ __curversion_next_single_key(WT_CURSOR *cursor)
                 }
                 durable_stop_ts = version_cursor->upd_durable_stop_ts;
                 stop_prepare_ts = version_cursor->upd_stop_prepare_ts;
+                stop_prepared_id = version_cursor->upd_stop_prepared_id;
                 stop_ts = version_cursor->upd_stop_ts;
                 stop_txn = version_cursor->upd_stop_txnid;
                 stop_prepared = version_cursor->upd_stop_prepared;
@@ -399,6 +405,7 @@ __curversion_next_single_key(WT_CURSOR *cursor)
                 }
                 durable_stop_ts = cbt->upd_value->tw.durable_stop_ts;
                 stop_prepare_ts = cbt->upd_value->tw.stop_prepare_ts;
+                stop_prepared_id = cbt->upd_value->tw.stop_prepared_id;
                 stop_ts = cbt->upd_value->tw.stop_ts;
                 stop_txn = cbt->upd_value->tw.stop_txn;
                 stop_prepared = WT_TIME_WINDOW_HAS_STOP_PREPARE(&cbt->upd_value->tw);
@@ -440,6 +447,7 @@ __curversion_next_single_key(WT_CURSOR *cursor)
 
                     stop_txn = WT_TXN_MAX;
                     stop_prepare_ts = WT_TS_MAX;
+                    stop_prepared_id = WT_PREPARED_ID_NONE;
                     stop_ts = WT_TS_MAX;
                     durable_stop_ts = WT_TS_NONE;
                     stop_prepared = false;
@@ -456,8 +464,9 @@ __curversion_next_single_key(WT_CURSOR *cursor)
               WT_TIME_WINDOW_HAS_START_PREPARE(&(cbt->upd_value->tw)) ?
                 cbt->upd_value->tw.start_prepare_ts :
                 cbt->upd_value->tw.durable_start_ts,
-              stop_txn, stop_prepared ? stop_prepare_ts : stop_ts, durable_stop_ts,
-              WT_UPDATE_STANDARD, version_prepared, 0, WT_CURVERSION_DISK_IMAGE));
+              cbt->upd_value->tw.start_prepare_ts, cbt->upd_value->tw.start_prepared_id, stop_txn,
+              stop_prepared ? stop_prepare_ts : stop_ts, durable_stop_ts, stop_prepare_ts,
+              stop_prepared_id, WT_UPDATE_STANDARD, version_prepared, 0, WT_CURVERSION_DISK_IMAGE));
 
             version_cursor->upd_stop_txnid = cbt->upd_value->tw.start_txn;
             version_cursor->upd_durable_stop_ts =
@@ -467,6 +476,8 @@ __curversion_next_single_key(WT_CURSOR *cursor)
             version_cursor->upd_stop_ts = WT_TIME_WINDOW_HAS_START_PREPARE(&(cbt->upd_value->tw)) ?
               cbt->upd_value->tw.start_prepare_ts :
               cbt->upd_value->tw.start_ts;
+            version_cursor->upd_stop_prepare_ts = cbt->upd_value->tw.start_prepare_ts;
+            version_cursor->upd_stop_prepared_id = cbt->upd_value->tw.start_prepared_id;
 
             upd_found = true;
         } else
@@ -568,19 +579,23 @@ skip_on_page:
                 goto done;
         }
 
-        WT_ERR(__curversion_set_value_with_format(cursor, WT_CURVERSION_METADATA_FORMAT,
-          twp->start_txn,
-          WT_TIME_WINDOW_HAS_START_PREPARE(twp) ? twp->start_prepare_ts : twp->start_ts,
-          WT_TIME_WINDOW_HAS_START_PREPARE(twp) ? twp->start_prepare_ts : twp->durable_start_ts,
-          twp->stop_txn, WT_TIME_WINDOW_HAS_STOP_PREPARE(twp) ? twp->stop_prepare_ts : twp->stop_ts,
-          WT_TIME_WINDOW_HAS_STOP_PREPARE(twp) ? twp->stop_prepare_ts : twp->durable_stop_ts,
-          hs_upd_type, 0, 0, WT_CURVERSION_HISTORY_STORE));
+        WT_ERR(
+          __curversion_set_value_with_format(cursor, WT_CURVERSION_METADATA_FORMAT, twp->start_txn,
+            WT_TIME_WINDOW_HAS_START_PREPARE(twp) ? twp->start_prepare_ts : twp->start_ts,
+            WT_TIME_WINDOW_HAS_START_PREPARE(twp) ? twp->start_prepare_ts : twp->durable_start_ts,
+            twp->start_prepare_ts, twp->start_prepared_id, twp->stop_txn,
+            WT_TIME_WINDOW_HAS_STOP_PREPARE(twp) ? twp->stop_prepare_ts : twp->stop_ts,
+            WT_TIME_WINDOW_HAS_STOP_PREPARE(twp) ? twp->stop_prepare_ts : twp->durable_stop_ts,
+            twp->stop_prepare_ts, twp->stop_prepared_id, hs_upd_type, 0, 0,
+            WT_CURVERSION_HISTORY_STORE));
 
         version_cursor->upd_stop_txnid = twp->start_txn;
         version_cursor->upd_durable_stop_ts =
           WT_TIME_WINDOW_HAS_START_PREPARE(twp) ? twp->start_prepare_ts : twp->durable_start_ts;
         version_cursor->upd_stop_ts =
           WT_TIME_WINDOW_HAS_START_PREPARE(twp) ? twp->start_prepare_ts : twp->start_ts;
+        version_cursor->upd_stop_prepare_ts = twp->start_prepare_ts;
+        version_cursor->upd_stop_prepared_id = twp->start_prepared_id;
 
         upd_found = true;
     }
@@ -621,6 +636,7 @@ __curversion_version_reset(WT_CURSOR_VERSION *version_cursor)
     version_cursor->upd_durable_stop_ts = WT_TS_NONE;
     version_cursor->upd_stop_ts = WT_TS_MAX;
     version_cursor->upd_stop_prepare_ts = WT_TS_MAX;
+    version_cursor->upd_stop_prepared_id = WT_PREPARED_ID_NONE;
     version_cursor->upd_stop_prepared = false;
 
     F_CLR(version_cursor,
@@ -692,6 +708,7 @@ __curversion_skip_starting_updates(WT_SESSION_IMPL *session, WT_CURSOR_VERSION *
     version_cursor->upd_durable_stop_ts = WT_TS_NONE;
     version_cursor->upd_stop_ts = WT_TS_MAX;
     version_cursor->upd_stop_prepare_ts = WT_TS_MAX;
+    version_cursor->upd_stop_prepared_id = WT_PREPARED_ID_NONE;
     version_cursor->upd_stop_prepared = false;
 
     if (version_cursor->next_upd == NULL)
@@ -961,6 +978,8 @@ __wt_curversion_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner
     version_cursor->upd_stop_txnid = WT_TXN_MAX;
     version_cursor->upd_durable_stop_ts = WT_TS_MAX;
     version_cursor->upd_stop_ts = WT_TS_MAX;
+    version_cursor->upd_stop_prepare_ts = WT_TS_MAX;
+    version_cursor->upd_stop_prepared_id = WT_PREPARED_ID_NONE;
 
     WT_ERR_NOTFOUND_OK(
       __wt_config_gets_def(session, cfg, "debug.dump_version.visible_only", 0, &cval), true);
@@ -1001,6 +1020,8 @@ __wt_curversion_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner
     version_cursor->upd_stop_txnid = WT_TXN_MAX;
     version_cursor->upd_durable_stop_ts = WT_TS_MAX;
     version_cursor->upd_stop_ts = WT_TS_MAX;
+    version_cursor->upd_stop_prepare_ts = WT_TS_MAX;
+    version_cursor->upd_stop_prepared_id = WT_PREPARED_ID_NONE;
 
     /* Mark the cursor as version cursor for python api. */
     F_SET(cursor, WT_CURSTD_VERSION_CURSOR);

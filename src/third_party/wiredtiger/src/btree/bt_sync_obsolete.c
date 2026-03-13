@@ -679,14 +679,21 @@ __checkpoint_cleanup_get_uri(WT_SESSION_IMPL *session, WT_ITEM *uri)
 
     /* Position the cursor on the given URI. */
     cursor->set_key(cursor, (const char *)uri->data);
-    WT_ERR(cursor->search_near(cursor, &exact));
+
+    /* FIXME-WT-15259: here should be adjusted when this ticket is done. */
+    WT_WITH_TXN_ISOLATION(
+      session, WT_ISO_READ_UNCOMMITTED, ret = cursor->search_near(cursor, &exact));
+    WT_ERR(ret);
 
     /*
      * The given URI may not exist in the metadata file. Since we always want to return a URI that
      * is lexicographically larger the given one, make sure not to go backwards.
      */
-    if (exact <= 0)
-        WT_ERR(cursor->next(cursor));
+    if (exact <= 0) {
+        /* FIXME-WT-15259: here should be adjusted when this ticket is done. */
+        WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED, ret = cursor->next(cursor));
+        WT_ERR(ret);
+    }
 
     /* Loop through the eligible candidates. */
     do {
@@ -702,7 +709,10 @@ __checkpoint_cleanup_get_uri(WT_SESSION_IMPL *session, WT_ITEM *uri)
         /* Check the given uri needs checkpoint cleanup. */
         if (__checkpoint_cleanup_eligibility(session, key, value))
             break;
-    } while ((ret = cursor->next(cursor)) == 0);
+
+        /* FIXME-WT-15259: here should be adjusted when this ticket is done. */
+        WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED, ret = cursor->next(cursor));
+    } while (ret == 0);
     WT_ERR(ret);
 
     /* Save the selected uri. */

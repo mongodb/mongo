@@ -82,9 +82,9 @@ class TestDecodeDeltaPage(unittest.TestCase):
             # Check page header fields (from expected output)
             page_header = page.page_header
             self.assertEqual(page_header.recno, 0)
-            self.assertEqual(page_header.write_gen, 8)
-            self.assertEqual(page_header.mem_size, 176)
-            self.assertEqual(page_header.entries, 2)
+            self.assertEqual(page_header.write_gen, 6)
+            self.assertEqual(page_header.mem_size, 2268)
+            self.assertEqual(page_header.entries, 10)
             self.assertEqual(page_header.type.name, 'WT_PAGE_ROW_LEAF')
             self.assertEqual(int(page_header.flags), 0)
             self.assertEqual(page_header.version, 0)
@@ -95,12 +95,12 @@ class TestDecodeDeltaPage(unittest.TestCase):
             self.assertEqual(block_header.version, 1)
             self.assertEqual(block_header.compatible_version, 1)
             self.assertEqual(block_header.header_size, 44)
-            self.assertEqual(block_header.checksum, 2779041603)
-            self.assertEqual(block_header.previous_checksum, 592301193)
+            self.assertEqual(block_header.checksum, 2836552602)
+            self.assertEqual(block_header.previous_checksum, 4000115340)
             self.assertTrue(block_header.flags & btree_format.BlockDisaggFlags.WT_BLOCK_DISAGG_DATA_CKSUM)
 
-            # There should be two cells
-            self.assertEqual(len(page.cells), 2)
+            # There should be ten cells
+            self.assertEqual(len(page.cells), 10)
 
             # First cell: short key 9 bytes, packed 64-bit value which encodes timestamp
             c0 = page.cells[0]
@@ -109,10 +109,10 @@ class TestDecodeDeltaPage(unittest.TestCase):
             # Second cell: value cell with timestamps and BSON payload
             c1 = page.cells[1]
             self.assertTrue(c1.is_value)
-            self.assertEqual(len(c1.data), 103)
+            self.assertEqual(len(c1.data), 419)
             # Check timestamps
             self.assertIsNotNone(c1.start_ts)
-            self.assertEqual(c1.start_ts, 0x69645dcb00000012)
+            self.assertEqual(c1.start_ts, 7613589195910545415)
 
 
 if __name__ == "__main__":

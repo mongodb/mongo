@@ -86,6 +86,10 @@ class test_layered17(wttest.WiredTigerTestCase):
         self.disagg_advance_checkpoint(conn_follow)
         session_follow = conn_follow.open_session('')
 
+        # Check the last checkpoint timestamp in the follower
+        self.assertTimestampsEqual(conn_follow.query_timestamp('get=last_checkpoint'),
+                                   self.timestamp_str(checkpoint_timestamp))
+
         # Check the table in the follower
         cursor = session_follow.open_cursor(self.uri, None, None)
         for i in range(self.nitems):
@@ -116,6 +120,10 @@ class test_layered17(wttest.WiredTigerTestCase):
 
         # Pick up the new checkpoint
         self.disagg_advance_checkpoint(conn_follow)
+
+        # Check the last checkpoint timestamp in the follower
+        self.assertTimestampsEqual(conn_follow.query_timestamp('get=last_checkpoint'),
+                                   self.timestamp_str(checkpoint_timestamp))
 
         # Check the table in the follower
         cursor = session_follow.open_cursor(self.uri, None, None)
@@ -151,6 +159,10 @@ class test_layered17(wttest.WiredTigerTestCase):
 
         # Pick up the new checkpoint
         self.disagg_advance_checkpoint(conn_follow)
+
+        # Check the last checkpoint timestamp in the follower
+        self.assertTimestampsEqual(conn_follow.query_timestamp('get=last_checkpoint'),
+                                   self.timestamp_str(checkpoint_timestamp))
 
         # Check the table in the follower (should not see the latest changes)
         cursor = session_follow.open_cursor(self.uri, None, None)

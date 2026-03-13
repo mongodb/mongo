@@ -2169,6 +2169,14 @@ methods = {
 'WT_CONNECTION.add_page_log' : Method([]),
 'WT_CONNECTION.add_storage_source' : Method([]),
 'WT_CONNECTION.close' : Method([
+    Config('debug', '', r'''
+        configure debug specific behavior on connection close. Generally only used for internal
+        testing purposes.''',
+        type='category', subconfig=[
+        Config('skip_checkpoint', 'false', r'''
+            Skips the checkpoint during shutdown.''',
+            type='boolean'),
+        ]),
     Config('final_flush', 'false', r'''
         wait for final flush_tier to copy objects''',
         type='boolean', undoc=True),

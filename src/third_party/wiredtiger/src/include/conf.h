@@ -150,7 +150,7 @@ struct __wt_conf_value {
  * DO NOT EDIT: automatically built by dist/api_config.py.
  * Per-API configuration structure declarations: BEGIN
  */
-WT_CONF_API_DECLARE(WT_CONNECTION, close, 1, 3);
+WT_CONF_API_DECLARE(WT_CONNECTION, close, 2, 5);
 WT_CONF_API_DECLARE(WT_CONNECTION, debug_info, 1, 8);
 WT_CONF_API_DECLARE(WT_CONNECTION, load_extension, 1, 4);
 WT_CONF_API_DECLARE(WT_CONNECTION, open_session, 3, 9);

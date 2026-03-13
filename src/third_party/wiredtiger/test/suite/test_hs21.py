@@ -108,6 +108,8 @@ class test_hs21(wttest.WiredTigerTestCase):
         for f in range(self.numfiles):
             table_uri = 'table:%s.%d' % (self.file_name, f)
             file_uri = 'file:%s.%d.wt' % (self.file_name, f)
+            if self.key_format == 'S' and self.runningHook('disagg'):
+                file_uri += '_stable'
             # Create a small table.
             ds = SimpleDataSet(
                 self, table_uri, 0, key_format=self.key_format, value_format=self.value_format,
@@ -204,6 +206,8 @@ class test_hs21(wttest.WiredTigerTestCase):
             # Check that the most recent transaction has the correct data.
             self.check(self.session, value2, ds.uri, self.nrows, 100)
             file_uri = 'file:%s.%d.wt' % (self.file_name, idx)
+            if self.key_format == 'S' and self.runningHook('disagg'):
+                file_uri += '_stable'
             # Get the current base_write_gen and ensure it hasn't changed since being
             # closed.
             base_write_gen = self.parse_run_write_gen(file_uri)

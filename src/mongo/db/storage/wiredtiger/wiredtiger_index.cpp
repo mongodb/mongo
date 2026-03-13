@@ -442,7 +442,8 @@ void WiredTigerIndex::printIndexEntryMetadata(OperationContext* opCtx,
     while (ret != WT_NOTFOUND) {
         invariantWTOK(ret, cursor->session);
 
-        uint64_t startTs = 0, startDurableTs = 0, stopTs = 0, stopDurableTs = 0;
+        uint64_t startTs = 0, startDurableTs = 0, startPrepareTs = 0, startPreparedId = 0;
+        uint64_t stopTs = 0, stopDurableTs = 0, stopPrepareTs = 0, stopPreparedId = 0;
         uint64_t startTxnId = 0, stopTxnId = 0;
         uint8_t flags = 0, location = 0, prepare = 0, type = 0;
         WT_ITEM value;
@@ -451,9 +452,13 @@ void WiredTigerIndex::printIndexEntryMetadata(OperationContext* opCtx,
                                         &startTxnId,
                                         &startTs,
                                         &startDurableTs,
+                                        &startPrepareTs,
+                                        &startPreparedId,
                                         &stopTxnId,
                                         &stopTs,
                                         &stopDurableTs,
+                                        &stopPrepareTs,
+                                        &stopPreparedId,
                                         &type,
                                         &prepare,
                                         &flags,
@@ -473,9 +478,13 @@ void WiredTigerIndex::printIndexEntryMetadata(OperationContext* opCtx,
               "startTxnId"_attr = startTxnId,
               "startTs"_attr = Timestamp(startTs),
               "startDurableTs"_attr = Timestamp(startDurableTs),
+              "startPrepareTs"_attr = Timestamp(startPrepareTs),
+              "startPreparedId"_attr = startPreparedId,
               "stopTxnId"_attr = stopTxnId,
               "stopTs"_attr = Timestamp(stopTs),
               "stopDurableTs"_attr = Timestamp(stopDurableTs),
+              "stopPrepareTs"_attr = Timestamp(stopPrepareTs),
+              "stopPreparedId"_attr = stopPreparedId,
               "type"_attr = type,
               "prepare"_attr = prepare,
               "flags"_attr = flags,

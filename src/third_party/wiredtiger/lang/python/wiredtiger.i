@@ -1084,8 +1084,8 @@ typedef int int_void;
 			return [self._get_json_value()]
 		elif self.is_version_cursor:
 			result = self._get_version_cursor_value()
-			metadata = unpack("QQQQQQBBBB", result[0])
-			data = unpack(self.value_format[10:], result[1])
+			metadata = unpack("QQQQQQQQQQBBBB", result[0])
+			data = unpack(self.value_format[14:], result[1])
 			return metadata + data
 		else:
 			return unpack(self.value_format, self._get_value())

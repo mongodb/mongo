@@ -55,16 +55,25 @@ class test_cursor18(wttest.WiredTigerTestCase):
 
     def verify_value(self, version_cursor, expected_start_ts, expected_start_durable_ts, expected_stop_ts, expected_stop_durable_ts, expected_type, expected_prepare_state, expected_flags, expected_location, expected_value):
         values = version_cursor.get_values()
-        # Ignore the transaction ids from the value in the verification
+        # Ignore the transaction ids from the value in the verification.
+        # Format: start_txn(0), start_ts(1), start_durable_ts(2), start_prepare_ts(3),
+        #   start_prepared_id(4), stop_txn(5), stop_ts(6), stop_durable_ts(7),
+        #   stop_prepare_ts(8), stop_prepared_id(9), type(10), prepare(11),
+        #   flags(12), location(13), value(14)
         self.assertEqual(values[1], expected_start_ts)
         self.assertEqual(values[2], expected_start_durable_ts)
-        self.assertEqual(values[4], expected_stop_ts)
-        self.assertEqual(values[5], expected_stop_durable_ts)
-        self.assertEqual(values[6], expected_type)
-        self.assertEqual(values[7], expected_prepare_state)
-        self.assertEqual(values[8], expected_flags)
-        self.assertEqual(values[9], expected_location)
-        self.assertEqual(values[10], expected_value)
+        self.assertEqual(values[6], expected_stop_ts)
+        self.assertEqual(values[7], expected_stop_durable_ts)
+        self.assertEqual(values[10], expected_type)
+        self.assertEqual(values[11], expected_prepare_state)
+        self.assertEqual(values[12], expected_flags)
+        self.assertEqual(values[13], expected_location)
+        self.assertEqual(values[14], expected_value)
+
+    def verify_prepare_fields(self, version_cursor, expected_start_prepare_ts, expected_stop_prepare_ts):
+        values = version_cursor.get_values()
+        self.assertEqual(values[3], expected_start_prepare_ts)
+        self.assertEqual(values[8], expected_stop_prepare_ts)
 
     def open_version_cursor(self, visible_only=False, start_ts=None):
         internal_config = ["enabled=true", self.cross_key_config]
@@ -98,9 +107,11 @@ class test_cursor18(wttest.WiredTigerTestCase):
         self.assertEqual(version_cursor.search(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
         self.verify_value(version_cursor, 5, 5, WT_TS_MAX, 0, 3, 0, 0, 0, 1)
+        self.verify_prepare_fields(version_cursor, 0, WT_TS_MAX)
         self.assertEqual(version_cursor.next(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
         self.verify_value(version_cursor, 1, 1, 5, 5, 3, 0, 0, 0, 0)
+        self.verify_prepare_fields(version_cursor, 0, 0)
         self.assertEqual(version_cursor.next(), wiredtiger.WT_NOTFOUND)
 
     def test_ondisk_only(self):
@@ -323,9 +334,11 @@ class test_cursor18(wttest.WiredTigerTestCase):
         self.assertEqual(version_cursor.get_key(), 1)
 
         self.verify_value(version_cursor, 1, 0, WT_TS_MAX, 0, 3, 1, 64, 0, 0)
+        self.verify_prepare_fields(version_cursor, 1, WT_TS_MAX)
         self.assertEqual(version_cursor.next(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
         self.verify_value(version_cursor, 1, 1, 1, 0, 3, 1, 0, 1, 0)
+        self.verify_prepare_fields(version_cursor, 1, 1)
         self.assertEqual(version_cursor.next(), wiredtiger.WT_NOTFOUND)
 
     def test_reuse_version_cursor(self):
@@ -390,6 +403,7 @@ class test_cursor18(wttest.WiredTigerTestCase):
         self.assertEqual(version_cursor.search(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
         self.verify_value(version_cursor, 1, 1, 2, 0, 3, 1, 0, 1, 0)
+        self.verify_prepare_fields(version_cursor, 0, 2)
         self.assertEqual(version_cursor.next(), wiredtiger.WT_NOTFOUND)
 
     def test_search_when_positioned(self):
@@ -570,8 +584,10 @@ class test_cursor18(wttest.WiredTigerTestCase):
         self.assertEqual(version_cursor.search(), 0)
         self.assertEqual(version_cursor.get_key(), 1)
         self.verify_value(version_cursor, 1, 1, WT_TS_MAX, 0, 3, 0, 0, 0, 0)
+        self.verify_prepare_fields(version_cursor, 0, WT_TS_MAX)
         self.assertEqual(version_cursor.next(), 0)
         self.verify_value(version_cursor, 1, 1, WT_TS_MAX, 0, 3, 0, 0, 1, 0)
+        self.verify_prepare_fields(version_cursor, 0, WT_TS_MAX)
         self.assertEqual(version_cursor.next(), wiredtiger.WT_NOTFOUND)
 
     def test_unpositioned_cursor(self):

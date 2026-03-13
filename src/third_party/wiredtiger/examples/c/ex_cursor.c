@@ -171,14 +171,16 @@ cursor_remove(WT_CURSOR *cursor)
 int
 version_cursor_dump(WT_CURSOR *cursor)
 {
-    wt_timestamp_t start_ts, start_durable_ts, stop_ts, stop_durable_ts;
-    uint64_t start_txnid, stop_txnid;
+    wt_timestamp_t start_ts, start_durable_ts, start_prepare_ts, stop_ts, stop_durable_ts,
+      stop_prepare_ts;
+    uint64_t start_txnid, start_prepared_id, stop_txnid, stop_prepared_id;
     uint8_t flags, location, prepare, type;
     const char *value;
     cursor->set_key(cursor, "foo");
     error_check(cursor->search(cursor));
-    error_check(cursor->get_value(cursor, &start_txnid, &start_ts, &start_durable_ts, &stop_txnid,
-      &stop_ts, &stop_durable_ts, &type, &prepare, &flags, &location, &value));
+    error_check(cursor->get_value(cursor, &start_txnid, &start_ts, &start_durable_ts,
+      &start_prepare_ts, &start_prepared_id, &stop_txnid, &stop_ts, &stop_durable_ts,
+      &stop_prepare_ts, &stop_prepared_id, &type, &prepare, &flags, &location, &value));
 
     return (0);
 }

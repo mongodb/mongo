@@ -12,12 +12,59 @@ static int __layered_last_checkpoint_order(
   WT_SESSION_IMPL *session, const char *shared_uri, int64_t *ckpt_order);
 
 /*
+ * __layered_assert_tombstone_has_value_on_stable_btree --
+ *     Assert that a value exists on the stable btree before moving a tombstone intended to delete
+ *     it.
+ */
+static WT_INLINE void
+__layered_assert_tombstone_has_value_on_stable_btree(
+  WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *last_upd)
+{
+    bool has_value;
+
+    if (last_upd->type != WT_UPDATE_TOMBSTONE)
+        return;
+
+    /*
+     * If the last update is a tombstone, ensure that there is a corresponding value on the stable
+     * table that it deletes.
+     */
+    if (cbt->compare != 0)
+        /* No on-page value to check; rely solely on visibility. */
+        has_value = false;
+    else {
+        WT_ASSERT_ALWAYS(session, cbt->ins == NULL,
+          "The stable btree should not contain inserts prior to draining");
+        WT_UPDATE *upd = NULL;
+        if (cbt->ref->page->modify != NULL && cbt->ref->page->modify->mod_row_update != NULL)
+            upd = cbt->ref->page->modify->mod_row_update[cbt->slot];
+
+        if (upd != NULL) {
+            WT_ASSERT_ALWAYS(session, upd->txnid != WT_TXN_ABORTED,
+              "The stable btree should not contain aborted updates prior to draining");
+            has_value = upd->type != WT_UPDATE_TOMBSTONE;
+        } else {
+            WT_TIME_WINDOW tw;
+            bool tw_found = __wt_read_cell_time_window(cbt, &tw);
+            has_value = tw_found && !WT_TIME_WINDOW_HAS_STOP(&tw);
+        }
+    }
+
+    /*
+     * If a globally visible tombstone is observed at the end, the update it deletes may have been
+     * removed during the obsolete check.
+     */
+    WT_ASSERT_ALWAYS(session, has_value || __wt_txn_upd_visible_all(session, last_upd),
+      "No corresponding value exists on the stable table to delete");
+}
+
+/*
  * __layered_move_updates --
  *     Move the updates of a key to the stable table
  */
 static int
-__layered_move_updates(
-  WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key, WT_UPDATE *upds)
+__layered_move_updates(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key,
+  WT_UPDATE *upds, WT_UPDATE *last_upd)
 {
     WT_DECL_RET;
 
@@ -30,6 +77,8 @@ __layered_move_updates(
     /* Search the page. */
     WT_WITH_PAGE_INDEX(session, ret = __wt_row_search(cbt, key, true, NULL, false, NULL));
     WT_ERR(ret);
+
+    __layered_assert_tombstone_has_value_on_stable_btree(session, cbt, last_upd);
 
     /* Apply the modification. */
     WT_ERR(__wt_row_modify(cbt, key, NULL, &upds, WT_UPDATE_INVALID, false, false));
@@ -111,7 +160,7 @@ __layered_copy_ingest_table(WT_SESSION_IMPL *session, WT_LAYERED_TABLE_MANAGER_E
     WT_DECL_ITEM(value);
     WT_DECL_RET;
     WT_TIME_WINDOW tw;
-    WT_UPDATE *prev_upd, *tombstone, *upd, *upds;
+    WT_UPDATE *last_upd, *prev_upd, *tombstone, *upd, *upds;
     wt_timestamp_t last_checkpoint_timestamp;
     uint8_t flags, location, prepare, type;
     int cmp;
@@ -119,7 +168,7 @@ __layered_copy_ingest_table(WT_SESSION_IMPL *session, WT_LAYERED_TABLE_MANAGER_E
     const char *cfg[] = {WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL, NULL, NULL};
 
     stable_cursor = version_cursor = NULL;
-    prev_upd = tombstone = upd = upds = NULL;
+    last_upd = prev_upd = tombstone = upd = upds = NULL;
     WT_TIME_WINDOW_INIT(&tw);
 
     last_checkpoint_timestamp = __wt_atomic_load_uint64_acquire(
@@ -147,8 +196,8 @@ __layered_copy_ingest_table(WT_SESSION_IMPL *session, WT_LAYERED_TABLE_MANAGER_E
         WT_ERR_NOTFOUND_OK(version_cursor->next(version_cursor), true);
         if (ret == WT_NOTFOUND) {
             if (key->size > 0 && upds != NULL) {
-                WT_WITH_DHANDLE(
-                  session, cbt->dhandle, ret = __layered_move_updates(session, cbt, key, upds));
+                WT_WITH_DHANDLE(session, cbt->dhandle,
+                  ret = __layered_move_updates(session, cbt, key, upds, last_upd));
                 WT_ERR(ret);
                 upds = NULL;
             } else
@@ -166,8 +215,8 @@ __layered_copy_ingest_table(WT_SESSION_IMPL *session, WT_LAYERED_TABLE_MANAGER_E
             WT_ASSERT(session, key->size == 0 || cmp <= 0);
 
             if (upds != NULL) {
-                WT_WITH_DHANDLE(
-                  session, cbt->dhandle, ret = __layered_move_updates(session, cbt, key, upds));
+                WT_WITH_DHANDLE(session, cbt->dhandle,
+                  ret = __layered_move_updates(session, cbt, key, upds, last_upd));
                 WT_ERR(ret);
             }
 
@@ -177,10 +226,10 @@ __layered_copy_ingest_table(WT_SESSION_IMPL *session, WT_LAYERED_TABLE_MANAGER_E
         }
 
         WT_ERR(version_cursor->get_value(version_cursor, &tw.start_txn, &tw.start_ts,
-          &tw.durable_start_ts, &tw.stop_txn, &tw.stop_ts, &tw.durable_stop_ts, &type, &prepare,
-          &flags, &location, value));
-        /* We shouldn't see any prepared updates. */
-        WT_ASSERT(session, prepare == 0);
+          &tw.durable_start_ts, &tw.start_prepare_ts, &tw.start_prepared_id, &tw.stop_txn,
+          &tw.stop_ts, &tw.durable_stop_ts, &tw.stop_prepare_ts, &tw.stop_prepared_id, &type,
+          &prepare, &flags, &location, value));
+        WT_UNUSED(prepare);
 
         /* We assume the updates returned will be in timestamp order. */
         if (prev_upd != NULL) {
@@ -220,8 +269,11 @@ __layered_copy_ingest_table(WT_SESSION_IMPL *session, WT_LAYERED_TABLE_MANAGER_E
             upd->upd_durable_ts = tw.durable_start_ts;
             upd->prepare_ts = tw.start_prepare_ts;
             upd->prepared_id = tw.start_prepared_id;
-        } else
+            last_upd = upd;
+        } else {
             WT_ASSERT(session, tombstone != NULL);
+            last_upd = tombstone;
+        }
 
         /*
          * FIXME-WT-14732: we can simplify the algorithm if we don't use real tombstones on the

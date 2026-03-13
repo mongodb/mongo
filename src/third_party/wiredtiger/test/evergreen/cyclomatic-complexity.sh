@@ -12,7 +12,8 @@ python3 "../metrixplusplus/metrix++.py" collect --std.code.lines.code --std.code
 python3 "../metrixplusplus/metrix++.py" view
 
 # Set the cyclomatic complexity limit to 20
-python3 "../metrixplusplus/metrix++.py" limit --max-limit=std.code.complexity:cyclomatic:20
+# Set hotspots to 1000 arbitrarily to include all regions/functions above the limit, sorted by highest complexity.
+python3 "../metrixplusplus/metrix++.py" limit --max-limit=std.code.complexity:cyclomatic:20 --hotspots=1000
 
 # Fail if there are functions with cyclomatic complexity larger than 98
 python "../metrixplusplus/metrix++.py" limit --max-limit=std.code.complexity:cyclomatic:98 > $t
