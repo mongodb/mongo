@@ -29,7 +29,6 @@ EXCLUDED_PATTERNS = [
     ".github/workflows/",
     "src/third_party/private/",
     "sbom.private.json",
-    ".augment/",
     ".cursor/",
     ".claude/",
     "AGENTS.md",
