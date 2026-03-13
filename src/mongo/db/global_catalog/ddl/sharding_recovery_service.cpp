@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
@@ -150,6 +151,9 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
                         nss.toStringForErrorMsg(),
                         reason.toString()),
             !shard_role_details::getLocker(opCtx)->isLocked());
+
+    // Mark critical section acquisition operations non-deprioritizable
+    mongo::admission::execution_control::ScopedTaskTypeNonDeprioritizable deprioGuard(opCtx);
 
     {
         const auto lockAcquisitionDeadline = lockAcquisitionTimeout
@@ -412,6 +416,10 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
                         nss.toStringForErrorMsg(),
                         reason.toString()),
             !shard_role_details::getLocker(opCtx)->isLocked());
+
+    // Mark critical section release operations non-deprioritizable
+    boost::optional<admission::execution_control::ScopedTaskTypeNonDeprioritizable> deprioGuard(
+        opCtx);
 
     {
         Lock::DBLock dbLock{opCtx, nss.dbName(), MODE_IX};
