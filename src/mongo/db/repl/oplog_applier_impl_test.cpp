@@ -2313,24 +2313,29 @@ TEST_F(OplogApplierImplTest, ApplyContainerOperations) {
 
 TEST_F(OplogApplierImplTest, ContainerOplogEntryHashesOnKey) {
     auto nss = NamespaceString::createNamespaceString_forTest("test.hash");
-    auto ident = serviceContext->getStorageEngine()->generateNewInternalIdent();
+    auto ident1 = serviceContext->getStorageEngine()->generateNewInternalIdent();
+    auto ident2 = serviceContext->getStorageEngine()->generateNewInternalIdent();
     auto k1 = BSONBinData("K", 1, BinDataGeneral);
     auto k2 = BSONBinData("K", 2, BinDataGeneral);
     auto v = BSONBinData("V", 1, BinDataGeneral);
 
-    auto insertEntry = makeContainerInsertOplogEntry(nextOpTime(), nss, ident, k1, v);
-    auto deleteEntry1 = makeContainerDeleteOplogEntry(nextOpTime(), nss, ident, k1);
-    auto deleteEntry2 = makeContainerDeleteOplogEntry(nextOpTime(), nss, ident, k2);
+    auto insertEntry1 = makeContainerInsertOplogEntry(nextOpTime(), nss, ident1, k1, v);
+    auto insertEntry2 = makeContainerInsertOplogEntry(nextOpTime(), nss, ident2, k1, v);
+    auto deleteEntry1 = makeContainerDeleteOplogEntry(nextOpTime(), nss, ident1, k1);
+    auto deleteEntry2 = makeContainerDeleteOplogEntry(nextOpTime(), nss, ident1, k2);
 
     CachedCollectionProperties collPropertiesCache;
     uint32_t id1 =
-        OplogApplierUtils::getOplogEntryHash(_opCtx.get(), &insertEntry, &collPropertiesCache);
+        OplogApplierUtils::getOplogEntryHash(_opCtx.get(), &insertEntry1, &collPropertiesCache);
     uint32_t id2 =
         OplogApplierUtils::getOplogEntryHash(_opCtx.get(), &deleteEntry1, &collPropertiesCache);
     uint32_t id3 =
         OplogApplierUtils::getOplogEntryHash(_opCtx.get(), &deleteEntry2, &collPropertiesCache);
+    uint32_t id4 =
+        OplogApplierUtils::getOplogEntryHash(_opCtx.get(), &insertEntry2, &collPropertiesCache);
     ASSERT_EQUALS(id1, id2);
     ASSERT_NOT_EQUALS(id1, id3);
+    ASSERT_NOT_EQUALS(id1, id4);
 }
 
 class MultiOplogEntryOplogApplierImplTest : public OplogApplierImplTest {

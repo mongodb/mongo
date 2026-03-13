@@ -239,6 +239,7 @@ uint32_t OplogApplierUtils::getOplogEntryHash(OperationContext* opCtx,
         processCrudOp(opCtx, op, collProperties, opHash);
     } else if (op->isContainerOpType()) {
         getContainerKeyHash(opCtx, op, opHash);
+        return absl::HashOf(*op->getContainer(), *opHash);
     }
 
     return opHash ? absl::HashOf(nss, *opHash) : absl::HashOf(nss);
