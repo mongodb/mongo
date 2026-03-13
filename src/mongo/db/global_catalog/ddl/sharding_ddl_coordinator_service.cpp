@@ -229,6 +229,9 @@ void ShardingDDLCoordinatorService::waitForCoordinatorsOfGivenOfcvToComplete(
     OperationContext* opCtx, std::function<bool(boost::optional<FCV>)> pred) const {
     stdx::unique_lock lk(_mutex);
     opCtx->waitForConditionOrInterrupt(_recoveredOrCoordinatorCompletedCV, lk, [this, pred]() {
+        uassert(ErrorCodes::NotWritablePrimary,
+                "Should not wait on DDL Coordinators in kPaused state",
+                _state != State::kPaused);
         const auto numActiveCoords = _countActiveCoordinators(
             [pred](DDLCoordinatorTypeEnum, boost::optional<FCV> ofcv) { return pred(ofcv); });
         return _state == State::kRecovered && numActiveCoords == 0;

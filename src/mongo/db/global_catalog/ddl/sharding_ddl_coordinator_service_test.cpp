@@ -251,6 +251,25 @@ TEST_F(ShardingDDLCoordinatorServiceTest, StateTransitions) {
     assertStateIsRecovered();
 }
 
+TEST_F(ShardingDDLCoordinatorServiceTest, WaitingWhileKpaused) {
+    auto opCtx = makeOperationContext();
+
+    // Reaching a steady state to start the test
+    ddlService()->waitForRecovery(opCtx.get());
+    assertStateIsRecovered();
+
+    // We ensure to be in kPaused, after the step down
+    stepDown();
+    assertStateIsPaused();
+
+    // If we are now waiting for coordinators to complete, we should get an error since we are in
+    // kPaused state
+    ASSERT_THROWS_CODE(ddlService()->waitForCoordinatorsOfGivenOfcvToComplete(
+                           opCtx.get(), [&](boost::optional<FCV> ofcv) { return true; }),
+                       AssertionException,
+                       ErrorCodes::NotWritablePrimary);
+}
+
 TEST_F(ShardingDDLCoordinatorServiceTest,
        DDLLocksCanOnlyBeAcquiredOnceShardingDDLCoordinatorServiceIsRecovered) {
     auto opCtx = makeOperationContext();
