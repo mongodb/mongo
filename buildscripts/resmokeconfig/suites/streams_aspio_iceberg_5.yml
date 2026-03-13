@@ -6,6 +6,7 @@ selector:
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_partitioning.js
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_partitioning_2.js
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_metadata_validation.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_catalog_test.js
 
 executor:
   fixture:
