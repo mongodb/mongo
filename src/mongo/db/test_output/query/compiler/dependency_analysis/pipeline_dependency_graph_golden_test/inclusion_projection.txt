@@ -106,16 +106,16 @@ output: {
                     "declaringScope": "scope:3",
                     "dependencies": []
                 },
+                "_id:7": {
+                    "declaringScope": "scope:3",
+                    "dependencies": []
+                },
                 "b:3": {
                     "declaringScope": "scope:1",
                     "dependencies": []
                 },
                 "c:5": {
                     "declaringScope": "scope:2",
-                    "dependencies": []
-                },
-                "_id:7": {
-                    "declaringScope": "scope:3",
                     "dependencies": []
                 }
             }

@@ -161,10 +161,6 @@ output: {
                         "b1:3"
                     ]
                 },
-                "b:12": {
-                    "declaringScope": "scope:0",
-                    "dependencies": []
-                },
                 "a2:14": {
                     "declaringScope": "scope:6",
                     "scope:7": {
@@ -245,6 +241,10 @@ output: {
                     "dependencies": [
                         "b2:16"
                     ]
+                },
+                "b:12": {
+                    "declaringScope": "scope:0",
+                    "dependencies": []
                 }
             }
         },

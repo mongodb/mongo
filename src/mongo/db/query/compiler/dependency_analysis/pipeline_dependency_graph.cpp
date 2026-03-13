@@ -48,6 +48,8 @@ namespace {
  */
 template <typename T>
 struct TypedId {
+    using ValueType = int32_t;
+
     static constexpr TypedId none() {
         return TypedId{};
     }
@@ -63,7 +65,7 @@ struct TypedId {
 
     friend auto operator<=>(const TypedId&, const TypedId&) = default;
 
-    int32_t value{-1};
+    ValueType value{-1};
 };
 
 /**
@@ -286,11 +288,7 @@ public:
     }
 
     void describeTransformation(document_transformation::DocumentOperationVisitor& visitor) const {
-        // To do later: make the debug string order independent and call
-        // describeTransformation method. The order of iteration is different between the actual
-        // describeTransformation and getModifiedPaths and this affects the golden tests for now.
-        document_transformation::describeGetModPathsReturn(visitor,
-                                                           _documentSource.getModifiedPaths());
+        _documentSource.describeTransformation(visitor);
     }
 
     const OrderedPathSet& getPathDependencies() const {
@@ -821,15 +819,22 @@ public:
     }
 
 private:
-    using OrderedFieldId = int32_t;
-    using OrderedFields = std::vector<std::pair<StringPool::Id, FieldId>>;
-
-    class OrderedFieldIdMap {
+    /**
+     * Reassigns sequential "ordered" IDs.
+     */
+    template <typename T>
+    class OrderedIdMap {
     public:
-        OrderedFieldId get(FieldId fieldId) const {
-            auto [it, inserted] = _orderedFieldIds.emplace(fieldId, _nextOrderedFieldId);
+        using Id = TypedId<T>;
+        using OrderedId = TypedId<OrderedIdMap<T>>;
+
+        OrderedId get(Id id) const {
+            if (!id) {
+                return OrderedId::none();
+            }
+            auto [it, inserted] = _orderedIds.emplace(id, OrderedId{_nextFieldId});
             if (inserted) {
-                ++_nextOrderedFieldId;
+                ++_nextFieldId;
             }
             return it->second;
         }
@@ -837,21 +842,35 @@ private:
     private:
         // 'getModifiedPaths()' reports renames in an non-deterministic order so we assign each
         // field a "normalized" ID after by sorting the fields within a scope.
-        mutable OrderedFieldId _nextOrderedFieldId{0};
-        mutable absl::flat_hash_map<FieldId, OrderedFieldId> _orderedFieldIds;
+        mutable Id::ValueType _nextFieldId{0};
+        mutable absl::flat_hash_map<Id, OrderedId> _orderedIds;
     };
 
-    static OrderedFields sortedFieldMap(const FieldMap& fields) {
-        OrderedFields result(fields.begin(), fields.end());
-        std::sort(result.begin(), result.end(), [](auto& a, auto& b) { return a.first < b.first; });
-        return result;
+    using OrderedFieldId = OrderedIdMap<Field>::OrderedId;
+    using OrderedFields = std::vector<std::pair<std::string, OrderedFieldId>>;
+
+    std::vector<StringPool::Id> sortedStrings(std::vector<StringPool::Id> s) const {
+        std::vector<StringPool::Id> results = std::move(s);
+        std::sort(results.begin(), results.end(), [&](auto lhs, auto rhs) {
+            return _graph._strings.get(lhs) < _graph._strings.get(rhs);
+        });
+        return results;
+    }
+
+    template <typename It>
+    std::vector<StringPool::Id> getSortedStringKeys(It begin, It end) const {
+        std::vector<StringPool::Id> result;
+        for (; begin != end; ++begin) {
+            result.push_back(begin->first);
+        }
+        return sortedStrings(result);
     }
 
     auto sortedFieldDeps(const FieldDependencies& fields) const {
         auto result = std::vector(fields.begin(), fields.end());
         std::sort(result.begin(), result.end(), [&](FieldId lhs, FieldId rhs) {
-            return std::make_pair(resolveFieldName(lhs), lhs) <
-                std::make_pair(resolveFieldName(rhs), rhs);
+            return std::make_pair(resolveFieldName(lhs), _orderedFieldIds.get(lhs)) <
+                std::make_pair(resolveFieldName(rhs), _orderedFieldIds.get(rhs));
         });
         return result;
     }
@@ -875,13 +894,14 @@ private:
             {
                 BSONObjBuilder fieldsBob = scopeBob.subobjStart("fields");
                 {
-                    BSONObjBuilder fieldObj = fieldsBob.subobjStart(
-                        fmt::format("<missing>:{}", _orderedFieldIds.get(scope.missingField)));
+                    BSONObjBuilder fieldObj = fieldsBob.subobjStart(fmt::format(
+                        "<missing>:{}", _orderedFieldIds.get(scope.missingField).value));
                     serializeField(scope.missingField, fieldObj);
                 }
 
                 // FieldMap doesn't guarantee any order. We need a stable order for golden testing.
-                for (const auto& [name, fieldId] : sortedFieldMap(scope.fields)) {
+                for (auto&& name : getSortedStringKeys(scope.fields.begin(), scope.fields.end())) {
+                    auto fieldId = scope.fields.at(name);
                     auto scopeFieldName = formatField(_graph._strings.get(name), fieldId);
                     BSONObjBuilder fieldObj = fieldsBob.subobjStart(scopeFieldName);
                     serializeField(fieldId, fieldObj);
@@ -913,11 +933,11 @@ private:
     }
 
     std::string formatScope(ScopeId scopeId) const {
-        return fmt::format("scope:{}", scopeId.value);
+        return fmt::format("scope:{}", _orderedScopeIds.get(scopeId).value);
     }
 
     std::string formatField(PathRef name, FieldId fieldId) const {
-        return fmt::format("{}:{}", name, _orderedFieldIds.get(fieldId));
+        return fmt::format("{}:{}", name, _orderedFieldIds.get(fieldId).value);
     }
 
     std::string formatField(FieldId fieldId) const {
@@ -942,7 +962,8 @@ private:
 
     const DependencyGraph::Impl& _graph;
     absl::flat_hash_set<ScopeId> _visitedScopes;
-    OrderedFieldIdMap _orderedFieldIds;
+    OrderedIdMap<Field> _orderedFieldIds;
+    OrderedIdMap<Scope> _orderedScopeIds;
 };
 
 BSONObj DependencyGraph::Impl::toBSON() const {
