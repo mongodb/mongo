@@ -200,8 +200,8 @@ ExtensionConfig ExtensionLoader::loadExtensionConfig(const std::string& extensio
 
     LOGV2(11042903,
           "Successfully loaded config file",
-          "sharedLibraryPath"_attr = config.sharedLibraryPath,
-          "extensionOptions"_attr = YAML::Dump(config.extOptions));
+          "extensionName"_attr = extensionName,
+          "sharedLibraryPath"_attr = config.sharedLibraryPath);
 
     return config;
 }
