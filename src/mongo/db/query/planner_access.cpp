@@ -38,7 +38,7 @@
 
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include "mongo/base/checked_cast.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -70,8 +70,6 @@
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/planner_access.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
-#include "mongo/db/query/query_execution_knobs_gen.h"
-#include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_request_helper.h"
@@ -1113,7 +1111,7 @@ void QueryPlannerAccess::finishTextNode(const CanonicalQuery& cq,
         // stash in prefixExprs.
         size_t curChild = 0;
         while (curChild < amExpr->numChildren()) {
-            IndexTag* ixtag = checked_cast<IndexTag*>(amExpr->getChild(curChild)->getTag());
+            IndexTag* ixtag = indexTagCast<IndexTag>(amExpr->getChild(curChild)->getTag());
             tassert(9751505, "expected non-null index tag", nullptr != ixtag);
             // Skip this child if it's not part of a prefix, or if we've already assigned a
             // predicate to this prefix position.
@@ -1446,7 +1444,7 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
             break;
         }
 
-        scanState.ixtag = checked_cast<IndexTag*>(child->getTag());
+        scanState.ixtag = indexTagCast<IndexTag>(child->getTag());
         // If there's a tag it must be valid.
         MONGO_verify(IndexTag::kNoIndex != scanState.ixtag->index);
 
@@ -1472,7 +1470,7 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
         // If 'child' is a NOT, then the tag we're interested in is on the NOT's
         // child node.
         if (MatchExpression::NOT == child->matchType()) {
-            scanState.ixtag = checked_cast<IndexTag*>(child->getChild(0)->getTag());
+            scanState.ixtag = indexTagCast<IndexTag>(child->getChild(0)->getTag());
             tassert(11321014,
                     "Expected the NOT child to have an index tag",
                     IndexTag::kNoIndex != scanState.ixtag->index);
@@ -1633,7 +1631,7 @@ bool QueryPlannerAccess::processIndexScansElemMatch(
         MatchExpression* emChild = emChildren[i];
         tassert(
             11321015, "emChild->getTag() must not return nullptr", nullptr != emChild->getTag());
-        scanState->ixtag = checked_cast<IndexTag*>(emChild->getTag());
+        scanState->ixtag = indexTagCast<IndexTag>(emChild->getTag());
 
         // If 'emChild' is a NOT, then the tag we're interested in is on the NOT's
         // child node.
@@ -1641,7 +1639,7 @@ bool QueryPlannerAccess::processIndexScansElemMatch(
             tassert(11321016,
                     "emChild->getChild(0)->getTag() must not return nullptr",
                     nullptr != emChild->getChild(0)->getTag());
-            scanState->ixtag = checked_cast<IndexTag*>(emChild->getChild(0)->getTag());
+            scanState->ixtag = indexTagCast<IndexTag>(emChild->getChild(0)->getTag());
             tassert(11321017,
                     "expected scanState->ixtag->index to not be kNoIndex",
                     IndexTag::kNoIndex != scanState->ixtag->index);
@@ -2034,7 +2032,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
             return nullptr;
         } else if (Indexability::isBoundsGenerating(root)) {
             // Make an index scan over the tagged index #.
-            IndexTag* tag = checked_cast<IndexTag*>(root->getTag());
+            IndexTag* tag = indexTagCast<IndexTag>(root->getTag());
 
             IndexBoundsBuilder::BoundsTightness tightness = IndexBoundsBuilder::EXACT;
 
