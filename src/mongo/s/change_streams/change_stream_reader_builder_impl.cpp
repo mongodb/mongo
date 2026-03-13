@@ -58,7 +58,7 @@ std::unique_ptr<ChangeStreamShardTargeter> ChangeStreamReaderBuilderImpl::buildS
             return std::make_unique<DatabaseChangeStreamShardTargeterImpl>(std::move(fetcher));
         }
         case ChangeStreamType::kAllDatabases: {
-            return std::make_unique<AllDatabasesChangeStreamShardTargeterImpl>(std::move(fetcher));
+            return std::make_unique<AllDatabasesChangeStreamShardTargeterImpl>();
         }
     }
 

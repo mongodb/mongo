@@ -32,7 +32,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/global_catalog/ddl/placement_history_commands_gen.h"
 #include "mongo/db/pipeline/change_stream_reader_context.h"
-#include "mongo/db/pipeline/data_to_shards_allocation_query_service.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/util/modules.h"
 
@@ -58,11 +57,5 @@ void assertHistoricalPlacementStatusOK(const HistoricalPlacement& placement);
  * placement result are not set, and tasserts otherwise.
  */
 void assertHistoricalPlacementHasNoSegment(const HistoricalPlacement& placement);
-
-/**
- * Returns a pointer to the data to shards allocation query service from the context, asserting
- * if one is not set.
- */
-DataToShardsAllocationQueryService* getDataToShardsAllocationQueryService(OperationContext* opCtx);
 
 }  // namespace mongo::change_streams

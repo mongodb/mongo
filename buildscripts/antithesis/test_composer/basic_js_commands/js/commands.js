@@ -54,7 +54,7 @@ function randomInt(max) {
     return Math.floor(Math.random() * max);
 }
 
-// Establishes a connection
+// Establishes a conenction
 function getDB() {
     return retryOnFailure(() => new Mongo(MONGOD_URI).getDB("test"));
 }

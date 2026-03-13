@@ -17,6 +17,8 @@ function isChangeStreamCommandWithoutVersion(cmdObj) {
     return (
         cmdObj &&
         cmdObj.aggregate &&
+        // TODO: SERVER-111381 Implement AllDatabasesChangeStreamShardTargeterImpl module.
+        cmdObj.aggregate.$db !== "admin" &&
         Array.isArray(cmdObj.pipeline) &&
         cmdObj.pipeline.length > 0 &&
         typeof cmdObj.pipeline[0].$changeStream == "object" &&

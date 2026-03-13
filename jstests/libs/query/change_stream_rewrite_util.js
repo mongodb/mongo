@@ -2,7 +2,6 @@
  * Helper functions that are used in change streams rewrite test cases.
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     assertCreateCollection,
     assertDropAndRecreateCollection,
@@ -154,12 +153,6 @@ export function assertNumChangeStreamDocsReturnedFromShard(
     expectedTotalReturned,
     expectedMigrateChunkToNewShardEvents,
 ) {
-    // TODO SERVER-119944: the following checks rely on the shards property to be set in the explain plan,
-    // but for change streams v2 that field is unset, which causes the asserts to fail. Skip the check when
-    // running change streams v2.
-    if (FeatureFlagUtil.isEnabled(db, "ChangeStreamPreciseShardTargeting")) {
-        return;
-    }
     assert(stats.shards.hasOwnProperty(shardName), stats);
     const stages = stats.shards[shardName].stages;
     const lastStage = stages[stages.length - 1];
@@ -200,12 +193,6 @@ export function assertNumMatchingOplogEventsForShard(
     expectedTotalReturned,
     expectedMigrateChunkToNewShardEvents,
 ) {
-    // TODO SERVER-119944: the following checks rely on the shards property to be set in the explain plan,
-    // but for change streams v2 that field is unset, which causes the asserts to fail. Skip the check when
-    // running change streams v2.
-    if (FeatureFlagUtil.isEnabled(db, "ChangeStreamPreciseShardTargeting")) {
-        return;
-    }
     const executionStats = getExecutionStatsForShard(stats, shardName);
     // We verify the number of documents from the unwind stage instead of the oplog cursor, so we
     // are testing that the filter is applied to the output of batched oplog entries as well.

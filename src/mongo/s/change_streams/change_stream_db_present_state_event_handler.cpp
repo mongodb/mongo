@@ -44,6 +44,17 @@
 
 namespace mongo {
 
+namespace {
+DataToShardsAllocationQueryService* getDataToShardsAllocationQueryService(OperationContext* opCtx) {
+    DataToShardsAllocationQueryService* dataToShardsAllocationQueryService =
+        DataToShardsAllocationQueryService::get(opCtx);
+    tassert(11901800,
+            "expecting DataToShardsAllocationQueryService to be available",
+            dataToShardsAllocationQueryService);
+    return dataToShardsAllocationQueryService;
+}
+}  // namespace
+
 ShardTargeterDecision ChangeStreamShardTargeterDbPresentStateEventHandler::handleEvent(
     OperationContext* opCtx,
     const ControlEvent& event,
@@ -91,8 +102,8 @@ ChangeStreamShardTargeterDbPresentStateEventHandler::handleEventInDegradedMode(
         const NamespacePlacementChangedControlEvent& placementChangedEvent =
             std::get<NamespacePlacementChangedControlEvent>(event);
         if (placementChangedEvent.nss.isEmpty() &&
-            change_streams::getDataToShardsAllocationQueryService(opCtx)
-                    ->getAllocationToShardsStatus(opCtx, placementChangedEvent.clusterTime) ==
+            getDataToShardsAllocationQueryService(opCtx)->getAllocationToShardsStatus(
+                opCtx, placementChangedEvent.clusterTime) ==
                 AllocationToShardsStatus::kNotAvailable) {
             // No shard placement information is available. Use v1 change stream reader.
             return ShardTargeterDecision::kSwitchToV1;

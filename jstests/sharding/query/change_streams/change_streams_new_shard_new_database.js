@@ -9,7 +9,6 @@
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {addShardToCluster} from "jstests/libs/query/change_stream_util.js";
 
 const rsNodeOptions = {
     setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1},
@@ -25,6 +24,15 @@ const adminDB = st.s.getDB("admin");
 
 const oldShardColl = oldShardDB.coll;
 const newShardColl = newShardDB.test;
+
+// Helper function to add a new ReplSetTest shard into the cluster.
+function addShardToCluster(shardName) {
+    const replTest = new ReplSetTest({name: shardName, nodes: 1, nodeOptions: rsNodeOptions});
+    replTest.startSet({shardsvr: ""});
+    replTest.initiate();
+    assert.commandWorked(st.s.adminCommand({addShard: replTest.getURL(), name: shardName}));
+    return replTest;
+}
 
 // Helper function to confirm that a stream sees an expected sequence of documents.
 function assertAllEventsObserved(changeStream, expectedDocs) {
@@ -66,7 +74,7 @@ for (let csCursor of [wholeDBCS, singleCollCS]) {
 }
 
 // Now add a new shard into the cluster...
-const newShard1 = addShardToCluster(st, "newShard1", 1, rsNodeOptions);
+const newShard1 = addShardToCluster("newShard1");
 
 // .. make sure the primary shard of 'newShardDB' database is the new shard ..
 assert.commandWorked(st.s.adminCommand({enableSharding: newShardDB.getName(), primaryShard: "newShard1"}));

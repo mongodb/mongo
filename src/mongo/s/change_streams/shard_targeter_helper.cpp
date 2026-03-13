@@ -87,13 +87,4 @@ void assertHistoricalPlacementHasNoSegment(const HistoricalPlacement& placement)
             !placement.getNextPlacementChangedAt().has_value());
 }
 
-DataToShardsAllocationQueryService* getDataToShardsAllocationQueryService(OperationContext* opCtx) {
-    DataToShardsAllocationQueryService* dataToShardsAllocationQueryService =
-        DataToShardsAllocationQueryService::get(opCtx);
-    tassert(11901800,
-            "expecting DataToShardsAllocationQueryService to be available",
-            dataToShardsAllocationQueryService);
-    return dataToShardsAllocationQueryService;
-}
-
 }  // namespace mongo::change_streams
