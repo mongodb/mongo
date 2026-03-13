@@ -128,6 +128,21 @@ mongo_cc_unit_test(
     deps = [":metric_unit"],
 )
 
+mongo_cc_library(
+    name = "metrics_attributes",
+    srcs = ["metrics_attributes.cpp"],
+    deps = ["//src/mongo:base"],
+)
+
+mongo_cc_unit_test(
+    name = "metrics_attributes_test",
+    srcs = [
+        "metrics_attributes_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [":metrics_attributes"],
+)
+
 mongo_cc_unit_test(
     name = "metrics_counter_test",
     srcs = [
