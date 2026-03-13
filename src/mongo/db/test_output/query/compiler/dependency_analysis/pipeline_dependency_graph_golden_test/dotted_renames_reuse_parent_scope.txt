@@ -56,7 +56,8 @@ output: {
             "exhaustiveScope": "scope:-1",
             "fields": {
                 "<missing>:0": {
-                    "declaringScope": "scope:0"
+                    "declaringScope": "scope:0",
+                    "dependencies": []
                 },
                 "a1:1": {
                     "declaringScope": "scope:0",
@@ -64,7 +65,8 @@ output: {
                         "exhaustiveScope": "scope:-1",
                         "fields": {
                             "<missing>:2": {
-                                "declaringScope": "scope:1"
+                                "declaringScope": "scope:1",
+                                "dependencies": []
                             },
                             "b1:3": {
                                 "declaringScope": "scope:1",
@@ -72,7 +74,8 @@ output: {
                                     "exhaustiveScope": "scope:-1",
                                     "fields": {
                                         "<missing>:4": {
-                                            "declaringScope": "scope:2"
+                                            "declaringScope": "scope:2",
+                                            "dependencies": []
                                         },
                                         "c1:5": {
                                             "declaringScope": "scope:2",
@@ -80,7 +83,8 @@ output: {
                                                 "exhaustiveScope": "scope:-1",
                                                 "fields": {
                                                     "<missing>:6": {
-                                                        "declaringScope": "scope:3"
+                                                        "declaringScope": "scope:3",
+                                                        "dependencies": []
                                                     },
                                                     "d1:7": {
                                                         "declaringScope": "scope:3",
@@ -88,7 +92,8 @@ output: {
                                                             "exhaustiveScope": "scope:-1",
                                                             "fields": {
                                                                 "<missing>:8": {
-                                                                    "declaringScope": "scope:4"
+                                                                    "declaringScope": "scope:4",
+                                                                    "dependencies": []
                                                                 },
                                                                 "e1:9": {
                                                                     "declaringScope": "scope:4",
@@ -96,45 +101,69 @@ output: {
                                                                         "exhaustiveScope": "scope:-1",
                                                                         "fields": {
                                                                             "<missing>:10": {
-                                                                                "declaringScope": "scope:5"
+                                                                                "declaringScope": "scope:5",
+                                                                                "dependencies": []
                                                                             },
                                                                             "f1:11": {
-                                                                                "declaringScope": "scope:5"
+                                                                                "declaringScope": "scope:5",
+                                                                                "dependencies": []
                                                                             }
                                                                         }
-                                                                    }
+                                                                    },
+                                                                    "dependencies": [
+                                                                        "f1:11"
+                                                                    ]
                                                                 }
                                                             }
-                                                        }
+                                                        },
+                                                        "dependencies": [
+                                                            "e1:9"
+                                                        ]
                                                     }
                                                 }
-                                            }
+                                            },
+                                            "dependencies": [
+                                                "d1:7"
+                                            ]
                                         }
                                     }
-                                }
+                                },
+                                "dependencies": [
+                                    "c1:5"
+                                ]
                             }
                         }
-                    }
+                    },
+                    "dependencies": [
+                        "b1:3"
+                    ]
                 },
                 "b:12": {
-                    "declaringScope": "scope:0"
+                    "declaringScope": "scope:0",
+                    "dependencies": []
                 }
             }
-        }
+        },
+        "dependencies": []
     },
     "$set:1": {
         "scope:6": {
             "exhaustiveScope": "scope:-1",
             "fields": {
                 "<missing>:13": {
-                    "declaringScope": "scope:6"
+                    "declaringScope": "scope:6",
+                    "dependencies": []
                 },
                 "a1:1": {
                     "declaringScope": "scope:0",
-                    "scope:1": "scope:1"
+                    "scope:1": "scope:1",
+                    "dependencies": [
+                        "b1:3"
+                    ]
                 },
                 "b:12": {
-                    "declaringScope": "scope:0"
+                    "declaringScope": "scope:0",
+                    "dependencies": []
                 },
                 "a2:14": {
                     "declaringScope": "scope:6",
@@ -142,7 +171,8 @@ output: {
                         "exhaustiveScope": "scope:-1",
                         "fields": {
                             "<missing>:15": {
-                                "declaringScope": "scope:7"
+                                "declaringScope": "scope:7",
+                                "dependencies": []
                             },
                             "b2:16": {
                                 "declaringScope": "scope:7",
@@ -150,7 +180,8 @@ output: {
                                     "exhaustiveScope": "scope:-1",
                                     "fields": {
                                         "<missing>:17": {
-                                            "declaringScope": "scope:8"
+                                            "declaringScope": "scope:8",
+                                            "dependencies": []
                                         },
                                         "c2:18": {
                                             "declaringScope": "scope:8",
@@ -158,7 +189,8 @@ output: {
                                                 "exhaustiveScope": "scope:-1",
                                                 "fields": {
                                                     "<missing>:19": {
-                                                        "declaringScope": "scope:9"
+                                                        "declaringScope": "scope:9",
+                                                        "dependencies": []
                                                     },
                                                     "d2:20": {
                                                         "declaringScope": "scope:9",
@@ -166,7 +198,8 @@ output: {
                                                             "exhaustiveScope": "scope:-1",
                                                             "fields": {
                                                                 "<missing>:21": {
-                                                                    "declaringScope": "scope:10"
+                                                                    "declaringScope": "scope:10",
+                                                                    "dependencies": []
                                                                 },
                                                                 "e2:22": {
                                                                     "declaringScope": "scope:10",
@@ -174,34 +207,62 @@ output: {
                                                                         "exhaustiveScope": "scope:-1",
                                                                         "fields": {
                                                                             "<missing>:23": {
-                                                                                "declaringScope": "scope:11"
+                                                                                "declaringScope": "scope:11",
+                                                                                "dependencies": []
                                                                             },
                                                                             "f2:24": {
-                                                                                "declaringScope": "scope:11"
+                                                                                "declaringScope": "scope:11",
+                                                                                "dependencies": [
+                                                                                    "f1:11"
+                                                                                ]
                                                                             }
                                                                         }
-                                                                    }
+                                                                    },
+                                                                    "dependencies": [
+                                                                        "f2:24"
+                                                                    ]
                                                                 }
                                                             }
-                                                        }
+                                                        },
+                                                        "dependencies": [
+                                                            "e2:22"
+                                                        ]
                                                     }
                                                 }
-                                            }
+                                            },
+                                            "dependencies": [
+                                                "d2:20"
+                                            ]
                                         }
                                     }
-                                }
+                                },
+                                "dependencies": [
+                                    "c2:18"
+                                ]
                             }
                         }
-                    }
+                    },
+                    "dependencies": [
+                        "b2:16"
+                    ]
                 }
             }
-        }
+        },
+        "dependencies": [
+            "f1:11"
+        ]
     },
     "$match:2": {
-        "scope:6": "scope:6"
+        "scope:6": "scope:6",
+        "dependencies": [
+            "f2:24"
+        ]
     },
     "$match:3": {
-        "scope:6": "scope:6"
+        "scope:6": "scope:6",
+        "dependencies": [
+            "a2:14"
+        ]
     }
 }
 

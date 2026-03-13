@@ -149,22 +149,29 @@ using ScopeId = TypedId<Scope>;
 using FieldId = TypedId<Field>;
 
 using FieldMap = absl::flat_hash_map<StringPool::Id, FieldId>;
+/// Represents the set of field definition nodes that a stage or a field definition node depends on.
+/// When a stage depends on a field definition, it means that the stage references a field that was
+/// most recently modified by that field definition node. Similarly, field definition A can depend
+/// on field definition B if A references B through a rename or in an expression.
+using FieldDependencies = absl::flat_hash_set<FieldId>;
 
 /**
  * Represents a DocumentSource that references or defines fields (or both).
  */
 struct Stage {
-    // TODO(SERVER-119840): Track field dependencies
     Stage(ScopeId scope,
           boost::intrusive_ptr<DocumentSource> documentSource,
+          FieldDependencies dependencies,
           bool isSingleDocumentTransformation,
           ScopeId nextNewScope)
         : documentSource(std::move(documentSource)),
+          dependencies(std::move(dependencies)),
           scope(scope),
           nextNewScope(nextNewScope),
           isSingleDocumentTransformation(isSingleDocumentTransformation) {}
 
     boost::intrusive_ptr<DocumentSource> documentSource;
+    FieldDependencies dependencies;
     // The scope representing visible definitions immediately _after_ this stage. Stages which
     // don't modify fields just inherit this from the previous stage.
     ScopeId scope;
@@ -235,14 +242,18 @@ struct Field {
      */
     struct Metadata {};
 
-    // TODO(SERVER-119840): Track field dependencies
-    Field(ScopeId declaringScope, ScopeId embeddedScope = ScopeId::none(), Metadata metadata = {})
+    Field(ScopeId declaringScope,
+          ScopeId embeddedScope = ScopeId::none(),
+          FieldDependencies dependencies = {},
+          Metadata metadata = {})
         : metadata(std::move(metadata)),
+          dependencies(std::move(dependencies)),
           declaringScope(declaringScope),
           embeddedScope(embeddedScope) {}
 
     // This could also be stored as a node, and referenced here by its ID.
     Metadata metadata{};
+    FieldDependencies dependencies{};
     // Scope declaring this field.
     // NOTE: We might not need to track this, since we know the scope in lookupField.
     ScopeId declaringScope{ScopeId::none()};
@@ -354,6 +365,8 @@ private:
     using Scope = detail::Scope;
     using Field = detail::Field;
 
+    using FieldDependencies = detail::FieldDependencies;
+
     using ParsedPath = boost::container::small_vector<detail::StringPool::Id, 8>;
     using ParsedPathView = std::span<detail::StringPool::Id>;
 
@@ -381,7 +394,7 @@ private:
      * If 'a' already exists, any fields are preserved.
      * Returns the FieldId for the base component in path (for 'a.b' returns 'a').
      */
-    FieldId declareField(ScopeId scope, ParsedPathView path);
+    FieldId declareField(ScopeId scope, ParsedPathView path, FieldDependencies dependencies);
 
     /**
      * Includes the field from the parent scope into the given scope.
@@ -408,7 +421,10 @@ private:
     /**
      * Create graph nodes to represent the scope declared by the document source.
      */
-    ScopeId processScope(const detail::DocumentSourceInfo& ds, StageId stage, ScopeId parentScope);
+    ScopeId processScope(const detail::DocumentSourceInfo& ds,
+                         StageId stage,
+                         ScopeId parentScope,
+                         const FieldDependencies& dependencies);
 
     /**
      * Creates graph nodes to represent the document source.

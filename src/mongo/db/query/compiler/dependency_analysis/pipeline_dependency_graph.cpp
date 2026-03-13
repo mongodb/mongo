@@ -182,19 +182,30 @@ void DependencyGraph::processStage(boost::intrusive_ptr<DocumentSource> document
     _dsToStageId.emplace(documentSource.get(), stageId);
 
     auto parentScopeId = _stages.empty() ? ScopeId::none() : _stages.back().scope;
-
+    FieldDependencies dependencies;
+    if (parentScopeId) {
+        for (auto&& path : dsInfo.getPathDependencies()) {
+            auto parsedPath = internPath(path);
+            auto fieldId = lookupFullPath(parentScopeId, parsedPath);
+            if (fieldId) {
+                dependencies.insert(fieldId);
+            }
+        }
+    }
     const auto nextNewScopeId = _scopes.getNextId();
-    auto scopeId = processScope(dsInfo, stageId, parentScopeId);
+    auto scopeId = processScope(dsInfo, stageId, parentScopeId, dependencies);
 
     _stages.append(Stage{scopeId,
                          std::move(documentSource),
+                         std::move(dependencies),
                          dsInfo.isSingleDocumentTransformation(),
                          nextNewScopeId});
 }
 
 DependencyGraph::ScopeId DependencyGraph::processScope(const detail::DocumentSourceInfo& ds,
                                                        StageId stage,
-                                                       ScopeId parentScope) {
+                                                       ScopeId parentScope,
+                                                       const FieldDependencies& depsFromStage) {
     const ScopeId scopeId = _scopes.getNextId();
 
     bool preservePaths = false;
@@ -236,7 +247,7 @@ DependencyGraph::ScopeId DependencyGraph::processScope(const detail::DocumentSou
         if (preservePaths) {
             includeField(scopeId, parentScope, parsedPath);
         } else {
-            declareField(scopeId, parsedPath);
+            declareField(scopeId, parsedPath, depsFromStage);
         }
     }
 
@@ -244,7 +255,12 @@ DependencyGraph::ScopeId DependencyGraph::processScope(const detail::DocumentSou
         for (auto&& [newPath, oldPath] : ds.getRenames()) {
             auto parsedOldPath = internPath(oldPath);
             auto parsedNewPath = internPath(newPath);
-            declareField(scopeId, parsedNewPath);
+            if (auto dependency = lookupFullPath(parentScope, parsedOldPath)) {
+                // We know exactly which 1 field this one depends on.
+                declareField(scopeId, parsedNewPath, {dependency});
+            } else {
+                declareField(scopeId, parsedNewPath, depsFromStage);
+            }
         }
         tassert(11937305, "Unimplemented complex renames", ds.getComplexRenames().empty());
     } else {
@@ -280,7 +296,9 @@ void DependencyGraph::includeField(ScopeId scope, ScopeId parentScope, ParsedPat
             _scopes[scope].fields[path.front()] = existingField;
             return;
         }
-        declareField(scope, path);
+        // TODO (SERVER-119374): Deps should be either missingField or whatever we use to represent
+        // a field from the base collection.
+        declareField(scope, path, {});
         return;
     }
 
@@ -310,12 +328,13 @@ void DependencyGraph::includeField(ScopeId scope, ScopeId parentScope, ParsedPat
             return;
         }
         // We cannot figure out where this 'b' comes from. We will re-declare it here.
-        declareField(_fields[existingBaseField].embeddedScope, subPath);
+        // TODO (SERVER-119374): How to represent fields that come from the base collection?
+        declareField(_fields[existingBaseField].embeddedScope, subPath, {});
         return;
     }
 
     // 'a' is not included in the current scope, so we need to declare it then include 'b'.
-    auto newBaseField = declareField(scope, basePath);
+    auto newBaseField = declareField(scope, basePath, {});
     if (previousBaseField && _fields[previousBaseField].embeddedScope) {
         // We know about 'a' from before, so we can include 'b'.
         auto embeddedScope = _scopes.getNextId();
@@ -327,13 +346,16 @@ void DependencyGraph::includeField(ScopeId scope, ScopeId parentScope, ParsedPat
 
     // We do not know about 'a', so we don't know what is being included at all.
     // We will need to just declare 'a.b' anew.
-    declareField(scope, path);
+    // TODO (SERVER-119374): How to represent fields that come from the base collection?
+    declareField(scope, path, {});
 }
 
-DependencyGraph::FieldId DependencyGraph::declareField(ScopeId scope, ParsedPathView path) {
+DependencyGraph::FieldId DependencyGraph::declareField(ScopeId scope,
+                                                       ParsedPathView path,
+                                                       FieldDependencies dependencies) {
     // Declaring 'a' should create field 'a' and exit.
     if (path.size() == 1) {
-        auto field = _fields.append(Field{scope, ScopeId::none()});
+        auto field = _fields.append(Field{scope, ScopeId::none(), std::move(dependencies)});
         _scopes[scope].fields[path.front()] = field;
         return field;
     }
@@ -369,11 +391,17 @@ DependencyGraph::FieldId DependencyGraph::declareField(ScopeId scope, ParsedPath
         auto exhaustiveEmbeddedScope = existingBaseField
             ? _scopes[_fields[existingBaseField].declaringScope].exhaustiveScope
             : ScopeId::none();
+        if (parentEmbeddedScope) {
+            // The new field depends on the previous field, since it inherits paths.
+            _fields[newBaseField].dependencies.emplace(existingBaseField);
+        }
         declareScope(_scopes[scope].stage, exhaustiveEmbeddedScope, parentEmbeddedScope);
         _scopes[scope].fields[basePath.front()] = newBaseField;
     }
     // Finally, declare the subPath in the embeddedScope we found or created.
-    (void)declareField(_fields[newBaseField].embeddedScope, subPath);
+    auto embeddedField =
+        declareField(_fields[newBaseField].embeddedScope, subPath, std::move(dependencies));
+    _fields[newBaseField].dependencies.emplace(embeddedField);
     return newBaseField;
 }
 
@@ -406,9 +434,7 @@ public:
     BSONObj serializeToBson() {
         BSONObjBuilder stagesBob;
         for (StageId stageId{0}; stageId < _graph._stages.getNextId(); stageId.value++) {
-            const auto& stage = _graph._stages[stageId];
-            BSONObjBuilder stageBob = stagesBob.subobjStart(formatStage(stageId));
-            serializeScope(stage.scope, stageBob);
+            serializeStage(stageId, stagesBob);
         }
         return stagesBob.obj();
     }
@@ -434,10 +460,26 @@ private:
         mutable absl::flat_hash_map<FieldId, OrderedFieldId> _orderedFieldIds;
     };
 
-    static OrderedFields sortedFields(const detail::FieldMap& fields) {
+    static OrderedFields sortedFieldMap(const detail::FieldMap& fields) {
         OrderedFields result(fields.begin(), fields.end());
         std::sort(result.begin(), result.end(), [](auto& a, auto& b) { return a.first < b.first; });
         return result;
+    }
+
+    auto sortedFieldDeps(const FieldDependencies& fields) const {
+        auto result = std::vector(fields.begin(), fields.end());
+        std::sort(result.begin(), result.end(), [&](FieldId lhs, FieldId rhs) {
+            return std::make_pair(resolveFieldName(lhs), lhs) <
+                std::make_pair(resolveFieldName(rhs), rhs);
+        });
+        return result;
+    }
+
+    void serializeStage(StageId stageId, BSONObjBuilder& bob) {
+        const auto& stage = _graph._stages[stageId];
+        BSONObjBuilder stageBob = bob.subobjStart(formatStage(stageId));
+        serializeScope(stage.scope, stageBob);
+        serializeDependencies(stage.dependencies, stageBob);
     }
 
     void serializeScope(ScopeId scopeId, BSONObjBuilder& bob) {
@@ -458,7 +500,7 @@ private:
                 }
 
                 // FieldMap doesn't guarantee any order. We need a stable order for golden testing.
-                for (const auto& [name, fieldId] : sortedFields(scope.fields)) {
+                for (const auto& [name, fieldId] : sortedFieldMap(scope.fields)) {
                     auto scopeFieldName = formatField(_graph._strings.get(name), fieldId);
                     BSONObjBuilder fieldObj = fieldsBob.subobjStart(scopeFieldName);
                     serializeField(fieldId, fieldObj);
@@ -473,6 +515,14 @@ private:
         bob.append("declaringScope", fieldScopeName);
         if (field.embeddedScope) {
             serializeScope(field.embeddedScope, bob);
+        }
+        serializeDependencies(field.dependencies, bob);
+    }
+
+    void serializeDependencies(const FieldDependencies& deps, BSONObjBuilder& bob) {
+        BSONArrayBuilder depsBuilder = bob.subarrayStart("dependencies");
+        for (auto depFieldId : sortedFieldDeps(deps)) {
+            depsBuilder.append(formatField(depFieldId));
         }
     }
 
@@ -490,19 +540,24 @@ private:
     }
 
     std::string formatField(FieldId fieldId) const {
+        return formatField(resolveFieldName(fieldId), fieldId);
+    }
+
+    std::string resolveFieldName(FieldId fieldId) const {
         const auto& field = _graph._fields[fieldId];
+        // The field doesn't know the field name. We need to find the name from the declaring scope,
+        // which contains a mapping from field name to field id.
         const auto& fieldMap = _graph._scopes[field.declaringScope].fields;
         auto fieldIt = std::find_if(fieldMap.begin(), fieldMap.end(), [fieldId](const auto& p) {
             return p.second == fieldId;
         });
         if (fieldIt == fieldMap.end() &&
             _graph._scopes[field.declaringScope].missingField == fieldId) {
-            return fmt::format("<missing>:{}", _orderedFieldIds.get(fieldId));
+            return "<missing>";
         }
         tassert(11937309, "Cannot find field in parent scope", fieldIt != fieldMap.end());
-        return formatField(_graph._strings.get(fieldIt->first), fieldIt->second);
+        return std::string{_graph._strings.get(fieldIt->first)};
     }
-
 
     const DependencyGraph& _graph;
     absl::flat_hash_set<ScopeId> _visitedScopes;
