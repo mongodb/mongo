@@ -114,7 +114,6 @@ class MongoShellDebugSession extends DebugSession {
 
         this.debugConnection.on("end", () => {
             this.connected = false;
-            this.unverifyBreakpoints();
         });
 
         // Send any queued breakpoints from before connection (attach mode)
@@ -171,78 +170,36 @@ class MongoShellDebugSession extends DebugSession {
      * @overload
      */
     setBreakPointsRequest(response, args) {
-        const lines = (args.breakpoints || []).map((bp) => ({
-            line: bp.line,
-            condition: bp.condition,
-            logMessage: bp.logMessage,
-        }));
+        // Store these in the map to be sent when a new shell connects.
+        // When a breakpoint is set/removed from a file, this method fires with the list of ALL breakpoints
+        // in that file, so updating it keyed off the filename is sufficient here; no need to track individual lines.
+        this.breakpoints.set(args.source.path, [response, args]);
 
         if (this.connected) {
-            // Unfortunately the UI still marks this as a red dot in the file.
-            // Would be better if we could either not mark the breakpoint, or at least mark it unverified.
+            // The UI still marks this as a red dot in the file, which can be confusing when a test is rerun and it's not hit.
+            // Would be ideal if we could either not mark the breakpoint, or at least mark it unverified.
+            // These are still stored in the map above, so new shells will appropriately honor them.
+            // TODO SERVER-120754: Add JS breakpoints after script is already loaded
             this.sendErrorResponse(
                 response,
                 1016,
-                "New breakpoints are not supported. Breakpoints must be set before the shell launches.",
+                "New breakpoints are not supported while a shell is connected.\n" +
+                    "Any new/changed breakpoints will be applied when the next shell launches.",
             );
-        }
-
-        // If not connected yet (attach mode), return unverified breakpoints
-        // They will be sent to the shell once it connects
-        if (!this.connected) {
-            const bps = lines.map((bp) => {
-                const breakpoint = new Breakpoint(false, bp.line, 0, args.source.path);
-                return breakpoint;
-            });
-
-            this.breakpoints.set(args.source.path, {lines, unverified: bps});
-            response.body = {breakpoints: bps};
-            this.sendResponse(response);
-            return;
         }
     }
 
     // Send breakpoints that were set before shell connected
     sendQueuedBreakpoints() {
-        for (const [filePath, value] of this.breakpoints.entries()) {
-            // Check if these are unverified (queued) breakpoints
-            if (value.lines && value.unverified) {
-                this.sendCommand("setBreakpoints", {source: filePath, lines: value.lines})
-                    .then((result) => {
-                        const bps = result.breakpoints.map((bp) => {
-                            const breakpoint = new Breakpoint(bp.verified, bp.line, bp.column);
-                            breakpoint.id = bp.id;
-                            return breakpoint;
-                        });
-
-                        // Update stored breakpoints
-                        this.breakpoints.set(filePath, bps);
-
-                        // Send breakpoint changed events for each one
-                        bps.forEach((bp) => {
-                            this.sendEvent(new BreakpointEvent("changed", bp));
-                        });
-                    })
-                    .catch((err) => {
-                        this.log(`Failed to set queued breakpoints: ${err.message}`, "stderr");
-                    });
-            }
-        }
-    }
-
-    // Reset all breakpoints to unverified state so they can be re-sent when the shell reconnects
-    unverifyBreakpoints() {
-        for (const [filePath, value] of this.breakpoints.entries()) {
-            if (Array.isArray(value)) {
-                // Convert verified breakpoints back to unverified queued format
-                const lines = value.map((bp) => ({
-                    line: bp.line,
-                    condition: bp.condition,
-                    logMessage: bp.logMessage,
-                }));
-                const unverified = lines.map((bp) => new Breakpoint(false, bp.line, 0));
-                this.breakpoints.set(filePath, {lines, unverified});
-            }
+        for (const [response, args] of this.breakpoints.values()) {
+            this.sendCommand("setBreakpoints", args)
+                .then((result) => {
+                    response.body = result;
+                    this.sendResponse(response);
+                })
+                .catch((err) => {
+                    this.log(`Failed to set queued breakpoints: ${err.message}`, "stderr");
+                });
         }
     }
 

@@ -38,11 +38,10 @@ namespace protocol {
 
 TEST(Request, fromJSON) {
 
-    std::string json =
-        R"({"type":"request","seq":17,"command":"setBreakpoints","arguments":{"source":"","lines":[]}})";
+    std::string json = R"({"type":"request","seq":17,"command":"fake","arguments":{}})";
     auto req = Request::fromJSON(json);
     ASSERT_EQ(req->seq, 17);
-    ASSERT_EQ(req->command, "setBreakpoints");
+    ASSERT_EQ(req->command, "fake");
 }
 
 TEST(Message, AckResponse) {
@@ -58,15 +57,17 @@ TEST(Message, AckResponse) {
 TEST(SetBreakpointsRequest, parseRequestAndResponse) {
 
     std::string json =
-        R"({"type":"request","seq":17,"command":"setBreakpoints","arguments":{"source":"jstests/my_test.js","lines":[{"line":5},{"line":82}]}})";
+        // we don't make use of some of these fields, and some are deprecated, but this is a
+        // realistic looking request from VSCode
+        R"({"type":"request","seq":17,"command":"setBreakpoints","arguments":{"source":{"name":"my_test.js","path":"/home/ubuntu/mongo/jstests/my_test.js"},"lines":[5,82],"breakpoints":[{"line":5},{"line":82}],"sourceModified":false}})";
     auto request = std::static_pointer_cast<SetBreakpointsRequest>(Request::fromJSON(json));
     ASSERT_EQ(request->seq, 17);
-    ASSERT_EQ(request->source, "jstests/my_test.js");
+    ASSERT_EQ(request->source, "/home/ubuntu/mongo/jstests/my_test.js");
     ASSERT_EQ(request->lines, std::vector<int>({5, 82}));
 
     auto response = request->response();
     std::string expectedResponse =
-        R"({ "type" : "response", "seq" : 17, "body" : { "breakpoints" : [ { "id" : 1, "verified" : true, "line" : 5, "column" : 0, "source" : { "path" : "jstests/my_test.js" } }, { "id" : 2, "verified" : true, "line" : 82, "column" : 0, "source" : { "path" : "jstests/my_test.js" } } ] } })";
+        R"({ "type" : "response", "seq" : 17, "body" : { "breakpoints" : [ { "id" : 1, "verified" : true, "line" : 5, "column" : 0, "source" : { "path" : "/home/ubuntu/mongo/jstests/my_test.js" } }, { "id" : 2, "verified" : true, "line" : 82, "column" : 0, "source" : { "path" : "/home/ubuntu/mongo/jstests/my_test.js" } } ] } })";
     ASSERT_EQ(response.getJson(), expectedResponse);
 }
 

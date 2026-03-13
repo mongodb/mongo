@@ -100,6 +100,7 @@ void DebugAdapter::handleRequest(ConfigurationDoneRequest& request) {
 void DebugAdapter::handleRequest(SetBreakpointsRequest& request) {
     request.source = abs2rel(request.source);
     DebuggerGlobal::setBreakpoints(request);
+    request.source = rel2abs(request.source);
     sendMessage(request.response());
 }
 

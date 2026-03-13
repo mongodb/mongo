@@ -95,13 +95,14 @@ Response ConfigurationDoneRequest::response() {
 SetBreakpointsRequest::SetBreakpointsRequest(const PartialRequest& partial)
     : VisitableRequest(partial) {
     // Get source from arguments
-    source = std::string(toStdStringViewForInterop(arguments.getStringField("source")));
+    auto sourceField = arguments.getObjectField("source");
+    source = std::string(toStdStringViewForInterop(sourceField.getStringField("path")));
 
     // Get lines array from arguments and extract line numbers
-    std::vector<BSONElement> linesArr = arguments.getField("lines").Array();
-    for (const auto& lineElem : linesArr) {
-        BSONObj lineObj = lineElem.Obj();
-        int lineNum = lineObj.getIntField("line");
+    std::vector<BSONElement> bpArr = arguments.getField("breakpoints").Array();
+    for (const auto& bpElem : bpArr) {
+        BSONObj bpObj = bpElem.Obj();
+        int lineNum = bpObj.getIntField("line");
         lines.push_back(lineNum);
     }
 }
