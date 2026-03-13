@@ -7,3 +7,5 @@ filters:
       Not production code, more like linter config. All teams should be able to edit
       their own module definitions, but there are advantages to keeping all modules
       defined in a single file.
+  - filter: "/.agents/skills/OWNERS.yml"
+    justification: Teams should be able to add their own skills and claim them without asking permission.
