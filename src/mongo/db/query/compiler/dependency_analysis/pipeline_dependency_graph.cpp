@@ -33,6 +33,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/compiler/dependency_analysis/document_transformation_helpers.h"
 #include "mongo/util/string_map.h"
 
 #include <utility>
@@ -278,32 +279,18 @@ struct Field {
 class DocumentSourceInfo {
 public:
     explicit DocumentSourceInfo(const DocumentSource& documentSource)
-        : _modPaths(documentSource.getModifiedPaths()),
+        : _documentSource(documentSource),
           _isSingleDocumentTransformation(documentSource.getId() ==
                                           DocumentSourceSingleDocumentTransformation::id) {
         documentSource.getDependencies(&_deps);
     }
 
-    bool modifiesAnyPaths() const {
-        return !(_modPaths.type == DocumentSource::GetModPathsReturn::Type::kFiniteSet &&
-                 _modPaths.paths.empty() && _modPaths.renames.empty() &&
-                 _modPaths.complexRenames.empty());
-    }
-
-    DocumentSource::GetModPathsReturn::Type getModPathsType() const {
-        return _modPaths.type;
-    }
-
-    const OrderedPathSet& getModifiedPaths() const {
-        return _modPaths.paths;
-    }
-
-    const StringMap<std::string>& getRenames() const {
-        return _modPaths.renames;
-    }
-
-    const StringMap<std::string>& getComplexRenames() const {
-        return _modPaths.complexRenames;
+    void describeTransformation(document_transformation::DocumentOperationVisitor& visitor) const {
+        // To do later: make the debug string order independent and call
+        // describeTransformation method. The order of iteration is different between the actual
+        // describeTransformation and getModifiedPaths and this affects the golden tests for now.
+        document_transformation::describeGetModPathsReturn(visitor,
+                                                           _documentSource.getModifiedPaths());
     }
 
     const OrderedPathSet& getPathDependencies() const {
@@ -315,13 +302,14 @@ public:
     }
 
 private:
-    // Modified paths.
-    DocumentSource::GetModPathsReturn _modPaths;
+    const DocumentSource& _documentSource;
     // Dependencies.
     DepsTracker _deps;
     // Is the document source an instance of DocumentSourceSingleDocumentTransformation.
     bool _isSingleDocumentTransformation;
 };
+
+static_assert(document_transformation::DescribesDocumentTransformation<DocumentSourceInfo>);
 }  // namespace
 
 class DependencyGraph::Impl {
@@ -576,74 +564,88 @@ private:
                          StageId stage,
                          ScopeId parentScope,
                          const FieldDependencies& depsFromStage) {
+        using namespace mongo::document_transformation;
         const ScopeId scopeId = _scopes.getNextId();
 
-        bool preservePaths = false;
-        switch (ds.getModPathsType()) {
-            using Type = DocumentSource::GetModPathsReturn::Type;
-            // TODO(SERVER-119374): Revisit how to handle kNotSupported and kAllPaths.
-            case Type::kNotSupported:
-            case Type::kAllPaths: {
-                // All paths might be modified. This scope does not inherit the parent scope fields.
-                // It also doesn't know all fields - all lookups will fail and we should say we have
-                // no information about the field (as opposed to saying the field is definitely
-                // missing like for kAllExcept).
-                declareScope(stage, scopeId /*exhaustiveScope*/, ScopeId::none());
-                break;
-            }
-            case Type::kFiniteSet: {
-                // A specific set of paths are modified, which means lookups should find them in
-                // this scope. This scope inherits all fields from the parent scope too.
-                if (parentScope && !ds.modifiesAnyPaths()) {
-                    return parentScope;
-                }
+        // If the stage modified any fields, we will declare a scope.
+        // Otherwise, we will reuse the previous scope.
+        bool hasDeclaredScope = false;
+        // We delay creating the scope until the first operation we observe.
+        auto maybeDeclareInheritedScope = [&]() {
+            if (!hasDeclaredScope) {
                 ScopeId exhaustiveScope =
                     parentScope ? _scopes[parentScope].exhaustiveScope : ScopeId::none();
                 // Parent scope names are valid.
                 declareScope(stage, exhaustiveScope, parentScope);
-                break;
+                hasDeclaredScope = true;
             }
-            case Type::kAllExcept: {
-                // Parent scope names other than the ones in paths are not valid.
-                // TODO(SERVER-119374): Handle this properly.
-                declareScope(stage, _scopes.getNextId(), ScopeId::none());
-                preservePaths = true;
-                break;
-            }
+        };
+
+        document_transformation::describeTransformation(
+            OverloadedVisitor{
+                [&](const ReplaceRoot&) {
+                    // TODO(SERVER-119374): Revisit how to handle kNotSupported and kAllPaths.
+                    // All paths might be modified. This scope does not inherit the parent scope
+                    // fields. It also doesn't know all fields - all lookups will fail and we should
+                    // say we have no information about the field (as opposed to saying the field is
+                    // definitely missing like for kAllExcept).
+                    declareScope(stage, scopeId /*exhaustiveScope*/, ScopeId::none());
+                    tassert(
+                        11996201, "Did not expect ReplaceRoot in this position", !hasDeclaredScope);
+                    hasDeclaredScope = true;
+                },
+                [&](const PreservePath& p) {
+                    tassert(11996202, "Expected operation before PreservePath", hasDeclaredScope);
+                    auto parsedPath = internPath(p.getPath());
+                    includeField(scopeId, parentScope, parsedPath);
+                },
+                [&](const ModifyPath& p) {
+                    maybeDeclareInheritedScope();
+                    auto parsedPath = internPath(p.getPath());
+                    declareField(scopeId, parsedPath, depsFromStage);
+                },
+                [&](const RenamePath& p) {
+                    maybeDeclareInheritedScope();
+                    auto parsedOldPath = internPath(p.getOldPath());
+                    auto parsedNewPath = internPath(p.getNewPath());
+
+                    BSONDepthIndex oldPathArrays = p.getOldPathMaxArrayTraversals();
+                    BSONDepthIndex newPathArrays = p.getNewPathMaxArrayTraversals();
+
+                    if (oldPathArrays == 0 && newPathArrays == 0) {
+                        if (parentScope) {
+                            if (auto dependency = lookupFullPath(parentScope, parsedOldPath)) {
+                                // We know exactly which 1 field this one depends on.
+                                declareField(scopeId, parsedNewPath, {dependency});
+                            } else {
+                                declareField(scopeId, parsedNewPath, depsFromStage);
+                            }
+                        } else {
+                            tasserted(11937303, "Unimplemented renames when no parent scope");
+                        }
+                    } else if (oldPathArrays == 0 && newPathArrays == 1) {
+                        if (parentScope) {
+                            tasserted(11937305, "Unimplemented complex renames");
+                        } else {
+                            tasserted(11937304,
+                                      "Unimplemented complex renames when no parent scope");
+                        }
+                    } else {
+                        // Treat potential reshaping as path modification, not as rename.
+                        declareField(scopeId, parsedNewPath, depsFromStage);
+                    }
+                },
+            },
+            ds);
+
+        // Special case: When this is the first stage and it did not modify anything,
+        // we create a empty initial scope.
+        if (!parentScope && !hasDeclaredScope) {
+            maybeDeclareInheritedScope();
+            return scopeId;
         }
 
-        for (auto&& path : ds.getModifiedPaths()) {
-            auto parsedPath = internPath(path);
-            if (preservePaths) {
-                includeField(scopeId, parentScope, parsedPath);
-            } else {
-                declareField(scopeId, parsedPath, depsFromStage);
-            }
-        }
-
-        if (parentScope) {
-            for (auto&& [newPath, oldPath] : ds.getRenames()) {
-                auto parsedOldPath = internPath(oldPath);
-                auto parsedNewPath = internPath(newPath);
-                if (auto dependency = lookupFullPath(parentScope, parsedOldPath)) {
-                    // We know exactly which 1 field this one depends on.
-                    declareField(scopeId, parsedNewPath, {dependency});
-                } else {
-                    declareField(scopeId, parsedNewPath, depsFromStage);
-                }
-            }
-            tassert(11937305, "Unimplemented complex renames", ds.getComplexRenames().empty());
-        } else {
-            // Assume no renames or complex renames.
-            tassert(
-                11937303, "Unimplemented renames when no parent scope", ds.getRenames().empty());
-            tassert(11937304,
-                    "Unimplemented complex renames when no parent scope",
-                    ds.getComplexRenames().empty());
-        }
-
-        // Scope with scopeId was added.
-        return scopeId;
+        return hasDeclaredScope ? scopeId : parentScope;
     }
 
     /**
