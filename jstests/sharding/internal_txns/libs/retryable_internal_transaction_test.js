@@ -123,6 +123,13 @@ export function RetryableInternalTransactionTest(collectionOptions = {}, initiat
 
     function setUpTestMode(mode) {
         if (mode == kTestMode.kRestart) {
+            if (TestData.doesNotSupportRestartingSecondaryWithPreparedTxn) {
+                // Ensure the latest changes are checkpointed and sent to the SLS backend before the
+                // restart.
+                // TODO SERVER-115355: Remove this.
+                assert.commandWorked(st.rs0.getPrimary().adminCommand({fsync: 1}));
+            }
+
             st.rs0.restart(
                 0,
                 {

@@ -43,6 +43,13 @@ if (TestData.doesNotSupportGracefulStepdown) {
 
 function setUpTestMode(mode) {
     if (mode == kTestMode.kRestart) {
+        if (TestData.doesNotSupportRestartingSecondaryWithPreparedTxn) {
+            // Ensure the latest changes are checkpointed and sent to the SLS backend before the
+            // restart.
+            // TODO SERVER-115355: Remove this.
+            assert.commandWorked(rst.getPrimary().adminCommand({fsync: 1}));
+        }
+
         rst.stopSet(null /* signal */, true /*forRestart */, {skipValidation: true, skipCheckDBHashes: true});
         rst.startSet({restart: true});
         primary = rst.getPrimary();
