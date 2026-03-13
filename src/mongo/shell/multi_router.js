@@ -606,7 +606,7 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
             assert.commandWorked(this.primaryMongo._runCommandImpl("admin", {flushRouterConfig: 1}, 0, undefined));
 
             // Ensure the primary mongos has the latest topology time.
-            // TODO (SERVER-117871) remove this once the issue is fixed.
+            // TODO (SERVER-60746) remove this once the issue is fixed.
             assert.commandWorked(this.primaryMongo._runCommandImpl("config", {find: "shards"}, 0, undefined));
 
             this.hasPrimaryMongoRefreshed = true;

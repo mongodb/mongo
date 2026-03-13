@@ -7,7 +7,7 @@
  * ]
  */
 
-// TODO (SERVER-117871) remove this once the issue is fixed.
+// TODO (SERVER-60746) remove this once the issue is fixed.
 TestData.pinToSingleMongos = true;
 
 // Given the output from the listDatabases command, ensures that the total size reported is the
