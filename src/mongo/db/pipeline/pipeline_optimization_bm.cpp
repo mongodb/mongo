@@ -222,11 +222,11 @@ BENCHMARK_DEFINE_F(PipelineOptimizationBMFixture, BM_RebuildDependencyGraphFromM
 (benchmark::State& state) {
     auto pipeline = makePipeline(state);
     size_t middle = state.range(0) / 2;
-    auto middleIt = std::next(pipeline->getSources().begin(), middle);
+    auto middleIt = std::next(pipeline->getSources().cbegin(), middle);
 
     DependencyGraph graph(pipeline->getSources());
     for (auto keepRunning : state) {
-        graph.recomputeFromStage(middleIt, pipeline->getSources());
+        graph.recompute(pipeline->getSources(), middleIt);
     }
 }
 BENCHMARK_REGISTER_F(PipelineOptimizationBMFixture, BM_RebuildDependencyGraphFromMiddle)

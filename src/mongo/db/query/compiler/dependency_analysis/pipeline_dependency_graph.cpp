@@ -57,7 +57,7 @@ StringPool::Id StringPool::lookup(StringData str) const {
 }  // namespace detail
 
 DependencyGraph::DependencyGraph(const DocumentSourceContainer& container) {
-    recomputeFromStage(container.begin(), container);
+    recompute(container);
 }
 
 boost::intrusive_ptr<mongo::DocumentSource> DependencyGraph::getDeclaringStage(DocumentSource* ds,
@@ -132,10 +132,11 @@ DependencyGraph::FieldLookupResult DependencyGraph::lookupField(ScopeId scopeId,
     return {FieldId::none()};
 }
 
-void DependencyGraph::recomputeFromStage(DocumentSourceContainer::const_iterator stageIt,
-                                         const DocumentSourceContainer& container) {
-    invalidate(container, stageIt);
-    for (auto it = stageIt; it != container.end(); it++) {
+void DependencyGraph::recompute(const DocumentSourceContainer& container,
+                                boost::optional<DocumentSourceContainer::const_iterator> stageIt) {
+    auto recomputeFrom = stageIt ? *stageIt : container.begin();
+    invalidate(container, recomputeFrom);
+    for (auto it = recomputeFrom; it != container.end(); it++) {
         detail::DocumentSourceInfo dsInfo{**it};
         processStage(*it, dsInfo);
     }

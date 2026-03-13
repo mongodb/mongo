@@ -339,8 +339,8 @@ public:
      * Invalidate and recompute the subgraph starting from the earliest nodes which correspond to
      * the stage pointed to by 'stageIt'.
      */
-    void recomputeFromStage(DocumentSourceContainer::const_iterator stageIt,
-                            const DocumentSourceContainer& container);
+    void recompute(const DocumentSourceContainer& container,
+                   boost::optional<DocumentSourceContainer::const_iterator> stageIt = {});
 
     /**
      * Generate a string which describes the graph.
