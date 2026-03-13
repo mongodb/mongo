@@ -106,6 +106,11 @@ public:
      */
     bool shouldAvoidDuplicateCheckpoints() const override;
 
+    /**
+     * We can safely use wiredTigerCursorModify(), so no need to force a full update.
+     */
+    bool shouldForceUpdateWithFullDocument() const override;
+
     bool supportsCursorReuseForExpressPathQueries() const override;
 
     /**

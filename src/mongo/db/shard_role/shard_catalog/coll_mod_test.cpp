@@ -512,6 +512,10 @@ public:
     bool shouldUseOplogWritesForFlowControlSampling() const override {
         return true;
     }
+
+    bool shouldForceUpdateWithFullDocument() const override {
+        return true;
+    }
 };
 
 TEST_F(CollModTest, CollModSetting_ReplicatedRecordIds_ToFalse_WhenProviderRequiresIt_Fails) {

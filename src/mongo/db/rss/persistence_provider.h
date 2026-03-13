@@ -135,6 +135,14 @@ public:
     virtual bool shouldAvoidDuplicateCheckpoints() const = 0;
 
     /**
+     * If true, always do a full update of documents, instead of recording only the changes to
+     * represent an update.
+     *
+     * TODO SERVER-111602: remove this workaround.
+     */
+    virtual bool shouldForceUpdateWithFullDocument() const = 0;
+
+    /**
      * If true, the storage provider supports the reuse of cursors in express path queries. Used to
      * disable this optimization for disaggregated storage for now.
      *

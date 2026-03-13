@@ -120,6 +120,10 @@ bool AttachedPersistenceProvider::shouldAvoidDuplicateCheckpoints() const {
     return false;
 }
 
+bool AttachedPersistenceProvider::shouldForceUpdateWithFullDocument() const {
+    return false;
+}
+
 bool AttachedPersistenceProvider::supportsCursorReuseForExpressPathQueries() const {
     return true;
 }
