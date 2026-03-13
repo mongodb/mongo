@@ -5,3 +5,7 @@ excludes:
   - "bulk_write.single_op_core_excluded_files"
   - "bulk_write.single_op_txns_excluded_files"
   - "bulk_write.single_op_fle_excluded_files"
+overrides:
+  # TODO (SERVER-121474) - Remove this override once bulkWrite attaches errorLabels for transient
+  # transaction errors in FLE operations.
+  - "bulk_write.sharding_temporarily_enforce_1_mongos"

@@ -58,6 +58,14 @@
       # and any writes performed are simply for setting up the test collection.
       - src/mongo/db/modules/enterprise/jstests/fle2/query/aggregate_lookupMultiSchema.js
 
+# TODO (SERVER-121474) - Remove this override once bulkWrite attaches errorLabels for transient
+# transaction errors in FLE operations.
+- name: sharding_temporarily_enforce_1_mongos
+  value:
+    executor:
+      fixture:
+        num_mongos: 1
+
 - name: txn_passthrough_runner_selftest
   value:
     exclude_files:

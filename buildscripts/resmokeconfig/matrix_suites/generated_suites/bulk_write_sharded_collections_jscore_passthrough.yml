@@ -32,7 +32,7 @@ executor:
         internalQueryStatsErrorsAreCommandFatal: true
         internalQueryStatsRateLimit: -1
         internalQueryStatsWriteCmdSampleRate: 1
-    num_mongos: 3
+    num_mongos: 1
     num_shards: 2
   hooks:
     - class: RunQueryStats
