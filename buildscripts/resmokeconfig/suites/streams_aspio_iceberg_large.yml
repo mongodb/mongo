@@ -2,12 +2,10 @@ test_kind: js_test
 
 selector:
   roots:
-    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_benchmark_tpcc_inserts_updates.js
-    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_benchmark_tpcc_inserts_updates_1kb.js
-    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_benchmark_tpcc_only_inserts.js
-    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_benchmark_tpcc_initial_sync_updates.js
-    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_benchmark_tpcc_initial_sync_timespanning.js
-    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_benchmark_tpcc_partition_transforms.js
+    - src/mongo/db/modules/enterprise/jstests/streams/aspio/iceberg/iceberg_benchmark_tpcc_onedimension.js
+    - src/mongo/db/modules/enterprise/jstests/streams/aspio/iceberg/iceberg_benchmark_tpcc_tinyrows.js
+    - src/mongo/db/modules/enterprise/jstests/streams/aspio/iceberg/iceberg_benchmark_tpcc_smallrows.js
+    - src/mongo/db/modules/enterprise/jstests/streams/aspio/iceberg/iceberg_benchmark_tpcc_mediumrows.js
 
 executor:
   fixture:
