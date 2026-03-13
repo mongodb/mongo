@@ -29,6 +29,12 @@ notifications:
     slack:
       overall_scope_tags:
         - "<!here>"
+        - "<@U0WM3PSMV>" # mira.carey@mongodb.com - SVP
+        - "<@U03J9P66LRW>" # tyler.brock@mongodb.com - VP
+        - "<@U032DKCUWQ4>" # mick.graham@mongodb.com - VP
+        - "<@U067K23N0RL>" # thomas.chang@mongodb.com - VP
+        - "<@U03F4KZUYP5>" # tara.hernandez@mongodb.com - VP
+        - "<@U0V9XLF8R>" # kelsey.schubert@mongodb.com - Director
       message_footer: |
         Refer to our playbook at <http://go/blockonred> for details.
         Drill into the data using the <https://jira.mongodb.org/secure/Dashboard.jspa?selectPageId=33310|Jira Dashboard>.
