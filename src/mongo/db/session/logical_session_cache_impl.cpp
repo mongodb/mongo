@@ -31,6 +31,7 @@
 #include "mongo/db/session/logical_session_cache_impl.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_settings.h"
@@ -216,6 +217,10 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
         return uniqueCtx->get();
     }();
 
+    // Mark this operation as non-deprioritizable to prevent session reaping from being
+    // starved by admission control during periods of high load.
+    admission::execution_control::ScopedTaskTypeNonDeprioritizable nonDeprioritizable(opCtx);
+
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord && replCoord->getSettings().isReplSet() &&
         replCoord->getMemberState().arbiter()) {
@@ -281,6 +286,10 @@ Status LogicalSessionCacheImpl::_refresh(Client* client) {
         uniqueCtx.emplace(client->makeOperationContext());
         return uniqueCtx->get();
     }();
+
+    // Mark this operation as non-deprioritizable to prevent session refresh from being
+    // starved by admission control during periods of high load.
+    admission::execution_control::ScopedTaskTypeNonDeprioritizable nonDeprioritizable(opCtx);
 
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord && replCoord->getSettings().isReplSet() &&

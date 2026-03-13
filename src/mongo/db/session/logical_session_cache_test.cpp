@@ -34,6 +34,7 @@
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -447,6 +448,98 @@ TEST_F(LogicalSessionCacheTest, RefreshMatrixSessionState) {
     }
 }
 
+// Test that refresh operations are marked as non-deprioritizable
+TEST_F(LogicalSessionCacheTest, RefreshIsNonDeprioritizable) {
+    // Track whether operation was marked as non-deprioritizable during execution
+    bool refreshWasNonDeprioritizable = false;
+
+    // Insert a session so there's something to refresh
+    auto record = makeLogicalSessionRecordForTest();
+    ASSERT_OK(cache()->startSession(opCtx(), record));
+
+    // Set up a hook that runs during refresh to check the non-deprioritizable flag
+    sessions()->setRefreshHook([&refreshWasNonDeprioritizable](const LogicalSessionRecordSet&) {
+        auto* currentOpCtx = Client::getCurrent()->getOperationContext();
+        if (currentOpCtx) {
+            auto& admissionCtx = ExecutionAdmissionContext::get(currentOpCtx);
+            refreshWasNonDeprioritizable = admissionCtx.getMarkedNonDeprioritizable();
+        }
+        return SessionsCollection::RefreshSessionsResult{};
+    });
+
+    // Force a refresh
+    service()->fastForward(kForceRefresh);
+    ASSERT_OK(cache()->refreshNow(opCtx()));
+    ASSERT_TRUE(refreshWasNonDeprioritizable)
+        << "LogicalSessionCacheRefresh should mark operation as non-deprioritizable";
+}
+
+/**
+ * Test fixture that allows verification of the reap callback.
+ */
+class LogicalSessionCacheReapTest : public ServiceContextTest {
+public:
+    LogicalSessionCacheReapTest()
+        : _service(std::make_shared<MockServiceLiaisonImpl>()),
+          _sessions(std::make_shared<MockSessionsCollectionImpl>()) {
+
+        Client::releaseCurrent();
+        Client::initThread(getThreadName(), getGlobalServiceContext()->getService());
+        _opCtx = makeOperationContext();
+
+        auto mockService = std::make_unique<MockServiceLiaison>(_service);
+        auto mockSessions = std::make_unique<MockSessionsCollection>(_sessions);
+
+        // Create cache with a reap callback that checks the non-deprioritizable flag
+        _cache = std::make_unique<LogicalSessionCacheImpl>(
+            std::move(mockService),
+            std::move(mockSessions),
+            [this](OperationContext* opCtx, SessionsCollection&, Date_t) {
+                auto& admissionCtx = ExecutionAdmissionContext::get(opCtx);
+                _reapWasNonDeprioritizable = admissionCtx.getMarkedNonDeprioritizable();
+                return 0;
+            });
+    }
+
+    void reset() {
+        _reapWasNonDeprioritizable = false;
+    }
+
+    std::unique_ptr<LogicalSessionCache>& cache() {
+        return _cache;
+    }
+
+    std::shared_ptr<MockServiceLiaisonImpl> service() {
+        return _service;
+    }
+
+    std::shared_ptr<MockSessionsCollectionImpl> sessions() {
+        return _sessions;
+    }
+
+    OperationContext* opCtx() {
+        return _opCtx.get();
+    }
+
+    bool reapWasNonDeprioritizable() const {
+        return _reapWasNonDeprioritizable;
+    }
+
+private:
+    ServiceContext::UniqueOperationContext _opCtx;
+    std::shared_ptr<MockServiceLiaisonImpl> _service;
+    std::shared_ptr<MockSessionsCollectionImpl> _sessions;
+    std::unique_ptr<LogicalSessionCache> _cache;
+    bool _reapWasNonDeprioritizable = false;
+};
+
+// Test that reap operations are marked as non-deprioritizable
+TEST_F(LogicalSessionCacheReapTest, ReapIsNonDeprioritizable) {
+    // Force a reap
+    cache()->reapNow(opCtx());
+    ASSERT_TRUE(reapWasNonDeprioritizable())
+        << "LogicalSessionCacheReap should mark operation as non-deprioritizable";
+}
 
 }  // namespace
 }  // namespace mongo

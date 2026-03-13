@@ -492,6 +492,18 @@ public:
             dassert(write_ops::verifySizeEstimate(request(), &unparsedRequest()));
 
             doTransactionValidationForWrites(opCtx, ns());
+
+            // TODO: SERVER-121373 remove this and provide a more generic way of marking remote
+            // operations as non-deprioritizable. Writes to system-critical collections issued
+            // remotely by internal clients should not be deprioritized:
+            // - Session collection upsert for LogicalSessionCacheRefresh.
+            const bool isSystemCriticalNss = (ns() == NamespaceString::kLogicalSessionsNamespace);
+            boost::optional<admission::execution_control::ScopedTaskTypeNonDeprioritizable>
+                systemCriticalTaskType;
+            if (isSystemCriticalNss && opCtx->getClient()->isInternalClient()) {
+                systemCriticalTaskType.emplace(opCtx);
+            }
+
             write_ops::UpdateCommandReply updateReply;
             if (prepareForFLERewrite(opCtx, request().getEncryptionInformation())) {
                 return processFLEUpdate(opCtx, request());
@@ -739,6 +751,17 @@ public:
 
             doTransactionValidationForWrites(opCtx, ns());
             write_ops::DeleteCommandReply deleteReply;
+
+            // TODO: SERVER-121373 remove this and provide a more generic way of marking remote
+            // operations as non-deprioritizable. Writes to system-critical collections issued
+            // remotely by internal clients should not be deprioritized:
+            // - Session collection deletes in removeRecords.
+            const bool isSystemCriticalNss = (ns() == NamespaceString::kLogicalSessionsNamespace);
+            boost::optional<admission::execution_control::ScopedTaskTypeNonDeprioritizable>
+                systemCriticalTaskType;
+            if (isSystemCriticalNss && opCtx->getClient()->isInternalClient()) {
+                systemCriticalTaskType.emplace(opCtx);
+            }
 
             if (prepareForFLERewrite(opCtx, request().getEncryptionInformation())) {
                 return processFLEDelete(opCtx, request());

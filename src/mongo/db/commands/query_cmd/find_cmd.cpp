@@ -622,6 +622,19 @@ public:
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* replyBuilder) override {
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
+            // TODO: SERVER-121373 remove this and provide a more generic way of marking remote
+            // operations as non-deprioritizable. Reads to system-critical collections issued
+            // remotely by internal clients should not be deprioritized:
+            // - Session collection reads in findRemovedSessions.
+            // - Key collection refresh.
+            const bool isSystemCriticalNss = (_ns == NamespaceString::kLogicalSessionsNamespace ||
+                                              _ns == NamespaceString::kKeysCollectionNamespace);
+            boost::optional<admission::execution_control::ScopedTaskTypeNonDeprioritizable>
+                systemCriticalTaskType;
+            if (isSystemCriticalNss && opCtx->getClient()->isInternalClient()) {
+                systemCriticalTaskType.emplace(opCtx);
+            }
+
             const BSONObj& cmdObj = _request.body;
 
             // Parse the command BSON to a FindCommandRequest. Pass in the parsedNss in case cmdObj
@@ -682,17 +695,6 @@ public:
                 // depend on data reaching secondaries in order to proceed; and secondaries may get
                 // stalled replicating because of an inability to acquire a read ticket.
                 admissionPriority.emplace(opCtx, AdmissionContext::Priority::kExempt);
-            }
-
-            // TODO: SERVER-121373 remove this and provide a more
-            // generic way of marking remote query as non-deprioritizable Key collection operations
-            // issued remotely by shards/mongos for key refresh should not be deprioritized. These
-            // are system-critical operations that must complete to allow cluster time validation.
-            const bool isKeysCollectionNss = (_ns == NamespaceString::kKeysCollectionNamespace);
-            boost::optional<admission::execution_control::ScopedTaskTypeNonDeprioritizable>
-                keysCollectionTaskType;
-            if (isKeysCollectionNss && opCtx->getClient()->isInternalClient()) {
-                keysCollectionTaskType.emplace(opCtx);
             }
 
             // If this read represents a reverse oplog scan, we want to bypass oplog visibility

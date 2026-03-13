@@ -756,19 +756,22 @@ public:
             serviceOpCounters(opCtx).gotGetMore();
             auto curOp = CurOp::get(opCtx);
             NamespaceString nss = ns();
+
+            // TODO: SERVER-121373 remove this and provide a more generic way of marking remote
+            // operations as non-deprioritizable. Reads to system-critical collections issued
+            // remotely by internal clients should not be deprioritized:
+            // - Session collection reads in findRemovedSessions.
+            // - Key collection refresh.
+            const bool isSystemCriticalNss = (nss == NamespaceString::kLogicalSessionsNamespace ||
+                                              nss == NamespaceString::kKeysCollectionNamespace);
+            boost::optional<admission::execution_control::ScopedTaskTypeNonDeprioritizable>
+                systemCriticalTaskType;
+            if (isSystemCriticalNss && opCtx->getClient()->isInternalClient()) {
+                systemCriticalTaskType.emplace(opCtx);
+            }
+
             int64_t cursorId = cmd.getCommandParameter();
             curOp->debug().cursorid = cursorId;
-
-            // TODO: SERVER-121373 remove this and provide a more
-            // generic way of marking remote query as non-deprioritizable. Key collection operations
-            // issued remotely by shards/mongos for key refresh should not be deprioritized. These
-            // are system-critical operations that must complete to allow cluster time validation.
-            const bool isKeysCollectionNss = (nss == NamespaceString::kKeysCollectionNamespace);
-            boost::optional<admission::execution_control::ScopedTaskTypeNonDeprioritizable>
-                keysCollectionTaskType;
-            if (isKeysCollectionNss && opCtx->getClient()->isInternalClient()) {
-                keysCollectionTaskType.emplace(opCtx);
-            }
 
             // The presence of a term in the request indicates that this is an internal replication
             // oplog read request.
