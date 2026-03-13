@@ -998,12 +998,12 @@ error_codes:
   - {code: 442, name: RetryMultiPlanning}
   - {
       code: 443,
-      name: StreamProcessorS3ConnectionError,
+      name: StreamProcessorBlobStorageRetryableError,
       categories: [StreamProcessorUserError, StreamProcessorRetryableError],
     }
   - {
       code: 444,
-      name: StreamProcessorS3Error,
+      name: StreamProcessorBlobStorageError,
       categories: [StreamProcessorUserError],
     }
   - {
@@ -1040,7 +1040,7 @@ error_codes:
     }
   - {
       code: 451,
-      name: StreamProcessorS3TokenExpired,
+      name: StreamProcessorBlobStorageTokenExpired,
       categories: [StreamProcessorRetryableError],
     }
 
