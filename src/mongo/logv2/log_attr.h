@@ -58,7 +58,7 @@ private:
 };
 
 template <typename T>
-struct NamedArg {
+struct MONGO_MOD_PUBLIC NamedArg {
     const char* name;
     const T& value;
 };
