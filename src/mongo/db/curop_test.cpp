@@ -977,8 +977,8 @@ TEST(CurOpTest, ShouldFinalizeExecutionStatsWhenOperationHasNoValidResponse) {
     BSONObjBuilder bob;
     TicketingSystem::get(service)->appendStats(bob);
     BSONObj stats = bob.obj();
-    ASSERT_TRUE(stats.hasField("shortRunning"));
-    ASSERT_EQ(stats["shortRunning"]["totalOpsFinished"].Long(), 1);
+    ASSERT_TRUE(stats.hasField("nonDeprioritizable"));
+    ASSERT_EQ(stats["nonDeprioritizable"]["totalOpsFinished"].Long(), 1);
 }
 
 TEST(CurOpTest, ShouldNotReportFailpointMsgIfNotSet) {

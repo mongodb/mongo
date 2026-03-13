@@ -54,12 +54,12 @@ ExecutionAdmissionContext::ExecutionAdmissionContext(const ExecutionAdmissionCon
     : AdmissionContext(other),
       _readDelinquencyStats(other._readDelinquencyStats),
       _writeDelinquencyStats(other._writeDelinquencyStats),
-      _readShortStats(other._readShortStats),
-      _readLongStats(other._readLongStats),
-      _writeShortStats(other._writeShortStats),
-      _writeLongStats(other._writeLongStats),
-      _shortRunningFinalStats(other._shortRunningFinalStats),
-      _longRunningFinalStats(other._longRunningFinalStats),
+      _readNonDeprioritizableStats(other._readNonDeprioritizableStats),
+      _readDeprioritizableStats(other._readDeprioritizableStats),
+      _writeNonDeprioritizableStats(other._writeNonDeprioritizableStats),
+      _writeDeprioritizableStats(other._writeDeprioritizableStats),
+      _nonDeprioritizableFinalStats(other._nonDeprioritizableFinalStats),
+      _deprioritizableFinalStats(other._deprioritizableFinalStats),
       _priorityLowered(other._priorityLowered.loadRelaxed()),
       _markedNonDeprioritizable(other._markedNonDeprioritizable.loadRelaxed()),
       _taskType(other._taskType.loadRelaxed()),
@@ -73,12 +73,12 @@ ExecutionAdmissionContext& ExecutionAdmissionContext::operator=(
     AdmissionContext::operator=(other);
     _readDelinquencyStats = other._readDelinquencyStats;
     _writeDelinquencyStats = other._writeDelinquencyStats;
-    _readShortStats = other._readShortStats;
-    _readLongStats = other._readLongStats;
-    _writeShortStats = other._writeShortStats;
-    _writeLongStats = other._writeLongStats;
-    _shortRunningFinalStats = other._shortRunningFinalStats;
-    _longRunningFinalStats = other._longRunningFinalStats;
+    _readNonDeprioritizableStats = other._readNonDeprioritizableStats;
+    _readDeprioritizableStats = other._readDeprioritizableStats;
+    _writeNonDeprioritizableStats = other._writeNonDeprioritizableStats;
+    _writeDeprioritizableStats = other._writeDeprioritizableStats;
+    _nonDeprioritizableFinalStats = other._nonDeprioritizableFinalStats;
+    _deprioritizableFinalStats = other._deprioritizableFinalStats;
     _priorityLowered.store(other._priorityLowered.loadRelaxed());
     _markedNonDeprioritizable.store(other._markedNonDeprioritizable.loadRelaxed());
     _taskType.store(other._taskType.loadRelaxed());
@@ -100,11 +100,11 @@ boost::optional<ExecutionAdmissionContext::FinalizedStats> ExecutionAdmissionCon
     // Append CPU, elapsed time, and load-shed stats only if the operation is not composed solely of
     // exempted admissions.
     if (getAdmissions() > getExemptedAdmissions()) {
-        // Record CPU and elapsed time to the appropriate finalized stats bucket (short/long
-        // running). This is independent of operation type (read/write) since the type may have
-        // changed during the operation's lifetime.
-        auto& stats = _isLongRunning(true /* isFinalization */) ? _longRunningFinalStats
-                                                                : _shortRunningFinalStats;
+        // Record CPU and elapsed time to the appropriate finalized stats bucket
+        // (deprioritizable/non-deprioritizable). This is independent of operation type (read/write)
+        // since the type may have changed during the operation's lifetime.
+        auto& stats = _isDeprioritizable(true /* isFinalization */) ? _deprioritizableFinalStats
+                                                                    : _nonDeprioritizableFinalStats;
 
         stats.totalOpsFinished.fetchAndAddRelaxed(1);
         stats.totalCPUUsageMicros.fetchAndAddRelaxed(cpuUsageMicros);
@@ -122,12 +122,12 @@ boost::optional<ExecutionAdmissionContext::FinalizedStats> ExecutionAdmissionCon
 
     // Take a snapshot of all stats.
     FinalizedStats result;
-    result.shortRunning = _shortRunningFinalStats;
-    result.longRunning = _longRunningFinalStats;
-    result.readShort = _readShortStats;
-    result.readLong = _readLongStats;
-    result.writeShort = _writeShortStats;
-    result.writeLong = _writeLongStats;
+    result.nonDeprioritizable = _nonDeprioritizableFinalStats;
+    result.deprioritizable = _deprioritizableFinalStats;
+    result.readNonDeprioritizable = _readNonDeprioritizableStats;
+    result.readDeprioritizable = _readDeprioritizableStats;
+    result.writeNonDeprioritizable = _writeNonDeprioritizableStats;
+    result.writeDeprioritizable = _writeDeprioritizableStats;
     result.readDelinquency = _readDelinquencyStats;
     result.writeDelinquency = _writeDelinquencyStats;
     result.wasDeprioritized = getPriorityLowered();
@@ -182,15 +182,15 @@ void ExecutionAdmissionContext::recordDelinquentAcquisition(Milliseconds delay) 
     recordDelinquentAcquisition(delay, operationStats);
 }
 
-bool ExecutionAdmissionContext::_isLongRunning(bool isFinalization) const {
-    // Multi-document txns are never classified as "long running" because they are exempt from
+bool ExecutionAdmissionContext::_isDeprioritizable(bool isFinalization) const {
+    // Multi-document txns are never classified as "deprioritizable" because they are exempt from
     // deprioritization.
     if (_inMultiDocTxn.loadRelaxed()) {
         return false;
     }
 
-    // Non-deprioritizable tasks are never classified as "long running" because they are exempt from
-    // deprioritization.
+    // Non-deprioritizable tasks are never classified as "deprioritizable" because they are exempt
+    // from deprioritization.
     if (_taskType.loadRelaxed() == TaskType::NonDeprioritizable) {
         return false;
     }
@@ -203,7 +203,7 @@ bool ExecutionAdmissionContext::_isLongRunning(bool isFinalization) const {
         admissions -= 1;
     }
 
-    // An operation is considered "long running" if any of these conditions are true:
+    // An operation is considered "deprioritizable" if any of these conditions are true:
     //   1. It exceeded the admission threshold (heuristic deprioritization).
     //   2. It was explicitly deprioritized at some point (priorityLowered flag).
     //   3. It has an inherently low priority.
@@ -213,14 +213,14 @@ bool ExecutionAdmissionContext::_isLongRunning(bool isFinalization) const {
 }
 
 ec::OperationExecutionStats& ExecutionAdmissionContext::_getOperationExecutionStats() {
-    const bool isLongRunning = _isLongRunning();
+    const bool isDeprioritizable = _isDeprioritizable();
 
     switch (getOperationType()) {
         case ec::OperationType::kRead:
-            return isLongRunning ? _readLongStats : _readShortStats;
+            return isDeprioritizable ? _readDeprioritizableStats : _readNonDeprioritizableStats;
 
         case ec::OperationType::kWrite:
-            return isLongRunning ? _writeLongStats : _writeShortStats;
+            return isDeprioritizable ? _writeDeprioritizableStats : _writeNonDeprioritizableStats;
     }
 
     MONGO_UNREACHABLE;

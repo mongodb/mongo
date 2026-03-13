@@ -72,8 +72,8 @@ public:
     static constexpr auto kExemptPriorityName = "exempt"_sd;
     static constexpr auto kLowPriorityName = "lowPriority"_sd;
     static constexpr auto kNormalPriorityName = "normalPriority"_sd;
-    static constexpr auto kShortRunningName = "shortRunning"_sd;
-    static constexpr auto kLongRunningName = "longRunning"_sd;
+    static constexpr auto kNonDeprioritizableName = "nonDeprioritizable"_sd;
+    static constexpr auto kDeprioritizableName = "deprioritizable"_sd;
 
     struct RWTicketHolder {
         std::unique_ptr<TicketHolder> read;
@@ -244,7 +244,7 @@ private:
     TicketHolder* _getHolder(AdmissionContext::Priority p, OperationType o) const;
 
     /**
-     * Appends long/short operation statistics.
+     * Appends deprioritizable/non-deprioritizable operation statistics.
      */
     void _appendOperationStats(BSONObjBuilder& b, OperationType opType) const;
 
@@ -361,7 +361,8 @@ private:
     AtomicWord<std::int64_t> _opsMarkedNonDeprioritizable;
 
     /**
-     * Accumulate long/short operation statistics for read and write operations.
+     * Accumulate deprioritizable/non-deprioritizable operation statistics for read and write
+     * operations.
      */
     AggregatedExecutionStats _operationStats;
 

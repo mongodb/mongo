@@ -501,18 +501,20 @@ Status TicketingSystem::setBackgroundTasksDeprioritization(bool enabled) {
 }
 
 void TicketingSystem::_appendOperationStats(BSONObjBuilder& b, OperationType opType) const {
-    const auto& shortExecutionStats =
-        opType == OperationType::kRead ? _operationStats.readShort : _operationStats.writeShort;
-    const auto& longExecutionStats =
-        opType == OperationType::kRead ? _operationStats.readLong : _operationStats.writeLong;
+    const auto& nonDeprioritizableStats = opType == OperationType::kRead
+        ? _operationStats.readNonDeprioritizable
+        : _operationStats.writeNonDeprioritizable;
+    const auto& deprioritizableStats = opType == OperationType::kRead
+        ? _operationStats.readDeprioritizable
+        : _operationStats.writeDeprioritizable;
 
-    BSONObjBuilder shortB(b.subobjStart(kShortRunningName));
-    shortExecutionStats.appendStats(shortB);
-    shortB.done();
+    BSONObjBuilder nonDeprioritizableB(b.subobjStart(kNonDeprioritizableName));
+    nonDeprioritizableStats.appendStats(nonDeprioritizableB);
+    nonDeprioritizableB.done();
 
-    BSONObjBuilder longB(b.subobjStart(kLongRunningName));
-    longExecutionStats.appendStats(longB);
-    longB.done();
+    BSONObjBuilder deprioritizableB(b.subobjStart(kDeprioritizableName));
+    deprioritizableStats.appendStats(deprioritizableB);
+    deprioritizableB.done();
 }
 
 void TicketingSystem::_appendTicketHolderStats(BSONObjBuilder& b,
@@ -542,7 +544,7 @@ void TicketingSystem::_appendTicketHolderStats(BSONObjBuilder& b,
         BSONObjBuilder exemptBuilder(opStats->subobjStart(kExemptPriorityName));
         holder->appendExemptStats(opStats.value());
         exemptBuilder.done();
-        // Report short/long running operation that lives in the normal holder.
+        // Report deprioritizable/non-deprioritizable operation stats in the normal holder.
         _appendOperationStats(opStats.value(), opType);
     }
 }
@@ -625,17 +627,17 @@ void TicketingSystem::appendStats(BSONObjBuilder& b) const {
         _admissionsHistogram.appendStats(histogramBuilder);
     }
 
-    // Report finalized stats (CPU, elapsed, load shed) by short/long running classification.
-    // These are independent of read/write operation type.
+    // Report finalized stats (CPU, elapsed, load shed) by deprioritizable/non-deprioritizable
+    // classification. These are independent of read/write operation type.
     {
-        BSONObjBuilder shortB(b.subobjStart(kShortRunningName));
-        _operationStats.shortRunning.appendStats(shortB);
-        shortB.done();
+        BSONObjBuilder nonDeprioritizableB(b.subobjStart(kNonDeprioritizableName));
+        _operationStats.nonDeprioritizable.appendStats(nonDeprioritizableB);
+        nonDeprioritizableB.done();
     }
     {
-        BSONObjBuilder longB(b.subobjStart(kLongRunningName));
-        _operationStats.longRunning.appendStats(longB);
-        longB.done();
+        BSONObjBuilder deprioritizableB(b.subobjStart(kDeprioritizableName));
+        _operationStats.deprioritizable.appendStats(deprioritizableB);
+        deprioritizableB.done();
     }
 }
 
@@ -680,15 +682,17 @@ void TicketingSystem::finalizeOperationStats(OperationContext* opCtx,
     _getHolder(priority, OperationType::kWrite)
         ->incrementDelinquencyStats(finalizedStats.writeDelinquency);
 
-    // Increment finalized stats (CPU, elapsed, load shed) - only depend on short/long running.
-    _operationStats.shortRunning += finalizedStats.shortRunning;
-    _operationStats.longRunning += finalizedStats.longRunning;
+    // Increment finalized stats (CPU, elapsed, load shed) - depend on deprioritizable
+    // classification.
+    _operationStats.nonDeprioritizable += finalizedStats.nonDeprioritizable;
+    _operationStats.deprioritizable += finalizedStats.deprioritizable;
 
-    // Increment per-acquisition execution stats (short and long running) by read/write type.
-    _operationStats.readShort += finalizedStats.readShort;
-    _operationStats.readLong += finalizedStats.readLong;
-    _operationStats.writeShort += finalizedStats.writeShort;
-    _operationStats.writeLong += finalizedStats.writeLong;
+    // Increment per-acquisition execution stats (deprioritizable/non-deprioritizable) by read/write
+    // type.
+    _operationStats.readNonDeprioritizable += finalizedStats.readNonDeprioritizable;
+    _operationStats.readDeprioritizable += finalizedStats.readDeprioritizable;
+    _operationStats.writeNonDeprioritizable += finalizedStats.writeNonDeprioritizable;
+    _operationStats.writeDeprioritizable += finalizedStats.writeDeprioritizable;
 
     // Increment other global statistics counters.
     if (wasDeprioritized) {

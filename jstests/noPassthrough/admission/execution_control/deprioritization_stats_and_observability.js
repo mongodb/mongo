@@ -530,7 +530,7 @@ describe("Execution control statistics and observability", function () {
         const kBusyTimeMs = 2000;
         let replTest, mongod, db, coll;
 
-        // Keys for per-acquisition stats (in read/write shortRunning/longRunning).
+        // Keys for per-acquisition stats (in read/write nonDeprioritizable/deprioritizable).
         const perAcquisitionKeys = [
             "totalTimeProcessingMicros",
             "totalTimeQueuedMicros",
@@ -540,7 +540,7 @@ describe("Execution control statistics and observability", function () {
             "maxAcquisitionDelinquencyMillis",
         ];
 
-        // Keys for finalized stats (in top-level shortRunning/longRunning).
+        // Keys for finalized stats (in top-level nonDeprioritizable/deprioritizable).
         const finalizedStatsKeys = [
             "totalCPUUsageMicros",
             "totalElapsedTimeMicros",
@@ -568,56 +568,58 @@ describe("Execution control statistics and observability", function () {
             assert.gte(
                 executionStats.read.normalPriority.totalTimeQueuedMicros +
                     executionStats.read.lowPriority.totalTimeQueuedMicros,
-                executionStats.read.shortRunning.totalTimeQueuedMicros +
-                    executionStats.read.longRunning.totalTimeQueuedMicros,
+                executionStats.read.nonDeprioritizable.totalTimeQueuedMicros +
+                    executionStats.read.deprioritizable.totalTimeQueuedMicros,
                 "Read totalTimeQueuedMicros mismatch: " + tojson(executionStats),
             );
             assert.gte(
                 executionStats.write.normalPriority.totalTimeQueuedMicros +
                     executionStats.write.lowPriority.totalTimeQueuedMicros,
-                executionStats.write.shortRunning.totalTimeQueuedMicros +
-                    executionStats.write.longRunning.totalTimeQueuedMicros,
+                executionStats.write.nonDeprioritizable.totalTimeQueuedMicros +
+                    executionStats.write.deprioritizable.totalTimeQueuedMicros,
                 "Write totalTimeQueuedMicros mismatch: " + tojson(executionStats),
             );
             assert.gte(
                 executionStats.write.normalPriority.totalDelinquentAcquisitions +
                     executionStats.write.lowPriority.totalDelinquentAcquisitions,
-                executionStats.write.shortRunning.totalDelinquentAcquisitions +
-                    executionStats.write.longRunning.totalDelinquentAcquisitions,
+                executionStats.write.nonDeprioritizable.totalDelinquentAcquisitions +
+                    executionStats.write.deprioritizable.totalDelinquentAcquisitions,
                 "Write totalDelinquentAcquisitions mismatch: " + tojson(executionStats),
             );
             assert.gte(
                 executionStats.write.normalPriority.totalAcquisitionDelinquencyMillis +
                     executionStats.write.lowPriority.totalAcquisitionDelinquencyMillis,
-                executionStats.write.shortRunning.totalAcquisitionDelinquencyMillis +
-                    executionStats.write.longRunning.totalAcquisitionDelinquencyMillis,
+                executionStats.write.nonDeprioritizable.totalAcquisitionDelinquencyMillis +
+                    executionStats.write.deprioritizable.totalAcquisitionDelinquencyMillis,
                 "Write totalAcquisitionDelinquencyMillis mismatch: " + tojson(executionStats),
             );
             assert.gte(
                 executionStats.read.normalPriority.startedProcessing +
                     executionStats.read.lowPriority.startedProcessing +
                     executionStats.read.exempt.startedProcessing,
-                executionStats.read.longRunning.totalAdmissions + executionStats.read.shortRunning.totalAdmissions,
+                executionStats.read.deprioritizable.totalAdmissions +
+                    executionStats.read.nonDeprioritizable.totalAdmissions,
                 "Read startedProcessing mismatch: " + tojson(executionStats),
             );
             assert.gte(
                 executionStats.write.normalPriority.startedProcessing +
                     executionStats.write.lowPriority.startedProcessing +
                     executionStats.write.exempt.startedProcessing,
-                executionStats.write.longRunning.totalAdmissions + executionStats.write.shortRunning.totalAdmissions,
+                executionStats.write.deprioritizable.totalAdmissions +
+                    executionStats.write.nonDeprioritizable.totalAdmissions,
                 "Write startedProcessing mismatch: " + tojson(executionStats),
             );
         }
 
         function assertExecutionShedStatsCorrect(executionStats) {
             assert.gt(
-                executionStats.shortRunning.totalOpsLoadShed + executionStats.longRunning.totalOpsLoadShed,
+                executionStats.nonDeprioritizable.totalOpsLoadShed + executionStats.deprioritizable.totalOpsLoadShed,
                 0,
                 "totalOpsLoadShed mismatch: " + tojson(executionStats),
             );
             assert.gt(
-                executionStats.shortRunning.totalElapsedTimeMicrosLoadShed +
-                    executionStats.longRunning.totalElapsedTimeMicrosLoadShed,
+                executionStats.nonDeprioritizable.totalElapsedTimeMicrosLoadShed +
+                    executionStats.deprioritizable.totalElapsedTimeMicrosLoadShed,
                 0,
                 "totalElapsedTimeMicrosLoadShed mismatch: " + tojson(executionStats),
             );
@@ -685,66 +687,66 @@ describe("Execution control statistics and observability", function () {
             replTest.stopSet();
         });
 
-        it("should report short/long running stats in serverStatus", function () {
+        it("should report nonDeprioritizable/deprioritizable stats in serverStatus", function () {
             insertTestDocuments(coll, kNumDocs);
 
             let executionStats = db.serverStatus().queues.execution;
 
-            // Check top-level shortRunning/longRunning finalized stats.
+            // Check top-level nonDeprioritizable/deprioritizable finalized stats.
             assert(
-                executionStats.hasOwnProperty("shortRunning"),
-                "Missing top-level shortRunning stats: " + tojson(executionStats),
+                executionStats.hasOwnProperty("nonDeprioritizable"),
+                "Missing top-level nonDeprioritizable stats: " + tojson(executionStats),
             );
-            assertFinalizedStatsPresent(executionStats.shortRunning);
+            assertFinalizedStatsPresent(executionStats.nonDeprioritizable);
             assert(
-                executionStats.hasOwnProperty("longRunning"),
-                "Missing top-level longRunning stats: " + tojson(executionStats),
+                executionStats.hasOwnProperty("deprioritizable"),
+                "Missing top-level deprioritizable stats: " + tojson(executionStats),
             );
-            assertFinalizedStatsPresent(executionStats.longRunning);
+            assertFinalizedStatsPresent(executionStats.deprioritizable);
 
-            // Check per-acquisition stats in read shortRunning/longRunning.
+            // Check per-acquisition stats in read nonDeprioritizable/deprioritizable.
             assert(
-                executionStats.read.hasOwnProperty("shortRunning"),
-                "Missing read shortRunning stats: " + tojson(executionStats.read),
+                executionStats.read.hasOwnProperty("nonDeprioritizable"),
+                "Missing read nonDeprioritizable stats: " + tojson(executionStats.read),
             );
-            assertPerAcquisitionStatsPresent(executionStats.read.shortRunning);
+            assertPerAcquisitionStatsPresent(executionStats.read.nonDeprioritizable);
             assert(
-                executionStats.read.hasOwnProperty("longRunning"),
-                "Missing read longRunning stats: " + tojson(executionStats.read),
+                executionStats.read.hasOwnProperty("deprioritizable"),
+                "Missing read deprioritizable stats: " + tojson(executionStats.read),
             );
-            assertPerAcquisitionStatsPresent(executionStats.read.longRunning);
+            assertPerAcquisitionStatsPresent(executionStats.read.deprioritizable);
 
-            // Check per-acquisition stats in write shortRunning/longRunning.
+            // Check per-acquisition stats in write nonDeprioritizable/deprioritizable.
             assert(
-                executionStats.write.hasOwnProperty("shortRunning"),
-                "Missing write shortRunning stats: " + tojson(executionStats.write),
+                executionStats.write.hasOwnProperty("nonDeprioritizable"),
+                "Missing write nonDeprioritizable stats: " + tojson(executionStats.write),
             );
-            assertPerAcquisitionStatsPresent(executionStats.write.shortRunning);
+            assertPerAcquisitionStatsPresent(executionStats.write.nonDeprioritizable);
             assert(
-                executionStats.write.hasOwnProperty("longRunning"),
-                "Missing write longRunning stats: " + tojson(executionStats.write),
+                executionStats.write.hasOwnProperty("deprioritizable"),
+                "Missing write deprioritizable stats: " + tojson(executionStats.write),
             );
-            assertPerAcquisitionStatsPresent(executionStats.write.longRunning);
+            assertPerAcquisitionStatsPresent(executionStats.write.deprioritizable);
         });
 
-        it("should increment shortRunning stats for a single read", function () {
-            const beforeStats = getExecutionControlStats(mongod).shortRunning;
+        it("should increment nonDeprioritizable stats for a single read", function () {
+            const beforeStats = getExecutionControlStats(mongod).nonDeprioritizable;
             coll.find({_id: 1}).toArray();
-            const afterStats = getExecutionControlStats(mongod).shortRunning;
+            const afterStats = getExecutionControlStats(mongod).nonDeprioritizable;
             assert.gt(afterStats.totalOpsFinished, beforeStats.totalOpsFinished);
         });
 
-        it("should increment shortRunning stats for a single write", function () {
-            const beforeStats = getExecutionControlStats(mongod).shortRunning;
+        it("should increment nonDeprioritizable stats for a single write", function () {
+            const beforeStats = getExecutionControlStats(mongod).nonDeprioritizable;
             coll.insertOne({x: 1});
-            const afterStats = getExecutionControlStats(mongod).shortRunning;
+            const afterStats = getExecutionControlStats(mongod).nonDeprioritizable;
             assert.gt(afterStats.totalOpsFinished, beforeStats.totalOpsFinished);
         });
 
-        it("should increment longRunning stats for a long running read", function () {
-            const beforeStats = getExecutionControlStats(mongod).longRunning;
+        it("should increment deprioritizable stats for a deprioritizable read", function () {
+            const beforeStats = getExecutionControlStats(mongod).deprioritizable;
             runDeprioritizedFind(coll, findComment);
-            const afterStats = getExecutionControlStats(mongod).longRunning;
+            const afterStats = getExecutionControlStats(mongod).deprioritizable;
             assert.gt(afterStats.totalOpsFinished, beforeStats.totalOpsFinished);
         });
 

@@ -49,15 +49,16 @@ enum class OperationType;
  * Identifies which stats bucket an operation's metrics should be recorded to.
  */
 enum class ExecutionStatsBucket {
-    kShort,  // Operations that complete quickly (below admission threshold).
-    kLong    // Operations that yield frequently or are explicitly low-priority.
+    kNonDeprioritizable,  // Operations that don't meet deprioritization criteria.
+    kDeprioritizable      // Operations that meet deprioritization criteria.
 };
 
 /**
  * Histogram tracking the distribution of completed operations by their total admission count.
  *
  * Each bucket counts operations that had a specific range of ticket acquisitions during their
- * lifetime. This helps identify the distribution of short vs long-running operations.
+ * lifetime. This helps identify the distribution of deprioritizable vs non-deprioritizable
+ * operations.
  *
  * Bucket ranges: 1-2, 3-4, 5-8, 9-16, 17-32, 33-64, 65-128, 129-256, 257-512, 513-1024, 1025+
  */
@@ -118,8 +119,8 @@ public:
 
 /**
  * Stats recorded at operation finalization time (CPU usage, elapsed time, load shed info).
- * These are independent of read/write operation type and only depend on short/long running
- * classification.
+ * These are independent of read/write operation type and only depend on deprioritizable/not
+ * deprioritizable classification.
  */
 class OperationFinalizedStats {
 public:
@@ -141,9 +142,9 @@ public:
 };
 
 /**
- * Recollect information about long and short operations on the server.
- * These stats are recorded per-acquisition and depend on both read/write type and short/long
- * running classification.
+ * Recollect information about deprioritizable and non-deprioritizable operations on the server.
+ * These stats are recorded per-acquisition and depend on both read/write type and
+ * deprioritizable/non-deprioritizable classification.
  */
 class OperationExecutionStats {
 public:
@@ -162,19 +163,19 @@ public:
 
 /**
  * Aggregated execution stats for the ticketing system.
- * Contains both per-acquisition stats (by read/write and short/long) and finalized stats
- * (by short/long running only).
+ * Contains both per-acquisition stats (by read/write and deprioritizable/non-deprioritizable) and
+ * finalized stats (by deprioritizable/non-deprioritizable only).
  */
 struct AggregatedExecutionStats {
-    // Finalized stats (CPU, elapsed, load shed) - only depend on short/long running classification.
-    OperationFinalizedStats shortRunning;
-    OperationFinalizedStats longRunning;
+    // Finalized stats (CPU, elapsed, load shed) - only depend on deprioritizable classification.
+    OperationFinalizedStats nonDeprioritizable;
+    OperationFinalizedStats deprioritizable;
 
-    // Per-acquisition stats by bucket (short/long) and type (read/write).
-    OperationExecutionStats readShort;
-    OperationExecutionStats readLong;
-    OperationExecutionStats writeShort;
-    OperationExecutionStats writeLong;
+    // Per-acquisition stats by bucket (deprioritizable/non-deprioritizable) and type (read/write).
+    OperationExecutionStats readNonDeprioritizable;
+    OperationExecutionStats readDeprioritizable;
+    OperationExecutionStats writeNonDeprioritizable;
+    OperationExecutionStats writeDeprioritizable;
 };
 
 }  // namespace mongo::admission::execution_control

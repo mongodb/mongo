@@ -174,16 +174,17 @@ public:
      * Represents the finalized stats from an operation, ready to be accumulated into global stats.
      */
     struct FinalizedStats {
-        // Stats recorded at finalization time (CPU, elapsed, load shed) - only depend on short/long
-        // running classification, not read/write type.
-        ec::OperationFinalizedStats shortRunning;
-        ec::OperationFinalizedStats longRunning;
+        // Stats recorded at finalization time (CPU, elapsed, load shed) - only depend on
+        // deprioritizable/non-deprioritizable classification, not read/write type.
+        ec::OperationFinalizedStats nonDeprioritizable;
+        ec::OperationFinalizedStats deprioritizable;
 
-        // Per-acquisition execution stats by bucket (short/long) and type (read/write).
-        ec::OperationExecutionStats readShort;
-        ec::OperationExecutionStats readLong;
-        ec::OperationExecutionStats writeShort;
-        ec::OperationExecutionStats writeLong;
+        // Per-acquisition execution stats by bucket (deprioritizable/non-deprioritizable) and type
+        // (read/write).
+        ec::OperationExecutionStats readNonDeprioritizable;
+        ec::OperationExecutionStats readDeprioritizable;
+        ec::OperationExecutionStats writeNonDeprioritizable;
+        ec::OperationExecutionStats writeDeprioritizable;
 
         // This stats are owned by the ticket holder and will be aggregated into the global stats by
         // the ticketing system. That is done because at the end of the operation we know the
@@ -203,10 +204,10 @@ public:
         void clearDelinquencyStats() {
             readDelinquency = ec::DelinquencyStats{};
             writeDelinquency = ec::DelinquencyStats{};
-            readShort.delinquencyStats = ec::DelinquencyStats{};
-            readLong.delinquencyStats = ec::DelinquencyStats{};
-            writeShort.delinquencyStats = ec::DelinquencyStats{};
-            writeLong.delinquencyStats = ec::DelinquencyStats{};
+            readNonDeprioritizable.delinquencyStats = ec::DelinquencyStats{};
+            readDeprioritizable.delinquencyStats = ec::DelinquencyStats{};
+            writeNonDeprioritizable.delinquencyStats = ec::DelinquencyStats{};
+            writeDeprioritizable.delinquencyStats = ec::DelinquencyStats{};
         }
     };
 
@@ -231,17 +232,17 @@ private:
     friend class ec::ScopedTaskTypeModifierBase;
 
     /**
-     * Returns true if this operation should be classified as "long running" based on admission
+     * Returns true if this operation should be classified as "deprioritizable" based on admission
      * count, priority flags, and exemption status.
      *
      * 'isFinalization' ensures the admission count is adjusted (decremented) to reflect the state
      * at the time of the deprioritization decision, rather than the final total.
      */
-    bool _isLongRunning(bool isFinalization = false) const;
+    bool _isDeprioritizable(bool isFinalization = false) const;
 
     /**
      * Returns a reference to the appropriate OperationExecutionStats based on the current operation
-     * type (read/write) and stats bucket (short/long).
+     * type (read/write) and stats bucket (deprioritizable/non-deprioritizable).
      */
     ec::OperationExecutionStats& _getOperationExecutionStats();
 
@@ -256,23 +257,22 @@ private:
     ec::DelinquencyStats _writeDelinquencyStats;
 
     /**
-     * Stats for read and write short/long operations. Whether they're short or long will be
-     * determined by the execution contol heuristic. These stats will be accumulated regardless of
-     * whether deprioritization is active, that way, some external source could measure the running
-     * state of the workload and evaluate whether the activation or not of the de-prioritization
-     * will be helpfull at any given time, specially under heavy load.
+     * Stats for read and write deprioritizable/non-deprioritizable operations. Whether they're
+     * deprioritizable or not will be determined by the execution control heuristic. These stats
+     * will be accumulated regardless of whether deprioritization is active.
      */
-    ec::OperationExecutionStats _readShortStats;
-    ec::OperationExecutionStats _readLongStats;
-    ec::OperationExecutionStats _writeShortStats;
-    ec::OperationExecutionStats _writeLongStats;
+    ec::OperationExecutionStats _readNonDeprioritizableStats;
+    ec::OperationExecutionStats _readDeprioritizableStats;
+    ec::OperationExecutionStats _writeNonDeprioritizableStats;
+    ec::OperationExecutionStats _writeDeprioritizableStats;
 
     /**
      * Stats recorded at finalization time (CPU, elapsed, load shed). These are independent of
-     * read/write operation type and only depend on short/long running classification.
+     * read/write operation type and only depend on deprioritizable/non-deprioritizable
+     * classification.
      */
-    ec::OperationFinalizedStats _shortRunningFinalStats;
-    ec::OperationFinalizedStats _longRunningFinalStats;
+    ec::OperationFinalizedStats _nonDeprioritizableFinalStats;
+    ec::OperationFinalizedStats _deprioritizableFinalStats;
 
     // True if this operation was ever heuristically deprioritized.
     Atomic<bool> _priorityLowered{false};
