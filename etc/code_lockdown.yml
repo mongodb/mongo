@@ -312,7 +312,7 @@ teams:
       - "<@U0V9XLF8R>" # kelsey.schubert@mongodb.com - Director
   - name: "~ Unassigned"
     slack_tags:
-      - "<@S0AHTLRQLJD>" # @buildbaronteam for routing to appropriate team
+      - "<!subteam^S0AHTLRQLJD>" # @buildbaronteam for routing to appropriate team
   - name: "Product Performance"
     slack_tags:
       - "<@U0V9XLF8R>" # kelsey.schubert@mongodb.com - Director
