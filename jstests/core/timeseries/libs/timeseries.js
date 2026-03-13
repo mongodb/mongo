@@ -251,53 +251,79 @@ export var TimeseriesTest = class {
         testFn(insert(false));
     }
 
+    /**
+     * Ensures the given collection is distributed on multiple shards by calling moveRange on @coll with @splitPointDate
+     * @param {*} coll The collection to distribute
+     * @param {*} splitPointDate The splitpoint to use to split the data
+     */
     static ensureDataIsDistributedIfSharded(coll, splitPointDate) {
+        if (!isShardedTimeseries(coll)) {
+            return;
+        }
+
         const db = coll.getDB();
-        if (isShardedTimeseries(coll)) {
-            const timeFieldName = db.getCollectionInfos({name: coll.getName()})[0].options.timeseries.timeField;
+        const getDataBearingShards = () => {
+            const shardedDataDistribution = db
+                .getSiblingDB("admin")
+                .aggregate([{$shardedDataDistribution: {}}, {$match: {ns: coll.getFullName()}}])
+                .toArray();
+            assert.eq(shardedDataDistribution.length, 1);
+            return shardedDataDistribution[0].shards.map((shard) => shard.shardName);
+        };
 
-            const splitPoint = {[`control.min.${timeFieldName}`]: splitPointDate};
-            assert.commandWorked(
-                db.adminCommand({split: getTimeseriesCollForDDLOps(db, coll).getFullName(), middle: splitPoint}),
-            );
+        assert.soon(() => {
+            const allShards = db.adminCommand({listShards: 1}).shards.map((shard) => shard._id);
+            const currentShards = getDataBearingShards();
 
-            const allShards = db
-                .getSiblingDB("config")
-                .shards.find()
-                .sort({_id: 1})
-                .toArray()
-                .map((doc) => doc._id);
-            const currentShards = coll
-                .aggregate([{"$collStats": {storageStats: {}}}, {$project: {shard: 1}}, {$sort: {shard: 1}}])
-                .toArray()
-                .map((doc) => doc.shard);
+            if (documentEq(allShards, currentShards)) {
+                return true;
+            }
 
-            if (!documentEq(allShards, currentShards)) {
-                let otherShard;
+            const otherShard = (() => {
                 for (let i in allShards) {
                     if (!currentShards.includes(allShards[i])) {
-                        otherShard = allShards[i];
-                        break;
+                        return allShards[i];
                     }
                 }
-                assert(otherShard);
+                return undefined;
+            })();
+            if (!otherShard) {
+                return false;
+            }
 
+            const timeFieldName = `control.min.${db.getCollectionInfos({name: coll.getName()})[0].options.timeseries.timeField}`;
+            try {
                 assert.commandWorked(
                     db.adminCommand({
-                        movechunk: getTimeseriesCollForDDLOps(db, coll).getFullName(),
-                        find: splitPoint,
-                        to: otherShard,
-                        _waitForDelete: true,
+                        moveRange: getTimeseriesCollForDDLOps(db, coll).getFullName(),
+                        min: {[timeFieldName]: splitPointDate},
+                        max: {[timeFieldName]: MaxKey},
+                        toShard: otherShard,
+                        waitForDelete: true,
                     }),
                 );
+            } catch (error) {
+                const acceptedErrors = [
+                    // If there is an active chunk moving operation, this move range will fail
+                    ErrorCodes.ConflictingOperationInProgress,
+                ];
+                if (TestData.shardsAddedRemoved) {
+                    // If this is a suite that adds and removes shards, it's acceptable to have a shard not found as we might had removed the target given shard already
+                    acceptedErrors.push(ErrorCodes.ShardNotFound);
+                    // If this is a suite that adds and removes shards, it's acceptable to have an operation failed as we might selected a target shard that is actively draining (preparing for remove)
+                    acceptedErrors.push(ErrorCodes.OperationFailed);
+                }
+                assert.commandFailedWithCode(error, acceptedErrors);
+                return false;
+            }
 
-                const updatedShards = coll
-                    .aggregate([{"$collStats": {storageStats: {}}}, {$project: {shard: 1}}, {$sort: {shard: 1}}])
-                    .toArray()
-                    .map((doc) => doc.shard);
+            if (!TestData.runningWithBalancer) {
+                const updatedShards = getDataBearingShards();
                 assert.eq(updatedShards.length, currentShards.length + 1);
             }
-        }
+
+            return true;
+        });
     }
 
     static assertInsertWorked(res) {
