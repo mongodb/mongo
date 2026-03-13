@@ -118,10 +118,10 @@ variables:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-  - &rhel8_debug_aubsan_compile_variant_dependency
+  - &rhel8_debug_aubsan_compile_variant_dependency_x86
     depends_on:
       - name: archive_dist_test
-        variant: &rhel8_debug_aubsan_compile_variant_name rhel8-debug-aubsan-compile
+        variant: &rhel8_debug_aubsan_compile_variant_name rhel8-debug-aubsan-compile-x86
       - name: archive_jstestshell
         variant: *rhel8_debug_aubsan_compile_variant_name
       - name: version_gen
@@ -130,7 +130,17 @@ variables:
         # Without this we are adding extra dependencies on evergreen and it is causing strain
         omit_generated_tasks: true
     # - name: generate_buildid_to_debug_symbols_mapping
-    #   variant: rhel8-debug-aubsan-compile
+    #   variant: rhel8-debug-aubsan-compile-x86
+
+  - &rhel8_debug_aubsan_compile_variant_dependency_arm64
+    depends_on:
+      - name: archive_dist_test
+        variant: &rhel8_arm64_debug_aubsan_compile_variant_name rhel8-arm64-debug-aubsan-compile
+      - name: archive_jstestshell
+        variant: *rhel8_arm64_debug_aubsan_compile_variant_name
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
 
   # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
@@ -147,7 +157,7 @@ variables:
         # Without this we are adding extra dependencies on evergreen and it is causing strain
         omit_generated_tasks: true
     # - name: generate_buildid_to_debug_symbols_mapping
-    #   variant: rhel8-debug-aubsan-compile
+    #   variant: rhel8-debug-aubsan-compile-x86
 
   # If you add anything to san_options, make sure the appropriate changes are
   # also made in bazel.
@@ -242,6 +252,9 @@ variables:
       --jobs=800
     # Avoid starting too many mongod's under TSAN build.
     resmoke_jobs_factor: 0.3
+
+  - &enterprise-rhel8-debug-tsan-expansions-template-x86
+    <<: *enterprise-rhel8-debug-tsan-expansions-template
     large_distro_name: &enterprise-rhel8-debug-tsan-large-distro-name rhel8.8-xlarge
     xlarge_distro_name: rhel8.8-xxlarge
     core_analyzer_distro_name: rhel8.8-xxlarge
@@ -323,7 +336,7 @@ buildvariants:
 
   # This needs to be RHEL8 since it's used for multiversion testing.
   - <<: *generic_linux_compile_params
-    name: &rhel8-debug-aubsan-compile rhel8-debug-aubsan-compile
+    name: &rhel8-debug-aubsan-compile-x86 rhel8-debug-aubsan-compile-x86
     display_name: "RHEL 8 x86_64 {A,UB}SAN Enterprise Compile"
     tags: ["forbid_tasks_tagged_with_experimental"]
     expansions:
@@ -338,7 +351,7 @@ buildvariants:
       build_mongot: true
       download_mongot_release: true
       evergreen_remote_exec: on
-      compile_variant: *rhel8-debug-aubsan-compile
+      compile_variant: *rhel8-debug-aubsan-compile-x86
       test_flags: >-
         --excludeWithAnyTags=incompatible_aubsan
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"
@@ -360,6 +373,50 @@ buildvariants:
       - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_aubsan
         distros:
           - rhel8.8-xlarge
+
+  # ARM64 version of rhel8-debug-aubsan-compile-x86 for multiversion testing on RHEL8 ARM64
+  - name: &rhel8-arm64-debug-aubsan-compile rhel8-arm64-debug-aubsan-compile
+    display_name: "RHEL 8 arm64 {A,UB}SAN Enterprise Compile (not multiversion)"
+    tags: ["forbid_tasks_tagged_with_experimental"]
+    run_on:
+      - rhel8.8-arm64-m8g-8xlarge
+    stepback: false
+    expansions:
+      <<: *generic_linux_compile_expansions
+      activate: false
+      san_options: *aubsan_options
+      large_distro_name: rhel8.8-arm64-m8g-8xlarge
+      core_analyzer_distro_name: rhel8.8-arm64-m8g-8xlarge
+      bazel_compile_flags: >-
+        --config=dbg_aubsan
+        --opt=on
+        --fission=no
+        --jobs=800
+      build_mongot: true
+      download_mongot_release: true
+      evergreen_remote_exec: on
+      compile_variant: *rhel8-arm64-debug-aubsan-compile
+      test_flags: >-
+        --excludeWithAnyTags=incompatible_aubsan
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"
+    tasks:
+      - name: compile_test_parallel_core_stream_TG !.multiversion
+      - name: run_unit_tests_TG !.multiversion
+      - name: compile_test_parallel_dbtest_stream_TG !.multiversion
+      - name: compile_integration_and_test_parallel_stream_TG !.multiversion
+      - name: compile_jstestshell_TG !.multiversion
+      - name: .development_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_aubsan !.multiversion !.multiversion
+      - name: .development_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_aubsan !.multiversion !.multiversion
+        distros:
+          - rhel8.8-arm64-m8g-8xlarge
+      - name: .release_critical .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_aubsan !.multiversion !.multiversion
+      - name: .release_critical .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_aubsan !.multiversion !.multiversion
+        distros:
+          - rhel8.8-arm64-m8g-8xlarge
+      - name: .default .requires_compile_variant !.requires_large_host !.incompatible_development_variant !.incompatible_aubsan !.multiversion !.multiversion
+      - name: .default .requires_compile_variant .requires_large_host !.incompatible_development_variant !.incompatible_aubsan !.multiversion !.multiversion
+        distros:
+          - rhel8.8-arm64-m8g-8xlarge
 
   - <<: *linux_arm64_debug_compile_variant_dependency
     name: linux-64-debug-required
@@ -425,16 +482,16 @@ buildvariants:
       - name: jsCore_txns
       - name: jsCore_wildcard_indexes_gen
 
-  - <<: *rhel8_debug_aubsan_compile_variant_dependency
-    name: rhel8-debug-aubsan
-    display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG"
+  - <<: *rhel8_debug_aubsan_compile_variant_dependency_x86
+    name: rhel8-debug-aubsan-x86
+    display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 x86 DEBUG (multiversion)"
     tags:
       [
         "suggested",
         "forbid_tasks_tagged_with_experimental",
         "emergency_release",
       ]
-    cron: "0 1 1-31/2 * *" # For cost reasons, we run this variant every other day
+    cron: "0 1 * * 0" # From the ${project_weekly_cron} parameter # This variant runs infrequently to reduce its cost.
     run_on:
       - rhel8.8-large
     expansions:
@@ -443,24 +500,62 @@ buildvariants:
         --excludeWithAnyTags=requires_increased_memlock_limits,incompatible_aubsan
         --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"
     tasks:
-      - name: .development_critical !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
-      - name: .development_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .development_critical !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags .multiversion
+      - name: .development_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags .multiversion
         distros:
           - rhel8.8-xlarge
-      - name: .release_critical !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
-      - name: .release_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .release_critical !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags .multiversion
+      - name: .release_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags .multiversion
         distros:
           - rhel8.8-xlarge
-      - name: .default !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
-      - name: .default !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .default !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags .multiversion
+      - name: .default !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags .multiversion
         distros:
           - rhel8.8-xlarge
-      - name: .non_deterministic !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
-      - name: .non_deterministic !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .non_deterministic !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags .multiversion
+      - name: .non_deterministic !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags .multiversion
         distros:
           - rhel8.8-xlarge
 
-  - <<: *rhel8_debug_aubsan_compile_variant_dependency
+  - <<: *rhel8_debug_aubsan_compile_variant_dependency_arm64
+    name: rhel8-debug-aubsan-arm64
+    display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 arm64 DEBUG (not multiversion)"
+    tags:
+      [
+        "suggested",
+        "forbid_tasks_tagged_with_experimental",
+        "emergency_release",
+      ]
+    cron: "0 1 1-31/2 * *" # For cost reasons, we run this variant every other day
+    run_on:
+      - rhel8.8-arm64-m8g-8xlarge
+    expansions:
+      <<: *aubsan-lite-required-expansions
+      compile_variant: *rhel8_arm64_debug_aubsan_compile_variant_name
+      large_distro_name: rhel8.8-arm64-m8g-8xlarge
+      xlarge_distro_name: rhel8.8-arm64-m8g-12xlarge
+      test_flags: >-
+        --excludeWithAnyTags=requires_increased_memlock_limits,incompatible_aubsan
+        --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"
+    tasks:
+      - name: .development_critical !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags !.multiversion
+      - name: .development_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags !.multiversion
+        distros:
+          - rhel8.8-arm64-m8g-8xlarge
+      - name: .release_critical !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags !.multiversion
+      - name: .release_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags !.multiversion
+        distros:
+          - rhel8.8-arm64-m8g-8xlarge
+      - name: .default !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags !.multiversion
+      - name: .default !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags !.multiversion
+        distros:
+          - rhel8.8-arm64-m8g-8xlarge
+      - name: .non_deterministic !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags !.multiversion
+      - name: .non_deterministic !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags !.multiversion
+        distros:
+          - rhel8.8-arm64-m8g-8xlarge
+
+  - <<: *rhel8_debug_aubsan_compile_variant_dependency_x86
     name: rhel8-debug-aubsan-roll-back-incremental-feature-flags
     display_name: "Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (roll back incremental feature flags)"
     tags: ["forbid_tasks_tagged_with_experimental"]
@@ -494,7 +589,7 @@ buildvariants:
         distros:
           - rhel8.8-large
 
-  - <<: *rhel8_debug_aubsan_compile_variant_dependency
+  - <<: *rhel8_debug_aubsan_compile_variant_dependency_x86
     name: rhel8-debug-aubsan-experimental
     display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG Experimental"
     tags: ["suggested"]
@@ -596,7 +691,7 @@ buildvariants:
       - rhel8.8-large
     stepback: false
     expansions:
-      <<: *enterprise-rhel8-debug-tsan-expansions-template
+      <<: *enterprise-rhel8-debug-tsan-expansions-template-x86
     tasks:
       - name: compile_test_parallel_core_stream_TG
       - name: run_unit_tests_TG
@@ -682,7 +777,7 @@ buildvariants:
       - rhel8.8-large
     stepback: false
     expansions:
-      <<: *enterprise-rhel8-debug-tsan-expansions-template
+      <<: *enterprise-rhel8-debug-tsan-expansions-template-x86
       test_flags: >-
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180, receiveChunkWaitForRangeDeleterTimeoutMS: 180000}"
         --excludeWithAnyTags=tsan_incompatible
@@ -729,7 +824,7 @@ buildvariants:
       - rhel8.8-large
     stepback: false
     expansions:
-      <<: *enterprise-rhel8-debug-tsan-expansions-template
+      <<: *enterprise-rhel8-debug-tsan-expansions-template-x86
       test_flags: >-
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180, receiveChunkWaitForRangeDeleterTimeoutMS: 180000}"
         --excludeWithAnyTags=tsan_incompatible
@@ -764,7 +859,7 @@ buildvariants:
         distros:
           - *enterprise-rhel8-debug-tsan-large-distro-name
 
-  - <<: *rhel8_debug_aubsan_compile_variant_dependency
+  - <<: *rhel8_debug_aubsan_compile_variant_dependency_x86
     name: rhel8-debug-aubsan-classic-engine
     display_name: "* {A,UB}SAN Enterprise RHEL 8 DEBUG (Classic Engine)"
     tags: ["suggested"]

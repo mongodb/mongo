@@ -87,7 +87,8 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
     ],
     "rhel8-debug-aubsan-classic-engine": _AUBSAN_TASK_FACTOR_OVERRIDES,
     "rhel8-debug-aubsan-all-feature-flags": _AUBSAN_TASK_FACTOR_OVERRIDES,
-    "rhel8-debug-aubsan": _AUBSAN_TASK_FACTOR_OVERRIDES,
+    "rhel8-debug-aubsan-x86": _AUBSAN_TASK_FACTOR_OVERRIDES,
+    "rhel8-debug-aubsan-arm64": _AUBSAN_TASK_FACTOR_OVERRIDES,
     "linux-debug-aubsan-compile-grpc": _AUBSAN_TASK_FACTOR_OVERRIDES,
     "enterprise-rhel-8-64-bit-dynamic-debug-mode": [
         {"task": "aggregation_one_shard_sharded_collections", "factor": 0.25},
