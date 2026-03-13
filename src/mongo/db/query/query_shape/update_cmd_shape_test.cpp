@@ -2648,5 +2648,91 @@ TEST_F(UpdateCmdShapeTest, PipelineUpdateShapeTokenization) {
                      SerializationContext::stateDefault()));
 }
 
+TEST_F(UpdateCmdShapeTest, ReplacementUpdateRedaction) {
+    auto basic = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [ { q: { x: {$eq: 3} }, u: { foo: "bar" }, multi: false, upsert: false } ],
+        "$db": "testDB"
+    })"_sd);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            cmdNs: { db: "HASH<testDB>", coll: "HASH<testColl>" },
+            command: "update",
+            q: { "HASH<x>": { $eq: "?number" } },
+            u: "?object",
+            multi: false,
+            upsert: false
+        })",
+        basic.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     SerializationContext::stateDefault()));
+}
+
+TEST_F(UpdateCmdShapeTest, PipelineUpdateRedaction) {
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [ {
+            q: { x: {$eq: 3} },
+            u: [
+                { "$addFields": {
+                    "newField": "value",
+                    "total": { "$add": ["$price", "$tax"] },
+                    "nested": { "$add": [{ "$multiply": [2, 3] }, 1] }
+                } },
+                { "$project": { "oldField": 0, "_id": 1 } },
+                { "$replaceRoot": { "newRoot": { "finalDoc": "$$ROOT", "processed": true } } }
+            ],
+            multi: false,
+            upsert: false
+        } ],
+        "$db": "testDB"
+    })"_sd);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            cmdNs: { db: "HASH<testDB>", coll: "HASH<testColl>" },
+            command: "update",
+            q: { "HASH<x>": { $eq: "?number" } },
+            u: [
+                {
+                    "$addFields": {
+                        "HASH<newField>": "?string",
+                        "HASH<total>": {
+                            "$add": ["$HASH<price>", "$HASH<tax>"]
+                        },
+                        "HASH<nested>": {
+                            "$add": [
+                                {
+                                    "$multiply": "?array<?number>"
+                                },
+                                "?number"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$project": {
+                        "HASH<oldField>": false,
+                        "HASH<_id>": true
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "HASH<finalDoc>": "$$ROOT",
+                            "HASH<processed>": "?bool"
+                        }
+                    }
+                }
+            ],
+            multi: false,
+            upsert: false
+        })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     SerializationContext::stateDefault()));
+}
+
 }  // namespace
 }  // namespace mongo::query_shape
