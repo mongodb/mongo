@@ -86,14 +86,14 @@ assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
 replTest.awaitReplication();
 
 // --- Start proxy protocol servers for each node (egress via Unix domain sockets). ---
-const uds0 = `${kSocketPrefix}/unix-mongodb-${node0Port}.sock`;
+const uds0 = `${kSocketPrefix}/proxy-mongodb-${node0Port}.sock`;
 assert(fileExists(uds0), `Proxy UDS should exist at ${uds0}`);
 const proxy0 = new ProxyProtocolServer(kProxyIngressPort0, node0Port, kProxyVersion, {
     egressUnixSocket: uds0,
 });
 proxy0.start();
 
-const uds1 = `${kSocketPrefix}/unix-mongodb-${node1Port}.sock`;
+const uds1 = `${kSocketPrefix}/proxy-mongodb-${node1Port}.sock`;
 assert(fileExists(uds1), `Proxy UDS should exist at ${uds1}`);
 const proxy1 = new ProxyProtocolServer(kProxyIngressPort1, node1Port, kProxyVersion, {
     egressUnixSocket: uds1,

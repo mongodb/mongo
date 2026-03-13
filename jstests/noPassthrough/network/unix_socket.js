@@ -8,11 +8,10 @@
  *    cause the server to exit with an error (socket names with whitespace are now supported)
  * 4) That the default unix socket doesn't get created if --nounixsocket is specified
  * 5) When proxyUnixSocketPrefix is set, the proxy Unix domain socket file is created at
- *    {prefix}/unix-mongodb-{port}.sock and removed on shutdown (connect/ping use the
+ *    {prefix}/proxy-mongodb-{port}.sock and removed on shutdown (connect/ping use the
  *    regular unix socket; proxy sockets require PROXY protocol so we only verify creation/cleanup).
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 // @tags: [
 //   requires_sharding,
@@ -105,7 +104,7 @@ let testSockOptions = function (bindPath, expectSockPath, optDict, bindSep = ","
     // require PROXY protocol.
     let proxyPath = null;
     if (!jsTestOptions().shellGRPC && optDict.proxyUnixSocketPrefix) {
-        proxyPath = `${optDict.proxyUnixSocketPrefix}/unix-mongodb-${conn.port}.sock`;
+        proxyPath = `${optDict.proxyUnixSocketPrefix}/proxy-mongodb-${conn.port}.sock`;
         assert(fileExists(proxyPath), `Proxy socket should exist: ${proxyPath}`);
         const proxyMode = new Number(getFileMode(proxyPath));
         assert.eq(

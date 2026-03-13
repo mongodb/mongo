@@ -250,7 +250,7 @@ std::string makeUnixSockPath(int port, StringData label) {
 }
 
 std::string makeProxyUnixSockPath(int port, StringData prefix) {
-    return fmt::format("{}/unix-mongodb-{}.sock", prefix, port);
+    return fmt::format("{}/proxy-mongodb-{}.sock", prefix, port);
 }
 
 int parsePortFromUnixSockPath(StringData path) {

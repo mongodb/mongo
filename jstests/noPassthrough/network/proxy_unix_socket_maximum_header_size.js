@@ -2,7 +2,6 @@
  * Test the proxyUnixSocketMaximumHeaderSize server parameter.
  * This parameter controls the maximum size of the proxy protocol header
  * that can be read from proxy Unix domain sockets.
- * Uses real proxy unix domain socket (no isConnectedToProxyUnixSocketOverride).
  *
  * @tags: [
  *   grpc_incompatible,
@@ -18,7 +17,7 @@ import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function makeProxySocketPath(prefix, port) {
-    return `${prefix}/unix-mongodb-${port}.sock`;
+    return `${prefix}/proxy-mongodb-${port}.sock`;
 }
 
 const kDefaultHeaderSize = 536;

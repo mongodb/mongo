@@ -23,7 +23,7 @@ const kUnauthorizedCode = 13;
 const kInternalErrorCode = 1;
 
 function makeProxySocketPath(prefix, port) {
-    return `${prefix}/unix-mongodb-${port}.sock`;
+    return `${prefix}/proxy-mongodb-${port}.sock`;
 }
 
 function assertConnectionFails(conn, path) {

@@ -65,7 +65,6 @@ MONGO_FAIL_POINT_DEFINE(asioTransportLayerBlockBeforeOpportunisticRead);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerBlockBeforeAddSession);
 MONGO_FAIL_POINT_DEFINE(clientIsConnectedToLoadBalancerPort);
 MONGO_FAIL_POINT_DEFINE(clientIsLoadBalancedPeer);
-MONGO_FAIL_POINT_DEFINE(isConnectedToProxyUnixSocketOverride);
 MONGO_FAIL_POINT_DEFINE(proxyUnixDomainSocketPeerCredentialValidationOverride);
 
 namespace {
@@ -274,8 +273,7 @@ bool CommonAsioSession::isLoadBalancerPeer() const {
 }
 
 bool CommonAsioSession::isConnectedToProxyUnixSocket() const {
-    return _isConnectedToProxyUnixSocket ||
-        MONGO_unlikely(isConnectedToProxyUnixSocketOverride.shouldFail());
+    return _isConnectedToProxyUnixSocket;
 }
 
 Status CommonAsioSession::validateProxyUnixSocketPeerPermissions() {

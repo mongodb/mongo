@@ -160,7 +160,7 @@ if (!isWindows) {
      * @returns {ProxyProtocolServer} A started proxy server instance.
      */
     function startProxy(ingressPort, targetPort, socketPrefix) {
-        const udsPath = `${socketPrefix}/unix-mongodb-${targetPort}.sock`;
+        const udsPath = `${socketPrefix}/proxy-mongodb-${targetPort}.sock`;
         assert(fileExists(udsPath), `Proxy UDS should exist at ${udsPath}`);
 
         const proxy = new ProxyProtocolServer(ingressPort, targetPort, 2, {
