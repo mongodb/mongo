@@ -34,10 +34,10 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
-#include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/compiler/dependency_analysis/pipeline_dependency_graph.h"
 #include "mongo/db/query/query_fcv_environment_for_test.h"
-#include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/logv2/log_manager.h"
 #include "mongo/util/intrusive_counter.h"
 
 #include <benchmark/benchmark.h>
@@ -46,39 +46,22 @@
 namespace mongo {
 namespace {
 
+using DependencyGraph = pipeline::dependency_graph::DependencyGraph;
+
+/**
+ * In every benchmark defined using this fixture, the first argument denotes pipeline length.
+ */
 class PipelineOptimizationBMFixture : public benchmark::Fixture {
 public:
-    void runPipelineOptimization(std::vector<BSONObj> rawPipeline, benchmark::State& state) {
-        NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "bm");
-        auto expCtx = make_intrusive<ExpressionContextForTest>(nss);
-
-        for (auto keepRunning : state) {
-            state.PauseTiming();
-            auto pipeline = pipeline_factory::makePipeline(
-                rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
-            state.ResumeTiming();
-
-            pipeline_optimization::optimizePipeline(*pipeline);
-        }
-    }
-
-    void SetUp(benchmark::State& state) override {
-        QueryFCVEnvironmentForTest::setUp();
-        // Keep the same default on debug builds.
-        internalPipelineLengthLimit.store(1000);
-    };
-
-    void TearDown(benchmark::State& state) override {
-        internalPipelineLengthLimit.store(defaultInternalPipelineLengthLimit());
-    }
-
-    static std::vector<BSONObj> makePipeline(size_t numStages) {
+    /**
+     * Generates a pipeline by repeating the pattern defined in makeNextStages() until we reach the
+     * desired number of stages. The goal is to stress the code that applies rewrites, rather than
+     * to provide comprehensive coverage of many different rewrites. Hence we want a pipeline that
+     * can have a large (relative to 'numStages') number of rewrites applied to it.
+     */
+    static std::vector<BSONObj> generateRawPipeline(size_t numStages) {
         size_t nextFieldSuffix{0};
 
-        // The pipeline repeats this pattern until we reach the desired number of stages. The goal
-        // is to stress the code that applies rewrites, rather than to provide comprehensive
-        // coverage of many different rewrites. Hence we want a pipeline that can have a large
-        // (relative to 'numStages') number of rewrites applied to it.
         auto makeNextStages = [&]() -> std::vector<std::string> {
             size_t fieldSuffix = ++nextFieldSuffix;
             return {
@@ -106,22 +89,152 @@ public:
             }
         }
     }
+
+    std::unique_ptr<Pipeline> makePipeline(benchmark::State& state) {
+        return pipeline_factory::makePipeline(
+            generateRawPipeline(state.range(0)), expCtx, pipeline_factory::kOptionsMinimal);
+    }
+
+    void SetUp(benchmark::State& state) override {
+        QueryFCVEnvironmentForTest::setUp();
+        // Suppress logs.
+        logv2::LogManager::global().getGlobalSettings().setMinimumLoggedSeverity(
+            mongo::logv2::LogComponent::kDefault, mongo::logv2::LogSeverity::Error());
+        // Keep the same default on debug builds.
+        internalPipelineLengthLimit.store(1000);
+        expCtx = make_intrusive<ExpressionContextForTest>(
+            NamespaceString::createNamespaceString_forTest("test", "bm"));
+    };
+
+    void TearDown(benchmark::State& state) override {
+        logv2::LogManager::global().getGlobalSettings().setMinimumLoggedSeverity(
+            mongo::logv2::LogComponent::kDefault, mongo::logv2::LogSeverity::Log());
+        internalPipelineLengthLimit.store(defaultInternalPipelineLengthLimit());
+        expCtx = {};
+    }
+
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx;
 };
 
-BENCHMARK_F(PipelineOptimizationBMFixture, BM_OptimizePipeline10Stages)
+// Report optimization time.
+BENCHMARK_DEFINE_F(PipelineOptimizationBMFixture, BM_OptimizePipeline)
 (benchmark::State& state) {
-    runPipelineOptimization(makePipeline(10), state);
-}
+    auto rawPipeline = generateRawPipeline(state.range(0));
+    for (auto keepRunning : state) {
+        state.PauseTiming();
+        auto pipeline =
+            pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
+        state.ResumeTiming();
 
-BENCHMARK_F(PipelineOptimizationBMFixture, BM_OptimizePipeline100Stages)
-(benchmark::State& state) {
-    runPipelineOptimization(makePipeline(100), state);
+        pipeline_optimization::optimizePipeline(*pipeline);
+    }
 }
+BENCHMARK_REGISTER_F(PipelineOptimizationBMFixture, BM_OptimizePipeline)
+    ->Arg(10)
+    ->Arg(50)
+    ->Arg(100)
+    ->Arg(1000)
+    ->Unit(benchmark::kMicrosecond);
 
-BENCHMARK_F(PipelineOptimizationBMFixture, BM_OptimizePipeline1000Stages)
+// Report pipeline parsing time.
+BENCHMARK_DEFINE_F(PipelineOptimizationBMFixture, BM_ParsePipeline)
 (benchmark::State& state) {
-    runPipelineOptimization(makePipeline(1000), state);
+    auto rawPipeline = generateRawPipeline(state.range(0));
+    for (auto keepRunning : state) {
+        benchmark::DoNotOptimize(
+            pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal));
+    }
 }
+BENCHMARK_REGISTER_F(PipelineOptimizationBMFixture, BM_ParsePipeline)
+    ->Arg(10)
+    ->Arg(50)
+    ->Arg(100)
+    ->Arg(1000)
+    ->Unit(benchmark::kMicrosecond);
+
+// Report cost of Pipeline::getDependencies().
+BENCHMARK_DEFINE_F(PipelineOptimizationBMFixture, BM_PipelineGetDependencies)
+(benchmark::State& state) {
+    auto pipeline = makePipeline(state);
+    for (auto keepRunning : state) {
+        benchmark::DoNotOptimize(pipeline->getDependencies({}));
+    }
+}
+BENCHMARK_REGISTER_F(PipelineOptimizationBMFixture, BM_PipelineGetDependencies)
+    ->Arg(10)
+    ->Arg(50)
+    ->Arg(100)
+    ->Arg(1000)
+    ->Unit(benchmark::kMicrosecond);
+
+// Report the cost to of calling getModifiedPaths() for each stage.
+BENCHMARK_DEFINE_F(PipelineOptimizationBMFixture, BM_DocumentSourceGetModifiedPaths)
+(benchmark::State& state) {
+    auto pipeline = makePipeline(state);
+    for (auto keepRunning : state) {
+        for (auto&& stage : pipeline->getSources()) {
+            benchmark::DoNotOptimize(stage->getModifiedPaths());
+        }
+    }
+}
+BENCHMARK_REGISTER_F(PipelineOptimizationBMFixture, BM_DocumentSourceGetModifiedPaths)
+    ->Arg(10)
+    ->Arg(50)
+    ->Arg(100)
+    ->Arg(1000)
+    ->Unit(benchmark::kMicrosecond);
+
+// Report the cost to of calling getDependencies() for each stage.
+BENCHMARK_DEFINE_F(PipelineOptimizationBMFixture, BM_DocumentSourceGetDependencies)
+(benchmark::State& state) {
+    auto pipeline = makePipeline(state);
+    for (auto keepRunning : state) {
+        for (auto&& stage : pipeline->getSources()) {
+            DepsTracker deps;
+            benchmark::DoNotOptimize(stage->getDependencies(&deps));
+        }
+    }
+}
+BENCHMARK_REGISTER_F(PipelineOptimizationBMFixture, BM_DocumentSourceGetDependencies)
+    ->Arg(10)
+    ->Arg(50)
+    ->Arg(100)
+    ->Arg(1000)
+    ->Unit(benchmark::kMicrosecond);
+
+// Report the cost of building the dependency graph from scratch.
+BENCHMARK_DEFINE_F(PipelineOptimizationBMFixture, BM_BuildDependencyGraph)
+(benchmark::State& state) {
+    auto pipeline = makePipeline(state);
+    for (auto keepRunning : state) {
+        benchmark::DoNotOptimize(DependencyGraph(pipeline->getSources()));
+    }
+}
+BENCHMARK_REGISTER_F(PipelineOptimizationBMFixture, BM_BuildDependencyGraph)
+    ->Arg(10)
+    ->Arg(50)
+    ->Arg(100)
+    ->Arg(1000)
+    ->Unit(benchmark::kMicrosecond);
+
+// Report the cost of re-building the dependency graph from the middle of the pipeline.
+BENCHMARK_DEFINE_F(PipelineOptimizationBMFixture, BM_RebuildDependencyGraphFromMiddle)
+(benchmark::State& state) {
+    auto pipeline = makePipeline(state);
+    size_t middle = state.range(0) / 2;
+    auto middleIt = std::next(pipeline->getSources().begin(), middle);
+
+    DependencyGraph graph(pipeline->getSources());
+    for (auto keepRunning : state) {
+        graph.recomputeFromStage(middleIt, pipeline->getSources());
+    }
+}
+BENCHMARK_REGISTER_F(PipelineOptimizationBMFixture, BM_RebuildDependencyGraphFromMiddle)
+    ->Arg(10)
+    ->Arg(50)
+    ->Arg(100)
+    ->Arg(1000)
+    ->Unit(benchmark::kMicrosecond);
 
 }  // namespace
 }  // namespace mongo
