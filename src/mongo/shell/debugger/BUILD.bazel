@@ -45,6 +45,7 @@ mongo_cc_library(
 
 JSFILES_TO_PRECOMPILE = [
     "onDebuggerStatement.js",
+    "onExceptionUnwind.js",
     "onNewScript.js",
 ]
 

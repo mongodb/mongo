@@ -318,13 +318,27 @@ Response SetVariableRequest::response(std::string value) {
  * StoppedEvent
  */
 
+StoppedEvent StoppedEvent::Breakpoint() {
+    StoppedEvent e("breakpoint");
+    return e;
+}
+
+StoppedEvent StoppedEvent::Exception(std::string text) {
+    StoppedEvent e("exception");
+    e.text = text;
+    return e;
+}
+
 std::string StoppedEvent::getJson() const {
     BSONObjBuilder eventBuilder;
     eventBuilder.append("type", "event");
     eventBuilder.append("event", "stopped");
 
     BSONObjBuilder bodyBuilder;
-    bodyBuilder.append("reason", "breakpoint");
+    bodyBuilder.append("reason", reason);
+    if (text) {
+        bodyBuilder.append("text", *text);
+    }
 
     eventBuilder.append("body", bodyBuilder.obj());
 

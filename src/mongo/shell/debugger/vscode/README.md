@@ -4,6 +4,27 @@ Use VSCode's Debugger UI with resmoke's `--shellJSDebugMode` flag.
 
 ![example.png](./example.png)
 
+## Features
+
+- Add breakpoints directly inside JS files in the VSCode editor UI.
+- Shell pauses on breakpoints
+- See all variables and scopes in the sidebar
+- Hover on variables in the editor to see their current values in a tooltip
+- See the JS callstack and easily jump to those files/lines
+- Update variable values directly in the Variables sidebar
+- Use the Debug Console to inspect/modify variables and evaluate expressions
+- Continue to the next breakpoint
+- Automatically stop on uncaught exceptions
+- `debugger;` statements will pause at the terminal for user input, to inspect/modify variables and evaluate expressions.
+
+### Limitations
+
+- Step functionality (step, step in, step out) is not supported. Each currently redirects to the Continue functionality.
+- Watching variables is not supported.
+- Deeply nested variables are truncated in the Variables sidebar display, with only 1 level of expansion. Use the Debug Console to inspect more.
+- Breakpoints can't be changed while the debugger is already attached to a running shell. Users will see a Toast UI when this occurs, and breakpoints will be applied on the _next_ shell launch.
+- The debugger uses port 9229, the default Chrome debugging port. Any open Chrome debuggers (eg. Developer Tools open in a Chrome tab) will conflict with this VSCode Debugger.
+
 ## Install
 
 Run the following to package and install the latest extension:
