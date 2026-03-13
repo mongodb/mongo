@@ -126,7 +126,7 @@ export let MongosAPIParametersUtil = (function () {
         },
         {commandName: "_mergeAuthzCollections", skip: "internal API"},
         {commandName: "_mongotConnPoolStats", skip: "internal API"},
-        {commandName: "_recoverShardRegistry", skip: "internal command"},
+        {commandName: "_flushShardRegistry", skip: "internal command"},
         {commandName: "abortMoveCollection", skip: "TODO(SERVER-108802)"},
         {commandName: "abortReshardCollection", skip: "TODO(SERVER-108802)"},
         {commandName: "abortRewriteCollection", skip: "TODO(SERVER-108802)"},

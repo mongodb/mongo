@@ -147,7 +147,7 @@ let viewsCommandTests = {
     _mirrorMaestroConnPoolStats: {skip: isAnInternalCommand},
     _mongotConnPoolStats: {skip: isAnInternalCommand},
     _movePrimary: {skip: isAnInternalCommand},
-    _recoverShardRegistry: {skip: isAnInternalCommand},
+    _flushShardRegistry: {skip: isAnInternalCommand},
     _recvChunkAbort: {skip: isAnInternalCommand},
     _recvChunkCommit: {skip: isAnInternalCommand},
     _recvChunkReleaseCritSec: {skip: isAnInternalCommand},

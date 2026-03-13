@@ -35,29 +35,29 @@ imports:
     - "mongo/db/basic_types.idl"
 
 commands:
-    _recoverShardRegistry:
-        description: "Internal command to recover the shard registry on the local node"
-        command_name: _recoverShardRegistry
-        cpp_name: RecoverShardRegistry
+    _flushShardRegistry:
+        description: "Internal command to flush the shard registry on the local node"
+        command_name: _flushShardRegistry
+        cpp_name: FlushShardRegistry
         namespace: ignored
         api_version: ""
         strict: true
-        reply_type: RecoverShardRegistryResponse
+        reply_type: FlushShardRegistryResponse
 
 structs:
-    RecoverShardRegistryResponse:
-        description: "Response for _recoverShardRegistry command"
+    FlushShardRegistryResponse:
+        description: "Response for _flushShardRegistry command"
         strict: false
         fields:
             cachedTimeBefore:
-                description: "Timestamp of the ShardRegistry cached data before the recovery"
+                description: "Timestamp of the ShardRegistry cached data before the flush"
                 type: timestamp
             forceReloadIncrementBefore:
-                description: "Force reload increment before the recovery"
+                description: "Force reload increment before the flush"
                 type: long
             cachedTimeAfter:
-                description: "Timestamp of the ShardRegistry cached data after the recovery"
+                description: "Timestamp of the ShardRegistry cached data after the flush"
                 type: timestamp
             forceReloadIncrementAfter:
-                description: "Force reload increment after the recovery"
+                description: "Force reload increment after the flush"
                 type: long

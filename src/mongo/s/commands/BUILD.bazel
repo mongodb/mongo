@@ -24,9 +24,9 @@ mongo_cc_library(
     name = "sharded_cluster_sharding_commands",
     srcs = [
         "//src/mongo/db/router_role/routing_cache:flush_router_config_cmd.cpp",
+        "//src/mongo/db/topology:flush_shard_registry_command.cpp",
+        "//src/mongo/db/topology:flush_shard_registry_gen",
         "//src/mongo/db/topology:get_shard_map_cmd.cpp",
-        "//src/mongo/db/topology:recover_shard_registry_command.cpp",
-        "//src/mongo/db/topology:recover_shard_registry_gen",
     ],
     deps = [
         "//src/mongo/db:commands",

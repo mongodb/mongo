@@ -97,7 +97,7 @@ let testCases = {
     _shardsvrMovePrimaryEnterCriticalSection: {skip: "primary only"},
     _shardsvrMovePrimaryExitCriticalSection: {skip: "primary only"},
     _shardsvrMoveRange: {skip: "primary only"},
-    _recoverShardRegistry: {skip: "internal command"},
+    _flushShardRegistry: {skip: "internal command"},
     _recvChunkAbort: {skip: "primary only"},
     _recvChunkCommit: {skip: "primary only"},
     _recvChunkReleaseCritSec: {skip: "primary only"},

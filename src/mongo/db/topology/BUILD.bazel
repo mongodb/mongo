@@ -97,8 +97,8 @@ idl_generator(
 )
 
 idl_generator(
-    name = "recover_shard_registry_gen",
-    src = "recover_shard_registry.idl",
+    name = "flush_shard_registry_gen",
+    src = "flush_shard_registry.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/idl:generic_argument_gen",

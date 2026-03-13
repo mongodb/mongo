@@ -84,7 +84,7 @@ const allCommands = {
     _migrateClone: {skip: isPrimaryOnly},
     _mirrorMaestroConnPoolStats: {skip: isAnInternalCommand},
     _mongotConnPoolStats: {skip: isAnInternalCommand},
-    _recoverShardRegistry: {skip: isAnInternalCommand},
+    _flushShardRegistry: {skip: isAnInternalCommand},
     _recvChunkAbort: {skip: isPrimaryOnly},
     _recvChunkCommit: {skip: isPrimaryOnly},
     _recvChunkReleaseCritSec: {skip: isPrimaryOnly},

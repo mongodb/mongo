@@ -142,7 +142,7 @@ let testCases = {
     _migrateClone: {skip: "internal command"},
     _mirrorMaestroConnPoolStats: {skip: "internal command"},
     _mongotConnPoolStats: {skip: "internal command"},
-    _recoverShardRegistry: {skip: "internal command"},
+    _flushShardRegistry: {skip: "internal command"},
     _recvChunkAbort: {skip: "internal command"},
     _recvChunkCommit: {skip: "internal command"},
     _recvChunkReleaseCritSec: {skip: "internal command"},

@@ -1,5 +1,5 @@
 /**
- * Tests the _recoverShardRegistry command.
+ * Tests the _flushShardRegistry command.
  *
  * @tags: [
  *   requires_fcv_83,
@@ -17,9 +17,9 @@ const shard1 = st.shard1;
 const configsvr = st.configRS.getPrimary();
 
 // Test 1: Run command on shard server
-jsTest.log.info("Test 1: Running _recoverShardRegistry on shard server");
+jsTest.log.info("Test 1: Running _flushShardRegistry on shard server");
 {
-    let result = shard0.adminCommand({_recoverShardRegistry: 1});
+    let result = shard0.adminCommand({_flushShardRegistry: 1});
     jsTest.log.debug("Shard0 refresh result: " + tojson(result));
     assert.commandWorked(result);
     assert(result.hasOwnProperty("cachedTimeBefore"), "Response should contain cachedTimeBefore field");
@@ -40,11 +40,11 @@ jsTest.log.info("Test 1: Running _recoverShardRegistry on shard server");
 }
 
 // Test 2: Run on different secondaries of the same replica set of shard0
-jsTest.log.info("Test 2: Running _recoverShardRegistry on different secondaries");
+jsTest.log.info("Test 2: Running _flushShardRegistry on different secondaries");
 {
     let secondaries = st.rs0.getSecondaries();
     for (let secondary of secondaries) {
-        let result = secondary.adminCommand({_recoverShardRegistry: 1});
+        let result = secondary.adminCommand({_flushShardRegistry: 1});
         jsTest.log.debug("Secondary refresh result: " + tojson(result));
         assert.commandWorked(result);
         assert.lt(
@@ -56,9 +56,9 @@ jsTest.log.info("Test 2: Running _recoverShardRegistry on different secondaries"
 }
 
 // Test 3: Run on config server
-jsTest.log.info("Test 3: Running _recoverShardRegistry on config server");
+jsTest.log.info("Test 3: Running _flushShardRegistry on config server");
 {
-    let result = configsvr.adminCommand({_recoverShardRegistry: 1});
+    let result = configsvr.adminCommand({_flushShardRegistry: 1});
     jsTest.log.debug("Config server refresh result: " + tojson(result));
     assert.commandWorked(result);
     assert.lt(
@@ -69,9 +69,9 @@ jsTest.log.info("Test 3: Running _recoverShardRegistry on config server");
 }
 
 // Test 4: Run command on router
-jsTest.log.info("Test 4: Running _recoverShardRegistry on router");
+jsTest.log.info("Test 4: Running _flushShardRegistry on router");
 {
-    let result = mongos.adminCommand({_recoverShardRegistry: 1});
+    let result = mongos.adminCommand({_flushShardRegistry: 1});
     jsTest.log.debug("Shard0 refresh result: " + tojson(result));
     assert.commandWorked(result);
     assert(result.hasOwnProperty("cachedTimeBefore"), "Response should contain cachedTimeBefore field");
@@ -94,7 +94,7 @@ jsTest.log.info("Test 4: Running _recoverShardRegistry on router");
 // Test 5: Command fails on non-admin database
 jsTest.log.info("Test 5: Command should fail on non-admin database");
 {
-    let result = shard0.getDB("test").runCommand({_recoverShardRegistry: 1});
+    let result = shard0.getDB("test").runCommand({_flushShardRegistry: 1});
     assert.commandFailed(result);
 }
 
@@ -109,7 +109,7 @@ jsTest.log.info("Test 6: Verify refresh picks up newly added shard");
     assert.commandWorked(mongos.adminCommand({addShard: newShard.getURL(), name: "shard2"}));
 
     // Recover on router
-    let result = mongos.adminCommand({_recoverShardRegistry: 1});
+    let result = mongos.adminCommand({_flushShardRegistry: 1});
     jsTest.log.debug("After adding shard: " + tojson(result));
     assert.commandWorked(result);
     assert.lt(
@@ -132,7 +132,7 @@ jsTest.log.info("Test 6: Verify refresh picks up newly added shard");
 jsTest.log.info("Test 6: Command is idempotent - multiple calls should succeed");
 {
     for (let i = 0; i < 3; i++) {
-        let result = mongos.adminCommand({_recoverShardRegistry: 1});
+        let result = mongos.adminCommand({_flushShardRegistry: 1});
         assert.commandWorked(result);
         assert.lt(
             result.forceReloadIncrementBefore,
@@ -182,8 +182,8 @@ jsTest.log.info("Test 7: Query sharded and untracked collections before and afte
     assert.eq(untrackedSampleBefore.value, 30, "Untracked collection sample data should be correct");
 
     // Run recovery
-    jsTest.log.info("Running _recoverShardRegistry");
-    let result = mongos.adminCommand({_recoverShardRegistry: 1});
+    jsTest.log.info("Running _flushShardRegistry");
+    let result = mongos.adminCommand({_flushShardRegistry: 1});
     assert.commandWorked(result);
     assert.lt(
         result.forceReloadIncrementBefore,

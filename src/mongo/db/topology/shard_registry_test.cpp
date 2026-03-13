@@ -480,13 +480,13 @@ TEST_F(ShardRegistryTest, NewerLookupTimeGreaterThanOlder) {
     ASSERT_GT(newerTime, olderTime);
 }
 
-TEST_F(ShardRegistryTest, RecoverShardRegistryClearsCachedConnectionStrings) {
+TEST_F(ShardRegistryTest, FlushShardRegistryClearsCachedConnectionStrings) {
     ASSERT_EQ(getLatestConnStringsSize(), 1);  // This is the config shard
     clearForRecovery();
     ASSERT_EQ(getLatestConnStringsSize(), 0);
 }
 
-TEST_F(ShardRegistryTest, RecoverShardRegistryReloadForRecovery) {
+TEST_F(ShardRegistryTest, FlushShardRegistryReloadForRecovery) {
     setupHostReassignmentScenario();
 
     auto future = launchAsync([this] {

@@ -30,7 +30,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/topology/recover_shard_registry_gen.h"
+#include "mongo/db/topology/flush_shard_registry_gen.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/logv2/log.h"
 
@@ -39,10 +39,10 @@
 namespace mongo {
 namespace {
 
-class RecoverShardRegistryCommand final : public TypedCommand<RecoverShardRegistryCommand> {
+class FlushShardRegistryCommand final : public TypedCommand<FlushShardRegistryCommand> {
 public:
-    using Request = RecoverShardRegistry;
-    using Response = RecoverShardRegistryResponse;
+    using Request = FlushShardRegistry;
+    using Response = FlushShardRegistryResponse;
 
     class Invocation final : public InvocationBase {
     public:
@@ -107,7 +107,7 @@ public:
     };
 
     std::string help() const override {
-        return "Internal command to recover the shard registry on the local node. This command is "
+        return "Internal command to flush the shard registry on the local node. This command is "
                "used to clear the cached connection strings and ReplicaSetMonitors.";
     }
 
@@ -119,7 +119,7 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 };
-MONGO_REGISTER_COMMAND(RecoverShardRegistryCommand).forRouter().forShard();
+MONGO_REGISTER_COMMAND(FlushShardRegistryCommand).forRouter().forShard();
 
 }  // namespace
 }  // namespace mongo
