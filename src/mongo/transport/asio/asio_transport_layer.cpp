@@ -1125,7 +1125,7 @@ Status AsioTransportLayer::setup() {
         if (addr.family() == AF_UNIX) {
             auto addrStr = addr.toString();
             if (auto lastSlashIndex = addrStr.rfind('/'); lastSlashIndex != StringData::npos &&
-                addrStr.substr(lastSlashIndex + 1).starts_with("unix")) {
+                addrStr.substr(lastSlashIndex + 1).starts_with("proxy")) {
                 setUnixDomainSocketPermissions(addrStr, kProxyUnixDomainSocketPerms);
             } else {
                 setUnixDomainSocketPermissions(addrStr, serverGlobalParams.unixSocketPermissions);

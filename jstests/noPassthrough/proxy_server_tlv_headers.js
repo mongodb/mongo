@@ -15,7 +15,7 @@ if (_isWindows()) {
 import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
 
 function makeProxySocketPath(prefix, port) {
-    return `${prefix}/unix-mongodb-${port}.sock`;
+    return `${prefix}/proxy-mongodb-${port}.sock`;
 }
 
 const kProxyIngressPort = allocatePort();

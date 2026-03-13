@@ -32,7 +32,7 @@ const mongod = MongoRunner.runMongod({
 });
 assert.neq(mongod, null, "Expected mongod to start");
 
-const proxySocketPath = `${prefix}/unix-mongodb-${mongod.port}.sock`;
+const proxySocketPath = `${prefix}/proxy-mongodb-${mongod.port}.sock`;
 assert(fileExists(proxySocketPath), `Expected proxy socket to exist: ${proxySocketPath}`);
 
 const ingressPort = allocatePort();
