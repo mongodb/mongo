@@ -142,34 +142,18 @@ void UncommittedCatalogUpdates::dropCollection(const Collection* collection) {
         std::find_if(_entries.rbegin(), _entries.rend(), [uuid = collection->uuid()](auto&& entry) {
             return entry.uuid() == uuid;
         });
-    if (it == _entries.rend()) {
-        // An entry with this uuid was not found so add a new entry.
-        Entry entry;
-        entry.action = Entry::Action::kDroppedCollection;
-        entry.nss = collection->ns();
-        entry.externalUUID = collection->uuid();
-        _entries.push_back(std::move(entry));
-        return;
-    }
 
-    if (it->action == Entry::Action::kRecreatedCollection) {
-        // Scenario: i. drop nss  ->  ii. recreate nss  ->  iii. drop nss again
-        //
-        // In this case, we don't have to create another drop entry (iii), we can simply delete
-        // entry (ii) such that subsequent lookups will find the previous drop (i).
-        _entries.erase(it.base());
-        return;
-    }
-
-    // If the entry doesn't have a Collection pointer, no further action is needed.
-    if (!it->collection) {
-        return;
-    }
+    // All collection modifications, including drop, happen via writeable collection, which means
+    // the collection must have been installed in UncommittedCatalogUpdates. Performing other
+    // Actions just to later drop the collection within the same transaction doesn't make much
+    // sense, so it is unsupported.
+    invariant(it != _entries.rend() && it->action == Entry::Action::kWritableCollection);
 
     // Transform the found entry into a dropped entry.
     invariant(it->collection.get() == collection);
     it->action = Entry::Action::kDroppedCollection;
     it->externalUUID = it->collection->uuid();
+    it->droppedCollection = it->collection;
     it->collection = nullptr;
 }
 

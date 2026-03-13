@@ -323,9 +323,10 @@ public:
     /**
      * Deregister the collection.
      */
-    std::shared_ptr<Collection> deregisterCollection(OperationContext* opCtx,
-                                                     const UUID& uuid,
-                                                     boost::optional<Timestamp> commitTime);
+    void deregisterCollection(OperationContext* opCtx,
+                              const UUID& uuid,
+                              boost::optional<Timestamp> commitTime,
+                              std::shared_ptr<Collection> dropPendingCollection = nullptr);
 
     /**
      * Deregister all the collection objects and view namespaces.

@@ -53,6 +53,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    void onDeregisterFromCatalog(ServiceContext* svcCtx, Collection* collection) override {
+        MONGO_UNREACHABLE;
+    }
+
     bool haveAnyIndexes() const override {
         MONGO_UNREACHABLE;
     }

@@ -271,6 +271,8 @@ CollectionImpl::CollectionImpl(OperationContext* opCtx,
 CollectionImpl::~CollectionImpl() = default;
 
 void CollectionImpl::onDeregisterFromCatalog(ServiceContext* svcCtx) {
+    _indexCatalog->onDeregisterFromCatalog(svcCtx, this);
+
     if (ns().isOplog()) {
         repl::clearLocalOplogPtr(svcCtx);
     }

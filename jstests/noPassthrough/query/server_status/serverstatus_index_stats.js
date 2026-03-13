@@ -9,54 +9,15 @@
  */
 
 import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {
+    assertCountIncrease,
+    assertFeatureAccessIncrease,
+    assertFeatureCountIncrease,
+    assertStats,
+    assertZeroAccess,
+    assertZeroCounts,
+} from "jstests/libs/index_stats_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-
-const assertStats = (db, assertFn) => {
-    const stats = db.serverStatus().indexStats;
-    try {
-        assertFn(stats);
-    } catch (e) {
-        print("result: " + tojson(stats));
-        throw e;
-    }
-};
-
-const assertZeroCounts = (db) => {
-    assertStats(db, (featureStats) => {
-        assert.eq(featureStats.count, 0);
-        for (const [feature, stats] of Object.entries(featureStats.features)) {
-            assert.eq(0, stats.count, feature);
-        }
-    });
-};
-
-const assertZeroAccess = (db) => {
-    assertStats(db, (featureStats) => {
-        for (const [feature, stats] of Object.entries(featureStats.features)) {
-            assert.eq(0, stats.accesses, feature);
-        }
-    });
-};
-
-const assertCountIncrease = (last, current, inc) => {
-    assert.eq(last.count + inc, current.count, "incorrect index count");
-};
-
-const assertFeatureCountIncrease = (last, current, feature, inc) => {
-    assert.eq(
-        last.features[feature].count + inc,
-        current.features[feature].count,
-        "incorrect feature count for " + feature,
-    );
-};
-
-const assertFeatureAccessIncrease = (last, current, feature, inc) => {
-    assert.eq(
-        last.features[feature].accesses + inc,
-        current.features[feature].accesses,
-        "incorrect feature accesses for " + feature,
-    );
-};
 
 const replSet = new ReplSetTest({nodes: 1});
 replSet.startSet();

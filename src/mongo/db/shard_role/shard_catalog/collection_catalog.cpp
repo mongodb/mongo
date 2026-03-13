@@ -609,10 +609,13 @@ public:
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kDroppedCollection: {
-                    writeJobs.push_back(
-                        [opCtx, uuid = *entry.uuid(), commitTime](CollectionCatalog& catalog) {
-                            catalog.deregisterCollection(opCtx, uuid, commitTime);
-                        });
+                    writeJobs.push_back([opCtx,
+                                         uuid = *entry.uuid(),
+                                         dropPendingCollection = entry.droppedCollection,
+                                         commitTime](CollectionCatalog& catalog) {
+                        catalog.deregisterCollection(
+                            opCtx, uuid, commitTime, dropPendingCollection);
+                    });
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kRecreatedCollection: {
@@ -2347,11 +2350,14 @@ void CollectionCatalog::_registerCollection(OperationContext* opCtx,
     resourceCatalog.add({RESOURCE_COLLECTION, nss}, nss);
 }
 
-std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
-    OperationContext* opCtx, const UUID& uuid, boost::optional<Timestamp> commitTime) {
+void CollectionCatalog::deregisterCollection(OperationContext* opCtx,
+                                             const UUID& uuid,
+                                             boost::optional<Timestamp> commitTime,
+                                             std::shared_ptr<Collection> dropPendingCollection) {
     invariant(_catalog.find(uuid));
+    invariant(!dropPendingCollection || dropPendingCollection->uuid() == uuid);
 
-    auto coll = std::move(_catalog[uuid]);
+    auto coll = dropPendingCollection ? dropPendingCollection : std::move(_catalog[uuid]);
     auto ns = coll->ns();
     auto dbIdPair = std::make_pair(ns.dbName(), uuid);
 
@@ -2379,8 +2385,6 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
     if (!storageGlobalParams.repair && coll->ns().isSystemDotViews()) {
         _viewsForDatabase = _viewsForDatabase.erase(coll->ns().dbName());
     }
-
-    return coll;
 }
 
 void CollectionCatalog::Stats::adjustOnCollectionRegistration(const Collection& coll,

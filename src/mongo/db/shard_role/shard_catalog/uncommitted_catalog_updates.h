@@ -108,6 +108,12 @@ public:
         // New set of view information for a database.
         // Set for action kReplacedViewsForDatabase, boost::none otherwise.
         boost::optional<ViewsForDatabase> viewsForDb;
+
+        // Store the dropped collection. Set for kDroppedCollection only. The "collection" is used
+        // to implement "read your own writes", meaning a dropped collection needs to be nullptr.
+        // However, when deregistering a collection we may want to act on the latest non-dropped
+        // copy.
+        std::shared_ptr<Collection> droppedCollection;
     };
 
     struct CollectionLookupResult {

@@ -101,6 +101,9 @@ export function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
     const kElectableNodes = 2;
     const kRetryIntervalMS = 25;
 
+    const kEnsureRollbackDbName = "EnsureThereIsAtLeastOneOpToRollback";
+    const kEnsureRollbackCollName = "ensureRollback";
+
     let awaitSecondaryNodesForRollbackTimeout;
 
     let rst;
@@ -210,6 +213,11 @@ export function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
 
         rst = replSet;
         lastRBID = assert.commandWorked(curSecondary.adminCommand("replSetGetRBID")).rbid;
+
+        // Pre-create kEnsureRollbackDbName and kEnsureRollbackCollName to ensure they exist before
+        // transition to rollback operations. This ensures that tests on catalog stats do not get
+        // unexpected statistic changes due to the creation of the collection and its indexes.
+        curPrimary.getDB(kEnsureRollbackDbName).createCollection(kEnsureRollbackCollName);
 
         // Insert a document and replicate it to all 3 nodes so that any of the nodes can sync from
         // any other. If we do not do this, then due to initial sync timing and sync source
@@ -508,9 +516,8 @@ export function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
         // ensure that this document is not lost due to unclean shutdowns. Ephemeral and in-memory
         // storage engines are an exception because journaling isn't supported.
         let writeConcern = TestData.rollbackShutdowns ? {w: 1, j: true} : {w: 1};
-        let dbName = "EnsureThereIsAtLeastOneOpToRollback";
-        runWithTenantIfNeeded(curPrimary.getDB(dbName), {
-            insert: "ensureRollback",
+        runWithTenantIfNeeded(curPrimary.getDB(kEnsureRollbackDbName), {
+            insert: kEnsureRollbackCollName,
             documents: [{thisDocument: "is inserted to ensure rollback is not skipped"}],
             writeConcern,
         });
