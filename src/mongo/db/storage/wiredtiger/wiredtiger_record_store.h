@@ -97,6 +97,10 @@ public:
     class Capped;
     class Oplog;
 
+    // Updates of values at or below this length always take the full-update path rather than WT
+    // modify.
+    static constexpr int kMinLengthForDiff = 1024;
+
     // Encapsulates configuration parameters to configure a WiredTiger table.
     struct WiredTigerTableConfig {
         // This specifies the value for the key_format configuration parameter.

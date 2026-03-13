@@ -141,7 +141,7 @@ long long SpillTable::numRecords() const {
 }
 
 int64_t SpillTable::storageSize() const {
-    _ru->setIsolation(RecoveryUnit::Isolation::readUncommitted);
+    _ru->setIsolation(RecoveryUnit::Isolation::readCommitted);
     return _rs->storageSize(*_ru);
 }
 
@@ -211,7 +211,7 @@ Status SpillTable::insertRecords(OperationContext* opCtx, std::vector<Record>* r
 
 bool SpillTable::findRecord(OperationContext* opCtx, const RecordId& rid, RecordData* out) const {
     _ru->setOperationContext(opCtx);
-    _ru->setIsolation(RecoveryUnit::Isolation::readUncommitted);
+    _ru->setIsolation(RecoveryUnit::Isolation::readCommitted);
     ON_BLOCK_EXIT([this] { _ru->setOperationContext(nullptr); });
 
     return _rs->findRecord(opCtx, *_ru, rid, out);
@@ -264,7 +264,7 @@ void SpillTable::deleteRecord(OperationContext* opCtx, const RecordId& rid) {
 std::unique_ptr<SpillTable::Cursor> SpillTable::getCursor(OperationContext* opCtx,
                                                           bool forward) const {
     _ru->setOperationContext(opCtx);
-    _ru->setIsolation(RecoveryUnit::Isolation::readUncommitted);
+    _ru->setIsolation(RecoveryUnit::Isolation::readCommitted);
 
     return std::make_unique<SpillTable::Cursor>(*_ru, _rs->getCursor(opCtx, *_ru, forward));
 }

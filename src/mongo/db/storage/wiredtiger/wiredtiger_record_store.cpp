@@ -395,7 +395,6 @@ Status WiredTigerRecordStore::wtUpdateRecord(OperationContext* opCtx,
     //
     // Skip modify for logged tables: don't trust WiredTiger's recovery with operations that are not
     // idempotent.
-    const int kMinLengthForDiff = 1024;
     const int kMaxEntries = 16;
     const int kMaxDiffBytes = len / 10;
 

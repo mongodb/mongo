@@ -76,6 +76,71 @@ TEST(WiredTigerRecordStoreTest, StorageSizeStatisticsDisabled) {
     ASSERT_THROWS(rs->storageSize(ru), AssertionException);
 }
 
+TEST(WiredTigerRecordStoreTest, UpdateLargeUnloggedRecordAndReadBack) {
+    WiredTigerHarnessHelper harnessHelper;
+    ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
+    auto& ru =
+        *checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()));
+
+    const std::string ns = "updateLargeUnloggedRecordAndReadBack";
+    const std::string ident = "collection-updateLargeUnloggedRecordAndReadBack";
+    const std::string uri = WiredTigerUtil::kTableUriPrefix + ident;
+
+    WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig;
+    wtTableConfig.keyFormat = KeyFormat::Long;
+    wtTableConfig.logEnabled = false;
+
+    {
+        StorageWriteTransaction txn(ru);
+        WiredTigerSession* s = ru.getSession();
+        invariantWTOK(
+            s->create(uri.c_str(),
+                      WiredTigerRecordStore::generateCreateString(ns, wtTableConfig).c_str()),
+            *s);
+        txn.commit();
+    }
+
+    WiredTigerRecordStore::Params params;
+    params.uuid = UUID::gen();
+    params.ident = ident;
+    params.engineName = std::string{kWiredTigerEngineName};
+    params.keyFormat = KeyFormat::Long;
+    params.overwrite = true;
+    params.isLogged = false;
+    params.forceUpdateWithFullDocument = false;
+    params.inMemory = false;
+    params.sizeStorer = nullptr;
+    params.tracksSizeAdjustments = true;
+
+    auto rs = std::make_unique<WiredTigerRecordStore>(
+        static_cast<WiredTigerKVEngine*>(harnessHelper.getEngine()),
+        WiredTigerRecoveryUnit::get(ru),
+        params);
+
+    const RecordId rid(1);
+    std::string originalValue(WiredTigerRecordStore::kMinLengthForDiff, 'a');
+    std::string updatedValue = originalValue + "b";
+
+    {
+        StorageWriteTransaction txn(ru);
+        auto status = rs->insertRecord(
+            opCtx.get(), ru, rid, originalValue.data(), originalValue.size(), Timestamp{});
+        ASSERT_OK(status.getStatus());
+        txn.commit();
+    }
+
+    {
+        StorageWriteTransaction txn(ru);
+        ASSERT_OK(rs->updateRecord(opCtx.get(), ru, rid, updatedValue.data(), updatedValue.size()));
+        txn.commit();
+    }
+
+    ru.setIsolation(RecoveryUnit::Isolation::readCommitted);
+    RecordData record;
+    ASSERT_TRUE(rs->findRecord(opCtx.get(), ru, rid, &record));
+    ASSERT_EQ(std::string(record.data(), record.size()), updatedValue);
+}
+
 TEST(WiredTigerRecordStoreTest, SizeStorer1) {
     WiredTigerHarnessHelper harnessHelper;
     std::string indexUri = WiredTigerUtil::kTableUriPrefix + "myindex";
