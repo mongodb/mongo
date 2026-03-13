@@ -243,6 +243,30 @@ functions:
       # Mark as optional to allow local-mode execution to succeed.
       optional: true
 
+  "get engflow release key": &get_engflow_release_key
+    command: s3.get
+    display_name: "get engflow release key"
+    params:
+      aws_key: ${engflow_key}
+      aws_secret: ${engflow_secret}
+      remote_file: engflow/release/engflow_release.key
+      bucket: serverengflow
+      local_file: "src/.tmp/engflow_release.key"
+      # Mark as optional to allow local-mode execution to succeed.
+      optional: true
+
+  "get engflow release cert": &get_engflow_release_cert
+    command: s3.get
+    display_name: "get engflow release cert"
+    params:
+      aws_key: ${engflow_key}
+      aws_secret: ${engflow_secret}
+      remote_file: engflow/release/engflow_release.cert
+      bucket: serverengflow
+      local_file: "src/.tmp/engflow_release.cert"
+      # Mark as optional to allow local-mode execution to succeed.
+      optional: true
+
   "generate evergreen bazelrc": &generate_evergreen_bazelrc
     command: subprocess.exec
     params:
@@ -254,6 +278,8 @@ functions:
   "get engflow creds":
     - *get_engflow_key
     - *get_engflow_cert
+    - *get_engflow_release_key
+    - *get_engflow_release_cert
     - *f_expansions_write
     - *generate_evergreen_bazelrc
 

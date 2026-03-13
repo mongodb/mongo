@@ -17,6 +17,8 @@ buildvariants:
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
         --streams_release_build=True
+      release_rbe: true
+      evergreen_remote_exec: on
       multiversion_platform: amazon2023
       multiversion_edition: enterprise-streams
       compile_variant: enterprise-amazon2023-streams
@@ -43,6 +45,8 @@ buildvariants:
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
         --streams_release_build=True
+      release_rbe: true
+      evergreen_remote_exec: on
       multiversion_platform: amazon2023
       multiversion_edition: enterprise-streams
       compile_variant: enterprise-amazon2023-streams-arm64

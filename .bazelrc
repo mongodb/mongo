@@ -571,21 +571,31 @@ common:local --jobs=auto
 common:no-remote-exec --remote_executor=
 common:no-remote-exec --jobs=auto
 
-# Disable remote execution and caching for public releases
+# Common settings for all types of release builds
 --config=public-release
-common:public-release --remote_executor=
-common:public-release --experimental_remote_downloader=
-common:public-release --remote_cache=
-common:public-release --bes_backend=
-common:public-release --bes_results_url=
-common:public-release --tls_client_certificate=
-common:public-release --tls_client_key=
-common:public-release --remote_cache_compression=false
-common:public-release --grpc_keepalive_time=0s
-common:public-release --legacy_important_outputs
 common:public-release --//bazel/config:release=True
 common:public-release --//bazel/config:extensions_signature_verification_secure=True
 common:public-release --stamp
+
+# Disable remote execution and caching for public releases
+--config=public-release-local
+common:public-release-local --config=public-release
+common:public-release-local --remote_executor=
+common:public-release-local --experimental_remote_downloader=
+common:public-release-local --remote_cache=
+common:public-release-local --bes_backend=
+common:public-release-local --bes_results_url=
+common:public-release-local --tls_client_certificate=
+common:public-release-local --tls_client_key=
+common:public-release-local --remote_cache_compression=false
+common:public-release-local --grpc_keepalive_time=0s
+common:public-release-local --legacy_important_outputs
+
+# Release configuration with rbe enabled
+--config=public-release-rbe
+common:public-release-rbe --config=public-release
+common:public-release-rbe --remote_instance_name=release
+common:public-release-rbe --bes_instance_name=release
 
 common --@rules_rust//rust/toolchain/channel=nightly
 common --@rules_rust//rust/settings:experimental_use_allocator_libraries_with_mangled_symbols=true

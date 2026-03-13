@@ -43,6 +43,8 @@ uri="https://spruce.mongodb.com/task/${task_id:?}?execution=${execution:?}"
 
 echo "common --tls_client_certificate=./engflow.cert" >>.bazelrc.evergreen
 echo "common --tls_client_key=./engflow.key" >>.bazelrc.evergreen
+echo "common:public-release-rbe --tls_client_certificate=./.tmp/engflow_release.cert" >>.bazelrc.evergreen
+echo "common:public-release-rbe --tls_client_key=./.tmp/engflow_release.key" >>.bazelrc.evergreen
 echo "common --bes_keywords=engflow:CiCdPipelineName=${build_variant:?}" >>.bazelrc.evergreen
 echo "common --bes_keywords=engflow:CiCdJobName=${task_name:?}" >>.bazelrc.evergreen
 echo "common --bes_keywords=engflow:CiCdUri=${uri:?}" >>.bazelrc.evergreen

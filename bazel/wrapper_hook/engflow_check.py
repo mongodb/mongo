@@ -41,9 +41,9 @@ def engflow_auth(args):
     args_str = " ".join(args)
     if (
         "--config=local" not in args_str
-        and "--config=public-release" not in args_str
+        and "--config=public-release-local" not in args_str
         and "--config local" not in args_str
-        and "--config public-release" not in args_str
+        and "--config public-release-local" not in args_str
     ):
         if os.environ.get("CI") is None and platform.machine().lower() not in {"ppc64le", "s390x"}:
             setup_auth_wrapper()
