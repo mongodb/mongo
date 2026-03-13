@@ -101,6 +101,9 @@ QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettin
     _enableJoinEnumerationHJOrderPruning = internalEnableJoinEnumerationHJOrderPruning.load();
     _enableJoinOptimizationUseIndexUniqueness =
         internalEnableJoinOptimizationUseIndexUniqueness.load();
+    _joinMethod = ServerParameterSet::getNodeParameterSet()
+                      ->get<ForcedJoinMethod>("internalJoinMethod")
+                      ->_data.get();
     _enablePathArrayness = internalEnablePathArrayness.loadRelaxed();
     _enablePipelineOptimizationAdditionalTestingRules =
         internalEnablePipelineOptimizationAdditionalTestingRules.loadRelaxed();
@@ -165,6 +168,10 @@ size_t QueryKnobConfiguration::getMaxNumberNodesConsideredForImplicitEdges() con
 
 bool QueryKnobConfiguration::getEnableJoinEnumerationHJOrderPruning() const {
     return _enableJoinEnumerationHJOrderPruning;
+}
+
+ForcedJoinMethodEnum QueryKnobConfiguration::getJoinMethod() const {
+    return _joinMethod;
 }
 
 size_t QueryKnobConfiguration::getInternalJoinPlanSamplingSize() const {

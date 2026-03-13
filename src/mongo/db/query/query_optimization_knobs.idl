@@ -89,6 +89,15 @@ enums:
             kRightDeep: "rightDeep"
             kZigZag: "zigZag"
 
+    ForcedJoinMethod:
+        description: "Enum for forcing a specific join method."
+        type: string
+        values:
+            kAny: "any"
+            kHJ: "HJ"
+            kINLJ: "INLJ"
+            kNLJ: "NLJ"
+
 structs:
     InternalQueryCutoffForSampleFromRandomCursorStorage:
         description: "A specification for the 'internalQueryCutoffForSampleFromRandomCursor' cluster-wide configuration parameter type."
@@ -607,6 +616,18 @@ server_parameters:
         cpp_varname: "internalEnableJoinOptimizationUseIndexUniqueness"
         cpp_vartype: AtomicWord<bool>
         default: false
+        redact: false
+
+    internalJoinMethod:
+        description: >-
+            Forces all joins produced by the join optimizer to use the specified method.
+            When set to "any" (default), the optimizer picks the method itself.
+        set_at: [startup, runtime]
+        cpp_class:
+            name: ForcedJoinMethod
+            data: synchronized_value<ForcedJoinMethodEnum>
+        default:
+            expr: ForcedJoinMethodEnum::kAny
         redact: false
 
     internalQueryEnableCSTParser:

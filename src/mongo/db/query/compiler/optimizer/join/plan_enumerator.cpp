@@ -154,7 +154,8 @@ bool PlanEnumeratorContext::canPlanBeEnumerated(JoinMethod method,
                                                 const JoinSubset& left,
                                                 const JoinSubset& right,
                                                 const JoinSubset& subset) {
-    if (_mode.mode == PlanEnumerationMode::HINTED && _mode.hint->method != method) {
+    // Filter by hinted join method if present, regardless of enumeration mode.
+    if (_mode.hint && _mode.hint->method != method) {
         return false;
     }
 

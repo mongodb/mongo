@@ -112,7 +112,7 @@ public:
         // First level at which to apply this mode.
         size_t level;
         PlanEnumerationMode mode;
-        // Only used by HINTED mode to specify what we should enumerate for this subset level.
+        // Optionally configures plan enumeration via hints.
         boost::optional<JoinHint> hint = boost::none;
 
         BSONObj toBSON() const;

@@ -61,6 +61,23 @@ export function usedNestedLoopJoinEmbedding(explain) {
     return stages.includes("NESTED_LOOP_JOIN_EMBEDDING");
 }
 
+/**
+ * Returns an abbreviation for a join embedding stage name, or the original name
+ * if it is not a join stage.
+ */
+export function joinStageAbbreviation(stageName) {
+    switch (stageName) {
+        case "HASH_JOIN_EMBEDDING":
+            return "HJ";
+        case "NESTED_LOOP_JOIN_EMBEDDING":
+            return "NLJ";
+        case "INDEXED_NESTED_LOOP_JOIN_EMBEDDING":
+            return "INLJ";
+        default:
+            return stageName;
+    }
+}
+
 export function plannerStageIsJoinOptNode(stageObj) {
     return (
         stageObj.stage.includes("NESTED_LOOP_JOIN_EMBEDDING") ||

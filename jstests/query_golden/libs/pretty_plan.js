@@ -9,23 +9,11 @@ import {
     kExplainChildFieldNames,
     getRejectedPlans,
 } from "jstests/libs/query/analyze_plan.js";
+import {joinStageAbbreviation} from "jstests/libs/query/join_utils.js";
 
 //
 // Helpers used below to get an abbreviated join order.
 //
-
-function getStageAbbreviation(stageName) {
-    switch (stageName) {
-        case "HASH_JOIN_EMBEDDING":
-            return "HJ";
-        case "NESTED_LOOP_JOIN_EMBEDDING":
-            return "NLJ";
-        case "INDEX_NESTED_LOOP_JOIN_EMBEDDING":
-            return "INLJ";
-        default:
-            return stageName;
-    }
-}
 
 function formatEmbeddingField(field) {
     if (field && field !== "none") {
@@ -35,7 +23,7 @@ function formatEmbeddingField(field) {
 }
 
 function abbreviate(node) {
-    const abbrev = getStageAbbreviation(node.stage);
+    const abbrev = joinStageAbbreviation(node.stage);
     if (abbrev == node.stage) {
         if (node.nss) {
             return `${node.stage} [${node.nss}]`;

@@ -70,26 +70,49 @@ PlanTreeShape getPlanTreeShape(JoinPlanTreeShapeEnum shape) {
     }
 }
 
-PerSubsetLevelEnumerationMode getMode(size_t minLevel, size_t maxLevel) {
+boost::optional<JoinMethod> getJoinMethod(ForcedJoinMethodEnum algorithm) {
+    switch (algorithm) {
+        case ForcedJoinMethodEnum::kAny:
+            return boost::none;
+        case ForcedJoinMethodEnum::kHJ:
+            return JoinMethod::HJ;
+        case ForcedJoinMethodEnum::kINLJ:
+            return JoinMethod::INLJ;
+        case ForcedJoinMethodEnum::kNLJ:
+            return JoinMethod::NLJ;
+        default:
+            MONGO_UNREACHABLE_TASSERT(12018700);
+    }
+}
+
+PerSubsetLevelEnumerationMode getMode(size_t minLevel,
+                                      size_t maxLevel,
+                                      boost::optional<JoinHint> hint = boost::none) {
     // Only try to update the enumeration mode to ALL if the query knobs are set to sane values.
     if (minLevel < maxLevel && minLevel < kHardMaxNodesInJoin) {
         if (minLevel == 0) {
-            return {{{0, PlanEnumerationMode::ALL}, {maxLevel, PlanEnumerationMode::CHEAPEST}}};
+            return {{{0, PlanEnumerationMode::ALL, hint},
+                     {maxLevel, PlanEnumerationMode::CHEAPEST, hint}}};
         }
-
-        return {{{0, PlanEnumerationMode::CHEAPEST},
-                 {minLevel, PlanEnumerationMode::ALL},
-                 {maxLevel, PlanEnumerationMode::CHEAPEST}}};
+        return {{{0, PlanEnumerationMode::CHEAPEST, hint},
+                 {minLevel, PlanEnumerationMode::ALL, hint},
+                 {maxLevel, PlanEnumerationMode::CHEAPEST, hint}}};
     }
 
-    return PlanEnumerationMode::CHEAPEST;
+    return {{{0, PlanEnumerationMode::CHEAPEST, hint}}};
 }
 
 EnumerationStrategy getEnumerationStrategy(const QueryKnobConfiguration& qkc) {
     auto minLevel = qkc.getInternalMinAllPlansEnumerationSubsetLevel();
     auto maxLevel = qkc.getInternalMaxAllPlansEnumerationSubsetLevel();
+    auto joinMethod = getJoinMethod(qkc.getJoinMethod());
+
+    // Override the join method for all joins if specified by the 'internalJoinMethod' query knob.
+    auto methodHint =
+        joinMethod ? boost::optional<JoinHint>(JoinHint{0, *joinMethod, false}) : boost::none;
+
     return {.planShape = getPlanTreeShape(qkc.getJoinPlanTreeShape()),
-            .mode = getMode(minLevel, maxLevel),
+            .mode = getMode(minLevel, maxLevel, methodHint),
             .enableHJOrderPruning = qkc.getEnableJoinEnumerationHJOrderPruning()};
 }
 
@@ -322,15 +345,16 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
             }
             case JoinReorderModeEnum::kRandom:
                 // Randomly reorder joins (while still passing through bottom-up enumerator). NOTE:
-                // this currently ignores all query knobs other than the random seed & plan tree
-                // shape, but could easily be modified to take the values of other query knobs as
-                // "overrides".
+                // this currently ignores all query knobs other than the random seed, the plan tree
+                // shape and the join method, but could easily be modified to take the values of
+                // other query knobs as "overrides".
                 return constructSolutionWithRandomOrder(
                     ctx,
                     &cardEstimator,
                     &costEstimator,
                     qkc.getRandomJoinOrderSeed(),
-                    getPlanTreeShape(qkc.getJoinPlanTreeShape()));
+                    getPlanTreeShape(qkc.getJoinPlanTreeShape()),
+                    getJoinMethod(qkc.getJoinMethod()));
             default:
                 MONGO_UNREACHABLE_TASSERT(11336911);
         }

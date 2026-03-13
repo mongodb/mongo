@@ -275,6 +275,7 @@ mongo_cc_library(
 mongo_cc_library(
     name = "query_knobs",
     srcs = [
+        "forced_join_method.cpp",
         "framework_control.cpp",
         "join_plan_tree_shape.cpp",
         "join_reorder_mode.cpp",
