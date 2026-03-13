@@ -488,4 +488,12 @@ TEST(JoinGraphTests, IsConnected) {
         ASSERT_FALSE(graph.isConnected());
     }
 }
+
+ASSERT_DOES_NOT_COMPILE(NodeSetNotConstructibleFromNodeIdDirectInit,
+                        typename T = NodeSet,
+                        T(std::declval<NodeId>()));
+
+ASSERT_DOES_NOT_COMPILE(NodeSetNotConstructibleFromNodeIdUniformInit,
+                        typename T = NodeSet,
+                        T{std::declval<NodeId>()});
 }  // namespace mongo::join_ordering

@@ -213,7 +213,7 @@ public:
               NodeCardinalities(jCtx.joinGraph.numNodes(), cost_based_ranker::zeroCE)) {
         for (uint64_t i = 0; i < std::pow(2, jCtx.joinGraph.numNodes()); ++i) {
             _subsetCardinalities.emplace(
-                NodeSet{i},
+                NodeSet::fromUIntBitSet(i),
                 // Convert the bitset to a double to get a consistent estimate.
                 CardinalityEstimate{CardinalityType{static_cast<double>(i)},
                                     EstimationSource::Code});

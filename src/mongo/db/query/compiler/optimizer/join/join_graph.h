@@ -51,11 +51,64 @@ constexpr size_t kHardMaxEdgesInJoin = 4096;
  */
 constexpr size_t kHardMaxPredicatesInJoin = std::numeric_limits<PredicateId>::max();
 
-/** NodeSet is a bitset representation of a subset of join nodes. It is used to efficiently
+/**
+ * NodeSet is a bitset representation of a subset of join nodes. It is used to efficiently
  * track which nodes are included in an intermediate join. This compact representation is highly
  * effective for the join reordering algorithm.
  */
-using NodeSet = std::bitset<kHardMaxNodesInJoin>;
+class NodeSet : public std::bitset<kHardMaxNodesInJoin> {
+    using Base = std::bitset<kHardMaxNodesInJoin>;
+
+    // For use by the methods/operators below to easily return a NodeSet.
+    explicit NodeSet(const Base& b) : Base(b) {}
+
+public:
+    NodeSet() = default;
+    explicit NodeSet(const char* str) : Base(str) {}
+
+    // Do not allow implicit conversion from NodeId.
+    NodeSet(NodeId) = delete;
+
+    // Initialization from unsigned int is permitted only when explicitly requested. This is to be
+    // used when the number represents a bit set, not a singular id (like NodeId).
+    static NodeSet fromUIntBitSet(uint64_t i) {
+        return NodeSet(Base(i));
+    }
+
+    // Because we are publicly inheriting from bitset, we inherit its methods. Here, we re-implement
+    // some of its methods/operators that return a bitset so that we have versions that return a
+    // NodeSet instead. This allows for easy chaining of operators outside of this class.
+    NodeSet& operator&=(const NodeSet& rhs) {
+        Base::operator&=(rhs);
+        return *this;
+    }
+    NodeSet& operator|=(const NodeSet& rhs) {
+        Base::operator|=(rhs);
+        return *this;
+    }
+    NodeSet& operator^=(const NodeSet& rhs) {
+        Base::operator^=(rhs);
+        return *this;
+    }
+    NodeSet& set(size_t pos, bool val = true) {
+        Base::set(pos, val);
+        return *this;
+    }
+    friend NodeSet operator&(NodeSet lhs, const NodeSet& rhs) {
+        return lhs &= rhs;
+    }
+    friend NodeSet operator|(NodeSet lhs, const NodeSet& rhs) {
+        return lhs |= rhs;
+    }
+    friend NodeSet operator^(NodeSet lhs, const NodeSet& rhs) {
+        return lhs ^= rhs;
+    }
+
+    template <typename H>
+    friend H AbslHashValue(H h, const NodeSet& ns) {
+        return H::combine(std::move(h), static_cast<const Base&>(ns));
+    }
+};
 
 std::string nodeSetToString(const NodeSet& set, size_t numNodesToPrint = kHardMaxNodesInJoin);
 
