@@ -683,7 +683,7 @@ void ReplSetConfig::_addInternalWriteConcernModes() {
     // $majorityConfig: the majority of all voting members including arbiters.
     pattern = _tagConfig.makePattern();
     status = _tagConfig.addTagCountConstraintToPattern(
-        &pattern, MemberConfig::kConfigVoterTagName, _majorityVoteCount / 2 + 1);
+        &pattern, MemberConfig::kConfigVoterTagName, _majorityVoteCount);
     if (status.isOK()) {
         _customWriteConcernModes[kConfigMajorityWriteConcernModeName] = pattern;
     } else if (status != ErrorCodes::NoSuchKey) {

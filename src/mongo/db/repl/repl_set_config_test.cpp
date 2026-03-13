@@ -91,6 +91,29 @@ BSONObj createConfigDocWithArbiters(int members, int arbiters = 0) {
     return fromjson(configJson);
 }
 
+void verifyConfigMajority(ReplSetConfig& config, int expectedMajority) {
+    // Fetch the internal $configMajority tag pattern.
+    auto swPattern = config.findCustomWriteMode(ReplSetConfig::kConfigMajorityWriteConcernModeName);
+    ASSERT_OK(swPattern.getStatus());
+    auto pattern = swPattern.getValue();
+
+    ReplSetTagMatch matcher(pattern);
+
+    // Loop through members and calculate how many are needed to satisfy the tag pattern.
+    int membersNeeded = 0;
+    for (const auto& member : config.members()) {
+        if (matcher.isSatisfied()) {
+            break;
+        }
+        ++membersNeeded;
+        for (MemberConfig::TagIterator it = member.tagsBegin(); it != member.tagsEnd(); ++it) {
+            matcher.update(*it);
+        }
+    }
+
+    ASSERT_EQ(expectedMajority, membersNeeded);
+}
+
 TEST(ReplSetConfig, ParseMinimalConfigAndCheckDefaults) {
     ReplSetConfig config(ReplSetConfig::parse(
         BSON("_id" << "rs0"
@@ -241,6 +264,115 @@ TEST(ReplSetConfig, MajorityCalculationNearlyHalfSecondariesNoVotes) {
                                                 << "_id" << 4)))));
     ASSERT_OK(config.validate());
     ASSERT_EQUALS(2, config.getWriteMajority());
+}
+
+TEST(ReplSetConfig, ConfigMajorityInFiveNodeSet) {
+    // 5 voting members, no arbiters.
+    ReplSetConfig config(
+        ReplSetConfig::parse(BSON("_id" << "mySet"
+                                        << "version" << 2 << "protocolVersion" << 1 << "members"
+                                        << BSON_ARRAY(BSON("host" << "node1:12345"
+                                                                  << "_id" << 0)
+                                                      << BSON("host" << "node2:12345"
+                                                                     << "_id" << 1)
+                                                      << BSON("host" << "node3:12345"
+                                                                     << "_id" << 2)
+                                                      << BSON("host" << "node4:12345"
+                                                                     << "_id" << 3)
+                                                      << BSON("host" << "node5:12345"
+                                                                     << "_id" << 4)))));
+
+    ASSERT_OK(config.validate());
+    // For 5 voting members, the expected config majority is 3.
+    verifyConfigMajority(config, 3);
+}
+
+TEST(ReplSetConfig, ConfigMajorityInFourNodeSet) {
+    // 4 voting members, no arbiters.
+    ReplSetConfig config(
+        ReplSetConfig::parse(BSON("_id" << "mySet"
+                                        << "version" << 2 << "protocolVersion" << 1 << "members"
+                                        << BSON_ARRAY(BSON("host" << "node1:12345"
+                                                                  << "_id" << 0)
+                                                      << BSON("host" << "node2:12345"
+                                                                     << "_id" << 1)
+                                                      << BSON("host" << "node3:12345"
+                                                                     << "_id" << 2)
+                                                      << BSON("host" << "node4:12345"
+                                                                     << "_id" << 3)))));
+
+    ASSERT_OK(config.validate());
+    // For 4 voting members, the expected config majority is 3.
+    verifyConfigMajority(config, 3);
+}
+
+TEST(ReplSetConfig, ConfigMajorityInFiveNodeSetOneArbiter) {
+    // 4 node set with 2 arbiters, which also qualify for $configMajority. This
+    // test confirms that an arbiter counts towards the required majority of 3.
+    RAIIServerParameterControllerForTest controller{"allowMultipleArbiters", true};
+    ReplSetConfig config(ReplSetConfig::parse(
+        BSON("_id" << "mySet"
+                   << "version" << 2 << "protocolVersion" << 1 << "members"
+                   << BSON_ARRAY(BSON("host" << "node1:12345"
+                                             << "_id" << 0)
+                                 << BSON("host" << "node2:12345"
+                                                << "_id" << 1)
+                                 << BSON("host" << "node3:12345"
+                                                << "_id" << 2 << "arbiterOnly" << 1)
+                                 << BSON("host" << "node4:12345"
+                                                << "_id" << 3 << "arbiterOnly" << 1)))));
+
+    ASSERT_OK(config.validate());
+    // For 4 voting members, including 2 arbiters, the expected config majority is 3.
+    verifyConfigMajority(config, 3);
+}
+
+TEST(ReplSetConfig, ConfigMajorityInFourNodeSetTwoVotersOnly) {
+    // 4 node set but only 2 voting members. $configMajority should be 2.
+    ReplSetConfig config(ReplSetConfig::parse(
+        BSON("_id" << "mySet"
+                   << "version" << 2 << "protocolVersion" << 1 << "members"
+                   << BSON_ARRAY(BSON("host" << "node1:12345"
+                                             << "_id" << 0)
+                                 << BSON("host" << "node2:12345"
+                                                << "_id" << 1 << "votes" << 0 << "priority" << 0)
+                                 << BSON("host" << "node3:12345"
+                                                << "_id" << 2 << "votes" << 0 << "priority" << 0)
+                                 << BSON("host" << "node4:12345"
+                                                << "_id" << 3)))));
+
+    ASSERT_OK(config.validate());
+
+    // Fetch the internal $configMajority tag pattern.
+    auto swPattern = config.findCustomWriteMode(ReplSetConfig::kConfigMajorityWriteConcernModeName);
+    ASSERT_OK(swPattern.getStatus());
+    auto pattern = swPattern.getValue();
+
+    ReplSetTagMatch matcher(pattern);
+
+    // Get tags from a member at index i
+    auto updateMatcherWithMemberTagsAt = [&](int i) {
+        const auto& member = config.getMemberAt(i);
+        for (MemberConfig::TagIterator it = member.tagsBegin(); it != member.tagsEnd(); ++it) {
+            matcher.update(*it);
+        }
+    };
+
+    // Update the matcher with node 0's tags, which should not satisfy $configMajority yet.
+    updateMatcherWithMemberTagsAt(0);
+    ASSERT_FALSE(matcher.isSatisfied());
+
+    // Update the matcher with the tags of nodes 1 and 2. Since they are non-voting, the tag
+    // match should still be unsatisfied.
+    updateMatcherWithMemberTagsAt(1);
+    ASSERT_FALSE(matcher.isSatisfied());
+    updateMatcherWithMemberTagsAt(2);
+    ASSERT_FALSE(matcher.isSatisfied());
+
+    // Finally, update the matcher with node 3's tags, which brings $configMajority to 2 and
+    // should satisfy the tag pattern.
+    updateMatcherWithMemberTagsAt(3);
+    ASSERT_TRUE(matcher.isSatisfied());
 }
 
 TEST(ReplSetConfig, ParseFailsWithBadOrMissingIdField) {
