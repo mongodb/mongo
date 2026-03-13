@@ -18,12 +18,15 @@ import {testProperty} from "jstests/libs/property_test_helpers/property_testing_
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {getMatchArb} from "jstests/libs/property_test_helpers/models/match_models.js";
 import {
-    simpleProjectArb,
     addFieldsConstArb,
-    computedProjectArb,
     addFieldsVarArb,
     getSortArb,
 } from "jstests/libs/property_test_helpers/models/query_models.js";
+import {
+    simpleProjectArb,
+    multipleFieldProjectArb,
+    computedProjectArb,
+} from "jstests/libs/property_test_helpers/models/project_models.js";
 
 if (isSlowBuild(db)) {
     jsTest.log.info("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
@@ -48,6 +51,7 @@ const correctnessProperty = createCorrectnessProperty(controlColl, experimentCol
 // guaranteed to be the same across the control/experiment collections.
 const allowedStages = [
     simpleProjectArb,
+    multipleFieldProjectArb,
     getMatchArb(),
     addFieldsConstArb,
     computedProjectArb,

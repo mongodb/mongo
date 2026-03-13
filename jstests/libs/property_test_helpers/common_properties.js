@@ -331,17 +331,19 @@ export function createRepeatQueriesUseCacheProperty(experimentColl) {
     };
 }
 
-// Function to verify the field excluded by an exclusion projection does not exist in any result documents.
+// Function to verify the fields excluded by an exclusion projection do not exist in any result documents.
 export function checkExclusionProjectionFieldResults(query, results) {
     const projectSpec = query.pipeline.at(-1)["$project"];
-    const excludedField = Object.keys(projectSpec).filter((field) => field !== "_id")[0];
+    const excludedFields = Object.keys(projectSpec).filter((field) => field !== "_id");
     const isIdFieldIncluded = projectSpec._id;
 
     for (const doc of results) {
         const docFields = Object.keys(doc);
-        // If the excluded field still exists, fail.
-        if (docFields.includes(excludedField)) {
-            return false;
+        // If the excluded fields still exist in the document, fail.
+        for (const excludedField of excludedFields) {
+            if (docFields.includes(excludedField)) {
+                return false;
+            }
         }
         // If _id is excluded and it exists, fail.
         if (!isIdFieldIncluded && docFields.includes("_id")) {
@@ -351,10 +353,10 @@ export function checkExclusionProjectionFieldResults(query, results) {
     return true;
 }
 
-// Function to verify only the field included by an inclusion projection exists in the result documents.
+// Function to verify only the fields included by an inclusion projection exist in the result documents.
 export function checkInclusionProjectionResults(query, results) {
     const projectSpec = query.pipeline.at(-1)["$project"];
-    const includedField = Object.keys(projectSpec).filter((field) => field !== "_id")[0];
+    const includedFields = Object.keys(projectSpec).filter((field) => field !== "_id");
     const isIdFieldExcluded = !projectSpec._id;
 
     for (const doc of results) {
@@ -363,8 +365,9 @@ export function checkInclusionProjectionResults(query, results) {
             if (field === "_id" && isIdFieldExcluded) {
                 return false;
             }
-            // If we have a field on the doc that is not the included field, fail.
-            if (field !== "_id" && field !== includedField) {
+            // A dotted result field like "m.m1" is acceptable if either "m.m1" or its
+            // parent "m" is in the inclusion projection.
+            if (field !== "_id" && !includedFields.includes(field)) {
                 return false;
             }
         }

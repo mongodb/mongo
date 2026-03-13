@@ -21,7 +21,8 @@ import {groupArb} from "jstests/libs/property_test_helpers/models/group_models.j
 import {getMatchArb} from "jstests/libs/property_test_helpers/models/match_models.js";
 import {getDatasetModel} from "jstests/libs/property_test_helpers/models/document_models.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
-import {computedProjectArb, addFieldsVarArb} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {addFieldsVarArb} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {computedProjectArb} from "jstests/libs/property_test_helpers/models/project_models.js";
 import {createQueriesWithKnobsSetAreSameAsControlCollScanProperty} from "jstests/libs/property_test_helpers/common_properties.js";
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";

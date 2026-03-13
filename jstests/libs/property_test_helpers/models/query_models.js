@@ -19,25 +19,11 @@ import {getEqLookupArb, getEqLookupUnwindArb} from "jstests/libs/property_test_h
 import {getMatchArb} from "jstests/libs/property_test_helpers/models/match_models.js";
 import {oneof} from "jstests/libs/property_test_helpers/models/model_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
-
-// Inclusion/Exclusion projections. {$project: {_id: 1, a: 0}}
-export function getSingleFieldProjectArb(isInclusion, {simpleFieldsOnly = false} = {}) {
-    const projectedFieldArb = simpleFieldsOnly ? assignableFieldArb : fieldArb;
-    return fc.record({field: projectedFieldArb, includeId: fc.boolean()}).map(function ({field, includeId}) {
-        const includeIdVal = includeId ? 1 : 0;
-        const includeFieldVal = isInclusion ? 1 : 0;
-        return {$project: {_id: includeIdVal, [field]: includeFieldVal}};
-    });
-}
-export const simpleProjectArb = oneof(
-    getSingleFieldProjectArb(true /*isInclusion*/),
-    getSingleFieldProjectArb(false /*isInclusion*/),
-);
-
-// Project from one field to another. {$project {a: '$b'}}
-export const computedProjectArb = fc.tuple(fieldArb, dollarFieldArb).map(function ([destField, srcField]) {
-    return {$project: {[destField]: srcField}};
-});
+import {
+    simpleProjectArb,
+    multipleFieldProjectArb,
+    computedProjectArb,
+} from "jstests/libs/property_test_helpers/models/project_models.js";
 
 // Add field with a constant argument. {$addFields: {a: 5}}
 export const addFieldsConstArb = fc.tuple(fieldArb, leafParameterArb).map(function ([destField, leafParams]) {
@@ -113,6 +99,7 @@ function getAllowedStages(allowOrs, deterministicBag, isTS) {
     if (deterministicBag) {
         allowedStages = [
             simpleProjectArb,
+            multipleFieldProjectArb,
             getMatchArb(allowOrs),
             addFieldsConstArb,
             computedProjectArb,
@@ -126,6 +113,7 @@ function getAllowedStages(allowOrs, deterministicBag, isTS) {
             limitArb,
             skipArb,
             simpleProjectArb,
+            multipleFieldProjectArb,
             getMatchArb(allowOrs),
             addFieldsConstArb,
             computedProjectArb,
@@ -171,6 +159,7 @@ export function getTrySbeEnginePushdownEligibleAggPipelineArb(
     }
     stages.push(
         simpleProjectArb,
+        multipleFieldProjectArb,
         getMatchArb(allowOrs),
         addFieldsConstArb,
         computedProjectArb,

@@ -3,14 +3,17 @@ import {getDatasetModel, getDocModel} from "jstests/libs/property_test_helpers/m
 import {
     addFieldsConstArb,
     addFieldsVarArb,
-    computedProjectArb,
-    simpleProjectArb,
     getAggPipelineArb,
     getQueryAndOptionsModel,
     getTrySbeRestrictedPushdownEligibleAggPipelineArb,
     getTrySbeEnginePushdownEligibleAggPipelineArb,
     getSbeFullPushdownEligibleAggPipelineArb,
 } from "jstests/libs/property_test_helpers/models/query_models.js";
+import {
+    simpleProjectArb,
+    multipleFieldProjectArb,
+    computedProjectArb,
+} from "jstests/libs/property_test_helpers/models/project_models.js";
 import {getMatchArb, getMatchPredicateSpec} from "jstests/libs/property_test_helpers/models/match_models.js";
 import {groupArb} from "jstests/libs/property_test_helpers/models/group_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
@@ -144,7 +147,7 @@ export function sbeFullPushdownEligibleAggModel(foreignName, {isTS = false, is83
 
 export function projectFirstStageAggModel({isTS = false, is83orAbove = true} = {}) {
     let aggArb = fc.record({
-        projectStage: fc.oneof(simpleProjectArb, computedProjectArb),
+        projectStage: fc.oneof(simpleProjectArb, multipleFieldProjectArb, computedProjectArb),
         restOfPipeline: getAggPipelineArb({isTS: isTS}),
     });
 

@@ -22,12 +22,16 @@ import {testProperty} from "jstests/libs/property_test_helpers/property_testing_
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {getMatchArb} from "jstests/libs/property_test_helpers/models/match_models.js";
 import {
-    simpleProjectArb,
     addFieldsConstArb,
-    computedProjectArb,
     addFieldsVarArb,
     getSortArb,
 } from "jstests/libs/property_test_helpers/models/query_models.js";
+import {
+    simpleProjectArb,
+    multipleFieldProjectArb,
+    computedProjectArb,
+} from "jstests/libs/property_test_helpers/models/project_models.js";
+
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 import {getDatasetModel} from "jstests/libs/property_test_helpers/models/document_models.js";
 
@@ -52,6 +56,7 @@ const correctnessProperty = createCacheCorrectnessProperty(controlColl, experime
 // guaranteed to be the same across the control/experiment collections.
 const allowedStages = [
     simpleProjectArb,
+    multipleFieldProjectArb,
     getMatchArb(),
     addFieldsConstArb,
     computedProjectArb,

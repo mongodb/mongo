@@ -21,12 +21,7 @@
  */
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {groupArb} from "jstests/libs/property_test_helpers/models/group_models.js";
-import {
-    getAggPipelineArb,
-    getSingleFieldProjectArb,
-    getSortArb,
-    limitArb,
-} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {getAggPipelineArb, getSortArb, limitArb} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
@@ -38,6 +33,10 @@ import {
     checkSortResults,
     makeBehavioralPropertyFn,
 } from "jstests/libs/property_test_helpers/common_properties.js";
+import {
+    getSingleFieldProjectArb,
+    getMultipleFieldProjectArb,
+} from "jstests/libs/property_test_helpers/models/project_models.js";
 
 if (isSlowBuild(db)) {
     jsTest.log.info("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
@@ -64,11 +63,23 @@ const exclusionProjectionTest = {
     failMsg: "Exclusion projection did not remove the specified fields.",
 };
 
+const multipleExclusionProjectionsTest = {
+    stageArb: getMultipleFieldProjectArb(false /*isInclusion*/, {simpleFieldsOnly: true}),
+    checkResultsFn: checkExclusionProjectionFieldResults,
+    failMsg: "Multiple exclusion projection did not remove the specified fields.",
+};
+
 // --- Inclusion projection testing ---
 const inclusionProjectionTest = {
     stageArb: getSingleFieldProjectArb(true /*isInclusion*/, {simpleFieldsOnly: true}),
     checkResultsFn: checkInclusionProjectionResults,
     failMsg: "Inclusion projection did not drop all other fields.",
+};
+
+const multipleInclusionProjectionTest = {
+    stageArb: getMultipleFieldProjectArb(true /*isInclusion*/, {simpleFieldsOnly: true}),
+    checkResultsFn: checkInclusionProjectionResults,
+    failMsg: "Multiple inclusion projection did not drop all other fields.",
 };
 
 // --- $limit testing ---
@@ -103,7 +114,15 @@ const groupTest = {
     failMsg: "$group did not output documents with unique _ids",
 };
 
-const testCases = [exclusionProjectionTest, inclusionProjectionTest, limitTest, sortTest, groupTest];
+const testCases = [
+    exclusionProjectionTest,
+    multipleExclusionProjectionsTest,
+    inclusionProjectionTest,
+    multipleInclusionProjectionTest,
+    limitTest,
+    sortTest,
+    groupTest,
+];
 const experimentColl = db.agg_behavior_correctness_experiment;
 
 for (const {stageArb, checkResultsFn, failMsg} of testCases) {
