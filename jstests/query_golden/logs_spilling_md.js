@@ -4,6 +4,8 @@
  * @tags: [
  *     requires_persistence,
  *     requires_fcv_81,
+ *     # TODO SERVER-121517: Remove after updating test to account for profiling level > 0 not being supported in disagg.
+ *     requires_profiling
  * ]
  */
 

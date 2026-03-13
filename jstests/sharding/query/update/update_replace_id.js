@@ -14,6 +14,8 @@
  * @tags: [
  *   uses_multi_shard_transactions,
  *   uses_transactions,
+ *   # TODO SERVER-121516: Remove after updating test to account for profiling level > 0 not being supported in disagg.
+ *   requires_profiling,
  * ]
  */
 import {profilerHasSingleMatchingEntryOrThrow, profilerHasZeroMatchingEntriesOrThrow} from "jstests/libs/profiler.js";

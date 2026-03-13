@@ -1,5 +1,9 @@
 // Tests whether profiling can trigger stale config errors and interfere with write batches
 // SERVER-13413
+//  @tags: [
+//      # TODO SERVER-121515:5: Remove after updating test to account for profiling level > 0 not being supported in disagg.
+//      requires_profiling,
+//  ]
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 

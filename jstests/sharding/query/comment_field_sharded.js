@@ -2,6 +2,11 @@
  * Test to verify that the 'comment' field set while running a command gets populated in $currentOp
  * and profiler. This test also verifies that for a sharded collection, the 'comment' fields gets
  * passed on from mongos to the respective shards.
+ * @tags: [
+ *   # TODO SERVER-121515: Remove after updating test to account for profiling level > 0 not being supported in disagg.
+ *   requires_profiling,
+ * ]
+
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

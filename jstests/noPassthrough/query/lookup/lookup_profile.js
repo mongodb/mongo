@@ -1,5 +1,9 @@
 // Tests that lookups on local capped collections acquire a snapshot on the capped collection
 // correctly. Tests the scenario fixed by SERVER-91203 no longer causes a crash.
+//  @tags: [
+//      # TODO SERVER-121515: Remove after updating test to account for profiling level > 0 not being supported in disagg.
+//      requires_profiling,
+//  ]
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 

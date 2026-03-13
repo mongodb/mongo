@@ -1,5 +1,9 @@
 // Sanity test for the override logic in network_error_and_txn_override.js. We use the profiler to
 // check that operation is not visible immediately, but is visible after the transaction commits.
+//  @tags: [
+//      # TODO SERVER-121518: Remove after updating test to account for profiling level > 0 not being supported in disagg.
+//      requires_profiling,
+//  ]
 
 const testName = jsTest.name();
 

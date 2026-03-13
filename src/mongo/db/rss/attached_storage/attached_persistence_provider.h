@@ -208,6 +208,11 @@ public:
     bool shouldDeferUntimestampedDrops() const override;
 
     /**
+     * Attached storage fully supports the level field on the profile command.
+     */
+    bool supportsProfilingLevel(int profilingLevel) const override;
+
+    /**
      * The oplog has been truncated if the first entry is not a noop with an "initiating set"
      * message (the initialization entry in attached storage).
      */

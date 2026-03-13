@@ -2,6 +2,8 @@
  * Tests for expected behavior when querying a view that is based on a sharded collection.
  * @tags: [
  *  requires_fcv_63,
+ *  # TODO SERVER-121515: Remove after updating test to account for profiling level > 0 not being supported in disagg.
+ *  requires_profiling
  * ]
  */
 

@@ -1,6 +1,10 @@
 /**
  * Performs a test that validates a concurrent view creation doesn't cause issues with the catalog
  * that an aggregation uses.
+ * @tags: [
+ *   # TODO SERVER-121515: Remove after updating test to account for profiling level > 0 not being supported in disagg.
+ *   requires_profiling,
+ * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

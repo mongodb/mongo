@@ -3,6 +3,8 @@
  * @tags: [
  *   requires_replication,
  *   requires_sharding,
+ *   # TODO SERVER-121515: Remove after updating test to account for profiling level > 0 not being supported in disagg.
+ *   requires_profiling,
  * ]
  */
 import {withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";

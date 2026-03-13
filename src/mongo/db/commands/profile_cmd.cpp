@@ -38,6 +38,7 @@
 #include "mongo/db/profile_collection.h"
 #include "mongo/db/profile_filter_impl.h"
 #include "mongo/db/profile_settings.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/shard_role/shard_catalog/database.h"
 #include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
@@ -94,6 +95,12 @@ protected:
                                          const DatabaseName& dbName,
                                          const ProfileCmdRequest& request) const final {
         const auto profilingLevel = request.getCommandParameter();
+
+        const auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+        uassert(ErrorCodes::CommandNotSupported,
+                str::stream() << "Profile level " << profilingLevel
+                              << " is not supported in this storage mode: " << provider.name(),
+                provider.supportsProfilingLevel(profilingLevel));
 
         // An invalid profiling level (outside the range [0, 2]) represents a request to read the
         // current profiling level. Similarly, if the request does not include a filter, we only

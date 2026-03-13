@@ -2,6 +2,8 @@
  * Tests that $percentile is computed correctly for sharded collections.
  * @tags: [
  *   requires_fcv_81,
+ *   # TODO SERVER-121515: Remove after updating test to account for profiling level > 0 not being supported in disagg.
+ *   requires_profiling,
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";

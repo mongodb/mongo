@@ -212,6 +212,10 @@ bool AttachedPersistenceProvider::shouldDeferUntimestampedDrops() const {
     return false;
 }
 
+bool AttachedPersistenceProvider::supportsProfilingLevel(int profilingLevel) const {
+    return true;
+}
+
 bool AttachedPersistenceProvider::oplogHasBeenTruncated(const BSONObj& firstOplogEntry) const {
     repl::OplogEntryParserNonStrict parser{firstOplogEntry};
     return parser.getOpType() != repl::OpTypeEnum::kNoop ||

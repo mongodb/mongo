@@ -1,5 +1,9 @@
 /**
  * Tests that release memory can be interrupted on a sharded cluster.
+ * @tags: [
+ *   # TODO SERVER-121516: Remove after updating test to account for profiling level > 0 not being supported in disagg.
+ *   requires_profiling,
+ * ]
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";

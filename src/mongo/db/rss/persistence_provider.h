@@ -246,6 +246,11 @@ public:
     virtual bool shouldDeferUntimestampedDrops() const = 0;
 
     /**
+     * If true, the provider supports this level on the profile command.
+     */
+    virtual bool supportsProfilingLevel(int profilingLevel) const = 0;
+
+    /**
      * Returns whether the oplog has been truncated, based on inspection of the first oplog entry.
      * The check is provider-specific because the format of the initialization entry differs between
      * persistence providers.

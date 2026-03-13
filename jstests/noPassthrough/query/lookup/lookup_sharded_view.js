@@ -2,6 +2,8 @@
 // @tags: [
 //   requires_sharding,
 //   requires_fcv_81,
+//   # TODO SERVER-121515: Remove after updating test to account for profiling level > 0 not being supported in disagg.
+//   requires_profiling,
 // ]
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {profilerHasSingleMatchingEntryOrThrow} from "jstests/libs/profiler.js";

@@ -231,8 +231,14 @@ public:
     }
 
     bool shouldDeferUntimestampedDrops() const override {
+        uasserted(
+            mongo::ErrorCodes::NotImplemented,
+            "StubPersistenceProvider::shouldDeferUntimestampedDrops() method not implemented");
+    }
+
+    bool supportsProfilingLevel(int profilingLevel) const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+                  "StubPersistenceProvider::supportsProfilingLevel() method not implemented");
     }
 
     bool oplogHasBeenTruncated(const BSONObj& firstOplogEntry) const override {

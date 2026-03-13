@@ -12,7 +12,9 @@
  *   requires_fcv_73,
  *   # TODO (SERVER-85629): Re-enable this test once redness is resolved in multiversion suites.
  *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
- *   requires_fcv_80
+ *   requires_fcv_80,
+ *   # TODO SERVER-121515: Remove after updating test to account for profiling level > 0 not being supported in disagg.
+ *   requires_profiling,
  * ]
  */
 

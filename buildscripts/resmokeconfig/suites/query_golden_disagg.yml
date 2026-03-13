@@ -6,6 +6,9 @@ selector:
   exclude_files:
     - jstests/query_golden/libs/**/*.js
     - jstests/query_golden/test_inputs/**/*.js
+  exclude_with_any_tags:
+    # TODO SERVER-121517: Remove after updating test to account for profiling level > 0 not being supported in disagg.
+    - requires_profiling
 
 executor:
   config:
