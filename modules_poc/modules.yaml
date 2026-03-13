@@ -819,6 +819,7 @@ disagg_storage:
     fully_marked: true
   files:
     - src/mongo/db/modules/atlas/src/disagg_storage
+    - src/mongo/db/modules/atlas/src/disagg_storage/replication_coordinator_disagg_magic_restore*
 
 disagg_storage.encryption:
   meta:
