@@ -25,7 +25,6 @@ import {assertCollectionsMatch} from "jstests/write_path/timeseries/pbt/lib/asse
 
 const ctrlCollName = jsTestName() + "_control";
 const tsCollName = jsTestName() + "_timeseries";
-const tsBucketCollName = "system.buckets." + tsCollName;
 
 const geoField = "loc";
 const metaValue = "geospatial";
@@ -33,7 +32,6 @@ const metaValue = "geospatial";
 describe("Geospatial Query Comparative Test for Timeseries", () => {
     let tsColl;
     let ctrlColl;
-    let bucketColl;
 
     const beforeHook = () => {
         db[ctrlCollName].drop();
@@ -44,7 +42,6 @@ describe("Geospatial Query Comparative Test for Timeseries", () => {
 
         ctrlColl = db.getCollection(ctrlCollName);
         tsColl = db.getCollection(tsCollName);
-        bucketColl = db.getCollection(tsBucketCollName);
 
         // This test needs to create 2dsphere indexes to properly exercise the timeseries write path.
         ctrlColl.createIndex({[geoField]: "2dsphere"});
@@ -74,7 +71,7 @@ describe("Geospatial Query Comparative Test for Timeseries", () => {
                 .property(programArb, (cmds) => {
                     const model = makeEmptyModel();
                     fc.modelRun(() => ({model: model, real: {tsColl, ctrlColl}}), cmds);
-                    assertCollectionsMatch(tsColl, ctrlColl, bucketColl);
+                    assertCollectionsMatch(tsColl, ctrlColl);
                 })
                 .beforeEach(beforeHook),
             {numRuns: 50},
@@ -108,7 +105,7 @@ describe("Geospatial Query Comparative Test for Timeseries", () => {
                         const model = makeEmptyModel();
                         fc.modelRun(() => ({model: model, real: {tsColl, ctrlColl}}), cmds);
                         for (const query of queries) {
-                            assertCollectionsMatch(tsColl, ctrlColl, bucketColl, query);
+                            assertCollectionsMatch(tsColl, ctrlColl, query);
                         }
                     },
                 )

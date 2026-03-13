@@ -2,6 +2,8 @@
  * Assertions PBT
  */
 
+import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
+
 /**
  * Compare the results of a query against a timeseries collection and standard collection which should be identical.
  *
@@ -10,7 +12,7 @@
  * @param {DBCollection} bucketColl raw timeseries bucket collection
  * @param {Object} [query] query specification
  */
-export function assertCollectionsMatch(tsColl, ctrlColl, bucketColl, query = {}) {
+export function assertCollectionsMatch(tsColl, ctrlColl, query = {}) {
     const timeField = tsColl.getMetadata().options.timeseries.timeField;
     const metaField = tsColl.getMetadata().options.timeseries.metaField;
     const tsDocs = tsColl.find(query).sort({_id: 1}).toArray();
@@ -31,11 +33,17 @@ export function assertCollectionsMatch(tsColl, ctrlColl, bucketColl, query = {})
 
     for (let i = 0; i < Math.min(tsDocs.length, ctrlDocs.length); ++i) {
         assert.docEq(ctrlDocs[i], tsDocs[i], () => {
-            const bucket = bucketColl.findOne({
-                [metaField]: tsDocs[i][metaField],
-                [`control.min.${timeField}`]: {$lte: tsDocs[i][timeField]},
-                [`control.max.${timeField}`]: {$gte: tsDocs[i][timeField]},
-            });
+            // In the event the documents do not match, find the originating bucket from the
+            // timeseries collection and include it in the log.
+            let cursor = getTimeseriesCollForRawOps(tsColl.getDB(), tsColl)
+                .find({
+                    [metaField]: tsDocs[i][metaField],
+                    [`control.min.${timeField}`]: {$lte: tsDocs[i][timeField]},
+                    [`control.max.${timeField}`]: {$gte: tsDocs[i][timeField]},
+                })
+                .rawData()
+                .limit(1);
+            const bucket = cursor.hasNext() ? cursor.next() : null;
             return {
                 message: "tsColl and ctrlColl diverged, expected is ctrlDoc, actual is tsDoc",
                 documentIndex: i,

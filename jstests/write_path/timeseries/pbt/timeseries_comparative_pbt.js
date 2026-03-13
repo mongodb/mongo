@@ -21,7 +21,6 @@ import {assertCollectionsMatch} from "jstests/write_path/timeseries/pbt/lib/asse
 
 const ctrlCollName = jsTestName() + "_control";
 const tsCollName = jsTestName() + "_timeseries";
-const tsBucketCollName = "system.buckets." + tsCollName;
 const timeField = "ts";
 const metaField = "meta";
 
@@ -39,11 +38,10 @@ describe("Basic comparative PBT for timeseries inserts", () => {
 
         ctrlColl = db.getCollection(ctrlCollName);
         tsColl = db.getCollection(tsCollName);
-        bucketColl = db.getCollection(tsBucketCollName);
     };
 
     it("keeps tsColl and ctrlColl in sync under insert/batch-insert/delete", () => {
-        const metaValue = "metavalu";
+        const metaValue = "metavalue";
 
         const programArb = makeTimeseriesCommandSequenceArb(
             /* minCommands   */ 1,
@@ -65,7 +63,7 @@ describe("Basic comparative PBT for timeseries inserts", () => {
                 .property(programArb, (cmds) => {
                     const model = makeEmptyModel();
                     fc.modelRun(() => ({model: model, real: {tsColl, ctrlColl}}), cmds);
-                    assertCollectionsMatch(tsColl, ctrlColl, bucketColl);
+                    assertCollectionsMatch(tsColl, ctrlColl);
                 })
                 .beforeEach(beforeHook),
             {numRuns: 50},

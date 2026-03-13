@@ -344,8 +344,7 @@ export function makeTimeseriesCommandSequenceArb(
     const deleteArb = makeDeleteByRandomIdCommandArb();
 
     return fc.commands([insertArb, batchInsertArb, deleteArb], {
-        minLength: minCommands,
-        maxLength: maxCommands,
-        replayPath: replayPath,
+        maxCommands,
+        replayPath,
     });
 }
