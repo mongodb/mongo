@@ -465,10 +465,18 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             )
 
         # If we're killing or aborting to archive data files, stopping the balancer will execute
-        # server commands that might lead to on-disk changes from the point of failure.
-        if self.enable_balancer and mode not in (
-            interface.TeardownMode.KILL,
-            interface.TeardownMode.ABORT,
+        # server commands that might lead to on-disk changes from the point of failure. We also skip
+        # stopping the balancer if processes are already dead (e.g. killed by the hang analyzer
+        # after a timeout), since attempting to connect will just wait until the connection timeout
+        # expires.
+        if (
+            self.enable_balancer
+            and running_at_start
+            and mode
+            not in (
+                interface.TeardownMode.KILL,
+                interface.TeardownMode.ABORT,
+            )
         ):
             self.stop_balancer()
 
