@@ -177,6 +177,7 @@ mongo_cc_library(
         "//src/mongo/db/storage:spill_table",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/otel/metrics:otel_metrics_service",
     ],
 )
 
@@ -338,6 +339,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl:storage_interface_impl",
         "//src/mongo/db/shard_role",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/otel/metrics:metrics_test_util",
     ],
 )
 

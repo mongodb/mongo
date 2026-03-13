@@ -53,6 +53,11 @@
 #include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/metrics/metric_unit.h"
+#include "mongo/otel/metrics/metrics_counter.h"
+#include "mongo/otel/metrics/metrics_gauge.h"
+#include "mongo/otel/metrics/metrics_histogram.h"
+#include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/namespace_string_util.h"
@@ -68,11 +73,33 @@ MONGO_FAIL_POINT_DEFINE(hangDuringIndexBuildDrainYieldSecond);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringDrainWritesPhase);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringDrainWritesPhaseSecond);
 
+namespace {
+auto& sideWritesWrittenCounter = otel::metrics::MetricsService::instance().createInt64Counter(
+    otel::metrics::MetricNames::kIndexBuildSideWritesWritten,
+    "Total number of side writes written",
+    otel::metrics::MetricUnit::kOperations);
+auto& sideWritesDrainedCounter = otel::metrics::MetricsService::instance().createInt64Counter(
+    otel::metrics::MetricNames::kIndexBuildSideWritesDrained,
+    "Total number of side writes drained",
+    otel::metrics::MetricUnit::kOperations);
+auto& sideWritesDrainDurationHistogram =
+    otel::metrics::MetricsService::instance().createInt64Histogram(
+        otel::metrics::MetricNames::kIndexBuildSideWritesDrainDuration,
+        "Duration of side writes drain calls",
+        otel::metrics::MetricUnit::kMilliseconds);
+}  // namespace
+
 
 Status SideWritesTracker::bufferSideWrite(OperationContext* opCtx,
                                           const CollectionPtr& coll,
                                           const IndexCatalogEntry* indexCatalogEntry,
                                           const std::vector<BSONObj>& toInsert) {
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+        [written = static_cast<int64_t>(toInsert.size())](OperationContext*,
+                                                          boost::optional<Timestamp>) {
+            sideWritesWrittenCounter.add(written);
+        });
+
     _counter->fetchAndAdd(toInsert.size());
     // This insert may roll back, but not necessarily from inserting into this table. If other
     // write operations outside this table and in the same transaction are rolled back, this
@@ -370,6 +397,7 @@ Status SideWritesTracker::drainWritesIntoIndex(
             progress.get(lk)->hit(batchSize);
         }
         _numApplied += batchSize;
+        sideWritesDrainedCounter.add(batchSize);
 
         // Lock yielding will be directed by the yield policy provided.
         // We will typically yield locks during the draining phase if we are holding intent
@@ -421,6 +449,7 @@ Status SideWritesTracker::drainWritesIntoIndex(
                 "totalInserted"_attr = totalInserted,
                 "totalDeleted"_attr = totalDeleted,
                 "durationMillis"_attr = timer.millis());
+    sideWritesDrainDurationHistogram.record(timer.millis());
 
     return Status::OK();
 }
