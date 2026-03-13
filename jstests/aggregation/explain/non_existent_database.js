@@ -10,10 +10,9 @@
  *   requires_fcv_83,
  * ]
  */
-import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
-const isSbeFullyEnabled = checkSbeFullyEnabled(db);
+import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
+
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase({}));
 
@@ -21,7 +20,7 @@ assert.commandWorked(testDB.dropDatabase({}));
 for (let i = 0; i < 2; i++) {
     const result = testDB.test.explain().aggregate([]);
 
-    if (!isSbeFullyEnabled || isMongos(testDB)) {
+    if (isMongos(testDB) || result.explainVersion === "1") {
         assert.eq(result.queryPlanner.winningPlan.stage, "EOF", result);
         assert.eq(result.queryPlanner.winningPlan.type, "nonExistentNamespace", result);
     } else {
