@@ -8,15 +8,15 @@ Level 2:
 111
 
 Output plans (best plan 0):
-0.(25.2957)[111] HJ
+0.(137.247)[111] HJ
  -> left:
-    (1.71437)[011] HJ
+    (4.57993)[011] HJ
      -> left:
-        (0.0148174)[001][test.nss0] COLLSCAN
+        (0.0327213)[001][test.nss0] COLLSCAN
      -> right:
-        (1.49656)[010][test.nss1] COLLSCAN
+        (3.30485)[010][test.nss1] COLLSCAN
  -> right:
-    (2.97829)[100][test.nss2] COLLSCAN
+    (6.57698)[100][test.nss2] COLLSCAN
 
 RIGHT DEEP, 3 Nodes with pruning
 HJ order pruning enabled: 1
@@ -28,15 +28,15 @@ Level 2:
 111
 
 Output plans (best plan 0):
-0.(25.2957)[111] HJ
+0.(137.247)[111] HJ
  -> left:
-    (2.97829)[100][test.nss2] COLLSCAN
+    (6.57698)[100][test.nss2] COLLSCAN
  -> right:
-    (1.71437)[011] HJ
+    (4.57993)[011] HJ
      -> left:
-        (0.0148174)[001][test.nss0] COLLSCAN
+        (0.0327213)[001][test.nss0] COLLSCAN
      -> right:
-        (1.49656)[010][test.nss1] COLLSCAN
+        (3.30485)[010][test.nss1] COLLSCAN
 
 ZIG ZAG, 3 Nodes with pruning
 HJ order pruning enabled: 1
@@ -48,13 +48,13 @@ Level 2:
 111
 
 Output plans (best plan 0):
-0.(25.2957)[111] HJ
+0.(137.247)[111] HJ
  -> left:
-    (1.71437)[011] HJ
+    (4.57993)[011] HJ
      -> left:
-        (0.0148174)[001][test.nss0] COLLSCAN
+        (0.0327213)[001][test.nss0] COLLSCAN
      -> right:
-        (1.49656)[010][test.nss1] COLLSCAN
+        (3.30485)[010][test.nss1] COLLSCAN
  -> right:
-    (2.97829)[100][test.nss2] COLLSCAN
+    (6.57698)[100][test.nss2] COLLSCAN
 

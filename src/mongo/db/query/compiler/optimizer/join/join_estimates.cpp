@@ -31,15 +31,13 @@
 
 namespace mongo::join_ordering {
 
-// TODO SERVER-117084: Calibrate coefficients
-// As a starting point, assume the following:
-// * Processing a document takes 100 nanoseconds
-// * Sequential IO is 100x slower that processing a document
-// * Random IO is 10x slower than sequential IO.
-const CostCoefficient docProcessCpuIncremental = makeCostCoefficient(100.0ns);
+// These coefficients were calibrated in /buildscripts/cost_model/join_start.py,
+// which indicated that processing a single document takes 612 nanoseconds.
+const CostCoefficient docProcessCpuIncremental = makeCostCoefficient(612.0ns);
 const CostCoefficient ioSeqIncremental{
-    CostCoefficientType{docProcessCpuIncremental.toDouble() * 10e2}};
-const CostCoefficient ioRandIncremental{CostCoefficientType{ioSeqIncremental.toDouble() * 10}};
+    CostCoefficientType{docProcessCpuIncremental.toDouble() * 261.1}};
+const CostCoefficient ioRandIncremental{
+    CostCoefficientType{docProcessCpuIncremental.toDouble() * 1411.4}};
 
 JoinCostEstimate::JoinCostEstimate(CardinalityEstimate numDocsProcessed,
                                    CardinalityEstimate numDocsOutput,
