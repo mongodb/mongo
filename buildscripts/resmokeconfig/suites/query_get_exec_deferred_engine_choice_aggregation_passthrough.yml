@@ -9,9 +9,6 @@ selector:
     - jstests/aggregation/extras/*.js
     - jstests/aggregation/data/*.js
 
-    # TODO SERVER-120707 re-enable test once $limit-$match issue is fixed.
-    - jstests/aggregation/optimization/optimize_away_pipeline.js
-
     # TODO SERVER-119037 implement replanning in new get_executor
     - jstests/aggregation/sbe/sbe_pushdown_replan_reason.js
 

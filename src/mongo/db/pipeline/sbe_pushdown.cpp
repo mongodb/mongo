@@ -144,18 +144,16 @@ struct CompatiblePipelineStages {
     bool unpackBucket : 1;
 };
 
-// Determine if 'stage' is eligible for SBE, and if it is add it to the 'stagesForPushdown' list and
-// return true. Return false if 'stage' is ineligible, either because it is disallowed by
-// 'allowedStages' or because it requires functionality that cannot be translated to SBE.
-bool pushDownPipelineStageIfCompatible(
-    const OperationContext* opCtx,
-    const boost::intrusive_ptr<DocumentSource>& stage,
-    SbeCompatibility minRequiredCompatibility,
-    const CompatiblePipelineStages& allowedStages,
-    size_t maxGroupAccumulators,
-    const std::map<NamespaceString, CollectionInfo>& collectionsInfo,
-    std::vector<boost::intrusive_ptr<DocumentSource>>& stagesForPushdown,
-    const MultipleCollectionAccessor& collections) {
+// Determine if 'stage' is eligible for SBE. Return false if 'stage' is ineligible, either because
+// it is disallowed by 'allowedStages' or because it requires functionality that cannot be
+// translated to SBE.
+bool pipelineStageIsCompatible(const OperationContext* opCtx,
+                               const boost::intrusive_ptr<DocumentSource>& stage,
+                               SbeCompatibility minRequiredCompatibility,
+                               const CompatiblePipelineStages& allowedStages,
+                               size_t maxGroupAccumulators,
+                               const std::map<NamespaceString, CollectionInfo>& collectionsInfo,
+                               const MultipleCollectionAccessor& collections) {
 
     auto stageId = stage->getId();
     if (stageId == DocumentSourceMatch::id) {
@@ -164,7 +162,6 @@ bool pushDownPipelineStageIfCompatible(
                 minRequiredCompatibility) {
             return false;
         }
-        stagesForPushdown.emplace_back(std::move(stage));
         return true;
     } else if (stageId == DocumentSourceGroup::id) {
         auto groupStage = static_cast<DocumentSourceGroup*>(stage.get());
@@ -173,7 +170,6 @@ bool pushDownPipelineStageIfCompatible(
             groupStage->sbeCompatibility() < minRequiredCompatibility) {
             return false;
         }
-        stagesForPushdown.emplace_back(std::move(stage));
         return true;
     } else if (stageId == DocumentSourceLookUp::id) {
         DocumentSourceLookUp* lookupStage = static_cast<DocumentSourceLookUp*>(stage.get());
@@ -200,7 +196,6 @@ bool pushDownPipelineStageIfCompatible(
             return false;
         }
 
-        stagesForPushdown.emplace_back(std::move(stage));
         return true;
     } else if (stageId == DocumentSourceUnwind::id) {
         if (!allowedStages.unwind ||
@@ -208,7 +203,6 @@ bool pushDownPipelineStageIfCompatible(
                 minRequiredCompatibility) {
             return false;
         }
-        stagesForPushdown.emplace_back(std::move(stage));
         return true;
     } else if (stageId == DocumentSourceSingleDocumentTransformation::id) {
         if (!allowedStages.transform) {
@@ -217,12 +211,10 @@ bool pushDownPipelineStageIfCompatible(
         if (auto replaceRoot = sbeCompatibleReplaceRootStage(
                 static_cast<DocumentSourceSingleDocumentTransformation*>(stage.get()),
                 minRequiredCompatibility)) {
-            stagesForPushdown.emplace_back(std::move(replaceRoot));
             return true;
         } else if (auto projectionStage = sbeCompatibleProjectionFromSingleDocumentTransformation(
                        *static_cast<DocumentSourceSingleDocumentTransformation*>(stage.get()),
                        minRequiredCompatibility)) {
-            stagesForPushdown.emplace_back(std::move(projectionStage));
             return true;
         }
         return false;
@@ -231,20 +223,17 @@ bool pushDownPipelineStageIfCompatible(
             !isSortStageSbeCompatible(static_cast<DocumentSourceSort*>(stage.get()))) {
             return false;
         }
-        stagesForPushdown.emplace_back(std::move(stage));
         return true;
     } else if (stageId == DocumentSourceLimit::id || stageId == DocumentSourceSkip::id) {
         if (!allowedStages.limitSkip) {
             return false;
         }
-        stagesForPushdown.emplace_back(std::move(stage));
         return true;
     } else if (stageId == DocumentSourceSearchMeta::id || stageId == DocumentSourceSearch::id ||
                stageId == DocumentSourceInternalSearchMongotRemote::id) {
         if (!allowedStages.search) {
             return false;
         }
-        stagesForPushdown.emplace_back(std::move(stage));
         return true;
     } else if (stageId == DocumentSourceInternalSetWindowFields::id) {
         if (!allowedStages.window ||
@@ -252,18 +241,16 @@ bool pushDownPipelineStageIfCompatible(
                 minRequiredCompatibility) {
             return false;
         }
-        stagesForPushdown.emplace_back(std::move(stage));
         return true;
     } else if (stageId == DocumentSourceInternalUnpackBucket::id) {
         if (!allowedStages.unpackBucket) {
             return false;
         }
-        stagesForPushdown.emplace_back(std::move(stage));
         return true;
     } else {
         return false;
     }
-}  // pushDownPipelineStageIfCompatible
+}  // pipelineStageIsCompatible
 
 /**
  * Prunes $addFields from 'stagesForPushdown' if it is the last stage, subject to additional
@@ -435,6 +422,68 @@ constexpr size_t kSbeMaxPipelineStages = 400;
 constexpr size_t kSbeMaxPipelineStages = 100;
 #endif
 
+size_t getNumSbeCompatibleStagesForPushdown(
+    const DocumentSourceContainer& sources,
+    const CanonicalQuery* cq,
+    const MultipleCollectionAccessor& collections,
+    const Pipeline* pipeline,
+    std::unique_ptr<QueryPlannerParams> plannerParams,
+    const std::vector<boost::intrusive_ptr<DocumentSource>>& stagesForPushdown,
+    const CompatiblePipelineStages& allowedStages,
+    const SbeCompatibility minRequiredCompatibility,
+    size_t maxGroupAccumulators) {
+    bool seenStageForSbeRestricted = false;
+    size_t ret = 0;
+    for (auto itr = sources.begin(); itr != sources.end(); ++itr) {
+        // Push down at most kMaxPipelineStages stages for execution in SBE.
+        if (stagesForPushdown.size() + ret >= kSbeMaxPipelineStages) {
+            break;
+        }
+
+        // If the pipeline has a lookup stage, we check if the foreign collection has an index that
+        // can be used in both classic and sbe. We do not push to sbe if the classic engine might
+        // use an index for the foreign collection but sbe cannot. In such a case, executing the
+        // lookup in classic might provide better performance.
+        auto id = (*itr)->getId();
+        if (id == DocumentSourceLookUp::id && plannerParams->secondaryCollectionsInfo.empty()) {
+            plannerParams->fillOutSecondaryCollectionsInfo(
+                pipeline->getContext()->getOperationContext(),
+                *cq,
+                collections,
+                false /* includeSizeStats */);
+        }
+
+        if (!pipelineStageIsCompatible(pipeline->getContext()->getOperationContext(),
+                                       *itr,
+                                       minRequiredCompatibility,
+                                       allowedStages,
+                                       maxGroupAccumulators,
+                                       plannerParams->secondaryCollectionsInfo,
+                                       collections)) {
+            // Stop pushing stages down once we hit an incompatible stage.
+            break;
+        }
+
+        seenStageForSbeRestricted |= (id == DocumentSourceGroup::id) ||
+            (id == DocumentSourceLookUp::id) || (id == DocumentSourceInternalUnpackBucket::id);
+        ret++;
+
+        // Waive the accumulator limit on $group if it will be processing time-series data. We
+        // strongly prefer SBE for $group operations that may process block-based data.
+        if ((*itr)->getId() == DocumentSourceInternalUnpackBucket::id) {
+            maxGroupAccumulators = std::numeric_limits<size_t>::max();
+        }
+    }
+
+    if (minRequiredCompatibility == SbeCompatibility::noRequirements &&
+        !seenStageForSbeRestricted) {
+        // In trySbeRestricted, if there is no SBE-eligible group or lookup, don't use SBE at all.
+        return 0;
+    }
+
+    return ret;
+}
+
 /**
  * Finds a prefix of stages from the given pipeline to prepare for pushdown into the inner query
  * layer so that it can be executed using SBE. Populates 'stagesForPushdown' with the result and
@@ -599,45 +648,37 @@ bool findSbeCompatibleStagesForPushdown(
         maxGroupAccumulators = queryKnob.getMaxGroupAccumulatorsInSbe();
     }
 
-    bool allStagesPushedDown = true;
-    for (auto itr = sources.begin(); itr != sources.end(); ++itr) {
-        // Push down at most kMaxPipelineStages stages for execution in SBE.
-        if (stagesForPushdown.size() >= kSbeMaxPipelineStages) {
-            break;
-        }
+    size_t numSbeCompatibleStagesForPushdown =
+        getNumSbeCompatibleStagesForPushdown(sources,
+                                             cq,
+                                             collections,
+                                             pipeline,
+                                             std::move(plannerParams),
+                                             stagesForPushdown,
+                                             allowedStages,
+                                             minRequiredCompatibility,
+                                             maxGroupAccumulators);
 
-        // If the pipeline has a lookup stage, we check if the foreign collection has an index that
-        // can be used in both classic and sbe. We do not push to sbe if the classic engine might
-        // use an index for the foreign collection but sbe cannot. In such a case, executing the
-        // lookup in classic might provide better performance.
-        if ((*itr)->getId() == DocumentSourceLookUp::id &&
-            plannerParams->secondaryCollectionsInfo.empty()) {
-            plannerParams->fillOutSecondaryCollectionsInfo(
-                pipeline->getContext()->getOperationContext(),
-                *cq,
-                collections,
-                false /* includeSizeStats */);
+    auto itr = sources.begin();
+    for (size_t i = 0; i < numSbeCompatibleStagesForPushdown; i++) {
+        if ((*itr)->getId() == DocumentSourceSingleDocumentTransformation::id) {
+            if (auto replaceRoot = sbeCompatibleReplaceRootStage(
+                    static_cast<DocumentSourceSingleDocumentTransformation*>(itr->get()),
+                    minRequiredCompatibility)) {
+                stagesForPushdown.emplace_back(std::move(replaceRoot));
+            } else if (auto projectionStage =
+                           sbeCompatibleProjectionFromSingleDocumentTransformation(
+                               *static_cast<DocumentSourceSingleDocumentTransformation*>(
+                                   itr->get()),
+                               minRequiredCompatibility)) {
+                stagesForPushdown.emplace_back(std::move(projectionStage));
+            }
+        } else {
+            stagesForPushdown.emplace_back(std::move(*itr));
         }
-
-        if (!pushDownPipelineStageIfCompatible(pipeline->getContext()->getOperationContext(),
-                                               *itr,
-                                               minRequiredCompatibility,
-                                               allowedStages,
-                                               maxGroupAccumulators,
-                                               plannerParams->secondaryCollectionsInfo,
-                                               stagesForPushdown,
-                                               collections)) {
-            // Stop pushing stages down once we hit an incompatible stage.
-            allStagesPushedDown = false;
-            break;
-        }
-
-        // Waive the accumulator limit on $group if it will be processing time-series data. We
-        // strongly prefer SBE for $group operations that may process block-based data.
-        if ((*itr)->getId() == DocumentSourceInternalUnpackBucket::id) {
-            maxGroupAccumulators = std::numeric_limits<size_t>::max();
-        }
+        itr++;
     }
+    bool allStagesPushedDown = numSbeCompatibleStagesForPushdown == sources.size();
 
     // Remove stage patterns where pushing down may degrade performance.
     prunePushdownStages(stagesForPushdown, minRequiredCompatibility, allStagesPushedDown);
