@@ -60,6 +60,17 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "replicated_fast_count_delta_utils",
+    srcs = [
+        "replicated_fast_count_delta_utils.cpp",
+    ],
+    deps = [
+        "replicated_fast_count_enabled",
+        "//src/mongo/db/repl:oplog_entry",
+    ],
+)
+
+mongo_cc_library(
     name = "replicated_fast_count_test_helpers",
     srcs = [
         "replicated_fast_count_test_helpers.cpp",
@@ -85,6 +96,7 @@ mongo_cc_unit_test(
         "server-collection-write-path",
     ],
     deps = [
+        "replicated_fast_count_delta_utils",
         "replicated_fast_count_init",
         "replicated_fast_count_test_helpers",
         "replicated_fast_count_uncommitted_changes",

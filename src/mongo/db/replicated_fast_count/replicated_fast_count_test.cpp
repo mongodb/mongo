@@ -35,6 +35,8 @@
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_interface_local.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
@@ -926,11 +928,12 @@ TEST_F(ReplicatedFastCountTest, ReplicatedFastCountTracksNonLocalInternalCollect
 }
 
 /**
- * Set of tests confirming oplog entries are generated with replicated size count metadata.
+ * Tests that operations with replicated size and count are logged with 'sizeMetadata' (information
+ * stored in the top-level 'm' field) in their oplog entries.
  */
-class ReplicatedFastCountOplogEntryTest : public ReplicatedFastCountTest {};
+class SizeMetadataLoggingTest : public ReplicatedFastCountTest {};
 
-TEST_F(ReplicatedFastCountOplogEntryTest, BasicInsertOplogEntry) {
+TEST_F(SizeMetadataLoggingTest, BasicInsertOplogEntry) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
     AutoGetCollection coll(_opCtx, _nss1, LockMode::MODE_IX);
 
@@ -952,7 +955,7 @@ TEST_F(ReplicatedFastCountOplogEntryTest, BasicInsertOplogEntry) {
                                                                       expectedSizeDelta);
 }
 
-TEST_F(ReplicatedFastCountOplogEntryTest, BasicUpdateOplogEntry) {
+TEST_F(SizeMetadataLoggingTest, BasicUpdateOplogEntry) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
     auto coll = acquireCollection(
         _opCtx,
@@ -984,7 +987,7 @@ TEST_F(ReplicatedFastCountOplogEntryTest, BasicUpdateOplogEntry) {
                                                                       expectedSizeDelta);
 }
 
-TEST_F(ReplicatedFastCountOplogEntryTest, BasicUpdateOplogEntryWithNegativeDelta) {
+TEST_F(SizeMetadataLoggingTest, BasicUpdateOplogEntryWithNegativeDelta) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
     auto coll = acquireCollection(
         _opCtx,
@@ -1016,7 +1019,7 @@ TEST_F(ReplicatedFastCountOplogEntryTest, BasicUpdateOplogEntryWithNegativeDelta
                                                                       expectedSizeDelta);
 }
 
-TEST_F(ReplicatedFastCountOplogEntryTest, BasicDeleteOplogEntry) {
+TEST_F(SizeMetadataLoggingTest, BasicDeleteOplogEntry) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
     auto coll = acquireCollection(
         _opCtx,
@@ -1045,7 +1048,7 @@ TEST_F(ReplicatedFastCountOplogEntryTest, BasicDeleteOplogEntry) {
                                                                       -expectedSizeDelta);
 }
 
-TEST_F(ReplicatedFastCountOplogEntryTest, BasicGroupCommit) {
+TEST_F(SizeMetadataLoggingTest, BasicGroupCommit) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
     auto coll = acquireCollection(
         _opCtx,
@@ -1069,6 +1072,134 @@ TEST_F(ReplicatedFastCountOplogEntryTest, BasicGroupCommit) {
     repl::ApplyOps::extractOperationsTo(
         applyOpsOplogEntry, applyOpsOplogEntry.getEntry().toBSON(), &innerEntries);
     replicated_fast_count_test_helpers::assertOpsMatchSpecs(innerEntries, expectedOps);
+}
+
+using ReplicatedFastCountDeltaUtilsTest = ReplicatedFastCountTest;
+
+repl::OplogEntrySizeMetadata makeOperationSizeMetadata(int32_t replicatedSizeDelta) {
+    repl::OplogEntrySizeMetadata m;
+    m.setSz(replicatedSizeDelta);
+    return m;
+}
+
+repl::OplogEntry makeOplogEntryWithSizeMeta(const NamespaceString& nss,
+                                            repl::OpTypeEnum opType,
+                                            int32_t sizeDelta) {
+
+    auto sizeMetadata = makeOperationSizeMetadata(sizeDelta);
+    return repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(),
+        .opType = opType,
+        .nss = nss,
+        .oField = BSONObj(),
+        .sizeMetadata = sizeMetadata,
+        .wallClockTime = Date_t::now(),
+    }};
+}
+
+TEST_F(ReplicatedFastCountDeltaUtilsTest, ExtractSizeCountDeltaForInsert) {
+    const int32_t sizeDelta = 400;
+    const auto insertOp = makeOplogEntryWithSizeMeta(_nss1, repl::OpTypeEnum::kInsert, sizeDelta);
+    const auto extractedSizeCount = replicated_fast_count::extractSizeCountDeltaForOp(insertOp);
+    ASSERT(extractedSizeCount.has_value());
+
+    // Insert means count increases by 1.
+    ASSERT_EQ(1, extractedSizeCount->count);
+    ASSERT_EQ(sizeDelta, extractedSizeCount->size);
+}
+
+TEST_F(ReplicatedFastCountDeltaUtilsTest, ExtractSizeCountDeltaForUpdate) {
+    const int32_t sizeDelta = 400;
+    const auto insertOp = makeOplogEntryWithSizeMeta(_nss1, repl::OpTypeEnum::kUpdate, sizeDelta);
+    const auto extractedSizeCount = replicated_fast_count::extractSizeCountDeltaForOp(insertOp);
+    ASSERT(extractedSizeCount.has_value());
+
+    // Updates imply no new documents, count delta is 0.
+    ASSERT_EQ(0, extractedSizeCount->count);
+    ASSERT_EQ(sizeDelta, extractedSizeCount->size);
+}
+
+TEST_F(ReplicatedFastCountDeltaUtilsTest, ExtractSizeCountDeltaForDelete) {
+    const int32_t sizeDelta = 400;
+    const auto insertOp = makeOplogEntryWithSizeMeta(_nss1, repl::OpTypeEnum::kDelete, sizeDelta);
+    const auto extractedSizeCount = replicated_fast_count::extractSizeCountDeltaForOp(insertOp);
+    ASSERT(extractedSizeCount.has_value());
+
+    // Delete implies one less document.
+    ASSERT_EQ(-1, extractedSizeCount->count);
+    ASSERT_EQ(sizeDelta, extractedSizeCount->size);
+}
+
+TEST_F(ReplicatedFastCountDeltaUtilsTest, NoSizeCountDeltaWhenAbsentFromOplogEntry) {
+    // 'OpTypeEnum::kInsert' supports replicated fast count information, but none is extracted
+    // because the 'm' field is absent from the oplog entry.
+    repl::OplogEntry insertOpNoSizeMetadata{repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(),
+        .opType = repl::OpTypeEnum::kInsert,
+        .nss = _nss1,
+        .oField = BSONObj(),
+        .wallClockTime = Date_t::now(),
+    }}};
+    const auto extractedSizeCount =
+        replicated_fast_count::extractSizeCountDeltaForOp(insertOpNoSizeMetadata);
+    ASSERT_FALSE(insertOpNoSizeMetadata.getSizeMetadata().has_value());
+}
+
+TEST_F(ReplicatedFastCountDeltaUtilsTest, NoSizeCountDeltaWhenAbsentAndIncompatibleOpType) {
+    // 'OpTypeEnum::kCommand' does not support top level 'sizeMetadata' field 'm', and in absence of
+    // the 'sizeMetadata', nothing is returned when trying to extract size count deltas.
+    repl::OplogEntry commandOpNoSizeMetadata{repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(),
+        .opType = repl::OpTypeEnum::kCommand,
+        .nss = _nss1,
+        .oField = BSONObj(),
+        .wallClockTime = Date_t::now(),
+    }}};
+    const auto extractedSizeCount =
+        replicated_fast_count::extractSizeCountDeltaForOp(commandOpNoSizeMetadata);
+    ASSERT_FALSE(commandOpNoSizeMetadata.getSizeMetadata().has_value());
+}
+
+TEST_F(ReplicatedFastCountDeltaUtilsTest, ExtractSizeCountDeltaOnUnsupportedOpType) {
+    const auto oplogEntry =
+        makeOplogEntryWithSizeMeta(_nss1, repl::OpTypeEnum::kNoop, 400 /* sizeDelta */);
+
+    // Size metadata is only supported for 'insert', 'delete', and 'update' operations. All other
+    // operations are incompatible with a top-level 'm' field.
+    // TODO SERVER-121175: Include truncates in accepted opTypes comment.
+    ASSERT_THROWS_CODE(
+        replicated_fast_count::extractSizeCountDeltaForOp(oplogEntry), DBException, 12115900);
+}
+
+TEST_F(ReplicatedFastCountDeltaUtilsTest, ExtractSizeCountDeltaOnNonEligibleNss) {
+    const NamespaceString localNss =
+        NamespaceString::createNamespaceString_forTest("local", "coll1");
+    EXPECT_FALSE(isReplicatedFastCountEligible(localNss));
+
+    const auto oplogEntry =
+        makeOplogEntryWithSizeMeta(localNss, repl::OpTypeEnum::kNoop, 400 /* sizeDelta */);
+
+    // Local namespaces are not eligible for replicated size count.
+    ASSERT_THROWS_CODE(
+        replicated_fast_count::extractSizeCountDeltaForOp(oplogEntry), DBException, 12115900);
+}
+
+TEST_F(ReplicatedFastCountDeltaUtilsTest,
+       ExtractSizeCountDeltaOnNonEligibleNssWithoutSizeMetadata) {
+    const NamespaceString localNss =
+        NamespaceString::createNamespaceString_forTest("local", "coll1");
+    EXPECT_FALSE(isReplicatedFastCountEligible(localNss));
+
+    repl::OplogEntry insertOpLocalNs{repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(),
+        .opType = repl::OpTypeEnum::kInsert,
+        .nss = localNss,
+        .oField = BSONObj(),
+        .wallClockTime = Date_t::now(),
+    }}};
+
+    // Local namespace without sizeMetadata shouldn't throw an error.
+    ASSERT_FALSE(replicated_fast_count::extractSizeCountDeltaForOp(insertOpLocalNs).has_value());
 }
 
 using ReplicatedFastCountDeathTest = ReplicatedFastCountTest;

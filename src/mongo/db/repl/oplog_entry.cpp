@@ -101,6 +101,9 @@ BSONObj makeOplogEntryDoc(DurableOplogEntryParams p) {
     if (p.o2Field) {
         builder.append(OplogEntryBase::kObject2FieldName, p.o2Field.value());
     }
+    if (p.sizeMetadata) {
+        builder.append(OplogEntryBase::kSizeMetadataFieldName, p.sizeMetadata.value().toBSON());
+    }
     if (p.isUpsert) {
         invariant(p.o2Field);
         builder.append(OplogEntryBase::kUpsertFieldName, p.isUpsert.value());
@@ -403,6 +406,7 @@ DurableOplogEntry::DurableOplogEntry(OpTime opTime,
                                                                   oField,
                                                                   o2Field,
                                                                   sessionInfo,
+                                                                  /* sizeMetadata */ boost::none,
                                                                   isUpsert,
                                                                   wallClockTime,
                                                                   statementIds,
@@ -733,7 +737,7 @@ boost::optional<bool> OplogEntry::getIsTimeseries() const {
     return _entry.getIsTimeseries();
 }
 
-boost::optional<OplogEntrySizeMetadata> OplogEntry::getSizeMetadata() const {
+const boost::optional<OplogEntrySizeMetadata>& OplogEntry::getSizeMetadata() const {
     return _entry.getSizeMetadata();
 }
 

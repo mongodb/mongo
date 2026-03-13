@@ -496,6 +496,7 @@ struct DurableOplogEntryParams {
     BSONObj oField;
     boost::optional<BSONObj> o2Field;
     OperationSessionInfo sessionInfo;
+    boost::optional<OplogEntrySizeMetadata> sizeMetadata;
     boost::optional<bool> isUpsert;
     Date_t wallClockTime;
     std::vector<StmtId> statementIds;
@@ -879,7 +880,7 @@ public:
     const mongo::BSONObj& getObject() const;
     const boost::optional<mongo::BSONObj>& getObject2() const;
     boost::optional<bool> getIsTimeseries() const;
-    boost::optional<mongo::repl::OplogEntrySizeMetadata> getSizeMetadata() const;
+    const boost::optional<mongo::repl::OplogEntrySizeMetadata>& getSizeMetadata() const;
     boost::optional<bool> getUpsert() const;
     const boost::optional<mongo::repl::OpTime>& getPreImageOpTime() const;
     const boost::optional<mongo::ShardId>& getDestinedRecipient() const;
