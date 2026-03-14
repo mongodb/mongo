@@ -42,7 +42,7 @@ namespace search_index_view_validation {
  * are as follows:
  *    - Only $addFields ($set) and $match can be used.
  *    - $addFields and cannot modify _id.
- *    - $match can only be used with $expr.
+ *    - $match can be empty or contain only $expr.
  *    - Variables $$NOW, $$CLUSTER_TIME, and $$USER_ROLES cannot be used.
  *    - Operators $rand and $function cannot be used.
  *    - Overriding the CURRENT variable with $let is not allowed.

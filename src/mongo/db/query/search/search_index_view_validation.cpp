@@ -54,7 +54,7 @@ static const StringDataSet bannedOperators = {"$rand", ExpressionFunction::kExpr
 void matchValidator(const BSONObj& stage) {
     uassert(10623001,
             str::stream() << errorPrefix << "$match stage can only contain $expr",
-            stage.hasField("$expr") && stage.nFields() == 1);
+            stage.isEmpty() || (stage.hasField("$expr") && stage.nFields() == 1));
 }
 
 void modificationValidator(const BSONObj& stage) {

@@ -16,14 +16,16 @@ const coll = testDb.underlyingSourceCollection;
 coll.drop();
 coll.insertOne({});
 
-const testSearchIndexOnInvalidView = function ({name, pipeline, errorCode}) {
+const createViewAndSearchIndexDef = function (name, pipeline) {
     assert.commandWorked(testDb.createView(name, coll.getName(), pipeline));
-
-    const searchIndexDef = {
+    return {
         name: `${name}_index`,
         definition: {mappings: {dynamic: false, fields: {name: {type: "string"}}}},
     };
+};
 
+const testSearchIndexOnInvalidView = function ({name, pipeline, errorCode}) {
+    const searchIndexDef = createViewAndSearchIndexDef(name, pipeline);
     assert.commandFailedWithCode(testDb.runCommand({createSearchIndexes: name, indexes: [searchIndexDef]}), errorCode);
 };
 
@@ -144,3 +146,12 @@ testSearchIndexOnInvalidView({
     pipeline: [{$addFields: {result: {$let: {vars: {CURRENT: "$name"}, in: "$$CURRENT"}}}}],
     errorCode: overrideCurrentErrorCode,
 });
+
+// ===============================================================================
+// Valid: empty $match should be allowed.
+// ===============================================================================
+(function testEmptyMatchIsValid() {
+    const viewName = "search_index_empty_match_view";
+    const searchIndexDef = createViewAndSearchIndexDef(viewName, [{$match: {}}]);
+    assert.commandWorked(testDb.runCommand({createSearchIndexes: viewName, indexes: [searchIndexDef]}));
+})();
