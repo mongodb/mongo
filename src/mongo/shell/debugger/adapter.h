@@ -59,7 +59,6 @@ public:
 
     // Send a StoppedEvent to the client
     static void sendPause();
-    static void sendStoppedOnException(std::string text);
 
     // RequestHandler visitors
     void handleRequest(ConfigurationDoneRequest& request) override;

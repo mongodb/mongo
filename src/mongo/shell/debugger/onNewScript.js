@@ -39,13 +39,51 @@
                         line: frame.script?.getOffsetLocation(frame.offset)?.lineNumber ?? 0,
                     };
 
-                    storeCallStack(frame);
+                    storeFrames(frame);
                     processScopes(frame);
 
                     // Invoke the C++ callback to send pause event
                     globalThis.__onScriptSetBreakpoint();
 
-                    spinwait(frame);
+                    // Spin-wait until the paused flag is cleared
+                    // This blocks JavaScript execution in this frame
+                    while (globalThis.__isPaused()) {
+                        // Check for pending evaluation requests
+                        if (globalThis.__hasEvalRequest()) {
+                            // Get the expression to evaluate
+                            const expr = globalThis.__getEvalRequest();
+
+                            // Wrap the expression to format the result
+                            const wrappedExpr = `\
+                                (function() {
+                                    try {
+                                        const __result = (${expr});
+                                        return tojson(__result);
+                                    } catch (e) {
+                                        return e.name + ": " + e.message;
+                                    }
+                                })()`;
+                            // Evaluate in the context of the current frame
+                            let result = "";
+                            try {
+                                const output = frame.eval(wrappedExpr);
+                                if (output.return) {
+                                    result = output.return;
+                                } else if (output.throw) {
+                                    // eg, syntax error in eval'ed string
+                                    const e = output.throw.unsafeDereference(); // unwrap Debugger.Object
+                                    result = e.name + ": " + e.message;
+                                }
+                            } catch (e) {
+                                // something really unexpected happened, but avoid a crash
+                                result = e.name + ": " + e.message;
+                            }
+                            globalThis.__storeEvalResult(result);
+
+                            // Refresh the captured variables after evaluation in case it was updated
+                            processScopes(frame);
+                        }
+                    }
                 },
             });
         }
@@ -57,51 +95,9 @@
         processScript(child);
     }
 
-    // Spin-wait until the paused flag is cleared
-    function spinwait(frame) {
-        // This blocks JavaScript execution in this frame
-        while (globalThis.__isPaused()) {
-            // Check for pending evaluation requests
-            if (globalThis.__hasEvalRequest()) {
-                // Get the expression to evaluate
-                const expr = globalThis.__getEvalRequest();
-
-                // Wrap the expression to format the result
-                const wrappedExpr = `\
-                    (function() {
-                        try {
-                            const __result = (${expr});
-                            return tojson(__result);
-                        } catch (e) {
-                            return e.name + ": " + e.message;
-                        }
-                    })()`;
-                // Evaluate in the context of the current frame
-                let result = "";
-                try {
-                    const output = frame.eval(wrappedExpr);
-                    if (output.return) {
-                        result = output.return;
-                    } else if (output.throw) {
-                        // eg, syntax error in eval'ed string
-                        const e = output.throw.unsafeDereference(); // unwrap Debugger.Object
-                        result = e.name + ": " + e.message;
-                    }
-                } catch (e) {
-                    // something really unexpected happened, but avoid a crash
-                    result = e.name + ": " + e.message;
-                }
-                globalThis.__storeEvalResult(result);
-
-                // Refresh the captured variables after evaluation in case it was updated
-                processScopes(frame);
-            }
-        }
-    }
-
     // HELPER FUNCTIONS to parse variable/scope labeling
 
-    function storeCallStack(frame) {
+    function storeFrames(frame) {
         // Build the full call stack by walking frame.older
         const stackFrames = [];
         let currentFrame = frame;

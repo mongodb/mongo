@@ -160,12 +160,7 @@ void DebugAdapter::waitForHandshake() {
 }
 
 void DebugAdapter::sendPause() {
-    auto e = StoppedEvent::Breakpoint();
-    sendMessage(e);
-}
-
-void DebugAdapter::sendStoppedOnException(std::string text) {
-    auto e = StoppedEvent::Exception(text);
+    StoppedEvent e;
     sendMessage(e);
 }
 

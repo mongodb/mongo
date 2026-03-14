@@ -48,7 +48,6 @@ namespace mongo {
 // Forward declarations for generated JS files
 namespace JSFiles {
 extern const JSFile onDebuggerStatement;
-extern const JSFile onExceptionUnwind;
 extern const JSFile onNewScript;
 }  // namespace JSFiles
 }  // namespace mongo
@@ -80,6 +79,7 @@ std::vector<protocol::StackFrame> _capturedStackFrames;
 
 // Debugger state
 static std::unique_ptr<DebuggerObject> _debuggerObject;
+static JS::PersistentRootedObject _debuggerGlobal;
 
 // Pending breakpoints: map from source URL to set of line numbers
 static std::map<std::string, std::set<int>> _pendingBreakpoints;
@@ -475,66 +475,6 @@ bool DebuggerObject::storeVariablesCallback(JSContext* cx, unsigned argc, JS::Va
     return true;
 }
 
-std::string _lastException;
-
-bool DebuggerObject::onExceptionCallback(JSContext* cx, unsigned argc, JS::Value* vp) {
-    DebuggerFrame frame(cx);
-    _pausedScript = frame.getScriptUrl();
-    _pausedLine = frame.getLineNumber();
-
-    DebugAdapter::sendStoppedOnException(_lastException);
-    _paused.store(true);
-
-    return true;
-}
-
-bool DebuggerObject::storeExceptionInfoCallback(JSContext* cx, unsigned argc, JS::Value* vp) {
-    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-
-    if (argc < 1 || !args[0].isString()) {
-        args.rval().setUndefined();
-        return true;
-    }
-
-    JS::RootedString exStr(cx, args[0].toString());
-    JS::UniqueChars exChars = JS_EncodeStringToUTF8(cx, exStr);
-    // Store exception string in static variable for DAP response
-    _lastException = exChars ? std::string(exChars.get()) : "unknown";
-
-    args.rval().setUndefined();
-    return true;
-}
-
-Status DebuggerObject::setOnExceptionUnwindCallback(JS::RootedObject const& global) {
-    Status status = Status::OK();
-
-    // Register native callbacks
-    status = registerNativeFunction(
-        _cx, global, "__onException", DebuggerObject::onExceptionCallback, 0);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    status = registerNativeFunction(
-        _cx, global, "__storeExceptionInfo", DebuggerObject::storeExceptionInfoCallback, 1);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    // Compile and set the JS handler
-    JS::RootedValue onExceptionUnwind(_cx);
-    status = compileJSCodeBlock(::mongo::JSFiles::onExceptionUnwind, &onExceptionUnwind);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    if (!JS_SetProperty(_cx, _debugger, "onExceptionUnwind", onExceptionUnwind)) {
-        return Status(ErrorCodes::JSInterpreterFailure, "Failed to set onExceptionUnwind");
-    }
-
-    return Status::OK();
-}
-
 Status DebuggerObject::setOnDebuggerStatementCallback(JS::RootedObject const& global) {
     Status status = Status::OK();
 
@@ -917,6 +857,7 @@ Status DebuggerGlobal::init(JSContext* cx) {
     if (!debuggerGlobal) {
         return Status(ErrorCodes::JSInterpreterFailure, "Failed to create debugger compartment");
     }
+    _debuggerGlobal.init(cx, debuggerGlobal);
 
     Status status = Status::OK();
 
@@ -942,11 +883,6 @@ Status DebuggerGlobal::init(JSContext* cx) {
 
         // Set up script.onNewScript hook to activate breakpoints
         status = _debuggerObject->setOnNewScriptCallback(debuggerGlobal);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        status = _debuggerObject->setOnExceptionUnwindCallback(debuggerGlobal);
         if (!status.isOK()) {
             return status;
         }

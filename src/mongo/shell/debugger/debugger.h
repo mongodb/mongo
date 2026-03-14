@@ -119,10 +119,6 @@ public:
 
     std::string evaluate(EvaluateRequest request);
     std::string setVariable(SetVariableRequest request);
-
-    static bool onExceptionCallback(JSContext* cx, unsigned argc, JS::Value* vp);
-    static bool storeExceptionInfoCallback(JSContext* cx, unsigned argc, JS::Value* vp);
-    Status setOnExceptionUnwindCallback(JS::RootedObject const& global);
 };
 
 /**

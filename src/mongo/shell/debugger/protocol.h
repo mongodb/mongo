@@ -34,8 +34,6 @@
 #include <string>
 #include <string_view>
 
-#include <boost/optional/optional.hpp>
-
 namespace mongo {
 namespace mozjs {
 namespace debugger {
@@ -257,16 +255,7 @@ public:
 // https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Stopped
 class StoppedEvent : public Event {
 public:
-    const std::string reason;
-    boost::optional<std::string> text;
-
     std::string getJson() const override;
-
-    static StoppedEvent Breakpoint();
-    static StoppedEvent Exception(std::string text);
-
-private:
-    StoppedEvent(std::string reason) : reason(reason) {};
 };
 
 }  // namespace protocol
