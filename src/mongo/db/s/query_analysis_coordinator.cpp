@@ -160,8 +160,7 @@ void QueryAnalysisCoordinator::onSamplerDelete(const MongosType& doc) {
     invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
     stdx::lock_guard<Latch> lk(_mutex);
 
-    auto erased = _samplers.erase(doc.getName());
-    invariant(erased);
+    _samplers.erase(doc.getName());
 }
 
 void QueryAnalysisCoordinator::onStartup(OperationContext* opCtx) {

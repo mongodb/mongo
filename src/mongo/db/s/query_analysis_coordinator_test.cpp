@@ -534,6 +534,24 @@ TEST_F(QueryAnalysisCoordinatorTest, RemoveSamplersOnDelete) {
     ASSERT(samplers.empty());
 }
 
+TEST_F(QueryAnalysisCoordinatorTest, RemoveUntrackedSamplerOnDeleteDoesNotCrash) {
+    auto coordinator = QueryAnalysisCoordinator::get(operationContext());
+
+    // There are no samplers initially.
+    auto samplers = coordinator->getSamplersForTest();
+    ASSERT(samplers.empty());
+
+    // Directly call onSamplerDelete for a sampler that was never inserted into the coordinator's
+    // in-memory map. This simulates the scenario where a delete on config.mongos targets a sampler
+    // that was not loaded during onStartup (e.g., because its ping time was too old). This must not
+    // crash the server (SERVER-121686).
+    auto mongosDoc = makeConfigMongosDocument(mongosName0);
+    coordinator->onSamplerDelete(mongosDoc);
+
+    samplers = coordinator->getSamplersForTest();
+    ASSERT(samplers.empty());
+}
+
 TEST_F(QueryAnalysisCoordinatorTest, CreateSamplersOnStartup) {
     auto coordinator = QueryAnalysisCoordinator::get(operationContext());
 

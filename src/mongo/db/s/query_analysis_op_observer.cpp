@@ -69,8 +69,16 @@ void QueryAnalysisOpObserver::onInserts(OperationContext* opCtx,
                 const auto parsedDoc = uassertStatusOK(MongosType::fromBSON(it->doc));
                 opCtx->recoveryUnit()->onCommit(
                     [parsedDoc](OperationContext* opCtx, boost::optional<Timestamp>) {
-                        analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerInsert(
-                            parsedDoc);
+                        try {
+                            analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)
+                                ->onSamplerInsert(parsedDoc);
+                        } catch (const DBException& ex) {
+                            LOGV2_WARNING(10690305,
+                                          "Failed to handle sampler insert in "
+                                          "QueryAnalysisCoordinator",
+                                          "sampler"_attr = parsedDoc,
+                                          "error"_attr = ex.toString());
+                        }
                     });
             }
         }
@@ -93,7 +101,16 @@ void QueryAnalysisOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdat
                 uassertStatusOK(MongosType::fromBSON(args.updateArgs->updatedDoc));
             opCtx->recoveryUnit()->onCommit([parsedDoc](OperationContext* opCtx,
                                                         boost::optional<Timestamp>) {
-                analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerUpdate(parsedDoc);
+                try {
+                    analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerUpdate(
+                        parsedDoc);
+                } catch (const DBException& ex) {
+                    LOGV2_WARNING(10690306,
+                                  "Failed to handle sampler update in "
+                                  "QueryAnalysisCoordinator",
+                                  "sampler"_attr = parsedDoc,
+                                  "error"_attr = ex.toString());
+                }
             });
         }
     }
@@ -143,7 +160,16 @@ void QueryAnalysisOpObserver::onDelete(OperationContext* opCtx,
             const auto parsedDoc = uassertStatusOK(MongosType::fromBSON(doc));
             opCtx->recoveryUnit()->onCommit([parsedDoc](OperationContext* opCtx,
                                                         boost::optional<Timestamp>) {
-                analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerDelete(parsedDoc);
+                try {
+                    analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerDelete(
+                        parsedDoc);
+                } catch (const DBException& ex) {
+                    LOGV2_WARNING(10690307,
+                                  "Failed to handle sampler delete in "
+                                  "QueryAnalysisCoordinator",
+                                  "sampler"_attr = parsedDoc,
+                                  "error"_attr = ex.toString());
+                }
             });
         }
     }
