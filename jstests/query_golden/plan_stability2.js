@@ -27,7 +27,7 @@
 
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
-import {runPlanStabilityPipelines} from "jstests/query_golden/libs/utils.js";
+import {runPlanStabilityPipelines} from "jstests/query_golden/libs/plan_stability_utils.js";
 import {pipelines} from "jstests/query_golden/test_inputs/plan_stability_pipelines2.js";
 import {DataGenerator} from "jstests/libs/query/data_generator.js";
 import {checkPauseAfterPopulate} from "jstests/libs/pause_after_populate.js";

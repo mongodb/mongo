@@ -601,6 +601,8 @@ buildvariants:
         cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
       - name: query_golden_join_optimization
         cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
+      - name: query_golden_join_optimization_plan_stability
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
       - name: query_join_optimization_passthrough_gen
         cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
       - name: query_join_optimization_no_passthrough_with_mongod_gen
