@@ -16,6 +16,7 @@ post:
   - func: "upload test/format config"
   - func: "upload test/model workloads"
   - func: "dump stderr/stdout"
+  - func: "upload stat files"
   - func: "upload artifact"
     vars:
       postfix: -${execution}
@@ -492,6 +493,36 @@ functions:
       content_type: text/plain
       remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${task_name}_${build_id}/
       preserve_path: true
+  "upload stat files":
+    - command: shell.exec
+      type: setup
+      params:
+        working_dir: "wiredtiger/cmake_build"
+        shell: bash
+        script: |
+          set -o errexit
+          set -o verbose
+          mkdir stat_files
+          ${python_binary|python3} ../test/evergreen/collect_stat_files.py -d stat_files
+    - command: archive.targz_pack
+      type: setup
+      params:
+        target: wiredtiger/cmake_build/stat_files.tar.gz
+        source_dir: wiredtiger/cmake_build/stat_files
+        include:
+          - "./**"
+    - command: s3.put
+      type: setup
+      params:
+        aws_secret: ${aws_secret}
+        aws_key: ${aws_key}
+        local_file: wiredtiger/cmake_build/stat_files.tar.gz
+        bucket: build_external
+        permissions: public-read
+        content_type: application/tar
+        remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${task_name}_${build_id}/stat_files.tar.gz
+        display_name: "Statistics"
+
   "run data validation stress test checkpoint":
     - *fetch_artifacts
     - command: shell.exec
