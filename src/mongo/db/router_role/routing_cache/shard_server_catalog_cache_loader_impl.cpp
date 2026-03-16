@@ -566,6 +566,11 @@ SemiFuture<CollectionAndChangedChunks> ShardServerCatalogCacheLoaderImpl::getChu
                             getGlobalServiceContext()->getService(),
                             ClientOperationKillableByStepdown{false});
             auto context = _contexts.makeOperationContext(*tc);
+            // This prevents the reads from config.cache.collections/chunks and the majority noop
+            // write on the primary from being deprioritized. The writes to config.cache.* on the
+            // primary are done on a different opCtx and have their own exception.
+            admission::execution_control::ScopedTaskTypeNonDeprioritizable deprioGuard(
+                context.opCtx());
 
             {
                 // We may have missed an OperationContextGroup interrupt since this operation
@@ -579,7 +584,7 @@ SemiFuture<CollectionAndChangedChunks> ShardServerCatalogCacheLoaderImpl::getChu
             }
 
             if (isPrimary) {
-                return _schedulePrimaryGetChunksSince(context.opCtx(), nss, version, term);
+                return _runPrimaryGetChunksSince(context.opCtx(), nss, version, term);
             } else {
                 return _runSecondaryGetChunksSince(context.opCtx(), nss, version);
             }
@@ -606,6 +611,13 @@ SemiFuture<DatabaseType> ShardServerCatalogCacheLoaderImpl::getDatabase(
                             ClientOperationKillableByStepdown{false});
             auto context = _contexts.makeOperationContext(*tc);
 
+            // This prevents the majority noop write on the primary from being deprioritized and
+            // also protects the read of config.cache.databases from being deprioritized on
+            // secondaries. Both of these are very unlikely to be deprioritized, but we prevent it
+            // just to be safe and consistent with collection refreshes.
+            admission::execution_control::ScopedTaskTypeNonDeprioritizable deprioGuard(
+                context.opCtx());
+
             {
                 // We may have missed an OperationContextGroup interrupt since this operation began
                 // but before the OperationContext was added to the group. So we'll check that we're
@@ -618,7 +630,7 @@ SemiFuture<DatabaseType> ShardServerCatalogCacheLoaderImpl::getDatabase(
             }
 
             if (isPrimary) {
-                return _schedulePrimaryGetDatabase(context.opCtx(), dbName, term);
+                return _runPrimaryGetDatabase(context.opCtx(), dbName, term);
             } else {
                 return _runSecondaryGetDatabase(context.opCtx(), dbName);
             }
@@ -779,8 +791,7 @@ ShardServerCatalogCacheLoaderImpl::_runSecondaryGetChunksSince(
         opCtx, std::move(nssNotif), nss, catalogCacheSinceVersion);
 }
 
-StatusWith<CollectionAndChangedChunks>
-ShardServerCatalogCacheLoaderImpl::_schedulePrimaryGetChunksSince(
+StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoaderImpl::_runPrimaryGetChunksSince(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ChunkVersion& catalogCacheSinceVersion,
@@ -929,7 +940,7 @@ StatusWith<DatabaseType> ShardServerCatalogCacheLoaderImpl::_runSecondaryGetData
     return dbt;
 }
 
-StatusWith<DatabaseType> ShardServerCatalogCacheLoaderImpl::_schedulePrimaryGetDatabase(
+StatusWith<DatabaseType> ShardServerCatalogCacheLoaderImpl::_runPrimaryGetDatabase(
     OperationContext* opCtx, const DatabaseName& dbName, long long termScheduled) {
     auto swDatabaseType = _configServerLoader->getDatabase(dbName).getNoThrow();
     if (swDatabaseType == ErrorCodes::NamespaceNotFound) {
@@ -1153,6 +1164,9 @@ void ShardServerCatalogCacheLoaderImpl::_runCollAndChunksTasks(const NamespaceSt
                     ClientOperationKillableByStepdown{false});
 
     auto context = _contexts.makeOperationContext(*tc);
+    // This ensures that the writes to config.cache.collections/chunks don't get deprioritized and
+    // block secondaries' ability to refresh.
+    admission::execution_control::ScopedTaskTypeNonDeprioritizable deprioGuard(context.opCtx());
     bool taskFinished = false;
     bool inShutdown = false;
     try {
@@ -1229,6 +1243,9 @@ void ShardServerCatalogCacheLoaderImpl::_runDbTasks(const DatabaseName& dbName) 
                     getGlobalServiceContext()->getService(),
                     ClientOperationKillableByStepdown{false});
     auto context = _contexts.makeOperationContext(*tc);
+    // This ensures that the writes to config.cache.databases don't get deprioritized and block
+    // secondaries' ability to refresh.
+    admission::execution_control::ScopedTaskTypeNonDeprioritizable deprioGuard(context.opCtx());
 
     bool taskFinished = false;
     bool inShutdown = false;

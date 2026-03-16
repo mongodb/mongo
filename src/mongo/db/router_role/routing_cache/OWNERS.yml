@@ -3,3 +3,6 @@ filters:
   - "*":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "shard_server_catalog_cache_loader*":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog

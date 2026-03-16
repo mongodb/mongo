@@ -353,7 +353,7 @@ private:
      *
      * Only run on the shard primary.
      */
-    StatusWith<CollectionAndChangedChunks> _schedulePrimaryGetChunksSince(
+    StatusWith<CollectionAndChangedChunks> _runPrimaryGetChunksSince(
         OperationContext* opCtx,
         const NamespaceString& nss,
         const ChunkVersion& catalogCacheSinceVersion,
@@ -377,9 +377,9 @@ private:
      *
      * Only run on the shard primary.
      */
-    StatusWith<DatabaseType> _schedulePrimaryGetDatabase(OperationContext* opCtx,
-                                                         const DatabaseName& dbName,
-                                                         long long termScheduled);
+    StatusWith<DatabaseType> _runPrimaryGetDatabase(OperationContext* opCtx,
+                                                    const DatabaseName& dbName,
+                                                    long long termScheduled);
 
     /**
      * Loads chunk metadata from the shard persisted metadata store and any in-memory tasks with

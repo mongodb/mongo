@@ -34,6 +34,9 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/admission/execution_control/execution_admission_context.h"
+#include "mongo/db/admission/execution_control/execution_control_parameters_gen.h"
+#include "mongo/db/admission/execution_control/ticketing_system.h"
 #include "mongo/db/global_catalog/ddl/shard_metadata_util.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection.h"
@@ -151,6 +154,12 @@ public:
     void refreshCollectionEpochOnRemoteLoader();
     void refreshDatabaseOnRemoteLoader();
 
+    int64_t getTotalMarkedNonDeprioritizable() {
+        BSONObjBuilder bob;
+        admission::execution_control::TicketingSystem::get(getServiceContext())->appendStats(bob);
+        return bob.obj()["totalMarkedNonDeprioritizable"].Long();
+    }
+
     ConfigServerCatalogCacheLoaderMock* _remoteLoaderMock;
     std::unique_ptr<ShardServerCatalogCacheLoader> _shardLoader;
 
@@ -161,6 +170,21 @@ private:
 
 void ShardServerCatalogCacheLoaderTest::setUp() {
     ShardServerTestFixture::setUp();
+
+    auto* svcCtx = getServiceContext();
+    using TicketingSystem = admission::execution_control::TicketingSystem;
+    TicketingSystem::RWTicketHolder normal{std::make_unique<TicketHolder>(svcCtx, 100, true, 100),
+                                           std::make_unique<TicketHolder>(svcCtx, 100, true, 100)};
+    TicketingSystem::RWTicketHolder low{std::make_unique<TicketHolder>(svcCtx, 100, true, 100),
+                                        std::make_unique<TicketHolder>(svcCtx, 100, true, 100)};
+    TicketingSystem::use(
+        svcCtx,
+        std::make_unique<TicketingSystem>(
+            svcCtx,
+            std::move(normal),
+            std::move(low),
+            admission::execution_control::ExecutionControlConcurrencyAdjustmentAlgorithmEnum::
+                kFixedConcurrentTransactions));
 
     // Create mock remote and real shard loader, retaining a pointer to the mock remote loader so
     // that unit tests can manipulate it to return certain responses.
@@ -769,5 +793,42 @@ TEST_F(ShardServerCatalogCacheLoaderTest, UnsplittableFieldIsPropagatedOnSSCCL) 
         retryableGetChunksSince(_shardLoader.get(), kNss, ChunkVersion::UNTRACKED());
     ASSERT(collAndChunksRes.unsplittable);
 }
+
+void assertSoon(std::function<bool()> pred) {
+    Timer t;
+    const Milliseconds timeout{300};
+    const Milliseconds interval{5};
+    while (t.elapsed() < timeout) {
+        if (pred()) {
+            return;
+        }
+        sleepFor(interval);
+    }
+    ASSERT(false) << "Timed out waiting the predicate to be satisfied";
+}
+
+TEST_F(ShardServerCatalogCacheLoaderTest, GetChunksSinceMarksOpsNonDeprioritizable) {
+    auto countBefore = getTotalMarkedNonDeprioritizable();
+
+    setUpChunkLoaderWithFiveChunks();
+    _shardLoader->waitForCollectionFlush(operationContext(), kNss);
+
+    // The collAndChunksTask opCtx isn't destroyed before waitForCollectionFlush returns. However,
+    // it is destroyed just after, so we just wait a little until the update happens.
+    assertSoon([&] { return getTotalMarkedNonDeprioritizable() - countBefore == 2; });
+}
+
+TEST_F(ShardServerCatalogCacheLoaderTest, GetDatabaseMarksOpsNonDeprioritizable) {
+    auto countBefore = getTotalMarkedNonDeprioritizable();
+
+    refreshDatabaseOnRemoteLoader();
+    _shardLoader->getDatabase(kNss.dbName()).get();
+    _shardLoader->waitForDatabaseFlush(operationContext(), kNss.dbName());
+
+    // The dbTask opCtx isn't destroyed before waitForDatabaseFlush returns. However, it is
+    // destroyed just after, so we just wait a little until the update happens.
+    assertSoon([&] { return getTotalMarkedNonDeprioritizable() - countBefore == 2; });
+}
+
 }  // namespace
 }  // namespace mongo
