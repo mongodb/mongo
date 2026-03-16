@@ -27,31 +27,27 @@ function testNoResultsQueryIsPlannedWithCBR() {
     // TODO SERVER-115958: This test fails with featureFlagSbeFull.
     if (getEngine(explain) === "classic") {
         const winningPlan = getWinningPlanFromExplain(explain);
-        assertPlanCosted(winningPlan);
+        assertPlanNotCosted(winningPlan);
         const rejectedPlans = getRejectedPlans(explain);
-        assert.eq(rejectedPlans.length, 3, toJsonForLog(explain));
-        assertPlanCosted(rejectedPlans[0]);
-        assertPlanNotCosted(rejectedPlans[1]);
-        assertPlanNotCosted(rejectedPlans[2]);
+        assert.eq(rejectedPlans.length, 2, toJsonForLog(explain));
+        assertPlanNotCosted(rejectedPlans[0]);
+        assertPlanCosted(rejectedPlans[1]);
         const execStats = getExecutionStats(explain)[0];
 
         assert.eq(execStats.nReturned, 0, toJsonForLog(explain));
 
-        assert.eq(execStats.allPlansExecution.length, 4, toJsonForLog(explain));
-        assertPlanCosted(execStats.allPlansExecution[0].executionStages);
+        assert.eq(execStats.allPlansExecution.length, 3, toJsonForLog(explain));
+        assertPlanNotCosted(execStats.allPlansExecution[0].executionStages);
         assert.eq(execStats.allPlansExecution[0].executionStages.advanced, 0, toJsonForLog(explain));
         // TODO SERVER-117670: Revisit how we display the works collected when caching CBR chosen plan.
         // The winning plan chosen by CBR (IXSCAN on "b") will need a total of 9999k works to hit EOF.
         assert.eq(execStats.allPlansExecution[0].executionStages.works, 9999, toJsonForLog(explain));
-        assertPlanCosted(execStats.allPlansExecution[1].executionStages);
+        assertPlanNotCosted(execStats.allPlansExecution[1].executionStages);
         assert.eq(execStats.allPlansExecution[1].executionStages.advanced, 0, toJsonForLog(explain));
-        assert.eq(execStats.allPlansExecution[1].executionStages.works, 0, toJsonForLog(explain));
-        assertPlanNotCosted(execStats.allPlansExecution[2].executionStages);
+        assert.eq(execStats.allPlansExecution[1].executionStages.works, 5000, toJsonForLog(explain));
+        assertPlanCosted(execStats.allPlansExecution[2].executionStages);
         assert.eq(execStats.allPlansExecution[2].executionStages.advanced, 0, toJsonForLog(explain));
-        assert.eq(execStats.allPlansExecution[2].executionStages.works, 5000, toJsonForLog(explain));
-        assertPlanNotCosted(execStats.allPlansExecution[3].executionStages);
-        assert.eq(execStats.allPlansExecution[3].executionStages.advanced, 0, toJsonForLog(explain));
-        assert.eq(execStats.allPlansExecution[3].executionStages.works, 5000, toJsonForLog(explain));
+        assert.eq(execStats.allPlansExecution[2].executionStages.works, 0, toJsonForLog(explain));
     }
 }
 
@@ -155,13 +151,12 @@ function testReturnKeyIsPlannedWithMultiPlanner() {
     const cbrWinningPlan = getWinningPlanFromExplain(cbrExplain);
     // TODO SERVER-115958: This test failes with featureFlagSbeFull.
     if (getEngine(cbrExplain) === "classic") {
-        assertPlanCosted(cbrWinningPlan);
+        assertPlanNotCosted(cbrWinningPlan);
 
         const rejectedPlans = getRejectedPlans(cbrExplain);
-        assert.eq(rejectedPlans.length, 3, toJsonForLog(cbrExplain));
-        assertPlanCosted(rejectedPlans[0]);
-        assertPlanNotCosted(rejectedPlans[1]);
-        assertPlanNotCosted(rejectedPlans[2]);
+        assert.eq(rejectedPlans.length, 2, toJsonForLog(cbrExplain));
+        assertPlanNotCosted(rejectedPlans[0]);
+        assertPlanCosted(rejectedPlans[1]);
     }
     assert.eq(getExecutionStats(cbrExplain)[0].nReturned, 0, toJsonForLog(cbrExplain));
 }

@@ -252,9 +252,10 @@ public:
     PlanExplainerData extractExplainData();
 
     /**
-     * Abandons the trial period without picking a best plan thus rejecting all plans.
+     * Abandons the trial period without picking a best plan thus rejecting all plans
+     * except for plans with the given hash.
      */
-    void abandonTrials();
+    void abandonTrialsExceptHash(size_t hash);
 
     const QuerySolution* querySolution() const override;
 

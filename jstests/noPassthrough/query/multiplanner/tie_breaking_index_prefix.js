@@ -4,8 +4,9 @@
 
 "use strict";
 
-import {getPlanStages, getWinningPlanFromExplain, getEngine} from "jstests/libs/query/analyze_plan.js";
-import {getPlanRankerMode, isPlanCosted} from "jstests/libs/query/cbr_utils.js";
+import {getPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {getPlanRankerMode} from "jstests/libs/query/cbr_utils.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 // Test initialization.
 
@@ -198,10 +199,12 @@ function preferShortestIndexWithComparisonsInFilter(indexPruningActive) {
         assertIndexScan(false, filter, [{a: 1, b: 1}]);
     } else {
         const explain = setParamsAndRunCommand(false, filter);
-        const winningPlan = getWinningPlanFromExplain(explain);
 
         // If we fall back to CBR, we will choose the smaller index regardless of whether index pruning is used or not.
-        if (isPlanCosted(winningPlan)) {
+
+        // TODO(SERVER-121641): Switch this back to isPlanCosted() after fixing the winning plan
+        // not having CBR estimates even if picked by CBR.
+        if (getPlanRankerMode(conn) !== "multiPlanner" && !checkSbeFullyEnabled(db)) {
             assertIndexScan(false, filter, [{a: 1, b: 1}], explain);
         } else {
             assertIndexScan(false, filter, [{a: 1, b: 1, c: 1}], explain);

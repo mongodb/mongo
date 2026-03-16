@@ -93,7 +93,7 @@ template <typename PlanStageType, typename ResultType, typename Data>
 void calcDocsExaminedHeuristicBonus(
     const std::vector<std::pair<double, size_t>>& scoresAndCandidateIndices,
     size_t numberOfTiedPlans,
-    const std::vector<BaseCandidatePlan<PlanStageType, ResultType, Data>>& candidates,
+    const std::span<BaseCandidatePlan<PlanStageType, ResultType, Data>>& candidates,
     const std::vector<size_t>& documentsExamined,
     std::vector<TieBreakingScores>& scores) {
     // The vector tiedPlans holds the number of documents and the plan's index.
@@ -123,7 +123,7 @@ template <typename PlanStageType, typename ResultType, typename Data>
 void calcIndexPrefixHeuristicBonus(
     const std::vector<std::pair<double, size_t>>& scoresAndCandidateIndices,
     size_t numberOfTiedPlans,
-    const std::vector<BaseCandidatePlan<PlanStageType, ResultType, Data>>& candidates,
+    const std::span<BaseCandidatePlan<PlanStageType, ResultType, Data>>& candidates,
     std::vector<TieBreakingScores>& scores) {
     std::vector<const QuerySolution*> solutions{};
     solutions.reserve(numberOfTiedPlans);
@@ -147,7 +147,7 @@ template <typename PlanStageType, typename ResultType, typename Data>
 void calcDistinctScanBonus(
     const std::vector<std::pair<double, size_t>>& scoresAndCandidateIndices,
     size_t numberOfTiedPlans,
-    const std::vector<BaseCandidatePlan<PlanStageType, ResultType, Data>>& candidates,
+    const std::span<BaseCandidatePlan<PlanStageType, ResultType, Data>>& candidates,
     std::vector<TieBreakingScores>& scores) {
 
     for (size_t i = 0; i < numberOfTiedPlans; ++i) {
@@ -164,7 +164,7 @@ void calcDistinctScanBonus(
 template <typename PlanStageType, typename ResultType, typename Data>
 void addTieBreakingHeuristicsBonuses(
     std::vector<std::pair<double, size_t>>& scoresAndCandidateIndices,
-    const std::vector<BaseCandidatePlan<PlanStageType, ResultType, Data>>& candidates,
+    const std::span<BaseCandidatePlan<PlanStageType, ResultType, Data>>& candidates,
     const std::vector<size_t>& documentsExamined) {
     auto tiedPlansEnd = findTopTiedPlans(scoresAndCandidateIndices);
     int numberOfTiedPlans = std::distance(scoresAndCandidateIndices.begin(), tiedPlansEnd);
@@ -221,7 +221,7 @@ void addTieBreakingHeuristicsBonuses(
  */
 template <typename PlanStageType, typename ResultType, typename Data>
 StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
-    const std::vector<BaseCandidatePlan<PlanStageType, ResultType, Data>>& candidates,
+    const std::span<BaseCandidatePlan<PlanStageType, ResultType, Data>> candidates,
     const CanonicalQuery& cq) {
     tassert(11321200, "candidates must not be empty", !candidates.empty());
     // A plan that hits EOF is automatically scored above

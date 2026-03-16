@@ -384,9 +384,12 @@ Status MultiPlanStage::pickBestPlan() {
 
     tassert(11484502, "Picking best plan without having run trials", _specificStats.totalWorks > 0);
 
+    // Create a span on the candidate set to avoid considering any plans we have rejected so far.
+    // (see _candidates)
     // After picking best plan, ranking will own plan stats from candidate solutions (winner and
     // losers).
-    auto statusWithRanking = plan_ranker::pickBestPlan(_candidates, *_query);
+    auto statusWithRanking = plan_ranker::pickBestPlan(
+        std::span(_candidates.begin(), _candidates.begin() + _children.size()), *_query);
     if (!statusWithRanking.isOK()) {
         return statusWithRanking.getStatus();
     }
@@ -440,7 +443,8 @@ Status MultiPlanStage::pickBestPlan() {
 bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolicy) {
     bool doneWorking = false;
 
-    for (size_t ix = 0; ix < _candidates.size(); ++ix) {
+    // Avoid working plans we have rejected.
+    for (size_t ix = 0; ix < _children.size(); ++ix) {
         auto& candidate = _candidates[ix];
         if (!candidate.status.isOK()) {
             continue;
@@ -571,38 +575,45 @@ bool MultiPlanStage::hasBackupPlan() const {
     PlanExplainerData planExplainerData;
     planExplainerData.rejectedPlansWithStages.reserve(_rejected.size());
 
-    // If a best plan has been chosen, the candidates vector has been reordered such that the
-    // best plan is at index 0, and the backup plan (if one exists) is at index 1. The rejected
-    // plans follow.
-    size_t candidateOffset = 0;
     if (bestPlanChosen()) {
-        candidateOffset = 1;
-
         planExplainerData.multiPlannerWinningPlanTrialStats =
             _candidates[_bestPlanIdx].root->getStats();
         planExplainerData.multiPlannerWinningPlanScore = getCandidateScore(_bestPlanIdx);
-        if (hasBackupPlan()) {
-            candidateOffset = 2;
-        }
     }
 
     for (size_t i = 0; i < _rejected.size(); ++i) {
         planExplainerData.rejectedPlansWithStages.push_back(
-            {std::move(_candidates[i + candidateOffset].solution), std::move(_rejected[i])});
+            // Rejected plans are reordered after the non-rejected plans in the _candidates vector.
+            // See _candidates and _rejected.
+            {std::move(_candidates[i + _children.size()].solution), std::move(_rejected[i])});
     }
     _rejected.clear();
     return planExplainerData;
 }
 
-void MultiPlanStage::abandonTrials() {
+void MultiPlanStage::abandonTrialsExceptHash(size_t hash) {
     if (_isStateSaved) {
         restoreState(&collectionPtr());
     }
 
     tassert(11542002, "cannot abandon trials after best plan has been chosen", !bestPlanChosen());
-    for (size_t i = 0; i < _candidates.size(); ++i) {
-        rejectPlan(i);
+    size_t idx;
+    for (idx = 0; idx < _candidates.size(); idx++) {
+        if (_candidates[idx].solution->hash() == hash) {
+            // Move the selected plan to the beginning
+            std::swap(_candidates[0], _candidates[idx]);
+            std::swap(_children[0], _children[idx]);
+            break;
+        }
     }
+    tassert(11763501, "Expected plan not found.", idx < _candidates.size());
+
+    // Reject all the other plans
+    for (size_t idx = 1; idx < _candidates.size(); idx++) {
+        rejectPlan(idx);
+    }
+
+    _children.resize(1);
 }
 
 bool MultiPlanStage::bestPlanChosen() const {

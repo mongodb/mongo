@@ -80,16 +80,6 @@ function runInitialCacheTest(isMultiplanning) {
         // TODO SERVER-116684: Change these assertions.
         assert.eq(entry.creationExecStats.length, 1);
         assert.eq(entry.candidatePlanScores.length, 1);
-
-        // TODO SERVER-116684: Check the output of $planCacheStats instead, and confirm that the plan in the cache has costs.
-        assert(
-            checkLog.checkContainsWithCountJson(
-                db,
-                11918000,
-                {query: aIndexQueryExpectedCQLog},
-                expectedNumCBRChoseCachedPlanLogs,
-            ),
-        );
     }
 
     // Running the query again activates the cache entry.
@@ -107,16 +97,6 @@ function runInitialCacheTest(isMultiplanning) {
         // TODO SERVER-116684: Change these assertions.
         assert.eq(entry.creationExecStats.length, 1);
         assert.eq(entry.candidatePlanScores.length, 1);
-
-        // TODO SERVER-116684: Check the output of $planCacheStats instead, and confirm that the plan in the cache has costs.
-        assert(
-            checkLog.checkContainsWithCountJson(
-                db,
-                11918000,
-                {query: aIndexQueryExpectedCQLog},
-                expectedNumCBRChoseCachedPlanLogs,
-            ),
-        );
     }
 }
 
@@ -178,16 +158,6 @@ function runReplanningTest(isMultiplanning) {
         // TODO SERVER-116684: Change these assertions.
         assert.eq(entry.creationExecStats.length, 1);
         assert.eq(entry.candidatePlanScores.length, 1);
-
-        // TODO SERVER-116684: Check the output of $planCacheStats instead, and confirm that the plan in the cache has costs.
-        assert(
-            checkLog.checkContainsWithCountJson(
-                db,
-                11918000,
-                {query: aIndexQueryExpectedCQLog},
-                expectedNumCBRChoseCachedPlanLogs,
-            ),
-        );
     }
 
     const growthCoefficient = assert.commandWorked(

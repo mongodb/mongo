@@ -104,12 +104,28 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
     }
 
     if (cbrResult.getValue().solutions.size() == 1) {
-        _multiPlanner->abandonTrials();
         // TODO SERVER-117373. Only if explain is needed.
         auto resultValue = std::move(cbrResult.getValue());
-        resultValue.maybeExplainData << _multiPlanner->extractExplainData();
+        // TODO(SERVER-104684): Avoid abandoning the backup plan.
+        _multiPlanner->abandonTrialsExceptHash(resultValue.solutions[0]->hash());
+        auto remainingMultiPlannerWorksPerPlan =
+            trialsConfig.maxNumWorksPerPlan - cappedTrialsConfig.maxNumWorksPerPlan;
+        auto status =
+            _multiPlanner->runTrials({.maxNumWorksPerPlan = remainingMultiPlannerWorksPerPlan,
+                                      .targetNumResults = trialsConfig.targetNumResults});
+        if (!status.isOK()) {
+            return status;
+        }
+        status = _multiPlanner->pickBestPlan();
+        if (!status.isOK()) {
+            return status;
+        }
+        resultValue.execState = std::move(*_multiPlanner).extractExecState();
 
-        return std::move(resultValue);
+        // TODO(SERVER-121641): Set resultValue.solutions[0] to nullptr (like we do when
+        // MP decides) & re-introduce the tassert in get_executor.cpp from SERVER-120784.
+
+        return resultValue;
     } else {
         // move solutions from cbrResult into maybeExplainData.rejectedPlansWithStages
         for (size_t i = 0; i < cbrResult.getValue().solutions.size(); i++) {
