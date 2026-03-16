@@ -260,6 +260,7 @@ admission::execution_control::ScopedTaskTypeModifierBase::ScopedTaskTypeModifier
     LOGV2_DEBUG(12043501,
                 1,
                 "Changing task type on ExecutionAdmissionContext",
+                "oldValue"_attr = to_string(currentType),
                 "newValue"_attr = to_string(newType));
 }
 
@@ -268,12 +269,18 @@ admission::execution_control::ScopedTaskTypeModifierBase::~ScopedTaskTypeModifie
     // ExecutionAdmissionContext) is a 1 to 1 relation.
     // Nobody should update the ExecutionAdmissionContext's counter from a different thread (sharing
     // opCtx is prohibited).
+    const auto currentType = ExecutionAdmissionContext::get(_opCtx).getTaskType();
     const auto recursionCount =
         --ExecutionAdmissionContext::get(_opCtx)._scopedTaskTypeModifierRecursion;
     dassert(recursionCount >= 0);
     if (recursionCount == 0) {
         ExecutionAdmissionContext::get(_opCtx)._taskType.store(
             ExecutionAdmissionContext::TaskType::Default);
+        LOGV2_DEBUG(12137201,
+                    1,
+                    "Resetting task type on ExecutionAdmissionContext",
+                    "oldValue"_attr = to_string(currentType),
+                    "newValue"_attr = to_string(ExecutionAdmissionContext::TaskType::Default));
     }
 }
 

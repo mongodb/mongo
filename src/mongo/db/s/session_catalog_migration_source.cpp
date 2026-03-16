@@ -410,6 +410,10 @@ int64_t SessionCatalogMigrationSource::untransferredCatchUpDataSize() {
     return _newWriteOpTimeList.size() * _averageSessionDocSize;
 }
 
+void SessionCatalogMigrationSource::onCriticalSectionEntered() {
+    _prioritizeLocalOps.store(true);
+}
+
 void SessionCatalogMigrationSource::onCommitCloneStarted() {
     stdx::lock_guard<stdx::mutex> _lk(_newOplogMutex);
 
@@ -424,6 +428,9 @@ void SessionCatalogMigrationSource::onCloneCleanup() {
     stdx::lock_guard<stdx::mutex> _lk(_newOplogMutex);
 
     _state = State::kCleanup;
+    // We reset this here since the migration has been aborted so there is non need to mark ops as
+    // non-deprioritizable.
+    _prioritizeLocalOps.store(false);
     if (_newOplogNotification) {
         _newOplogNotification->set(true);
         _newOplogNotification.reset();
@@ -450,6 +457,10 @@ SessionCatalogMigrationSource::OplogResult SessionCatalogMigrationSource::getLas
 }
 
 bool SessionCatalogMigrationSource::fetchNextOplog(OperationContext* opCtx) {
+    boost::optional<admission::execution_control::ScopedTaskTypeNonDeprioritizable> deprioGuard;
+    if (_prioritizeLocalOps.load()) {
+        deprioGuard.emplace(opCtx);
+    }
     if (_fetchNextOplogFromSessionCatalog(opCtx)) {
         return true;
     }

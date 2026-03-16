@@ -45,6 +45,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
@@ -1804,6 +1805,140 @@ TEST_F(MigrationChunkClonerSourceTest, JumboChunkIndexScanWithYielding) {
     });
     ASSERT_OK(cloner.commitClone(operationContext()));
     futureCommit.default_timed_get();
+}
+
+TEST_F(MigrationChunkClonerSourceTest, NextModsBatchNonDeprioritizableAfterCommitClone) {
+    const std::vector<BSONObj> contents = {createCollectionDocument(99),
+                                           createCollectionDocument(100),
+                                           createCollectionDocument(199),
+                                           createCollectionDocument(200)};
+    const ShardKeyPattern shardKeyPattern(kShardKeyPattern);
+
+    createShardedCollection(contents);
+
+    const ShardsvrMoveRange req =
+        createMoveRangeRequest(ChunkRange(BSON("X" << 100), BSON("X" << 200)));
+    MigrationChunkClonerSource cloner(operationContext(),
+                                      req,
+                                      WriteConcernOptions(),
+                                      kShardKeyPattern,
+                                      kDonorConnStr,
+                                      kRecipientConnStr.getServers()[0]);
+
+    {
+        auto futureStartClone = launchAsync([&]() {
+            onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
+        });
+
+        ASSERT_OK(cloner.startClone(operationContext(), UUID::gen(), _lsid, _txnNumber));
+        futureStartClone.default_timed_get();
+    }
+
+    {
+        const auto collection = acquireCollection(operationContext(), kNss, MODE_IS);
+
+        BSONArrayBuilder arrBuilder;
+        ASSERT_OK(cloner.nextCloneBatch(operationContext(), collection, &arrBuilder));
+        ASSERT_EQ(2, arrBuilder.arrSize());
+    }
+
+    insertDocsInShardedCollection({createCollectionDocument(150)});
+
+    {
+        const auto collection = acquireCollection(operationContext(), kNss, MODE_IX);
+
+        WriteUnitOfWork wuow(operationContext());
+        cloner.onInsertOp(operationContext(), createCollectionDocument(150), {});
+        wuow.commit();
+    }
+
+    {
+        const auto collection = acquireCollection(operationContext(), kNss, MODE_IS);
+
+        {
+            BSONArrayBuilder arrBuilder;
+            ASSERT_OK(cloner.nextCloneBatch(operationContext(), collection, &arrBuilder));
+            ASSERT_EQ(0, arrBuilder.arrSize());
+        }
+
+        {
+            BSONObjBuilder modsBuilder;
+            ASSERT_OK(cloner.nextModsBatch(operationContext(), &modsBuilder));
+            ASSERT_EQ(1U, modsBuilder.obj()["reload"].Array().size());
+        }
+    }
+
+    ASSERT_FALSE(ExecutionAdmissionContext::get(operationContext()).getMarkedNonDeprioritizable());
+
+    auto futureCommit = launchAsync([&]() {
+        onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
+    });
+
+    ASSERT_OK(cloner.commitClone(operationContext()));
+    futureCommit.default_timed_get();
+
+    {
+        const auto collection = acquireCollection(operationContext(), kNss, MODE_IS);
+
+        BSONObjBuilder modsBuilder;
+        ASSERT_OK(cloner.nextModsBatch(operationContext(), &modsBuilder));
+    }
+
+    ASSERT_TRUE(ExecutionAdmissionContext::get(operationContext()).getMarkedNonDeprioritizable());
+}
+
+TEST_F(MigrationChunkClonerSourceTest, NextCloneBatchNonDeprioritizableAfterCommitClone) {
+    const std::vector<BSONObj> contents = {createCollectionDocument(99),
+                                           createCollectionDocument(100),
+                                           createCollectionDocument(199),
+                                           createCollectionDocument(200)};
+
+    createShardedCollection(contents);
+
+    const ShardsvrMoveRange req =
+        createMoveRangeRequest(ChunkRange(BSON("X" << 100), BSON("X" << 200)));
+    MigrationChunkClonerSource cloner(operationContext(),
+                                      req,
+                                      WriteConcernOptions(),
+                                      kShardKeyPattern,
+                                      kDonorConnStr,
+                                      kRecipientConnStr.getServers()[0]);
+
+    {
+        auto futureStartClone = launchAsync([&]() {
+            onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
+        });
+
+        ASSERT_OK(cloner.startClone(operationContext(), UUID::gen(), _lsid, _txnNumber));
+        futureStartClone.default_timed_get();
+    }
+
+    {
+        const auto collection = acquireCollection(operationContext(), kNss, MODE_IS);
+
+        BSONArrayBuilder arrBuilder;
+        ASSERT_OK(cloner.nextCloneBatch(operationContext(), collection, &arrBuilder));
+        ASSERT_EQ(2, arrBuilder.arrSize());
+    }
+
+    ASSERT_FALSE(ExecutionAdmissionContext::get(operationContext()).getMarkedNonDeprioritizable());
+
+    auto futureCommit = launchAsync([&]() {
+        onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
+    });
+
+    ASSERT_OK(cloner.commitClone(operationContext()));
+    futureCommit.default_timed_get();
+
+    {
+        const auto collection = acquireCollection(operationContext(), kNss, MODE_IS);
+
+        BSONArrayBuilder arrBuilder;
+        ASSERT_OK(cloner.nextCloneBatch(operationContext(), collection, &arrBuilder));
+        ASSERT_EQ(0, arrBuilder.arrSize());
+    }
+
+    ASSERT_TRUE(ExecutionAdmissionContext::get(operationContext()).getMarkedNonDeprioritizable());
 }
 
 }  // namespace

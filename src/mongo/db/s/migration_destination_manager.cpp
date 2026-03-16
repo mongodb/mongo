@@ -1640,6 +1640,12 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                     return false;
                 }
 
+                // In jumbo-chunk migrations the entire cloning phase may run under the critical
+                // section.
+                // The recipient can't tell whether a given migration is jumbo, so we always treat
+                // cloning work as non-deprioritizable.
+                admission::execution_control::ScopedTaskTypeNonDeprioritizable deprioGuard(opCtx);
+
                 if (!_applyMigrateOp(opCtx, nextBatch)) {
                     return true;
                 }
@@ -1758,6 +1764,13 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                 auto mods = res.response;
 
                 if (mods["size"].number() > 0) {
+                    // In jumbo-chunk migrations the entire cloning phase may run under the critical
+                    // section.
+                    // The recipient can't tell whether a given migration is jumbo, so we always
+                    // treat cloning work as non-deprioritizable.
+                    admission::execution_control::ScopedTaskTypeNonDeprioritizable deprioGuard(
+                        opCtx);
+
                     (void)_applyMigrateOp(opCtx, mods);
                     lastOpApplied = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
                     continue;

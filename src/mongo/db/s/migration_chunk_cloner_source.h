@@ -718,6 +718,9 @@ private:
     // The current state of the cloner
     State _state{kNew};
 
+    // Used to keep track of the critical section to mark transfer mods as non-deprioritizable
+    AtomicWord<bool> _prioritizeLocalOps{false};
+
     CloneList _cloneList;
 
     RecordIdSet::size_type _numRecordsCloned{0};

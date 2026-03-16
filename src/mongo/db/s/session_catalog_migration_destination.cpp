@@ -466,6 +466,11 @@ SessionCatalogMigrationDestination::_processSessionOplog(const BSONObj& oplogBSO
     auto opCtx = uniqueOpCtx.get();
     opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
+    // In jumbo-chunk migrations the entire cloning phase may run under the critical section.
+    // The recipient can't tell whether a given migration is jumbo, so we always treat cloning work
+    // as non-deprioritizable.
+    admission::execution_control::ScopedTaskTypeNonDeprioritizable deprioGuard(opCtx);
+
     // Irrespective of whether or not the oplog gets logged, we want to update the
     // entriesMigrated counter to signal that we have succesfully recieved the oplog
     // from the source and have processed it.

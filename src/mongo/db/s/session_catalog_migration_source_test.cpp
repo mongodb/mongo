@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/query/write_ops/write_ops_retryability.h"
@@ -4018,6 +4019,115 @@ TEST_F(SessionCatalogMigrationSourceTest, DeriveOplogEntriesForMultiApplyOpsBasi
     ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
     ASSERT_EQ(migrationSource.getSessionOplogEntriesToBeMigratedSoFar(), 3);
     ASSERT_EQ(migrationSource.getSessionOplogEntriesSkippedSoFarLowerBound(), 2);
+}
+
+TEST_F(SessionCatalogMigrationSourceTest,
+       FetchNextOplogNonDeprioritizableAfterCriticalSectionEntered) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const auto txnNumber = TxnNumber{1};
+
+    auto entry1 = makeOplogEntry(
+        repl::OpTime(Timestamp(52, 345), 2),  // optime
+        repl::OpTypeEnum::kInsert,            // op type
+        BSON("x" << 30),                      // o
+        boost::none,                          // o2
+        Date_t::now(),                        // wall clock time,
+        sessionId,
+        txnNumber,
+        {0},                                // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
+    insertOplogEntry(entry1);
+
+    SessionTxnRecord sessionRecord;
+    sessionRecord.setSessionId(sessionId);
+    sessionRecord.setTxnNum(txnNumber);
+    sessionRecord.setLastWriteOpTime(entry1.getOpTime());
+    sessionRecord.setLastWriteDate(entry1.getWallClockTime());
+
+    DBDirectClient client(opCtx());
+    client.insert(NamespaceString::kSessionTransactionsTableNamespace, sessionRecord.toBSON());
+
+    SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
+    migrationSource.init(opCtx(), kMigrationLsid);
+
+    ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
+    ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
+
+    ASSERT_FALSE(ExecutionAdmissionContext::get(opCtx()).getMarkedNonDeprioritizable());
+
+    migrationSource.onCriticalSectionEntered();
+
+    auto entry2 =
+        makeOplogEntry(repl::OpTime(Timestamp(67, 54801), 2),  // optime
+                       repl::OpTypeEnum::kInsert,              // op type
+                       BSON("x" << 50),                        // o
+                       boost::none,                            // o2
+                       Date_t::now(),                          // wall clock time,
+                       sessionId,
+                       txnNumber,
+                       {1},                  // statement ids
+                       entry1.getOpTime());  // optime of previous write within same transaction
+    insertOplogEntry(entry2);
+
+    migrationSource.notifyNewWriteOpTime(
+        {entry2.getOpTime(), SessionCatalogMigrationSource::EntryAtOpTimeType::kRetryableWrite});
+
+    ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
+
+    ASSERT_TRUE(ExecutionAdmissionContext::get(opCtx()).getMarkedNonDeprioritizable());
+}
+
+TEST_F(SessionCatalogMigrationSourceTest, FetchNextOplogNotNonDeprioritizableAfterCloneCleanup) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const auto txnNumber = TxnNumber{1};
+
+    auto entry1 = makeOplogEntry(
+        repl::OpTime(Timestamp(52, 345), 2),  // optime
+        repl::OpTypeEnum::kInsert,            // op type
+        BSON("x" << 30),                      // o
+        boost::none,                          // o2
+        Date_t::now(),                        // wall clock time,
+        sessionId,
+        txnNumber,
+        {0},                                // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
+    insertOplogEntry(entry1);
+
+    SessionTxnRecord sessionRecord;
+    sessionRecord.setSessionId(sessionId);
+    sessionRecord.setTxnNum(txnNumber);
+    sessionRecord.setLastWriteOpTime(entry1.getOpTime());
+    sessionRecord.setLastWriteDate(entry1.getWallClockTime());
+
+    DBDirectClient client(opCtx());
+    client.insert(NamespaceString::kSessionTransactionsTableNamespace, sessionRecord.toBSON());
+
+    SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
+    migrationSource.init(opCtx(), kMigrationLsid);
+
+    migrationSource.onCriticalSectionEntered();
+
+    // Drain the initial oplog entry. This sets the sticky non-deprioritizable flag on opCtx().
+    ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
+    ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
+
+    ASSERT_TRUE(ExecutionAdmissionContext::get(opCtx()).getMarkedNonDeprioritizable());
+
+    migrationSource.onCloneCleanup();
+
+    // Use a fresh opCtx since getMarkedNonDeprioritizable() is a sticky flag that persists after
+    // the ScopedTaskTypeNonDeprioritizable guard is destroyed.
+    auto newClient = getServiceContext()->getService()->makeClient("cleanupTestClient");
+    auto newOpCtx = newClient->makeOperationContext();
+
+    ASSERT_FALSE(ExecutionAdmissionContext::get(newOpCtx.get()).getMarkedNonDeprioritizable());
+
+    // After cleanup, fetchNextOplog should not create a non-deprioritizable guard because
+    // onCloneCleanup resets _prioritizeLocalOps. The session catalog is drained and no new writes
+    // were notified, so fetchNextOplog returns false without requiring DB access.
+    ASSERT_FALSE(migrationSource.fetchNextOplog(newOpCtx.get()));
+
+    ASSERT_FALSE(ExecutionAdmissionContext::get(newOpCtx.get()).getMarkedNonDeprioritizable());
 }
 
 }  // namespace

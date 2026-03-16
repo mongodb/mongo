@@ -421,6 +421,13 @@ Status MigrationChunkClonerSource::awaitUntilCriticalSectionIsAppropriate(
 StatusWith<BSONObj> MigrationChunkClonerSource::commitClone(OperationContext* opCtx) {
     invariant(_state == kCloning);
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+
+    // Mark operations as non-deprioritizable. We notify the session cloner early to prioritize
+    // local ops to handle the jumbo chunk case where we want to prioritize operation prior to
+    // waiting for cloning to complete.
+    _prioritizeLocalOps.store(true);
+    _sessionCatalogSource->onCriticalSectionEntered();
+
     if (_jumboChunkCloneState && _forceJumbo) {
         if (_args.getForceJumbo() == ForceJumbo::kForceManual) {
             auto status = _checkRecipientCloningStatus(opCtx, kMaxWaitToCommitCloneForJumboChunk);
@@ -463,6 +470,8 @@ StatusWith<BSONObj> MigrationChunkClonerSource::commitClone(OperationContext* op
 void MigrationChunkClonerSource::cancelClone(OperationContext* opCtx) {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
+    // Reset prioritization since we are cancelling the migration.
+    _prioritizeLocalOps.store(false);
     _sessionCatalogSource->onCloneCleanup();
 
     switch (_state) {
@@ -828,6 +837,11 @@ Status MigrationChunkClonerSource::nextCloneBatch(OperationContext* opCtx,
                     collection.has_value());
     }
 
+    boost::optional<admission::execution_control::ScopedTaskTypeNonDeprioritizable> deprioGuard;
+    if (_prioritizeLocalOps.load()) {
+        deprioGuard.emplace(opCtx);
+    }
+
     // If this chunk is too large to store records in _cloneRecordIds and the command args specify
     // to attempt to move it, scan the collection directly.
     if (_jumboChunkCloneState && _forceJumbo) {
@@ -915,6 +929,11 @@ void MigrationChunkClonerSource::_processDeferredXferMods(OperationContext* opCt
 
 Status MigrationChunkClonerSource::nextModsBatch(OperationContext* opCtx, BSONObjBuilder* builder) {
     dassert(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss(), MODE_IS));
+
+    boost::optional<admission::execution_control::ScopedTaskTypeNonDeprioritizable> deprioGuard;
+    if (_prioritizeLocalOps.load()) {
+        deprioGuard.emplace(opCtx);
+    }
 
     _processDeferredXferMods(opCtx);
 

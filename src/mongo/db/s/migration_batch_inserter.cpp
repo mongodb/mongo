@@ -150,6 +150,11 @@ void MigrationBatchInserter::run(Status status) const try {
 
     auto opCtx = applicationOpCtx.get();
 
+    // In jumbo-chunk migrations the entire cloning phase may run under the critical section.
+    // The recipient can't tell whether a given migration is jumbo, so we always treat cloning work
+    // as non-deprioritizable.
+    admission::execution_control::ScopedTaskTypeNonDeprioritizable deprioGuard(opCtx);
+
     auto assertNotAborted = [&]() {
         {
             stdx::lock_guard<Client> lk(*_outerOpCtx->getClient());
