@@ -26,7 +26,7 @@ python3 buildscripts/resmoke.py run --suites=core
 Run multiple suites:
 
 ```bash
-python3 buildscripts/resmoke.py run --suites=core,noPassthrough
+python3 buildscripts/resmoke.py run --suites=core,no_passthrough
 ```
 
 Run a single test file:
@@ -55,14 +55,14 @@ python3 buildscripts/resmoke.py run --suites=core -n
 
 ### Common Test Suites
 
-| Suite           | Purpose                                      |
-| --------------- | -------------------------------------------- |
-| `core`          | General mongod tests (runs as standalone)    |
-| `noPassthrough` | Tests that manage their own mongod instances |
-| `auth`          | Authentication/authorization tests           |
-| `sharding`      | Sharded cluster tests                        |
-| `replica_sets`  | Replication tests                            |
-| `concurrency`   | Concurrency and locking tests                |
+| Suite            | Purpose                                      |
+| ---------------- | -------------------------------------------- |
+| `core`           | General mongod tests (runs as standalone)    |
+| `no_passthrough` | Tests that manage their own mongod instances |
+| `auth`           | Authentication/authorization tests           |
+| `sharding`       | Sharded cluster tests                        |
+| `replica_sets`   | Replication tests                            |
+| `concurrency`    | Concurrency and locking tests                |
 
 ## Exploring Tests
 
