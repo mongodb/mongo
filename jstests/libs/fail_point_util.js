@@ -132,10 +132,24 @@ export var kDefaultWaitForFailPointTimeout;
 })();
 
 export function configureFailPointForAllShardsAndMongos({conn, failPointName, data = {}, failPointMode}) {
-    for (const host of DiscoverTopology.findNonConfigNodes(db.getMongo())) {
-        const conn = new Mongo(host, undefined);
+    const isMultiShardedClusterFixture = TestData.isMultiShardedClusterFixture || false;
+
+    let rootConnections;
+    if (isMultiShardedClusterFixture) {
+        const clusterDocs = db.getMongo().getDB("config").multiShardedClusterFixture.find().sort({_id: 1}).toArray();
+        rootConnections = clusterDocs.map((doc) => new Mongo(doc.connectionString, undefined));
+    } else {
+        rootConnections = [db.getMongo()];
+    }
+
+    const hosts = rootConnections.flatMap((rootConn) => DiscoverTopology.findNonConfigNodes(rootConn));
+
+    for (const host of hosts) {
+        const hostConn = new Mongo(host, undefined);
         assert.commandWorked(
-            conn.getDB("admin").runCommand({"configureFailPoint": failPointName, "mode": failPointMode, data: data}),
+            hostConn
+                .getDB("admin")
+                .runCommand({"configureFailPoint": failPointName, "mode": failPointMode, data: data}),
         );
     }
 }
