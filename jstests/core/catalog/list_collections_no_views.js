@@ -14,7 +14,10 @@
  *   requires_timeseries,
  * ]
  */
-import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {
+    isViewlessTimeseriesOnlySuite,
+    isViewfulTimeseriesOnlySuite,
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 
 let mydb = db.getSiblingDB("list_collections_no_views");
@@ -23,37 +26,40 @@ assert.commandWorked(mydb.createCollection("foo"));
 assert.commandWorked(mydb.createView("bar", "foo", []));
 assert.commandWorked(mydb.createCollection("ts", {timeseries: {timeField: "t", metaField: "m"}}));
 
-// Helper to create base expected array with regular collections (no views, no timeseries)
-function getBaseCollectionsExpected() {
-    return [
-        {
-            "name": "foo",
-            "type": "collection",
-        },
-        {
-            "name": "system.views",
-            "type": "collection",
-        },
-    ];
-}
+let allExpected = [
+    {
+        "name": "foo",
+        "type": "collection",
+    },
+    {
+        "name": "system.views",
+        "type": "collection",
+    },
+    {
+        "name": "bar",
+        "type": "view",
+    },
+    {
+        "name": "ts",
+        "type": "timeseries",
+    },
+];
 
-// Helper to add timeseries-related collections to expected array
-function addTimeseriesExpected(expectedArray, shouldIncludeTimeseriesType) {
-    const viewlessTimeseriesEnabled = areViewlessTimeseriesEnabled(mydb);
-    // In legacy mode, bucket is always present as a separate collection
-    if (!viewlessTimeseriesEnabled) {
-        expectedArray.push({
-            "name": "system.buckets.ts",
-            "type": "collection",
-        });
+// TODO SERVER-120014: Remove once 9.0 becomes last LTS and all timeseries collections are viewless.
+function checkAndRemoveTimeseriesBucketsCollection(list) {
+    const buckets = list.find((c) => c.name == "system.buckets.ts");
+    if (!buckets) {
+        // We didn't find system.buckets => Collection is or was in viewless timeseries format
+        assert(!isViewfulTimeseriesOnlySuite(mydb), tojson(list));
+        return;
     }
-    // Main namespace is included when filter allows type "timeseries"
-    if (shouldIncludeTimeseriesType) {
-        expectedArray.push({
-            "name": "ts",
-            "type": "timeseries",
-        });
-    }
+
+    // We found system.buckets => Collection is or was in viewful timeseries format
+    assert(!isViewlessTimeseriesOnlySuite(mydb), tojson(list));
+    assert(buckets.type == "collection", tojson(list));
+
+    // Remove the buckets collection, the rest of the checks in this test don't expect it
+    list.splice(list.indexOf(buckets), 1);
 }
 
 // Helper to sort collection objects by name
@@ -70,16 +76,8 @@ function sortCollectionsByName(c1, c2) {
 let all = mydb.runCommand({listCollections: 1});
 assert.commandWorked(all);
 
-let allExpected = getBaseCollectionsExpected();
-allExpected.push({
-    "name": "bar",
-    "type": "view",
-});
-
-// Add timeseries to expected results
 // listCollections without filter returns all: collections, views, and timeseries
-addTimeseriesExpected(allExpected, true /* shouldIncludeTimeseriesType */);
-
+checkAndRemoveTimeseriesBucketsCollection(all.cursor.firstBatch);
 assert.eq(
     allExpected.sort(sortCollectionsByName),
     all.cursor.firstBatch
@@ -98,20 +96,10 @@ let collOnlyCommand = {
 let collOnly = mydb.runCommand(collOnlyCommand);
 assert.commandWorked(collOnly);
 
-let collOnlyExpected = [
-    {
-        "name": "foo",
-        "type": "collection",
-    },
-    {
-        "name": "system.views",
-        "type": "collection",
-    },
-];
+let collOnlyExpected = allExpected.filter((x) => x.type == "collection");
 
 // Filter {$or: [{type: "collection"}, {type: {$exists: false}}]} excludes type="timeseries"
-addTimeseriesExpected(collOnlyExpected, false /* shouldIncludeTimeseriesType */);
-
+checkAndRemoveTimeseriesBucketsCollection(collOnly.cursor.firstBatch);
 assert.eq(
     collOnlyExpected.sort(sortCollectionsByName),
     collOnly.cursor.firstBatch
@@ -152,6 +140,7 @@ assert.commandWorked(
 );
 
 let collOnlyInvalidView = mydb.runCommand(collOnlyCommand);
+checkAndRemoveTimeseriesBucketsCollection(collOnlyInvalidView.cursor.firstBatch);
 assert.eq(
     collOnlyExpected,
     collOnlyInvalidView.cursor.firstBatch
@@ -175,9 +164,9 @@ if (isFCVgte(mydb, "8.3")) {
     assert.commandWorked(excludeViewsResult);
 
     // Filter {type: {$ne: "view"}} should include type="timeseries"
-    let excludeViewsExpected = getBaseCollectionsExpected();
-    addTimeseriesExpected(excludeViewsExpected, true /* shouldIncludeTimeseriesType */);
+    let excludeViewsExpected = allExpected.filter((x) => x.type != "view");
 
+    checkAndRemoveTimeseriesBucketsCollection(excludeViewsResult.cursor.firstBatch);
     assert.eq(
         excludeViewsExpected.sort(sortCollectionsByName),
         excludeViewsResult.cursor.firstBatch

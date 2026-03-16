@@ -13,7 +13,7 @@
  * ]
  */
 
-import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {isViewlessTimeseriesOnlySuite} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const kDb1 = "db1_agg_list_cluster_catalog";
 const kDb2 = "db2_agg_list_cluster_catalog";
@@ -120,7 +120,7 @@ function isTempCollection(collectionName) {
     if (collectionName.startsWith("system.resharding") || collectionName.startsWith("tmp.agg_out")) {
         return true;
     }
-    if (!areViewlessTimeseriesEnabled(db)) {
+    if (!isViewlessTimeseriesOnlySuite(db)) {
         if (
             collectionName.startsWith("system.buckets.resharding") ||
             collectionName.startsWith("system.buckets.tmp.agg_out")

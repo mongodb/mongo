@@ -53,6 +53,14 @@ const sendFCVUpDown = function (ver) {
             );
             return;
         }
+        // TODO SERVER-120014: Remove once 9.0 becomes last LTS and all timeseries collections are viewless.
+        // TODO SERVER-121384: Remove once setFCV with invalid views returns CannotUpgrade rather than InvalidViewDefinition
+        // This can happen if the test created an invalid view definition, because
+        // viewless timeseries upgrade/downgrade relies on dropping/creating views.
+        if (e.code == ErrorCodes.InvalidViewDefinition) {
+            jsTestLog("setFCV: Invalid view definition");
+            return;
+        }
         throw e;
     }
 };

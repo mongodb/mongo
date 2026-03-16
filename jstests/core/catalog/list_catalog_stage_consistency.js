@@ -12,8 +12,9 @@
  * ]
  */
 import {
-    areViewlessTimeseriesEnabled,
     getTimeseriesBucketsColl,
+    isViewfulTimeseriesOnlySuite,
+    isViewlessTimeseriesOnlySuite,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {assertCatalogListOperationsConsistencyForCollection} from "jstests/libs/catalog_list_operations_consistency_validator.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
@@ -84,21 +85,23 @@ createViewAndCheckConsistency(db, "view_collation", "collection_simple", [{$matc
 /**
  * Timeseries test cases.
  */
-createCollectionAndCheckConsistency(db, "timeseries_simple", {timeseries: {timeField: "t"}});
+if (isViewlessTimeseriesOnlySuite(db) || isViewfulTimeseriesOnlySuite(db)) {
+    createCollectionAndCheckConsistency(db, "timeseries_simple", {timeseries: {timeField: "t"}});
 
-createCollectionAndCheckConsistency(db, "timeseries_complex", {
-    timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"},
-    collation: {
-        locale: "fr",
-    },
-    expireAfterSeconds: 600,
-    storageEngine: {wiredTiger: {configString: "block_compressor=snappy"}},
-});
+    createCollectionAndCheckConsistency(db, "timeseries_complex", {
+        timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"},
+        collation: {
+            locale: "fr",
+        },
+        expireAfterSeconds: 600,
+        storageEngine: {wiredTiger: {configString: "block_compressor=snappy"}},
+    });
 
-assert.commandWorked(db.runCommand({collMod: "timeseries_complex", timeseriesBucketsMayHaveMixedSchemaData: true}));
-assertCatalogListOperationsConsistencyForCollection(db.timeseries_complex);
+    assert.commandWorked(db.runCommand({collMod: "timeseries_complex", timeseriesBucketsMayHaveMixedSchemaData: true}));
+    assertCatalogListOperationsConsistencyForCollection(db.timeseries_complex);
+}
 
-if (!areViewlessTimeseriesEnabled(db)) {
+if (isViewfulTimeseriesOnlySuite(db)) {
     // TODO(SERVER-68439): Remove once the view and buckets are atomically created by DDLs.
     createViewAndCheckConsistency(db, "timeseries_no_buckets", getTimeseriesBucketsColl("timeseries_no_buckets"), []);
     db.timeseries_no_buckets.drop();

@@ -14,7 +14,10 @@
  * ]
  */
 
-import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {
+    isViewfulTimeseriesOnlySuite,
+    isViewlessTimeseriesOnlySuite,
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const dbTest1 = db.getSiblingDB(jsTestName() + "1");
@@ -43,6 +46,37 @@ function removePrimaryField(listOfCollections) {
     return listResult;
 }
 
+// TODO SERVER-120014: Remove once 9.0 becomes last LTS and all timeseries collections are viewless.
+function getBucketCollections(listOfCollections) {
+    return listOfCollections.filter((collEntry) => collEntry["ns"].includes(".system.buckets."));
+}
+
+// TODO SERVER-120014: Remove once 9.0 becomes last LTS and all timeseries collections are viewless.
+function normalizeTimeseriesCollectionFormat(listOfCollections) {
+    if (isViewlessTimeseriesOnlySuite(db)) {
+        return listOfCollections;
+    }
+
+    // Remove buckets collections since as those can change during viewless timeseries upgrade/downgrade
+    let list = listOfCollections.filter((collEntry) => !collEntry["ns"].includes(".system.buckets."));
+
+    // Remove the UUID field, since it is only present for viewless timeseries collections
+    // (normalize so that we can compare timeseries collections regardless of the format).
+    list = list.map((entry) => {
+        if (entry.type !== "timeseries") {
+            return entry;
+        }
+
+        const {
+            info: {uuid: uuid, ...infoWithoutUuid},
+            ...entryWithoutInfo
+        } = entry;
+        return {info: infoWithoutUuid, ...entryWithoutInfo};
+    });
+
+    return list;
+}
+
 function compareInternalListCollectionsStageAgainstListCollections(dbTest, expectedNumOfCollections) {
     // Fetch all the collections for the `dbTest` using the `listCollections` command and transform
     // them to the same format used by `$_internalListCollections`.
@@ -62,6 +96,9 @@ function compareInternalListCollectionsStageAgainstListCollections(dbTest, expec
             return !collEntry["ns"].includes("resharding");
         });
     }
+
+    const listCollectionsBuckets = getBucketCollections(listCollectionsResponse);
+    listCollectionsResponse = normalizeTimeseriesCollectionFormat(listCollectionsResponse);
     assert.eq(expectedNumOfCollections, listCollectionsResponse.length, listCollectionsResponse);
 
     // Check that all the collections returned by `listCollections` are also returned by
@@ -69,13 +106,16 @@ function compareInternalListCollectionsStageAgainstListCollections(dbTest, expec
     let internalStageResponseAgainstDbTest = dbTest
         .aggregate([{$_internalListCollections: {}}, {$match: {ns: {$not: /resharding/}}}])
         .toArray();
-    assert.eq(expectedNumOfCollections, internalStageResponseAgainstDbTest.length, internalStageResponseAgainstDbTest);
     if (isBalancerEnabled) {
         // The uuid may change if there are moveCollection operations on the background, therefore
         // we don't check it.
         internalStageResponseAgainstDbTest = removeUuidField(internalStageResponseAgainstDbTest);
     }
     internalStageResponseAgainstDbTest = removePrimaryField(internalStageResponseAgainstDbTest);
+
+    const internalListCollectionsBuckets = getBucketCollections(internalStageResponseAgainstDbTest);
+    internalStageResponseAgainstDbTest = normalizeTimeseriesCollectionFormat(internalStageResponseAgainstDbTest);
+    assert.eq(expectedNumOfCollections, internalStageResponseAgainstDbTest.length, internalStageResponseAgainstDbTest);
 
     assert.sameMembers(
         listCollectionsResponse,
@@ -96,6 +136,7 @@ function compareInternalListCollectionsStageAgainstListCollections(dbTest, expec
         stageResponseAgainstAdminDb = removeUuidField(stageResponseAgainstAdminDb);
     }
     stageResponseAgainstAdminDb = removePrimaryField(stageResponseAgainstAdminDb);
+    stageResponseAgainstAdminDb = normalizeTimeseriesCollectionFormat(stageResponseAgainstAdminDb);
 
     listCollectionsResponse.forEach((entry) => {
         assert.contains(
@@ -107,6 +148,25 @@ function compareInternalListCollectionsStageAgainstListCollections(dbTest, expec
                 tojson(stageResponseAgainstAdminDb),
         );
     });
+
+    // TODO SERVER-120014: Remove once 9.0 becomes last LTS and all timeseries collections are viewless.
+    if (isViewlessTimeseriesOnlySuite(dbTest)) {
+        assert.eq(0, listCollectionsBuckets.length, tojson(listCollectionsBuckets));
+        assert.eq(0, internalListCollectionsBuckets.length, tojson(internalListCollectionsBuckets));
+    } else if (isViewfulTimeseriesOnlySuite(dbTest)) {
+        // We expect as many system.buckets collections as timeseries views
+        const numTimeseries = listCollectionsResponse.filter((collEntry) => collEntry.type == "timeseries").length;
+        assert.eq(numTimeseries, listCollectionsBuckets.length, tojson(listCollectionsBuckets));
+
+        assert.sameMembers(
+            listCollectionsBuckets,
+            internalListCollectionsBuckets,
+            "listCollectionsBuckets: " +
+                tojson(listCollectionsBuckets) +
+                ", $internalListCollectionsBuckets: " +
+                tojson(internalListCollectionsBuckets),
+        );
+    }
 }
 
 function runTestOnDb(dbTest) {
@@ -149,17 +209,17 @@ function runTestOnDb(dbTest) {
                 timeseries: {timeField: "t"},
             }),
         );
-        numCollections += 1 + !areViewlessTimeseriesEnabled(db);
+        ++numCollections;
         compareInternalListCollectionsStageAgainstListCollections(dbTest, numCollections);
     }
 
     // Timeseries collections
     assert.commandWorked(dbTest.createCollection("collTim1", {timeseries: {timeField: "t"}}));
-    numCollections += 1 + !areViewlessTimeseriesEnabled(db);
+    ++numCollections;
     compareInternalListCollectionsStageAgainstListCollections(dbTest, numCollections);
 
     assert.commandWorked(dbTest.createCollection("collTim2", {timeseries: {timeField: "t"}}));
-    numCollections += 1 + !areViewlessTimeseriesEnabled(db);
+    ++numCollections;
     compareInternalListCollectionsStageAgainstListCollections(dbTest, numCollections);
 }
 

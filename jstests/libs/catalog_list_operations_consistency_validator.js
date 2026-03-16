@@ -534,7 +534,7 @@ function filterListCatalogEntriesFromShardsWithoutChunks(db, listCatalog) {
 export function assertCatalogListOperationsConsistencyForCollection(collection) {
     // TODO SERVER-101594 Remove 'collectionNames' and pass the collection name directly
     const collectionNames = [collection.getName()];
-    if (!areViewlessTimeseriesEnabled(db) && collection.getMetadata().type === "timeseries") {
+    if (collection.getMetadata().type === "timeseries" && !areViewlessTimeseriesEnabled(db)) {
         collectionNames.push(getTimeseriesBucketsColl(collection).getName());
     }
 

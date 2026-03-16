@@ -13,7 +13,7 @@
  * ]
  */
 import {
-    areViewlessTimeseriesEnabled,
+    isViewlessTimeseriesOnlySuite,
     getTimeseriesBucketsColl,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
@@ -40,8 +40,10 @@ function checkEntries(coll, entries, type, {numSecondaryIndexes, viewOn}) {
             assert(entry.shard);
         }
 
-        if (!areViewlessTimeseriesEnabled(testDB) && type === "timeseries") {
-            assert.eq(entry.viewOn, viewOn);
+        if (type === "timeseries" && entry.viewOn) {
+            assert(!isViewlessTimeseriesOnlySuite(testDB));
+            assert.eq(entry.viewOn, getTimeseriesBucketsColl(entry.name));
+            continue;
         }
 
         if (type === "view") {
@@ -125,28 +127,24 @@ describe("Basic tests for the $listCatalog aggregation stage", function () {
         assert.commandWorked(collTimeseries.insert({_id: 1, tt: ISODate(), x: 123}));
 
         // collection-ful aggregate
-        if (areViewlessTimeseriesEnabled(testDB)) {
+        try {
             const res = collTimeseries.aggregate([{$listCatalog: {}}]).toArray();
             jsTestLog(collTimeseries.getFullName() + " $listCatalog: " + tojson(res));
             checkEntries(collTimeseries, res, "timeseries", {numSecondaryIndexes: 0});
-        } else {
-            assert.commandFailedWithCode(
-                testDB.runCommand({aggregate: collTimeseries.getName(), pipeline: [{$listCatalog: {}}], cursor: {}}),
-                40602,
-            );
+        } catch (e) {
+            if (e.code != 40602) {
+                throw e;
+            }
+
+            // Acceptable error: "$listCatalog is only valid as the first stage in a pipeline":
+            // $listCatalog fails with this error against a viewful timeseries (but works with viewless timeseries).
+            assert(!isViewlessTimeseriesOnlySuite(testDB));
         }
 
         // collection-less aggregate
         const res = adminDB.aggregate([{$listCatalog: {}}]).toArray();
         jsTestLog("Collectionless $listCatalog: " + tojson(res));
-
-        if (areViewlessTimeseriesEnabled(testDB)) {
-            checkEntries(collTimeseries, res, "timeseries", {numSecondaryIndexes: 0});
-        } else {
-            checkEntries(collTimeseries, res, "timeseries", {
-                viewOn: getTimeseriesBucketsColl(collTimeseries).getName(),
-            });
-        }
+        checkEntries(collTimeseries, res, "timeseries", {numSecondaryIndexes: 0});
     });
 
     it("clustered collection", () => {

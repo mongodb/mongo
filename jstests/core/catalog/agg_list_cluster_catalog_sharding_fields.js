@@ -12,8 +12,8 @@
  */
 
 import {
-    areViewlessTimeseriesEnabled,
-    getTimeseriesCollForDDLOps,
+    isViewlessTimeseriesOnlySuite,
+    getTimeseriesBucketsColl,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
@@ -60,17 +60,7 @@ expectedResults[REPLICA_SET][kCollUnsharded] = {
 
 // Standard unsharded timeseries
 dbTest.createCollection(kCollTimeseries, {timeseries: {timeField: "time"}});
-if (!areViewlessTimeseriesEnabled(dbTest)) {
-    expectedResults[SHARDED_CLUSTER][kCollTimeseries] = {
-        sharded: false,
-        shardKey: undefined,
-        shards: [primaryShard],
-        tracked: false,
-        balancingEnabled: undefined,
-        balancingEnabledReason: undefined,
-    };
-}
-expectedResults[SHARDED_CLUSTER][getTimeseriesCollForDDLOps(dbTest, kCollTimeseries)] = {
+expectedResults[SHARDED_CLUSTER][kCollTimeseries] = {
     sharded: false,
     shardKey: undefined,
     shards: [primaryShard],
@@ -78,17 +68,7 @@ expectedResults[SHARDED_CLUSTER][getTimeseriesCollForDDLOps(dbTest, kCollTimeser
     balancingEnabled: undefined,
     balancingEnabledReason: undefined,
 };
-if (!areViewlessTimeseriesEnabled(dbTest)) {
-    expectedResults[REPLICA_SET][kCollTimeseries] = {
-        sharded: false,
-        shardKey: undefined,
-        shards: [],
-        tracked: false,
-        balancingEnabled: undefined,
-        balancingEnabledReason: undefined,
-    };
-}
-expectedResults[REPLICA_SET][getTimeseriesCollForDDLOps(dbTest, kCollTimeseries)] = {
+expectedResults[REPLICA_SET][kCollTimeseries] = {
     sharded: false,
     shardKey: undefined,
     shards: [],
@@ -134,17 +114,7 @@ if (FixtureHelpers.isMongos(dbTest)) {
         timeseries: {timeField: "time"},
         key: {time: 1},
     });
-    if (!areViewlessTimeseriesEnabled(dbTest)) {
-        expectedResults[SHARDED_CLUSTER][kCollTimeseriesSharded] = {
-            sharded: false,
-            shardKey: undefined,
-            shards: [primaryShard],
-            tracked: false,
-            balancingEnabled: undefined,
-            balancingEnabledReason: undefined,
-        };
-    }
-    expectedResults[SHARDED_CLUSTER][getTimeseriesCollForDDLOps(dbTest, kCollTimeseriesSharded)] = {
+    expectedResults[SHARDED_CLUSTER][kCollTimeseriesSharded] = {
         sharded: true,
         shardKey: {"control.min.time": 1},
         shards: [primaryShard],
@@ -161,7 +131,7 @@ const results = dbTest
     .toArray();
 jsTestLog("$listClusterCatalog output: " + tojson(results));
 
-for (const [collName, expectedResult] of Object.entries(expectedResults[serverType])) {
+function checkCollectionEntry(collName, expectedResult) {
     const result = results.find((collEntry) => {
         return collEntry.ns === dbName + "." + collName;
     });
@@ -178,6 +148,30 @@ for (const [collName, expectedResult] of Object.entries(expectedResults[serverTy
             "The value of the field '" + field + "' doesn't match with the expected one for the collection " + collName,
         );
     }
+}
+
+for (const [collName, expectedResult] of Object.entries(expectedResults[serverType])) {
+    // TODO SERVER-120014: Remove this test once 9.0 becomes last LTS and all timeseries collections are viewless.
+    if (results.find((collEntry) => collEntry.ns == dbName + "." + getTimeseriesBucketsColl(collName))) {
+        assert(collName == kCollTimeseries || collName == kCollTimeseriesSharded, tojson(results));
+        assert(!isViewlessTimeseriesOnlySuite(dbTest), tojson(results));
+
+        // Check timeseries view
+        checkCollectionEntry(collName, {
+            sharded: false,
+            shardKey: undefined,
+            shards: serverType == SHARDED_CLUSTER ? [primaryShard] : [],
+            tracked: false,
+            balancingEnabled: undefined,
+            balancingEnabledReason: undefined,
+        });
+
+        // Check timeseries collection in buckets namespace
+        checkCollectionEntry(getTimeseriesBucketsColl(collName), expectedResult);
+        continue;
+    }
+
+    checkCollectionEntry(collName, expectedResult);
 }
 
 // 3. Test balancingEnabled and balancingEnabledReason flags with all the possible configurations.
