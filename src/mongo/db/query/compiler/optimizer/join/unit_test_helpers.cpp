@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/cbr_test_utils.h"
 #include "mongo/db/query/compiler/optimizer/join/catalog_stats.h"
 
 namespace mongo::join_ordering {
@@ -158,5 +159,32 @@ std::unique_ptr<ce::SamplingEstimator> JoinOrderingTestFixture::samplingEstimato
 
 NamespaceString makeNSS(StringData collName) {
     return NamespaceString::makeLocalCollection(collName);
+}
+
+void JoinOrderingTestFixture::initGraph(size_t numNodes, bool withIndexes) {
+    for (size_t i = 0; i < numNodes; i++) {
+        auto nss =
+            NamespaceString::createNamespaceString_forTest("test", str::stream() << "nss" << i);
+        std::string fieldName = str::stream() << "a" << i;
+        auto filterBSON = bsonStorage.emplace_back(BSON(fieldName << BSON("$gt" << 0)));
+
+        // Pick some cardinalities.
+        collCards.push_back(makeCard(i * 1000.0 + 10.0));
+        subsetCards.emplace(makeNodeSet((NodeId)i), collCards[i]);
+        catStats.collStats[nss] =
+            CollectionStats{.logicalDataSizeBytes = collCards[i].toDouble() * 420.0};
+
+        auto cq = makeCanonicalQuery(nss, filterBSON);
+        cbrCqQsns.emplace(cq.get(),
+                          makeCollScanPlan(nss, cq->getPrimaryMatchExpression()->clone()));
+        ASSERT_TRUE(graph.addNode(nss, std::move(cq), boost::none).has_value());
+
+        if (withIndexes) {
+            perCollIdxs.emplace(nss,
+                                makeIndexCatalogEntries({BSON(fieldName << (i % 2 ? 1 : -1))}));
+        }
+
+        resolvedPaths.emplace_back(ResolvedPath{(NodeId)i, FieldPath(fieldName)});
+    }
 }
 }  // namespace mongo::join_ordering

@@ -450,7 +450,7 @@ PerSubsetLevelEnumerationMode makeRandomizedEnumerationHint(
     };
 
     // Pick the shape of the tree & the join methods used.
-    std::vector<PerSubsetLevelEnumerationMode::SubsetLevelMode> modes;
+    std::vector<SubsetLevelMode> modes;
     modes.reserve(nodes.size());
     size_t level = 0;
     NodeSet prevSubset;

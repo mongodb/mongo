@@ -109,6 +109,14 @@ public:
         return jCtx;
     }
 
+    /**
+     * Helper used to initialize the join graph with some number of nodes and some arbitrary
+     * cardinalities, as well as populating index information if 'withIndexes' is set to true.
+     *
+     * NOTE: this does not add any edges to the graph.
+     */
+    void initGraph(size_t numNodes, bool withIndexes = false);
+
 protected:
     unittest::GoldenTestConfig goldenTestConfig;
 
@@ -123,6 +131,8 @@ protected:
 
     std::vector<int> seeds;
     std::vector<NamespaceString> namespaces;
+
+    std::vector<BSONObj> bsonStorage;
 };
 
 using namespace cost_based_ranker;

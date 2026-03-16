@@ -48,6 +48,7 @@ mongo_cc_library(
 mongo_cc_library(
     name = "plan_enumerator",
     srcs = [
+        "hint.cpp",
         "join_plan.cpp",
         "plan_enumerator.cpp",
         "plan_enumerator_helpers.cpp",
@@ -71,6 +72,7 @@ mongo_cc_unit_test(
         "graph_cycle_breaker_test.cpp",
         "join_cost_estimator_test.cpp",
         "join_graph_test.cpp",
+        "join_hint_test.cpp",
         "path_resolver_test.cpp",
         "plan_enumerator_test.cpp",
         "predicate_extractor_test.cpp",
@@ -90,7 +92,6 @@ mongo_cc_unit_test(
         ":unit_test_helpers",
         "//src/mongo/db:query_exec",
         "//src/mongo/db/exec/document_value:document_value_test_util",
-        "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:cbr_test_utils",
     ],
 )
 
@@ -167,6 +168,7 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db/pipeline",
         "//src/mongo/db/pipeline:aggregation_context_fixture",
+        "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:cbr_test_utils",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
         "//src/mongo/unittest",
     ],
