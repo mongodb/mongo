@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   uses_atclustertime,
+ *   requires_profiling,
  * ]
  */
 import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";

@@ -3,6 +3,10 @@
  * is, when the recipient is approaching strict consistency, the resharding oplog fetcher starts
  * targeting the primary node of the donor shard instead of the nearest node to prepare for the
  * critical section.
+ *
+ * @tags: [
+ *   requires_profiling,
+ * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
