@@ -459,10 +459,9 @@ PerSubsetLevelEnumerationMode makeRandomizedEnumerationHint(
         bool isLeftChild = pickChildSide();
         auto method =
             overrideMethod ? *overrideMethod : pickMethod(node, prevSubset, isLeftChild, level);
-        modes.push_back(
-            {.level = level,
-             .mode = PlanEnumerationMode::HINTED,
-             .hint = JoinHint{.node = node, .method = method, .isLeftChild = isLeftChild}});
+        modes.push_back({level,
+                         PlanEnumerationMode::HINTED,
+                         JoinHint{.node = node, .method = method, .isLeftChild = isLeftChild}});
         level++;
         prevSubset.set(node);
     }

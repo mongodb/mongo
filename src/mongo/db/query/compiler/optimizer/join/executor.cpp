@@ -109,8 +109,9 @@ EnumerationStrategy getEnumerationStrategy(const QueryKnobConfiguration& qkc) {
     auto joinMethod = getJoinMethod(qkc.getJoinMethod());
 
     // Override the join method for all joins if specified by the 'internalJoinMethod' query knob.
-    auto methodHint =
-        joinMethod ? boost::optional<JoinHint>(JoinHint{0, *joinMethod, false}) : boost::none;
+    auto methodHint = joinMethod
+        ? boost::optional<JoinHint>(JoinHint{boost::none, *joinMethod, boost::none})
+        : boost::none;
 
     return {.planShape = getPlanTreeShape(qkc.getJoinPlanTreeShape()),
             .mode = getMode(minLevel, maxLevel, methodHint),

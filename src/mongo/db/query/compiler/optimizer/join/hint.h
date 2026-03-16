@@ -51,13 +51,14 @@ enum class PlanEnumerationMode {
 };
 
 /**
- * Hints how a join should be done at the current subset level.
+ * Hints how a join should be done at the current subset level. All hints are optional- when not
+ * specified, the choice is up to the plan enumerator.
  */
 struct JoinHint {
     // The next node to join with.
-    NodeId node;
+    boost::optional<NodeId> node;
     // The next join method to use. Ignored for base subset.
-    JoinMethod method;
+    boost::optional<JoinMethod> method;
     /**
      * Indicates if the base collection access node is the left or right child of this node.
      * Ignored for base subset. For example, this hint vector (let every entry indicate one subset
@@ -75,22 +76,94 @@ struct JoinHint {
      * the left side of a HJ ('isLeftChild' = true), and our current subtree on the right. Finally,
      * we place an NLJ with node 3 on the right ('isLeftChild' = false).
      */
-    bool isLeftChild;
+    boost::optional<bool> isLeftChild;
 
     BSONObj toBSON() const;
+
+    bool operator==(const JoinHint& other) const {
+        return node == other.node && method == other.method && isLeftChild == other.isLeftChild;
+    }
 };
 
 /**
  * Describes enumeration strategy for a given subset level and above.
  */
-struct SubsetLevelMode {
-    // First level at which to apply this mode.
-    size_t level;
-    PlanEnumerationMode mode;
-    // Only used by HINTED mode to specify what we should enumerate for this subset level.
-    boost::optional<JoinHint> hint = boost::none;
+class SubsetLevelMode {
+public:
+    SubsetLevelMode(size_t level,
+                    PlanEnumerationMode mode,
+                    boost::optional<JoinHint> hint = boost::none);
+
+    inline bool specifiesNode() const {
+        return _hint && _hint->node.has_value();
+    }
+
+    inline bool canBaseNodeBe(NodeId node) const {
+        return !_hint || !_hint->node || (*_hint->node == node);
+    }
+
+    inline bool baseNodeCanBeOnLeft() const {
+        if (!_hint || !_hint->isLeftChild.has_value()) {
+            return true;
+        }
+        return _hint->isLeftChild.get();
+    }
+
+    inline bool baseNodeCanBeOnRight() const {
+        if (!_hint || !_hint->isLeftChild.has_value()) {
+            return true;
+        }
+        return !_hint->isLeftChild.get();
+    }
+
+    inline bool canMethodBe(JoinMethod method) const {
+        return !_hint || !_hint->method.has_value() || (*_hint->method == method);
+    }
+
+    inline size_t level() const {
+        return _level;
+    }
+
+    inline PlanEnumerationMode mode() const {
+        return _mode;
+    }
+
+    inline bool specifiesHint() const {
+        return _hint.has_value();
+    }
+
+    inline NodeId baseNode() const {
+        tassert(11987002, "Expected a node to be specified", specifiesNode());
+        return *_hint->node;
+    }
+
+    inline JoinMethod method() const {
+        tassert(11987003,
+                "Expected a join method to be specified",
+                specifiesHint() && _hint->method.has_value());
+        return *_hint->method;
+    }
+
+    inline bool baseNodeOnLeft() const {
+        tassert(11987004,
+                "Expected a node side to be specified",
+                specifiesHint() && _hint->isLeftChild.has_value());
+        return *_hint->isLeftChild;
+    }
+
+    inline const JoinHint& hint() const {
+        tassert(11987005, "Expected a hint to be specified", specifiesHint());
+        return *_hint;
+    }
 
     BSONObj toBSON() const;
+
+private:
+    // First level at which to apply this mode.
+    size_t _level;
+    PlanEnumerationMode _mode;
+    // Used to specify what we should enumerate for this subset level.
+    boost::optional<JoinHint> _hint = boost::none;
 };
 
 /**

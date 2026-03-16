@@ -49,8 +49,7 @@ bool PlanEnumeratorContext::canPlanBeEnumerated(JoinMethod method,
                                                 const JoinSubset& left,
                                                 const JoinSubset& right,
                                                 const JoinSubset& subset) {
-    // Filter by hinted join method if present, regardless of enumeration mode.
-    if (_mode.hint && _mode.hint->method != method) {
+    if (!_mode.canMethodBe(method)) {
         return false;
     }
 
@@ -128,7 +127,7 @@ void PlanEnumeratorContext::enumerateINLJPlan(EdgeId edge,
         ? _coster->costINLJFragment(_registry.get(leftPlan), rightNodeId, ie, edge)
         : zeroCost;
     bool isBestPlan = isBestPlanSoFar(subset, inljCost);
-    if (_mode.mode == PlanEnumerationMode::CHEAPEST && !isBestPlan) {
+    if (_mode.mode() == PlanEnumerationMode::CHEAPEST && !isBestPlan) {
         // Only build this plan if it is better than what we already have.
         return;
     }
@@ -153,7 +152,7 @@ void PlanEnumeratorContext::enumerateJoinPlan(JoinMethod method,
     }();
 
     bool isBestPlan = isBestPlanSoFar(subset, joinCost);
-    if (_mode.mode == PlanEnumerationMode::CHEAPEST && !isBestPlan) {
+    if (_mode.mode() == PlanEnumerationMode::CHEAPEST && !isBestPlan) {
         // Only build this plan if it is better than what we already have.
         return;
     }
@@ -218,7 +217,7 @@ void PlanEnumeratorContext::addJoinPlan(JoinMethod method,
         return;
     }
 
-    switch (_mode.mode) {
+    switch (_mode.mode()) {
         // When we hint, we use the cheapest plan from the child subsets. If a child subset was
         // hinted, there can only be one plan for that subset anyway.
         case PlanEnumerationMode::HINTED:
@@ -226,7 +225,7 @@ void PlanEnumeratorContext::addJoinPlan(JoinMethod method,
                         5,
                         "Applying hint for subset",
                         "subset"_attr = subset.toString(_ctx.joinGraph.numNodes()),
-                        "hint"_attr = _mode.hint->toBSON());
+                        "hint"_attr = _mode.hint().toBSON());
             [[fallthrough]];
         case PlanEnumerationMode::CHEAPEST: {
             enumerateCheapestJoinPlan(method, left, right, edges, subset);
@@ -280,8 +279,8 @@ void PlanEnumeratorContext::enumerateJoinSubsets() {
     // Special case: for the first subset, we still want to enumerate all base nodes, even when
     // hinting. However, we just want to join with one of them.
     NodeId hintedFirstLevelSubset = 0;
-    if (_mode.mode == PlanEnumerationMode::HINTED) {
-        hintedFirstLevelSubset = _mode.hint->node;
+    if (_mode.specifiesNode()) {
+        hintedFirstLevelSubset = _mode.baseNode();
     }
 
     modeIt.next();
@@ -302,7 +301,7 @@ void PlanEnumeratorContext::enumerateJoinSubsets() {
     for (size_t level = 1; level < numNodes; ++level) {
         // Find the right enumeration mode for the current level. Only need to increment by one
         // because strategy modes change at most as frequently as once per level.
-        if (modeIt != _strategy.mode.end() && modeIt.get().level == level) {
+        if (modeIt != _strategy.mode.end() && modeIt.get().level() == level) {
             // Update the mode once we reach the level it refers to.
             _mode = modeIt.get();
             modeIt.next();
@@ -310,7 +309,7 @@ void PlanEnumeratorContext::enumerateJoinSubsets() {
 
         auto& joinSubsetsPrevLevel = _joinSubsets[level - 1];
         auto& joinSubsetsCurrLevel = _joinSubsets[level];
-        if (!_mode.hint) {
+        if (!_mode.specifiesNode()) {
             // Preallocate entries for all subsets in the current level, but not if we're hinting
             // (in which case, we will just enumerate one subset).
             joinSubsetsCurrLevel.reserve(cs.next());
@@ -330,10 +329,10 @@ void PlanEnumeratorContext::enumerateJoinSubsets() {
                     continue;
                 }
 
-                if (_mode.mode == PlanEnumerationMode::HINTED && i != _mode.hint->node) {
+                if (!_mode.canBaseNodeBe(i)) {
                     // We should only enumerate plans for the next hinted node.
                     continue;
-                } else if (_mode.mode == PlanEnumerationMode::HINTED && level == 1 &&
+                } else if (_mode.specifiesNode() && level == 1 &&
                            !prevJoinSubset.subset.test(hintedFirstLevelSubset)) {
                     // Special case for hinting: don't try to join with all subsets in the first
                     // level (since we enumerated all base collection accesses). Only join with the
@@ -364,12 +363,12 @@ void PlanEnumeratorContext::enumerateJoinSubsets() {
                 }
 
                 auto& cur = joinSubsetsCurrLevel[subsetIdx];
-                if (_mode.mode != PlanEnumerationMode::HINTED || !_mode.hint->isLeftChild) {
+                if (_mode.baseNodeCanBeOnRight()) {
                     // We don't have a hint, or our hint says to enumerate the next base collection
                     // on the right.
                     enumerateJoinPlans(prevJoinSubset, _joinSubsets[kBaseLevel][i], cur);
                 }
-                if (_mode.mode != PlanEnumerationMode::HINTED || _mode.hint->isLeftChild) {
+                if (_mode.baseNodeCanBeOnLeft()) {
                     // We don't have a hint, or our hint says to enumerate the next base collection
                     // on the left.
                     enumerateJoinPlans(_joinSubsets[kBaseLevel][i], prevJoinSubset, cur);

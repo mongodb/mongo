@@ -31,8 +31,9 @@
 
 namespace mongo::join_ordering {
 namespace {
-bool isModeValid(const SubsetLevelMode& slm) {
-    return slm.mode != PlanEnumerationMode::HINTED || slm.hint;
+bool isHintValid(const JoinHint& hint) {
+    // Must specify at least one field in a hint.
+    return hint.isLeftChild || hint.method || hint.node;
 }
 
 /**
@@ -45,45 +46,49 @@ bool isEnumerationModeValid(const std::vector<SubsetLevelMode>& modes) {
         return false;
     }
 
-    if (modes[0].level != 0 || !isModeValid(modes[0])) {
+    if (modes[0].level() != 0) {
         // First entry must specify how we should start enumeration from the 1st subset.
         return false;
     }
 
     NodeSet seenNodes;
-    if (modes[0].hint) {
-        seenNodes.set(modes[0].hint->node);
+    if (modes[0].specifiesNode()) {
+        seenNodes.set(modes[0].baseNode());
     }
 
     for (size_t i = 1; i < modes.size(); i++) {
-        if (!isModeValid(modes[i])) {
-            return false;
-        }
-
-        if (modes[i - 1].level >= modes[i].level) {
+        if (modes[i - 1].level() >= modes[i].level()) {
             // Not strictly ascending.
             return false;
         }
 
-        if (modes[i - 1].mode == PlanEnumerationMode::HINTED &&
-            modes[i].level - modes[i - 1].level != 1) {
-            // If previous mode is HINTED, the current level must be the previous level + 1.
-            return false;
-        }
-
-        if (modes[i].mode == PlanEnumerationMode::HINTED) {
-            if (seenNodes.test(modes[i].hint->node)) {
+        if (modes[i].specifiesHint() && modes[i].specifiesNode()) {
+            if (seenNodes.test(modes[i].baseNode())) {
                 // We can't hint on joining with the same node twice.
                 return false;
             }
 
-            seenNodes.set(modes[i].hint->node);
+            if (modes[i].level() - modes[i - 1].level() != 1) {
+                // If previous mode specifies a node, the current level must be the previous
+                // level + 1.
+                return false;
+            }
+
+            seenNodes.set(modes[i].baseNode());
             continue;
         }
 
-        if (modes[i - 1].mode == modes[i].mode) {
-            // Two consecutive levels specify the same enumeration mode, and that mode isn't HINTED.
-            return false;
+        // Check if two consecutive levels are duplicates.
+        if (modes[i - 1].mode() == modes[i].mode() &&
+            modes[i - 1].specifiesHint() == modes[i].specifiesHint()) {
+            if (!modes[i - 1].specifiesHint()) {
+                // If neither has a hint, they're the same.
+                return false;
+            }
+            if (modes[i].hint() == modes[i - 1].hint()) {
+                // If both have the same hint, they're duplicates.
+                return false;
+            }
         }
     }
     return true;
@@ -102,16 +107,35 @@ std::string planEnumModeToString(PlanEnumerationMode mode) {
 }
 }  // namespace
 
+SubsetLevelMode::SubsetLevelMode(size_t level,
+                                 PlanEnumerationMode mode,
+                                 boost::optional<JoinHint> hint)
+    : _level(level), _mode(mode), _hint(std::move(hint)) {
+    tassert(11987000, "Expected a hint to be set", _mode != PlanEnumerationMode::HINTED || _hint);
+    if (_hint) {
+        tassert(11987001, "Expected a valid hint", isHintValid(*_hint));
+    }
+}
+
 BSONObj JoinHint::toBSON() const {
-    return BSON("node" << node << "method" << joinMethodToString(method) << "isLeftChild"
-                       << isLeftChild);
+    BSONObjBuilder bob;
+    if (node) {
+        bob << "node" << *node;
+    }
+    if (method) {
+        bob << "method" << joinMethodToString(*method);
+    }
+    if (isLeftChild.has_value()) {
+        bob << "isLeftChild" << *isLeftChild;
+    }
+    return bob.obj();
 }
 
 BSONObj SubsetLevelMode::toBSON() const {
     BSONObjBuilder bob;
-    bob << "level" << (int)level << "mode" << planEnumModeToString(mode);
-    if (hint) {
-        bob << "hint" << hint->toBSON();
+    bob << "level" << (int)_level << "mode" << planEnumModeToString(_mode);
+    if (_hint) {
+        bob << "hint" << _hint->toBSON();
     }
     return bob.obj();
 }
