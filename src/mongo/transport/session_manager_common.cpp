@@ -83,6 +83,7 @@ struct ClientSummary {
         }
         attrs.add("uuid", m.uuid);
         attrs.add("connectionId", m.id);
+        attrs.add("local", m.local);
 
         return attrs;
     }

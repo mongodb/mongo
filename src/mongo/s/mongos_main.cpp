@@ -815,6 +815,23 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
                         "port"_attr = serverGlobalParams.port);
             quickExit(ExitCode::badOptions);
         }
+        const auto secondaryPort = serverGlobalParams.secondaryPort;
+        if (secondaryPort) {
+            if (*secondaryPort == serverGlobalParams.port) {
+                LOGV2_ERROR(12165302,
+                            "Secondary port must be different from the normal ingress port.",
+                            "port"_attr = serverGlobalParams.port);
+                quickExit(ExitCode::badOptions);
+            }
+
+            if (loadBalancerPort && *secondaryPort == loadBalancerPort) {
+                LOGV2_ERROR(12165303,
+                            "Secondary port must be different from the normal load balancer port.",
+                            "port"_attr = *loadBalancerPort);
+                quickExit(ExitCode::badOptions);
+            }
+        }
+
 
         TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                                   "Set up transport layer listener",
@@ -824,7 +841,8 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
             serviceContext,
             loadBalancerPort,
             boost::none,
-            std::make_unique<ClientTransportObserverMongos>());
+            std::make_unique<ClientTransportObserverMongos>(),
+            std::move(secondaryPort));
         if (auto res = tl->setup(); !res.isOK()) {
             LOGV2_ERROR(22856, "Error setting up listener", "error"_attr = res);
             return ExitCode::netError;

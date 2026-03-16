@@ -66,7 +66,8 @@ struct ServerGlobalParams {
     std::string binaryName;  // mongod or mongos
     std::string cwd;         // cwd of when process started
 
-    int port = DefaultDBPort;  // --port
+    int port = DefaultDBPort;            // --port
+    boost::optional<int> secondaryPort;  // --secondaryPort
     enum {
         RouterPort = 27016,
         DefaultDBPort = 27017,

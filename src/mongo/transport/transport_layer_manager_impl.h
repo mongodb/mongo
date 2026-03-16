@@ -81,7 +81,8 @@ public:
         ServiceContext* ctx,
         boost::optional<int> loadBalancerPort = {},
         boost::optional<int> routerPort = {},
-        std::shared_ptr<ClientTransportObserver> observer = nullptr);
+        std::shared_ptr<ClientTransportObserver> observer = nullptr,
+        boost::optional<int> secondaryPort = {});
 
     static std::unique_ptr<TransportLayerManager> makeAndStartDefaultEgressTransportLayer();
 

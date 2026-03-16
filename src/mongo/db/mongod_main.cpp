@@ -333,6 +333,7 @@ const ntservice::NtServiceDefaultStrings defaultServiceStrings = {
 auto makeTransportLayer(ServiceContext* svcCtx) {
     boost::optional<int> routerPort;
     boost::optional<int> proxyPort;
+    boost::optional<int> secondaryPort;
 
     if (serverGlobalParams.routerPort) {
         routerPort = serverGlobalParams.routerPort;
@@ -343,6 +344,16 @@ auto makeTransportLayer(ServiceContext* svcCtx) {
             quickExit(ExitCode::badOptions);
         }
         // TODO SERVER-78730: add support for load-balanced connections.
+    }
+
+    if (serverGlobalParams.secondaryPort) {
+        secondaryPort = serverGlobalParams.secondaryPort;
+        if (*secondaryPort == serverGlobalParams.port) {
+            LOGV2_ERROR(12165300,
+                        "The secondary port must be different from the public listening port.",
+                        "port"_attr = serverGlobalParams.port);
+            quickExit(ExitCode::badOptions);
+        }
     }
 
     // (Ignore FCV check): The proxy port needs to be open before the FCV is set.
@@ -356,6 +367,13 @@ auto makeTransportLayer(ServiceContext* svcCtx) {
                 quickExit(ExitCode::badOptions);
             }
 
+            if (secondaryPort && *proxyPort == *secondaryPort) {
+                LOGV2_ERROR(12165301,
+                            "The proxy port must be different from the public secondary port.",
+                            "port"_attr = *secondaryPort);
+                quickExit(ExitCode::badOptions);
+            }
+
             if (routerPort && *proxyPort == *routerPort) {
                 LOGV2_ERROR(9967801,
                             "The proxy port must be different from the public router port.",
@@ -365,8 +383,12 @@ auto makeTransportLayer(ServiceContext* svcCtx) {
         }
     }
 
-    return transport::TransportLayerManagerImpl::createWithConfig(
-        &serverGlobalParams, svcCtx, std::move(proxyPort), std::move(routerPort));
+    return transport::TransportLayerManagerImpl::createWithConfig(&serverGlobalParams,
+                                                                  svcCtx,
+                                                                  std::move(proxyPort),
+                                                                  std::move(routerPort),
+                                                                  nullptr,
+                                                                  std::move(secondaryPort));
 }
 
 void logStartup(OperationContext* opCtx) {

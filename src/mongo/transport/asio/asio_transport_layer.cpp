@@ -1030,6 +1030,9 @@ Status AsioTransportLayer::setup() {
     if (auto port = _listenerOptions.routerPort) {
         ports.push_back(*port);
     }
+    if (_listenerOptions.secondaryPort) {
+        ports.push_back(*_listenerOptions.secondaryPort);
+    }
 
     // Self-deduplicating list of unique endpoint addresses.
     std::set<WrappedEndpoint> endpoints;
