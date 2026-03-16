@@ -265,7 +265,6 @@ TEST_F(TrialRunTrackerTest, DisablingTrackingForAChildStagePreventsEarlyExit) {
                 makeFunction("fail",
                              makeInt32Constant(ErrorCodes::NotImplemented),
                              makeStringConstant("Unexpected merge with allowDiskUse=false")))),
-            makeSV(), /* Seek slot */
             true,
             boost::none,
             false /* allowDiskUse */,

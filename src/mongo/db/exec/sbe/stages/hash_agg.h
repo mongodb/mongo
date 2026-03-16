@@ -103,7 +103,6 @@ public:
     HashAggStage(std::unique_ptr<PlanStage> input,
                  value::SlotVector gbs,
                  std::vector<std::unique_ptr<HashAggAccumulator>> accumulatorList,
-                 value::SlotVector seekKeysSlots,
                  bool optimizedClose,
                  boost::optional<value::SlotId> collatorSlot,
                  bool allowDiskUse,
@@ -137,14 +136,7 @@ protected:
     void setIteratorToNextRecord() {
         if (_htIt == _ht->end()) {
             // First invocation of getNext() after open().
-            if (!_seekKeysAccessors.empty()) {
-                _htIt = _ht->find(_seekKeys);
-            } else {
-                _htIt = _ht->begin();
-            }
-        } else if (!_seekKeysAccessors.empty()) {
-            // Subsequent invocation with seek keys. Return only 1 single row (if any).
-            _htIt = _ht->end();
+            _htIt = _ht->begin();
         } else {
             ++_htIt;
         }
@@ -193,7 +185,6 @@ private:
     std::vector<std::unique_ptr<HashAggAccumulator>> _accumulatorList;
 
     const boost::optional<value::SlotId> _collatorSlot;
-    const value::SlotVector _seekKeysSlots;
     // When this operator does not expect to be reopened (almost always) then it can close the child
     // early.
     const bool _optimizedClose{true};
@@ -237,9 +228,6 @@ private:
     value::MaterializedRow _outAggRowRecordStore{0};
     std::vector<std::unique_ptr<value::MaterializedSingleRowAccessor>> _outRecordStoreAggAccessors;
     std::vector<std::unique_ptr<value::SwitchAccessor>> _outAggAccessors;
-
-    std::vector<value::SlotAccessor*> _seekKeysAccessors;
-    value::MaterializedRow _seekKeys;
 
     // Function object which can be used to check whether two materialized rows of key values are
     // equal. This comparison is collation-aware if the query has a non-simple collation.

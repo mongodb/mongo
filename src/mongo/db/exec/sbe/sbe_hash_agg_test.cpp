@@ -154,7 +154,6 @@ void HashAggStageTest::performHashAggWithSpillChecking(
                     "sum",
                     makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1))),
                 makeFunction("sum", makeVariable(spillSlot)))),
-            makeSV(),
             true,
             boost::optional<value::SlotId>{shouldUseCollator, collatorSlot},
             shouldSpill,
@@ -278,7 +277,6 @@ TEST_F(HashAggStageTest, HashAggMinMaxTest) {
                     makeFunction("fail",
                                  makeInt32Constant(ErrorCodes::NotImplemented),
                                  makeStringConstant("Unexpected merge with allowDiskUse=false")))),
-            makeSV(),
             true,
             boost::none,
             false /* allowDiskUse */,
@@ -339,7 +337,6 @@ TEST_F(HashAggStageTest, HashAggAddToSetTest) {
                 makeFunction("fail",
                              makeInt32Constant(ErrorCodes::NotImplemented),
                              makeStringConstant("Unexpected merge with allowDiskUse=false")))),
-            makeSV(),
             true,
             boost::none,
             false /* allowDiskUse */,
@@ -415,82 +412,6 @@ TEST_F(HashAggStageTest, HashAggCollationTest) {
     performHashAggWithSpillChecking(inputArr, nonCollatorExpectedOutputArr);
 }
 
-TEST_F(HashAggStageTest, HashAggSeekKeysTest) {
-    auto ctx = makeCompileCtx();
-
-    // Create a seek slot we will use to peek into the hash table.
-    auto seekSlot = generateSlotId();
-    value::OwnedValueAccessor seekAccessor;
-    ctx->pushCorrelated(seekSlot, &seekAccessor);
-
-    // Build a scan of the [5,6,7,5,6,7,6,7,7] input array.
-    auto [inputTag, inputVal] =
-        stage_builder::makeValue(BSON_ARRAY(5 << 6 << 7 << 5 << 6 << 7 << 6 << 7 << 7));
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
-
-
-    auto [outputSlot, stage] = [this, seekSlot](value::SlotId scanSlot,
-                                                std::unique_ptr<PlanStage> scanStage) {
-        // Build a HashAggStage, group by the scanSlot and compute a simple count.
-        auto countsSlot = generateSlotId();
-
-        auto hashAggStage = makeS<HashAggStage>(
-            std::move(scanStage),
-            makeSV(scanSlot),
-            makeHashAggAccumulatorList(std::make_unique<CompiledHashAggAccumulator>(
-                countsSlot,
-                generateSlotId(),
-                makeFunction(
-                    "sum",
-                    makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1))),
-                makeFunction("fail",
-                             makeInt32Constant(ErrorCodes::NotImplemented),
-                             makeStringConstant("Unexpected merge with allowDiskUse=false")))),
-            makeSV(seekSlot),
-            true,
-            boost::none,
-            false /* allowDiskUse */,
-            nullptr /* yieldPolicy */,
-            kEmptyPlanNodeId);
-
-        return std::make_pair(countsSlot, std::move(hashAggStage));
-    }(scanSlot, std::move(scanStage));
-
-    // Let's start with '5' as our seek value.
-    seekAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int>(5));
-
-    // Prepare the tree and get the 'SlotAccessor' for the output slot.
-    auto resultAccessor = prepareTree(ctx.get(), stage.get(), outputSlot);
-    ctx->popCorrelated();
-
-    ASSERT_TRUE(stage->getNext() == PlanState::ADVANCED);
-    auto [res1Tag, res1Val] = resultAccessor->getViewOfValue();
-    // There are '2' occurrences of '5' in the input.
-    assertValuesEqual(res1Tag, res1Val, value::TypeTags::NumberInt32, value::bitcastFrom<int>(2));
-    ASSERT_TRUE(stage->getNext() == PlanState::IS_EOF);
-
-    // Reposition to '6'.
-    seekAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int>(6));
-    stage->open(true);
-    ASSERT_TRUE(stage->getNext() == PlanState::ADVANCED);
-    auto [res2Tag, res2Val] = resultAccessor->getViewOfValue();
-    // There are '3' occurrences of '6' in the input.
-    assertValuesEqual(res2Tag, res2Val, value::TypeTags::NumberInt32, value::bitcastFrom<int>(3));
-    ASSERT_TRUE(stage->getNext() == PlanState::IS_EOF);
-
-    // Reposition to '7'.
-    seekAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int>(7));
-    stage->open(true);
-    ASSERT_TRUE(stage->getNext() == PlanState::ADVANCED);
-    auto [res3Tag, res3Val] = resultAccessor->getViewOfValue();
-    // There are '4' occurrences of '7' in the input.
-    assertValuesEqual(res3Tag, res3Val, value::TypeTags::NumberInt32, value::bitcastFrom<int>(4));
-    ASSERT_TRUE(stage->getNext() == PlanState::IS_EOF);
-
-    checkMemoryStats(stage.get(), false /*spill*/);
-    stage->close();
-}
-
 TEST_F(HashAggStageTest, HashAggBasicCountNoSpill) {
     // We shouldn't spill to disk if memory is plentiful (which by default it is), even if we are
     // allowed to.
@@ -515,7 +436,6 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpill) {
                                              makeE<EConstant>(value::TypeTags::NumberInt64,
                                                               value::bitcastFrom<int64_t>(1))),
                                 makeFunction("sum", makeVariable(spillSlot)))),
-                            makeSV(),  // Seek slot
                             true,
                             boost::none,
                             true /* allowDiskUse */,
@@ -570,7 +490,6 @@ TEST_F(HashAggStageTest, HashAggBasicCountForceSpill) {
                                              makeE<EConstant>(value::TypeTags::NumberInt64,
                                                               value::bitcastFrom<int64_t>(1))),
                                 makeFunction("sum", makeVariable(spillSlot)))),
-                            makeSV(),  // Seek slot
                             true,
                             boost::none,
                             true /* allowDiskUse */,
@@ -652,7 +571,6 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpill) {
                                              makeE<EConstant>(value::TypeTags::NumberInt64,
                                                               value::bitcastFrom<int64_t>(1))),
                                 makeFunction("sum", makeVariable(spillSlot)))),
-                            makeSV(),  // Seek slot
                             true,
                             boost::none,
                             true /* allowDiskUse */,
@@ -724,7 +642,6 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillIfNoMemCheck) {
                                              makeE<EConstant>(value::TypeTags::NumberInt64,
                                                               value::bitcastFrom<int64_t>(1))),
                                 makeFunction("sum", makeVariable(spillSlot)))),
-                            makeSV(),  // Seek slot
                             true,
                             boost::none,
                             true /* allowDiskUse */,
@@ -784,7 +701,6 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpillDouble) {
                                              makeE<EConstant>(value::TypeTags::NumberInt64,
                                                               value::bitcastFrom<int64_t>(1))),
                                 makeFunction("sum", makeVariable(spillSlot)))),
-                            makeSV(),  // Seek slot
                             true,
                             boost::none,
                             true /* allowDiskUse */,
@@ -847,7 +763,6 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillWithNoGroupByDouble) {
                                              makeE<EConstant>(value::TypeTags::NumberInt64,
                                                               value::bitcastFrom<int64_t>(1))),
                                 makeFunction("sum", makeVariable(spillSlot)))),
-                            makeSV(),  // Seek slot
                             true,
                             boost::none,
                             true /* allowDiskUse */,
@@ -916,7 +831,6 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpill) {
                                     spillSlot2,
                                     makeFunction("sum", makeVariable(scanSlot)),
                                     makeFunction("sum", makeVariable(spillSlot2)))),
-                            makeSV(),  // Seek slot
                             true,
                             boost::none,
                             true /* allowDiskUse */,
@@ -992,7 +906,6 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpillAllToDisk) {
                                     spillSlot2,
                                     makeFunction("sum", makeVariable(scanSlot)),
                                     makeFunction("sum", makeVariable(spillSlot2)))),
-                            makeSV(),  // Seek slot
                             true,
                             boost::none,
                             true,  // allowDiskUse=true
@@ -1063,7 +976,6 @@ TEST_F(HashAggStageTest, HashAggMultipleAccForceSpill) {
                                     spillSlot2,
                                     makeFunction("sum", makeVariable(scanSlot)),
                                     makeFunction("sum", makeVariable(spillSlot2)))),
-                            makeSV(),  // Seek slot
                             true,
                             boost::none,
                             true /* allowDiskUse */,
@@ -1162,7 +1074,6 @@ TEST_F(HashAggStageTest, HashAggMultipleAccForceSpillAfterSpill) {
                                     spillSlot2,
                                     makeFunction("sum", makeVariable(scanSlot)),
                                     makeFunction("sum", makeVariable(spillSlot2)))),
-                            makeSV(),  // Seek slot
                             true,
                             boost::none,
                             true /* allowDiskUse */,
@@ -1248,7 +1159,6 @@ TEST_F(HashAggStageTest, HashAggSum10Groups) {
                                 spillSlot,
                                 makeFunction("sum", makeVariable(scanSlot)),
                                 makeFunction("sum", makeVariable(spillSlot)))),
-                            makeSV(),  // Seek slot
                             true,
                             boost::none,
                             true,  // allowDiskUse=true
@@ -1298,7 +1208,6 @@ TEST_F(HashAggStageTest, HashAggBasicCountWithRecordIds) {
                                              makeE<EConstant>(value::TypeTags::NumberInt64,
                                                               value::bitcastFrom<int64_t>(1))),
                                 makeFunction("sum", makeVariable(spillSlot)))),
-                            makeSV(),  // Seek slot
                             true,
                             boost::none,
                             true,  // allowDiskUse=true

@@ -777,7 +777,6 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeHashAgg(
     stage = sbe::makeS<sbe::HashAggStage>(std::move(stage),
                                           std::move(groupBySlots),
                                           std::move(loweredAccumulatorList),
-                                          sbe::value::SlotVector{},
                                           true /* optimized close */,
                                           collatorSlot,
                                           _state.allowDiskUse,
