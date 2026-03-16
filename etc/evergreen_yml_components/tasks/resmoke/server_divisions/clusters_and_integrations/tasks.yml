@@ -1189,6 +1189,22 @@ tasks:
           # as when the task is run on small distro.
           resmoke_jobs_factor: 0.1
 
+  - <<: *gen_task_template
+    name: disagg_analyze_shard_key_jscore_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "default",
+        "large",
+        "clustered_collections",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: disagg_analyze_shard_key_jscore_passthrough
+          resmoke_jobs_max: 1
+
   - <<: *benchmark_template
     name: benchmarks_sharding
     tags:

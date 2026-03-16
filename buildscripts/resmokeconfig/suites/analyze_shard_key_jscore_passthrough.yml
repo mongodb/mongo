@@ -112,6 +112,7 @@ executor:
       - CheckReplOplogs
       - CheckMetadataConsistencyInBackground
       - ValidateCollections
+      - AnalyzeShardKeysInBackground
   config:
     shell_options:
       eval: >-
