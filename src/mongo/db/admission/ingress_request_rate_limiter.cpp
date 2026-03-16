@@ -64,6 +64,10 @@ class ClientAdmissionControlState {
 public:
     static bool isExempted(Client*);
 
+    // TODO(SERVER-114130): Remove this function once failpoint routes through regular rate limiter
+    // pathway.
+    static bool appNameIsExempted_forTest(Client* client);
+
 private:
     template <typename T>
     using Snapshot = VersionedValue<T>::Snapshot;
@@ -116,6 +120,10 @@ const auto getAdmissionControlState = Client::declareDecoration<ClientAdmissionC
 
 bool ClientAdmissionControlState::isExempted(Client* client) {
     return getAdmissionControlState(client)._isExempted(client);
+}
+
+bool ClientAdmissionControlState::appNameIsExempted_forTest(Client* client) {
+    return getAdmissionControlState(client)._isApplicationExempt(client);
 }
 
 }  // namespace
@@ -192,6 +200,15 @@ Status IngressRequestRateLimiter::admitRequest(Client* client) {
     }
 
     return rateLimitResult;
+}
+
+// This function is only for testing, but the _forTest name append makes the module linter
+// complain.
+//
+// TODO(SERVER-114130): Remove this function once failpoint routes through regular rate limiter
+// pathway.
+bool IngressRequestRateLimiter::isAppNameExempted(Client* client) {
+    return ClientAdmissionControlState::appNameIsExempted_forTest(client);
 }
 
 void IngressRequestRateLimiter::updateRateParameters(double refreshRatePerSec,

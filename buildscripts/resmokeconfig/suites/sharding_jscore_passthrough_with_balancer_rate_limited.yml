@@ -115,6 +115,17 @@ executor:
         failpoint.failIngressRequestRateLimiting:
           mode:
             activationProbability: 0.25
+        ingressRequestRateLimiterApplicationExemptions: >
+          {"appNames":["MongoDB Internal Client",
+                      "NetworkInterfaceTL-ReplNetwork",
+                      "NetworkInterfaceTL-ReplCoordExternNetwork",
+                      "NetworkInterfaceTL-ReplNodeDbWorkerNetwork",
+                      "NetworkInterfaceTL-ReplicaSetMonitor-TaskExecutor",
+                      "NetworkInterfaceTL-HelloMe-TaskExecutor",
+                      "NetworkInterfaceTL-AddShardCoordinator-TaskExecutor",
+                      "NetworkInterfaceTL-ConfigsvrCoordinatorServiceNetwork",
+                      "NetworkInterfaceTL-StandaloneNetwork",
+                      "NetworkInterfaceTL-ShardingDDLCoordinatorNetwork"]}
     num_rs_nodes_per_shard: 1
     num_mongos: 3
     num_shards: 2

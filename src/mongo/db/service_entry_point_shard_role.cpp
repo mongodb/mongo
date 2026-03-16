@@ -39,6 +39,7 @@
 #include "mongo/db/admission/ingress_admission_context.h"
 #include "mongo/db/admission/ingress_admission_control_gen.h"
 #include "mongo/db/admission/ingress_admission_controller.h"
+#include "mongo/db/admission/ingress_request_rate_limiter.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_contract.h"
 #include "mongo/db/auth/authorization_contract_guard.h"
@@ -1838,6 +1839,12 @@ void ExecCommandDatabase::_initiateCommand() {
                 if (!isFromMongoExecutable) {
                     return false;
                 }
+            }
+
+            // Respect the ingressRequestRateLimiterApplicationExemptions list so that internal
+            // clients are exempt from the failpoint.
+            if (IngressRequestRateLimiter::isAppNameExempted(opCtx->getClient())) {
+                return false;
             }
 
             return true;
