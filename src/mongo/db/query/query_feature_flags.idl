@@ -423,6 +423,13 @@ feature_flags:
         default: false
         incremental_rollout_phase: in_development
 
+    featureFlagLookupWithPipelinesInSbe:
+        description: "Feature flag to enable SBE to execute eligible $lookup stages containing subpipelines."
+        cpp_varname: gFeatureFlagLookupWithPipelinesInSbe
+        fcv_gated: false
+        default: false
+        incremental_rollout_phase: in_development
+
     featureFlagExtensionsInsideHybridSearch:
         description: "Feature flag to enable extension stages inside of hybrid search."
         cpp_varname: gFeatureFlagExtensionsInsideHybridSearch
