@@ -3,7 +3,6 @@
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 import {getRawOperationSpec, isRawOperationSupported} from "jstests/libs/raw_operation_utils.js";
 
 export const defaultSnapshotSize = 1000;
@@ -430,7 +429,7 @@ function listCollectionsWithoutViews(database) {
 function getIndexNames(db, collName, allowedErrorCodes) {
     // TODO(SERVER-118882): Remove this once 9.0 becomes last LTS.
     // Ignore system.buckets.*
-    if (isRawOperationSupported(db) && collName.startsWith("system.buckets")) {
+    if (isRawOperationSupported(db) && collName.startsWith("system.buckets.")) {
         return [];
     }
     let failMsg = "'listIndexes' command failed";
@@ -503,8 +502,9 @@ export const runDbCheckForDatabase = (
             }
 
             // TODO(SERVER-118882): Remove this once 9.0 becomes last LTS.
-            // Ignore system.buckets.* collections when FCV >= 8.3
-            if (isFCVgte(replSet.getPrimary(), "8.3") && collName.startsWith("system.buckets")) {
+            // Starting from 8.3 binary, dbCheck supports targeting the main timeseries namespace,
+            // which internally handles the translation to system.buckets for legacy timeseries.
+            if (collName.startsWith("system.buckets.")) {
                 jsTest.log.info(
                     "dbCheck (" +
                         tojson(collDbCheckParameters) +
