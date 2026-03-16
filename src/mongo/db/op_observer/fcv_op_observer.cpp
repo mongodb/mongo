@@ -39,6 +39,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/change_stream_expired_pre_image_remover.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_options.h"
@@ -165,6 +166,25 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
         !(prevVersion && prevVersion.value() == newVersion);
     if (isReplSet && shouldIncrementTopologyVersion) {
         replCoordinator->incrementTopologyVersion();
+    }
+
+    // TODO SERVER-108753 Remove the following section once the feature flag for replicated
+    // truncates gets removed.
+    if (isReplSet && prevFcvSnapshot.isVersionInitialized() &&
+        prevFcvSnapshot.getVersion() != newFcvSnapshot.getVersion()) {
+        try {
+            // Notify the periodic change streams pre-images removal job about the FCV change.
+            // This is necessary because the job depends on an FCV-gated feature flag for replicated
+            // truncates, which can change its value on FCV upgrade/downgrade.
+            if (auto* removerService = ChangeStreamExpiredPreImagesRemoverService::get(opCtx)) {
+                removerService->onFCVChange(opCtx, newFcvSnapshot);
+            }
+        } catch (const DBException& ex) {
+            LOGV2_WARNING(
+                12047102,
+                "Failed while updating FCV status for periodic change streams removal service",
+                "status"_attr = ex.reason());
+        }
     }
 }
 

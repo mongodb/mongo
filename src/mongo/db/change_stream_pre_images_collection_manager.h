@@ -135,7 +135,8 @@ public:
     /**
      * Scans the system pre-images collection and deletes the expired pre-images from it.
      */
-    void performExpiredChangeStreamPreImagesRemovalPass(Client* client);
+    void performExpiredChangeStreamPreImagesRemovalPass(Client* client,
+                                                        bool useReplicatedTruncates);
 
     const PurgingJobStats& getPurgingJobStats() const {
         return _purgingJobStats;
@@ -144,6 +145,8 @@ public:
     int64_t getDocsInserted() const {
         return _docsInserted.loadRelaxed();
     }
+
+    void flushTruncateMarkers();
 
 private:
     /**
@@ -181,9 +184,10 @@ private:
      * Lazily initializes truncate markers if they don't already exist, then utilizes the truncate
      * markers to remove expired pre-images from the collection.
      *
-     * Returns the number of pre-image documents removed.
+     * Returns the estimated number of pre-image documents removed.
      */
-    size_t _deleteExpiredPreImagesWithTruncate(OperationContext* opCtx);
+    size_t _deleteExpiredPreImagesWithTruncate(OperationContext* opCtx,
+                                               bool useReplicatedTruncates);
 
     PurgingJobStats _purgingJobStats;
 

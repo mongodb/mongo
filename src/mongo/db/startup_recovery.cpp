@@ -462,6 +462,16 @@ void cleanupPreImagesCollectionAfterUncleanShutdown(OperationContext* opCtx) {
         return;
     }
 
+    // It is possible to be in a situation in which the recovery runs but the FCV snapshot is not
+    // present. This can happen with the in-memory engine. In this case it is not safe to use the
+    // feature flag value from last LTS or last continuous FCV, because other servers in the replica
+    // set may already be running latest FCV. In this case, we do not want local truncations to
+    // happen either.
+    if (const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        !fcvSnapshot.isVersionInitialized()) {
+        return;
+    }
+
     writeConflictRetry(
         opCtx,
         "cleanupPreImagesCollectionAfterUncleanShutdown",

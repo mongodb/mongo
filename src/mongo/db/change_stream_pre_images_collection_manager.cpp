@@ -163,7 +163,7 @@ void ChangeStreamPreImagesCollectionManager::insertPreImage(OperationContext* op
 }
 
 void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImagesRemovalPass(
-    Client* client) {
+    Client* client, bool useReplicatedTruncates) {
     Timer timer;
 
     const auto startTime = Date_t::now();
@@ -171,26 +171,72 @@ void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImages
     try {
         opCtx = client->makeOperationContext();
 
+        // The removal job either issues local or replicated truncates, based on the capabilities of
+        // the persistence provider (attached storage / disaggregated storage) OR the value of the
+        // FCV-gated feature flag 'useReplicatedTruncatesForDeletions'. The feature flag value can
+        // flip during FCV upgrade or downgrade.
+        // Using a 'FixedOperationFCVRegion' ensures the FCV cannot change on the primary while the
+        // removal is executing. There is no such protection on the secondaries, meaning that the
+        // FCV and thus the value of the feature flag can change while the removal is executing on
+        // secondaries. This can lead to potential inconsistencies between the primary and the
+        // secondaries, which are acceptable due to the following reasoning:
+        // - DSC: on DSC, the value of the feature flag is always ignored, because replicated
+        //   truncates are ensured on persistence provider level. Only the current primary will ever
+        //   execute the removals, and secondaries apply removals with the oplog. There are no
+        //   possible inconsistencies.
+        // - ASC: on ASC, the value of the feature flag is used, and it can flip its value from
+        //   false to true during FCV upgrade, or from true to false during FCV downgrade.
+        //   - FCV upgrade: before the FCV upgrade, all nodes execute the removal job locally, so
+        //     there can already be inconsistencies between the nodes. The FCV upgrade will stop the
+        //     removal job on the secondaries, which means that there will be no _new_
+        //     inconsistencies after the FCV upgrade has completed and the secondaries have seen the
+        //     FCV upgrade. Inconsistencies continue to exist until all nodes have stepped up once
+        //     and were responsible for the removal based on their own view of the data. These
+        //     inconsistencies have existed since the introduction of the local removals in v7.1,
+        //     and are acceptable.
+        //   - FCV downgrade: The FCV downgrade will enable local removal jobs on all nodes, which
+        //     brings back possible inconsistencies anyway. This is an unavoidable side effect of
+        //     using local removals.
+        VersionContext::FixedOperationFCVRegion fixedFcvRegion(opCtx.get());
+
+        // Don't execute the removal if the feature flag value has changed compared to when the job
+        // was originally started.
+        if (const bool currentUseReplicatedTruncates =
+                change_stream_pre_image_util::shouldUseReplicatedTruncatesForPreImages(opCtx.get());
+            currentUseReplicatedTruncates != useReplicatedTruncates) {
+            LOGV2_DEBUG(
+                12047100,
+                2,
+                "Skipping periodic change stream expired pre-images removal job because FCV-gated "
+                "feature flag value for using replicated truncates changed between the "
+                "installation and the execution of the job",
+                "currentValue"_attr = currentUseReplicatedTruncates,
+                "originalValue"_attr = useReplicatedTruncates);
+            return;
+        }
+
         // The number of removals here can be an estimate based on collection size information,
         // which can be inaccurate.
-        if (size_t estimatedNumberOfRemovals = _deleteExpiredPreImagesWithTruncate(opCtx.get());
+        if (size_t estimatedNumberOfRemovals =
+                _deleteExpiredPreImagesWithTruncate(opCtx.get(), useReplicatedTruncates);
             estimatedNumberOfRemovals > 0) {
             LOGV2_DEBUG(5869104,
                         1,
-                        "Periodic expired pre-images removal job finished executing",
+                        "Periodic change stream expired pre-images removal job finished executing",
                         "estimatedNumberOfRemovals"_attr = estimatedNumberOfRemovals,
                         "jobDuration"_attr = (Date_t::now() - startTime).toString());
         }
     } catch (const DBException& exception) {
         Status interruptStatus = opCtx ? opCtx.get()->checkForInterruptNoAssert() : Status::OK();
         if (!interruptStatus.isOK()) {
-            LOGV2_DEBUG(5869105,
-                        3,
-                        "Periodic expired pre-images removal job operation was interrupted",
-                        "errorCode"_attr = interruptStatus);
+            LOGV2_DEBUG(
+                5869105,
+                3,
+                "Periodic change stream expired pre-images removal job operation was interrupted",
+                "errorCode"_attr = interruptStatus);
         } else {
             LOGV2_ERROR(5869106,
-                        "Periodic expired pre-images removal job failed",
+                        "Periodic change stream expired pre-images removal job failed",
                         "reason"_attr = exception.reason());
         }
     }
@@ -199,9 +245,14 @@ void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImages
     _purgingJobStats.totalPass.fetchAndAddRelaxed(1);
 }
 
+void ChangeStreamPreImagesCollectionManager::flushTruncateMarkers() {
+    _truncateManager.flushTruncateMarkers();
+}
+
 size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithTruncate(
-    OperationContext* opCtx) {
-    const auto truncateStats = _truncateManager.truncateExpiredPreImages(opCtx);
+    OperationContext* opCtx, bool useReplicatedTruncates) {
+    const auto truncateStats =
+        _truncateManager.truncateExpiredPreImages(opCtx, useReplicatedTruncates);
 
     _purgingJobStats.maxTimestampEligibleForTruncate.store(
         truncateStats.maxTimestampEligibleForTruncate);

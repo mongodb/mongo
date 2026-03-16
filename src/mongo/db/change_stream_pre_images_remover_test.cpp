@@ -70,6 +70,7 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include <boost/none.hpp>
@@ -238,13 +239,13 @@ protected:
         return static_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource());
     }
 
-    BSONObj performPass(Milliseconds timeToAdvance) {
+    BSONObj performPass(Milliseconds timeToAdvance, bool useReplicatedTruncates) {
         auto clock = clockSource();
         clock->advance(timeToAdvance);
         auto& manager = ChangeStreamPreImagesCollectionManager::get(getServiceContext());
         auto newClient = getServiceContext()->getService()->makeClient("");
         AlternativeClientRegion acr(newClient);
-        manager.performExpiredChangeStreamPreImagesRemovalPass(&cc());
+        manager.performExpiredChangeStreamPreImagesRemovalPass(&cc(), useReplicatedTruncates);
         return manager.getPurgingJobStats().toBSON();
     }
 
@@ -294,7 +295,8 @@ protected:
     }
 
     // This test is executed twice, with and without replicated truncates.
-    void testEnsureNoMoreInternalScansWithTruncates(long long expectedDocsDeleted) {
+    void testEnsureNoMoreInternalScansWithTruncates(long long expectedDocsDeleted,
+                                                    bool useReplicatedTruncates) {
         RAIIServerParameterControllerForTest minBytesPerMarker{
             "preImagesCollectionTruncateMarkersMinBytes", 1};
 
@@ -312,7 +314,7 @@ protected:
 
         setExpirationTime(Seconds{1});
         // Verify that expiration works as expected.
-        auto passStats = performPass(Milliseconds{2000});
+        auto passStats = performPass(Milliseconds{2000}, useReplicatedTruncates);
         ASSERT_EQ(passStats["totalPass"].numberLong(), 1);
         ASSERT_EQ(passStats["docsDeleted"].numberLong(), expectedDocsDeleted);
         ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 1);
@@ -320,7 +322,7 @@ protected:
         ASSERT_EQ(0, countPreImagesForNsUUID(operationContext(), uuid));
 
         // Assert that internal scans still occur while the collection exists.
-        passStats = performPass(Milliseconds{2000});
+        passStats = performPass(Milliseconds{2000}, useReplicatedTruncates);
         ASSERT_EQ(passStats["totalPass"].numberLong(), 2);
         ASSERT_EQ(passStats["docsDeleted"].numberLong(), expectedDocsDeleted);
         ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 2);
@@ -329,14 +331,14 @@ protected:
         // exist.
         invariantStatusOK(
             storageInterface()->dropCollection(operationContext(), kPreImageEnabledCollection));
-        passStats = performPass(Milliseconds{2000});
+        passStats = performPass(Milliseconds{2000}, useReplicatedTruncates);
         ASSERT_EQ(passStats["totalPass"].numberLong(), 3);
         ASSERT_EQ(passStats["docsDeleted"].numberLong(), expectedDocsDeleted);
         // One more scan occurs after the drop verifying there's no more data and it is safe to
         // ignore in the future.
         ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 3);
 
-        passStats = performPass(Milliseconds{2000});
+        passStats = performPass(Milliseconds{2000}, useReplicatedTruncates);
         ASSERT_EQ(passStats["totalPass"].numberLong(), 4);
         ASSERT_EQ(passStats["docsDeleted"].numberLong(), expectedDocsDeleted);
         ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 3);
@@ -344,7 +346,7 @@ protected:
 
     // This test is executed twice, with and without replicated truncates.
     void testEnsureAllDocsEventuallyTruncatedFromPrePopulatedCollection(
-        long long expectedDocsDeleted) {
+        long long expectedDocsDeleted, bool useReplicatedTruncates) {
         auto uuid =
             CollectionCatalog::get(operationContext())
                 ->lookupCollectionByNamespace(operationContext(), kPreImageEnabledCollection)
@@ -365,7 +367,7 @@ protected:
 
         setExpirationTime(Seconds{1});
 
-        auto passStats = performPass(Milliseconds{0});
+        auto passStats = performPass(Milliseconds{0}, useReplicatedTruncates);
         ASSERT_EQ(passStats["totalPass"].numberLong(), 1);
         ASSERT_EQ(passStats["docsDeleted"].numberLong(), expectedDocsDeleted);
         ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 1);
@@ -374,7 +376,8 @@ protected:
     }
 
     // This test is executed twice, with and without replicated truncates.
-    void testTruncatesAreOnlyAfterAllDurable(long long expectedDocsDeleted) {
+    void testTruncatesAreOnlyAfterAllDurable(long long expectedDocsDeleted,
+                                             bool useReplicatedTruncates) {
         RAIIServerParameterControllerForTest minBytesPerMarkerController{
             "preImagesCollectionTruncateMarkersMinBytes", 1};
 
@@ -415,7 +418,7 @@ protected:
         clock->advance(Seconds{10});
         setExpirationTime(Seconds{1});
 
-        auto passStats = performPass(Milliseconds{0});
+        auto passStats = performPass(Milliseconds{0}, useReplicatedTruncates);
         ASSERT_EQ(passStats["maxTimestampEligibleForTruncate"].timestamp(), allDurableTS);
         ASSERT_EQ(passStats["totalPass"].numberLong(), 1);
         ASSERT_EQ(passStats["docsDeleted"].numberLong(), expectedDocsDeleted);
@@ -496,21 +499,24 @@ TEST_F(PreImagesRemoverTest, RecordIdToPreImageTimestampRetrieval) {
 TEST_F(PreImagesRemoverTest, EnsureNoMoreInternalScansWithLocalTruncates) {
     RAIIServerParameterControllerForTest featureFlagScope{
         "featureFlagUseReplicatedTruncatesForDeletions", false};
-    testEnsureNoMoreInternalScansWithTruncates(2 /* expectedDocsDeleted */);
+    testEnsureNoMoreInternalScansWithTruncates(2 /* expectedDocsDeleted */,
+                                               false /* useReplicatedTruncates */);
 }
 
 // Run test with replicated truncates.
 TEST_F(PreImagesRemoverTest, EnsureNoMoreInternalScansWithReplicatedTruncates) {
     RAIIServerParameterControllerForTest featureFlagScope{
         "featureFlagUseReplicatedTruncatesForDeletions", true};
-    testEnsureNoMoreInternalScansWithTruncates(3 /* expectedDocsDeleted */);
+    testEnsureNoMoreInternalScansWithTruncates(3 /* expectedDocsDeleted */,
+                                               true /* useReplicatedTruncates */);
 }
 
 TEST_F(PreImagesRemoverTest,
        EnsureAllDocsEventuallyTruncatedFromPrePopulatedCollectionLocalTruncates) {
     RAIIServerParameterControllerForTest featureFlagScope{
         "featureFlagUseReplicatedTruncatesForDeletions", false};
-    testEnsureAllDocsEventuallyTruncatedFromPrePopulatedCollection(1000 /* expectedDocsDeleted */);
+    testEnsureAllDocsEventuallyTruncatedFromPrePopulatedCollection(
+        1000 /* expectedDocsDeleted */, false /* useReplicatedTruncates */);
 }
 
 TEST_F(PreImagesRemoverTest,
@@ -520,7 +526,7 @@ TEST_F(PreImagesRemoverTest,
     // Note: the expected value here is very inaccurate, but this is due to no size information
     // being used when estimating the number of documents in the truncate markers.
     testEnsureAllDocsEventuallyTruncatedFromPrePopulatedCollection(
-        360448 /* expectedDocsDeleted */);
+        360448 /* expectedDocsDeleted */, true /* useReplicatedTruncates */);
 }
 
 TEST_F(PreImagesRemoverTest, RemoverPassWithTruncateOnEmptyCollectionLocalTruncates) {
@@ -529,7 +535,7 @@ TEST_F(PreImagesRemoverTest, RemoverPassWithTruncateOnEmptyCollectionLocalTrunca
 
     setExpirationTime(Seconds{1});
 
-    auto passStats = performPass(Milliseconds{0});
+    auto passStats = performPass(Milliseconds{0}, false /* useReplicatedTruncates */);
     ASSERT_EQ(passStats["totalPass"].numberLong(), 1);
     ASSERT_EQ(passStats["docsDeleted"].numberLong(), 0);
     ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 0);
@@ -541,7 +547,7 @@ TEST_F(PreImagesRemoverTest, RemoverPassWithTruncateOnEmptyCollectionReplicatesT
 
     setExpirationTime(Seconds{1});
 
-    auto passStats = performPass(Milliseconds{0});
+    auto passStats = performPass(Milliseconds{0}, true /* useReplicatedTruncates */);
     ASSERT_EQ(passStats["totalPass"].numberLong(), 1);
     ASSERT_EQ(passStats["docsDeleted"].numberLong(), 0);
     ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 0);
@@ -550,7 +556,8 @@ TEST_F(PreImagesRemoverTest, RemoverPassWithTruncateOnEmptyCollectionReplicatesT
 TEST_F(PreImagesRemoverTest, TruncatesAreOnlyAfterAllDurableLocalTruncates) {
     RAIIServerParameterControllerForTest featureFlagScope{
         "featureFlagUseReplicatedTruncatesForDeletions", false};
-    testTruncatesAreOnlyAfterAllDurable(1000 /* expectedDocsDeleted */);
+    testTruncatesAreOnlyAfterAllDurable(1000 /* expectedDocsDeleted */,
+                                        false /* useReplicatedTruncates */);
 }
 
 // This test will currently fail when enabling the feature flag for replicated truncates.
@@ -565,7 +572,8 @@ TEST_F(PreImagesRemoverTest, TruncatesAreOnlyAfterAllDurableLocalTruncates) {
 // TEST_F(PreImagesRemoverTest, TruncatesAreOnlyAfterAllDurableReplicatedTruncates) {
 //     RAIIServerParameterControllerForTest featureFlagScope{
 //         "featureFlagUseReplicatedTruncatesForDeletions", true};
-//     testTruncatesAreOnlyAfterAllDurable(1 /* expectedDocsDeleted */);
+//     testTruncatesAreOnlyAfterAllDurable(1 /* expectedDocsDeleted */, true /*
+//     useReplicatedTruncates */);
 // }
 
 /**
@@ -593,54 +601,53 @@ protected:
     }
 };
 
-TEST_F(PreImagesRemoverServiceTest, PeriodicJobStartsWithRollbackFalse) {
+TEST_F(PreImagesRemoverServiceTest, PeriodicJobStartupHonorsRollbackFlagOnConsistentDataAvailable) {
+    RAIIServerParameterControllerForTest featureFlagScope{
+        "featureFlagUseReplicatedTruncatesForDeletions", false};
+
     auto opCtx = operationContext();
     auto preImageRemoverService = ChangeStreamExpiredPreImagesRemoverService::get(opCtx);
 
-    ASSERT_FALSE(preImageRemoverService->hasStartedPeriodicJob());
-
-    preImageRemoverService->onConsistentDataAvailable(
-        opCtx, false /* isMajority */, false /* isRollback */);
-
-    ASSERT_TRUE(preImageRemoverService->hasStartedPeriodicJob());
-}
-
-TEST_F(PreImagesRemoverServiceTest, PeriodicJobDoesNotStartWhenRollbackTrue) {
-    auto opCtx = operationContext();
-    auto preImageRemoverService = ChangeStreamExpiredPreImagesRemoverService::get(opCtx);
-
-    ASSERT_FALSE(preImageRemoverService->hasStartedPeriodicJob());
+    ASSERT_EQ(boost::none, preImageRemoverService->getJobContext_forTest());
 
     preImageRemoverService->onConsistentDataAvailable(
         opCtx, false /* isMajority */, true /* isRollback */);
-    ASSERT_FALSE(preImageRemoverService->hasStartedPeriodicJob());
+    ASSERT_EQ(boost::none, preImageRemoverService->getJobContext_forTest());
 
     // Test a second call doesn't start up the periodic remover, since 'isRollback' true may be
     // called multiple times throughout the lifetime of the mongod.
     preImageRemoverService->onConsistentDataAvailable(
         opCtx, false /* isMajority */, true /* isRollback */);
-    ASSERT_FALSE(preImageRemoverService->hasStartedPeriodicJob());
+    ASSERT_EQ(boost::none, preImageRemoverService->getJobContext_forTest());
 }
 
 TEST_F(PreImagesRemoverServiceTest, PeriodicJobOnSecondary) {
+    RAIIServerParameterControllerForTest featureFlagScope{
+        "featureFlagUseReplicatedTruncatesForDeletions", false};
+
     auto opCtx = operationContext();
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
 
     auto preImageRemoverService = ChangeStreamExpiredPreImagesRemoverService::get(opCtx);
 
-    ASSERT_FALSE(preImageRemoverService->hasStartedPeriodicJob());
+    ASSERT_EQ(boost::none, preImageRemoverService->getJobContext_forTest());
 
     preImageRemoverService->onConsistentDataAvailable(
         opCtx, false /* isMajority */, true /* isRollback */);
-    ASSERT_FALSE(preImageRemoverService->hasStartedPeriodicJob());
+    ASSERT_EQ(boost::none, preImageRemoverService->getJobContext_forTest());
 
     preImageRemoverService->onConsistentDataAvailable(
         opCtx, false /* isMajority */, false /* isRollback */);
-    ASSERT_TRUE(preImageRemoverService->hasStartedPeriodicJob());
+    ASSERT_EQ((ChangeStreamExpiredPreImagesRemoverService::PreImagesRemovalJobContext{
+                  .id = 1, .usesReplicatedTruncates = false}),
+              preImageRemoverService->getJobContext_forTest());
 }
 
 TEST_F(PreImagesRemoverServiceTest, PeriodicJobDoesntStartOnStandalone) {
+    RAIIServerParameterControllerForTest featureFlagScope{
+        "featureFlagUseReplicatedTruncatesForDeletions", false};
+
     auto opCtx = operationContext();
     repl::ReplicationCoordinator::set(getServiceContext(),
                                       std::make_unique<repl::ReplicationCoordinatorMock>(
@@ -648,12 +655,12 @@ TEST_F(PreImagesRemoverServiceTest, PeriodicJobDoesntStartOnStandalone) {
 
     auto preImageRemoverService = ChangeStreamExpiredPreImagesRemoverService::get(opCtx);
 
-    ASSERT_FALSE(preImageRemoverService->hasStartedPeriodicJob());
+    ASSERT_EQ(boost::none, preImageRemoverService->getJobContext_forTest());
 
     preImageRemoverService->onConsistentDataAvailable(
         opCtx, false /* isMajority */, false /* isRollback */);
 
-    ASSERT_FALSE(preImageRemoverService->hasStartedPeriodicJob());
+    ASSERT_EQ(boost::none, preImageRemoverService->getJobContext_forTest());
 }
 
 }  // namespace mongo

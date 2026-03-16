@@ -105,7 +105,12 @@ public:
      */
     void refreshMarkers(OperationContext* opCtx);
 
-    PreImagesTruncateStats truncateExpiredPreImages(OperationContext* opCtx);
+    /**
+     * Performs the truncation of the change stream pre-images collection based on the in-memory
+     * state of the 'CollectionTruncateMarkers' in '_markersMap'.
+     */
+    PreImagesTruncateStats truncateExpiredPreImages(OperationContext* opCtx,
+                                                    bool useReplicatedTruncates);
 
     /**
      * Updates or creates the 'PreImagesTruncateMarkersPerNsUUID' to account for a

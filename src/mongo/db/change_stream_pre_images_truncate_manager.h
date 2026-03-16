@@ -47,7 +47,8 @@ public:
     /*
      * Truncates expired pre-images spanning the pre-images collection.
      */
-    PreImagesTruncateStats truncateExpiredPreImages(OperationContext* opCtx);
+    PreImagesTruncateStats truncateExpiredPreImages(OperationContext* opCtx,
+                                                    bool useReplicatedTruncates);
 
     /**
      * Updates truncate markers to account for a newly inserted 'preImage' into the pre-images
@@ -57,6 +58,12 @@ public:
     void updateMarkersOnInsert(OperationContext* opCtx,
                                const ChangeStreamPreImage& preImage,
                                int64_t bytesInserted);
+
+    /**
+     * Erase any existing in-memory truncate markers, so that they will be rebuilt from scratch next
+     * time.
+     */
+    void flushTruncateMarkers();
 
     /**
      * Returns true if the '_truncateMarkers' instance variable is populated, false otherwise.

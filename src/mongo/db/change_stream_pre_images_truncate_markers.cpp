@@ -53,8 +53,10 @@ namespace {
 
 class MaybeUnreplicatedPreImageTruncateBlock {
 public:
-    explicit MaybeUnreplicatedPreImageTruncateBlock(OperationContext* opCtx) {
-        if (!change_stream_pre_image_util::shouldUseReplicatedTruncatesForPreImages(opCtx)) {
+    explicit MaybeUnreplicatedPreImageTruncateBlock(OperationContext* opCtx,
+                                                    bool useReplicatedTruncates) {
+        if (!useReplicatedTruncates) {
+            // Use unreplicated truncates only when required.
             _uwb.emplace(opCtx);
         }
     }
@@ -135,6 +137,7 @@ void truncateExpiredMarkersForNsUUID(
     const UUID& nsUUID,
     const RecordId& minRecordIdForNs,
     const Timestamp& maxTSEligibleForTruncate,
+    bool useReplicatedTruncates,
     int64_t& totalDocsDeletedOutput,
     int64_t& totalBytesDeletedOutput,
     Date_t& maxWallTimeForNsTruncateOutput) {
@@ -151,7 +154,7 @@ void truncateExpiredMarkersForNsUUID(
             auto bytesDeleted = marker->bytes;
             auto docsDeleted = marker->records;
 
-            MaybeUnreplicatedPreImageTruncateBlock mupitb(opCtx);
+            MaybeUnreplicatedPreImageTruncateBlock mupitb(opCtx, useReplicatedTruncates);
             WriteUnitOfWork wuow(opCtx);
             collection_internal::truncateRange(opCtx,
                                                preImagesColl,
@@ -240,7 +243,8 @@ void PreImagesTruncateMarkers::refreshMarkers(OperationContext* opCtx) {
                        });
 }
 
-PreImagesTruncateStats PreImagesTruncateMarkers::truncateExpiredPreImages(OperationContext* opCtx) {
+PreImagesTruncateStats PreImagesTruncateMarkers::truncateExpiredPreImages(
+    OperationContext* opCtx, bool useReplicatedTruncates) {
     const auto markersMapSnapshot = _markersMap.getUnderlyingSnapshot();
 
     // Truncates are untimestamped. Allow multiple truncates to occur.
@@ -303,6 +307,7 @@ PreImagesTruncateStats PreImagesTruncateMarkers::truncateExpiredPreImages(Operat
                                         nsUUID,
                                         minRecordId,
                                         maxTSEligibleForTruncate,
+                                        useReplicatedTruncates,
                                         docsDeletedForNs,
                                         bytesDeletedForNs,
                                         maxWallTimeForNsTruncate);
@@ -317,6 +322,7 @@ PreImagesTruncateStats PreImagesTruncateMarkers::truncateExpiredPreImages(Operat
                                         nsUUID,
                                         minRecordId,
                                         maxTSEligibleForTruncate,
+                                        useReplicatedTruncates,
                                         docsDeletedForNs,
                                         bytesDeletedForNs,
                                         maxWallTimeForNsTruncate);
@@ -341,7 +347,7 @@ PreImagesTruncateStats PreImagesTruncateMarkers::truncateExpiredPreImages(Operat
                     .recordId();
 
             writeConflictRetry(opCtx, "final truncate", preImagesColl->ns(), [&] {
-                MaybeUnreplicatedPreImageTruncateBlock mupitb(opCtx);
+                MaybeUnreplicatedPreImageTruncateBlock mupitb(opCtx, useReplicatedTruncates);
                 WriteUnitOfWork wuow(opCtx);
                 collection_internal::truncateRange(
                     opCtx, preImagesColl, minRecordId, maxRecordId, 0, 0);

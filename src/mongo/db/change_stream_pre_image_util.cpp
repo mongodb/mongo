@@ -85,8 +85,13 @@ bool shouldUseReplicatedTruncatesForPreImages(OperationContext* opCtx) {
         return true;
     }
 
-    // Next check feature flag.
+    // Next check feature flag value.
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    return shouldUseReplicatedTruncatesForPreImages(opCtx, fcvSnapshot);
+}
+
+bool shouldUseReplicatedTruncatesForPreImages(OperationContext* opCtx,
+                                              const ServerGlobalParams::FCVSnapshot& fcvSnapshot) {
     return feature_flags::gFeatureFlagUseReplicatedTruncatesForDeletions
         .isEnabledUseLastLTSFCVWhenUninitialized(VersionContext::getDecoration(opCtx), fcvSnapshot);
 }
@@ -112,6 +117,9 @@ void truncatePreImagesByTimestampExpirationApproximation(
     OperationContext* opCtx,
     const CollectionAcquisition& preImagesCollection,
     Timestamp expirationTimestampApproximation) {
+    tassert(12047105,
+            "expecting no replicated truncates to be used",
+            !change_stream_pre_image_util::shouldUseReplicatedTruncatesForPreImages(opCtx));
 
     const auto nsUUIDs = change_stream_pre_image_util::getNsUUIDs(opCtx, preImagesCollection);
 

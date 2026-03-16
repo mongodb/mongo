@@ -62,6 +62,11 @@ public:
 
     void run(Client* client);
 
+    // Escape hatch to allow creating multiple jobs with a single MockPeriodicRunner instance.
+    void resetJob() {
+        _job.reset();
+    }
+
 private:
     std::shared_ptr<periodic_runner_detail::MockPeriodicJob> _job;
 };

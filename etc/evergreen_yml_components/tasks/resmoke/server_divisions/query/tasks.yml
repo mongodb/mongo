@@ -583,6 +583,18 @@ tasks:
             --runNoFeatureFlagTests
 
   - <<: *task_template
+    name: change_streams_pre_images_removal_fcv_upgrade_downgrade
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "change_streams",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
     name: change_streams_mongos_sessions_passthrough
     tags: [
         "assigned_to_jira_team_server_query_execution",

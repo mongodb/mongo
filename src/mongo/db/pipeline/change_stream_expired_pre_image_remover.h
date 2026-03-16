@@ -31,11 +31,14 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 
+#include <cstdint>
 #include <string>
 
 #include <boost/optional/optional.hpp>
@@ -45,7 +48,7 @@ namespace mongo {
 /**
  * Manages the conditions under which periodic pre-image removal runs on a node.
  */
-class ChangeStreamExpiredPreImagesRemoverService
+class MONGO_MOD_PUBLIC ChangeStreamExpiredPreImagesRemoverService
     : public ReplicaSetAwareService<ChangeStreamExpiredPreImagesRemoverService> {
 public:
     ChangeStreamExpiredPreImagesRemoverService() = default;
@@ -91,51 +94,88 @@ public:
      */
     void onShutdown() override;
 
+    /**
+     * Can be called during FCV upgrades or downgrades. Stops/starts the periodic job as needed
+     * given the new FCV.
+     */
+    void onFCVChange(OperationContext* opCtx,
+                     const ServerGlobalParams::FCVSnapshot& newFcvSnapshot);
+
     std::string getServiceName() const final {
         return "ChangeStreamExpiredPreImagesRemoverService";
     }
 
-    bool hasStartedPeriodicJob() const {
-        stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
-        return _periodicJob.isValid();
-    }
+    /**
+     * Returns the context of the periodic job, if currently running.
+     */
+    struct PreImagesRemovalJobContext {
+        /**
+         * Internal id of the job. Every job instance gets a different id.
+         */
+        int64_t id = 0;
 
-    boost::optional<bool> useReplicatedTruncates_forTest() const {
-        return _useReplicatedTruncates;
-    }
+        /**
+         * Whether or not the job uses replicated truncates. Populated exactly once during job
+         * creation, and constant afterwards.
+         */
+        bool usesReplicatedTruncates = false;
+
+        bool operator==(const PreImagesRemovalJobContext& other) const {
+            return id == other.id && usesReplicatedTruncates == other.usesReplicatedTruncates;
+        }
+    };
+    boost::optional<PreImagesRemovalJobContext> getJobContext_forTest() const;
 
 private:
-    // Populates the '_useReplicatedTruncates' flag with its initial value. Does nothing if the flag
-    // is already populated.
-    void _populateUseReplicatedTruncatesFlag(OperationContext* opCtx);
+    /**
+     * Starts the pre-images removal job. Must be called while holding the mutex '_mutex'.
+     * If a previous instance of the pre-images removal job is still running, it will be stopped
+     * before starting a new instance of the job.
+     */
+    void _startChangeStreamExpiredPreImagesRemoverServiceJob(WithLock lk,
+                                                             OperationContext* opCtx,
+                                                             bool useReplicatedTruncates);
 
-    // Starts the pre-images removal job.
-    void _startChangeStreamExpiredPreImagesRemoverServiceJob(OperationContext* opCtx);
+    /**
+     * Stops the pre-images removal job if it is running. Must be called while holding the mutex
+     * '_mutex'. It is not an error to call this method if the job is not currently running.
+     */
+    void _stopChangeStreamExpiredPreImagesRemoverServiceJob(WithLock);
 
-    // Stops the pre-images removal job.
-    void _stopChangeStreamExpiredPreImagesRemoverServiceJob();
+    struct PeriodicJobState {
+        /**
+         * Job for periodic pre-images removal.
+         */
+        PeriodicJobAnchor job;
 
-    // Protects '_periodicJob'.
+        /**
+         * Job context, containing metadata about the job's id and the job's usage of replicated
+         * truncates.
+         */
+        PreImagesRemovalJobContext context;
+    };
+
+    /**
+     * Protects '_periodicJob', '_nextJobId' and '_isPrimary'.
+     */
     mutable stdx::mutex _mutex;
 
-    // Job for periodic pre-images removal.
-    // If replicated truncates are enabled, the job is started only on the primary when it steps up
-    // (via 'onStepUpComplete()'), and is stopped on every step-down (via 'onStepDown()').
-    // Secondaries do not run the pre-images removal job.
-    //
-    // If replicated truncates are disabled, the job is executed on primaries and secondaries
-    // locally and independently. It is then started as part of the 'onConsistentDataAvailable()'
-    // callback.
-    PeriodicJobAnchor _periodicJob;
+    /**
+     * State of the currently running periodic job, if active. Otherwise empty.
+     */
+    boost::optional<PeriodicJobState> _periodicJob;
 
-    // Whether or not replicated truncates are used. Populated exactly once inside
-    // '_populateUseReplicatedTruncatesFlag()'. callback. Constant afterwards.
-    // The flag cannot be populated in the constructor or 'onStartup()' due to the lack of an
-    // OperationContext and/or the FCV snapshot not being initialized yet.
-    // Outside of tests, this flag is queried or set inside any of the 'ReplicaSetAwareService'
-    // callbacks (e.g. 'onConsistentDataAvailable()', 'onStepUpComplete()', 'onStepDown()'), which
-    // should never run concurrently inside the same mongod process. Thus access to this member is
-    // not synchronized.
-    boost::optional<bool> _useReplicatedTruncates;
+    /**
+     * Id that will be assigned to the next instance of the periodic job. Incremented by one for
+     * every new job instance created. Uses mainly for testing to tell different instances of the
+     * job apart from each other.
+     */
+    int64_t _nextJobId = 1;
+
+    /**
+     * Flag indicating if the node is the current primary of the replica set. Updated on every call
+     * to 'onStepUpComplete()' and 'onStepDown()', and cleared in 'onShutdown()'.
+     */
+    bool _isPrimary = false;
 };
 }  // namespace mongo

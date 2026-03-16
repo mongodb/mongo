@@ -180,6 +180,7 @@ mongo_cc_library(
         ":op_observer_util",
         "//src/mongo:base",
         "//src/mongo/db/commands:mongod_fcv",
+        "//src/mongo/db/pipeline:change_stream_expired_pre_image_remover",
         "//src/mongo/db/session:kill_sessions_local",
         "//src/mongo/executor:egress_connection_closer_manager",
     ],

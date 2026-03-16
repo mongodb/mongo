@@ -1,0 +1,40 @@
+test_kind: js_test
+
+# Runs a selection of change streams pre-images tests with background FCV upgrades and downgrades.
+
+selector:
+  roots:
+    - jstests/change_streams/change_stream_pre_image_lookup_whole_db_whole_cluster.js
+    - jstests/change_streams/lookup_pit_pre_and_post_image.js
+    - jstests/change_streams/lookup_pre_image.js
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - ValidateCollections
+      - FCVUpgradeDowngradeInBackground
+  config:
+    shell_options:
+      eval: >-
+        globalThis.testingReplication = true;
+        await import('jstests/libs/override_methods/set_read_and_write_concerns.js');
+        await import('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
+        await import("jstests/libs/override_methods/implicitly_retry_on_fcv_upgrade_downgrade.js");
+      # Set longer host discovery time to handle change stream resumable errors.
+      setShellParameter: defaultFindReplicaSetHostTimeoutMS=120000
+      global_vars:
+        TestData:
+          defaultReadConcernLevel: null
+          isRunningFCVUpgradeDowngradeSuite: true
+  hooks:
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: FCVUpgradeDowngradeInBackground
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      bind_ip_all: ""
+      set_parameters:
+        enableTestCommands: 1
+    num_nodes: 3

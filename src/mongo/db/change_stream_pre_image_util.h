@@ -30,13 +30,11 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
-
-#include <cstdint>
-#include <utility>
 
 #include <boost/optional/optional.hpp>
 
@@ -53,6 +51,8 @@ namespace MONGO_MOD_NEEDS_REPLACEMENT change_stream_pre_image_util {
  * consulted and its value will be returned.
  */
 bool shouldUseReplicatedTruncatesForPreImages(OperationContext* opCtx);
+bool shouldUseReplicatedTruncatesForPreImages(OperationContext* opCtx,
+                                              const ServerGlobalParams::FCVSnapshot& fcvSnapshot);
 
 /**
  * If 'expireAfterSeconds' is defined for pre-images, returns its value.
@@ -69,7 +69,9 @@ boost::optional<Date_t> getPreImageOpTimeExpirationDate(OperationContext* opCtx,
                                                         Date_t currentTime);
 
 /**
- * Truncates all pre-images with '_id.ts' <= 'expirationTimestampApproximation'.
+ * Truncates all pre-images with '_id.ts' <= 'expirationTimestampApproximation' using an
+ * unreplicated truncate. Only called during startup recovery, and assumes that no replicated
+ * truncates are used.
  */
 void truncatePreImagesByTimestampExpirationApproximation(
     OperationContext* opCtx,

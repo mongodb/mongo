@@ -50,7 +50,8 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(preImagesTruncateOnlyOnSecondaries);
 
-PreImagesTruncateStats PreImagesTruncateManager::truncateExpiredPreImages(OperationContext* opCtx) {
+PreImagesTruncateStats PreImagesTruncateManager::truncateExpiredPreImages(
+    OperationContext* opCtx, bool useReplicatedTruncates) {
     // Pre-images collections can multiply the amount of user data inserted and deleted
     // on each node. It is imperative that truncate marker generation and pre-image removal are
     // prioritized so they can keep up with inserts and prevent users from running out of disk
@@ -60,7 +61,7 @@ PreImagesTruncateStats PreImagesTruncateManager::truncateExpiredPreImages(Operat
 
     try {
         if (auto truncateMarkers = _getInitializedMarkersForPreImagesCollection(opCtx)) {
-            return truncateMarkers->truncateExpiredPreImages(opCtx);
+            return truncateMarkers->truncateExpiredPreImages(opCtx, useReplicatedTruncates);
         }
         return {};
     } catch (const ExceptionFor<ErrorCodes::InterruptedDueToStorageChange>& ex) {
@@ -75,6 +76,10 @@ PreImagesTruncateStats PreImagesTruncateManager::truncateExpiredPreImages(Operat
     } catch (const DBException&) {
         throw;
     }
+}
+
+void PreImagesTruncateManager::flushTruncateMarkers() {
+    _setTruncateMarkers(nullptr);
 }
 
 void PreImagesTruncateManager::updateMarkersOnInsert(OperationContext* opCtx,
