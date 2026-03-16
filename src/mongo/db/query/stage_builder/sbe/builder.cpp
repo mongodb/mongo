@@ -1131,7 +1131,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildCountScan(
     const auto indexDescriptor = indexEntry->descriptor();
     auto indexAccessMethod = indexEntry->accessMethod()->asSortedData();
 
-    std::unique_ptr<key_string::Value> lowKey, highKey;
+    boost::optional<key_string::Value> lowKey, highKey;
     bool isPointInterval = false;
     if (csn->iets.empty()) {
         std::tie(lowKey, highKey) =
@@ -1142,7 +1142,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildCountScan(
                               indexAccessMethod->getSortedDataInterface()->getKeyStringVersion(),
                               indexAccessMethod->getSortedDataInterface()->getOrdering(),
                               true /* forward */);
-        isPointInterval = *lowKey == *highKey;
+        isPointInterval = lowKey == highKey;
     } else {
         isPointInterval = ietsArePointInterval(csn->iets);
     }

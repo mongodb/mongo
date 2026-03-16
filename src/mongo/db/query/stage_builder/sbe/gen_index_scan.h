@@ -59,8 +59,7 @@ constexpr StringData kIdIndexName = IndexConstants::kIdIndexName;
 /**
  * A list of low and high key values representing ranges over a particular index.
  */
-using IndexIntervals =
-    std::vector<std::pair<std::unique_ptr<key_string::Value>, std::unique_ptr<key_string::Value>>>;
+using IndexIntervals = std::vector<std::pair<key_string::Value, key_string::Value>>;
 
 /**
  * This method returns a pair containing: (1) an SBE plan stage tree implementing an index scan;
@@ -89,8 +88,8 @@ generateSingleIntervalIndexScanAndSlots(StageBuilderState& state,
                                         const std::string& indexName,
                                         const BSONObj& keyPattern,
                                         bool forward,
-                                        std::unique_ptr<key_string::Value> lowKey,
-                                        std::unique_ptr<key_string::Value> highKey,
+                                        boost::optional<key_string::Value> lowKey,
+                                        boost::optional<key_string::Value> highKey,
                                         const PlanStageReqs& reqs,
                                         PlanNodeId planNodeId,
                                         bool isPointInterval);

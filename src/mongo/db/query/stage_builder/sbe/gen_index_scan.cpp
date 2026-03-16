@@ -603,8 +603,8 @@ generateSingleIntervalIndexScanAndSlotsImpl(StageBuilderState& state,
                                             const std::string& indexName,
                                             const BSONObj& keyPattern,
                                             bool forward,
-                                            std::unique_ptr<key_string::Value> lowKey,
-                                            std::unique_ptr<key_string::Value> highKey,
+                                            boost::optional<key_string::Value> lowKey,
+                                            boost::optional<key_string::Value> highKey,
                                             const PlanStageReqs& reqs,
                                             PlanNodeId nodeId,
                                             bool isPointInterval) {
@@ -623,12 +623,14 @@ generateSingleIntervalIndexScanAndSlotsImpl(StageBuilderState& state,
                                       sbe::value::TypeTags::Nothing, 0, true, slotIdGenerator)})
                                 : boost::none;
 
-    auto lowKeyExpr = !lowKey ? SbExpr{*lowKeySlot}
-                              : b.makeConstant(sbe::value::TypeTags::keyString,
-                                               sbe::value::makeKeyString(*lowKey).second);
-    auto highKeyExpr = !highKey ? SbExpr{*highKeySlot}
-                                : b.makeConstant(sbe::value::TypeTags::keyString,
-                                                 sbe::value::makeKeyString(*highKey).second);
+    auto lowKeyExpr = !lowKey
+        ? SbExpr{*lowKeySlot}
+        : b.makeConstant(sbe::value::TypeTags::keyString,
+                         sbe::value::makeKeyString(std::move(*lowKey)).second);
+    auto highKeyExpr = !highKey
+        ? SbExpr{*highKeySlot}
+        : b.makeConstant(sbe::value::TypeTags::keyString,
+                         sbe::value::makeKeyString(std::move(*highKey)).second);
 
     auto [stage, outputs] = generateSingleIntervalIndexScanImpl(state,
                                                                 collection,
@@ -804,8 +806,8 @@ generateSingleIntervalIndexScanAndSlots(StageBuilderState& state,
                                         const std::string& indexName,
                                         const BSONObj& keyPattern,
                                         bool forward,
-                                        std::unique_ptr<key_string::Value> lowKey,
-                                        std::unique_ptr<key_string::Value> highKey,
+                                        boost::optional<key_string::Value> lowKey,
+                                        boost::optional<key_string::Value> highKey,
                                         const PlanStageReqs& reqs,
                                         PlanNodeId nodeId,
                                         bool isPointInterval) {
@@ -883,7 +885,7 @@ std::pair<SbStage, PlanStageSlots> generateIndexScanImpl(StageBuilderState& stat
         // If we have just a single interval, we can construct a simplified sub-tree.
         auto&& [lowKey, highKey] = intervals[0];
 
-        const bool isPointInterval = *lowKey == *highKey;
+        const bool isPointInterval = lowKey == highKey;
         std::tie(stage, outputs, std::ignore) =
             generateSingleIntervalIndexScanAndSlotsImpl(state,
                                                         collection,
@@ -1003,10 +1005,12 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> packIndexIntervalsInSbeArray(
         auto obj = sbe::value::getObjectView(val);
         sbe::value::ValueGuard guard{tag, val};
         obj->reserve(2);
-        obj->push_back(
-            "l"_sd, sbe::value::TypeTags::keyString, sbe::value::makeKeyString(*lowKey).second);
-        obj->push_back(
-            "h"_sd, sbe::value::TypeTags::keyString, sbe::value::makeKeyString(*highKey).second);
+        obj->push_back("l"_sd,
+                       sbe::value::TypeTags::keyString,
+                       sbe::value::makeKeyString(std::move(lowKey)).second);
+        obj->push_back("h"_sd,
+                       sbe::value::TypeTags::keyString,
+                       sbe::value::makeKeyString(std::move(highKey)).second);
         guard.reset();
         arr->push_back(tag, val);
     }
@@ -1050,8 +1054,8 @@ std::pair<SbStage, PlanStageSlots> generateIndexScanWithDynamicBoundsImpl(
                 indexName,
                 keyPattern,
                 forward,
-                nullptr,
-                nullptr,
+                boost::none,
+                boost::none,
                 reqs,
                 ixn->nodeId(),
                 intervalsRequired == IntervalsRequired::EqualityInterval /* isPointInterval */);

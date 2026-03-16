@@ -162,9 +162,9 @@ std::pair<TypeTags, Value> makeNewBsonCodeWScope(StringData code, const char* sc
     return {TypeTags::bsonCodeWScope, bitcastFrom<char*>(buffer.release())};
 }
 
-std::pair<TypeTags, Value> makeKeyString(const key_string::Value& inKey) {
+std::pair<TypeTags, Value> makeKeyString(key_string::Value inKey) {
     return {TypeTags::keyString,
-            bitcastFrom<value::KeyStringEntry*>(new value::KeyStringEntry(inKey))};
+            bitcastFrom<value::KeyStringEntry*>(new value::KeyStringEntry(std::move(inKey)))};
 }
 
 std::pair<TypeTags, Value> makeCopyTimeZone(const TimeZone& tz) {

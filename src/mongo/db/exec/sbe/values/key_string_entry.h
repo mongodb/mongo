@@ -42,7 +42,7 @@ public:
 
     explicit KeyStringEntry(const SortedDataKeyValueView& view);
 
-    explicit KeyStringEntry(const key_string::Value& value);
+    explicit KeyStringEntry(key_string::Value value);
 
     KeyStringEntry& operator=(KeyStringEntry&& other) noexcept;
 

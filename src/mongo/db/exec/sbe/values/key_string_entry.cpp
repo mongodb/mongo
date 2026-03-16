@@ -35,7 +35,7 @@ KeyStringEntry::KeyStringEntry(const SortedDataKeyValueView& view) {
     _initFromView(view);
 }
 
-KeyStringEntry::KeyStringEntry(const key_string::Value& value) : _value(value) {
+KeyStringEntry::KeyStringEntry(key_string::Value value) : _value(std::move(value)) {
     auto view = SortedDataKeyValueView::fromValue(*_value);
     _initFromView(view);
 }

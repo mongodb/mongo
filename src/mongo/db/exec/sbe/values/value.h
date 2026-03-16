@@ -2139,8 +2139,7 @@ inline std::pair<TypeTags, Value> makeCopyBsonCodeWScope(const BsonCodeWScope& c
     return makeNewBsonCodeWScope(cws.code, cws.scope);
 }
 
-std::pair<TypeTags, Value> makeKeyString(std::unique_ptr<key_string::Value> inKey);
-std::pair<TypeTags, Value> makeKeyString(const key_string::Value& inKey);
+std::pair<TypeTags, Value> makeKeyString(key_string::Value inKey);
 
 std::pair<TypeTags, Value> makeCopyCollator(const CollatorInterface& collator);
 
