@@ -42,3 +42,6 @@ filters:
   - "upgrade_during_vectored_insert.js":
     approvers:
       - 10gen/server-replication-reviewers
+  - "set_cluster_parameter.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology

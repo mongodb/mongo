@@ -9,6 +9,7 @@
 // ]
 //
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 
 const coll = assertDropAndRecreateCollection(db, jsTestName());
@@ -146,8 +147,7 @@ checkQueryShapeAndHash(
 // The following tests rely on fields that were added to the $changeStreams stage in v8.2, and for
 // which query shape hash computation was changed in v8.3, so we only execute them if the FCV
 // version is high enough.
-const fcvDoc = db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
-if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "8.3") >= 0) {
+if (isFCVgte(db, "8.3")) {
     // Check shape and hash when setting the change stream reader version.
     checkQueryShapeAndHash(
         db,

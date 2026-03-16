@@ -1,3 +1,4 @@
+import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
@@ -67,8 +68,7 @@ assert.eq(
 );
 
 // TODO(SERVER-97588): Remove version check from tests when 8.1 becomes last LTS.
-const fcvDoc = db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
-if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "8.1") >= 0) {
+if (isFCVgte(s, "8.1")) {
     // Ensure it does not fail on boundaries that are already split.
     assert.eq(true, s.adminCommand({split: "test.foo", middle: {name: "allan"}}));
     assert.eq(true, s.adminCommand({split: "test.foo", middle: {name: "eliot"}}));

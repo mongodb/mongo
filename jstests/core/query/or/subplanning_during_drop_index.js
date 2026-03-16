@@ -19,6 +19,7 @@
  * exclude_from_timeseries_crud_passthrough,
  * ]
  */
+import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 import {getDocModel} from "jstests/libs/property_test_helpers/models/document_models.js";
@@ -44,10 +45,7 @@ const indexCount = 10;
 const queryCount = 60;
 const iterations = 5; // Count of iterations the test makes before returning success.
 
-const is83orAbove = (() => {
-    const {version} = db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}).featureCompatibilityVersion;
-    return MongoRunner.compareBinVersions(version, "8.3") >= 0;
-})();
+const is83orAbove = isFCVgte(db, "8.3");
 
 function generateDocuments() {
     jsTest.log.info("Generating (" + documentCount + ") documents");

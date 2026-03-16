@@ -2,6 +2,7 @@
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 
 const coll = assertDropAndRecreateCollection(db, "agg_sample");
 coll.drop();
@@ -41,8 +42,7 @@ assertErrorCode(
 );
 
 // TODO(SERVER-94154): Remove version check here.
-const fcvDoc = db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
-if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "8.1") >= 0) {
+if (isFCVgte(db, "8.1")) {
     // Using a sample of size zero is only disallowed in some newer versions.
     assertErrorCode(coll, [{$sample: {size: 0}}], 28747);
 }

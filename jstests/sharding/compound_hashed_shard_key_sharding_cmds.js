@@ -5,6 +5,7 @@
  *   multiversion_incompatible,
  * ]
  */
+import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
@@ -104,8 +105,7 @@ function testSplit(shardKey, collName) {
     verifyChunkSplitIntoTwo(namespace, chunkToBeSplit);
 
     // TODO(SERVER-97588): Remove version check from tests when 8.1 becomes last LTS.
-    const fcvDoc = configDB.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "8.1") >= 0) {
+    if (isFCVgte(st.s, "8.1")) {
         // It should not fail on boundaries that have already been split.
         assert.commandWorked(configDB.adminCommand({split: namespace, middle: chunkToBeSplit.min}));
     } else {

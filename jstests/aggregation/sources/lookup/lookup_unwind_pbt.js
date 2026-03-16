@@ -9,6 +9,7 @@
  * ]
  */
 
+import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 import {describe, it} from "jstests/libs/mochalite.js";
 import {createCorrectnessProperty} from "jstests/libs/property_test_helpers/common_properties.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
@@ -26,11 +27,7 @@ if (isSlowBuild(db)) {
 }
 
 // FCV-based guard to filter out known problematic patterns on older versions.
-const is83orAbove = (() => {
-    const fcvResult = db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}).featureCompatibilityVersion;
-    const version = typeof fcvResult === "string" ? fcvResult : fcvResult.version;
-    return MongoRunner.compareBinVersions(version, "8.3") >= 0;
-})();
+const is83orAbove = isFCVgte(db, "8.3");
 
 // Tweak these while iterating; bump them up when the test is stable.
 const numRuns = 20;

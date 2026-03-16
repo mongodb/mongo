@@ -22,6 +22,7 @@
  * ]
  */
 
+import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getAggPipelineArb, getSortArb, limitArb} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
@@ -46,10 +47,7 @@ if (isSlowBuild(db)) {
     quit();
 }
 
-const is83orAbove = (() => {
-    const {version} = db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}).featureCompatibilityVersion;
-    return MongoRunner.compareBinVersions(version, "8.3") >= 0;
-})();
+const is83orAbove = isFCVgte(db, "8.3");
 
 const numRuns = 20;
 

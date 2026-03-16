@@ -5,13 +5,14 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {getCurrentFCV} from "jstests/libs/feature_compatibility_version.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 1, rs: {nodes: 2}});
 const db = st.s.getDB("test");
 
-const initialFCV = db.getSiblingDB("admin").system.version.findOne({_id: "featureCompatibilityVersion"}).version;
+const initialFCV = getCurrentFCV(st.s);
 const shouldSnapshotOFCV = FeatureFlagUtil.isPresentAndEnabled(db, "SnapshotFCVInDDLCoordinators");
 
 function createCollectionAndAssertVersionContext(collName, expectedVersionContext) {

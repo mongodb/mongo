@@ -98,12 +98,12 @@ export var FeatureFlagUtil = (function () {
     }
 
     function _getStatusLegacy(conn, ignoreFCV, flagDoc) {
-        const fcvDoc = assert.commandWorked(conn.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}));
-        assert(fcvDoc.hasOwnProperty("featureCompatibilityVersion"), fcvDoc);
+        const adminDB = typeof conn.getDB === "function" ? conn.getDB("admin") : conn.getSiblingDB("admin");
+        const fcvDoc = adminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
+        assert(fcvDoc, "FCV document not found");
 
         const flagIsEnabled = flagDoc.value;
-        const flagVersionIsValid =
-            MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, flagDoc.version) >= 0;
+        const flagVersionIsValid = MongoRunner.compareBinVersions(fcvDoc.version, flagDoc.version) >= 0;
 
         const flagShouldBeFCVGated = flagDoc.fcv_gated;
 

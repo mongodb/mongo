@@ -3,6 +3,7 @@
  * meet the minimum FCV needed on a cluster parameter.
  */
 
+import {getCurrentFCV} from "jstests/libs/feature_compatibility_version.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Test sharding cluster with multiple versions should fail since the FCV will be last-lts and the
@@ -20,10 +21,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
     const adminDB = st.s.getDB("admin");
 
     // Assert cluster is running the last-lts FCV.
-    const version = assert.commandWorked(adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1}))
-        .featureCompatibilityVersion.version;
-
-    assert.eq(version, lastLTSFCV, "Cluster is not running the last-lts FCV");
+    assert.eq(getCurrentFCV(st.s), lastLTSFCV, "Cluster is not running the last-lts FCV");
 
     assert.commandFailedWithCode(
         adminDB.runCommand({setClusterParameter: {cwspTestNeedsLatestFCV: {intData: 106}}}),
@@ -46,10 +44,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
     const adminDB = st.s.getDB("admin");
 
     // Assert cluster is running the latest FCV.
-    const version = assert.commandWorked(adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1}))
-        .featureCompatibilityVersion.version;
-
-    assert.eq(version, latestFCV, "Cluster is not running the latest FCV");
+    assert.eq(getCurrentFCV(st.s), latestFCV, "Cluster is not running the latest FCV");
 
     assert.commandWorked(adminDB.runCommand({setClusterParameter: {cwspTestNeedsLatestFCV: {intData: 106}}}));
 

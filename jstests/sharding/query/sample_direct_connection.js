@@ -2,6 +2,7 @@
 // direct connection to a shard without failing, and $sample behaves as if we sampled an unsharded
 // collection.
 // @tags: [requires_fcv_51]
+import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let st = new ShardingTest({shards: 1});
@@ -21,8 +22,7 @@ const res = assert.commandWorked(shardDB.runCommand({aggregate: "foo", pipeline:
 assert.eq(res.cursor.firstBatch.length, 3);
 
 // TODO(SERVER-94154): Remove version check here.
-const fcvDoc = st.s.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
-if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "8.1") >= 0) {
+if (isFCVgte(st.s, "8.1")) {
     // Using a sample of size zero is only disallowed in some newer versions.
     assert.commandFailedWithCode(
         shardDB.runCommand({aggregate: "foo", pipeline: [{$sample: {size: 0}}], cursor: {}}),

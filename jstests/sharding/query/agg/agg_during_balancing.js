@@ -1,5 +1,6 @@
 // Inserts some interesting data into a sharded collection, enables the balancer, and tests that
 // various kinds of aggregations return the expected results.
+import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const shardedAggTest = new ShardingTest({shards: 2, mongos: 1});
@@ -200,8 +201,7 @@ testSample(nItems);
 testSample(nItems + 1);
 
 // TODO(SERVER-94154): Remove version check here.
-const fcvDoc = shardedAggTest.s0.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
-if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "8.1") >= 0) {
+if (isFCVgte(shardedAggTest.s0, "8.1")) {
     // Using a sample of size zero is only disallowed in some newer versions.
     assert.throwsWithCode(() => testSample(0), 28747);
 }

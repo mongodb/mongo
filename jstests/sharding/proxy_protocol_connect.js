@@ -8,6 +8,7 @@
 if (_isWindows()) {
     quit();
 }
+import {getCurrentFCV} from "jstests/libs/feature_compatibility_version.js";
 import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -35,8 +36,7 @@ function testProxyProtocolConnect(ingressPort, egressPort, version) {
     assert.neq(null, conn, "Client was unable to connect to the load balancer port");
     assert.commandWorked(conn.getDB("admin").runCommand({hello: 1}));
 
-    const fcv = conn.getDB("admin").runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    if (fcv.featureCompatibilityVersion.version === latestFCV) {
+    if (getCurrentFCV(conn) === latestFCV) {
         assertContainsOnceJsonStringMatch(st.s, 22943, "isLoadBalanced", "true", "isLoadBalanced was set to false");
         assertContainsOnceJsonStringMatch(
             st.s,

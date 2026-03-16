@@ -5,6 +5,7 @@ import {
     withRetryOnTransientTxnError,
     withTxnAndAutoRetryOnMongos,
 } from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {getCurrentFCV} from "jstests/libs/feature_compatibility_version.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 export var WriteConflictHelpers = (function () {
@@ -34,9 +35,7 @@ export var WriteConflictHelpers = (function () {
         }
 
         if (typeof getWriteConflictsFromAllShards.incompatible === "undefined") {
-            const version = assert.commandWorked(
-                coll.getDB().adminCommand({getParameter: 1, featureCompatibilityVersion: 1}),
-            ).featureCompatibilityVersion.version;
+            const version = getCurrentFCV(coll.getDB());
             getWriteConflictsFromAllShards.incompatible = MongoRunner.compareBinVersions(version, "7.3") < 0;
             if (getWriteConflictsFromAllShards.incompatible) {
                 print(`getWriteConflictsFromAllShards skipped for mongod ${version}`);

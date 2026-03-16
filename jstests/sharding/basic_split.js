@@ -1,6 +1,7 @@
 /**
  * Perform basic tests for the split command against mongos.
  */
+import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
@@ -29,8 +30,7 @@ assert.commandWorked(configDB.adminCommand({split: "test.user", middle: {_id: 0}
 assert.neq(null, findChunksUtil.findOneChunkByNs(configDB, "test.user", {min: {_id: 0}}));
 
 // TODO(SERVER-97588): Remove version check from tests when 8.1 becomes last LTS.
-const fcvDoc = configDB.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
-if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "8.1") >= 0) {
+if (isFCVgte(st.s0, "8.1")) {
     // It should not fail on boundaries that have already been split.
     assert.commandWorked(configDB.adminCommand({split: "test.user", middle: {_id: 0}}));
 } else {
@@ -83,7 +83,7 @@ assert.commandWorked(configDB.adminCommand({split: "test.compound", middle: {x: 
 assert.neq(null, findChunksUtil.findOneChunkByNs(configDB, "test.compound", {min: {x: 0, y: 0}}));
 
 // TODO(SERVER-97588): Remove version check from tests when 8.1 becomes last LTS.
-if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "8.1") >= 0) {
+if (isFCVgte(st.s0, "8.1")) {
     // It should not fail on boundaries that have already been split.
     assert.commandWorked(configDB.adminCommand({split: "test.compound", middle: {x: 0, y: 0}}));
     assert.commandWorked(configDB.adminCommand({split: "test.compound", middle: {x: MinKey, y: MinKey}}));

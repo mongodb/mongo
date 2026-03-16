@@ -14,6 +14,7 @@
  * requires_getmore,
  * ]
  */
+import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 import {createCacheCorrectnessProperty} from "jstests/libs/property_test_helpers/common_properties.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getQueryAndOptionsModel} from "jstests/libs/property_test_helpers/models/query_models.js";
@@ -26,10 +27,7 @@ if (isSlowBuild(db)) {
     quit();
 }
 
-const is83orAbove = (() => {
-    const {version} = db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}).featureCompatibilityVersion;
-    return MongoRunner.compareBinVersions(version, "8.3") >= 0;
-})();
+const is83orAbove = isFCVgte(db, "8.3");
 
 const numRuns = 50;
 const numQueriesPerRun = 15;

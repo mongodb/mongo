@@ -31,6 +31,7 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -53,6 +54,7 @@
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
@@ -100,6 +102,26 @@ using GenericFCV = multiversion::GenericFCV;
 using FCV = multiversion::FeatureCompatibilityVersion;
 
 namespace {
+
+/**
+ * TODO (SERVER-114661): Remove this workaround.
+ *
+ * On mongos, the FCV server parameter should not be defined. This is a workaround for the incorrect
+ * Bazel linking of mongod_fcv to mongos.
+ */
+MONGO_INITIALIZER_GENERAL(DisableFCVParameterOnMongos,
+                          ("EndServerParameterRegistration"),
+                          ("default"))
+(InitializerContext*) {
+    if (!serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer)) {
+        return;
+    }
+
+    auto& parameterMap = ServerParameterSet::getNodeParameterSet()->getMap();
+    if (auto it = parameterMap.find("featureCompatibilityVersion"); it != parameterMap.end()) {
+        it->second->disable(true);
+    }
+}
 
 /**
  * Utility class for recording permitted transitions between feature compatibility versions and

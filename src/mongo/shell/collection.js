@@ -1495,11 +1495,9 @@ DBCollection.prototype.enableBalancing = function () {
     }
 
     let adminDb = this.getDB().getSiblingDB("admin");
-    const fcvDoc = adminDb.runCommand({
-        getParameter: 1,
-        featureCompatibilityVersion: 1,
-    });
-    if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "8.1") >= 0) {
+    const fcvDoc = adminDb.system.version.findOne({_id: "featureCompatibilityVersion"});
+    const fcvVersion = fcvDoc ? fcvDoc.version : latestFCV;
+    if (MongoRunner.compareBinVersions(fcvVersion, "8.1") >= 0) {
         return adminDb.runCommand({configureCollectionBalancing: this._fullName, enableBalancing: true});
     } else {
         let configDb = this.getDB().getSiblingDB("config");
@@ -1518,11 +1516,9 @@ DBCollection.prototype.disableBalancing = function () {
         throw Error("Collection " + this + " is not sharded.");
     }
     let adminDb = this.getDB().getSiblingDB("admin");
-    const fcvDoc = adminDb.runCommand({
-        getParameter: 1,
-        featureCompatibilityVersion: 1,
-    });
-    if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "8.1") >= 0) {
+    const fcvDoc = adminDb.system.version.findOne({_id: "featureCompatibilityVersion"});
+    const fcvVersion = fcvDoc ? fcvDoc.version : latestFCV;
+    if (MongoRunner.compareBinVersions(fcvVersion, "8.1") >= 0) {
         return adminDb.runCommand({configureCollectionBalancing: this._fullName, enableBalancing: false});
     } else {
         let configDb = this.getDB().getSiblingDB("config");
