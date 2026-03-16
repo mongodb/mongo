@@ -93,9 +93,6 @@ BucketAutoStage::BucketAutoStage(
 SortOptions BucketAutoStage::makeSortOptions() {
     SortOptions opts;
     opts.MaxMemoryUsageBytes(_memoryTracker.maxAllowedMemoryUsageBytes());
-    if (pExpCtx->getAllowDiskUse() && !pExpCtx->getInRouter()) {
-        opts.TempDir(pExpCtx->getTempDir());
-    }
     return opts;
 }
 
@@ -105,9 +102,9 @@ GetNextResult BucketAutoStage::populateSorter() {
         _sorter = Sorter<Value, Document>::template make<Comparator>(
             opts,
             Comparator(pExpCtx->getValueComparator()),
-            (opts.tempDir)
+            (pExpCtx->getAllowDiskUse() && !pExpCtx->getInRouter())
                 ? std::make_shared<sorter::FileBasedSorterSpiller<Value, Document, Comparator>>(
-                      *opts.tempDir,
+                      pExpCtx->getTempDir(),
                       &_sorterFileStats,
                       /*dbName=*/boost::none,
                       sorter::kLatestChecksumVersion,

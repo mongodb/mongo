@@ -278,10 +278,6 @@ private:
         }
 
         opts.MaxMemoryUsageBytes(_stats.maxMemoryUsageBytes);
-        if (_diskUseAllowed) {
-            opts.TempDir(_tempDir);
-        }
-
         return opts;
     }
 

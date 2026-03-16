@@ -41,9 +41,9 @@ std::unique_ptr<Sorter<Value, T>> SortExecutor<T>::makeSorter() {
     return Sorter<Value, T>::template make<Comparator>(
         opts,
         Comparator(_sortPattern),
-        (opts.tempDir)
+        _diskUseAllowed
             ? std::make_shared<sorter::FileBasedSorterSpiller<Value, T, Comparator>>(
-                  *opts.tempDir,
+                  _tempDir,
                   _sorterFileStats.get(),
                   /*dbName=*/boost::none,
                   sorter::kLatestChecksumVersion,

@@ -563,7 +563,8 @@ TEST_P(ContainerBasedSpillerTest, Spill) {
     auto ns = NamespaceString::createNamespaceString_forTest("test", "container_based_spiller");
     CollectionMock coll{ns};
     CollectionPtr collPtr{&coll};
-    ViewableIntegerKeyedContainer container{std::make_shared<Ident>("ident")};
+    const auto identStr = ident::generateNewInternalIdent("container_spill"_sd);
+    ViewableIntegerKeyedContainer container{std::make_shared<Ident>(identStr)};
     SorterContainerStats stats{nullptr};
 
     ContainerBasedSpiller<IntWrapper, NullValue, IWComparator> spiller{
@@ -580,11 +581,11 @@ TEST_P(ContainerBasedSpillerTest, Spill) {
     std::vector<std::pair<IntWrapper, NullValue>> data{{50, {}}, {100, {}}, {75, {}}, {125, {}}};
     std::span span{data};
 
-    auto it1 = spiller.spill(SortOptions{}.TempDir("/tmp"),
+    auto it1 = spiller.spill(SortOptions{},
                              SorterSpiller<IntWrapper, NullValue, IWComparator>::Settings{},
                              span.subspan(0, 2),
                              0);
-    auto it2 = spiller.spill(SortOptions{}.TempDir("/tmp"),
+    auto it2 = spiller.spill(SortOptions{},
                              SorterSpiller<IntWrapper, NullValue, IWComparator>::Settings{},
                              span.subspan(2, 2),
                              0);
@@ -611,7 +612,8 @@ TEST_P(ContainerBasedSpillerTest, MergeSpills) {
     auto ns = NamespaceString::createNamespaceString_forTest("test", "container_based_spiller");
     CollectionMock coll{ns};
     CollectionPtr collPtr{&coll};
-    ViewableIntegerKeyedContainer container{std::make_shared<Ident>("ident")};
+    const auto identStr = ident::generateNewInternalIdent("container_spill"_sd);
+    ViewableIntegerKeyedContainer container{std::make_shared<Ident>(identStr)};
     SorterContainerStats containerStats{nullptr};
 
     ContainerBasedSpiller<IntWrapper, NullValue, IWComparator> spiller{
@@ -631,23 +633,23 @@ TEST_P(ContainerBasedSpillerTest, MergeSpills) {
 
     std::vector<std::shared_ptr<sorter::Iterator<IntWrapper, NullValue>>> iterators;
     iterators.push_back(
-        spiller.spill(SortOptions{}.TempDir("/tmp"),
+        spiller.spill(SortOptions{},
                       SorterSpiller<IntWrapper, NullValue, IWComparator>::Settings{},
                       span.subspan(0, 2),
                       0));
     iterators.push_back(
-        spiller.spill(SortOptions{}.TempDir("/tmp"),
+        spiller.spill(SortOptions{},
                       SorterSpiller<IntWrapper, NullValue, IWComparator>::Settings{},
                       span.subspan(2, 2),
                       0));
     iterators.push_back(
-        spiller.spill(SortOptions{}.TempDir("/tmp"),
+        spiller.spill(SortOptions{},
                       SorterSpiller<IntWrapper, NullValue, IWComparator>::Settings{},
                       span.subspan(4, 1),
                       0));
 
     SorterStats sorterStats{nullptr};
-    spiller.mergeSpills(SortOptions{}.TempDir("/tmp"),
+    spiller.mergeSpills(SortOptions{},
                         SorterSpiller<IntWrapper, NullValue, IWComparator>::Settings{},
                         sorterStats,
                         iterators,
@@ -684,7 +686,8 @@ TEST_P(ContainerBasedSpillerTest, MergeSpillsMultiplePasses) {
     auto ns = NamespaceString::createNamespaceString_forTest("test", "container_based_spiller");
     CollectionMock coll{ns};
     CollectionPtr collPtr{&coll};
-    ViewableIntegerKeyedContainer container{std::make_shared<Ident>("ident")};
+    const auto identStr = ident::generateNewInternalIdent("container_spill"_sd);
+    ViewableIntegerKeyedContainer container{std::make_shared<Ident>(identStr)};
     SorterContainerStats containerStats{nullptr};
 
     ContainerBasedSpiller<IntWrapper, NullValue, IWComparator> spiller{
@@ -713,14 +716,14 @@ TEST_P(ContainerBasedSpillerTest, MergeSpillsMultiplePasses) {
     std::vector<std::shared_ptr<sorter::Iterator<IntWrapper, NullValue>>> iterators;
     for (size_t i = 0; i < data.size(); ++i) {
         iterators.push_back(
-            spiller.spill(SortOptions{}.TempDir("/tmp"),
+            spiller.spill(SortOptions{},
                           SorterSpiller<IntWrapper, NullValue, IWComparator>::Settings{},
                           span.subspan(i, 1),
                           0));
     }
 
     SorterStats sorterStats{nullptr};
-    spiller.mergeSpills(SortOptions{}.TempDir("/tmp"),
+    spiller.mergeSpills(SortOptions{},
                         SorterSpiller<IntWrapper, NullValue, IWComparator>::Settings{},
                         sorterStats,
                         iterators,
@@ -788,18 +791,19 @@ TEST_P(ContainerBasedSpillerTest, SpillDirPathFromIdent) {
             ns.dbName(), testCase.directoryPerDB, testCase.directoryForIndexes);
         auto internalIdent = ident::generateNewInternalIndexBuildIdent(sorterStem, indexIdent);
         ViewableIntegerKeyedContainer container{std::make_shared<Ident>(internalIdent)};
-        ContainerBasedSorterStorage<IntWrapper, NullValue> storage{*opCtx,
-                                                                   ru,
-                                                                   collPtr,
-                                                                   container,
-                                                                   stats,
-                                                                   /*currKey=*/0,
-                                                                   ns.dbName(),
-                                                                   sorter::kLatestChecksumVersion};
+        ContainerBasedSpiller<IntWrapper, NullValue, IWComparator> spiller{
+            *opCtx,
+            ru,
+            collPtr,
+            container,
+            stats,
+            ns.dbName(),
+            sorter::kLatestChecksumVersion,
+            /*batchSize=*/GetParam(),
+            testSpillingMinAvailableDiskSpaceBytes};
 
-        auto spillPath = storage.getSpillDirPath();
-        ASSERT(spillPath);
-        EXPECT_EQ(*spillPath, testCase.expectedPath);
+        auto spillPath = spiller.getSpillDir();
+        EXPECT_EQ(spillPath, testCase.expectedPath);
     }
 }
 

@@ -246,7 +246,6 @@ private:
                        : 0);
         opts.MoveSortedDataIntoIterator(true);
         if (_stage._allowDiskUse) {
-            opts.TempDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp");
             if (!_sorterFileStats) {
                 _sorterFileStats = std::make_unique<SorterFileStats>(nullptr);
             }
@@ -259,10 +258,10 @@ private:
         _sorter = Sorter<KeyRow, ValueRow>::template make<Comparator>(
             opts,
             Comparator(_stage._dirs),
-            (opts.tempDir)
+            (_stage._allowDiskUse)
                 ? std::make_shared<
                       mongo::sorter::FileBasedSorterSpiller<KeyRow, ValueRow, Comparator>>(
-                      *opts.tempDir,
+                      boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp",
                       _sorterFileStats.get(),
                       /*dbName=*/boost::none,
                       sorter::kLatestChecksumVersion,

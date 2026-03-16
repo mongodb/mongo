@@ -214,7 +214,6 @@ bool isMultikeyFromPaths(const MultikeyPaths& multikeyPaths) {
 
 SortOptions makeSortOptions(size_t maxMemoryUsageBytes) {
     return SortOptions()
-        .TempDir(storageGlobalParams.dbpath + "/_tmp")
         .MaxMemoryUsageBytes(maxMemoryUsageBytes)
         .UseMemoryPool(true)
         .Tracker(&indexBulkBuilderSSS.sorterTracker);

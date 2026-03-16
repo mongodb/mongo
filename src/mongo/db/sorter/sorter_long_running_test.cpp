@@ -69,19 +69,18 @@ using test::FileTraits;
 class SortedFileWriterAndFileIteratorTests : public unittest::Test {
 protected:
     int appendToFile(const SortOptions& opts,
+                     const boost::filesystem::path& tempDir,
                      SorterFileStats* sorterFileStats,
                      int currentFileSize,
                      int range) const {
         auto makeFile = [&] {
-            return std::make_shared<SorterFile>(sorter::nextFileName(*(opts.tempDir)),
-                                                sorterFileStats);
+            return std::make_shared<SorterFile>(sorter::nextFileName(tempDir), sorterFileStats);
         };
 
         int currentBufSize = 0;
         // TODO(SERVER-114080): Ensure testing of non-file-based sorter storage is comprehensive.
         FileBasedSorterStorage<IntWrapper, IntWrapper> sorterStorage(
             makeFile(),
-            *opts.tempDir,
             /*dbName=*/boost::none,
             sorter::kLatestChecksumVersion);
         std::unique_ptr<SortedStorageWriter<IntWrapper, IntWrapper>> sorter =
@@ -309,9 +308,6 @@ void assertPersistedRangeInfo(const std::shared_ptr<IWSorter>& sorter,
                               const SortOptions& opts,
                               const RangeCoverageExpectation& expected) {
     auto state = sorter->persistDataForShutdown();
-    if (opts.tempDir) {
-        ASSERT_FALSE(state.storageIdentifier.empty());
-    }
     ASSERT_EQ(state.ranges.size(), expected.numRanges);
     ASSERT_EQ(sorter->stats().spilledRanges(), expected.spilledRanges);
 }
@@ -334,7 +330,7 @@ protected:
 
     void resetFixtureTempDir() {
         _tempDir = std::make_unique<unittest::TempDir>(makeTempDirName());
-        _opts = SortOptions().TempDir(_tempDir->path());
+        _opts = SortOptions();
     }
 
     const unittest::TempDir& tempDir() const {
@@ -355,15 +351,22 @@ protected:
         }
     }
 
-    std::shared_ptr<IWSorter> makeSorter(const SortOptions& sortOpts, Direction direction) {
-        return std::shared_ptr<IWSorter>(IWSorter::make(
-            sortOpts, IWComparator(direction), storage().makeSpiller(sortOpts), /*settings=*/{}));
+    // TODO(SERVER-121481): Enable creating a sorter without a spiller and ensure there is test
+    // coverage of sorters without spillers.
+    std::shared_ptr<IWSorter> makeSorter(const SortOptions& sortOpts,
+                                         const boost::filesystem::path& pathToSpillDir,
+                                         Direction direction) {
+        return std::shared_ptr<IWSorter>(
+            IWSorter::make(sortOpts,
+                           IWComparator(direction),
+                           storage().makeSpiller(sortOpts, pathToSpillDir),
+                           /*settings=*/{}));
     }
 
     std::shared_ptr<IWSorter> runSort(const SortOptions& sortOpts,
                                       const KeyList& input,
                                       Direction direction) {
-        auto sorter = makeSorter(sortOpts, direction);
+        auto sorter = makeSorter(sortOpts, tempDir().path(), direction);
         addInputToSorter(sorter.get(), input);
         return sorter;
     }
@@ -373,8 +376,9 @@ protected:
         const KeyList& input,
         Direction direction,
         bool insertInParallel = false) {
-        std::array<std::shared_ptr<IWSorter>, 2> sorters = {makeSorter(sortOpts, direction),
-                                                            makeSorter(sortOpts, direction)};
+        std::array<std::shared_ptr<IWSorter>, 2> sorters = {
+            makeSorter(sortOpts, tempDir().path(), direction),
+            makeSorter(sortOpts, tempDir().path(), direction)};
 
         if (insertInParallel) {
             stdx::thread inBackground(
@@ -461,7 +465,9 @@ TYPED_TEST_SUITE(SorterTypedTestManualSpills, SorterTypedTestTypes);
 
 class SorterTestPauseAndResumeBase : public SorterFileTest {
 protected:
-    void assertSortAndMergeWithPauseValidation(const SortOptions& sortOpts, const KeyList& input) {
+    void assertSortAndMergeWithPauseValidation(const SortOptions& sortOpts,
+                                               const boost::filesystem::path& pathToSpillDir,
+                                               const KeyList& input) {
         for (Direction direction : kDirections) {
             auto sorter = runSort(sortOpts, input, direction);
             validateSortOutput(sorter, sortOpts, input, direction);
@@ -570,17 +576,18 @@ TEST_F(SortedFileWriterAndFileIteratorTests, SortedFileWriterAndFileIterator) {
     unittest::TempDir tempDir("sortedFileWriterTests");
     SorterTracker sorterTracker;
     SorterFileStats sorterFileStats(&sorterTracker);
-    const SortOptions opts = SortOptions().TempDir(tempDir.path());
+    const SortOptions opts = SortOptions();
 
     int currentFileSize = 0;
 
-    currentFileSize = appendToFile(opts, &sorterFileStats, currentFileSize, 5);
+    currentFileSize = appendToFile(opts, tempDir.path(), &sorterFileStats, currentFileSize, 5);
 
     ASSERT_EQ(sorterFileStats.opened.load(), 1);
     ASSERT_EQ(sorterFileStats.closed.load(), 1);
     ASSERT_LTE(sorterTracker.bytesSpilled.load(), currentFileSize);
 
-    currentFileSize = appendToFile(opts, &sorterFileStats, currentFileSize, 10 * 1000 * 1000);
+    currentFileSize =
+        appendToFile(opts, tempDir.path(), &sorterFileStats, currentFileSize, 10 * 1000 * 1000);
 
     ASSERT_EQ(sorterFileStats.opened.load(), 2);
     ASSERT_EQ(sorterFileStats.closed.load(), 2);
@@ -768,19 +775,19 @@ TYPED_TEST(SorterTypedTestManualSpills, ManualSpillsWithLimit) {
 
 TEST_F(SorterTestPauseAndResume, PauseAndResume) {
     const KeyList input = {0, 3, 4, 2, 1};
-    assertSortAndMergeWithPauseValidation(opts(), input);
+    assertSortAndMergeWithPauseValidation(opts(), "pathToSpillDir", input);
 }
 
 TEST_F(SorterTestPauseAndResumeLimit, PauseAndResumeLimit) {
     const KeyList input = {3, 0, 4, 2, 1, -1};
     const auto sortOpts = SortOptions(opts()).Limit(5);
-    assertSortAndMergeWithPauseValidation(sortOpts, input);
+    assertSortAndMergeWithPauseValidation(sortOpts, "pathToSpillDir", input);
 }
 
 TEST_F(SorterTestPauseAndResumeLimitOne, PauseAndResumeLimitOne) {
     const KeyList input = {3, 0, 4, 2, 1, -1};
     const auto sortOpts = SortOptions(opts()).Limit(1);
-    assertSortAndMergeWithPauseValidation(sortOpts, input);
+    assertSortAndMergeWithPauseValidation(sortOpts, "pathToSpillDir", input);
 }
 
 }  // namespace SorterTests

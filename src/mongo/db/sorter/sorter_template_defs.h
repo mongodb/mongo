@@ -85,12 +85,12 @@
 namespace mongo {
 namespace sorter {
 
-inline void checkNoExternalSortOnMongos(const SortOptions& opts) {
+inline void checkNoExternalSortOnMongos(bool spillerConfigured) {
     // This should be checked by consumers, but if it isn't try to fail early.
     uassert(16947,
             "Attempting to use external sort from mongos. This is not allowed.",
             !(serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer) &&
-              opts.tempDir));
+              spillerConfigured));
 }
 
 MONGO_MOD_PUB inline SharedBufferFragmentBuilder makeMemPool() {
@@ -182,13 +182,10 @@ public:
 
         uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
                 "Requested to spill InMemIterator but did not opt in to external sorting",
-                opts.tempDir);
-        uassert(11539600,
-                "Requested to spill InMemIterator but did not provide a SorterSpiller",
                 _spiller != nullptr);
 
         uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
-            *opts.tempDir,
+            _spiller->getSpillDir(),
             static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.load())));
 
         auto iterator = _spiller->spillUnique(opts, settings, _data, _index);
@@ -588,10 +585,9 @@ public:
                   const Settings& settings)
         : MergeableSorter<Key, Value, Comparator>(
               opts, storageIdentifier, comp, std::move(spiller), settings) {
-        invariant(opts.tempDir);
         invariant(this->_spiller != nullptr);
 
-        auto path = *opts.tempDir / storageIdentifier;
+        auto path = this->_spiller->getSpillDir() / storageIdentifier;
         uassert(16815,
                 str::stream() << "Unexpected empty file: " << path.string(),
                 ranges.empty() || boost::filesystem::file_size(path) != 0);
@@ -732,7 +728,7 @@ private:
 
         // Ensure there is sufficient disk space for spilling
         uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
-            *(this->_spiller->getStorage().getSpillDirPath()),
+            this->_spiller->getSpillDir(),
             static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.load())));
 
         sort();
@@ -1077,7 +1073,7 @@ private:
 
         invariant(!_done);
 
-        if (!this->_opts.tempDir) {
+        if (this->_spiller == nullptr) {
             // This error message only applies to sorts from user queries made through the find or
             // aggregation commands. Other clients should suppress this error, either by allowing
             // external sorting or by catching and throwing a more appropriate error.
@@ -1142,7 +1138,6 @@ Sorter<Key, Value>::Sorter(const SortOptions& opts) : SorterBase(opts.sorterTrac
 template <typename Key, typename Value>
 Sorter<Key, Value>::Sorter(const SortOptions& opts, std::string storageIdentifier)
     : SorterBase(opts.sorterTracker), _opts(opts) {
-    invariant(opts.tempDir);
     invariant(!storageIdentifier.empty());
     if (opts.useMemPool) {
         _memPool.emplace(sorter::makeMemPool());
@@ -1500,7 +1495,7 @@ void BoundedSorter<Key, Value, Comparator, BoundMaker>::_spill(size_t maxMemoryU
             this->_spiller != nullptr);
 
     uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
-        *(this->_spiller->getStorage().getSpillDirPath()),
+        this->_spiller->getSpillDir(),
         internalQuerySpillingMinAvailableDiskSpaceBytes.loadRelaxed()));
 
     this->_stats.incrementSpilledKeyValuePairs(_heap.size());
@@ -1542,7 +1537,7 @@ std::unique_ptr<Sorter<Key, Value>> Sorter<Key, Value>::make(
     const Comparator& comp,
     std::shared_ptr<SorterSpiller<Key, Value, Comparator>> spiller,
     const Settings& settings) {
-    sorter::checkNoExternalSortOnMongos(opts);
+    sorter::checkNoExternalSortOnMongos(spiller != nullptr);
     switch (opts.limit) {
         case 0:
             return std::make_unique<sorter::NoLimitSorter<Key, Value, Comparator>>(
@@ -1564,7 +1559,7 @@ std::unique_ptr<Sorter<Key, Value>> Sorter<Key, Value>::makeFromExistingRanges(
     const Comparator& comp,
     std::shared_ptr<SorterSpiller<Key, Value, Comparator>> spiller,
     const Settings& settings) {
-    sorter::checkNoExternalSortOnMongos(opts);
+    sorter::checkNoExternalSortOnMongos(spiller != nullptr);
 
     invariant(opts.limit == 0,
               str::stream() << "Creating a Sorter from existing ranges is only available with the "

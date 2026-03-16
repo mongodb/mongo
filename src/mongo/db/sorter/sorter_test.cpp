@@ -132,7 +132,7 @@ TEST_F(InMemIterTest, SpillDoesNotChangeResultAndUpdateStatistics) {
     unittest::TempDir tempDir("InMemIterTests");
     SorterTracker sorterTracker;
     SorterFileStats sorterFileStats(&sorterTracker);
-    const SortOptions opts = SortOptions().TempDir(tempDir.path()).Tracker(&sorterTracker);
+    const SortOptions opts = SortOptions().Tracker(&sorterTracker);
     std::shared_ptr<FileBasedSorterSpiller<IntWrapper, IntWrapper, IWComparator>> spiller =
         std::make_shared<FileBasedSorterSpiller<IntWrapper, IntWrapper, IWComparator>>(
             tempDir.path(),
@@ -170,6 +170,7 @@ public:
     static std::vector<SorterRange> makeSampleRanges();
     static std::unique_ptr<FileBasedSorterSpiller<IntWrapper, IntWrapper, IWComparator>>
     makeSorterSpiller(const SortOptions& opts,
+                      const boost::filesystem::path& path,
                       SorterFileStats* fileStats,
                       SorterChecksumVersion = sorter::kLatestChecksumVersion,
                       std::string storageIdentifier = "");
@@ -186,10 +187,12 @@ std::vector<SorterRange> MakeFromExistingRangesFixture::makeSampleRanges() {
 // static
 std::unique_ptr<FileBasedSorterSpiller<IntWrapper, IntWrapper, IWComparator>>
 MakeFromExistingRangesFixture::makeSorterSpiller(const SortOptions& opts,
+                                                 const boost::filesystem::path& pathToSpillDir,
                                                  SorterFileStats* fileStats,
                                                  const SorterChecksumVersion checksumVersion,
                                                  std::string storageIdentifier) {
-    return makeFileSorterSpiller(opts, fileStats, checksumVersion, std::move(storageIdentifier));
+    return makeFileSorterSpiller(
+        opts, pathToSpillDir, fileStats, checksumVersion, std::move(storageIdentifier));
 }
 
 template <typename Traits>
@@ -237,28 +240,33 @@ DEATH_TEST_F(
     MakeFromExistingRangesDeathTest,
     NonZeroLimit,
     "Creating a Sorter from existing ranges is only available with the NoLimitSorter (limit 0)") {
-    auto opts = SortOptions().Limit(1ULL).TempDir("unused_storage_location");
+    unittest::TempDir storageLocation = makeTempDir();
+    auto opts = SortOptions().Limit(1ULL);
     IWSorter::template makeFromExistingRanges<IWComparator>(
         "",
         {},
         opts,
         IWComparator(ASC),
-        makeSorterSpiller(opts, /*fileStats=*/nullptr),
+        makeSorterSpiller(opts, storageLocation.path(), /*fileStats=*/nullptr),
         /*settings=*/{});
 }
 
 DEATH_TEST_F(MakeFromExistingRangesDeathTest,
              EmptyStorageIdentifier,
              "!storageIdentifier.empty()") {
+    unittest::TempDir storageLocation = makeTempDir();
     std::string storageIdentifier;
-    auto opts = SortOptions().TempDir("unused_storage_location");
+    auto opts = SortOptions();
     IWSorter::template makeFromExistingRanges<IWComparator>(
         storageIdentifier,
         {},
         opts,
         IWComparator(ASC),
-        makeSorterSpiller(
-            opts, /*fileStats=*/nullptr, sorter::kLatestChecksumVersion, storageIdentifier),
+        makeSorterSpiller(opts,
+                          storageLocation.path(),
+                          /*fileStats=*/nullptr,
+                          sorter::kLatestChecksumVersion,
+                          storageIdentifier),
         /*settings=*/{});
 }
 
@@ -266,11 +274,8 @@ DEATH_TEST_F(MakeFromExistingRangesDeathTest, NullSorterSpiller, "this->_spiller
     unittest::TempDir storageLocation = makeTempDir();
     SorterTracker sorterTracker;
 
-    auto opts = SortOptions()
-                    .Limit(0)
-                    .TempDir(storageLocation.path())
-                    .MaxMemoryUsageBytes(sizeof(IWSorter::Data))
-                    .Tracker(&sorterTracker);
+    auto opts =
+        SortOptions().Limit(0).MaxMemoryUsageBytes(sizeof(IWSorter::Data)).Tracker(&sorterTracker);
 
     IWPair pairInsertedBeforeShutdown(1, 100);
 
@@ -279,11 +284,11 @@ DEATH_TEST_F(MakeFromExistingRangesDeathTest, NullSorterSpiller, "this->_spiller
     // SorterSpiller.
     IWSorter::PersistedState state;
     {
-        auto sorterBeforeShutdown =
-            IWSorter::template make<IWComparator>(opts,
-                                                  IWComparator(ASC),
-                                                  makeSorterSpiller(opts, /*fileStats=*/nullptr),
-                                                  /*settings=*/{});
+        auto sorterBeforeShutdown = IWSorter::template make<IWComparator>(
+            opts,
+            IWComparator(ASC),
+            makeSorterSpiller(opts, storageLocation.path(), /*fileStats=*/nullptr),
+            /*settings=*/{});
         sorterBeforeShutdown->add(pairInsertedBeforeShutdown.first,
                                   pairInsertedBeforeShutdown.second);
         state = sorterBeforeShutdown->persistDataForShutdown();
@@ -305,15 +310,16 @@ DEATH_TEST_F(MakeFromExistingRangesDeathTest, NullSorterSpiller, "this->_spiller
 
 TYPED_TEST(FileBasedMakeFromExistingRangesTest, SkipFileCheckingOnEmptyRanges) {
     auto storageIdentifier = "unused_sorter_storage";
+    unittest::TempDir storageLocation = makeTempDir();
     SorterTracker sorterTracker;
-    auto opts = SortOptions().TempDir("unused_storage_location").Tracker(&sorterTracker);
+    auto opts = SortOptions().Tracker(&sorterTracker);
     auto sorter = IWSorter::template makeFromExistingRanges<IWComparator>(
         storageIdentifier,
         {},
         opts,
         IWComparator(ASC),
         this->storage().makeSpillerForResume(
-            opts, sorter::kLatestChecksumVersion, storageIdentifier),
+            opts, storageLocation.path(), sorter::kLatestChecksumVersion, storageIdentifier),
         /*settings=*/{});
 
     ASSERT_EQ(0, sorter->stats().spilledRanges());
@@ -328,44 +334,46 @@ TYPED_TEST(FileBasedMakeFromExistingRangesTest, MissingStorage) {
     auto storageIdentifier = "unused_sorter_storage";
     auto storageLocation = "unused_storage_location";
     SorterTracker sorterTracker;
-    auto opts = SortOptions().TempDir(storageLocation).Tracker(&sorterTracker);
-    ASSERT_THROWS_WITH_CHECK(IWSorter::template makeFromExistingRanges<IWComparator>(
-                                 storageIdentifier,
-                                 MakeFromExistingRangesFixture::makeSampleRanges(),
-                                 opts,
-                                 IWComparator(ASC),
-                                 this->storage().makeSpillerForResume(
-                                     opts, sorter::kLatestChecksumVersion, storageIdentifier),
-                                 /*settings=*/{}),
-                             std::exception,
-                             [&](const auto& ex) {
-                                 ASSERT_STRING_CONTAINS(ex.what(), storageLocation);
-                                 ASSERT_STRING_CONTAINS(ex.what(), storageIdentifier);
-                             });
+    auto opts = SortOptions().Tracker(&sorterTracker);
+    ASSERT_THROWS_WITH_CHECK(
+        IWSorter::template makeFromExistingRanges<IWComparator>(
+            storageIdentifier,
+            MakeFromExistingRangesFixture::makeSampleRanges(),
+            opts,
+            IWComparator(ASC),
+            this->storage().makeSpillerForResume(
+                opts, storageLocation, sorter::kLatestChecksumVersion, storageIdentifier),
+            /*settings=*/{}),
+        std::exception,
+        [&](const auto& ex) {
+            ASSERT_STRING_CONTAINS(ex.what(), storageLocation);
+            ASSERT_STRING_CONTAINS(ex.what(), storageIdentifier);
+        });
 }
 
 TYPED_TEST(FileBasedMakeFromExistingRangesTest, EmptyStorage) {
     unittest::TempDir storageLocation = makeTempDir();
     auto storageIdentifier = this->storage().makeEmptyStorage(storageLocation.path());
     SorterTracker sorterTracker;
-    auto opts = SortOptions().TempDir(storageLocation.path()).Tracker(&sorterTracker);
+    auto opts = SortOptions().Tracker(&sorterTracker);
     // Throws unexpected empty storage.
-    ASSERT_THROWS_CODE(IWSorter::template makeFromExistingRanges<IWComparator>(
-                           storageIdentifier,
-                           MakeFromExistingRangesFixture::makeSampleRanges(),
-                           opts,
-                           IWComparator(ASC),
-                           this->storage().makeSpillerForResume(
-                               opts, sorter::kLatestChecksumVersion, storageIdentifier),
-                           /*settings=*/{}),
-                       DBException,
-                       TestFixture::kEmptyStorageErrorCode);
+    ASSERT_THROWS_CODE(
+        IWSorter::template makeFromExistingRanges<IWComparator>(
+            storageIdentifier,
+            MakeFromExistingRangesFixture::makeSampleRanges(),
+            opts,
+            IWComparator(ASC),
+            this->storage().makeSpillerForResume(
+                opts, storageLocation.path(), sorter::kLatestChecksumVersion, storageIdentifier),
+            /*settings=*/{}),
+        DBException,
+        TestFixture::kEmptyStorageErrorCode);
 }
 
 TYPED_TEST(FileBasedMakeFromExistingRangesTest, CorruptedStorage) {
     unittest::TempDir storageLocation = makeTempDir();
     SorterTracker sorterTracker;
-    auto opts = SortOptions().TempDir(storageLocation.path()).Tracker(&sorterTracker);
+    auto opts = SortOptions().Tracker(&sorterTracker);
     auto storageIdentifier = this->storage().makeCorruptedStorage(storageLocation.path());
     auto sorter = IWSorter::template makeFromExistingRanges<IWComparator>(
         storageIdentifier,
@@ -373,7 +381,7 @@ TYPED_TEST(FileBasedMakeFromExistingRangesTest, CorruptedStorage) {
         opts,
         IWComparator(ASC),
         this->storage().makeSpillerForResume(
-            opts, sorter::kLatestChecksumVersion, storageIdentifier),
+            opts, storageLocation.path(), sorter::kLatestChecksumVersion, storageIdentifier),
         /*settings=*/{});
 
     // The number of spills is set when NoLimitSorter is constructed from existing ranges.
@@ -391,7 +399,6 @@ TYPED_TEST(FileBasedMakeFromExistingRangesTest, RoundTrip) {
 
     auto opts =
         SortOptions()
-            .TempDir(storageLocation.path())
             .Tracker(&sorterTracker)
             .MaxMemoryUsageBytes(sizeof(IWSorter::Data) + this->storage().iteratorSizeBytes());
 
@@ -402,8 +409,11 @@ TYPED_TEST(FileBasedMakeFromExistingRangesTest, RoundTrip) {
     // data.
     IWSorter::PersistedState state;
     {
-        auto sorterBeforeShutdown = IWSorter::make(
-            opts, IWComparator(ASC), this->storage().makeSpiller(opts), /*settings=*/{});
+        auto sorterBeforeShutdown =
+            IWSorter::make(opts,
+                           IWComparator(ASC),
+                           this->storage().makeSpiller(opts, storageLocation.path()),
+                           /*settings=*/{});
         sorterBeforeShutdown->add(pairInsertedBeforeShutdown.first,
                                   pairInsertedBeforeShutdown.second);
         state = sorterBeforeShutdown->persistDataForShutdown();
@@ -419,7 +429,7 @@ TYPED_TEST(FileBasedMakeFromExistingRangesTest, RoundTrip) {
         opts,
         IWComparator(ASC),
         this->storage().makeSpillerForResume(
-            opts, sorter::kLatestChecksumVersion, state.storageIdentifier),
+            opts, storageLocation.path(), sorter::kLatestChecksumVersion, state.storageIdentifier),
         /*settings=*/{});
 
     // The number of spills is set when NoLimitSorter is constructed from existing ranges.
@@ -456,13 +466,13 @@ TYPED_TEST(FileBasedMakeFromExistingRangesTest, RoundTrip) {
 
 TYPED_TEST(MakeFromExistingRangesTest, NextWithDeferredValues) {
     unittest::TempDir storageLocation = makeTempDir();
-    auto opts = SortOptions().TempDir(storageLocation.path()).Tracker(nullptr);
+    auto opts = SortOptions().Tracker(nullptr);
 
     IWPair pair1(1, 100);
     IWPair pair2(2, 200);
 
     std::unique_ptr<SortedStorageWriter<IntWrapper, IntWrapper>> writer =
-        this->storage().makeWriter(opts);
+        this->storage().makeWriter(opts, storageLocation.path());
     writer->addAlreadySorted(pair1.first, pair1.second);
     writer->addAlreadySorted(pair2.first, pair2.second);
     auto iter = writer->done();
@@ -484,9 +494,9 @@ TYPED_TEST(MakeFromExistingRangesTest, NextWithDeferredValues) {
 
 TYPED_TEST(MakeFromExistingRangesTest, MergeSpillsTracksMergedSpillBatches) {
     unittest::TempDir storageLocation = makeTempDir();
-    auto opts = SortOptions().TempDir(storageLocation.path());
+    auto opts = SortOptions();
 
-    auto spiller = this->storage().makeSpiller(opts);
+    auto spiller = this->storage().makeSpiller(opts, storageLocation.path());
     using IteratorPtr = std::shared_ptr<sorter::Iterator<IntWrapper, IntWrapper>>;
 
     constexpr size_t kInitialRanges = 7;
@@ -521,9 +531,9 @@ TYPED_TEST(MakeFromExistingRangesTest, MergeSpillsTracksMergedSpillBatches) {
 
 TYPED_TEST(MakeFromExistingRangesTest, MergeSpillsRejectsDisjointRanges) {
     unittest::TempDir storageLocation = makeTempDir();
-    auto opts = SortOptions().TempDir(storageLocation.path());
+    auto opts = SortOptions();
 
-    auto spiller = this->storage().makeSpiller(opts);
+    auto spiller = this->storage().makeSpiller(opts, storageLocation.path());
     using IteratorPtr = std::shared_ptr<sorter::Iterator<IntWrapper, IntWrapper>>;
     auto spillSingleKey = [&](int key) -> IteratorPtr {
         std::vector<IWPair> oneRecord{{key, -key}};
@@ -547,9 +557,9 @@ TYPED_TEST(MakeFromExistingRangesTest, MergeSpillsRejectsDisjointRanges) {
 
 TYPED_TEST(MakeFromExistingRangesTest, MergeSpillsRejectsDecreasingOffsets) {
     unittest::TempDir storageLocation = makeTempDir();
-    auto opts = SortOptions().TempDir(storageLocation.path());
+    auto opts = SortOptions();
 
-    auto spiller = this->storage().makeSpiller(opts);
+    auto spiller = this->storage().makeSpiller(opts, storageLocation.path());
     using IteratorPtr = std::shared_ptr<sorter::Iterator<IntWrapper, IntWrapper>>;
     auto makeRange = [](int64_t start, int64_t end) -> IteratorPtr {
         return std::make_shared<RangeOnlyIterator>(SorterRange{start, end, 0});
@@ -569,12 +579,14 @@ TYPED_TEST(MakeFromExistingRangesTest, MergeSpillsRejectsDecreasingOffsets) {
 
 TYPED_TEST(FileBasedMakeFromExistingRangesTest, ChecksumVersion) {
     unittest::TempDir storageLocation = makeTempDir();
-    auto opts = SortOptions().TempDir(storageLocation.path()).Tracker(nullptr);
+    auto opts = SortOptions().Tracker(nullptr);
 
     // By default checksum version should be v2
     {
-        auto sorter = IWSorter::make(
-            opts, IWComparator(ASC), this->storage().makeSpiller(opts), /*settings=*/{});
+        auto sorter = IWSorter::make(opts,
+                                     IWComparator(ASC),
+                                     this->storage().makeSpiller(opts, storageLocation.path()),
+                                     /*settings=*/{});
         sorter->add(1, -1);
         auto state = sorter->persistDataForShutdown();
         ASSERT_EQUALS(state.ranges[0].getChecksumVersion(), sorter::kLatestChecksumVersion);
@@ -584,10 +596,11 @@ TYPED_TEST(FileBasedMakeFromExistingRangesTest, ChecksumVersion) {
     // Setting checksum version to v1 results in using v1 but getChecksumVersion() returning none
     // because v1 did not persist a version.
     {
-        auto sorter = IWSorter::make(opts,
-                                     IWComparator(ASC),
-                                     this->storage().makeSpiller(opts, SorterChecksumVersion::v1),
-                                     /*settings=*/{});
+        auto sorter = IWSorter::make(
+            opts,
+            IWComparator(ASC),
+            this->storage().makeSpiller(opts, storageLocation.path(), SorterChecksumVersion::v1),
+            /*settings=*/{});
         sorter->add(1, -1);
         auto state = sorter->persistDataForShutdown();
         ASSERT_EQUALS(state.ranges[0].getChecksumVersion(), boost::none);
@@ -603,8 +616,10 @@ TYPED_TEST(FileBasedMakeFromExistingRangesTest, ValidChecksumValidation) {
                   state.ranges,
                   state.opts,
                   state.comp,
-                  this->storage().makeSpillerForResume(
-                      state.opts, sorter::kLatestChecksumVersion, state.storageIdentifier),
+                  this->storage().makeSpillerForResume(state.opts,
+                                                       storageLocation.path(),
+                                                       sorter::kLatestChecksumVersion,
+                                                       state.storageIdentifier),
                   /*settings=*/{})
                   ->done();
     ASSERT_ITERATORS_EQUIVALENT(it, std::make_unique<IntIterator>(0, 10));
@@ -619,8 +634,10 @@ TYPED_TEST(FileBasedMakeFromExistingRangesTest, IncompleteReadDoesNotReportCheck
                   state.ranges,
                   state.opts,
                   state.comp,
-                  this->storage().makeSpillerForResume(
-                      state.opts, sorter::kLatestChecksumVersion, state.storageIdentifier),
+                  this->storage().makeSpillerForResume(state.opts,
+                                                       storageLocation.path(),
+                                                       sorter::kLatestChecksumVersion,
+                                                       state.storageIdentifier),
                   /*settings=*/{})
                   ->done();
     // Read the first (and only) block of data, but don't deserialize any of it
@@ -639,8 +656,10 @@ DEATH_TEST_F(MakeFromExistingRangesDeathTest,
                   state.ranges,
                   state.opts,
                   state.comp,
-                  FileTraits::makeSpillerForResume(
-                      state.opts, sorter::kLatestChecksumVersion, state.storageIdentifier),
+                  FileTraits::makeSpillerForResume(state.opts,
+                                                   storageLocation.path(),
+                                                   sorter::kLatestChecksumVersion,
+                                                   state.storageIdentifier),
                   /*settings=*/{})
                   ->done();
     ASSERT_ITERATORS_EQUIVALENT(it, std::make_unique<IntIterator>(0, 10));
@@ -659,6 +678,7 @@ DEATH_TEST_F(MakeFromExistingRangesDeathTest,
                   state.opts,
                   state.comp,
                   makeSorterSpiller(state.opts,
+                                    storageLocation.path(),
                                     /*fileStats=*/nullptr,
                                     sorter::kLatestChecksumVersion,
                                     state.storageIdentifier),
@@ -910,8 +930,7 @@ TEST_F(BoundedSorterTest, MemoryLimitsNoExtSortAllowed) {
 
 TEST_F(BoundedSorterTest, SpillSorted) {
     unittest::TempDir tempDir = makeTempDir();
-    auto options =
-        SortOptions().TempDir(tempDir.path()).MaxMemoryUsageBytes(16).Tracker(&sorterTracker);
+    auto options = SortOptions().MaxMemoryUsageBytes(16).Tracker(&sorterTracker);
     std::shared_ptr<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>> spiller =
         std::make_shared<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>>(
             tempDir.path(),
@@ -939,7 +958,7 @@ TEST_F(BoundedSorterTest, SpillSorted) {
 
 TEST_F(BoundedSorterTest, SpillSortedExceptOne) {
     unittest::TempDir tempDir = makeTempDir();
-    auto options = SortOptions().TempDir(tempDir.path()).MaxMemoryUsageBytes(16);
+    auto options = SortOptions().MaxMemoryUsageBytes(16);
     std::shared_ptr<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>> spiller =
         std::make_shared<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>>(
             tempDir.path(),
@@ -968,8 +987,7 @@ TEST_F(BoundedSorterTest, SpillSortedExceptOne) {
 
 TEST_F(BoundedSorterTest, SpillAlmostSorted) {
     unittest::TempDir tempDir = makeTempDir();
-    auto options =
-        SortOptions().TempDir(tempDir.path()).MaxMemoryUsageBytes(16).Tracker(&sorterTracker);
+    auto options = SortOptions().MaxMemoryUsageBytes(16).Tracker(&sorterTracker);
     std::shared_ptr<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>> spiller =
         std::make_shared<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>>(
             tempDir.path(),
@@ -999,7 +1017,7 @@ TEST_F(BoundedSorterTest, SpillAlmostSorted) {
 
 TEST_F(BoundedSorterTest, SpillWrongInput) {
     unittest::TempDir tempDir = makeTempDir();
-    auto options = SortOptions().TempDir(tempDir.path()).MaxMemoryUsageBytes(16);
+    auto options = SortOptions().MaxMemoryUsageBytes(16);
 
     std::vector<Doc> input = {
         {3},
@@ -1053,12 +1071,15 @@ TEST_F(BoundedSorterTest, SpillWrongInput) {
 
 TEST_F(BoundedSorterTest, LimitNoSpill) {
     unittest::TempDir tempDir = makeTempDir();
-    auto options = SortOptions()
-                       .TempDir(tempDir.path())
-                       .MaxMemoryUsageBytes(40)
-                       .Tracker(&sorterTracker)
-                       .Limit(2);
-    sorter = makeAsc(options);
+    auto options = SortOptions().MaxMemoryUsageBytes(40).Tracker(&sorterTracker).Limit(2);
+    std::shared_ptr<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>> spiller =
+        std::make_shared<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>>(
+            tempDir.path(),
+            /*fileStats=*/nullptr,
+            /*dbName=*/boost::none,
+            sorter::kLatestChecksumVersion,
+            testSpillingMinAvailableDiskSpaceBytes);
+    sorter = makeAsc(options, spiller);
 
     auto output = sort(
         {
@@ -1085,11 +1106,7 @@ TEST_F(BoundedSorterTest, LimitNoSpill) {
 
 TEST_F(BoundedSorterTest, LimitSpill) {
     unittest::TempDir tempDir = makeTempDir();
-    auto options = SortOptions()
-                       .TempDir(tempDir.path())
-                       .MaxMemoryUsageBytes(40)
-                       .Tracker(&sorterTracker)
-                       .Limit(3);
+    auto options = SortOptions().MaxMemoryUsageBytes(40).Tracker(&sorterTracker).Limit(3);
     std::shared_ptr<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>> spiller =
         std::make_shared<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>>(
             tempDir.path(),
@@ -1126,10 +1143,7 @@ TEST_F(BoundedSorterTest, LimitSpill) {
 TEST_F(BoundedSorterTest, ForceSpill) {
     SorterFileStats fileStats(&sorterTracker);
     unittest::TempDir tempDir = makeTempDir();
-    auto options = SortOptions()
-                       .TempDir(tempDir.path())
-                       .MaxMemoryUsageBytes(100 * 1024 * 1024)
-                       .Tracker(&sorterTracker);
+    auto options = SortOptions().MaxMemoryUsageBytes(100 * 1024 * 1024).Tracker(&sorterTracker);
 
     std::shared_ptr<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>> spiller =
         std::make_shared<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>>(
@@ -1433,8 +1447,7 @@ TEST_F(BoundedSorterTest, CompoundLimit) {
 
 TEST_F(BoundedSorterTest, CompoundSpill) {
     unittest::TempDir tempDir = makeTempDir();
-    auto options =
-        SortOptions().TempDir(tempDir.path()).Tracker(&sorterTracker).MaxMemoryUsageBytes(40);
+    auto options = SortOptions().Tracker(&sorterTracker).MaxMemoryUsageBytes(40);
     std::shared_ptr<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>> spiller =
         std::make_shared<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>>(
             tempDir.path(),
@@ -1490,7 +1503,7 @@ TEST_F(BoundedSorterTest, LargeSpill) {
     static size_t kDocCountToCauseSpilling = (kMemoryLimit / kPerEntryMemUsage) + 1;
 
     unittest::TempDir tempDir = makeTempDir();
-    auto options = SortOptions().TempDir(tempDir.path()).MaxMemoryUsageBytes(kMemoryLimit);
+    auto options = SortOptions().MaxMemoryUsageBytes(kMemoryLimit);
     std::shared_ptr<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>> spiller =
         std::make_shared<FileBasedSorterSpiller<Key, Doc, ComparatorAsc>>(
             tempDir.path(),
@@ -1524,10 +1537,10 @@ TYPED_TEST(SpillerMergeDiskSpaceTest, MergeSpillsRespectsDiskSpaceCheck) {
 
     unittest::TempDir storageLocation = makeTempDir();
     SortOptions opts;
-    opts.TempDir(storageLocation.path());
 
     auto& storage = this->storage();
-    auto spiller = storage.makeSpiller(opts, sorter::kLatestChecksumVersion);
+    auto spiller =
+        storage.makeSpiller(opts, storageLocation.path(), sorter::kLatestChecksumVersion);
     ASSERT(spiller);
 
     using IteratorPtr = std::shared_ptr<sorter::Iterator<IntWrapper, IntWrapper>>;

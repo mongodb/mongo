@@ -115,10 +115,6 @@ struct SortOptions {
     size_t maxMemoryUsageBytes;
     static const size_t DefaultMaxMemoryUsageBytes = 64 * 1024 * 1024;
 
-    // Directory into which we place a file when spilling to disk. boost::none means we aren't
-    // allowing external sorting.
-    boost::optional<boost::filesystem::path> tempDir;
-
     // If set, allows us to observe aggregate Sorter behaviors. The lifetime of this object must
     // exceed that of the Sorter instance; otherwise, it will lead to a user-after-free error.
     SorterTracker* sorterTracker;
@@ -135,7 +131,6 @@ struct SortOptions {
     SortOptions()
         : limit(0),
           maxMemoryUsageBytes(DefaultMaxMemoryUsageBytes),
-          tempDir(boost::none),
           sorterTracker(nullptr),
           useMemPool(false),
           moveSortedDataIntoIterator(false) {}
@@ -149,11 +144,6 @@ struct SortOptions {
 
     SortOptions& MaxMemoryUsageBytes(size_t newMaxMemoryUsageBytes) {
         maxMemoryUsageBytes = newMaxMemoryUsageBytes;
-        return *this;
-    }
-
-    SortOptions& TempDir(boost::filesystem::path newTempDir) {
-        tempDir = std::move(newTempDir);
         return *this;
     }
 
@@ -451,12 +441,6 @@ public:
     virtual std::string getStorageIdentifier() = 0;
 
     /**
-     * Retrieves the directory where the storage is created for spilling data.
-     * boost::none if we aren't enabling spilling.
-     */
-    virtual boost::optional<boost::filesystem::path> getSpillDirPath() = 0;
-
-    /**
      * Persists a SorterStorage upon clean shutdown.
      */
     virtual void keep() = 0;
@@ -611,6 +595,11 @@ public:
                              std::size_t numParallelSpills) = 0;
 
     virtual SorterStorage<Key, Value>& getStorage() = 0;
+
+    /**
+     * Retrieves the directory where the storage is created for spilling data.
+     */
+    virtual boost::filesystem::path getSpillDir() = 0;
 
     virtual ~SorterSpiller() = default;
 };

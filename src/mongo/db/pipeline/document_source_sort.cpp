@@ -422,9 +422,6 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
     SortOptions opts;
     opts.maxMemoryUsageBytes =
         loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes);
-    if (expCtx->getAllowDiskUse()) {
-        opts.TempDir(expCtx->getTempDir());
-    }
 
     if (limit) {
         opts.Limit(limit.value());
@@ -515,9 +512,6 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
     SortOptions opts;
     opts.MaxMemoryUsageBytes(
         loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes));
-    if (expCtx->getAllowDiskUse()) {
-        opts.TempDir(expCtx->getTempDir());
-    }
     if (BSONElement limitElem = args["limit"]) {
         uassert(6588100,
                 "$_internalBoundedSort limit must be a non-negative number if specified",

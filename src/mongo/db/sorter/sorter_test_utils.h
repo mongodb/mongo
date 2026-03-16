@@ -305,11 +305,11 @@ std::shared_ptr<IWIterator> spillToFile(IteratorPtr inputIter,
     if (!inputIter->more()) {
         return std::make_shared<EmptyIterator>();
     }
-    const SortOptions opts = SortOptions().TempDir(tempDir.path());
-    auto spillFile = std::make_shared<SorterFile>(sorter::nextFileName(*(opts.tempDir)), fileStats);
+    const SortOptions opts = SortOptions();
+    auto spillFile = std::make_shared<SorterFile>(sorter::nextFileName(tempDir.path()), fileStats);
     // TODO(SERVER-114080): Ensure testing of non-file-based sorter storage is comprehensive.
     FileBasedSorterStorage<IntWrapper, IntWrapper> sorterStorage(
-        spillFile, *opts.tempDir, /*dbName=*/boost::none, SorterChecksumVersion::v2);
+        spillFile, /*dbName=*/boost::none, SorterChecksumVersion::v2);
     std::unique_ptr<SortedStorageWriter<IntWrapper, IntWrapper>> writer =
         sorterStorage.makeWriter(opts, /*settings=*/{});
     while (inputIter->more()) {
@@ -324,7 +324,6 @@ std::shared_ptr<IWIterator> mergeIterators(IteratorPtr (&array)[N],
                                            const unittest::TempDir& tempDir,
                                            Direction Dir = ASC,
                                            const SortOptions& opts = SortOptions()) {
-    invariant(!opts.tempDir);
     std::vector<std::shared_ptr<IWIterator>> vec;
     for (auto& it : array) {
         // Spill iterator outputs to a file and obtain a new iterator for it.

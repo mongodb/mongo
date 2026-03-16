@@ -255,8 +255,7 @@ PlanStage::StageState NearStage::advanceNext(WorkingSetID* toReturn) {
 SortOptions NearStage::makeSortOptions() {
     if (feature_flags::gFeatureFlagExtendedAutoSpilling.isEnabled()) {
         return SortOptions{}  // Spilling will handled externally by NearStage::spill method
-            .MaxMemoryUsageBytes(std::numeric_limits<int64_t>::max())
-            .TempDir(expCtx()->getTempDir());
+            .MaxMemoryUsageBytes(std::numeric_limits<int64_t>::max());
     } else {
         return SortOptions{}.MaxMemoryUsageBytes(std::numeric_limits<int64_t>::max());
     }

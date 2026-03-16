@@ -154,7 +154,6 @@ public:
 
     SpilledPartition(const boost::filesystem::path& tempDir, SorterFileStats* fileStats)
         : _storage(std::make_shared<SorterFile>(sorter::nextFileName(tempDir), fileStats),
-                   tempDir,
                    /*dbName=*/boost::none,
                    sorter::kLatestChecksumVersion),
           _writer(_storage.makeWriter(SortOptions{}, /*settings=*/{})) {}

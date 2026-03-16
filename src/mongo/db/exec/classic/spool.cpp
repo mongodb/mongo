@@ -106,11 +106,10 @@ void SpoolStage::spill() {
                                              _spillStats.get());
     }
 
-    auto opts = SortOptions().TempDir(expCtx()->getTempDir());
+    auto opts = SortOptions();
 
     sorter::FileBasedSorterStorage<RecordId, NullValue> sorterStorage(
         _file,
-        expCtx()->getTempDir(),
         /*dbName=*/boost::none,
         sorter::kLatestChecksumVersion);
     std::unique_ptr<SortedStorageWriter<RecordId, NullValue>> writer =
