@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2024-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/change_stream_pre_images_truncate_markers.h"
+#include "mongo/db/change_stream_pre_images_truncate_markers_sampling_strategy/equal_step_sampling_strategy.h"
 
 #include "mongo/db/change_stream_pre_image_test_helpers.h"
 #include "mongo/db/record_id_helpers.h"
@@ -55,8 +55,8 @@ BSONObj recordIdToBSON(const RecordId& rid) {
 /**
  * Tests components of pre-image truncate marker initialization across a pre-image collection.
  */
-class PreImageMarkerInitializationTest : public CatalogTestFixture,
-                                         public ChangeStreamPreImageTestConstants {
+class EqualStepSamplingStrategyTest : public CatalogTestFixture,
+                                      public ChangeStreamPreImageTestConstants {
 public:
     void assertEqualRangeSampleForNsUUIDContainsExactPreimages(
         uint64_t numSamples, const std::vector<ChangeStreamPreImage>& expectedPreImages) {
@@ -70,7 +70,8 @@ public:
         ASSERT_TRUE(nsUUIDLastRecords.contains(kNsUUID));
         const auto& lastRidAndWall = nsUUIDLastRecords.find(kNsUUID)->second;
 
-        auto samples = sampleNSUUIDRangeEqually(
+        EqualStepSamplingStrategy samplingStrategy(numSamples, 1);
+        auto samples = samplingStrategy.sampleNSUUIDRangeEqually(
             operationContext(), preImagesCollection, kNsUUID, lastRidAndWall, numSamples);
 
         ASSERT_EQ(expectedPreImages.size(), samples.size());
@@ -86,301 +87,29 @@ public:
     }
 };
 
-using PreImageMarkerInitializationDeathTest = PreImageMarkerInitializationTest;
-
-/**
- * Tests for 'sampleLastRecordPerNsUUID'.
- */
-TEST_F(PreImageMarkerInitializationTest, SampleEmptyCollection) {
-    auto opCtx = operationContext();
-    createPreImagesCollection(opCtx);
-
-    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx);
-    const auto lastRecordsMap = sampleLastRecordPerNsUUID(opCtx, preImagesRAII);
-    ASSERT_EQ(0, lastRecordsMap.size());
-}
-
-TEST_F(PreImageMarkerInitializationTest, SampleLastRecordSingleNsUUID) {
-    auto opCtx = operationContext();
-    createPreImagesCollection(opCtx);
-
-    // Pre-image inserts aren't guaranteed to be serialized. Simulate inserting a more recent
-    // pre-image before a slightly older one.
-    insertDirectlyToPreImagesCollection(opCtx, kPreImage1);
-    insertDirectlyToPreImagesCollection(opCtx, kPreImage3);
-    insertDirectlyToPreImagesCollection(opCtx, kPreImage2);
-
-    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx);
-    const auto lastRecordsMap = sampleLastRecordPerNsUUID(opCtx, preImagesRAII);
-    ASSERT_EQ(1, lastRecordsMap.size());
-    auto it = lastRecordsMap.find(kNsUUID);
-    ASSERT(it != lastRecordsMap.end());
-    const auto [actualRid, actualWallTime] = it->second;
-    const auto [expectedRid, expectedWallTime] = extractRecordIdAndWallTime(kPreImage3);
-    ASSERT_EQ(expectedRid, actualRid);
-    ASSERT_EQ(expectedWallTime, actualWallTime);
-}
-
-TEST_F(PreImageMarkerInitializationTest, SampleLastRecordMultipleNsUUIDs) {
-    auto opCtx = operationContext();
-    createPreImagesCollection(opCtx);
-
-    // 2 pre-images for 'kNsUUID', 2 pre-images for 'kNsUUIDOther'.
-    insertDirectlyToPreImagesCollection(opCtx, kPreImage1);
-    insertDirectlyToPreImagesCollection(opCtx, kPreImage2);
-    insertDirectlyToPreImagesCollection(opCtx, kPreImageOtherMin);
-    insertDirectlyToPreImagesCollection(opCtx, kPreImageOther);
-
-    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx);
-    const auto lastRecordsMap = sampleLastRecordPerNsUUID(opCtx, preImagesRAII);
-    ASSERT_EQ(2, lastRecordsMap.size());
-
-    stdx::unordered_map<UUID, CollectionTruncateMarkers::RecordIdAndWallTime> expectedLastRecords{
-        {kNsUUID, extractRecordIdAndWallTime(kPreImage2)},
-        {kNsUUIDOther, extractRecordIdAndWallTime(kPreImageOther)}};
-
-    ASSERT_EQ(expectedLastRecords.size(), lastRecordsMap.size());
-    for (const auto& [uuid, ridAndWall] : expectedLastRecords) {
-        auto it = lastRecordsMap.find(uuid);
-        ASSERT(it != lastRecordsMap.end());
-        const auto [actualRid, actualWallTime] = it->second;
-        const auto [expectedRid, expectedWallTime] = ridAndWall;
-        ASSERT_EQ(expectedRid, actualRid);
-        ASSERT_EQ(expectedWallTime, actualWallTime);
-    }
-}
-
-/**
- * Tests for 'collectPreImageSamples'.
- */
-TEST_F(PreImageMarkerInitializationTest, PreImageSamplesFromEmptyCollection) {
-    auto opCtx = operationContext();
-    createPreImagesCollection(opCtx);
-
-    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx);
-
-    std::vector<uint64_t> targetSampleOptions{0, 1, 2, 100};
-    for (const auto& targetNumSamples : targetSampleOptions) {
-        LOGV2(9528901,
-              "Running test case to retrieve pre-image samples on an empty collection",
-              "targetNumSamples"_attr = targetNumSamples);
-        const auto samples = collectPreImageSamples(opCtx, preImagesRAII, targetNumSamples);
-        ASSERT_EQ(0, samples.size());
-    }
-}
-
-// Tests there is at least 1 sample per nsUUID, even if less samples are requested.
-TEST_F(PreImageMarkerInitializationTest, PreImageSamplesAlwaysContainLastRecordPerNsUUID) {
-    auto opCtx = operationContext();
-    createPreImagesCollection(opCtx);
-
-    auto assert1SampleForNsUUID = [](const UUID& nsUUID,
-                                     const ChangeStreamPreImage& expectedPreImage,
-                                     const SamplesMap& samples) {
-        auto it = samples.find(nsUUID);
-        ASSERT(it != samples.end());
-        auto vec = it->second;
-        ASSERT_EQ(1, it->second.size());
-        const auto actualSample = it->second[0];
-        const auto expectedSample = extractRecordIdAndWallTime(expectedPreImage);
-        ASSERT_EQ(expectedSample.id, actualSample.id);
-        ASSERT_EQ(expectedSample.wall, actualSample.wall);
-    };
-
-    {
-        // Test Case: 1 pre-image for 'kNsUUID' in the pre-images collection with 0 samples
-        // requested yields 1 sample.
-        insertDirectlyToPreImagesCollection(opCtx, kPreImage1);
-        auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx);
-        const auto samples = collectPreImageSamples(opCtx, preImagesRAII, 0);
-        assert1SampleForNsUUID(kNsUUID, kPreImage1, samples);
-    }
-
-    {
-        // Test Case: 2 pre-images for 'kNsUUID' in the pre-images collection with 0 samples
-        // requested yields 1 sample.
-        insertDirectlyToPreImagesCollection(opCtx, kPreImage2);
-        auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx);
-        const auto samples = collectPreImageSamples(opCtx, preImagesRAII, 0);
-        assert1SampleForNsUUID(kNsUUID, kPreImage2, samples);
-    }
-
-    {
-        // Test Case: 2 pre-images for 'kNsUUID', 1 for 'kNsOtherUUID' in the pre-images collection
-        // with 0 samples requested yields 1 sample per nsUUID.
-        insertDirectlyToPreImagesCollection(opCtx, kPreImageOther);
-        auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx);
-        const auto samples = collectPreImageSamples(opCtx, preImagesRAII, 0);
-        assert1SampleForNsUUID(kNsUUID, kPreImage2, samples);
-        assert1SampleForNsUUID(kNsUUIDOther, kPreImageOther, samples);
-    }
-}
-
-// Demonstrates that pre-image sampling can result in repeated results of the same pre-image on a
-// non-empty collection.
-TEST_F(PreImageMarkerInitializationTest, PreImageSamplesRepeatSamples) {
-    auto opCtx = operationContext();
-    createPreImagesCollection(opCtx);
-
-    const Timestamp baseTimestamp = Timestamp(1, 1);
-    const Date_t baseDate = dateFromISOString("2024-01-01T00:00:01.000Z").getValue();
-
-    const auto kNsUUID = UUID::gen();
-    const auto preImage = makePreImage(kNsUUID, baseTimestamp, baseDate);
-    insertDirectlyToPreImagesCollection(opCtx, preImage);
-
-    const auto preImagesRAII = acquirePreImagesCollectionForRead(opCtx);
-
-    std::vector<int64_t> targetSampleOptions{1, 10};
-    for (const auto& targetNumSamples : targetSampleOptions) {
-        LOGV2(9528902,
-              "Running test case to retrieve pre-image samples on an empty collection",
-              "targetNumSamples"_attr = targetNumSamples);
-        const auto samples = collectPreImageSamples(opCtx, preImagesRAII, targetNumSamples);
-        ASSERT_EQ(targetNumSamples, countTotalSamples(samples));
-    }
-}
+using EqualStepSamplingStrategyDeathTest = EqualStepSamplingStrategyTest;
 
 /**
  * Tests for scanning / sampling.
  */
-TEST_F(PreImageMarkerInitializationTest, PopulateMapWithEmptyCollection) {
+TEST_F(EqualStepSamplingStrategyTest, PopulateMapWithEmptyCollection) {
     auto opCtx = operationContext();
     createPreImagesCollection(opCtx);
-    const auto minBytesPerMarker = gPreImagesCollectionTruncateMarkersMinBytes;
 
-    {
-        // Populate by scanning an empty collection.
-        MarkersMap mapByScan;
-        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx);
-        populateByScanning(opCtx, preImagesCollection, minBytesPerMarker, mapByScan);
-        const auto mapSnapshot = mapByScan.getUnderlyingSnapshot();
-        ASSERT_EQ(0, mapSnapshot->size());
-    }
-
-    {
-        // Populate by sampling an empty collection where the initial 'totalRecords' and
-        // 'totalBytes' estimates are accurate.
-        MarkersMap mapBySamples;
-        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx);
-        populateByRandomSampling(opCtx,
-                                 preImagesCollection,
-                                 0 /* totalRecords */,
-                                 0 /* totalBytes */,
-                                 minBytesPerMarker,
-                                 CollectionTruncateMarkers::kRandomSamplesPerMarker,
-                                 mapBySamples);
-        const auto mapSnapshot = mapBySamples.getUnderlyingSnapshot();
-        ASSERT_EQ(0, mapSnapshot->size());
-    }
-
-    {
-        // Populate by sampling an empty collection where the initial 'totalRecords' and
-        // 'totalBytes' estimates aren't accurate. The size tracked in-memory can be inaccurate
-        // after unclean shutdowns.
-        MarkersMap mapBySamples;
-        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx);
-        populateByRandomSampling(opCtx,
-                                 preImagesCollection,
-                                 100 /* totalRecords */,
-                                 200 /* totalBytes */,
-                                 minBytesPerMarker,
-                                 CollectionTruncateMarkers::kRandomSamplesPerMarker,
-                                 mapBySamples);
-        const auto mapSnapshot = mapBySamples.getUnderlyingSnapshot();
-        ASSERT_EQ(0, mapSnapshot->size());
-    }
-
-    {
-        // Populate by sampling an empty collection using the "equal step" sampling method.
-        MarkersMap mapBySamples;
-        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx);
-        populateByEqualStepSampling(opCtx,
-                                    preImagesCollection,
-                                    CollectionTruncateMarkers::kRandomSamplesPerMarker,
-                                    mapBySamples);
-        const auto mapSnapshot = mapBySamples.getUnderlyingSnapshot();
-        ASSERT_EQ(0, mapSnapshot->size());
-    }
-}
-
-TEST_F(PreImageMarkerInitializationTest, PopulateMapWithSinglePreImage) {
-    auto opCtx = operationContext();
-    createPreImagesCollection(opCtx);
-    insertDirectlyToPreImagesCollection(opCtx, kPreImage1);
-    auto assertPreImageIsTracked = [](const UUID& expectedUUID,
-                                      const MarkersMap& csvMap,
-                                      const ChangeStreamPreImage& expectedPreImage) {
-        const auto mapSnapshot = csvMap.getUnderlyingSnapshot();
-        ASSERT_GTE(1, mapSnapshot->size());
-        auto it = mapSnapshot->find(expectedUUID);
-        ASSERT(it != mapSnapshot->end());
-        auto perNsUUIDMarkers = it->second;
-        ASSERT_FALSE(perNsUUIDMarkers->isEmpty());
-
-        bool trackingPreImage = activelyTrackingPreImage(*perNsUUIDMarkers, expectedPreImage);
-        ASSERT_TRUE(trackingPreImage) << fmt::format(
-            "Expected pre-image to be actively tracked in truncate markers. Pre-image: {}, "
-            "truncateMarkers: {}",
-            expectedPreImage.toBSON().toString(),
-            toBSON(*perNsUUIDMarkers).toString());
-    };
-
-    {
-        // Populate by scanning, pre-image covered by full marker.
-        MarkersMap mapByScan;
-        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx);
-        populateByScanning(opCtx, preImagesCollection, 1 /* minBytesPerMarker */, mapByScan);
-        assertPreImageIsTracked(kNsUUID, mapByScan, kPreImage1);
-    }
-
-    {
-        // Populate by scanning, pre-image not covered in marker.
-        MarkersMap mapByScan;
-        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx);
-        populateByScanning(
-            opCtx, preImagesCollection, bytes(kPreImage1) + 100 /* minBytesPerMarker */, mapByScan);
-        assertPreImageIsTracked(kNsUUID, mapByScan, kPreImage1);
-    }
-
-    {
-        MarkersMap mapBySamples;
-        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx);
-        populateByRandomSampling(opCtx,
-                                 preImagesCollection,
-                                 1 /* totalRecords */,
-                                 bytes(kPreImage1) /* totalBytes */,
-                                 1 /* minBytesPerMarker */,
-                                 1 /* randomSamplesPerMarker */,
-                                 mapBySamples);
-        assertPreImageIsTracked(kNsUUID, mapBySamples, kPreImage1);
-    }
-
-    {
-        MarkersMap mapBySamples;
-        auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx);
-        populateByEqualStepSampling(opCtx, preImagesCollection, 1 /* numSamples */, mapBySamples);
-        assertPreImageIsTracked(kNsUUID, mapBySamples, kPreImage1);
-    }
-}
-
-DEATH_TEST_REGEX_F(PreImageMarkerInitializationDeathTest,
-                   populateByEqualStepSamplingSampleSize0,
-                   "Tripwire assertion.*11423701") {
-    auto opCtx = operationContext();
-    createPreImagesCollection(opCtx);
-    insertDirectlyToPreImagesCollection(opCtx, kPreImage1);
-
+    // Populate by sampling an empty collection using the "equal step" sampling method.
+    MarkersMap mapBySamples;
     auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx);
-
-    MarkersMap markersMap;
-    populateByEqualStepSampling(opCtx, preImagesCollection, 0 /* numSamples */, markersMap);
+    EqualStepSamplingStrategy samplingStrategy(CollectionTruncateMarkers::kRandomSamplesPerMarker,
+                                               1);
+    ASSERT_TRUE(samplingStrategy.performSampling(opCtx, preImagesCollection, mapBySamples));
+    const auto mapSnapshot = mapBySamples.getUnderlyingSnapshot();
+    ASSERT_EQ(0, mapSnapshot->size());
 }
 
 /**
  * Tests for 'sampleNSUUIDRangeEqually.
  */
-DEATH_TEST_REGEX_F(PreImageMarkerInitializationDeathTest,
+DEATH_TEST_REGEX_F(EqualStepSamplingStrategyDeathTest,
                    SampleNSUUIDRangeEquallySampleSize0,
                    "Tripwire assertion.*11423700") {
     auto opCtx = operationContext();
@@ -396,12 +125,13 @@ DEATH_TEST_REGEX_F(PreImageMarkerInitializationDeathTest,
     ASSERT_TRUE(nsUUIDLastRecords.contains(kNsUUID));
     const auto& lastRidAndWall = nsUUIDLastRecords.find(kNsUUID)->second;
 
-    sampleNSUUIDRangeEqually(
+    EqualStepSamplingStrategy samplingStrategy(1, 1);
+    samplingStrategy.sampleNSUUIDRangeEqually(
         opCtx, preImagesCollection, kNsUUID, lastRidAndWall, 0 /* numSamples */);
 }
 
 // Tests for sample size 1, which has a few special cases.
-TEST_F(PreImageMarkerInitializationTest, SampleNSUUIDRangeEquallySampleSize1) {
+TEST_F(EqualStepSamplingStrategyTest, SampleNSUUIDRangeEquallySampleSize1) {
     auto opCtx = operationContext();
     createPreImagesCollection(opCtx);
 
@@ -426,7 +156,7 @@ TEST_F(PreImageMarkerInitializationTest, SampleNSUUIDRangeEquallySampleSize1) {
 }
 
 // Tests for sample size 2, which has a few special cases.
-TEST_F(PreImageMarkerInitializationTest, SampleNSUUIDRangeEquallySampleSize2) {
+TEST_F(EqualStepSamplingStrategyTest, SampleNSUUIDRangeEquallySampleSize2) {
     auto opCtx = operationContext();
     createPreImagesCollection(opCtx);
 
@@ -451,7 +181,7 @@ TEST_F(PreImageMarkerInitializationTest, SampleNSUUIDRangeEquallySampleSize2) {
 }
 
 // Tests for a sample size larger than the number of documents in the collection.
-TEST_F(PreImageMarkerInitializationTest, SampleNSUUIDRangeEquallySampleSizeLargerThanCollection) {
+TEST_F(EqualStepSamplingStrategyTest, SampleNSUUIDRangeEquallySampleSizeLargerThanCollection) {
     auto opCtx = operationContext();
     createPreImagesCollection(opCtx);
 
@@ -475,7 +205,7 @@ TEST_F(PreImageMarkerInitializationTest, SampleNSUUIDRangeEquallySampleSizeLarge
 }
 
 // Test sampling when the document timestamps in the collection are almost equally distributed.
-TEST_F(PreImageMarkerInitializationTest,
+TEST_F(EqualStepSamplingStrategyTest,
        SampleNSUUIDRangeEquallyCollectionWithEquallyDistancedEntries) {
     auto opCtx = operationContext();
     createPreImagesCollection(opCtx);
@@ -505,19 +235,19 @@ TEST_F(PreImageMarkerInitializationTest,
     ASSERT_EQ(1, nsUUIDLastRecords.size());
     ASSERT_TRUE(nsUUIDLastRecords.contains(kNsUUID));
 
-    constexpr uint64_t kNumSamples = 10;
-
     // For a sample size of 10, expect documents with the following timestamps to be sampled.
     std::vector<ChangeStreamPreImage> expectedPreImages;
     for (int i : {0, 11, 22, 33, 44, 55, 66, 77, 88, 99}) {
         expectedPreImages.push_back(
             buildPreImage(kNsUUID, Timestamp(Seconds(baseTime + i), 0), 0, BSON("x" << i)));
     }
+
+    constexpr uint64_t kNumSamples = 10;
     assertEqualRangeSampleForNsUUIDContainsExactPreimages(kNumSamples, expectedPreImages);
 }
 
 // Test sampling when the document timestamps in the collection are unevenly distributed.
-TEST_F(PreImageMarkerInitializationTest,
+TEST_F(EqualStepSamplingStrategyTest,
        SampleNSUUIDRangeEquallyCollectionWithUnevenlyDistancedEntries) {
     auto opCtx = operationContext();
     createPreImagesCollection(opCtx);
@@ -547,8 +277,6 @@ TEST_F(PreImageMarkerInitializationTest,
     ASSERT_EQ(1, nsUUIDLastRecords.size());
     ASSERT_TRUE(nsUUIDLastRecords.contains(kNsUUID));
 
-    constexpr uint64_t kNumSamples = 15;
-
     // For a sample size of 15, expect documents with the following timestamps to be sampled.
     // Note that due to the skewed distribution, we'll actually get less than the requested number
     // of samples (13 instead of 15).
@@ -557,12 +285,14 @@ TEST_F(PreImageMarkerInitializationTest,
         expectedPreImages.push_back(
             buildPreImage(kNsUUID, Timestamp(Seconds(baseTime + i), 0), 0, BSON("x" << i)));
     }
+
+    constexpr uint64_t kNumSamples = 15;
     assertEqualRangeSampleForNsUUIDContainsExactPreimages(kNumSamples, expectedPreImages);
 }
 
 // Test sampling when the document timestamps in the collection have the same Timestamp 't' value,
 // but different Timestamp 'i' values.
-TEST_F(PreImageMarkerInitializationTest,
+TEST_F(EqualStepSamplingStrategyTest,
        SampleNSUUIDRangeEquallyCollectionWithTimestampsDifferingOnlyByIncrements) {
     auto opCtx = operationContext();
     createPreImagesCollection(opCtx);
@@ -592,21 +322,20 @@ TEST_F(PreImageMarkerInitializationTest,
     ASSERT_EQ(1, nsUUIDLastRecords.size());
     ASSERT_TRUE(nsUUIDLastRecords.contains(kNsUUID));
 
-    constexpr uint64_t kNumSamples = 10;
-
     // For a sample size of 10, expect documents with the following timestamps to be sampled.
     std::vector<ChangeStreamPreImage> expectedPreImages;
     for (int i : {0, 11, 22, 33, 44, 55, 66, 77, 88, 99}) {
         expectedPreImages.push_back(
             buildPreImage(kNsUUID, Timestamp(Seconds(baseTime), i), 0, BSON("x" << i)));
     }
+
+    constexpr uint64_t kNumSamples = 10;
     assertEqualRangeSampleForNsUUIDContainsExactPreimages(kNumSamples, expectedPreImages);
 }
 
 // Test for sampling documents that have the same Timestamp value, but different 'applyOpsIndex'
 // values.
-TEST_F(PreImageMarkerInitializationTest,
-       SampleNSUUIDRangeEquallySameTimestampDifferentApplyOpsIndex) {
+TEST_F(EqualStepSamplingStrategyTest, SampleNSUUIDRangeEquallySameTimestampDifferentApplyOpsIndex) {
     auto opCtx = operationContext();
     createPreImagesCollection(opCtx);
 
@@ -635,8 +364,6 @@ TEST_F(PreImageMarkerInitializationTest,
     ASSERT_EQ(1, nsUUIDLastRecords.size());
     ASSERT_TRUE(nsUUIDLastRecords.contains(kNsUUID));
 
-    constexpr uint64_t kNumSamples = 10;
-
     // The different 'applyOpsIndex' values here are not perfectly distributed because the step size
     // used for sampling is calculated using integer division, which leads to cumulative rounding
     // errors when adding the (rounded-down) step size multiple times.
@@ -645,6 +372,8 @@ TEST_F(PreImageMarkerInitializationTest,
         expectedPreImages.push_back(buildPreImage(
             kNsUUID, Timestamp(Seconds(baseTime), 0), i /* applyOpsIndex */, BSON("x" << i)));
     }
+
+    constexpr uint64_t kNumSamples = 10;
     assertEqualRangeSampleForNsUUIDContainsExactPreimages(kNumSamples, expectedPreImages);
 }
 

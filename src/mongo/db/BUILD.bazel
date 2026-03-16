@@ -2140,12 +2140,27 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "change_stream_pre_images_truncate_markers_per_nsUUID",
+    srcs = [
+        "change_stream_pre_images_truncate_markers_per_nsUUID.cpp",
+    ],
+    deps = [
+        ":change_stream_options_manager",
+        ":change_stream_pre_image_util",
+        ":record_id_helpers",
+        ":server_base",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/pipeline:change_stream_preimage",
+        "//src/mongo/db/shard_role/lock_manager:exception_util",
+    ],
+)
+
+mongo_cc_library(
     name = "change_stream_pre_images_collection_manager",
     srcs = [
         "change_stream_pre_images_collection_manager.cpp",
         "change_stream_pre_images_truncate_manager.cpp",
         "change_stream_pre_images_truncate_markers.cpp",
-        "change_stream_pre_images_truncate_markers_per_nsUUID.cpp",
     ],
     deps = [
         ":change_stream_options_manager",
@@ -2154,6 +2169,7 @@ mongo_cc_library(
         ":record_id_helpers",
         ":server_base",
         ":server_feature_flags",
+        "//src/mongo/db/change_stream_pre_images_truncate_markers_sampling_strategy",
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/pipeline:change_stream_preimage",
         "//src/mongo/db/repl:storage_interface",
@@ -2983,7 +2999,6 @@ mongo_cc_unit_test(
         "change_stream_pre_images_remover_test.cpp",
         "change_stream_pre_images_truncate_manager_test.cpp",
         "change_stream_pre_images_truncate_markers_per_nsUUID_test.cpp",
-        "change_stream_pre_images_truncate_markers_test.cpp",
     ],
     tags = ["mongo_unittest_eighth_group"],
     deps = [

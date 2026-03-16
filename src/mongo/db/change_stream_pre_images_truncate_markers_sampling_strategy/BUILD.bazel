@@ -1,0 +1,61 @@
+load("@poetry//:dependencies.bzl", "dependency")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_binary", "mongo_cc_fuzzer_test_deprecated", "mongo_cc_integration_test", "mongo_cc_library", "mongo_cc_unit_test", "mongo_idl_library", "windows_rc")
+load("//bazel/config:render_template.bzl", "render_template")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "change_stream_pre_images_truncate_markers_sampling_strategy",
+    srcs = [
+        "equal_step_sampling_strategy.cpp",
+        "random_sampling_strategy.cpp",
+        "sampling_strategy.cpp",
+        "scanning_sampling_strategy.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:change_stream_pre_image_util",
+        "//src/mongo/db:change_stream_pre_images_truncate_markers_per_nsUUID",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/pipeline:change_stream_preimage",
+        "//src/mongo/db/repl:storage_interface",
+        "//src/mongo/db/shard_role/lock_manager:exception_util",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_helpers",
+        "//src/mongo/db/shard_role/shard_catalog:collection_options",
+        "//src/mongo/db/storage:storage_options",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "change_stream_pre_images_truncate_markers_sampling_strategy_test",
+    srcs = [
+        "equal_step_sampling_strategy_test.cpp",
+        "random_sampling_strategy_test.cpp",
+        "sampling_strategy_test.cpp",
+        "scanning_sampling_strategy_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":change_stream_pre_images_truncate_markers_sampling_strategy",
+        "//src/mongo/db:change_stream_options",
+        "//src/mongo/db:change_stream_options_manager",
+        "//src/mongo/db:change_stream_pre_image_test_helpers",
+        "//src/mongo/db:change_stream_pre_image_util",
+        "//src/mongo/db:change_stream_pre_images_collection_manager",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/op_observer:op_observer_impl",
+        "//src/mongo/db/op_observer:operation_logger_impl",
+        "//src/mongo/db/pipeline:change_stream_expired_pre_image_remover",
+        "//src/mongo/db/shard_role",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/db/shard_role/shard_catalog:collection_catalog",
+        "//src/mongo/db/storage:record_store_base",
+    ],
+)
