@@ -72,10 +72,21 @@ def generate_noop_toolchain(ctx, substitutions):
     # BUILD file is required for a no-op.
     # Keep a stub mongo_toolchain target so unconditional register_toolchains()
     # calls don't fail when the toolchain is intentionally skipped/unsupported.
+    # Create a stub clang-format script so that targets referencing
+    # //:clang_format (e.g. the format_multirun rule) can still build on
+    # platforms where the mongo toolchain is unavailable (macOS, etc.).
+    ctx.file(
+        "clang_format_noop.sh",
+        "#!/usr/bin/env bash\n# Stub: mongo toolchain clang-format is not available on this platform.\nexit 0\n",
+        executable = True,
+    )
+
     ctx.file(
         "BUILD.bazel",
         """
 # {} not supported on this platform
+
+package(default_visibility = ["//visibility:public"])
 
 filegroup(
     name = "all_files",
@@ -87,9 +98,9 @@ filegroup(
     srcs = [],
 )
 
-filegroup(
+sh_binary(
     name = "clang_format",
-    srcs = [],
+    srcs = ["clang_format_noop.sh"],
 )
 
 filegroup(
