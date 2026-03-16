@@ -361,8 +361,10 @@ function runUpdateTokenizationTests(topologyName, setupFn, teardownFn) {
         });
 
         it("should tokenize pipeline update with constants", function () {
+            // Hash of "newVal".
+            const kHashedConstant = "VaksLvxpslthbM1qCItU0mhsNVyN8A97qAJzqIKrZoI=";
             // Hash of "$$newVal"
-            const kHashedConstant = "$$VaksLvxpslthbM1qCItU0mhsNVyN8A97qAJzqIKrZoI=";
+            const kHashedUsedConstant = "$$" + kHashedConstant;
             const cmdObj = {
                 update: collName,
                 updates: [
@@ -380,8 +382,8 @@ function runUpdateTokenizationTests(topologyName, setupFn, teardownFn) {
             assert.eq(1, queryStats.length);
             assert.eq("update", queryStats[0].key.queryShape.command);
             assert.eq({[kHashedFieldName]: {$eq: "?number"}}, queryStats[0].key.queryShape.q);
-            assert.eq([{$set: {[kHashedFieldName]: kHashedConstant}}], queryStats[0].key.queryShape.u);
-            assert.eq({newVal: "?number"}, queryStats[0].key.queryShape.c);
+            assert.eq([{$set: {[kHashedFieldName]: kHashedUsedConstant}}], queryStats[0].key.queryShape.u);
+            assert.eq({[kHashedConstant]: "?number"}, queryStats[0].key.queryShape.c);
         });
     });
 }

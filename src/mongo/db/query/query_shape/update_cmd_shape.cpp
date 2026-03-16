@@ -153,7 +153,8 @@ boost::optional<BSONObj> shapifyUpdateConstants(const ParsedUpdate& parsedUpdate
     for (const auto& elem : constants.value()) {
         StringData varName = elem.fieldNameStringData();
         Value shapifiedValue = opts.serializeLiteral(elem);
-        shapifiedValue.addToBsonObj(&shapifiedConstants, varName);
+        shapifiedValue.addToBsonObj(&shapifiedConstants,
+                                    opts.serializeFieldPathFromString(varName));
     }
 
     return shapifiedConstants.obj();

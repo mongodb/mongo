@@ -2734,5 +2734,131 @@ TEST_F(UpdateCmdShapeTest, PipelineUpdateRedaction) {
                      SerializationContext::stateDefault()));
 }
 
+TEST_F(UpdateCmdShapeTest, PipelineUpdateWithConstantsRedaction) {
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [ { 
+            q: { x: 1 }, 
+            u: [ { "$set": { "foo": "$$myVar", "num": "$$myNum" } } ],
+            c: { "myVar": "hello", "myNum": 42 },
+            multi: false, 
+            upsert: false 
+        } ],
+        "$db": "testDB"
+    })"_sd);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "cmdNs": {
+                "db": "HASH<testDB>",
+                "coll": "HASH<testColl>"
+            },
+            "command": "update",
+            "q": {
+                "HASH<x>": {
+                    "$eq": "?number"
+                }
+            },
+            "u": [
+                {
+                    "$set": {
+                        "HASH<foo>": "$$HASH<myVar>",
+                        "HASH<num>": "$$HASH<myNum>"
+                    }
+                }
+            ],
+            "c": {
+                "HASH<myVar>": "?string",
+                "HASH<myNum>": "?number"
+            },
+            "multi": false,
+            "upsert": false
+        })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     SerializationContext::stateDefault()));
+}
+
+TEST_F(UpdateCmdShapeTest, PipelineUpdateWithNestedConstantsRedaction) {
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [ {
+            q: { x: 1 },
+            u: [ { "$set": { "x": "$$simpleObject", "nested": "$$nestedObject" } } ],
+            c: {
+                "simpleObject": { "a": 1 },
+                "nestedObject": { "$pretendField": [{ "$anotherFakeOne": [3, 4] }, 5] }
+            },
+            multi: false,
+            upsert: false
+        } ],
+        "$db": "testDB"
+    })"_sd);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "cmdNs": {
+                "db": "HASH<testDB>",
+                "coll": "HASH<testColl>"
+            },
+            "command": "update",
+            "q": {
+                "HASH<x>": {
+                    "$eq": "?number"
+                }
+            },
+            "u": [
+                {
+                    "$set": {
+                        "HASH<x>": "$$HASH<simpleObject>",
+                        "HASH<nested>": "$$HASH<nestedObject>"
+                    }
+                }
+            ],
+            "c": {
+                "HASH<simpleObject>": "?object",
+                "HASH<nestedObject>": "?object"
+            },
+            "multi": false,
+            "upsert": false
+        })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     SerializationContext::stateDefault()));
+}
+
+TEST_F(UpdateCmdShapeTest, LetRedaction) {
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [ { q: { x: {$eq: 3} }, u: { foo: "bar" }, multi: false, upsert: true } ],
+        let: {x: 4, y: "abc"},
+        "$db": "testDB"
+    })"_sd);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "cmdNs": {
+                "db": "HASH<testDB>",
+                "coll": "HASH<testColl>"
+            },
+            "command": "update",
+            "q": {
+                "HASH<x>": {
+                    "$eq": "?number"
+                }
+            },
+            "u": "?object",
+            "multi": false,
+            "upsert": true,
+            "let": {
+                "HASH<x>": "?number",
+                "HASH<y>": "?string"
+            }
+        })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     SerializationContext::stateDefault()));
+}
+
 }  // namespace
 }  // namespace mongo::query_shape
