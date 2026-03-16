@@ -1,9 +1,11 @@
+import argparse
 import concurrent.futures
 import hashlib
 import heapq
 import json
 import os
 import platform
+import random
 import re
 import shlex
 import subprocess
@@ -203,6 +205,118 @@ def _hash_file_name(file_name: str) -> int:
     return int.from_bytes(digest[:8], byteorder="big", signed=False)
 
 
+def _selection_key_for_entry(entry: dict[str, Any]) -> str | None:
+    """Build a canonical key for cross-platform deterministic selection.
+
+    compile_commands entries may use absolute paths rooted in machine-specific Bazel
+    output locations (e.g. /tmp/.../external/... or Z:/.../bazel-out/<config>/...).
+    We normalize those prefixes so the same logical source tends to hash the same
+    across Linux/Windows.
+    """
+    file_name = entry.get("file")
+    if not isinstance(file_name, str):
+        return None
+
+    directory = entry.get("directory")
+    p = file_name.replace("\\", "/")
+    # Windows paths are case-insensitive; lowercasing also improves cross-OS stability.
+    p = p.lower()
+
+    # If this is an absolute path under the entry directory, strip that prefix.
+    if isinstance(directory, str):
+        d = directory.replace("\\", "/").lower().rstrip("/")
+        if d and p.startswith(d + "/"):
+            p = p[len(d) + 1 :]
+
+    # Strip machine-specific prefixes while preserving meaningful roots.
+    if "/execroot/_main/" in p:
+        p = p.split("/execroot/_main/", 1)[1]
+    elif "/external/" in p:
+        p = "external/" + p.split("/external/", 1)[1]
+    elif "/bazel-out/" in p:
+        p = "bazel-out/" + p.split("/bazel-out/", 1)[1]
+    elif "/src/" in p:
+        p = "src/" + p.split("/src/", 1)[1]
+
+    # Normalize bazel configuration segment (platform/config differs by OS).
+    p = re.sub(r"(^|/)bazel-out/[^/]+/", r"\1bazel-out/<config>/", p)
+    p = re.sub(r"/+", "/", p).lstrip("./")
+    return p or file_name.lower()
+
+
+def _is_truthy_env(value: str | None) -> bool:
+    if value is None:
+        return False
+    return value.strip().lower() not in ("", "0", "false", "no", "off")
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    selection_group = parser.add_mutually_exclusive_group()
+    selection_group.add_argument(
+        "--run-all",
+        action="store_true",
+        help="Validate every compile_commands entry instead of sampling.",
+    )
+    selection_group.add_argument(
+        "--sample-size",
+        type=int,
+        help="Validate a fixed number of compile_commands entries.",
+    )
+    return parser.parse_args()
+
+
+def _determine_selection_count(
+    default_count: int = 10,
+    *,
+    cli_run_all: bool = False,
+    cli_sample_size: int | None = None,
+) -> int:
+    """Resolve how many compile_commands entries to test.
+
+    CLI flags take precedence over environment variables.
+
+    - --run-all: run all entries.
+    - --sample-size N: run N entries (N > 0).
+    - VALIDATE_COMPILE_COMMANDS_RUN_ALL=1: run all entries.
+    - VALIDATE_COMPILE_COMMANDS_SAMPLE_SIZE=<N>: run N entries (N > 0).
+    """
+    if cli_run_all:
+        return 0
+
+    if cli_sample_size is not None:
+        if cli_sample_size <= 0:
+            raise ValueError(f"--sample-size must be > 0, got: {cli_sample_size}")
+        return cli_sample_size
+
+    if _is_truthy_env(os.environ.get("VALIDATE_COMPILE_COMMANDS_RUN_ALL")):
+        return 0
+
+    sample_size_env = os.environ.get("VALIDATE_COMPILE_COMMANDS_SAMPLE_SIZE")
+    if sample_size_env is None:
+        return default_count
+    try:
+        sample_size = int(sample_size_env)
+    except ValueError as exc:
+        raise ValueError(
+            f"VALIDATE_COMPILE_COMMANDS_SAMPLE_SIZE must be an integer, got: {sample_size_env!r}"
+        ) from exc
+    if sample_size <= 0:
+        raise ValueError(f"VALIDATE_COMPILE_COMMANDS_SAMPLE_SIZE must be > 0, got: {sample_size}")
+    return sample_size
+
+
+def _should_validate_entry(entry: dict[str, Any]) -> bool:
+    selection_key = _selection_key_for_entry(entry)
+    if not selection_key:
+        return False
+
+    # Keep the sample focused on MongoDB workspace sources. External repositories and
+    # vendored third-party code have their own generated include layouts that are not
+    # meaningful for validating the repo's compile_commands coverage.
+    return selection_key.startswith("src/mongo/")
+
+
 def _make_test_compile_args(args: list[str]) -> list[str]:
     """Convert a compile command into a 'test compile' command.
 
@@ -251,6 +365,22 @@ def _map_writable_output_path(out_root: str, original_path: str) -> str:
         if comp in ("", ".", ".."):
             return "_"
         return comp
+
+    if platform.system() == "Windows":
+        drive, _ = os.path.splitdrive(original_path)
+        drive_tag = drive.rstrip(":")
+        drive_tag = drive_tag.lstrip("\\/").replace("\\", "_").replace("/", "_")
+        drive_tag = _sanitize_component(drive_tag) if drive_tag else "PATH"
+
+        normalized = os.path.normcase(os.path.normpath(original_path))
+        digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
+        basename = _sanitize_component(os.path.basename(original_path)) or "out"
+        stem, ext = os.path.splitext(basename)
+        if len(stem) > 48:
+            stem = stem[:48]
+        short_name = f"{stem}-{digest}{ext}"
+
+        return os.path.normpath(os.path.join(out_root, "win", drive_tag, short_name))
 
     drive, tail = os.path.splitdrive(original_path)
     parts: list[str] = []
@@ -461,11 +591,22 @@ def _ensure_parent_dirs_exist_for_outputs(args: list[str], cwd: str, repo_root: 
 
 
 def _select_entries_for_test_compile(path: str, n: int) -> tuple[int, list[dict[str, Any]]]:
-    """Pick N entries by sorting deterministic hashes of entry['file'] and taking the first N."""
+    """Pick N entries by sorting deterministic hashes of a canonicalized file key."""
+    if n <= 0:
+        total = 0
+        selected: list[dict[str, Any]] = []
+        for entry in _iter_compiledb_entries(path):
+            total += 1
+            file_name = entry.get("file")
+            if not isinstance(file_name, str):
+                continue
+            selected.append(entry)
+        return total, selected
+
     # Keep a max-heap of the N smallest hashes.
     # IMPORTANT: include stable, comparable tie-breakers so heapq never compares dicts.
-    # Tuple: (-hash, file_name, seq, entry)
-    heap: list[tuple[int, str, int, dict[str, Any]]] = []
+    # Tuple: (-hash, selection_key, file_name, seq, entry)
+    heap: list[tuple[int, str, str, int, dict[str, Any]]] = []
     total = 0
     seq = 0
     for entry in _iter_compiledb_entries(path):
@@ -473,26 +614,45 @@ def _select_entries_for_test_compile(path: str, n: int) -> tuple[int, list[dict[
         file_name = entry.get("file")
         if not isinstance(file_name, str):
             continue
-        h = _hash_file_name(file_name)
-        item = (-h, file_name, seq, entry)
+        selection_key = _selection_key_for_entry(entry)
+        if not selection_key or not _should_validate_entry(entry):
+            continue
+        h = _hash_file_name(selection_key)
+        item = (-h, selection_key, file_name, seq, entry)
         seq += 1
         if len(heap) < n:
             heapq.heappush(heap, item)
         else:
             # If this hash is smaller than the current largest in the heap, replace it.
-            if item[:3] > heap[0][:3]:
+            if item[:4] > heap[0][:4]:
                 heapq.heapreplace(heap, item)
 
     # Sort ascending by hash.
     selected = [
-        e for (_neg_h, _file_name, _seq, e) in sorted(heap, key=lambda t: (-t[0], t[1], t[2]))
+        e
+        for (_neg_h, _selection_key, _file_name, _seq, e) in sorted(
+            heap, key=lambda t: (-t[0], t[1], t[2], t[3])
+        )
     ]
     return total, selected
 
 
 def main() -> int:
+    cli_args = _parse_args()
     compdb_path = "compile_commands.json"
-    total, selected = _select_entries_for_test_compile(compdb_path, n=10)
+    try:
+        selection_count = _determine_selection_count(
+            default_count=10,
+            cli_run_all=cli_args.run_all,
+            cli_sample_size=cli_args.sample_size,
+        )
+    except ValueError as e:
+        sys.stderr.write(f"ERROR: {e}\n")
+        return 1
+
+    total, selected = _select_entries_for_test_compile(compdb_path, n=selection_count)
+    if selection_count <= 0:
+        random.shuffle(selected)
 
     if total < 1000:
         sys.stderr.write(
@@ -503,6 +663,13 @@ def main() -> int:
     if not selected:
         sys.stderr.write("ERROR: Failed to select any entries for test compilation.\n")
         return 1
+
+    if selection_count <= 0:
+        print(
+            f"Selected all compile_commands entries for validation ({len(selected)}).", flush=True
+        )
+    else:
+        print(f"Selected {len(selected)} compile_commands entries for validation.", flush=True)
 
     out_root = os.environ.get(
         "VALIDATE_COMPILE_COMMANDS_OUT_DIR",

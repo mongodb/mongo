@@ -545,6 +545,15 @@ common:mod-scanner --output_groups=report
 common:mod-scanner --aspects //modules_poc:mod_scanner.bzl%mod_scanner_aspect
 common:mod-scanner --remote_download_regex=.*\.mod_scanner_decls.json$
 
+--config=compiledb
+common:compiledb --aspects //bazel/compiledb:compiledb_aspect.bzl%compiledb_aspect
+common:compiledb --output_groups=compiledb_report
+common:compiledb --keep_going
+common:compiledb --remote_download_regex=.*\.compile_command\.json$
+
+--config=compiledb-aspect
+common:compiledb-aspect --config=compiledb
+
 --config=symbol-checker
 common:symbol-checker --aspects //bazel/symbol_checker:symbol_checker.bzl%symbol_checker_aspect
 common:symbol-checker --output_groups=symbol_checker

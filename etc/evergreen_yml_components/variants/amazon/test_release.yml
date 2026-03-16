@@ -456,6 +456,10 @@ buildvariants:
       - name: test_packages
         distros:
           - ubuntu2204-arm64-m8g-4xlarge
+      - name: full_bazel_compiledb
+        cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter.
+        distros:
+          - amazon2023-arm64-latest-m8gd-4xlarge
       - name: .development_critical !.requires_large_host
       - name: .development_critical .requires_large_host
         distros:
