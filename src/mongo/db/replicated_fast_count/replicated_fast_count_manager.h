@@ -43,6 +43,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/uuid.h"
 
 #include <boost/container/flat_map.hpp>
@@ -266,7 +267,7 @@ private:
      * In-memory cache of committed fast sizes & counts since last checkpoint.
      * Implemented as a map of collection UUID to the last committed size and count.
      */
-    mutable stdx::mutex _metadataMutex;
+    mutable ObservableMutex<stdx::mutex> _metadataMutex;
     FastSizeCountMap _metadata;
     bool _flushRequested = false;  // Prevents spurious wakeups.
 };

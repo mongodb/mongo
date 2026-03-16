@@ -166,6 +166,9 @@ void ReplicatedFastCountManager::startup(OperationContext* opCtx) {
 
     LOGV2(12051100, "Starting up ReplicatedFastCountManager thread");
 
+    ObservableMutexRegistry::get().add("ReplicatedFastCountManager::_metadataMutex",
+                                       _metadataMutex);
+
     if (!_isUnderTest) {
         _isEnabled.store(true);
         _backgroundThread = stdx::thread(

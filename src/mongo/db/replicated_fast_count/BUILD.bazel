@@ -131,3 +131,21 @@ mongo_cc_unit_test(
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
     ],
 )
+
+mongo_cc_unit_test(
+    name = "replicated_fast_count_metrics_test",
+    srcs = [
+        "replicated_fast_count_metrics_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    # TODO(SERVER-110898): Remove once TSAN works with ObservableMutex.
+    target_compatible_with = select({
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "replicated_fast_count_init",
+        "replicated_fast_count_test_helpers",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+    ],
+)
