@@ -137,13 +137,18 @@ boost::optional<ExecutionAdmissionContext::FinalizedStats> ExecutionAdmissionCon
     return result;
 }
 
-void ExecutionAdmissionContext::recordExecutionAcquisition() {
+void ExecutionAdmissionContext::recordExecutionAcquisition(AdmissionContext::Priority priority) {
     if (!_shouldRecordStats()) {
         return;
     }
 
     auto& stats = _getOperationExecutionStats();
     stats.totalAdmissions.fetchAndAddRelaxed(1);
+    if (priority == AdmissionContext::Priority::kLow) {
+        stats.totalLowPriorityAdmissions.fetchAndAddRelaxed(1);
+    } else {
+        stats.totalNormalPriorityAdmissions.fetchAndAddRelaxed(1);
+    }
 }
 
 void ExecutionAdmissionContext::recordExecutionWaitedAcquisition(Microseconds queueTimeMicros) {

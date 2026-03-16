@@ -238,6 +238,8 @@ public:
         // statistics.
         boost::optional<Microseconds> totalTimeQueuedMicros;
         boost::optional<uint64_t> totalAdmissions;
+        boost::optional<uint64_t> totalNormalPriorityAdmissions;
+        boost::optional<uint64_t> totalLowPriorityAdmissions;
         boost::optional<bool> wasLoadShed;
         boost::optional<bool> wasDeprioritized;
         boost::optional<bool> wasMarkedNonDeprioritizable;

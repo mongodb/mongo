@@ -325,7 +325,7 @@ void TicketHolder::_recordAcquisition(AdmissionContext* admCtx,
     }
 
     if (_reportAcquisitionOpCallback) {
-        _reportAcquisitionOpCallback(admCtx);
+        _reportAcquisitionOpCallback(admCtx, priority);
     }
 }
 

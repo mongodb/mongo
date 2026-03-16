@@ -50,8 +50,8 @@ std::unique_ptr<TicketingSystem> createTicketingSystem(
         static_cast<ExecutionAdmissionContext*>(admCtx)->recordDelinquentAcquisition(delta);
     };
 
-    auto acquisitionCb = [](AdmissionContext* admCtx) {
-        static_cast<ExecutionAdmissionContext*>(admCtx)->recordExecutionAcquisition();
+    auto acquisitionCb = [](AdmissionContext* admCtx, AdmissionContext::Priority priority) {
+        static_cast<ExecutionAdmissionContext*>(admCtx)->recordExecutionAcquisition(priority);
     };
 
     auto waitedAcquisitionCb = [](AdmissionContext* admCtx, Microseconds timeQueued) {

@@ -151,9 +151,10 @@ public:
     }
 
     /**
-     * Records that a ticket was acquired. Increments totalAdmissions for the current bucket.
+     * Records that a ticket was acquired. Increments the appropriate admission counter
+     * (normal or low priority) for the current bucket based on the provided priority.
      */
-    void recordExecutionAcquisition();
+    void recordExecutionAcquisition(AdmissionContext::Priority priority);
 
     /**
      * Records the time spent waiting in queue before acquiring a ticket.

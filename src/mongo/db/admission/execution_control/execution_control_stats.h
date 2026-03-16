@@ -158,6 +158,8 @@ public:
     AtomicWord<int64_t> totalTimeQueuedMicros{0};
     AtomicWord<int64_t> totalTimeProcessingMicros{0};
     AtomicWord<int64_t> totalAdmissions{0};
+    AtomicWord<int64_t> totalNormalPriorityAdmissions{0};
+    AtomicWord<int64_t> totalLowPriorityAdmissions{0};
     DelinquencyStats delinquencyStats;
 };
 

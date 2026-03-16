@@ -510,6 +510,14 @@ void CurOp::_setEndOfOpMetrics(OpDebug::AdditiveMetrics& metrics) {
                 metrics.totalTimeQueuedMicros.value_or(Microseconds(0)) +
                 admCtx.totalTimeQueuedMicros();
             metrics.totalAdmissions = metrics.totalAdmissions.value_or(0) + admCtx.getAdmissions();
+            // Low priority admissions come from AdmissionContext::getLowAdmissions().
+            // Normal priority admissions = total - low.
+            auto lowAdmissions = admCtx.getLowAdmissions();
+            auto normalAdmissions = admCtx.getAdmissions() - lowAdmissions;
+            metrics.totalNormalPriorityAdmissions =
+                metrics.totalNormalPriorityAdmissions.value_or(0) + normalAdmissions;
+            metrics.totalLowPriorityAdmissions =
+                metrics.totalLowPriorityAdmissions.value_or(0) + lowAdmissions;
             metrics.wasLoadShed = metrics.wasLoadShed.value_or(false) || admCtx.getLoadShed();
             metrics.wasDeprioritized =
                 metrics.wasDeprioritized.value_or(false) || admCtx.getPriorityLowered();

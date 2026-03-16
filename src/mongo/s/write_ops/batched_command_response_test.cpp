@@ -215,6 +215,7 @@ TEST(BatchedCommandResponseTest, ParseQueryStatsMetrics) {
                     << "overdueInterruptApproxMaxMillis" << 0LL << "nMatched" << nMatched
                     << "nUpserted" << 0LL << "nModified" << nMatched << "nDeleted" << 0LL
                     << "nInserted" << 0LL << "totalTimeQueuedMicros" << 0LL << "totalAdmissions"
+                    << 0LL << "totalNormalPriorityAdmissions" << 0LL << "totalLowPriorityAdmissions"
                     << 0LL << "wasLoadShed" << false << "wasDeprioritized" << false
                     << "wasMarkedNonDeprioritizable" << false);
     };

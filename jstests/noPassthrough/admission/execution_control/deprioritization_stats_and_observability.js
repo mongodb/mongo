@@ -518,10 +518,10 @@ describe("Execution control statistics and observability", function () {
         });
     });
 
-    describe("Short/long running operation statistics", function () {
+    describe("Non-deprioritizable/deprioritizable operation statistics", function () {
         const dbName = jsTestName();
         const collName = "testcoll";
-        const findComment = "short_long_running_test";
+        const findComment = "deprioritization_test";
 
         const kNumDocs = 1000;
         const kNumReadTickets = 5;
@@ -535,6 +535,8 @@ describe("Execution control statistics and observability", function () {
             "totalTimeProcessingMicros",
             "totalTimeQueuedMicros",
             "totalAdmissions",
+            "totalNormalPriorityAdmissions",
+            "totalLowPriorityAdmissions",
             "totalDelinquentAcquisitions",
             "totalAcquisitionDelinquencyMillis",
             "maxAcquisitionDelinquencyMillis",
@@ -593,6 +595,23 @@ describe("Execution control statistics and observability", function () {
                     executionStats.write.deprioritizable.totalAcquisitionDelinquencyMillis,
                 "Write totalAcquisitionDelinquencyMillis mismatch: " + tojson(executionStats),
             );
+
+            // Verify that totalAdmissions equals the sum of per-priority counters.
+            const verifyAndGetTotalAdmissions = (bucket, name) => {
+                const sumOfPriorities = bucket.totalNormalPriorityAdmissions + bucket.totalLowPriorityAdmissions;
+                assert.eq(
+                    bucket.totalAdmissions,
+                    sumOfPriorities,
+                    name + " totalAdmissions should equal sum of per-priority counters: " + tojson(bucket),
+                );
+                return sumOfPriorities;
+            };
+
+            verifyAndGetTotalAdmissions(executionStats.read.nonDeprioritizable, "read.nonDeprioritizable");
+            verifyAndGetTotalAdmissions(executionStats.read.deprioritizable, "read.deprioritizable");
+            verifyAndGetTotalAdmissions(executionStats.write.nonDeprioritizable, "write.nonDeprioritizable");
+            verifyAndGetTotalAdmissions(executionStats.write.deprioritizable, "write.deprioritizable");
+
             assert.gte(
                 executionStats.read.normalPriority.startedProcessing +
                     executionStats.read.lowPriority.startedProcessing +
@@ -787,12 +806,12 @@ describe("Execution control statistics and observability", function () {
             }
         }
 
-        it("Check that short/long running stats are correct without deprioritization", function () {
+        it("Check that nonDeprioritizable/deprioritizable stats are correct without deprioritization", function () {
             configureExecutionControlState(false /*deprioritization*/, false /*shedding*/);
             exhaustReadTicketsForLimitedTime();
             assertExecutionStatsCorrect(db.serverStatus().queues.execution);
         });
-        it("Check that short/long running stats are correct with deprioritization", function () {
+        it("Check that nonDeprioritizable/deprioritizable stats are correct with deprioritization", function () {
             configureExecutionControlState(true /*deprioritization*/, false /*shedding*/);
             exhaustReadTicketsForLimitedTime();
             assertExecutionStatsCorrect(db.serverStatus().queues.execution);

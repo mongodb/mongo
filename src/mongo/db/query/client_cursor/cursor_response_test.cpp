@@ -74,6 +74,8 @@ static const BSONObj basicMetricsObj = fromjson(R"({
     maxAcquisitionDelinquencyMillis: {"$numberLong": "0"},
     totalTimeQueuedMicros: {"$numberLong": "0"},
     totalAdmissions: {"$numberLong": "0"},
+    totalNormalPriorityAdmissions: {"$numberLong": "0"},
+    totalLowPriorityAdmissions: {"$numberLong": "0"},
     wasLoadShed: false,
     wasDeprioritized: false,
     wasMarkedNonDeprioritizable: false,

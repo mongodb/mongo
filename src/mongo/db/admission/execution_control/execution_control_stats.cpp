@@ -145,6 +145,8 @@ OperationExecutionStats& OperationExecutionStats::operator=(const OperationExecu
     totalTimeQueuedMicros.storeRelaxed(other.totalTimeQueuedMicros.loadRelaxed());
     totalTimeProcessingMicros.storeRelaxed(other.totalTimeProcessingMicros.loadRelaxed());
     totalAdmissions.storeRelaxed(other.totalAdmissions.loadRelaxed());
+    totalNormalPriorityAdmissions.storeRelaxed(other.totalNormalPriorityAdmissions.loadRelaxed());
+    totalLowPriorityAdmissions.storeRelaxed(other.totalLowPriorityAdmissions.loadRelaxed());
     delinquencyStats = other.delinquencyStats;
     return *this;
 }
@@ -153,6 +155,9 @@ OperationExecutionStats& OperationExecutionStats::operator+=(const OperationExec
     totalTimeQueuedMicros.fetchAndAddRelaxed(other.totalTimeQueuedMicros.loadRelaxed());
     totalTimeProcessingMicros.fetchAndAddRelaxed(other.totalTimeProcessingMicros.loadRelaxed());
     totalAdmissions.fetchAndAddRelaxed(other.totalAdmissions.loadRelaxed());
+    totalNormalPriorityAdmissions.fetchAndAddRelaxed(
+        other.totalNormalPriorityAdmissions.loadRelaxed());
+    totalLowPriorityAdmissions.fetchAndAddRelaxed(other.totalLowPriorityAdmissions.loadRelaxed());
     delinquencyStats += other.delinquencyStats;
     return *this;
 }
@@ -161,6 +166,8 @@ void OperationExecutionStats::appendStats(BSONObjBuilder& b) const {
     b.append("totalTimeProcessingMicros", totalTimeProcessingMicros.loadRelaxed());
     b.append("totalTimeQueuedMicros", totalTimeQueuedMicros.loadRelaxed());
     b.append("totalAdmissions", totalAdmissions.loadRelaxed());
+    b.append("totalNormalPriorityAdmissions", totalNormalPriorityAdmissions.loadRelaxed());
+    b.append("totalLowPriorityAdmissions", totalLowPriorityAdmissions.loadRelaxed());
     delinquencyStats.appendStats(b);
 }
 }  // namespace mongo::admission::execution_control

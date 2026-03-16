@@ -202,6 +202,16 @@ structs:
                 type: long
                 stability: unstable
                 default: 0
+            totalNormalPriorityAdmissions:
+                description: "Total number of normal priority admissions during the operation."
+                type: long
+                stability: unstable
+                default: 0
+            totalLowPriorityAdmissions:
+                description: "Total number of low priority admissions during the operation."
+                type: long
+                stability: unstable
+                default: 0
             wasLoadShed:
                 description: "If true, the operation was load shed."
                 type: bool

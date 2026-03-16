@@ -71,6 +71,8 @@ struct MONGO_MOD_PUB DataBearingNodeMetrics {
 
     Microseconds totalTimeQueuedMicros{0};
     uint64_t totalAdmissions = 0;
+    uint64_t totalNormalPriorityAdmissions = 0;
+    uint64_t totalLowPriorityAdmissions = 0;
     bool wasLoadShed = false;
     bool wasDeprioritized = false;
     bool wasMarkedNonDeprioritizable = false;
@@ -108,6 +110,8 @@ struct MONGO_MOD_PUB DataBearingNodeMetrics {
         nInserted += other.nInserted;
         totalTimeQueuedMicros += other.totalTimeQueuedMicros;
         totalAdmissions += other.totalAdmissions;
+        totalNormalPriorityAdmissions += other.totalNormalPriorityAdmissions;
+        totalLowPriorityAdmissions += other.totalLowPriorityAdmissions;
         wasLoadShed = wasLoadShed || other.wasLoadShed;
         wasDeprioritized = wasDeprioritized || other.wasDeprioritized;
         wasMarkedNonDeprioritizable =
@@ -169,6 +173,8 @@ struct MONGO_MOD_PUB DataBearingNodeMetrics {
         nInserted += metrics.getNInserted();
         totalTimeQueuedMicros += Microseconds(metrics.getTotalTimeQueuedMicros());
         totalAdmissions += metrics.getTotalAdmissions();
+        totalNormalPriorityAdmissions += metrics.getTotalNormalPriorityAdmissions();
+        totalLowPriorityAdmissions += metrics.getTotalLowPriorityAdmissions();
         wasLoadShed = wasLoadShed || metrics.getWasLoadShed();
         wasDeprioritized = wasDeprioritized || metrics.getWasDeprioritized();
         wasMarkedNonDeprioritizable =

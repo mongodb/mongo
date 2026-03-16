@@ -63,7 +63,7 @@ class MONGO_MOD_PUBLIC TicketHolder {
 
 public:
     using DelinquentCallback = std::function<void(AdmissionContext*, Milliseconds)>;
-    using AcquisitionCallback = std::function<void(AdmissionContext*)>;
+    using AcquisitionCallback = std::function<void(AdmissionContext*, AdmissionContext::Priority)>;
     using WaitedAcquisitionCallback = std::function<void(AdmissionContext*, Microseconds)>;
     using ReleaseCallback = std::function<void(AdmissionContext*, Microseconds)>;
 

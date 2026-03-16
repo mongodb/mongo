@@ -1557,6 +1557,10 @@ void OpDebug::AdditiveMetrics::add(const AdditiveMetrics& otherMetrics) {
     }
     totalTimeQueuedMicros = addOptionals(totalTimeQueuedMicros, otherMetrics.totalTimeQueuedMicros);
     totalAdmissions = addOptionals(totalAdmissions, otherMetrics.totalAdmissions);
+    totalNormalPriorityAdmissions =
+        addOptionals(totalNormalPriorityAdmissions, otherMetrics.totalNormalPriorityAdmissions);
+    totalLowPriorityAdmissions =
+        addOptionals(totalLowPriorityAdmissions, otherMetrics.totalLowPriorityAdmissions);
     wasLoadShed = addOptionals(wasLoadShed, otherMetrics.wasLoadShed);
     wasDeprioritized = addOptionals(wasDeprioritized, otherMetrics.wasDeprioritized);
     wasMarkedNonDeprioritizable =
@@ -1619,6 +1623,10 @@ void OpDebug::AdditiveMetrics::aggregateDataBearingNodeMetrics(
     totalTimeQueuedMicros =
         totalTimeQueuedMicros.value_or(Microseconds(0)) + metrics.totalTimeQueuedMicros;
     totalAdmissions = totalAdmissions.value_or(0) + metrics.totalAdmissions;
+    totalNormalPriorityAdmissions =
+        totalNormalPriorityAdmissions.value_or(0) + metrics.totalNormalPriorityAdmissions;
+    totalLowPriorityAdmissions =
+        totalLowPriorityAdmissions.value_or(0) + metrics.totalLowPriorityAdmissions;
     wasLoadShed = wasLoadShed.value_or(false) || metrics.wasLoadShed;
     wasDeprioritized = wasDeprioritized.value_or(false) || metrics.wasDeprioritized;
     wasMarkedNonDeprioritizable =
@@ -1693,6 +1701,8 @@ void OpDebug::AdditiveMetrics::aggregateCursorMetrics(const CursorMetrics& metri
         static_cast<uint64_t>(metrics.getNInserted()),
         Microseconds(metrics.getTotalTimeQueuedMicros()),
         static_cast<uint64_t>(metrics.getTotalAdmissions()),
+        static_cast<uint64_t>(metrics.getTotalNormalPriorityAdmissions()),
+        static_cast<uint64_t>(metrics.getTotalLowPriorityAdmissions()),
         metrics.getWasLoadShed(),
         metrics.getWasDeprioritized(),
         metrics.getWasMarkedNonDeprioritizable(),
