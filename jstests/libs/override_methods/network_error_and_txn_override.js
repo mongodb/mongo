@@ -90,7 +90,6 @@ const kNonRetryableCommands = new Set([
     "_configsvrUpdateZoneKeyRange",
     "_mergeAuthzCollections",
     "_recvChunkStart",
-    "appendOplogNote",
     "applyOps",
     "clone",
     "cloneCollectionAsCapped",

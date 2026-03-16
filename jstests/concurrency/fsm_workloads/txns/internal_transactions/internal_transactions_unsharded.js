@@ -194,13 +194,10 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
     $config.data.isAcceptableAggregateCmdError = function isAcceptableAggregateCmdError(res) {
         // The aggregate command is expected to involve running getMore commands which are not
         // retryable after network errors.
-        // The linearizable read has a 15s timeout, then a LinearizableReadConcernError will be
-        // thrown, so we retry on this error in test
         return (
             res &&
-            (res.code == ErrorCodes.LinearizableReadConcernError ||
-                ((TestData.runningWithShardStepdowns || TestData.killShards) &&
-                    interruptedQueryErrors.includes(res.code)))
+            (TestData.runningWithShardStepdowns || TestData.killShards) &&
+            interruptedQueryErrors.includes(res.code)
         );
     };
 
@@ -210,12 +207,23 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
             cursor: {},
             pipeline: [{$match: {tid: this.tid}}, {$sample: {size: 1}}],
         };
-        // Use linearizable read concern to guarantee any subsequent transaction snapshot will
-        // include the found document. Skip if the test has a default read concern or requires
-        // casual consistency because in both cases the default read concern should provide this
-        // guarantee already.
-        if (!TestData.defaultReadConcernLevel && !db.getSession().getOptions().isCausalConsistency()) {
-            aggregateCmdObj.readConcern = {level: "linearizable"};
+
+        // We need to ensure that any subsequent transaction snapshot will include the found
+        // document. This should already be guaranteed if a default read concern level is set or
+        // causal consistency is enabled. Otherwise, advance the majority commit point before
+        // sampling. Since each thread only writes to its own documents (filtered by tid), this
+        // ensures any document we sample is majority-committed and visible to subsequent
+        // transactions using any user facing read concern.
+        const hasDefaultReadConcern = !!TestData.defaultReadConcernLevel;
+        const usesCausalConsistency = db.getSession().getOptions().isCausalConsistency();
+        if (!hasDefaultReadConcern && !usesCausalConsistency) {
+            assert.commandWorked(
+                db.adminCommand({
+                    appendOplogNote: 1,
+                    data: {msg: "advance commit point before sample"},
+                    writeConcern: {w: "majority"},
+                }),
+            );
         }
 
         let numTries = 0;
