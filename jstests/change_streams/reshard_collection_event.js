@@ -102,10 +102,7 @@ function validateExpectedEventAndConfirmResumability(setupFn, userCmdFn, collPar
     setupFn();
     let collectionUUID = getCollectionUuid(kCollName);
 
-    let pipeline = [
-        {$changeStream: {showExpandedEvents: true}},
-        {$match: {operationType: {$nin: ["create", "createIndexes"]}}},
-    ];
+    let pipeline = [{$changeStream: {showExpandedEvents: true}}];
 
     let cursor = test.startWatchingChanges({
         pipeline: pipeline,

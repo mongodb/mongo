@@ -167,8 +167,12 @@ struct DefaultClonerImpl::BatchHandler {
                 const bool createDefaultIndexes = true;
                 CollectionOptions collectionOptions = uassertStatusOK(CollectionOptions::parse(
                     from_options, CollectionOptions::ParseKind::parseForCommand));
-                invariant(db->userCreateNS(
-                              opCtx, nss, collectionOptions, createDefaultIndexes, from_id_index),
+                invariant(db->userCreateNS(opCtx,
+                                           nss,
+                                           collectionOptions,
+                                           createDefaultIndexes,
+                                           from_id_index,
+                                           true /* fromMigrate */),
                           str::stream() << "collection creation failed during clone ["
                                         << nss.toStringForErrorMsg() << "]");
                 wunit.commit();
@@ -372,7 +376,7 @@ void DefaultClonerImpl::_copyIndexes(OperationContext* opCtx,
             return;
         }
 
-        auto fromMigrate = false;
+        auto fromMigrate = true;
         IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
             opCtx, collection, indexesToBuild, fromMigrate);
         wunit.commit();
@@ -490,8 +494,12 @@ Status DefaultClonerImpl::_createCollectionsForDb(
                         unsafeCreateCollection(opCtx,
                                                nss,
                                                /* forceCSRAsUnknownAfterCollectionCreation */ true);
-                    Status createStatus = db->userCreateNS(
-                        opCtx, nss, collectionOptions, createDefaultIndexes, params.idIndexSpec);
+                    Status createStatus = db->userCreateNS(opCtx,
+                                                           nss,
+                                                           collectionOptions,
+                                                           createDefaultIndexes,
+                                                           params.idIndexSpec,
+                                                           true /* fromMigrate */);
                     if (!createStatus.isOK()) {
                         return createStatus;
                     }
