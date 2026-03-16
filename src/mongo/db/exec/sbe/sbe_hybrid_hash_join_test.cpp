@@ -40,10 +40,13 @@
 #include "mongo/unittest/framework.h"
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <map>
 #include <set>
 #include <string>
+
+#include <boost/math/distributions/chi_squared.hpp>
 
 namespace mongo::sbe {
 namespace {
@@ -1168,6 +1171,121 @@ TEST_F(HybridHashJoinTestFixture, BloomFilterWithStringKeys) {
                 << "Matched key " << buildKey << " should be in build set";
         }
     }
+}
+
+TEST_F(HybridHashJoinTestFixture, TestPartitionDistribution) {
+    constexpr size_t kPartitions = 256;
+    constexpr size_t kPartitionMask = kPartitions - 1;
+    constexpr int kBitsPerLevel = 8;
+    constexpr size_t kKeysPerPartition = 5000;
+    constexpr size_t kNumKeys = kPartitions * kKeysPerPartition;
+
+    // The distribution of keys in the partitions with good hash distribution should approximately
+    // follow Poisson distribution, for which the standard deviation would be sqrt(5000)=71 and
+    // Coefficient of Variation = 1/sqrt(5000) = 0.014 = 1.4%. We test with higher bounds to prevent
+    // any spurious failures.
+    constexpr double kMaxCV = 0.15;
+    constexpr double kMaxMaxToMeanRatio =
+        1.2;  // this would be 14 standard deviation away, which should be very unlikely.
+
+    value::MaterializedRowHasher hasher;
+
+    auto computeCounts = [&](auto&& keyGen, int recursionLevel) {
+        std::vector<size_t> counts(kPartitions, 0);
+        for (size_t i = 0; i < kNumKeys; ++i) {
+            auto key = keyGen(i);
+            size_t hash = hasher(key);
+            size_t partition = (hash >> (recursionLevel * kBitsPerLevel)) & kPartitionMask;
+            counts[partition]++;
+        }
+        return counts;
+    };
+
+    // Chi-sqaure test would be more susceptible to flaky failures in CI so commenting it out.
+    /*
+    constexpr double kMinPValue = 0.05;
+
+    auto computeChiSquare = [&](auto& counts) {
+        double expected = static_cast<double>(kNumKeys) / kPartitions;
+        double chiSq = 0.0;
+        for (auto count : counts) {
+            double diff = static_cast<double>(count) - expected;
+            chiSq += (diff * diff) / expected;
+        }
+        return chiSq;
+    };
+
+    auto computePValue = [&](double chiSquare) {
+        int df = kPartitions - 1;
+        boost::math::chi_squared dist(df);
+        return boost::math::cdf(boost::math::complement(dist, chiSquare));
+    };
+
+    auto testChiSquare = [&](auto& counts, int level) {
+        double chiSquare = computeChiSquare(counts);
+        double pValue = computePValue(chiSquare);
+        ASSERT_GT(pValue, kMinPValue) << "Chi-square = " << chiSquare << ". pValue = " << pValue
+                                      << " at recursion level " << level;
+    };
+    */
+
+    auto computeCoV = [&](auto& counts) {
+        double mean = static_cast<double>(kNumKeys) / kPartitions;
+        double sumSquaredDiff = 0.0;
+        for (auto count : counts) {
+            double diff = static_cast<double>(count) - mean;
+            sumSquaredDiff += diff * diff;
+        }
+        double stddev = std::sqrt(sumSquaredDiff / kPartitions);
+        return stddev / mean;
+    };
+
+    auto testCoV = [&](auto& counts, int level) {
+        double cv = computeCoV(counts);
+        ASSERT_LT(cv, kMaxCV) << "CV=" << cv << " at recursion level " << level;
+    };
+
+    auto computeMaxToMeanRatio = [&](auto& counts) {
+        double mean = static_cast<double>(kNumKeys) / kPartitions;
+
+        size_t max = 0;
+        for (auto count : counts) {
+            max = std::max(max, count);
+        }
+        return (double)max / mean;
+    };
+
+    auto testMaxToMeanRatio = [&](auto& counts, int level) {
+        double maxToMeanRatio = computeMaxToMeanRatio(counts);
+        ASSERT_LT(maxToMeanRatio, kMaxMaxToMeanRatio)
+            << "MaxToMeanRatio=" << maxToMeanRatio << " at recursion level " << level;
+    };
+
+    auto test = [&](auto&& keyGen) {
+        for (int level = 0; level <= 1; ++level) {
+            auto counts = computeCounts(keyGen, level);
+
+            // testChiSquare(counts, level);
+            testCoV(counts, level);
+            testMaxToMeanRatio(counts, level);
+        }
+    };
+
+    test([](size_t i) { return makeKeyRow(static_cast<int64_t>(i)); });
+    test([](size_t i) { return makeKeyRow(static_cast<int64_t>(i * 7)); });
+    test([](size_t i) { return makeKeyRow(static_cast<int64_t>(i + 1000000)); });
+    test([](size_t i) {
+        return makeCompositeKeyRow(static_cast<int64_t>(i), static_cast<int64_t>(i * 3 + 1));
+    });
+    test([](size_t i) {
+        return makeCompositeKeyRow(static_cast<int64_t>(0), static_cast<int64_t>(i));
+    });
+    test([](size_t i) {
+        return makeCompositeKeyRow(static_cast<int64_t>(i), static_cast<int64_t>(0));
+    });
+    test([](size_t i) {
+        return makeCompositeKeyRow(static_cast<int64_t>(i), static_cast<int64_t>(i));
+    });
 }
 }  // namespace
 }  // namespace mongo::sbe

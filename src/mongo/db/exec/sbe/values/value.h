@@ -428,7 +428,8 @@ inline std::size_t hashInit() noexcept {
 }
 
 inline std::size_t hashCombine(std::size_t state, std::size_t val) noexcept {
-    return state * 31 + val;
+    state ^= val + 0x9e3779b9 + (state << 6) + (state >> 2);
+    return state;
 }
 
 /**
