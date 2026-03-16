@@ -26,6 +26,7 @@ buildvariants:
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=suse15
         --build_otel=False
+        --disable_streams=True
       compile_all_but_not_unittests_flags: >-
         --linkopt=-s
       test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_ldap_pool,resource_intensive,requires_otel_build
