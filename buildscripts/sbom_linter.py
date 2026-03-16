@@ -190,7 +190,13 @@ def validate_properties(component: dict, error_manager: ErrorManager) -> None:
         comp_pedigree_version = ""
 
     # At this point a version is attempted to be read from the import script file
-    script_version = get_script_version(script_path, "VERSION", error_manager)
+    script_version_key = "VERSION"
+    if "properties" in component:
+        for prop in component["properties"]:
+            if prop["name"] == "internal:generate_sbom:import_script_variable_name":
+                script_version_key = prop["value"]
+
+    script_version = get_script_version(script_path, script_version_key, error_manager)
     if script_version == "":
         error_manager.append_full_error_message(MISSING_VERSION_IN_IMPORT_FILE_ERROR + script_path)
     elif strip_extra_prefixes(script_version) != strip_extra_prefixes(

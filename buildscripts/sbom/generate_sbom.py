@@ -254,7 +254,7 @@ def get_component_priority_version_source(component: dict) -> str:
     priority_version_source = [
         p.get("value")
         for p in component.get("properties", [])
-        if p.get("name") == "generate_sbom:priority_version_source"
+        if p.get("name") == "internal:generate_sbom:priority_version_source"
     ]
     if len(priority_version_source):
         # There should only be 1 result, if any
@@ -263,34 +263,34 @@ def get_component_priority_version_source(component: dict) -> str:
         return None
 
 
-def del_component_priority_version_source(component: dict) -> None:
-    """Delete all priority version source properties."""
+def get_import_script_variable_name(component: dict) -> str:
+    """Get the variable name used in the import script, if defined in metadata file."""
+    import_script_variable_name = [
+        p.get("value")
+        for p in component.get("properties", [])
+        if p.get("name") == "internal:generate_sbom:import_script_variable_name"
+    ]
+    if len(import_script_variable_name):
+        # There should only be 1 result, if any
+        return import_script_variable_name[0]
+    else:
+        return None
 
-    # Reverse iterate properties list to safely modify in situ
-    if "properties" in component:
-        for i in range(len(component["properties"]) - 1, -1, -1):
-            if component["properties"][i].get("name") == "generate_sbom:priority_version_source":
-                logger.debug(
-                    "PRIORITY VERSION SOURCE: %s: Removing priority version source from SBOM metadata.",
-                    component["bom-ref"],
-                )
-                del component["properties"][i]
 
-
-def get_version_from_import_script(file_path: str) -> str:
+def get_version_from_import_script(file_path: str, variable_name: str) -> str:
     """A rudimentary parse of a shell or python script file to extract the static value defined for the VERSION variable"""
     try:
         with open(file_path, "r", encoding="utf-8") as file:
             for line in file:
-                if line.strip().startswith("VERSION="):
+                if line.strip().startswith(f"{variable_name}="):
                     return re.sub(
-                        r"^VERSION=(?P<quote>[\"']?)(?P<content>\S+)(?P=quote).*$",
+                        rf"^{variable_name}=(?P<quote>[\"']?)(?P<content>\S+)(?P=quote).*$",
                         r"\g<content>",
                         line.strip(),
                     )
-                elif line.strip().startswith("VERSION = "):
+                elif line.strip().startswith(f"{variable_name} = "):
                     return re.sub(
-                        r"^VERSION\s=\s(?P<quote>[\"']?)(?P<content>\S+)(?P=quote).*$",
+                        rf"^{variable_name}\s=\s(?P<quote>[\"']?)(?P<content>\S+)(?P=quote).*$",
                         r"\g<content>",
                         line.strip(),
                     )
@@ -717,7 +717,6 @@ def main() -> None:
                 component_key,
                 priority_version_source,
             )
-            del_component_priority_version_source(component)
 
         ################ Endor Labs ################
         if component_key in endor_components:
@@ -738,7 +737,9 @@ def main() -> None:
         if import_script_path:
             import_script = Path(import_script_path)
             if import_script.exists():
-                versions["import_script"] = get_version_from_import_script(import_script_path)
+                versions["import_script"] = get_version_from_import_script(
+                    import_script_path, get_import_script_variable_name(component) or "VERSION"
+                )
                 if versions["import_script"]:
                     versions["import_script"] = versions["import_script"].replace("release-", "")
                 if versions["import_script"]:

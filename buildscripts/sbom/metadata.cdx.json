@@ -158,7 +158,7 @@
           "value": "src/third_party/private/libxml2/scripts/import.sh"
         },
         {
-          "name": "generate_sbom:priority_version_source",
+          "name": "internal:generate_sbom:priority_version_source",
           "value": "import_script"
         }
       ]
@@ -423,6 +423,62 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:github/apache/arrow-nanoarrow@{{VERSION}}",
+      "supplier": {
+        "name": "The Apache Software Foundation",
+        "url": [
+          "https://apache.org/"
+        ]
+      },
+      "group": "apache",
+      "name": "Apache Arrow Nanoarrow",
+      "version": "{{VERSION}}",
+      "description": "Helpers for Arrow C Data & Arrow C Stream interfaces",
+      "scope": "excluded",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "copyright": "Copyright 2016-present The Apache Software Foundation",
+      "cpe": "cpe:2.3:a:apache:arrow-nanoarrow:{{VERSION}}:*:*:*:*:*:*:*",
+      "purl": "pkg:github/apache/arrow-nanoarrow@{{VERSION}}",
+      "externalReferences": [
+        {
+          "url": "https://github.com/apache/arrow-nanoarrow.git",
+          "type": "distribution"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/private/iceberg-cpp/dist/nanoarrow"
+          }
+        ]
+      },
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/private/iceberg-cpp/scripts/fetch_sources.sh"
+        },
+        {
+          "name": "internal:generate_sbom:priority_version_source",
+          "value": "import_script"
+        },
+        {
+          "name": "internal:generate_sbom:import_script_variable_name",
+          "value": "NANOARROW_VERSION"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:github/apache/arrow@{{VERSION}}",
       "supplier": {
         "name": "The Apache Software Foundation",
@@ -518,7 +574,7 @@
           "value": "src/third_party/private/arrow/scripts/getsources.py"
         },
         {
-          "name": "generate_sbom:priority_version_source",
+          "name": "internal:generate_sbom:priority_version_source",
           "value": "import_script"
         }
       ]
@@ -575,8 +631,64 @@
           "value": "src/third_party/private/avro-cpp/scripts/import.sh"
         },
         {
-          "name": "generate_sbom:priority_version_source",
+          "name": "internal:generate_sbom:priority_version_source",
           "value": "import_script"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:github/apache/iceberg-cpp@{{VERSION}}",
+      "supplier": {
+        "name": "The Apache Software Foundation",
+        "url": [
+          "https://apache.org/"
+        ]
+      },
+      "group": "apache",
+      "name": "Apache Iceberg\u2122 C++",
+      "version": "{{VERSION}}",
+      "description": "C++ implementation of Apache Iceberg\u2122, the open table format for analytic datasets.",
+      "scope": "excluded",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "copyright": "Copyright 2024-2026 The Apache Software Foundation",
+      "cpe": "cpe:2.3:a:apache:iceberg-cpp:{{VERSION}}:*:*:*:*:*:*:*",
+      "purl": "pkg:github/apache/iceberg-cpp@{{VERSION}}",
+      "externalReferences": [
+        {
+          "url": "https://github.com/apache/iceberg-cpp.git",
+          "type": "distribution"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/private/iceberg-cpp"
+          }
+        ]
+      },
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/private/iceberg-cpp/scripts/fetch_sources.sh"
+        },
+        {
+          "name": "internal:generate_sbom:priority_version_source",
+          "value": "import_script"
+        },
+        {
+          "name": "internal:generate_sbom:import_script_variable_name",
+          "value": "ICEBERG_CPP_VERSION"
         }
       ]
     },
@@ -766,7 +878,7 @@
           "value": "src/third_party/private/azure-sdk/scripts/import.sh"
         },
         {
-          "name": "generate_sbom:priority_version_source",
+          "name": "internal:generate_sbom:priority_version_source",
           "value": "import_script"
         }
       ]
@@ -963,8 +1075,8 @@
       "supplier": {
         "name": "The Cyrus Project",
         "url": [
-          "https://www.cyrusimap.org/sasl/",
-          "https://www.cyrusimap.org/overview/who_is_cyrus.html"
+          "https://www.cyrusimap.org/overview/who_is_cyrus.html",
+          "https://www.cyrusimap.org/sasl/"
         ]
       },
       "author": "The Cyrus Team",
@@ -1742,7 +1854,7 @@
           "value": "src/third_party/gperftools/scripts/import.sh"
         },
         {
-          "name": "generate_sbom:priority_version_source",
+          "name": "internal:generate_sbom:priority_version_source",
           "value": "import_script"
         }
       ]
@@ -1883,6 +1995,54 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:github/json-c/json-c@{{VERSION}}",
+      "supplier": {
+        "name": "json-c project",
+        "url": [
+          "https://github.com/json-c/json-c"
+        ]
+      },
+      "author": "Eric Haszlakiewicz",
+      "group": "json-c",
+      "name": "json-c",
+      "version": "{{VERSION}}",
+      "description": "A JSON implementation in C.",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2009-2012 Eric Haszlakiewicz; Copyright (c) 2004, 2005 Metaparadigm Pte Ltd",
+      "purl": "pkg:github/json-c/json-c@{{VERSION}}",
+      "externalReferences": [
+        {
+          "url": "https://github.com/json-c/json-c",
+          "type": "distribution"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/json-c"
+          }
+        ]
+      },
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/json-c/scripts/import.sh"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:github/json-schema-org/json-schema-test-suite@728066f9c5c258ba3b1804a22a5b998f2ec77ec0",
       "supplier": {
         "name": "JSON Schema",
@@ -2004,6 +2164,54 @@
         {
           "name": "emits_persisted_data",
           "value": "false"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:github/libarchive/bzip2@bzip2-{{VERSION}}",
+      "supplier": {
+        "name": "bzip2 project",
+        "url": [
+          "https://sourceware.org/bzip2/"
+        ]
+      },
+      "author": "Julian Seward",
+      "group": "libarchive",
+      "name": "bzip2",
+      "version": "{{VERSION}}",
+      "description": "A high-quality data compression program and library.",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "bzip2-1.0.6"
+          }
+        }
+      ],
+      "copyright": "Copyright (C) 1996-2010 Julian Seward <jseward@acm.org>; Copyright (C) 2019-2020 Federico Mena Quintero <federico@gnome.org>; Copyright (C) 2021 Micah Snyder.",
+      "purl": "pkg:github/libarchive/bzip2@bzip2-{{VERSION}}",
+      "externalReferences": [
+        {
+          "url": "https://github.com/libarchive/bzip2",
+          "type": "distribution"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/bzip2"
+          }
+        ]
+      },
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/bzip2/scripts/import.sh"
         }
       ]
     },
@@ -2473,7 +2681,7 @@
           "value": "src/third_party/opentelemetry-proto/scripts/import.sh"
         },
         {
-          "name": "generate_sbom:priority_version_source",
+          "name": "internal:generate_sbom:priority_version_source",
           "value": "import_script"
         }
       ]
@@ -2573,8 +2781,66 @@
           "value": "src/third_party/protobuf/scripts/import.sh"
         },
         {
-          "name": "generate_sbom:priority_version_source",
+          "name": "internal:generate_sbom:priority_version_source",
           "value": "import_script"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:github/rnpgp/rnp@{{VERSION}}",
+      "supplier": {
+        "name": "Ribose Group Inc.",
+        "url": [
+          "https://www.rnpgp.org/"
+        ]
+      },
+      "author": "Ribose Group Inc.",
+      "group": "rnpgp",
+      "name": "rnp",
+      "version": "{{VERSION}}",
+      "description": "A high performance C++ OpenPGP library, fully compliant to RFC 4880.",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-2-Clause"
+          }
+        },
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        },
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2017-2024, Ribose Inc. All rights reserved.",
+      "purl": "pkg:github/rnpgp/rnp@{{VERSION}}",
+      "externalReferences": [
+        {
+          "url": "https://github.com/rnpgp/rnp",
+          "type": "distribution"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/rnp"
+          }
+        ]
+      },
+      "properties": [
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/rnp/scripts/import.sh"
         }
       ]
     },
@@ -3065,160 +3331,6 @@
           "value": "false"
         }
       ]
-    },
-    {
-      "type": "library",
-      "bom-ref": "pkg:github/libarchive/bzip2@bzip2-{{VERSION}}",
-      "supplier": {
-        "name": "bzip2 project",
-        "url": [
-          "https://sourceware.org/bzip2/"
-        ]
-      },
-      "author": "Julian Seward",
-      "group": "libarchive",
-      "name": "bzip2",
-      "version": "{{VERSION}}",
-      "description": "A high-quality data compression program and library.",
-      "licenses": [
-        {
-          "license": {
-            "id": "bzip2-1.0.6"
-          }
-        }
-      ],
-      "copyright": "Copyright (C) 1996-2010 Julian Seward <jseward@acm.org>; Copyright (C) 2019-2020 Federico Mena Quintero <federico@gnome.org>; Copyright (C) 2021 Micah Snyder.",
-      "purl": "pkg:github/libarchive/bzip2@bzip2-{{VERSION}}",
-      "externalReferences": [
-        {
-          "url": "https://github.com/libarchive/bzip2",
-          "type": "distribution"
-        }
-      ],
-      "properties": [
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        },
-        {
-          "name": "import_script_path",
-          "value": "src/third_party/bzip2/scripts/import.sh"
-        }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/bzip2"
-          }
-        ]
-      },
-      "scope": "required"
-    },
-    {
-      "type": "library",
-      "bom-ref": "pkg:github/json-c/json-c@{{VERSION}}",
-      "supplier": {
-        "name": "json-c project",
-        "url": [
-          "https://github.com/json-c/json-c"
-        ]
-      },
-      "author": "Eric Haszlakiewicz",
-      "group": "json-c",
-      "name": "json-c",
-      "version": "{{VERSION}}",
-      "description": "A JSON implementation in C.",
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "copyright": "Copyright (c) 2009-2012 Eric Haszlakiewicz; Copyright (c) 2004, 2005 Metaparadigm Pte Ltd",
-      "purl": "pkg:github/json-c/json-c@{{VERSION}}",
-      "externalReferences": [
-        {
-          "url": "https://github.com/json-c/json-c",
-          "type": "distribution"
-        }
-      ],
-      "properties": [
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        },
-        {
-          "name": "import_script_path",
-          "value": "src/third_party/json-c/scripts/import.sh"
-        }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/json-c"
-          }
-        ]
-      },
-      "scope": "required"
-    },
-    {
-      "type": "library",
-      "bom-ref": "pkg:github/rnpgp/rnp@{{VERSION}}",
-      "supplier": {
-        "name": "Ribose Group Inc.",
-        "url": [
-          "https://www.rnpgp.org/"
-        ]
-      },
-      "author": "Ribose Group Inc.",
-      "group": "rnpgp",
-      "name": "rnp",
-      "version": "{{VERSION}}",
-      "description": "A high performance C++ OpenPGP library, fully compliant to RFC 4880.",
-      "licenses": [
-        {
-          "license": {
-            "id": "BSD-2-Clause"
-          }
-        },
-        {
-          "license": {
-            "id": "Apache-2.0"
-          }
-        },
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "copyright": "Copyright (c) 2017-2024, Ribose Inc. All rights reserved.",
-      "purl": "pkg:github/rnpgp/rnp@{{VERSION}}",
-      "externalReferences": [
-        {
-          "url": "https://github.com/rnpgp/rnp",
-          "type": "distribution"
-        }
-      ],
-      "properties": [
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        },
-        {
-          "name": "import_script_path",
-          "value": "src/third_party/rnp/scripts/import.sh"
-        }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/rnp"
-          }
-        ]
-      },
-      "scope": "required"
     }
   ],
   "dependencies": [
@@ -3255,6 +3367,10 @@
       "dependsOn": []
     },
     {
+      "ref": "pkg:github/apache/arrow-nanoarrow@{{VERSION}}",
+      "dependsOn": []
+    },
+    {
       "ref": "pkg:github/apache/arrow@{{VERSION}}",
       "dependsOn": [
         "pkg:github/apache/thrift@{{VERSION}}",
@@ -3266,6 +3382,12 @@
     {
       "ref": "pkg:github/apache/avro@{{VERSION}}",
       "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/apache/iceberg-cpp@{{VERSION}}",
+      "dependsOn": [
+        "pkg:github/apache/arrow-nanoarrow@{{VERSION}}"
+      ]
     },
     {
       "ref": "pkg:github/arximboldi/immer@{{VERSION}}",
@@ -3406,8 +3528,8 @@
     {
       "ref": "pkg:github/mongodb/mongo-c-driver@{{VERSION}}",
       "dependsOn": [
-        "pkg:github/madler/zlib@{{VERSION}}",
         "pkg:github/juliastrings/utf8proc@{{VERSION}}",
+        "pkg:github/madler/zlib@{{VERSION}}",
         "pkg:github/troydhanson/uthash@{{VERSION}}"
       ]
     },
@@ -3430,6 +3552,7 @@
         "pkg:github/antirez/linenoise@6cdc775807e57b2c3fd64bd207814f8ee1fe35f3",
         "pkg:github/apache/arrow@{{VERSION}}",
         "pkg:github/apache/avro@{{VERSION}}",
+        "pkg:github/apache/iceberg-cpp@{{VERSION}}",
         "pkg:github/arximboldi/immer@{{VERSION}}",
         "pkg:github/aws/aws-sdk-cpp@{{VERSION}}",
         "pkg:github/azure/azure-sdk-for-cpp@azure-storage-blobs_{{VERSION}}",

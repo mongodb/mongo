@@ -47,10 +47,10 @@ third_party_folders_remove = [
 ]
 
 # ################ Component Renaming ################
-# Endor does not have syntactically valid PURLs for C/C++ packages.
+# Endor does not always have syntactically valid PURLs for C/C++ packages.
 # e.g.,
-# Invalid: pkg:c/github.com/abseil/abseil-cpp@20250512.1
-# Valid: pkg:github/abseil/abseil-cpp@20250512.1
+#  Invalid: pkg:c/github.com/abseil/abseil-cpp@20250512.1
+#  Valid: pkg:github/abseil/abseil-cpp@20250512.1
 # Run string replacements to correct for this:
 endor_components_rename = [
     ["pkg:generic/sourceware.org/git/valgrind", "pkg:generic/valgrind/valgrind"],

@@ -3,9 +3,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "serialNumber": "urn:uuid:71d980f0-95c5-4dfa-8987-307eb8880ce2",
-  "version": 3,
+  "version": 4,
   "metadata": {
-    "timestamp": "2026-03-11T08:06:46Z",
+    "timestamp": "2026-03-16T06:12:10Z",
     "lifecycles": [
       {
         "phase": "pre-build"
@@ -1615,7 +1615,7 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/madler/zlib@1.3.1",
+      "bom-ref": "pkg:github/madler/zlib@1.3",
       "supplier": {
         "name": "zlib",
         "url": [
@@ -1625,7 +1625,7 @@
       "author": "Jean-loup Gailly, Mark Adler",
       "group": "madler",
       "name": "zlib",
-      "version": "1.3.1",
+      "version": "1.3",
       "description": "zlib is a general purpose data compression library.",
       "scope": "required",
       "licenses": [
@@ -1636,8 +1636,8 @@
         }
       ],
       "copyright": "Copyright \u00a9 1995-2024 Jean-loup Gailly and Mark Adler.",
-      "cpe": "cpe:2.3:a:zlib:zlib:1.3.1:*:*:*:*:*:*:*",
-      "purl": "pkg:github/madler/zlib@1.3.1",
+      "cpe": "cpe:2.3:a:zlib:zlib:1.3:*:*:*:*:*:*:*",
+      "purl": "pkg:github/madler/zlib@1.3",
       "externalReferences": [
         {
           "url": "https://zlib.net/fossils/",
@@ -2393,6 +2393,38 @@
           "value": "false"
         }
       ]
+    },
+    {
+      "bom-ref": "pkg:github/apache/arrow-nanoarrow@apache-arrow-nanoarrow-0.7.0?package-id=614f3463351947a8",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "name": "github.com/apache/arrow-nanoarrow",
+      "purl": "pkg:github/apache/arrow-nanoarrow@apache-arrow-nanoarrow-0.7.0",
+      "type": "library",
+      "version": "apache-arrow-nanoarrow-0.7.0",
+      "scope": "excluded",
+      "properties": []
+    },
+    {
+      "bom-ref": "pkg:github/apache/iceberg-cpp@v0.2.0-rc1?package-id=ce0b9d2c8402061a",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "name": "github.com/apache/iceberg-cpp",
+      "purl": "pkg:github/apache/iceberg-cpp@v0.2.0-rc1",
+      "type": "library",
+      "version": "v0.2.0-rc1",
+      "scope": "excluded",
+      "properties": []
     }
   ],
   "dependencies": [
@@ -2529,7 +2561,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/madler/zlib@1.3.1",
+      "ref": "pkg:github/madler/zlib@1.3",
       "dependsOn": []
     },
     {
@@ -2539,7 +2571,7 @@
     {
       "ref": "pkg:github/mongodb/mongo-c-driver@1.28.1",
       "dependsOn": [
-        "pkg:github/madler/zlib@1.3.1"
+        "pkg:github/madler/zlib@1.3"
       ]
     },
     {
@@ -2577,7 +2609,7 @@
         "pkg:github/json-schema-org/json-schema-test-suite@728066f9c5c258ba3b1804a22a5b998f2ec77ec0",
         "pkg:github/libtom/libtomcrypt@v1.18.2",
         "pkg:github/libunwind/libunwind@v1.8.1",
-        "pkg:github/madler/zlib@1.3.1",
+        "pkg:github/madler/zlib@1.3",
         "pkg:github/mongodb/libmongocrypt@1.15.0",
         "pkg:github/nlohmann/json@v3.11.3",
         "pkg:github/nodejs/node@22.1.0?download_url=https%3A%2F%2Fgithub.com%2Fnodejs%2Fnode%2Fblob%2F8b45c5d26a829bcd3280401dbc1874bcd1302289%2Fsrc%2Fnode_i18n.cc%23L825%23src%2Fnode_i18n.cc%3AGetStringWidth#src/node_i18n.cc",
@@ -2649,6 +2681,14 @@
     },
     {
       "ref": "pkg:pypi/ocspresponder@0.5.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/apache/arrow-nanoarrow@apache-arrow-nanoarrow-0.7.0?package-id=614f3463351947a8",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/apache/iceberg-cpp@v0.2.0-rc1?package-id=ce0b9d2c8402061a",
       "dependsOn": []
     }
   ]

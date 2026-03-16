@@ -34,6 +34,8 @@ a notice will be included in
 | [fmt]                                                | MIT                                            | 11.2.0                                   |                      | ✗                               |
 | [folly]                                              | Apache-2.0                                     | 2023.12.25.00                            |                      | ✗                               |
 | [fuzztest]                                           | BSD-3-Clause, Apache-2.0, HPND                 | 2025-07-28                               |                      |                                 |
+| [github.com/apache/arrow-nanoarrow]                  | Apache-2.0                                     | apache-arrow-nanoarrow-0.7.0             |                      |                                 |
+| [github.com/apache/iceberg-cpp]                      | Apache-2.0                                     | v0.2.0-rc1                               |                      |                                 |
 | [googletest]                                         | BSD-3-Clause                                   | 1.17.0                                   |                      |                                 |
 | [gperftools]                                         | BSD-3-Clause                                   | 2.9.1                                    |                      | ✗                               |
 | [gRPC (C++)]                                         | Apache-2.0                                     | 1.74.1                                   |                      | ✗                               |
@@ -71,7 +73,7 @@ a notice will be included in
 | [valgrind.h]                                         | BSD-4-Clause                                   | 093bef43d69236287ccc748591c9560a71181b0a |                      | ✗                               |
 | [WiredTiger]                                         | GPL-2.0-only OR GPL-3.0-only                   | 12.0.0                                   | ✗                    | ✗                               |
 | [yaml-cpp]                                           | MIT                                            | 0.6.3                                    |                      | ✗                               |
-| [zlib]                                               | Zlib                                           | 1.3.1                                    | ✗                    | ✗                               |
+| [zlib]                                               | Zlib                                           | 1.3                                      | ✗                    | ✗                               |
 | [Zstandard (zstd)]                                   | BSD-3-Clause OR GPL-2.0-only                   | 1.5.5                                    | ✗                    | ✗                               |
 
 [Abseil Common Libraries (C++)]: https://github.com/abseil/abseil-cpp.git
@@ -103,6 +105,8 @@ a notice will be included in
 [folly]: https://github.com/facebook/folly.git
 [fuzztest]: https://github.com/google/fuzztest.git
 [gRPC (C++)]: https://github.com/grpc/grpc.git
+[github.com/apache/arrow-nanoarrow]: pkg:github/apache/arrow-nanoarrow@apache-arrow-nanoarrow-0.7.0
+[github.com/apache/iceberg-cpp]: pkg:github/apache/iceberg-cpp@v0.2.0-rc1
 [googletest]: https://github.com/google/googletest.git
 [gperftools]: https://github.com/gperftools/gperftools.git
 [immer]: https://github.com/arximboldi/immer.git

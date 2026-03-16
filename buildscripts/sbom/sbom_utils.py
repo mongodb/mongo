@@ -130,14 +130,15 @@ def convert_sbom_to_public(sbom_dict: dict):
         "PUBLIC SBOM: Removed %d internal components",
         original_components_len - len(sbom_dict["components"]),
     )
-    # Remove internal proerties from public components
+    # Remove internal properties from public components
     original_properties_len = sum(len(c.get("properties", [])) for c in sbom_dict["components"])
     for component in sbom_dict["components"]:
-        component["properties"] = [
-            p
-            for p in component.get("properties", [])
-            if not p.get("name", "").startswith("internal:")
-        ]
+        if "properties" in component:
+            component["properties"] = [
+                p
+                for p in component.get("properties", [])
+                if not p.get("name", "").startswith("internal:")
+            ]
     logger.info(
         "PUBLIC SBOM: Removed %d internal properties from public components",
         original_properties_len
