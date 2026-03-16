@@ -276,36 +276,54 @@ bool CommonAsioSession::isConnectedToProxyUnixSocket() const {
     return _isConnectedToProxyUnixSocket;
 }
 
-Status CommonAsioSession::validateProxyUnixSocketPeerPermissions() {
-#ifndef _WIN32
-    if (auto fp = proxyUnixDomainSocketPeerCredentialValidationOverride.scoped();
-        MONGO_unlikely(fp.isActive()))
-        if (auto data = fp.getData()["data"]; data.ok())
-            if (auto code = data["code"]; code.ok())
-                return Status(static_cast<ErrorCodes::Error>(code.numberInt()), "Failpoint result");
+#ifdef __APPLE__
+StatusWith<gid_t> getPeerGid(AsioSession::GenericSocket::native_handle_type handle) {
+    [[maybe_unused]] uid_t remoteUid;
+    gid_t remoteGid;
+    if (::getpeereid(handle, &remoteUid, &remoteGid) != 0)
+        return Status(ErrorCodes::InternalError, errorMessage(lastSocketError()));
+    return remoteGid;
+}
+#endif
 
+#ifdef __linux__
+StatusWith<gid_t> getPeerGid(AsioSession::GenericSocket::native_handle_type handle) {
     struct ucred credentials;
-    auto handle = getSocket().native_handle();
     socklen_t optLen = sizeof(credentials);
     if (::getsockopt(handle, SOL_SOCKET, SO_PEERCRED, &credentials, &optLen) != 0)
         return Status(ErrorCodes::InternalError, errorMessage(lastSocketError()));
-    auto remoteGid = credentials.gid;
-    auto expectedGid = ::getegid();
+    return credentials.gid;
+}
+#endif  // __linux__
+
+Status CommonAsioSession::validateProxyUnixSocketPeerPermissions() {
+#ifndef _WIN32
+    auto peerCreds = getPeerGid(getSocket().native_handle());
+    if (!peerCreds.isOK())
+        return peerCreds.getStatus();
+    gid_t remoteGid = peerCreds.getValue();
+    gid_t expectedGid = ::getegid();
+
     if (auto fp = proxyUnixDomainSocketPeerCredentialValidationOverride.scoped();
         MONGO_unlikely(fp.isActive()))
         if (auto data = fp.getData()["data"]; data.ok()) {
+            if (auto code = data["code"]; code.ok())
+                return Status(static_cast<ErrorCodes::Error>(code.numberInt()), "Failpoint result");
             if (auto gid = data["remoteGid"]; gid.ok())
                 remoteGid = gid.Int();
             if (auto gid = data["expectedGid"]; gid.ok())
                 expectedGid = gid.Int();
         }
+
     if (expectedGid != remoteGid)
         return Status(ErrorCodes::Unauthorized,
-                      fmt::format("Proxy unix domain socket peer UID mismatch: expected {}, got {}",
+                      fmt::format("Proxy unix domain socket peer GID mismatch: expected {}, got {}",
                                   expectedGid,
                                   remoteGid));
-#endif
+
     return Status::OK();
+#endif
+    MONGO_UNREACHABLE;
 }
 
 void CommonAsioSession::setisLoadBalancerPeer(bool helloHasLoadBalancedOption) {
