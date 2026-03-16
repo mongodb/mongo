@@ -69,12 +69,12 @@ using test::FileTraits;
 class SortedFileWriterAndFileIteratorTests : public unittest::Test {
 protected:
     int appendToFile(const SortOptions& opts,
-                     const boost::filesystem::path& tempDir,
+                     const boost::filesystem::path& spillDir,
                      SorterFileStats* sorterFileStats,
                      int currentFileSize,
                      int range) const {
         auto makeFile = [&] {
-            return std::make_shared<SorterFile>(sorter::nextFileName(tempDir), sorterFileStats);
+            return std::make_shared<SorterFile>(sorter::nextFileName(spillDir), sorterFileStats);
         };
 
         int currentBufSize = 0;
@@ -118,7 +118,7 @@ constexpr std::size_t dataMemLimitFromTotal(std::size_t totalMemLimit) {
     return totalMemLimit - totalMemLimit / 10;
 }
 
-std::string makeTempDirName() {
+std::string makeSpillDirName() {
     auto name = fmt::format("{}_{}", unittest::getSuiteName(), unittest::getTestName());
     std::replace(name.begin(), name.end(), '/', '_');
     std::replace(name.begin(), name.end(), '\\', '_');
@@ -325,16 +325,16 @@ protected:
         } else {
             _storage.emplace();
         }
-        resetFixtureTempDir();
+        resetFixtureSpillDir();
     }
 
-    void resetFixtureTempDir() {
-        _tempDir = std::make_unique<unittest::TempDir>(makeTempDirName());
+    void resetFixtureSpillDir() {
+        _spillDir = std::make_unique<unittest::TempDir>(makeSpillDirName());
         _opts = SortOptions();
     }
 
-    const unittest::TempDir& tempDir() const {
-        return *_tempDir;
+    const unittest::TempDir& spillDir() const {
+        return *_spillDir;
     }
 
     const SortOptions& opts() const {
@@ -354,19 +354,18 @@ protected:
     // TODO(SERVER-121481): Enable creating a sorter without a spiller and ensure there is test
     // coverage of sorters without spillers.
     std::shared_ptr<IWSorter> makeSorter(const SortOptions& sortOpts,
-                                         const boost::filesystem::path& pathToSpillDir,
+                                         const boost::filesystem::path& spillDir,
                                          Direction direction) {
-        return std::shared_ptr<IWSorter>(
-            IWSorter::make(sortOpts,
-                           IWComparator(direction),
-                           storage().makeSpiller(sortOpts, pathToSpillDir),
-                           /*settings=*/{}));
+        return std::shared_ptr<IWSorter>(IWSorter::make(sortOpts,
+                                                        IWComparator(direction),
+                                                        storage().makeSpiller(sortOpts, spillDir),
+                                                        /*settings=*/{}));
     }
 
     std::shared_ptr<IWSorter> runSort(const SortOptions& sortOpts,
                                       const KeyList& input,
                                       Direction direction) {
-        auto sorter = makeSorter(sortOpts, tempDir().path(), direction);
+        auto sorter = makeSorter(sortOpts, spillDir().path(), direction);
         addInputToSorter(sorter.get(), input);
         return sorter;
     }
@@ -377,8 +376,8 @@ protected:
         Direction direction,
         bool insertInParallel = false) {
         std::array<std::shared_ptr<IWSorter>, 2> sorters = {
-            makeSorter(sortOpts, tempDir().path(), direction),
-            makeSorter(sortOpts, tempDir().path(), direction)};
+            makeSorter(sortOpts, spillDir().path(), direction),
+            makeSorter(sortOpts, spillDir().path(), direction)};
 
         if (insertInParallel) {
             stdx::thread inBackground(
@@ -402,7 +401,7 @@ protected:
 
         auto mergedExpected = expectedOutputForLimit(doubledInput, mergedSortOpts, direction);
         assertOutputMatches(
-            mergeIterators(iters, tempDir(), direction), std::move(mergedExpected), direction);
+            mergeIterators(iters, spillDir(), direction), std::move(mergedExpected), direction);
         return sorters;
     }
 
@@ -431,15 +430,15 @@ protected:
             }
         }
         ASSERT_EQ(expectedRangeCoverage.has_value(),
-                  !boost::filesystem::is_empty(tempDir().path()));
+                  !boost::filesystem::is_empty(spillDir().path()));
 #else
         ASSERT_EQ(expectedRangeCoverage.has_value(),
-                  !boost::filesystem::is_empty(tempDir().path()));
+                  !boost::filesystem::is_empty(spillDir().path()));
 #endif
     }
 
 private:
-    std::unique_ptr<unittest::TempDir> _tempDir;
+    std::unique_ptr<unittest::TempDir> _spillDir;
     SortOptions _opts;
     boost::optional<Traits> _storage;
 };
@@ -466,7 +465,7 @@ TYPED_TEST_SUITE(SorterTypedTestManualSpills, SorterTypedTestTypes);
 class SorterTestPauseAndResumeBase : public SorterFileTest {
 protected:
     void assertSortAndMergeWithPauseValidation(const SortOptions& sortOpts,
-                                               const boost::filesystem::path& pathToSpillDir,
+                                               const boost::filesystem::path& spillDir,
                                                const KeyList& input) {
         for (Direction direction : kDirections) {
             auto sorter = runSort(sortOpts, input, direction);
@@ -480,7 +479,7 @@ protected:
         }
 #endif
 
-        ASSERT(boost::filesystem::is_empty(tempDir().path()));
+        ASSERT(boost::filesystem::is_empty(spillDir));
     }
 };
 
@@ -573,32 +572,32 @@ protected:
 };
 
 TEST_F(SortedFileWriterAndFileIteratorTests, SortedFileWriterAndFileIterator) {
-    unittest::TempDir tempDir("sortedFileWriterTests");
+    unittest::TempDir spillDir("sortedFileWriterTests");
     SorterTracker sorterTracker;
     SorterFileStats sorterFileStats(&sorterTracker);
     const SortOptions opts = SortOptions();
 
     int currentFileSize = 0;
 
-    currentFileSize = appendToFile(opts, tempDir.path(), &sorterFileStats, currentFileSize, 5);
+    currentFileSize = appendToFile(opts, spillDir.path(), &sorterFileStats, currentFileSize, 5);
 
     ASSERT_EQ(sorterFileStats.opened.load(), 1);
     ASSERT_EQ(sorterFileStats.closed.load(), 1);
     ASSERT_LTE(sorterTracker.bytesSpilled.load(), currentFileSize);
 
     currentFileSize =
-        appendToFile(opts, tempDir.path(), &sorterFileStats, currentFileSize, 10 * 1000 * 1000);
+        appendToFile(opts, spillDir.path(), &sorterFileStats, currentFileSize, 10 * 1000 * 1000);
 
     ASSERT_EQ(sorterFileStats.opened.load(), 2);
     ASSERT_EQ(sorterFileStats.closed.load(), 2);
     ASSERT_LTE(sorterTracker.bytesSpilled.load(), currentFileSize);
     ASSERT_LTE(sorterFileStats.bytesSpilled(), currentFileSize);
 
-    ASSERT(boost::filesystem::is_empty(tempDir.path()));
+    ASSERT(boost::filesystem::is_empty(spillDir.path()));
 }
 
 TEST(MergeIteratorTests, MergeIterator) {
-    unittest::TempDir tempDir("mergeIteratorTests");
+    unittest::TempDir spillDir("mergeIteratorTests");
     {  // test empty (no inputs)
         std::vector<std::shared_ptr<IWIterator>> vec;
         std::shared_ptr<IWIterator> mergeIter(
@@ -610,7 +609,7 @@ TEST(MergeIteratorTests, MergeIterator) {
                                                    std::make_shared<EmptyIterator>(),
                                                    std::make_shared<EmptyIterator>()};
 
-        ASSERT_ITERATORS_EQUIVALENT(mergeIterators(iterators, tempDir, ASC),
+        ASSERT_ITERATORS_EQUIVALENT(mergeIterators(iterators, spillDir, ASC),
                                     std::make_shared<EmptyIterator>());
     }
 
@@ -620,7 +619,7 @@ TEST(MergeIteratorTests, MergeIterator) {
             std::make_shared<IntIterator>(0, 20, 2)   // 0, 2, ... 18
         };
 
-        ASSERT_ITERATORS_EQUIVALENT(mergeIterators(iterators, tempDir, ASC),
+        ASSERT_ITERATORS_EQUIVALENT(mergeIterators(iterators, spillDir, ASC),
                                     std::make_shared<IntIterator>(0, 20, 1));
     }
 
@@ -630,7 +629,7 @@ TEST(MergeIteratorTests, MergeIterator) {
                                                    std::make_shared<IntIterator>(28, 0, -3),
                                                    std::make_shared<EmptyIterator>()};
 
-        ASSERT_ITERATORS_EQUIVALENT(mergeIterators(iterators, tempDir, DESC),
+        ASSERT_ITERATORS_EQUIVALENT(mergeIterators(iterators, spillDir, DESC),
                                     std::make_shared<IntIterator>(30, 0, -1));
     }
     {  // test Limit
@@ -638,7 +637,7 @@ TEST(MergeIteratorTests, MergeIterator) {
                                                    std::make_shared<IntIterator>(0, 20, 2)};
 
         ASSERT_ITERATORS_EQUIVALENT(
-            mergeIterators(iterators, tempDir, ASC, SortOptions().Limit(10)),
+            mergeIterators(iterators, spillDir, ASC, SortOptions().Limit(10)),
             std::make_shared<LimitIterator>(10, std::make_shared<IntIterator>(0, 20, 1)));
     }
 
@@ -651,15 +650,15 @@ TEST(MergeIteratorTests, MergeIterator) {
         auto itD = std::make_shared<IntIterator>(15, 20, 1);
 
         std::shared_ptr<IWIterator> iteratorsAD[] = {itD, itA};
-        auto mergedAD = mergeIterators(iteratorsAD, tempDir, ASC);
+        auto mergedAD = mergeIterators(iteratorsAD, spillDir, ASC);
         ASSERT_ITERATORS_EQUIVALENT_FOR_N_STEPS(mergedAD, itFull, 5);
 
         std::shared_ptr<IWIterator> iteratorsABD[] = {mergedAD, itB};
-        auto mergedABD = mergeIterators(iteratorsABD, tempDir, ASC);
+        auto mergedABD = mergeIterators(iteratorsABD, spillDir, ASC);
         ASSERT_ITERATORS_EQUIVALENT_FOR_N_STEPS(mergedABD, itFull, 5);
 
         std::shared_ptr<IWIterator> iteratorsABCD[] = {itC, mergedABD};
-        auto mergedABCD = mergeIterators(iteratorsABCD, tempDir, ASC);
+        auto mergedABCD = mergeIterators(iteratorsABCD, spillDir, ASC);
         ASSERT_ITERATORS_EQUIVALENT_FOR_N_STEPS(mergedABCD, itFull, 5);
     }
 }
@@ -724,7 +723,7 @@ TYPED_TEST(SorterTypedTest, LimitExtremes) {
 
 TYPED_TEST(SorterTypedTest, AggressiveSpilling) {
     for (auto shuffleMode : {ShuffleMode::kNoShuffle, ShuffleMode::kShuffle}) {
-        this->resetFixtureTempDir();
+        this->resetFixtureSpillDir();
         const auto context = fmt::format(
             "dataSize={},memoryLimit={},limit={}", kLargeNumberOfKeys, kAggressiveSpillMemLimit, 0);
         const KeyList input = makeInputData(kLargeNumberOfKeys, shuffleMode, context);
@@ -743,7 +742,7 @@ TYPED_TEST(SorterTypedTest, LotsOfDataWithLimit) {
 
     for (auto limit : limits) {
         for (auto shuffleMode : {ShuffleMode::kNoShuffle, ShuffleMode::kShuffle}) {
-            this->resetFixtureTempDir();
+            this->resetFixtureSpillDir();
             const auto context = fmt::format("dataSize={},memoryLimit={},limit={}",
                                              kLargeNumberOfKeys,
                                              kAggressiveSpillMemLimit,
@@ -775,19 +774,19 @@ TYPED_TEST(SorterTypedTestManualSpills, ManualSpillsWithLimit) {
 
 TEST_F(SorterTestPauseAndResume, PauseAndResume) {
     const KeyList input = {0, 3, 4, 2, 1};
-    assertSortAndMergeWithPauseValidation(opts(), "pathToSpillDir", input);
+    assertSortAndMergeWithPauseValidation(opts(), spillDir().path(), input);
 }
 
 TEST_F(SorterTestPauseAndResumeLimit, PauseAndResumeLimit) {
     const KeyList input = {3, 0, 4, 2, 1, -1};
     const auto sortOpts = SortOptions(opts()).Limit(5);
-    assertSortAndMergeWithPauseValidation(sortOpts, "pathToSpillDir", input);
+    assertSortAndMergeWithPauseValidation(sortOpts, spillDir().path(), input);
 }
 
 TEST_F(SorterTestPauseAndResumeLimitOne, PauseAndResumeLimitOne) {
     const KeyList input = {3, 0, 4, 2, 1, -1};
     const auto sortOpts = SortOptions(opts()).Limit(1);
-    assertSortAndMergeWithPauseValidation(sortOpts, "pathToSpillDir", input);
+    assertSortAndMergeWithPauseValidation(sortOpts, spillDir().path(), input);
 }
 
 }  // namespace SorterTests
