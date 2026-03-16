@@ -49,7 +49,7 @@ last-continuous:
       ticket: SERVER-107211
     - test_file: jstests/concurrency/fsm_workloads/query/yield/repl_set_resize_oplog.js
       ticket: SERVER-94787
-    - test_file: jstests/core/timeseries/ddl/rename_timeseries.js
+    - test_file: jstests/core/timeseries/ddl/rename_timeseries_legacy.js
       ticket: SERVER-109087
     - test_file: jstests/sharding/query/agg/agg_orphan_filtering_renamed_shardkey.js
       ticket: SERVER-105047
@@ -706,7 +706,7 @@ last-lts:
       ticket: SERVER-107211
     - test_file: jstests/concurrency/fsm_workloads/query/yield/repl_set_resize_oplog.js
       ticket: SERVER-94787
-    - test_file: jstests/core/timeseries/ddl/rename_timeseries.js
+    - test_file: jstests/core/timeseries/ddl/rename_timeseries_legacy.js
       ticket: SERVER-109087
     - test_file: jstests/sharding/query/agg/agg_orphan_filtering_renamed_shardkey.js
       ticket: SERVER-105047

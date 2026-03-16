@@ -9,22 +9,21 @@
  *  # rename only works across databases with same primary shard
  *  # TODO SERVER-90096: change this tag with a more specific one
  *  assumes_balancer_off,
+ *  # Renaming a timeseries collection is only possible with viewless timeseries collections,
+ *  # with legacy viewful timeseries collection it was not supported.
+ *  featureFlagCreateViewlessTimeseriesCollections,
  * ]
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {getTimeseriesBucketsColl} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const dbName = db.getName();
 const otherDbName = `${dbName}_other`;
 const collName = `coll_${jsTestName()}`;
-const bucketsCollName = `system.buckets.${collName}`;
 const timeseriesOpts = {
     timeseries: {timeField: "time"},
 };
-
-// TODO SERVER-101595 get rid of all the code protected behind this flag
-const viewlessTimeseriesEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections");
 
 function setupEnv() {
     db.dropDatabase();
@@ -47,11 +46,11 @@ function setupEnv() {
 }
 
 // Insert measurements -> rename -> check measurements/buckets have not changed
-function checkSuccessfullRename(fromDb, fromColl, toDb, toColl) {
-    const srcNss = fromDb + (viewlessTimeseriesEnabled ? "." : ".system.buckets.") + fromColl;
-    const srcColl = db.getSiblingDB(fromDb)[fromColl];
-    const dstNss = toDb + (viewlessTimeseriesEnabled ? "." : ".system.buckets.") + toColl;
-    const dstColl = db.getSiblingDB(toDb)[toColl];
+function checkSuccesfulRename(fromDBName, fromCollName, toDBName, toCollName) {
+    const fromDB = db.getSiblingDB(fromDBName);
+    const toDB = db.getSiblingDB(toDBName);
+    const fromColl = fromDB[fromCollName];
+    const toColl = toDB[toCollName];
 
     // 4 measurements falling into 3 different buckets
     const measurements = [
@@ -62,109 +61,39 @@ function checkSuccessfullRename(fromDb, fromColl, toDb, toColl) {
     ];
 
     for (let i = 0; i < measurements.length; i++) {
-        assert.commandWorked(srcColl.insert(measurements[i]));
+        assert.commandWorked(fromColl.insert(measurements[i]));
     }
 
-    const beforeBuckets = viewlessTimeseriesEnabled ? srcColl.find().rawData().toArray() : srcColl.find().toArray();
+    const beforeBuckets = fromColl.find().rawData().toArray();
 
-    assert.commandWorked(db.adminCommand({renameCollection: srcNss, to: dstNss}));
+    assert.commandWorked(
+        db.adminCommand({
+            renameCollection: fromColl.getFullName(),
+            to: toColl.getFullName(),
+        }),
+    );
 
-    if (!viewlessTimeseriesEnabled) {
-        // Fix view definitions following rename
-        assert.commandWorked(db.getSiblingDB(fromDb).runCommand({drop: fromColl}));
-        assert.commandWorked(db.getSiblingDB(toDb).createCollection(toColl, timeseriesOpts));
-    }
-
-    const afterBuckets = viewlessTimeseriesEnabled ? dstColl.find().rawData().toArray() : dstColl.find().toArray();
+    const afterBuckets = toColl.find().rawData().toArray();
     assert.eq(beforeBuckets, afterBuckets);
 
-    const afterMeasurements = dstColl.find({}, {_id: 0}).sort({time: 1}).toArray();
+    const afterMeasurements = toColl.find({}, {_id: 0}).sort({time: 1}).toArray();
     assert.eq(afterMeasurements, measurements);
 }
 
-function runSystemBucketsTests(targetDbName) {
-    {
-        jsTest.log("Renaming a timeseries collection using the main namespace is not supported");
-
-        setupEnv();
-        assert.commandWorked(db.createCollection(collName, timeseriesOpts));
-        assert.commandFailedWithCode(
-            db.adminCommand({renameCollection: `${dbName}.${collName}`, to: `${targetDbName}.newColl`}),
-            // TODO SERVER-89100 unify error code between sharded clusters and replicaset
-            [ErrorCodes.IllegalOperation, ErrorCodes.CommandNotSupportedOnView],
-        );
-    }
-    {
-        jsTest.log("Renaming a simple collection to a bucket collection without timeseries options fails");
-        setupEnv();
-        assert.commandWorked(db.createCollection(collName));
-        const res = db.adminCommand({
-            renameCollection: `${dbName}.${collName}`,
-            to: `${targetDbName}.system.buckets.newColl`,
-        });
-        assert.commandFailedWithCode(res, [ErrorCodes.IllegalOperation]);
-    }
-    {
-        jsTest.log("Renaming a timeseries collection using the main namespace with a target bucket collection fail");
-        setupEnv();
-        assert.commandWorked(db.createCollection(collName, timeseriesOpts));
-        assert.commandFailedWithCode(
-            db.adminCommand({
-                renameCollection: `${dbName}.${collName}`,
-                to: `${dbName}.system.buckets.newColl`,
-            }),
-            // TODO SERVER-89100 unify error code between sharded clusters and replicaset
-            [ErrorCodes.IllegalOperation, ErrorCodes.CommandNotSupportedOnView],
-        );
-    }
-    {
-        jsTest.log("Renaming a timeseries bucket collection to a normal collection fail");
-        setupEnv();
-        assert.commandWorked(db.createCollection(collName, timeseriesOpts));
-        assert.commandFailedWithCode(
-            db.adminCommand({renameCollection: `${dbName}.${bucketsCollName}`, to: `${targetDbName}.newColl`}),
-            ErrorCodes.IllegalOperation,
-        );
-    }
-
+function runTimeseriesTests(targetDbName) {
     {
         setupEnv();
         assert.commandWorked(db.createCollection(collName, timeseriesOpts));
         const isUnsharded =
-            db
-                .getSiblingDB("config")
-                .collections.countDocuments({_id: `${dbName}.${bucketsCollName}`, unsplittable: {$ne: true}}) == 0;
-        // Rename across db is not supported for sharded collections
-        if (dbName == targetDbName || isUnsharded) {
-            jsTest.log("Renaming a timeseries bucket collection to another bucket collection works");
-            checkSuccessfullRename(dbName, collName, targetDbName, "newColl");
-        } else {
-            jsTest.log("Renaming a sharded timeseries bucket collection to a different db fails");
-
-            assert.commandFailedWithCode(
-                db.adminCommand({
-                    renameCollection: `${dbName}.${bucketsCollName}`,
-                    to: `${targetDbName}.system.buckets.newColl`,
-                }),
-                ErrorCodes.CommandFailed,
-            );
-        }
-    }
-}
-
-function runViewLessTimeseriesTests(targetDbName) {
-    {
-        setupEnv();
-        assert.commandWorked(db.createCollection(collName, timeseriesOpts));
-        const isUnsharded =
-            db
-                .getSiblingDB("config")
-                .collections.countDocuments({_id: `${dbName}.${collName}`, unsplittable: {$ne: true}}) == 0;
+            db.getSiblingDB("config").collections.countDocuments({
+                _id: `${dbName}.${collName}`,
+                unsplittable: {$ne: true},
+            }) == 0;
 
         // Rename across db is not supported for sharded collections
         if (dbName == targetDbName || isUnsharded) {
             jsTest.log("Renaming a viewless timeseries collection works");
-            checkSuccessfullRename(dbName, collName, targetDbName, "newColl");
+            checkSuccesfulRename(dbName, collName, targetDbName, "newColl");
         } else {
             jsTest.log("Renaming a sharded viewless timeseries collection to a different db fails");
             assert.commandFailedWithCode(
@@ -183,22 +112,14 @@ function runViewLessTimeseriesTests(targetDbName) {
         assert.commandWorked(db.createCollection(collName));
         const res = db.adminCommand({
             renameCollection: `${dbName}.${collName}`,
-            to: `${targetDbName}.system.buckets.newColl`,
+            to: `${targetDbName}.${getTimeseriesBucketsColl("newColl")}`,
         });
         assert.commandFailedWithCode(res, [ErrorCodes.IllegalOperation]);
     }
 }
 
-jsTest.log("Run test cases with rename within same database");
-if (viewlessTimeseriesEnabled) {
-    runViewLessTimeseriesTests(dbName);
-} else {
-    runSystemBucketsTests(dbName);
-}
+jsTest.log.info("Run test cases with rename within same database");
+runTimeseriesTests(dbName);
 
-jsTest.log("Run test cases with rename across different databases");
-if (viewlessTimeseriesEnabled) {
-    runViewLessTimeseriesTests(otherDbName);
-} else {
-    runSystemBucketsTests(otherDbName);
-}
+jsTest.log.info("Run test cases with rename across different databases");
+runTimeseriesTests(otherDbName);

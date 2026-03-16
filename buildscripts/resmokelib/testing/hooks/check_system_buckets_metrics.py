@@ -37,7 +37,7 @@ class CheckSystemBucketsMetrics(interface.Hook):
         "jstests/core/timeseries/ddl/timeseries_user_system_buckets.js",
         "jstests/core/timeseries/ddl/timeseries_list_catalog.js",
         # Calls rename on system.buckets collection.
-        "jstests/core/timeseries/ddl/rename_timeseries.js",
+        "jstests/core/timeseries/ddl/rename_timeseries_legacy.js",
         # Calls getPlanCache.list on system.buckets collection.
         "jstests/core/timeseries/query/bucket_unpacking_with_sort_plan_cache.js",
         # Calls createCollection on system.buckets collection.

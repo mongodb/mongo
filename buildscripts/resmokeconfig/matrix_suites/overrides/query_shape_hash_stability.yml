@@ -140,6 +140,7 @@
       - jstests/core/query/idhack.js
       - jstests/core/query/explain/explain_all_plans_execution_stats.js
       - jstests/core/timeseries/ddl/rename_timeseries.js
+      - jstests/core/timeseries/ddl/rename_timeseries_legacy.js
       - jstests/core/timeseries/write/timeseries_delete_with_meta.js
 
 - name: multiversion_aggregation_excludes
