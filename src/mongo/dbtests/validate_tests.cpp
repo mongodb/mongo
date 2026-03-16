@@ -67,6 +67,7 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -394,11 +395,11 @@ protected:
         auto storageEngine = _opCtx.getServiceContext()->getStorageEngine();
         IndexBuildInfo indexBuildInfo(spec, *storageEngine, _autoDb->getDb()->name());
         indexBuildInfo.indexIdent = entry->getIdent();
-        WriteUnitOfWork wuow(&_opCtx);
-        auto interceptor = std::make_unique<IndexBuildInterceptor>(
-            &_opCtx, entry, indexBuildInfo, /*resume=*/false, /*generateTableWrites=*/true);
-        wuow.commit();
-        return interceptor;
+        return std::make_unique<IndexBuildInterceptor>(&_opCtx,
+                                                       entry,
+                                                       indexBuildInfo,
+                                                       LazyRecordStore::CreateMode::immediate,
+                                                       /*generateTableWrites=*/true);
     }
 
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();

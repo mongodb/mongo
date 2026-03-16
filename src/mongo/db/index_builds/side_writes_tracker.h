@@ -41,9 +41,9 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
+#include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
@@ -61,16 +61,12 @@ public:
      */
     enum class DrainYieldPolicy { kNoYield, kYield };
 
-    SideWritesTracker(OperationContext* opCtx, std::string ident, bool resume)
-        : _table([&]() {
-              auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-              if (resume) {
-                  return storageEngine->makeTemporaryRecordStoreFromExistingIdent(
-                      opCtx, ident, KeyFormat::Long);
-              } else {
-                  return storageEngine->makeTemporaryRecordStore(opCtx, ident, KeyFormat::Long);
-              }
-          }()) {}
+    SideWritesTracker(OperationContext* opCtx,
+                      StringData ident,
+                      LazyRecordStore::CreateMode createMode)
+        : _table(opCtx, ident, createMode) {
+        _table.getOrCreateTable(opCtx);
+    }
 
     /**
      * Buffer a side write of the docs in `toInsert`.
@@ -80,9 +76,11 @@ public:
                            const IndexCatalogEntry* indexCatalogEntry,
                            const std::vector<BSONObj>& toInsert);
 
-    void keepTemporaryTable();
-
-    std::string getTableIdent() const;
+    /**
+     * Keeps the temporary table managed by this tracker. Creates the table if it has not yet been
+     * created.
+     */
+    void keepTemporaryTable(OperationContext* opCtx);
 
     uint64_t count() const {
         return _counter->load();
@@ -113,6 +111,13 @@ public:
         return _numApplied;
     }
 
+    /**
+     * Schedules the temporary table for drop.
+     */
+    void dropTemporaryTable() {
+        _table.drop();
+    }
+
 private:
     /**
      * Yield lock manager locks and abandon the current storage engine snapshot.
@@ -126,7 +131,7 @@ private:
                                    FailPoint* fp,
                                    long long iteration) const;
 
-    std::unique_ptr<TemporaryRecordStore> _table;
+    LazyRecordStore _table;
 
     // This allows the counter to be used in a RecoveryUnit rollback handler where the
     // IndexBuildInterceptor is no longer available (e.g. due to index build cleanup). If there

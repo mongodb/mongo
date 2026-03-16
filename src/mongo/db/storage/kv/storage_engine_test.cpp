@@ -481,19 +481,21 @@ protected:
         return mdbCatalog->getIndexIdent(opCtx, catalogId, indexName);
     }
 
-    // Makes an internal table that contains index-resume metadata, where |pretendSideTable| is an
-    // internal table used for that resume.
+    // Makes an internal table that contains index-resume metadata, where |pretendSideTable| and
+    // |pretendSkippedRecordTable| are internal tables used for that resume.
     std::unique_ptr<TemporaryRecordStore> makeIndexBuildResumeTable(
         OperationContext* opCtx,
         const TemporaryRecordStore& pretendSideTable,
+        const TemporaryRecordStore& pretendSkippedRecordTable,
         const BSONObj& indexSpec = {}) {
         std::unique_ptr<TemporaryRecordStore> ret;
         {
             Lock::GlobalLock lk(opCtx, MODE_IX);
             WriteUnitOfWork wuow(opCtx);
-            ret = _storageEngine->makeTemporaryRecordStoreForResumableIndexBuild(opCtx,
-                                                                                 KeyFormat::Long);
-            BSONObj resInfo = makePretendResumeInfo(pretendSideTable, indexSpec);
+            ret = _storageEngine->makeTemporaryRecordStore(
+                opCtx, ident::generateNewInternalIdent(kResumableIndexIdentStem), KeyFormat::Long);
+            BSONObj resInfo =
+                makePretendResumeInfo(pretendSideTable, pretendSkippedRecordTable, indexSpec);
             ASSERT_OK(ret->rs()->insertRecord(opCtx,
                                               *shard_role_details::getRecoveryUnit(opCtx),
                                               resInfo.objdata(),
@@ -505,15 +507,17 @@ protected:
         return ret;
     }
 
-    // Returns index-resume metadata which would use the given |pretendSideTable| in the index's
-    // build.
+    // Returns index-resume metadata which would use the given |pretendSideTable| and
+    // |pretendSkippedRecordTable| in the index's build.
     BSONObj makePretendResumeInfo(const TemporaryRecordStore& pretendSideTable,
+                                  const TemporaryRecordStore& pretendSkippedRecordTable,
                                   const BSONObj& indexSpec) {
         IndexStateInfo indexInfo;
         indexInfo.setSpec(indexSpec);
         indexInfo.setIsMultikey({});
         indexInfo.setMultikeyPaths({});
         indexInfo.setSideWritesTable(pretendSideTable.rs()->getIdent());
+        indexInfo.setSkippedRecordTrackerTable(pretendSkippedRecordTable.rs()->getIdent());
         indexInfo.setStorageIdentifier(resumableIndexFileName);
         indexInfo.setRanges({{}});
         ResumeIndexInfo resumeInfo;
@@ -530,8 +534,9 @@ TEST_F(StorageEngineReconcileTest, ReconcileDropsAllIdentsForUncleanShutdown) {
 
     std::unique_ptr<TemporaryRecordStore> irrelevantRs = makeInternalTable(opCtx.get());
     std::unique_ptr<TemporaryRecordStore> necessaryRs = makeInternalTable(opCtx.get());
+    std::unique_ptr<TemporaryRecordStore> skippedRecordRs = makeInternalTable(opCtx.get());
     std::unique_ptr<TemporaryRecordStore> resumableIndexRs =
-        makeIndexBuildResumeTable(opCtx.get(), *necessaryRs);
+        makeIndexBuildResumeTable(opCtx.get(), *necessaryRs, *skippedRecordRs);
 
     // Reconcile will drop all temporary idents when starting up after an unclean shutdown.
     auto reconcileResult = unittest::assertGet(reconcileAfterUncleanShutdown(opCtx.get()));
@@ -541,6 +546,7 @@ TEST_F(StorageEngineReconcileTest, ReconcileDropsAllIdentsForUncleanShutdown) {
     ASSERT_FALSE(identExists(opCtx.get(), irrelevantRs->rs()->getIdent()));
     ASSERT_FALSE(identExists(opCtx.get(), resumableIndexRs->rs()->getIdent()));
     ASSERT_FALSE(identExists(opCtx.get(), necessaryRs->rs()->getIdent()));
+    ASSERT_FALSE(identExists(opCtx.get(), skippedRecordRs->rs()->getIdent()));
 }
 
 TEST_F(StorageEngineReconcileTest, ReconcileOnlyKeepsNecessaryIdentsForCleanShutdown) {
@@ -548,8 +554,9 @@ TEST_F(StorageEngineReconcileTest, ReconcileOnlyKeepsNecessaryIdentsForCleanShut
 
     std::unique_ptr<TemporaryRecordStore> irrelevantRs = makeInternalTable(opCtx.get());
     std::unique_ptr<TemporaryRecordStore> necessaryRs = makeInternalTable(opCtx.get());
+    std::unique_ptr<TemporaryRecordStore> skippedRecordRs = makeInternalTable(opCtx.get());
     std::unique_ptr<TemporaryRecordStore> resumableIndexRs =
-        makeIndexBuildResumeTable(opCtx.get(), *necessaryRs);
+        makeIndexBuildResumeTable(opCtx.get(), *necessaryRs, *skippedRecordRs);
 
     auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
 
@@ -560,6 +567,7 @@ TEST_F(StorageEngineReconcileTest, ReconcileOnlyKeepsNecessaryIdentsForCleanShut
     ASSERT_FALSE(identExists(opCtx.get(), irrelevantRs->rs()->getIdent()));
     ASSERT_FALSE(identExists(opCtx.get(), resumableIndexRs->rs()->getIdent()));
     ASSERT_TRUE(identExists(opCtx.get(), necessaryRs->rs()->getIdent()));
+    ASSERT_TRUE(identExists(opCtx.get(), skippedRecordRs->rs()->getIdent()));
 }
 
 void createTempFile(const boost::filesystem::path& path) {
@@ -574,8 +582,9 @@ TEST_F(StorageEngineReconcileTest, StartupRecoveryForUncleanShutdown) {
 
     std::unique_ptr<TemporaryRecordStore> irrelevantRs = makeInternalTable(opCtx.get());
     std::unique_ptr<TemporaryRecordStore> necessaryRs = makeInternalTable(opCtx.get());
+    std::unique_ptr<TemporaryRecordStore> skippedRecordRs = makeInternalTable(opCtx.get());
     std::unique_ptr<TemporaryRecordStore> resumableIndexRs =
-        makeIndexBuildResumeTable(opCtx.get(), *necessaryRs);
+        makeIndexBuildResumeTable(opCtx.get(), *necessaryRs, *skippedRecordRs);
     auto spillTable = makeSpillTable(opCtx.get());
 
     startup_recovery::repairAndRecoverDatabases(opCtx.get(),
@@ -585,6 +594,7 @@ TEST_F(StorageEngineReconcileTest, StartupRecoveryForUncleanShutdown) {
     ASSERT_FALSE(identExists(opCtx.get(), irrelevantRs->rs()->getIdent()));
     ASSERT_FALSE(identExists(opCtx.get(), resumableIndexRs->rs()->getIdent()));
     ASSERT_FALSE(identExists(opCtx.get(), necessaryRs->rs()->getIdent()));
+    ASSERT_FALSE(identExists(opCtx.get(), skippedRecordRs->rs()->getIdent()));
     ASSERT_FALSE(spillIdentExists(opCtx.get(), spillTable->getIdent()));
 }
 
@@ -609,10 +619,11 @@ TEST_F(StorageEngineReconcileTest, StartupRecoveryResumableIndexForCleanShutdown
 
     std::unique_ptr<TemporaryRecordStore> irrelevantRs = makeInternalTable(opCtx.get());
     std::unique_ptr<TemporaryRecordStore> necessaryRs = makeInternalTable(opCtx.get());
+    std::unique_ptr<TemporaryRecordStore> skippedRecordRs = makeInternalTable(opCtx.get());
     BSONObj indexSpec;
     auto indexIdent = prepareIndexBuild(opCtx.get(), indexSpec);
     std::unique_ptr<TemporaryRecordStore> resumableIndexRs =
-        makeIndexBuildResumeTable(opCtx.get(), *necessaryRs, indexSpec);
+        makeIndexBuildResumeTable(opCtx.get(), *necessaryRs, *skippedRecordRs, indexSpec);
 
     // Test cleanup of temporary directory used by resumable index build
     auto tempDir = boost::filesystem::path(storageGlobalParams.dbpath).append("_tmp");
@@ -636,6 +647,7 @@ TEST_F(StorageEngineReconcileTest, StartupRecoveryResumableIndexForCleanShutdown
     ASSERT_FALSE(identExists(opCtx.get(), irrelevantRs->rs()->getIdent()));
     ASSERT_FALSE(identExists(opCtx.get(), resumableIndexRs->rs()->getIdent()));
     ASSERT_TRUE(identExists(opCtx.get(), necessaryRs->rs()->getIdent()));
+    ASSERT_TRUE(identExists(opCtx.get(), skippedRecordRs->rs()->getIdent()));
     ASSERT_TRUE(identExists(opCtx.get(), indexIdent));
 }
 
@@ -646,6 +658,7 @@ TEST_F(StorageEngineReconcileTest, StartupRecoveryResumableIndexFallbackToRestar
 
     std::unique_ptr<TemporaryRecordStore> irrelevantRs = makeInternalTable(opCtx.get());
     std::unique_ptr<TemporaryRecordStore> necessaryRs = makeInternalTable(opCtx.get());
+    std::unique_ptr<TemporaryRecordStore> skippedRecordRs = makeInternalTable(opCtx.get());
     std::string indexIdent;
     {
         BSONObj unusedSpec;
@@ -655,7 +668,7 @@ TEST_F(StorageEngineReconcileTest, StartupRecoveryResumableIndexFallbackToRestar
     // Use an empty indexSpec which is invalid to resume.
     // The resumable index build will fail and fall back to restart.
     std::unique_ptr<TemporaryRecordStore> resumableIndexRs =
-        makeIndexBuildResumeTable(opCtx.get(), *necessaryRs);
+        makeIndexBuildResumeTable(opCtx.get(), *necessaryRs, *skippedRecordRs);
 
     // Test cleanup of temporary directory used by resumable index build
     auto tempDir = boost::filesystem::path(storageGlobalParams.dbpath).append("_tmp");

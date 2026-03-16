@@ -68,7 +68,7 @@ public:
     /**
      * Prevent any temporary tables from being dropped when this IndexBuildBlock is destructed.
      */
-    void keepTemporaryTables();
+    void keepTemporaryTables(OperationContext* opCtx);
 
     /**
      * Initializes a new entry for the index in the IndexCatalog.
@@ -143,6 +143,12 @@ public:
     static Status buildEmptyIndex(OperationContext* opCtx,
                                   Collection* collection,
                                   const IndexBuildInfo& indexBuildInfo);
+
+    void dropTemporaryTables() {
+        if (_indexBuildInterceptor) {
+            _indexBuildInterceptor->dropTemporaryTables();
+        }
+    }
 
 private:
     void _completeInit(OperationContext* opCtx, Collection* collection);

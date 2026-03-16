@@ -34,14 +34,11 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/modules.h"
-
-#include <memory>
-#include <string>
 
 namespace mongo {
 /**
@@ -56,12 +53,13 @@ public:
     DuplicateKeyTracker(OperationContext* opCtx,
                         const IndexCatalogEntry* indexCatalogEntry,
                         StringData ident,
-                        bool tableExists);
+                        LazyRecordStore::CreateMode createMode);
 
     /**
-     * Keeps the temporary table for the duplicate key constraint violations.
+     * Keeps the temporary table for duplicate key constraint violations. Creates the table if it
+     * has not yet been created.
      */
-    void keepTemporaryTable();
+    void keepTemporaryTable(OperationContext* opCtx);
 
     /**
      * Given a duplicate key, insert it into the key constraint table.
@@ -83,15 +81,16 @@ public:
         const CollectionPtr& coll,
         const IndexCatalogEntry* indexCatalogEntry) const;
 
-    std::string getTableIdent() const {
-        return std::string{_keyConstraintsTable->rs()->getIdent()};
+    /**
+     * Schedules the temporary table for drop.
+     */
+    void dropTemporaryTable() {
+        _keyConstraintsTable.drop();
     }
 
 private:
     AtomicWord<long long> _duplicateCounter{0};
-
-    // This temporary record store is owned by the duplicate key tracker and dropped along with it.
-    std::unique_ptr<TemporaryRecordStore> _keyConstraintsTable;
+    LazyRecordStore _keyConstraintsTable;
 };
 
 }  // namespace mongo

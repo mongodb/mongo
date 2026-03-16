@@ -73,6 +73,7 @@
 #include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/disk_space_util.h"
+#include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -2199,29 +2200,28 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
         auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
         for (const auto& indexStateInfo : resumeInfo.getIndexes()) {
             IndexBuildInfo indexBuildInfo(indexStateInfo.getSpec(), boost::none);
-            boost::optional<std::string> skippedRecordsTrackerIdent;
-            boost::optional<std::string> constraintViolationsTrackerIdent;
-            if (indexStateInfo.getSkippedRecordTrackerTable()) {
-                skippedRecordsTrackerIdent =
-                    std::string{*indexStateInfo.getSkippedRecordTrackerTable()};
+            indexBuildInfo.sideWritesIdent.emplace(indexStateInfo.getSideWritesTable());
+            if (auto ident = indexStateInfo.getSkippedRecordTrackerTable()) {
+                indexBuildInfo.skippedRecordsTrackerIdent.emplace(*ident);
             } else {
-                // IndexBuildInterceptor requires the the skipped records tracker table ident to
-                // be present in the resume case, so create a new table if none exists already.
-                WriteUnitOfWork wuow(opCtx);
-                skippedRecordsTrackerIdent = storageEngine->generateNewInternalIdent();
-                auto tempTable = storageEngine->makeTemporaryRecordStore(
-                    opCtx, *skippedRecordsTrackerIdent, KeyFormat::Long);
-                tempTable->keep();
-                wuow.commit();
+                // Older versions only persisted the skipped record tracker table ident if there
+                // were skipped records, so it may be missing. If it is, we can safely generate a
+                // new one as there's no existing table we need to reuse and we can't be in a
+                // primary-driven index build.
+                auto skippedRecordsTrackerIdent = storageEngine->generateNewInternalIdent();
+                auto lazyRecordStore = LazyRecordStore(
+                    opCtx, skippedRecordsTrackerIdent, LazyRecordStore::CreateMode::immediate);
+                lazyRecordStore.keepTemporaryTable(opCtx);
+                // Immediate creation ensures the table is created.
+                indexBuildInfo.skippedRecordsTrackerIdent.emplace(skippedRecordsTrackerIdent);
             }
-            if (indexStateInfo.getDuplicateKeyTrackerTable()) {
-                constraintViolationsTrackerIdent =
-                    std::string{*indexStateInfo.getDuplicateKeyTrackerTable()};
+            if (auto ident = indexStateInfo.getDuplicateKeyTrackerTable()) {
+                indexBuildInfo.constraintViolationsTrackerIdent.emplace(*ident);
+            } else {
+                // Nothing to do here, unlike in the skipped records tracker case, because the only
+                // reason for the constraint violations table to be missing is if the index being
+                // built is not unique and we don't need it.
             }
-            indexBuildInfo.setInternalIdents(boost::none,
-                                             std::string{indexStateInfo.getSideWritesTable()},
-                                             std::move(skippedRecordsTrackerIdent),
-                                             std::move(constraintViolationsTrackerIdent));
             indexes.push_back(std::move(indexBuildInfo));
         }
 

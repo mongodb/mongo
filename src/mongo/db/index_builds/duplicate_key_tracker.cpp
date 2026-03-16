@@ -32,16 +32,17 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/bson/util/builder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/collection_crud/container_write.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/key_format.h"
+#include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/sorted_data_interface.h"
@@ -52,9 +53,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/progress_meter.h"
-#include "mongo/util/str.h"
-
-#include <mutex>
 
 #include <boost/optional/optional.hpp>
 
@@ -70,21 +68,13 @@ static constexpr StringData kKeyField = "key"_sd;
 DuplicateKeyTracker::DuplicateKeyTracker(OperationContext* opCtx,
                                          const IndexCatalogEntry* entry,
                                          StringData ident,
-                                         bool tableExists)
-    : _keyConstraintsTable([&]() {
-          auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-          if (tableExists) {
-              return storageEngine->makeTemporaryRecordStoreFromExistingIdent(
-                  opCtx, ident, KeyFormat::Long);
-          } else {
-              return storageEngine->makeTemporaryRecordStore(opCtx, ident, KeyFormat::Long);
-          }
-      }()) {
+                                         LazyRecordStore::CreateMode createMode)
+    : _keyConstraintsTable(opCtx, ident, createMode) {
     invariant(entry->descriptor()->unique());
 }
 
-void DuplicateKeyTracker::keepTemporaryTable() {
-    _keyConstraintsTable->keep();
+void DuplicateKeyTracker::keepTemporaryTable(OperationContext* opCtx) {
+    _keyConstraintsTable.keepTemporaryTable(opCtx);
 }
 
 Status DuplicateKeyTracker::recordKey(OperationContext* opCtx,
@@ -97,6 +87,8 @@ Status DuplicateKeyTracker::recordKey(OperationContext* opCtx,
                 1,
                 "Index build: recording duplicate key conflict on unique index",
                 "index"_attr = indexCatalogEntry->descriptor()->indexName());
+
+    auto& rs = _keyConstraintsTable.getOrCreateTable(opCtx);
 
     // The key_string::Value will be serialized in the format [KeyString][TypeBits]. We need to
     // store the TypeBits for error reporting later on. The RecordId does not need to be stored, so
@@ -114,14 +106,13 @@ Status DuplicateKeyTracker::recordKey(OperationContext* opCtx,
                     "Index build: writing to duplicate key tracker container for primary-driven "
                     "index build.",
                     "index"_attr = indexCatalogEntry->descriptor()->indexName());
-        invariant(_keyConstraintsTable->rs()->keyFormat() == KeyFormat::Long);
-        IntegerKeyedContainer& container = std::get<std::reference_wrapper<IntegerKeyedContainer>>(
-                                               _keyConstraintsTable->rs()->getContainer())
-                                               .get();
+        invariant(rs.keyFormat() == KeyFormat::Long);
+        IntegerKeyedContainer& container =
+            std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs.getContainer()).get();
 
 
         std::vector<RecordId> reservedRidBlock;
-        _keyConstraintsTable->rs()->reserveRecordIds(
+        rs.reserveRecordIds(
             opCtx, *shard_role_details::getRecoveryUnit(opCtx), &reservedRidBlock, 1);
         invariant(reservedRidBlock.size() == 1);
         auto status = container_write::insert(opCtx,
@@ -134,12 +125,11 @@ Status DuplicateKeyTracker::recordKey(OperationContext* opCtx,
         if (!status.isOK())
             return status;
     } else {
-        auto status =
-            _keyConstraintsTable->rs()->insertRecord(opCtx,
-                                                     *shard_role_details::getRecoveryUnit(opCtx),
-                                                     builder.buf(),
-                                                     builder.len(),
-                                                     Timestamp());
+        auto status = rs.insertRecord(opCtx,
+                                      *shard_role_details::getRecoveryUnit(opCtx),
+                                      builder.buf(),
+                                      builder.len(),
+                                      Timestamp());
         if (!status.isOK())
             return status.getStatus();
     }
@@ -163,9 +153,12 @@ boost::optional<SortedDataInterface::DuplicateKey> DuplicateKeyTracker::checkCon
     const CollectionPtr& coll,
     const IndexCatalogEntry* indexCatalogEntry) const {
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
+    auto rs = _keyConstraintsTable.getTableIfExists();
+    if (!rs) {
+        return boost::none;
+    }
 
-    auto constraintsCursor =
-        _keyConstraintsTable->rs()->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+    auto constraintsCursor = rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     auto record = constraintsCursor->next();
 
     auto index = indexCatalogEntry->accessMethod()->asSortedData()->getSortedDataInterface();
@@ -195,17 +188,14 @@ boost::optional<SortedDataInterface::DuplicateKey> DuplicateKeyTracker::checkCon
             fcvSnapshot.isVersionInitialized() &&
             feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
                 VersionContext::getDecoration(opCtx), fcvSnapshot)) {
-            uassertStatusOK(
-                container_write::remove(opCtx,
-                                        *shard_role_details::getRecoveryUnit(opCtx),
-                                        coll,
-                                        std::get<std::reference_wrapper<IntegerKeyedContainer>>(
-                                            _keyConstraintsTable->rs()->getContainer())
-                                            .get(),
-                                        record->id.getLong()));
+            uassertStatusOK(container_write::remove(
+                opCtx,
+                *shard_role_details::getRecoveryUnit(opCtx),
+                coll,
+                std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs->getContainer()).get(),
+                record->id.getLong()));
         } else {
-            _keyConstraintsTable->rs()->deleteRecord(
-                opCtx, *shard_role_details::getRecoveryUnit(opCtx), record->id);
+            rs->deleteRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), record->id);
         }
 
         constraintsCursor->save();

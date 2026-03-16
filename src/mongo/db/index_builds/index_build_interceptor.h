@@ -41,17 +41,14 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/db/yieldable.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/fail_point.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <memory>
-#include <string>
 #include <utility>
-#include <vector>
 
 #include <boost/optional/optional.hpp>
 
@@ -71,13 +68,13 @@ public:
     enum class TrackDuplicates { kNoTrack, kTrack };
 
     /**
-     * If 'resume' is false, creates temporary tables needed during an index build. If 'resume' is
-     * true, uses the temporary tables that were previously created.
+     * Based on the create mode, it either creates temporary tables needed during an index build or
+     * uses the existing temporary tables that were previously created.
      */
     IndexBuildInterceptor(OperationContext* opCtx,
                           const IndexCatalogEntry* entry,
                           const IndexBuildInfo& indexBuildInfo,
-                          bool resume,
+                          LazyRecordStore::CreateMode createMode,
                           bool generateTableWrites);
 
     /**
@@ -92,7 +89,7 @@ public:
      * Keeps the temporary side writes, duplicate key constraint violations, and skipped records
      * tables.
      */
-    void keepTemporaryTables();
+    void keepTemporaryTables(OperationContext* opCtx);
 
     /**
      * Client writes that are concurrent with an index build will have their index updates written
@@ -187,23 +184,26 @@ public:
      */
     boost::optional<MultikeyPaths> getMultikeyPaths() const;
 
-    std::string getSideWritesTableIdent() const {
-        return _sideWritesTracker.getTableIdent();
-    }
-
-    boost::optional<std::string> getDuplicateKeyTrackerTableIdent() const {
-        return _duplicateKeyTracker ? boost::make_optional(_duplicateKeyTracker->getTableIdent())
-                                    : boost::none;
-    }
-
     /**
      * Creates a ContainerSpiller from the _sorterTable.
      */
     IntegerKeyedContainer& getSorterContainer() {
         invariant(_sorterTable);
-        return std::get<std::reference_wrapper<IntegerKeyedContainer>>(
-                   _sorterTable->rs()->getContainer())
-            .get();
+        auto rs = _sorterTable->getTableIfExists();
+        // Sorter table is guaranteed to be created immediately
+        invariant(rs);
+        return std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs->getContainer()).get();
+    }
+
+    void dropTemporaryTables() {
+        if (_sorterTable) {
+            _sorterTable->drop();
+        }
+        if (_duplicateKeyTracker) {
+            _duplicateKeyTracker->dropTemporaryTable();
+        }
+        _skippedRecordTracker.dropTemporaryTable();
+        _sideWritesTracker.dropTemporaryTable();
     }
 
 private:
@@ -221,7 +221,7 @@ private:
     // This temporary record store records all the index keys that we encounter upon collection
     // scan. We will use the _sorterTable for primary-driven index builds to replicate sorting and
     // inserting the sorted index keys into each node's index table.
-    std::unique_ptr<TemporaryRecordStore> _sorterTable;
+    boost::optional<LazyRecordStore> _sorterTable;
 
     // This temporary record store records intercepted keys that will be written into the index by
     // calling drainWritesIntoIndex(). It is owned by the interceptor and dropped along with it.

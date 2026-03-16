@@ -45,7 +45,6 @@
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
-#include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/get_executor.h"
@@ -53,7 +52,6 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_feature_flags_gen.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
@@ -64,14 +62,12 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sorter/container_based_spiller.h"
 #include "mongo/db/sorter/file_based_spiller.h"
-#include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
@@ -96,16 +92,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <exception>
-#include <mutex>
 #include <string>
 #include <utility>
-
-#include <boost/container/flat_set.hpp>
-#include <boost/container/small_vector.hpp>
-#include <boost/container/vector.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
@@ -300,6 +288,12 @@ void MultiIndexBlock::abortIndexBuild(OperationContext* opCtx,
 
             wunit.commit();
             _buildIsCleanedUp = true;
+            if (_resumeStateTempRecordStore) {
+                _resumeStateTempRecordStore->drop();
+            }
+            for (auto& index : _indexes) {
+                index.block->dropTemporaryTables();
+            }
             return;
         } catch (const StorageUnavailableException&) {
             continue;
@@ -354,6 +348,10 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
     if (resumeInfo) {
         _phase = resumeInfo->getPhase();
     }
+
+    _resumeStateTempRecordStore.emplace(opCtx,
+                                        ident::generateNewInternalIdent(kResumableIndexIdentStem),
+                                        LazyRecordStore::CreateMode::deferred);
 
     bool forRecovery = initMode == InitMode::Recovery;
     // Guarantees that exceptions cannot be returned from index builder initialization except for
@@ -548,7 +546,6 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                 if (!_buildUUID) {
                     return;
                 }
-
                 LOGV2(20346,
                       "Index build: initialized",
                       "buildUUID"_attr = _buildUUID,
@@ -1366,7 +1363,15 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
         collectionQueryInfo.rebuildPathArrayness(opCtx, collection);
     }
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-        [this](OperationContext*, boost::optional<Timestamp>) { _buildIsCleanedUp = true; });
+        [this](OperationContext*, boost::optional<Timestamp>) {
+            _buildIsCleanedUp = true;
+            if (_resumeStateTempRecordStore) {
+                _resumeStateTempRecordStore->drop();
+            }
+            for (auto& index : _indexes) {
+                index.block->dropTemporaryTables();
+            }
+        });
 
     return Status::OK();
 }
@@ -1396,16 +1401,7 @@ void MultiIndexBlock::persistResumeState(OperationContext* opCtx,
     invariant(!_buildIsCleanedUp);
     invariant(_buildUUID);
 
-    WriteUnitOfWork wuow(opCtx);
-    if (!_resumeStateTempRecordStore) {
-        _resumeStateTempRecordStore =
-            opCtx->getServiceContext()
-                ->getStorageEngine()
-                ->makeTemporaryRecordStoreForResumableIndexBuild(opCtx, KeyFormat::Long);
-    }
-
-    _writeStateToDisk(opCtx, collection, _resumeStateTempRecordStore.get());
-    wuow.commit();
+    _writeStateToDisk(opCtx, collection, _resumeStateTempRecordStore->getOrCreateTable(opCtx));
 }
 
 void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx,
@@ -1428,21 +1424,12 @@ void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx,
                            .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
         }
 
-        WriteUnitOfWork wuow(opCtx);
-        if (!_resumeStateTempRecordStore) {
-            _resumeStateTempRecordStore =
-                opCtx->getServiceContext()
-                    ->getStorageEngine()
-                    ->makeTemporaryRecordStoreForResumableIndexBuild(opCtx, KeyFormat::Long);
-        }
-
-        _writeStateToDisk(opCtx, collection, _resumeStateTempRecordStore.get());
-        wuow.commit();
+        _writeStateToDisk(opCtx, collection, _resumeStateTempRecordStore->getOrCreateTable(opCtx));
 
         // Ensure all temporary tables are kept around after destruction.
-        _resumeStateTempRecordStore->keep();
+        _resumeStateTempRecordStore->keepTemporaryTable(opCtx);
         for (auto& index : _indexes) {
-            index.block->keepTemporaryTables();
+            index.block->keepTemporaryTables(opCtx);
         }
     }
 
@@ -1451,13 +1438,12 @@ void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx,
 
 void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx,
                                         const CollectionPtr& collection,
-                                        TemporaryRecordStore* tempRS) const {
+                                        RecordStore& rs) const {
     auto obj = _constructStateObject(opCtx, collection);
 
     WriteUnitOfWork wuow(opCtx);
 
-    auto truncateStatus =
-        tempRS->rs()->truncate(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+    auto truncateStatus = rs.truncate(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     if (!truncateStatus.isOK()) {
         LOGV2_ERROR(11231501,
                     "Index build: failed to truncate temporary record store for resumable state",
@@ -1472,11 +1458,11 @@ void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx,
         return;
     }
 
-    auto insertStatus = tempRS->rs()->insertRecord(opCtx,
-                                                   *shard_role_details::getRecoveryUnit(opCtx),
-                                                   obj.objdata(),
-                                                   obj.objsize(),
-                                                   Timestamp());
+    auto insertStatus = rs.insertRecord(opCtx,
+                                        *shard_role_details::getRecoveryUnit(opCtx),
+                                        obj.objdata(),
+                                        obj.objsize(),
+                                        Timestamp());
     if (!insertStatus.isOK()) {
         LOGV2_ERROR(4841501,
                     "Index build: failed to write resumable state to disk",
@@ -1527,30 +1513,17 @@ BSONObj MultiIndexBlock::_constructStateObject(OperationContext* opCtx,
             indexStateInfo = index.bulk->persistDataForShutdown();
         }
 
-        auto indexBuildInterceptor =
-            index.block->getEntry(opCtx, collection)->indexBuildInterceptor();
-        indexStateInfo.setSideWritesTable(indexBuildInterceptor->getSideWritesTableIdent());
-
-        if (auto duplicateKeyTrackerTableIdent =
-                indexBuildInterceptor->getDuplicateKeyTrackerTableIdent()) {
-            auto ident = StringData(*duplicateKeyTrackerTableIdent);
-            indexStateInfo.setDuplicateKeyTrackerTable(ident);
+        auto& indexBuildInfo = index.block->getIndexBuildInfo();
+        indexStateInfo.setSideWritesTable(*indexBuildInfo.sideWritesIdent);
+        indexStateInfo.setSkippedRecordTrackerTable(*indexBuildInfo.skippedRecordsTrackerIdent);
+        // For compatibility with v8.0, the constraintViolationsTrackerIdent is not persisted in the
+        // resume state if the index is not unique given that version used to check explicitly for
+        // this case and fail otherwise.
+        if (index.block->getSpec()["unique"].trueValue()) {
+            if (auto& duplicateKeyTrackerIdent = indexBuildInfo.constraintViolationsTrackerIdent) {
+                indexStateInfo.setDuplicateKeyTrackerTable(*duplicateKeyTrackerIdent);
+            }
         }
-
-        if (!indexBuildInterceptor->getSkippedRecordTracker().getTableIdent()) {
-            // IndexBuildInterceptor requires the the skipped records tracker table ident to
-            // be present in the resume case, so create the table if it hasn't been created yet.
-            // TODO(SERVER-111080): Remove the code to create the skipped records tracker table
-            // here.
-            auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-            auto tempTable = storageEngine->makeTemporaryRecordStore(
-                opCtx,
-                *index.block->getIndexBuildInfo().skippedRecordsTrackerIdent,
-                KeyFormat::Long);
-            tempTable->keep();
-        }
-        indexStateInfo.setSkippedRecordTrackerTable(
-            *index.block->getIndexBuildInfo().skippedRecordsTrackerIdent);
 
         indexStateInfo.setSpec(index.block->getSpec());
         indexStateInfo.setIsMultikey(index.bulk->isMultikey());

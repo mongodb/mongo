@@ -33,6 +33,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/sorter/sorter.h"
+#include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/db/storage/container.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/recovery_unit.h"

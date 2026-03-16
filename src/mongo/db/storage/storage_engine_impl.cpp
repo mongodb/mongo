@@ -785,20 +785,6 @@ std::unique_ptr<TemporaryRecordStore> StorageEngineImpl::makeTemporaryRecordStor
     return std::make_unique<DeferredDropRecordStore>(std::move(rs), this);
 }
 
-std::unique_ptr<TemporaryRecordStore>
-StorageEngineImpl::makeTemporaryRecordStoreForResumableIndexBuild(OperationContext* opCtx,
-                                                                  KeyFormat keyFormat) {
-    std::unique_ptr<RecordStore> rs =
-        _engine->makeTemporaryRecordStore(*shard_role_details::getRecoveryUnit(opCtx),
-                                          generateNewResumableIndexBuildIdent(),
-                                          keyFormat);
-    LOGV2_DEBUG(4921500,
-                1,
-                "Created temporary record store for resumable index build",
-                "ident"_attr = rs->getIdent());
-    return std::make_unique<DeferredDropRecordStore>(std::move(rs), this);
-}
-
 std::unique_ptr<TemporaryRecordStore> StorageEngineImpl::makeTemporaryRecordStoreFromExistingIdent(
     OperationContext* opCtx, StringData ident, KeyFormat keyFormat) {
     auto rs = _engine->getTemporaryRecordStore(

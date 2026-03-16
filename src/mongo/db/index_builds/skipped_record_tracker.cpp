@@ -50,6 +50,7 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -59,13 +60,6 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/shared_buffer_fragment.h"
-
-#include <mutex>
-
-#include <boost/container/flat_set.hpp>
-#include <boost/container/small_vector.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
@@ -77,37 +71,11 @@ static constexpr StringData kRecordIdField = "recordId"_sd;
 
 SkippedRecordTracker::SkippedRecordTracker(OperationContext* opCtx,
                                            StringData ident,
-                                           bool tableExists)
-    : _ident(std::string{ident}) {
-    if (!tableExists) {
-        // TODO(SERVER-110289): Use utility function instead of checking fcvSnapshot.
-        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-        auto isPrimaryDrivenIndexBuild = fcvSnapshot.isVersionInitialized() &&
-            feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
-                VersionContext::getDecoration(opCtx), fcvSnapshot);
-        if (isPrimaryDrivenIndexBuild) {
-            // Proactively create the table in case of primary driven index builds so that the table
-            // gets created at the same timestamp on all replicas.
-            // TODO(SERVER-111080): We should ideally do this for hybrid index builds as well to
-            // keep things simple.
-            _skippedRecordsTable =
-                opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
-                    opCtx, _ident, KeyFormat::Long);
-        }
-        return;
-    }
+                                           LazyRecordStore::CreateMode createMode)
+    : _skippedRecordsTable(opCtx, ident, createMode) {}
 
-    // Only initialize the table if it already exists. Otherwise, lazily initialize table when we
-    // record the first document.
-    _skippedRecordsTable =
-        opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStoreFromExistingIdent(
-            opCtx, _ident, KeyFormat::Long);
-}
-
-void SkippedRecordTracker::keepTemporaryTable() {
-    if (_skippedRecordsTable) {
-        _skippedRecordsTable->keep();
-    }
+void SkippedRecordTracker::keepTemporaryTable(OperationContext* opCtx) {
+    _skippedRecordsTable.keepTemporaryTable(opCtx);
 }
 
 void SkippedRecordTracker::record(OperationContext* opCtx,
@@ -117,14 +85,7 @@ void SkippedRecordTracker::record(OperationContext* opCtx,
     recordId.serializeToken(kRecordIdField, &builder);
     BSONObj toInsert = builder.obj();
 
-    // Lazily initialize table when we record the first document.
-    if (!_skippedRecordsTable) {
-        WriteUnitOfWork wuow(opCtx);
-        _skippedRecordsTable =
-            opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
-                opCtx, _ident, KeyFormat::Long);
-        wuow.commit();
-    }
+    auto& rs = _skippedRecordsTable.getOrCreateTable(opCtx);
 
     writeConflictRetry(
         opCtx, "recordSkippedRecordTracker", NamespaceString::kIndexBuildEntryNamespace, [&]() {
@@ -142,14 +103,13 @@ void SkippedRecordTracker::record(OperationContext* opCtx,
 
                 // We guarantee that the container is an integer container because the skipped
                 // record tracker initialized above has KeyFormat::Long.
-                invariant(_skippedRecordsTable->rs()->keyFormat() == KeyFormat::Long);
+                invariant(rs.keyFormat() == KeyFormat::Long);
                 IntegerKeyedContainer& container =
-                    std::get<std::reference_wrapper<IntegerKeyedContainer>>(
-                        _skippedRecordsTable->rs()->getContainer())
+                    std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs.getContainer())
                         .get();
 
                 std::vector<RecordId> reservedRidBlock;
-                _skippedRecordsTable->rs()->reserveRecordIds(
+                rs.reserveRecordIds(
                     opCtx, *shard_role_details::getRecoveryUnit(opCtx), &reservedRidBlock, 1);
                 invariant(reservedRidBlock.size() == 1);
 
@@ -162,12 +122,11 @@ void SkippedRecordTracker::record(OperationContext* opCtx,
                     std::span<const char>(toInsert.objdata(), toInsert.objsize()),
                     container::ExistingKeyPolicy::overwrite));
             } else {
-                uassertStatusOK(_skippedRecordsTable->rs()
-                                    ->insertRecord(opCtx,
-                                                   *shard_role_details::getRecoveryUnit(opCtx),
-                                                   toInsert.objdata(),
-                                                   toInsert.objsize(),
-                                                   Timestamp::min())
+                uassertStatusOK(rs.insertRecord(opCtx,
+                                                *shard_role_details::getRecoveryUnit(opCtx),
+                                                toInsert.objdata(),
+                                                toInsert.objsize(),
+                                                Timestamp::min())
                                     .getStatus());
             }
             wuow.commit();
@@ -175,18 +134,13 @@ void SkippedRecordTracker::record(OperationContext* opCtx,
 }
 
 bool SkippedRecordTracker::areAllRecordsApplied(OperationContext* opCtx) const {
-    if (!_skippedRecordsTable) {
+    auto rs = _skippedRecordsTable.getTableIfExists();
+    if (!rs) {
         return true;
     }
-    auto cursor =
-        _skippedRecordsTable->rs()->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
-    auto record = cursor->next();
-
+    auto cursor = rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     // The table is empty only when all writes are applied.
-    if (!record)
-        return true;
-
-    return false;
+    return !cursor->next();
 }
 
 Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
@@ -198,7 +152,9 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
 
     dassert(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
         collection->ns(), keyGenerationOnly ? MODE_IX : MODE_X));
-    if (!_skippedRecordsTable) {
+
+    auto recordStore = _skippedRecordsTable.getTableIfExists();
+    if (!recordStore) {
         return Status::OK();
     }
 
@@ -235,7 +191,6 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
     SharedBufferFragmentBuilder pooledBuilder(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
     auto& containerPool = PreallocatedContainerPool::get(opCtx);
 
-    auto recordStore = _skippedRecordsTable->rs();
     auto cursor = recordStore->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     while (auto record = cursor->next()) {
         const BSONObj doc = record->data.toBson();

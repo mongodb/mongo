@@ -51,6 +51,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/ttl/ttl_collection_cache.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -80,9 +81,9 @@ IndexBuildBlock::IndexBuildBlock(const NamespaceString& nss,
                                  boost::optional<UUID> indexBuildUUID)
     : _nss(nss), _spec(spec.getOwned()), _method(method), _buildUUID(indexBuildUUID) {}
 
-void IndexBuildBlock::keepTemporaryTables() {
+void IndexBuildBlock::keepTemporaryTables(OperationContext* opCtx) {
     if (_indexBuildInterceptor) {
-        _indexBuildInterceptor->keepTemporaryTables();
+        _indexBuildInterceptor->keepTemporaryTables(opCtx);
     }
 }
 
@@ -131,8 +132,12 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
             return status;
     }
 
-    _indexBuildInterceptor = std::make_unique<IndexBuildInterceptor>(
-        opCtx, writableEntry, indexBuildInfo, /*resume=*/true, generateTableWrites);
+    _indexBuildInterceptor =
+        std::make_unique<IndexBuildInterceptor>(opCtx,
+                                                writableEntry,
+                                                indexBuildInfo,
+                                                LazyRecordStore::CreateMode::openExisting,
+                                                generateTableWrites);
     writableEntry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
 
     _completeInit(opCtx, collection);
@@ -173,11 +178,22 @@ Status IndexBuildBlock::init(OperationContext* opCtx,
     }
 
     if (isBackgroundBuilding(_method)) {
+        // Primary-driven index builds use replicated tables rather than temporary local tables, so
+        // they need to be created at a consistent timestamp on all nodes. Currently this is done by
+        // creating them eagerly rather than as needed.
+        // TODO(SERVER-110289): Use utility function instead of checking fcvSnapshot.
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        auto isPrimaryDrivenIndexBuild = fcvSnapshot.isVersionInitialized() &&
+            feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+                VersionContext::getDecoration(opCtx), fcvSnapshot);
+        auto mode = isPrimaryDrivenIndexBuild ? LazyRecordStore::CreateMode::immediate
+                                              : LazyRecordStore::CreateMode::deferred;
+
         auto indexCatalog = collection->getIndexCatalog();
         auto indexCatalogEntry = indexCatalog->getWritableEntryByName(
             opCtx, getIndexName(), IndexCatalog::InclusionPolicy::kUnfinished);
         _indexBuildInterceptor = std::make_unique<IndexBuildInterceptor>(
-            opCtx, indexCatalogEntry, *_indexBuildInfo, /*resume=*/false, generateTableWrites);
+            opCtx, indexCatalogEntry, *_indexBuildInfo, mode, generateTableWrites);
         indexCatalogEntry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
     }
 

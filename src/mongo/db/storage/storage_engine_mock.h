@@ -101,10 +101,6 @@ public:
                                                                    KeyFormat keyFormat) final {
         return {};
     }
-    std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStoreForResumableIndexBuild(
-        OperationContext* opCtx, KeyFormat keyFormat) final {
-        return {};
-    }
     std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStoreFromExistingIdent(
         OperationContext* opCtx, StringData ident, KeyFormat keyFormat) final {
         return {};

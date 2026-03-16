@@ -50,7 +50,6 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
 #include "mongo/otel/metrics/metric_unit.h"
@@ -109,9 +108,12 @@ Status SideWritesTracker::bufferSideWrite(OperationContext* opCtx,
             sharedCounter->fetchAndSubtract(size);
         });
 
+    auto rs = _table.getTableIfExists();
+    invariant(rs);
+
     // Reserve the record ids which will be used for either the table insert or the container write.
     std::vector<RecordId> rids;
-    _table->rs()->reserveRecordIds(
+    rs->reserveRecordIds(
         opCtx, *shard_role_details::getRecoveryUnit(opCtx), &rids, toInsert.size());
 
     // TODO(SERVER-110289): Use utility function instead of checking fcvSnapshot.
@@ -127,10 +129,9 @@ Status SideWritesTracker::bufferSideWrite(OperationContext* opCtx,
                 "index"_attr = indexCatalogEntry->descriptor()->indexName());
 
     if (primaryDrivenFeatureFlagEnabled) {
-        invariant(_table->rs()->keyFormat() == KeyFormat::Long);
+        invariant(rs->keyFormat() == KeyFormat::Long);
         IntegerKeyedContainer& container =
-            std::get<std::reference_wrapper<IntegerKeyedContainer>>(_table->rs()->getContainer())
-                .get();
+            std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs->getContainer()).get();
 
         for (size_t i = 0; i < toInsert.size(); ++i) {
             auto& doc = toInsert[i];
@@ -161,16 +162,12 @@ Status SideWritesTracker::bufferSideWrite(OperationContext* opCtx,
     // but rather with the timestamp of the owning operation.
     std::vector<Timestamp> timestamps(records.size());
 
-    return _table->rs()->insertRecords(
+    return rs->insertRecords(
         opCtx, *shard_role_details::getRecoveryUnit(opCtx), &records, timestamps);
 }
 
-void SideWritesTracker::keepTemporaryTable() {
-    _table->keep();
-}
-
-std::string SideWritesTracker::getTableIdent() const {
-    return std::string{_table->rs()->getIdent()};
+void SideWritesTracker::keepTemporaryTable(OperationContext* opCtx) {
+    _table.keepTemporaryTable(opCtx);
 }
 
 void SideWritesTracker::_checkDrainPhaseFailPoint(OperationContext* opCtx,
@@ -238,6 +235,9 @@ Status SideWritesTracker::drainWritesIntoIndex(
     DrainYieldPolicy drainYieldPolicy) {
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
+    auto rs = _table.getTableIfExists();
+    invariant(rs);
+
     // These are used for logging only.
     int64_t totalDeleted = 0;
     int64_t totalInserted = 0;
@@ -304,7 +304,7 @@ Status SideWritesTracker::drainWritesIntoIndex(
         int32_t batchSize = 0;
         int64_t batchSizeBytes = 0;
 
-        auto cursor = _table->rs()->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+        auto cursor = rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
 
         // We use an ordered container because the order of deletion for the records in the side
         // table matters.
@@ -368,8 +368,7 @@ Status SideWritesTracker::drainWritesIntoIndex(
         for (const auto& recordId : recordsAddedToIndex) {
             if (primaryDrivenFeatureFlagEnabled) {
                 IntegerKeyedContainer& container =
-                    std::get<std::reference_wrapper<IntegerKeyedContainer>>(
-                        _table->rs()->getContainer())
+                    std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs->getContainer())
                         .get();
                 auto status = container_write::remove(opCtx,
                                                       *shard_role_details::getRecoveryUnit(opCtx),
@@ -380,8 +379,7 @@ Status SideWritesTracker::drainWritesIntoIndex(
                     return status;
                 }
             } else {
-                _table->rs()->deleteRecord(
-                    opCtx, *shard_role_details::getRecoveryUnit(opCtx), recordId);
+                rs->deleteRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), recordId);
             }
         }
 
@@ -456,10 +454,11 @@ Status SideWritesTracker::drainWritesIntoIndex(
 
 
 bool SideWritesTracker::checkAllWritesApplied(OperationContext* opCtx, bool fatal) const {
-    invariant(_table);
+    auto rs = _table.getTableIfExists();
+    invariant(rs);
 
     // The table is empty only when all writes are applied.
-    auto cursor = _table->rs()->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+    auto cursor = rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     auto record = cursor->next();
     if (fatal) {
         invariant(

@@ -139,9 +139,6 @@ public:
                                                                    StringData ident,
                                                                    KeyFormat keyFormat) override;
 
-    std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStoreForResumableIndexBuild(
-        OperationContext* opCtx, KeyFormat keyFormat) override;
-
     std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStoreFromExistingIdent(
         OperationContext* opCtx, StringData ident, KeyFormat keyFormat) override;
 

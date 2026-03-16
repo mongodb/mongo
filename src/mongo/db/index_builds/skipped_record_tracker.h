@@ -35,14 +35,12 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
+#include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
-#include <memory>
-#include <string>
 
 #include <boost/optional/optional.hpp>
 
@@ -65,7 +63,7 @@ public:
 
     SkippedRecordTracker(OperationContext* opCtx,
                          StringData skippedRecordsTrackerIdent,
-                         bool tableExists);
+                         LazyRecordStore::CreateMode createMode);
 
     /**
      * Records a RecordId that was unable to be indexed due to a key generation error. At the
@@ -75,10 +73,10 @@ public:
     void record(OperationContext* opCtx, const CollectionPtr& coll, const RecordId& recordId);
 
     /**
-     * Keeps the temporary table managed by this tracker. This is a no-op when the table is empty or
-     * has not yet been initialized.
+     * Keeps the temporary table managed by this tracker. Creates the table if it has not yet been
+     * created.
      */
-    void keepTemporaryTable();
+    void keepTemporaryTable(OperationContext* opCtx);
 
     /**
      * Returns true if the temporary table is empty.
@@ -97,20 +95,19 @@ public:
         const IndexCatalogEntry* indexCatalogEntry,
         RetrySkippedRecordMode mode = RetrySkippedRecordMode::kKeyGenerationAndInsertion);
 
-    boost::optional<std::string> getTableIdent() const {
-        return _skippedRecordsTable
-            ? boost::make_optional(std::string{_skippedRecordsTable->rs()->getIdent()})
-            : boost::none;
-    }
-
     boost::optional<MultikeyPaths> getMultikeyPaths() const {
         return _multikeyPaths;
     }
 
-private:
-    std::string _ident;
+    /**
+     * Schedules the temporary table for drop.
+     */
+    void dropTemporaryTable() {
+        _skippedRecordsTable.drop();
+    }
 
-    std::unique_ptr<TemporaryRecordStore> _skippedRecordsTable;
+private:
+    LazyRecordStore _skippedRecordsTable;
 
     AtomicWord<std::uint32_t> _skippedRecordCounter{0};
 

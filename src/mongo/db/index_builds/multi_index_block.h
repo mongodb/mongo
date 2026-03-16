@@ -45,6 +45,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
+#include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/modules.h"
@@ -351,7 +352,7 @@ private:
 
     void _writeStateToDisk(OperationContext* opCtx,
                            const CollectionPtr& collection,
-                           TemporaryRecordStore* tempRS) const;
+                           RecordStore& rs) const;
 
     BSONObj _constructStateObject(OperationContext* opCtx, const CollectionPtr& collection) const;
 
@@ -415,7 +416,6 @@ private:
     const Collection* _collForScan = nullptr;
 
     // The temporary record store used for persisting the resume state of a resumable index build.
-    // This value may be null if the index build has not yet had its state persisted.
-    std::unique_ptr<TemporaryRecordStore> _resumeStateTempRecordStore;
+    boost::optional<LazyRecordStore> _resumeStateTempRecordStore;
 };
 }  // namespace MONGO_MOD_PUBLIC mongo

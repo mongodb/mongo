@@ -38,7 +38,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/client.h"
-#include "mongo/db/collection_crud/container_write.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index_builds/duplicate_key_tracker.h"
@@ -61,13 +60,6 @@
 #include <cstdint>
 #include <vector>
 
-#include <boost/container/flat_set.hpp>
-#include <boost/container/small_vector.hpp>
-#include <boost/container/vector.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
 
@@ -76,27 +68,27 @@ namespace mongo {
 IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
                                              const IndexCatalogEntry* entry,
                                              const IndexBuildInfo& indexBuildInfo,
-                                             bool resume,
+                                             LazyRecordStore::CreateMode createMode,
                                              bool generateTableWrites)
     : _generateTableWrites(generateTableWrites),
       _sideWritesTracker([&]() {
           uassert(10709201, "sideWritesIdent is not provided", indexBuildInfo.sideWritesIdent);
-          return SideWritesTracker{opCtx, *indexBuildInfo.sideWritesIdent, resume};
+          return SideWritesTracker{opCtx, *indexBuildInfo.sideWritesIdent, createMode};
       }()),
       _skippedRecordTracker([&]() {
           uassert(10709202,
                   "skippedRecordsTrackerIdent is not provided",
                   indexBuildInfo.skippedRecordsTrackerIdent);
           return SkippedRecordTracker(
-              opCtx, *indexBuildInfo.skippedRecordsTrackerIdent, /*tableExists=*/resume);
+              opCtx, *indexBuildInfo.skippedRecordsTrackerIdent, createMode);
       }()),
-      _skipNumAppliedCheck(resume) {
+      _skipNumAppliedCheck(createMode == LazyRecordStore::CreateMode::openExisting) {
     if (entry->descriptor()->unique()) {
         uassert(10709203,
                 "constraintViolationsTrackerIdent is not provided",
                 indexBuildInfo.constraintViolationsTrackerIdent);
         _duplicateKeyTracker = std::make_unique<DuplicateKeyTracker>(
-            opCtx, entry, *indexBuildInfo.constraintViolationsTrackerIdent, /*tableExists=*/resume);
+            opCtx, entry, *indexBuildInfo.constraintViolationsTrackerIdent, createMode);
     }
     // TODO(SERVER-110289): Use utility function instead of checking fcvSnapshot.
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
@@ -105,19 +97,22 @@ IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
             VersionContext::getDecoration(opCtx), fcvSnapshot);
     if (isPrimaryDrivenIndexBuild) {
         uassert(11411100, "sorterIdent is not provided", indexBuildInfo.sorterIdent);
-        uassert(11411101, "Resumability with the sorter is not supported", !resume);
-        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-        _sorterTable = storageEngine->makeTemporaryRecordStore(
-            opCtx, *indexBuildInfo.sorterIdent, KeyFormat::Long);
+        uassert(11411101,
+                "Primary-driven index builds require immediate table creation",
+                createMode == LazyRecordStore::CreateMode::immediate);
+        _sorterTable = LazyRecordStore(opCtx, *indexBuildInfo.sorterIdent, createMode);
     }
 }
 
-void IndexBuildInterceptor::keepTemporaryTables() {
-    _sideWritesTracker.keepTemporaryTable();
+void IndexBuildInterceptor::keepTemporaryTables(OperationContext* opCtx) {
+    _sideWritesTracker.keepTemporaryTable(opCtx);
     if (_duplicateKeyTracker) {
-        _duplicateKeyTracker->keepTemporaryTable();
+        _duplicateKeyTracker->keepTemporaryTable(opCtx);
     }
-    _skippedRecordTracker.keepTemporaryTable();
+    _skippedRecordTracker.keepTemporaryTable(opCtx);
+    if (_sorterTable) {
+        _sorterTable->keepTemporaryTable(opCtx);
+    }
 }
 
 Status IndexBuildInterceptor::recordDuplicateKey(OperationContext* opCtx,
