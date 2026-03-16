@@ -81,15 +81,13 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListExtensions::createFromBso
             nss.isAdminDB() && nss.isCollectionlessAggregateNS());
 
     // Get the loaded extensions and insert them in the queue with the format
-    // {"extensionName": "...", "extensionOptions": {...}}. The queue won't be
-    // populated until the first call to getNext().
+    // {"extensionName": "..."}. The queue won't be populated until the first call to getNext().
     DocumentSourceQueue::DeferredQueue deferredQueue{[]() {
         const auto loadedExtensions = extension::host::ExtensionLoader::getLoadedExtensions();
         std::deque<DocumentSource::GetNextResult> queue;
 
-        for (const auto& [extensionName, config] : loadedExtensions) {
-            queue.push_back(Document(BSON("extensionName" << extensionName << "extensionOptions"
-                                                          << YAML::Dump(config.extOptions))));
+        for (const auto& [extensionName, _] : loadedExtensions) {
+            queue.push_back(Document(BSON("extensionName" << extensionName)));
         }
 
         // Canonicalize output order of results. Sort in ascending order so that

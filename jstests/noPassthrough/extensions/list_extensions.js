@@ -163,9 +163,9 @@ describe("$listExtensions with some extensions loaded", function () {
             .aggregate([{$listExtensions: {}}])
             .toArray();
         const expected = [
-            {"extensionName": libFooExtension, "extensionOptions": "{}"},
-            {"extensionName": libParseExtension, "extensionOptions": "checkMax: false\nmax: 1"},
-            {"extensionName": libTestOptionsExtension, "extensionOptions": "optionA: true"},
+            {"extensionName": libFooExtension},
+            {"extensionName": libParseExtension},
+            {"extensionName": libTestOptionsExtension},
         ];
         assert.eq(actual, expected);
     }
