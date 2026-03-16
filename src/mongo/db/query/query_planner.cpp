@@ -1854,9 +1854,6 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
 
         auto lookupStage = dynamic_cast<DocumentSourceLookUp*>(innerStage);
         if (lookupStage) {
-            tassert(6369000,
-                    "This $lookup stage should be compatible with SBE",
-                    lookupStage->sbeCompatibility() != SbeCompatibility::notCompatible);
             auto [strategy, idxEntry, scanDirection] =
                 QueryPlannerAnalysis::determineLookupStrategy(
                     lookupStage->getFromNs(),

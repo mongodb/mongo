@@ -144,6 +144,42 @@ struct CompatiblePipelineStages {
     bool unpackBucket : 1;
 };
 
+SbeCompatibility determineSbeCompatibility(DocumentSourceLookUp* lookup) {
+    // This stage has the SBE compatibility as least the same as that of the expression context.
+    SbeCompatibility sbeCompatibility = lookup->getExpCtx()->getSbeCompatibility();
+    if (lookup->hasUnwindSrc()) {
+        // TODO SERVER-118544: Read the knob value through QueryKnobConfiguration.
+        if (internalQuerySlotBasedExecutionDisableLookupUnwindPushdown.loadRelaxed()) {
+            sbeCompatibility = SbeCompatibility::notCompatible;
+        } else if (!feature_flags::gFeatureFlagSbeEqLookupUnwind.checkWithContext(
+                       lookup->getExpCtx()->getVersionContext(),
+                       *lookup->getExpCtx()->getIfrContext(),
+                       serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            sbeCompatibility = std::min(sbeCompatibility, SbeCompatibility::requiresTrySbe);
+        }
+    }
+    if (lookup->hasPipeline() || lookup->hasAdditionalFilter()) {
+        sbeCompatibility = SbeCompatibility::notCompatible;
+    }
+    auto sbeCompatibleByStageConfig =
+        // We currently only support lowering equi-join that uses localField/foreignField
+        // syntax.
+        lookup->getLocalField() &&
+        lookup->getForeignField()
+        // SBE doesn't support match-like paths with numeric components. (Note: "as" field is a
+        // project-like field and numbers in it are treated as literal names of fields rather
+        // than indexes into arrays, which is compatible with SBE.)
+        && !FieldRef(lookup->getLocalField()->fullPath()).hasNumericPathComponents() &&
+        !FieldRef(lookup->getForeignField()->fullPath()).hasNumericPathComponents()
+        // We currently don't lower $lookup against views ('_fromNs' does not correspond to a
+        // view).
+        && lookup->getExpCtx()->getResolvedNamespace(lookup->getFromNs()).pipeline.empty();
+    if (!sbeCompatibleByStageConfig) {
+        sbeCompatibility = SbeCompatibility::notCompatible;
+    }
+    return sbeCompatibility;
+}
+
 // Determine if 'stage' is eligible for SBE. Return false if 'stage' is ineligible, either because
 // it is disallowed by 'allowedStages' or because it requires functionality that cannot be
 // translated to SBE.
@@ -173,7 +209,8 @@ bool pipelineStageIsCompatible(const OperationContext* opCtx,
         return true;
     } else if (stageId == DocumentSourceLookUp::id) {
         DocumentSourceLookUp* lookupStage = static_cast<DocumentSourceLookUp*>(stage.get());
-        if (!allowedStages.lookup || lookupStage->sbeCompatibility() < minRequiredCompatibility) {
+        if (!allowedStages.lookup ||
+            determineSbeCompatibility(lookupStage) < minRequiredCompatibility) {
             return false;
         }
 

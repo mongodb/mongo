@@ -41,10 +41,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_lookup_gen.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
-#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
@@ -287,10 +285,6 @@ public:
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const final;
 
-    SbeCompatibility sbeCompatibility() const {
-        return _sbeCompatibility;
-    }
-
     const NamespaceString& getFromNs() const {
         return _fromNs;
     }
@@ -403,21 +397,6 @@ private:
      */
     bool foreignShardedLookupAllowed() const;
 
-    /**
-     * Checks conditions necessary for SBE compatibility and sets '_sbeCompatibility' enum. Note:
-     * when optimizing the pipeline the flag might be modified.
-     */
-    void determineSbeCompatibility();
-
-    /**
-     * Sets '_sbeCompatibility' enum to 'maxCompatibility' iff that *reduces* the compatibility.
-     */
-    inline void downgradeSbeCompatibility(SbeCompatibility maxCompatibility) {
-        if (maxCompatibility < _sbeCompatibility) {
-            _sbeCompatibility = maxCompatibility;
-        }
-    }
-
     NamespaceString _fromNs;
     NamespaceString _resolvedNs;
     bool _fromNsIsAView;
@@ -443,9 +422,6 @@ private:
     // The ExpressionContext used when performing aggregation pipelines against the '_resolvedNs'
     // namespace.
     boost::intrusive_ptr<ExpressionContext> _fromExpCtx;
-
-    // Can this $lookup be pushed down into SBE?
-    SbeCompatibility _sbeCompatibility = SbeCompatibility::notCompatible;
 
     // The aggregation pipeline defined with the user request, prior to optimization and view
     // resolution. If the user did not define a pipeline this will be 'boost::none'. Subpipelines on

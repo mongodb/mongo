@@ -49,25 +49,19 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_documents.h"
 #include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
-#include "mongo/db/pipeline/document_source_merge_gen.h"
+#include "mongo/db/pipeline/document_source_lookup_gen.h"
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
-#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
-#include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
 #include "mongo/db/pipeline/sort_reorder_helpers.h"
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/query/allowed_contexts.h"
-#include "mongo/db/query/query_execution_knobs_gen.h"
-#include "mongo/db/query/query_integration_knobs_gen.h"
-#include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/topology/sharding_state.h"
-#include "mongo/db/views/resolved_view.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
@@ -532,27 +526,6 @@ bool DocumentSourceLookUp::foreignShardedLookupAllowed() const {
         gFeatureFlagAllowAdditionalParticipants.isEnabled(fcvSnapshot);
 }
 
-void DocumentSourceLookUp::determineSbeCompatibility() {
-    _sbeCompatibility = getExpCtx()->getSbeCompatibility();
-    // This stage has the SBE compatibility as least the same as that of the expression context.
-    auto sbeCompatibleByStageConfig =
-        // We currently only support lowering equi-join that uses localField/foreignField
-        // syntax.
-        !_userPipeline && _localField &&
-        _foreignField
-        // SBE doesn't support match-like paths with numeric components. (Note: "as" field is a
-        // project-like field and numbers in it are treated as literal names of fields rather
-        // than indexes into arrays, which is compatible with SBE.)
-        && !FieldRef(_localField->fullPath()).hasNumericPathComponents() &&
-        !FieldRef(_foreignField->fullPath()).hasNumericPathComponents()
-        // We currently don't lower $lookup against views ('_fromNs' does not correspond to a
-        // view).
-        && getExpCtx()->getResolvedNamespace(_fromNs).pipeline.empty();
-    if (!sbeCompatibleByStageConfig) {
-        _sbeCompatibility = SbeCompatibility::notCompatible;
-    }
-}
-
 StageConstraints DocumentSourceLookUp::constraints(PipelineSplitState pipeState) const {
     HostTypeRequirement hostRequirement;
     bool nominateMergingShard = false;
@@ -670,15 +643,6 @@ DocumentSourceContainer::iterator DocumentSourceLookUp::optimizeAt(
     // would be hard to do so here as it requires several inputs we do not have. It is also hard to
     // move that determination earlier as it occurs in the deep stack under createLegacyExecutor().
     if (nextUnwind && !_unwindSrc && nextUnwind->getUnwindPath() == _as.fullPath()) {
-        // TODO SERVER-118544: Read the knob value through QueryKnobConfiguration.
-        if (internalQuerySlotBasedExecutionDisableLookupUnwindPushdown.loadRelaxed()) {
-            downgradeSbeCompatibility(SbeCompatibility::notCompatible);
-        } else if (!feature_flags::gFeatureFlagSbeEqLookupUnwind.checkWithContext(
-                       getExpCtx()->getVersionContext(),
-                       *getExpCtx()->getIfrContext(),
-                       serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            downgradeSbeCompatibility(SbeCompatibility::requiresTrySbe);
-        }
         _unwindSrc = std::move(nextUnwind);
         container->erase(std::next(itr));
         return itr;
@@ -767,8 +731,6 @@ DocumentSourceContainer::iterator DocumentSourceLookUp::optimizeAt(
         return std::next(itr);
     }
 
-    // We cannot yet lower $LUM (combined $lookup + $unwind + $match) stages to SBE.
-    _sbeCompatibility = SbeCompatibility::notCompatible;
     bool needToOptimize = false;
     if (!_matchSrc) {
         _matchSrc = nextMatch;
@@ -782,11 +744,11 @@ DocumentSourceContainer::iterator DocumentSourceLookUp::optimizeAt(
     container->erase(std::next(itr));
 
     // We have internalized a $match, but have not yet computed the descended $match that should
-    // be applied to our queries. Note that we have to optimze the MatchExpression that we pass into
-    // 'descendMatchOnPath' because the call to 'joinMatchWith' rebuilds the new $match stage using
-    // each stage's unoptimized BSON predicate. The unoptimized BSON may contain predicates that
-    // were optimized away, so that the checks performed by 'computeWhetherMatchOnlyOnAs' may no
-    // longer be true for the combined $match's MatchExpression.
+    // be applied to our queries. Note that we have to optimize the MatchExpression that we pass
+    // into 'descendMatchOnPath' because the call to 'joinMatchWith' rebuilds the new $match stage
+    // using each stage's unoptimized BSON predicate. The unoptimized BSON may contain predicates
+    // that were optimized away, so that the checks performed by 'computeWhetherMatchOnlyOnAs' may
+    // no longer be true for the combined $match's MatchExpression.
     _additionalFilter =
         DocumentSourceMatch::descendMatchOnPath(
             needToOptimize ? optimizeMatchExpression(
@@ -1241,7 +1203,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
         lookupStage->_unwindSrc = boost::dynamic_pointer_cast<DocumentSourceUnwind>(
             DocumentSourceUnwind::createFromBson(unwindSpec.firstElement(), pExpCtx));
     }
-    lookupStage->determineSbeCompatibility();
     return lookupStage;
 }
 
