@@ -44,11 +44,8 @@ _AUBSAN_TASK_FACTOR_OVERRIDES = [
     {"task": r"noPassthrough", "factor": 0.25},
     {"task": r"sharded_causally_consistent_jscore_passthrough", "factor": 0.125},
     {"task": "sharded_causally_consistent_read_concern_snapshot_passthrough", "factor": 0.25},
-    {
-        "task": r"sharding_jscore_passthrough.*",
-        "factor": 0.25,
-    },
-    {"task": r"sharding*stepdown*jscore_passthrough", "factor": 0.125},
+    {"task": r"sharding_jscore_passthrough.*", "factor": 0.25},
+    {"task": r"sharding.*stepdown.*jscore_passthrough.*", "factor": 0.125},
 ]
 # Apply factor for a task based on the build variant it is running on.
 VARIANT_TASK_FACTOR_OVERRIDES = {
@@ -72,6 +69,8 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
         {"task": r"fcv_upgrade_downgrade_sharded_collections_jscore_passthrough.*", "factor": 0.27},
         {"task": r"sharding_kill_stepdown_terminate_jscore_passthrough.*", "factor": 0.125},
         {"task": r"bulk_write_targeted_override.*", "factor": 0.25},
+        {"task": r"sharding_stepdown_fcv_upgrade_downgrade_jscore_passthrough.*", "factor": 0.125},
+        {"task": "sharding_jscore_passthrough_priority_ports", "factor": 0.25},
     ],
     "enterprise-rhel8-debug-tsan-all-feature-flags": [
         # Lower the default resmoke_jobs_factor for TSAN to reduce memory pressure for this suite,
@@ -84,6 +83,8 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
         },
         {"task": r"fcv_upgrade_downgrade_replica_sets_jscore_passthrough.*", "factor": 0.27},
         {"task": r"sharding_kill_stepdown_terminate_jscore_passthrough.*", "factor": 0.125},
+        {"task": r"sharding_stepdown_fcv_upgrade_downgrade_jscore_passthrough.*", "factor": 0.125},
+        {"task": "sharding_jscore_passthrough_priority_ports", "factor": 0.25},
     ],
     "rhel8-debug-aubsan-classic-engine": _AUBSAN_TASK_FACTOR_OVERRIDES,
     "rhel8-debug-aubsan-all-feature-flags": _AUBSAN_TASK_FACTOR_OVERRIDES,
