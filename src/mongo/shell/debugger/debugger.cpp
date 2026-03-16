@@ -370,6 +370,11 @@ bool DebuggerObject::storeStackFramesCallback(JSContext* cx, unsigned argc, JS::
             JS::UniqueChars urlChars = JS_EncodeStringToUTF8(cx, urlStr);
             url = urlChars ? std::string(urlChars.get()) : "unknown";
         }
+        if (url == "") {
+            // Not a valid stackframe to record/relay.
+            // JS handlers should avoid this situation, but this is defensive.
+            continue;
+        }
 
         // Extract line number
         JS::RootedValue lineVal(cx);

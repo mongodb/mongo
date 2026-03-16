@@ -9,10 +9,18 @@
         return;
     }
 
+    const url = frame.script?.url;
+    if (!url) {
+        // Shell is terminated or in the process of - don't pause.
+        // eg: This can occur from Mochalite exceptions that are running on shell exit,
+        // and the final "frame" is back in the C++ execution that invoked the runner.
+        return;
+    }
+
     // Store exception location info
     globalThis.__pausedLocation = {
-        script: frame.script?.url ?? "unknown",
-        line: frame.script?.getOffsetLocation(frame.offset)?.lineNumber ?? 0,
+        script: url,
+        line: frame.script.getOffsetLocation(frame.offset)?.lineNumber ?? 0,
     };
 
     // Store the exception value for display
