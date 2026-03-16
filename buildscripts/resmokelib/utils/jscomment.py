@@ -11,7 +11,7 @@ _JSTEST_TAGS_RE = re.compile(r".*@tags\s*:\s*(\[[^\]]*\])", re.DOTALL)
 
 
 @functools.cache
-def get_tags(pathname):
+def get_tags(pathname: str) -> list[str]:
     """Return the list of tags found in the (JS-style) comments of 'pathname'.
 
     The definition can span multiple lines, use unquoted,
@@ -68,7 +68,7 @@ def get_tags(pathname):
     return []
 
 
-def _strip_jscomments(string):
+def _strip_jscomments(string: str | bytes) -> str:
     """Strip JS comments from a 'string'.
 
     Given a string 'string' that represents the contents after the "@tags:"

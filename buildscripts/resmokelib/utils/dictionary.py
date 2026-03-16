@@ -1,9 +1,9 @@
 """Utility functions for working with Dict-type structures."""
 
-from typing import MutableMapping
+from typing import Any, MutableMapping
 
 
-def merge_dicts(dict1, dict2):
+def merge_dicts(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:
     """Recursively merges dict2 into dict1."""
     if not (isinstance(dict1, MutableMapping) and isinstance(dict2, MutableMapping)):
         return dict2
@@ -19,7 +19,9 @@ def merge_dicts(dict1, dict2):
     return dict1
 
 
-def extend_dict_lists(dict1, dict2):
+def extend_dict_lists(
+    dict1: MutableMapping[str, Any] | list[Any], dict2: MutableMapping[str, Any] | list[Any]
+) -> MutableMapping[str, Any] | list[Any]:
     """Recursively merges dict2 into dict1, by extending the lists on dict1.
 
     All terminal elements in dict2 must be lists. For each terminal element in dict2, the matching
@@ -50,7 +52,7 @@ def extend_dict_lists(dict1, dict2):
                 - element 4
     """
 
-    def assert_valid_instance(obj):
+    def assert_valid_instance(obj: Any) -> None:
         if not isinstance(obj, (list, MutableMapping)):
             raise ValueError(f"the {obj} field must be a list")
 
@@ -76,7 +78,7 @@ def extend_dict_lists(dict1, dict2):
     return dict1
 
 
-def get_dict_value(dict1, path):
+def get_dict_value(dict1: MutableMapping[str, Any], path: list[str]) -> Any:
     current_object = dict1
 
     for key in path:
@@ -88,7 +90,7 @@ def get_dict_value(dict1, path):
     return current_object
 
 
-def set_dict_value(dict1, path, value):
+def set_dict_value(dict1: MutableMapping[str, Any], path: list[str], value: Any) -> None:
     current_object = dict1
 
     for key in path[:-1]:
