@@ -312,10 +312,6 @@ private:
      * checking interrupt during yield and calling 'abandonSnapshot()' to relinquish the query's
      * storage engine snapshot.
      */
-    void performYield(OperationContext* opCtx,
-                      const Yieldable& yieldable,
-                      std::function<void()> whileYieldingFn,
-                      std::function<void()> afterSnapshotAbandonFn);
     void performYieldWithAcquisitions(OperationContext* opCtx,
                                       std::function<void()> whileYieldingFn,
                                       std::function<void()> afterSnapshotAbandonFn);

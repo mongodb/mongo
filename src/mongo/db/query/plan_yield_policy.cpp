@@ -184,63 +184,6 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
-void PlanYieldPolicy::performYield(OperationContext* opCtx,
-                                   const Yieldable& yieldable,
-                                   std::function<void()> whileYieldingFn,
-                                   std::function<void()> afterSnapshotAbandonFn) {
-    // Things have to happen here in a specific order:
-    //   * Release 'yieldable'.
-    //   * Abandon the current storage engine snapshot.
-    //   * Check for interrupt if the yield policy requires.
-    //   * Release lock manager locks.
-    //   * Reacquire lock manager locks.
-    //   * Restore 'yieldable'.
-    tassert(11321330,
-            fmt::format("Unexpected yield policy {} during performYield()",
-                        serializeYieldPolicy(_policy)),
-            canReleaseLocksDuringExecution());
-
-    // If we are here, the caller has guaranteed locks are not recursively held. This is a top level
-    // operation and we can safely clear the 'yieldable' state before unlocking and then
-    // re-establish it after re-locking.
-    yieldable.yield();
-
-    // Release any storage engine resources. This requires holding a global lock to correctly
-    // synchronize with states such as shutdown and rollback.
-    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
-
-    // Check for interrupt before releasing locks. This avoids the complexities of having to
-    // re-acquire locks to clean up when we are interrupted. This is the main interrupt check during
-    // query execution. Yield points and interrupt points are one and the same.
-    if (getPolicy() == PlanYieldPolicy::YieldPolicy::YIELD_AUTO) {
-        opCtx->checkForInterrupt();  // throws
-    }
-
-    // After we've abandoned our snapshot, perform any work before releasing locks.
-    if (afterSnapshotAbandonFn) {
-        afterSnapshotAbandonFn();
-    }
-
-    Locker* locker = shard_role_details::getLocker(opCtx);
-    Locker::LockSnapshot snapshot;
-    locker->saveLockStateAndUnlock(&snapshot);
-
-    if (_callbacks) {
-        _callbacks->duringYield(opCtx);
-    }
-
-    if (whileYieldingFn) {
-        whileYieldingFn();
-    }
-
-    locker->restoreLockState(opCtx, snapshot);
-
-    // A yield has occurred, but there still may not be a 'yieldable' if the PlanExecutor
-    // has a 'locks internally' lock policy.
-    // Yieldable restore may set a new read source if necessary.
-    yieldable.restore();
-}
-
 void PlanYieldPolicy::performYieldWithAcquisitions(OperationContext* opCtx,
                                                    std::function<void()> whileYieldingFn,
                                                    std::function<void()> afterSnapshotAbandonFn) {
@@ -251,7 +194,7 @@ void PlanYieldPolicy::performYieldWithAcquisitions(OperationContext* opCtx,
     //   * Yield the acquired TransactionResources
     //   * Restore the yielded TransactionResources
     tassert(1321331,
-            fmt::format("Unexpected yield policy {} during performYield()",
+            fmt::format("Unexpected yield policy {} during performYieldWithAcquisitions()",
                         serializeYieldPolicy(_policy)),
             canReleaseLocksDuringExecution());
 

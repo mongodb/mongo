@@ -29,11 +29,8 @@ Yielding means releasing database locks during the execution of a query, i.e. lo
 
 Queries are intended to yield at least every 10 ms by default. Yielding is configurable via the **internalQueryExecYieldPeriodMS** and **internalQueryExecYieldIterations** query execution knobs, respectively.
 
-**PlanExecutorImpl** and **PlanExecutorSBE**, in the mongo::PlanStage or sbe::PlanStage stages they are executing, yield by calling down into **PlanYieldPolicy::yieldOrInterrupt()**, which itself may call down into **PlanYieldPolicy::performYield()** or **PlanYieldPolicy::performYieldWithAcquisitions()**, which perform the actual yields as follows:
+**PlanExecutorImpl** and **PlanExecutorSBE**, in the mongo::PlanStage or sbe::PlanStage stages they are executing, yield by calling down into **PlanYieldPolicy::yieldOrInterrupt()**, which itself may call down into **PlanYieldPolicy::performYieldWithAcquisitions()**, which performs the actual yields as follows:
 
-- performYield() → locker->saveLockStateAndUnlock() – yields by releasing the locks
-- performYield() → locker->restoreLockState() – “unyields” by reacquiring the locks
-  <br>
 - performYieldWithAcquisitions() → yieldTransactionResourcesFromOperationContext() → getLocker(opCtx)->saveLockStateAndUnlock() – yields by releasing the locks
 - performYieldWithAcquisitions() → restoreTransactionResourcesToOperationContext() → getLocker(opCtx)->restoreLockState() – “unyields” by reacquiring the locks
 
