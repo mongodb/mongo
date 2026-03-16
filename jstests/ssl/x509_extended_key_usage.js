@@ -65,7 +65,7 @@ function testServerAuthEKU(serverCert, shouldFail) {
         const oldTimeout = ReplSetTest.kDefaultTimeoutMS;
         const shortTimeout = 5 * 1000;
         ReplSetTest.kDefaultTimeoutMS = shortTimeout;
-        rst.timeoutMS = shortTimeout;
+        rst.kDefaultTimeoutMS = shortTimeout;
         MongoRunner.runHangAnalyzer.disable();
         try {
             assert.throws(function() {
@@ -73,6 +73,7 @@ function testServerAuthEKU(serverCert, shouldFail) {
             });
         } finally {
             ReplSetTest.kDefaultTimeoutMS = oldTimeout;
+            rst.kDefaultTimeoutMS = oldTimeout;
             MongoRunner.runHangAnalyzer.enable();
         }
         TestData.skipCheckDBHashes = true;
