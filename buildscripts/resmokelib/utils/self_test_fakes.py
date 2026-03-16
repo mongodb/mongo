@@ -1,3 +1,4 @@
+import logging
 import os
 
 import psutil
@@ -5,7 +6,7 @@ import psutil
 from buildscripts.resmokelib import config
 
 
-def test_analysis(logger, pids):
+def test_analysis(logger: logging.Logger, pids: list[int]) -> None:
     """
     Write the pids out to a file and kill them instead of running analysis.
     This option will only be specified in resmoke selftests.

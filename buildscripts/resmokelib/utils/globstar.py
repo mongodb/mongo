@@ -4,11 +4,12 @@ import functools
 import glob as _glob
 import os.path
 import re
+from collections.abc import Iterator
 
 _CONTAINS_GLOB_PATTERN = re.compile("[*?[]")
 
 
-def is_glob_pattern(string):
+def is_glob_pattern(string: str) -> bool:
     """Return true if 'string' represents a glob pattern, and false otherwise."""
 
     # Copied from glob.has_magic().
@@ -16,7 +17,7 @@ def is_glob_pattern(string):
 
 
 @functools.cache
-def glob(globbed_pathname):
+def glob(globbed_pathname: str) -> list[str]:
     """Return a list of pathnames matching the 'globbed_pathname' pattern.
 
     In addition to containing simple shell-style wildcards a la fnmatch,
@@ -27,7 +28,7 @@ def glob(globbed_pathname):
     return list(iglob(globbed_pathname))
 
 
-def iglob(globbed_pathname):
+def iglob(globbed_pathname: str) -> Iterator[str]:
     """Emit a list of pathnames matching the 'globbed_pathname' pattern.
 
     In addition to containing simple shell-style wildcards a la fnmatch,

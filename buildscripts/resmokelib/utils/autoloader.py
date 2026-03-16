@@ -4,7 +4,7 @@ import importlib
 import pkgutil
 
 
-def load_all_modules(name, path):
+def load_all_modules(name: str, path: list[str]) -> None:
     """Dynamically load all modules in the 'name' package.
 
     This function is useful in combination with the registry.py module

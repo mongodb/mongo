@@ -5,13 +5,13 @@ from buildscripts.resmokelib import utils
 _START_TIME_FILE = ".resmoke_start_time.yml"
 
 
-def setup_start_time(start_time_secs: float):
+def setup_start_time(start_time_secs: float) -> None:
     """Persist resmoke start time to disk."""
     to_serialize = {"start_time": start_time_secs}
     utils.dump_yaml_file(to_serialize, _START_TIME_FILE)
 
 
-def compare_start_time(cur_time_secs):
+def compare_start_time(cur_time_secs: float) -> float:
     """
     Return the difference between the current unix time in seconds and the start time in seconds.
 
