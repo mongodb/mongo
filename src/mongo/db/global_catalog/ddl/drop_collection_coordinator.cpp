@@ -106,6 +106,9 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
             return;
         }
 
+        // Mark critical section acquisition operations non-deprioritizable
+        mongo::admission::execution_control::ScopedTaskTypeNonDeprioritizable deprioGuard(opCtx);
+
         if (requireCollectionEmpty) {
             bool isEmpty = [&]() {
                 auto localCatalog = CollectionCatalog::get(opCtx);
@@ -141,6 +144,10 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
 
         CancelableOperationContext alternativeOpCtx(
             cc().makeOperationContext(), opCtx->getCancellationToken(), executor);
+
+        // Mark the alternative opCtx non-deprioritizable
+        mongo::admission::execution_control::ScopedTaskTypeNonDeprioritizable altDeprioGuard(
+            alternativeOpCtx.get());
 
         try {
             rangedeletionutil::removeAllPersistentTasksForCollection(alternativeOpCtx.get(),

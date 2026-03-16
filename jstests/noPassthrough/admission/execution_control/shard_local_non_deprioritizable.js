@@ -6,7 +6,6 @@
  *
  * The test uses serverStatus metrics to verify that operations are marked as NonDeprioritizable.
  *
- *
  * @tags: [
  *   requires_sharding,
  * ]
@@ -37,6 +36,17 @@ const kShardLocalNonDeprioritizableCommands = [
             _shardsvrParticipantBlock: "participant_block_exit",
             blockType: "Unblock",
             test: "non_deprioritizable_exit_critical_section",
+            writeConcern: {w: "majority"},
+        },
+    },
+    {
+        name: "Local drop collection",
+        description: "Local drop collection operations for shard participants.",
+        db: "admin",
+        command: {
+            _shardsvrDropCollectionParticipant: "testDB.testColl",
+            lsid: {id: UUID()},
+            txnNumber: NumberLong(1),
             writeConcern: {w: "majority"},
         },
     },
@@ -77,6 +87,8 @@ function testCommandIsNonDeprioritizable(shardConn, testCase) {
  */
 function runShardLocalTests() {
     const st = new ShardingTest({shards: 1, mongos: 1});
+
+    assert.commandWorked(st.shard0.getDB("testDB")["testColl"].insert({x: 1}));
 
     try {
         for (const testCase of kShardLocalNonDeprioritizableCommands) {
