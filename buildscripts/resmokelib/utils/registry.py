@@ -8,7 +8,9 @@ its name.
 
 import sys
 import threading
+from collections.abc import Generator
 from contextlib import contextmanager
+from typing import Any
 
 from buildscripts.resmokelib.utils import default_if_none
 
@@ -22,7 +24,7 @@ SUFFIX_LOCK = threading.Lock()
 
 
 @contextmanager
-def suffix(suf):
+def suffix(suf: str) -> Generator[str, None, None]:
     """
     Set a global suffix that's postpended to registered names.
 
@@ -39,7 +41,9 @@ def suffix(suf):
         GLOBAL_SUFFIX = ""
 
 
-def make_registry_metaclass(registry_store, base_metaclass=None):
+def make_registry_metaclass(
+    registry_store: dict[str, Any], base_metaclass: type | None = None
+) -> type:
     """Return a new Registry metaclass."""
 
     if not isinstance(registry_store, dict):
@@ -50,7 +54,9 @@ def make_registry_metaclass(registry_store, base_metaclass=None):
     class Registry(base_metaclass):
         """A metaclass that stores a reference to all registered classes."""
 
-        def __new__(mcs, class_name, base_classes, class_dict):
+        def __new__(
+            mcs: type, class_name: str, base_classes: tuple[type, ...], class_dict: dict[str, Any]
+        ) -> type:
             """Create and returns a new instance of Registry.
 
             The registry is a class named 'class_name' derived from 'base_classes'

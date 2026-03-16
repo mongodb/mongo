@@ -4,6 +4,8 @@ import contextlib
 import random
 import re
 import sys
+from collections.abc import Generator
+from typing import Any
 
 import yaml
 
@@ -14,7 +16,7 @@ __all__ = ["archival"]
 
 
 @contextlib.contextmanager
-def open_or_use_stdout(filename):
+def open_or_use_stdout(filename: str) -> Generator[Any, None, None]:
     """Open the specified file for writing, or returns sys.stdout if filename is "-"."""
 
     if filename == "-":
@@ -34,7 +36,7 @@ def open_or_use_stdout(filename):
         fp.close()
 
 
-def default_if_none(*values):
+def default_if_none(*values: Any) -> Any:
     """Return the first argument that is not 'None'."""
     for value in values:
         if value is not None:
@@ -43,17 +45,17 @@ def default_if_none(*values):
     return None
 
 
-def is_windows():
+def is_windows() -> bool:
     """Return True if Windows."""
     return sys.platform.startswith("win32") or sys.platform.startswith("cygwin")
 
 
-def is_string_list(lst):
+def is_string_list(lst: Any) -> bool:
     """Return true if 'lst' is a list of strings, and false otherwise."""
     return isinstance(lst, list) and all(isinstance(x, str) for x in lst)
 
 
-def load_yaml_file(filename):
+def load_yaml_file(filename: str) -> Any:
     """Attempt to read 'filename' as YAML."""
     try:
         with open(filename, "r", encoding="utf8") as fp:
@@ -62,7 +64,7 @@ def load_yaml_file(filename):
         raise ValueError("File '%s' contained invalid YAML: %s" % (filename, err))
 
 
-def dump_yaml_file(value, filename):
+def dump_yaml_file(value: Any, filename: str) -> None:
     """Attempt to write YAML object to filename."""
     try:
         with open(filename, "w") as fp:
@@ -71,13 +73,13 @@ def dump_yaml_file(value, filename):
         raise ValueError("Could not write YAML to file '%s': %s" % (filename, err))
 
 
-def dump_yaml(value):
+def dump_yaml(value: Any) -> str:
     """Return 'value' formatted as YAML."""
     # Use block (indented) style for formatting YAML.
     return yaml.safe_dump(value, default_flow_style=False).rstrip()
 
 
-def load_yaml(value):
+def load_yaml(value: str) -> Any:
     """Attempt to parse 'value' as YAML."""
     try:
         return yaml.safe_load(value)
@@ -85,7 +87,7 @@ def load_yaml(value):
         raise ValueError("Attempted to parse invalid YAML value '%s': %s" % (value, err))
 
 
-def get_task_name_without_suffix(task_name, variant_name):
+def get_task_name_without_suffix(task_name: str, variant_name: str) -> str:
     """Return evergreen task name without suffix added to the generated task.
 
     Remove evergreen variant name, numerical suffix and underscores between them from evergreen task name.
@@ -95,7 +97,7 @@ def get_task_name_without_suffix(task_name, variant_name):
     return re.sub(rf"(_[0-9]+)?(_{variant_name})?$", "", task_name)
 
 
-def pick_catalog_shard_node(config_shard, num_shards):
+def pick_catalog_shard_node(config_shard: str | None, num_shards: int | None) -> int | None:
     """Get config_shard node index or None if no config_shard."""
     if config_shard is None:
         return None
