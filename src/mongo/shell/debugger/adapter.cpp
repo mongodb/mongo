@@ -150,17 +150,23 @@ void DebugAdapter::handleRequest(UnknownRequest& request) {
     std::cerr << "Unknown request for command '" << request.command << "'" << std::endl;
 }
 
-void DebugAdapter::waitForHandshake() {
+bool DebugAdapter::waitForHandshake() {
     // The DAP should already be running, which is probing the port for when to attach to a new
     // shell. The shell can come up and start running tests before the DAP gets to relay any pending
     // breakpoints. We need to wait for the DAP to sync up, and then continue.
 
     std::unique_lock<std::mutex> lock(_configMutex);
-    _configCV.wait_for(lock, std::chrono::milliseconds(100), [] { return _configured.load(); });
+    return _configCV.wait_for(
+        lock, std::chrono::milliseconds(100), [] { return _configured.load(); });
 }
 
 void DebugAdapter::sendPause() {
-    StoppedEvent e;
+    auto e = StoppedEvent::Breakpoint();
+    sendMessage(e);
+}
+
+void DebugAdapter::sendStoppedOnException(std::string text) {
+    auto e = StoppedEvent::Exception(text);
     sendMessage(e);
 }
 

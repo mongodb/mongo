@@ -84,6 +84,7 @@ private:
     static bool storeVariablesCallback(JSContext* cx, unsigned argc, JS::Value* vp);
     static bool storeStackFramesCallback(JSContext* cx, unsigned argc, JS::Value* vp);
     static bool getPendingBreakpointsCallback(JSContext* cx, unsigned argc, JS::Value* vp);
+    static bool fromInteractiveREPL(JSContext* cx, unsigned argc, JS::Value* vp);
 
     static bool hasEvalRequest(JSContext* cx, unsigned argc, JS::Value* vp);
     static bool getEvalRequest(JSContext* cx, unsigned argc, JS::Value* vp);
@@ -119,6 +120,10 @@ public:
 
     std::string evaluate(EvaluateRequest request);
     std::string setVariable(SetVariableRequest request);
+
+    static bool onExceptionCallback(JSContext* cx, unsigned argc, JS::Value* vp);
+    static bool storeExceptionInfoCallback(JSContext* cx, unsigned argc, JS::Value* vp);
+    Status setOnExceptionUnwindCallback(JS::RootedObject const& global);
 };
 
 /**

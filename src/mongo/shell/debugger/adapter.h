@@ -54,11 +54,13 @@ public:
 
     static void handleMessagesThread();
 
-    // Wait for the debugger to be configured before continuing execution
-    static void waitForHandshake();
+    // Wait for the debugger to be configured before continuing execution.
+    // Returns true if connected to a DAP client.
+    static bool waitForHandshake();
 
     // Send a StoppedEvent to the client
     static void sendPause();
+    static void sendStoppedOnException(std::string text);
 
     // RequestHandler visitors
     void handleRequest(ConfigurationDoneRequest& request) override;

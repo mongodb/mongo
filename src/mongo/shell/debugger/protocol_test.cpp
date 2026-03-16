@@ -161,11 +161,19 @@ TEST(SetVariableRequest, parseRequestAndResponse) {
     ASSERT_EQ(response.getJson(), expectedResponse);
 }
 
-TEST(StoppedEvent, parseEvent) {
+TEST(StoppedEvent, parseEventFromBreakpoint) {
 
-    auto event = StoppedEvent();
+    auto event = StoppedEvent::Breakpoint();
     std::string expectedJson =
         R"({ "type" : "event", "event" : "stopped", "body" : { "reason" : "breakpoint" } })";
+    ASSERT_EQ(event.getJson(), expectedJson);
+}
+
+TEST(StoppedEvent, parseEventFromException) {
+
+    auto event = StoppedEvent::Exception("my text");
+    std::string expectedJson =
+        R"({ "type" : "event", "event" : "stopped", "body" : { "reason" : "exception", "text" : "my text" } })";
     ASSERT_EQ(event.getJson(), expectedJson);
 }
 

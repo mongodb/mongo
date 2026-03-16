@@ -48,6 +48,7 @@ namespace mongo {
 // Forward declarations for generated JS files
 namespace JSFiles {
 extern const JSFile onDebuggerStatement;
+extern const JSFile onExceptionUnwind;
 extern const JSFile onNewScript;
 }  // namespace JSFiles
 }  // namespace mongo
@@ -71,6 +72,7 @@ std::string _pendingEval;
 std::string _evalResult;
 AtomicWord<bool> _hasEvalRequest{false};
 AtomicWord<bool> _evalComplete{false};
+AtomicWord<bool> _fromInteractiveREPL{false};
 
 // Data captured when paused
 static std::vector<Scope> _capturedScopes;
@@ -79,7 +81,6 @@ std::vector<protocol::StackFrame> _capturedStackFrames;
 
 // Debugger state
 static std::unique_ptr<DebuggerObject> _debuggerObject;
-static JS::PersistentRootedObject _debuggerGlobal;
 
 // Pending breakpoints: map from source URL to set of line numbers
 static std::map<std::string, std::set<int>> _pendingBreakpoints;
@@ -169,6 +170,15 @@ bool DebuggerObject::getEvalRequest(JSContext* cx, unsigned argc, JS::Value* vp)
 
     JS::RootedString cmdStr(cx, JS_NewStringCopyZ(cx, cmd.c_str()));
     args.rval().setString(cmdStr);
+    return true;
+}
+
+/**
+ * Get boolean state if we're within an interactive REPL context
+ */
+bool DebuggerObject::fromInteractiveREPL(JSContext* cx, unsigned argc, JS::Value* vp) {
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    args.rval().setBoolean(_fromInteractiveREPL.load());
     return true;
 }
 
@@ -475,6 +485,72 @@ bool DebuggerObject::storeVariablesCallback(JSContext* cx, unsigned argc, JS::Va
     return true;
 }
 
+std::string _lastException;
+
+bool DebuggerObject::onExceptionCallback(JSContext* cx, unsigned argc, JS::Value* vp) {
+    DebuggerFrame frame(cx);
+    _pausedScript = frame.getScriptUrl();
+    _pausedLine = frame.getLineNumber();
+
+    DebugAdapter::sendStoppedOnException(_lastException);
+    _paused.store(true);
+
+    return true;
+}
+
+bool DebuggerObject::storeExceptionInfoCallback(JSContext* cx, unsigned argc, JS::Value* vp) {
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+
+    if (argc < 1 || !args[0].isString()) {
+        args.rval().setUndefined();
+        return true;
+    }
+
+    JS::RootedString exStr(cx, args[0].toString());
+    JS::UniqueChars exChars = JS_EncodeStringToUTF8(cx, exStr);
+    // Store exception string in static variable for DAP response
+    _lastException = exChars ? std::string(exChars.get()) : "unknown";
+
+    args.rval().setUndefined();
+    return true;
+}
+
+Status DebuggerObject::setOnExceptionUnwindCallback(JS::RootedObject const& global) {
+    Status status = Status::OK();
+
+    // Register native callbacks
+    status = registerNativeFunction(
+        _cx, global, "__fromInteractiveREPL", DebuggerObject::fromInteractiveREPL, 0);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    status = registerNativeFunction(
+        _cx, global, "__onException", DebuggerObject::onExceptionCallback, 0);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    status = registerNativeFunction(
+        _cx, global, "__storeExceptionInfo", DebuggerObject::storeExceptionInfoCallback, 1);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    // Compile and set the JS handler
+    JS::RootedValue onExceptionUnwind(_cx);
+    status = compileJSCodeBlock(::mongo::JSFiles::onExceptionUnwind, &onExceptionUnwind);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    if (!JS_SetProperty(_cx, _debugger, "onExceptionUnwind", onExceptionUnwind)) {
+        return Status(ErrorCodes::JSInterpreterFailure, "Failed to set onExceptionUnwind");
+    }
+
+    return Status::OK();
+}
+
 Status DebuggerObject::setOnDebuggerStatementCallback(JS::RootedObject const& global) {
     Status status = Status::OK();
 
@@ -583,6 +659,8 @@ std::string evaluateInREPL(std::string expression) {
     // We do the evaluation via frame.eval in the JS frame context while in a spin-wait.
     // This logic allows us to pass requests and retrieves results from that loop.
 
+    _fromInteractiveREPL.store(true);
+
     _pendingEval = expression;
     _evalComplete.store(false);
     _hasEvalRequest.store(true);
@@ -595,11 +673,13 @@ std::string evaluateInREPL(std::string expression) {
         retries--;
     }
 
+    _fromInteractiveREPL.store(false);
+    _hasEvalRequest.store(false);
+
     if (_evalComplete.load()) {
         return _evalResult;
     }
 
-    _hasEvalRequest.store(false);
     return "ERROR: Evaluation timed out";
 };
 
@@ -857,7 +937,6 @@ Status DebuggerGlobal::init(JSContext* cx) {
     if (!debuggerGlobal) {
         return Status(ErrorCodes::JSInterpreterFailure, "Failed to create debugger compartment");
     }
-    _debuggerGlobal.init(cx, debuggerGlobal);
 
     Status status = Status::OK();
 
@@ -881,12 +960,6 @@ Status DebuggerGlobal::init(JSContext* cx) {
             return status;
         }
 
-        // Set up script.onNewScript hook to activate breakpoints
-        status = _debuggerObject->setOnNewScriptCallback(debuggerGlobal);
-        if (!status.isOK()) {
-            return status;
-        }
-
     }  // Exit debugger compartment - JSAutoRealm goes out of scope here
 
     status = DebugAdapter::connect();
@@ -894,11 +967,29 @@ Status DebuggerGlobal::init(JSContext* cx) {
         return status;
     }
 
+
     // Wait for the debugger to send initial configuration (breakpoints, etc.)
     // before proceeding with script execution
-    DebugAdapter::waitForHandshake();
+    bool isConnected = DebugAdapter::waitForHandshake();
 
-    // Start stdin handling thread for debug commands
+    // add relevant functionality if we're connected to a DAP
+    if (isConnected) {
+        JSAutoRealm realm(cx, debuggerGlobal);
+
+        // Set up debugger.onNewScript hook to pause on breakpoints
+        status = _debuggerObject->setOnNewScriptCallback(debuggerGlobal);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        // Set up debugger.onExceptionUnwind hook to pause on exceptions
+        status = _debuggerObject->setOnExceptionUnwindCallback(debuggerGlobal);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
+    // Start stdin handling thread for debugger statement evaluations
     _stdinThread = std::make_unique<std::thread>(handleStdinThread);
 
     return status;

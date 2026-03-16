@@ -15,6 +15,7 @@ const {
     // https://github.com/microsoft/vscode-debugadapter-node/tree/main/adapter
 } = require("@vscode/debugadapter");
 const net = require("net");
+const {stripVTControlCharacters} = require("util");
 
 // ID of the associated thread in the debug protocol.
 // This is single-threaded here, so it is a constant 1.
@@ -227,10 +228,12 @@ class MongoShellDebugSession extends DebugSession {
                 this.sendEvent(new BreakpointEvent("changed", bp));
                 break;
             }
-            case "stopped":
-                this.stackFrames = msg.body.stackFrames || [];
-                this.sendEvent(new StoppedEvent(msg.body.reason || "pause", THREAD_ID));
+            case "stopped": {
+                const text = msg.body.text ? stripVTControlCharacters(msg.body.text) : undefined;
+                const e = new StoppedEvent(msg.body.reason || "pause", THREAD_ID, text);
+                this.sendEvent(e);
                 break;
+            }
             default:
                 this.log(`Event "${msg.event}" has no handler`);
         }
