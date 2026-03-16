@@ -1154,11 +1154,8 @@ void WiredTigerKVEngine::flushAllFiles(OperationContext* opCtx, bool callerHolds
 
     // Immediately flush the size storer information to disk. When the node is fsync locked for
     // operations such as backup, it's imperative that we copy the most up-to-date data files.
-    if (!_sizeStorer) {
-        if (isReplicatedFastCountEnabled(opCtx)) {
-            // TODO(SERVER-101413): Remove this once checkpointing and recovery is functional.
-            ReplicatedFastCountManager::get(opCtx->getServiceContext()).flushAsync();
-        }
+    if (isReplicatedFastCountEnabled(opCtx)) {
+        ReplicatedFastCountManager::get(opCtx->getServiceContext()).flushAsync();
     }
     syncSizeInfo(true);
 
