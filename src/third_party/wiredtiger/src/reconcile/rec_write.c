@@ -2853,8 +2853,7 @@ __wti_rec_hs_clear_on_tombstone(
       __wt_failpoint(session, WT_TIMING_STRESS_FAILPOINT_HISTORY_STORE_DELETE_KEY_FROM_TS, 1))
         return (EBUSY);
 
-    WT_STAT_CONN_INCR(session, cache_hs_key_truncate_onpage_removal);
-    WT_STAT_DATA_INCR(session, cache_hs_key_truncate_onpage_removal);
+    WT_STAT_CONN_DATA_INCR(session, cache_hs_key_truncate_onpage_removal);
 
     return (0);
 }

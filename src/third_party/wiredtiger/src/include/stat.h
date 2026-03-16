@@ -649,6 +649,16 @@ struct __wt_connection_stats {
     int64_t capacity_time_log;
     int64_t capacity_time_read;
     int64_t capacity_time_chunkcache;
+    int64_t checkpoint_cleanup_duration;
+    int64_t checkpoint_cleanup_handle_processed;
+    int64_t checkpoint_cleanup_inmem_pages_visited;
+    int64_t checkpoint_cleanup_pages_evict;
+    int64_t checkpoint_cleanup_pages_obsolete_tw;
+    int64_t checkpoint_cleanup_pages_read_reclaim_space;
+    int64_t checkpoint_cleanup_pages_read_obsolete_tw;
+    int64_t checkpoint_cleanup_pages_removed;
+    int64_t checkpoint_cleanup_pages_walk_skipped;
+    int64_t checkpoint_cleanup_pages_visited;
     int64_t checkpoint_cleanup_success;
     int64_t checkpoint_snapshot_acquired;
     int64_t checkpoint_skipped;
@@ -678,13 +688,6 @@ struct __wt_connection_stats {
     int64_t checkpoint_pages_visited_internal;
     int64_t checkpoint_pages_visited_leaf;
     int64_t checkpoint_pages_reconciled;
-    int64_t checkpoint_cleanup_pages_evict;
-    int64_t checkpoint_cleanup_pages_obsolete_tw;
-    int64_t checkpoint_cleanup_pages_read_reclaim_space;
-    int64_t checkpoint_cleanup_pages_read_obsolete_tw;
-    int64_t checkpoint_cleanup_pages_removed;
-    int64_t checkpoint_cleanup_pages_walk_skipped;
-    int64_t checkpoint_cleanup_pages_visited;
     int64_t checkpoint_prep_running;
     int64_t checkpoint_prep_max;
     int64_t checkpoint_prep_min;
@@ -1275,7 +1278,6 @@ struct __wt_dsrc_stats {
     int64_t cache_state_refs_skipped;
     int64_t cache_state_root_size;
     int64_t cache_state_pages;
-    int64_t checkpoint_snapshot_acquired;
     int64_t checkpoint_cleanup_pages_evict;
     int64_t checkpoint_cleanup_pages_obsolete_tw;
     int64_t checkpoint_cleanup_pages_read_reclaim_space;
@@ -1283,6 +1285,7 @@ struct __wt_dsrc_stats {
     int64_t checkpoint_cleanup_pages_removed;
     int64_t checkpoint_cleanup_pages_walk_skipped;
     int64_t checkpoint_cleanup_pages_visited;
+    int64_t checkpoint_snapshot_acquired;
     int64_t checkpoint_obsolete_applied;
     int64_t compress_precomp_intl_max_page_size;
     int64_t compress_precomp_leaf_max_page_size;
