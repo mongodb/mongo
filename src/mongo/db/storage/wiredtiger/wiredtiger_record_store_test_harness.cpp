@@ -89,26 +89,31 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     return _engine->getRecordStore(opCtx.get(), nss, ident, recordStoreOptions, uuid);
 }
 
-std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStore() {
-    auto ret = newOplogRecordStoreNoInit();
-    ServiceContext::UniqueOperationContext opCtx(newOperationContext());
-    auto oplog = static_cast<WiredTigerRecordStore::Oplog*>(ret.get());
-    _engine->getOplogManager()->start(opCtx.get(), *_engine, *oplog, _isReplSet);
-    return ret;
-}
-
-std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit() {
-    std::string ident = std::string{redactTenant(NamespaceString::kRsOplogNamespace)};
+static const auto kOplogOptions = [] {
     RecordStore::Options oplogRecordStoreOptions;
     oplogRecordStoreOptions.isOplog = true;
     oplogRecordStoreOptions.isCapped = true;
     // Large enough not to exceed capped limits.
     oplogRecordStoreOptions.oplogMaxSize = 1024 * 1024 * 1024;
-    const auto res = _engine->createRecordStore(
-        NamespaceString::kRsOplogNamespace, ident, oplogRecordStoreOptions);
+    return oplogRecordStoreOptions;
+}();
+
+std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStore() {
+    std::string ident(redactTenant(NamespaceString::kRsOplogNamespace));
+    ServiceContext::UniqueOperationContext opCtx(newOperationContext());
+    const auto res =
+        _engine->createRecordStore(NamespaceString::kRsOplogNamespace, ident, kOplogOptions);
+    return _engine->getRecordStore(
+        opCtx.get(), NamespaceString::kRsOplogNamespace, ident, kOplogOptions, UUID::gen());
+}
+
+std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit() {
+    std::string ident(redactTenant(NamespaceString::kRsOplogNamespace));
+    ServiceContext::UniqueOperationContext opCtx(newOperationContext());
+    const auto res =
+        _engine->createRecordStore(NamespaceString::kRsOplogNamespace, ident, kOplogOptions);
 
     // Cannot use 'getRecordStore', which automatically starts the the oplog manager.
-    ServiceContext::UniqueOperationContext opCtx(newOperationContext());
     return std::make_unique<WiredTigerRecordStore::Oplog>(
         _engine.get(),
         WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx.get())),
@@ -117,7 +122,7 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit(
                                              .engineName = std::string{kWiredTigerEngineName},
                                              .inMemory = false,
                                              // Large enough not to exceed capped limits.
-                                             .oplogMaxSize = oplogRecordStoreOptions.oplogMaxSize,
+                                             .oplogMaxSize = kOplogOptions.oplogMaxSize,
                                              .sizeStorer = nullptr,
                                              .tracksSizeAdjustments = true,
                                              .forceUpdateWithFullDocument = false});
