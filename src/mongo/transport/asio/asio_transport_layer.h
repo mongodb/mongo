@@ -106,6 +106,7 @@ public:
         int port = ServerGlobalParams::DefaultDBPort;  // port to bind to
         boost::optional<int> loadBalancerPort;         // accepts load balancer connections
         boost::optional<int> priorityPort;             // accepts priority connections
+        boost::optional<int> secondaryPort;            // accepts secondary connections
         std::vector<std::string> ipList;               // addresses to bind to
 #ifndef _WIN32
         bool useUnixSockets = true;         // whether to allow UNIX sockets in ipList

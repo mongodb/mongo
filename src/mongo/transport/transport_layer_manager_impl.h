@@ -90,7 +90,8 @@ public:
         bool useEgressGRPC = false,
         boost::optional<int> loadBalancerPort = {},
         boost::optional<int> priorityPort = {},
-        std::shared_ptr<ClientTransportObserver> observer = nullptr);
+        std::shared_ptr<ClientTransportObserver> observer = nullptr,
+        boost::optional<int> secondaryPort = {});
 
     static std::unique_ptr<TransportLayerManager> makeDefaultEgressTransportLayer();
 

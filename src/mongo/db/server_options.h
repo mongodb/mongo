@@ -68,7 +68,8 @@ struct MONGO_MOD_PUB ServerGlobalParams {
     std::string binaryName;  // mongod or mongos
     std::string cwd;         // cwd of when process started
 
-    int port = DefaultDBPort;  // --port
+    int port = DefaultDBPort;            // --port
+    boost::optional<int> secondaryPort;  // --secondaryPort
     enum {
         DefaultDBPort = 27017,
         ShardServerPort = 27018,

@@ -1401,6 +1401,9 @@ Status AsioTransportLayer::setup() {
     const auto listenUnixDomainSocketAddrs = getUnixDomainSocketAddrs(ports);
     const auto listenProxyUnixDomainSocketAddrs{
         getProxyUnixDomainSocketAddrs({_listenerOptions.port})};
+    if (_listenerOptions.secondaryPort) {
+        ports.push_back(*_listenerOptions.secondaryPort);
+    }
     if (auto status = _listenerInterfaceMainPort->setup(ports,
                                                         listenIPAddrs,
                                                         listenUnixDomainSocketAddrs,

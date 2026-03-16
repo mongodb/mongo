@@ -177,6 +177,7 @@ std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::make(
     ServiceContext* svcCtx, bool isUseGrpc, std::shared_ptr<ClientTransportObserver> observer) {
     boost::optional<int> proxyPort;
     boost::optional<int> priorityPort;
+    boost::optional<int> secondaryPort;
 
     using PortMap = std::unordered_map<int, StringData>;
     auto addUniquePort = [](PortMap& uniquePorts, int port, StringData role) {
@@ -193,6 +194,11 @@ std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::make(
 
     PortMap uniquePorts;
     addUniquePort(uniquePorts, serverGlobalParams.port, "main"_sd);
+
+    if (serverGlobalParams.secondaryPort) {
+        addUniquePort(uniquePorts, *serverGlobalParams.secondaryPort, "secondary"_sd);
+        secondaryPort = serverGlobalParams.secondaryPort;
+    }
 
     if (serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
         const auto loadBalancerPort = load_balancer_support::getLoadBalancerPort();
@@ -248,7 +254,8 @@ std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::make(
                                                                   useEgressGRPC,
                                                                   std::move(proxyPort),
                                                                   std::move(priorityPort),
-                                                                  std::move(observer));
+                                                                  std::move(observer),
+                                                                  std::move(secondaryPort));
 }
 
 std::unique_ptr<TransportLayerManager>
@@ -267,7 +274,8 @@ std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::createWithConf
     bool useEgressGRPC,
     boost::optional<int> loadBalancerPort,
     boost::optional<int> priorityPort,
-    std::shared_ptr<ClientTransportObserver> observer) {
+    std::shared_ptr<ClientTransportObserver> observer,
+    boost::optional<int> secondaryPort) {
 
     std::vector<std::unique_ptr<TransportLayer>> retVector;
     std::vector<std::shared_ptr<ClientTransportObserver>> observers;
@@ -279,6 +287,7 @@ std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::createWithConf
         AsioTransportLayer::Options opts(config);
         opts.loadBalancerPort = std::move(loadBalancerPort);
         opts.priorityPort = std::move(priorityPort);
+        opts.secondaryPort = std::move(secondaryPort);
 
         auto sm = std::make_unique<AsioSessionManager>(svcCtx, observers);
         auto tl = std::make_unique<AsioTransportLayer>(opts, std::move(sm));

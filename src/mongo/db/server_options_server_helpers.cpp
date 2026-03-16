@@ -319,6 +319,10 @@ Status storeServerOptions(const moe::Environment& params) {
         serverGlobalParams.port = params["net.port"].as<int>();
     }
 
+    if (params.count("net.secondaryPort")) {
+        serverGlobalParams.secondaryPort = params["net.secondaryPort"].as<int>();
+    }
+
     if (params.count("net.ipv6") && params["net.ipv6"].as<bool>() == true) {
         serverGlobalParams.enableIPv6 = true;
         enableIPv6();
