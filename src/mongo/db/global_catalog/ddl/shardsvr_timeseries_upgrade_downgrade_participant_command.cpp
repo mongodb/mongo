@@ -228,6 +228,10 @@ public:
                     Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor());
                 newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
+                // Mark the alternative opCtx non-deprioritizable
+                mongo::admission::execution_control::ScopedTaskTypeNonDeprioritizable
+                    altDeprioGuard(newOpCtx.get());
+
                 ForwardableOperationMetadata forwardableOpMetadata(opCtx);
                 forwardableOpMetadata.setOn(newOpCtx.get());
 
