@@ -67,37 +67,17 @@ DEATH_TEST(PerSubsetLevelEnumerationModeDeathTest, NonAscendingMode3, "11391600"
         {3, PlanEnumerationMode::CHEAPEST},
     });
 }
-DEATH_TEST(PerSubsetLevelEnumerationModeDeathTest, HintedWithNoHints, "11987000") {
-    PerSubsetLevelEnumerationMode({
-        {0, PlanEnumerationMode::HINTED},
-    });
-}
-DEATH_TEST(PerSubsetLevelEnumerationModeDeathTest, HintedWithNoHints2, "11987000") {
-    PerSubsetLevelEnumerationMode({
-        {0, PlanEnumerationMode::CHEAPEST},
-        {5, PlanEnumerationMode::HINTED},
-    });
-}
-DEATH_TEST(PerSubsetLevelEnumerationModeDeathTest, HintedWithNoHints3, "11987000") {
-    PerSubsetLevelEnumerationMode({
-        {0, PlanEnumerationMode::CHEAPEST},
-        {3,
-         PlanEnumerationMode::HINTED,
-         JoinHint{.node = 1, .method = JoinMethod::HJ, .isLeftChild = true}},
-        {4, PlanEnumerationMode::HINTED},  // Bad hint.
-    });
-}
 DEATH_TEST(PerSubsetLevelEnumerationModeDeathTest, HintedWithRepeatedNode, "11391600") {
     PerSubsetLevelEnumerationMode({
         {0, PlanEnumerationMode::CHEAPEST},
         {3,
-         PlanEnumerationMode::HINTED,
+         PlanEnumerationMode::CHEAPEST,
          JoinHint{.node = 1, .method = JoinMethod::HJ, .isLeftChild = false}},
         {4,
-         PlanEnumerationMode::HINTED,
+         PlanEnumerationMode::CHEAPEST,
          JoinHint{.node = 2, .method = JoinMethod::HJ, .isLeftChild = true}},
         {5,
-         PlanEnumerationMode::HINTED,
+         PlanEnumerationMode::CHEAPEST,
          JoinHint{.node = 1, .method = JoinMethod::HJ, .isLeftChild = true}},  // Bad hint.
     });
 }
@@ -105,13 +85,13 @@ DEATH_TEST(PerSubsetLevelEnumerationModeDeathTest, HintedWithLevelSkip, "1139160
     PerSubsetLevelEnumerationMode({
         {0, PlanEnumerationMode::CHEAPEST},
         {3,
-         PlanEnumerationMode::HINTED,
+         PlanEnumerationMode::CHEAPEST,
          JoinHint{.node = 1, .method = JoinMethod::HJ, .isLeftChild = false}},
         {4,
-         PlanEnumerationMode::HINTED,
+         PlanEnumerationMode::CHEAPEST,
          JoinHint{.node = 2, .method = JoinMethod::HJ, .isLeftChild = true}},
         {6,
-         PlanEnumerationMode::HINTED,
+         PlanEnumerationMode::CHEAPEST,
          JoinHint{.node = 3, .method = JoinMethod::HJ, .isLeftChild = true}},  // Bad hint.
     });
 }
@@ -141,7 +121,7 @@ public:
 
         // Validate we have all base nodes.
         auto it = strat.mode.begin();
-        ASSERT_EQ(it.get().mode(), PlanEnumerationMode::HINTED);
+        ASSERT_EQ(it.get().mode(), PlanEnumerationMode::CHEAPEST);
         ASSERT(it.get().specifiesHint());
         const auto firstHintNode = it.get().baseNode();
         ASSERT_EQ(ctx.getSubsets(0).size(), jCtx.joinGraph.numNodes());
@@ -161,7 +141,7 @@ public:
         // Furthermore, ensure that each such plan matches its corresponding hint.
         for (size_t i = 1; i < jCtx.joinGraph.numNodes(); i++) {
             const auto& nxt = it.get();
-            ASSERT_EQ(nxt.mode(), PlanEnumerationMode::HINTED);
+            ASSERT_EQ(nxt.mode(), PlanEnumerationMode::CHEAPEST);
             ASSERT(nxt.specifiesHint());
 
             const auto& s = ctx.getSubsets(i);
@@ -365,13 +345,13 @@ TEST_F(JoinPlanEnumeratorHintingTest, HintedEnumeration) {
             .planShape = PlanTreeShape::ZIG_ZAG,
             .mode = PerSubsetLevelEnumerationMode({
                 {0,
-                 PlanEnumerationMode::HINTED,
+                 PlanEnumerationMode::CHEAPEST,
                  JoinHint{.node = 1, .method = JoinMethod::HJ, .isLeftChild = true}},
                 {1,
-                 PlanEnumerationMode::HINTED,
+                 PlanEnumerationMode::CHEAPEST,
                  JoinHint{.node = 2, .method = JoinMethod::NLJ, .isLeftChild = false}},
                 {2,
-                 PlanEnumerationMode::HINTED,
+                 PlanEnumerationMode::CHEAPEST,
                  JoinHint{.node = 0, .method = JoinMethod::HJ, .isLeftChild = true}},
             }),
             .enableHJOrderPruning = false});
@@ -382,13 +362,13 @@ TEST_F(JoinPlanEnumeratorHintingTest, HintedEnumeration) {
             .planShape = PlanTreeShape::LEFT_DEEP,
             .mode = PerSubsetLevelEnumerationMode({
                 {0,
-                 PlanEnumerationMode::HINTED,
+                 PlanEnumerationMode::CHEAPEST,
                  JoinHint{.node = 0, .method = JoinMethod::NLJ, .isLeftChild = false}},
                 {1,
-                 PlanEnumerationMode::HINTED,
+                 PlanEnumerationMode::CHEAPEST,
                  JoinHint{.node = 2, .method = JoinMethod::HJ, .isLeftChild = false}},
                 {2,
-                 PlanEnumerationMode::HINTED,
+                 PlanEnumerationMode::CHEAPEST,
                  JoinHint{.node = 1, .method = JoinMethod::NLJ, .isLeftChild = false}},
             }),
             .enableHJOrderPruning = false});
@@ -400,13 +380,13 @@ TEST_F(JoinPlanEnumeratorHintingTest, HintedEnumeration) {
             .planShape = PlanTreeShape::LEFT_DEEP,
             .mode = PerSubsetLevelEnumerationMode({
                 {0,
-                 PlanEnumerationMode::HINTED,
+                 PlanEnumerationMode::CHEAPEST,
                  JoinHint{.node = 0, .method = JoinMethod::NLJ, .isLeftChild = false}},
                 {1,
-                 PlanEnumerationMode::HINTED,
+                 PlanEnumerationMode::CHEAPEST,
                  JoinHint{.node = 2, .method = JoinMethod::NLJ, .isLeftChild = false}},
                 {2,
-                 PlanEnumerationMode::HINTED,
+                 PlanEnumerationMode::CHEAPEST,
                  JoinHint{.node = 1, .method = JoinMethod::INLJ, .isLeftChild = false}},
             }),
             .enableHJOrderPruning = false});
@@ -418,13 +398,13 @@ TEST_F(JoinPlanEnumeratorHintingTest, HintedEnumeration) {
             .planShape = PlanTreeShape::RIGHT_DEEP,
             .mode = PerSubsetLevelEnumerationMode({
                 {0,
-                 PlanEnumerationMode::HINTED,
+                 PlanEnumerationMode::CHEAPEST,
                  JoinHint{.node = 0, .method = JoinMethod::NLJ, .isLeftChild = false}},
                 {1,
-                 PlanEnumerationMode::HINTED,
+                 PlanEnumerationMode::CHEAPEST,
                  JoinHint{.node = 2, .method = JoinMethod::NLJ, .isLeftChild = false}},
                 {2,
-                 PlanEnumerationMode::HINTED,
+                 PlanEnumerationMode::CHEAPEST,
                  JoinHint{.node = 1, .method = JoinMethod::NLJ, .isLeftChild = false}},
             }),
             .enableHJOrderPruning = false});
@@ -441,10 +421,10 @@ TEST_F(JoinPlanEnumeratorHintingTest, HintedEnumerationINLJ) {
             .planShape = PlanTreeShape::ZIG_ZAG,
             .mode = PerSubsetLevelEnumerationMode({
                 {0,
-                 PlanEnumerationMode::HINTED,
+                 PlanEnumerationMode::CHEAPEST,
                  JoinHint{.node = 0, .method = JoinMethod::INLJ, .isLeftChild = true}},
                 {1,
-                 PlanEnumerationMode::HINTED,
+                 PlanEnumerationMode::CHEAPEST,
                  JoinHint{.node = 1, .method = JoinMethod::INLJ, .isLeftChild = false}},
             }),
             .enableHJOrderPruning = false});
@@ -454,10 +434,10 @@ TEST_F(JoinPlanEnumeratorHintingTest, HintedEnumerationINLJ) {
             .planShape = PlanTreeShape::RIGHT_DEEP,
             .mode = PerSubsetLevelEnumerationMode({
                 {0,
-                 PlanEnumerationMode::HINTED,
+                 PlanEnumerationMode::CHEAPEST,
                  JoinHint{.node = 1, .method = JoinMethod::INLJ, .isLeftChild = false}},
                 {1,
-                 PlanEnumerationMode::HINTED,
+                 PlanEnumerationMode::CHEAPEST,
                  JoinHint{.node = 0, .method = JoinMethod::INLJ, .isLeftChild = false}},
             }),
             .enableHJOrderPruning = false});
@@ -468,13 +448,13 @@ TEST_F(JoinPlanEnumeratorHintingTest, HintedEnumerationINLJ) {
             .planShape = PlanTreeShape::LEFT_DEEP,
             .mode = PerSubsetLevelEnumerationMode({
                 {0,
-                 PlanEnumerationMode::HINTED,
+                 PlanEnumerationMode::CHEAPEST,
                  JoinHint{.node = 0, .method = JoinMethod::NLJ, .isLeftChild = false}},
                 {1,
-                 PlanEnumerationMode::HINTED,
+                 PlanEnumerationMode::CHEAPEST,
                  JoinHint{.node = 2, .method = JoinMethod::NLJ, .isLeftChild = false}},
                 {2,
-                 PlanEnumerationMode::HINTED,
+                 PlanEnumerationMode::CHEAPEST,
                  JoinHint{.node = 1, .method = JoinMethod::NLJ, .isLeftChild = false}},
             }),
             .enableHJOrderPruning = false});
@@ -494,13 +474,13 @@ TEST_F(JoinPlanEnumeratorHintingTest, HintedEnumerationNoContradictoryShapes) {
             .planShape = PlanTreeShape::ZIG_ZAG,
             .mode = PerSubsetLevelEnumerationMode({
                 {0,
-                 PlanEnumerationMode::HINTED,
+                 PlanEnumerationMode::CHEAPEST,
                  JoinHint{.node = 0, .method = JoinMethod::INLJ, .isLeftChild = true}},
                 {1,
-                 PlanEnumerationMode::HINTED,
+                 PlanEnumerationMode::CHEAPEST,
                  JoinHint{.node = 2, .method = JoinMethod::INLJ, .isLeftChild = true}},
                 {2,
-                 PlanEnumerationMode::HINTED,
+                 PlanEnumerationMode::CHEAPEST,
                  JoinHint{.node = 1, .method = JoinMethod::INLJ, .isLeftChild = true}},
             }),
             .enableHJOrderPruning = false});
@@ -511,13 +491,13 @@ TEST_F(JoinPlanEnumeratorHintingTest, HintedEnumerationNoContradictoryShapes) {
             .planShape = PlanTreeShape::LEFT_DEEP,
             .mode = PerSubsetLevelEnumerationMode({
                 {0,
-                 PlanEnumerationMode::HINTED,
+                 PlanEnumerationMode::CHEAPEST,
                  JoinHint{.node = 0, .method = JoinMethod::HJ, .isLeftChild = true}},
                 {1,
-                 PlanEnumerationMode::HINTED,
+                 PlanEnumerationMode::CHEAPEST,
                  JoinHint{.node = 2, .method = JoinMethod::HJ, .isLeftChild = true}},
                 {2,
-                 PlanEnumerationMode::HINTED,
+                 PlanEnumerationMode::CHEAPEST,
                  JoinHint{.node = 1, .method = JoinMethod::HJ, .isLeftChild = true}},
             }),
             .enableHJOrderPruning = false});

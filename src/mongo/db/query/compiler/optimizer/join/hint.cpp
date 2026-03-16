@@ -38,7 +38,7 @@ bool isHintValid(const JoinHint& hint) {
 
 /**
  * Validates that the enumeration strategy 'mode' has two properties- strictly ascending, and no two
- * consecutive modes are the same, unless the mode is HINTED.
+ * consecutive modes are the same.
  */
 bool isEnumerationModeValid(const std::vector<SubsetLevelMode>& modes) {
     if (modes.size() < 1) {
@@ -100,8 +100,6 @@ std::string planEnumModeToString(PlanEnumerationMode mode) {
             return "CHEAPEST";
         case PlanEnumerationMode::ALL:
             return "ALL";
-        case PlanEnumerationMode::HINTED:
-            return "HINTED";
     }
     MONGO_UNREACHABLE_TASSERT(11458204);
 }
@@ -111,7 +109,6 @@ SubsetLevelMode::SubsetLevelMode(size_t level,
                                  PlanEnumerationMode mode,
                                  boost::optional<JoinHint> hint)
     : _level(level), _mode(mode), _hint(std::move(hint)) {
-    tassert(11987000, "Expected a hint to be set", _mode != PlanEnumerationMode::HINTED || _hint);
     if (_hint) {
         tassert(11987001, "Expected a valid hint", isHintValid(*_hint));
     }
@@ -141,11 +138,7 @@ BSONObj SubsetLevelMode::toBSON() const {
 }
 
 PerSubsetLevelEnumerationMode::PerSubsetLevelEnumerationMode(PlanEnumerationMode mode)
-    : _modes{{0, mode}} {
-    tassert(11458200,
-            "Only accept hinted enumeration when at least one hint is provided",
-            mode != PlanEnumerationMode::HINTED);
-}
+    : _modes{{0, mode}} {}
 
 PerSubsetLevelEnumerationMode::PerSubsetLevelEnumerationMode(std::vector<SubsetLevelMode> modes)
     : _modes{std::move(modes)} {

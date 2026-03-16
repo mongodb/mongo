@@ -217,16 +217,15 @@ void PlanEnumeratorContext::addJoinPlan(JoinMethod method,
         return;
     }
 
+    if (_mode.specifiesHint()) {
+        LOGV2_DEBUG(11458210,
+                    5,
+                    "Applying hint for subset",
+                    "subset"_attr = subset.toString(_ctx.joinGraph.numNodes()),
+                    "hint"_attr = _mode.hint().toBSON());
+    }
+
     switch (_mode.mode()) {
-        // When we hint, we use the cheapest plan from the child subsets. If a child subset was
-        // hinted, there can only be one plan for that subset anyway.
-        case PlanEnumerationMode::HINTED:
-            LOGV2_DEBUG(11458210,
-                        5,
-                        "Applying hint for subset",
-                        "subset"_attr = subset.toString(_ctx.joinGraph.numNodes()),
-                        "hint"_attr = _mode.hint().toBSON());
-            [[fallthrough]];
         case PlanEnumerationMode::CHEAPEST: {
             enumerateCheapestJoinPlan(method, left, right, edges, subset);
             break;

@@ -45,9 +45,7 @@ enum class PlanEnumerationMode {
     // Only enumerate plans if they are cheaper than the lowest-cost plan for each subset.
     CHEAPEST,
     // Enumerates all plans, regardless of cost.
-    ALL,
-    // Enumerates a plan based on hints.
-    HINTED
+    ALL
 };
 
 /**

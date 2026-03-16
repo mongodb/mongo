@@ -460,7 +460,9 @@ PerSubsetLevelEnumerationMode makeRandomizedEnumerationHint(
         auto method =
             overrideMethod ? *overrideMethod : pickMethod(node, prevSubset, isLeftChild, level);
         modes.push_back({level,
-                         PlanEnumerationMode::HINTED,
+                         // When a plan is fully hinted, we only have one option at each subset
+                         // anyway- pick the cheapest one.
+                         PlanEnumerationMode::CHEAPEST,
                          JoinHint{.node = node, .method = method, .isLeftChild = isLeftChild}});
         level++;
         prevSubset.set(node);
