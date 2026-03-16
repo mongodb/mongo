@@ -46,6 +46,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/storage/storage_options.h"
@@ -82,6 +83,27 @@ Status validateCollectionStatsNamespaces(const std::vector<std::string> value,
 }
 
 namespace {
+
+struct CollectionStatsSpec {
+    StringData statsName;
+    StringData collName;
+    const DatabaseName& dbName;
+};
+
+std::vector<CollectionStatsSpec> getCollectionSpecs(ServiceContext* serviceContext) {
+    std::vector<CollectionStatsSpec> specs{
+        {"local.oplog.rs.stats"_sd, "oplog.rs"_sd, DatabaseName::kLocal},
+        {"config.transactions.stats"_sd, "transactions"_sd, DatabaseName::kConfig},
+    };
+
+    auto& rss = rss::ReplicatedStorageService::get(serviceContext);
+    if (rss.getPersistenceProvider().supportsFindAndModifyImageCollection()) {
+        specs.emplace_back(
+            "config.image_collection.stats"_sd, "image_collection"_sd, DatabaseName::kConfig);
+    }
+
+    return specs;
+}
 
 class FTDCCollectionStatsCollector final : public FTDCCollectorInterface {
 public:
@@ -175,7 +197,7 @@ std::unique_ptr<FTDCCollectorInterface> makeFilteredCollector(
     return std::make_unique<FilteredFTDCCollector>(std::move(pred), std::move(collector));
 }
 
-void registerShardCollectors(FTDCController* controller) {
+void registerShardCollectors(ServiceContext* serviceContext, FTDCController* controller) {
     registerServerCollectors(controller);
     registerNetworkingCollectors(controller);
 
@@ -186,25 +208,17 @@ void registerShardCollectors(FTDCController* controller) {
 
 
         // CollectionStats
-        const struct {
-            StringData stat;
-            StringData coll;
-            const DatabaseName& db;
-        } specs[]{
-            {"local.oplog.rs.stats"_sd, "oplog.rs"_sd, DatabaseName::kLocal},
-            {"config.transactions.stats"_sd, "transactions"_sd, DatabaseName::kConfig},
-            {"config.image_collection.stats"_sd, "image_collection"_sd, DatabaseName::kConfig},
-        };
+        const std::vector<CollectionStatsSpec> specs = getCollectionSpecs(serviceContext);
 
         for (const auto& spec : specs) {
             controller->addPeriodicCollector(
                 makeFilteredCollector(isDataStoringNode,
                                       std::make_unique<FTDCSimpleInternalCommandCollector>(
                                           "aggregate",
-                                          spec.stat,
-                                          spec.db,
+                                          spec.statsName,
+                                          spec.dbName,
                                           BSONObjBuilder{}
-                                              .append("aggregate", spec.coll)
+                                              .append("aggregate", spec.collName)
                                               .append("cursor", BSONObj{})
                                               .append("pipeline", pipelineObj)
                                               .obj())));

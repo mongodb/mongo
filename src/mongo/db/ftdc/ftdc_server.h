@@ -53,7 +53,7 @@ namespace mongo {
 /**
  * Function that allows FTDC server components to register their own collectors as needed.
  */
-using RegisterCollectorsFunction = std::function<void(FTDCController*)>;
+using RegisterCollectorsFunction = std::function<void(ServiceContext*, FTDCController*)>;
 
 /**
  * An enum that decides whether FTDC will startup as part of startup or if its deferred to later.

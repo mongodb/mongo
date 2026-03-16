@@ -419,7 +419,7 @@ void startFTDC(ServiceContext* serviceContext,
     auto controller = std::make_unique<FTDCController>(path, config);
 
     for (auto&& fn : registerCollectorsFns) {
-        fn(controller.get());
+        fn(serviceContext, controller.get());
     }
 
     controller->addPeriodicCollector(std::make_unique<TransportLayerFTDCCollector>());

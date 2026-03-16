@@ -57,7 +57,7 @@ namespace mongo {
 
 namespace {
 
-void registerRouterCollectors(FTDCController* controller) {
+void registerRouterCollectors(ServiceContext*, FTDCController* controller) {
     registerServerCollectors(controller);
 
     registerNetworkingCollectors(controller);
