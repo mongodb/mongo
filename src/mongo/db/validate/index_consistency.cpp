@@ -425,18 +425,17 @@ void KeyStringIndexConsistency::addIndexKey(OperationContext* opCtx,
                 options.dupsAllowed = !indexInfo->unique;
                 int64_t numDeleted = 0;
                 auto nss = entry->getNSSFromCatalog(opCtx);
-                writeConflictRetry(opCtx, "removingExtraIndexEntries", _validateState->nss(), [&] {
-                    WriteUnitOfWork wunit(opCtx);
-                    Status status = indexInfo->accessMethod->asSortedData()->removeKeys(
-                        opCtx,
-                        *shard_role_details::getRecoveryUnit(opCtx),
-                        _validateState->getCollection(),
-                        entry,
-                        {ks},
-                        options,
-                        &numDeleted);
-                    wunit.commit();
-                });
+                WriteUnitOfWork wunit(opCtx);
+                Status status = indexInfo->accessMethod->asSortedData()->removeKeys(
+                    opCtx,
+                    *shard_role_details::getRecoveryUnit(opCtx),
+                    _validateState->getCollection(),
+                    entry,
+                    {ks},
+                    options,
+                    &numDeleted);
+                uassertStatusOK(status);
+                wunit.commit();
                 auto& indexResults = results->getIndexValidateResult(indexInfo->indexName);
                 indexResults.addKeysTraversed(-numDeleted);
                 results->addNumRemovedExtraIndexEntries(numDeleted);
@@ -803,14 +802,11 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
             // 2. This index was built before 3.4, and there is no multikey path information for
             // the index. We can effectively 'upgrade' the index so that it does not need to be
             // rebuilt to update this information.
-            writeConflictRetry(opCtx, "updateMultikeyPaths", _validateState->nss(), [&]() {
-                WriteUnitOfWork wuow(opCtx);
-                auto writeableIndex = const_cast<IndexCatalogEntry*>(index);
-                const bool isMultikey = true;
-                writeableIndex->forceSetMultikey(
-                    opCtx, _validateState->getCollection(), isMultikey, documentPaths);
-                wuow.commit();
-            });
+            WriteUnitOfWork wuow(opCtx);
+            const bool isMultikey = true;
+            index->forceSetMultikey(
+                opCtx, _validateState->getCollection(), isMultikey, documentPaths);
+            wuow.commit();
 
             if (results) {
                 results->addWarning(str::stream() << "Updated index multikey metadata"
@@ -830,14 +826,10 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
             // This makes an improvement in the case that no documents make the index multikey and
             // the flag can be unset entirely. This may be due to a change in the data or historical
             // multikey bugs that have persisted incorrect multikey infomation.
-            writeConflictRetry(opCtx, "unsetMultikeyPaths", _validateState->nss(), [&]() {
-                WriteUnitOfWork wuow(opCtx);
-                auto writeableIndex = const_cast<IndexCatalogEntry*>(index);
-                const bool isMultikey = false;
-                writeableIndex->forceSetMultikey(
-                    opCtx, _validateState->getCollection(), isMultikey, {});
-                wuow.commit();
-            });
+            WriteUnitOfWork wuow(opCtx);
+            const bool isMultikey = false;
+            index->forceSetMultikey(opCtx, _validateState->getCollection(), isMultikey, {});
+            wuow.commit();
 
             if (results) {
                 results->addWarning(str::stream() << "Unset index multikey metadata"
@@ -917,12 +909,10 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
 
     if (!index->isMultikey(opCtx, coll) && shouldBeMultikey) {
         if (_validateState->fixErrors()) {
-            writeConflictRetry(opCtx, "setIndexAsMultikey", coll->ns(), [&] {
-                WriteUnitOfWork wuow(opCtx);
-                coll->getIndexCatalog()->setMultikeyPaths(
-                    opCtx, coll, index, *multikeyMetadataKeys, *documentMultikeyPaths);
-                wuow.commit();
-            });
+            WriteUnitOfWork wuow(opCtx);
+            coll->getIndexCatalog()->setMultikeyPaths(
+                opCtx, coll, index, *multikeyMetadataKeys, *documentMultikeyPaths);
+            wuow.commit();
 
             LOGV2(4614700,
                   "Index set to multikey",
@@ -953,12 +943,10 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
         const MultikeyPaths& indexPaths = index->getMultikeyPaths(opCtx, coll);
         if (!MultikeyPathTracker::covers(indexPaths, *documentMultikeyPaths.get())) {
             if (_validateState->fixErrors()) {
-                writeConflictRetry(opCtx, "increaseMultikeyPathCoverage", coll->ns(), [&] {
-                    WriteUnitOfWork wuow(opCtx);
-                    coll->getIndexCatalog()->setMultikeyPaths(
-                        opCtx, coll, index, *multikeyMetadataKeys, *documentMultikeyPaths);
-                    wuow.commit();
-                });
+                WriteUnitOfWork wuow(opCtx);
+                coll->getIndexCatalog()->setMultikeyPaths(
+                    opCtx, coll, index, *multikeyMetadataKeys, *documentMultikeyPaths);
+                wuow.commit();
 
                 LOGV2(4614701,
                       "Multikey paths updated to cover multikey document",
