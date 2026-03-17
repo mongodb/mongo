@@ -40,6 +40,3 @@
       # they fail with InterruptedDueToTimeseriesUpgradeDowngrade error.
       # TODO SPM-1153 remove this tag
       - requires_multi_updates
-      # Collstats could miss timeseries section when executed concurrently with timeseries upgrade/downgrade
-      # TODO SERVER-120247 remove this tag once the bug is fixed
-      - requires_collstats

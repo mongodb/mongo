@@ -52,6 +52,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
+#include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_map.h"
@@ -319,39 +320,31 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
     bool numericOnly = storageStatsSpec.getNumericOnly();
     static constexpr auto kStorageStatsField = "storageStats"_sd;
 
-    // TODO(SERVER-110087): Remove this legacy timeseries translation logic once v9.0 is last LTS
-    const auto bucketNss =
-        nss.isTimeseriesBucketsCollection() ? nss : nss.makeTimeseriesBucketsNamespace();
-    // Hold reference to the catalog for collection lookup without locks to be safe.
-    auto catalog = CollectionCatalog::get(opCtx);
-    auto bucketsColl = catalog->lookupCollectionByNamespace(opCtx, bucketNss);
-    const bool mayBeLegacyTimeseries = bucketsColl && bucketsColl->getTimeseriesOptions();
-    const auto collNss = (mayBeLegacyTimeseries && !nss.isTimeseriesBucketsCollection())
-        ? std::move(bucketNss)
-        : nss;
-
     auto failed = [&](const DBException& ex) {
-        LOGV2_DEBUG(3088801,
-                    2,
-                    "Failed to retrieve storage statistics",
-                    logAttrs(collNss),
-                    "error"_attr = ex);
+        LOGV2_DEBUG(
+            3088801, 2, "Failed to retrieve storage statistics", logAttrs(nss), "error"_attr = ex);
         return Status::OK();
     };
 
     boost::optional<CollectionAcquisition> collectionAcquisition;
     try {
-        collectionAcquisition = acquireCollectionMaybeLockFree(
-            opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(opCtx,
-                                                    collNss,
-                                                    AcquisitionPrerequisites::kRead,
-                                                    waitForLock ? Date_t::max() : Date_t::now()));
+        // TODO(SERVER-110087): switch to acquireCollection once v9.0 is last LTS
+        collectionAcquisition = timeseries::acquireCollectionWithBucketsLookup(
+                                    opCtx,
+                                    CollectionAcquisitionRequest::fromOpCtx(
+                                        opCtx,
+                                        nss,
+                                        AcquisitionPrerequisites::kRead,
+                                        waitForLock ? Date_t::max() : Date_t::now()),
+                                    MODE_IS)
+                                    .first;
     } catch (const ExceptionFor<ErrorCodes::LockTimeout>& ex) {
         return failed(ex);
     } catch (const ExceptionFor<ErrorCodes::MaxTimeMSExpired>& ex) {
         return failed(ex);
     }
+
+    const auto& collNss = collectionAcquisition->nss();
 
     AutoStatsTracker statsTracker(opCtx,
                                   collNss,
@@ -360,17 +353,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
                                   DatabaseProfileSettings::get(opCtx->getServiceContext())
                                       .getDatabaseProfileLevel(collNss.dbName()));
 
-    const auto& collectionPtr =
-        collectionAcquisition->getCollectionPtr();  // Will be set if present
-    const bool isTimeseries = collectionPtr && collectionPtr->getTimeseriesOptions().has_value();
-
-    // We decided the requested namespace was a time series view, so we redirected to the underlying
-    // buckets collection. However, when we tried to acquire that collection, it did not exist or it
-    // did not have time series options, which means it was dropped and potentially recreated in
-    // between the two calls. Logically, the collection that we were looking for does not exist.
-    bool logicallyNotFound = collNss != nss && !isTimeseries;
-
-    if (!collectionPtr || logicallyNotFound) {
+    if (!collectionAcquisition->exists()) {
         result->appendNumber("size", 0);
         result->appendNumber("count", 0);
         result->appendNumber("numOrphanDocs", 0);
@@ -384,6 +367,8 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
         return {ErrorCodes::NamespaceNotFound,
                 "Collection [" + collNss.toStringForErrorMsg() + "] not found."};
     }
+
+    const auto& collectionPtr = collectionAcquisition->getCollectionPtr();
 
     // We will parse all 'filterObj' into different groups of data to compute. This groups will be
     // marked and appended to the vector 'groupsToCompute'. In addition, if the filterObj doesn't
@@ -421,7 +406,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
                                    serializationCtx,
                                    nss.isNamespaceAlwaysUntracked(),
                                    scale,
-                                   isTimeseries,
+                                   collectionPtr->isTimeseriesCollection(),
                                    result);
                 break;
             case StorageStatsGroups::kRecordStoreField:

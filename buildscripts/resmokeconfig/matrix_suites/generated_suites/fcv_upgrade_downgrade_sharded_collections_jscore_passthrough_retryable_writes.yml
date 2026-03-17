@@ -252,7 +252,6 @@ selector:
     - requires_getmore
     - requires_non_retryable_writes
     - requires_multi_updates
-    - requires_collstats
   roots:
     - jstests/core/**/*.js
     - jstests/core_sharding/**/*.js

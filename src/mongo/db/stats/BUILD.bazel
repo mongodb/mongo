@@ -176,6 +176,7 @@ mongo_cc_library(
         "//src/mongo/db/shard_role",
         "//src/mongo/db/shard_role/shard_catalog:collection_options",
         "//src/mongo/db/shard_role/shard_catalog:index_catalog",
+        "//src/mongo/db/timeseries:catalog_helper",
         "//src/mongo/db/timeseries/bucket_catalog",
         "//src/mongo/util/concurrency:spin_lock",
     ],

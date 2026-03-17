@@ -123,6 +123,25 @@ export const $config = (function () {
             const count = withRetryOnTimeseriesUpgradeDowngradeError(() => coll.countDocuments({}));
             assert.eq(count, expectedDocs.length);
         },
+
+        collStatsCmd: function (db, collName) {
+            const coll = getCollection(db, Random.randInt(numCollections));
+
+            const result = withRetryOnTimeseriesUpgradeDowngradeError(() =>
+                assert.commandWorked(db.runCommand({collStats: coll.getName()})),
+            );
+            assert.hasFields(result, ["timeseries"]);
+        },
+
+        collStatsAgg: function (db, collName) {
+            const coll = getCollection(db, Random.randInt(numCollections));
+
+            const result = withRetryOnTimeseriesUpgradeDowngradeError(() =>
+                coll.aggregate([{$collStats: {storageStats: {}}}]).toArray(),
+            );
+            assert.hasFields(result[0], ["storageStats"]);
+            assert.hasFields(result[0].storageStats, ["timeseries"]);
+        },
     };
 
     const setup = function (db, collName, cluster) {
