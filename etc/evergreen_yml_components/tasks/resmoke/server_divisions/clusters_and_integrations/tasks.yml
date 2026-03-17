@@ -1939,11 +1939,6 @@ tasks:
       ]
     commands:
       - func: "generate resmoke tasks"
-        vars:
-          # TODO(SERVER-119866): Enable viewless timeseries in upgrade/downgrade suites
-          resmoke_args: >-
-            --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
-            --disableFeatureFlags=featureFlagBlockDirectSystemBucketsAccess
 
   - <<: *gen_task_template
     name: sharding_jscore_passthrough_with_config_transitions_and_add_remove_shard_gen
