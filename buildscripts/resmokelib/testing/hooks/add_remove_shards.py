@@ -304,6 +304,8 @@ class _AddRemoveShardThread(threading.Thread):
                 return True
             if "Can't reshard a timeseries collection" in str(err):
                 return True
+            if "Can't register a temporary collection" in str(err):
+                return True
             for regex in self._UNMOVABLE_NAMESPACE_REGEXES:
                 if re.search(regex, namespace):
                     return True
