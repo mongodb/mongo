@@ -1,0 +1,81 @@
+{
+    "planShape": "zigZag",
+    "perSubsetLevelMode": {
+        "0": {
+            "level": {"$numberInt":"0"},
+            "mode": "CHEAPEST",
+            "hint": {
+                "node": {"$numberInt":"0"},
+                "method": "INLJ",
+                "isLeftChild": true
+            }
+        },
+        "1": {
+            "level": {"$numberInt":"1"},
+            "mode": "CHEAPEST",
+            "hint": {
+                "node": {"$numberInt":"1"},
+                "method": "INLJ",
+                "isLeftChild": false
+            }
+        }
+    },
+    "enableHJOrderPruning": false
+}
+{
+    "planShape": "rightDeep",
+    "perSubsetLevelMode": {
+        "0": {
+            "level": {"$numberInt":"0"},
+            "mode": "CHEAPEST",
+            "hint": {
+                "node": {"$numberInt":"1"},
+                "method": "INLJ",
+                "isLeftChild": false
+            }
+        },
+        "1": {
+            "level": {"$numberInt":"1"},
+            "mode": "CHEAPEST",
+            "hint": {
+                "node": {"$numberInt":"0"},
+                "method": "INLJ",
+                "isLeftChild": false
+            }
+        }
+    },
+    "enableHJOrderPruning": false
+}
+{
+    "planShape": "leftDeep",
+    "perSubsetLevelMode": {
+        "0": {
+            "level": {"$numberInt":"0"},
+            "mode": "CHEAPEST",
+            "hint": {
+                "node": {"$numberInt":"0"},
+                "method": "NLJ",
+                "isLeftChild": false
+            }
+        },
+        "1": {
+            "level": {"$numberInt":"1"},
+            "mode": "CHEAPEST",
+            "hint": {
+                "node": {"$numberInt":"2"},
+                "method": "NLJ",
+                "isLeftChild": false
+            }
+        },
+        "2": {
+            "level": {"$numberInt":"2"},
+            "mode": "CHEAPEST",
+            "hint": {
+                "node": {"$numberInt":"1"},
+                "method": "NLJ",
+                "isLeftChild": false
+            }
+        }
+    },
+    "enableHJOrderPruning": false
+}

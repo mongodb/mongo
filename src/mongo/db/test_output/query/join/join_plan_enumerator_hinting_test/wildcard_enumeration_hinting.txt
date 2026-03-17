@@ -1,0 +1,73 @@
+{
+    "planShape": "zigZag",
+    "perSubsetLevelMode": {
+        "0": {
+            "level": {"$numberInt":"0"},
+            "mode": "ALL",
+            "hint": {
+                "method": "INLJ"
+            }
+        }
+    },
+    "enableHJOrderPruning": false
+}
+{
+    "planShape": "zigZag",
+    "perSubsetLevelMode": {
+        "0": {
+            "level": {"$numberInt":"0"},
+            "mode": "ALL",
+            "hint": {
+                "method": "HJ"
+            }
+        }
+    },
+    "enableHJOrderPruning": false
+}
+{
+    "planShape": "zigZag",
+    "perSubsetLevelMode": {
+        "0": {
+            "level": {"$numberInt":"0"},
+            "mode": "ALL",
+            "hint": {
+                "method": "NLJ"
+            }
+        }
+    },
+    "enableHJOrderPruning": false
+}
+{
+    "planShape": "leftDeep",
+    "perSubsetLevelMode": {
+        "0": {
+            "level": {"$numberInt":"0"},
+            "mode": "ALL",
+            "hint": {
+                "method": "NLJ"
+            }
+        }
+    },
+    "enableHJOrderPruning": false
+}
+{
+    "planShape": "leftDeep",
+    "perSubsetLevelMode": {
+        "0": {
+            "level": {"$numberInt":"0"},
+            "mode": "ALL",
+            "hint": {
+                "node": {"$numberInt":"1"}
+            }
+        },
+        "1": {
+            "level": {"$numberInt":"1"},
+            "mode": "ALL",
+            "hint": {
+                "node": {"$numberInt":"0"},
+                "isLeftChild": true
+            }
+        }
+    },
+    "enableHJOrderPruning": false
+}

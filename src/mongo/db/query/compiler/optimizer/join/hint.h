@@ -39,6 +39,13 @@ namespace mongo::join_ordering {
 enum class PlanTreeShape { LEFT_DEEP, RIGHT_DEEP, ZIG_ZAG };
 
 /**
+ * Helpers to serialize/deserialize a plan tree shape. Deserialization uasserts if string is not a
+ * valid plan tree shape.
+ */
+std::string planShapeToString(PlanTreeShape mode);
+PlanTreeShape planShapeFromString(const std::string& mode);
+
+/**
  * Determines what plans we enumerate.
  */
 enum class PlanEnumerationMode {
@@ -47,6 +54,13 @@ enum class PlanEnumerationMode {
     // Enumerates all plans, regardless of cost.
     ALL
 };
+
+/**
+ * Helpers to serialize/deserialize a plan enumeration mode. Deserialization uasserts if string is
+ * not a valid mode.
+ */
+std::string planEnumModeToString(PlanEnumerationMode mode);
+PlanEnumerationMode planEnumModeFromString(const std::string& mode);
 
 /**
  * Hints how a join should be done at the current subset level. All hints are optional- when not
@@ -77,6 +91,7 @@ struct JoinHint {
     boost::optional<bool> isLeftChild;
 
     BSONObj toBSON() const;
+    static JoinHint fromBSON(const BSONObj& obj);
 
     bool operator==(const JoinHint& other) const {
         return node == other.node && method == other.method && isLeftChild == other.isLeftChild;
@@ -155,6 +170,7 @@ public:
     }
 
     BSONObj toBSON() const;
+    static SubsetLevelMode fromBSON(const BSONObj& obj);
 
 private:
     // First level at which to apply this mode.
@@ -225,9 +241,10 @@ public:
     };
 
     BSONObj toBSON() const;
+    static PerSubsetLevelEnumerationMode fromBSON(const BSONObj& obj);
 
 private:
-    const std::vector<SubsetLevelMode> _modes;
+    std::vector<SubsetLevelMode> _modes;
     friend PerSubsetLevelEnumerationMode::Iterator;
 };
 
@@ -239,6 +256,9 @@ struct EnumerationStrategy {
     PlanTreeShape planShape;
     PerSubsetLevelEnumerationMode mode;
     bool enableHJOrderPruning;
+
+    static EnumerationStrategy fromBSON(const BSONObj& obj);
+    BSONObj toBSON() const;
 };
 
 }  // namespace mongo::join_ordering

@@ -94,6 +94,15 @@ bool isEnumerationModeValid(const std::vector<SubsetLevelMode>& modes) {
     return true;
 }
 
+void uassertExpectedType(const BSONElement& elem, BSONType expected) {
+    uassert(12016301,
+            str::stream() << "Expected " << elem.fieldName() << " to be of type "
+                          << typeName(expected) << ", found " << typeName(elem.type()),
+            elem.type() == expected);
+}
+
+}  // namespace
+
 std::string planEnumModeToString(PlanEnumerationMode mode) {
     switch (mode) {
         case PlanEnumerationMode::CHEAPEST:
@@ -103,7 +112,37 @@ std::string planEnumModeToString(PlanEnumerationMode mode) {
     }
     MONGO_UNREACHABLE_TASSERT(11458204);
 }
-}  // namespace
+
+PlanEnumerationMode planEnumModeFromString(const std::string& mode) {
+    if (mode == "CHEAPEST") {
+        return PlanEnumerationMode::CHEAPEST;
+    }
+    uassert(12016302, str::stream() << "Unexpected join enumeration mode " << mode, mode == "ALL");
+    return PlanEnumerationMode::ALL;
+}
+
+PlanTreeShape planShapeFromString(const std::string& shape) {
+    if (shape == "leftDeep") {
+        return PlanTreeShape::LEFT_DEEP;
+    } else if (shape == "rightDeep") {
+        return PlanTreeShape::RIGHT_DEEP;
+    }
+    uassert(12016303, str::stream() << "Unexpected join plan shape " << shape, shape == "zigZag");
+    return PlanTreeShape::ZIG_ZAG;
+}
+
+std::string planShapeToString(PlanTreeShape shape) {
+    switch (shape) {
+        case PlanTreeShape::LEFT_DEEP:
+            return "leftDeep";
+        case PlanTreeShape::RIGHT_DEEP:
+            return "rightDeep";
+        case PlanTreeShape::ZIG_ZAG:
+            return "zigZag";
+    }
+
+    MONGO_UNREACHABLE_TASSERT(12016304);
+}
 
 SubsetLevelMode::SubsetLevelMode(size_t level,
                                  PlanEnumerationMode mode,
@@ -128,6 +167,30 @@ BSONObj JoinHint::toBSON() const {
     return bob.obj();
 }
 
+JoinHint JoinHint::fromBSON(const BSONObj& obj) {
+    JoinHint hint;
+    for (auto elem : obj) {
+        if (elem.fieldNameStringData() == "node") {
+            uassertExpectedType(elem, BSONType::numberInt);
+            auto i = elem.numberInt();
+            uassert(12016305, "Expectected 'node' to be non-negative", i >= 0);
+            hint.node = i;
+        } else if (elem.fieldNameStringData() == "method") {
+            uassertExpectedType(elem, BSONType::string);
+            hint.method = joinMethodFromString(elem.String());
+        } else if (elem.fieldNameStringData() == "isLeftChild") {
+            uassertExpectedType(elem, BSONType::boolean);
+            hint.isLeftChild = elem.boolean();
+        } else {
+            uasserted(12016306,
+                      str::stream()
+                          << "Unexpected field '" << elem.fieldName() << "' for join hint.");
+        }
+    }
+    uassert(12016307, "Provided hint was not valid", isHintValid(hint));
+    return hint;
+}
+
 BSONObj SubsetLevelMode::toBSON() const {
     BSONObjBuilder bob;
     bob << "level" << (int)_level << "mode" << planEnumModeToString(_mode);
@@ -135,6 +198,33 @@ BSONObj SubsetLevelMode::toBSON() const {
         bob << "hint" << _hint->toBSON();
     }
     return bob.obj();
+}
+
+SubsetLevelMode SubsetLevelMode::fromBSON(const BSONObj& obj) {
+    boost::optional<size_t> level;
+    boost::optional<PlanEnumerationMode> mode;
+    boost::optional<JoinHint> hint;
+    for (auto elem : obj) {
+        if (elem.fieldNameStringData() == "level") {
+            uassertExpectedType(elem, BSONType::numberInt);
+            auto i = elem.numberInt();
+            uassert(12016308, "Expectected 'level' to be non-negative", i >= 0);
+            level = i;
+        } else if (elem.fieldNameStringData() == "mode") {
+            uassertExpectedType(elem, BSONType::string);
+            mode = planEnumModeFromString(elem.String());
+        } else if (elem.fieldNameStringData() == "hint") {
+            uassertExpectedType(elem, BSONType::object);
+            hint = JoinHint::fromBSON(elem.Obj());
+        } else {
+            uasserted(12016309,
+                      str::stream() << "Unexpected field '" << elem.fieldNameStringData()
+                                    << "' for subset level mode.");
+        }
+    }
+
+    uassert(12016310, "", mode && level);
+    return SubsetLevelMode(*level, *mode, std::move(hint));
 }
 
 PerSubsetLevelEnumerationMode::PerSubsetLevelEnumerationMode(PlanEnumerationMode mode)
@@ -152,4 +242,53 @@ BSONObj PerSubsetLevelEnumerationMode::toBSON() const {
     }
     return bab.arr();
 }
+
+PerSubsetLevelEnumerationMode PerSubsetLevelEnumerationMode::fromBSON(const BSONObj& obj) {
+    std::vector<SubsetLevelMode> modes;
+    for (auto elem : obj) {
+        uassertExpectedType(elem, BSONType::object);
+        modes.push_back(SubsetLevelMode::fromBSON(elem.Obj()));
+    }
+    uassert(12016311, "Expected valid enumeration mode", isEnumerationModeValid(modes));
+    return {modes};
+}
+
+BSONObj EnumerationStrategy::toBSON() const {
+    return BSON("planShape" << planShapeToString(planShape) << "perSubsetLevelMode" << mode.toBSON()
+                            << "enableHJOrderPruning" << enableHJOrderPruning);
+}
+
+EnumerationStrategy EnumerationStrategy::fromBSON(const BSONObj& obj) {
+    PlanTreeShape planShape = PlanTreeShape::ZIG_ZAG;
+    bool enableHJOrderPruning = false;
+    boost::optional<PerSubsetLevelEnumerationMode> mode;
+
+    uassert(12016312, "Expected field to be set in enumeration strategy", !obj.isEmpty());
+    for (auto elem : obj) {
+        if (elem.fieldNameStringData() == "planShape") {
+            uassertExpectedType(elem, BSONType::string);
+            planShape = planShapeFromString(elem.String());
+        } else if (elem.fieldNameStringData() == "perSubsetLevelMode") {
+            uassertExpectedType(elem, BSONType::object);
+            auto obj = elem.Obj();
+            mode = PerSubsetLevelEnumerationMode::fromBSON(obj);
+        } else if (elem.fieldNameStringData() == "enableHJOrderPruning") {
+            uassert(12016313,
+                    "Expected 'enableHJOrderPruning' value to be a boolean",
+                    elem.type() == BSONType::boolean);
+            enableHJOrderPruning = elem.boolean();
+        } else {
+            uasserted(12016314,
+                      str::stream() << "Unexpected field '" << elem.fieldNameStringData()
+                                    << "' for enumeration strategy");
+        }
+    }
+
+    if (!mode) {
+        mode = PerSubsetLevelEnumerationMode(PlanEnumerationMode::CHEAPEST);
+    }
+
+    return EnumerationStrategy{planShape, std::move(*mode), enableHJOrderPruning};
+}
+
 }  // namespace mongo::join_ordering

@@ -1,0 +1,64 @@
+{
+    "planShape": "zigZag",
+    "perSubsetLevelMode": {
+        "0": {
+            "level": {"$numberInt":"0"},
+            "mode": "ALL"
+        },
+        "1": {
+            "level": {"$numberInt":"1"},
+            "mode": "CHEAPEST"
+        },
+        "2": {
+            "level": {"$numberInt":"2"},
+            "mode": "ALL"
+        }
+    },
+    "enableHJOrderPruning": false
+}
+{
+    "planShape": "zigZag",
+    "perSubsetLevelMode": {
+        "0": {
+            "level": {"$numberInt":"0"},
+            "mode": "CHEAPEST"
+        },
+        "1": {
+            "level": {"$numberInt":"1"},
+            "mode": "ALL"
+        },
+        "2": {
+            "level": {"$numberInt":"2"},
+            "mode": "CHEAPEST"
+        }
+    },
+    "enableHJOrderPruning": false
+}
+{
+    "planShape": "zigZag",
+    "perSubsetLevelMode": {
+        "0": {
+            "level": {"$numberInt":"0"},
+            "mode": "CHEAPEST"
+        },
+        "1": {
+            "level": {"$numberInt":"2"},
+            "mode": "ALL"
+        }
+    },
+    "enableHJOrderPruning": false
+}
+{
+    "planShape": "zigZag",
+    "perSubsetLevelMode": {
+        "0": {
+            "level": {"$numberInt":"0"},
+            "mode": "ALL"
+        },
+        "1": {
+            "level": {"$numberInt":"2"},
+            "mode": "CHEAPEST"
+        }
+    },
+    "enableHJOrderPruning": false
+}

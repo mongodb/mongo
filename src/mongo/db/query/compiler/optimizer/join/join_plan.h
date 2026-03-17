@@ -107,9 +107,11 @@ enum class JoinMethod {
 };
 
 /**
- * Helper to pretty-print join method.
+ * Helpers to serialize/deserialize join method. Deserialization uasserts if string is not a valid
+ * join method.
  */
 std::string joinMethodToString(JoinMethod method);
+JoinMethod joinMethodFromString(const std::string& method);
 
 /**
  * A JoinPlan node representing a base collection access.

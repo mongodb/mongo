@@ -27,10 +27,12 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/json.h"
 #include "mongo/db/query/compiler/optimizer/join/join_plan.h"
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator.h"
 #include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::join_ordering {
@@ -108,14 +110,30 @@ DEATH_TEST(PerSubsetLevelEnumerationModeDeathTest, DuplicateMethodHints, "113916
 
 class JoinPlanEnumeratorHintingTest : public JoinOrderingTestFixture {
 public:
+    void validateEnumerationStrategySerialization(const EnumerationStrategy& strat) {
+        if (!_goldenCtx) {
+            // Initialize if not yet initialized.
+            _goldenCtx = std::make_unique<unittest::GoldenTestContext>(&goldenTestConfig);
+        }
+        auto bson = strat.toBSON();
+        _goldenCtx->outStream() << tojson(bson, ExtendedCanonicalV2_0_0, /* pretty */ true)
+                                << std::endl;
+        auto parsed = EnumerationStrategy::fromBSON(bson);
+        // Ensure round-trip parsing works. Golden-testing this ensures it doesn't change.
+        ASSERT_BSONOBJ_EQ(bson, parsed.toBSON());
+    }
+
     PlanEnumeratorContext makeEnumeratorContext(const JoinReorderingContext& ctx,
                                                 EnumerationStrategy strategy) {
+        // Test serialization while we're here.
+        validateEnumerationStrategySerialization(strategy);
         return {ctx, nullptr, nullptr, std::move(strategy)};
     }
 
     void validatePlanWasHintedCorrectly(const JoinReorderingContext& jCtx,
                                         EnumerationStrategy strat) {
-        auto ctx = makeEnumeratorContext(jCtx, std::move(strat));
+        // Note: copy 'strat' here so we can compare it with the plan we get.
+        auto ctx = makeEnumeratorContext(jCtx, strat);
         ctx.enumerateJoinSubsets();
         const auto& registry = ctx.registry();
 
@@ -187,6 +205,9 @@ public:
         ctx.enumerateJoinSubsets();
         ASSERT_FALSE(ctx.enumerationSuccessful());
     }
+
+private:
+    std::unique_ptr<unittest::GoldenTestContext> _goldenCtx;
 };
 
 TEST_F(JoinPlanEnumeratorHintingTest, MultiEnumerationModes) {
