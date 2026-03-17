@@ -8,8 +8,6 @@
 *.json
 *.wxs
 
-README
-
 # Ignore files that fail after format
 jstests/noPassthrough/js_exceptions.js
 jstests/noPassthrough/network/client_metadata_slowlog.js

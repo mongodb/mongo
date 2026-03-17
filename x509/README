@@ -10,11 +10,14 @@ This directory contains:
 
 To run:
 
+```
 python x509/mkcert.py CONFIG [--mkcrl | --no-mkcrl] [-o OUTPUT] [--static-dir STATIC_DIR]
     [--dry-run] [certs ...]
+```
+
 - CONFIG is the path to the JSON file specifying a list of certificates, required
 - OUTPUT is the path to a directory where the generated items will be stored, default .
-- STATIC_DIR is the path where signing keys needed by certificates are stored, default x509/static 
+- STATIC_DIR is the path where signing keys needed by certificates are stored, default x509/static
 - If --mkcrl is specified, CRLs will be generated after certificate generation ends. Default false.
   These are hardcoded and require certain certificates to be generated to work.
 - If --dry-run is specified, no files will be written out. This can be used to test what files will
@@ -38,6 +41,7 @@ Future work:
 
 Certificate definition format:
 
+```
 {
   "global": {
     # Optional, default value to use for Key1 for all certs, overridden by values in cert entries.
@@ -61,7 +65,7 @@ Certificate definition format:
       # Optional, serial number to assign this certificate (default: sequential numbers starting from 1000)
       "serial": 42,
       # Optional, validity start date, expressed in seconds relative to midnight on the first day of the current year.
-      "not_before": -86400, # 1 day before 
+      "not_before": -86400, # 1 day before
       # Optional, validity end date, currently expressed in seconds relative to midnight on the first day of the current year.
       # Note that not_after - not_before, the validity period, should be less than or equal to 825 days, see:
       # https://support.apple.com/en-us/HT210176
@@ -103,3 +107,4 @@ Certificate definition format:
     ...
   ]
 }
+```

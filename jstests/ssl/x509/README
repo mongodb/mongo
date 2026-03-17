@@ -1,8 +1,8 @@
 This directory contains two scripts.
 
-mkcert.py    - A python3 script using PyOpenSSL to generate the majority of
-               X509 certificates based on the contents of certs.yml
-mkcrl.sh     - Certificate Revocation List generators.
+mkcert.py - A python3 script using PyOpenSSL to generate the majority of
+X509 certificates based on the contents of certs.yml
+mkcrl.sh - Certificate Revocation List generators.
 
 mkcert.py may be invoked without any arguments, in which case it will regenerate ALL certificates.
 Alternatively, pass one or more certificate symbolic names.
@@ -10,6 +10,7 @@ If any of these certificates represent CAs, then all dependent certificates will
 
 cert.yml format:
 
+```
 global:
   output_path: '.../'   # Required, default output path for all certs in this file.
   Subject: {...}        # Optional, name entities to use for all cert, overridden by values in cert entries.
@@ -35,7 +36,7 @@ certs:
     serial: 42
     # Optional, validity start date, currently expressed in seconds relative to now.
     not_before: -86400 # 1 day ago
-    # Optional, validity end date, currently expressed in seconds relative to now. 
+    # Optional, validity end date, currently expressed in seconds relative to now.
     # Note that not_after - not_before, the validity period, should be less than or equal to 825 days, see:
     # https://support.apple.com/en-us/HT210176
     not_after: 71107200 # 823 days from now
@@ -65,3 +66,4 @@ certs:
       - {role: readWrite, db: test1}
       - {role: read, db: test2}
     - mongoClusterMembership: clusterName
+```
