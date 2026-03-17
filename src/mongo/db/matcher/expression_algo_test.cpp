@@ -2241,6 +2241,95 @@ TEST_F(SplitMatchExpressionExprTest, SplitWithVarReferences) {
                   {{"y", "z"}});
 }
 
+TEST(ApplyRenamesToExpression, ShouldApplyRenamesForAlwaysBoolean) {
+    {
+        // kOther -- always true.
+        BSONObj matchPredicate = fromjson("{$alwaysTrue: 1}");
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+        ASSERT_OK(matcher.getStatus());
+
+        StringMap<std::string> renames{{"a", "x.y"}, {"d.e", "y"}, {"c", "q.r"}};
+        auto renamedExpr =
+            expression::copyExpressionAndApplyRenames(matcher.getValue().get(), renames);
+        ASSERT_TRUE(renamedExpr);
+
+        ASSERT_BSONOBJ_EQ(renamedExpr->serialize(), fromjson("{$alwaysTrue: 1}"));
+    }
+    {
+        // kOther -- always false.
+        BSONObj matchPredicate = fromjson("{$alwaysFalse: 1}");
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+        ASSERT_OK(matcher.getStatus());
+
+        StringMap<std::string> renames{{"a", "x.y"}, {"d.e", "y"}, {"c", "q.r"}};
+        auto renamedExpr =
+            expression::copyExpressionAndApplyRenames(matcher.getValue().get(), renames);
+        ASSERT_TRUE(renamedExpr);
+
+        ASSERT_BSONOBJ_EQ(renamedExpr->serialize(), fromjson("{$alwaysFalse: 1}"));
+    }
+}
+
+TEST(ApplyRenamesToExpression, ShouldApplyRenamesForAlwaysBooleanWithEmptyRenameMap) {
+    {
+        BSONObj matchPredicate = fromjson("{$alwaysTrue: 1}");
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+        ASSERT_OK(matcher.getStatus());
+
+        StringMap<std::string> renames{};
+        auto renamedExpr =
+            expression::copyExpressionAndApplyRenames(matcher.getValue().get(), renames);
+        ASSERT_TRUE(renamedExpr);
+
+        ASSERT_BSONOBJ_EQ(renamedExpr->serialize(), fromjson("{$alwaysTrue: 1}"));
+    }
+    {
+        BSONObj matchPredicate = fromjson("{$alwaysFalse: 1}");
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+        ASSERT_OK(matcher.getStatus());
+
+        StringMap<std::string> renames{};
+        auto renamedExpr =
+            expression::copyExpressionAndApplyRenames(matcher.getValue().get(), renames);
+        ASSERT_TRUE(renamedExpr);
+
+        ASSERT_BSONOBJ_EQ(renamedExpr->serialize(), fromjson("{$alwaysFalse: 1}"));
+    }
+}
+
+TEST(ApplyRenamesToExpression, ShouldApplyRenamesForAlwaysBooleanInsideAnd) {
+    BSONObj matchPredicate = fromjson("{$and: [{$alwaysTrue: 1}, {a: 1}]}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"a", "x.y"}};
+    auto renamedExpr = expression::copyExpressionAndApplyRenames(matcher.getValue().get(), renames);
+    ASSERT_TRUE(renamedExpr);
+
+    ASSERT_BSONOBJ_EQ(renamedExpr->serialize(),
+                      fromjson("{$and: [{$alwaysTrue: 1}, {'x.y': {$eq: 1}}]}"));
+}
+
+TEST(ApplyRenamesToExpression, ShouldApplyRenamesForAlwaysBooleanAndExprTogether) {
+    BSONObj matchPredicate =
+        fromjson("{$and: [{$alwaysFalse: 1}, {$expr: {$eq: ['$a', '$b.c']}}]}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"a", "q"}, {"b", "z"}};
+    auto renamedExpr = expression::copyExpressionAndApplyRenames(matcher.getValue().get(), renames);
+    ASSERT_TRUE(renamedExpr);
+
+    ASSERT_BSONOBJ_EQ(renamedExpr->serialize(),
+                      fromjson("{$and: [{$alwaysFalse: 1}, {$expr: {$eq: ['$q', '$z.c']}}]}"));
+}
+
 TEST(ApplyRenamesToExpression, ShouldApplyBasicRenamesForAMatchWithExpr) {
     BSONObj matchPredicate = fromjson("{$expr: {$eq: ['$a.b', '$c']}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -2310,6 +2399,172 @@ TEST(ApplyRenamesToExpression, ShouldNotApplyRenamesForAMatchWithExprWithNoField
     ASSERT_BSONOBJ_EQ(
         renamedExpr->serialize(),
         fromjson("{$expr: {$concat: [{$const: 'a'}, {$const: 'b'}, {$const: 'c'}]}}"));
+}
+
+TEST(ApplyRenamesToExpression, ShouldApplyRenamesForInternalSchemaNumProperties) {
+    {
+        // _internalSchemaMinItems is not a top level operator, requires a name of field.
+        // This makes it by default renamable, if the encapsulating operator allows renaming.
+        BSONObj matchPredicate = fromjson("{a: {$_internalSchemaMinItems: 3}}");
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+        ASSERT_OK(matcher.getStatus());
+
+        StringMap<std::string> renames{{"a", "c"}};
+        auto renamedExpr =
+            expression::copyExpressionAndApplyRenames(matcher.getValue().get(), renames);
+        ASSERT_TRUE(renamedExpr);
+
+        ASSERT_BSONOBJ_EQ(renamedExpr->serialize(), fromjson("{c: {$_internalSchemaMinItems: 3}}"));
+    }
+    {
+        // _internalSchemaMaxItems is not a top level operator, requires a name of field.
+        // This makes it by default renamable, if the encapsulating operator allows renaming.
+        BSONObj matchPredicate = fromjson("{a: {$_internalSchemaMaxItems: 3}}");
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+        ASSERT_OK(matcher.getStatus());
+
+        StringMap<std::string> renames{{"a", "c"}};
+        auto renamedExpr =
+            expression::copyExpressionAndApplyRenames(matcher.getValue().get(), renames);
+        ASSERT_TRUE(renamedExpr);
+
+        ASSERT_BSONOBJ_EQ(renamedExpr->serialize(), fromjson("{c: {$_internalSchemaMaxItems: 3}}"));
+    }
+}
+
+TEST(ApplyRenamesToExpression, ShouldNotApplyRenamesForInternalSchemaCond) {
+    BSONObj matchPredicate = fromjson("{$_internalSchemaCond: [{a: 1}, {b: 1}, {c: 1}]}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"a", "d"}, {"b", "e"}, {"c", "f"}};
+    auto renamedExpr = expression::copyExpressionAndApplyRenames(matcher.getValue().get(), renames);
+    ASSERT_FALSE(renamedExpr);
+}
+
+
+TEST(ApplyRenamesToExpression, ShouldNotApplyRenamesForInternalSchemaCondDottedPaths) {
+    BSONObj matchPredicate = fromjson("{$_internalSchemaCond: [{a: 1}, {b: 2}, {c: 3}]}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"a", "x.y"}, {"b", "z"}, {"c", "m.n"}};
+    auto renamedExpr = expression::copyExpressionAndApplyRenames(matcher.getValue().get(), renames);
+    ASSERT_FALSE(renamedExpr);
+}
+
+TEST(ApplyRenamesToExpression, ShouldNotApplyRenamesForInternalSchemaBinDataEncryptedType) {
+    auto matchPredicate =
+        BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::string));
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"a", "d"}};
+    auto renamedExpr = expression::copyExpressionAndApplyRenames(matcher.getValue().get(), renames);
+    ASSERT_FALSE(renamedExpr);
+}
+
+TEST(ApplyRenamesToExpression,
+     ShouldNotApplyRenamesForInternalSchemaBinDataEncryptedTypeDottedPaths) {
+    BSONObj matchPredicate = fromjson("{a: {$_internalSchemaBinDataEncryptedType: [2, 9]}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"a", "x.y"}};
+    auto renamedExpr = expression::copyExpressionAndApplyRenames(matcher.getValue().get(), renames);
+    ASSERT_FALSE(renamedExpr);
+}
+
+TEST(ApplyRenamesToExpression, ShouldNotApplyRenamesForInternalSchemaBinDataFLE2EncryptedType) {
+    InternalSchemaBinDataFLE2EncryptedTypeExpression matcher("a"_sd, BSONType::string);
+    auto opts = SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
+    matcher.getSerializedRightHandSide(opts);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StringMap<std::string> renames{{"a", "d"}};
+    auto renamedExpr = expression::copyExpressionAndApplyRenames(&matcher, renames);
+    ASSERT_FALSE(renamedExpr);
+}
+
+TEST(ApplyRenamesToExpression,
+     ShouldNotApplyRenamesForInternalSchemaBinDataFLE2EncryptedTypeDottedPaths) {
+    InternalSchemaBinDataFLE2EncryptedTypeExpression matcher("a"_sd, BSONType::string);
+    auto opts = SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
+    matcher.getSerializedRightHandSide(opts);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StringMap<std::string> renames{{"a", "x.y"}};
+    auto renamedExpr = expression::copyExpressionAndApplyRenames(&matcher, renames);
+    ASSERT_FALSE(renamedExpr);
+}
+
+TEST(ApplyRenamesToExpression, ShouldNotApplyRenamesForInternalSchemaObjectMatch) {
+    auto matchPredicate = fromjson(
+        "{$or: [{a: {$not: {$exists: true }}}, {$and: [{a: {$_internalSchemaObjectMatch: "
+        "{$or: [{b: {$not: {$exists: true}}}, {b: {$_internalSchemaType: [2]}}]}}}, {a: "
+        "{$_internalSchemaType: [3]}}]}]}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"a", "d"}, {"b", "e"}};
+    auto renamedExpr = expression::copyExpressionAndApplyRenames(matcher.getValue().get(), renames);
+    ASSERT_FALSE(renamedExpr);
+}
+
+TEST(ApplyRenamesToExpression, ShouldNotApplyRenamesForInternalSchemaObjectMatchDottedPaths) {
+    BSONObj matchPredicate = fromjson("{a: {$_internalSchemaObjectMatch: {b: 1}}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"a", "x.y"}, {"b", "q.r"}};
+    auto renamedExpr = expression::copyExpressionAndApplyRenames(matcher.getValue().get(), renames);
+    ASSERT_FALSE(renamedExpr);
+}
+
+TEST(ApplyRenamesToExpression, ShouldNotApplyRenamesForInternalSchemaRootDocEq) {
+    auto matchPredicate = fromjson("{$_internalSchemaRootDocEq: {a: 1}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"a", "d"}};
+    auto renamedExpr = expression::copyExpressionAndApplyRenames(matcher.getValue().get(), renames);
+    // Root doc equality is not eligible for renames.
+    ASSERT_FALSE(renamedExpr);
+}
+
+TEST(ApplyRenamesToExpression, ShouldNotApplyRenamesForInternalSchemaAllowedProperties) {
+    auto matchPredicate = fromjson(
+        "{$_internalSchemaAllowedProperties: {properties: ['a', 'b'],"
+        "namePlaceholder: 'c', patternProperties: [], otherwise: {c: 0}}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"a", "d"}, {"b", "e"}, {"c", "f"}};
+    auto renamedExpr = expression::copyExpressionAndApplyRenames(matcher.getValue().get(), renames);
+    ASSERT_FALSE(renamedExpr);
+}
+
+TEST(ApplyRenamesToExpression, ShouldNotApplyRenamesForWhere) {
+    auto matchPredicate = fromjson("{$where: 'function() { return this.a == 1; }'}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher =
+        MatchExpressionParser::parse(matchPredicate,
+                                     std::move(expCtx),
+                                     ExtensionsCallbackNoop(),
+                                     MatchExpressionParser::AllowedFeatures::kJavascript);
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"a", "d"}, {"b", "e"}, {"c", "f"}};
+    auto renamedExpr = expression::copyExpressionAndApplyRenames(matcher.getValue().get(), renames);
+    ASSERT_FALSE(renamedExpr);
 }
 
 TEST(MapOverMatchExpression, DoesMapOverLogicalNodes) {

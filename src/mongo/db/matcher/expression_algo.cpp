@@ -1065,72 +1065,81 @@ bool hasOnlyRenameableMatchExpressionChildrenImpl(E&& expr,
                                                   Args&&... renameables) {
     constexpr bool mutating = shouldCollectRenameables<E, Args...>;
 
-    if (expr.matchType() == MatchExpression::MatchType::EXPRESSION) {
-        if constexpr (mutating) {
-            auto exprExpr = checked_cast<MaybeMutablePtr<mutating, ExprMatchExpression>>(&expr);
-            if (renames.size() > 0 && exprExpr->hasRenameablePath(renames)) {
-                // The second element is ignored for $expr.
-                (renameables.emplace_back(exprExpr, ""_sd), ...);
+    switch (expr.getCategory()) {
+        case MatchExpression::MatchCategory::kArrayMatching:
+        case MatchExpression::MatchCategory::kLeaf: {
+            auto pathExpr = checked_cast<MaybeMutablePtr<mutating, PathMatchExpression>>(&expr);
+            if (renames.size() == 0 || !pathExpr->optPath()) {
+                return true;
             }
-        }
 
-        return true;
-    }
+            // Cannot proceed to dependency or independence checks if any attempted rename would
+            // fail.
+            auto&& [wouldSucceed, optNewPath] = pathExpr->wouldRenameSucceed(renames);
+            if (!wouldSucceed) {
+                if constexpr (mutating) {
+                    (renameables.clear(), ...);
+                }
+                return false;
+            }
 
-    if (expr.getCategory() == MatchExpression::MatchCategory::kOther) {
-        if constexpr (mutating) {
-            (renameables.clear(), ...);
-        }
-        return false;
-    }
-
-    if (expr.getCategory() == MatchExpression::MatchCategory::kArrayMatching ||
-        expr.getCategory() == MatchExpression::MatchCategory::kLeaf) {
-        auto pathExpr = checked_cast<MaybeMutablePtr<mutating, PathMatchExpression>>(&expr);
-        if (renames.size() == 0 || !pathExpr->optPath()) {
+            if constexpr (mutating) {
+                if (optNewPath) {
+                    (renameables.emplace_back(pathExpr, *optNewPath), ...);
+                }
+            }
             return true;
         }
+        case MatchExpression::MatchCategory::kOther: {
+            switch (expr.matchType()) {
+                case MatchExpression::MatchType::EXPRESSION: {
+                    if constexpr (mutating) {
+                        auto exprExpr =
+                            checked_cast<MaybeMutablePtr<mutating, ExprMatchExpression>>(&expr);
+                        if (renames.size() > 0 && exprExpr->hasRenameablePath(renames)) {
+                            // The second element is ignored for $expr.
+                            (renameables.emplace_back(exprExpr, ""_sd), ...);
+                        }
+                    }
 
-        // Cannot proceed to dependency or independence checks if any attempted rename would fail.
-        auto&& [wouldSucceed, optNewPath] = pathExpr->wouldRenameSucceed(renames);
-        if (!wouldSucceed) {
-            if constexpr (mutating) {
-                (renameables.clear(), ...);
+                    return true;
+                }
+                case MatchExpression::MatchType::ALWAYS_TRUE:
+                case MatchExpression::MatchType::ALWAYS_FALSE: {
+                    return true;
+                }
+                default: {
+                    if constexpr (mutating) {
+                        (renameables.clear(), ...);
+                    }
+                    return false;
+                }
             }
-            return false;
         }
-
-        if constexpr (mutating) {
-            if (optNewPath) {
-                (renameables.emplace_back(pathExpr, *optNewPath), ...);
+        case MatchExpression::MatchCategory::kLogical: {
+            for (size_t i = 0; i < expr.numChildren(); ++i) {
+                bool hasOnlyRenameables = [&] {
+                    if constexpr (mutating) {
+                        return (hasOnlyRenameableMatchExpressionChildrenImpl(
+                                    *(expr.getChild(i)), renames, std::forward<Args>(renameables)),
+                                ...);
+                    } else {
+                        return hasOnlyRenameableMatchExpressionChildrenImpl(*(expr.getChild(i)),
+                                                                            renames);
+                    }
+                }();
+                if (!hasOnlyRenameables) {
+                    if constexpr (mutating) {
+                        (renameables.clear(), ...);
+                    }
+                    return false;
+                }
             }
+            return true;
         }
-
-        return true;
+        default:
+            MONGO_UNREACHABLE;
     }
-
-    tassert(7585300,
-            "Expression category must be logical at this point",
-            expr.getCategory() == MatchExpression::MatchCategory::kLogical);
-    for (size_t i = 0; i < expr.numChildren(); ++i) {
-        bool hasOnlyRenameables = [&] {
-            if constexpr (mutating) {
-                return (hasOnlyRenameableMatchExpressionChildrenImpl(
-                            *(expr.getChild(i)), renames, std::forward<Args>(renameables)),
-                        ...);
-            } else {
-                return hasOnlyRenameableMatchExpressionChildrenImpl(*(expr.getChild(i)), renames);
-            }
-        }();
-        if (!hasOnlyRenameables) {
-            if constexpr (mutating) {
-                (renameables.clear(), ...);
-            }
-            return false;
-        }
-    }
-
-    return true;
 }
 
 bool hasOnlyRenameableMatchExpressionChildren(MatchExpression& expr,
@@ -1495,7 +1504,7 @@ void applyRenamesToExpression(const StringMap<std::string>& renames,
             // PathMatchExpression.
             get<PathMatchExpression*>(matchExpr)->setPath(newPath);
         } else {
-            // ExprMatchExpression.
+            // ExprMatchExpression
             get<ExprMatchExpression*>(matchExpr)->applyRename(renames);
         }
     }
