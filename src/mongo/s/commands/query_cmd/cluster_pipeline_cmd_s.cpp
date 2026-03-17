@@ -34,17 +34,12 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/pipeline/aggregation_request_helper.h"
-#include "mongo/db/query/explain_options.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/commands/query_cmd/cluster_pipeline_cmd.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/database_name_util.h"
 
-#include <memory>
 #include <set>
 #include <string>
-#include <utility>
 
 #include <absl/container/node_hash_map.h>
 #include <boost/optional/optional.hpp>
@@ -56,7 +51,8 @@ namespace {
  * Implements the cluster aggregate command on mongos.
  */
 struct ClusterPipelineCommandS {
-    static constexpr StringData kName = "aggregate"_sd;
+    using Request = AggregateCommandRequest;
+    static constexpr StringData kCommandName = "aggregate"_sd;
 
     static const std::set<std::string>& getApiVersions() {
         return kApiVersions1;
@@ -77,13 +73,6 @@ struct ClusterPipelineCommandS {
 
     static void checkCanExplainHere(OperationContext* opCtx) {
         // Can always run on a mongos.
-    }
-
-    static AggregateCommandRequest parseAggregationRequest(
-        const OpMsgRequest& opMsgRequest,
-        boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
-        return aggregation_request_helper::parseFromBSON(
-            opMsgRequest.body, opMsgRequest.validatedTenancyScope, explainVerbosity);
     }
 };
 MONGO_REGISTER_COMMAND(ClusterPipelineCommandBase<ClusterPipelineCommandS>).forRouter();

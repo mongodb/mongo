@@ -306,13 +306,14 @@ public:
 
             uassertNoQuerySettings(opCtx);
 
+            // Mark this request as 'explain' so that downstream components such as query stats key
+            // construction can see it.
+            request().setExplain(true);
+
             // See run() for why we need this validation.
             // TODO SERVER-119402: Change explainVerbosity parameter to bool.
             aggregation_request_helper::validate(request(), body, ns(), verbosity);
 
-            // Mark this request as 'explain' so that downstream components such as query stats key
-            // construction can see it.
-            request().setExplain(true);
 
             // See run() method for details.
             uassertStatusOK(runAggregate(opCtx,

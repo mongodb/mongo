@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
@@ -38,74 +37,50 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
-#include "mongo/db/router_role/collection_routing_info_targeter.h"
-#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
-#include "mongo/db/views/resolved_view.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
 
+/**
+ * Implements the cluster aggregate command on both mongos (router) and shard servers.
+ *
+ * The 'Impl' template parameter is a small struct that provides the properties that differ between
+ * the 'ClusterPipelineCmdD' and 'ClusterPipelineCmdS' variants, such as:
+ *  - The command name.
+ *  - The stable API version of the command via 'getApiVersions()'.
+ *  - Whether the command or its explain can run via 'checkCanRunHere()' and
+ * 'checkCanExplainHere()'.
+ *
+ * The class uses CRTP with 'TypedCommand' where:
+ *  - The type ClusterPipelineCommandBase<Impl> is passed as the concrete type for the template
+ * parameter.
+ *  - 'Impl' provides the command-specific behavior.
+ *
+ * This template class provides the shared functionality between the command variants such as the
+ * 'run()' and 'explain()' functions.
+ *
+ * See 'cluster_pipeline_cmd_s.cpp' and 'cluster_pipeline_cmd_s.cpp' for more details.
+ */
 template <typename Impl>
-class ClusterPipelineCommandBase final : public Command {
+class ClusterPipelineCommandBase final : public TypedCommand<ClusterPipelineCommandBase<Impl>> {
 public:
-    ClusterPipelineCommandBase() : Command(Impl::kName) {}
+    using TC = TypedCommand<ClusterPipelineCommandBase<Impl>>;
+    using Request = typename Impl::Request;
+    ClusterPipelineCommandBase() : TC(Impl::kCommandName) {}
 
     const std::set<std::string>& apiVersions() const override {
         return Impl::getApiVersions();
     }
 
-    /**
-     * It's not known until after parsing whether or not an aggregation command is an explain
-     * request, because it might include the `explain: true` field (ie. aggregation explains do not
-     * need to arrive via the `explain` command). Therefore even parsing of regular aggregation
-     * commands needs to be able to handle the explain case.
-     *
-     * As a result, aggregation command parsing is done in parseForExplain():
-     *
-     * - To parse a regular aggregation command, call parseForExplain() with `explainVerbosity` of
-     *   boost::none.
-     *
-     * - To parse an aggregation command as the sub-command in an `explain` command, call
-     *   parseForExplain() with `explainVerbosity` set to the desired verbosity.
-     */
-    std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
-                                             const OpMsgRequest& opMsgRequest) override {
-        return parseForExplain(opCtx, opMsgRequest, boost::none);
-    }
+    class Invocation final : public TC::MinimalInvocationBase {
+        using TC::MinimalInvocationBase::MinimalInvocationBase;
+        using TC::MinimalInvocationBase::request;
+        using TC::MinimalInvocationBase::unparsedRequest;
 
-    std::unique_ptr<CommandInvocation> parseForExplain(
-        OperationContext* opCtx,
-        const OpMsgRequest& opMsgRequest,
-        boost::optional<ExplainOptions::Verbosity> explainVerbosity) override {
-        const auto aggregationRequest =
-            Impl::parseAggregationRequest(opMsgRequest, explainVerbosity);
-
-        auto privileges = uassertStatusOK(
-            auth::getPrivilegesForAggregate(opCtx,
-                                            AuthorizationSession::get(opCtx->getClient()),
-                                            aggregationRequest.getNamespace(),
-                                            aggregationRequest,
-                                            true));
-
-        // Forbid users from passing 'querySettings' explicitly.
-        uassert(7708000,
-                "BSON field 'querySettings' is an unknown field",
-                !aggregationRequest.getQuerySettings().has_value());
-
-        return std::make_unique<Invocation>(
-            this, opMsgRequest, std::move(aggregationRequest), std::move(privileges));
-    }
-
-    class Invocation final : public CommandInvocation {
     public:
-        Invocation(Command* cmd,
-                   const OpMsgRequest& request,
-                   AggregateCommandRequest aggregationRequest,
-                   PrivilegeVector privileges)
-            : CommandInvocation(cmd),
-              _request(request),
-              _aggregationRequest(std::move(aggregationRequest)),
+        Invocation(OperationContext* opCtx, Command* cmd, const OpMsgRequest& opMsgRequest)
+            : TC::MinimalInvocationBase(opCtx, cmd, opMsgRequest),
               _extensionMetrics(static_cast<const ClusterPipelineCommandBase*>(cmd)
                                     ->getExtensionMetricsAllocation()),
               // Create IFRContext early to ensure consistent flag values throughout the operation,
@@ -114,13 +89,18 @@ public:
               // here.
               _ifrContext(std::make_shared<IncrementalFeatureRolloutContext>()),
               _liteParsedPipeline(
-                  _aggregationRequest,
+                  request(),
                   false /* isRunningAgainstView_ForHybridSearch */,
                   {.ifrContext = _ifrContext, .extensionMetrics = &_extensionMetrics}),
-              _privileges(std::move(privileges)) {}
+              _privileges(uassertStatusOK(
+                  auth::getPrivilegesForAggregate(opCtx,
+                                                  AuthorizationSession::get(opCtx->getClient()),
+                                                  request().getNamespace(),
+                                                  request(),
+                                                  true))) {}
 
         const GenericArguments& getGenericArguments() const override {
-            return _aggregationRequest.getGenericArguments();
+            return request().getGenericArguments();
         }
 
         bool isReadOperation() const override {
@@ -136,7 +116,7 @@ public:
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
                                                      bool isImplicitDefault) const override {
-            bool isExplain = _aggregationRequest.getExplain().get_value_or(false);
+            bool isExplain = request().getExplain().get_value_or(false);
             return _liteParsedPipeline.supportsReadConcern(level, isImplicitDefault, isExplain);
         }
 
@@ -149,13 +129,13 @@ public:
                             boost::optional<ExplainOptions::Verbosity> verbosity) {
             if (auto pipelineForLog = _liteParsedPipeline.pipelineToBsonForLog()) {
                 aggregation_request_helper::updateOpDescriptionForLog(
-                    opCtx, _request.body, *pipelineForLog);
+                    opCtx, unparsedRequest().body, *pipelineForLog);
             }
 
-            const auto& nss = _aggregationRequest.getNamespace();
+            const auto& nss = ns();
             uassertStatusOK(ClusterAggregate::runAggregate(opCtx,
                                                            ClusterAggregate::Namespaces{nss, nss},
-                                                           _aggregationRequest,
+                                                           request(),
                                                            _liteParsedPipeline,
                                                            _privileges,
                                                            verbosity,
@@ -166,14 +146,22 @@ public:
         }
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
-            CommandHelpers::handleMarkKillOnClientDisconnect(
-                opCtx, !Pipeline::aggHasWriteStage(_request.body));
+            const auto& body = unparsedRequest().body;
+            CommandHelpers::handleMarkKillOnClientDisconnect(opCtx,
+                                                             !Pipeline::aggHasWriteStage(body));
+            uassertNoQuerySettings();
+
+            // Run aggregate-specific semantic validation beyond what the IDL-parsing provides. We
+            // pass boost::none as explainVerbosity because 'validate()' interprets a non-none
+            // explainVerbosity as a top-level explain.
+            // TODO SERVER-119402: Change explainVerbosity parameter to bool.
+            aggregation_request_helper::validate(request(), body, ns(), boost::none);
 
             Impl::checkCanRunHere(opCtx);
 
             auto bob = reply->getBodyBuilder();
             boost::optional<ExplainOptions::Verbosity> verbosity = boost::none;
-            if (_aggregationRequest.getExplain().get_value_or(false)) {
+            if (request().getExplain().get_value_or(false)) {
                 verbosity = ExplainOptions::Verbosity::kQueryPlanner;
             }
             _runAggCommand(opCtx, &bob, verbosity);
@@ -183,24 +171,44 @@ public:
                      ExplainOptions::Verbosity verbosity,
                      rpc::ReplyBuilderInterface* result) override {
             Impl::checkCanExplainHere(opCtx);
+            uassertNoQuerySettings();
+
+            // Mark this request as 'explain' so that downstream components such as query stats key
+            // construction can see it.
+            request().setExplain(true);
+
+            // Run aggregate-specific semantic validation beyond what the IDL-parsing provides. We
+            // pass boost::none as explainVerbosity because 'validate()' interprets a non-none
+            // explainVerbosity as a top-level explain.
+            // TODO SERVER-119402: Change explainVerbosity parameter to bool.
+            aggregation_request_helper::validate(
+                request(), unparsedRequest().body, ns(), verbosity);
+
             auto bodyBuilder = result->getBodyBuilder();
             _runAggCommand(opCtx, &bodyBuilder, verbosity);
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
-            Impl::doCheckAuthorization(opCtx, _request, _privileges);
+            Impl::doCheckAuthorization(opCtx, unparsedRequest(), _privileges);
+        }
+
+        // TODO SERVER-119513: Remove once aggregation_request_helper::validate() handles this
+        // check.
+        void uassertNoQuerySettings() const {
+            // Forbid users from passing 'querySettings' explicitly.
+            uassert(7708000,
+                    "BSON field 'querySettings' is an unknown field",
+                    !request().getQuerySettings().has_value());
         }
 
         NamespaceString ns() const override {
-            return _aggregationRequest.getNamespace();
+            return request().getNamespace();
         }
 
         const DatabaseName& db() const override {
-            return _aggregationRequest.getDbName();
+            return request().getDbName();
         }
 
-        const OpMsgRequest& _request;
-        AggregateCommandRequest _aggregationRequest;
         ExtensionMetrics _extensionMetrics;
         // Store the IFR context as a shared pointer. This object is mutable while running the
         // command. It must be shared because commands with subpipelines pass the same IFR context
@@ -217,12 +225,12 @@ public:
                "http://dochub.mongodb.org/core/aggregation for more details.";
     }
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
+    typename TC::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return TC::AllowedOnSecondary::kAlways;
     }
 
-    ReadWriteType getReadWriteType() const override {
-        return ReadWriteType::kRead;
+    typename TC::ReadWriteType getReadWriteType() const override {
+        return TC::ReadWriteType::kRead;
     }
 
     /**
@@ -263,7 +271,7 @@ public:
 
 protected:
     void doInitializeClusterRole(ClusterRole role) override {
-        _extensionMetricsAllocation.emplace(getName(), role);
+        _extensionMetricsAllocation.emplace(this->getName(), role);
     }
 
 private:
