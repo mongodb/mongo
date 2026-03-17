@@ -1,8 +1,9 @@
 """Script to fix up our MSI files."""
 
 import argparse
-import msilib
 import shutil
+
+import msilib
 
 
 def exec_delete(db, query):

@@ -19,7 +19,7 @@ To build MongoDB, you will need:
     - `libcurl4-gnutls-dev`
   - On Ubuntu, the lzma library is required. Install `liblzma-dev`
   - On Amazon Linux, the xz-devel library is required. `yum install xz-devel`
-- Python 3.10
+- Python 3.13
 - About 13 GB of free disk space for the core binaries (`mongod`,
   `mongos`, and `mongo`).
 
@@ -85,7 +85,7 @@ individual install target trees like `bazel-bin/<install-target>`.
 Build requirements:
 
 - Visual Studio 2022 version 17.0 or newer
-- Python 3.10
+- Python 3.13
 
 Or download a prebuilt binary for Windows at www.mongodb.org.
 

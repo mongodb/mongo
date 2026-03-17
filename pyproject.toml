@@ -1,7 +1,7 @@
 [project]
 name = "mdb-python-deps"
 version = "1.0.0"
-requires-python = ">=3.10,<4.0"
+requires-python = ">=3.13,<4.0"
 description = "MongoDB python dependencies"
 authors = [ { name = "MongoDB" } ]
 package-mode = false
@@ -32,7 +32,7 @@ dependencies = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.10,<4.0"
+python = ">=3.13,<4.0"
 # OPTIONAL
 # Libdeps depdencies
 networkx = "*"                                    # This is also used as a part of build_metrics so it is sort of required
@@ -214,7 +214,7 @@ extend-exclude = [
 ]
 
 line-length = 100
-target-version = "py310"
+target-version = "py313"
 
 [tool.ruff.lint]
 extend-select = [
@@ -251,7 +251,7 @@ exclude = [
     "**/third_party/**",
     "**/external/**"
 ]
-pythonVersion  = "3.10"
+pythonVersion  = "3.13"
 
 # These should be set to "error" for basic functionality
 reportInvalidTypeForm = "none"
