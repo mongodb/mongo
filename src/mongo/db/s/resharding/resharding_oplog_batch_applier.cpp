@@ -90,7 +90,7 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
                    // chainCtx->nextToApply on each loop iteration.
                    for (auto& i = chainCtx->nextToApply; i < chainCtx->batch.size(); ++i) {
                        const auto& oplogEntry = *chainCtx->batch[i];
-                       auto opCtx = factory->makeOperationContext(&cc());
+                       auto opCtx = _makeOperationContext(factory);
 
                        boost::optional<rss::consensus::WriteIntentGuard> writeGuard;
                        if (gFeatureFlagIntentRegistration.isEnabled()) {
@@ -149,6 +149,11 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
         // triggering an invariant due to the task executor's thread having a Client still.
         .onCompletion([](auto x) { return x; })
         .semi();
+}
+
+CancelableOperationContext ReshardingOplogBatchApplier::_makeOperationContext(
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) const {
+    return resharding::makeReshardingOperationContext(*factory, true /* nonDeprioritizable */);
 }
 
 template SemiFuture<void> ReshardingOplogBatchApplier::applyBatch<false>(

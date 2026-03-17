@@ -359,6 +359,12 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
     }
 }
 
+CancelableOperationContext ReshardingRecipientService::RecipientStateMachine::_makeOperationContext(
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) const {
+    return resharding::makeReshardingOperationContext(
+        *factory, _recipientCtx.getState() >= RecipientStateEnum::kApplying);
+}
+
 ExecutorFuture<void>
 ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrErrored(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
@@ -495,7 +501,7 @@ ReshardingRecipientService::RecipientStateMachine::_notifyCoordinatorAndAwaitDec
 
     return _retryingCancelableOpCtxFactory
         ->withAutomaticRetry([this, executor](auto factory) {
-            auto opCtx = factory->makeOperationContext(&cc());
+            auto opCtx = _makeOperationContext(factory);
             _updateContextMetrics(opCtx.get());
             return _updateCoordinator(opCtx.get(), executor, factory);
         })
@@ -541,7 +547,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                     }
                 })
                 .then([this, factory] {
-                    auto opCtx = factory->makeOperationContext(&cc());
+                    auto opCtx = _makeOperationContext(factory);
                     _updateContextMetrics(opCtx.get());
                 })
                 .then([this, factory] {
@@ -559,7 +565,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                     }
 
                     if (!_isAlsoDonor) {
-                        auto opCtx = factory->makeOperationContext(&cc());
+                        auto opCtx = _makeOperationContext(factory);
 
                         _externalState->clearFilteringMetadataOnTempReshardingCollection(
                             opCtx.get(), _metadata.getTempReshardingNss());
@@ -574,12 +580,12 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                     }
                 })
                 .then([this, executor, factory] {
-                    auto opCtx = factory->makeOperationContext(&cc());
+                    auto opCtx = _makeOperationContext(factory);
                     return _updateCoordinator(opCtx.get(), executor, factory);
                 })
                 .then([this, factory] {
                     {
-                        auto opCtx = factory->makeOperationContext(&cc());
+                        auto opCtx = _makeOperationContext(factory);
                         removeRecipientDocFailpoint.pauseWhileSet(opCtx.get());
                     }
                     _removeRecipientDocument(factory);
@@ -843,7 +849,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
         .then([this, executor, factory](
                   ReshardingRecipientService::RecipientStateMachine::CloneDetails cloneDetails) {
             {
-                auto opCtx = factory->makeOperationContext(&cc());
+                auto opCtx = _makeOperationContext(factory);
                 reshardingPauseRecipientBeforeTransitionToCreateCollection.pauseWhileSet(
                     opCtx.get());
             }
@@ -887,7 +893,7 @@ void ReshardingRecipientService::RecipientStateMachine::
     }
 
     {
-        auto opCtx = factory->makeOperationContext(&cc());
+        auto opCtx = _makeOperationContext(factory);
 
         _externalState->ensureTempReshardingCollectionExistsWithIndexes(
             opCtx.get(), _metadata, *_cloneTimestamp);
@@ -1113,12 +1119,12 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToBuildin
     }
 
     {
-        auto opCtx = factory->makeOperationContext(&cc());
+        auto opCtx = _makeOperationContext(factory);
         reshardingPauseRecipientBeforeCloning.pauseWhileSet(opCtx.get());
     }
 
     if (!_skipCloningAndApplying) {
-        auto opCtx = factory->makeOperationContext(&cc());
+        auto opCtx = _makeOperationContext(factory);
         _ensureDataReplicationStarted(opCtx.get(), executor, factory);
     }
 
@@ -1128,7 +1134,7 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToBuildin
     });
 
     {
-        auto opCtx = factory->makeOperationContext(&cc());
+        auto opCtx = _makeOperationContext(factory);
         reshardingPauseRecipientDuringCloning.pauseWhileSet(opCtx.get());
     }
 
@@ -1167,18 +1173,18 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
     }
 
     if (!_skipCloningAndApplying) {
-        auto opCtx = factory->makeOperationContext(&cc());
+        auto opCtx = _makeOperationContext(factory);
         _ensureDataReplicationStarted(opCtx.get(), executor, factory);
     }
 
     {
-        auto opCtx = factory->makeOperationContext(&cc());
+        auto opCtx = _makeOperationContext(factory);
         reshardingPauseRecipientBeforeBuildingIndex.pauseWhileSet(opCtx.get());
     }
 
     return ExecutorFuture<void>(**executor)
         .then([this, factory] {
-            auto opCtx = factory->makeOperationContext(&cc());
+            auto opCtx = _makeOperationContext(factory);
             // We call validateShardKeyIndexExistsOrCreateIfPossible again here in case if we
             // restarted after creatingCollection phase, whatever indexSpec we get in that
             // phase will go away.
@@ -1221,7 +1227,7 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
             return indexSpecs;
         })
         .then([this, executor, factory](const std::vector<BSONObj>& indexSpecs) {
-            auto opCtx = factory->makeOperationContext(&cc());
+            auto opCtx = _makeOperationContext(factory);
             auto& rss = rss::ReplicatedStorageService::get(opCtx.get()->getServiceContext());
             auto mustUsePrimaryDrivenIndexBuilds =
                 rss.getPersistenceProvider().mustUsePrimaryDrivenIndexBuilds();
@@ -1258,7 +1264,7 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                            LOGV2(10356604,
                                  "Start building indexes",
                                  "reshardingUUID"_attr = _metadata.getReshardingUUID());
-                           auto opCtx = factory->makeOperationContext(&cc());
+                           auto opCtx = _makeOperationContext(factory);
 
                            auto buildUUID = UUID::gen();
 
@@ -1317,7 +1323,7 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                        _cancelState->getAbortOrStepdownToken())
                 .thenRunOn(**executor)
                 .then([this, factory](const ReplIndexBuildState::IndexCatalogStats& stats) {
-                    if (auto opCtx = factory->makeOperationContext(&cc());
+                    if (auto opCtx = _makeOperationContext(factory);
                         resharding::gReshardingIndexVerification.load()) {
                         auto [sourceIdxSpecs, _] = _externalState->getCollectionIndexes(
                             opCtx.get(),
@@ -1361,11 +1367,11 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
     }
 
     if (!_skipCloningAndApplying) {
-        auto opCtx = factory->makeOperationContext(&cc());
+        auto opCtx = _makeOperationContext(factory);
         _ensureDataReplicationStarted(opCtx.get(), executor, factory);
     }
 
-    auto opCtx = factory->makeOperationContext(&cc());
+    auto opCtx = _makeOperationContext(factory);
     return _updateCoordinator(opCtx.get(), executor, factory)
         .then([this] {
             if (_skipCloningAndApplying) {
@@ -1391,13 +1397,13 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
                 return;
             }
 
-            auto opCtx = factory->makeOperationContext(&cc());
+            auto opCtx = _makeOperationContext(factory);
             _externalState->ensureReshardingStashCollectionsEmpty(
                 opCtx.get(), _metadata.getSourceUUID(), _donorShards);
         })
         .then([this, factory] {
             if (!_isAlsoDonor) {
-                auto opCtx = factory->makeOperationContext(&cc());
+                auto opCtx = _makeOperationContext(factory);
                 ShardingRecoveryService::get(opCtx.get())
                     ->acquireRecoverableCriticalSectionBlockWrites(
                         opCtx.get(),
@@ -1413,7 +1419,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
 
 void ReshardingRecipientService::RecipientStateMachine::_writeStrictConsistencyOplog(
     std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
-    auto opCtx = factory->makeOperationContext(&cc());
+    auto opCtx = _makeOperationContext(factory);
     auto rawOpCtx = opCtx.get();
 
     auto generateOplogEntry = [&]() {
@@ -1454,7 +1460,7 @@ void ReshardingRecipientService::RecipientStateMachine::_renameTemporaryReshardi
     }
 
     if (!_isAlsoDonor) {
-        auto opCtx = factory->makeOperationContext(&cc());
+        auto opCtx = _makeOperationContext(factory);
         // Allow bypassing user write blocking. The check has already been performed on the
         // db-primary shard's ReshardCollectionCoordinator.
         WriteBlockBypass::get(opCtx.get()).set(true);
@@ -1474,7 +1480,8 @@ void ReshardingRecipientService::RecipientStateMachine::_cleanupReshardingCollec
     std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     reshardingPauseRecipientBeforeCleanup.pauseWhileSet();
 
-    auto opCtx = factory->makeOperationContext(&cc());
+    auto opCtx = _makeOperationContext(factory);
+
     resharding::data_copy::ensureOplogCollectionsDropped(
         opCtx.get(), _metadata.getReshardingUUID(), _metadata.getSourceUUID(), _donorShards);
 
@@ -1577,7 +1584,7 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionToApplying(
     auto newRecipientCtx = _recipientCtx;
     newRecipientCtx.setState(RecipientStateEnum::kApplying);
     {
-        auto opCtx = factory->makeOperationContext(&cc());
+        auto opCtx = _makeOperationContext(factory);
         auto cloningMetrics = _tryFetchCloningMetrics(opCtx.get());
         if (cloningMetrics) {
             newRecipientCtx.setTotalNumDocuments(cloningMetrics->getDocumentsCopied());
@@ -1683,7 +1690,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_updateC
         .waitUntilMajorityForWrite(clientOpTime, CancellationToken::uncancelable())
         .thenRunOn(**executor)
         .then([this, factory] {
-            auto opCtx = factory->makeOperationContext(&cc());
+            auto opCtx = _makeOperationContext(factory);
             auto shardId = _externalState->myShardId(opCtx->getServiceContext());
 
             BSONObjBuilder updateBuilder;
@@ -1741,7 +1748,7 @@ void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument
     boost::optional<ReshardingRecipientService::RecipientStateMachine::CloneDetails>&& cloneDetails,
     boost::optional<mongo::Date_t> configStartTime,
     std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
-    auto opCtx = factory->makeOperationContext(&cc());
+    auto opCtx = _makeOperationContext(factory);
     PersistentTaskStore<ReshardingRecipientDocument> store(
         NamespaceString::kRecipientReshardingOperationsNamespace);
     Date_t timestamp = resharding::getCurrentTime();
@@ -1825,7 +1832,7 @@ void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument
     invariant(_metadata.getPerformVerification());
     invariant(!_skipCloningAndApplying);
 
-    auto opCtx = factory->makeOperationContext(&cc());
+    auto opCtx = _makeOperationContext(factory);
     auto updateMod = BSON("$set" << BSON(ReshardingRecipientDocument::kChangeStreamsMonitorFieldName
                                          << newChangeStreamsCtx.toBSON()));
     PersistentTaskStore<ReshardingRecipientDocument> store(
@@ -1843,7 +1850,7 @@ void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument
 
 void ReshardingRecipientService::RecipientStateMachine::_removeRecipientDocument(
     std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
-    auto opCtx = factory->makeOperationContext(&cc());
+    auto opCtx = _makeOperationContext(factory);
 
     const auto& nss = NamespaceString::kRecipientReshardingOperationsNamespace;
     writeConflictRetry(opCtx.get(), "RecipientStateMachine::_removeRecipientDocument", nss, [&] {
@@ -1905,7 +1912,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_restore
 void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
     std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     ReshardingMetrics::ExternallyTrackedRecipientFields externalMetrics;
-    auto opCtx = factory->makeOperationContext(&cc());
+    auto opCtx = _makeOperationContext(factory);
     [&] {
         const auto tempReshardingColl = acquireCollection(
             opCtx.get(),

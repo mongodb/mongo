@@ -172,6 +172,12 @@ public:
 
 private:
     /**
+     * Helper to construct an opCtx and set non-deprioritizable state if needed.
+     */
+    CancelableOperationContext _makeOperationContext(
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) const;
+
+    /**
      * Returns true if there's more work to do and the task should be rescheduled.
      */
     void _ensureCollection(Client* client,

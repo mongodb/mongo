@@ -132,6 +132,14 @@ private:
     using OplogBatch = std::vector<repl::OplogEntry>;
 
     /**
+     * Helper to construct an opCtx and set non-deprioritizable state. Since this class exists
+     * both outside of and within the critical section but has no concept of the resharding phases,
+     * it is always non-deprioritizable.
+     */
+    CancelableOperationContext _makeOperationContext(
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) const;
+
+    /**
      * Setup the worker threads to apply the ops in the current buffer in parallel. Waits for all
      * worker threads to finish (even when some of them finished early due to an error).
      */

@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
@@ -48,6 +49,7 @@
 #include "mongo/db/s/resharding/resharding_noop_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_txn_cloner.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/session_txn_record_gen.h"
@@ -59,6 +61,8 @@
 #include "mongo/otel/traces/telemetry_context_serialization.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/uuid.h"
 
@@ -823,6 +827,42 @@ TEST_F(ReshardingTxnCloningPipelineTest, TxnPipelineAfterID) {
     auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
 
     ASSERT(pipelineMatchesDeque(execPipeline, expectedTransactions));
+}
+
+class MakeReshardingOperationContextTest : public ServiceContextTest {
+protected:
+    void setUp() override {
+        ServiceContextTest::setUp();
+        _executor = std::make_shared<ThreadPool>([] {
+            ThreadPool::Options options;
+            options.poolName = "TestMakeReshardingOpCtxPool";
+            options.minThreads = 1;
+            options.maxThreads = 1;
+            return options;
+        }());
+        _factory = std::make_unique<HierarchicalCancelableOperationContextFactory>(
+            CancellationToken::uncancelable(), _executor);
+    }
+
+    HierarchicalCancelableOperationContextFactory& factory() {
+        return *_factory;
+    }
+
+private:
+    std::shared_ptr<ThreadPool> _executor;
+    std::unique_ptr<HierarchicalCancelableOperationContextFactory> _factory;
+};
+
+TEST_F(MakeReshardingOperationContextTest, NonDeprioritizableTrue) {
+    auto cancelableOpCtx = makeReshardingOperationContext(factory(), true);
+    auto& admCtx = ExecutionAdmissionContext::get(cancelableOpCtx.get());
+    ASSERT_EQ(admCtx.getTaskType(), ExecutionAdmissionContext::TaskType::NonDeprioritizable);
+}
+
+TEST_F(MakeReshardingOperationContextTest, NonDeprioritizableFalse) {
+    auto cancelableOpCtx = makeReshardingOperationContext(factory(), false);
+    auto& admCtx = ExecutionAdmissionContext::get(cancelableOpCtx.get());
+    ASSERT_EQ(admCtx.getTaskType(), ExecutionAdmissionContext::TaskType::Default);
 }
 
 }  // namespace

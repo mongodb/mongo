@@ -118,6 +118,11 @@ ReshardingOplogApplier::ReshardingOplogApplier(
       _batchApplier{_crudApplication, _sessionApplication},
       _oplogIter(std::move(oplogIterator)) {}
 
+CancelableOperationContext ReshardingOplogApplier::_makeOperationContext(
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) const {
+    return resharding::makeReshardingOperationContext(*factory, true /* nonDeprioritizable */);
+}
+
 SemiFuture<void> ReshardingOplogApplier::_applyBatch(
     std::shared_ptr<executor::TaskExecutor> executor,
     CancellationToken cancelToken,
@@ -220,7 +225,7 @@ SemiFuture<void> ReshardingOplogApplier::run(
                            return false;
                        }
 
-                       auto opCtx = factory->makeOperationContext(&cc());
+                       auto opCtx = _makeOperationContext(factory);
                        _clearAppliedOpsAndStoreProgress(opCtx.get());
                        return true;
                    });

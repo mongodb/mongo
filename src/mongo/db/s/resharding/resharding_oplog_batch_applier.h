@@ -65,6 +65,14 @@ public:
         std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) const;
 
 private:
+    /**
+     * Helper to construct an opCtx and set non-deprioritizable state. Since this class exists
+     * both outside of and within the critical section but has no concept of the resharding phases,
+     * it is always non-deprioritizable.
+     */
+    CancelableOperationContext _makeOperationContext(
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) const;
+
     const ReshardingOplogApplicationRules& _crudApplication;
     const ReshardingOplogSessionApplication& _sessionApplication;
 };

@@ -762,11 +762,17 @@ public:
             // remotely by internal clients should not be deprioritized:
             // - Session collection reads in findRemovedSessions.
             // - Key collection refresh.
+            // - Resharding application phase
             const bool isSystemCriticalNss = (nss == NamespaceString::kLogicalSessionsNamespace ||
-                                              nss == NamespaceString::kKeysCollectionNamespace);
+                                              nss == NamespaceString::kKeysCollectionNamespace ||
+                                              nss == NamespaceString::kRsOplogNamespace);
             boost::optional<admission::execution_control::ScopedTaskTypeNonDeprioritizable>
                 systemCriticalTaskType;
-            if (isSystemCriticalNss && opCtx->getClient()->isInternalClient()) {
+            // Note that we exclude commands with the term attached since this is used for the oplog
+            // fetcher which is marked exempt below. Since exempt + non-deprioritizable = exempt,
+            // skipping this would be fine but it messes with our metrics by hugely inflating the
+            // number of non-deprioritized ops.
+            if (!cmd.getTerm() && isSystemCriticalNss && opCtx->getClient()->isInternalClient()) {
                 systemCriticalTaskType.emplace(opCtx);
             }
 

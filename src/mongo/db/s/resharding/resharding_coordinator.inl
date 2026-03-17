@@ -247,6 +247,12 @@ void markCompleted(const Status& status, ReshardingMetrics* metrics) {
 
 #ifdef RESHARDING_COORDINATOR_PART_1
 
+CancelableOperationContext ReshardingCoordinator::_makeOperationContext() const {
+    return resharding::makeReshardingOperationContext(*_cancelableOpCtxFactory,
+                                                      _coordinatorDoc.getState() >=
+                                                          CoordinatorStateEnum::kBlockingWrites);
+}
+
 Status ReshardingCoordinator::_getEffectiveStatus(Status status) const {
     if (auto abortReason = _ctHolder->getAbortReason()) {
         // The resharding operation has been aborted, so override the given status with a resharding
@@ -339,7 +345,7 @@ ExecutorFuture<void> ReshardingCoordinator::_initializeCoordinator(
         })
         .onError([this, executor](Status status) {
             {
-                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                auto opCtx = _makeOperationContext();
                 reshardingPauseCoordinatorBeforeStartingErrorFlow.pauseWhileSet(opCtx.get());
             }
 
@@ -473,7 +479,7 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
         })
         .onError([this, executor](Status status) -> ExecutorFuture<ReshardingCoordinatorDocument> {
             {
-                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                auto opCtx = _makeOperationContext();
                 reshardingPauseCoordinatorBeforeStartingErrorFlow.pauseWhileSet(opCtx.get());
             }
 
@@ -504,7 +510,7 @@ ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
     return resharding::WithAutomaticRetry([this, executor, updatedCoordinatorDoc] {
                return ExecutorFuture<void>(**executor)
                    .then([this, executor] {
-                       auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                       auto opCtx = _makeOperationContext();
                        if (feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting.isEnabled(
                                VersionContext::getDecoration(opCtx.get()),
                                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
@@ -552,7 +558,7 @@ ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
                            })
                            .thenRunOn(**executor)
                            .then([this, executor] {
-                               auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                               auto opCtx = _makeOperationContext();
                                if (feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting
                                        .isEnabled(VersionContext::getDecoration(opCtx.get()),
                                                   serverGlobalParams.featureCompatibility
@@ -578,7 +584,7 @@ ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
                                _updateChunkImbalanceMetrics(_coordinatorDoc.getSourceNss());
                            })
                            .then([this, updatedCoordinatorDoc] {
-                               auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                               auto opCtx = _makeOperationContext();
                                resharding::removeChunkDocs(opCtx.get(),
                                                            updatedCoordinatorDoc.getSourceUUID());
                                return Status::OK();
@@ -612,7 +618,7 @@ ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
                 .runOn(**executor, _ctHolder->getStepdownToken())
                 .onError([this, executor](Status status) {
                     {
-                        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                        auto opCtx = _makeOperationContext();
                         reshardingPauseCoordinatorBeforeStartingErrorFlow.pauseWhileSet(
                             opCtx.get());
                     }
@@ -694,7 +700,7 @@ ExecutorFuture<void> ReshardingCoordinator::_quiesce(
                             "Resharding coordinator quiesce period done",
                             "reshardingUUID"_attr = _coordinatorDoc.getReshardingUUID());
                 if (!_ctHolder->isSteppingOrShuttingDown()) {
-                    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                    auto opCtx = _makeOperationContext();
                     ReshardingCoordinatorDocument updatedCoordinatorDoc = _coordinatorDoc;
                     updatedCoordinatorDoc.setState(CoordinatorStateEnum::kDone);
                     resharding::executeMetadataChangesInTxn(
@@ -741,7 +747,7 @@ ExecutorFuture<void> ReshardingCoordinator::_runReshardingOp(
         .onCompletion([this, executor, telemetryCtx = telemetryCtx->clone()](
                           Status status) mutable {
             auto span = _startSpan(telemetryCtx, "ReshardingCoordinator::afterFinish");
-            auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+            auto opCtx = _makeOperationContext();
             reshardingPauseCoordinatorBeforeCompletion.executeIf(
                 [&](const BSONObj&) {
                     reshardingPauseCoordinatorBeforeCompletion.pauseWhileSetAndNotCanceled(
@@ -826,7 +832,7 @@ ExecutorFuture<void> ReshardingCoordinator::_onAbortCoordinatorOnly(
     }
 
     return resharding::WithAutomaticRetry([this, executor, status] {
-               auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+               auto opCtx = _makeOperationContext();
 
                // Notify metrics as the operation is now complete for external observers.
                markCompleted(status, _metrics.get());
@@ -958,7 +964,7 @@ ExecutorFuture<bool> ReshardingCoordinator::_isReshardingOpRedundant(
     }
 
     return resharding::WithAutomaticRetry([this, executor] {
-               auto cancelableOpCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+               auto cancelableOpCtx = _makeOperationContext();
                auto opCtx = cancelableOpCtx.get();
 
                const auto cm = uassertStatusOK(
@@ -1065,7 +1071,7 @@ void ReshardingCoordinator::_insertCoordDocAndChangeOrigCollEntry() {
             _coordinatorDocWrittenPromise.emplaceValue();
         }
     } else {
-        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+        auto opCtx = _makeOperationContext();
         reshardingPauseCoordinatorBeforeInitializing.pauseWhileSetAndNotCanceled(
             opCtx.get(), _ctHolder->getStepdownToken());
         ReshardingCoordinatorDocument updatedCoordinatorDoc = _coordinatorDoc;
@@ -1089,7 +1095,7 @@ void ReshardingCoordinator::_calculateParticipantsAndChunksThenWriteToDisk() {
     if (_coordinatorDoc.getState() > CoordinatorStateEnum::kInitializing) {
         return;
     }
-    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    auto opCtx = _makeOperationContext();
     auto provenance = _coordinatorDoc.getCommonReshardingMetadata().getProvenance();
 
     std::vector<ReshardingZoneType> zones;
@@ -1186,7 +1192,7 @@ ReshardingApproxCopySize computeApproxCopySize(OperationContext* opCtx,
 
 ExecutorFuture<void> ReshardingCoordinator::_awaitAllDonorsReadyToDonate(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    auto opCtx = _makeOperationContext();
     if (_coordinatorDao.getPhase(opCtx.get()) > CoordinatorStateEnum::kPreparingToDonate) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
@@ -1197,7 +1203,7 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllDonorsReadyToDonate(
         .thenRunOn(**executor)
         .then([this](ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
             {
-                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                auto opCtx = _makeOperationContext();
                 reshardingPauseCoordinatorBeforeCloning.pauseWhileSetAndNotCanceled(
                     opCtx.get(), _ctHolder->getAbortToken());
             }
@@ -1205,7 +1211,7 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllDonorsReadyToDonate(
             auto highestMinFetchTimestamp = resharding::getHighestMinFetchTimestamp(
                 coordinatorDocChangedOnDisk.getDonorShards());
             auto approxCopySize = [&] {
-                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                auto opCtx = _makeOperationContext();
                 return computeApproxCopySize(opCtx.get(), coordinatorDocChangedOnDisk);
             }();
 
@@ -1246,7 +1252,7 @@ ExecutorFuture<void> ReshardingCoordinator::_fetchAndPersistNumDocumentsToCloneF
     return resharding::WithAutomaticRetry([this, executor] {
                return ExecutorFuture<void>(**executor)
                    .then([this, anchor = shared_from_this(), executor] {
-                       auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                       auto opCtx = _makeOperationContext();
 
                        // If running in "relaxed" mode, instruct the receiving shards to ignore
                        // collection uuid mismatches between the local and sharding catalogs.
@@ -1307,7 +1313,7 @@ ExecutorFuture<void> ReshardingCoordinator::_fetchAndPersistNumDocumentsToCloneF
                                                  << " not found in documentsToCopy map",
                                    it != documentsToCopy.end());
                        }
-                       auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                       auto opCtx = _makeOperationContext();
                        auto updatedCoordinatorDoc =
                            _coordinatorDao.updateNumberOfDocsToCopy(opCtx.get(), documentsToCopy);
                        _installCoordinatorDoc(updatedCoordinatorDoc);
@@ -1343,7 +1349,7 @@ ExecutorFuture<void> ReshardingCoordinator::_fetchAndPersistNumDocumentsToCloneF
 
 ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedCloning(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    auto opCtx = _makeOperationContext();
     if (_coordinatorDao.getPhase(opCtx.get()) > CoordinatorStateEnum::kCloning) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
@@ -1354,7 +1360,7 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedCloning(
         .thenRunOn(**executor)
         .then([this, executor](ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
             if (_metadata.getPerformVerification()) {
-                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                auto opCtx = _makeOperationContext();
                 // Fetch the coordinator doc from disk since the 'coordinatorDocChangedOnDisk' above
                 // came from the OpObserver and may not reflect the latest version coordinator doc
                 // because the write to populate donor 'documentsToCopy' metrics (to be used for
@@ -1371,7 +1377,7 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedCloning(
         })
         .then([this] {
             {
-                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                auto opCtx = _makeOperationContext();
                 reshardingPauseCoordinatorBeforeApplying.pauseWhileSetAndNotCanceled(
                     opCtx.get(), _ctHolder->getAbortToken());
             }
@@ -1462,7 +1468,7 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedApplying(
         })
         .then([this, executor] {
             {
-                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                auto opCtx = _makeOperationContext();
                 reshardingPauseCoordinatorBeforeBlockingWrites.pauseWhileSetAndNotCanceled(
                     opCtx.get(), _ctHolder->getAbortToken());
             }
@@ -1520,7 +1526,7 @@ ExecutorFuture<void> ReshardingCoordinator::_fetchAndPersistNumDocumentsFinalFro
     return resharding::WithAutomaticRetry([this, executor] {
                return ExecutorFuture<void>(**executor)
                    .then([this, anchor = shared_from_this(), executor] {
-                       auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                       auto opCtx = _makeOperationContext();
 
                        return _reshardingCoordinatorExternalState->getDocumentsDeltaFromDonors(
                            opCtx.get(),
@@ -1555,7 +1561,7 @@ ExecutorFuture<void> ReshardingCoordinator::_fetchAndPersistNumDocumentsFinalFro
                            documentsFinal.emplace(donorShard.getId(),
                                                   *documentsToCopy + it->second);
                        }
-                       auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                       auto opCtx = _makeOperationContext();
                        auto updatedCoordinatorDoc = _coordinatorDao.updateNumberOfDocsCopiedFinal(
                            opCtx.get(), documentsFinal);
                        _installCoordinatorDoc(updatedCoordinatorDoc);
@@ -1607,7 +1613,7 @@ ReshardingCoordinator::_awaitAllRecipientsInStrictConsistency(
         .thenRunOn(**executor)
         .then([this, executor](ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
             if (_metadata.getPerformVerification()) {
-                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                auto opCtx = _makeOperationContext();
                 // Fetch the coordinator doc from disk since the 'coordinatorDocChangedOnDisk'
                 // above came from the OpObserver and may not reflect the latest version
                 // coordinator doc because the write to populate donor 'documentsFinal' metrics
@@ -1655,7 +1661,7 @@ void ReshardingCoordinator::_commit(const ReshardingCoordinatorDocument& coordin
     ReshardingCoordinatorDocument updatedCoordinatorDoc = coordinatorDoc;
     updatedCoordinatorDoc.setState(CoordinatorStateEnum::kCommitting);
 
-    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    auto opCtx = _makeOperationContext();
     reshardingPauseCoordinatorBeforeDecisionPersisted.pauseWhileSetAndNotCanceled(
         opCtx.get(), _ctHolder->getAbortToken());
 
@@ -1794,7 +1800,7 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllParticipantShardsDone(
                                          _ctHolder->getStepdownToken())
         .thenRunOn(**executor)
         .then([this, executor](const auto& coordinatorDocsChangedOnDisk) {
-            auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+            auto opCtx = _makeOperationContext();
             auto& coordinatorDoc = coordinatorDocsChangedOnDisk[1];
 
             boost::optional<Status> abortReason;
@@ -1842,7 +1848,7 @@ void ReshardingCoordinator::_updateCoordinatorDocStateAndCatalogEntries(
     resharding::emplaceCloneTimestampIfExists(updatedCoordinatorDoc, std::move(cloneTimestamp));
     resharding::emplaceTruncatedAbortReasonIfExists(updatedCoordinatorDoc, abortReason);
 
-    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    auto opCtx = _makeOperationContext();
     resharding::writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
         opCtx.get(), _metrics.get(), updatedCoordinatorDoc, boost::none);
 
@@ -1854,7 +1860,7 @@ void ReshardingCoordinator::_updateCoordinatorDocStateAndCatalogEntries(
 
 void ReshardingCoordinator::_updateCoordinatorDocStateAndCatalogEntries(
     resharding::PhaseTransitionFn phaseTransitionFn) {
-    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    auto opCtx = _makeOperationContext();
     resharding::writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
         opCtx.get(), _metrics.get(), _coordinatorDoc, std::move(phaseTransitionFn));
 
@@ -1882,7 +1888,7 @@ void ReshardingCoordinator::_removeOrQuiesceCoordinatorDocAndRemoveReshardingFie
 void ReshardingCoordinator::_establishAllDonorsAsParticipants(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     invariant(_coordinatorDoc.getState() == CoordinatorStateEnum::kPreparingToDonate);
-    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    auto opCtx = _makeOperationContext();
 
     _reshardingCoordinatorExternalState->establishAllDonorsAsParticipants(
         opCtx.get(),
@@ -1895,7 +1901,7 @@ void ReshardingCoordinator::_establishAllDonorsAsParticipants(
 void ReshardingCoordinator::_establishAllRecipientsAsParticipants(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     invariant(_coordinatorDoc.getState() == CoordinatorStateEnum::kPreparingToDonate);
-    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    auto opCtx = _makeOperationContext();
 
     _reshardingCoordinatorExternalState->establishAllRecipientsAsParticipants(
         opCtx.get(),
@@ -1907,7 +1913,7 @@ void ReshardingCoordinator::_establishAllRecipientsAsParticipants(
 
 void ReshardingCoordinator::_tellAllRecipientsToClone(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    auto opCtx = _makeOperationContext();
     // TODO (SERVER-99772): Remove failpoint.
     reshardingPauseBeforeTellingRecipientsToClone.pauseWhileSetAndNotCanceled(
         opCtx.get(), _ctHolder->getAbortToken());
@@ -1926,7 +1932,7 @@ void ReshardingCoordinator::_tellAllRecipientsToRefresh(
         isCommitting ? _coordinatorDoc.getSourceNss() : _coordinatorDoc.getTempReshardingNss();
     auto token = isCommitting ? _ctHolder->getStepdownToken() : _ctHolder->getAbortToken();
 
-    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    auto opCtx = _makeOperationContext();
     _reshardingCoordinatorExternalState->tellAllRecipientsToRefresh(
         opCtx.get(),
         nssToRefresh,
@@ -1938,7 +1944,7 @@ void ReshardingCoordinator::_tellAllRecipientsToRefresh(
 
 void ReshardingCoordinator::_tellAllDonorsToRefresh(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    auto opCtx = _makeOperationContext();
 
     _reshardingCoordinatorExternalState->tellAllDonorsToRefresh(opCtx.get(),
                                                                 _coordinatorDoc.getSourceNss(),
@@ -1956,21 +1962,21 @@ void ReshardingCoordinator::_tellAllDonorsToStartChangeStreamsMonitor(
         return;
     }
 
-    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    auto opCtx = _makeOperationContext();
     resharding::tellAllDonorsToStartChangeStreamsMonitor(
         opCtx.get(), _coordinatorDoc, _ctHolder->getStepdownToken(), executor);
 }
 
 void ReshardingCoordinator::_tellAllRecipientsCriticalSectionStarted(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    auto opCtx = _makeOperationContext();
     resharding::tellAllRecipientsCriticalSectionStarted(
         opCtx.get(), _coordinatorDoc, _ctHolder->getAbortToken(), executor);
 }
 
 void ReshardingCoordinator::_tellAllParticipantsToCommit(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    auto opCtx = _makeOperationContext();
     reshardingPauseBeforeTellingParticipantsToCommit.pauseWhileSetAndNotCanceled(
         opCtx.get(), _ctHolder->getAbortToken());
 
@@ -1980,13 +1986,13 @@ void ReshardingCoordinator::_tellAllParticipantsToCommit(
 
 void ReshardingCoordinator::_tellAllParticipantsToAbort(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor, bool isUserAborted) {
-    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    auto opCtx = _makeOperationContext();
     resharding::tellAllParticipantsToAbort(
         opCtx.get(), _coordinatorDoc, _ctHolder->getStepdownToken(), executor, isUserAborted);
 }
 
 void ReshardingCoordinator::_updateChunkImbalanceMetrics(const NamespaceString& nss) {
-    auto cancellableOpCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    auto cancellableOpCtx = _makeOperationContext();
     auto opCtx = cancellableOpCtx.get();
 
     try {

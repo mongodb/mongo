@@ -421,7 +421,7 @@ bool ReshardingOplogFetcher::iterate(
     try {
         std::shared_ptr<Shard> targetShard;
         {
-            auto opCtxRaii = factory->makeOperationContext(client);
+            auto opCtxRaii = _makeOperationContext(factory);
             opCtxRaii->checkForInterrupt();
 
             StatusWith<std::shared_ptr<Shard>> swDonor =
@@ -450,11 +450,17 @@ bool ReshardingOplogFetcher::iterate(
     }
 }
 
+CancelableOperationContext ReshardingOplogFetcher::_makeOperationContext(
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) const {
+    return resharding::makeReshardingOperationContext(*factory,
+                                                      _isPreparingForCriticalSection.load());
+}
+
 void ReshardingOplogFetcher::_ensureCollection(
     Client* client,
     std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory,
     const NamespaceString nss) {
-    auto opCtxRaii = factory->makeOperationContext(client);
+    auto opCtxRaii = _makeOperationContext(factory);
     auto opCtx = opCtxRaii.get();
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
@@ -482,7 +488,7 @@ void ReshardingOplogFetcher::_ensureCollection(
 
 AggregateCommandRequest ReshardingOplogFetcher::_makeAggregateCommandRequest(
     Client* client, std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
-    auto opCtxRaii = factory->makeOperationContext(client);
+    auto opCtxRaii = _makeOperationContext(factory);
     auto opCtx = opCtxRaii.get();
     auto expCtx = _makeExpressionContext(opCtx);
 
@@ -627,7 +633,7 @@ bool ReshardingOplogFetcher::consume(
 
     auto aggRequest = _makeAggregateCommandRequest(client, factory);
 
-    auto opCtxRaii = factory->makeOperationContext(client);
+    auto opCtxRaii = _makeOperationContext(factory);
     int currentNumBatchesProcessed = 0;
     bool moreToCome = true;
 
@@ -650,7 +656,7 @@ bool ReshardingOplogFetcher::consume(
                                             _reshardingUUID.toString(),
                                             _donorShard.toString()),
                                 _service()->getService());
-            auto opCtxRaii = factory->makeOperationContext(client.get());
+            auto opCtxRaii = _makeOperationContext(factory);
             auto opCtx = opCtxRaii.get();
 
             auto prevBatchLastOplogId = [&] {
