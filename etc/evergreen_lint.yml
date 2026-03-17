@@ -167,10 +167,25 @@ rules:
         forbidden_task_tag: "experimental"
         ignored_tasks: [
             # TODO: remove this exception when SERVER-94572 is resolved
+            "benchmarks_streams",
+            "streams_gen",
             "streams_kafka_gen",
             "streams_kafka_gwproxy",
+            "streams_kafka_benchmark",
+            "streams_https",
             "streams_lambda",
             "streams_s3",
+            "streams_kinesis",
+            "streams_aspio",
+            "streams_aspio_iceberg_0",
+            "streams_aspio_iceberg_1",
+            "streams_aspio_iceberg_2",
+            "streams_aspio_iceberg_3",
+            "streams_aspio_iceberg_large",
+            "streams_aspio_iceberg_5",
+            "streams_aspio_utilities",
+            "streams_externaljs",
+            "streams_aspio_pubsub",
             # TODO: remove these exceptions when SERVER-94573 is resolved
             "selinux_rhel9_enterprise",
             "selinux_rhel8_org",

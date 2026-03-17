@@ -158,6 +158,7 @@ variables:
       --opt=on
       --fission=no
       --jobs=800
+      --streams_release_build=True
     # Avoid starting too many mongod's under TSAN build.
     resmoke_jobs_factor: 0.3
     large_distro_name: &enterprise-rhel8-debug-tsan-large-distro-name rhel8.8-xlarge
@@ -462,6 +463,7 @@ buildvariants:
   - <<: *rhel8_debug_aubsan_compile_variant_dependency
     name: rhel8-debug-aubsan-all-feature-flags
     display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (all feature flags)"
+    modules: ["asp-js-engine"]
     tags:
       [
         "suggested",
@@ -480,11 +482,12 @@ buildvariants:
       # operations from making progress on slow sanitizer variants.
       test_flags: >-
         --runAllFeatureFlagTests
+        --additionalFeatureFlags=featureFlagStreams
         --excludeWithAnyTags=incompatible_aubsan
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"
         --mongosSetParameters="{maxRoundsWithoutProgressParameter: 20}"
         --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"
-    tasks: &rhel8-debug-aubsan-task-list
+    tasks:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
         distros:
@@ -499,6 +502,9 @@ buildvariants:
           - rhel8.8-xlarge
       - name: .non_deterministic !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
       - name: .non_deterministic .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .streams_release_test !.requires_extra_system_deps !streams_kafka_gen !streams_kafka_benchmark !streams_kafka_gwproxy
         distros:
           - rhel8.8-xlarge
 
@@ -544,7 +550,23 @@ buildvariants:
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"
         --mongosSetParameters="{maxRoundsWithoutProgressParameter: 20}"
         --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"
-    tasks: *rhel8-debug-aubsan-task-list
+    tasks:
+      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .default !.requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .default .requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
+      - name: .non_deterministic !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .non_deterministic .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - rhel8.8-xlarge
 
   - name: &rhel8-debug-aubsan-benchmarks rhel8-debug-aubsan-benchmarks
     display_name: "* {A,UB}SAN Enterprise RHEL 8 DEBUG (Benchmarks)"
@@ -559,6 +581,7 @@ buildvariants:
         --config=dbg_aubsan
         --opt=on
         --fission=no
+        --streams_release_build=True
       test_flags: >-
         --benchmarkRepetitions=1
         --excludeWithAnyTags=incompatible_aubsan
@@ -574,6 +597,7 @@ buildvariants:
   - <<: *enterprise-rhel8-debug-tsan-compile-dependency
     name: enterprise-rhel8-debug-tsan-all-feature-flags
     display_name: "* TSAN Enterprise RHEL 8 DEBUG (all feature flags)"
+    modules: ["asp-js-engine"]
     tags:
       [
         "suggested",
@@ -594,7 +618,8 @@ buildvariants:
         --mongosSetParameters="{maxRoundsWithoutProgressParameter: 20}"
         --excludeWithAnyTags=tsan_incompatible
         --runAllFeatureFlagTests
-    tasks: &enterprise-rhel8-debug-tsan-task-list
+        --additionalFeatureFlags=featureFlagStreams
+    tasks:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
         distros:
@@ -623,6 +648,9 @@ buildvariants:
       - name: .non_deterministic .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
         distros:
           - *enterprise-rhel8-debug-tsan-large-distro-name
+      - name: .streams_release_test !.requires_extra_system_deps !streams_kafka_gen !streams_kafka_benchmark !streams_kafka_gwproxy !streams_s3
+        distros:
+          - *enterprise-rhel8-debug-tsan-large-distro-name
 
   - <<: *enterprise-rhel8-debug-tsan-compile-dependency
     name: enterprise-rhel8-debug-tsan-all-non-rollback-feature-flags
@@ -642,7 +670,35 @@ buildvariants:
         --mongosSetParameters="{maxRoundsWithoutProgressParameter: 20}"
         --excludeWithAnyTags=tsan_incompatible
         --runAllFeatureFlagTests --disableUnreleasedIFRFlags
-    tasks: *enterprise-rhel8-debug-tsan-task-list
+    tasks:
+      - name: .development_critical !.requires_large_host !.requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - *enterprise-rhel8-debug-tsan-large-distro-name
+      - name: .development_critical .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - *enterprise-rhel8-debug-tsan-large-distro-name
+      - name: .release_critical !.requires_large_host !.requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - *enterprise-rhel8-debug-tsan-large-distro-name
+      - name: .release_critical .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - *enterprise-rhel8-debug-tsan-large-distro-name
+      - name: .default !.requires_large_host !.requires_large_host_tsan !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .default .requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - *enterprise-rhel8-debug-tsan-large-distro-name
+      - name: .default .requires_large_host_tsan !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - *enterprise-rhel8-debug-tsan-large-distro-name
+      - name: .non_deterministic !.requires_large_host !.requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+      - name: .non_deterministic .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - *enterprise-rhel8-debug-tsan-large-distro-name
+      - name: .non_deterministic .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
+        distros:
+          - *enterprise-rhel8-debug-tsan-large-distro-name
 
   - name: &linux-debug-aubsan-compile-grpc linux-debug-aubsan-compile-grpc
     display_name: "~ Linux x86 Shared Library {A,UB}SAN Enterprise Compile with Ingress GRPC"

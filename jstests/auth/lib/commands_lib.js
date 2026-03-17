@@ -91,13 +91,13 @@ one argument, the connection object.
 
 */
 
+import {testOnlyCommands} from "jstests/auth/test_only_commands_list.js";
+import {getUriForColl} from "jstests/disk/libs/wt_file_helper.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
-    storageEngineIsWiredTigerOrInMemory,
     storageEngineIsWiredTiger,
+    storageEngineIsWiredTigerOrInMemory,
 } from "jstests/libs/storage_engine/storage_engine_utils.js";
-import {getUriForColl} from "jstests/disk/libs/wt_file_helper.js";
-import {testOnlyCommands} from "jstests/auth/test_only_commands_list.js";
 
 // constants
 
@@ -236,8 +236,11 @@ const skippedAuthTestingAggStages = [
     "$merge", // Already covered in 'aggregate_merge_insert_documents' and
     // 'aggregate_merge_replace_documents'.
     "$set", // Alias for "$addFields" and already covered.
+];
 
-    // The following stages are required to be tested in stream processors.
+// The following stages are required to be tested in stream processors.
+// Only included in skip list when streams feature is available.
+const streamsSkippedAuthTestingAggStages = [
     "$hoppingWindow",
     "$tumblingWindow",
     "$sessionWindow",
@@ -247,7 +250,7 @@ const skippedAuthTestingAggStages = [
 
 // The following commands are skipped in 'authCommandsLib' because they are unable to be
 // tested here and already have auth tests elsewhere.
-//TODO SERVER-112286: Audit commands skipped.
+// TODO SERVER-112286: Audit commands skipped.
 const skippedAuthTestingCommands = [
     "analyzeShardKey",
     "authenticate",
@@ -9660,12 +9663,22 @@ function checkAggStageCoverage(conn) {
         .aggregate([{$listMqlEntities: {entityType: "aggregationStages"}}])
         .toArray()
         .map((obj) => obj.name);
+
+    // Only skip streams stages when the feature flag is disabled. When enabled, they should
+    // be tested. When not compiled in, they won't appear anyway.
+    let skipList = skippedAuthTestingAggStages;
+    if (
+        streamsSkippedAuthTestingAggStages.some((stage) => aggStages.includes(stage)) &&
+        !FeatureFlagUtil.isPresentAndEnabled(adminDb, "Streams")
+    ) {
+        skipList = skipList.concat(streamsSkippedAuthTestingAggStages);
+    }
     adminDb.logout();
 
     const unvisited = {};
     for (let aggStage of aggStages) {
-        // Tracks 'aggStage' unless listed in the exception list 'skippedAuthTestingAggStages'.
-        if (!skippedAuthTestingAggStages.includes(aggStage)) {
+        // Tracks 'aggStage' unless listed in the exception list 'skipList'.
+        if (!skipList.includes(aggStage)) {
             unvisited[aggStage] = 1;
         }
     }
@@ -9702,6 +9715,9 @@ function checkCommandCoverage(conn) {
     const res = assert.commandWorked(adminDb.runCommand({listCommands: 1}));
     const allCommands = Object.keys(res.commands);
 
+    // Don't skip streams commands. When the feature flag is disabled, streams commands
+    // are hidden from listCommands (they have requiresFeatureFlag). When enabled, they
+    // appear and should be tested.
     adminDb.logout();
 
     const unvisited = {};
@@ -9724,9 +9740,8 @@ function checkCommandCoverage(conn) {
     assert.eq(
         unvisitedList.length,
         0,
-        `'authCommandsLib.tests' misses auth testing for ${
-            unvisitedList.length
-        } commands: ${unvisitedList.join(", ")}. ` +
-            `Add tests for these commands or add them to 'skippedAuthTestingCommands' with justification.`,
+        `'authCommandsLib.tests' misses auth testing for ${unvisitedList.length} commands: ${unvisitedList.join(
+            ", ",
+        )}. ` + `Add tests for these commands or add them to 'skippedAuthTestingCommands' with justification.`,
     );
 }

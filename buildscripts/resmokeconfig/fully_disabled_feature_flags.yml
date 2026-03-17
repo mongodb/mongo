@@ -31,3 +31,7 @@
 - featureFlagTimeseriesUpdatesSupport
 # TODO SERVER-112823 Enable featureFlagGetExecutorDeferredEngineChoice feature flag when fully compatible.
 - featureFlagGetExecutorDeferredEngineChoice
+# Streams feature flag is excluded by default because streams requires a separate build flag
+# (--streams_release_build=True) to compile the streams code into the binary. Variants that
+# support streams should explicitly enable this flag.
+- featureFlagStreams

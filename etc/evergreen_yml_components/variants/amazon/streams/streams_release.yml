@@ -48,24 +48,7 @@ buildvariants:
         distros:
           - amazon2023.3-c5-24xlarge
       - name: aggregation
-      - name: streams_gen
-      - name: streams_kafka_gen
-      - name: streams_kafka_gwproxy
-      - name: streams_kafka_benchmark
-      - name: streams_https
-      - name: streams_lambda
-      - name: streams_s3
-      - name: streams_kinesis
-      - name: streams_aspio
-      - name: streams_aspio_iceberg_0
-      - name: streams_aspio_iceberg_1
-      - name: streams_aspio_iceberg_2
-      - name: streams_aspio_iceberg_3
-      - name: streams_aspio_iceberg_large
-      - name: streams_aspio_iceberg_5
-      - name: streams_aspio_utilities
-      - name: streams_externaljs
-      - name: streams_aspio_pubsub
+      - name: .streams_release_test
       - name: streams_build_and_push_gen
       - name: streams_build_and_push_break_glass_gen
         activate: false # Only run on manual patches
@@ -116,25 +99,7 @@ buildvariants:
       - name: compile_and_archive_dist_test_TG
         distros:
           - amazon2023.3-arm64-xxxlarge
-      - name: streams_gen
-      - name: streams_kafka_gen
-      - name: streams_kafka_gwproxy
-      - name: streams_kafka_benchmark
-      - name: streams_kinesis
-      - name: streams_https
-      - name: streams_lambda
-      - name: streams_s3
-      - name: aggregation
-      - name: streams_aspio
-      - name: streams_aspio_iceberg_0
-      - name: streams_aspio_iceberg_1
-      - name: streams_aspio_iceberg_2
-      - name: streams_aspio_iceberg_3
-      - name: streams_aspio_iceberg_large
-      - name: streams_aspio_iceberg_5
-      - name: streams_aspio_utilities
-      - name: streams_externaljs
-      - name: streams_aspio_pubsub
+      - name: .streams_release_test
       - name: streams_build_and_push_gen
       - name: streams_build_and_push_break_glass_gen
         activate: false # Only run on manual patches

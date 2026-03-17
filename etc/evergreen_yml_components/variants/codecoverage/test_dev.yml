@@ -19,6 +19,7 @@ buildvariants:
         --linkstatic=False
         --gcov=True
         --collect_code_coverage
+        --streams_release_build=True
         ${coverage_bazel_tags}
       large_distro_name: amazon2023.3-arm64-m8g-4xlarge
       resmoke_jobs_factor: 0.5 # Avoid starting too many mongod's
@@ -53,7 +54,7 @@ buildvariants:
       - name: change_streams_mongos_sessions_passthrough
       - name: fle2_sharding
       # All streams jstest tasks excluding some that are not compatible at the moment.
-      - name: .streams_release_test !streams_aspio_iceberg_large !streams_externaljs
+      - name: .streams_release_test !.requires_extra_system_deps
 
   # Variant to support Code Coverage on amd64/x86_64
   - name: &rhel-93-64-bit-coverage rhel-93-64-bit-coverage

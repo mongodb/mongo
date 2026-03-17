@@ -244,7 +244,8 @@ tasks:
 
   - <<: *gen_task_template
     name: streams_gen
-    tags: ["assigned_to_jira_team_streams", "default", "streams_release_test"]
+    tags:
+      ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -283,7 +284,8 @@ tasks:
 
   - <<: *task_template
     name: streams_https
-    tags: ["assigned_to_jira_team_streams", "default", "streams_release_test"]
+    tags:
+      ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -319,7 +321,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_streams",
-        "default",
+        "experimental",
         "streams_release_test",
         "requires_extra_system_deps",
       ]
@@ -334,7 +336,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_streams",
-        "default",
+        "experimental",
         "streams_release_test",
         "requires_extra_system_deps",
       ]
@@ -349,7 +351,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_streams",
-        "default",
+        "experimental",
         "streams_release_test",
         "requires_extra_system_deps",
       ]
@@ -364,7 +366,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_streams",
-        "default",
+        "experimental",
         "streams_release_test",
         "requires_extra_system_deps",
       ]
@@ -379,7 +381,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_streams",
-        "default",
+        "experimental",
         "streams_release_test",
         "requires_extra_system_deps",
       ]
@@ -394,7 +396,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_streams",
-        "default",
+        "experimental",
         "streams_release_test",
         "requires_extra_system_deps",
       ]
@@ -409,7 +411,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_streams",
-        "default",
+        "experimental",
         "streams_release_test",
         "requires_extra_system_deps",
       ]
@@ -424,7 +426,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_streams",
-        "default",
+        "experimental",
         "streams_release_test",
         "requires_extra_system_deps",
       ]
@@ -439,7 +441,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_streams",
-        "default",
+        "experimental",
         "streams_release_test",
         "requires_extra_system_deps",
       ]
@@ -455,7 +457,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_streams",
-        "default",
+        "experimental",
         "streams_release_test",
         "requires_extra_system_deps",
       ]

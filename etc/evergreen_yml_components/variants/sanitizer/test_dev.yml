@@ -250,6 +250,7 @@ variables:
       --opt=on
       --fission=no
       --jobs=800
+      --streams_release_build=True
     # Avoid starting too many mongod's under TSAN build.
     resmoke_jobs_factor: 0.3
 
@@ -348,6 +349,7 @@ buildvariants:
         --opt=on
         --fission=no
         --jobs=800
+        --streams_release_build=True
       build_mongot: true
       download_mongot_release: true
       evergreen_remote_exec: on

@@ -2624,7 +2624,7 @@ mongo_cc_library(
         ],
         "//conditions:default": [],
     }) + select({
-        "//bazel/config:enterprise_feature_streams_and_streams_build_enabled": [
+        "//bazel/config:enterprise_feature_queryable_and_streams_build_enabled": [
             "//src/mongo/db/modules/enterprise/src/streams/commands:streams_commands",
         ],
         "//conditions:default": [],

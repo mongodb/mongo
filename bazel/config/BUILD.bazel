@@ -21,7 +21,6 @@ load(
     "dbg_level",
     "debug_symbols",
     "dev_stacktrace",
-    "disable_streams",
     "disable_warnings_as_errors",
     "dtlto",
     "dwarf_version",
@@ -2004,22 +2003,6 @@ selects.config_setting_group(
 )
 
 # --------------------------------------
-# streams non release options
-# --------------------------------------
-
-disable_streams(
-    name = "disable_streams",
-    build_setting_default = False,
-)
-
-config_setting(
-    name = "streams_enabled",
-    flag_values = {
-        "//bazel/config:disable_streams": "False",
-    },
-)
-
-# --------------------------------------
 # stream_release_build
 # --------------------------------------
 
@@ -2050,8 +2033,8 @@ selects.config_setting_group(
     ],
 )
 
-# The streams_release_build flag is effectively a guard to assure streams are not
-# built on release builds. For non-release builds, it's not required.
+# The streams_release_build flag is required to build streams for both release
+# and non-release builds. This ensures streams are only built when explicitly enabled.
 selects.config_setting_group(
     name = "_streams_for_release_build",
     match_all = [
@@ -2066,9 +2049,9 @@ selects.config_setting_group(
     name = "_streams_for_non_release_build",
     match_all = [
         ":release_disabled",
+        ":streams_release_build_enabled",
         ":platform_for_streaming_build",
         ":ssl_enabled_linux",
-        ":streams_enabled",
     ],
 )
 
@@ -2764,7 +2747,7 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
-    name = "enterprise_feature_streams_and_streams_build_enabled",
+    name = "enterprise_feature_queryable_and_streams_build_enabled",
     match_all = [
         ":enterprise_feature_queryable_enabled",
         ":streams_release_build_required_setting",

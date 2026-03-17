@@ -84,7 +84,6 @@ buildvariants:
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
         --config=local
-        --disable_streams=True
       compile_variant: *amazon-linux2023-arm64-local-compile
     tasks:
       - name: run_unit_tests_TG
@@ -164,6 +163,7 @@ buildvariants:
         distros:
           - amazon2023-arm64-atlas-latest-m8g-2xlarge
       - name: .fuzzer_deterministic
+      - name: .streams_release_test !.requires_extra_system_deps !streams_kafka_gen !streams_kafka_benchmark !streams_kafka_gwproxy !streams_kinesis
 
   - <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
     name: enterprise-amazon-linux2023-arm64-all-feature-flags-extra-system-deps
@@ -176,8 +176,10 @@ buildvariants:
       tss_enabled: false
       large_distro_name: amazon2023-arm64-latest-m8g-4xlarge
       core_analyzer_distro_name: amazon2023-arm64-latest-xlarge
+      # featureFlagStreams is added to support streams commands and aggregations in auth test suites
       test_flags: >-
         --runAllFeatureFlagTests
+        --additionalFeatureFlags=featureFlagStreams
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source
     tasks:
       - name: .requires_extra_system_deps .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
@@ -194,8 +196,9 @@ buildvariants:
           - amazon2023-arm64-latest-m8g-4xlarge
       - name: query_golden_disagg_gen
       - name: query_golden_sharding_disagg_gen
-      - name: streams_build_only_gen
       - name: no_passthrough_disagg_override_gen
+      - name: streams_build_only_gen
+      - name: .streams_release_test .requires_extra_system_deps
 
   - name: amazon-linux2023-arm64-tests-lto-pgo-bolt
     display_name: "Amazon Linux 2023 arm64 Atlas Enterprise (all feature flags) LTO/PGO/BOLT"

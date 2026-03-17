@@ -27,7 +27,6 @@ buildvariants:
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2
         --build_enterprise=False
-        --disable_streams=True
       compile_all_but_not_unittests_flags: >-
         --linkopt=-s
       multiversion_platform: amazon2
@@ -82,7 +81,6 @@ buildvariants:
       mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2
-        --disable_streams=True
       compile_all_but_not_unittests_flags: >-
         --linkopt=-s
       multiversion_platform: amazon2
@@ -136,7 +134,6 @@ buildvariants:
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2
         --build_enterprise=False
-        --disable_streams=True
       compile_all_but_not_unittests_flags: >-
         --linkopt=-s
       multiversion_platform: amazon2
@@ -191,7 +188,6 @@ buildvariants:
       mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2
-        --disable_streams=True
       compile_all_but_not_unittests_flags: >-
         --linkopt=-s
       multiversion_platform: amazon2

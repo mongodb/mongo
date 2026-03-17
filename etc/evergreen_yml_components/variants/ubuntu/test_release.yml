@@ -310,7 +310,6 @@ buildvariants:
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=ubuntu2204
         --allocator=tcmalloc-gperf
-        --disable_streams=True
       compile_all_but_not_unittests_flags: >-
         --linkopt=-s
       large_distro_name: ubuntu2204-large

@@ -317,13 +317,7 @@ buildvariants:
     name: enterprise-rhel-8-64-bit-dynamic-all-feature-flags-experimental
     display_name: "* Enterprise RHEL 8 (all feature flags) Experimental"
     tags: ["suggested"]
-    tasks:
-      &experimental-task-list # TODO(SERVER-90936): Remove streams_kafka* and streams_lambda tests when they work with the "default" tag.
-      - name: streams_kafka_gen
-      - name: streams_kafka_gwproxy
-      - name: streams_lambda
-      - name: streams_s3
-      - name: streams_kinesis
+    tasks: &experimental-task-list
       - name: product_limits
         cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
 
