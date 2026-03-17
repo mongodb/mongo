@@ -53,7 +53,7 @@ namespace mongo {
  * the bitwise-and operator can be used like so:
  *   (mask & getBSONTypeMask(t)) != 0
  */
-inline uint32_t getBSONTypeMask(BSONType t) noexcept {
+inline constexpr uint32_t getBSONTypeMask(BSONType t) noexcept {
     switch (t) {
         case BSONType::eoo:
             return 0;
@@ -66,10 +66,10 @@ inline uint32_t getBSONTypeMask(BSONType t) noexcept {
     }
 }
 
-const uint32_t kNumberMask = getBSONTypeMask(BSONType::numberInt) |
+constexpr uint32_t kNumberMask = getBSONTypeMask(BSONType::numberInt) |
     getBSONTypeMask(BSONType::numberLong) | getBSONTypeMask(BSONType::numberDouble) |
     getBSONTypeMask(BSONType::numberDecimal);
 
-const uint32_t kDateMask = getBSONTypeMask(BSONType::date);
+constexpr uint32_t kDateMask = getBSONTypeMask(BSONType::date);
 
 }  // namespace mongo

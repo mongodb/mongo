@@ -319,7 +319,70 @@ inline constexpr bool isShallowType(TypeTags tag) noexcept {
     return tag <= TypeTags::EndOfShallowTypeTags;
 }
 
-BSONType tagToType(TypeTags tag) noexcept;
+inline constexpr BSONType tagToType(TypeTags tag) noexcept {
+    switch (tag) {
+        case TypeTags::Nothing:
+            return BSONType::eoo;
+        case TypeTags::NumberInt32:
+            return BSONType::numberInt;
+        case TypeTags::NumberInt64:
+            return BSONType::numberLong;
+        case TypeTags::NumberDouble:
+            return BSONType::numberDouble;
+        case TypeTags::NumberDecimal:
+            return BSONType::numberDecimal;
+        case TypeTags::Date:
+            return BSONType::date;
+        case TypeTags::Timestamp:
+            return BSONType::timestamp;
+        case TypeTags::Boolean:
+            return BSONType::boolean;
+        case TypeTags::Null:
+            return BSONType::null;
+        case TypeTags::StringSmall:
+            return BSONType::string;
+        case TypeTags::StringBig:
+            return BSONType::string;
+        case TypeTags::Array:
+            return BSONType::array;
+        case TypeTags::ArraySet:
+            return BSONType::array;
+        case TypeTags::ArrayMultiSet:
+            return BSONType::array;
+        case TypeTags::Object:
+            return BSONType::object;
+        case TypeTags::ObjectId:
+            return BSONType::oid;
+        case TypeTags::MinKey:
+            return BSONType::minKey;
+        case TypeTags::MaxKey:
+            return BSONType::maxKey;
+        case TypeTags::bsonObject:
+            return BSONType::object;
+        case TypeTags::bsonArray:
+            return BSONType::array;
+        case TypeTags::bsonString:
+            return BSONType::string;
+        case TypeTags::bsonSymbol:
+            return BSONType::symbol;
+        case TypeTags::bsonObjectId:
+            return BSONType::oid;
+        case TypeTags::bsonBinData:
+            return BSONType::binData;
+        case TypeTags::bsonUndefined:
+            return BSONType::undefined;
+        case TypeTags::bsonRegex:
+            return BSONType::regEx;
+        case TypeTags::bsonJavascript:
+            return BSONType::code;
+        case TypeTags::bsonDBPointer:
+            return BSONType::dbRef;
+        case TypeTags::bsonCodeWScope:
+            return BSONType::codeWScope;
+        default:
+            return BSONType::eoo;
+    }
+}
 
 /**
  * This function takes an SBE TypeTag, looks up the corresponding BSONType t, and then returns a
@@ -327,7 +390,7 @@ BSONType tagToType(TypeTags tag) noexcept;
  *
  * For details on how sets of BSONTypes are represented as bitmasks, see mongo::getBSONTypeMask().
  */
-inline uint32_t getBSONTypeMask(value::TypeTags tag) noexcept {
+inline constexpr uint32_t getBSONTypeMask(value::TypeTags tag) noexcept {
     BSONType t = value::tagToType(tag);
     return getBSONTypeMask(t);
 }

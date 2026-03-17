@@ -1353,14 +1353,14 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
 
         auto [owned, tag, val] = getFromStack(offsetParam, popParam);
 
-        if (tag != value::TypeTags::Nothing) {
-            pushStack(false,
-                      value::TypeTags::Boolean,
-                      value::bitcastFrom<bool>(getBSONTypeMask(tag) & mask));
-        } else {
-            pushStack(false, value::TypeTags::Nothing, 0);
-        }
-        if (owned && popParam) {
+        static_assert(static_cast<uint8_t>(value::TypeTags::Nothing) == 0);
+        static_assert(getBSONTypeMask(value::TypeTags::Nothing) == 0);
+        pushStack(false,
+                  value::TypeTags{static_cast<uint8_t>(static_cast<int>(value::TypeTags::Boolean) *
+                                                       (tag != value::TypeTags::Nothing))},
+                  value::bitcastFrom<bool>(getBSONTypeMask(tag) & mask));
+
+        if (MONGO_unlikely(owned && popParam)) {
             value::releaseValue(tag, val);
         }
     }
@@ -1411,11 +1411,9 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
         auto [owned, tag, val] = getFromStack(0);
         popStack();
 
-        if (tag == value::TypeTags::Boolean && value::bitcastTo<bool>(val)) {
-            pcPointer += jumpOffset;
-        }
+        pcPointer += (tag == value::TypeTags::Boolean && value::bitcastTo<bool>(val)) * jumpOffset;
 
-        if (owned) {
+        if (MONGO_unlikely(owned)) {
             value::releaseValue(tag, val);
         }
     }
@@ -1427,11 +1425,9 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
         auto [owned, tag, val] = getFromStack(0);
         popStack();
 
-        if (tag == value::TypeTags::Boolean && !value::bitcastTo<bool>(val)) {
-            pcPointer += jumpOffset;
-        }
+        pcPointer += (tag == value::TypeTags::Boolean && !value::bitcastTo<bool>(val)) * jumpOffset;
 
-        if (owned) {
+        if (MONGO_unlikely(owned)) {
             value::releaseValue(tag, val);
         }
     }
@@ -1441,9 +1437,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
         pcPointer += sizeof(jumpOffset);
 
         auto [owned, tag, val] = getFromStack(0);
-        if (tag == value::TypeTags::Nothing) {
-            pcPointer += jumpOffset;
-        }
+        pcPointer += (tag == value::TypeTags::Nothing) * jumpOffset;
     }
     DISPATCH();
     INSTRUCTION(jmpNotNothing) {
@@ -1451,9 +1445,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
         pcPointer += sizeof(jumpOffset);
 
         auto [owned, tag, val] = getFromStack(0);
-        if (tag != value::TypeTags::Nothing) {
-            pcPointer += jumpOffset;
-        }
+        pcPointer += (tag != value::TypeTags::Nothing) * jumpOffset;
     }
     DISPATCH();
     INSTRUCTION(ret) {
