@@ -133,30 +133,6 @@ public:
                 }(),
                 differentCAServerCertSucceeds,
             }};
-        // TODO(SERVER-115428): Restore IPv6 Loopback testing for ingress gRPC
-        // {
-        //     "Mismatched server name",
-        //     []() {
-        //         auto options = CommandServiceTestFixtures::makeServerOptions();
-        //         options.tlsCertificateKeyFile = "jstests/libs/server.pem";
-        //         // ::1 is not included as a server name in server.pem.
-        //         options.addresses = {HostAndPort("::1", test::kLetKernelChoosePort)};
-        //         return options;
-        //     }(),
-        //     mismatchedServerNameSucceeds,
-        // },
-        // {
-        //     "Mismatched server name and different CAs",
-        //     []() {
-        //         auto options = CommandServiceTestFixtures::makeServerOptions();
-        //         options.tlsCertificateKeyFile = "jstests/libs/ecdsa-server.pem";
-        //         options.tlsCAFile = "jstests/libs/ecdsa-ca.pem";
-        //         options.addresses = {HostAndPort("::1", test::kLetKernelChoosePort)};
-        //         return options;
-        //     }(),
-        //     bothSucceeds,
-        // }};
-
 
         auto makeClientThreadBody = [&](bool shouldSucceed) {
             return [&, shouldSucceed](auto& server, auto& monitor) {
