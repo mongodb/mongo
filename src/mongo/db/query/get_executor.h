@@ -260,6 +260,15 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
  * STRICT_DISTINCT_ONLY), a DISTINCT_SCAN is not possible, and the caller would have to fall back
  * to a different plan.
  *
+ * Another meaning of QueryPlannerParams::STRICT_DISTINCT_ONLY is to indicate we expect to not
+ * perform a distinct scan if its over a sparse index. For example, if the collection has a document
+ * {b: 5} and an index on {a: 1}, the distinct('a') command would return no results since the
+ * distinct command ignores missing fields. If the index {a: 1} was sparse, this would not affect
+ * the results as the sparse index does not cover missing fields. However, {$group: {_id: '$a'}}
+ * should return the result {_id: null} because $group treats missing fields as null. Thus, the
+ * $group would use the STRICT_DISTINCT_ONLY option to ensure that we do not ignore missing fields
+ * by using a distinct scan over a sparse index.
+ *
  * Note that this function uses the projection in 'parsedDistinct' to produce a covered query when
  * possible, but when a covered query is not possible, the resulting plan may elide the projection
  * stage (instead returning entire fetched documents).

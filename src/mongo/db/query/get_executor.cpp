@@ -2682,8 +2682,10 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
     plannerParams.options = QueryPlannerParams::NO_TABLE_SCAN | plannerOptions;
 
     // If the caller did not request a "strict" distinct scan then we may choose a plan which
-    // unwinds arrays and treats each element in an array as its own key.
-    const bool mayUnwindArrays = !(plannerOptions & QueryPlannerParams::STRICT_DISTINCT_ONLY);
+    // either unwinds arrays and treats each element in an array as its own key or ignores missing
+    // fields.
+    const bool mayUnwindArraysOrIgnoreMissing =
+        !(plannerOptions & QueryPlannerParams::STRICT_DISTINCT_ONLY);
     auto ii = collection->getIndexCatalog()->getIndexIterator(
         opCtx, IndexCatalog::InclusionPolicy::kReady);
     auto query = parsedDistinct.getQuery()->getFindCommandRequest().getFilter();
@@ -2708,7 +2710,13 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
                 // requested sort order.
                 continue;
             }
-            if (!mayUnwindArrays &&
+
+            // If we do not want to ignore missing fields then we cannot use a sparse index.
+            if (!mayUnwindArraysOrIgnoreMissing && desc->isSparse()) {
+                continue;
+            }
+
+            if (!mayUnwindArraysOrIgnoreMissing &&
                 isAnyComponentOfPathMultikey(desc->keyPattern(),
                                              ice->isMultikey(opCtx, collection),
                                              ice->getMultikeyPaths(opCtx, collection),
@@ -2733,13 +2741,13 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
                     opCtx, collection, *ice, parsedDistinct.getQuery()));
             }
 
-            // It is not necessary to do any checks about 'mayUnwindArrays' in this case, because:
-            // 1) If there is no predicate on the distinct(), a wildcard indices may not be used.
-            // 2) distinct() _with_ a predicate may not be answered with a DISTINCT_SCAN on _any_
-            // multikey index.
+            // It is not necessary to do any checks about 'mayUnwindArraysOrIgnoreMissing' in this
+            // case, because: 1) If there is no predicate on the distinct(), a wildcard indices may
+            // not be used. 2) distinct() _with_ a predicate may not be answered with a
+            // DISTINCT_SCAN on _any_ multikey index.
 
             // So, we will not distinct scan a wildcard index that's multikey on the distinct()
-            // field, regardless of the value of 'mayUnwindArrays'.
+            // field, regardless of the value of 'mayUnwindArraysOrIgnoreMissing'.
         }
     }
 
