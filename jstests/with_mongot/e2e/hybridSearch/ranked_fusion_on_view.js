@@ -295,3 +295,19 @@ const runRankFusionViewTest = (testName, inputPipelines, viewPipeline, checkCorr
     };
     testHybridSearchViewWithSubsequentUnionOnDifferentView(rankFusionInputPipelines, createRankFusionPipeline);
 })();
+
+// $rankFusion with an empty input pipeline should trigger the correct error.
+(function testRankFusionEmptyPipelineOnView() {
+    const collName = jsTestName() + "_empty_pipeline_coll";
+    const viewName = jsTestName() + "_empty_pipeline_view";
+    db[collName].drop();
+    assert.commandWorked(db.createView(viewName, collName, []));
+    assert.commandFailedWithCode(
+        db.runCommand({
+            aggregate: viewName,
+            pipeline: [{$rankFusion: {input: {pipelines: {p: []}}}}],
+            cursor: {},
+        }),
+        9834300,
+    );
+})();
