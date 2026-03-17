@@ -33,7 +33,6 @@ import sys
 import time
 
 from mongo_toolchain import get_mongo_toolchain
-from setup_clang_tidy import clang_tidy_setup_recovery_message
 
 CLTCONFIG = """
 # This file is intended to document the configuration options available
@@ -100,7 +99,7 @@ def main():
     if checks_so and os.path.isfile(checks_so):
         clang_tidy_cmd += [f"-load={checks_so}"]
     else:
-        print(f"ERROR: failed to find mongo tidy checks. {clang_tidy_setup_recovery_message()}")
+        print("ERROR: failed to find mongo tidy checks, run `bazel build compiledb'")
         sys.exit(1)
 
     files_to_check = []
@@ -126,10 +125,7 @@ def main():
         )
 
     if not os.path.exists("compile_commands.json"):
-        print(
-            "ERROR: failed to find compile_commands.json, run "
-            "`bazel build --config=compiledb //src/...`"
-        )
+        print("ERROR: failed to find compile_commands.json, run 'bazel build compiledb'")
         sys.exit(1)
 
     with open("compile_commands.json") as f:

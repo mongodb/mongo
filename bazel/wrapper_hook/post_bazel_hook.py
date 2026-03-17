@@ -15,7 +15,6 @@ BAZEL_CI_NAMESPACE = "ci-prod"
 def main():
     install_modules(sys.argv[1], sys.argv[1:])
 
-    from bazel.wrapper_hook.compiledb import finalize_compiledb_posthook
     from bazel.wrapper_hook.flag_sync import sync_flags
 
     if os.environ.get("NO_FLAG_SYNC") is None:
@@ -23,10 +22,6 @@ def main():
             sync_flags(BAZEL_USER_NAMESPACE)
         else:
             sync_flags(BAZEL_CI_NAMESPACE)
-
-    enterprise = (REPO_ROOT / "src" / "mongo" / "db" / "modules" / "enterprise").exists()
-    atlas = (REPO_ROOT / "src" / "mongo" / "db" / "modules" / "atlas").exists()
-    finalize_compiledb_posthook(sys.argv[1], enterprise=enterprise, atlas=atlas)
 
 
 if __name__ == "__main__":

@@ -160,13 +160,6 @@ tasks:
             --output_groups=compilation_outputs
             --keep_going
             --build_tag_filters=${bazel_filters_for_cache_hydration}
-      - func: "bazel compile"
-        vars:
-          targets: compiledb
-          bazel_args: >-
-            --config=fastbuild
-            --define GIT_COMMIT_HASH=nogitversion
-            --keep_going
 
   - name: hydrate_bazel_profile_all_headers
     tags:
@@ -192,14 +185,6 @@ tasks:
             --output_groups=compilation_outputs
             --keep_going
             --build_tag_filters=${bazel_filters_for_cache_hydration}
-      - func: "bazel compile"
-        vars:
-          targets: compiledb
-          bazel_args: >-
-            --config=fastbuild
-            --all_headers=True
-            --define GIT_COMMIT_HASH=nogitversion
-            --keep_going
 
   - name: build_source_graph_index
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
@@ -245,13 +230,6 @@ tasks:
             --output_groups=compilation_outputs
             --keep_going
             --build_tag_filters=${bazel_filters_for_cache_hydration}
-      - func: "bazel compile"
-        vars:
-          targets: compiledb
-          bazel_args: >-
-            --config=opt
-            --define GIT_COMMIT_HASH=nogitversion
-            --keep_going
 
   - name: hydrate_bazel_profile_dbg
     tags:
@@ -275,13 +253,6 @@ tasks:
             --output_groups=compilation_outputs
             --keep_going
             --build_tag_filters=${bazel_filters_for_cache_hydration}
-      - func: "bazel compile"
-        vars:
-          targets: compiledb
-          bazel_args: >-
-            --config=dbg
-            --define GIT_COMMIT_HASH=nogitversion
-            --keep_going
 
   - name: hydrate_bazel_profile_dbg_aubsan
     tags:
@@ -305,13 +276,6 @@ tasks:
             --output_groups=compilation_outputs
             --keep_going
             --build_tag_filters=${bazel_filters_for_cache_hydration}
-      - func: "bazel compile"
-        vars:
-          targets: compiledb
-          bazel_args: >-
-            --config=dbg_aubsan
-            --define GIT_COMMIT_HASH=nogitversion
-            --keep_going
 
   - name: hydrate_bazel_profile_dbg_tsan
     tags:
@@ -335,13 +299,6 @@ tasks:
             --output_groups=compilation_outputs
             --keep_going
             --build_tag_filters=${bazel_filters_for_cache_hydration}
-      - func: "bazel compile"
-        vars:
-          targets: compiledb
-          bazel_args: >-
-            --config=dbg_tsan
-            --define GIT_COMMIT_HASH=nogitversion
-            --keep_going
 
   - name: hydrate_bazel_unit_tests
     tags:
@@ -437,22 +394,6 @@ tasks:
       - func: bazel run
         vars:
           target: //evergreen:validate_compile_commands
-
-  - name: full_bazel_compiledb
-    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
-    exec_timeout_secs: 43200 # 12 hour timeout: validates every compile_commands entry.
-    depends_on:
-      - name: version_expansions_gen
-        variant: generate-tasks-for-version
-    commands:
-      - func: "do bazel setup"
-      - func: "bazel compile"
-        vars:
-          targets: compiledb
-      - func: bazel run
-        vars:
-          target: //evergreen:validate_compile_commands
-          args: -- --run-all
 
   - name: compile_upload_benchmarks
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]

@@ -26,17 +26,6 @@ def dedupe_stable(xs):
             out.append(x)
     return out
 
-_AUTO_HEADER_EXTENSIONS = {
-    ".c": True,
-    ".cc": True,
-    ".cpp": True,
-    ".cxx": True,
-    ".h": True,
-    ".hh": True,
-    ".hpp": True,
-    ".hxx": True,
-}
-
 def _fg_name_for_filename(name):
     # NEW: collapse to leaf to match Python generator
     leaf = name.rsplit("/", 1)[-1]
@@ -86,10 +75,6 @@ def _is_third_party_pkg(pkg):
         "third_party/" in pkg  # safety
     )
 
-def _has_auto_header_extension(name):
-    dot = name.rfind(".")
-    return dot != -1 and name[dot:] in _AUTO_HEADER_EXTENSIONS
-
 def maybe_compute_auto_headers(srcs):
     # Only handle plain list-of-strings; if configurable/mixed, return None
     if type(srcs) != "list":
@@ -105,12 +90,12 @@ def maybe_compute_auto_headers(srcs):
             out.append(s)
             continue
 
-        # Skip external repos entirely.
-        if s.startswith("@"):
-            continue
-
         pkg, name = _split_label_or_file(s)
         if _is_third_party_pkg(pkg):
+            continue
+
+        # Skip external repos and any third_party package entirely
+        if s.startswith("@"):
             continue
 
         # If *_gen listed in srcs, add its auto-header (transitive headers),
@@ -120,7 +105,8 @@ def maybe_compute_auto_headers(srcs):
             continue
 
         # Regular mapping for files we care about
-        if _has_auto_header_extension(name):
+        if (name.endswith(".c") or name.endswith(".cc") or name.endswith(".cpp") or name.endswith(".cxx") or
+            name.endswith(".h") or name.endswith(".hh") or name.endswith(".hpp") or name.endswith(".hxx")):
             out.append(_auto_header_label(pkg, name))
             continue
 
@@ -275,7 +261,6 @@ def build_selects_and_flat_files(srcs_select, *, lib_name, debug = False):
         return [], []
     select_objs = []
     flat_files = []
-    seen_flat_files = {}
     for i, condmap in enumerate(srcs_select):
         if type(condmap) != type({}):
             fail("mongo_cc macro({}): srcs_select[{}] must be a dict of {cond: [srcs]}."
@@ -291,8 +276,6 @@ def build_selects_and_flat_files(srcs_select, *, lib_name, debug = False):
                 if type(s) != "string":
                     fail("mongo_cc macro({}): srcs_select[{}][{}] item must be string, got {}"
                         .format(lib_name, i, cond, type(s)))
-                if s not in seen_flat_files:
-                    seen_flat_files[s] = True
-                    flat_files.append(s)
+            flat_files.extend(src_list)
         select_objs.append(select(condmap))
-    return select_objs, flat_files
+    return select_objs, dedupe_preserve_order(flat_files)

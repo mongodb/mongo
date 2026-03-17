@@ -102,10 +102,6 @@ buildvariants:
       - name: run_unit_tests_no_sandbox_TG
         distros:
           - windows-2022-xxlarge
-      - name: full_bazel_compiledb
-        cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter.
-        distros:
-          - windows-2022-xxxlarge-compile
       - name: .development_critical !.requires_large_host !.incompatible_windows
       - name: .development_critical .requires_large_host !.incompatible_windows
         distros:

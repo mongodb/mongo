@@ -80,25 +80,6 @@ py_binary(
     ],
 )
 
-py_binary(
-    name = "setup_clang_tidy",
-    srcs = ["setup_clang_tidy.py"],
-    args = [
-        "--config-rlocation=$(rlocationpath //:clang_tidy_config)",
-    ],
-    data = [
-        "//:clang_tidy_config",
-        "//src/mongo/tools/mongo_tidy_checks",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        dependency(
-            "bazel-runfiles",
-            group = "testing",
-        ),
-    ],
-)
-
 py_library(
     name = "install_bazel",
     srcs = [

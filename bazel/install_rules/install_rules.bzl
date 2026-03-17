@@ -13,26 +13,6 @@ load("//bazel/install_rules:providers.bzl", "TestBinaryInfo")
 load("//bazel/toolchains/cc:mongo_errors.bzl", "DWP_ERROR_MESSAGE")
 load("//bazel:transitions.bzl", "extensions_transition")
 
-_WINDOWS_BINARY_EXTENSIONS = {
-    ".dll": True,
-    ".exe": True,
-    ".pdb": True,
-    ".ps1": True,
-}
-
-_WINDOWS_DEBUG_EXTENSIONS = {
-    ".pdb": True,
-}
-
-_LINUX_DEBUG_EXTENSIONS = {
-    ".debug": True,
-    ".dwp": True,
-}
-
-_MACOS_DEBUG_EXTENSIONS = {
-    ".dSYM": True,
-}
-
 # Used to skip rules on certain OS architectures
 def _empty_rule_impl(ctx):
     pass
@@ -128,30 +108,7 @@ def get_constraints(ctx):
     windows_constraint = ctx.attr._windows_constraint[platform_common.ConstraintValueInfo]
     return linux_constraint, macos_constraint, windows_constraint
 
-def _platform_kind(ctx):
-    linux_constraint, macos_constraint, windows_constraint = get_constraints(ctx)
-    if ctx.target_platform_has_constraint(linux_constraint):
-        return "linux"
-    if ctx.target_platform_has_constraint(macos_constraint):
-        return "macos"
-    if ctx.target_platform_has_constraint(windows_constraint):
-        return "windows"
-    ctx.fail("Unknown OS")
-    return ""
-
-def _basename(path):
-    slash = path.rfind("/")
-    if slash == -1:
-        return path
-    return path[slash + 1:]
-
-def _extension(basename):
-    dot = basename.rfind(".")
-    if dot == -1:
-        return ""
-    return basename[dot:]
-
-def is_binary_file(platform_kind, basename):
+def is_binary_file(ctx, basename):
     """Check if file looks like a binary
 
     Args:
@@ -161,16 +118,18 @@ def is_binary_file(platform_kind, basename):
     Returns:
         True if it looks like a binary, False otherwise
     """
-    if platform_kind == "linux":
+    linux_constraint, macos_constraint, windows_constraint = get_constraints(ctx)
+    if ctx.target_platform_has_constraint(linux_constraint):
         return not (basename.startswith("lib") or basename.startswith("mongo_crypt_v") or basename.startswith("stitch_support.so"))
-    elif platform_kind == "macos":
+    elif ctx.target_platform_has_constraint(macos_constraint):
         return not (basename.startswith("lib") or basename.startswith("mongo_crypt_v") or basename.startswith("stitch_support.dylib"))
-    elif platform_kind == "windows":
-        return _extension(basename) in _WINDOWS_BINARY_EXTENSIONS
+    elif ctx.target_platform_has_constraint(windows_constraint):
+        return basename.endswith(".exe") or basename.endswith(".pdb") or basename.endswith(".dll") or basename.endswith(".ps1")
     else:
+        ctx.fail("Unknown OS")
         return False
 
-def is_debug_file(platform_kind, basename):
+def is_debug_file(ctx, basename):
     """Check if file looks a debug file
 
     Args:
@@ -180,14 +139,15 @@ def is_debug_file(platform_kind, basename):
     Returns:
         True if it looks like a debug file, False otherwise
     """
-    ext = _extension(basename)
-    if platform_kind == "linux":
-        return ext in _LINUX_DEBUG_EXTENSIONS
-    elif platform_kind == "macos":
-        return ext in _MACOS_DEBUG_EXTENSIONS
-    elif platform_kind == "windows":
-        return ext in _WINDOWS_DEBUG_EXTENSIONS
+    linux_constraint, macos_constraint, windows_constraint = get_constraints(ctx)
+    if ctx.target_platform_has_constraint(linux_constraint):
+        return basename.endswith(".debug") or basename.endswith(".dwp")
+    elif ctx.target_platform_has_constraint(macos_constraint):
+        return basename.endswith(".dSYM")
+    elif ctx.target_platform_has_constraint(windows_constraint):
+        return basename.endswith(".pdb")
     else:
+        ctx.fail("Unknown OS")
         return False
 
 def declare_output(ctx, output, is_directory):
@@ -206,7 +166,7 @@ def declare_output(ctx, output, is_directory):
     else:
         return ctx.actions.declare_file(output)
 
-def sort_file(ctx, file, basename, install_dir, file_map, is_directory, platform_kind):
+def sort_file(ctx, file, install_dir, file_map, is_directory):
     """Determine location a file should be installed to
 
     Args:
@@ -217,28 +177,24 @@ def sort_file(ctx, file, basename, install_dir, file_map, is_directory, platform
         is_directory: determines if the file is a directory
 
     """
-    install_basename = basename
-    ext = _extension(basename)
-    if ext == ".dwp":
+    _, macos_constraint, _ = get_constraints(ctx)
+    basename = paths.basename(file)
+    bin_install = install_dir + "/bin/" + basename
+    if bin_install.endswith(".dwp"):
         # Due to us creating our binaries using the _with_debug name
         # the dwp files also contain it. Strip the _with_debug from the name
-        install_basename = install_basename.replace("_with_debug.dwp", ".dwp")
+        bin_install = bin_install.replace("_with_debug.dwp", ".dwp")
 
-    bin_install = install_dir + "/bin/" + install_basename
+    lib_install = install_dir + "/lib/" + basename
 
-    lib_install = install_dir + "/lib/" + install_basename
-    is_binary = is_binary_file(platform_kind, basename)
-    is_debug = is_debug_file(platform_kind, basename)
-    is_python = ext == ".py"
-
-    if is_binary or is_python:
-        if not is_debug:
+    if is_binary_file(ctx, basename) or basename.endswith(".py"):
+        if not is_debug_file(ctx, basename):
             if ctx.attr.debug != "debug":
                 file_map["binaries"][file] = declare_output(ctx, bin_install, is_directory)
         elif ctx.attr.debug != "stripped" or ctx.attr.publish_debug_in_stripped:
             file_map["binaries_debug"][file] = declare_output(ctx, bin_install, is_directory)
 
-    elif not is_debug:
+    elif not is_debug_file(ctx, basename):
         if ctx.attr.debug != "debug":
             file_map["dynamic_libs"][file] = declare_output(ctx, lib_install, is_directory)
 
@@ -269,24 +225,19 @@ def mongo_install_rule_impl(ctx):
     outputs = []
     dwps = []
     install_dir = ctx.label.name
-    platform_kind = _platform_kind(ctx)
-    install_script = ctx.attr._install_script.files.to_list()[0]
 
     # sort direct sources
     for input_bin in ctx.attr.srcs:
         if DebugPackageInfo in input_bin and ctx.attr.create_dwp and ctx.attr.debug != "stripped":
             bin = input_bin[DebugPackageInfo].dwp_file
             dwps.append(bin)
-            sort_file(ctx, bin.path, bin.basename, install_dir, file_map, bin.is_directory, platform_kind)
-        input_test_binaries = input_bin[TestBinaryInfo].test_binaries.to_list()
-        input_files = input_bin.files.to_list()
-        test_files.extend(input_test_binaries)
-        for bin in input_files:
-            sort_file(ctx, bin.path, bin.basename, install_dir, file_map, bin.is_directory, platform_kind)
+            sort_file(ctx, bin.path, install_dir, file_map, bin.is_directory)
+        test_files.extend(input_bin[TestBinaryInfo].test_binaries.to_list())
+        for bin in input_bin.files.to_list():
+            sort_file(ctx, bin.path, install_dir, file_map, bin.is_directory)
 
     for input_label, output_folder in ctx.attr.root_files.items():
-        label_files = input_label.files.to_list()
-        for file in label_files:
+        for file in input_label.files.to_list():
             file_map["root_files"][file.path] = declare_output(ctx, install_dir + "/" + output_folder + "/" + file.basename, file.is_directory)
 
     for input_label, output_path in ctx.attr.include_files.items():
@@ -295,25 +246,24 @@ def mongo_install_rule_impl(ctx):
 
     # sort dependency install files
     for dep in ctx.attr.deps:
-        dep_test_binaries = dep[TestBinaryInfo].test_binaries.to_list()
-        dep_default_files = dep[DefaultInfo].files.to_list()
-        dep_src_map_file = dep[MongoInstallInfo].src_map.to_list()[0]
-        test_files.extend(dep_test_binaries)
+        test_files.extend(dep[TestBinaryInfo].test_binaries.to_list())
 
         # Create a map of filename to if its a directory, ie. { coolfolder: True, coolfile: False } as the json loses that info
-        file_directory_map = {file_dep.basename: file_dep.is_directory for file_dep in dep_default_files}
-        src_map = json.decode(dep_src_map_file)
+        file_directory_map = {file_dep.basename: file_dep.is_directory for file_dep in dep[DefaultInfo].files.to_list()}
+        src_map = json.decode(dep[MongoInstallInfo].src_map.to_list()[0])
+        files = []
         for key in src_map:
             if key != "roots":
-                for file in src_map[key]:
-                    filename = _basename(file)
+                files.extend(src_map[key])
+        for file in files:
+            filename = file.split("/")[-1]
 
-                    # Due to us creating our binaries using the _with_debug name
-                    # the dwp files also contain it. Strip the _with_debug from the name
-                    filename = filename.replace("_with_debug.dwp", ".dwp")
-                    sort_file(ctx, file, filename, install_dir, file_map, file_directory_map[filename], platform_kind)
+            # Due to us creating our binaries using the _with_debug name
+            # the dwp files also contain it. Strip the _with_debug from the name
+            filename = filename.replace("_with_debug.dwp", ".dwp")
+            sort_file(ctx, file, install_dir, file_map, file_directory_map[filename])
         for file, folder in src_map["roots"].items():
-            filename = _basename(file)
+            filename = file.split("/")[-1]
             file_map["root_files"][file] = declare_output(ctx, install_dir + "/" + folder + "/" + filename, file_directory_map[filename])
 
     # aggregate based on type of installs
@@ -337,9 +287,8 @@ def mongo_install_rule_impl(ctx):
     input_deps = []
     installed_tests = []
     for file in test_files:
-        file_basename = file.basename
-        if not is_debug_file(platform_kind, file_basename) and ctx.attr.debug != "debug":
-            if is_binary_file(platform_kind, file_basename) or _extension(file_basename) == ".py":
+        if not is_debug_file(ctx, file.basename) and ctx.attr.debug != "debug":
+            if is_binary_file(ctx, file.basename) or file.basename.endswith(".py"):
                 test_path = file_map["binaries"][file.path].path
 
                 # point at the binaries in bazel-bin/install/ rather than bazel-out/<some-arch>/bin/<some-install>/
@@ -429,7 +378,7 @@ def mongo_install_rule_impl(ctx):
             outputs = outputs,
             inputs = inputs,
             arguments = [
-                install_script.path,
+                ctx.attr._install_script.files.to_list()[0].path,
                 "--depfile=" + deps_file.path,
                 "--install-dir=" + full_install_dir,
             ] + ["--depfile=" + str(dep[MongoInstallInfo].deps_files.to_list()[0].path) for dep in ctx.attr.deps],

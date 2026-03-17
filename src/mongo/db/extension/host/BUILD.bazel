@@ -103,7 +103,6 @@ generate_embedded_public_key_header(
     name = "embed_mongot_key",
     embedded_key_header_path = "mongot_extension_signing_key.h",
     public_key_path = "mongot-extension.asc",
-    tags = ["gen_source"],
     target_compatible_with = select({
         "@platforms//os:linux": [],
         "//conditions:default": ["@platforms//:incompatible"],

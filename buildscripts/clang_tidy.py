@@ -23,7 +23,6 @@ import yaml
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from mongo_toolchain import get_mongo_toolchain
-from setup_clang_tidy import clang_tidy_setup_recovery_message
 from simple_report import make_report, put_report, try_combine_reports
 
 checks_so = None
@@ -33,11 +32,7 @@ if os.path.exists(".mongo_checks_module_path"):
 
 
 config_file = ""
-for config in [
-    ".clang-tidy",
-    "/tmp/compiledb-bin/.clang-tidy.strict",
-    "bazel-bin/.clang-tidy.strict",
-]:
+for config in ["/tmp/compiledb-bin/.clang-tidy.strict", "bazel-bin/.clang-tidy.strict"]:
     if os.path.exists(config):
         config_file = config
         break
@@ -186,7 +181,7 @@ def _run_tidy(args, parser_defaults):
         if args.compile_commands == parser_defaults.compile_commands:
             print(
                 f"Could not find compile commands: '{args.compile_commands}', to generate it, use the build command:\n\n"
-                + "bazel build --config=compiledb //src/...\n"
+                + "bazel build compiledb\n"
             )
         else:
             print(f"Could not find compile commands: {args.compile_commands}")
@@ -199,8 +194,7 @@ def _run_tidy(args, parser_defaults):
         if args.clang_tidy_cfg == parser_defaults.clang_tidy_cfg:
             print(
                 f"Could not find config file: '{args.clang_tidy_cfg}', to generate it, use the build command:\n\n"
-                + clang_tidy_setup_recovery_message()
-                + "\n"
+                + "bazel build compiledb\n"
             )
         else:
             print(f"Could not find config file: {args.clang_tidy_cfg}")
