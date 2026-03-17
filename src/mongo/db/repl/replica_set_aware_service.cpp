@@ -127,7 +127,7 @@ void ReplicaSetAwareServiceRegistry::onStepUpComplete(OperationContext* opCtx, l
             LOGV2(6699602,
                   "Duration spent in ReplicaSetAwareServiceRegistry::onStepUpComplete "
                   "for all services exceeded slowTotalOnStepUpCompleteThresholdMS",
-                  "thresholdMills"_attr = threshold,
+                  "thresholdMillis"_attr = threshold,
                   "durationMillis"_attr = timeSpent);
         }
     });
@@ -141,7 +141,7 @@ void ReplicaSetAwareServiceRegistry::onStepUpComplete(OperationContext* opCtx, l
                 LOGV2(6699603,
                       "Duration spent in ReplicaSetAwareServiceRegistry::onStepUpComplete "
                       "for service exceeded slowServiceOnStepUpCompleteThresholdMS",
-                      "thresholdMills"_attr = threshold,
+                      "thresholdMillis"_attr = threshold,
                       "durationMillis"_attr = timeSpent,
                       "serviceName"_attr = service->getServiceName());
             }
@@ -152,7 +152,19 @@ void ReplicaSetAwareServiceRegistry::onStepUpComplete(OperationContext* opCtx, l
 
 void ReplicaSetAwareServiceRegistry::onStepDown() {
     std::for_each(_services.begin(), _services.end(), [](ReplicaSetAwareInterface* service) {
+        Timer t{};
         service->onStepDown();
+
+        auto timeSpent = t.millis();
+        auto threshold = repl::slowServiceOnStepDownThresholdMS.load();
+        if (timeSpent > threshold) {
+            LOGV2(10594201,
+                  "Duration spent in ReplicaSetAwareServiceRegistry::onStepDown "
+                  "for service exceeded slowServiceOnStepDownThresholdMS",
+                  "thresholdMillis"_attr = threshold,
+                  "durationMillis"_attr = timeSpent,
+                  "serviceName"_attr = service->getServiceName());
+        }
     });
 }
 
