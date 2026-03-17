@@ -29,14 +29,65 @@
 
 #include "mongo/db/query/plan_ranking/cbr_plan_ranking.h"
 
+#include "mongo/db/commands/server_status/histogram_server_status_metric.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/query/compiler/ce/exact/exact_cardinality.h"
 #include "mongo/db/query/compiler/ce/exact/exact_cardinality_impl.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/planner_analysis.h"
+#include "mongo/db/stats/counters.h"
 
 namespace mongo {
+
+namespace {
+/**
+ * Aggregation of the total number of microseconds spent in CBR.
+ * This includes both sampling and ranking time.
+ */
+auto& microsTotal = *MetricBuilder<DurationCounter64<Microseconds>>{"query.cbr.micros"};
+
+/**
+ * Aggregation of the total number of microseconds spent sampling in CBR.
+ */
+auto& samplingMicrosTotal =
+    *MetricBuilder<DurationCounter64<Microseconds>>{"query.cbr.samplingMicros"};
+
+/**
+ * Aggregation of the total number of invocations of CBR.
+ */
+auto& invocationCount = *MetricBuilder<Counter64>{"query.cbr.count"};
+
+/**
+ * Aggregation of the total number of candidate plans.
+ */
+auto& numPlansTotal = *MetricBuilder<Counter64>{"query.cbr.numPlans"};
+
+/**
+ * An element in this histogram is the number of microseconds spent in an invocation of CBR.
+ * This includes both sampling and ranking time.
+ */
+auto& microsHistogram =
+    *MetricBuilder<HistogramServerStatusMetric>{"query.cbr.histograms.micros"}.bind(
+        HistogramServerStatusMetric::pow(11, 1024, 4));
+
+/**
+ * An element in this histogram is the number of microseconds spent sampling in an invocation of
+ * CBR.
+ */
+auto& samplingMicrosHistogram =
+    *MetricBuilder<HistogramServerStatusMetric>{"query.cbr.histograms.samplingMicros"}.bind(
+        HistogramServerStatusMetric::pow(11, 1024, 4));
+
+/**
+ * An element in this histogram is the number of plans in the candidate set of an invocation of CBR.
+ */
+auto& numPlansHistogram =
+    *MetricBuilder<HistogramServerStatusMetric>{"query.cbr.histograms.numPlans"}.bind(
+        HistogramServerStatusMetric::pow(5, 2, 2));
+
+}  // namespace
 
 namespace {
 bool isTriviallyEstimable(const CanonicalQuery& cq) {
@@ -98,7 +149,17 @@ StatusWith<PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
         topLevelSampleFieldNames.merge(meTopLevelFields);
     }
 
-    if (statusWithMultiPlanSolns.getValue().size() == 1 &&
+    size_t numSolutions = statusWithMultiPlanSolns.getValue().size();
+
+    // Start timer for server status metrics
+    auto tickSource = opCtx->getServiceContext()->getTickSource();
+    auto startTicks = tickSource->getTicks();
+
+    numPlansHistogram.increment(numSolutions);
+    numPlansTotal.increment(numSolutions);
+    invocationCount.increment();
+
+    if (numSolutions == 1 &&
         (!query.getExplain() ||
          // TODO(SERVER-118659): Remove this disjunction once we support costing count_scan
          QueryPlannerAnalysis::isCountScan(statusWithMultiPlanSolns.getValue()[0].get()))) {
@@ -124,6 +185,9 @@ StatusWith<PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
             yieldPolicy,
             collections);
 
+        // Start timer for sampling server status metrics
+        auto startSamplingTicks = tickSource->getTicks();
+
         // If we do not have any fields that we want to sample then we just include all the
         // fields in the sample. This can occur for primary match expressions which are
         // not trivially estimable yet have no top-level fields (eg. $geoNear or $expr).
@@ -132,14 +196,28 @@ StatusWith<PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
                 ? ce::ProjectionParams{ce::NoProjection{}}
                 : ce::TopLevelFieldsProjection{std::move(topLevelSampleFieldNames)});
 
+        auto samplingDurationMicros =
+            tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startSamplingTicks);
+
+        samplingMicrosTotal.increment(samplingDurationMicros);
+        samplingMicrosHistogram.increment(durationCount<Microseconds>(samplingDurationMicros));
+
         auto n = samplingEstimator->getSampleSize();
         CurOp::get(opCtx)->debug().getAdditiveMetrics().nDocsSampled = static_cast<uint64_t>(n);
     }
 
-    return QueryPlanner::planWithCostBasedRanking(plannerParams,
-                                                  samplingEstimator.get(),
-                                                  exactCardinality.get(),
-                                                  std::move(statusWithMultiPlanSolns));
+    auto planRankingResult =
+        QueryPlanner::planWithCostBasedRanking(plannerParams,
+                                               samplingEstimator.get(),
+                                               exactCardinality.get(),
+                                               std::move(statusWithMultiPlanSolns));
+
+    // Calculate duration for server status metrics
+    auto durationMicros = tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startTicks);
+    microsHistogram.increment(durationCount<Microseconds>(durationMicros));
+    microsTotal.increment(durationMicros);
+
+    return planRankingResult;
 }
 }  // namespace plan_ranking
 }  // namespace mongo

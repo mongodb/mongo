@@ -32,6 +32,7 @@ function assertClassicMultiPlannerMetrics(multiPlannerMetrics, expectedCount) {
     assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicNumPlans), expectedCount);
     assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicWorks), expectedCount);
     assert.eq(multiPlannerMetrics.classicCount, expectedCount);
+    assert.eq(multiPlannerMetrics.choseWinningPlan, expectedCount);
     assert.eq(multiPlannerMetrics.stoppingCondition.hitEof, expectedCount * 2);
     assert.eq(multiPlannerMetrics.stoppingCondition.hitResultsLimit, 0);
     assert.eq(multiPlannerMetrics.stoppingCondition.hitWorksLimit, 0);
@@ -100,11 +101,13 @@ assert.soon(
     assert.commandWorked(coll.find({a: 1, b: 1, c: 1}).explain());
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlanEvaluationWorks: 10000}));
 
-    assert.docEq(db.serverStatus().metrics.query.multiPlanner.stoppingCondition, {
+    multiPlannerMetrics = db.serverStatus().metrics.query.multiPlanner;
+    assert.docEq(multiPlannerMetrics.stoppingCondition, {
         hitEof: 4,
         hitWorksLimit: 1,
         hitResultsLimit: 0,
     });
+    assert.eq(multiPlannerMetrics.choseWinningPlan, 3);
 }
 
 // Test 'stoppingConditions.hitResultsLimit'.
@@ -118,11 +121,13 @@ assert.soon(
     assert.commandWorked(coll.find({a: 1, b: 1, c: 1}).explain());
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlanEvaluationMaxResults: 101}));
 
-    assert.docEq(db.serverStatus().metrics.query.multiPlanner.stoppingCondition, {
+    multiPlannerMetrics = db.serverStatus().metrics.query.multiPlanner;
+    assert.docEq(multiPlannerMetrics.stoppingCondition, {
         hitEof: 4,
         hitWorksLimit: 1,
         hitResultsLimit: 2,
     });
+    assert.eq(multiPlannerMetrics.choseWinningPlan, 4);
 }
 
 MongoRunner.stopMongod(conn);

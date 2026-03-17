@@ -50,6 +50,7 @@
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/restore_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -88,7 +89,8 @@ void markShouldCollectTimingInfoOnSubtree(PlanStage* root) {
 /**
  * Aggregation of the total number of microseconds spent (in the classic multiplanner).
  */
-auto& classicMicrosTotal = *MetricBuilder<Counter64>{"query.multiPlanner.classicMicros"};
+auto& classicMicrosTotal =
+    *MetricBuilder<DurationCounter64<Microseconds>>{"query.multiPlanner.classicMicros"};
 
 /**
  * Aggregation of the total number of "works" performed (in the classic multiplanner).
@@ -152,6 +154,14 @@ auto& multiPlannerHitWorksLimitTotal =
  */
 auto& multiPlannerAllPlansHitMemoryLimitTotal =
     *MetricBuilder<Counter64>{"query.multiPlanner.allPlansHitMemoryLimit"};
+
+/**
+ * Aggregation of the total number of times multiplanning chose the winning plan. With the
+ * introduction of automaticCE mode, this may differ from the number of times multiplanning is
+ * invoked.
+ */
+auto& multiPlannerChoseWinningPlan =
+    *MetricBuilder<Counter64>{"query.multiPlanner.choseWinningPlan"};
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(sleepWhileMultiplanning);
@@ -354,9 +364,8 @@ Status MultiPlanStage::runTrials(PlanYieldPolicy* yieldPolicy,
         return e.toStatus().withContext("error while multiplanner was selecting best plan");
     }
 
-    auto durationMicros = durationCount<Microseconds>(
-        tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startTicks));
-    classicMicrosHistogram.increment(durationMicros);
+    auto durationMicros = tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startTicks);
+    classicMicrosHistogram.increment(durationCount<Microseconds>(durationMicros));
     classicMicrosTotal.increment(durationMicros);
 
     // Save state after running trials so that we are safe to yield or do other things
@@ -433,6 +442,9 @@ Status MultiPlanStage::pickBestPlan() {
     _onPickBestPlan(*_query, *this, std::move(ranking), _candidates);
 
     removeRejectedPlans();
+
+    // Increment relevant server status metric.
+    multiPlannerChoseWinningPlan.increment();
 
     return Status::OK();
 }

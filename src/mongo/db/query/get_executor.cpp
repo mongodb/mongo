@@ -38,6 +38,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/classic/cached_plan.h"
@@ -130,6 +131,13 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+
+namespace {
+/**
+ * Aggregation of the total number of times query planning occurred.
+ */
+auto& plannerInvocationCount = *MetricBuilder<Counter64>{"query.planning.invocationCount"};
+}  // namespace
 
 boost::intrusive_ptr<ExpressionContext> makeExpressionContextForGetExecutor(
     OperationContext* opCtx,
@@ -391,6 +399,8 @@ public:
     }
 
     StatusWith<std::unique_ptr<ResultType>> finishPrepare() {
+        plannerInvocationCount.increment();
+
         if (SubplanStage::needsSubplanning(*_cq)) {
             LOGV2_DEBUG(20924,
                         2,
@@ -405,7 +415,6 @@ public:
 
             return buildSubPlan();
         }
-
 
         plan_ranking::PlanRanker planRanker;
         auto rankerResult = planRanker.rankPlans(_opCtx,

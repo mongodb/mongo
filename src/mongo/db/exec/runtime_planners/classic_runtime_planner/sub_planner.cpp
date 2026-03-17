@@ -27,10 +27,22 @@
  *    it in the license file.
  */
 
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 
-namespace mongo::classic_runtime_planner {
+namespace mongo {
+
+namespace {
+/**
+ * Aggregation of the total number of times the classic subplanner chose the winning plan.
+ */
+auto& classicChoseWinningPlan =
+    *MetricBuilder<Counter64>{"query.subPlanner.classicChoseWinningPlan"};
+
+}  // namespace
+
+namespace classic_runtime_planner {
 
 SubPlanner::SubPlanner(PlannerData plannerData) : ClassicPlannerInterface(std::move(plannerData)) {
     SubplanStage::PlanSelectionCallbacks callbacks{
@@ -65,6 +77,10 @@ Status SubPlanner::doPlan(PlanYieldPolicy* planYieldPolicy) {
 }
 
 std::unique_ptr<QuerySolution> SubPlanner::extractQuerySolution() {
+    // This function is called when the plan executor is created to extract the winning plan from
+    // the planner, so if this code runs then we know the subplanner was invoked and chose the
+    // winning plan.
+    classicChoseWinningPlan.increment();
     return nullptr;
 }
 
@@ -76,4 +92,5 @@ const QuerySolution* SubPlanner::querySolution() const {
     // whole-query QSN (if there is one) from the SubplanStage.
     MONGO_UNREACHABLE_TASSERT(8746606);
 }
-}  // namespace mongo::classic_runtime_planner
+}  // namespace classic_runtime_planner
+}  // namespace mongo
