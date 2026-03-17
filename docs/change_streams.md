@@ -215,8 +215,22 @@ Future versions may introduce new resume token versions. Client applications sho
 tokens as opaque identifiers and should not make any assumptions about the format or internals
 or resume tokens, nor should they rely on the internal implementation details of resume tokens.
 
-Resume tokens are serialized and deserialized by the [ResumeToken](https://github.com/mongodb/mongo/blob/6d182bc73acdf2270320eba611538f6619b627bc/src/mongo/db/pipeline/resume_token.h#L147)
-class. The resume token internal data is stored in [ResumeTokenData](https://github.com/mongodb/mongo/blob/6d182bc73acdf2270320eba611538f6619b627bc/src/mongo/db/pipeline/resume_token.h#L50).
+Resume tokens are serialized and deserialized by the [ResumeToken](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/pipeline/resume_token.h#L148)
+class. The resume token internal data is stored in [ResumeTokenData](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/pipeline/resume_token.h#L51).
+
+#### Resume Token Types
+
+There are two types of resume tokens:
+
+- event resume tokens
+- high watermark resume tokens
+
+The former stem from actual change events.
+High watermark token are a special kind of change stream resume token that represent a logical
+position in the global change stream ordered only by cluster time, not a specific event.
+
+High watermark tokens sort strictly before any real event token at the same cluster time.
+That is, a high‑watermark token for time T sorts ahead of all events whose cluster time >= T.
 
 #### Decoding Resume Tokens
 
@@ -266,6 +280,35 @@ issuing follow-up `getMore` commands to this cursor.
 If a change stream cursor cannot be successfully opened, the initial `aggregate` command will
 return an error, and the returned cursor id will be `0`. In this case, no events can be consumed
 from the change stream, and the consumer needs to resolve the error.
+
+### Change Stream errors
+
+When a change stream is opened at a specific point in time, it is validated that the oplog of all
+participating nodes actually contains data for this point in time.
+If the oplog does not contain any data for the exact point in time or before, it would be possible
+that the requested data has already fallen off the oplog.
+In case no oplog entry can be found that is at least as old as the specified timetamp, opening the
+change stream will fail with error code `OplogQueryMinTsMissing`.
+This validation happens for all change streams, regardless if the start timestamp is specified via
+the `resumeAfter`, `startAfter` or `startAtOperationTime` parameters, or if the start time is
+implied from the current time.
+An exception in which opening a change stream at a later point in time than the timestamp of the
+first present oplog entry is permitted is for new shard primaries.
+New shard primary can be added to an existing cluster at any point in time. When a new shard primary
+is added, its first oplog entry will be a no-op entry with `msg` == `initiating set` (on ASC) or
+`msg` == `new primary` (on DSC).
+
+The code for this can be found [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/exec/classic/collection_scan.cpp#L195-L227).
+
+Another common error is `ChangeStreamHistoryLost`. This error is raised when a change stream is
+opened with a resume token that cannot be found (anymore) in any of the participating nodes' oplogs.
+This can either happen when the resume event has actually fallen off the oplog, or, when a
+change stream is resumed with the resume token from another change stream with a different `$match`
+expression. In this case, the new change stream may filter out the resume event due to the different
+`$match` expression, so it cannot be found anymore.
+
+Resuming a change stream using a resume token from a change stream with a different `$match`
+expression is thus not guaranteed to work.
 
 ## Consuming Events from a Change Stream
 
@@ -347,8 +390,8 @@ A few such fields include:
 - `updateDescription` / `rawUpdateDescription`: contains details for "update" events.
 
 The majority of change stream event fields are emitted by the `ChangeStreamDefaultEventTransformation`
-object [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/pipeline/change_stream_event_transform.cpp#L289). This object is called by the `ChangeStreamEventTransform`
-stage [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/exec/agg/change_stream_transform_stage.cpp#L75).
+object [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/pipeline/change_stream_event_transform.cpp#L321). This object is called by the `ChangeStreamEventTransform`
+stage [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/exec/agg/change_stream_transform_stage.cpp#L75).
 
 A custom `$project` stage in the change stream pipeline can be used to suppress certain fields.
 
@@ -376,8 +419,8 @@ db.getSiblingDB("testDB").runCommand({
 });
 ```
 
-The splitting is performed by the `ChangeStreamSplitLargeEventStage` stage [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/exec/agg/change_stream_split_large_event_stage.cpp#L72),
-using [this helper function](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/pipeline/change_stream_split_event_helpers.cpp#L63).
+The splitting is performed by the `ChangeStreamSplitLargeEventStage` stage [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/exec/agg/change_stream_split_large_event_stage.cpp#L72),
+using [this helper function](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/pipeline/change_stream_split_event_helpers.cpp#L63).
 The change stream consumer is responsible for assembling the split event fragments into a single
 event later.
 
@@ -397,18 +440,18 @@ close the change stream cursor in specific situations:
   There are no "invalidate" events in all-cluster change streams.
 
 Issuing of change stream invalidate events is implemented in the `ChangeStreamCheckInvalidateStage`
-[here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/exec/agg/change_stream_check_invalidate_stage.cpp#L134).
+[here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/exec/agg/change_stream_check_invalidate_stage.cpp#L106-L157).
 
 ## Change Stream Parameters
 
 The behavior of change streams can be controlled via various parameters that can be passed with the
 initial `aggregate` command used to open the change stream.
-The parameters are defined in an [IDL file](https://github.com/mongodb/mongo/blob/12ca4325fb5c5eca38d77b75bb570cc043398144/src/mongo/db/pipeline/document_source_change_stream.idl#L83).
+The parameters are defined in an [IDL file](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/pipeline/document_source_change_stream.idl#L84).
 
 The parameters that are provided when opening the change stream are automatically validated using
 mechanisms provided by the IDL framework. Additional validation of the change stream parameters is
-performed [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/pipeline/document_source_change_stream.cpp#L388). Invalid change stream parameters are immediately rejected
-with appropriate errors.
+performed [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/pipeline/document_source_change_stream.cpp#L391).
+Invalid change stream parameters are immediately rejected with appropriate errors.
 
 ### `fullDocument`
 
@@ -436,7 +479,7 @@ When pre-images are enabled, they are written synchronously with the regular "up
 and change stream events aren’t returned until both have been majority-committed.
 
 Post-images for "update" events are added to change events by the `ChangeStreamAddPostImage` stage
-[here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/exec/agg/change_stream_add_post_image_stage.cpp#L84).
+[here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/exec/agg/change_stream_add_post_image_stage.cpp#L84).
 
 ### `fullDocumentBeforeChange`
 
@@ -453,7 +496,7 @@ The following values are possible:
   error.
 
   Pre-images are added to change events by the `ChangeStreamAddPreImage` stage
-  [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/exec/agg/change_stream_add_pre_image_stage.cpp#L68).
+  [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/exec/agg/change_stream_add_pre_image_stage.cpp#L67).
 
 ### Change Stream Flags
 
@@ -571,18 +614,18 @@ The latter is why change streams in a sharded cluster can have higher latency th
 in replica sets.
 
 For sharded cluster change streams, the merging of the multiple streams of change events from the
-different cursors is performed by the [`AsyncResultsMerger`](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/s/query/exec/async_results_merger.h#L98).
+different cursors is performed by the [`AsyncResultsMerger`](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/s/query/exec/async_results_merger.h#L100).
 
 ## Change Stream Pipeline Building
 
 A change stream pipeline issued by a consumer contains the `$changeStream` meta stage.
-This stage is expanded internally into multiple `DocumentSource`s [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/pipeline/change_stream_pipeline_helpers.cpp#L172).
+This stage is expanded internally into multiple `DocumentSource`s [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/pipeline/change_stream_pipeline_helpers.cpp#L171).
 
-The change stream `DocumentSource`s are located in the `src/mongo/db/pipeline` directory [here](https://github.com/mongodb/mongo/tree/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/pipeline), among other `DocumentSource`s that
+The change stream `DocumentSource`s are located in the `src/mongo/db/pipeline` directory [here](https://github.com/mongodb/mongo/tree/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/pipeline), among other `DocumentSource`s that
 are not related to change streams.
 The `DocumentSource`s are only used for pipeline building and optimization, but they are converted
 into execution `Stage`s later when the change stream is executed.
-These `Stage`s are located in the `src/mongo/db/exec/agg` directory [here](https://github.com/mongodb/mongo/tree/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/exec/agg).
+These `Stage`s are located in the `src/mongo/db/exec/agg` directory [here](https://github.com/mongodb/mongo/tree/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/exec/agg).
 
 ### Replica Set Pipelines
 
@@ -679,8 +722,8 @@ The merge pipeline on _mongos_ will look like this:
 #### `$_internalChangeStreamOplogMatch`
 
 This stage is responsible for reading data from the oplog and filtering out irrelevant events.
-The `DocumentSourceChangeStreamOplogMatch` code is [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/pipeline/document_source_change_stream_oplog_match.h#L54).
-The oplog filter for the stage is built [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/pipeline/document_source_change_stream_oplog_match.cpp#L76).
+The `DocumentSourceChangeStreamOplogMatch` code is [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/pipeline/document_source_change_stream_oplog_match.h#L61).
+The oplog filter for the stage is built [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/pipeline/document_source_change_stream_oplog_match.cpp#L79).
 
 There is no `Stage` equivalent for `DocumentSourceChangeStreamOplogMatch`, as it will be turned into
 a `$cursor` stage for execution.
@@ -689,27 +732,27 @@ a `$cursor` stage for execution.
 
 This stage is responsible for "unwinding" (expanding) multiple operations that are contained in an
 "applyOps" oplog entry into individual events.
-The `DocumentSourceChangeStreamUnwindTransaction` code is [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/pipeline/document_source_change_stream_unwind_transaction.h#L66).
-The `ChangeStreamUnwindTransactionStage` code is [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/exec/agg/change_stream_unwind_transaction_stage.cpp#L89).
+The `DocumentSourceChangeStreamUnwindTransaction` code is [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/pipeline/document_source_change_stream_unwind_transaction.h#L71).
+The `ChangeStreamUnwindTransactionStage` code is [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/pipeline/document_source_change_stream_unwind_transaction.cpp#L83).
 
 #### `$_internalChangeStreamTransform`
 
 This stage is responsible for converting oplog entries into change events. It will build a change
 event document for every oplog entry that enters this stage.
 Event fields are added based on the change stream configuration.
-The `DocumentSourceChangeStreamTransform` code is [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/pipeline/document_source_change_stream_transform.h#L55).
-The `ChangeStreamTransformStage` code is [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/exec/agg/change_stream_transform_stage.cpp#L75).
-The actual event transformation happens inside `ChangeStreamDefaultEventTransformation` [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/pipeline/change_stream_event_transform.cpp#L289).
+The `DocumentSourceChangeStreamTransform` code is [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/pipeline/document_source_change_stream_transform.h#L60).
+The `ChangeStreamTransformStage` code is [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/exec/agg/change_stream_transform_stage.cpp#L75).
+The actual event transformation happens inside `ChangeStreamDefaultEventTransformation` [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/pipeline/change_stream_event_transform.cpp#L321).
 
 #### `$_internalChangeStreamCheckInvalidate`
 
 This stage is responsible for creating change stream "invalidate" events and is only added for
 collection-level and database-level change streams.
-The `DocumentSourceChangeStreamCheckInvalidate` code is [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/pipeline/document_source_change_stream_check_invalidate.h#L60).
-The `ChangeStreamCheckInvalidate` code is [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/exec/agg/change_stream_check_invalidate_stage.cpp#L106).
+The `DocumentSourceChangeStreamCheckInvalidate` code is [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/pipeline/document_source_change_stream_check_invalidate.h#L65).
+The `ChangeStreamCheckInvalidate` code is [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/exec/agg/change_stream_check_invalidate_stage.cpp#L106).
 
 When an invalidate event is encountered, the stage will first emit an "invalidate" event, and then
-throws a `ChangeStreamInvalidated` exception on the next call. The [`ChangeStreamInvalidatedInfo`](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/pipeline/change_stream_invalidation_info.h#L46)
+throws a `ChangeStreamInvalidated` exception on the next call. The [`ChangeStreamInvalidatedInfo`](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/pipeline/change_stream_invalidation_info.h#L47).
 exception type contains the error code `ChangeStreamInvalidated`.
 
 #### `$_internalChangeStreamCheckResumability`
@@ -718,8 +761,8 @@ This stage checks if the oplog has enough history to resume the change stream, a
 events up to the given resume point. If no data for the resume point can be found in the oplog
 anymore, it will throw a `ChangeStreamHistoryLost` error.
 
-The `DocumentSourceChangeStreamCheckResumability` code is [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/pipeline/document_source_change_stream_check_resumability.h#L73).
-The `ChangeStreamCheckResumabilityStage` code is [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/exec/agg/change_stream_check_resumability_stage.cpp#L68).
+The `DocumentSourceChangeStreamCheckResumability` code is [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/pipeline/document_source_change_stream_check_resumability.h#L79).
+The `ChangeStreamCheckResumabilityStage` code is [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/exec/agg/change_stream_check_resumability_stage.cpp#L68).
 
 #### `$_internalChangeStreamAddPreImage`
 
@@ -728,8 +771,8 @@ is only added to change stream pipelines if the `fullDocumentBeforeChange` param
 `off`.
 If enabled, the stage relies on the pre-images stored in the system's pre-image system collection.
 
-The `DocumentSourceChangeStreamAddPreImage` code is [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/pipeline/document_source_change_stream_add_pre_image.h#L62).
-The `ChangeStreamAddPreImageStage` code is [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/exec/agg/change_stream_add_pre_image_stage.cpp#L68).
+The `DocumentSourceChangeStreamAddPreImage` code is [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/pipeline/document_source_change_stream_add_pre_image.h#L67).
+The `ChangeStreamAddPreImageStage` code is [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/exec/agg/change_stream_add_pre_image_stage.cpp#L67).
 
 #### `$_internalChangeStreamAddPostImage`
 
@@ -752,8 +795,8 @@ pre-image of the document in the system's pre-image system collection. It will f
 and then apply the delta that is stored in the "update" change event on top of it, and store the
 result in the `fullDocument` field.
 
-The `DocumentSourceChangeStreamAddPostImage` code is [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/pipeline/document_source_change_stream_add_post_image.h#L58).
-The `ChangeStreamAddPostImageStage` code is [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/exec/agg/change_stream_add_post_image_stage.cpp#L84).
+The `DocumentSourceChangeStreamAddPostImage` code is [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/pipeline/document_source_change_stream_add_post_image.h#L63).
+The `ChangeStreamAddPostImageStage` code is [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/exec/agg/change_stream_add_post_image_stage.cpp#L84).
 
 #### `$_internalChangeStreamEnsureResumeTokenPresent`
 
@@ -762,8 +805,8 @@ the change stream parameters is actually in the stream. The stage is only presen
 stream resume token is not a high water mark token. If the resume token cannot be found in the
 stream, it will throw a `ChangeStreamFatalError`.
 
-The `DocumentSourceChangeStreamEnsureResumeTokenPresent` code is [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h#L50).
-The `ChangeStreamEnsureResumeTokenPresent` code is [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/exec/agg/change_stream_ensure_resume_token_present_stage.cpp#L67).
+The `DocumentSourceChangeStreamEnsureResumeTokenPresent` code is [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h#L51).
+The `ChangeStreamEnsureResumeTokenPresent` code is [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/exec/agg/change_stream_ensure_resume_token_present_stage.cpp#L67).
 
 #### `$_internalChangeStreamHandleTopologyChange`
 
@@ -772,8 +815,8 @@ merge pipeline. The stage is responsible for opening additional cursors to shard
 added to the cluster. It will handle "insert" events into the `config.shards` collection that
 were observed from the config server.
 
-The `DocumentSourceChangeStreamHandleTopologyChange` code can be found [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/pipeline/document_source_change_stream_handle_topology_change.h#L58).
-The `ChangeStreamHandleTopologyChangeStage` code can be found [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/exec/agg/change_stream_handle_topology_change_stage.cpp#L133).
+The `DocumentSourceChangeStreamHandleTopologyChange` code can be found [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/pipeline/document_source_change_stream_handle_topology_change.h#L63).
+The `ChangeStreamHandleTopologyChangeStage` code can be found [here](https://github.com/mongodb/mongo/blob/eb4c6148f6a25c444be39a0e330506834526d935/src/mongo/db/exec/agg/change_stream_handle_topology_change_stage.cpp#L121).
 
 ## Missing documentation (to be completed)
 
