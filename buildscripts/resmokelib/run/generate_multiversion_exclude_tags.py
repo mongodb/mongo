@@ -66,6 +66,7 @@ def get_git_file_content(commit_hash: str) -> str:
             # to ensure we have the commit's contents then try again.
             _ = subprocess.run(git_fetch_command, capture_output=True, text=True, check=True)
             result = subprocess.run(git_command, capture_output=True, text=True, check=True)
+            return result.stdout
         except subprocess.CalledProcessError as err:
             raise RuntimeError(
                 f"Failed to retrieve file content using command: {' '.join(git_command)}. Error: {err.stderr}"
