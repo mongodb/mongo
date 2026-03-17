@@ -90,6 +90,17 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "explain_command_helpers",
+    srcs = [
+        "explain_cmd_helpers.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:commands",
+    ],
+)
+
+mongo_cc_library(
     name = "current_op_common",
     srcs = [
         "current_op_common.cpp",

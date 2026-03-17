@@ -31,34 +31,26 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/client.h"
 #include "mongo/db/command_can_run_here.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/query_cmd/explain_cmd_helpers.h"
 #include "mongo/db/commands/query_cmd/explain_gen.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/explain_options.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
-#include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
 
 #include <memory>
-#include <mutex>
-#include <set>
 #include <string>
-#include <utility>
 
 
 namespace mongo {
@@ -76,17 +68,9 @@ namespace {
  * This command like a dispatcher: it just retrieves a pointer to the nested command and invokes
  * its explain() implementation.
  */
-class CmdExplain final : public Command {
+class CmdExplain final : public ExplainCmdVersion1Gen<CmdExplain> {
 public:
-    CmdExplain() : Command("explain") {}
-
-    const std::set<std::string>& apiVersions() const override {
-        return kApiVersions1;
-    }
-
-    std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
-                                             const OpMsgRequest& request) override;
-
+    using ExplainCmdVersion1Gen<CmdExplain>::ExplainCmdVersion1Gen;
     /**
      * Running an explain on a secondary requires explicitly setting slaveOk.
      */
@@ -118,158 +102,78 @@ public:
         return true;
     }
 
-private:
-    class Invocation;
+    class Invocation final : public MinimalInvocationBase {
+    public:
+        Invocation(OperationContext* opCtx, Command* cmd, const OpMsgRequest& opMsgRequest)
+            : MinimalInvocationBase(opCtx, cmd, opMsgRequest),
+              _verbosity(request().getVerbosity()) {
+            CommandHelpers::uassertNoDocumentSequences(definition()->getName(), opMsgRequest);
+            auto explainedObj = request().getCommandParameter();
+
+            auto explainedCommand =
+                explain_cmd_helpers::makeExplainedCommand(opCtx,
+                                                          opMsgRequest,
+                                                          request().getDbName(),
+                                                          request().getCommandParameter(),
+                                                          _verbosity,
+                                                          request().getSerializationContext());
+            _innerRequest = std::move(explainedCommand.innerRequest);
+            _innerInvocation = std::move(explainedCommand.innerInvocation);
+        }
+
+        NamespaceString ns() const override {
+            return _innerInvocation->ns();
+        }
+
+        bool supportsWriteConcern() const override {
+            return false;
+        }
+
+        ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
+                                                     bool isImplicitDefault) const override {
+            static const Status kDefaultReadConcernNotPermitted{
+                ErrorCodes::InvalidOptions,
+                "Explain does not permit default readConcern to be applied."};
+            return {Status::OK(), {kDefaultReadConcernNotPermitted}};
+        }
+
+        bool isSubjectToIngressAdmissionControl() const override {
+            return true;
+        }
+
+        /**
+         * You are authorized to run an explain if you are authorized to run
+         * the command that you are explaining. The auth check is performed recursively
+         * on the nested command.
+         */
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            _innerInvocation->checkAuthorization(opCtx, *_innerRequest);
+        }
+
+        void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
+            // Explain is never allowed in multi-document transactions.
+            const bool inMultiDocumentTransaction = false;
+            uassert(50746,
+                    "Explain's child command cannot run on this node. "
+                    "Are you explaining a write command on a secondary?",
+                    commandCanRunHere(opCtx,
+                                      request().getDbName(),
+                                      _innerInvocation->definition(),
+                                      inMultiDocumentTransaction));
+            ON_BLOCK_EXIT([&] {
+                aggregation_request_helper::restoreExplainOpDescription(opCtx,
+                                                                        unparsedRequest().body);
+            });
+            _innerInvocation->explain(opCtx, _verbosity, result);
+        }
+
+    private:
+        ExplainOptions::Verbosity _verbosity;
+        std::unique_ptr<OpMsgRequest>
+            _innerRequest;  // Lifespan must enclose that of _innerInvocation.
+        std::unique_ptr<CommandInvocation> _innerInvocation;
+    };
 };
-
-class CmdExplain::Invocation final : public CommandInvocation {
-public:
-    Invocation(const CmdExplain* explainCommand,
-               const OpMsgRequest& request,
-               ExplainOptions::Verbosity verbosity,
-               std::unique_ptr<OpMsgRequest> innerRequest,
-               std::unique_ptr<CommandInvocation> innerInvocation)
-        : CommandInvocation(explainCommand),
-          _outerRequest{&request},
-          _dbName(request.parseDbName()),
-          _verbosity{std::move(verbosity)},
-          _innerRequest{std::move(innerRequest)},
-          _innerInvocation{std::move(innerInvocation)},
-          _genericArgs(
-              GenericArguments::parse(_outerRequest->body,
-                                      IDLParserContext("explain",
-                                                       _outerRequest->validatedTenancyScope,
-                                                       _outerRequest->getValidatedTenantId(),
-                                                       _outerRequest->getSerializationContext()))) {
-    }
-
-    void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
-        // Explain is never allowed in multi-document transactions.
-        const bool inMultiDocumentTransaction = false;
-        uassert(50746,
-                "Explain's child command cannot run on this node. "
-                "Are you explaining a write command on a secondary?",
-                commandCanRunHere(
-                    opCtx, _dbName, _innerInvocation->definition(), inMultiDocumentTransaction));
-        ON_BLOCK_EXIT([&] {
-            aggregation_request_helper::restoreExplainOpDescription(opCtx, _outerRequest->body);
-        });
-        _innerInvocation->explain(opCtx, _verbosity, result);
-    }
-
-    void explain(OperationContext* opCtx,
-                 ExplainOptions::Verbosity verbosity,
-                 rpc::ReplyBuilderInterface* result) override {
-        uasserted(ErrorCodes::IllegalOperation, "Explain cannot explain itself.");
-    }
-
-    NamespaceString ns() const override {
-        return _innerInvocation->ns();
-    }
-
-    const DatabaseName& db() const override {
-        return _dbName;
-    }
-
-    bool supportsWriteConcern() const override {
-        return false;
-    }
-
-    ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
-                                                 bool isImplicitDefault) const override {
-        static const Status kDefaultReadConcernNotPermitted{
-            ErrorCodes::InvalidOptions,
-            "Explain does not permit default readConcern to be applied."};
-        return {Status::OK(), {kDefaultReadConcernNotPermitted}};
-    }
-
-    bool isSubjectToIngressAdmissionControl() const override {
-        return true;
-    }
-
-    /**
-     * You are authorized to run an explain if you are authorized to run
-     * the command that you are explaining. The auth check is performed recursively
-     * on the nested command.
-     */
-    void doCheckAuthorization(OperationContext* opCtx) const override {
-        _innerInvocation->checkAuthorization(opCtx, *_innerRequest);
-    }
-
-    const GenericArguments& getGenericArguments() const override {
-        return _genericArgs;
-    }
-
-private:
-    const CmdExplain* command() const {
-        return static_cast<const CmdExplain*>(definition());
-    }
-
-    const OpMsgRequest* _outerRequest;
-    const DatabaseName _dbName;
-    ExplainOptions::Verbosity _verbosity;
-    std::unique_ptr<OpMsgRequest> _innerRequest;  // Lifespan must enclose that of _innerInvocation.
-    std::unique_ptr<CommandInvocation> _innerInvocation;
-    const GenericArguments _genericArgs;
-};
-
-std::unique_ptr<CommandInvocation> CmdExplain::parse(OperationContext* opCtx,
-                                                     const OpMsgRequest& request) {
-    CommandHelpers::uassertNoDocumentSequences(getName(), request);
-
-    // To enforce API versioning
-    auto cmdObj = idl::parseCommandRequest<ExplainCommandRequest>(
-        request,
-        IDLParserContext(ExplainCommandRequest::kCommandName,
-                         request.validatedTenancyScope,
-                         request.getValidatedTenantId(),
-                         request.getSerializationContext()));
-    auto const dbName = cmdObj.getDbName();
-    ExplainOptions::Verbosity verbosity = cmdObj.getVerbosity();
-    auto explainedObj = cmdObj.getCommandParameter();
-
-    // Extract 'comment' field from the 'explainedObj' only if there is no top-level comment.
-    auto commentField = explainedObj["comment"];
-    if (!opCtx->getComment() && commentField) {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        opCtx->setComment(commentField.wrap());
-    }
-
-    if (auto innerDb = explainedObj["$db"]) {
-        auto innerDbName = DatabaseNameUtil::deserialize(
-            dbName.tenantId(), innerDb.checkAndGetStringData(), cmdObj.getSerializationContext());
-        uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Mismatched $db in explain command. Expected "
-                              << dbName.toStringForErrorMsg() << " but got "
-                              << innerDbName.toStringForErrorMsg(),
-                innerDbName == dbName);
-    }
-    auto explainedCommand =
-        CommandHelpers::findCommand(opCtx, explainedObj.firstElementFieldName());
-    uassert(ErrorCodes::CommandNotFound,
-            str::stream() << "Explain failed due to unknown command: "
-                          << explainedObj.firstElementFieldName(),
-            explainedCommand);
-    auto innerRequest = std::make_unique<OpMsgRequest>(
-        OpMsgRequestBuilder::create(request.validatedTenancyScope, dbName, explainedObj));
-    auto innerInvocation = explainedCommand->parseForExplain(opCtx, *innerRequest, verbosity);
-
-    uassert(ErrorCodes::InvalidOptions,
-            "Command does not support the rawData option",
-            !innerInvocation->getGenericArguments().getRawData() ||
-                innerInvocation->supportsRawData());
-    uassert(ErrorCodes::InvalidOptions,
-            "rawData is not enabled",
-            !innerInvocation->getGenericArguments().getRawData() ||
-                gFeatureFlagRawDataCrudOperations.isEnabled());
-    if (innerInvocation->getGenericArguments().getRawData()) {
-        isRawDataOperation(opCtx) = true;
-    }
-
-    return std::make_unique<Invocation>(
-        this, request, std::move(verbosity), std::move(innerRequest), std::move(innerInvocation));
-}
-
 MONGO_REGISTER_COMMAND(CmdExplain).forShard();
 
 }  // namespace

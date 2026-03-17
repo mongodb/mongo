@@ -29,36 +29,22 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/query_cmd/explain_cmd_helpers.h"
 #include "mongo/db/commands/query_cmd/explain_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/explain_options.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
-#include "mongo/idl/command_generic_argument.h"
-#include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/database_name_util.h"
-#include "mongo/util/decorable.h"
-#include "mongo/util/str.h"
 
 #include <memory>
-#include <mutex>
-#include <set>
 #include <string>
-#include <utility>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -70,16 +56,9 @@ namespace {
  * Implements the explain command on mongos.
  */
 
-class ClusterExplainCmd final : public Command {
+class ClusterExplainCmd final : public ExplainCmdVersion1Gen<ClusterExplainCmd> {
 public:
-    ClusterExplainCmd() : Command("explain") {}
-
-    const std::set<std::string>& apiVersions() const override {
-        return kApiVersions1;
-    }
-
-    std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
-                                             const OpMsgRequest& request) override;
+    using Request = ExplainCommandRequest;
 
     /**
      * Running an explain on a secondary requires explicitly setting slaveOk.
@@ -104,176 +83,67 @@ public:
         return true;
     }
 
-private:
-    class Invocation;
-};
+    class Invocation final : public MinimalInvocationBase {
+    public:
+        Invocation(OperationContext* opCtx, Command* cmd, const OpMsgRequest& opMsgRequest)
+            : MinimalInvocationBase(opCtx, cmd, opMsgRequest),
+              _verbosity(request().getVerbosity()) {
+            CommandHelpers::uassertNoDocumentSequences(definition()->getName(), opMsgRequest);
 
-class ClusterExplainCmd::Invocation final : public CommandInvocation {
-public:
-    Invocation(const ClusterExplainCmd* explainCommand,
-               const OpMsgRequest& request,
-               ExplainOptions::Verbosity verbosity,
-               std::unique_ptr<OpMsgRequest> innerRequest,
-               std::unique_ptr<CommandInvocation> innerInvocation)
-        : CommandInvocation(explainCommand),
-          _outerRequest{&request},
-          _ns{CommandHelpers::parseNsFromCommand(_outerRequest->parseDbName(),
-                                                 _outerRequest->body)},
-          _verbosity{std::move(verbosity)},
-          _genericArgs(
-              GenericArguments::parse(_outerRequest->body,
-                                      IDLParserContext("explain",
-                                                       request.validatedTenancyScope,
-                                                       request.getValidatedTenantId(),
-                                                       request.getSerializationContext()))),
-          _innerRequest{std::move(innerRequest)},
-          _innerInvocation{std::move(innerInvocation)} {}
+            auto explainedObj = explain_cmd_helpers::makeExplainedObjForMongos(
+                unparsedRequest().body, request().getCommandParameter());
 
-    ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
-                                                 bool isImplicitDefault) const override {
-        static const Status kDefaultReadConcernNotPermitted{
-            ErrorCodes::InvalidOptions,
-            "Explain does not permit default readConcern to be applied."};
-        return {Status::OK(), {kDefaultReadConcernNotPermitted}};
-    }
-
-    const GenericArguments& getGenericArguments() const override {
-        return _genericArgs;
-    }
-
-private:
-    void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
-        ON_BLOCK_EXIT([&] {
-            aggregation_request_helper::restoreExplainOpDescription(opCtx, _outerRequest->body);
-        });
-        _innerInvocation->explain(opCtx, _verbosity, result);
-    }
-
-    void explain(OperationContext* opCtx,
-                 ExplainOptions::Verbosity verbosity,
-                 rpc::ReplyBuilderInterface* result) override {
-        uasserted(ErrorCodes::IllegalOperation, "Explain cannot explain itself.");
-    }
-
-    NamespaceString ns() const override {
-        return _ns;
-    }
-
-    const DatabaseName& db() const override {
-        return _ns.dbName();
-    }
-
-    bool supportsWriteConcern() const override {
-        return false;
-    }
-
-    /**
-     * You are authorized to run an explain if you are authorized to run
-     * the command that you are explaining. The auth check is performed recursively
-     * on the nested command.
-     */
-    void doCheckAuthorization(OperationContext* opCtx) const override {
-        _innerInvocation->checkAuthorization(opCtx, *_innerRequest);
-    }
-
-    const ClusterExplainCmd* command() const {
-        return static_cast<const ClusterExplainCmd*>(definition());
-    }
-
-    const OpMsgRequest* _outerRequest;
-    NamespaceString _ns;
-    ExplainOptions::Verbosity _verbosity;
-    const GenericArguments _genericArgs;
-    std::unique_ptr<OpMsgRequest> _innerRequest;  // Lifespan must enclose that of _innerInvocation.
-    std::unique_ptr<CommandInvocation> _innerInvocation;
-};
-
-/**
- * Synthesize a BSONObj for the command to be explained.
- * To do this we must copy generic arguments from the enclosing explain command.
- */
-BSONObj makeExplainedObj(const BSONObj& outerObj,
-                         const DatabaseName& dbName,
-                         const SerializationContext& serializationContext) {
-    const auto& first = outerObj.firstElement();
-    uassert(ErrorCodes::BadValue,
-            "explain command requires a nested object",
-            first.type() == BSONType::object);
-    const BSONObj& innerObj = first.Obj();
-
-    if (auto innerDb = innerObj["$db"]) {
-        uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Mismatched $db in explain command. Expected "
-                              << dbName.toStringForErrorMsg() << " but got "
-                              << innerDb.checkAndGetStringData(),
-                DatabaseNameUtil::deserialize(dbName.tenantId(),
-                                              innerDb.checkAndGetStringData(),
-                                              serializationContext) == dbName);
-    }
-
-    BSONObjBuilder bob;
-    bob.appendElements(innerObj);
-    for (auto outerElem : outerObj) {
-        // If the argument is in both the inner and outer command, we currently let the
-        // inner version take precedence.
-        const auto name = outerElem.fieldNameStringData();
-        if (isGenericArgument(name) && !innerObj.hasField(name)) {
-            bob.append(outerElem);
+            auto innerCommand =
+                explain_cmd_helpers::makeExplainedCommand(opCtx,
+                                                          opMsgRequest,
+                                                          request().getDbName(),
+                                                          explainedObj,
+                                                          _verbosity,
+                                                          request().getSerializationContext());
+            _innerRequest = std::move(innerCommand.innerRequest);
+            _innerInvocation = std::move(innerCommand.innerInvocation);
         }
-    }
-    return bob.obj();
-}
 
-std::unique_ptr<CommandInvocation> ClusterExplainCmd::parse(OperationContext* opCtx,
-                                                            const OpMsgRequest& request) {
-    CommandHelpers::uassertNoDocumentSequences(getName(), request);
+        ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
+                                                     bool isImplicitDefault) const override {
+            static const Status kDefaultReadConcernNotPermitted{
+                ErrorCodes::InvalidOptions,
+                "Explain does not permit default readConcern to be applied."};
+            return {Status::OK(), {kDefaultReadConcernNotPermitted}};
+        }
 
-    // To enforce API versioning
-    auto cmdObj = idl::parseCommandRequest<ExplainCommandRequest>(
-        request,
-        IDLParserContext(ExplainCommandRequest::kCommandName,
-                         request.validatedTenancyScope,
-                         request.getValidatedTenantId(),
-                         request.getSerializationContext()));
-    ExplainOptions::Verbosity verbosity = cmdObj.getVerbosity();
-    // This is the nested command which we are explaining. We need to propagate generic
-    // arguments into the inner command since it is what is passed to the virtual
-    // CommandInvocation::explain() method.
-    const BSONObj explainedObj =
-        makeExplainedObj(request.body, cmdObj.getDbName(), cmdObj.getSerializationContext());
+        void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
+            ON_BLOCK_EXIT([&] {
+                aggregation_request_helper::restoreExplainOpDescription(opCtx,
+                                                                        unparsedRequest().body);
+            });
+            _innerInvocation->explain(opCtx, _verbosity, result);
+        }
 
-    // Extract 'comment' field from the 'explainedObj' only if there is no top-level comment.
-    auto commentField = explainedObj["comment"];
-    if (!opCtx->getComment() && commentField) {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        opCtx->setComment(commentField.wrap());
-    }
+    private:
+        NamespaceString ns() const override {
+            return NamespaceString(request().getDbName());
+        }
 
-    const std::string cmdName = explainedObj.firstElementFieldName();
-    auto explainedCommand = CommandHelpers::findCommand(opCtx, cmdName);
-    uassert(ErrorCodes::CommandNotFound,
-            str::stream() << "Explain failed due to unknown command: " << cmdName,
-            explainedCommand);
-    auto innerRequest = std::make_unique<OpMsgRequest>(OpMsg{explainedObj});
-    innerRequest->validatedTenancyScope = request.validatedTenancyScope;
-    auto innerInvocation = explainedCommand->parseForExplain(opCtx, *innerRequest, verbosity);
+        bool supportsWriteConcern() const override {
+            return false;
+        }
 
-    uassert(ErrorCodes::InvalidOptions,
-            "Command does not support the rawData option",
-            !innerInvocation->getGenericArguments().getRawData() ||
-                innerInvocation->supportsRawData());
-    uassert(ErrorCodes::InvalidOptions,
-            "rawData is not enabled",
-            !innerInvocation->getGenericArguments().getRawData() ||
-                gFeatureFlagRawDataCrudOperations.isEnabled());
-    if (innerInvocation->getGenericArguments().getRawData()) {
-        isRawDataOperation(opCtx) = true;
-    }
+        /**
+         * You are authorized to run an explain if you are authorized to run
+         * the command that you are explaining. The auth check is performed recursively
+         * on the nested command.
+         */
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            _innerInvocation->checkAuthorization(opCtx, *_innerRequest);
+        }
 
-    return std::make_unique<Invocation>(
-        this, request, std::move(verbosity), std::move(innerRequest), std::move(innerInvocation));
-}
-
+        ExplainOptions::Verbosity _verbosity;
+        std::unique_ptr<OpMsgRequest>
+            _innerRequest;  // Lifespan must enclose that of _innerInvocation.
+        std::unique_ptr<CommandInvocation> _innerInvocation;
+    };
+};
 MONGO_REGISTER_COMMAND(ClusterExplainCmd).forRouter();
 
 }  // namespace

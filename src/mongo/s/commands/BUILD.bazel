@@ -205,6 +205,7 @@ mongo_cc_library(
         "//src/mongo/db/commands/query_cmd:bulk_write_common",
         "//src/mongo/db/commands/query_cmd:bulk_write_parser",
         "//src/mongo/db/commands/query_cmd:current_op_common",
+        "//src/mongo/db/commands/query_cmd:explain_command_helpers",
         "//src/mongo/db/commands/query_cmd:map_reduce_parser",
         "//src/mongo/db/commands/query_cmd:plan_cache_commands",
         "//src/mongo/db/commands/query_cmd:search_index_commands",
