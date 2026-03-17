@@ -2,20 +2,16 @@
 import logging
 import os
 import re
+import subprocess
 import tempfile
 from collections import defaultdict
 from subprocess import check_output
-from typing import Optional
-from github import GithubIntegration
-
-import requests
 
 from buildscripts.resmokelib.testing import tags as _tags
 from buildscripts.resmokelib.config import MultiversionOptions
 from buildscripts.resmokelib.core.programs import get_path_env_var
 from buildscripts.resmokelib.utils import is_windows
 from buildscripts.util.fileops import read_yaml_file
-from buildscripts.util.read_config import read_config_file
 
 BACKPORT_REQUIRED_TAG = "backport_required_multiversion"
 
@@ -25,28 +21,7 @@ BACKPORTS_REQUIRED_FILE = "backports_required_for_multiversion_tests.yml"
 BACKPORTS_REQUIRED_BASE_URL = "https://raw.githubusercontent.com/10gen/mongo"
 
 
-def get_installation_access_token(app_id: int, private_key: str,
-                                  installation_id: int) -> Optional[str]:  # noqa: D406,D407,D413
-    """
-    Obtain an installation access token using JWT.
-
-    Args:
-    - app_id: The application ID for GitHub App.
-    - private_key: The private key associated with the GitHub App.
-    - installation_id: The installation ID of the GitHub App for a particular account.
-
-    Returns:
-    - Optional[str]: The installation access token. Returns `None` if there's an error obtaining the token.
-    """
-    integration = GithubIntegration(app_id, private_key)
-    auth = integration.get_access_token(installation_id)
-    if auth:
-        return auth.token
-    else:
-        raise Exception("Error obtaining installation token")
-
-
-def get_backports_required_hash_for_shell_version(mongo_shell_path=None):
+def get_backports_required_hash_for_shell_version(mongo_shell_path: str | None = None):
     """Parse the old shell binary to get the commit hash."""
     env_vars = os.environ.copy()
     paths = get_path_env_var(env_vars=env_vars)
@@ -75,39 +50,45 @@ def get_backports_required_hash_for_shell_version(mongo_shell_path=None):
         f"Could not find a valid commit hash from the {mongo_shell_path} mongo binary.")
 
 
-def get_old_yaml(commit_hash, expansions_file):
+def get_git_file_content(commit_hash: str) -> str:
+    """Retrieve the content of a file from a specific commit in a local Git repository."""
+
+    git_command = ["git", "show", f"{commit_hash}:{ETC_DIR}/{BACKPORTS_REQUIRED_FILE}"]
+    git_fetch_command = ["git", "fetch", "--depth", "1", commit_hash]
+
+    try:
+        result = subprocess.run(git_command, capture_output=True, text=True, check=True)
+        return result.stdout
+    except subprocess.CalledProcessError:
+        try:
+            # If the git show command failed once, we attempt to shallow fetch the commit
+            # to ensure we have the commit's contents then try again.
+            _ = subprocess.run(git_fetch_command, capture_output=True, text=True, check=True)
+            result = subprocess.run(git_command, capture_output=True, text=True, check=True)
+            return result.stdout
+        except subprocess.CalledProcessError as err:
+            raise RuntimeError(
+                f"Failed to retrieve file content using command: {' '.join(git_command)}. Error: {err.stderr}"
+            )
+
+
+def get_old_yaml(commit_hash: str):
     """Download BACKPORTS_REQUIRED_FILE from the old commit and return the yaml."""
 
-    if not os.path.exists(expansions_file):
-        raise FileNotFoundError(f"The specified file does not exist: {expansions_file}")
-    expansions = read_config_file(expansions_file)
-
-    # Obtain installation access tokens using app credentials
-    access_token_10gen_mongo = get_installation_access_token(
-        expansions["app_id_10gen_mongo"], expansions["private_key_10gen_mongo"],
-        expansions["installation_id_10gen_mongo"])
-
-    response = requests.get(
-        f'{BACKPORTS_REQUIRED_BASE_URL}/{commit_hash}/{ETC_DIR}/{BACKPORTS_REQUIRED_FILE}',
-        headers={
-            'Authorization': f'token {access_token_10gen_mongo}',
-        })
-
-    # If the response was successful, no exception will be raised.
-    response.raise_for_status()
+    file_content = get_git_file_content(commit_hash)
 
     old_yaml_file = f"{commit_hash}_{BACKPORTS_REQUIRED_FILE}"
     temp_dir = tempfile.mkdtemp()
     temp_old_yaml_file = os.path.join(temp_dir, old_yaml_file)
+
     with open(temp_old_yaml_file, "w") as fileh:
-        fileh.write(response.text)
+        fileh.write(file_content)
 
     backports_required_old = read_yaml_file(temp_old_yaml_file)
     return backports_required_old
 
 
-def generate_exclude_yaml(old_bin_version: str, output: str, expansions_file: str,
-                          logger: logging.Logger) -> None:
+def generate_exclude_yaml(old_bin_version: str, output: str, logger: logging.Logger) -> None:
     """
     Create a tag file associating multiversion tests to tags for exclusion.
 
@@ -138,7 +119,7 @@ def generate_exclude_yaml(old_bin_version: str, output: str, expansions_file: st
 
     # Get the yaml contents from the old commit.
     logger.info(f"Downloading file from commit hash of old branch {old_version_commit_hash}")
-    backports_required_old = get_old_yaml(old_version_commit_hash, expansions_file)
+    backports_required_old = get_old_yaml(old_version_commit_hash)
 
     def diff(list1, list2):
         return [elem for elem in (list1 or []) if elem not in (list2 or [])]
