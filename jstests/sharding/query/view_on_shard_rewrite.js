@@ -10,6 +10,7 @@
  *     collection and executes.
  *
  * @tags: [
+ *   requires_profiling,
  * ]
  */
 
