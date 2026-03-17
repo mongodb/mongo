@@ -138,8 +138,7 @@ StatusWith<int64_t> WiredTigerIndexUtil::compact(Interruptible& interruptible,
 
     if (ret == EBUSY) {
         return Status(ErrorCodes::Interrupted,
-                      str::stream() << "Compaction interrupted on " << uri.c_str()
-                                    << " due to cache eviction pressure");
+                      str::stream() << "Compaction interrupted on " << uri.c_str());
     }
 
     invariantWTOK(ret, s);
