@@ -402,6 +402,10 @@ bool requiresShardFiltering(const CanonicalQuery& canonicalQuery,
         return true;
     }
 
+    if (canonicalQuery.getExpCtx()->needsMerge) {
+        return true;
+    }
+
     return !isEqualityOnShardKeyTargetable(
         extractedKey, shardKeyPattern, !canonicalQuery.getCollator());
 }
