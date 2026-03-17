@@ -967,7 +967,8 @@ public:
                   const KeyHandlerFn& onDuplicateKeyInserted,
                   const RecordIdHandlerFn& onDuplicateRecord,
                   const YieldFn& yieldFn,
-                  size_t keyBatchSize) final;
+                  size_t keyBatchSize,
+                  size_t keyBatchBytes) final;
 
     IndexStateInfo persistDataForShutdown() final;
 
@@ -1210,7 +1211,8 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
                                const KeyHandlerFn& onDuplicateKeyInserted,
                                const RecordIdHandlerFn& onDuplicateRecord,
                                const YieldFn& yieldFn,
-                               const size_t keyBatchSize) {
+                               const size_t keyBatchSize,
+                               const size_t keyBatchBytes) {
     Timer timer;
 
     _ns = entry->getNSSFromCatalog(opCtx);
@@ -1232,11 +1234,13 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
     int64_t iterations = 0;
 
     size_t numKeysInBatch = 0;
+    size_t bytesInBatch = 0;
     boost::optional<WriteUnitOfWork> wunit;
-    auto commitAndResetWunit = [&wunit, &numKeysInBatch]() {
+    auto commitAndResetWunit = [&wunit, &numKeysInBatch, &bytesInBatch]() {
         wunit->commit();
         wunit.reset();
         numKeysInBatch = 0;
+        bytesInBatch = 0;
     };
     // Handles when we don't commit the wunit and exit the while-loop early. For example, if we
     // encounter duplicate multikey metadata keys.
@@ -1319,7 +1323,9 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
                 }
                 _addKeyForCommit(opCtx, ru, *collection, data.first);
                 numKeysInBatch++;
-                if (numKeysInBatch == keyBatchSize || !it->more()) {
+                bytesInBatch += data.first.getSize();
+                if (numKeysInBatch == keyBatchSize || bytesInBatch >= keyBatchBytes ||
+                    !it->more()) {
                     invariant(wunit);
                     commitAndResetWunit();
                 }
@@ -1329,6 +1335,7 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
             if (wunit) {
                 wunit.reset();
                 numKeysInBatch = 0;
+                bytesInBatch = 0;
             }
             Status status = e.toStatus();
             // Duplicates are checked before inserting.

@@ -266,6 +266,8 @@ public:
          * new CollectionPtr* and IndexCatalogEntry* entry that shall be used from this point on.
          * @param keyBatchSize -  The maximum number of index keys that will be batched together
          * into a single storage transaction.
+         * @param keyBatchBytes - The maximum number of bytes that will be batched together into a
+         * single storage transaction.
          */
         virtual Status commit(OperationContext* opCtx,
                               RecoveryUnit& ru,
@@ -276,7 +278,8 @@ public:
                               const KeyHandlerFn& onDuplicateKeyInserted,
                               const RecordIdHandlerFn& onDuplicateRecord,
                               const YieldFn& yieldFn,
-                              size_t keyBatchSize) = 0;
+                              size_t keyBatchSize,
+                              size_t keyBatchBytes) = 0;
 
         virtual const MultikeyPaths& getMultikeyPaths() const = 0;
 

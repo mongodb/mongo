@@ -92,6 +92,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <exception>
+#include <limits>
 #include <string>
 #include <utility>
 
@@ -1144,7 +1145,10 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
                 yieldFn,
                 (this->_method == IndexBuildMethodEnum::kPrimaryDriven)
                     ? primaryDrivenIndexBuildIndexInsertionBatchSize.load()
-                    : 1);
+                    : 1,
+                (this->_method == IndexBuildMethodEnum::kPrimaryDriven)
+                    ? primaryDrivenIndexBuildIndexInsertionBatchBytes.load()
+                    : std::numeric_limits<size_t>::max());
 
             if (!status.isOK()) {
                 return status;

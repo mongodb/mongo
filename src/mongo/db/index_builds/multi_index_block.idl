@@ -99,6 +99,19 @@ server_parameters:
             gte: 1
         redact: false
 
+    primaryDrivenIndexBuildIndexInsertionBatchBytes:
+        description: "The maximum number of bytes in a batch when inserting keys from the sorter to the index table."
+        set_at:
+            - runtime
+            - startup
+        cpp_varname: primaryDrivenIndexBuildIndexInsertionBatchBytes
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 4 * 1024 * 1024 # 4 MB
+        validator:
+            gte: 1
+        redact: false
+
     primaryDrivenIndexBuildSorterInsertionBatchSize:
         description: "The number of index keys in a batch when inserting into the sorter."
         set_at:
