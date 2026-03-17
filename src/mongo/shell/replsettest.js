@@ -186,6 +186,11 @@ var ReplSetTest = function ReplSetTest(opts) {
         if (conn.length == null)
             connArray = [conn];
 
+        let rst_keyfile = null;
+        if (rst !== undefined && rst !== null) {
+            rst_keyfile = rst.keyFile;
+        }
+
         const unauthenticatedConns = connArray.filter(connection => {
             const connStatus = connection.adminCommand({connectionStatus: 1, showPrivileges: true});
             const connIsAuthenticated = connStatus.authInfo.authenticatedUsers.length > 0;
@@ -196,7 +201,7 @@ var ReplSetTest = function ReplSetTest(opts) {
         const authMode = connOptions.clusterAuthMode || connArray[0].clusterAuthMode ||
             jsTest.options().clusterAuthMode;
 
-        keyFileParam = keyFileParam || connOptions.keyFile || rst.keyFile;
+        keyFileParam = keyFileParam || connOptions.keyFile || rst_keyfile;
         let needsAuth = (keyFileParam || authMode === "x509" || authMode === "sendX509" ||
                          authMode === "sendKeyFile") &&
             unauthenticatedConns.length > 0;
