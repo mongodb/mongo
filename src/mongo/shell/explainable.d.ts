@@ -41,7 +41,14 @@ declare class Explainable {
      * @param options Query options
      * @returns Explain output
      */
-    find(filter?: object, projection?: object, limit?: number, skip?: number, batchSize?: number, options?: number): object;
+    find(
+        filter?: object,
+        projection?: object,
+        limit?: number,
+        skip?: number,
+        batchSize?: number,
+        options?: number,
+    ): object;
 
     /**
      * Explain a findOne query.
@@ -53,7 +60,14 @@ declare class Explainable {
      * @param rawData Whether to use raw data
      * @returns Explain output
      */
-    findOne(filter?: object, projection?: object, options?: object, readConcern?: object, collation?: object, rawData?: boolean): object;
+    findOne(
+        filter?: object,
+        projection?: object,
+        options?: object,
+        readConcern?: object,
+        collation?: object,
+        rawData?: boolean,
+    ): object;
 
     /**
      * Explain a count query.
@@ -88,7 +102,12 @@ declare class Explainable {
      * @param multi Whether to update multiple documents
      * @returns Explain output
      */
-    update(query: object, updateSpec: object, upsert?: boolean, multi?: boolean): object;
+    update(
+        query: object,
+        updateSpec: object,
+        upsert?: boolean,
+        multi?: boolean,
+    ): object;
 
     /**
      * Explain a remove operation.
@@ -120,7 +139,11 @@ declare class Explainable {
      * @param options Options
      * @returns Explain output
      */
-    findOneAndReplace(filter: object, replacement: object, options?: object): object;
+    findOneAndReplace(
+        filter: object,
+        replacement: object,
+        options?: object,
+    ): object;
 
     /**
      * Explain a findOneAndUpdate operation.

@@ -5,7 +5,6 @@
 .clang-tidy
 
 *.code-workspace
-*.d.ts
 *.json
 *.wxs
 

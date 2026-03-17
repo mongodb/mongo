@@ -48,7 +48,14 @@ declare class DBCollection {
      * @param options Query options
      * @returns Query cursor
      */
-    find(filter?: object, projection?: object, limit?: number, skip?: number, batchSize?: number, options?: number): DBQuery;
+    find(
+        filter?: object,
+        projection?: object,
+        limit?: number,
+        skip?: number,
+        batchSize?: number,
+        options?: number,
+    ): DBQuery;
 
     /**
      * Find a single document.
@@ -60,7 +67,14 @@ declare class DBCollection {
      * @param rawData Whether to return raw BSON data
      * @returns The matching document or null
      */
-    findOne(filter?: object, projection?: object, options?: object, readConcern?: object, collation?: object, rawData?: boolean): any;
+    findOne(
+        filter?: object,
+        projection?: object,
+        options?: object,
+        readConcern?: object,
+        collation?: object,
+        rawData?: boolean,
+    ): any;
 
     /**
      * Insert a document or documents.
@@ -68,7 +82,10 @@ declare class DBCollection {
      * @param options Insert options (ordered, writeConcern, etc.)
      * @returns WriteResult or BulkWriteResult
      */
-    insert(obj: object | object[], options?: object): WriteResult | BulkWriteResult;
+    insert(
+        obj: object | object[],
+        options?: object,
+    ): WriteResult | BulkWriteResult;
 
     /**
      * Insert a single document.
@@ -94,7 +111,12 @@ declare class DBCollection {
      * @param multi If true, update all matching documents
      * @returns WriteResult
      */
-    update(query: object, updateSpec: object, upsert?: boolean, multi?: boolean): WriteResult;
+    update(
+        query: object,
+        updateSpec: object,
+        upsert?: boolean,
+        multi?: boolean,
+    ): WriteResult;
 
     /**
      * Update a single document.
@@ -177,7 +199,11 @@ declare class DBCollection {
      * @param options Options including sort, projection, upsert, returnDocument, collation
      * @returns The document (before or after replacement depending on returnDocument)
      */
-    findOneAndReplace(filter: object, replacement: object, options?: object): any;
+    findOneAndReplace(
+        filter: object,
+        replacement: object,
+        options?: object,
+    ): any;
 
     /**
      * Find one document and update it.
@@ -236,7 +262,12 @@ declare class DBCollection {
      * @param cmdArgs Additional command arguments
      * @returns Command result
      */
-    createIndex(keys: object, options?: object, commitQuorum?: any, cmdArgs?: object): object;
+    createIndex(
+        keys: object,
+        options?: object,
+        commitQuorum?: any,
+        cmdArgs?: object,
+    ): object;
 
     /**
      * Create multiple indexes.
@@ -246,7 +277,12 @@ declare class DBCollection {
      * @param cmdArgs Additional command arguments
      * @returns Command result
      */
-    createIndexes(keys: object[], options?: object, commitQuorum?: any, cmdArgs?: object): object;
+    createIndexes(
+        keys: object[],
+        options?: object,
+        commitQuorum?: any,
+        cmdArgs?: object,
+    ): object;
 
     /**
      * Get all indexes for the collection.

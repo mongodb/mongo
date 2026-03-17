@@ -1,20 +1,19 @@
 // type declarations for db.js, which extends objects/methods implemented in cpp.
 
 declare class DB {
-
     constructor(mongo: Mongo, name: string);
 
     /**
      * Get the Mongo connection object for this database.
      * @returns The Mongo connection object
      */
-    getMongo(): Mongo
+    getMongo(): Mongo;
 
     /**
      * Get the name of this database.
      * @returns The database name
      */
-    getName(): string
+    getName(): string;
 
     /**
      * Dynamic property to produce a DBCollection.
@@ -24,42 +23,42 @@ declare class DB {
      * let coll1 = db[jsTestName()];
      * let coll2 = db.myCollection;
      */
-    [collectionIndex: string]: DBCollection
+    [collectionIndex: string]: DBCollection;
 
     /**
      * Rotate server certificates, CRLs, and CA files.
      * @param message Optional message to log when certificates are rotated
      * @returns Command result object
      */
-    rotateCertificates(message?: string): object
+    rotateCertificates(message?: string): object;
 
     /**
      * Get another database from the same connection.
      * @param name Name of the database to retrieve
      * @returns The requested database object
      */
-    getSiblingDB(name: string): DB
+    getSiblingDB(name: string): DB;
 
     /**
      * Get statistics about the database.
      * @param opt Scale factor (number) or options object. Scale converts sizes (1024 for KB, 1024*1024 for MB, etc.)
      * @returns Database statistics object
      */
-    stats(opt?: number | object): object
+    stats(opt?: number | object): object;
 
     /**
      * Get a collection from this database.
      * @param name Name of the collection
      * @returns The collection object
      */
-    getCollection(name: string): DBCollection
+    getCollection(name: string): DBCollection;
 
     /**
      * Get help text for a specific database command.
      * @param name Command name
      * @returns Help text for the command
      */
-    commandHelp(name: string): string
+    commandHelp(name: string): string;
 
     /**
      * Run a database command with read preference applied.
@@ -68,7 +67,11 @@ declare class DB {
      * @param queryOptions Query options bitmask
      * @returns Command result object
      */
-    runReadCommand(obj: object | string, extra?: object, queryOptions?: number): object
+    runReadCommand(
+        obj: object | string,
+        extra?: object,
+        queryOptions?: number,
+    ): object;
 
     /**
      * Run a database command.
@@ -78,10 +81,10 @@ declare class DB {
      * @returns Command result object with ok field and command-specific fields
      */
     runCommand<Req extends Partial<Commands[keyof Commands]["req"]>>(
-      command: GenericArguments & Req,
-      extra?: object,
-      queryOptions?: number,
-    ): GenericReplyFieldsAnd<GetResponseType<Req>>
+        command: GenericArguments & Req,
+        extra?: object,
+        queryOptions?: number,
+    ): GenericReplyFieldsAnd<GetResponseType<Req>>;
 
     /**
      * Run a command against the admin database (switches to admin db).
@@ -89,7 +92,7 @@ declare class DB {
      * @param extra Additional command options (if obj is a string)
      * @returns Command result object
      */
-    adminCommand(obj: object | string, extra?: object): object
+    adminCommand(obj: object | string, extra?: object): object;
 
     /**
      * Perform a collectionless aggregation on the database.
@@ -98,7 +101,7 @@ declare class DB {
      * @param aggregateOptions Options like cursor batch size, maxTimeMS, readConcern, etc.
      * @returns Aggregation result cursor
      */
-    aggregate(pipeline: object[], aggregateOptions?: object): object
+    aggregate(pipeline: object[], aggregateOptions?: object): object;
 
     /**
      * Create a new collection in the database.
@@ -106,7 +109,7 @@ declare class DB {
      * @param opt Options like capped, size, max, storageEngine, validator, etc.
      * @returns Command result object with ok field
      */
-    createCollection(name: string, opt?: object): object
+    createCollection(name: string, opt?: object): object;
 
     /**
      * Create a view based on an aggregation pipeline.
@@ -116,27 +119,32 @@ declare class DB {
      * @param opt Options like collation
      * @returns Command result object with ok field
      */
-    createView(name: string, viewOn: string, pipeline?: object | object[], opt?: object): object
+    createView(
+        name: string,
+        viewOn: string,
+        pipeline?: object | object[],
+        opt?: object,
+    ): object;
 
     /**
      * @deprecated Use getProfilingStatus() instead
      * Get the current profiling level.
      * @returns Profiling level: 0 (off), 1 (slow operations), 2 (all operations), or null on error
      */
-    getProfilingLevel(): number | null
+    getProfilingLevel(): number | null;
 
     /**
      * Get the profiling status including level and slowms threshold.
      * @returns Object with 'was' (level), 'slowms', and other profiling settings
      */
-    getProfilingStatus(): object
+    getProfilingStatus(): object;
 
     /**
      * Drop (delete) the entire database.
      * @param writeConcern Write concern for the operation
      * @returns Command result object with ok field
      */
-    dropDatabase(writeConcern?: object): object
+    dropDatabase(writeConcern?: object): object;
 
     /**
      * Shutdown the MongoDB server (must be run against admin database).
@@ -144,17 +152,17 @@ declare class DB {
      * @param opts.force Force shutdown even if not connected to a secondary
      * @param opts.timeoutSecs Time to wait for secondaries to catch up before forcing
      */
-    shutdownServer(opts?: { force?: boolean, timeoutSecs?: number }): void
+    shutdownServer(opts?: {force?: boolean; timeoutSecs?: number}): void;
     /**
      * Print help text for database methods.
      */
-    help(): void
+    help(): void;
 
     /**
      * Print statistics for all collections in the database.
      * @param scale Scale factor for sizes (e.g., 1024 for KB)
      */
-    printCollectionStats(scale?: number): void
+    printCollectionStats(scale?: number): void;
 
     /**
      * Set the database profiling level and options.
@@ -162,7 +170,7 @@ declare class DB {
      * @param options Slowms threshold (number) or options object with slowms and other settings
      * @returns Command result object
      */
-    setProfilingLevel(level: number, options?: number | object): object
+    setProfilingLevel(level: number, options?: number | object): object;
 
     /**
      * @deprecated Server-side JavaScript execution is deprecated
@@ -171,7 +179,7 @@ declare class DB {
      * @param args Arguments to pass to the function
      * @returns Result of the function execution
      */
-    eval(jsfunction: Function, ...args: any[]): any
+    eval(jsfunction: Function, ...args: any[]): any;
 
     /**
      * @deprecated
@@ -179,190 +187,190 @@ declare class DB {
      * @param parmsObj Parameters object with key, reduce, initial, etc.
      * @returns Aggregation results
      */
-    groupeval(parmsObj: object): any
+    groupeval(parmsObj: object): any;
 
     /**
      * Force an error for testing purposes.
      */
-    forceError(): void
+    forceError(): void;
 
     /**
      * Get names of all collections in the database.
      * @returns Array of collection name strings
      */
-    getCollectionNames(): string[]
+    getCollectionNames(): string[];
 
     /**
      * Convert database to JSON string representation.
      * @returns The database name
      */
-    tojson(): string
+    tojson(): string;
 
     /**
      * Convert database to string representation.
      * @returns The database name
      */
-    toString(): string
+    toString(): string;
 
     /**
      * @deprecated Use hello() instead
      * Check if this node is the primary in a replica set.
      * @returns isMaster command result
      */
-    isMaster(): object
+    isMaster(): object;
 
     /**
      * Check replica set status and get server topology information.
      * @returns hello command result with topology and replica set information
      */
-    hello(): object
+    hello(): object;
 
     /**
      * Get information about currently executing operations.
      * @param arg Pass true to include all operations, or an object to filter results
      * @returns Object with 'inprog' array of current operations
      */
-    currentOp(arg?: boolean | object): object
+    currentOp(arg?: boolean | object): object;
 
     /**
      * Get a cursor for currently executing operations.
      * @param arg Pass true to include all operations, or an object to filter results
      * @returns Cursor over current operations
      */
-    currentOpCursor(arg?: boolean | object): DBCommandCursor
+    currentOpCursor(arg?: boolean | object): DBCommandCursor;
 
     /**
      * Kill a running operation.
      * @param op Operation ID (number) or connection ID (string) to kill
      * @returns Command result object
      */
-    killOp(op: number | string): object
+    killOp(op: number | string): object;
     /**
      * Get replication information for this database.
      * @returns Object with replication lag and oplog information
      */
-    getReplicationInfo(): object
+    getReplicationInfo(): object;
 
     /**
      * Print formatted replication status information to the console.
      */
-    printReplicationInfo(): void
+    printReplicationInfo(): void;
 
     /**
      * @deprecated Use printSecondaryReplicationInfo() instead
      * Print replication information for secondary nodes.
      */
-    printSlaveReplicationInfo(): void
+    printSlaveReplicationInfo(): void;
 
     /**
      * Print replication information for secondary (non-primary) nodes.
      */
-    printSecondaryReplicationInfo(): void
+    printSecondaryReplicationInfo(): void;
 
     /**
      * Get detailed server build information.
      * @returns Object with version, gitVersion, modules, allocator, javascriptEngine, etc.
      */
-    serverBuildInfo(): object
+    serverBuildInfo(): object;
 
     /**
      * Get comprehensive server status including metrics and statistics.
      * @param options Optional filter for specific sections (e.g., {repl: 1, metrics: 0})
      * @returns Large object with server metrics, connections, operations, locks, etc.
      */
-    serverStatus(options?: object): object
+    serverStatus(options?: object): object;
 
     /**
      * Get information about the host system running MongoDB.
      * @returns Object with system info, OS, CPUs, memory, etc.
      */
-    hostInfo(): object
+    hostInfo(): object;
 
     /**
      * Get the command line options used to start the server.
      * @returns Object with parsed and argv arrays
      */
-    serverCmdLineOpts(): object
+    serverCmdLineOpts(): object;
 
     /**
      * Get the MongoDB server version string.
      * @returns Version string (e.g., "7.0.0")
      */
-    version(): string
+    version(): string;
 
     /**
      * Get the server process architecture.
      * @returns 32 or 64 (bits)
      */
-    serverBits(): number
+    serverBits(): number;
 
     /**
      * List all available database commands with descriptions.
      * @returns Object mapping command names to their descriptions
      */
-    listCommands(): object
+    listCommands(): object;
 
     /**
      * Print sharding configuration and chunk distribution.
      * @param verbose If true, show detailed chunk information
      */
-    printShardingStatus(verbose?: boolean): void
+    printShardingStatus(verbose?: boolean): void;
 
     /**
      * Lock the server and flush all data to disk for backup purposes.
      * @returns Command result object
      */
-    fsyncLock(): object
+    fsyncLock(): object;
 
     /**
      * Unlock the server after an fsyncLock operation.
      * @returns Command result object
      */
-    fsyncUnlock(): object
+    fsyncUnlock(): object;
 
     /**
      * @deprecated Use setSecondaryOk() instead
      * Allow or disallow queries on secondary replica set members.
      * @param value True to allow secondary reads
      */
-    setSlaveOk(value?: boolean): void
+    setSlaveOk(value?: boolean): void;
 
     /**
      * @deprecated Use getSecondaryOk() instead
      * Check if secondary reads are allowed.
      * @returns True if secondary reads are enabled
      */
-    getSlaveOk(): boolean
+    getSlaveOk(): boolean;
 
     /**
      * Allow queries to run on secondary replica set members.
      * @param value True to allow secondary reads (default: true)
      */
-    setSecondaryOk(value?: boolean): void
+    setSecondaryOk(value?: boolean): void;
 
     /**
      * Check if queries are allowed on secondary replica set members.
      * @returns True if secondary reads are enabled
      */
-    getSecondaryOk(): boolean
+    getSecondaryOk(): boolean;
 
     /**
      * Get the query options bitmask for this database.
      * @returns Options bitmask (includes slaveOk, etc.)
      */
-    getQueryOptions(): number
+    getQueryOptions(): number;
 
     /**
      * Load and execute all JavaScript code stored in the db.system.js collection.
      */
-    loadServerScripts(): void
+    loadServerScripts(): void;
     /**
      * Create a new user in the database.
      * @param userObj User document with user, pwd, roles, and optional customData, authenticationRestrictions
      * @param writeConcern Write concern for the operation
      * @returns Command result object
      */
-    createUser(userObj: object, writeConcern?: object): object
+    createUser(userObj: object, writeConcern?: object): object;
 
     /**
      * Update an existing user's properties (roles, password, customData, etc.).
@@ -371,7 +379,11 @@ declare class DB {
      * @param writeConcern Write concern for the operation
      * @returns Command result object
      */
-    updateUser(name: string, updateObject: object, writeConcern?: object): object
+    updateUser(
+        name: string,
+        updateObject: object,
+        writeConcern?: object,
+    ): object;
 
     /**
      * Change a user's password.
@@ -380,13 +392,17 @@ declare class DB {
      * @param writeConcern Write concern for the operation
      * @returns Command result object
      */
-    changeUserPassword(username: string, password: string, writeConcern?: object): object
+    changeUserPassword(
+        username: string,
+        password: string,
+        writeConcern?: object,
+    ): object;
 
     /**
      * Log out the currently authenticated user from this database.
      * @returns Command result object
      */
-    logout(): object
+    logout(): object;
 
     /**
      * @deprecated Use dropUser() instead
@@ -395,7 +411,7 @@ declare class DB {
      * @param writeConcern Write concern for the operation
      * @returns Command result object
      */
-    removeUser(username: string, writeConcern?: object): object
+    removeUser(username: string, writeConcern?: object): object;
 
     /**
      * Remove a user from the database.
@@ -403,14 +419,14 @@ declare class DB {
      * @param writeConcern Write concern for the operation
      * @returns Command result object
      */
-    dropUser(username: string, writeConcern?: object): object
+    dropUser(username: string, writeConcern?: object): object;
 
     /**
      * Remove all users from the database.
      * @param writeConcern Write concern for the operation
      * @returns Command result object with count of users removed
      */
-    dropAllUsers(writeConcern?: object): object
+    dropAllUsers(writeConcern?: object): object;
 
     /**
      * Authenticate a user against this database.
@@ -418,7 +434,7 @@ declare class DB {
      * @param password Password (or omit to prompt)
      * @returns Authentication result object
      */
-    auth(username?: string, password?: string): object
+    auth(username?: string, password?: string): object;
 
     /**
      * Grant additional roles to a user.
@@ -427,7 +443,11 @@ declare class DB {
      * @param writeConcern Write concern for the operation
      * @returns Command result object
      */
-    grantRolesToUser(username: string, roles: string[] | object[], writeConcern?: object): object
+    grantRolesToUser(
+        username: string,
+        roles: string[] | object[],
+        writeConcern?: object,
+    ): object;
 
     /**
      * Revoke roles from a user.
@@ -436,7 +456,11 @@ declare class DB {
      * @param writeConcern Write concern for the operation
      * @returns Command result object
      */
-    revokeRolesFromUser(username: string, roles: string[] | object[], writeConcern?: object): object
+    revokeRolesFromUser(
+        username: string,
+        roles: string[] | object[],
+        writeConcern?: object,
+    ): object;
 
     /**
      * Get information about a specific user.
@@ -444,14 +468,14 @@ declare class DB {
      * @param args Optional arguments like showCredentials, showPrivileges, showAuthenticationRestrictions
      * @returns User document or null if not found
      */
-    getUser(username: string, args?: object): object | null
+    getUser(username: string, args?: object): object | null;
 
     /**
      * Get information about all users in the database.
      * @param args Optional filter and options
      * @returns Array of user documents
      */
-    getUsers(args?: object): object[]
+    getUsers(args?: object): object[];
 
     /**
      * Create a new role in the database.
@@ -459,7 +483,7 @@ declare class DB {
      * @param writeConcern Write concern for the operation
      * @returns Command result object
      */
-    createRole(roleObj: object, writeConcern?: object): object
+    createRole(roleObj: object, writeConcern?: object): object;
 
     /**
      * Update an existing role's properties.
@@ -468,7 +492,11 @@ declare class DB {
      * @param writeConcern Write concern for the operation
      * @returns Command result object
      */
-    updateRole(name: string, updateObject: object, writeConcern?: object): object
+    updateRole(
+        name: string,
+        updateObject: object,
+        writeConcern?: object,
+    ): object;
 
     /**
      * Drop a role from the database.
@@ -476,14 +504,14 @@ declare class DB {
      * @param writeConcern Write concern for the operation
      * @returns Command result object
      */
-    dropRole(name: string, writeConcern?: object): object
+    dropRole(name: string, writeConcern?: object): object;
 
     /**
      * Drop all user-defined roles from the database.
      * @param writeConcern Write concern for the operation
      * @returns Command result object with count of roles dropped
      */
-    dropAllRoles(writeConcern?: object): object
+    dropAllRoles(writeConcern?: object): object;
 
     /**
      * Grant roles to an existing role (role inheritance).
@@ -492,7 +520,11 @@ declare class DB {
      * @param writeConcern Write concern for the operation
      * @returns Command result object
      */
-    grantRolesToRole(rolename: string, roles: string[] | object[], writeConcern?: object): object
+    grantRolesToRole(
+        rolename: string,
+        roles: string[] | object[],
+        writeConcern?: object,
+    ): object;
 
     /**
      * Revoke roles from an existing role.
@@ -501,7 +533,11 @@ declare class DB {
      * @param writeConcern Write concern for the operation
      * @returns Command result object
      */
-    revokeRolesFromRole(rolename: string, roles: string[] | object[], writeConcern?: object): object
+    revokeRolesFromRole(
+        rolename: string,
+        roles: string[] | object[],
+        writeConcern?: object,
+    ): object;
 
     /**
      * Grant privileges to a role.
@@ -510,7 +546,11 @@ declare class DB {
      * @param writeConcern Write concern for the operation
      * @returns Command result object
      */
-    grantPrivilegesToRole(rolename: string, privileges: object[], writeConcern?: object): object
+    grantPrivilegesToRole(
+        rolename: string,
+        privileges: object[],
+        writeConcern?: object,
+    ): object;
 
     /**
      * Revoke privileges from a role.
@@ -519,7 +559,11 @@ declare class DB {
      * @param writeConcern Write concern for the operation
      * @returns Command result object
      */
-    revokePrivilegesFromRole(rolename: string, privileges: object[], writeConcern?: object): object
+    revokePrivilegesFromRole(
+        rolename: string,
+        privileges: object[],
+        writeConcern?: object,
+    ): object;
 
     /**
      * Get information about a specific role.
@@ -527,37 +571,37 @@ declare class DB {
      * @param args Optional arguments like showPrivileges, showBuiltinRoles
      * @returns Role document or null if not found
      */
-    getRole(rolename: string, args?: object): object | null
+    getRole(rolename: string, args?: object): object | null;
 
     /**
      * Get information about all roles in the database.
      * @param args Optional filter and options
      * @returns Array of role documents
      */
-    getRoles(args?: object): object[]
+    getRoles(args?: object): object[];
 
     /**
      * Set the default write concern for operations on this database.
      * @param wc Write concern object with w, j, wtimeout fields
      */
-    setWriteConcern(wc: object): void
+    setWriteConcern(wc: object): void;
 
     /**
      * Get the effective write concern for this database.
      * @returns Write concern object or undefined if not set
      */
-    getWriteConcern(): object | undefined
+    getWriteConcern(): object | undefined;
 
     /**
      * Unset (remove) the write concern for this database.
      */
-    unsetWriteConcern(): void
+    unsetWriteConcern(): void;
 
     /**
      * Get the current log verbosity levels for all components.
      * @returns Object with verbosity levels by component
      */
-    getLogComponents(): object
+    getLogComponents(): object;
 
     /**
      * Set the log verbosity level for a specific component.
@@ -565,7 +609,7 @@ declare class DB {
      * @param component Component name (e.g., "query", "replication") or omit for global
      * @returns Command result object
      */
-    setLogLevel(logLevel: number, component?: string): object
+    setLogLevel(logLevel: number, component?: string): object;
 
     /**
      * Open a change stream to watch for changes across all collections in the database.
@@ -573,13 +617,13 @@ declare class DB {
      * @param options Options like fullDocument, resumeAfter, startAtOperationTime
      * @returns Change stream cursor
      */
-    watch(pipeline?: object[], options?: object): DBCommandCursor
+    watch(pipeline?: object[], options?: object): DBCommandCursor;
 
     /**
      * Get the implicit session associated with this database connection.
      * @returns The driver session object
      */
-    getSession(): DriverSession
+    getSession(): DriverSession;
 
     /**
      * Create an encrypted collection using Queryable Encryption (QE).
@@ -587,31 +631,31 @@ declare class DB {
      * @param opts Options including encryptedFields specification
      * @returns Object with collection creation details
      */
-    createEncryptedCollection(name: string, opts: object): object
+    createEncryptedCollection(name: string, opts: object): object;
 
     /**
      * Drop an encrypted collection and its associated state collections.
      * @param name Name of the encrypted collection to drop
      * @returns Command result object
      */
-    dropEncryptedCollection(name: string): object
+    dropEncryptedCollection(name: string): object;
 
     /**
      * Check for metadata inconsistencies in the database (sharding metadata, indexes, etc.).
      * @param options Options to control the check scope
      * @returns Cursor over inconsistency results
      */
-    checkMetadataConsistency(options?: object): DBCommandCursor
+    checkMetadataConsistency(options?: object): DBCommandCursor;
 
     /**
      * Get the shard ID of the primary shard for this database (sharded clusters only).
      * @returns Shard ID string
      */
-    getDatabasePrimaryShardId(): string
+    getDatabasePrimaryShardId(): string;
 
     /**
      * Get detailed server build information (alias for serverBuildInfo).
      * @returns Object with version, gitVersion, modules, allocator, etc.
      */
-    getServerBuildInfo(): object
+    getServerBuildInfo(): object;
 }

@@ -17,7 +17,7 @@ declare class BSONAwareMap {}
  * ISODate("2024-01-15") // midnight UTC
  * ISODate() // current date/time
  */
-declare function ISODate(isoDateStr?: string): Date
+declare function ISODate(isoDateStr?: string): Date;
 
 /**
  * Check if a value is a number.
@@ -26,7 +26,7 @@ declare function ISODate(isoDateStr?: string): Date
  * @param x Value to check
  * @returns True if x is a number type
  */
-declare function isNumber(x: any): x is number
+declare function isNumber(x: any): x is number;
 
 /**
  * Check if a value is an object.
@@ -37,7 +37,7 @@ declare function isNumber(x: any): x is number
  * @param x Value to check
  * @returns True if x is an object type (including arrays and null)
  */
-declare function isObject(x: any): x is object
+declare function isObject(x: any): x is object;
 
 /**
  * Check if a value is a string.
@@ -46,19 +46,19 @@ declare function isObject(x: any): x is object
  * @param x Value to check
  * @returns True if x is a string type
  */
-declare function isString(x: any): x is string
+declare function isString(x: any): x is string;
 
 /**
  * Print a value as formatted JSON to the console.
  * Uses multi-line formatting with indentation for readability.
- * 
+ *
  * A convenience for `print(tojson(x))`.
  *
  * @param x Value to print
  *
  * See {@link tojsononeline} for more.
  */
-declare function printjson(x: any): void
+declare function printjson(x: any): void;
 
 /**
  * Print a value as single-line JSON to the console.
@@ -66,15 +66,15 @@ declare function printjson(x: any): void
  *
  * @param x Value to print
  */
-declare function printjsononeline(x: any): void
+declare function printjsononeline(x: any): void;
 
 /**
  * Convert a value to JSON string suitable for structured logging.
- * 
+ *
  * The results of `toJsonForLog` and {@link tostrictjson} should be equal for BSON objects and arrays.
  * Unlike {@link tostrictjson}, `toJsonForLog` also accepts non-object types, recognizes recursive
  * objects, and provides more detailed serializations for commonly used JavaScript classes.
- * 
+ *
  * Handles special JavaScript types that standard JSON.stringify doesn't:
  * - undefined → {"$undefined": true}
  * - Error → {"$error": message}
@@ -84,11 +84,11 @@ declare function printjsononeline(x: any): void
  *
  * @param x Value to convert
  * @returns JSON string suitable for logging systems
- * 
+ *
  * Unlike {@link tojson}, the result of `eval(toJsonForLog(x))` will not always evaluate into an object
  * equivalent to `x` and may throw a syntax error.
  */
-declare function toJsonForLog(x: any): string
+declare function toJsonForLog(x: any): string;
 
 /**
  * Convert a value to a JSON-formatted string.
@@ -117,18 +117,30 @@ declare function toJsonForLog(x: any): string
  * tojson(doc, "", true)  // single-line output
  * tojson(doc, "\t")      // tab-indented
  */
-declare function tojson(val, indent?: string = "", nolint?: any, depth?: number = 0, sortKeys?: boolean): string
+declare function tojson(
+    val,
+    indent?: string = "",
+    nolint?: any,
+    depth?: number = 0,
+    sortKeys?: boolean,
+): string;
 
 /**
  * Convert an object to a json-formatted string.
  * Lower-level function used by {@link tojson}.
  */
-declare function tojsonObject(obj: Object, indent: string = "", nolint: any, depth: number = 0, sortKeys: boolean = false): string
+declare function tojsonObject(
+    obj: Object,
+    indent: string = "",
+    nolint: any,
+    depth: number = 0,
+    sortKeys: boolean = false,
+): string;
 
 /**
  * Convert a value to a compact single-line JSON string.
  * Shorthand for tojson(x, "", true).
- * 
+ *
  * See {@link tojson} for more.
  */
-declare function tojsononeline(x: any): string
+declare function tojsononeline(x: any): string;

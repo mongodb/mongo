@@ -1,5 +1,5 @@
 // type declarations for mongo.h
 
-declare function _forgetReplSet()
-declare function load()
-declare function quit()
+declare function _forgetReplSet();
+declare function load();
+declare function quit();

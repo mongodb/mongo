@@ -5,7 +5,7 @@
  * Returns the names of all test pipes that have been created for inter-process communication.
  * @returns Array of test pipe name strings
  */
-declare function _readTestPipes(): string[]
+declare function _readTestPipes(): string[];
 
 /**
  * Run a MongoDB program with arguments and wait for completion.
@@ -13,14 +13,14 @@ declare function _readTestPipes(): string[]
  * @param args Program name followed by command-line arguments
  * @returns Exit code of the program
  */
-declare function _runMongoProgram(...args: string[]): number
+declare function _runMongoProgram(...args: string[]): number;
 
 /**
  * Get PIDs of all running child MongoDB processes.
  * Returns process IDs of all MongoDB programs started by the shell.
  * @returns Array of process IDs (PIDs)
  */
-declare function _runningMongoChildProcessIds(): number[]
+declare function _runningMongoChildProcessIds(): number[];
 
 /**
  * Start a MongoDB program with arguments.
@@ -28,7 +28,7 @@ declare function _runningMongoChildProcessIds(): number[]
  * @param args Program name followed by command-line arguments
  * @returns Process ID (PID) of the started program
  */
-declare function _startMongoProgram(...args: string[]): number
+declare function _startMongoProgram(...args: string[]): number;
 
 /**
  * Stop a MongoDB program running on the specified port.
@@ -36,7 +36,7 @@ declare function _startMongoProgram(...args: string[]): number
  * @param port Port number the MongoDB process is listening on
  * @param signal Optional signal number (default: SIGTERM/15)
  */
-declare function _stopMongoProgram(port: number, signal?: number): void
+declare function _stopMongoProgram(port: number, signal?: number): void;
 
 /**
  * Write a value to a named test pipe.
@@ -44,7 +44,7 @@ declare function _stopMongoProgram(port: number, signal?: number): void
  * @param pipe Name of the test pipe
  * @param value Value to write (will be converted to JSON)
  */
-declare function _writeTestPipe(pipe: string, value: any): void
+declare function _writeTestPipe(pipe: string, value: any): void;
 
 /**
  * Write a BSON object to a test pipe file.
@@ -52,7 +52,7 @@ declare function _writeTestPipe(pipe: string, value: any): void
  * @param pipe Name of the test pipe
  * @param obj Object to serialize as BSON
  */
-declare function _writeTestPipeBsonFile(pipe: string, obj: object): void
+declare function _writeTestPipeBsonFile(pipe: string, obj: object): void;
 
 /**
  * Write a BSON object to a test pipe file synchronously.
@@ -60,7 +60,7 @@ declare function _writeTestPipeBsonFile(pipe: string, obj: object): void
  * @param pipe Name of the test pipe
  * @param obj Object to serialize as BSON
  */
-declare function _writeTestPipeBsonFileSync(pipe: string, obj: object): void
+declare function _writeTestPipeBsonFileSync(pipe: string, obj: object): void;
 
 /**
  * Write multiple BSON objects to a test pipe.
@@ -68,7 +68,7 @@ declare function _writeTestPipeBsonFileSync(pipe: string, obj: object): void
  * @param pipe Name of the test pipe
  * @param objs Array of objects to serialize as BSON documents
  */
-declare function _writeTestPipeObjects(pipe: string, objs: object[]): void
+declare function _writeTestPipeObjects(pipe: string, objs: object[]): void;
 
 /**
  * Check if a program is running on the specified port.
@@ -76,14 +76,14 @@ declare function _writeTestPipeObjects(pipe: string, objs: object[]): void
  * @param port Port number to check
  * @returns Object with status information about the program
  */
-declare function checkProgram(port: number): object
+declare function checkProgram(port: number): object;
 
 /**
  * Clear the captured output from MongoDB programs.
  * Clears the output buffer for programs started with _startMongoProgram.
  * @param port Optional port number to clear output for specific program (omit for all)
  */
-declare function clearRawMongoProgramOutput(port?: number): void
+declare function clearRawMongoProgramOutput(port?: number): void;
 
 /**
  * Convert a traffic recording file to BSON format.
@@ -93,7 +93,11 @@ declare function clearRawMongoProgramOutput(port?: number): void
  * @param args Additional arguments for conversion options
  * @returns Result object with conversion statistics
  */
-declare function convertTrafficRecordingToBSON(inputFile: string, outputFile: string, ...args: string[]): object
+declare function convertTrafficRecordingToBSON(
+    inputFile: string,
+    outputFile: string,
+    ...args: string[]
+): object;
 
 /**
  * Copy a database path directory.
@@ -101,14 +105,14 @@ declare function convertTrafficRecordingToBSON(inputFile: string, outputFile: st
  * @param from Source dbpath directory
  * @param to Destination dbpath directory
  */
-declare function copyDbpath(from: string, to: string): void
+declare function copyDbpath(from: string, to: string): void;
 
 /**
  * Get Feature Compatibility Version (FCV) constants.
  * Returns an object containing FCV version strings for use in version testing.
  * @returns Object with FCV constants (e.g., latestFCV, lastContinuousFCV, lastLTSFCV)
  */
-declare function getFCVConstants(): object
+declare function getFCVConstants(): object;
 
 /**
  * Check if a path exists.
@@ -116,7 +120,7 @@ declare function getFCVConstants(): object
  * @param path File or directory path to check
  * @returns True if the path exists, false otherwise
  */
-declare function pathExists(path: string): boolean
+declare function pathExists(path: string): boolean;
 
 /**
  * Get the raw output from a MongoDB program by port.
@@ -124,14 +128,14 @@ declare function pathExists(path: string): boolean
  * @param port Optional port number to get output for specific program (omit for all)
  * @returns Raw output string from the program(s)
  */
-declare function rawMongoProgramOutput(port?: number): string
+declare function rawMongoProgramOutput(port?: number): string;
 
 /**
  * Reset (clear) a database path directory.
  * Deletes all files in a dbpath directory to start with a clean state.
  * @param path Path to the dbpath directory to clear
  */
-declare function resetDbpath(path: string): void
+declare function resetDbpath(path: string): void;
 
 /**
  * Run a program with arguments and wait for completion.
@@ -140,7 +144,7 @@ declare function resetDbpath(path: string): void
  * @param args Command-line arguments
  * @returns Exit code of the program
  */
-declare function run(program: string, ...args: string[]): number
+declare function run(program: string, ...args: string[]): number;
 
 /**
  * Run a non-MongoDB program with arguments.
@@ -149,7 +153,7 @@ declare function run(program: string, ...args: string[]): number
  * @param args Command-line arguments
  * @returns Exit code of the program
  */
-declare function runNonMongoProgram(program: string, ...args: string[]): number
+declare function runNonMongoProgram(program: string, ...args: string[]): number;
 
 /**
  * Run a non-MongoDB program quietly without output.
@@ -158,7 +162,10 @@ declare function runNonMongoProgram(program: string, ...args: string[]): number
  * @param args Command-line arguments
  * @returns Exit code of the program
  */
-declare function runNonMongoProgramQuietly(program: string, ...args: string[]): number
+declare function runNonMongoProgramQuietly(
+    program: string,
+    ...args: string[]
+): number;
 
 /**
  * Run a program with arguments.
@@ -167,7 +174,7 @@ declare function runNonMongoProgramQuietly(program: string, ...args: string[]): 
  * @param args Command-line arguments
  * @returns Exit code of the program
  */
-declare function runProgram(program: string, ...args: string[]): number
+declare function runProgram(program: string, ...args: string[]): number;
 
 /**
  * Stop a program by PID.
@@ -175,7 +182,7 @@ declare function runProgram(program: string, ...args: string[]): number
  * @param pid Process ID to stop
  * @param signal Optional signal number (default: SIGTERM/15)
  */
-declare function stopMongoProgramByPid(pid: number, signal?: number): void
+declare function stopMongoProgramByPid(pid: number, signal?: number): void;
 
 /**
  * Wait for a MongoDB program on the specified port to exit.
@@ -183,7 +190,7 @@ declare function stopMongoProgramByPid(pid: number, signal?: number): void
  * @param port Port number the MongoDB process is listening on
  * @returns Exit code of the program
  */
-declare function waitMongoProgram(port: number): number
+declare function waitMongoProgram(port: number): number;
 
 /**
  * Wait for a program with the specified PID to exit.
@@ -191,7 +198,7 @@ declare function waitMongoProgram(port: number): number
  * @param pid Process ID to wait for
  * @returns Exit code of the program
  */
-declare function waitProgram(pid: number): number
+declare function waitProgram(pid: number): number;
 
 /**
  * Replay a workload recording file against a MongoDB instance.
@@ -199,4 +206,7 @@ declare function waitProgram(pid: number): number
  * @param filename Path to the workload recording file
  * @param connectionString Optional MongoDB connection string (default: localhost:27017)
  */
-declare function replayWorkloadRecordingFile(filename: string, connectionString?: string): void
+declare function replayWorkloadRecordingFile(
+    filename: string,
+    connectionString?: string,
+): void;

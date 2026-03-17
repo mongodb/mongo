@@ -1,3 +1,3 @@
 // type declarations for globals
 
-declare function TestData()
+declare function TestData();

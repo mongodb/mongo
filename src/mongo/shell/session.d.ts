@@ -128,7 +128,12 @@ declare class SessionAwareClient {
      * @param options Command options
      * @returns Command result
      */
-    runCommand(driverSession: DriverSession, dbName: string, cmdObj: object, options: any): any;
+    runCommand(
+        driverSession: DriverSession,
+        dbName: string,
+        cmdObj: object,
+        options: any,
+    ): any;
 }
 
 /**
@@ -258,7 +263,10 @@ declare class DriverSession {
      * @param txnOptsObj Transaction options
      * @param startNewTxnNumber Whether to start a new transaction number
      */
-    startTransaction_forTesting(txnOptsObj?: object, startNewTxnNumber?: boolean): void;
+    startTransaction_forTesting(
+        txnOptsObj?: object,
+        startNewTxnNumber?: boolean,
+    ): void;
 
     /**
      * Commit the active transaction.

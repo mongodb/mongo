@@ -1,3 +1,3 @@
 // type declarations for jsthread.h
 
-declare function _threadInject()
+declare function _threadInject();
