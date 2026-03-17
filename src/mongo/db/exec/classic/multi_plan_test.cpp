@@ -1291,27 +1291,41 @@ TEST_F(QueryStageMultiPlanTest, ExtractRejectedPlansAfterAbandonTrials) {
         insert(BSON("foo" << (i % 10)));
     }
 
-    addIndex(BSON("foo" << 1));
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("b" << 1));
+    addIndex(BSON("c" << 1));
 
     auto coll = getCollection();
 
-    // Plan 0: IXScan over foo == 7
-    unique_ptr<WorkingSet> sharedWs(new WorkingSet());
-    unique_ptr<PlanStage> ixScanRoot = getIxScanPlan(expCtx.get(), coll, sharedWs.get(), 7);
+    // Query for 'a' 'b' and 'c'.
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
+    findCommand->setFilter(BSON("a" << 1 << "b" << 1 << "c" << 1));
+    auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, coll);
 
-    // Plan 1: CollScan.
-    BSONObj filterObj = BSON("foo" << 7);
-    unique_ptr<MatchExpression> filter = makeMatchExpressionFromFilter(expCtx.get(), filterObj);
-    unique_ptr<PlanStage> collScanRoot =
-        getCollScanPlan(expCtx.get(), coll, sharedWs.get(), filter.get());
+    // Plan.
+    auto plannerParams = makePlannerParams(coll, *cq);
+    auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, plannerParams);
+    ASSERT_OK(statusWithMultiPlanSolns.getStatus());
+    auto solutions = std::move(statusWithMultiPlanSolns.getValue());
 
-    auto cq = makeCanonicalQuery(opCtx.get(), nss, filterObj);
+    // Expect one solution per index.
+    ASSERT_EQ(solutions.size(), 3);
+
+    auto solution2Hash = solutions[1]->hash();
 
     unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(
         expCtx.get(), coll, cq.get(), plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll});
 
-    mps->addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
-    mps->addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
+    unique_ptr<WorkingSet> sharedWs(new WorkingSet());
+
+    for (auto&& solution : std::move(solutions)) {
+        auto root = stage_builder::buildClassicExecutableTree(
+            opCtx.get(), coll, *cq, *solution, sharedWs.get());
+        mps->addPlan(std::move(solution), std::move(root), sharedWs.get());
+    }
 
     auto planYieldPolicy = makeClassicYieldPolicy(opCtx.get(),
                                                   nss,
@@ -1319,17 +1333,22 @@ TEST_F(QueryStageMultiPlanTest, ExtractRejectedPlansAfterAbandonTrials) {
                                                   PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
     ASSERT_OK(mps->runTrials(planYieldPolicy.get()));
-    mps->abandonTrials();
+    // Abandon all except the second index scan
+    mps->abandonTrialsExceptHash(solution2Hash);
     ASSERT_FALSE(mps->bestPlanChosen());
 
     auto planExplainerData = mps->extractPlanExplainerData();
     auto& rejectedPlansWithStages = planExplainerData.rejectedPlansWithStages;
-    // Both plans should be returned as rejected.
+    // The rejected plans should be returned as rejected.
     ASSERT_EQ(rejectedPlansWithStages.size(), 2UL);
     ASSERT_TRUE(rejectedPlansWithStages[0].solution);
     ASSERT_TRUE(rejectedPlansWithStages[0].planStage);
     ASSERT_TRUE(rejectedPlansWithStages[1].solution);
     ASSERT_TRUE(rejectedPlansWithStages[1].planStage);
+    // The MultiPlan stage should have one child (the non-rejected plan)
+    ASSERT_EQ(mps->getChildren().size(), 1);
+    // This relies on the non-rejected plan being moves to the first slot.
+    ASSERT_EQ(mps->getCandidate(0).solution->hash(), solution2Hash);
     ASSERT_EQ(planExplainerData.multiPlannerWinningPlanTrialStats, nullptr);
     ASSERT_EQ(planExplainerData.multiPlannerWinningPlanScore, boost::none);
 }
@@ -1384,6 +1403,11 @@ TEST_F(QueryStageMultiPlanTest, ManagesStateAroundAbandoningTrials) {
     unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(
         expCtx.get(), coll, cq.get(), plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll});
 
+    unique_ptr<WorkingSet> sharedWs(new WorkingSet());
+    mps->addPlan(createQuerySolution(),
+                 getCollScanPlan(expCtx.get(), coll, sharedWs.get(), {}),
+                 sharedWs.get());
+
     auto planYieldPolicy = makeClassicYieldPolicy(opCtx.get(),
                                                   nss,
                                                   static_cast<PlanStage*>(mps.get()),
@@ -1392,8 +1416,25 @@ TEST_F(QueryStageMultiPlanTest, ManagesStateAroundAbandoningTrials) {
     ASSERT_FALSE(mps->isStateSaved());
     ASSERT_OK(mps->runTrials(planYieldPolicy.get()));
     ASSERT_TRUE(mps->isStateSaved());
-    mps->abandonTrials();
+    mps->abandonTrialsExceptHash(createQuerySolution()->hash());
     ASSERT_FALSE(mps->isStateSaved());
+}
+
+DEATH_TEST_REGEX_F(QueryStageMultiPlanDeathTest,
+                   CannotAbandonExceptNonExistentCandidate,
+                   "Tripwire assertion.*11763501") {
+    // Insert a dummy object, just so the collection exists.
+    insert(BSON("foo" << 0));
+    auto coll = getCollection();
+
+    auto cq = makeCanonicalQuery(opCtx.get(), nss, {});
+
+    unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(
+        expCtx.get(), coll, cq.get(), plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll});
+
+    // No solution with this hash exists (no solution was added
+    // in the first place). So this should assert.
+    mps->abandonTrialsExceptHash(12345);
 }
 
 TEST_F(QueryStageMultiPlanTest, ManagesStateAroundPickingBestPlan) {

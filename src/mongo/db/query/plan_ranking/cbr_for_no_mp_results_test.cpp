@@ -222,28 +222,25 @@ TEST_F(CBRForNoMPResultsTest, NoResultsMultiPlannerUsesCBR) {
     ASSERT_OK(status.getStatus());
     ASSERT_EQ(status.getValue().solutions.size(), 1);
     auto& explainData = status.getValue().maybeExplainData.value();
-    ASSERT_EQ(explainData.rejectedPlansWithStages.size(), 3);  // 2 from MP + 1 from CBR
-    ASSERT_EQ(explainData.estimates.size(), 4);                // 2 x (IXSCAN + FETCH)
-    int numCBRRejectedPlans = 0;
+    // The plan rejected from CBR is in rejectedPlansWithStages
+    ASSERT_EQ(explainData.rejectedPlansWithStages.size(), 1);
+    ASSERT_EQ(explainData.estimates.size(), 4);  // 2 x (IXSCAN + FETCH)
     for (const auto& rejectedPlan : explainData.rejectedPlansWithStages) {
         ASSERT_FALSE(rejectedPlan.solution == nullptr);
-        if (rejectedPlan.planStage) {  // It is rejected by multi-planner
-            ASSERT_EQ(rejectedPlan.planStage->getStats()->common.works, 5000);
-            ASSERT_EQ(rejectedPlan.planStage->getStats()->common.advanced, 0);
-        } else {
-            numCBRRejectedPlans++;
-        }
+        ASSERT_EQ(rejectedPlan.planStage, nullptr);  // Not rejected by the multi-planner
     }
-    ASSERT_EQ(numCBRRejectedPlans, 1);
     ASSERT_TRUE(strategy.getMultiPlanner().has_value());
     auto stats = strategy.getMultiPlanner()->getSpecificStats();
-    ASSERT_FALSE(stats->earlyExit);
+    ASSERT_TRUE(stats->earlyExit);
     ASSERT_EQ(stats->numResultsFound, 0);
     ASSERT_EQ(stats->numCandidatePlans, 2);
-    ASSERT_EQ(stats->totalWorks, 10000);
+    ASSERT_EQ(stats->totalWorks, 10002);
     ASSERT_EQ(status.getValue().needsWorksMeasured, true);
 
-    ASSERT_FALSE(status.getValue().execState);
+    ASSERT_TRUE(status.getValue().execState);
+    auto mp = dynamic_cast<MultiPlanStage*>(status.getValue().execState->root.get());
+    ASSERT_TRUE(mp);
+    ASSERT_EQ(mp->getStats()->children.size(), 2);  // One winning and one rejected plan
 }
 
 TEST_F(CBRForNoMPResultsTest, CBRCannotDecideUsesMultiPlanner) {

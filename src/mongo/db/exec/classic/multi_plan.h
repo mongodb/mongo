@@ -210,11 +210,11 @@ public:
     [[nodiscard]] PlanExplainerData extractPlanExplainerData();
 
     /**
-     * Rejects all candidate plans without picking a best plan. Needed before extracting rejected
-     * plans for explain when no best plan was chosen. Also cannot be used if a best plan was
-     * already chosen.
+     * Rejects all candidate plans except those with the given hash without picking a best plan.
+     * Needed before extracting rejected plans for explain when no best plan was chosen via MP.
+     * Cannot be used if a best plan was already chosen.
      */
-    void abandonTrials();
+    void abandonTrialsExceptHash(size_t hash);
 
     bool isStateSaved() {
         return _isStateSaved;
@@ -284,10 +284,11 @@ private:
     // Candidate plans. Each candidate includes a child PlanStage tree and QuerySolution. Ownership
     // of all QuerySolutions is retained here, and will *not* be transferred to the PlanExecutor
     // that wraps this stage. Ownership of the PlanStages will be in PlanStage::_children which maps
-    // one-to-one with _candidates.
+    // one-to-one with _candidates for the not-rejected plans. Rejected plans follow. See _rejected.
     std::vector<plan_ranker::CandidatePlan> _candidates;
 
-    // Rejected plans in saved and detached state.
+    // Rejected plans in saved and detached state. Each element corresponds one-to-one to a
+    // candidate in _candidates, following the not-rejected plans.
     std::vector<std::unique_ptr<PlanStage>> _rejected;
 
     // index into _candidates, of the winner of the plan competition

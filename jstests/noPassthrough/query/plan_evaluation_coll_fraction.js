@@ -120,23 +120,6 @@ describe("MultiPlanner exit condition metrics get updated correctly", function (
     if (planRankerMode === "automaticCE" && !isSBEEnabled) {
         describe("automaticCE (CBR) mode", function () {
             describe("fallback to CBR", function () {
-                it("does not update multi-planner metrics when plan cache is disabled", function () {
-                    // We do not measure works for the chosen CBR plan, so MP metrics must not change.
-                    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: true}));
-
-                    assert.docEq(getStoppingCondition(0.1), {
-                        hitEof: 0,
-                        hitResultsLimit: 0,
-                        hitWorksLimit: 0,
-                    });
-
-                    assert.docEq(getStoppingCondition(20.0), {
-                        hitEof: 0,
-                        hitResultsLimit: 0,
-                        hitWorksLimit: 0,
-                    });
-                });
-
                 it("records hitWorksLimit when CBR fallback is measured with low collFraction", function () {
                     // With plan cache enabled, we measure works for the CBR-chosen plan.
                     // At low collFraction, CBR evaluation stops due to works budget, so hitWorksLimit should increment.
