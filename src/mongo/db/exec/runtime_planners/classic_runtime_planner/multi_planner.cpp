@@ -103,8 +103,8 @@ PlanExplainerData MultiPlanner::extractExplainData() {
     return explainData;
 }
 
-void MultiPlanner::abandonTrialsExceptHash(size_t hash) {
-    _multiplanStage->abandonTrialsExceptHash(hash);
+void MultiPlanner::abandonTrials() {
+    _multiplanStage->abandonTrials();
 }
 
 }  // namespace mongo::classic_runtime_planner
