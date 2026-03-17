@@ -771,7 +771,8 @@ TEST_F(DistinctCommandTest, ValidateMirroredQuery) {
 }
 
 TEST_F(DistinctCommandTest, ValidateShardVersionAndDatabaseVersion) {
-    std::vector<BSONObj> distinctArgs = {};
+    // "key" is required by distinct IDL.
+    std::vector<BSONObj> distinctArgs = {BSON("key" << "")};
     {
         auto mirroredObj = createCommandAndGetMirrored(kCollection, distinctArgs);
         ASSERT_FALSE(mirroredObj.hasField("shardVersion"));

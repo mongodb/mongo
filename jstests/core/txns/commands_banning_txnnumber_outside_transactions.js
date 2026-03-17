@@ -16,7 +16,7 @@ const nonRetryableWriteCommands = [
     // Commands that are allowed in transactions.
     {aggregate: 1, pipeline: [], cursor: {}},
     {commitTransaction: 1},
-    {distinct: "c"},
+    {distinct: "c", key: ""},
     {find: "c"},
     {getMore: NumberLong(1), collection: "c"},
     {killCursors: "system.users", cursors: []},
