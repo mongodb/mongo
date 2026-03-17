@@ -114,3 +114,6 @@ filters:
   - "mongodb_database_tools.js":
     approvers:
       - 10gen/query-optimization-correctness
+  - "release_memory_util.js":
+    approvers:
+      - 10gen/query-execution
