@@ -1761,6 +1761,10 @@ methods = {
                     Allow version cursos to walk across keys while calling next().
                     ''',
                     type='boolean', undoc=True),
+                Config('show_prepared_rollback', 'false', r'''
+                    Return prepared-aborted updates. Non-prepared aborted
+                    updates will be skipped.''',
+                    type='boolean', undoc=True),
         ]),
         Config('release_evict', 'false', r'''
             Configure the cursor to evict the page positioned on when the reset API call is used''',

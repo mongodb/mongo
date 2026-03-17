@@ -465,10 +465,30 @@ struct __wt_cursor_version {
      * debug metadata in the version cursor's key.
      */
     uint64_t upd_stop_txnid;
-    /* The previous traversed update's durable_ts will become the durable_stop_ts. */
-    wt_timestamp_t upd_durable_stop_ts;
-    /* The previous traversed update's start_ts will become the stop_ts. */
-    wt_timestamp_t upd_stop_ts;
+    /*
+     * The previous traversed update's durable timestamp/start timestamp become the durable
+     * stop/stop timestamp. For aborted updates these fields carry rollback timestamp/saved
+     * transaction id instead, mirroring the WT_UPDATE union in btmem.h.
+     */
+    union {
+        struct {
+            wt_timestamp_t durable_stop_ts;
+            wt_timestamp_t stop_ts;
+        } commit;
+        struct {
+            wt_timestamp_t stop_rollback_ts;
+            uint64_t stop_saved_txnid;
+        } prepare_rollback;
+    } stop_u;
+
+#undef curversion_durable_stop_ts
+#define curversion_durable_stop_ts stop_u.commit.durable_stop_ts
+#undef curversion_stop_ts
+#define curversion_stop_ts stop_u.commit.stop_ts
+#undef curversion_stop_rollback_ts
+#define curversion_stop_rollback_ts stop_u.prepare_rollback.stop_rollback_ts
+#undef curversion_stop_saved_txnid
+#define curversion_stop_saved_txnid stop_u.prepare_rollback.stop_saved_txnid
     /* The previous traversed update's prepare_ts will become the stop_prepare_ts. */
     wt_timestamp_t upd_stop_prepare_ts;
     /* The previous traversed update's prepared_id will become the stop_prepared_id. */
@@ -488,9 +508,10 @@ struct __wt_cursor_version {
 #define WT_CURVERSION_CROSS_KEY 0x01u
 #define WT_CURVERSION_HS_EXHAUSTED 0x02u
 #define WT_CURVERSION_ON_DISK_EXHAUSTED 0x04u
-#define WT_CURVERSION_TIMESTAMP_ORDER 0x08u
-#define WT_CURVERSION_UPDATE_EXHAUSTED 0x10u
-#define WT_CURVERSION_VISIBLE_ONLY 0x20u
+#define WT_CURVERSION_SHOW_PREPARED_ROLLBACK 0x08u
+#define WT_CURVERSION_TIMESTAMP_ORDER 0x10u
+#define WT_CURVERSION_UPDATE_EXHAUSTED 0x20u
+#define WT_CURVERSION_VISIBLE_ONLY 0x40u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
     uint8_t flags;
 };

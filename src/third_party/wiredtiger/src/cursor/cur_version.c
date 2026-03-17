@@ -16,6 +16,32 @@
 #define WT_CURVERSION_METADATA_FORMAT WT_UNCHECKED_STRING(QQQQQQQQQQBBBB)
 
 /*
+ * __curversion_is_prepare_rollback_value --
+ *     True if the update is a rolled-back prepared value update.
+ */
+static WT_INLINE bool
+__curversion_is_prepare_rollback_value(WT_UPDATE *upd)
+{
+    uint8_t prepare_state;
+
+    if (upd->txnid != WT_TXN_ABORTED || upd->type == WT_UPDATE_TOMBSTONE)
+        return (false);
+
+    WT_ACQUIRE_READ_WITH_BARRIER(prepare_state, upd->prepare_state);
+    return (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED);
+}
+
+/*
+ * __curversion_stop_uses_prepare_ts --
+ *     True if stop timestamp should be derived from stop prepare timestamp.
+ */
+static WT_INLINE bool
+__curversion_stop_uses_prepare_ts(WT_CURSOR_VERSION *version_cursor)
+{
+    return (version_cursor->upd_stop_prepared && version_cursor->upd_stop_txnid != WT_TXN_ABORTED);
+}
+
+/*
  * __curversion_set_key --
  *     WT_CURSOR->set_key implementation for version cursors.
  */
@@ -151,6 +177,39 @@ __curversion_set_value_with_format(WT_CURSOR *cursor, const char *fmt, ...)
 }
 
 /*
+ * __curversion_tombstone_next_upd --
+ *     After recording stop metadata from a tombstone, advance past it to find the value to emit.
+ *     Handles both the normal case (skip all aborted updates) and show_prepared_rollback mode
+ *     (include rolled-back prepared value updates).
+ */
+static WT_INLINE WT_UPDATE *
+__curversion_tombstone_next_upd(
+  WT_SESSION_IMPL *session, WT_CURSOR_VERSION *version_cursor, WT_UPDATE *tombstone)
+{
+    WT_UPDATE *upd;
+    bool show_prepared_rollback;
+
+    /*
+     * show_prepared_rollback currently targets ingest-table style rollback updates (in-memory
+     * trees), where rollback metadata lives on aborted prepared value updates and no globally
+     * visible tombstone with PREPARE_ROLLBACK flag is prepended. If this feature is extended to
+     * non-in-memory trees, we need additional handling for globally visible PREPARE_ROLLBACK
+     * tombstones and their underlying aborted value updates.
+     */
+    if (__wt_txn_upd_visible_all(session, tombstone))
+        return (NULL);
+
+    show_prepared_rollback = F_ISSET(version_cursor, WT_CURVERSION_SHOW_PREPARED_ROLLBACK);
+    upd = tombstone->next;
+
+    while (upd != NULL && upd->txnid == WT_TXN_ABORTED &&
+      (!show_prepared_rollback || !__curversion_is_prepare_rollback_value(upd)))
+        upd = upd->next;
+
+    return (upd);
+}
+
+/*
  * __curversion_next_single_key --
  *     Iterate the updates of a single key.
  */
@@ -217,21 +276,18 @@ __curversion_next_single_key(WT_CURSOR *cursor)
                 version_prepared =
                   prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED;
                 version_cursor->upd_stop_txnid = upd->txnid;
-                version_cursor->upd_durable_stop_ts = upd->upd_durable_ts;
-                version_cursor->upd_stop_ts = upd->upd_start_ts;
+                if (upd->txnid == WT_TXN_ABORTED) {
+                    version_cursor->curversion_stop_rollback_ts = upd->upd_rollback_ts;
+                    version_cursor->curversion_stop_saved_txnid = upd->upd_saved_txnid;
+                } else {
+                    version_cursor->curversion_durable_stop_ts = upd->upd_durable_ts;
+                    version_cursor->curversion_stop_ts = upd->upd_start_ts;
+                }
                 version_cursor->upd_stop_prepare_ts = upd->prepare_ts;
                 version_cursor->upd_stop_prepared_id = upd->prepared_id;
                 version_cursor->upd_stop_prepared = version_prepared;
 
-                /* No need to check the next update if the tombstone is globally visible. */
-                if (__wt_txn_upd_visible_all(session, upd))
-                    upd = NULL;
-                else
-                    upd = upd->next;
-
-                /* Make sure the next update is not an aborted update. */
-                while (upd != NULL && upd->txnid == WT_TXN_ABORTED)
-                    upd = upd->next;
+                upd = __curversion_tombstone_next_upd(session, version_cursor, tombstone);
             }
 
             if (upd == NULL) {
@@ -256,19 +312,35 @@ __curversion_next_single_key(WT_CURSOR *cursor)
                  * Set the version cursor's value, which also contains all the record metadata for
                  * that particular version of the update.
                  */
-                WT_ERR(__curversion_set_value_with_format(cursor, WT_CURVERSION_METADATA_FORMAT,
-                  upd->txnid, version_prepared ? upd->prepare_ts : upd->upd_start_ts,
-                  upd->upd_durable_ts, upd->prepare_ts, upd->prepared_id,
-                  version_cursor->upd_stop_txnid,
-                  version_cursor->upd_stop_prepared ? version_cursor->upd_stop_prepare_ts :
-                                                      version_cursor->upd_stop_ts,
-                  version_cursor->upd_durable_stop_ts, version_cursor->upd_stop_prepare_ts,
-                  version_cursor->upd_stop_prepared_id, upd->type, version_prepared, upd->flags,
-                  WT_CURVERSION_UPDATE_CHAIN));
+                if (upd->txnid == WT_TXN_ABORTED)
+                    WT_ERR(__curversion_set_value_with_format(cursor, WT_CURVERSION_METADATA_FORMAT,
+                      upd->txnid, upd->upd_saved_txnid, upd->upd_rollback_ts, upd->prepare_ts,
+                      upd->prepared_id, version_cursor->upd_stop_txnid,
+                      __curversion_stop_uses_prepare_ts(version_cursor) ?
+                        version_cursor->upd_stop_prepare_ts :
+                        version_cursor->curversion_stop_ts,
+                      version_cursor->curversion_durable_stop_ts,
+                      version_cursor->upd_stop_prepare_ts, version_cursor->upd_stop_prepared_id,
+                      upd->type, version_prepared, upd->flags, WT_CURVERSION_UPDATE_CHAIN));
+                else
+                    WT_ERR(__curversion_set_value_with_format(cursor, WT_CURVERSION_METADATA_FORMAT,
+                      upd->txnid, upd->upd_start_ts, upd->upd_durable_ts, upd->prepare_ts,
+                      upd->prepared_id, version_cursor->upd_stop_txnid,
+                      __curversion_stop_uses_prepare_ts(version_cursor) ?
+                        version_cursor->upd_stop_prepare_ts :
+                        version_cursor->curversion_stop_ts,
+                      version_cursor->curversion_durable_stop_ts,
+                      version_cursor->upd_stop_prepare_ts, version_cursor->upd_stop_prepared_id,
+                      upd->type, version_prepared, upd->flags, WT_CURVERSION_UPDATE_CHAIN));
 
                 version_cursor->upd_stop_txnid = upd->txnid;
-                version_cursor->upd_durable_stop_ts = upd->upd_durable_ts;
-                version_cursor->upd_stop_ts = upd->upd_start_ts;
+                if (upd->txnid == WT_TXN_ABORTED) {
+                    version_cursor->curversion_stop_rollback_ts = upd->upd_rollback_ts;
+                    version_cursor->curversion_stop_saved_txnid = upd->upd_saved_txnid;
+                } else {
+                    version_cursor->curversion_durable_stop_ts = upd->upd_durable_ts;
+                    version_cursor->curversion_stop_ts = upd->upd_start_ts;
+                }
                 version_cursor->upd_stop_prepare_ts = upd->prepare_ts;
                 version_cursor->upd_stop_prepared_id = upd->prepared_id;
                 version_cursor->upd_stop_prepared = version_prepared;
@@ -277,7 +349,10 @@ __curversion_next_single_key(WT_CURSOR *cursor)
 
                 /* Walk to the next non-obsolete update. */
                 for (next_upd = upd; next_upd != NULL; next_upd = next_upd->next) {
-                    if (next_upd->txnid == WT_TXN_ABORTED)
+                    /* Skip aborted updates unless showing prepared rollbacks. */
+                    if (next_upd->txnid == WT_TXN_ABORTED &&
+                      (!F_ISSET(version_cursor, WT_CURVERSION_SHOW_PREPARED_ROLLBACK) ||
+                        !__curversion_is_prepare_rollback_value(next_upd)))
                         continue;
 
                     if (first_globally_visible != NULL) {
@@ -295,11 +370,12 @@ __curversion_next_single_key(WT_CURSOR *cursor)
                         /*
                          * If we are here, the previous update is not globally visible. We need
                          * snapshot isolation and have pinned the global timestamp when we start the
-                         * version cursor.
+                         * version cursor. Aborted updates are never globally visible.
                          */
                         WT_ASSERT(session,
-                          !__wt_txn_visible_all(session, version_cursor->upd_stop_txnid,
-                            version_cursor->upd_durable_stop_ts));
+                          version_cursor->upd_stop_txnid == WT_TXN_ABORTED ||
+                            !__wt_txn_visible_all(session, version_cursor->upd_stop_txnid,
+                              version_cursor->curversion_durable_stop_ts));
                         break;
                     }
                 }
@@ -313,12 +389,12 @@ __curversion_next_single_key(WT_CURSOR *cursor)
     if (!upd_found && !F_ISSET(version_cursor, WT_CURVERSION_ON_DISK_EXHAUSTED)) {
         /*
          * We have already seen an update that is globally visible on the update chain. No need to
-         * return more updates.
+         * return more updates. Aborted updates are never globally visible.
          */
         if (F_ISSET(version_cursor, WT_CURVERSION_TIMESTAMP_ORDER) &&
-          !version_cursor->upd_stop_prepared &&
+          !version_cursor->upd_stop_prepared && version_cursor->upd_stop_txnid != WT_TXN_ABORTED &&
           __wt_txn_visible_all(
-            session, version_cursor->upd_stop_txnid, version_cursor->upd_durable_stop_ts))
+            session, version_cursor->upd_stop_txnid, version_cursor->curversion_durable_stop_ts))
             goto done;
 
         switch (page->type) {
@@ -362,22 +438,22 @@ __curversion_next_single_key(WT_CURSOR *cursor)
                     if (WT_TIME_WINDOW_HAS_START_PREPARE(&cbt->upd_value->tw))
                         goto skip_on_page;
 
-                    if (version_cursor->upd_stop_prepared) {
+                    if (__curversion_stop_uses_prepare_ts(version_cursor)) {
                         if (cbt->upd_value->tw.start_txn > version_cursor->upd_stop_txnid ||
                           cbt->upd_value->tw.start_ts > version_cursor->upd_stop_prepare_ts)
                             goto skip_on_page;
                     } else {
                         if (cbt->upd_value->tw.start_txn > version_cursor->upd_stop_txnid ||
-                          cbt->upd_value->tw.start_ts > version_cursor->upd_stop_ts)
+                          cbt->upd_value->tw.start_ts > version_cursor->curversion_stop_ts)
                             goto skip_on_page;
                     }
                 }
-                durable_stop_ts = version_cursor->upd_durable_stop_ts;
+                durable_stop_ts = version_cursor->curversion_durable_stop_ts;
                 stop_prepare_ts = version_cursor->upd_stop_prepare_ts;
                 stop_prepared_id = version_cursor->upd_stop_prepared_id;
-                stop_ts = version_cursor->upd_stop_ts;
+                stop_ts = version_cursor->curversion_stop_ts;
                 stop_txn = version_cursor->upd_stop_txnid;
-                stop_prepared = version_cursor->upd_stop_prepared;
+                stop_prepared = __curversion_stop_uses_prepare_ts(version_cursor);
             } else {
                 if (F_ISSET(version_cursor, WT_CURVERSION_TIMESTAMP_ORDER)) {
                     if (__wt_txn_tw_start_visible_all(session, &cbt->upd_value->tw))
@@ -386,13 +462,13 @@ __curversion_next_single_key(WT_CURSOR *cursor)
                     if (WT_TIME_WINDOW_HAS_STOP_PREPARE(&cbt->upd_value->tw))
                         goto skip_on_page;
 
-                    if (version_cursor->upd_stop_prepared) {
+                    if (__curversion_stop_uses_prepare_ts(version_cursor)) {
                         if (cbt->upd_value->tw.stop_txn > version_cursor->upd_stop_txnid ||
                           cbt->upd_value->tw.stop_ts > version_cursor->upd_stop_prepare_ts)
                             goto skip_on_page;
                     } else {
                         if (cbt->upd_value->tw.stop_txn > version_cursor->upd_stop_txnid ||
-                          cbt->upd_value->tw.stop_ts > version_cursor->upd_stop_ts)
+                          cbt->upd_value->tw.stop_ts > version_cursor->curversion_stop_ts)
                             goto skip_on_page;
                     }
 
@@ -469,11 +545,12 @@ __curversion_next_single_key(WT_CURSOR *cursor)
               stop_prepared_id, WT_UPDATE_STANDARD, version_prepared, 0, WT_CURVERSION_DISK_IMAGE));
 
             version_cursor->upd_stop_txnid = cbt->upd_value->tw.start_txn;
-            version_cursor->upd_durable_stop_ts =
+            version_cursor->curversion_durable_stop_ts =
               WT_TIME_WINDOW_HAS_START_PREPARE(&(cbt->upd_value->tw)) ?
               cbt->upd_value->tw.start_prepare_ts :
               cbt->upd_value->tw.durable_start_ts;
-            version_cursor->upd_stop_ts = WT_TIME_WINDOW_HAS_START_PREPARE(&(cbt->upd_value->tw)) ?
+            version_cursor->curversion_stop_ts =
+              WT_TIME_WINDOW_HAS_START_PREPARE(&(cbt->upd_value->tw)) ?
               cbt->upd_value->tw.start_prepare_ts :
               cbt->upd_value->tw.start_ts;
             version_cursor->upd_stop_prepare_ts = cbt->upd_value->tw.start_prepare_ts;
@@ -490,12 +567,12 @@ skip_on_page:
       !F_ISSET(version_cursor, WT_CURVERSION_HS_EXHAUSTED)) {
         /*
          * We have already seen an update that is globally visible on the update chain. No need to
-         * return more updates.
+         * return more updates. Aborted updates are never globally visible.
          */
         if (F_ISSET(version_cursor, WT_CURVERSION_TIMESTAMP_ORDER) &&
-          !version_cursor->upd_stop_prepared &&
+          !version_cursor->upd_stop_prepared && version_cursor->upd_stop_txnid != WT_TXN_ABORTED &&
           __wt_txn_visible_all(
-            session, version_cursor->upd_stop_txnid, version_cursor->upd_durable_stop_ts))
+            session, version_cursor->upd_stop_txnid, version_cursor->curversion_durable_stop_ts))
             goto done;
 
         /* Ensure we can see all the content in the history store. */
@@ -552,10 +629,11 @@ skip_on_page:
             if (!F_ISSET(version_cursor, WT_CURVERSION_TIMESTAMP_ORDER))
                 break;
 
-            /* Skip all the updates that are duplicate to the previous updates returned. */
-            if (twp->stop_txn <= version_cursor->upd_stop_txnid &&
-              twp->stop_ts <= version_cursor->upd_stop_ts &&
-              twp->durable_stop_ts <= version_cursor->upd_durable_stop_ts)
+            /* Skip all non-aborted updates that are duplicate to the previous updates returned. */
+            if (version_cursor->upd_stop_txnid != WT_TXN_ABORTED &&
+              twp->stop_txn <= version_cursor->upd_stop_txnid &&
+              twp->stop_ts <= version_cursor->curversion_stop_ts &&
+              twp->durable_stop_ts <= version_cursor->curversion_durable_stop_ts)
                 break;
 
             WT_ERR(hs_cursor->prev(hs_cursor));
@@ -590,9 +668,9 @@ skip_on_page:
             WT_CURVERSION_HISTORY_STORE));
 
         version_cursor->upd_stop_txnid = twp->start_txn;
-        version_cursor->upd_durable_stop_ts =
+        version_cursor->curversion_durable_stop_ts =
           WT_TIME_WINDOW_HAS_START_PREPARE(twp) ? twp->start_prepare_ts : twp->durable_start_ts;
-        version_cursor->upd_stop_ts =
+        version_cursor->curversion_stop_ts =
           WT_TIME_WINDOW_HAS_START_PREPARE(twp) ? twp->start_prepare_ts : twp->start_ts;
         version_cursor->upd_stop_prepare_ts = twp->start_prepare_ts;
         version_cursor->upd_stop_prepared_id = twp->start_prepared_id;
@@ -633,8 +711,8 @@ __curversion_version_reset(WT_CURSOR_VERSION *version_cursor)
 
     /* Clear the information used to track update metadata. */
     version_cursor->upd_stop_txnid = WT_TXN_MAX;
-    version_cursor->upd_durable_stop_ts = WT_TS_NONE;
-    version_cursor->upd_stop_ts = WT_TS_MAX;
+    version_cursor->curversion_durable_stop_ts = WT_TS_NONE;
+    version_cursor->curversion_stop_ts = WT_TS_MAX;
     version_cursor->upd_stop_prepare_ts = WT_TS_MAX;
     version_cursor->upd_stop_prepared_id = WT_PREPARED_ID_NONE;
     version_cursor->upd_stop_prepared = false;
@@ -685,9 +763,13 @@ __curversion_skip_starting_updates(WT_SESSION_IMPL *session, WT_CURSOR_VERSION *
     }
 
     for (; upd != NULL; upd = upd->next) {
-        /* Skip aborted updates. */
-        if (upd->txnid == WT_TXN_ABORTED)
+        /* Skip aborted updates unless showing prepared rollbacks. */
+        if (upd->txnid == WT_TXN_ABORTED) {
+            if (F_ISSET(version_cursor, WT_CURVERSION_SHOW_PREPARED_ROLLBACK) &&
+              __curversion_is_prepare_rollback_value(upd))
+                break;
             continue;
+        }
 
         if (!F_ISSET(version_cursor, WT_CURVERSION_VISIBLE_ONLY))
             break;
@@ -705,8 +787,8 @@ __curversion_skip_starting_updates(WT_SESSION_IMPL *session, WT_CURSOR_VERSION *
 
     version_cursor->next_upd = upd;
     version_cursor->upd_stop_txnid = WT_TXN_MAX;
-    version_cursor->upd_durable_stop_ts = WT_TS_NONE;
-    version_cursor->upd_stop_ts = WT_TS_MAX;
+    version_cursor->curversion_durable_stop_ts = WT_TS_NONE;
+    version_cursor->curversion_stop_ts = WT_TS_MAX;
     version_cursor->upd_stop_prepare_ts = WT_TS_MAX;
     version_cursor->upd_stop_prepared_id = WT_PREPARED_ID_NONE;
     version_cursor->upd_stop_prepared = false;
@@ -976,8 +1058,8 @@ __wt_curversion_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner
 
     /* Initialize information used to track update metadata. */
     version_cursor->upd_stop_txnid = WT_TXN_MAX;
-    version_cursor->upd_durable_stop_ts = WT_TS_MAX;
-    version_cursor->upd_stop_ts = WT_TS_MAX;
+    version_cursor->curversion_durable_stop_ts = WT_TS_MAX;
+    version_cursor->curversion_stop_ts = WT_TS_MAX;
     version_cursor->upd_stop_prepare_ts = WT_TS_MAX;
     version_cursor->upd_stop_prepared_id = WT_PREPARED_ID_NONE;
 
@@ -1010,6 +1092,19 @@ __wt_curversion_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner
     }
 
     WT_ERR_NOTFOUND_OK(
+      __wt_config_gets_def(session, cfg, "debug.dump_version.show_prepared_rollback", 0, &cval),
+      true);
+    if (ret == 0) {
+        if (cval.val) {
+            if (!F_ISSET(file_btree, WT_BTREE_IN_MEMORY))
+                WT_ERR_MSG(session, EINVAL,
+                  "debug.dump_version.show_prepared_rollback is only supported for in-memory "
+                  "b-trees");
+            F_SET(version_cursor, WT_CURVERSION_SHOW_PREPARED_ROLLBACK);
+        }
+    }
+
+    WT_ERR_NOTFOUND_OK(
       __wt_config_gets_def(session, cfg, "debug.dump_version.start_timestamp", 0, &cval), true);
     if (ret == 0)
         WT_ERR(__wt_txn_parse_timestamp(
@@ -1018,8 +1113,8 @@ __wt_curversion_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner
         ret = 0;
 
     version_cursor->upd_stop_txnid = WT_TXN_MAX;
-    version_cursor->upd_durable_stop_ts = WT_TS_MAX;
-    version_cursor->upd_stop_ts = WT_TS_MAX;
+    version_cursor->curversion_durable_stop_ts = WT_TS_MAX;
+    version_cursor->curversion_stop_ts = WT_TS_MAX;
     version_cursor->upd_stop_prepare_ts = WT_TS_MAX;
     version_cursor->upd_stop_prepared_id = WT_PREPARED_ID_NONE;
 
