@@ -37,7 +37,8 @@ namespace mongo::classic_runtime_planner {
 
 MultiPlanner::MultiPlanner(PlannerData plannerData,
                            std::vector<std::unique_ptr<QuerySolution>> solutions,
-                           PlanExplainerData maybeExplainData)
+                           PlanExplainerData maybeExplainData,
+                           bool addingCBRChosenPlanToPlanCache)
     : ClassicPlannerInterface(std::move(plannerData), std::move(maybeExplainData)) {
     plan_cache_util::CacheMode shouldCache = plannerParams().replanningData.has_value()
         ? plannerParams().replanningData->shouldCache
@@ -47,7 +48,9 @@ MultiPlanner::MultiPlanner(PlannerData plannerData,
         collections().getMainCollectionPtrOrAcquisition(),
         cq(),
         plan_cache_util::ConditionalClassicPlanCacheWriter{
-            shouldCache, opCtx(), collections().getMainCollectionPtrOrAcquisition()});
+            shouldCache, opCtx(), collections().getMainCollectionPtrOrAcquisition()},
+        boost::none /* replanReason */,
+        addingCBRChosenPlanToPlanCache);
     for (auto&& solution : solutions) {
         solution->indexFilterApplied = plannerParams().indexFiltersApplied;
         auto executableTree = buildExecutableTree(*solution);
@@ -105,6 +108,10 @@ PlanExplainerData MultiPlanner::extractExplainData() {
 
 void MultiPlanner::abandonTrialsExceptHash(size_t hash) {
     _multiplanStage->abandonTrialsExceptHash(hash);
+}
+
+void MultiPlanner::stopCollectingMetrics() {
+    _multiplanStage->stopCollectingMetrics();
 }
 
 }  // namespace mongo::classic_runtime_planner

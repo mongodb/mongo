@@ -100,7 +100,8 @@ public:
                    CollectionAcquisition collection,
                    const CanonicalQuery* cq,
                    OnPickBestPlan onPickBestPlan,
-                   boost::optional<std::string> replanReason = boost::none);
+                   boost::optional<std::string> replanReason = boost::none,
+                   bool addingCBRChosenPlanToPlanCache = false);
 
     bool isEOF() const final;
 
@@ -220,6 +221,10 @@ public:
         return _isStateSaved;
     }
 
+    void stopCollectingMetrics() {
+        _shouldNotCollectMetrics = true;
+    }
+
 protected:
     void doSaveStateRequiresCollection() final {
         _isStateSaved = true;
@@ -315,6 +320,15 @@ private:
     MultiPlanStats _specificStats;
 
     bool _isStateSaved = false;
+
+    // When planning is performed by CBR, sometimes the winning plan is wrapped in a MultiPlanStage
+    // after being chosen in order to add the plan to the plan cache.
+    // In this case planning is already complete in the sense that a winning plan has already been
+    // chosen, so we do not want to collect metrics from this multiplanning stage (eg.
+    // query.multiplanner.choseWinningPlan does not make sense to update, because the winning plan
+    // had already been chosen by CBR). This boolean is used to conditionally increment metrics in
+    // order to prevent this.
+    bool _shouldNotCollectMetrics = false;
 };
 
 }  // namespace mongo

@@ -106,6 +106,10 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
     if (cbrResult.getValue().solutions.size() == 1) {
         // TODO SERVER-117373. Only if explain is needed.
         auto resultValue = std::move(cbrResult.getValue());
+
+        // Stop collecting MP metrics because at this point CBR has already chosen the winning plan.
+        _multiPlanner->stopCollectingMetrics();
+
         // TODO(SERVER-104684): Avoid abandoning the backup plan.
         _multiPlanner->abandonTrialsExceptHash(resultValue.solutions[0]->hash());
         auto remainingMultiPlannerWorksPerPlan =

@@ -1,7 +1,7 @@
 /**
- * Tests the serverStatus and FTDC metrics for CBR (Cost-Based Ranking) plan selection.
+ * Tests the serverStatus metrics for CBR (Cost-Based Ranking) plan selection.
  *
- * Verifies all query.cbr.* metrics under both samplingCE and automaticCE modes.
+ * Verifies all query.cbr.* metrics under automaticCE mode.
  *
  * @tags: [requires_fcv_83]
  */
@@ -60,7 +60,7 @@ function getPlanningMetrics() {
 
 coll.getPlanCache().clear();
 
-const automaticCETestFilter = {a: {$gte: 500}, b: {$lte: 700}};
+const nonProductiveFilterWithMultipleSolutions = {nonexistentField: {$exists: true}, a: 1, b: 1};
 
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryCBRCEMode: "automaticCE"}));
 
@@ -72,7 +72,7 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryCBRCEMode: "
     const mpBefore = getMultiPlannerMetrics();
     const planningBefore = getPlanningMetrics();
 
-    assert.commandWorked(coll.find(automaticCETestFilter).explain());
+    assert.commandWorked(coll.find(nonProductiveFilterWithMultipleSolutions).explain());
 
     const cbrAfter = getCBRMetrics();
     const mpAfter = getMultiPlannerMetrics();
@@ -126,7 +126,7 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryCBRCEMode: "
     const mpBefore = getMultiPlannerMetrics();
     const planningBefore = getPlanningMetrics();
 
-    assert.commandWorked(coll.find(automaticCETestFilter).explain());
+    assert.commandWorked(coll.find(nonProductiveFilterWithMultipleSolutions).explain());
 
     const cbrAfter = getCBRMetrics();
     const mpAfter = getMultiPlannerMetrics();
@@ -145,10 +145,9 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryCBRCEMode: "
     );
 
     // Multiplanner trial metrics should still be incremented (the initial capped trials did run).
-    // TODO SERVER-117932: Metrics should only have increased by 1 after duplicate tracking is fixed.
     assert.eq(
         mpAfter.classicCount,
-        mpBefore.classicCount + 2,
+        mpBefore.classicCount + 1,
         `multiPlanner.classicCount should increase by 1 for the capped trial. Previous value: ${mpBefore.classicCount} Current value: ${mpAfter.classicCount}`,
     );
 
@@ -157,6 +156,13 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryCBRCEMode: "
         planningAfter.invocationCount,
         planningBefore.invocationCount + 1,
         `planning.invocationCount should increase by 1 when CBR wins in automaticCE. Previous value: ${planningBefore.invocationCount} Current value: ${planningAfter.invocationCount}`,
+    );
+
+    // But multiPlanner.choseWinningPlan should NOT increase since CBR chose the winner.
+    assert.eq(
+        mpAfter.choseWinningPlan,
+        mpBefore.choseWinningPlan,
+        "multiPlanner.choseWinningPlan should not change when CBR wins",
     );
 
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlanEvaluationWorks: originalKnobValue}));

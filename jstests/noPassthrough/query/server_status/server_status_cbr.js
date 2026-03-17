@@ -1,7 +1,7 @@
 /**
  * Tests the serverStatus and FTDC metrics for CBR (Cost-Based Ranking) plan selection.
  *
- * Verifies all query.cbr.* metrics under both samplingCE and automaticCE modes.
+ * Verifies all query.cbr.* metrics under samplingCE mode.
  *
  * @tags: [requires_fcv_83]
  */
@@ -9,7 +9,6 @@
 // TODO (SERVER-121763): Move all server status tests to noPassthroughWithMongod
 
 import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
-import {getCBRConfig, restoreCBRConfig} from "jstests/libs/query/cbr_utils.js";
 
 function sumHistogramBucketCounts(histogram) {
     assert(
@@ -31,19 +30,6 @@ assert.neq(conn, null, "mongod failed to start");
 const db = conn.getDB(dbName);
 let coll = db.getCollection(collName);
 coll.drop();
-
-// Save original config for restoration at end of test.
-const prevCBRConfig = getCBRConfig(db);
-const prevQueryKnobs = assert.commandWorked(
-    db.adminCommand({
-        getParameter: 1,
-        internalQuerySamplingBySequentialScan: 1,
-        internalQueryPlanEvaluationWorks: 1,
-    }),
-);
-const prevFrameworkControl = assert.commandWorked(
-    db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}),
-).internalQueryFrameworkControl;
 
 // Enable CBR with samplingCE mode.
 assert.commandWorked(
@@ -136,11 +122,24 @@ function getPlanningMetrics() {
     return db.serverStatus().metrics.query.planning;
 }
 
+function assertMultiPlannerMetricsUnchanged(before, after) {
+    assert.eq(
+        before.classicCount,
+        after.classicCount,
+        `multiPlanner.classicCount should not have changed. Previous value: ${before.classicCount} Current value: ${after.classicCount}`,
+    );
+    assert.eq(
+        before.choseWinningPlan,
+        after.choseWinningPlan,
+        `multiPlanner.choseWinningPlan should not have changed. Previous value: ${before.choseWinningPlan} Current value: ${after.choseWinningPlan}`,
+    );
+}
+
 // ======================
 // samplingCE mode tests.
 // ======================
 
-// TODO SERVER-117932: Add checks that MP metrics don't accumulate when CBR chooses the winning plan.
+const nonProductiveFilterWithMultipleSolutions = {nonexistentField: {$exists: true}, a: 1, b: 1};
 
 // Verify all CBR metrics start at zero.
 {
@@ -167,52 +166,64 @@ function getPlanningMetrics() {
 // Run a query (via explain to avoid plan cache effects).
 {
     const planningBefore = getPlanningMetrics();
-    assert.commandWorked(coll.find({a: {$gte: 500}, b: {$lte: 700}}).explain());
+    const mpBefore = getMultiPlannerMetrics();
+
+    assert.commandWorked(coll.find(nonProductiveFilterWithMultipleSolutions).explain());
     const planningAfter = getPlanningMetrics();
 
     const cbrMetrics = getCBRMetrics();
     assertCBRCounterMetrics(cbrMetrics, 1);
     assertCBRHistogramMetrics(cbrMetrics, 1);
+
     assert.eq(
         cbrMetrics.choseWinningPlan,
         1,
         `cbr.choseWinningPlan should be 1 after first CBR invocation. Expected value: 1 Current value: ${cbrMetrics.choseWinningPlan}`,
     );
+
     assert.eq(
         planningAfter.invocationCount,
         planningBefore.invocationCount + 1,
         `planning.invocationCount should increase by 1 after first CBR explain. Previous value: ${planningBefore.invocationCount} Current value: ${planningAfter.invocationCount}`,
     );
+
+    // In samplingCE mode, no MultiPlanStage is used, so multiplanner metrics stay unchanged.
+    assertMultiPlannerMetricsUnchanged(mpBefore, getMultiPlannerMetrics());
 }
 
 // Run a second query to verify metrics accumulate.
 {
     const planningBefore = getPlanningMetrics();
-    assert.commandWorked(coll.find({a: {$gte: 100}, b: {$lte: 900}}).explain());
+    const mpBefore = getMultiPlannerMetrics();
+
+    assert.commandWorked(coll.find(nonProductiveFilterWithMultipleSolutions).explain());
     const planningAfter = getPlanningMetrics();
 
     const cbrMetrics = getCBRMetrics();
     assertCBRCounterMetrics(cbrMetrics, 2);
     assertCBRHistogramMetrics(cbrMetrics, 2);
+
     assert.eq(
         cbrMetrics.choseWinningPlan,
         2,
         `cbr.choseWinningPlan should be 2 after second CBR invocation. Expected value: 2 Current value: ${cbrMetrics.choseWinningPlan}`,
     );
+
     assert.eq(
         planningAfter.invocationCount,
         planningBefore.invocationCount + 1,
         `planning.invocationCount should increase by 1 after second CBR explain. Previous value: ${planningBefore.invocationCount} Current value: ${planningAfter.invocationCount}`,
     );
+
+    assertMultiPlannerMetricsUnchanged(mpBefore, getMultiPlannerMetrics());
 }
 
-// Run non-explain queries to populate the plan cache, then verify that cached execution
-// does NOT increment CBR metrics
+// Run non-explain queries to populate the plan cache, then verify that cached execution does NOT increment CBR or multiplanner metrics.
 {
     coll.getPlanCache().clear();
 
-    // First execution: triggers CBR, creates inactive cache entry.
-    coll.find({a: {$gte: 500}, b: {$lte: 700}}).toArray();
+    // First execution: creates inactive cache entry.
+    coll.find(nonProductiveFilterWithMultipleSolutions).toArray();
 
     const cbrAfterFirst = getCBRMetrics();
     assert.eq(
@@ -221,8 +232,8 @@ function getPlanningMetrics() {
         `cbr.count should be 3 after third invocation. Expected value: 3 Current value: ${cbrAfterFirst.count}`,
     );
 
-    // Second execution: triggers CBR again, will activate cache entry for next run.
-    coll.find({a: {$gte: 500}, b: {$lte: 700}}).toArray();
+    // Second execution: will activate cache entry for next run.
+    coll.find(nonProductiveFilterWithMultipleSolutions).toArray();
     const cbrAfterSecond = getCBRMetrics();
     assert.eq(
         4,
@@ -230,12 +241,13 @@ function getPlanningMetrics() {
         `cbr.count should increase by 1 after second execution. Previous value: ${cbrAfterFirst.count} Current value: ${cbrAfterSecond.count}`,
     );
 
-    // Third execution: uses the active cache entry.
+    // Third execution: uses the active cache entry. Neither CBR nor multiplanner should run.
+    const mpAfterSecond = getMultiPlannerMetrics();
     const planningBeforeThird = getPlanningMetrics();
-    coll.find({a: {$gte: 500}, b: {$lte: 700}}).toArray();
+    coll.find(nonProductiveFilterWithMultipleSolutions).toArray();
     const planningAfterThird = getPlanningMetrics();
-
     const cbrAfterThird = getCBRMetrics();
+
     assert.eq(
         4,
         cbrAfterThird.count,
@@ -246,6 +258,8 @@ function getPlanningMetrics() {
         planningBeforeThird.invocationCount,
         `planning.invocationCount should not change on cached plan execution. Previous value: ${planningBeforeThird.invocationCount} Current value: ${planningAfterThird.invocationCount}`,
     );
+
+    assertMultiPlannerMetricsUnchanged(mpAfterSecond, getMultiPlannerMetrics());
 }
 
 // Test: CBR metrics are available in FTDC

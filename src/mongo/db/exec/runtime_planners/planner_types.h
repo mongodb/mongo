@@ -104,7 +104,7 @@ struct PlanRankingResult {
     // 'work' metric (for example, selected by a non-multiplanner). Such plans must be
     // run in a pre-execution phase to measure the amount of work done to produce the
     // first batch, so they can be considered for insertion into the classic plan cache.
-    bool needsWorksMeasured = false;
+    bool needsWorksMeasuredForPlanCache = false;
 
     // Ranker strategies may involve execution; they can return execution-relevant state
     // here, and the caller can choose to resume execution from that point.

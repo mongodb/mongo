@@ -125,11 +125,10 @@ describe("MultiPlanner exit condition metrics get updated correctly", function (
                     // At low collFraction, CBR evaluation stops due to works budget, so hitWorksLimit should increment.
                     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: false}));
 
-                    // TODO SERVER-117932: Avoid updating MP metrics if plan was chosen by CBR.
                     assert.docEq(getStoppingCondition(0.1), {
                         hitEof: 0,
                         hitResultsLimit: 0,
-                        hitWorksLimit: 1,
+                        hitWorksLimit: 0,
                     });
                 });
 
@@ -138,9 +137,8 @@ describe("MultiPlanner exit condition metrics get updated correctly", function (
                     // With plan cache enabled, this should be reflected as hitEof.
                     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: false}));
 
-                    // TODO SERVER-117932: Avoid updating MP metrics if plan was chosen by CBR.
                     assert.docEq(getStoppingCondition(20.0), {
-                        hitEof: 1,
+                        hitEof: 0,
                         hitResultsLimit: 0,
                         hitWorksLimit: 0,
                     });

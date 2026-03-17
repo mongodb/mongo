@@ -85,7 +85,7 @@ TEST_F(CBRForNoMPResultsTest, SingleSolutionDoesNotUseMultiPlanner) {
     ASSERT_EQ(status.getValue().solutions.size(), 1);
     ASSERT_FALSE(status.getValue().maybeExplainData.has_value());
     ASSERT_EQ(strategy.getMultiPlanner(), boost::none);
-    ASSERT_EQ(status.getValue().needsWorksMeasured, false);
+    ASSERT_EQ(status.getValue().needsWorksMeasuredForPlanCache, false);
 
     ASSERT_FALSE(status.getValue().execState);
 }
@@ -133,7 +133,7 @@ TEST_F(CBRForNoMPResultsTest, EOFMultiPlannerMakesADecisionWithoutCBR) {
     ASSERT_EQ(stats->numResultsFound, 2);  // One result per plan
     ASSERT_EQ(stats->numCandidatePlans, 2);
     ASSERT_EQ(stats->totalWorks, 4);  // 2 works per plan (seek + advance)
-    ASSERT_EQ(status.getValue().needsWorksMeasured, false);
+    ASSERT_EQ(status.getValue().needsWorksMeasuredForPlanCache, false);
 
     ASSERT_TRUE(status.getValue().execState);
 }
@@ -166,7 +166,7 @@ TEST_F(CBRForNoMPResultsTest, BatchFilledMultiPlannerMakesADecisionWithoutCBR) {
     ASSERT_EQ(stats->numResultsFound, 200);  // Batch filled during trials
     ASSERT_EQ(stats->numCandidatePlans, 2);
     ASSERT_EQ(stats->totalWorks, 202);  // 2 * 101 works in each plan
-    ASSERT_EQ(status.getValue().needsWorksMeasured, false);
+    ASSERT_EQ(status.getValue().needsWorksMeasuredForPlanCache, false);
 
     ASSERT_TRUE(status.getValue().execState);
 }
@@ -198,7 +198,7 @@ TEST_F(CBRForNoMPResultsTest, LittleResultsMultiPlannerMakesADecisionWithoutCBR)
     ASSERT_EQ(stats->numResultsFound, 2);  // One per plan
     ASSERT_EQ(stats->numCandidatePlans, 2);
     ASSERT_EQ(stats->totalWorks, 20000);  // Each plan exhausted all credits (10k)
-    ASSERT_EQ(status.getValue().needsWorksMeasured, false);
+    ASSERT_EQ(status.getValue().needsWorksMeasuredForPlanCache, false);
 
     ASSERT_TRUE(status.getValue().execState);
 }
@@ -235,7 +235,7 @@ TEST_F(CBRForNoMPResultsTest, NoResultsMultiPlannerUsesCBR) {
     ASSERT_EQ(stats->numResultsFound, 0);
     ASSERT_EQ(stats->numCandidatePlans, 2);
     ASSERT_EQ(stats->totalWorks, 10002);
-    ASSERT_EQ(status.getValue().needsWorksMeasured, true);
+    ASSERT_EQ(status.getValue().needsWorksMeasuredForPlanCache, true);
 
     ASSERT_TRUE(status.getValue().execState);
     auto mp = dynamic_cast<MultiPlanStage*>(status.getValue().execState->root.get());

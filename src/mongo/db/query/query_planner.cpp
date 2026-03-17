@@ -1836,7 +1836,8 @@ StatusWith<PlanRankingResult> QueryPlanner::planWithCostBasedRanking(
     }
 
     // If only the best plan is in the accepted solutions, CBR successfully chose a winner.
-    if (acceptedSoln.size() == 1) {
+    bool successfullyChoseWinner = acceptedSoln.size() == 1;
+    if (successfullyChoseWinner) {
         cbrChoseWinningPlan.increment();
     }
 
@@ -1845,7 +1846,7 @@ StatusWith<PlanRankingResult> QueryPlanner::planWithCostBasedRanking(
         .maybeExplainData =
             PlanExplainerData{.rejectedPlansWithStages = std::move(rejectedSolnWithStages),
                               .estimates = std::move(estimates)},
-        .needsWorksMeasured = true};
+        .needsWorksMeasuredForPlanCache = successfullyChoseWinner};
 }
 
 /**

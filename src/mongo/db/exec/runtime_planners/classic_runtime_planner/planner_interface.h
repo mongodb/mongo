@@ -220,7 +220,8 @@ class MultiPlanner final : public ClassicPlannerInterface {
 public:
     MultiPlanner(PlannerData plannerData,
                  std::vector<std::unique_ptr<QuerySolution>> solutions,
-                 PlanExplainerData explainData);
+                 PlanExplainerData explainData,
+                 bool addingCBRChosenPlanToPlanCache = false);
 
     /**
      * Runs the trial period by working all candidate plans for as long as given in 'trialConfig'.
@@ -250,6 +251,11 @@ public:
      * purposes
      */
     PlanExplainerData extractExplainData();
+
+    /**
+     * Stops collecting multi-planning metrics.
+     */
+    void stopCollectingMetrics();
 
     /**
      * Abandons the trial period without picking a best plan thus rejecting all plans

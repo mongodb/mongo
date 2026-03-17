@@ -335,6 +335,10 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
         if (!trialsRunStatus.isOK()) {
             return trialsRunStatus;
         }
+
+        // While the multiplanner is being used to plan each branch of the query, it is not choosing
+        // the overall winning plan so we don't want to update metrics when we call pickBestPlan().
+        multiPlanStage->stopCollectingMetrics();
         Status planSelectStat = multiPlanStage->pickBestPlan();
         if (!planSelectStat.isOK()) {
             return planSelectStat;

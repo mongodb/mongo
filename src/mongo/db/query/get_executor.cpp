@@ -442,22 +442,21 @@ public:
             return rankerResult.getStatus();
         }
 
-        std::vector<std::unique_ptr<QuerySolution>> solutions =
-            std::move(rankerResult.getValue().solutions);
-        // The planner should have returned an error status if there are no solutions.
-        tassert(11413100, "No solutions!!", !solutions.empty());
+        auto& result = rankerResult.getValue();
 
-        if (1 == solutions.size()) {
+        // The planner should have returned an error status if there are no solutions.
+        tassert(11413100, "No solutions!!", !result.solutions.empty());
+
+        if (1 == result.solutions.size()) {
             if (!shouldMultiPlanForSingleSolution(rankerResult.getValue(), _cq)) {
                 // Only one possible plan. Build the stages from the solution.
-                solutions[0]->indexFilterApplied = _plannerParams->indexFiltersApplied;
-                return buildSingleSolutionPlan(std::move(solutions[0]),
-                                               std::move(rankerResult.getValue().maybeExplainData));
+                result.solutions[0]->indexFilterApplied = _plannerParams->indexFiltersApplied;
+                return buildSingleSolutionPlan(std::move(result.solutions[0]),
+                                               std::move(result.maybeExplainData));
             }
         }
 
-        return buildMultiPlan(std::move(solutions),
-                              std::move(rankerResult.getValue().maybeExplainData));
+        return buildMultiPlan(std::move(rankerResult.getValue()));
     }
 
     /**
@@ -492,13 +491,13 @@ public:
             !rankerResult.maybeExplainData->rejectedPlansWithStages.empty();
 
         // If there is rejected plans in the  result from 'rankPlans()' and the
-        // 'needsWorksMeasured' flag is set, we run the single CBR picked solution through
-        // multiplanner to measure its number of works and add the plan to the plan cache. If
-        // 'internalQueryDisablePlanCache' disables the plan cache, we will ignore
-        // 'needsWorksMeasured' and the number of rejected plans and instead only check whether
-        // we should force running the single solution plan through the multiplanner.
+        // 'needsWorksMeasuredForPlanCache' flag is set, we run the single CBR picked solution
+        // through multiplanner to measure its number of works and add the plan to the plan cache.
+        // If 'internalQueryDisablePlanCache' disables the plan cache, we will ignore
+        // 'needsWorksMeasuredForPlanCache' and the number of rejected plans and instead only check
+        // whether we should force running the single solution plan through the multiplanner.
         auto shouldMultiplanForCBRChosenPlan = !internalQueryDisablePlanCache.load() &&
-            hasRejectedPlans && rankerResult.needsWorksMeasured;
+            hasRejectedPlans && rankerResult.needsWorksMeasuredForPlanCache;
 
         // We will not cache for an explain command.
         if (!expCtx->getExplain().has_value() && shouldMultiplanForCBRChosenPlan) {
@@ -590,9 +589,7 @@ protected:
      *    * Or builds a PlanStage tree for each of the 'solutions' and stores them in the result
      *      object, if multi-planning is implemented as a standalone component.
      */
-    virtual std::unique_ptr<ResultType> buildMultiPlan(
-        std::vector<std::unique_ptr<QuerySolution>> solutions,
-        boost::optional<PlanExplainerData> maybeExplainData) = 0;
+    virtual std::unique_ptr<ResultType> buildMultiPlan(PlanRankingResult planRankingResult) = 0;
 
     /**
      * Helper for getting the QuerySolution hash from the plan caches.
@@ -814,14 +811,15 @@ private:
     }
 
     std::unique_ptr<ClassicRuntimePlannerResult> buildMultiPlan(
-        std::vector<std::unique_ptr<QuerySolution>> solutions,
-        boost::optional<PlanExplainerData> maybeExplainData) final {
+        PlanRankingResult planRankingResult) final {
         auto result = releaseResult();
         result->runtimePlanner = std::make_unique<crp_classic::MultiPlanner>(
             makePlannerData(),
-            std::move(solutions),
-            maybeExplainData.has_value() ? std::move(maybeExplainData.value())
-                                         : PlanExplainerData{});
+            std::move(planRankingResult.solutions),
+            planRankingResult.maybeExplainData.has_value()
+                ? std::move(planRankingResult.maybeExplainData.value())
+                : PlanExplainerData{},
+            planRankingResult.needsWorksMeasuredForPlanCache);
         return result;
     }
 
@@ -928,26 +926,27 @@ protected:
     }
 
     std::unique_ptr<SbeWithClassicRuntimePlanningResult> buildMultiPlan(
-        std::vector<std::unique_ptr<QuerySolution>> solutions,
-        boost::optional<PlanExplainerData> maybeExplainData) final {
+        PlanRankingResult planRankingResult) final {
         // TODO SERVER-92589: Support CBR with SBE plans
-        for (auto&& solution : solutions) {
+        for (auto&& solution : planRankingResult.solutions) {
             solution->indexFilterApplied = this->_plannerParams->indexFiltersApplied;
         }
 
-        if (solutions.size() > 1 ||
+        if (planRankingResult.solutions.size() > 1 ||
             // Search queries are not supported in classic multi-planner.
             (this->_cq->getExpCtxRaw()
                  ->getQueryKnobConfiguration()
                  .getUseMultiplannerForSingleSolutions() &&
              !this->_cq->isSearchQuery())) {
             auto result = this->releaseResult();
-            result->runtimePlanner = std::make_unique<crp_sbe::MultiPlanner>(
-                this->makePlannerData(), std::move(solutions), true /*shouldWriteToPlanCache*/);
+            result->runtimePlanner =
+                std::make_unique<crp_sbe::MultiPlanner>(this->makePlannerData(),
+                                                        std::move(planRankingResult.solutions),
+                                                        true /*shouldWriteToPlanCache*/);
             return result;
         } else {
-            return this->buildSingleSolutionPlan(std::move(solutions[0]),
-                                                 std::move(maybeExplainData));
+            return this->buildSingleSolutionPlan(std::move(planRankingResult.solutions[0]),
+                                                 std::move(planRankingResult.maybeExplainData));
         }
     }
 
