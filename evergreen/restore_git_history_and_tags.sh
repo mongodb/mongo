@@ -25,11 +25,19 @@ if [ -f .git/shallow ]; then
     # back to doing a blobless fetch instead.
     required_version="2.20.0"
     git_version=$(git --version | awk '{print $3}')
+    # Disable commit-graph writes during fetch. The unshallow --tags fetch pulls
+    # in tag objects (e.g. old WiredTiger tags) whose full commit ancestry is not
+    # fetched, so a commit-graph written here would reference missing objects and
+    # break later git commands.
+    no_commit_graph="-c gc.writeCommitGraph=false -c fetch.writeCommitGraph=false"
     if [ "$(printf '%s\n' "$required_version" "$git_version" | sort -V | head -n1)" = "$required_version" ]; then
-        $retry_git fetch origin --filter=tree:0 --unshallow --tags
+        $retry_git $no_commit_graph fetch origin --filter=tree:0 --unshallow --tags
     else
-        $retry_git fetch origin --filter=blob:none --unshallow --tags
+        $retry_git $no_commit_graph fetch origin --filter=blob:none --unshallow --tags
     fi
+
+    # If describing the commit still fails after restoring history, refetch tags.
+    git describe 2>/dev/null || $retry_git fetch origin --tags
 else
     # Sometimes the tags necessary to describe a commit don't
     # get fetched due to git version, so ensure they are.

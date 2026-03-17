@@ -104,14 +104,27 @@ def get_tags() -> list[str]:
     return list(gen_tags())
 
 
-@retry(tries=3, delay=5)
-def _show_with_retry(tag: str, path: str):
-    return check_output(["git", "show", f"{tag}:{path}"])
+# Partial clones can have a commit-graph that references commits not in the
+# local object database (e.g. old WiredTiger commits reachable only via tags
+# whose full ancestry wasn't fetched). Passing core.commitGraph=false tells
+# git to ignore this optional cache, avoiding "in the commit graph file but
+# not in the object database" errors.
+_GIT = ["git", "-c", "core.commitGraph=false"]
 
 
 @retry(tries=3, delay=5)
-def _fetch_with_retry(tags: list[str]):
-    return check_output(["git", "fetch", "origin", *tags])
+def _show_with_retry(tag: str, path: str) -> bytes:
+    return check_output([*_GIT, "show", f"{tag}:{path}"])
+
+
+@retry(tries=3, delay=5)
+def _fetch_with_retry(tags: list[str]) -> bytes:
+    return check_output([*_GIT, "fetch", "origin", *tags])
+
+
+@retry(tries=3, delay=5)
+def _ls_tree_with_retry(tag: str) -> bytes:
+    return check_output([*_GIT, "ls-tree", "--name-only", "-r", tag])
 
 
 def make_idl_directories(tags: list[str], destination: str) -> None:
@@ -126,7 +139,7 @@ def make_idl_directories(tags: list[str], destination: str) -> None:
     for tag in tags:
         LOGGER.info("Checking out IDL files in %s", tag)
         directory = os.path.join(destination, tag)
-        for path in check_output(["git", "ls-tree", "--name-only", "-r", tag]).decode().split():
+        for path in _ls_tree_with_retry(tag).decode().split():
             if not path.endswith(".idl"):
                 continue
 
@@ -157,6 +170,7 @@ def main():
     tags = get_tags()
     LOGGER.info("Fetching IDL files for past tags: %s", tags)
     assert len(tags) >= 2, "we must always have at least two tags to check"
+
     make_idl_directories(tags, args.destination)
 
 
