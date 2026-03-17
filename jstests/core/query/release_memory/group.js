@@ -27,29 +27,10 @@ import {getEngine, hasMergeCursors} from "jstests/libs/query/analyze_plan.js";
 import {
     accumulateServerStatusMetric,
     assertReleaseMemoryFailedWithCode,
+    runReleaseMemoryTestWithRetries,
     setAvailableDiskSpaceMode,
 } from "jstests/libs/release_memory_util.js";
-import {runWithRetries} from "jstests/libs/run_with_retries.js";
 import {setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
-
-// Helper function to retry a test.
-// This is useful because the spilling stats are global and can be affected by spuriously
-// running background/system queries that are not part of the actual test.
-// In case the returned global spilling stats are modified by outside queries and are not as
-// expected by the test, we simply retry a few times to wait out the effects of the background
-// activity on the spilling stats.
-// This is not a perfect solution, but helps to reduce test flakiness.
-const retry = (fn) => {
-    return runWithRetries(
-        fn,
-        (e) => {
-            jsTest.log.info("caught exception and will retry", e);
-            return true;
-        },
-        3 /* numRetries */,
-        500 /* initialBackoffMs */,
-    );
-};
 
 function getSpillCounter() {
     return accumulateServerStatusMetric(db, (metrics) => metrics.query.group.spills);
@@ -154,15 +135,15 @@ for (const pipeline of pipelines) {
         const expectedResults = coll.aggregate(pipeline, {"allowDiskUse": false}).toArray();
         const expectedResultsCount = expectedResults.length;
 
-        jsTest.log(`Testing collection ${coll.getName()} on pipeline: ${tojson(pipeline)}`);
+        jsTest.log.info(`Testing collection ${coll.getName()} on pipeline: ${tojson(pipeline)}`);
 
         {
-            jsTest.log(`Running no spill in first batch`);
+            jsTest.log.info(`Running no spill in first batch`);
 
             setServerParameter(sbeMemorySizeKnob, 100 * 1024 * 1024);
             setServerParameter(classicMemorySizeKnob, 100 * 1024 * 1024);
 
-            retry(() => {
+            runReleaseMemoryTestWithRetries(() => {
                 let initialSpillCount = getSpillCounter();
 
                 const cursor = coll.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
@@ -200,11 +181,11 @@ for (const pipeline of pipelines) {
 
         // Run query with increased spilling to spill while creating the first batch.
         {
-            jsTest.log(`Running spill in first batch`);
+            jsTest.log.info(`Running spill in first batch`);
             setServerParameter(sbeMemorySizeKnob, 1);
             setServerParameter(classicMemorySizeKnob, 1);
 
-            retry(() => {
+            runReleaseMemoryTestWithRetries(() => {
                 let initialSpillCount = getSpillCounter();
 
                 const cursor = coll.aggregate(pipeline, {allowDiskUse: true, cursor: {batchSize: 1}});
@@ -232,12 +213,12 @@ for (const pipeline of pipelines) {
 
         // Return all results in the first batch.
         {
-            jsTest.log(`Return all results in the first batch`);
+            jsTest.log.info(`Return all results in the first batch`);
 
             setServerParameter(sbeMemorySizeKnob, 100 * 1024 * 1024);
             setServerParameter(classicMemorySizeKnob, 100 * 1024 * 1024);
 
-            retry(() => {
+            runReleaseMemoryTestWithRetries(() => {
                 let initialSpillCount = getSpillCounter();
 
                 const cursor = coll.aggregate(pipeline, {
@@ -273,9 +254,9 @@ for (const pipeline of pipelines) {
                 expectedResults.length <= 128 &&
                 getEngine(explain) === "sbe";
             if (!willNotSpill) {
-                jsTest.log(`Running releaseMemory with no disk space available`);
+                jsTest.log.info(`Running releaseMemory with no disk space available`);
 
-                retry(() => {
+                runReleaseMemoryTestWithRetries(() => {
                     const cursor = coll.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
                     const cursorId = cursor.getId();
 
@@ -303,9 +284,9 @@ for (const pipeline of pipelines) {
 
         // Disallow spilling in group.
         {
-            jsTest.log(`Running releaseMemory with no allowDiskUse`);
+            jsTest.log.info(`Running releaseMemory with no allowDiskUse`);
 
-            retry(() => {
+            runReleaseMemoryTestWithRetries(() => {
                 const cursor = coll.aggregate(pipeline, {"allowDiskUse": false, cursor: {batchSize: 1}});
                 const cursorId = cursor.getId();
 

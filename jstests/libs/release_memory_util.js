@@ -1,4 +1,24 @@
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {runWithRetries} from "jstests/libs/run_with_retries.js";
+
+// Helper function to retry a test.
+// This is useful because the spilling stats are global and can be affected by spuriously
+// running background/system queries that are not part of the actual test.
+// In case the returned global spilling stats are modified by outside queries and are not as
+// expected by the test, we simply retry a few times to wait out the effects of the background
+// activity on the spilling stats.
+// This is not a perfect solution, but helps to reduce test flakiness.
+export function runReleaseMemoryTestWithRetries(fn) {
+    return runWithRetries(
+        fn,
+        (e) => {
+            jsTest.log.info("caught exception and will retry", e);
+            return true;
+        },
+        3 /* numRetries */,
+        500 /* initialBackoffMs */,
+    );
+}
 
 /**
  * Asserts that releaseMemory command failed for a given cursor with the appropriate code.
