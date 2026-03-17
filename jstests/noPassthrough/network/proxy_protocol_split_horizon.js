@@ -10,6 +10,7 @@
  * resolve the split horizon, returning the appropriate horizon-specific hostnames in its response.
  *
  * @tags: [
+ *   grpc_incompatible,
  *   multiversion_incompatible,
  *   requires_replication
  * ]
