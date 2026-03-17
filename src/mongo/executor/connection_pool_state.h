@@ -64,12 +64,6 @@ enum class ConnectionPoolState {
      * It is set by triggerShutdown() or updateController(). It is never unset.
      */
     kShutdown,
-    /**
-     * The pool has received an overload failure during a connection setup.
-     * New connection spawns will happen with a backoff-with-jitter delay until the next
-     * returned connection gets refreshed or a setup succeeds.
-     */
-    kThrottle,
 };
 
 }  // namespace MONGO_MOD_PUBLIC executor

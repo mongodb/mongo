@@ -32,7 +32,6 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/client/backoff_with_jitter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/logv2/log.h"
@@ -244,14 +243,6 @@ public:
         return getPool()->_options.maxConnections;
     }
 
-    Milliseconds baseEstablishmentBackoffMS() const override {
-        return getPool()->_options.baseEstablishmentBackoffMS;
-    }
-
-    Milliseconds maxEstablishmentBackoffMS() const override {
-        return getPool()->_options.maxEstablishmentBackoffMS;
-    }
-
     StringData name() const override {
         return "LimitController"_sd;
     }
@@ -412,6 +403,13 @@ public:
      * inUseConnections, and leasedConnections.
      */
     size_t openConnections(WithLock) const;
+
+    /**
+     * Returns the total number of connections currently fully established that belong to this
+     * pool. This is the sum of availableConnections, inUseConnections, leasedConnections,
+     * and processingConnections that are part of already established connections.
+     */
+    size_t establishedConnections(WithLock) const;
 
     /**
      * Returns the number of unfulfilled requests pending.
@@ -577,7 +575,7 @@ private:
     typename OwnershipPoolType::mapped_type takeFromPool(
         WithLock, OwnershipPoolType& pool, typename OwnershipPoolType::key_type connPtr);
 
-    OwnedConnection takeFromProcessingPool(WithLock, ConnectionInterface* connection);
+    OwnedConnection takeFromProcessingPool(WithLock, ConnectionInterface* connection, bool onSetup);
 
     // Update the health struct and related variables
     void updateHealth();
@@ -615,7 +613,6 @@ private:
     std::shared_ptr<TimerInterface> _eventTimer;
     Date_t _eventTimerExpiration;
     Date_t _hostExpiration;
-    Date_t _backoffPeriodEnd;
 
     // The _generation is the set of connection objects we believe are healthy.
     // It increases when we process a failure. If a connection is from a previous generation,
@@ -632,9 +629,11 @@ private:
 
     size_t _refreshed = 0;
 
-    bool _needsRefresh = false;
+    // Connections in the processing pool that were already previously established, as opposed to
+    // connections in the processing pool that are establising for the first time.
+    size_t _establishedConnectionsReprocessing = 0;
 
-    Status _lastStatusInThrottleMode = Status::OK();
+    bool _needsRefresh = false;
 
     AtomicWord<size_t> _neverUsed{0};
 
@@ -660,8 +659,6 @@ private:
 
     // The next id to be used when creating a new conneciton, is incremented each time
     ConnectionInterface::PoolConnectionId _nextConnectionId{0u};
-
-    BackoffWithJitter _backoffWithJitter;
 };
 
 auto ConnectionPool::SpecificPool::make(std::shared_ptr<ConnectionPool> parent,
@@ -934,13 +931,9 @@ ConnectionPool::SpecificPool::SpecificPool(std::shared_ptr<ConnectionPool> paren
       _sslMode(sslMode),
       _hostAndPort(hostAndPort),
       _id(_parent->_nextPoolId++),
-      _readyPool(std::numeric_limits<size_t>::max()),
-      _backoffWithJitter(_parent->_controller->baseEstablishmentBackoffMS(),
-                         _parent->_controller->maxEstablishmentBackoffMS()) {
+      _readyPool(std::numeric_limits<size_t>::max()) {
     invariant(_parent);
     _eventTimer = _parent->_factory->makeTimer();
-    // TODO (SERVER-110963) Remove this increment once this task is completed.
-    _backoffWithJitter.incrementAttemptCount();
 }
 
 ConnectionPool::SpecificPool::~SpecificPool() {
@@ -1000,6 +993,11 @@ Milliseconds ConnectionPool::SpecificPool::getTotalConnUsageTime(WithLock) const
 
 size_t ConnectionPool::SpecificPool::openConnections(WithLock) const {
     return _checkedOutPool.size() + _readyPool.size() + _processingPool.size() + _leasedPool.size();
+}
+
+size_t ConnectionPool::SpecificPool::establishedConnections(WithLock) const {
+    return _checkedOutPool.size() + _readyPool.size() + _leasedPool.size() +
+        _establishedConnectionsReprocessing;
 }
 
 size_t ConnectionPool::SpecificPool::requestsPending(WithLock) const {
@@ -1190,7 +1188,7 @@ void ConnectionPool::SpecificPool::finishRefresh(
     ConnectionInterface* connPtr,
     Status status,
     bool onSetup) {
-    auto conn = takeFromProcessingPool(lk, connPtr);
+    auto conn = takeFromProcessingPool(lk, connPtr, onSetup);
 
     // We increment the total number of refreshed connections right upfront to track all completed
     // refreshes.
@@ -1221,30 +1219,25 @@ void ConnectionPool::SpecificPool::finishRefresh(
         return;
     }
 
-    // If a new connection is being setup and we get a 'HostUnreachable' or a 'SocketException'
-    // error, we'll assume the host is overloaded. Therefore, we won't drop any open connection and
-    // will force a refresh when the next connection gets returned.
-    if (onSetup &&
-        (status.code() == ErrorCodes::HostUnreachable ||
-         status.code() == ErrorCodes::SocketException) &&
-        openConnections(lk) != 0 &&
-        (_state == ConnectionPoolState::kHealthy || _state == ConnectionPoolState::kThrottle)) {
-        _needsRefresh = true;
-        _lastStatusInThrottleMode = status;
-
-        if (_state != ConnectionPoolState::kThrottle) {
-            _state = ConnectionPoolState::kThrottle;
-            _backoffPeriodEnd = _parent->_factory->now() +
-                _backoffWithJitter.getBackoffDelayAndIncrementAttemptCount();
-        }
-
+    if (onSetup) {
         LOGV2_DEBUG(10864501,
                     kDiagnosticLogLevel,
                     "Unable to establish a new connection.",
                     "hostAndPort"_attr = _hostAndPort,
                     "error"_attr = redact(status),
                     "numOpenConns"_attr = openConnections(lk));
-        return;
+
+        // If a new connection fails to establish while there are already established connections in
+        // the pool, we'll react as if the connection was rejected by the target's rate limiter.
+        // Therefore, we won't drop any open connection and will instead force a refresh when the
+        // next connection gets returned to determine whether this was the case.
+        if ((status.code() == ErrorCodes::HostUnreachable ||
+             status.code() == ErrorCodes::SocketException ||
+             status.code() == ErrorCodes::NetworkTimeout) &&
+            establishedConnections(lk) > 0) {
+            _needsRefresh = true;
+            return;
+        }
     }
 
     // Pass a failure on through
@@ -1262,13 +1255,6 @@ void ConnectionPool::SpecificPool::finishRefresh(
                 kDiagnosticLogLevel,
                 "Finishing connection refresh",
                 "hostAndPort"_attr = _hostAndPort);
-
-    if (_state == ConnectionPoolState::kThrottle) {
-        _state = ConnectionPoolState::kHealthy;
-        _backoffWithJitter.reset();
-        // TODO (SERVER-110963) Remove this increment once this task is completed.
-        _backoffWithJitter.incrementAttemptCount();
-    }
 
     // If the connection refreshed successfully, throw it back in the ready pool
     addToReady(lk, std::move(conn));
@@ -1348,6 +1334,7 @@ void ConnectionPool::SpecificPool::returnConnection(
         }
 
         _processingPool[connPtr] = std::move(conn);
+        ++_establishedConnectionsReprocessing;
 
         LOGV2_DEBUG(
             22568, kDiagnosticLogLevel, "Refreshing connection", "hostAndPort"_attr = _hostAndPort);
@@ -1468,6 +1455,7 @@ void ConnectionPool::SpecificPool::processFailure(
         }
     }
     _processingPool.clear();
+    _establishedConnectionsReprocessing = 0;
 
     // Mark ourselves as failed so we don't immediately respawn
     if (_state != ConnectionPoolState::kShutdown) {
@@ -1564,8 +1552,6 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::setGetCon
 
 // spawn enough connections to satisfy open requests and minpool, while honoring maxpool
 void ConnectionPool::SpecificPool::spawnConnections(WithLock lk) {
-    const auto now = _parent->_factory->now();
-
     if (_state == ConnectionPoolState::kShutdown) {
         // Dead pools spawn no conns
         return;
@@ -1579,19 +1565,6 @@ void ConnectionPool::SpecificPool::spawnConnections(WithLock lk) {
         return;
     }
 
-    if (_state == ConnectionPoolState::kThrottle) {
-        if (_backoffPeriodEnd > now) {
-            LOGV2_DEBUG(10864502,
-                        kDiagnosticLogLevel,
-                        "Pool is in throttling mode, postponing any attempts to spawn connections"
-                        "connections",
-                        "hostAndPort"_attr = _hostAndPort);
-            return;
-        }
-
-        _backoffPeriodEnd = now + _backoffWithJitter.getBackoffDelayAndIncrementAttemptCount();
-    }
-
     auto controls = _parent->_controller->getControls(_id);
     LOGV2_DEBUG(22575,
                 kDiagnosticLogLevel,
@@ -1599,11 +1572,8 @@ void ConnectionPool::SpecificPool::spawnConnections(WithLock lk) {
                 "hostAndPort"_attr = _hostAndPort,
                 "poolControls"_attr = controls);
 
-    const auto maxPendingConnections =
-        (_state == ConnectionPoolState::kThrottle ? 1 : controls.maxPendingConnections);
-
     auto pendingConnections = refreshingConnections(lk);
-    if (pendingConnections >= maxPendingConnections) {
+    if (pendingConnections >= controls.maxPendingConnections) {
         return;
     }
 
@@ -1619,7 +1589,7 @@ void ConnectionPool::SpecificPool::spawnConnections(WithLock lk) {
                 "hostAndPort"_attr = _hostAndPort);
 
     auto allowance = std::min(controls.targetConnections - totalConnections,
-                              maxPendingConnections - pendingConnections);
+                              controls.maxPendingConnections - pendingConnections);
     LOGV2_DEBUG(22577,
                 kDiagnosticLogLevel,
                 "Spawning connections",
@@ -1665,9 +1635,12 @@ typename OwnershipPoolType::mapped_type ConnectionPool::SpecificPool::takeFromPo
 }
 
 ConnectionPool::SpecificPool::OwnedConnection ConnectionPool::SpecificPool::takeFromProcessingPool(
-    WithLock lk, ConnectionInterface* connPtr) {
+    WithLock lk, ConnectionInterface* connPtr, bool onSetup) {
     auto conn = takeFromPool(lk, _processingPool, connPtr);
     if (conn) {
+        if (!onSetup) {
+            _establishedConnectionsReprocessing--;
+        }
         return conn;
     }
 
@@ -1718,11 +1691,6 @@ void ConnectionPool::SpecificPool::updateEventTimer() {
         nextEventTime = _requests.begin()->first;
     }
 
-    // If the backoff period is going to end before the next event, then it is the next event
-    if (_state == ConnectionPoolState::kThrottle && _backoffPeriodEnd < nextEventTime) {
-        nextEventTime = _backoffPeriodEnd;
-    }
-
     // Clamp next event time to be either now or in the future. Next event time
     // can be in the past anytime we wait a long time between invocations of
     // updateState; in these cases, we want to set our event timer to expire
@@ -1758,14 +1726,10 @@ void ConnectionPool::SpecificPool::updateEventTimer() {
             _lastActiveTime = now;
         }
 
-        const Status error = (_state == ConnectionPoolState::kThrottle
-                                  ? _lastStatusInThrottleMode
-                                  : Status(ErrorCodes::PooledConnectionAcquisitionExceededTimeLimit,
-                                           "Couldn't get a connection within the time limit"));
-
         ScopedUnlock guard(lk);
         for (auto& promise : toError) {
-            promise.setError(error);
+            promise.setError(Status(ErrorCodes::PooledConnectionAcquisitionExceededTimeLimit,
+                                    "Couldn't get a connection within the time limit"));
         }
     });
     _eventTimer->setTimeout(timeout, std::move(deferredStateUpdateFunc));

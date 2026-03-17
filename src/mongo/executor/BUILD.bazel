@@ -312,7 +312,6 @@ mongo_cc_library(
         ":connection_pool_stats",
         ":egress_connection_closer_manager",
         ":remote_command",
-        "//src/mongo/client:backoff_with_jitter",
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/util/net:network",
@@ -510,6 +509,7 @@ mongo_cc_unit_test(
 mongo_cc_integration_test(
     name = "executor_integration_test",
     srcs = [
+        "egress_connection_pool_rate_limiter_resilience_integration_test.cpp",
         "executor_integration_test_fixture.cpp",
         "exhaust_response_reader_integration_test.cpp",
         "network_interface_integration_test.cpp",

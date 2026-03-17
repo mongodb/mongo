@@ -112,8 +112,6 @@ public:
     static constexpr Milliseconds kDefaultRefreshRequirement = Minutes(1);
     static constexpr Milliseconds kDefaultRefreshTimeout = Seconds(20);
     static constexpr Milliseconds kHostRetryTimeout = Seconds(1);
-    static constexpr Milliseconds kDefaultBaseEstablishmentBackoffMS = Milliseconds(50);
-    static constexpr Milliseconds kDefaultMaxEstablishmentBackoffMS = Seconds(10);
 
     /**
      * Default value for limiting the size of a connection requests queue.
@@ -167,16 +165,6 @@ public:
          * out connections or new requests
          */
         Milliseconds hostTimeout = kDefaultHostTimeout;
-
-        /**
-         * The base backoff delay for connection establishment retries for each specific pool.
-         */
-        Milliseconds baseEstablishmentBackoffMS = kDefaultBaseEstablishmentBackoffMS;
-
-        /**
-         * The maximum backoff delay for connection establishment retries for each specific pool.
-         */
-        Milliseconds maxEstablishmentBackoffMS = kDefaultMaxEstablishmentBackoffMS;
 
         /**
          * An egress tag closer manager which will provide global access to this connection pool.
@@ -572,9 +560,6 @@ public:
 
     virtual size_t connectionRequestsMaxQueueDepth() const = 0;
     virtual size_t maxConnections() const = 0;
-
-    virtual Milliseconds baseEstablishmentBackoffMS() const = 0;
-    virtual Milliseconds maxEstablishmentBackoffMS() const = 0;
 
     /**
      * Get the name for this controller

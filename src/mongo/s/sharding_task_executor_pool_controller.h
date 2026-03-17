@@ -127,9 +127,6 @@ public:
 
         AtomicWord<int> minConnectionsForConfigServers;
         AtomicWord<int> maxConnectionsForConfigServers;
-
-        AtomicWord<int> baseEstablishmentBackoffMS;
-        AtomicWord<int> maxEstablishmentBackoffMS;
     };
 
     static inline Parameters gParameters;
@@ -173,9 +170,6 @@ public:
 
     size_t connectionRequestsMaxQueueDepth() const override;
     size_t maxConnections() const override;
-
-    Milliseconds baseEstablishmentBackoffMS() const override;
-    Milliseconds maxEstablishmentBackoffMS() const override;
 
     StringData name() const override {
         return "ShardingTaskExecutorPoolController"_sd;

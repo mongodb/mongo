@@ -1999,7 +1999,7 @@ TEST_F(ConnectionPoolTest, SetupTimeoutsDontFailOtherPendingRequestsWhenPoolIsNo
     // The attempt to get a connection times out on acquisitionTimeout
     PoolImpl::setNow(now + acquisitionTimeout);
     ASSERT(conn1);
-    ASSERT_EQ(conn1->getStatus(), ErrorCodes::HostUnreachable);
+    ASSERT_EQ(conn1->getStatus(), ErrorCodes::PooledConnectionAcquisitionExceededTimeLimit);
 }
 
 /**
@@ -2643,98 +2643,28 @@ TEST_F(ConnectionPoolTest, SetupTimeoutsShouldNotDropOpenConnections) {
         }
     });
 
-    // Setup connections fail with 'HostUnreachable' and 'SocketException'. None of this errors
-    // should drop available connections.
+    // Setup connections fail with 'HostUnreachable' and 'SocketException'. None of these errors
+    // should drop available connections. The pool spawns replacement connections for each failure.
     ConnectionImpl::pushSetup(Status(ErrorCodes::HostUnreachable, ""));
     ConnectionImpl::pushSetup(Status(ErrorCodes::SocketException, ""));
 
-    // Verify that there is still one available connection
+    // Verify that there is still one available connection and the pool maintains the target
+    // number of refreshing connections.
     {
         const auto connStats = getStats(pool);
         ASSERT_EQ(1, connStats.totalInUse);
         ASSERT_EQ(1, connStats.totalAvailable);
-        ASSERT_EQ(1, connStats.totalRefreshing);
+        ASSERT_EQ(3, connStats.totalRefreshing);
     }
 
     // Contrarily, when a setup connection fails with another error, the available connection gets
     // dropped.
-    ConnectionImpl::pushSetup(Status(ErrorCodes::NetworkTimeout, ""));
+    ConnectionImpl::pushSetup(Status(ErrorCodes::NetworkInterfaceExceededTimeLimit, ""));
     {
         const auto connStats = getStats(pool);
         ASSERT_EQ(1, connStats.totalInUse);
         ASSERT_EQ(0, connStats.totalRefreshing);
         ASSERT_EQ(0, connStats.totalAvailable);
-    }
-}
-
-TEST_F(ConnectionPoolTest, MaxPendingConnectionsIsOneWhenASetupTimesOutAndPoolIsNotEmpty) {
-
-    // Set a deterministic value for the delay to spawning new connections after a HostUnreachable
-    // error.
-    const auto backOffDelayMs = 1000;
-    FailPointEnableBlock fp{"setBackoffDelayForTesting", BSON("backoffDelayMs" << backOffDelayMs)};
-
-    boost::optional<StatusWith<ConnectionPool::ConnectionHandle>> connToTriggerSetup;
-
-    auto startTimePoint = Date_t::now();
-    PoolImpl::setNow(startTimePoint);
-
-    auto [pool, inUseConnections] = setupConnectionPool(
-        1,
-        1,
-        3,
-        [&](ConnectionPool::Options& options) { options.refreshTimeout = Seconds(100); },
-        [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
-            connToTriggerSetup = std::move(swConn);
-        });
-
-    ON_BLOCK_EXIT([&]() {
-        for (auto& conn : inUseConnections) {
-            doneWith(conn);
-        }
-
-        if (connToTriggerSetup && connToTriggerSetup->isOK()) {
-            doneWith(connToTriggerSetup->getValue());
-        }
-    });
-
-    // There should be three setup connections trying to refresh.
-    {
-        const auto connStats = getStats(pool);
-        ASSERT_EQ(1, connStats.totalInUse);
-        ASSERT_EQ(3, connStats.totalRefreshing);
-        ASSERT_EQ(1, connStats.totalAvailable);
-    }
-
-    // Make them fail with a HostUnreachable error, which will enable the kThrottling mode.
-    ConnectionImpl::pushSetup(Status(ErrorCodes::HostUnreachable, ""));
-    ConnectionImpl::pushSetup(Status(ErrorCodes::HostUnreachable, ""));
-    ConnectionImpl::pushSetup(Status(ErrorCodes::HostUnreachable, ""));
-
-    // Since we entered in BackOff mode, no connection should be immediately spawned.
-    {
-        const auto connStats = getStats(pool);
-        ASSERT_EQ(1, connStats.totalInUse);
-        ASSERT_EQ(0, connStats.totalRefreshing);
-        ASSERT_EQ(1, connStats.totalAvailable);
-    }
-
-    PoolImpl::setNow(startTimePoint + Milliseconds(backOffDelayMs));
-
-    {
-        const auto connStats = getStats(pool);
-        ASSERT_EQ(1, connStats.totalInUse);
-        ASSERT_EQ(1, connStats.totalRefreshing);
-        ASSERT_EQ(1, connStats.totalAvailable);
-    }
-
-    // When the setup succeeds, the maxPendingConnections is set back to its initial value
-    ConnectionImpl::pushSetup(Status::OK());
-    {
-        const auto connStats = getStats(pool);
-        ASSERT_EQ(1, connStats.totalInUse);
-        ASSERT_EQ(2, connStats.totalRefreshing);
-        ASSERT_EQ(2, connStats.totalAvailable);
     }
 }
 
@@ -2759,10 +2689,6 @@ TEST_F(ConnectionPoolTest, ForceAnImmediateRefreshWhenSetupTimesout) {
         }
     });
 
-    // Set a deterministic value for the delay to spawning new connections after a HostUnreachable
-    // error.
-    FailPointEnableBlock fp{"setBackoffDelayForTesting", BSON("backoffDelayMs" << 200)};
-
     {
         const auto connStats = getStats(pool);
         ASSERT_EQ(1, connStats.totalInUse);
@@ -2777,7 +2703,7 @@ TEST_F(ConnectionPoolTest, ForceAnImmediateRefreshWhenSetupTimesout) {
         const auto connStats = getStats(pool);
         ASSERT_EQ(1, connStats.totalInUse);
         ASSERT_EQ(1, connStats.totalAvailable);
-        ASSERT_EQ(0, connStats.totalRefreshing);
+        ASSERT_EQ(1, connStats.totalRefreshing);
     }
 
     // Return one connection
@@ -2794,94 +2720,9 @@ TEST_F(ConnectionPoolTest, ForceAnImmediateRefreshWhenSetupTimesout) {
         const auto connStats = getStats(pool);
         ASSERT_EQ(0, connStats.totalInUse);
         ASSERT_EQ(1, connStats.totalAvailable);
-        ASSERT_EQ(1, connStats.totalRefreshing);
+        ASSERT_EQ(2, connStats.totalRefreshing);
     }
 }
-
-TEST_F(ConnectionPoolTest, BackOffWhenSetupTimesOutAndPoolIsNotEmpty) {
-    boost::optional<StatusWith<ConnectionPool::ConnectionHandle>> connToTriggerSetup;
-
-    // Set a deterministic value for the delay to spawning new connections after a HostUnreachable
-    // error.
-    const auto backOffDelayMs = 1000;
-    FailPointEnableBlock fp{"setBackoffDelayForTesting", BSON("backoffDelayMs" << backOffDelayMs)};
-
-    const auto refreshTimeout = Seconds(2);
-
-    const auto startTimePoint = Date_t::now();
-    PoolImpl::setNow(startTimePoint);
-
-    auto [pool, inUseConnections] = setupConnectionPool(
-        1,
-        1,
-        1,
-        [&](ConnectionPool::Options& options) {
-            options.refreshTimeout = refreshTimeout;
-            options.refreshRequirement = Seconds(100);
-        },
-        [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
-            connToTriggerSetup = std::move(swConn);
-        });
-
-    ON_BLOCK_EXIT([&]() {
-        for (auto& conn : inUseConnections) {
-            doneWith(conn);
-        }
-
-        if (connToTriggerSetup && connToTriggerSetup->isOK()) {
-            doneWith(connToTriggerSetup->getValue());
-        }
-    });
-
-    // Setup times out
-    const auto setupFailureTimePoint = startTimePoint + refreshTimeout;
-    PoolImpl::setNow(setupFailureTimePoint);
-
-    // We should not see an immediate spawn of a new connection
-    {
-        const auto connStats = getStats(pool);
-        ASSERT_EQ(1, connStats.totalInUse);
-        ASSERT_EQ(1, connStats.totalAvailable);
-        ASSERT_EQ(0, connStats.totalRefreshing);
-    }
-
-    PoolImpl::setNow(setupFailureTimePoint + Milliseconds(backOffDelayMs) - Milliseconds(1));
-
-    // Still no refreshing connection
-    {
-        const auto connStats = getStats(pool);
-        ASSERT_EQ(1, connStats.totalInUse);
-        ASSERT_EQ(1, connStats.totalAvailable);
-        ASSERT_EQ(0, connStats.totalRefreshing);
-    }
-
-    // The connection won't be spawned even if a connection request kicks in
-    boost::optional<StatusWith<ConnectionPool::ConnectionHandle>> conn1;
-    pool->get_forTest(
-        HostAndPort(), Seconds(10), [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
-            conn1 = std::move(swConn);
-        });
-    ASSERT(conn1);
-
-    {
-        const auto connStats = getStats(pool);
-        ASSERT_EQ(2, connStats.totalInUse);
-        ASSERT_EQ(0, connStats.totalAvailable);
-        ASSERT_EQ(0, connStats.totalRefreshing);
-    }
-
-    // After the first backoff period, we should see a new setup attempt
-    PoolImpl::setNow(setupFailureTimePoint + Milliseconds(backOffDelayMs));
-    {
-        const auto connStats = getStats(pool);
-        ASSERT_EQ(2, connStats.totalInUse);
-        ASSERT_EQ(0, connStats.totalAvailable);
-        ASSERT_EQ(1, connStats.totalRefreshing);
-    }
-
-    doneWith(conn1->getValue());
-}
-
 
 TEST_F(ConnectionPoolTest, WhenARefreshFailsNewConnectionsAreSpawnedAfterHostTimeout) {
 
@@ -2964,11 +2805,6 @@ TEST_F(ConnectionPoolTest, WhenARefreshFailsNewConnectionsAreSpawnedOnNewConnect
 
     const auto refreshTimeout = Milliseconds(2);
     const auto refreshRequirement = Milliseconds(3);
-
-    // Set a deterministic value for the delay to spawning new connections after a HostUnreachable
-    // error. This delay should only be applied when the failed refresh originates from a setup
-    // connection. Therefore, it should not be triggered in this test.
-    FailPointEnableBlock fp{"setBackoffDelayForTesting", BSON("backoffDelayMs" << 50000)};
 
     const auto startTimePoint = Date_t::now();
     PoolImpl::setNow(startTimePoint);
@@ -3085,21 +2921,74 @@ TEST_F(ConnectionPoolTest, FailedPoolReportsFailedState) {
               static_cast<int>(ConnectionPoolState::kFailed));
 }
 
-TEST_F(ConnectionPoolTest, ThrottledPoolReportsThrottleState) {
-    boost::optional<StatusWith<ConnectionPool::ConnectionHandle>> connToTriggerSetup;
+TEST_F(ConnectionPoolTest, SetupFailureWithNoEstablishedConnectionsCausesPoolFailure) {
+    auto pool = makePool();
 
-    const auto refreshTimeout = Seconds(2);
-    const auto startTimePoint = Date_t::now();
-    PoolImpl::setNow(startTimePoint);
+    auto now = Date_t::now();
+    PoolImpl::setNow(now);
+
+    boost::optional<StatusWith<ConnectionPool::ConnectionHandle>> conn1;
+    pool->get_forTest(
+        HostAndPort(), Seconds(10), [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+            conn1 = std::move(swConn);
+        });
+
+    ConnectionImpl::pushSetup(Status(ErrorCodes::HostUnreachable, "host unreachable"));
+
+    ASSERT(conn1);
+    ASSERT(!conn1->isOK());
+    ASSERT_EQ(conn1->getStatus(), ErrorCodes::HostUnreachable);
+
+    auto stats = getStats(pool);
+    auto hostStats = stats.statsByHost.at(HostAndPort());
+    ASSERT_EQ(static_cast<int>(hostStats.poolState),
+              static_cast<int>(ConnectionPoolState::kFailed));
+}
+
+TEST_F(ConnectionPoolTest, SetupFailureWithMultiplePendingAndNoEstablishedCausesPoolFailure) {
+    ConnectionPool::Options options;
+    options.minConnections = 3;
+    options.maxConnections = 3;
+    options.maxConnecting = 3;
+    auto pool = makePool(options);
+
+    auto now = Date_t::now();
+    PoolImpl::setNow(now);
+
+    boost::optional<StatusWith<ConnectionPool::ConnectionHandle>> conn1;
+    pool->get_forTest(
+        HostAndPort(), Seconds(10), [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+            conn1 = std::move(swConn);
+        });
+
+    {
+        auto stats = getStats(pool);
+        auto hostStats = stats.statsByHost.at(HostAndPort());
+        ASSERT_EQ(0, hostStats.available);
+        ASSERT_EQ(0, hostStats.inUse);
+        ASSERT_EQ(3, hostStats.refreshing);
+    }
+
+    ConnectionImpl::pushSetup(Status(ErrorCodes::HostUnreachable, "host unreachable"));
+
+    ASSERT(conn1);
+    ASSERT(!conn1->isOK());
+    ASSERT_EQ(conn1->getStatus(), ErrorCodes::HostUnreachable);
+
+    auto stats = getStats(pool);
+    auto hostStats = stats.statsByHost.at(HostAndPort());
+    ASSERT_EQ(static_cast<int>(hostStats.poolState),
+              static_cast<int>(ConnectionPoolState::kFailed));
+}
+
+TEST_F(ConnectionPoolTest, MultipleConsecutiveSetupFailuresDoNotBlockNewConnections) {
+    boost::optional<StatusWith<ConnectionPool::ConnectionHandle>> connToTriggerSetup;
 
     auto [pool, inUseConnections] = setupConnectionPool(
         1,
-        1,
-        1,
-        [&](ConnectionPool::Options& options) {
-            options.refreshTimeout = refreshTimeout;
-            options.refreshRequirement = Seconds(100);
-        },
+        0,
+        3,
+        [&](ConnectionPool::Options& options) { options.refreshTimeout = Seconds(100); },
         [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
             connToTriggerSetup = std::move(swConn);
         });
@@ -3115,21 +3004,41 @@ TEST_F(ConnectionPoolTest, ThrottledPoolReportsThrottleState) {
     });
 
     {
-        auto stats = getStats(pool);
-        auto hostStats = stats.statsByHost.at(HostAndPort());
-        ASSERT_EQ(static_cast<int>(hostStats.poolState),
-                  static_cast<int>(ConnectionPoolState::kHealthy));
+        const auto connStats = getStats(pool);
+        ASSERT_EQ(1, connStats.totalInUse);
+        ASSERT_EQ(0, connStats.totalAvailable);
+        ASSERT_EQ(3, connStats.totalRefreshing);
     }
 
-    const auto setupFailureTimePoint = startTimePoint + refreshTimeout;
-    PoolImpl::setNow(setupFailureTimePoint);
-
+    // Push multiple HostUnreachable failures in sequence. The pool immediately spawns a
+    // replacement for each failed connection.
+    ConnectionImpl::pushSetup(Status(ErrorCodes::HostUnreachable, ""));
     {
-        auto stats = getStats(pool);
-        auto hostStats = stats.statsByHost.at(HostAndPort());
-        ASSERT_EQ(static_cast<int>(hostStats.poolState),
-                  static_cast<int>(ConnectionPoolState::kThrottle));
+        const auto connStats = getStats(pool);
+        ASSERT_EQ(1, connStats.totalInUse);
+        ASSERT_EQ(3, connStats.totalRefreshing);
     }
+
+    ConnectionImpl::pushSetup(Status(ErrorCodes::HostUnreachable, ""));
+    {
+        const auto connStats = getStats(pool);
+        ASSERT_EQ(1, connStats.totalInUse);
+        ASSERT_EQ(3, connStats.totalRefreshing);
+    }
+
+    ConnectionImpl::pushSetup(Status(ErrorCodes::HostUnreachable, ""));
+    {
+        const auto connStats = getStats(pool);
+        ASSERT_EQ(1, connStats.totalInUse);
+        ASSERT_EQ(3, connStats.totalRefreshing);
+    }
+
+    // Verify the pool is still healthy (not in failed state) because there's an established
+    // connection.
+    auto stats = getStats(pool);
+    auto hostStats = stats.statsByHost.at(HostAndPort());
+    ASSERT_EQ(static_cast<int>(hostStats.poolState),
+              static_cast<int>(ConnectionPoolState::kHealthy));
 }
 
 }  // namespace connection_pool_test_details
