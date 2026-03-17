@@ -224,6 +224,8 @@ functions:
         build_variant: ${build_variant}
         version_id: ${version_id}
         requester: ${requester}
+        github_pr_head_branch: ${github_pr_head_branch}
+        github_pr_base_branch: ${github_pr_base_branch}
       args:
         - "src/evergreen/bazel_test.sh"
 
@@ -1257,8 +1259,24 @@ functions:
     type: test
     params:
       binary: bash
+      env:
+        evergreen_remote_exec: ${evergreen_remote_exec|off}
+        author_email: ${author_email}
+        build_id: ${build_id}
+        distro_id: ${distro_id}
+        execution: ${execution}
+        project: ${project}
+        revision: ${revision}
+        revision_order_id: ${revision_order_id}
+        task_id: ${task_id}
+        task_name: ${task_name}
+        build_variant: ${build_variant}
+        version_id: ${version_id}
+        requester: ${requester}
+        github_pr_head_branch: ${github_pr_head_branch}
+        github_pr_base_branch: ${github_pr_base_branch}
       args:
-      - "src/evergreen/bazel_compile.sh"
+        - "src/evergreen/bazel_compile.sh"
 
   "bazel compile (gcc)":
   - *get_version_expansions
@@ -1284,8 +1302,24 @@ functions:
     type: test
     params:
       binary: bash
+      env:
+        evergreen_remote_exec: ${evergreen_remote_exec|off}
+        author_email: ${author_email}
+        build_id: ${build_id}
+        distro_id: ${distro_id}
+        execution: ${execution}
+        project: ${project}
+        revision: ${revision}
+        revision_order_id: ${revision_order_id}
+        task_id: ${task_id}
+        task_name: ${task_name}
+        build_variant: ${build_variant}
+        version_id: ${version_id}
+        requester: ${requester}
+        github_pr_head_branch: ${github_pr_head_branch}
+        github_pr_base_branch: ${github_pr_base_branch}
       args:
-      - "src/evergreen/bazel_run.sh"
+        - "src/evergreen/bazel_run.sh"
 
   "bazel run":
   - *get_version_expansions
