@@ -54,10 +54,6 @@ const AsyncResultsMergerParams& BlockingResultsMerger::asyncResultsMergerParams(
     return _arm->params();
 }
 
-void BlockingResultsMerger::setInitialHighWaterMark(const BSONObj& highWaterMark) {
-    _arm->setInitialHighWaterMark(highWaterMark);
-}
-
 void BlockingResultsMerger::recognizeControlEvents() {
     _arm->setNextHighWaterMarkDeterminingStrategy(
         NextHighWaterMarkDeterminingStrategyFactory::createForChangeStream(

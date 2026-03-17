@@ -78,6 +78,12 @@ static constexpr std::array<ErrorCodes::Error, 3> kSafeErrorCodesForRetrying{
     ErrorCodes::CursorNotFound};
 
 /**
+ * Error codes for which no kill command needs to be sent to the remote.
+ */
+static constexpr std::array<ErrorCodes::Error, 3> kCursorAlreadyDeadCodes = {
+    ErrorCodes::QueryPlanKilled, ErrorCodes::CursorKilled, ErrorCodes::CursorNotFound};
+
+/**
  * Returns an int less than 0 if 'leftSortKey' < 'rightSortKey', 0 if the two are equal, and an int
  * > 0 if 'leftSortKey' > 'rightSortKey' according to the pattern 'sortKeyPattern'.
  */
@@ -339,11 +345,6 @@ bool AsyncResultsMerger::checkHighWaterMarkIsMonotonicallyIncreasing(
     return compareSortKeys(current, proposed, sortKeyPattern) <= 0;
 }
 
-bool AsyncResultsMerger::checkHighWaterMarkIsMonotonicallyDecreasing(
-    const BSONObj& current, const BSONObj& proposed, const BSONObj& sortKeyPattern) {
-    return compareSortKeys(current, proposed, sortKeyPattern) >= 0;
-}
-
 void AsyncResultsMerger::addNewShardCursors(std::vector<RemoteCursor>&& newCursors,
                                             const ShardTag& tag) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -544,40 +545,30 @@ BSONObj AsyncResultsMerger::getHighWaterMark() {
             dassert(checkHighWaterMarkIsMonotonicallyIncreasing(
                 _highWaterMark, minPromisedSortKey->first, *_params.getSort()));
             _highWaterMark = std::move(minPromisedSortKey->first);
+            LOGV2_DEBUG(12163603,
+                        5,
+                        "Updated high water mark from min remote's min promised sort key",
+                        "highWaterMark"_attr = _highWaterMark,
+                        "remote"_attr = minRemote->shardId);
         }
     }
 
     // The high water mark is stored in sort-key format: {"": <high watermark>}. We only return
     // the <high watermark> part of the sort key, which looks like {_data: ..., _typeBits: ...}.
     tassert(11052303,
-            "Expected _highWaterMark to be either empty or of object type",
+            str::stream() << "Expected _highWaterMark to be either empty or of object type, got "
+                          << _highWaterMark,
             _highWaterMark.isEmpty() || _highWaterMark.firstElement().type() == BSONType::object);
     return _highWaterMark.isEmpty() ? BSONObj() : _highWaterMark.firstElement().Obj().getOwned();
 }
 
-void AsyncResultsMerger::setInitialHighWaterMark(const BSONObj& highWaterMark) {
-    _setHighWaterMark(
-        highWaterMark, "setInitialHighWaterMark"_sd, true /* mustBeMonotonicallyIncreasing */);
-}
-
 void AsyncResultsMerger::setHighWaterMark(const BSONObj& highWaterMark) {
-    _setHighWaterMark(
-        highWaterMark, "setHighWaterMark"_sd, false /* mustBeMonotonicallyIncreasing */);
-}
-
-void AsyncResultsMerger::_setHighWaterMark(const BSONObj& highWaterMark,
-                                           StringData context,
-                                           bool mustBeMonotonicallyIncreasing) {
     // Extra wrapping necessary here because the high water mark is stored in sort-key format: {"":
     // <high watermark>}.
     auto newHighWaterMark = BSON("" << highWaterMark);
+    LOGV2_DEBUG(12163600, 5, "Setting high water mark", "highWaterMark"_attr = newHighWaterMark);
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    if (mustBeMonotonicallyIncreasing) {
-        _ensureHighWaterMarkIsMonotonicallyIncreasing(_highWaterMark, newHighWaterMark, context);
-    } else {
-        _ensureHighWaterMarkIsMonotonicallyDecreasing(_highWaterMark, newHighWaterMark, context);
-    }
     _highWaterMark = std::move(newHighWaterMark);
 }
 
@@ -621,7 +612,10 @@ void AsyncResultsMerger::_removeRemoteFromPromisedMinSortKeys(WithLock,
                                                               const RemoteCursorPtr& remote) {
     if (remote->promisedMinSortKey) {
         std::size_t erased = _promisedMinSortKeys.erase({*remote->promisedMinSortKey, remote});
-        tassert(8456114, "Expected to find the promised min sort key in the set.", erased == 1);
+        tassert(8456114,
+                str::stream() << "Expected to find the promised min sort key in the set for remote "
+                              << remote->shardId,
+                erased == 1);
     }
 }
 
@@ -632,15 +626,6 @@ void AsyncResultsMerger::_ensureHighWaterMarkIsMonotonicallyIncreasing(const BSO
             str::stream() << "Cannot make high watermark go backwards (in " << context
                           << "()). Current: " << current << ", proposed: " << proposed,
             checkHighWaterMarkIsMonotonicallyIncreasing(current, proposed, *_params.getSort()));
-}
-
-void AsyncResultsMerger::_ensureHighWaterMarkIsMonotonicallyDecreasing(const BSONObj& current,
-                                                                       const BSONObj& proposed,
-                                                                       StringData context) const {
-    tassert(11057504,
-            str::stream() << "Cannot make high watermark go forward (in " << context
-                          << "()). Current: " << current << ", proposed: " << proposed,
-            checkHighWaterMarkIsMonotonicallyDecreasing(current, proposed, *_params.getSort()));
 }
 
 void AsyncResultsMerger::_rebuildMergeQueueFromRemainingRemotes(WithLock) {
@@ -678,6 +663,11 @@ void AsyncResultsMerger::_determineInitialHighWaterMark() {
     for (auto&& [minSortKey, remote] : _promisedMinSortKeys) {
         if (remote->eligibleForHighWaterMark) {
             _highWaterMark = minSortKey;
+            LOGV2_DEBUG(12163601,
+                        5,
+                        "Determined initial high water mark",
+                        "highWaterMark"_attr = _highWaterMark,
+                        "remote"_attr = remote->shardId);
             break;
         }
     }
@@ -806,7 +796,7 @@ void AsyncResultsMerger::_processAdditionalTransactionParticipants(OperationCont
     }
 }
 
-AsyncResultsMerger::NextReadyResult AsyncResultsMerger::_nextReadySorted(WithLock) {
+AsyncResultsMerger::NextReadyResult AsyncResultsMerger::_nextReadySorted(WithLock lk) {
     // Tailable non-awaitData cursors cannot have a sort.
     tassert(11052305,
             "Tailable non-awaitData cursors must not have a sort",
@@ -846,7 +836,7 @@ AsyncResultsMerger::NextReadyResult AsyncResultsMerger::_nextReadySorted(WithLoc
     // For sorted tailable awaitData cursors, update the high water mark to the document's sort key.
     if (_tailableMode == TailableModeEnum::kTailableAndAwaitData &&
         smallestRemote->eligibleForHighWaterMark) {
-        _updateHighWaterMark(*std::get<ClusterQueryResult>(result).getResult());
+        _updateHighWaterMark(lk, *std::get<ClusterQueryResult>(result).getResult());
     }
 
     return result;
@@ -886,7 +876,7 @@ AsyncResultsMerger::NextReadyResult AsyncResultsMerger::_nextReadyUnsorted(WithL
     return NextReadyResult{};
 }
 
-void AsyncResultsMerger::_updateHighWaterMark(const BSONObj& value) {
+void AsyncResultsMerger::_updateHighWaterMark(WithLock, const BSONObj& value) {
     BSONObj nextHighWaterMark = (*_nextHighWaterMarkDeterminingStrategy)(value, _highWaterMark);
 
     LOGV2_DEBUG(10657528,
@@ -901,6 +891,7 @@ void AsyncResultsMerger::_updateHighWaterMark(const BSONObj& value) {
     dassert(checkHighWaterMarkIsMonotonicallyIncreasing(
         _highWaterMark, nextHighWaterMark, *_params.getSort()));
     _highWaterMark = std::move(nextHighWaterMark);
+    LOGV2_DEBUG(12163602, 5, "Updated high water mark", "highWaterMark"_attr = _highWaterMark);
 }
 
 boost::optional<Milliseconds> AsyncResultsMerger::_calculateEffectiveAwaitDataTimeout(
@@ -918,7 +909,10 @@ boost::optional<Milliseconds> AsyncResultsMerger::_calculateEffectiveAwaitDataTi
 BSONObj AsyncResultsMerger::_makeRequest(WithLock lk,
                                          const RemoteCursorData& remote,
                                          const ServerGlobalParams::FCVSnapshot& fcvSnapshot) const {
-    tassert(11052306, "Expected to not have outstanding requests", !remote.outstandingRequest);
+    tassert(11052306,
+            str::stream() << "Expected to not have outstanding requests for remote "
+                          << remote.shardId,
+            !remote.outstandingRequest);
 
     GetMoreCommandRequest getMoreRequest(remote.cursorId, std::string{remote.cursorNss.coll()});
     getMoreRequest.setBatchSize(_params.getBatchSize());
@@ -1632,10 +1626,10 @@ void AsyncResultsMerger::_scheduleKillCursorForRemote(WithLock lk,
 }
 
 bool AsyncResultsMerger::_shouldKillRemote(WithLock, const RemoteCursorData& remote) {
-    static const std::set<ErrorCodes::Error> kCursorAlreadyDeadCodes = {
-        ErrorCodes::QueryPlanKilled, ErrorCodes::CursorKilled, ErrorCodes::CursorNotFound};
     return remote.cursorId && !remote.exhausted() &&
-        !kCursorAlreadyDeadCodes.count(remote.status.code());
+        std::find(kCursorAlreadyDeadCodes.begin(),
+                  kCursorAlreadyDeadCodes.end(),
+                  remote.status.code()) == kCursorAlreadyDeadCodes.end();
 }
 
 SharedSemiFuture<void> AsyncResultsMerger::kill(OperationContext* opCtx) {

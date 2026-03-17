@@ -159,10 +159,6 @@ void MergeCursorsStage::setHighWaterMark(const BSONObj& highWaterMark) {
     _blockingResultsMerger->setHighWaterMark(highWaterMark);
 }
 
-void MergeCursorsStage::setInitialHighWaterMark(const BSONObj& highWaterMark) {
-    _blockingResultsMerger->setInitialHighWaterMark(highWaterMark);
-}
-
 void MergeCursorsStage::setNextHighWaterMarkDeterminingStrategy(
     NextHighWaterMarkDeterminingStrategyPtr nextHighWaterMarkDeterminer) {
     _blockingResultsMerger->setNextHighWaterMarkDeterminingStrategy(

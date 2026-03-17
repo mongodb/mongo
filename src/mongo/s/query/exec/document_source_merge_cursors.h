@@ -143,11 +143,6 @@ public:
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
     /**
-     * Set the initial high watermark to return when no cursors are tracked.
-     * */
-    void setInitialHighWaterMark(const BSONObj& highWaterMark);
-
-    /**
      * Set the strategy to determine the next high water mark.
      * Assumes that the 'AsyncResultsMerger' is in tailable, awaitData mode.
      */

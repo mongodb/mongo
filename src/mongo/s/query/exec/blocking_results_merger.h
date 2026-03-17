@@ -146,11 +146,6 @@ public:
     }
 
     /**
-     * Sets the initial high watermark to return when no cursors are tracked.
-     */
-    void setInitialHighWaterMark(const BSONObj& highWaterMark);
-
-    /**
      * Sets the current high water mark of the underlying 'AsyncResultsMerger'. Notably this allows
      * to set the high water mark to a timestamp earlier than the current high water mark.
      */

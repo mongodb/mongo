@@ -207,15 +207,6 @@ public:
                                                             const BSONObj& sortKeyPattern);
 
     /**
-     * Checks if the 'proposed' high water mark is less or equal to 'current' high water mark,
-     * w.r.t. to the 'sortKeyPattern'. Returns true if 'proposed' compares less or equal to
-     * 'current', false otherwise.
-     */
-    static bool checkHighWaterMarkIsMonotonicallyDecreasing(const BSONObj& current,
-                                                            const BSONObj& proposed,
-                                                            const BSONObj& sortKeyPattern);
-
-    /**
      * Returns true if there is no need to schedule remote work in order to take the next action.
      * This means that either
      *   --there is a buffered result which we can return,
@@ -345,15 +336,11 @@ public:
     BSONObj getHighWaterMark();
 
     /**
-     * Sets the initial high watermark to return when no cursors are tracked. It is not allowed to
-     * call this method with a high water mark with a timestamp earlier than the current high water
-     * mark.
-     */
-    void setInitialHighWaterMark(const BSONObj& highWaterMark);
-
-    /**
-     * Sets the current high water mark of the 'AsyncResultsMerger'. Notably this allows to set the
-     * high water mark to a timestamp earlier than the current high water mark.
+     * Unconditionally sets the current high water mark of the 'AsyncResultsMerger'.
+     * Called from change streams-specific code in the 'ChangeStreamsHandleTopologyChangeV2' stage,
+     * when the initial cursors for V2 change streams or opened. Also called for v2 change streams
+     * in degraded mode when reversing the high water mark to the resume token of an already
+     * returned event.
      */
     void setHighWaterMark(const BSONObj& highWaterMark);
 
@@ -634,26 +621,6 @@ private:
                                                        StringData context) const;
 
     /**
-     * Ensures that the high watermark token in 'proposed' compares equal or less to the high
-     * watermark token in 'proposed', compared to the internal sort key pattern. Tasserts if this
-     * assumption is violated.
-     */
-    void _ensureHighWaterMarkIsMonotonicallyDecreasing(const BSONObj& current,
-                                                       const BSONObj& proposed,
-                                                       StringData context) const;
-
-    /**
-     * Internal helper function to set the high water mark. If 'mustBeMonotonicallyIncreasing' is
-     * set to 'true', will validate that the timestamp contained in the high water mark is not be
-     * less than that of the current high water mark contained in '_highWaterMark'. If
-     * 'mustBeMonotonicallyIncreasing' is set to 'false', will validate that the timestamp contained
-     * in the high water mark will not be greater than that of the current high water mark.
-     */
-    void _setHighWaterMark(const BSONObj& highWaterMark,
-                           StringData context,
-                           bool mustBeMonotonicallyIncreasing);
-
-    /**
      * Parses the find or getMore command response object to a CursorResponse.
      *
      * Returns a non-OK response if the response fails to parse or if there is a cursor id mismatch.
@@ -682,7 +649,7 @@ private:
      * Updates the internal high water mark with the passed value, using the configured next high
      * watermark determining strategy.
      */
-    void _updateHighWaterMark(const BSONObj& value);
+    void _updateHighWaterMark(WithLock, const BSONObj& value);
 
     /**
      * Checks whether or not the remote cursors are all exhausted.
@@ -702,7 +669,7 @@ private:
     // Helpers for nextReady().
     //
 
-    NextReadyResult _nextReadySorted(WithLock);
+    NextReadyResult _nextReadySorted(WithLock lk);
     NextReadyResult _nextReadyUnsorted(WithLock);
 
     using CbData = executor::TaskExecutor::RemoteCommandCallbackArgs;

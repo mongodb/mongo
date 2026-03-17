@@ -1151,26 +1151,6 @@ TEST_F(AsyncResultsMergerTest, HighWaterMarkTestRecognizeControlEvents) {
     runHighWaterMarkTest(true /* recognizeControlEvents */);
 }
 
-DEATH_TEST_REGEX_F(AsyncResultsMergerTestDeathTest,
-                   SetInitialHighWaterMarkWithTimeGoingBackwards,
-                   "Tripwire assertion.*10359104") {
-    AsyncResultsMergerParams params = AsyncResultsMergerTest::buildARMParamsForChangeStream();
-    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
-
-    // No high water mark set initially.
-    ASSERT_BSONOBJ_EQ(BSONObj(), arm->getHighWaterMark());
-
-    // Inject a high water mark.
-    auto highWaterMark = makePostBatchResumeToken(Timestamp(42, 33));
-
-    arm->setInitialHighWaterMark(highWaterMark);
-    ASSERT_BSONOBJ_EQ(highWaterMark, arm->getHighWaterMark());
-
-    auto highWaterMarkBefore = makePostBatchResumeToken(Timestamp(42, 32));
-    ASSERT_THROWS_CODE(
-        arm->setInitialHighWaterMark(highWaterMarkBefore), AssertionException, 10359104);
-}
-
 TEST_F(AsyncResultsMergerTest, SetHighWaterMark) {
     AsyncResultsMergerParams params = AsyncResultsMergerTest::buildARMParamsForChangeStream();
     auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
@@ -1180,56 +1160,46 @@ TEST_F(AsyncResultsMergerTest, SetHighWaterMark) {
 
     // Inject a high water mark.
     auto highWaterMark = makePostBatchResumeToken(Timestamp(23, 99));
-    arm->setInitialHighWaterMark(highWaterMark);
-    ASSERT_BSONOBJ_EQ(highWaterMark, arm->getHighWaterMark());
-
-    // Set a lower high water mark again.
-    highWaterMark = makePostBatchResumeToken(Timestamp(23, 0));
     arm->setHighWaterMark(highWaterMark);
     ASSERT_BSONOBJ_EQ(highWaterMark, arm->getHighWaterMark());
 
     // Set same high water mark again.
-    highWaterMark = makePostBatchResumeToken(Timestamp(23, 0));
+    highWaterMark = makePostBatchResumeToken(Timestamp(23, 99));
+    arm->setHighWaterMark(highWaterMark);
+    ASSERT_BSONOBJ_EQ(highWaterMark, arm->getHighWaterMark());
+
+    // Set a higher high water mark.
+    highWaterMark = makePostBatchResumeToken(Timestamp(23, 100));
+    arm->setHighWaterMark(highWaterMark);
+    ASSERT_BSONOBJ_EQ(highWaterMark, arm->getHighWaterMark());
+
+    // Set another higher high water mark.
+    highWaterMark = makePostBatchResumeToken(Timestamp(24, 0));
     arm->setHighWaterMark(highWaterMark);
     ASSERT_BSONOBJ_EQ(highWaterMark, arm->getHighWaterMark());
 }
 
-DEATH_TEST_REGEX_F(AsyncResultsMergerTestDeathTest,
-                   SetHighWaterMarkToHigher,
-                   "Tripwire assertion.*11057504") {
+TEST_F(AsyncResultsMergerTest, SetHighWaterMarkToLowerWhenNoResultsWereReturned) {
     AsyncResultsMergerParams params = AsyncResultsMergerTest::buildARMParamsForChangeStream();
     auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
 
     // No high water mark set initially.
     ASSERT_BSONOBJ_EQ(BSONObj(), arm->getHighWaterMark());
 
-    // Inject a high water mark.
+    // Set initial high water mark.
     auto highWaterMark = makePostBatchResumeToken(Timestamp(23, 99));
-    arm->setInitialHighWaterMark(highWaterMark);
+    arm->setHighWaterMark(highWaterMark);
     ASSERT_BSONOBJ_EQ(highWaterMark, arm->getHighWaterMark());
 
-    // Try to set a higher high water mark.
-    highWaterMark = makePostBatchResumeToken(Timestamp(24, 0));
-    ASSERT_THROWS_CODE(arm->setHighWaterMark(highWaterMark), AssertionException, 11057504);
-}
-
-TEST_F(AsyncResultsMergerTest, SetHighWaterMarkWithTimeGoingBackwards) {
-    AsyncResultsMergerParams params = AsyncResultsMergerTest::buildARMParamsForChangeStream();
-    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
-
-    // No high water mark set initially.
-    ASSERT_BSONOBJ_EQ(BSONObj(), arm->getHighWaterMark());
-
-    // Inject a high water mark.
-    auto highWaterMark = makePostBatchResumeToken(Timestamp(42, 33));
-
-    arm->setInitialHighWaterMark(highWaterMark);
+    // Set a lower high water mark.
+    highWaterMark = makePostBatchResumeToken(Timestamp(23, 98));
+    arm->setHighWaterMark(highWaterMark);
     ASSERT_BSONOBJ_EQ(highWaterMark, arm->getHighWaterMark());
 
-    auto highWaterMarkBefore = makePostBatchResumeToken(Timestamp(42, 32));
-    arm->setHighWaterMark(highWaterMarkBefore);
-
-    ASSERT_BSONOBJ_EQ(highWaterMarkBefore, arm->getHighWaterMark());
+    // Set a higher high water mark.
+    highWaterMark = makePostBatchResumeToken(Timestamp(23, 100));
+    arm->setHighWaterMark(highWaterMark);
+    ASSERT_BSONOBJ_EQ(highWaterMark, arm->getHighWaterMark());
 }
 
 TEST_F(AsyncResultsMergerTest, HandleControlEventsWithUniqueTimestamps) {
@@ -4101,7 +4071,7 @@ TEST_F(AsyncResultsMergerTest, UndoNextReadySortedTailable) {
     params.setSort(change_stream_constants::kSortSpec);
 
     auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
-    arm->setInitialHighWaterMark(pbrt0);
+    arm->setHighWaterMark(pbrt0);
     arm->enableUndoNextReadyMode();
 
     // Schedule requests.
@@ -4174,7 +4144,7 @@ TEST_F(AsyncResultsMergerTest, UndoNextReadySortedWithMoreResultsArriving) {
     params.setSort(change_stream_constants::kSortSpec);
 
     auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
-    arm->setInitialHighWaterMark(pbrt0);
+    arm->setHighWaterMark(pbrt0);
     arm->enableUndoNextReadyMode();
 
     // Schedule requests.

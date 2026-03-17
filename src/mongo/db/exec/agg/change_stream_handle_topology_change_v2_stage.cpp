@@ -101,7 +101,13 @@ public:
         _mergeCursors->recognizeControlEvents();
 
         _initializationResumeToken = ResumeToken(resumeTokenData);
-        _mergeCursors->setInitialHighWaterMark(_initializationResumeToken.toBSON());
+        LOGV2_DEBUG(12163604,
+                    5,
+                    "Using change stream resume token",
+                    "changeStream"_attr = _changeStream.toString(),
+                    "resumeToken"_attr = _initializationResumeToken,
+                    "resumeTokenClusterTime"_attr = resumeTokenData.clusterTime);
+        setHighWaterMark(_initializationResumeToken.getClusterTime());
 
         _originalAggregateCommand = expCtx->getOriginalAggregateCommand().getOwned();
     }
@@ -140,6 +146,7 @@ public:
                             3,
                             STAGE_LOG_PREFIX "Built pipeline command for data shard",
                             "cmdObj"_attr = redact(cmdObj),
+                            "atClusterTime"_attr = atClusterTime,
                             "changeStream"_attr = _changeStream);
 
                 std::vector<AsyncRequestsSender::Request> remotes;
@@ -191,6 +198,7 @@ public:
                             3,
                             STAGE_LOG_PREFIX "Built pipeline for config server",
                             "pipeline"_attr = serializedPipeline,
+                            "atClusterTime"_attr = atClusterTime,
                             "changeStream"_attr = _changeStream);
 
                 AggregateCommandRequest aggReq(nss, std::move(serializedPipeline));
@@ -445,7 +453,7 @@ class V2StageReaderContext final : public ChangeStreamReaderContext {
 
 public:
     V2StageReaderContext(
-        boost::intrusive_ptr<ExpressionContext> expCtx,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
         OperationContext* opCtx,
         exec::agg::ChangeStreamHandleTopologyChangeV2Stage::CursorManager& cursorManager,
         bool degradedMode)
@@ -747,7 +755,7 @@ private:
         }
     };
 
-    boost::intrusive_ptr<ExpressionContext> _expCtx;
+    const boost::intrusive_ptr<ExpressionContext>& _expCtx;
     OperationContext* _opCtx;
     exec::agg::ChangeStreamHandleTopologyChangeV2Stage::CursorManager& _cursorManager;
     const bool _degradedMode;

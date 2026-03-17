@@ -37,6 +37,7 @@
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/resume_token.h"
 #include "mongo/s/query/exec/merge_cursors_stage.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -58,8 +59,8 @@ RouterStagePipeline::RouterStagePipeline(std::unique_ptr<Pipeline> mergePipeline
 
     // If there is an initial post batch resume token, set it on the merge cursors stage.
     if (auto pbrt = _mergePipeline->getContext()->getInitialPostBatchResumeToken();
-        !pbrt.isEmpty()) {
-        _mergeCursorsStage->setInitialHighWaterMark(pbrt.getOwned());
+        !pbrt.isEmpty() && _mergeCursorsStage) {
+        _mergeCursorsStage->setHighWaterMark(pbrt.getOwned());
     }
 }
 

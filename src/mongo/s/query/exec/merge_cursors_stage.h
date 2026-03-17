@@ -114,11 +114,6 @@ public:
      */
     void setHighWaterMark(const BSONObj& highWaterMark);
 
-    /**
-     * Sets the initial high watermark to return when no cursors are tracked.
-     */
-    void setInitialHighWaterMark(const BSONObj& highWaterMark);
-
     void setNextHighWaterMarkDeterminingStrategy(
         NextHighWaterMarkDeterminingStrategyPtr nextHighWaterMarkDeterminer);
 

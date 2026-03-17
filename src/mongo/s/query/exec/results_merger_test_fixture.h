@@ -223,7 +223,7 @@ protected:
         // Inject a high water mark.
         auto highWaterMark = makePostBatchResumeToken(Timestamp(42, 1));
 
-        arm->setInitialHighWaterMark(highWaterMark);
+        arm->setHighWaterMark(highWaterMark);
 
         ASSERT_BSONOBJ_EQ(highWaterMark, arm->getHighWaterMark());
 
