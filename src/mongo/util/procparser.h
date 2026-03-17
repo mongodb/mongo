@@ -265,5 +265,13 @@ Status parseProcPressure(StringData data, BSONObjBuilder* builder);
  */
 Status parseProcPressureFile(StringData key, StringData filename, BSONObjBuilder* builder);
 
+/**
+ * Procfs files such as the files parsed by this component should be just a small to moderate amount
+ * of text. To protect us from abnormally huge or even corrupted procfs files, we enforce a max size
+ * on them. The ability to adjust this limit is allowed as a safety measure for the safety measure.
+ */
+void setProcFileSizeLimit(size_t limit);
+size_t getProcFileSizeLimit();
+
 }  // namespace procparser
 }  // namespace mongo
