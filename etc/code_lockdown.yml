@@ -338,9 +338,11 @@ teams:
   - name: "DevProd Build"
     slack_tags:
       - "<@U03D3JHNB1C>" # alex.neben@mongodb.com - Director
+      - "<@U03JWS27799>" # john.daniels@mongodb.com - Lead
   - name: "DevProd Correctness"
     slack_tags:
       - "<@U03D3JHNB1C>" # alex.neben@mongodb.com - Director
+      - "<@U06RQRMS2SE>" # steve.mcclure@mongodb.com - Lead
   - name: "DevProd Evergreen App"
     slack_tags:
       - "<@U05RNJZ9212>" # byron.hood@mongodb.com - Director
@@ -353,6 +355,7 @@ teams:
   - name: "DevProd Performance Infrastructure"
     slack_tags:
       - "<@U03D3JHNB1C>" # alex.neben@mongodb.com - Director
+      - "<@U04V70K9ZU5>" # james.littlejohn@mongodb.com - Lead
   - name: "DevProd Release Infrastructure"
     slack_tags:
       - "<@U064RTDGS2W>" # stacey.kingpoling@mongodb.com - Director
