@@ -40,7 +40,6 @@ export const kNonTestOnlyClusterParameters = {
     changeStreams: {
         default: {expireAfterSeconds: NumberLong(3600)},
         testValues: [{expireAfterSeconds: 30}, {expireAfterSeconds: 10}],
-        featureFlag: 'ServerlessChangeStreams',
         setParameters: {'multitenancySupport': true},
         serverless: true,
         standaloneIncompatible: false,

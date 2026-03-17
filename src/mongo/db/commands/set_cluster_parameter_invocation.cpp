@@ -87,6 +87,37 @@ Status allowedToEnable(const BSONObj& command) {
     return Status::OK();
 }
 
+// TODO (SERVER-118758): Remove once all cluster parameters use strict parsing.
+template <typename T>
+Status checkUnknownFieldsOnParameter(BSONObj obj) {
+    for (auto&& elem : obj) {
+        auto fieldName = elem.fieldNameStringData();
+        bool fieldIsValid = std::any_of(T::fieldNames.begin(),
+                                        T::fieldNames.end(),
+                                        [fieldName](const auto& fn) { return fn == fieldName; });
+        if (!fieldIsValid) {
+            return Status{ErrorCodes::IDLUnknownField,
+                          str::stream() << "Unknown field name: '" << fieldName << "'"};
+        }
+    }
+    return Status::OK();
+}
+
+// Ensure there are no unknown fields in cluster parameters that:
+//   - Use a non-strict IDL parser.
+//   - Have an object type.
+// This temporary check is needed while we migrate the remaining non-strict cluster parameters
+// to strict parsing; we cannot flip them all at once for backward compatibility reasons.
+// TODO (SERVER-118758): Remove once all cluster parameters use strict parsing.
+void checkUnknownFields(const BSONObj& command) {
+    StringData name = command.firstElement().fieldName();
+
+    if (name == "fleCompactionOptions") {
+        uassertStatusOK(
+            checkUnknownFieldsOnParameter<FLECompactionOptions>(command.firstElement().Obj()));
+    }
+}
+
 bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
                                            const SetClusterParameter& cmd,
                                            boost::optional<Timestamp> clusterParameterTime,
@@ -156,6 +187,9 @@ std::pair<BSONObj, BSONObj> SetClusterParameterInvocation::normalizeParameter(
     uassert(ErrorCodes::BadValue,
             str::stream() << "Server parameter: '" << sp->name() << "' is disabled",
             skipValidation || sp->isEnabled());
+
+    // TODO (SERVER-118758): Remove once all cluster parameters use strict parsing.
+    checkUnknownFields(cmdParamObj);
 
     Timestamp clusterTime =
         clusterParameterTime ? *clusterParameterTime : _dbService.getUpdateClusterTime(opCtx);

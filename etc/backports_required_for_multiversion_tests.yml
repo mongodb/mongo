@@ -905,6 +905,12 @@ last-continuous:
     ticket: SERVER-109200
   - test_file: jstests/sharding/resharding_skip_cloning.js
     ticket: SERVER-111929
+  - test_file: jstests/core/cluster_parameters/cluster_parameter_commands.js
+    ticket: SERVER-117009
+  - test_file: jstests/noPassthrough/server_parameters/cluster_parameter_validate.js
+    ticket: SERVER-117009
+  - test_file: jstests/noPassthrough/fle2_compaction_options.js
+    ticket: SERVER-117009
   - test_file: jstests/replsets/election_term_over_int_max.js
     ticket: SERVER-119413
   suites: null
@@ -1874,6 +1880,12 @@ last-lts:
     ticket: SERVER-109200
   - test_file: jstests/sharding/resharding_skip_cloning.js
     ticket: SERVER-111929
+  - test_file: jstests/core/cluster_parameters/cluster_parameter_commands.js
+    ticket: SERVER-117009
+  - test_file: jstests/noPassthrough/server_parameters/cluster_parameter_validate.js
+    ticket: SERVER-117009
+  - test_file: jstests/noPassthrough/fle2_compaction_options.js
+    ticket: SERVER-117009
   - test_file: jstests/replsets/election_term_over_int_max.js
     ticket: SERVER-119413
   suites: null
