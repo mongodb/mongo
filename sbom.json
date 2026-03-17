@@ -3,9 +3,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "serialNumber": "urn:uuid:71d980f0-95c5-4dfa-8987-307eb8880ce2",
-  "version": 4,
+  "version": 5,
   "metadata": {
-    "timestamp": "2026-03-16T06:12:10Z",
+    "timestamp": "2026-03-17T06:09:16Z",
     "lifecycles": [
       {
         "phase": "pre-build"
@@ -563,8 +563,8 @@
       "supplier": {
         "name": "The Cyrus Project",
         "url": [
-          "https://www.cyrusimap.org/sasl/",
-          "https://www.cyrusimap.org/overview/who_is_cyrus.html"
+          "https://www.cyrusimap.org/overview/who_is_cyrus.html",
+          "https://www.cyrusimap.org/sasl/"
         ]
       },
       "author": "The Cyrus Team",
@@ -2393,38 +2393,6 @@
           "value": "false"
         }
       ]
-    },
-    {
-      "bom-ref": "pkg:github/apache/arrow-nanoarrow@apache-arrow-nanoarrow-0.7.0?package-id=614f3463351947a8",
-      "licenses": [
-        {
-          "license": {
-            "id": "Apache-2.0"
-          }
-        }
-      ],
-      "name": "github.com/apache/arrow-nanoarrow",
-      "purl": "pkg:github/apache/arrow-nanoarrow@apache-arrow-nanoarrow-0.7.0",
-      "type": "library",
-      "version": "apache-arrow-nanoarrow-0.7.0",
-      "scope": "excluded",
-      "properties": []
-    },
-    {
-      "bom-ref": "pkg:github/apache/iceberg-cpp@v0.2.0-rc1?package-id=ce0b9d2c8402061a",
-      "licenses": [
-        {
-          "license": {
-            "id": "Apache-2.0"
-          }
-        }
-      ],
-      "name": "github.com/apache/iceberg-cpp",
-      "purl": "pkg:github/apache/iceberg-cpp@v0.2.0-rc1",
-      "type": "library",
-      "version": "v0.2.0-rc1",
-      "scope": "excluded",
-      "properties": []
     }
   ],
   "dependencies": [
@@ -2681,14 +2649,6 @@
     },
     {
       "ref": "pkg:pypi/ocspresponder@0.5.0",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/apache/arrow-nanoarrow@apache-arrow-nanoarrow-0.7.0?package-id=614f3463351947a8",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/apache/iceberg-cpp@v0.2.0-rc1?package-id=ce0b9d2c8402061a",
       "dependsOn": []
     }
   ]
