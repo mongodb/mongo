@@ -198,10 +198,13 @@ Status initializeGlobalShardingState(
         return std::make_shared<ShardingTaskExecutorPoolController>(srwp);
     };
 
-    auto network = executor::makeNetworkInterface("Sharding-Fixed",
-                                                  std::make_unique<ShardingNetworkConnectionHook>(),
-                                                  hookBuilder(),
-                                                  connPoolOptions);
+    auto network = executor::makeNetworkInterface(
+        "Sharding-Fixed",
+        std::make_unique<ShardingNetworkConnectionHook>(),
+        hookBuilder(),
+        connPoolOptions,
+        transport::TransportProtocol::MongoRPC,
+        serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer));
     auto networkPtr = network.get();
     auto executorPool = makeShardingTaskExecutorPool(
         std::move(network), hookBuilder, connPoolOptions, taskExecutorPoolSize);

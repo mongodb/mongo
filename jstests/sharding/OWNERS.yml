@@ -175,3 +175,6 @@ filters:
   - "printShardingStatus.js":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "shard_requests_mongos_metrics.js":
+    approvers:
+      - 10gen/server-networking-and-observability

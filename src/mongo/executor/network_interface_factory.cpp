@@ -64,7 +64,8 @@ std::unique_ptr<NetworkInterface> makeNetworkInterface(
     std::unique_ptr<NetworkConnectionHook> hook,
     std::unique_ptr<rpc::EgressMetadataHook> metadataHook,
     ConnectionPool::Options connPoolOptions,
-    transport::TransportProtocol protocol) {
+    transport::TransportProtocol protocol,
+    bool trackRequestCounts) {
 
     if (!connPoolOptions.egressConnectionCloserManager && hasGlobalServiceContext()) {
         connPoolOptions.egressConnectionCloserManager =
@@ -75,7 +76,8 @@ std::unique_ptr<NetworkInterface> makeNetworkInterface(
         instanceName,
         std::make_shared<PooledAsyncClientFactory>(
             makeInstanceName(instanceName), std::move(connPoolOptions), std::move(hook), protocol),
-        std::move(metadataHook));
+        std::move(metadataHook),
+        trackRequestCounts);
 }
 
 #ifdef MONGO_CONFIG_GRPC
@@ -91,9 +93,12 @@ std::unique_ptr<NetworkInterface> makeNetworkInterfaceGRPC(
 std::unique_ptr<NetworkInterface> makeNetworkInterfaceWithClientFactory(
     StringData instanceName,
     std::shared_ptr<AsyncClientFactory> clientFactory,
-    std::unique_ptr<rpc::EgressMetadataHook> metadataHook) {
-    return std::make_unique<NetworkInterfaceTL>(
-        makeInstanceName(instanceName), std::move(clientFactory), std::move(metadataHook));
+    std::unique_ptr<rpc::EgressMetadataHook> metadataHook,
+    bool trackRequestCounts) {
+    return std::make_unique<NetworkInterfaceTL>(makeInstanceName(instanceName),
+                                                std::move(clientFactory),
+                                                std::move(metadataHook),
+                                                trackRequestCounts);
 }
 
 }  // namespace executor

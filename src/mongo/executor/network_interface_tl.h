@@ -77,7 +77,8 @@ class MONGO_MOD_NEEDS_REPLACEMENT NetworkInterfaceTL : public NetworkInterface {
 public:
     NetworkInterfaceTL(std::string instanceName,
                        std::shared_ptr<AsyncClientFactory> factory,
-                       std::unique_ptr<rpc::EgressMetadataHook> metadataHook);
+                       std::unique_ptr<rpc::EgressMetadataHook> metadataHook,
+                       bool trackShardRequestCounts);
     ~NetworkInterfaceTL() override;
 
     constexpr static Milliseconds kCancelCommandTimeout{1000};
@@ -341,6 +342,8 @@ private:
     // take an undeterministic amount of time to return.
     stdx::condition_variable _stoppedCV;
     State _state;
+
+    const bool _trackShardRequestCounts{false};
 
     stdx::thread _ioThread;
 

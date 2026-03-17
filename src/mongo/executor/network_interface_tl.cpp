@@ -88,6 +88,9 @@ MONGO_FAIL_POINT_DEFINE(triggerSendRequestNetworkTimeout);
 MONGO_FAIL_POINT_DEFINE(forceConnectionNetworkTimeout);
 MONGO_FAIL_POINT_DEFINE(hangBeforeDrainingCommandStates);
 MONGO_FAIL_POINT_DEFINE(increaseTimeoutOnKillOp);
+MONGO_FAIL_POINT_DEFINE(blockShardRequestBeforeQueueing);
+MONGO_FAIL_POINT_DEFINE(blockShardRequestBeforeSending);
+MONGO_FAIL_POINT_DEFINE(blockShardRequestBeforeResolving);
 
 auto& numConnectionNetworkTimeouts =
     *MetricBuilder<Counter64>("operation.numConnectionNetworkTimeouts");
@@ -106,6 +109,10 @@ void appendMetadata(RemoteCommandRequest* request,
         request->metadata = bob.obj();
     }
 }
+
+auto& shardRequestsInQueue = *MetricBuilder<Counter64>{"shardRequests.inQueue"};
+auto& shardRequestsAwaitingResponse = *MetricBuilder<Counter64>{"shardRequests.awaitingResponse"};
+auto& shardRequestsComplete = *MetricBuilder<Counter64>{"shardRequests.complete"};
 }  // namespace
 
 /**
@@ -160,11 +167,13 @@ constexpr auto kNotYetStartedUpMsg = "NetworkInterface has not started yet"_sd;
 
 NetworkInterfaceTL::NetworkInterfaceTL(std::string instanceName,
                                        std::shared_ptr<AsyncClientFactory> factory,
-                                       std::unique_ptr<rpc::EgressMetadataHook> metadataHook)
+                                       std::unique_ptr<rpc::EgressMetadataHook> metadataHook,
+                                       bool trackShardRequestCounts)
     : _instanceName(std::move(instanceName)),
       _clientFactory(std::move(factory)),
       _metadataHook(std::move(metadataHook)),
-      _state(kDefault) {
+      _state(kDefault),
+      _trackShardRequestCounts{trackShardRequestCounts} {
     ObservableMutexRegistry::get().add("NetworkInterfaceTL::_mutex", _mutex);
 }
 
@@ -986,6 +995,10 @@ ExecutorPtr NetworkInterfaceTL::CommandStateBase::makeGuaranteedExecutor() {
 
 ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::_runCommand(
     std::shared_ptr<CommandStateBase> cmdState) {
+    if (_trackShardRequestCounts) {
+        blockShardRequestBeforeQueueing.pauseWhileSet();
+        shardRequestsInQueue.incrementRelaxed();
+    }
     if (auto maxTimeMsLocalBufferTimeMillis = Milliseconds(gMaxTimeMsLocalBufferTimeMillis.load());
         maxTimeMsLocalBufferTimeMillis > Milliseconds::zero()) {
         // Extend the deadline on the opCtx to ensure the baton doesn't get interupted
@@ -1004,6 +1017,11 @@ ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::_runCommand(
         })
         .then(
             [this, cmdState](std::shared_ptr<AsyncClientFactory::AsyncClientHandle> retrievedConn) {
+                if (_trackShardRequestCounts) {
+                    blockShardRequestBeforeSending.pauseWhileSet();
+                    shardRequestsAwaitingResponse.incrementRelaxed();
+                    shardRequestsInQueue.decrementRelaxed();
+                }
                 return cmdState->sendRequest(std::move(retrievedConn))
                     .then([cmdState](RemoteCommandResponse resp) {
                         cmdState->doMetadataHook(resp);
@@ -1017,6 +1035,11 @@ ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::_runCommand(
                     });
             })
         .onCompletion([cmdState, this](StatusWith<RemoteCommandResponse> swResponse) {
+            if (_trackShardRequestCounts) {
+                blockShardRequestBeforeResolving.pauseWhileSet();
+                shardRequestsComplete.incrementRelaxed();
+                shardRequestsAwaitingResponse.decrementRelaxed();
+            }
             auto response = [&]() -> RemoteCommandResponse {
                 if (swResponse.isOK()) {
                     return swResponse.getValue();

@@ -56,7 +56,8 @@ std::unique_ptr<NetworkInterface> makeNetworkInterface(
     std::unique_ptr<NetworkConnectionHook> hook,
     std::unique_ptr<rpc::EgressMetadataHook> metadataHook,
     ConnectionPool::Options options = ConnectionPool::Options(),
-    transport::TransportProtocol protocol = transport::TransportProtocol::MongoRPC);
+    transport::TransportProtocol protocol = transport::TransportProtocol::MongoRPC,
+    bool trackRequestCounts = false);
 
 #ifdef MONGO_CONFIG_GRPC
 /**
@@ -74,7 +75,8 @@ std::unique_ptr<NetworkInterface> makeNetworkInterfaceGRPC(
 std::unique_ptr<NetworkInterface> makeNetworkInterfaceWithClientFactory(
     StringData instanceName,
     std::shared_ptr<AsyncClientFactory> clientFactory,
-    std::unique_ptr<rpc::EgressMetadataHook> metadataHook = nullptr);
+    std::unique_ptr<rpc::EgressMetadataHook> metadataHook,
+    bool trackRequestCounts = false);
 
 }  // namespace MONGO_MOD_PUBLIC executor
 }  // namespace mongo
