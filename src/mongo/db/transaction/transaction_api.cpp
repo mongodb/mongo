@@ -866,8 +866,8 @@ Transaction::ErrorHandlingStep Transaction::handleError(const StatusWith<CommitR
                                                         int attemptCounter) const noexcept {
     stdx::lock_guard<Latch> lg(_mutex);
     // Errors aborting are always ignored.
-    invariant(!_state.is(TransactionState::kNeedsCleanup) &&
-              !_state.is(TransactionState::kStartedAbort));
+    invariant(!_state.is(TransactionState::kNeedsCleanup));
+    invariant(!_state.is(TransactionState::kStartedAbort));
 
     LOGV2_DEBUG(5875905,
                 3,
