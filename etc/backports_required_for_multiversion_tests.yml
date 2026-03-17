@@ -899,6 +899,8 @@ last-continuous:
     ticket: SERVER-109200
   - test_file: jstests/sharding/resharding_skip_cloning.js
     ticket: SERVER-111929
+  - test_file: jstests/replsets/election_term_over_int_max.js
+    ticket: SERVER-119413
   suites: null
 last-lts:
   all:
@@ -1858,4 +1860,6 @@ last-lts:
     ticket: SERVER-109200
   - test_file: jstests/sharding/resharding_skip_cloning.js
     ticket: SERVER-111929
+  - test_file: jstests/replsets/election_term_over_int_max.js
+    ticket: SERVER-119413
   suites: null
