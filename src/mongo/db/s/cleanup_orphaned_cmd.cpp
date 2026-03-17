@@ -139,11 +139,6 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
     // sleep for a short time and then try waitForClean again.
     while (auto numRemainingDeletionTasks =
                rangedeletionutil::checkForConflictingDeletions(opCtx, *range, *collectionUuid)) {
-        uassert(ErrorCodes::ResumableRangeDeleterDisabled,
-                "Failing cleanupOrphaned because the disableResumableRangeDeleter server parameter "
-                "is set to true and this shard contains range deletion tasks for the collection.",
-                !disableResumableRangeDeleter.load());
-
         LOGV2(4416003,
               "cleanupOrphaned going to wait for range deletion tasks to complete",
               logAttrs(ns),

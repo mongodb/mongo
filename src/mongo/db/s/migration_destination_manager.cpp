@@ -1422,12 +1422,6 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             return rangedeletionutil::checkForConflictingDeletions(
                 outerOpCtx, range, donorCollectionOptionsAndIndexes.uuid);
         })) {
-            uassert(ErrorCodes::ResumableRangeDeleterDisabled,
-                    "Failing migration because the disableResumableRangeDeleter server "
-                    "parameter is set to true on the recipient shard, which contains range "
-                    "deletion tasks overlapping the incoming range.",
-                    !disableResumableRangeDeleter.load());
-
             LOGV2(22001,
                   "Migration paused because the requested range overlaps with a range already "
                   "scheduled for deletion",

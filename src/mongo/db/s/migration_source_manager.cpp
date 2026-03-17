@@ -333,12 +333,6 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
     // RangeDeleterService, but may miss pending ones in case this code runs after a failover. The
     // enclosing while loop allows to address such a gap.
     while (rangedeletionutil::checkForConflictingDeletions(opCtx, range, collectionUUID)) {
-        uassert(ErrorCodes::ResumableRangeDeleterDisabled,
-                "Failing migration because the disableResumableRangeDeleter server "
-                "parameter is set to true on the donor shard, which contains range "
-                "deletion tasks overlapping with the incoming range.",
-                !disableResumableRangeDeleter.load());
-
         LOGV2(9197000,
               "Migration start deferred because the requested range overlaps with one or more "
               "ranges already scheduled for deletion",
