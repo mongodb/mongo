@@ -1051,18 +1051,24 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                             LOGV2_WARNING(8469901,
                                           "Detected a time-series bucket with mixed schema data",
                                           logAttrs(coll->ns()),
-                                          "bucketId"_attr = record->id);
+                                          "recordId"_attr = record->id);
                             results->warnings.push_back(
                                 str::stream()
                                 << "Detected a time-series bucket with mixed schema data");
                         } else if (!mixedSchemaAllowed && !bucketMixedSchemaDataError) {
                             bucketMixedSchemaDataError = true;
+                            const auto& controlField =
+                                recordBson.getField(timeseries::kBucketControlFieldName).Obj();
+                            int count =
+                                controlField.getIntField(timeseries::kBucketControlCountFieldName);
                             LOGV2_WARNING(8469902,
                                           "Detected a time-series bucket with mixed schema data "
                                           "when timeseriesBucketsMayHaveMixedSchemaData is false. "
                                           "You can run the collMod command to set this flag",
                                           logAttrs(coll->ns()),
-                                          "bucketId"_attr = record->id);
+                                          "recordId"_attr = record->id,
+                                          "objSize"_attr = recordBson.objsize(),
+                                          "measurementCount"_attr = count);
                             results->errors.push_back(
                                 str::stream()
                                 << "Detected a time-series bucket with mixed schema data when "
