@@ -531,20 +531,6 @@ private:
 /**
  * A view of a tag & value, not owned here.
  */
-class TagValueOwned;
-
-/**
- * Helper to return whether 't' is in the subsequent list of tags. E.g.
- * Instead of:
- *   if (tag == A || tag == B)
- * Can write:
- *   tagIn(tag, A, B)
- */
-template <typename... Tags>
-MONGO_COMPILER_ALWAYS_INLINE bool tagIn(TypeTags t, Tags... tags) {
-    return ((t == tags) || ...);
-}
-
 struct TagValueView {
     TypeTags tag = TypeTags::Nothing;
     Value value = 0;
@@ -552,13 +538,6 @@ struct TagValueView {
     operator std::pair<TypeTags, Value>() {
         return {tag, value};
     }
-
-    template <typename... Tags>
-    MONGO_COMPILER_ALWAYS_INLINE bool tagIn(Tags... tags) const {
-        return value::tagIn(tag, tags...);
-    }
-
-    TagValueOwned copy() const;
 };
 
 inline TagValueView rawToView(std::pair<TypeTags, Value> tv) {
@@ -630,10 +609,6 @@ public:
     }
     Value value() const {
         return _value;
-    }
-    template <typename... Tags>
-    MONGO_COMPILER_ALWAYS_INLINE bool tagIn(Tags... tags) const {
-        return value::tagIn(_tag, tags...);
     }
 
     std::pair<TypeTags, Value> releaseToRaw() {
@@ -743,10 +718,6 @@ public:
     bool owned() const {
         return _owned;
     }
-    template <typename... Tags>
-    MONGO_COMPILER_ALWAYS_INLINE bool tagIn(Tags... tags) const {
-        return value::tagIn(_tag, tags...);
-    }
 
     TagValueOwned getOwnedCopy() const {
         return TagValueOwned::fromRaw(value::copyValue(_tag, _value));
@@ -793,11 +764,6 @@ private:
 
 static_assert(sizeof(TagValueMaybeOwned) <= 16ULL,
               "TagValueMaybeOwned should not be larger than 16 bytes");
-
-// Must be here because of dependency on TagValueOwned.
-inline TagValueOwned TagValueView::copy() const {
-    return TagValueOwned::fromRaw(copyValue(tag, value));
-}
 
 class ValueVectorGuard {
 public:
