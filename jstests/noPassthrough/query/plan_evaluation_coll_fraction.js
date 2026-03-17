@@ -120,16 +120,42 @@ describe("MultiPlanner exit condition metrics get updated correctly", function (
     if (planRankerMode === "automaticCE" && !isSBEEnabled) {
         describe("automaticCE (CBR) mode", function () {
             describe("fallback to CBR", function () {
+                it("does not update multi-planner metrics when plan cache is disabled", function () {
+                    // We do not measure works for the chosen CBR plan, so MP metrics must not change.
+                    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: true}));
+
+                    assert.docEq(
+                        {
+                            hitEof: 0,
+                            hitResultsLimit: 0,
+                            hitWorksLimit: 0,
+                        },
+                        getStoppingCondition(0.1),
+                    );
+
+                    assert.docEq(
+                        {
+                            hitEof: 0,
+                            hitResultsLimit: 0,
+                            hitWorksLimit: 0,
+                        },
+                        getStoppingCondition(20.0),
+                    );
+                });
+
                 it("records hitWorksLimit when CBR fallback is measured with low collFraction", function () {
                     // With plan cache enabled, we measure works for the CBR-chosen plan.
                     // At low collFraction, CBR evaluation stops due to works budget, so hitWorksLimit should increment.
                     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: false}));
 
-                    assert.docEq(getStoppingCondition(0.1), {
-                        hitEof: 0,
-                        hitResultsLimit: 0,
-                        hitWorksLimit: 0,
-                    });
+                    assert.docEq(
+                        {
+                            hitEof: 0,
+                            hitResultsLimit: 0,
+                            hitWorksLimit: 0,
+                        },
+                        getStoppingCondition(0.1),
+                    );
                 });
 
                 it("records hitEof when CBR fallback is measured with high collFraction", function () {
@@ -137,11 +163,14 @@ describe("MultiPlanner exit condition metrics get updated correctly", function (
                     // With plan cache enabled, this should be reflected as hitEof.
                     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: false}));
 
-                    assert.docEq(getStoppingCondition(20.0), {
-                        hitEof: 0,
-                        hitResultsLimit: 0,
-                        hitWorksLimit: 0,
-                    });
+                    assert.docEq(
+                        {
+                            hitEof: 0,
+                            hitResultsLimit: 0,
+                            hitWorksLimit: 0,
+                        },
+                        getStoppingCondition(20.0),
+                    );
                 });
             });
 
@@ -161,11 +190,14 @@ describe("MultiPlanner exit condition metrics get updated correctly", function (
                     // Ensure the first-phase MP trials have enough works to reach the matching doc and EOF.
                     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlanEvaluationWorks: 15}));
 
-                    assert.docEq(getStoppingCondition(0.1), {
-                        hitEof: 1,
-                        hitResultsLimit: 0,
-                        hitWorksLimit: 0,
-                    });
+                    assert.docEq(
+                        {
+                            hitEof: 1,
+                            hitResultsLimit: 0,
+                            hitWorksLimit: 0,
+                        },
+                        getStoppingCondition(0.1),
+                    );
                 });
 
                 it("records hitResultsLimit when multiplanning hits the batch limit", function () {
@@ -182,11 +214,14 @@ describe("MultiPlanner exit condition metrics get updated correctly", function (
                     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlanEvaluationWorks: 15}));
 
                     // Limit(1) forces the batch results limit to be the stopping condition.
-                    assert.docEq(getStoppingCondition(0.1, 1), {
-                        hitEof: 0,
-                        hitResultsLimit: 1,
-                        hitWorksLimit: 0,
-                    });
+                    assert.docEq(
+                        {
+                            hitEof: 0,
+                            hitResultsLimit: 1,
+                            hitWorksLimit: 0,
+                        },
+                        getStoppingCondition(0.1, 1),
+                    );
                 });
             });
         });
@@ -195,21 +230,27 @@ describe("MultiPlanner exit condition metrics get updated correctly", function (
         describe("multiPlanning mode (no CBR)", function () {
             it("records hitWorksLimit for low collFraction", function () {
                 // With a low total collection fraction, multiplanning should stop due to works limit.
-                assert.docEq(getStoppingCondition(0.1), {
-                    hitEof: 0,
-                    hitResultsLimit: 0,
-                    hitWorksLimit: 1,
-                });
+                assert.docEq(
+                    {
+                        hitEof: 0,
+                        hitResultsLimit: 0,
+                        hitWorksLimit: 1,
+                    },
+                    getStoppingCondition(0.1),
+                );
             });
 
             it("records hitEof for high collFraction", function () {
                 // With a higher collFraction, multiplanning continues until the first plan
                 // scans the whole index and reaches EOF.
-                assert.docEq(getStoppingCondition(20.0), {
-                    hitEof: 1,
-                    hitResultsLimit: 0,
-                    hitWorksLimit: 0,
-                });
+                assert.docEq(
+                    {
+                        hitEof: 1,
+                        hitResultsLimit: 0,
+                        hitWorksLimit: 0,
+                    },
+                    getStoppingCondition(20.0),
+                );
             });
         });
     }
