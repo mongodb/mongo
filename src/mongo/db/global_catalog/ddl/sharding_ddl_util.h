@@ -243,21 +243,16 @@ MONGO_MOD_NEEDS_REPLACEMENT boost::optional<UUID> getCollectionUUID(OperationCon
                                                                     bool allowViews = false);
 
 /*
- * Performs a noop retryable write on the given shards using the session and txNumber specified in
- * 'osi'
- */
-MONGO_MOD_NEEDS_REPLACEMENT void performNoopRetryableWriteOnShards(
-    OperationContext* opCtx,
-    const std::vector<ShardId>& shardIds,
-    const OperationSessionInfo& osi,
-    const std::shared_ptr<executor::TaskExecutor>& executor,
-    const CancellationToken& token);
-
-
-/*
  * Performs a noop write locally with majority write concern.
  */
 MONGO_MOD_NEEDS_REPLACEMENT void performNoopMajorityWriteLocally(OperationContext* opCtx);
+
+/**
+ * Builds an UpdateCommandRequest that performs a no-op write by upserting a well-known document in
+ * the server configuration namespace. Used to generate an oplog entry for establishing causality
+ * barriers (e.g. waiting for majority write concern) without modifying real user data.
+ */
+MONGO_MOD_NEEDS_REPLACEMENT write_ops::UpdateCommandRequest buildNoopWriteRequestCommand();
 
 /**
  * Sends the _shardsvrDropCollectionParticipant command to the specified shards.

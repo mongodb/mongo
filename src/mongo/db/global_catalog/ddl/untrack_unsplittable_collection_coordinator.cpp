@@ -121,8 +121,8 @@ void UntrackUnsplittableCollectionCoordinator::_commitUntrackCollection(
     tassert(8631102, "There must be a collection stored in the document", _doc.getOptCollType());
 
     if (!_firstExecution) {
-        _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-            opCtx, getNewSession(opCtx), **executor, token);
+        AllShardsAndConfigCausalityBarrier barrier{**executor, token};
+        performCausalityBarrier(opCtx, barrier);
     }
 
     {

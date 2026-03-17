@@ -319,9 +319,7 @@ ExecutorFuture<void> SetClusterParameterCoordinator::_runImpl(
                                                        catalogManager->localConfigShard(),
                                                        catalogManager->localCatalogClient());
 
-                _updateSession(opCtx);
-                const auto session = _getCurrentSession();
-
+                const auto session = _getNewSession(opCtx);
                 {
                     // Ensure the topology is stable so shards added concurrently will
                     // not miss the cluster parameter. Keep it stable until we have

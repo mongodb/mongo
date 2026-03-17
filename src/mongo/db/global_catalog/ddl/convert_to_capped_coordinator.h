@@ -101,11 +101,7 @@ private:
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         const CancellationToken& token);
 
-    void _performNoopRetryableWriteOnParticipantShardsAndConfigsvr(
-        OperationContext* opCtx,
-        const OperationSessionInfo& osi,
-        const std::shared_ptr<executor::TaskExecutor>& executor,
-        const CancellationToken& token);
+    std::vector<ShardId> _getParticipantShards(OperationContext* opCtx);
 
     const mongo::ShardsvrConvertToCappedRequest _request;
 

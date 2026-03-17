@@ -407,11 +407,8 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
             Phase::kDrop,
             [this, token, dbNss, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 if (!_firstExecution) {
-                    // Perform a noop write on the participants in order to advance the txnNumber
-                    // for this coordinator's lsid so that requests with older txnNumbers can no
-                    // longer execute.
-                    _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                        opCtx, getNewSession(opCtx), **executor, token);
+                    AllShardsAndConfigCausalityBarrier barrier{**executor, token};
+                    performCausalityBarrier(opCtx, barrier);
                 }
 
                 ShardingLogging::get(opCtx)->logChange(opCtx, "dropDatabase.start", dbNss);

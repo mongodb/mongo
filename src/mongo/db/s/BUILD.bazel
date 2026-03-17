@@ -402,7 +402,10 @@ mongo_cc_library(
         "//src/mongo/db/router_role/routing_cache:read_only_catalog_cache_loader.cpp",
         "//src/mongo/db/router_role/routing_cache:shard_server_catalog_cache_loader_impl.cpp",
         "//src/mongo/db/s/metrics:phase_duration.cpp",
+        "//src/mongo/db/s/primary_only_service_helpers:all_shards_and_config_causality_barrier.cpp",
         "//src/mongo/db/s/primary_only_service_helpers:cancel_state.cpp",
+        "//src/mongo/db/s/primary_only_service_helpers:operation_session_tracker.cpp",
+        "//src/mongo/db/s/primary_only_service_helpers:participant_causality_barrier.cpp",
         "//src/mongo/db/s/primary_only_service_helpers:phase_transition_progress_gen",
         "//src/mongo/db/s/primary_only_service_helpers:primary_only_service_retry_strategy.cpp",
         "//src/mongo/db/s/primary_only_service_helpers:retry_until_majority_commit.cpp",
@@ -948,6 +951,8 @@ mongo_cc_unit_test(
         "//src/mongo/db/s/metrics:phase_duration_test.cpp",
         "//src/mongo/db/s/migration_blocking_operation:multi_update_coordinator_test.cpp",
         "//src/mongo/db/s/primary_only_service_helpers:cancel_state_test.cpp",
+        "//src/mongo/db/s/primary_only_service_helpers:operation_session_tracker_test.cpp",
+        "//src/mongo/db/s/primary_only_service_helpers:participant_causality_barrier_test.cpp",
         "//src/mongo/db/s/primary_only_service_helpers:primary_only_service_retry_strategy_test.cpp",
         "//src/mongo/db/s/primary_only_service_helpers:with_automatic_retry_test.cpp",
         "//src/mongo/db/topology/vector_clock:vector_clock_shard_server_test.cpp",
@@ -958,6 +963,8 @@ mongo_cc_unit_test(
     deps = [
         ":db_s_shard_server_test_deps",
         ":sharding_test_helpers",
+        "//src/mongo/executor:mock_async_rpc",
+        "//src/mongo/executor:network_interface_factory",
     ],
 )
 

@@ -48,8 +48,9 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
+#include "mongo/db/s/primary_only_service_helpers/all_shards_and_config_causality_barrier.h"
+#include "mongo/db/s/primary_only_service_helpers/operation_session_tracker.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/session/internal_session_pool.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
@@ -179,15 +180,6 @@ protected:
     virtual logv2::DynamicAttributes getCoordinatorLogAttrs() const {
         return getBasicCoordinatorAttrs();
     }
-    /*
-     * Performs a noop write on all shards and the configsvr using the sessionId and txnNumber
-     * specified in 'osi'.
-     */
-    void _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-        OperationContext* opCtx,
-        const OperationSessionInfo& osi,
-        const std::shared_ptr<executor::TaskExecutor>& executor,
-        const CancellationToken& token);
 
     /*
      * Specify if the coordinator must indefinitely be retried in case of exceptions. It is always
@@ -239,6 +231,8 @@ private:
         std::shared_ptr<executor::ScopedTaskExecutor> executor,
         const CancellationToken& token,
         const Status& status) noexcept;
+
+    virtual void _onCleanup(OperationContext* opCtx) {}
 
     void interrupt(Status status) final;
 
@@ -358,7 +352,8 @@ protected:
 
 template <class StateDoc, class Phase>
 class MONGO_MOD_UNFORTUNATELY_OPEN RecoverableShardingDDLCoordinator
-    : public ShardingDDLCoordinatorImpl<StateDoc> {
+    : public ShardingDDLCoordinatorImpl<StateDoc>,
+      public OperationSessionPersistence {
 protected:
     using ShardingDDLCoordinatorImpl<StateDoc>::_doc;
     using ShardingDDLCoordinatorImpl<StateDoc>::_docMutex;
@@ -366,9 +361,34 @@ protected:
     RecoverableShardingDDLCoordinator(ShardingDDLCoordinatorService* service,
                                       const std::string& name,
                                       const BSONObj& initialStateDoc)
-        : ShardingDDLCoordinatorImpl<StateDoc>(service, name, initialStateDoc) {}
+        : ShardingDDLCoordinatorImpl<StateDoc>(service, name, initialStateDoc),
+          _sessionTracker(this) {}
 
     virtual StringData serializePhase(const Phase& phase) const = 0;
+
+    /**
+     * Advances and persists the txnNumber to ensure causality between requests, then returns the
+     * updated operation session information (OSI).
+     */
+    OperationSessionInfo getNewSession(OperationContext* opCtx) {
+        return _sessionTracker.getNextSession(opCtx);
+    }
+
+    /**
+     * Releases the current session back to the InternalSessionPool and clears the persisted
+     * session state. No-op if no session is currently held.
+     */
+    void releaseSession(OperationContext* opCtx) {
+        _sessionTracker.releaseSession(opCtx);
+    }
+
+    /**
+     * Advances the session and performs the given causality barrier, ensuring that subsequent
+     * reads on the barrier's participants will reflect all prior writes.
+     */
+    void performCausalityBarrier(OperationContext* opCtx, CausalityBarrier& barrier) {
+        _sessionTracker.performCausalityBarrier(opCtx, barrier);
+    }
 
     std::function<void()> _buildPhaseHandler(const Phase& newPhase,
                                              std::function<void(OperationContext*)>&& handlerFn) {
@@ -488,17 +508,6 @@ protected:
         }
     }
 
-    /**
-     * Advances and persists the `txnNumber` to ensure causality between requests, then returns the
-     * updated operation session information (OSI).
-     * This modifies the _doc with a std::move, so any reference to members of the _doc will be
-     * invalidated after this call
-     */
-    OperationSessionInfo getNewSession(OperationContext* opCtx) {
-        _updateSession(opCtx);
-        return getCurrentSession();
-    }
-
     boost::optional<Status> getAbortReason() const override {
         const auto& status = _doc.getAbortReason();
         tassert(10644541, "when persisted, status must be an error", !status || !status->isOK());
@@ -529,41 +538,39 @@ protected:
     }
 
 private:
-    // lazily acquire Logical Session ID and a txn number
-    void _updateSession(OperationContext* opCtx) {
-        auto newDoc = _getDoc();
-        auto newShardingDDLCoordinatorMetadata = newDoc.getShardingDDLCoordinatorMetadata();
-
-        auto optSession = newShardingDDLCoordinatorMetadata.getSession();
-        if (optSession) {
-            auto txnNumber = optSession->getTxnNumber();
-            optSession->setTxnNumber(++txnNumber);
-            newShardingDDLCoordinatorMetadata.setSession(optSession);
-        } else {
-            auto session = InternalSessionPool::get(opCtx)->acquireSystemSession();
-            newShardingDDLCoordinatorMetadata.setSession(
-                ShardingDDLSession(session.getSessionId(), session.getTxnNumber()));
-        }
-
-        newDoc.setShardingDDLCoordinatorMetadata(std::move(newShardingDDLCoordinatorMetadata));
-        _updateStateDocument(opCtx, std::move(newDoc));
+    void _onCleanup(OperationContext* opCtx) override {
+        releaseSession(opCtx);
     }
 
-    OperationSessionInfo getCurrentSession() const {
+    boost::optional<OperationSessionInfo> readSession(OperationContext* opCtx) const override {
         auto optSession = [&] {
             stdx::lock_guard lk{_docMutex};
             return _doc.getShardingDDLCoordinatorMetadata().getSession();
         }();
-
-        tassert(10644542,
-                "Expected session to be set on the coordinator document metadata",
-                optSession);
-
+        if (!optSession) {
+            return boost::none;
+        }
         OperationSessionInfo osi;
         osi.setSessionId(optSession->getLsid());
         osi.setTxnNumber(optSession->getTxnNumber());
         return osi;
     }
+
+    void writeSession(OperationContext* opCtx,
+                      const boost::optional<OperationSessionInfo>& osi) override {
+        if (!osi) {
+            // The tracker will call writeSession with boost::none after calling releaseSession; by
+            // the time the DDL coordinator does this, we've already deleted our state document.
+            return;
+        }
+        auto newDoc = _getDoc();
+        auto newMetadata = newDoc.getShardingDDLCoordinatorMetadata();
+        newMetadata.setSession(ShardingDDLSession(*osi->getSessionId(), *osi->getTxnNumber()));
+        newDoc.setShardingDDLCoordinatorMetadata(std::move(newMetadata));
+        _updateStateDocument(opCtx, std::move(newDoc));
+    }
+
+    OperationSessionTracker _sessionTracker;
 };
 
 #undef MONGO_LOGV2_DEFAULT_COMPONENT

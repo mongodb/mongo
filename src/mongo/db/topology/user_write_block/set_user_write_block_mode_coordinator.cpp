@@ -140,11 +140,7 @@ ExecutorFuture<void> SetUserWriteBlockModeCoordinator::_runImpl(
             Phase::kPrepare,
             [this, anchor = shared_from_this()](auto* opCtx) {
                 auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-
-                // Get an incremented {lsid, txNnumber} pair that will be attached to the command
-                // sent to the shards to guarantee message replay protection.
-                _updateSession(opCtx);
-                const auto session = _getCurrentSession();
+                const auto session = _getNewSession(opCtx);
 
                 // Ensure the topology is stable so we don't miss propagating the write blocking
                 // state to any concurrently added shard. Keep it stable until we have persisted the
@@ -185,11 +181,7 @@ ExecutorFuture<void> SetUserWriteBlockModeCoordinator::_runImpl(
         .then(
             _buildPhaseHandler(Phase::kComplete, [this, anchor = shared_from_this()](auto* opCtx) {
                 auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-
-                // Get an incremented {lsid, txNnumber} pair that will be attached to the command
-                // sent to the shards to guarantee message replay protection.
-                _updateSession(opCtx);
-                const auto session = _getCurrentSession();
+                auto session = _getNewSession(opCtx);
 
                 // Ensure the topology is stable so we don't miss propagating the write blocking
                 // state to any concurrently added shard. Keep it stable until we have persisted the

@@ -45,6 +45,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/router_role/router_role.h"
+#include "mongo/db/s/primary_only_service_helpers/participant_causality_barrier.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
@@ -163,15 +164,11 @@ bool RefineCollectionShardKeyCoordinator::_mustAlwaysMakeProgress() {
     return _doc.getPhase() >= Phase::kRemoteIndexValidation;
 }
 
-void RefineCollectionShardKeyCoordinator::_performNoopWriteOnDataShardsAndConfigServer(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const OperationSessionInfo& osi,
-    const std::shared_ptr<executor::TaskExecutor>& executor,
-    const CancellationToken& token) {
+std::vector<ShardId> RefineCollectionShardKeyCoordinator::_getDataShardsAndConfigServer(
+    OperationContext* opCtx, const NamespaceString& nss) {
     auto shards = getShardsWithDataForCollection(opCtx, nss);
     shards.push_back(Grid::get(opCtx)->shardRegistry()->getConfigShard()->getId());
-    sharding_ddl_util::performNoopRetryableWriteOnShards(opCtx, shards, osi, executor, token);
+    return shards;
 }
 
 ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
@@ -248,9 +245,9 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
             Phase::kRemoteIndexValidation,
             [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
                 if (!_firstExecution) {
-                    const auto session = getNewSession(opCtx);
-                    _performNoopWriteOnDataShardsAndConfigServer(
-                        opCtx, nss(), session, **executor, token);
+                    ParticipantCausalityBarrier barrier{
+                        _getDataShardsAndConfigServer(opCtx, nss()), **executor, token};
+                    performCausalityBarrier(opCtx, barrier);
                 }
 
                 // Stop migrations during most of the execution of the coordinator to guarantee a
@@ -284,9 +281,9 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
             Phase::kBlockCrud,
             [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
                 if (!_firstExecution) {
-                    const auto session = getNewSession(opCtx);
-                    _performNoopWriteOnDataShardsAndConfigServer(
-                        opCtx, nss(), session, **executor, token);
+                    ParticipantCausalityBarrier barrier{
+                        _getDataShardsAndConfigServer(opCtx, nss()), **executor, token};
+                    performCausalityBarrier(opCtx, barrier);
                 }
 
                 ShardsvrParticipantBlock blockCRUDOperationsRequest(nss());
@@ -323,9 +320,9 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
             Phase::kCommit,
             [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
                 if (!_firstExecution) {
-                    const auto session = getNewSession(opCtx);
-                    _performNoopWriteOnDataShardsAndConfigServer(
-                        opCtx, nss(), session, **executor, token);
+                    ParticipantCausalityBarrier barrier{
+                        _getDataShardsAndConfigServer(opCtx, nss()), **executor, token};
+                    performCausalityBarrier(opCtx, barrier);
                 }
 
                 ConfigsvrCommitRefineCollectionShardKey commitRequest(nss());
@@ -353,16 +350,17 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                 // removable that was committed during the critical section.
                 VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
             }))
-        .then(_buildPhaseHandler(Phase::kReleaseCritSec,
-                                 [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
-                                     if (!_firstExecution) {
-                                         const auto session = getNewSession(opCtx);
-                                         _performNoopWriteOnDataShardsAndConfigServer(
-                                             opCtx, nss(), session, **executor, token);
-                                     }
+        .then(_buildPhaseHandler(
+            Phase::kReleaseCritSec,
+            [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
+                if (!_firstExecution) {
+                    ParticipantCausalityBarrier barrier{
+                        _getDataShardsAndConfigServer(opCtx, nss()), **executor, token};
+                    performCausalityBarrier(opCtx, barrier);
+                }
 
-                                     _exitCriticalSection(opCtx, executor, token);
-                                 }))
+                _exitCriticalSection(opCtx, executor, token);
+            }))
         .then(_buildPhaseHandler(
             Phase::kResumeMigrations,
             [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
@@ -419,8 +417,8 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_cleanupOnAbort(
             const auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
 
-            _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                opCtx, getNewSession(opCtx), **executor, token);
+            AllShardsAndConfigCausalityBarrier barrier{**executor, token};
+            performCausalityBarrier(opCtx, barrier);
 
             if (_doc.getPhase() >= Phase::kBlockCrud) {
                 _exitCriticalSection(opCtx, executor, token);

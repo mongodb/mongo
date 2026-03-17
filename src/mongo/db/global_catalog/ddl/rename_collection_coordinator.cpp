@@ -901,9 +901,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
             Phase::kBlockCrudAndRename,
             [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 if (!_firstExecution) {
-                    const auto session = getNewSession(opCtx);
-                    _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                        opCtx, session, **executor, token);
+                    AllShardsAndConfigCausalityBarrier barrier{**executor, token};
+                    performCausalityBarrier(opCtx, barrier);
                 }
 
                 const auto& fromNss = nss();
@@ -988,8 +987,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 // For an untracked collection the CSRS server can not verify the targetUUID.
                 // Use the session ID + txnNumber to ensure no stale requests get through.
                 if (!_firstExecution) {
-                    _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                        opCtx, getNewSession(opCtx), **executor, token);
+                    AllShardsAndConfigCausalityBarrier barrier{**executor, token};
+                    performCausalityBarrier(opCtx, barrier);
                 }
 
                 // Commit the collection and chunks metadata on the global catalog.
@@ -1055,8 +1054,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
             Phase::kUnblockCRUD,
             [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 if (!_firstExecution) {
-                    _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                        opCtx, getNewSession(opCtx), **executor, token);
+                    AllShardsAndConfigCausalityBarrier barrier{**executor, token};
+                    performCausalityBarrier(opCtx, barrier);
                 }
 
                 const auto& fromNss = nss();

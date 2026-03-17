@@ -74,12 +74,8 @@ private:
 
     bool _mustAlwaysMakeProgress() override;
 
-    void _performNoopWriteOnDataShardsAndConfigServer(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const OperationSessionInfo& osi,
-        const std::shared_ptr<executor::TaskExecutor>& executor,
-        const CancellationToken& token);
+    std::vector<ShardId> _getDataShardsAndConfigServer(OperationContext* opCtx,
+                                                       const NamespaceString& nss);
 
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;

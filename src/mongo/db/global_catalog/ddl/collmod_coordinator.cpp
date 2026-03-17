@@ -142,25 +142,6 @@ void CollModCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const
     cmdInfoBuilder->appendElements(_request.toBSON());
 };
 
-void CollModCoordinator::_performNoopRetryableWriteOnParticipants(
-    OperationContext* opCtx,
-    const std::shared_ptr<executor::TaskExecutor>& executor,
-    const CancellationToken& token) {
-    auto shardsAndConfigsvr = [&] {
-        const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-        auto participants = shardRegistry->getAllShardIds(opCtx);
-        if (std::find(participants.begin(), participants.end(), ShardId::kConfigServerId) ==
-            participants.end()) {
-            // The config server may be a shard, so only add if it isn't already in participants.
-            participants.emplace_back(shardRegistry->getConfigShard()->getId());
-        }
-        return participants;
-    }();
-
-    sharding_ddl_util::performNoopRetryableWriteOnShards(
-        opCtx, shardsAndConfigsvr, getNewSession(opCtx), executor, token);
-}
-
 void CollModCoordinator::_saveCollectionInfoOnCoordinatorIfNecessary(OperationContext* opCtx) {
     if (!_collInfo) {
         CollectionInfo info;
@@ -299,7 +280,8 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
             auto* opCtx = opCtxHolder.get();
 
             if (_doc.getPhase() > Phase::kUnset) {
-                _performNoopRetryableWriteOnParticipants(opCtx, **executor, token);
+                AllShardsAndConfigCausalityBarrier barrier{**executor, token};
+                performCausalityBarrier(opCtx, barrier);
             }
 
             {

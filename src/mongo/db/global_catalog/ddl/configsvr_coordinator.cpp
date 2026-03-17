@@ -88,19 +88,6 @@ void ConfigsvrCoordinator::_removeStateDocument(OperationContext* opCtx) {
                  defaultMajorityWriteConcern());
 }
 
-OperationSessionInfo ConfigsvrCoordinator::_getCurrentSession() const {
-    const auto& coordinatorMetadata = metadata();
-    tassert(10644544,
-            "Expected session to be set on the coordinator document metadata",
-            coordinatorMetadata.getSession());
-    ConfigsvrCoordinatorSession coordinatorSession = *coordinatorMetadata.getSession();
-
-    OperationSessionInfo osi;
-    osi.setSessionId(coordinatorSession.getLsid());
-    osi.setTxnNumber(coordinatorSession.getTxnNumber());
-    return osi;
-}
-
 void ConfigsvrCoordinator::interrupt(Status status) noexcept {
     LOGV2_DEBUG(6347303,
                 1,
@@ -150,15 +137,7 @@ SemiFuture<void> ConfigsvrCoordinator::run(std::shared_ptr<executor::ScopedTaskE
                 auto opCtxHolder = makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 _removeStateDocument(opCtx);
-
-                const auto session = metadata().getSession();
-                if (session && status.isOK()) {
-                    // Return lsid to the InternalSessionPool. If status is not OK, let the session
-                    // be discarded.
-                    InternalSessionPool::get(opCtx)->release(
-                        {session->getLsid(), session->getTxnNumber()});
-                }
-
+                _onCleanup(opCtx);
             } catch (DBException& ex) {
                 LOGV2_WARNING(6347302,
                               "Failed to remove ConfigsvrCoordinator state document",

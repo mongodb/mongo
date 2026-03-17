@@ -214,21 +214,6 @@ void deleteCollection(OperationContext* opCtx,
         opCtx, std::move(transactionChain), writeConcern, osi, executor);
 }
 
-write_ops::UpdateCommandRequest buildNoopWriteRequestCommand() {
-    write_ops::UpdateCommandRequest updateOp(NamespaceString::kServerConfigurationNamespace);
-    auto queryFilter = BSON("_id" << "shardingDDLCoordinatorRecoveryDoc");
-    auto updateModification =
-        write_ops::UpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(
-            BSON("$inc" << BSON("noopWriteCount" << 1))));
-
-    write_ops::UpdateOpEntry updateEntry(queryFilter, updateModification);
-    updateEntry.setMulti(false);
-    updateEntry.setUpsert(true);
-    updateOp.setUpdates({updateEntry});
-
-    return updateOp;
-}
-
 void setAllowMigrations(OperationContext* opCtx,
                         const NamespaceString& nss,
                         const boost::optional<UUID>& expectedCollectionUUID,
@@ -556,19 +541,6 @@ boost::optional<UUID> getCollectionUUID(OperationContext* opCtx,
     return autoColl ? boost::make_optional(autoColl->uuid()) : boost::none;
 }
 
-void performNoopRetryableWriteOnShards(OperationContext* opCtx,
-                                       const std::vector<ShardId>& shardIds,
-                                       const OperationSessionInfo& osi,
-                                       const std::shared_ptr<executor::TaskExecutor>& executor,
-                                       const CancellationToken& token) {
-    auto updateOp = buildNoopWriteRequestCommand();
-    generic_argument_util::setOperationSessionInfo(updateOp, osi);
-    generic_argument_util::setMajorityWriteConcern(updateOp);
-    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<write_ops::UpdateCommandRequest>>(
-        executor, token, updateOp);
-    sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
-}
-
 void performNoopMajorityWriteLocally(OperationContext* opCtx) {
     const auto updateOp = buildNoopWriteRequestCommand();
 
@@ -583,6 +555,21 @@ void performNoopMajorityWriteLocally(OperationContext* opCtx) {
     auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     uassertStatusOK(waitForWriteConcern(
         opCtx, latestOpTime, defaultMajorityWriteConcernDoNotUse(), &ignoreResult));
+}
+
+write_ops::UpdateCommandRequest buildNoopWriteRequestCommand() {
+    write_ops::UpdateCommandRequest updateOp(NamespaceString::kServerConfigurationNamespace);
+    auto queryFilter = BSON("_id" << "shardingDDLCoordinatorRecoveryDoc");
+    auto updateModification =
+        write_ops::UpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(
+            BSON("$inc" << BSON("noopWriteCount" << 1))));
+
+    write_ops::UpdateOpEntry updateEntry(queryFilter, updateModification);
+    updateEntry.setMulti(false);
+    updateEntry.setUpsert(true);
+    updateOp.setUpdates({updateEntry});
+
+    return updateOp;
 }
 
 void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,

@@ -38,7 +38,7 @@
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
-#include "mongo/db/session/internal_session_pool.h"
+#include "mongo/db/s/primary_only_service_helpers/operation_session_tracker.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/logv2/log.h"
@@ -100,8 +100,6 @@ protected:
 
     void _removeStateDocument(OperationContext* opCtx);
 
-    OperationSessionInfo _getCurrentSession() const;
-
     /**
      * Create an `OperationContext`. Provided for consistency with `ShardingDDLCoordinator`,
      * which provides a similar method which also sets the `ForwardableOperationMetadata`.
@@ -113,14 +111,19 @@ protected:
 
     stdx::mutex _mutex;
     SharedPromise<void> _completionPromise;
+
+private:
+    virtual void _onCleanup(OperationContext* opCtx) {}
 };
 
 template <class StateDoc, class Phase>
-class MONGO_MOD_UNFORTUNATELY_OPEN ConfigsvrCoordinatorImpl : public ConfigsvrCoordinator {
+class MONGO_MOD_UNFORTUNATELY_OPEN ConfigsvrCoordinatorImpl : public ConfigsvrCoordinator,
+                                                              public OperationSessionPersistence {
 public:
     ConfigsvrCoordinatorImpl(const BSONObj& stateDoc)
         : ConfigsvrCoordinator(stateDoc),
-          _doc(StateDoc::parse(stateDoc, IDLParserContext("CoordinatorDocument"))) {}
+          _doc(StateDoc::parse(stateDoc, IDLParserContext("CoordinatorDocument"))),
+          _sessionTracker(this) {}
 
     ~ConfigsvrCoordinatorImpl() override {}
 
@@ -178,25 +181,36 @@ protected:
         return evalF(_doc);
     }
 
-    /**
-     * Gets a new session if necessary and updates `_doc`.
-     */
-    void _updateSession(OperationContext* opCtx) {
-        auto internalSessionPool = InternalSessionPool::get(opCtx);
+    OperationSessionInfo _getNewSession(OperationContext* opCtx) {
+        return _sessionTracker.getNextSession(opCtx);
+    }
 
+    void _releaseSession(OperationContext* opCtx) {
+        _sessionTracker.releaseSession(opCtx);
+    }
+
+    boost::optional<OperationSessionInfo> readSession(OperationContext* opCtx) const override {
+        const auto& session = metadata().getSession();
+        if (!session) {
+            return boost::none;
+        }
+        OperationSessionInfo osi;
+        osi.setSessionId(session->getLsid());
+        osi.setTxnNumber(session->getTxnNumber());
+        return osi;
+    }
+
+    void writeSession(OperationContext* opCtx,
+                      const boost::optional<OperationSessionInfo>& osi) override {
+        if (!osi) {
+            // The tracker will call writeSession with boost::none after calling releaseSession; by
+            // the time the coordinator does this, we've already deleted our state document.
+            return;
+        }
         _updateStateDocumentWith(opCtx, [&](StateDoc& doc) {
             ConfigsvrCoordinatorMetadata newMetadata = doc.getConfigsvrCoordinatorMetadata();
-
-            const auto optPrevSession = doc.getSession();
-            if (optPrevSession) {
-                newMetadata.setSession(ConfigsvrCoordinatorSession(
-                    optPrevSession->getLsid(), optPrevSession->getTxnNumber() + 1));
-            } else {
-                const auto newSession = internalSessionPool->acquireSystemSession();
-                newMetadata.setSession(ConfigsvrCoordinatorSession(newSession.getSessionId(),
-                                                                   newSession.getTxnNumber()));
-            }
-
+            newMetadata.setSession(
+                ConfigsvrCoordinatorSession(*osi->getSessionId(), *osi->getTxnNumber()));
             doc.setConfigsvrCoordinatorMetadata(newMetadata);
         });
     }
@@ -260,6 +274,13 @@ protected:
 
     mutable stdx::mutex _docMutex;
     StateDoc _doc;
+
+private:
+    void _onCleanup(OperationContext* opCtx) override {
+        _releaseSession(opCtx);
+    }
+
+    OperationSessionTracker _sessionTracker;
 };
 
 #undef MONGO_LOGV2_DEFAULT_COMPONENT

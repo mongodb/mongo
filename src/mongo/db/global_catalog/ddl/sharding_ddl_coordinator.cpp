@@ -556,13 +556,8 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                             Status::OK());
                     }
 
-                    auto session = metadata().getSession();
-
-                    if (status.isOK() && session) {
-                        // Return lsid to the SessionCache. If status is not OK, let the lsid be
-                        // discarded.
-                        InternalSessionPool::get(opCtx)->release(
-                            {session->getLsid(), session->getTxnNumber()});
+                    if (status.isOK()) {
+                        _onCleanup(opCtx);
                     }
                 } catch (const DBException& ex) {
                     completionStatus = ex.toStatus();
@@ -590,26 +585,6 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
             return completionStatus;
         })
         .semi();
-}
-
-void ShardingDDLCoordinator::_performNoopRetryableWriteOnAllShardsAndConfigsvr(
-    OperationContext* opCtx,
-    const OperationSessionInfo& osi,
-    const std::shared_ptr<executor::TaskExecutor>& executor,
-    const CancellationToken& token) {
-    const auto shardsAndConfigsvr = [&] {
-        const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-        auto participants = shardRegistry->getAllShardIds(opCtx);
-        if (std::find(participants.begin(), participants.end(), ShardId::kConfigServerId) ==
-            participants.end()) {
-            // The config server may be a shard, so only add if it isn't already in participants.
-            participants.emplace_back(shardRegistry->getConfigShard()->getId());
-        }
-        return participants;
-    }();
-
-    sharding_ddl_util::performNoopRetryableWriteOnShards(
-        opCtx, shardsAndConfigsvr, osi, executor, token);
 }
 
 bool ShardingDDLCoordinator::_isRetriableErrorForDDLCoordinator(const Status& status) {

@@ -115,11 +115,6 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
-    void _performNoopRetryableWriteOnParticipants(
-        OperationContext* opCtx,
-        const std::shared_ptr<executor::TaskExecutor>& executor,
-        const CancellationToken& token);
-
     void _saveCollectionInfoOnCoordinatorIfNecessary(OperationContext* opCtx);
 
     void _saveShardingInfoOnCoordinatorIfNecessary(OperationContext* opCtx);

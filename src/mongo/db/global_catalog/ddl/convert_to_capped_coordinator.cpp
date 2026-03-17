@@ -37,6 +37,7 @@
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
 #include "mongo/db/s/config/initial_split_policy.h"
+#include "mongo/db/s/primary_only_service_helpers/participant_causality_barrier.h"
 #include "mongo/db/shard_role/ddl/list_collections_gen.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
@@ -441,15 +442,9 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                 // we can ensure the collection hasn't been capped.
                 if (_doc.getPhase() == Phase::kConvertCollectionToCappedOnDataShard) {
                     try {
-                        // Perform a noop write on the participant in order to advance the txnNumber
-                        // for this coordinator's lsid so that requests with older txnNumbers can no
-                        // longer execute.
-                        //
-                        // Additionally we want to wait for the completion of any ongoing command to
-                        // ensure that the subsequent check will see the correct status of the
-                        // collection.
-                        _performNoopRetryableWriteOnParticipantShardsAndConfigsvr(
-                            opCtx, getNewSession(opCtx), **executor, token);
+                        ParticipantCausalityBarrier barrier{
+                            _getParticipantShards(opCtx), **executor, token};
+                        performCausalityBarrier(opCtx, barrier);
 
                         if (!isCollectionCappedWithRequestedSize(opCtx,
                                                                  nss(),
@@ -561,27 +556,20 @@ logv2::DynamicAttributes ConvertToCappedCoordinator::getCoordinatorLogAttrs() co
                                     "targetUUID"_attr = _doc.getTargetUUID()};
 }
 
-void ConvertToCappedCoordinator::_performNoopRetryableWriteOnParticipantShardsAndConfigsvr(
-    OperationContext* opCtx,
-    const OperationSessionInfo& osi,
-    const std::shared_ptr<executor::TaskExecutor>& executor,
-    const CancellationToken& token) {
+std::vector<ShardId> ConvertToCappedCoordinator::_getParticipantShards(OperationContext* opCtx) {
     const ShardId configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard()->getId();
     const ShardId coordShardId = ShardingState::get(opCtx)->shardId();
-
     tassert(8577203, "Data shard not found.", _doc.getDataShard());
     const ShardId dataShard = *_doc.getDataShard();
-
     std::vector<ShardId> participants;
     participants.emplace_back(coordShardId);
-
     if (configShard != coordShardId) {
         participants.emplace_back(configShard);
     }
     if (dataShard != coordShardId && dataShard != configShard) {
         participants.emplace_back(dataShard);
     }
-    sharding_ddl_util::performNoopRetryableWriteOnShards(opCtx, participants, osi, executor, token);
+    return participants;
 }
 
 

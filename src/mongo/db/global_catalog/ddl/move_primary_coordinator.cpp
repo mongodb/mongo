@@ -289,12 +289,8 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
             Phase::kEnterCriticalSection,
             [this, token, executor, anchor = shared_from_this()](auto* opCtx) {
                 if (!_firstExecution) {
-                    // Perform a noop write on the recipient in order to
-                    // advance the txnNumber for this coordinator's logical
-                    // session. This prevents requests with older txnNumbers
-                    // from being processed.
-                    _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                        opCtx, getNewSession(opCtx), **executor, token);
+                    AllShardsAndConfigCausalityBarrier barrier{**executor, token};
+                    performCausalityBarrier(opCtx, barrier);
                 }
 
 
@@ -344,12 +340,9 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
         .then(_buildPhaseHandler(Phase::kExitCriticalSection,
                                  [this, token, executor, anchor = shared_from_this()](auto* opCtx) {
                                      if (!_firstExecution) {
-                                         // Perform a noop write on the recipient in order to
-                                         // advance the txnNumber for this coordinator's logical
-                                         // session. This prevents requests with older txnNumbers
-                                         // from being processed.
-                                         _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                                             opCtx, getNewSession(opCtx), **executor, token);
+                                         AllShardsAndConfigCausalityBarrier barrier{**executor,
+                                                                                    token};
+                                         performCausalityBarrier(opCtx, barrier);
                                      }
 
                                      unblockReadsAndWrites(opCtx);
@@ -403,8 +396,8 @@ ExecutorFuture<void> MovePrimaryCoordinator::_cleanupOnAbort(
             const auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
 
-            _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                opCtx, getNewSession(opCtx), **executor, token);
+            AllShardsAndConfigCausalityBarrier barrier{**executor, token};
+            performCausalityBarrier(opCtx, barrier);
 
             const auto& failedPhase = _doc.getPhase();
             const auto& toShardId = _doc.getToShardId();
