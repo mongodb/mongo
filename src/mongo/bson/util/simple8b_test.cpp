@@ -119,17 +119,33 @@ void testSimple8b(const std::vector<boost::optional<T>>& expectedValues,
     assertValuesEqual(s8b, expectedValues);
 
     make_signed_t<T> sum = 0;
+    boost::optional<T> last = T{0};
     for (auto&& val : expectedValues) {
         if (val) {
             sum = add(sum, Simple8bTypeUtil::decodeInt(*val));
         }
+        last = val;
     }
 
-    uint64_t prev = 0xE;  // Tests in this file assume that the previous value was '0'. This is
-                          // different semantics from BSONColumn.
+    uint64_t prev = simple8b::kSingleZero;
     auto s = simple8b::sum<make_signed_t<T>>(
         reinterpret_cast<const char*>(expectedBinary.data()), expectedBinary.size(), prev);
     ASSERT_EQ(s, sum);
+
+    // Test last
+    prev = simple8b::kSingleZero;
+    ASSERT_EQ(last,
+              simple8b::last<T>(reinterpret_cast<const char*>(expectedBinary.data()),
+                                expectedBinary.size(),
+                                prev));
+    if (last.has_value()) {
+        prev = simple8b::kSingleZero;
+        ASSERT_EQ(
+            Simple8bTypeUtil::decodeInt(*last),
+            simple8b::last<make_signed_t<T>>(
+                reinterpret_cast<const char*>(expectedBinary.data()), expectedBinary.size(), prev));
+    }
+
 
     auto testPrefixSum = [&](auto prefix) {
         make_signed_t<T> sum = prefix;
@@ -142,8 +158,7 @@ void testSimple8b(const std::vector<boost::optional<T>>& expectedValues,
             }
         }
 
-        uint64_t prev = 0xE;  // Tests in this file assume that the previous value was '0'. This is
-                              // different semantics from BSONColumn.
+        uint64_t prev = simple8b::kSingleZero;
         auto ps = simple8b::prefixSum<make_signed_t<T>>(
             reinterpret_cast<const char*>(expectedBinary.data()),
             expectedBinary.size(),

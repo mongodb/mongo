@@ -187,6 +187,20 @@ template <typename T, class Allocator>
 Simple8bBuilder<T, Allocator>::Simple8bBuilder(Allocator allocator) : _pendingValues(allocator) {}
 
 template <typename T, class Allocator>
+Simple8bBuilder<T, Allocator>::Simple8bBuilder(boost::optional<T> val,
+                                               int64_t num,
+                                               Allocator allocator)
+    : _rleCount(num), _lastValueInPrevWord(val), _pendingValues(allocator) {
+    if (val) {
+        auto pendingValue = _calculatePendingValue(*val);
+        invariant(pendingValue);
+        invariant(_doesIntegerFitInCurrentWord(*pendingValue));
+    }
+    _lastValidExtensionType = 0;
+    isSelectorPossible.fill(true);
+}
+
+template <typename T, class Allocator>
 Simple8bBuilder<T, Allocator>::~Simple8bBuilder() = default;
 
 template <typename T, class Allocator>
@@ -242,23 +256,6 @@ void Simple8bBuilder<T, Allocator>::flush(F&& writeFn) {
         // There are no more words in _pendingValues and RLE is possible.
         // However the _rleCount is 0 because we have not read any of the values in the next word.
         _rleCount = 0;
-    }
-}
-
-template <typename T, class Allocator>
-void Simple8bBuilder<T, Allocator>::setLastForRLE(boost::optional<T> val) {
-    _lastValueInPrevWord = val;
-    if (val) {
-        auto pendingValue = _calculatePendingValue(*val);
-        invariant(pendingValue);
-        invariant(_doesIntegerFitInCurrentWord(*pendingValue));
-    }
-}
-
-template <typename T, class Allocator>
-void Simple8bBuilder<T, Allocator>::resetLastForRLEIfNeeded() {
-    if (!rlePossible()) {
-        _lastValueInPrevWord = 0;
     }
 }
 

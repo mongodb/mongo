@@ -68,6 +68,7 @@ public:
     // Callback to handle writing of finalized Simple-8b blocks. Machine Endian byte order, the
     // value need to be converted to Little Endian before persisting.
     explicit Simple8bBuilder(Allocator = {});
+    Simple8bBuilder(boost::optional<T> val, int64_t num, Allocator = {});
     ~Simple8bBuilder();
 
     Simple8bBuilder(const Simple8bBuilder&) = default;
@@ -75,6 +76,20 @@ public:
 
     Simple8bBuilder& operator=(const Simple8bBuilder&) = default;
     Simple8bBuilder& operator=(Simple8bBuilder&&) = default;
+
+    /**
+     * Returns the allocator used by this Simple8bBuilder.
+     */
+    Allocator allocator() const {
+        // There is a bug in the version of MSVC we are using that fails to perform this cast when
+        // the allocator is std::allocator<void>. It is a stateless allocator so we just return a
+        // new instance as a workaround.
+        if constexpr (std::is_same_v<Allocator, std::allocator<void>>) {
+            return Allocator{};
+        } else {
+            return _pendingValues.get_allocator();
+        }
+    }
 
     /**
      * Appends val to Simple8b. Returns true if the append was successful and false if the value was
@@ -162,17 +177,6 @@ public:
      * Checks to see if RLE is possible and/or ongoing
      */
     bool rlePossible() const;
-
-    /**
-     * Forcibly set last value so future append/skip calls may use this to construct RLE. This
-     * should not be called in normal operation.
-     */
-    void setLastForRLE(boost::optional<T> val);
-
-    /**
-     * Reset RLE state on the last value, if needed. This should not be called in normal operation.
-     */
-    void resetLastForRLEIfNeeded();
 
     /**
      * Initialize RLE state from another builder
