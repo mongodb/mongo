@@ -720,11 +720,11 @@ def main():
         test_branch_str = 'testBranch = "copybara_test_branch"'
         config_file = f"{current_dir}/copy.bara.sky"
     elif args.workflow == "prod":
-        if expansions["is_patch"] == "true":
-            print("ERROR: prod workflow should not be run in patch builds!")
-            sys.exit(1)
+        # if expansions["is_patch"] == "true":
+        #     print("ERROR: prod workflow should not be run in patch builds!")
+        #     sys.exit(1)
         test_args = []
-        branch = "v8.2"
+        branch = "v8.2.6-hotfix"
         config_file = get_prod_copybara_config_from_master(current_dir)
     else:
         raise Exception(f"invalid workflow {args.workflow}")

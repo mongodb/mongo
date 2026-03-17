@@ -5,7 +5,7 @@ sourceUrl = "https://github.com/10gen/mongo.git"
 prodUrl = "https://github.com/mongodb/mongo.git"
 testUrl = "https://github.com/10gen/mongo-copybara.git"
 testBranch = "copybara_test_branch"
-prodRefForPinnedSourceCommit = "v8.2"
+prodRefForPinnedSourceCommit = "v8.2.6-hotfix"
 
 def make_workflow(workflow_name, destination_url, source_ref, destination_ref):
 
@@ -80,7 +80,7 @@ def make_workflow(workflow_name, destination_url, source_ref, destination_ref):
     )
 
 # push to the public repo
-make_workflow("prod", prodUrl, prodRefForPinnedSourceCommit, "v8.2")
+make_workflow("prod", prodUrl, prodRefForPinnedSourceCommit, "v8.2.6-hotfix")
 
 # push to private test repo to validate configs
 make_workflow("test", testUrl, testBranch, testBranch)
