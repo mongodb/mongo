@@ -205,13 +205,7 @@ output: {
                                 "declaringScope": "scope:7",
                                 "dependencies": []
                             },
-                            "a:9": {
-                                "declaringScope": "scope:3",
-                                "dependencies": [
-                                    "a:1",
-                                    "b:2"
-                                ]
-                            },
+                            "a:9": "a:9",
                             "b:20": {
                                 "declaringScope": "scope:7",
                                 "scope:8": {
@@ -275,13 +269,7 @@ output: {
                         "b:26"
                     ]
                 },
-                "c:16": {
-                    "declaringScope": "scope:2",
-                    "dependencies": [
-                        "a:1",
-                        "b:2"
-                    ]
-                }
+                "c:16": "c:16"
             }
         },
         "dependencies": [

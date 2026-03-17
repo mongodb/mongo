@@ -56,10 +56,7 @@ output: {
                     "declaringScope": "scope:1",
                     "dependencies": []
                 },
-                "b:1": {
-                    "declaringScope": "scope:0",
-                    "dependencies": []
-                },
+                "b:1": "b:1",
                 "c:3": {
                     "declaringScope": "scope:1",
                     "dependencies": [
@@ -80,16 +77,8 @@ output: {
                     "declaringScope": "scope:2",
                     "dependencies": []
                 },
-                "b:1": {
-                    "declaringScope": "scope:0",
-                    "dependencies": []
-                },
-                "c:3": {
-                    "declaringScope": "scope:1",
-                    "dependencies": [
-                        "b:1"
-                    ]
-                },
+                "b:1": "b:1",
+                "c:3": "c:3",
                 "d:5": {
                     "declaringScope": "scope:2",
                     "dependencies": [
@@ -110,22 +99,9 @@ output: {
                     "declaringScope": "scope:3",
                     "dependencies": []
                 },
-                "b:1": {
-                    "declaringScope": "scope:0",
-                    "dependencies": []
-                },
-                "c:3": {
-                    "declaringScope": "scope:1",
-                    "dependencies": [
-                        "b:1"
-                    ]
-                },
-                "d:5": {
-                    "declaringScope": "scope:2",
-                    "dependencies": [
-                        "c:3"
-                    ]
-                },
+                "b:1": "b:1",
+                "c:3": "c:3",
+                "d:5": "d:5",
                 "e:7": {
                     "declaringScope": "scope:3",
                     "dependencies": [

@@ -66,10 +66,7 @@ output: {
                     "declaringScope": "scope:1",
                     "dependencies": []
                 },
-                "b:2": {
-                    "declaringScope": "scope:0",
-                    "dependencies": []
-                }
+                "b:2": "b:2"
             }
         },
         "dependencies": []
@@ -82,10 +79,7 @@ output: {
                     "declaringScope": "scope:2",
                     "dependencies": []
                 },
-                "a:4": {
-                    "declaringScope": "scope:1",
-                    "dependencies": []
-                },
+                "a:4": "a:4",
                 "b:6": {
                     "declaringScope": "scope:2",
                     "dependencies": []

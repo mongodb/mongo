@@ -903,8 +903,14 @@ private:
                 for (auto&& name : getSortedStringKeys(scope.fields.begin(), scope.fields.end())) {
                     auto fieldId = scope.fields.at(name);
                     auto scopeFieldName = formatField(_graph._strings.get(name), fieldId);
-                    BSONObjBuilder fieldObj = fieldsBob.subobjStart(scopeFieldName);
-                    serializeField(fieldId, fieldObj);
+                    if (fieldId < scope.missingField) {
+                        // Field is inherited if the field ID is lower than the <missing> field of
+                        // the scope.
+                        fieldsBob.append(scopeFieldName, scopeFieldName);
+                    } else {
+                        BSONObjBuilder fieldObj = fieldsBob.subobjStart(scopeFieldName);
+                        serializeField(fieldId, fieldObj);
+                    }
                 }
             }
         }
