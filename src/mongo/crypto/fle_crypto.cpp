@@ -2250,7 +2250,7 @@ BSONObj FLEClientCrypto::generateCompactionTokens(const EncryptedFieldConfig& cf
     return tokensBuilder.obj();
 }
 
-BSONObj FLEClientCrypto::decryptDocument(BSONObj& doc, FLEKeyVault* keyVault) {
+BSONObj FLEClientCrypto::decryptDocument(const BSONObj& doc, FLEKeyVault* keyVault) {
     // TODO: SERVER-73851 replace with commented code once mongocrypt supports v2 decryption
     // auto crypt = createMongoCrypt();
 
@@ -2544,12 +2544,7 @@ BSONObj ESCCollection::generateNullAnchorDocument(HmacContext* hmacCtx,
 }
 
 StatusWith<ESCNullDocument> ESCCollection::decryptNullDocument(ESCTwiceDerivedValueToken valueToken,
-                                                               BSONObj& doc) {
-    return ESCCollection::decryptNullDocument(valueToken, std::move(doc));
-}
-
-StatusWith<ESCNullDocument> ESCCollection::decryptNullDocument(ESCTwiceDerivedValueToken valueToken,
-                                                               BSONObj&& doc) {
+                                                               const BSONObj& doc) {
     BSONElement encryptedValue;
     auto status = bsonExtractTypedField(doc, kValue, BinData, &encryptedValue);
     if (!status.isOK()) {
@@ -2568,12 +2563,7 @@ StatusWith<ESCNullDocument> ESCCollection::decryptNullDocument(ESCTwiceDerivedVa
 }
 
 StatusWith<ESCDocument> ESCCollection::decryptDocument(ESCTwiceDerivedValueToken valueToken,
-                                                       BSONObj& doc) {
-    return ESCCollection::decryptDocument(valueToken, std::move(doc));
-}
-
-StatusWith<ESCDocument> ESCCollection::decryptDocument(ESCTwiceDerivedValueToken valueToken,
-                                                       BSONObj&& doc) {
+                                                       const BSONObj& doc) {
     BSONElement encryptedValue;
     auto status = bsonExtractTypedField(doc, kValue, BinData, &encryptedValue);
     if (!status.isOK()) {
@@ -2593,7 +2583,7 @@ StatusWith<ESCDocument> ESCCollection::decryptDocument(ESCTwiceDerivedValueToken
 }
 
 StatusWith<ESCDocument> ESCCollection::decryptAnchorDocument(
-    const ESCTwiceDerivedValueToken& valueToken, BSONObj& doc) {
+    const ESCTwiceDerivedValueToken& valueToken, const BSONObj& doc) {
     return ESCCollection::decryptDocument(valueToken, doc);
 }
 

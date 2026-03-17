@@ -432,25 +432,13 @@ public:
      * Decrypt the null document.
      */
     static StatusWith<ESCNullDocument> decryptNullDocument(ESCTwiceDerivedValueToken valueToken,
-                                                           BSONObj& doc);
-
-    /**
-     * Decrypt the null document.
-     */
-    static StatusWith<ESCNullDocument> decryptNullDocument(ESCTwiceDerivedValueToken valueToken,
-                                                           BSONObj&& doc);
+                                                           const BSONObj& doc);
 
     /**
      * Decrypt a regular document.
      */
     static StatusWith<ESCDocument> decryptDocument(ESCTwiceDerivedValueToken valueToken,
-                                                   BSONObj& doc);
-
-    /**
-     * Decrypt a regular document.
-     */
-    static StatusWith<ESCDocument> decryptDocument(ESCTwiceDerivedValueToken valueToken,
-                                                   BSONObj&& doc);
+                                                   const BSONObj& doc);
 
     /**
      * Search for the highest document id for a given field/value pair based on the token.
@@ -513,7 +501,7 @@ public:
      * anchor position (apos), and ESCDocument.count is the cpos.
      */
     static StatusWith<ESCDocument> decryptAnchorDocument(
-        const ESCTwiceDerivedValueToken& valueToken, BSONObj& doc);
+        const ESCTwiceDerivedValueToken& valueToken, const BSONObj& doc);
 
     /*
      * Note on EmuBinaryV2 results:
@@ -829,7 +817,7 @@ public:
     /**
      * Decrypts a document. Only supports FLE2.
      */
-    static BSONObj decryptDocument(BSONObj& doc, FLEKeyVault* keyVault);
+    static BSONObj decryptDocument(const BSONObj& doc, FLEKeyVault* keyVault);
 
     /**
      * Validate the tags array exists and is of the right type.
