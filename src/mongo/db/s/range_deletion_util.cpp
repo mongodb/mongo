@@ -630,12 +630,9 @@ void removePersistentRangeDeletionTask(OperationContext* opCtx,
                                        const ChunkRange& range) {
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
 
-    auto overlappingRangeQuery = BSON(
-        RangeDeletionTask::kCollectionUuidFieldName
-        << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinKey << GTE
-        << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxKey << LTE
-        << range.getMax());
-    store.remove(opCtx, overlappingRangeQuery);
+    const auto overlappingRangeDeletionsQuery =
+        getQueryFilterForRangeDeletionTask(collectionUuid, range);
+    store.remove(opCtx, overlappingRangeDeletionsQuery);
 }
 
 void removePersistentRangeDeletionTasksByUUID(OperationContext* opCtx, const UUID& collectionUuid) {
