@@ -514,6 +514,9 @@ void TrafficRecorder::sessionEnded(const transport::Session& ts) {
 void TrafficRecorder::observe(const transport::Session& ts,
                               const Message& message,
                               EventType eventType) {
+    if (!_shouldRecord.load()) {
+        return;
+    }
     _observe(ts.id(), ts.toBSON().toString(), message, eventType);
 }
 
