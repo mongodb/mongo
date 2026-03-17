@@ -42,8 +42,8 @@ const ident = assert
     .indexDetails.x_1.uri.substring("statistics:table:".length);
 jsTestLog("Ident: " + ident);
 
-// Take a checkpoint so that the unfinished index is present in the catalog during the next startup.
-assert.commandWorked(primary.adminCommand({fsync: 1}));
+// Wait for a checkpoint so that the unfinished index is present in the catalog during the next startup.
+IndexBuildTest.assertIndexesStartedDurableSoon(primaryColl, "x_1");
 
 // Crash and restart the node.
 replSet.stop(primary, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});

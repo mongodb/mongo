@@ -85,11 +85,8 @@ assert(
 );
 
 // Check indexes on primary.
-IndexBuildTest.assertIndexes(coll, 2, ["_id_", "a_1"]);
-
-const cmdNs = testDB.getCollection("$cmd").getFullName();
-const ops = rst.dumpOplog(primary, {op: "c", ns: cmdNs, "o.commitIndexBuild": coll.getName()});
-assert.eq(1, ops.length, "primary did not write commitIndexBuild oplog entry: " + tojson(ops));
+IndexBuildTest.assertIndexesIdHelper(coll, 1, ["a_1"]);
+IndexBuildTest.assertIndexesCommitted(coll, "a_1");
 
 TestData.skipCheckDBHashes = true;
 rst.stopSet();

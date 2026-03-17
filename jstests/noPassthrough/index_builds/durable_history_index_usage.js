@@ -188,6 +188,7 @@ assert.eq(4, findWithIndex(undefined)["cursor"]["firstBatch"].length);
 
 // Demonstrate that durable history can be used across a restart with a finished index.
 assert.commandWorked(testDB().adminCommand({fsync: 1}));
+IndexBuildTest.assertIndexesDurable(coll(), "a_1");
 replTest.restart(primary());
 
 assert.eq(4, findWithIndex(undefined)["cursor"]["firstBatch"].length);

@@ -13,6 +13,15 @@ export var IndexBuildTest = class {
     /**
      * Starts an index build in a separate mongo shell process with given options.
      * Ensures the index build worked or failed with one of the expected failures.
+     *
+     * @param {Mongo} conn
+     * @param {string} ns
+     * @param {Object|Object[]} keyPattern
+     * @param {Object} [options]
+     * @param {number|number[]} [expectedFailures]
+     * @param {int|string} [commitQuorum]
+     * @param {Object} [authDoc]
+     * @returns {Function} awaitIndexBuildShellFn
      */
     static startIndexBuild(conn, ns, keyPattern, options, expectedFailures, commitQuorum, authDoc) {
         options = options || {};
@@ -42,6 +51,12 @@ export var IndexBuildTest = class {
      * 'indexName', or any index build if either is undefined. Returns -1 if there is no current
      * index build.
      * Accepts optional filter that can be used to customize the db.currentOp() query.
+     *
+     * @param {DB} database
+     * @param {string} [collectionName]
+     * @param {string} [indexName]
+     * @param {Object} [filter]
+     * @returns {number} opId
      */
     static getIndexBuildOpId(database, collectionName, indexName, filter) {
         let pipeline = [{$currentOp: {allUsers: true, idleConnections: true}}];
@@ -99,6 +114,15 @@ export var IndexBuildTest = class {
      * The filter may be necessary in situations when the index build is delegated to a thread pool
      * managed by the IndexBuildsCoordinator and it is necessary to differentiate between the
      * client connection thread and the IndexBuildsCoordinator thread actively building the index.
+     *
+     * This does not ensure that the startIndexBuild oplog entry has been persisted durably.
+     * @see IndexBuildTest.assertIndexesStartedDurableSoon
+     *
+     * @param {DB} database
+     * @param {string} [collectionName]
+     * @param {string} [indexName]
+     * @param {Object} [filter]
+     * @returns {number} opId
      */
     static waitForIndexBuildToStart(database, collectionName, indexName, filter) {
         if (collectionName) {
@@ -114,6 +138,10 @@ export var IndexBuildTest = class {
 
     /**
      * Wait for index build to begin its collection scan phase and return its op id.
+     * @param {DB} database
+     * @param {string} [collectionName]
+     * @param {string} [indexName]
+     * @returns {number} opId
      */
     static waitForIndexBuildToScanCollection(database, collectionName, indexName) {
         // The collection scan is the only phase of an index build that uses a progress meter.
@@ -126,7 +154,10 @@ export var IndexBuildTest = class {
     }
 
     /**
-     * Wait for all index builds to stop and return its op id.
+     * Wait for index build to stop.
+     * @param {DB} database
+     * @param {string} [collectionName]
+     * @param {string} [indexName]
      */
     static waitForIndexBuildToStop(database, collectionName, indexName) {
         assert.soon(function () {
@@ -138,6 +169,9 @@ export var IndexBuildTest = class {
      * Checks the db.currentOp() output for the index build with opId.
      *
      * An optional 'onOperationFn' callback accepts an operation to perform any additional checks.
+     * @param {DB} database
+     * @param {number} opId
+     * @param {Function(Object)} [onOperationFn]
      */
     static assertIndexBuildCurrentOpContents(database, opId, onOperationFn) {
         const inprog = database.currentOp({opid: opId, "$all": true}).inprog;
@@ -155,12 +189,25 @@ export var IndexBuildTest = class {
 
     /**
      * Returns true if `listIndexes` returns the '_id_' index for the collection
+     * @param {DBCollection} coll
+     * @returns {boolean}
      */
     static listIndexesIncludesId(coll) {
         const res = assert.commandWorked(coll.getDB().runCommand({listIndexes: coll.getName()}));
         return 1 == res.cursor.firstBatch.filter((i) => i.name == "_id_" || i.clustered).length;
     }
 
+    /**
+     * Helper for assertIndexes that automatically includes the '_id_' index for the collection as
+     * needed.
+     *
+     * @param {DBCollection} coll
+     * @param {number} numIndexes
+     * @param {string[]} readyIndexes
+     * @param {string[]} [notReadyIndexes]
+     * @param {Object} [options]
+     * @returns {Object} a map of index specs keyed by name
+     */
     static assertIndexesIdHelper(coll, numIndexes, readyIndexes, notReadyIndexes, options) {
         if (IndexBuildTest.listIndexesIncludesId(coll)) {
             numIndexes++;
@@ -174,7 +221,16 @@ export var IndexBuildTest = class {
      * Runs listIndexes command on collection.
      * If 'options' is provided, these will be sent along with the command request.
      * Asserts that all the indexes on this collection fit within the first batch of results.
-     * Returns a map of index specs keyed by name.
+     *
+     * Does not guarantee that ready indexes have been durably checkpointed.
+     * @see IndexBuildTest.assertIndexesDurable
+     *
+     * @param {DBCollection} coll
+     * @param {number} numIndexes
+     * @param {string[]} readyIndexes
+     * @param {string[]} [notReadyIndexes]
+     * @param {Object} [options]
+     * @returns {Object} a map of index specs keyed by name
      */
     static assertIndexes(coll, numIndexes, readyIndexes, notReadyIndexes, options) {
         notReadyIndexes = notReadyIndexes || [];
@@ -214,7 +270,7 @@ export var IndexBuildTest = class {
         for (let name of readyIndexes) {
             assert(
                 indexMap.hasOwnProperty(name),
-                "ready index " + name + " missing from listIndexes result: " + tojson(res),
+                "ready index " + name + " missing from listIndexes result: " + tojson(indexMap),
             );
             const spec = indexMap[name];
             assert(
@@ -231,7 +287,7 @@ export var IndexBuildTest = class {
         for (let name of notReadyIndexes) {
             assert(
                 indexMap.hasOwnProperty(name),
-                "not-ready index " + name + " missing from listIndexes result: " + tojson(res),
+                "not-ready index " + name + " missing from listIndexes result: " + tojson(indexMap),
             );
 
             const spec = indexMap[name];
@@ -259,6 +315,19 @@ export var IndexBuildTest = class {
         return indexMap;
     }
 
+    /**
+     * Helper for assertIndexes ensures the given indexes are ready soon.
+     *
+     * Does not guarantee that ready indexes have been durably checkpointed.
+     * @see IndexBuildTest.assertIndexesDurableSoon
+     *
+     * @param {DBCollection} coll
+     * @param {number} numIndexes
+     * @param {string[]} readyIndexes
+     * @param {string[]} [notReadyIndexes]
+     * @param {Object} [options]
+     * @returns {Object} a map of index specs keyed by name
+     */
     static assertIndexesSoon(coll, numIndexes, readyIndexes, notReadyIndexes, options) {
         let indexMap;
         assert.soonNoExcept(function () {
@@ -269,7 +338,240 @@ export var IndexBuildTest = class {
     }
 
     /**
+     * Asserts that the indexes with the given names (and/or buildUUIDs) have written oplog
+     * entries of the given type. When using a persistent storage engine (i.e. WT), this
+     * implies durability as the oplog is journaled.
+     *
+     * @param {string} oplogEntryType ("startIndexBuild", "commitIndexBuild", "abortIndexBuild")
+     * @param {DBCollection} coll
+     * @param {string|string[]} indexes
+     * @param {UUID[]} [buildUUIDs]
+     * @param {Object} [queryOptions]
+     * @returns {Timestamp} timestamp of the most recent oplog entry
+     */
+    static assertIndexOplogEntry(oplogEntryType, coll, indexes, buildUUIDs, queryOptions) {
+        const conn = coll.getMongo();
+        indexes = Array.isArray(indexes) ? indexes : [indexes];
+        buildUUIDs ??= [];
+
+        if (coll.getMetadata().type === "timeseries") {
+            coll = getTargetCollForIndexBuilds(coll);
+        }
+
+        const assertOplogTimestamp = (query, msg) => {
+            const res = conn
+                .getDB("local")
+                .getCollection("oplog.rs")
+                .find(query)
+                .sort({$natural: -1})
+                .limit(1)
+                .toArray();
+            assert(res && Array.isArray(res) && res.length == 1 && res[0].hasOwnProperty("ts"), msg);
+            return res[0].ts;
+        };
+
+        let greatestOplogEntryDurable = Timestamp();
+        const field = "o." + oplogEntryType;
+        const baseQuery = {
+            op: "c",
+            ns: coll.getDB().getName() + ".$cmd",
+            ...queryOptions,
+        };
+        baseQuery[field] = coll.getName();
+
+        const timestamps = [];
+        for (let indexName of indexes) {
+            const nameQuery = {...baseQuery, "o.indexes": {$elemMatch: {name: indexName}}};
+            const ts = assertOplogTimestamp(nameQuery, `${oplogEntryType} for index "${indexName}" not found`);
+            timestamps.push(ts);
+        }
+        for (let buildUUID of buildUUIDs) {
+            const buildUUIDQuery = {...baseQuery, "o.indexBuildUUID": buildUUID};
+            const ts = assertOplogTimestamp(
+                buildUUIDQuery,
+                `${oplogEntryType} for indexBuildUUID ${buildUUID} not found`,
+            );
+            timestamps.push(ts);
+        }
+        for (const oplogEntryDurable of timestamps) {
+            if (timestampCmp(oplogEntryDurable, greatestOplogEntryDurable) > 0) {
+                greatestOplogEntryDurable = oplogEntryDurable;
+            }
+        }
+        return greatestOplogEntryDurable;
+    }
+
+    /**
+     * Asserts that the indexes with the given names have written their startIndexBuild oplog
+     * entries. When using a persistent storage engine (i.e. WT), this implies durability as the
+     * oplog is journaled.
+     *
+     * This differs from {@link IndexBuildTest.waitForIndexBuildToStart} as it checks for the
+     * presence of the startIndexBuild oplog entry rather than db.currentOp().
+     *
+     * @param {DBCollection} coll
+     * @param {string|string[]} indexes
+     * @param {Object} [queryOptions]
+     * @returns {Timestamp} timestamp of the most recent oplog entry
+     */
+    static assertIndexesStarted(coll, indexes, queryOptions) {
+        return IndexBuildTest.assertIndexOplogEntry("startIndexBuild", coll, indexes, [], queryOptions);
+    }
+
+    /**
+     * Helper that ensures startIndexBuild oplog entries are written soon.
+     * @see IndexBuildTest.assertIndexesStarted
+     *
+     * @param {DBCollection} coll
+     * @param {string|string[]} indexes
+     * @param {Object} [queryOptions]
+     * @returns {Timestamp} timestamp of the most recent oplog entry
+     */
+    static assertIndexesStartedSoon(coll, indexes, queryOptions) {
+        let mostRecentTs;
+        assert.soonNoExcept(() => {
+            mostRecentTs = IndexBuildTest.assertIndexesStarted(coll, indexes, queryOptions);
+            return true;
+        });
+        return mostRecentTs;
+    }
+
+    /**
+     * Asserts that the indexes with the given names all have written their startIndexBuild oplog
+     * entries and that those oplog entries have been durably persisted in a stable checkpoint.
+     * @see IndexBuildTest.assertIndexesStarted
+     *
+     * @param {DBCollection} coll
+     * @param {string|string[]} indexes
+     * @param {Object} [queryOptions]
+     * @returns {Timestamp} timestamp of the most recent oplog entry
+     */
+    static assertIndexesStartedDurable(coll, indexes, queryOptions) {
+        const conn = coll.getMongo();
+        const mostRecentTs = IndexBuildTest.assertIndexesStarted(coll, indexes, queryOptions);
+        const stableTs = assert.commandWorked(conn.adminCommand({replSetGetStatus: 1})).lastStableRecoveryTimestamp;
+        assert.gte(
+            timestampCmp(stableTs, mostRecentTs),
+            0,
+            `lastStableRecoveryTimestamp ${tojson(stableTs)} not caught up with latest oplog entry timestamp ${tojson(mostRecentTs)}`,
+        );
+        return mostRecentTs;
+    }
+
+    /**
+     * Helper that ensures startIndexBuild oplog entries are durable in a stable checkpoint soon.
+     * @see IndexBuildTest.assertIndexesStarted
+     *
+     * @param {DBCollection} coll
+     * @param {string|string[]} indexes
+     * @param {Object} [queryOptions]
+     * @returns {Timestamp} timestamp of the most recent oplog entry
+     */
+    static assertIndexesStartedDurableSoon(coll, indexes, queryOptions) {
+        let mostRecentTs;
+        assert.soonNoExcept(() => {
+            const conn = coll.getMongo();
+            mostRecentTs = IndexBuildTest.assertIndexesStarted(coll, indexes, queryOptions);
+            const stableTs = assert.commandWorked(conn.adminCommand({replSetGetStatus: 1})).lastStableRecoveryTimestamp;
+            return timestampCmp(stableTs, mostRecentTs) >= 0;
+        }, "lastStableRecoveryTimestamp not caught up with latest oplog entry timestamp");
+        return mostRecentTs;
+    }
+
+    /**
+     * Asserts that the indexes with the given names (and/or buildUUIDs) have written their
+     * commitIndexBuild oplog entries. When using a persistent storage engine (i.e. WT), this
+     * implies durability as the oplog is journaled.
+     *
+     * This differs somewhat from {@link IndexBuildTest.assertIndexes} as it checks for the
+     * presence of the commitIndexBuild oplog entry rather than the index metadata in the catalog.
+     *
+     * Returns the timestamp of the most recent commitIndexBuild oplog entry.
+     *
+     * @param {DBCollection} coll
+     * @param {string|string[]} indexes
+     * @param {UUID[]} [buildUUIDs]
+     * @param {Object} [queryOptions]
+     * @returns {Timestamp} timestamp of the most recent oplog entry
+     */
+    static assertIndexesCommitted(coll, indexes, buildUUIDs, queryOptions) {
+        return IndexBuildTest.assertIndexOplogEntry("commitIndexBuild", coll, indexes, buildUUIDs, queryOptions);
+    }
+
+    /**
+     * Helper that ensures commitIndexBuild oplog entries are written soon.
+     * @see IndexBuildTest.assertIndexesCommitted
+     *
+     * @param {DBCollection} coll
+     * @param {string|string[]} indexes
+     * @param {UUID[]} [buildUUIDs]
+     * @param {Object} [queryOptions]
+     * @returns {Timestamp} timestamp of the most recent oplog entry
+     */
+    static assertIndexesCommittedSoon(coll, indexes, buildUUIDs, queryOptions) {
+        let greatestIndexCommitDurable;
+        assert.soonNoExcept(() => {
+            greatestIndexCommitDurable = IndexBuildTest.assertIndexesCommitted(coll, indexes, buildUUIDs, queryOptions);
+            return true;
+        });
+        return greatestIndexCommitDurable;
+    }
+
+    /**
+     * Asserts that the indexes with the given names (and/or buildUUIDs) all have written their
+     * commitIndexBuild oplog entries and that those oplog entries have been durably persisted in
+     * a stable checkpoint. This implies stable checkpoint durability of the index itself.
+     * @see IndexBuildTest.assertIndexesCommitted
+     *
+     * @param {DBCollection} coll
+     * @param {string|string[]} indexes
+     * @param {UUID[]} [buildUUIDs]
+     * @param {Object} [queryOptions]
+     * @returns {Timestamp} timestamp of the most recent oplog entry
+     */
+    static assertIndexesDurable(coll, indexes, buildUUIDs, queryOptions) {
+        const conn = coll.getMongo();
+        const greatestIndexCommitDurable = IndexBuildTest.assertIndexesCommitted(
+            coll,
+            indexes,
+            buildUUIDs,
+            queryOptions,
+        );
+        const stableTs = assert.commandWorked(conn.adminCommand({replSetGetStatus: 1})).lastStableRecoveryTimestamp;
+        assert.gte(
+            timestampCmp(stableTs, greatestIndexCommitDurable),
+            0,
+            `lastStableRecoveryTimestamp ${tojson(stableTs)} not caught up with latest commitIndexBuild timestamp ${tojson(greatestIndexCommitDurable)}`,
+        );
+        return greatestIndexCommitDurable;
+    }
+
+    /**
+     * Asserts that the indexes with the given names (and/or buildUUIDs) all have written their
+     * commitIndexBuild oplog entries and that those oplog entries have been durably persisted in
+     * a stable checkpoint. This implies stable checkpoint durability of the index itself.
+     * @see IndexBuildTest.assertIndexesCommitted
+     *
+     * @param {DBCollection} coll
+     * @param {string|string[]} indexes
+     * @param {UUID[]} [buildUUIDs]
+     * @param {Object} [queryOptions]
+     * @returns {Timestamp} timestamp of the most recent oplog entry
+     */
+    static assertIndexesDurableSoon(coll, indexes, buildUUIDs, queryOptions) {
+        let greatestIndexCommitDurable;
+        assert.soonNoExcept(() => {
+            const conn = coll.getMongo();
+            greatestIndexCommitDurable = IndexBuildTest.assertIndexesCommitted(coll, indexes, buildUUIDs, queryOptions);
+            const stableTs = assert.commandWorked(conn.adminCommand({replSetGetStatus: 1})).lastStableRecoveryTimestamp;
+            return timestampCmp(stableTs, greatestIndexCommitDurable) >= 0;
+        }, "lastStableRecoveryTimestamp not caught up with latest commitIndexBuild timestamp");
+        return greatestIndexCommitDurable;
+    }
+
+    /**
      * Prevent subsequent index builds from running to completion.
+     * @param {Mongo} conn
      */
     static pauseIndexBuilds(conn) {
         assert.commandWorked(conn.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "alwaysOn"}));
@@ -277,6 +579,7 @@ export var IndexBuildTest = class {
 
     /**
      * Unblock current and subsequent index builds.
+     * @param {Mongo} conn
      */
     static resumeIndexBuilds(conn) {
         assert.commandWorked(conn.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "off"}));
@@ -284,6 +587,14 @@ export var IndexBuildTest = class {
 
     /**
      * Restarts the node in standalone mode to build the index in a rolling fashion.
+     *
+     * @param {ReplSetTest} rst
+     * @param {Mongo} node
+     * @param {number} port the port for the standalone to listen on
+     * @param {string} dbName
+     * @param {string} collName
+     * @param {Object} indexSpec
+     * @param {string} indexName
      */
     static buildIndexOnNodeAsStandalone(rst, node, port, dbName, collName, indexSpec, indexName) {
         jsTestLog("Restarting as standalone: " + node.host);

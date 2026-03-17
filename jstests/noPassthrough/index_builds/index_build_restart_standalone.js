@@ -48,13 +48,9 @@ const createIndexCmd = IndexBuildTest.startIndexBuild(primary, primaryColl.getFu
 ]);
 IndexBuildTest.waitForIndexBuildToStart(secondaryDB, collName, indexName);
 
-// Wait for the stable timestamps on each node to advance, so that the  write is included in the
-// stable checkpoint taken on shutdown.
-jsTest.log("Wait for stable timestamps to advance.");
-const targetTs = primary.adminCommand({replSetGetStatus: 1}).optimes.readConcernMajorityOpTime.ts;
-rst.waitForStableTimestampTobeAdvanced(primary, targetTs);
-rst.waitForStableTimestampTobeAdvanced(secondary, targetTs);
-rst.awaitLastStableRecoveryTimestamp();
+// Wait until the write is included in the stable checkpoint.
+jsTest.log("Wait for stable checkpoint.");
+IndexBuildTest.assertIndexesStartedDurableSoon(primaryColl, indexName);
 
 TestData.skipCheckDBHashes = true;
 rst.stopSet(/*signal=*/ null, /*forRestart=*/ true);

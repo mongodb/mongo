@@ -70,9 +70,7 @@ thread.join();
 // index build. In this case they should be equal, but it's also okay for the reply time to be
 // greater than the actual commit time.
 const createIndexResult = thread.returnData();
-const oplog = primary.getDB("local").getCollection("oplog.rs");
-const commitEntry = oplog.find({"o.commitIndexBuild": "create_index_noop_optime"}).toArray()[0];
-
-assert.gte(createIndexResult.operationTime, commitEntry.ts);
+const commitTs = IndexBuildTest.assertIndexesCommitted(coll, "a_1");
+assert.gte(createIndexResult.operationTime, commitTs);
 
 replSet.stopSet();

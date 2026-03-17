@@ -24,12 +24,6 @@ const secondary = rst.getSecondary();
 
 const primaryDB = primary.getDB(dbName);
 const primaryColl = primaryDB[collName];
-const OplogColl = primary.getDB("local")["oplog.rs"];
-const docFilter = {
-    "ns": dbName + ".$cmd",
-    "o.commitIndexBuild": {$exists: true},
-    "o.indexes.0.name": indexName,
-};
 
 jsTestLog("Do some document writes.");
 assert.commandWorked(primaryColl.insert({_id: 0, x: 0}, {"writeConcern": {"w": "majority"}}));
@@ -44,9 +38,12 @@ function isIndexBuildInProgress(conn, indexName) {
 
 function sanityChecks() {
     // Check to see commitIndexBuild oplog entry is not present.
-    assert.isnull(
-        OplogColl.findOne(docFilter),
-        "Able to find commitIndexBuild oplog entry. Filter:" + tojson(docFilter),
+    assert.throws(
+        () => {
+            IndexBuildTest.assertIndexesCommitted(primaryColl, indexName);
+        },
+        [],
+        `Able to find commitIndexBuild oplog entry for index "${indexName}"`,
     );
 
     // Check if the index build is in progress on both the nodes.
@@ -54,7 +51,7 @@ function sanityChecks() {
     assert.eq(true, isIndexBuildInProgress(secondary, indexName));
 
     // Check if 'x_1' index is not yet ready.
-    IndexBuildTest.assertIndexes(primaryColl, 2, ["_id_"], ["x_1"]);
+    IndexBuildTest.assertIndexesIdHelper(primaryColl, 1, [], [indexName]);
 }
 
 function createIndex(dbName, collName, indexName) {
@@ -93,7 +90,7 @@ joinCreateIndexThread();
 rst.awaitReplication();
 
 jsTestLog("Check Primary to see if it contains 'commitIndexBuild' oplog entry ");
-assert(OplogColl.findOne(docFilter), "Not able to find a matching oplog entry. Filter:" + tojson(docFilter));
+IndexBuildTest.assertIndexesCommitted(primaryColl, indexName);
 
 // Sanity checks to see if the index build still runs on primary and secondary.
 assert.eq(false, isIndexBuildInProgress(primary, indexName));
