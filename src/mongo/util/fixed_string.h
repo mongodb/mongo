@@ -34,6 +34,7 @@
 
 #include <algorithm>
 #include <array>
+#include <compare>
 #include <concepts>
 #include <cstddef>
 #include <iterator>
@@ -41,8 +42,9 @@
 #include <type_traits>
 #include <utility>
 
+MONGO_MOD_PUBLIC;
 
-namespace MONGO_MOD_PUB mongo {
+namespace mongo {
 
 /**
  * A string-valued "structural type".
@@ -83,17 +85,12 @@ namespace MONGO_MOD_PUB mongo {
 template <size_t N>
 class FixedString {
 public:
-    // clang-format off
-
-    /** Create from a list of characters. */
+    /** Create from an argument pack of characters. */
     template <typename... Chars>
-        requires (sizeof...(Chars) == N) &&
-                 (... && std::is_convertible_v<char, Chars>) &&
-                 (... && !std::is_pointer_v<Chars>)
-    constexpr explicit FixedString(Chars... chars) noexcept
-        : _data{chars...} {}
-
-    // clang-format on
+    requires(sizeof...(Chars) == N) &&                //
+        (... && std::convertible_to<Chars, char>) &&  //
+        (... && !std::is_pointer_v<Chars>)            //
+    consteval explicit FixedString(Chars... chars) noexcept : _data{chars...} {}
 
     /**
      * Implicitly convert from a string literal.
@@ -120,85 +117,60 @@ public:
         return N;
     }
 
+    template <size_t BN>
+    friend constexpr bool operator==(const FixedString& a, const FixedString<BN>& b) {
+        return StringData{a} == StringData{b};
+    }
+
+    template <size_t BN>
+    friend constexpr auto operator<=>(const FixedString& a, const FixedString<BN>& b) {
+        return StringData{a} <=> StringData{b};
+    }
+
+    friend constexpr std::ostream& operator<<(std::ostream& os, const FixedString& s) {
+        return os << StringData{s};
+    }
+
+    /** Concatenation. */
+    template <size_t BN>
+    friend consteval FixedString<N + BN> operator+(const FixedString& a, const FixedString<BN>& b) {
+        char data[N + BN + 1];
+        char* w = data;
+        w = std::copy_n(a.data(), a.size(), w);
+        w = std::copy_n(b.data(), b.size(), w);
+        *w++ = 0;
+        return data;
+    }
+
+    template <size_t SN>
+    friend consteval FixedString<N + SN - 1> operator+(const FixedString& a, const char (&s)[SN]) {
+        return a + FixedString{s};
+    }
+
+    template <size_t SN>
+    friend consteval FixedString<SN - 1 + N> operator+(const char (&s)[SN], const FixedString& a) {
+        return FixedString{s} + a;
+    }
+
+    friend consteval FixedString<N + 1> operator+(const FixedString& a, char ch) {
+        return a + FixedString<1>{ch};
+    }
+
+    friend consteval FixedString<1 + N> operator+(char ch, const FixedString& a) {
+        return FixedString<1>{ch} + a;
+    }
+
     // Pseudo-private. Must be public as a requirement to be a structural type.
-    std::array<char, N + 1> _data;
+    MONGO_MOD_FILE_PRIVATE std::array<char, N + 1> _data;
 };
 
-template <size_t AN, size_t BN>
-constexpr bool operator==(const FixedString<AN>& a, const FixedString<BN>& b) {
-    return StringData{a} == StringData{b};
-}
-
-template <size_t AN, size_t BN>
-constexpr bool operator!=(const FixedString<AN>& a, const FixedString<BN>& b) {
-    return StringData{a} != StringData{b};
-}
-
-template <size_t AN, size_t BN>
-constexpr bool operator<(const FixedString<AN>& a, const FixedString<BN>& b) {
-    return StringData{a} < StringData{b};
-}
-
-template <size_t AN, size_t BN>
-constexpr bool operator>(const FixedString<AN>& a, const FixedString<BN>& b) {
-    return StringData{a} > StringData{b};
-}
-
-template <size_t AN, size_t BN>
-constexpr bool operator<=(const FixedString<AN>& a, const FixedString<BN>& b) {
-    return StringData{a} <= StringData{b};
-}
-
-template <size_t AN, size_t BN>
-constexpr bool operator>=(const FixedString<AN>& a, const FixedString<BN>& b) {
-    return StringData{a} >= StringData{b};
-}
-
-template <size_t N>
-constexpr std::ostream& operator<<(std::ostream& os, const FixedString<N>& s) {
-    return os << StringData{s};
-}
-
-// clang-format off
-/** Deduce N from character list count. */
+/** Deduce N from character argument pack count. */
 template <typename... Chars>
-    requires(...&& std::is_convertible_v<Chars, char>)
+requires(... && std::convertible_to<Chars, char>)
 FixedString(Chars... chars) -> FixedString<sizeof...(chars)>;
-// clang-format on
 
 /** Deduce N from string literal array size. */
 template <size_t N>
 FixedString(const char (&str)[N]) -> FixedString<N - 1>;
 
-/** Concatenation. */
-template <size_t AN, size_t BN>
-consteval FixedString<AN + BN> operator+(const FixedString<AN>& a, const FixedString<BN>& b) {
-    char data[AN + BN + 1];
-    char* w = data;
-    w = std::copy_n(a.data(), a.size(), w);
-    w = std::copy_n(b.data(), b.size(), w);
-    *w++ = 0;
-    return data;
-}
-
-template <size_t N, size_t SN>
-consteval FixedString<N + SN - 1> operator+(const FixedString<N>& a, const char (&s)[SN]) {
-    return a + FixedString{s};
-}
-
-template <size_t N, size_t SN>
-consteval FixedString<SN - 1 + N> operator+(const char (&s)[SN], const FixedString<N>& a) {
-    return FixedString{s} + a;
-}
-
-template <size_t N>
-consteval FixedString<N + 1> operator+(const FixedString<N>& a, char ch) {
-    return a + FixedString{ch};
-}
-
-template <size_t N>
-consteval FixedString<1 + N> operator+(char ch, const FixedString<N>& a) {
-    return FixedString{ch} + a;
-}
-
-}  // namespace MONGO_MOD_PUB mongo
+}  // namespace mongo

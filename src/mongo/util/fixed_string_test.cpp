@@ -113,17 +113,25 @@ TEST(FixedString, Comparison) {
         FixedString{"bb"},
         FixedString{"c"},
     };
-    auto doCompare = [](const auto& a, const auto& b) {
-        std::cout << "(" << str::escape(a) << ", " << str::escape(b) << ")\n";
-        ASSERT_EQ(a == b, StringData{a} == StringData{b});
-        ASSERT_EQ(a != b, StringData{a} != StringData{b});
-        ASSERT_EQ(a < b, StringData{a} < StringData{b});
-        ASSERT_EQ(a > b, StringData{a} > StringData{b});
-        ASSERT_EQ(a <= b, StringData{a} <= StringData{b});
-        ASSERT_EQ(a >= b, StringData{a} >= StringData{b});
-    };
-    std::apply([&](auto... pairs) { (std::apply(doCompare, pairs), ...); },
-               tupleCartesianProduct(strs, strs));
+    std::apply(
+        [&](auto... pairs) {
+            (std::apply(
+                 [](auto&& a, auto&& b) {
+                     StringData sa{a};
+                     StringData sb{b};
+                     SCOPED_TRACE(fmt::format("{}={:?}", "a", sa));
+                     SCOPED_TRACE(fmt::format("{}={:?}", "b", sb));
+                     EXPECT_EQ(a == b, sa == sb);
+                     EXPECT_EQ(a != b, sa != sb);
+                     EXPECT_EQ(a < b, sa < sb);
+                     EXPECT_EQ(a > b, sa > sb);
+                     EXPECT_EQ(a <= b, sa <= sb);
+                     EXPECT_EQ(a >= b, sa >= sb);
+                 },
+                 pairs),
+             ...);
+        },
+        tupleCartesianProduct(strs, strs));
 }
 
 template <FixedString name, typename Rep>
