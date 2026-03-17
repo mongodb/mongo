@@ -98,10 +98,9 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
     bool clientSuppliedWriteConcern = !writeConcern.usedDefaultConstructedWC;
     bool customDefaultWasApplied = false;
 
-    // WriteConcern defaults can only be applied on regular replica set members.
-    // Operations received by shard and config servers should always have WC explicitly specified.
-    bool canApplyDefaultWC = serverGlobalParams.clusterRole.has(ClusterRole::None) &&
-        repl::ReplicationCoordinator::get(opCtx)->isReplEnabled() &&
+    // Though the mongoS should always supply a write concern for shardsvr/configsvr nodes, we still
+    // apply the default here for direct shard operations (or for normal replica set members).
+    bool canApplyDefaultWC = repl::ReplicationCoordinator::get(opCtx)->isReplEnabled() &&
         (!opCtx->inMultiDocumentTransaction() ||
          isTransactionCommand(cmdObj.firstElementFieldName())) &&
         !opCtx->getClient()->isInDirectClient() && !isInternalClient;

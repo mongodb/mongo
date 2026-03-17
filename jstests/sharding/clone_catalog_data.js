@@ -155,7 +155,8 @@ TestData.skipCheckMetadataConsistency = true;
 
     // Check that the command fails without writeConcern majority.
     assert.commandFailedWithCode(
-        toShard.adminCommand({_shardsvrCloneCatalogData: 'test', from: fromShard.host}),
+        toShard.adminCommand(
+            {_shardsvrCloneCatalogData: 'test', from: fromShard.host, writeConcern: {w: 1}}),
         ErrorCodes.InvalidOptions);
 
     // Check that the command fails when attempting to clone the admin database.

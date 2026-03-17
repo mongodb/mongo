@@ -31,6 +31,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/global_index/global_index_util.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
@@ -55,6 +56,8 @@ class GlobalIndexInserterTest : public ShardServerTestFixture {
 public:
     void setUp() override {
         ShardServerTestFixture::setUp();
+
+        ReadWriteConcernDefaults::create(getServiceContext(), _lookupMock.getFetchDefaultsFn());
 
         // Create config.transactions collection
         auto opCtx = operationContext();
@@ -136,6 +139,7 @@ private:
     const RAIIServerParameterControllerForTest _enableFeature{"featureFlagGlobalIndexes", true};
 
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
+    ReadWriteConcernDefaultsLookupMock _lookupMock;
 };
 
 TEST_F(GlobalIndexInserterTest, ClonerUpdatesIndexEntryAndSkipIdCollection) {
