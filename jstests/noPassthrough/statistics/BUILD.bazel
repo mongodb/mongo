@@ -1,0 +1,10 @@
+load("//bazel:mongo_js_rules.bzl", "mongo_js_library")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_js_library(
+    name = "all_javascript_files",
+    srcs = glob([
+        "*.js",
+    ]),
+)

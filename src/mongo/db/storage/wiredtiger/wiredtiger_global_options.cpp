@@ -63,6 +63,25 @@ Status WiredTigerGlobalOptions::store(const moe::Environment& params) {
     return Status::OK();
 }
 
+Status WiredTigerGlobalOptions::validateStatisticsSetting(const std::string& setting) {
+    constexpr auto kAll = "all"_sd;
+    constexpr auto kCacheWalk = "cache_walk"_sd;
+    constexpr auto kFast = "fast"_sd;
+    constexpr auto kNone = "none"_sd;
+    constexpr auto kClear = "clear"_sd;
+    constexpr auto kTreeWalk = "tree_walk"_sd;
+
+    if (!kAll.equalCaseInsensitive(setting) && !kCacheWalk.equalCaseInsensitive(setting) &&
+        !kFast.equalCaseInsensitive(setting) && !kNone.equalCaseInsensitive(setting) &&
+        !kClear.equalCaseInsensitive(setting) && !kTreeWalk.equalCaseInsensitive(setting)) {
+        return {ErrorCodes::BadValue,
+                "storage.wiredTiger.engineConfig.statistics expects one of 'all', 'cache_walk', "
+                "'fast', 'none', 'clear', or 'tree_walk'"};
+    }
+
+    return Status::OK();
+}
+
 Status WiredTigerGlobalOptions::validateWiredTigerCompressor(const std::string& value) {
     constexpr auto kNone = "none"_sd;
     constexpr auto kSnappy = "snappy"_sd;

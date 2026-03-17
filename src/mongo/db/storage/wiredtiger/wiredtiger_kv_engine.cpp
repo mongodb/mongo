@@ -393,7 +393,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
            << "MB,";
 
     ss << "config_base=false,";
-    ss << "statistics=(fast),";
+    ss << "statistics=(" << wiredTigerGlobalOptions.statisticsSetting << "),";
 
     if (!WiredTigerSessionCache::isEngineCachingCursors()) {
         ss << "cache_cursors=false,";

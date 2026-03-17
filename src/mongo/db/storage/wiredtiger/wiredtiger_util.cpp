@@ -66,6 +66,7 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/snapshot_window_options_gen.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
@@ -1135,7 +1136,8 @@ bool WiredTigerUtil::historyStoreStatistics(WiredTigerKVEngine* engine,
 
     const auto historyStorageStatUri = "statistics:file:WiredTigerHS.wt";
 
-    Status status = exportTableToBSON(s, historyStorageStatUri, "statistics=(fast)", &bob);
+    std::string statsConfig = "statistics=(" + wiredTigerGlobalOptions.statisticsSetting + ")";
+    Status status = exportTableToBSON(s, historyStorageStatUri, statsConfig, &bob);
     if (!status.isOK()) {
         bob.append("error", "unable to retrieve statistics");
         bob.append("code", static_cast<int>(status.code()));
