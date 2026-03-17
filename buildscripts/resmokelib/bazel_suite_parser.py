@@ -12,6 +12,8 @@ import functools
 import os
 import re
 
+from buildscripts.resmokelib import config
+
 
 class BazelParseError(Exception):
     """Exception raised when parsing BUILD.bazel files fails."""
@@ -99,7 +101,8 @@ def _parse_label(target_label: str) -> tuple[str, str]:
     Args:
         target_label: A Bazel target label like "//package/path:target_name"
     Returns:
-        Tuple of (package_path, target_name)
+        Tuple of (absolute_package_path, target_name) where absolute_package_path
+        is the full path to the package directory (for finding BUILD.bazel files).
     Raises:
         BazelParseError: If the label format is invalid
     """
@@ -117,7 +120,8 @@ def _parse_label(target_label: str) -> tuple[str, str]:
         )
     package, target_name = label_without_prefix.split(":", 1)
 
-    return package, target_name
+    # Return absolute path for finding BUILD.bazel files
+    return os.path.join(config.RESMOKE_ROOT, package), target_name
 
 
 def _parse_load_statements(content: str, package: str) -> dict[str, str]:
@@ -149,13 +153,16 @@ def _parse_load_statements(content: str, package: str) -> dict[str, str]:
 
             # Convert the .bzl label to a file path
             # Example: "//jstests/suites:selectors.bzl"
-            #       -> "jstests/suites/selectors.bzl"
+            #       -> "/absolute/path/to/jstests/suites/selectors.bzl"
             if bzl_label.startswith("//"):
-                bzl_path = bzl_label[2:].replace(":", "/")
+                # Absolute Bazel label - resolve relative to RESMOKE_ROOT
+                relative_path = bzl_label[2:].replace(":", "/")
+                bzl_path = os.path.normpath(os.path.join(config.RESMOKE_ROOT, relative_path))
             else:
                 # Relative path - resolve relative to current package
-                bzl_path = os.path.join(package, bzl_label.replace(":", ""))
-            bzl_path = os.path.join(*bzl_path.split("/"))
+                # Strip leading ':' if present (package-relative reference)
+                relative_part = bzl_label[1:] if bzl_label.startswith(":") else bzl_label
+                bzl_path = os.path.normpath(os.path.join(package, relative_part.replace(":", "/")))
 
             # Extract all identifiers from the load statement
             identifier_pattern = r'["\']([^"\']+)["\']'
@@ -336,19 +343,22 @@ def resolve_target_to_files(target_label: str) -> str:
     Raises:
         BazelParseError: If target type is unsupported
     """
-    package, target_name = _parse_label(target_label)
+    absolute_package, target_name = _parse_label(target_label)
+
+    # Convert absolute package path to relative (for suite configuration)
+    relative_package = os.path.relpath(absolute_package, config.RESMOKE_ROOT)
 
     if target_name.endswith(".js"):
         # Direct file reference
-        return os.path.join(package, target_name)
+        return os.path.join(relative_package, target_name)
 
     elif target_name == "all_javascript_files":
         # Return glob pattern for *.js in package directory
-        return os.path.join(package, "*.js")
+        return os.path.join(relative_package, "*.js")
 
     elif target_name == "all_subpackage_javascript_files":
         # Return glob pattern for recursive **/*.js
-        return os.path.join(package, "**/*.js")
+        return os.path.join(relative_package, "**/*.js")
 
     else:
         raise BazelParseError(

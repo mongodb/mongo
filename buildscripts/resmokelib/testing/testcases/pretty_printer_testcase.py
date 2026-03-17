@@ -16,12 +16,13 @@ class PrettyPrinterTestCase(interface.ProcessTestCase):
         logger: logging.Logger,
         program_executables: list[str],
         program_options: Optional[dict] = None,
+        **kwargs,
     ):
         """Initialize the PrettyPrinterTestCase with the executable to run."""
 
         assert len(program_executables) == 1
         interface.ProcessTestCase.__init__(
-            self, logger, "pretty printer test", program_executables[0]
+            self, logger, "pretty printer test", program_executables[0], **kwargs
         )
 
         self.program_executable = program_executables[0]
@@ -30,8 +31,8 @@ class PrettyPrinterTestCase(interface.ProcessTestCase):
         interface.append_process_tracking_options(self.program_options, self._id)
 
     def _make_process(self):
-        # Merge fixture environment variables into program_options
+        # Merge test and fixture environment variables into program_options
         program_options = self.program_options.copy()
-        self._merge_fixture_environment_variables(program_options)
+        self._merge_environment_variables(program_options)
 
         return core.programs.make_process(self.logger, [self.program_executable], **program_options)

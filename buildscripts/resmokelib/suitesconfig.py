@@ -226,6 +226,10 @@ def _get_suite_config(suite_name_or_path):
 def generate():
     MatrixSuiteConfig.generate_all_matrix_suite_files()
 
+    # don't try to use bazel run format in external modules since bazel may not be available
+    if _config.IN_EXTERNAL_MODULE:
+        return
+
     print("\nRunning 'bazel run format' to format generated files...")
     print("Note: This may take a while to complete.")
     try:
@@ -441,9 +445,11 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         Returns:
             List of absolute paths to matrix suite directories.
         """
-        return [
-            os.path.join(_config.CONFIG_DIR, "matrix_suites")
-        ] + _config.MODULE_MATRIX_SUITE_DIRS
+        return (
+            [os.path.join(_config.CONFIG_DIR, "matrix_suites")]
+            + _config.MODULE_MATRIX_SUITE_DIRS
+            + _config.EXTERNAL_MODULE_MATRIX_SUITE_DIRS
+        )
 
     @staticmethod
     def get_suites_dirs_with_roots() -> list[tuple[str, str]]:
@@ -552,6 +558,31 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         res = copy.deepcopy(base_suite)
         res["matrix_suite"] = True
         overrides = copy.deepcopy(overrides)
+
+        # If this matrix suite is from an external module but the base suite is built-in,
+        # prefix selector paths with "builtin:" so they resolve correctly
+        matrix_suite_root = cls.get_suite_root(suite_name)
+        base_suite_root = ExplicitSuiteConfig.get_suite_root(base_suite_name)
+        if (
+            _config.IN_EXTERNAL_MODULE
+            and matrix_suite_root == _config.EXTERNAL_MODULE_ROOT
+            and base_suite_root == _config.RESMOKE_ROOT
+        ):
+            # Prefix all selector paths (roots, include_files, exclude_files) with "builtin:"
+            if "selector" in res:
+                selector = res["selector"]
+                for key in ["roots", "include_files", "exclude_files"]:
+                    if key in selector:
+                        paths = selector[key]
+                        if isinstance(paths, list):
+                            new_paths = []
+                            for path in paths:
+                                if path.startswith("builtin:"):
+                                    # Already has prefix
+                                    new_paths.append(path)
+                                else:
+                                    new_paths.append(f"builtin:{path}")
+                            selector[key] = new_paths
 
         if description:
             res["description"] = description
@@ -801,13 +832,18 @@ class MatrixSuiteConfig(SuiteConfigInterface):
             print(f"Could not find mappings file for {suite_name}")
             return None
 
+        suite_root = cls.get_suite_root(suite_name)
+        if not suite_root:
+            print(f"Could not determine suite root for {suite_name}")
+            raise RuntimeError(f"Could not determine suite root for {suite_name}")
+
         # Convert absolute path to relative path from RESMOKE_ROOT
         # This path needs to output the same text on both windows and linux/mac
         mapping_path = pathlib.PurePath(mapping_path)
         try:
-            mapping_path = mapping_path.relative_to(_config.RESMOKE_ROOT)
+            mapping_path = mapping_path.relative_to(suite_root)
         except ValueError:
-            # If mapping_path is not under RESMOKE_ROOT, keep it as-is
+            # If mapping_path is not under suite_root, keep it as-is
             pass
         yml = yaml.safe_dump(matrix_suite)
         comments = [

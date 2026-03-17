@@ -1,0 +1,21 @@
+# Example suite showing how to define environment variables for tests
+# Environment variables are defined in executor.config.env_vars
+# This works for all test types (js_test, py_test, cpp_unittest, etc.)
+
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/core/query/find/find1.js
+
+executor:
+  config:
+    env_vars:
+      TEST_VAR_1: "value1"
+      TEST_VAR_2: "value2"
+    shell_options:
+      global_vars:
+        TestData:
+          externalModuleTest: true
+  fixture:
+    class: MongoDFixture

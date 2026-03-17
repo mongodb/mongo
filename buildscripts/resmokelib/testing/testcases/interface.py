@@ -151,6 +151,19 @@ class TestCase(unittest.TestCase, metaclass=registry.make_registry_metaclass(_TE
 class ProcessTestCase(TestCase):
     """Base class for TestCases that executes an external process."""
 
+    def __init__(
+        self,
+        logger: logging.Logger,
+        test_kind: str,
+        test_name: str,
+        dynamic: bool = False,
+        **kwargs,
+    ):
+        """Initialize ProcessTestCase."""
+        TestCase.__init__(self, logger, test_kind, test_name, dynamic)
+        # Extract environment variables from test configuration
+        self._test_env_vars = self._extract_env_vars_from_config(**kwargs)
+
     def run_test(self):
         """Run the test."""
         try:
@@ -231,13 +244,30 @@ class ProcessTestCase(TestCase):
             return {}
         return self.fixture.get_environment_variables()
 
-    def _merge_fixture_environment_variables(self, process_kwargs):
+    @staticmethod
+    def _extract_env_vars_from_config(**kwargs):
         """
-        Merge fixture environment variables into process_kwargs.
+        Extract environment variables from test configuration.
 
-        This method updates process_kwargs in-place by merging fixture environment
-        variables with any existing env_vars. Fixture environment variables will not
-        override existing values in env_vars.
+        This is a helper to extract env_vars from the test_config passed to test cases.
+
+        Args:
+            **kwargs: Test configuration (typically from executor.config in suite YAML)
+
+        Returns:
+            dict: Environment variables to pass to the test, or empty dict if none found.
+        """
+        return kwargs.get("env_vars", {})
+
+    def _merge_environment_variables(self, process_kwargs):
+        """
+        Merge test and fixture environment variables into process_kwargs.
+
+        This method updates process_kwargs in-place by merging environment variables
+        in the following priority order (highest to lowest):
+        1. Existing values in process_kwargs['env_vars'] (e.g., process-specific)
+        2. Test environment variables from suite configuration
+        3. Fixture environment variables
 
         Args:
             process_kwargs (dict): Process kwargs dictionary that may contain 'env_vars'.
@@ -245,18 +275,22 @@ class ProcessTestCase(TestCase):
         Returns:
             dict: The updated process_kwargs dictionary (same object, modified in-place).
         """
-        fixture_env_vars = self._get_fixture_environment_variables()
-        if not fixture_env_vars:
-            return process_kwargs
-
         # Get or create env_vars in process_kwargs
         if "env_vars" not in process_kwargs:
             process_kwargs["env_vars"] = {}
 
+        # Merge test env vars, but don't override existing values
+        if self._test_env_vars:
+            for key, value in self._test_env_vars.items():
+                if key not in process_kwargs["env_vars"]:
+                    process_kwargs["env_vars"][key] = value
+
         # Merge fixture env vars, but don't override existing values
-        for key, value in fixture_env_vars.items():
-            if key not in process_kwargs["env_vars"]:
-                process_kwargs["env_vars"][key] = value
+        fixture_env_vars = self._get_fixture_environment_variables()
+        if fixture_env_vars:
+            for key, value in fixture_env_vars.items():
+                if key not in process_kwargs["env_vars"]:
+                    process_kwargs["env_vars"][key] = value
 
         return process_kwargs
 

@@ -21,11 +21,12 @@ class DBTestCase(interface.ProcessTestCase):
         dbtest_suites: list[str],
         dbtest_executable: Optional[str] = None,
         dbtest_options: Optional[dict] = None,
+        **kwargs,
     ):
         """Initialize the DBTestCase with the dbtest suite to run."""
 
         assert len(dbtest_suites) == 1
-        interface.ProcessTestCase.__init__(self, logger, "dbtest suite", dbtest_suites[0])
+        interface.ProcessTestCase.__init__(self, logger, "dbtest suite", dbtest_suites[0], **kwargs)
 
         # Command line options override the YAML configuration.
         self.dbtest_executable = utils.default_if_none(config.DBTEST_EXECUTABLE, dbtest_executable)
@@ -52,8 +53,8 @@ class DBTestCase(interface.ProcessTestCase):
 
         process_kwargs = copy.deepcopy(self.dbtest_options.get("process_kwargs", {}))
         interface.append_process_tracking_options(process_kwargs, self._id)
-        # Merge fixture environment variables into process_kwargs
-        self._merge_fixture_environment_variables(process_kwargs)
+        # Merge test and fixture environment variables into process_kwargs
+        self._merge_environment_variables(process_kwargs)
         self.dbtest_options["process_kwargs"] = process_kwargs
 
     def _execute(self, process):

@@ -22,10 +22,11 @@ class JSRunnerFileTestCase(interface.ProcessTestCase):
         test_runner_file: str,
         shell_executable: Optional[str] = None,
         shell_options: Optional[dict] = None,
+        **kwargs,
     ):
         """Initialize the JSRunnerFileTestCase with the 'test_name' file."""
 
-        interface.ProcessTestCase.__init__(self, logger, test_kind, test_name)
+        interface.ProcessTestCase.__init__(self, logger, test_kind, test_name, **kwargs)
 
         # Command line options override the YAML configuration.
         self.shell_executable = utils.default_if_none(config.MONGO_EXECUTABLE, shell_executable)
@@ -47,8 +48,8 @@ class JSRunnerFileTestCase(interface.ProcessTestCase):
 
         process_kwargs = copy.deepcopy(self.shell_options.get("process_kwargs", {}))
         interface.append_process_tracking_options(process_kwargs, self._id)
-        # Merge fixture environment variables into process_kwargs
-        self._merge_fixture_environment_variables(process_kwargs)
+        # Merge test and fixture environment variables into process_kwargs
+        self._merge_environment_variables(process_kwargs)
         self.shell_options["process_kwargs"] = process_kwargs
 
     def _populate_test_data(self, test_data):

@@ -31,9 +31,10 @@ class _SingleJSTestCase(interface.ProcessTestCase):
         _id: uuid.UUID,
         shell_executable: Optional[str] = None,
         shell_options: Optional[dict] = None,
+        **kwargs,
     ):
         """Initialize the _SingleJSTestCase with the JS file to run."""
-        interface.ProcessTestCase.__init__(self, logger, "JSTest", test_name)
+        interface.ProcessTestCase.__init__(self, logger, "JSTest", test_name, **kwargs)
 
         # Command line options override the YAML configuration.
         self.shell_executable: Optional[str] = utils.default_if_none(
@@ -124,8 +125,8 @@ class _SingleJSTestCase(interface.ProcessTestCase):
 
         interface.append_process_tracking_options(process_kwargs, self._id)
 
-        # Add fixture environment variables to process_kwargs
-        self._merge_fixture_environment_variables(process_kwargs)
+        # Merge test and fixture environment variables into process_kwargs
+        self._merge_environment_variables(process_kwargs)
 
         self.shell_options["process_kwargs"] = process_kwargs
         self.shell_options = certs.expand_x509_paths(self.shell_options)
@@ -165,11 +166,13 @@ class JSTestCaseBuilder(interface.TestCaseFactory):
         test_id: uuid.UUID,
         shell_executable: Optional[str] = None,
         shell_options: Optional[dict] = None,
+        **kwargs,
     ):
         """Initialize the JSTestCase with the JS file to run."""
         self.test_case_template = _SingleJSTestCase(
-            logger, js_filenames, test_name, test_id, shell_executable, shell_options
+            logger, js_filenames, test_name, test_id, shell_executable, shell_options, **kwargs
         )
+        self._test_kwargs = kwargs
         interface.TestCaseFactory.__init__(self, _SingleJSTestCase, shell_options)
 
     def configure(self, fixture: "interface.Fixture", *args, **kwargs):
@@ -190,6 +193,7 @@ class JSTestCaseBuilder(interface.TestCaseFactory):
             self.test_case_template._id,
             self.test_case_template.shell_executable,
             shell_options,
+            **self._test_kwargs,
         )
         test_case.configure(self.test_case_template.fixture)
         return test_case
@@ -349,6 +353,7 @@ class JSTestCase(MultiClientsTestCase):
         js_filenames: list[str],
         shell_executable: Optional[str] = None,
         shell_options: Optional[dict] = None,
+        **kwargs,
     ):
         """Initialize the TestCase for running JS files."""
         assert len(js_filenames) >= 1
@@ -364,6 +369,7 @@ class JSTestCase(MultiClientsTestCase):
             test_id,
             shell_executable,
             shell_options,
+            **kwargs,
         )
         MultiClientsTestCase.__init__(self, logger, self.TEST_KIND, test_name, test_id, factory)
 

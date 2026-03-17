@@ -30,6 +30,7 @@ class QueryTesterServerTestCase(interface.ProcessTestCase):
         test_dir: list[str],
         wait_for_files: bool = True,
         override: str = None,
+        **kwargs,
     ):
         """Initialize QueryTesterServerTestCase.
         test_dir: file path to a dir that contains .test files, their corresponding .results and a .coll file
@@ -38,7 +39,9 @@ class QueryTesterServerTestCase(interface.ProcessTestCase):
             if we are pulling from a remote git repo.
         """
         assert len(test_dir) == 1
-        interface.ProcessTestCase.__init__(self, logger, "QueryTesterServerTest", test_dir[0])
+        interface.ProcessTestCase.__init__(
+            self, logger, "QueryTesterServerTest", test_dir[0], **kwargs
+        )
 
         self.test_dir = test_dir[0]
         self.wait_for_files = wait_for_files
@@ -73,7 +76,7 @@ class QueryTesterServerTestCase(interface.ProcessTestCase):
 
         program_options = {}
         interface.append_process_tracking_options(program_options, self._id)
-        # Merge fixture environment variables into program_options
-        self._merge_fixture_environment_variables(program_options)
+        # Merge test and fixture environment variables into program_options
+        self._merge_environment_variables(program_options)
 
         return core.programs.generic_program(self.logger, command, program_options)

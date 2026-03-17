@@ -138,10 +138,9 @@ class TestIdentifierResolution(unittest.TestCase):
         content = 'load("//jstests/suites:selectors.bzl", "sharding_srcs", "core_srcs")'
         result = _parse_load_statements(content, "buildscripts/resmokeconfig")
 
-        self.assertEqual(
-            result["sharding_srcs"], os.path.join("jstests", "suites", "selectors.bzl")
-        )
-        self.assertEqual(result["core_srcs"], os.path.join("jstests", "suites", "selectors.bzl"))
+        expected_path = os.path.join(os.getcwd(), "jstests", "suites", "selectors.bzl")
+        self.assertEqual(result["sharding_srcs"], expected_path)
+        self.assertEqual(result["core_srcs"], expected_path)
 
     def test_parse_load_statements_multiple_loads(self):
         """Test parsing multiple load statements."""
@@ -152,18 +151,20 @@ load("//jstests/core:tests.bzl", "core_tests")
         result = _parse_load_statements(content, "buildscripts/resmokeconfig")
 
         self.assertEqual(
-            result["sharding_srcs"], os.path.join("jstests", "suites", "selectors.bzl")
+            result["sharding_srcs"], os.path.join(os.getcwd(), "jstests", "suites", "selectors.bzl")
         )
-        self.assertEqual(result["core_tests"], os.path.join("jstests", "core", "tests.bzl"))
+        self.assertEqual(
+            result["core_tests"], os.path.join(os.getcwd(), "jstests", "core", "tests.bzl")
+        )
 
     def test_parse_load_statements_relative_path(self):
         """Test parsing load statement with relative path."""
         content = 'load(":local_defs.bzl", "local_srcs")'
         result = _parse_load_statements(content, "buildscripts/resmokeconfig")
 
-        self.assertEqual(
-            result["local_srcs"], os.path.join("buildscripts", "resmokeconfig", "local_defs.bzl")
-        )
+        # Package-relative path: :local_defs.bzl resolves relative to package directory
+        expected_path = os.path.join("buildscripts", "resmokeconfig", "local_defs.bzl")
+        self.assertEqual(result["local_srcs"], expected_path)
 
     def test_resolve_identifier_simple(self):
         """Test resolving a simple identifier to list of labels."""

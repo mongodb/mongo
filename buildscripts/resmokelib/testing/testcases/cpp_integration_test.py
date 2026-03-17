@@ -18,12 +18,13 @@ class CPPIntegrationTestCase(interface.ProcessTestCase):
         logger: logging.Logger,
         program_executables: list[str],
         program_options: Optional[dict] = None,
+        **kwargs,
     ):
         """Initialize the CPPIntegrationTestCase with the executable to run."""
 
         assert len(program_executables) == 1
         interface.ProcessTestCase.__init__(
-            self, logger, "C++ integration test", program_executables[0]
+            self, logger, "C++ integration test", program_executables[0], **kwargs
         )
 
         self.program_executable = program_executables[0]
@@ -39,8 +40,8 @@ class CPPIntegrationTestCase(interface.ProcessTestCase):
 
         process_kwargs = copy.deepcopy(self.program_options.get("process_kwargs", {}))
         interface.append_process_tracking_options(process_kwargs, self._id)
-        # Merge fixture environment variables into process_kwargs
-        self._merge_fixture_environment_variables(process_kwargs)
+        # Merge test and fixture environment variables into process_kwargs
+        self._merge_environment_variables(process_kwargs)
         self.program_options["process_kwargs"] = process_kwargs
         self.program_options = certs.expand_x509_paths(self.program_options)
 

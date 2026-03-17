@@ -12,21 +12,23 @@ class QueryTesterSelfTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = "query_tester_self_test"
 
-    def __init__(self, logger: logging.Logger, test_filenames: list[str]):
+    def __init__(self, logger: logging.Logger, test_filenames: list[str], **kwargs):
         """Initialize QueryTesterSelfTestCase.
 
         test_filenames must contain one test_file - a python file that takes one argument: the uri of the mongod.
         To run multiple test files, you would create an instance of QueryTesterSelfTestCase for each one.
         """
         assert len(test_filenames) == 1
-        interface.ProcessTestCase.__init__(self, logger, "QueryTesterSelfTest", test_filenames[0])
+        interface.ProcessTestCase.__init__(
+            self, logger, "QueryTesterSelfTest", test_filenames[0], **kwargs
+        )
         self.test_file = test_filenames[0]
 
     def _make_process(self):
         program_options = {}
         interface.append_process_tracking_options(program_options, self._id)
-        # Merge fixture environment variables into program_options
-        self._merge_fixture_environment_variables(program_options)
+        # Merge test and fixture environment variables into program_options
+        self._merge_environment_variables(program_options)
         return core.programs.generic_program(
             self.logger,
             [

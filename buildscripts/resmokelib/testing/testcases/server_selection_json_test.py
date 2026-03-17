@@ -20,11 +20,12 @@ class ServerSelectionJsonTestCase(interface.ProcessTestCase):
         json_test_files: list[str],
         program_executable: Optional[str] = None,
         program_options: Optional[dict] = None,
+        **kwargs,
     ):
         """Initialize the TestCase with the executable to run."""
         assert len(json_test_files) == 1
         interface.ProcessTestCase.__init__(
-            self, logger, "Server Selection Json Test", json_test_files[0]
+            self, logger, "Server Selection Json Test", json_test_files[0], **kwargs
         )
 
         if program_executable:
@@ -51,7 +52,7 @@ class ServerSelectionJsonTestCase(interface.ProcessTestCase):
         command_line = [self.program_executable]
         command_line += ["--source-dir", self.TEST_DIR]
         command_line += ["-f", self.json_test_file]
-        # Merge fixture environment variables into program_options
+        # Merge test and fixture environment variables into program_options
         program_options = self.program_options.copy()
-        self._merge_fixture_environment_variables(program_options)
+        self._merge_environment_variables(program_options)
         return core.programs.make_process(self.logger, command_line, **program_options)

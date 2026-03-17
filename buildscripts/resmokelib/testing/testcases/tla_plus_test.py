@@ -19,6 +19,7 @@ class TLAPlusTestCase(interface.ProcessTestCase):
         model_config_files: list[str],
         java_binary: Optional[str] = None,
         model_check_command: Optional[str] = "sh model-check.sh",
+        **kwargs,
     ):
         """Initialize the TLAPlusTestCase with a TLA+ model config file.
 
@@ -46,7 +47,7 @@ class TLAPlusTestCase(interface.ProcessTestCase):
 
         self.model_check_command = model_check_command
 
-        interface.ProcessTestCase.__init__(self, logger, "TLA+ test", spec_dir)
+        interface.ProcessTestCase.__init__(self, logger, "TLA+ test", spec_dir, **kwargs)
 
     def _make_process(self):
         process_kwargs = {"cwd": self.working_dir}
@@ -54,8 +55,8 @@ class TLAPlusTestCase(interface.ProcessTestCase):
             process_kwargs["env_vars"] = {"JAVA_BINARY": self.java_binary}
 
         interface.append_process_tracking_options(process_kwargs, self._id)
-        # Merge fixture environment variables into process_kwargs
-        self._merge_fixture_environment_variables(process_kwargs)
+        # Merge test and fixture environment variables into process_kwargs
+        self._merge_environment_variables(process_kwargs)
 
         return core.programs.generic_program(
             self.logger,

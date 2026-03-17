@@ -18,11 +18,14 @@ class BenchmarkTestCase(interface.ProcessTestCase):
         logger: logging.Logger,
         program_executables: list[str],
         program_options: Optional[dict] = None,
+        **kwargs,
     ):
         """Initialize the BenchmarkTestCase with the executable to run."""
 
         assert len(program_executables) == 1
-        interface.ProcessTestCase.__init__(self, logger, "Benchmark test", program_executables[0])
+        interface.ProcessTestCase.__init__(
+            self, logger, "Benchmark test", program_executables[0], **kwargs
+        )
         self.validate_benchmark_options()
 
         self.bm_executable = program_executables[0]
@@ -80,8 +83,8 @@ class BenchmarkTestCase(interface.ProcessTestCase):
 
         process_kwargs = copy.deepcopy(bm_options.get("process_kwargs", {}))
         interface.append_process_tracking_options(process_kwargs, self._id)
-        # Merge fixture environment variables into process_kwargs
-        self._merge_fixture_environment_variables(process_kwargs)
+        # Merge test and fixture environment variables into process_kwargs
+        self._merge_environment_variables(process_kwargs)
         bm_options["process_kwargs"] = process_kwargs
 
         self.bm_options = bm_options

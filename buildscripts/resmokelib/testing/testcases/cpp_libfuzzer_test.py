@@ -20,12 +20,13 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
         program_executables: list[str],
         program_options: Optional[dict] = None,
         corpus_directory_stem="corpora",
+        **kwargs,
     ):
         """Initialize the CPPLibfuzzerTestCase with the executable to run."""
 
         assert len(program_executables) == 1
         interface.ProcessTestCase.__init__(
-            self, logger, "C++ libfuzzer test", program_executables[0]
+            self, logger, "C++ libfuzzer test", program_executables[0], **kwargs
         )
 
         self.program_executable = program_executables[0]
@@ -59,8 +60,8 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
             f"--corpus_database={self.corpus_directory}",
             f"--llvm_fuzzer_wrapper_corpus_dir={self.seed_directory}",
         ]
-        # Merge fixture environment variables into program_options
+        # Merge test and fixture environment variables into program_options
         program_options = self.program_options.copy()
-        self._merge_fixture_environment_variables(program_options)
+        self._merge_environment_variables(program_options)
 
         return core.programs.make_process(self.logger, default_args, **program_options)

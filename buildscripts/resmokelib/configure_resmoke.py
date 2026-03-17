@@ -125,6 +125,8 @@ def _load_external_module_config(config_path: str):
     Expected YAML format:
     suite_directories: [list of suite directories relative to EXTERNAL_MODULE_ROOT]
     matrix_suite_directories: [list of matrix suite directories relative to EXTERNAL_MODULE_ROOT]
+    fixture_directories: [list of fixture directories relative to EXTERNAL_MODULE_ROOT]
+    hook_directories: [list of hook directories relative to EXTERNAL_MODULE_ROOT]
     """
     if not os.path.isabs(config_path):
         # If relative path provided, resolve relative to EXTERNAL_MODULE_ROOT
@@ -166,6 +168,22 @@ def _load_external_module_config(config_path: str):
             _config.EXTERNAL_MODULE_MATRIX_SUITE_DIRS.append(full_path)
         else:
             print(f"Warning: External matrix suite directory not found: {full_path}")
+
+    for config_key, dir_type in [("fixture_directories", "fixture"), ("hook_directories", "hook")]:
+        dirs = external_config.get(config_key, [])
+        if not isinstance(dirs, list):
+            raise RuntimeError(f"'{config_key}' must be a list")
+
+        for dir_path in dirs:
+            full_path = os.path.join(_config.EXTERNAL_MODULE_ROOT, dir_path)
+            if not os.path.exists(full_path):
+                print(f"Warning: External {dir_type} directory not found: {full_path}")
+                continue
+
+            # Convert directory path to Python package name (replace slashes with dots)
+            package_name = dir_path.replace("/", ".")
+            # Use autoloader to load all modules in the directory
+            autoloader.load_all_modules(name=package_name, path=[full_path])
 
 
 def _validate_options(parser: argparse.ArgumentParser, args: dict):

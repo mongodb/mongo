@@ -17,6 +17,9 @@ RESMOKE_ROOT = str(Path(__file__).parent.parent.parent)
 # This is used when external projects import and use resmoke as a module
 EXTERNAL_MODULE_ROOT = os.getcwd()
 
+# Whether or not resmoke is being run from an external module
+IN_EXTERNAL_MODULE = os.path.normpath(EXTERNAL_MODULE_ROOT) != os.path.normpath(RESMOKE_ROOT)
+
 # Subdirectory under the dbpath prefix that contains directories with data files of mongod's started
 # by resmoke.py.
 FIXTURE_SUBDIR = "resmoke"
