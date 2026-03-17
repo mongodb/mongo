@@ -68,4 +68,25 @@ withExtensions({"libvector_search_extension.so": {}}, (conn) => {
 
     assert.commandWorked(adminDb.runCommand({setParameter: 1, featureFlagVectorSearchExtension: false}));
     assert.throwsWithCode(() => coll.aggregate(complexPipeline).toArray(), ErrorCodes.SearchNotEnabled);
+
+    // TODO SERVER-121764: Remove the returnStoredSource tests when the extension supports it.
+    // returnStoredSource: true forces fallback to legacy even with extension loaded and flag
+    // enabled, since the extension does not support returnStoredSource yet.
+    assert.commandWorked(adminDb.runCommand({setParameter: 1, featureFlagVectorSearchExtension: true}));
+    const returnStoredSourcePipeline = [{$vectorSearch: {returnStoredSource: true}}];
+    assert.throwsWithCode(() => coll.aggregate(returnStoredSourcePipeline).toArray(), ErrorCodes.SearchNotEnabled);
+
+    // returnStoredSource: false should still use the extension.
+    const returnStoredSourceFalsePipeline = [{$vectorSearch: {returnStoredSource: false}}];
+    assertArrayEq({
+        actual: coll.aggregate(returnStoredSourceFalsePipeline).toArray(),
+        expected: testData,
+    });
+
+    // Non-boolean returnStoredSource should still use the extension (not force fallback).
+    const returnStoredSourceInvalidPipeline = [{$vectorSearch: {returnStoredSource: "invalid"}}];
+    assertArrayEq({
+        actual: coll.aggregate(returnStoredSourceInvalidPipeline).toArray(),
+        expected: testData,
+    });
 });
