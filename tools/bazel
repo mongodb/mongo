@@ -310,9 +310,12 @@ else
   if [[ "$wrapper_redirect_output" == "1" ]]; then
       exec 1>&3 2>&4
   fi
-  
-  $bazel_real "${new_args[@]}"  
-  bazel_exit_code=$?  
+
+  bazel_exit_code=0
+  if [[ ${#new_args[@]} -ne 0 ]]; then
+    $bazel_real "${new_args[@]}"
+    bazel_exit_code=$?
+  fi
   ( >&2 $python $REPO_ROOT/bazel/wrapper_hook/post_bazel_hook.py $bazel_real )  
   exit $bazel_exit_code  
 fi 

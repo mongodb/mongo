@@ -1,5 +1,5 @@
 load("@poetry//:dependencies.bzl", "dependency")
-load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -7,6 +7,14 @@ py_binary(
     name = "validate_compile_commands",
     srcs = ["validate_compile_commands.py"],
     main = "validate_compile_commands.py",
+)
+
+py_test(
+    name = "validate_compile_commands_test",
+    srcs = [
+        "validate_compile_commands.py",
+        "validate_compile_commands_test.py",
+    ],
 )
 
 sh_binary(

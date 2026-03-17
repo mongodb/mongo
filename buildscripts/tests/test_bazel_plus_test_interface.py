@@ -1,10 +1,13 @@
+import os
 import sys
+import tempfile
 import unittest
 from contextlib import redirect_stderr
 from io import StringIO
 
 sys.path.append(".")
 
+import bazel.wrapper_hook.plus_interface as plus_interface
 from bazel.wrapper_hook.plus_interface import (
     BinAndSourceIncompatible,
     DuplicateSourceNames,
@@ -298,6 +301,235 @@ class Tests(unittest.TestCase):
 
         stderr_output = stderr_capture.getvalue()
         validate_first_suggestion(stderr_output, "+bson_obj_test")
+
+    def test_compiledb_target_runs_separately_and_leaves_other_targets(self):
+        def buildozer_output(autocomplete_query):
+            return ""
+
+        args = ["wrapper_hook", "build", "compiledb", "//src/mongo/base:error_codes"]
+        generate_calls = []
+
+        def fake_generate_compiledb(*call_args, **call_kwargs):
+            generate_calls.append((call_args, call_kwargs))
+
+        original_generate_compiledb = plus_interface.generate_compiledb
+        original_swap_default_config = plus_interface.swap_default_config
+        plus_interface.generate_compiledb = fake_generate_compiledb
+        plus_interface.swap_default_config = (
+            lambda args,
+            command,
+            config_mode,
+            compiledb_target,
+            clang_tidy,
+            user_specified_config: config_mode
+        )
+        try:
+            result = test_runner_interface(args, False, buildozer_output)
+        finally:
+            plus_interface.generate_compiledb = original_generate_compiledb
+            plus_interface.swap_default_config = original_swap_default_config
+
+        assert result == ["build", "//src/mongo/base:error_codes"]
+        assert len(generate_calls) == 1
+        assert "requested_build_flags" not in generate_calls[0][1]
+
+    def test_compiledb_only_target_skips_final_bazel_invocation(self):
+        def buildozer_output(autocomplete_query):
+            return ""
+
+        args = ["wrapper_hook", "build", "compiledb_only"]
+        generate_calls = []
+
+        def fake_generate_compiledb(*call_args, **call_kwargs):
+            generate_calls.append((call_args, call_kwargs))
+
+        original_generate_compiledb = plus_interface.generate_compiledb
+        original_swap_default_config = plus_interface.swap_default_config
+        plus_interface.generate_compiledb = fake_generate_compiledb
+        plus_interface.swap_default_config = (
+            lambda args,
+            command,
+            config_mode,
+            compiledb_target,
+            clang_tidy,
+            user_specified_config: config_mode
+        )
+        try:
+            result = test_runner_interface(args, False, buildozer_output)
+        finally:
+            plus_interface.generate_compiledb = original_generate_compiledb
+            plus_interface.swap_default_config = original_swap_default_config
+
+        assert result == []
+        assert len(generate_calls) == 1
+
+    def test_compiledb_target_preserves_define_flag_value(self):
+        def buildozer_output(autocomplete_query):
+            return ""
+
+        args = [
+            "wrapper_hook",
+            "build",
+            "compiledb",
+            "--define",
+            "MONGO_VERSION=1",
+            "--keep_going",
+            "//src/mongo/base:error_codes",
+        ]
+        generate_calls = []
+
+        def fake_generate_compiledb(*call_args, **call_kwargs):
+            generate_calls.append((call_args, call_kwargs))
+
+        original_generate_compiledb = plus_interface.generate_compiledb
+        original_swap_default_config = plus_interface.swap_default_config
+        plus_interface.generate_compiledb = fake_generate_compiledb
+        plus_interface.swap_default_config = (
+            lambda args,
+            command,
+            config_mode,
+            compiledb_target,
+            clang_tidy,
+            user_specified_config: config_mode
+        )
+        try:
+            result = test_runner_interface(args, False, buildozer_output)
+        finally:
+            plus_interface.generate_compiledb = original_generate_compiledb
+            plus_interface.swap_default_config = original_swap_default_config
+
+        assert result == [
+            "build",
+            "--define",
+            "MONGO_VERSION=1",
+            "--keep_going",
+            "//src/mongo/base:error_codes",
+        ]
+        assert len(generate_calls) == 1
+        assert "requested_build_flags" not in generate_calls[0][1]
+
+    def test_config_equals_compiledb_runs_normally(self):
+        def buildozer_output(autocomplete_query):
+            return ""
+
+        args = ["wrapper_hook", "build", "--config=compiledb", "//src/mongo/base:error_codes"]
+        generate_calls = []
+
+        def fake_generate_compiledb(*call_args, **call_kwargs):
+            generate_calls.append((call_args, call_kwargs))
+
+        original_generate_compiledb = plus_interface.generate_compiledb
+        original_wrapper_config_mode_file = plus_interface.WRAPPER_CONFIG_MODE_FILE
+        with tempfile.TemporaryDirectory() as tempdir:
+            wrapper_config_mode_file = os.path.join(tempdir, "mongo_wrapper_config_mode")
+            with open(wrapper_config_mode_file, "w", encoding="utf-8") as file_handle:
+                file_handle.write("dbg")
+            plus_interface.generate_compiledb = fake_generate_compiledb
+            plus_interface.WRAPPER_CONFIG_MODE_FILE = wrapper_config_mode_file
+            try:
+                result = test_runner_interface(args, False, buildozer_output)
+            finally:
+                plus_interface.generate_compiledb = original_generate_compiledb
+                plus_interface.WRAPPER_CONFIG_MODE_FILE = original_wrapper_config_mode_file
+
+        assert result == ["build", "--config=compiledb", "//src/mongo/base:error_codes"]
+        assert len(generate_calls) == 0
+
+    def test_config_separate_compiledb_runs_normally(self):
+        def buildozer_output(autocomplete_query):
+            return ""
+
+        args = ["wrapper_hook", "build", "--config", "compiledb", "//src/mongo/base:error_codes"]
+        generate_calls = []
+
+        def fake_generate_compiledb(*call_args, **call_kwargs):
+            generate_calls.append((call_args, call_kwargs))
+
+        original_generate_compiledb = plus_interface.generate_compiledb
+        original_wrapper_config_mode_file = plus_interface.WRAPPER_CONFIG_MODE_FILE
+        with tempfile.TemporaryDirectory() as tempdir:
+            wrapper_config_mode_file = os.path.join(tempdir, "mongo_wrapper_config_mode")
+            with open(wrapper_config_mode_file, "w", encoding="utf-8") as file_handle:
+                file_handle.write("dbg")
+            plus_interface.generate_compiledb = fake_generate_compiledb
+            plus_interface.WRAPPER_CONFIG_MODE_FILE = wrapper_config_mode_file
+            try:
+                result = test_runner_interface(args, False, buildozer_output)
+            finally:
+                plus_interface.generate_compiledb = original_generate_compiledb
+                plus_interface.WRAPPER_CONFIG_MODE_FILE = original_wrapper_config_mode_file
+
+        assert result == [
+            "build",
+            "--config",
+            "compiledb",
+            "//src/mongo/base:error_codes",
+        ]
+        assert len(generate_calls) == 0
+
+    def test_config_separate_compiledb_runs_normally_with_plain_target(self):
+        def buildozer_output(autocomplete_query):
+            return ""
+
+        args = ["wrapper_hook", "build", "--config", "compiledb", "install-dist-test"]
+        generate_calls = []
+
+        def fake_generate_compiledb(*call_args, **call_kwargs):
+            generate_calls.append((call_args, call_kwargs))
+
+        original_generate_compiledb = plus_interface.generate_compiledb
+        original_wrapper_config_mode_file = plus_interface.WRAPPER_CONFIG_MODE_FILE
+        with tempfile.TemporaryDirectory() as tempdir:
+            wrapper_config_mode_file = os.path.join(tempdir, "mongo_wrapper_config_mode")
+            with open(wrapper_config_mode_file, "w", encoding="utf-8") as file_handle:
+                file_handle.write("dbg")
+            plus_interface.generate_compiledb = fake_generate_compiledb
+            plus_interface.WRAPPER_CONFIG_MODE_FILE = wrapper_config_mode_file
+            try:
+                result = test_runner_interface(args, False, buildozer_output)
+            finally:
+                plus_interface.generate_compiledb = original_generate_compiledb
+                plus_interface.WRAPPER_CONFIG_MODE_FILE = original_wrapper_config_mode_file
+
+        assert result == [
+            "build",
+            "--config",
+            "compiledb",
+            "install-dist-test",
+        ]
+        assert len(generate_calls) == 0
+
+    def test_config_separate_compiledb_runs_normally_with_target_before_config(self):
+        def buildozer_output(autocomplete_query):
+            return ""
+
+        args = ["wrapper_hook", "build", "install-dist-test", "--config", "compiledb"]
+        generate_calls = []
+
+        def fake_generate_compiledb(*call_args, **call_kwargs):
+            generate_calls.append((call_args, call_kwargs))
+
+        original_generate_compiledb = plus_interface.generate_compiledb
+        original_wrapper_config_mode_file = plus_interface.WRAPPER_CONFIG_MODE_FILE
+        with tempfile.TemporaryDirectory() as tempdir:
+            wrapper_config_mode_file = os.path.join(tempdir, "mongo_wrapper_config_mode")
+            with open(wrapper_config_mode_file, "w", encoding="utf-8") as file_handle:
+                file_handle.write("dbg")
+            plus_interface.generate_compiledb = fake_generate_compiledb
+            plus_interface.WRAPPER_CONFIG_MODE_FILE = wrapper_config_mode_file
+            try:
+                result = test_runner_interface(args, False, buildozer_output)
+            finally:
+                plus_interface.generate_compiledb = original_generate_compiledb
+                plus_interface.WRAPPER_CONFIG_MODE_FILE = original_wrapper_config_mode_file
+
+        assert result == [
+            "build",
+            "install-dist-test",
+            "--config",
+            "compiledb",
+        ]
+        assert len(generate_calls) == 0
 
 
 if __name__ == "__main__":
