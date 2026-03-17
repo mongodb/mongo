@@ -235,6 +235,10 @@ public:
         }
     }
 
+    bool isLoadShedExempt() const override {
+        return getTaskType() == TaskType::Background;
+    }
+
 private:
     friend class ec::ScopedTaskTypeModifierBase;
 
