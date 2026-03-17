@@ -115,6 +115,13 @@ static const std::unordered_map<MetaType, StringData> kMetaTypeToMetaName = {
     {MetaType::kStream, streamName},
     {MetaType::kChangeStreamControlEvent, changeStreamControlEventName},
 };
+
+static const std::set<DocumentMetadataFields::MetaType> kScoreMetadataFields = {
+    DocumentMetadataFields::MetaType::kScore,
+    DocumentMetadataFields::MetaType::kSearchScore,
+    DocumentMetadataFields::MetaType::kVectorSearchScore,
+    DocumentMetadataFields::MetaType::kTextScore,
+};
 }  // namespace
 
 DocumentMetadataFields::DocumentMetadataFields(const DocumentMetadataFields& other)
@@ -149,6 +156,10 @@ StringData DocumentMetadataFields::serializeMetaType(MetaType type) {
             str::stream() << "No name found for meta type: " << type,
             nameIter != kMetaTypeToMetaName.end());
     return nameIter->second;
+}
+
+bool DocumentMetadataFields::isScoreProducingMetaType(StringData name) {
+    return kScoreMetadataFields.contains(DocumentMetadataFields::parseMetaType(name));
 }
 
 void DocumentMetadataFields::setMetaFieldFromValue(MetaType type, Value val) {

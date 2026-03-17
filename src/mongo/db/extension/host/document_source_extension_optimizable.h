@@ -332,6 +332,12 @@ public:
             this->transactionNotSupported(this->getParseTimeName());
         }
 
+        bool isRankedStage() const override;
+
+        bool isScoredStage() const override;
+
+        bool isSelectionStage() const override;
+
     private:
         AggStageAstNodeHandle _astNode;
         const MongoExtensionStaticProperties _properties;

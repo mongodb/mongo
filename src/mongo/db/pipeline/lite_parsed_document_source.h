@@ -493,6 +493,31 @@ public:
     }
 
     /**
+     * Returns true if this stage produces output sort key metadata ($sortKey).
+     * TODO SERVER-101722 This can be removed once LPDS has StageConstraints.
+     */
+    virtual bool isRankedStage() const {
+        return false;
+    }
+
+    /**
+     * Returns true if this stage produces score metadata.
+     * TODO SERVER-101722 This can be removed once LPDS has StageConstraints.
+     */
+    virtual bool isScoredStage() const {
+        return false;
+    }
+
+    /**
+     * Returns true if this stage is a selection stage. A selection stage does not modify or
+     * transform documents.
+     * TODO SERVER-101722 This can be removed once LPDS has StageConstraints.
+     */
+    virtual bool isSelectionStage() const {
+        return false;
+    }
+
+    /**
      * Returns true if this stage require knowledge of the collection default collation at parse
      * time, false otherwise. This is useful to know as it could save a network request to discern
      * the collation.

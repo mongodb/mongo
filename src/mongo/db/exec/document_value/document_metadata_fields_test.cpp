@@ -38,6 +38,7 @@
 
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace mongo {
 
@@ -795,5 +796,40 @@ TEST(DocumentMetadataFieldsTest, EqualityOperatorWithAllFields) {
     DocumentMetadataFields meta2 = generateMeta();
 
     ASSERT_EQ(meta1, meta2);
+}
+
+TEST(DocumentMetadataFieldsTest, IsScoreProducingMetaTypeReturnsTrueForScoreMetadataFields) {
+    const std::vector<std::string> scoreMetadataFields = {
+        "score", "searchScore", "vectorSearchScore", "textScore"};
+    for (const auto& field : scoreMetadataFields) {
+        ASSERT_TRUE(DocumentMetadataFields::isScoreProducingMetaType(StringData{field}))
+            << "Expected isScoreProducingMetaType to return true for: " << field;
+    }
+}
+
+TEST(DocumentMetadataFieldsTest, IsScoreProducingMetaTypeReturnsFalseForNonScoreMetadataFields) {
+    const std::vector<std::string> nonScoreMetadataFields = {"sortKey",
+                                                             "searchHighlights",
+                                                             "randVal",
+                                                             "geoNearDistance",
+                                                             "geoNearPoint",
+                                                             "indexKey",
+                                                             "recordId",
+                                                             "searchScoreDetails",
+                                                             "scoreDetails",
+                                                             "searchRootDocumentId",
+                                                             "searchSequenceToken",
+                                                             "stream",
+                                                             "changeStreamControlEvent"};
+    for (const auto& field : nonScoreMetadataFields) {
+        ASSERT_FALSE(DocumentMetadataFields::isScoreProducingMetaType(StringData{field}))
+            << "Expected isScoreProducingMetaType to return false for: " << field;
+    }
+}
+
+TEST(DocumentMetadataFieldsTest, IsScoreProducingMetaTypeThrowsForUnsupportedMetaField) {
+    ASSERT_THROWS_CODE(DocumentMetadataFields::isScoreProducingMetaType("unsupportedField"_sd),
+                       AssertionException,
+                       17308);
 }
 }  // namespace mongo

@@ -151,3 +151,8 @@ structs:
                 description: Whether the stage is allowed in $facet subpipelines.
                 type: bool
                 default: true
+            isSelectionStage:
+                description: >-
+                    Whether this stage is a selection stage. A selection stage does not modify or transform documents.
+                type: bool
+                default: false

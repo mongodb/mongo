@@ -233,6 +233,30 @@ void DocumentSourceExtensionOptimizable::LiteParsedExpanded::bindViewInfo(
     _astNode->bindViewInfo(viewInfoAdapter.getAsBoundaryType());
 }
 
+bool DocumentSourceExtensionOptimizable::LiteParsedExpanded::isRankedStage() const {
+    const auto& provided = _properties.getProvidedMetadataFields();
+    if (!provided.has_value() || provided->empty()) {
+        return false;
+    }
+    return std::find(provided->begin(),
+                     provided->end(),
+                     DocumentMetadataFields::serializeMetaType(
+                         DocumentMetadataFields::MetaType::kSortKey)) != provided->end();
+}
+
+bool DocumentSourceExtensionOptimizable::LiteParsedExpanded::isScoredStage() const {
+    const auto& provided = _properties.getProvidedMetadataFields();
+    if (!provided.has_value() || provided->empty()) {
+        return false;
+    }
+    return std::any_of(
+        provided->begin(), provided->end(), DocumentMetadataFields::isScoreProducingMetaType);
+}
+
+bool DocumentSourceExtensionOptimizable::LiteParsedExpanded::isSelectionStage() const {
+    return _properties.getIsSelectionStage();
+}
+
 // static
 void DocumentSourceExtensionOptimizable::registerStage(AggStageDescriptorHandle descriptor) {
     auto nameStringData = descriptor->getName();

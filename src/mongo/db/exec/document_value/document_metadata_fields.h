@@ -101,6 +101,11 @@ public:
     static StringData serializeMetaType(DocumentMetadataFields::MetaType type);
 
     /**
+     * Returns true if this metadata value produces score metadata.
+     */
+    static bool isScoreProducingMetaType(StringData name);
+
+    /**
      * Reads serialized metadata out of 'buf', and uses it to populate 'out'. Expects 'buf' to have
      * been written to by a previous call to serializeForSorter(). It is illegal to pass a null
      * pointer for 'out'.

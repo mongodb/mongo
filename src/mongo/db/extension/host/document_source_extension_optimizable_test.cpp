@@ -86,6 +86,15 @@ public:
         return BSON(std::string(stageName) << BSONObj());
     }
 
+    host::DocumentSourceExtensionOptimizable::LiteParsedExpanded
+    makeLiteParsedExpandedFromProperties(BSONObj properties, std::string stageName) {
+        auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(
+            std::make_unique<sdk::shared_test_stages::CustomPropertiesAstNode>(properties));
+        auto handle = AggStageAstNodeHandle{astNode};
+        return host::DocumentSourceExtensionOptimizable::LiteParsedExpanded(
+            std::move(stageName), std::move(handle), _nss);
+    }
+
 protected:
     NamespaceString _nss = NamespaceString::createNamespaceString_forTest(
         boost::none, "document_source_extension_test");
@@ -1010,6 +1019,81 @@ TEST_F(DocumentSourceExtensionOptimizableTest, SearchLikeSourceAggStageAstNode) 
     host::DocumentSourceExtensionOptimizable::LiteParsedExpanded lp(
         std::string(sdk::shared_test_stages::kSearchLikeSourceStageName), std::move(handle), _nss);
     ASSERT_TRUE(lp.isInitialSource());
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       LiteParsedExpandedIsRankedStageWithSortKeyInProvidedMetadataFields) {
+    auto lp = makeLiteParsedExpandedFromProperties(
+        BSON("providedMetadataFields" << BSON_ARRAY("sortKey")), "$rankedStage");
+    ASSERT_TRUE(lp.isRankedStage());
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       LiteParsedExpandedIsNotRankedStageWithSearchScoreInProvidedMetadataFields) {
+    auto lp = makeLiteParsedExpandedFromProperties(
+        BSON("providedMetadataFields" << BSON_ARRAY("searchScore")), "$nonRankedStage");
+    ASSERT_FALSE(lp.isRankedStage());
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       LiteParsedExpandedIsNotRankedStageWithEmptyProvidedMetadataFields) {
+    auto lp = makeLiteParsedExpandedFromProperties(BSON("providedMetadataFields" << BSONArray()),
+                                                   "$emptyStage");
+    ASSERT_FALSE(lp.isRankedStage());
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       LiteParsedExpandedIsNotRankedStageWithOmittedProvidedMetadataFields) {
+    auto lp = makeLiteParsedExpandedFromProperties(BSONObj(), "$noProvidedStage");
+    ASSERT_FALSE(lp.isRankedStage());
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       LiteParsedExpandedIsScoredStageWithSearchScoreInProvidedMetadataFields) {
+    auto lp = makeLiteParsedExpandedFromProperties(
+        BSON("providedMetadataFields" << BSON_ARRAY("searchScore")), "$scoredStage");
+    ASSERT_TRUE(lp.isScoredStage());
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       LiteParsedExpandedIsScoredStageWithVectorSearchScoreInProvidedMetadataFields) {
+    auto lp = makeLiteParsedExpandedFromProperties(
+        BSON("providedMetadataFields" << BSON_ARRAY("vectorSearchScore")), "$vectorScoredStage");
+    ASSERT_TRUE(lp.isScoredStage());
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       LiteParsedExpandedIsNotScoredStageWithSortKeyInProvidedMetadataFields) {
+    auto lp = makeLiteParsedExpandedFromProperties(
+        BSON("providedMetadataFields" << BSON_ARRAY("sortKey")), "$nonScoredStage");
+    ASSERT_FALSE(lp.isScoredStage());
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       LiteParsedExpandedIsNotScoredStageWithEmptyProvidedMetadataFields) {
+    auto lp = makeLiteParsedExpandedFromProperties(BSON("providedMetadataFields" << BSONArray()),
+                                                   "$emptyStage");
+    ASSERT_FALSE(lp.isScoredStage());
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       LiteParsedExpandedIsNotScoredStageWithOmittedProvidedMetadataFields) {
+    auto lp = makeLiteParsedExpandedFromProperties(BSONObj(), "$omittedStage");
+    ASSERT_FALSE(lp.isScoredStage());
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       LiteParsedExpandedIsSelectionStageWhenIsSelectionStageTrue) {
+    auto lp =
+        makeLiteParsedExpandedFromProperties(BSON("isSelectionStage" << true), "$selectionStage");
+    ASSERT_TRUE(lp.isSelectionStage());
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       LiteParsedExpandedIsNotSelectionStageWhenIsSelectionStageFalse) {
+    auto lp = makeLiteParsedExpandedFromProperties(BSON("isSelectionStage" << false),
+                                                   "$nonSelectionStage");
+    ASSERT_FALSE(lp.isSelectionStage());
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest,
