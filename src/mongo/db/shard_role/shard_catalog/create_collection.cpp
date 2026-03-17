@@ -115,7 +115,6 @@ MONGO_FAIL_POINT_DEFINE(failTimeseriesViewCreation);
 MONGO_FAIL_POINT_DEFINE(clusterAllCollectionsByDefault);
 MONGO_FAIL_POINT_DEFINE(skipIdIndex);
 MONGO_FAIL_POINT_DEFINE(hangCreateCollectionBeforeLockAcquisition);
-MONGO_FAIL_POINT_DEFINE(skipCheckCreateConflictingTimeseriesBuckets);
 
 using IndexVersion = IndexDescriptor::IndexVersion;
 
@@ -387,11 +386,10 @@ Status _checkNamespaceOrTimeseriesBucketsAlreadyExists(OperationContext* opCtx,
     //
     // TODO SERVER-121290 do not skip this check when viewless timeseries feature flag is disabled
     // once 8.3 becomes last continuous.
-    const auto skipOtherTimeseriesNssCheck =
-        !gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledAndIgnoreFCVUnsafe() ||
-        MONGO_unlikely(skipCheckCreateConflictingTimeseriesBuckets.shouldFail());
+    const auto checkOtherTimeseriesNss = opCtx->isEnforcingConstraints() &&
+        gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledAndIgnoreFCVUnsafe();
 
-    if (!skipOtherTimeseriesNssCheck) {
+    if (checkOtherTimeseriesNss) {
         auto otherTimeseriesNss = nss.isTimeseriesBucketsCollection()
             ? nss.getTimeseriesViewNamespace()
             : nss.makeTimeseriesBucketsNamespace();
@@ -631,11 +629,13 @@ void checkExistingCollectionIsCompatible(OperationContext* opCtx,
     }
 
     const auto& collatorFactory = CollatorFactoryInterface::get(opCtx->getServiceContext());
-    uassert(ErrorCodes::NamespaceExists,
-            fmt::format("namespace '{}' already exists, but with different options: {}",
-                        nss.toStringForErrorMsg(),
-                        existingOptions.toBSON().toString()),
-            normalizedRequestedOptions.matchesStorageOptions(existingOptions, collatorFactory));
+    uassert(
+        ErrorCodes::NamespaceExists,
+        fmt::format("namespace '{}' already exists, but with different options: {}, requested: {}",
+                    nss.toStringForErrorMsg(),
+                    existingOptions.toBSON().toString(),
+                    normalizedRequestedOptions.toBSON().toString()),
+        normalizedRequestedOptions.matchesStorageOptions(existingOptions, collatorFactory));
 }
 
 /**
@@ -717,6 +717,8 @@ bool checkNamespaceAlreadyExistsAndCompatible(OperationContext* opCtx,
         checkExistingCollectionIsCompatible(opCtx, collAcq.getCollectionPtr(), requestedOptions);
         return true;
     } else if (collAcq.isView()) {
+        // TODO SERVER-118970 remove this once 9.0 becomes last LTS.
+        // By then we will have only viewless timeseries and legacy timeseries view will be illegal
         const auto& requestedViewOptions = [&] {
             if (requestedOptions.timeseries) {
                 return _generateLegacyTimeseriesViewOptions(
@@ -748,7 +750,34 @@ Status _createView(OperationContext* opCtx,
     });
 }
 
-Status _createLegacyTimeseries(
+Status _setBucketingParametersAndAddClusteredIndex(CollectionOptions& options) {
+    Status timeseriesOptionsValidateAndSetStatus =
+        timeseries::validateAndSetBucketingParameters(options.timeseries.get());
+    if (!timeseriesOptionsValidateAndSetStatus.isOK()) {
+        return timeseriesOptionsValidateAndSetStatus;
+    }
+
+    // TODO(SERVER-101611): Initialize timeseriesBucketingParametersHaveChanged to false
+    // when TSBucketingParametersUnchanged is enabled. Currently, this is not done because the
+    // flag is stored in the WiredTiger config string (SERVER-91195), so doing it changes the
+    // output of listCollections and breaks creation idempotency with no straightforward fixes
+
+    // Cluster time-series buckets collections by _id.
+    if (options.expireAfterSeconds) {
+        uassertStatusOK(index_key_validate::validateExpireAfterSeconds(
+            *options.expireAfterSeconds,
+            index_key_validate::ValidateExpireAfterSecondsMode::kClusteredTTLIndex));
+    }
+    options.clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
+    return Status::OK();
+}
+
+/**
+ * Create timeseries collection function used in 8.3 version binaries.
+ *
+ * TODO SERVER-121290 remove this function once 8.3 becomes last continuous.
+ */
+Status _createLegacyTimeseries_OLD_PRE_90(
     OperationContext* opCtx,
     const NamespaceString& ns,
     const CollectionOptions& optionsArg,
@@ -953,6 +982,212 @@ Status _createLegacyTimeseries(
     return Status::OK();
 }
 
+/**
+ * Create timeseries collection function used in 9.0 version binaries.
+ *
+ * This function is used both for the creation of viewless timeseries collection and legacy
+ * system.buckets collections.
+ *
+ * TODO SERVER-121290 rename this function once 8.3 becomes last continuous.
+ */
+void _createTimeseriesBucketsCollection_NEW_FROM_90(
+    OperationContext* opCtx,
+    const NamespaceString& targetNs,
+    CollectionOptions collOptions,
+    const boost::optional<CreateCollCatalogIdentifier>& catalogIdentifier) {
+    WriteUnitOfWork wuow(opCtx);
+    auto db = DatabaseHolder::get(opCtx)->openDb(opCtx, targetNs.dbName());
+    AutoStatsTracker bucketsStatsTracker(opCtx,
+                                         targetNs,
+                                         Top::LockType::NotLocked,
+                                         AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                         DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                             .getDatabaseProfileLevel(targetNs.dbName()));
+
+    // If the buckets collection and time-series view creation roll back, ensure that their
+    // Top entries are deleted.
+    shard_role_details::getRecoveryUnit(opCtx)->onRollback([targetNs](OperationContext* opCtx) {
+        Top::getDecoration(opCtx).collectionDropped(targetNs);
+    });
+    // Create the buckets collection that will back the view.
+    const bool createIdIndex = false;
+    uassertStatusOK(db->userCreateNS(opCtx,
+                                     targetNs,
+                                     collOptions,
+                                     createIdIndex,
+                                     /*idIndex=*/BSONObj(),
+                                     /*fromMigrate=*/false,
+                                     catalogIdentifier));
+
+    CollectionWriter collectionWriter(opCtx, targetNs);
+
+    auto validatedCollator = collOptions.collation;
+    if (!collOptions.collation.isEmpty()) {
+        auto swCollator = db->validateCollator(opCtx, collOptions);
+
+        // The userCreateNS already has a uassertStatusOK and validateCollator is called in it,
+        // so we should have the case that the status of the swCollator is ok.
+        invariant(swCollator.getStatus());
+        validatedCollator = swCollator.getValue()->getSpec().toBSON();
+    }
+
+    // We create the index on time and meta, which is used for query-based reopening, here for
+    // viewless time-series collections if we are creating the collection on a primary. This is
+    // done within the same WUOW as the collection creation.
+    //
+    // It should be safe to create the index in a separate WUOW from the collection creation,
+    // this is currently what is done on secondaries. There is a risk that the index creation
+    // entry gets rolled back, leaving the collection without the index, but this is easily
+    // remedied by manually creating the index again. If the collection creation and index
+    // creation are moved to separate WUOWs, which could simplify the code a bit, we would need
+    // to take the X lock instead of the IX lock to prevent writes to the collection from being
+    // performed before we have built the default index on it. TODO SERVER-107681 consider
+    // performing the two creations in separate WUOWs on primaries as well.
+    uassertStatusOK(
+        timeseries::createDefaultTimeseriesIndex(opCtx, collectionWriter, validatedCollator));
+    wuow.commit();
+}
+
+/**
+ * Creates a timeseries collection.
+ *
+ * Only used starting with the 9.0 binary version.
+ *
+ * Throws NamespaceExists if a collection or view already exists with the same namespace but
+ * incompatible metadata.
+ *
+ * The newly created collection will be either in viewless (new) or viewful (legacy) format,
+ * depending on the status of the CreateViewlessTimeseries feature flag.
+ *
+ * This function is idempotent: if a timeseries collection already exists, in either viewless (new)
+ * or viewful (legacy) format, with compatible metadata, this function is a no-op.
+ *
+ * If it encounters a legacy system.buckets timeseries collection with compatible metadata but
+ * without the corresponding timeseries view, it will create the missing view.
+ *
+ * This function should only be used on the primary node. Creation of timeseries collections during
+ * oplog application is done through the _createCollection function.
+ *
+ * TODO SERVER-121290 rename this function once 8.3 becomes last continuous.
+ * TODO SERVER-118970 merge this function with the non-timeseries creation path once 9.0 becomes
+ *      last LTS.
+ */
+void _createTimeseriesCollection_NEW_FROM_90(
+    OperationContext* opCtx,
+    const NamespaceString& ns,
+    const CollectionOptions& optionsArg,
+    const boost::optional<BSONObj>& idIndex,
+    const boost::optional<CreateCollCatalogIdentifier>& catalogIdentifier) {
+
+    // This path should only be taken when a user creates a new time-series collection on the
+    // primary. Secondaries replicate individual oplog entries.
+    invariant(opCtx->writesAreReplicated());
+
+    const auto viewlessTimeseriesEnabled =
+        gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx));
+
+    tassert(12128910,
+            fmt::format("Received illegal create timeseries collection request on legacy system "
+                        "buckets namespace '{}' when viewless timeseries feature flag is enabled",
+                        ns.toStringForErrorMsg()),
+            !viewlessTimeseriesEnabled || !ns.isTimeseriesBucketsCollection());
+
+    const auto& [mainNs, bucketsNs] = [&]() -> std::tuple<NamespaceString, NamespaceString> {
+        if (ns.isTimeseriesBucketsCollection()) {
+            return {ns.getTimeseriesViewNamespace(), ns};
+        } else {
+            return {ns, ns.makeTimeseriesBucketsNamespace()};
+        }
+    }();
+
+    const auto& namespaceForValidation = viewlessTimeseriesEnabled ? mainNs : bucketsNs;
+    uassertStatusOK(userAllowedCreateNS(opCtx, namespaceForValidation));
+    uassertStatusOK(validateCollectionOptions(opCtx, namespaceForValidation, optionsArg, idIndex));
+
+    writeConflictRetry(opCtx, "createTimeseriesCollection", ns, [&] {
+        CollectionOrViewAcquisitionRequests requests{
+            CollectionOrViewAcquisitionRequest::fromOpCtx(
+                opCtx, mainNs, AcquisitionPrerequisites::kWrite),
+            CollectionOrViewAcquisitionRequest::fromOpCtx(
+                opCtx, bucketsNs, AcquisitionPrerequisites::kWrite),
+        };
+        auto acquisitions = makeAcquisitionMap(acquireCollectionsOrViews(opCtx, requests, MODE_X));
+        auto& mainAcq = acquisitions.at(mainNs);
+        auto& bucketsAcq = acquisitions.at(bucketsNs);
+
+        if (opCtx->writesAreReplicated() &&
+            !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, bucketsNs)) {
+            // Report the error with the user provided namespace
+            uasserted(ErrorCodes::NotWritablePrimary,
+                      str::stream()
+                          << "Not primary while creating collection " << ns.toStringForErrorMsg());
+        }
+
+        const auto mainNssExists =
+            checkNamespaceAlreadyExistsAndCompatible(opCtx, mainAcq, optionsArg);
+        if (mainNssExists && mainAcq.isCollection()) {
+            // A viewless timeseries collection with compatible options already exists
+            return;
+        }
+
+        const auto bucketsCollExists =
+            checkNamespaceAlreadyExistsAndCompatible(opCtx, bucketsAcq, optionsArg);
+
+        if (mainNssExists && mainAcq.isView() && !bucketsCollExists && viewlessTimeseriesEnabled) {
+            // We are attempting to create a viewless timeseries collection, we found a legacy
+            // timeseries view but the corresponding system.buckets collection does not exist.
+            uasserted(ErrorCodes::NamespaceExists,
+                      fmt::format("A legacy timeseries view already exists for namespace '{}', but "
+                                  "the corresponding system.buckets collection is missing",
+                                  mainNs.toStringForErrorMsg()));
+        }
+
+        if (!bucketsCollExists) {
+            auto bucketsOptions = optionsArg;
+            uassertStatusOK(_setBucketingParametersAndAddClusteredIndex(bucketsOptions));
+
+            if (viewlessTimeseriesEnabled) {
+                _createTimeseriesBucketsCollection_NEW_FROM_90(
+                    opCtx, mainNs, bucketsOptions, catalogIdentifier);
+                return;
+            } else {
+                // Set the validator option to a JSON schema enforcing constraints on bucket
+                // documents. This validation is only structural to prevent accidental corruption by
+                // users and cannot cover all constraints. Leave the validationLevel and
+                // validationAction to their strict/error defaults.
+                auto timeField = bucketsOptions.timeseries->getTimeField();
+                bucketsOptions.validator = timeseries::generateTimeseriesValidator(
+                    timeseries::kTimeseriesControlLatestVersion, timeField);
+
+                // Create the buckets collection that will back the view.
+                _createTimeseriesBucketsCollection_NEW_FROM_90(
+                    opCtx, bucketsNs, bucketsOptions, catalogIdentifier);
+            }
+        }
+
+        if (
+            // If the request came directly on the bucket namespace
+            // we do not need to create the view.
+            ns.isTimeseriesBucketsCollection() ||
+            // If the 'temp' flag is true, we are in the $out stage, and should return
+            // without creating the view definition.
+            optionsArg.temp ||
+            // The timeseries view already exists and is compatible
+            mainNssExists) {
+            return;
+        }
+
+        CollectionOptions viewOptions = _generateLegacyTimeseriesViewOptions(bucketsNs, optionsArg);
+        const auto viewCreationStatus = _createViewNoRetry(opCtx, mainNs, mainAcq, viewOptions);
+        uassertStatusOKWithContext(
+            viewCreationStatus,
+            str::stream() << "Failed to create view on " << bucketsNs.toStringForErrorMsg()
+                          << " for time-series collection " << ns.toStringForErrorMsg()
+                          << " with options " << viewOptions.toBSON());
+    });
+}
+
 Status _createCollection(
     OperationContext* opCtx,
     const NamespaceString& nss,
@@ -1073,22 +1308,6 @@ Status _createCollection(
         wunit.commit();
         return Status::OK();
     });
-}
-
-Status _setBucketingParametersAndAddClusteredIndex(CollectionOptions& options) {
-    Status timeseriesOptionsValidateAndSetStatus =
-        timeseries::validateAndSetBucketingParameters(options.timeseries.get());
-    if (!timeseriesOptionsValidateAndSetStatus.isOK()) {
-        return timeseriesOptionsValidateAndSetStatus;
-    }
-    // Cluster time-series buckets collections by _id.
-    if (options.expireAfterSeconds) {
-        uassertStatusOK(index_key_validate::validateExpireAfterSeconds(
-            *options.expireAfterSeconds,
-            index_key_validate::ValidateExpireAfterSecondsMode::kClusteredTTLIndex));
-    }
-    options.clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
-    return Status::OK();
 }
 
 /**
@@ -1310,14 +1529,15 @@ Status createCollectionForApplyOps(
 }
 
 
-Status createCollection(OperationContext* opCtx,
-                        const NamespaceString& ns,
-                        const CollectionOptions& optionsArg,
-                        const boost::optional<BSONObj>& idIndex) {
-    // Acquire an OFCV to get stable FCV-gated feature flag checks even during concurrent setFCV.
-    // We may not have an OFCV yet because e.g. system collection creations (in the config DB) call
-    // here directly, without going through the user command.
-    VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx);
+/**
+ * Create collection function used in 8.3 version binaries.
+ *
+ * TODO SERVER-121290 remove this function once 8.3 becomes last continuous.
+ */
+Status createCollection_OLD_PRE_90(OperationContext* opCtx,
+                                   const NamespaceString& ns,
+                                   const CollectionOptions& optionsArg,
+                                   const boost::optional<BSONObj>& idIndex) {
     const auto createViewlessTimeseriesColl = optionsArg.timeseries &&
         gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledUseLatestFCVWhenUninitialized(
             VersionContext::getDecoration(opCtx));
@@ -1345,7 +1565,7 @@ Status createCollection(OperationContext* opCtx,
         // This helper is designed for user-created time-series collections on primaries. If a
         // time-series buckets collection is created explicitly or during replication, treat this as
         // a normal collection creation.
-        return _createLegacyTimeseries(
+        return _createLegacyTimeseries_OLD_PRE_90(
             opCtx, ns, options, idIndex, /*catalogIdentifier=*/boost::none);
     }
     return _createCollection(opCtx,
@@ -1356,6 +1576,71 @@ Status createCollection(OperationContext* opCtx,
                              /*virtualCollectionOptions=*/boost::none);
 }
 
+/**
+ * Create collection function used in 9.0 version binaries.
+ *
+ * TODO SERVER-121290 rename this function once 8.3 becomes last continuous.
+ */
+Status createCollection_NEW_FROM_90(OperationContext* opCtx,
+                                    const NamespaceString& ns,
+                                    const CollectionOptions& options,
+                                    const boost::optional<BSONObj>& idIndex) {
+    auto status = _performCollectionCreationChecks(opCtx, ns, options);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    hangCreateCollectionBeforeLockAcquisition.pauseWhileSet();
+
+    if (options.isView()) {
+        return _createView(opCtx, ns, options);
+    }
+    if (options.timeseries && opCtx->writesAreReplicated()) {
+        try {
+            _createTimeseriesCollection_NEW_FROM_90(
+                opCtx, ns, options, idIndex, /*catalogIdentifier=*/boost::none);
+        } catch (const DBException&) {
+            return exceptionToStatus().withContext("Failed to create timeseries collection");
+        }
+        return Status::OK();
+    }
+    return _createCollection(opCtx,
+                             ns,
+                             options,
+                             /*isForApplyOps=*/false,
+                             idIndex,
+                             /*virtualCollectionOptions=*/boost::none);
+}
+
+/**
+ * Main entry point for creating user collections.
+ *
+ * TODO SERVER-121290 always use createCollection_NEW_FROM_90 function once 8.3 becomes last
+ * continuous.
+ */
+Status createCollection(OperationContext* opCtx,
+                        const NamespaceString& ns,
+                        const CollectionOptions& options,
+                        const boost::optional<BSONObj>& idIndex) {
+    // Acquire an OFCV to get stable FCV-gated feature flag checks even during concurrent setFCV.
+    // We may not have an OFCV yet because e.g. system collection creations (in the config DB) call
+    // here directly, without going through the user command.
+    VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx);
+
+    // (Ignore FCV check) we intentionally take the new creation path in binaries where the viewless
+    // timeseries are enabled regardless of the current FCV state.
+    // This is a temporary guardrail to ensure that 8.3 binaries does not engage the new creation
+    // path.
+    // TODO SERVER-121290 always take the new creation path once 8.3 becomes last continuous.
+    const auto useOldCreatePath =
+        !gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledAndIgnoreFCVUnsafe();
+
+    if (useOldCreatePath) {
+        return createCollection_OLD_PRE_90(opCtx, ns, options, idIndex);
+    }
+
+    return createCollection_NEW_FROM_90(opCtx, ns, options, idIndex);
+}
 
 Status createVirtualCollection(OperationContext* opCtx,
                                const NamespaceString& ns,

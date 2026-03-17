@@ -56,20 +56,24 @@ protected:
         RAIIServerParameterControllerForTest featureFlagController(
             "featureFlagCreateViewlessTimeseriesCollections", false);
         createTimeseriesCollection(nss);
-        return CollectionCatalog::get(operationContext())
-            ->lookupCollectionByNamespace(
-                operationContext(),
-                nss.isTimeseriesBucketsCollection() ? nss : nss.makeTimeseriesBucketsNamespace())
-            ->uuid();
+        auto collPtr =
+            CollectionCatalog::get(operationContext())
+                ->lookupCollectionByNamespace(operationContext(),
+                                              nss.isTimeseriesBucketsCollection()
+                                                  ? nss
+                                                  : nss.makeTimeseriesBucketsNamespace());
+        ASSERT(collPtr);
+        return collPtr->uuid();
     }
 
     UUID createViewlessTimeseriesCollection(const NamespaceString& nss) {
         RAIIServerParameterControllerForTest featureFlagController(
             "featureFlagCreateViewlessTimeseriesCollections", true);
         createTimeseriesCollection(nss);
-        return CollectionCatalog::get(operationContext())
-            ->lookupCollectionByNamespace(operationContext(), nss)
-            ->uuid();
+        auto collPtr = CollectionCatalog::get(operationContext())
+                           ->lookupCollectionByNamespace(operationContext(), nss);
+        ASSERT(collPtr);
+        return collPtr->uuid();
     }
 
     void assertIsTimeseriesCollection(const NamespaceString& nss, const UUID& uuid) {
@@ -499,12 +503,16 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanDowngradeFailsWithConflictingB
     createViewlessTimeseriesCollection(nss1);
 
     {
-        FailPointEnableBlock allowConflictingCollCreation(
-            "skipCheckCreateConflictingTimeseriesBuckets");
         // Create a conflicting viewless timeseries at the buckets namespace.
         // This simulates an inconsistent state where both foo and system.buckets.foo have
         // collections.
-        createViewlessTimeseriesCollection(nss1.makeTimeseriesBucketsNamespace());
+        const auto& bucketsNss = nss1.makeTimeseriesBucketsNamespace();
+        AutoGetDb autoDb(operationContext(), bucketsNss.dbName(), MODE_IX);
+        Lock::CollectionLock collLock(operationContext(), bucketsNss, MODE_IX);
+        CreateCommand cmd = CreateCommand(bucketsNss);
+        cmd.getCreateCollectionRequest().setTimeseries(TimeseriesOptions("timestamp"));
+        ASSERT_OK(createCollectionForApplyOps(
+            operationContext(), bucketsNss.dbName(), boost::none /*UUID*/, cmd.toBSON(), false));
     }
 
     RAIIServerParameterControllerForTest featureFlagController(

@@ -16,6 +16,7 @@
  */
 
 import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let st = new ShardingTest({shards: 2});
@@ -173,9 +174,24 @@ if (!areViewlessTimeseriesEnabled(db)) {
         jsTest.log("Case collection: sharded standard / collection: bucket timeseries.");
         runTest(() => {
             shardCollectionWorked(kColl);
-            // TODO SERVER-85855 creating a bucket timeseries when the main namespace already exists
-            // and is not timeseries should fail
-            createWorked(kBucket, tsOptions);
+            const isMultiversionSuite =
+                Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+                Boolean(TestData.multiversionBinVersion);
+            // TODO SERVER-121290 always assert that the bucket creation fails once 8.3 becomes last continuous.
+            if (
+                FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections", true /* ignoreFCV */) &&
+                !isMultiversionSuite
+            ) {
+                createFailed(kBucket, tsOptions, ErrorCodes.NamespaceExists);
+            } else {
+                // TODO SERVER-85855 creating a bucket timeseries when the main namespace already exists
+                // and is not timeseries should fail
+                // In multiversion scenario a new binary (with new create checks) could correctly reject the creation.
+                assert.commandWorkedOrFailedWithCode(
+                    db.createCollection(kBucket, {timeseries: tsOptions}),
+                    ErrorCodes.NamespaceExists,
+                );
+            }
         });
     }
 

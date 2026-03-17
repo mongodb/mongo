@@ -8,8 +8,6 @@
  *   # Runs setFCV, which can interfere with other tests.
  *   incompatible_with_concurrency_simultaneous,
  *   runs_set_fcv,
- *   # TODO SERVER-119172: on replica set cluster create coll are racy with setFCV
- *   requires_sharding,
  *   # TODO (SERVER-104171) Remove the 'assumes_balancer_off' tag
  *   assumes_balancer_off,
  *   # The fuzzer tries to enable server parameters not available on lastLTS FCV
@@ -19,6 +17,7 @@
 
 import {handleRandomSetFCVErrors} from "jstests/concurrency/fsm_workload_helpers/fcv/handle_setFCV_errors.js";
 import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const timeFieldName = "t_field";
 const metaFieldName = "m_field";
@@ -44,12 +43,37 @@ export const $config = (function () {
         },
         create: (db, collName) => {
             const coll = db[getRandomColl()];
-            assert.commandWorked(
+            assert.commandWorkedOrFailedWithCode(
                 db.createCollection(coll.getName(), {
                     timeseries: {timeField: timeFieldName, metaField: metaFieldName},
                 }),
+                [
+                    // In suites that implicitly shard or track the timeseries collection,
+                    // the router could exhaust the retry attempts on StaleConfig because we repeatedly
+                    // drop and re-create the collection, causing its shard version to change continuously.
+                    ErrorCodes.StaleConfig,
+                ],
             );
         },
+        drop: (db, collName) => {
+            const coll = db[getRandomColl()];
+            assert.commandWorked(db.runCommand({drop: coll.getName()}));
+        },
+    };
+
+    let setup = function (db, collName, cluster) {
+        // Skip the test if not running on a sharded cluster AND createViewlessTimeseriesCollections is disabled
+        // TODO SERVER-121290 execute this test in all cluster configuration once 8.3 becomes last continuous.
+        // Once 8.3 branches out we can enable the new replicaset create with serialization and idempotency for viewful and viewless timeseries.
+        if (
+            !cluster.isSharded() &&
+            !FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections", true /* ignoreFCV */)
+        ) {
+            jsTest.log(
+                "Skipping test because create timeseries collection on replicasets without viewless timeseries is racy",
+            );
+            quit();
+        }
     };
 
     let teardown = function (db, collName) {
@@ -62,6 +86,7 @@ export const $config = (function () {
         iterations: 300,
         states: states,
         teardown: teardown,
+        setup: setup,
         transitions: uniformDistTransitions(states),
     };
 })();
