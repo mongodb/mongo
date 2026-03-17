@@ -99,6 +99,8 @@ void ShardingStatistics::report(BSONObjBuilder* builder) const {
                     countTransitionToDedicatedConfigServerCompleted.loadRelaxed());
     builder->append("countTransitionFromDedicatedConfigServerCompleted",
                     countTransitionFromDedicatedConfigServerCompleted.loadRelaxed());
+    builder->append("countHitsOfCompoundWildcardIndexesWithShardKeyPrefix",
+                    countHitsOfCompoundWildcardIndexesWithShardKeyPrefix.loadRelaxed());
 }
 
 }  // namespace mongo
