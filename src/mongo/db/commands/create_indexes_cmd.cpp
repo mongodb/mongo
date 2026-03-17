@@ -213,6 +213,20 @@ void validateTTLOptions(OperationContext* opCtx,
     }
 }
 
+/**
+ * Ensures that the user is authorized to create an index of a given type.
+ */
+void validateIndexType(OperationContext* opCtx, const CreateIndexesCommand& cmd) {
+    for (const auto& elem : cmd.getIndexes()) {
+        for (const auto& key : elem.getField("key").Obj()) {
+            const auto type = key.str();  // will return "" for btree
+            uassert(ErrorCodes::CannotCreateIndex,
+                    fmt::format("Index Type {} is for internal use only", type),
+                    !IndexNames::isVirtualIndexType(type));
+        }
+    }
+}
+
 void checkEncryptedFieldIndexRestrictions(OperationContext* opCtx,
                                           const Collection* coll,
                                           const CreateIndexesCommand& cmd) {
@@ -553,6 +567,7 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
             }
 
             validateTTLOptions(opCtx, collection.getCollectionPtr().get(), cmd);
+            validateIndexType(opCtx, cmd);
 
             if (collection.exists() &&
                 !UncommittedCatalogUpdates::get(opCtx).isCreatedCollection(opCtx, ns)) {
