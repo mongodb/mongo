@@ -100,7 +100,7 @@ class BulkWriteMockNSTargeter : public MockNSTargeter {
 public:
     using MockNSTargeter::MockNSTargeter;
 
-    enum class LastErrorType { kCouldNotTarget, kStaleShardVersion, kStaleDbVersion };
+    enum class LastErrorType { kCouldNotTarget, kStaleRoutingInfo };
 
     void noteCouldNotTarget() override {
         _lastError = LastErrorType::kCouldNotTarget;
@@ -108,12 +108,12 @@ public:
 
     void noteStaleCollVersionResponse(OperationContext* opCtx,
                                       const StaleConfigInfo& staleInfo) override {
-        _lastError = LastErrorType::kStaleShardVersion;
+        _lastError = LastErrorType::kStaleRoutingInfo;
     }
 
     void noteStaleDbVersionResponse(OperationContext* opCtx,
                                     const StaleDbRoutingVersion& staleInfo) override {
-        _lastError = LastErrorType::kStaleDbVersion;
+        _lastError = LastErrorType::kStaleRoutingInfo;
     }
 
     bool refreshIfNeeded(OperationContext* opCtx) override {

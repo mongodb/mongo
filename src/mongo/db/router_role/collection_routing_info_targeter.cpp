@@ -186,7 +186,7 @@ void CollectionRoutingInfoTargeter::noteCouldNotTarget() {
 
 void CollectionRoutingInfoTargeter::noteStaleCollVersionResponse(OperationContext* opCtx,
                                                                  const StaleConfigInfo& staleInfo) {
-    dassert(!_lastError || _lastError.value() == LastErrorType::kStaleShardVersion);
+    dassert(!_lastError || _lastError.value() == LastErrorType::kStaleRoutingInfo);
     Grid::get(opCtx)->catalogCache()->onStaleCollectionVersion(staleInfo.getNss(),
                                                                staleInfo.getVersionWanted());
 
@@ -195,21 +195,19 @@ void CollectionRoutingInfoTargeter::noteStaleCollVersionResponse(OperationContex
         Grid::get(opCtx)->catalogCache()->onStaleCollectionVersion(_nss, boost::none);
     }
 
-    _lastError = LastErrorType::kStaleShardVersion;
+    _lastError = LastErrorType::kStaleRoutingInfo;
 }
 
 void CollectionRoutingInfoTargeter::noteStaleDbVersionResponse(
     OperationContext* opCtx, const StaleDbRoutingVersion& staleInfo) {
-    dassert(!_lastError || _lastError.value() == LastErrorType::kStaleDbVersion);
+    dassert(!_lastError || _lastError.value() == LastErrorType::kStaleRoutingInfo);
     Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(_nss.dbName(),
                                                              staleInfo.getVersionWanted());
-    _lastError = LastErrorType::kStaleDbVersion;
+    _lastError = LastErrorType::kStaleRoutingInfo;
 }
 
 bool CollectionRoutingInfoTargeter::hasStaleShardResponse() {
-    return _lastError &&
-        (_lastError.value() == LastErrorType::kStaleShardVersion ||
-         _lastError.value() == LastErrorType::kStaleDbVersion);
+    return _lastError && _lastError.value() == LastErrorType::kStaleRoutingInfo;
 }
 
 void CollectionRoutingInfoTargeter::noteCannotImplicitlyCreateCollectionResponse(
@@ -240,8 +238,7 @@ bool CollectionRoutingInfoTargeter::refreshIfNeeded(OperationContext* opCtx) {
                 4,
                 "CollectionRoutingInfoTargeter checking if refresh is needed",
                 "couldNotTarget"_attr = _lastError.value() == LastErrorType::kCouldNotTarget,
-                "staleShardVersion"_attr = _lastError.value() == LastErrorType::kStaleShardVersion,
-                "staleDbVersion"_attr = _lastError.value() == LastErrorType::kStaleDbVersion);
+                "staleRoutingInfo"_attr = _lastError.value() == LastErrorType::kStaleRoutingInfo);
 
     // Get the latest metadata information from the cache if there were issues
     auto lastManager = _cri;
@@ -273,7 +270,7 @@ bool CollectionRoutingInfoTargeter::createCollectionIfNeeded(OperationContext* o
         return false;
     }
     // Ensure the routing info is refreshed before the command is retried to avoid StaleConfig
-    _lastError = LastErrorType::kStaleShardVersion;
+    _lastError = LastErrorType::kStaleRoutingInfo;
     return true;
 }
 

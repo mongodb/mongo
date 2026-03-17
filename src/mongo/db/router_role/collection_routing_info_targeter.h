@@ -62,8 +62,7 @@ class MONGO_MOD_NEEDS_REPLACEMENT CollectionRoutingInfoTargeter final : public N
 public:
     enum class LastErrorType {
         kCouldNotTarget,
-        kStaleShardVersion,
-        kStaleDbVersion,
+        kStaleRoutingInfo,
         kCannotImplicitlyCreateCollection
     };
 
