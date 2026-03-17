@@ -606,7 +606,9 @@ def get_prod_pinned_source_ref(config_file: str) -> str:
 def get_prod_copybara_config_from_master(current_dir: str) -> str:
     source_config_file = os.path.join(current_dir, "copy.bara.sky")
     source_ref = get_prod_pinned_source_ref(source_config_file)
-    run_command(f"git fetch origin {source_ref}")
+    run_command(
+        f"git fetch origin refs/heads/{source_ref}:refs/remotes/origin/{source_ref}"
+    )
     source_commit_sha = run_command(f"git rev-parse origin/{source_ref}").strip()
     config_file = os.path.join(current_dir, "tmp_copybara_config_from_master.sky")
     sky_contents = run_command(f"git --no-pager show {source_commit_sha}:copy.bara.sky")
