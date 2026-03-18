@@ -19,7 +19,7 @@ CONF_FILENAME = "mongot-extension.conf"
 
 # Pinned release version. Uses release URL (not latest) so normal mongot-extension
 # pushes don't overwrite the artifact — only sign-and-publish-release does.
-MONGOT_EXTENSION_VERSION = "0.0.0"
+MONGOT_EXTENSION_VERSION = "1.0.0"
 
 
 def get_so_path(is_evergreen: bool) -> str:

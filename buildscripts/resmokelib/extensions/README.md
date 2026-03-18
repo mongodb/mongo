@@ -54,7 +54,7 @@ All `vector_search_extension_*` test suites use this framework to run server Ext
 ### How It Works
 
 1. Builds the download URL from the **pinned release version** (see `MONGOT_EXTENSION_VERSION` in `setup_mongot_extension.py`).
-   We use the **release/** path (e.g. `release/mongot-extension-0.0.0-{platform}-{arch}.tgz`), not **latest/**, so normal mongot-extension pushes do not overwrite the artifact.
+   We use the **release/** path (e.g. `release/mongot-extension-1.0.0-{platform}-{arch}.tgz`), not **latest/**, so normal mongot-extension pushes do not overwrite the artifact.
    Only **sign-and-publish-release** will change the content when run.
 2. Downloads the tarball from S3 and verifies it using the hardcoded SHA256 checksums in `buildscripts/s3_binary/hashes.py`.
 3. Extracts the `.so` file and creates a configuration file
@@ -62,7 +62,7 @@ All `vector_search_extension_*` test suites use this framework to run server Ext
 ### Updating Checksums
 
 The `mongot-extension` binaries are stored in S3 and verified using hardcoded SHA256 checksums in `buildscripts/s3_binary/hashes.py`.
-When the mongot-extension team overwrites **release/0.0.0** (by running `sign-and-publish-release`), the content at the same URL changes and the hashes in `hashes.py` must be updated.
+When a new version is released (by running `sign-and-publish-release`), update `MONGOT_EXTENSION_VERSION` in `setup_mongot_extension.py` and the hashes in `hashes.py`.
 This ensures every change is explicitly documented in the commit history and no component changes without an auditable commit.
 
 This cross-repo test infrastructure is temporary for the initial rollout of extension `$vectorSearch`. Long-term, all extension testing will live outside the server repository.
@@ -72,8 +72,9 @@ This cross-repo test infrastructure is temporary for the initial rollout of exte
 1. Run the following to download each tarball and print its SHA256. Use **all four** so Evergreen and other developers have the correct hashes.
 
 ```bash
+VERSION=1.0.0  # replace with the new version
 for s in amazon2023-x86_64 amazon2023-aarch64 amazon2-x86_64 amazon2-aarch64; do
-  url="https://mongot-extension.s3.amazonaws.com/release/mongot-extension-0.0.0-${s}.tgz"
+  url="https://mongot-extension.s3.amazonaws.com/release/mongot-extension-${VERSION}-${s}.tgz"
   curl -sL -o "/tmp/mongot-${s}.tgz" "$url"
   echo "$url"
   sha256sum "/tmp/mongot-${s}.tgz" | awk '{print $1}'
