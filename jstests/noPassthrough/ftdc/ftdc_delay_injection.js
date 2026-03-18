@@ -1,8 +1,10 @@
 /**
- * Tests that injecting a delay into an FTDC collector will not prevent FTDC from collecting data.
+ * Tests that forcing a FTDC collector to block will not prevent FTDC from collecting data.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
+import {verifyGetDiagnosticData, getNextSample} from "jstests/libs/ftdc.js";
+
+const kDefaultPeriod = 1000;
 
 let conn = MongoRunner.runMongod({
     setParameter: {
@@ -12,20 +14,19 @@ let conn = MongoRunner.runMongod({
 });
 let adminDb = conn.getDB("admin");
 
-let data = verifyGetDiagnosticData(adminDb);
+// Wait until FTDC is up and running before running any tests.
+verifyGetDiagnosticData(adminDb);
+
+let data = getNextSample(adminDb);
 assert(data.hasOwnProperty("transportLayerStats"));
-assert(data.hasOwnProperty("serverStatus"));
+assert(data.hasOwnProperty("serverStatus")); // server status collector's result is included.
 
-const fp = configureFailPoint(conn, "injectFTDCServerStatusCollectionDelay", {sleepTimeMillis: 10000});
-fp.waitWithTimeout(2000);
+const fp = configureFailPoint(conn, "injectFTDCServerStatusCollectionDelay");
+fp.waitWithTimeout(kDefaultPeriod * 2);
 
-// Since there is no guarantee on the order we run collectors, this sleep lets us test that we can
-// still schedule and collect the results of transportLayerStats while serverStatus is actively
-// blocking.
-sleep(2000);
-
-let dataAfterFp = assert.commandWorked(adminDb.runCommand("getDiagnosticData")).data;
+let dataAfterFp = getNextSample(adminDb);
 assert(dataAfterFp.hasOwnProperty("transportLayerStats"));
-assert(!dataAfterFp.hasOwnProperty("serverStatus"));
+assert(!dataAfterFp.hasOwnProperty("serverStatus")); // server status collector's result is not included, because that collector timed out
 
+fp.off();
 MongoRunner.stopMongod(conn);
