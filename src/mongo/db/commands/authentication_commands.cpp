@@ -162,13 +162,25 @@ std::unique_ptr<UserRequest> getX509UserRequest(OperationContext* opCtx, const U
         session = opCtx->getClient()->session();
     }
 
+    bool insertAuthenticatedMechanism =
+        gFeatureFlagUseInternalAuthzInsteadOfLDAP.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     if (!allowRolesFromX509Certificates || !session) {
+        if (insertAuthenticatedMechanism) {
+            return std::make_unique<UserRequestGeneral>(
+                username, boost::none, auth::kMechanismMongoX509);
+        }
         return std::make_unique<UserRequestGeneral>(username, boost::none);
     }
 
     auto sslPeerInfo = SSLPeerInfo::forSession(session);
     if (!sslPeerInfo || sslPeerInfo->roles().empty() ||
         (sslPeerInfo->subjectName().toString() != username.getUser())) {
+        if (insertAuthenticatedMechanism) {
+            return std::make_unique<UserRequestGeneral>(
+                username, boost::none, auth::kMechanismMongoX509);
+        }
         return std::make_unique<UserRequestGeneral>(username, boost::none);
     }
 
@@ -176,7 +188,8 @@ std::unique_ptr<UserRequest> getX509UserRequest(OperationContext* opCtx, const U
     auto roles = std::set<RoleName>();
     std::copy(peerRoles.begin(), peerRoles.end(), std::inserter(roles, roles.begin()));
 
-    return uassertStatusOK(UserRequestX509::makeUserRequestX509(username, roles, sslPeerInfo));
+    return uassertStatusOK(UserRequestX509::makeUserRequestX509(
+        username, roles, sslPeerInfo, true, insertAuthenticatedMechanism));
 }
 
 constexpr auto kX509AuthenticationDisabledMessage = "x.509 authentication is disabled."_sd;

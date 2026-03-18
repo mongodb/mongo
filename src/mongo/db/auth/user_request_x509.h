@@ -67,7 +67,8 @@ public:
         UserName name,
         boost::optional<std::set<RoleName>> roles,
         std::shared_ptr<const SSLPeerInfo> peerInfo,
-        bool forReacquire = true);
+        bool forReacquire = true,
+        bool insertAuthenticatedMechanism = false);
 
     UserRequestType getType() const final {
         return UserRequestType::X509;
@@ -78,12 +79,13 @@ public:
     std::unique_ptr<UserRequest> clone() const final {
         // Since we are invoking the non-reacquire version of makeUserRequestX509,
         // we can be certain that the uassert below will not throw.
-        return uassertStatusOK(
-            makeUserRequestX509(getUserName(), getRoles(), getPeerInfo(), false));
+        return uassertStatusOK(makeUserRequestX509(
+            getUserName(), getRoles(), getPeerInfo(), false, hasAuthenticatedMechanism()));
     }
 
     StatusWith<std::unique_ptr<UserRequest>> cloneForReacquire() const final {
-        return makeUserRequestX509(getUserName(), getRoles(), getPeerInfo());
+        return makeUserRequestX509(
+            getUserName(), getRoles(), getPeerInfo(), hasAuthenticatedMechanism());
     }
 
     UserRequestCacheKey generateUserRequestCacheKey() const final;

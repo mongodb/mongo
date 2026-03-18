@@ -287,6 +287,19 @@ feature_flags:
         cpp_varname: gFeatureFlagESEKeystoreV2
         default: false
         fcv_gated: true
+    featureFlagUseInternalAuthzInsteadOfLDAP:
+        description: >-
+            Feature flag to enable the use of internal authorization instead of LDAP for OIDC, AWS and
+            X.509 authenticated users. When this feature is enabled, the usersInfo and UserRequest will
+            include extra parameters to store the mechanism used to authenticate the user. When OIDC
+            authentication is used, internal authorization will always be used if roles are not configured
+            in the token. The setParameter useInternalAuthzForX509 boolean flag will also be enabled, so
+            internal authorization will always be used regardless of whether LDAP is enabled when this flag
+            is set to true if X.509 authentication is used and roles are not present in the client
+            certificate.
+        cpp_varname: gFeatureFlagUseInternalAuthzInsteadOfLDAP
+        default: false
+        fcv_gated: true
 
 server_parameters:
     allowDirectSystemBucketsAccess:

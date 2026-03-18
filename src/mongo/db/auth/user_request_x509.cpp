@@ -29,6 +29,8 @@
 
 #include "mongo/db/auth/user_request_x509.h"
 
+#include "mongo/client/authenticate.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/util/net/ssl_peer_info.h"
 
 namespace mongo {
@@ -39,7 +41,8 @@ StatusWith<std::unique_ptr<UserRequest>> UserRequestX509::makeUserRequestX509(
     UserName name,
     boost::optional<std::set<RoleName>> roles,
     std::shared_ptr<const SSLPeerInfo> peerInfo,
-    bool forReacquire) {
+    bool forReacquire,
+    bool insertAuthenticatedMechanism) {
     auto request =
         std::make_unique<UserRequestX509>(std::move(name), std::move(roles), std::move(peerInfo));
 
@@ -48,6 +51,9 @@ StatusWith<std::unique_ptr<UserRequest>> UserRequestX509::makeUserRequestX509(
     }
 
     request->_tryAcquireRoles();
+    if (insertAuthenticatedMechanism) {
+        request->setAuthenticatedMechanism(std::string{auth::kMechanismMongoX509});
+    }
     return std::unique_ptr<UserRequest>(std::move(request));
 }
 

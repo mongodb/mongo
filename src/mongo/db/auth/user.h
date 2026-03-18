@@ -42,6 +42,7 @@
 #include "mongo/db/auth/user_acquisition_stats.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
@@ -128,6 +129,8 @@ public:
     virtual const boost::optional<std::set<RoleName>>& getRoles() const = 0;
     virtual UserRequestType getType() const = 0;
     virtual void setRoles(boost::optional<std::set<RoleName>> roles) = 0;
+    virtual void setAuthenticatedMechanism(StringData mechanism) = 0;
+    virtual boost::optional<StringData> getAuthenticatedMechanism() const = 0;
     virtual std::unique_ptr<UserRequest> clone() const = 0;
 
     /**
@@ -147,8 +150,17 @@ public:
  */
 class UserRequestGeneral : public UserRequest {
 public:
-    UserRequestGeneral(UserName name, boost::optional<std::set<RoleName>> roles)
-        : name(std::move(name)), roles(std::move(roles)) {}
+    UserRequestGeneral(UserName name,
+                       boost::optional<std::set<RoleName>> roles,
+                       boost::optional<StringData> authMechanism = boost::none)
+        : name(std::move(name)), roles(std::move(roles)) {
+        if (authMechanism) {
+            uassert(ErrorCodes::BadValue,
+                    "User name must be provided with an authenticated mechanism",
+                    this->name.getUser() != ""_sd);
+            authenticatedMechanism = std::string(*authMechanism);
+        }
+    }
 
     const UserName& getUserName() const final {
         return name;
@@ -166,14 +178,34 @@ public:
         this->roles = std::move(roles);
     }
 
+    void setAuthenticatedMechanism(StringData mechanism) final {
+        if (mechanism.empty()) {
+            authenticatedMechanism = boost::none;
+            return;
+        }
+        uassert(ErrorCodes::BadValue,
+                "User name must be provided with an authenticated mechanism",
+                name.getUser() != ""_sd);
+        authenticatedMechanism = std::string{mechanism};
+    }
+
+    boost::optional<StringData> getAuthenticatedMechanism() const final {
+        return authenticatedMechanism ? boost::optional<StringData>(*authenticatedMechanism)
+                                      : boost::none;
+    }
+
+    bool hasAuthenticatedMechanism() const {
+        return authenticatedMechanism.has_value();
+    }
+
     std::unique_ptr<UserRequest> clone() const override {
-        return std::unique_ptr<UserRequest>(
-            std::make_unique<UserRequestGeneral>(getUserName(), getRoles()));
+        return std::make_unique<UserRequestGeneral>(
+            getUserName(), getRoles(), getAuthenticatedMechanism());
     }
 
     StatusWith<std::unique_ptr<UserRequest>> cloneForReacquire() const override {
-        return std::unique_ptr<UserRequest>(
-            std::make_unique<UserRequestGeneral>(getUserName(), boost::none));
+        return std::unique_ptr<UserRequest>(std::make_unique<UserRequestGeneral>(
+            getUserName(), boost::none, getAuthenticatedMechanism()));
     }
 
     UserRequestCacheKey generateUserRequestCacheKey() const override;
@@ -183,6 +215,10 @@ protected:
     UserName name;
     // Any authorization grants which should override and be used in favor of roles acquisition.
     boost::optional<std::set<RoleName>> roles;
+
+    // The authentication mechanism used to successfully authenticate this user.
+    // This is only set after successful authentication.
+    boost::optional<std::string> authenticatedMechanism;
 };
 
 /**

@@ -10,10 +10,10 @@ executor:
   config:
     shell_options:
       nodb: ""
-      ssl: ""
-      sslAllowInvalidCertificates: ""
-      sslCAFile: ${x509ObjDir}/ca.pem
-      sslPEMKeyFile: ${x509ObjDir}/client.pem
+      tls: ""
+      tlsAllowInvalidCertificates: ""
+      tlsCAFile: ${x509ObjDir}/ca.pem
+      tlsCertificateKeyFile: ${x509ObjDir}/client.pem
       global_vars:
         TestData:
           setParameters:

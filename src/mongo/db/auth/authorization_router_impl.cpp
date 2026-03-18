@@ -34,6 +34,7 @@
 #include "mongo/db/auth/user_request_x509.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/multitenancy.h"
+#include "mongo/db/server_feature_flags_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
@@ -105,6 +106,7 @@ Status AuthorizationRouterImpl::getUserDescription(
     BSONObj* result,
     const SharedUserAcquisitionStats& userAcquisitionStats) try {
     bool hasExternalRoles = userRequest.getRoles().has_value();
+    bool hasUserName = userRequest.getUserName().getUser() != ""_sd;
     if (!hasExternalRoles) {
         // If the userRequest does not have roles, then we need to run usersInfo.
         UsersInfoCommand usersInfoCmd(auth::UsersInfoCommandArg(userRequest.getUserName()));
@@ -112,6 +114,17 @@ Status AuthorizationRouterImpl::getUserDescription(
         usersInfoCmd.setShowCredentials(true);
         usersInfoCmd.setShowAuthenticationRestrictions(true);
         usersInfoCmd.setShowCustomData(false);
+        if (gFeatureFlagUseInternalAuthzInsteadOfLDAP.isEnabledUseLastLTSFCVWhenUninitialized(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+            (userRequest.getAuthenticatedMechanism().has_value()) &&
+            (userRequest.getAuthenticatedMechanism().value() != ""_sd)) {
+            // Ensure that if the feature flag is enabled and the user request has an
+            // authenticated mechanism, there is a username argument since that
+            // authenticated mechanism must apply to a specific user.
+            uassert(ErrorCodes::BadValue, "User name must be provided", hasUserName);
+            usersInfoCmd.setAuthenticatedMechanism(userRequest.getAuthenticatedMechanism().value());
+        }
 
         const auto& usersNSS =
             NamespaceString::makeTenantUsersCollection(userRequest.getUserName().tenantId());

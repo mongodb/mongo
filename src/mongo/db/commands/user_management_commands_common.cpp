@@ -366,6 +366,15 @@ void checkAuthForTypedCommand(OperationContext* opCtx, const UsersInfoCommand& r
     const auto& arg = request.getCommandParameter();
     auto* as = AuthorizationSession::get(opCtx->getClient());
 
+    // Ensure that the authenticatedMechanism field is from an internal client, if it is present.
+    // This field should only be used by the server itself when it runs a usersInfo command
+    // internally as part of authentication, and should not be set by external clients.
+    if (request.getAuthenticatedMechanism()) {
+        uassert(ErrorCodes::Unauthorized,
+                "authenticatedMechanism on usersInfo command requires ActionType::internal",
+                as->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(dbname.tenantId()), ActionType::internal));
+    }
     if (arg.isAllOnCurrentDB()) {
         uassert(ErrorCodes::Unauthorized,
                 str::stream() << "Not authorized to view users from the "

@@ -28,6 +28,8 @@
 global:
     cpp_namespace: "mongo"
     mod_visibility: public
+    cpp_includes:
+        - "mongo/db/commands/user_management_commands_validation.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -364,6 +366,14 @@ commands:
                     user.
                 type: safeBool
                 default: true
+            authenticatedMechanism:
+                description: >-
+                    The mechanism used to authenticate the user. Allowable values:
+                    MONGODB-X509, PLAIN, GSSAPI, SCRAM-SHA-1, SCRAM-SHA-256, MONGODB-AWS, MONGODB-OIDC.
+                type: string
+                optional: true
+                validator:
+                    callback: validateAuthMechanism
             filter:
                 description: >-
                     A document that specifies $match stage conditions to return information

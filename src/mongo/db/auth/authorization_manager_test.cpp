@@ -54,6 +54,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/net/ssl_peer_info.h"
@@ -511,6 +512,15 @@ TEST_F(AuthorizationManagerTest, testAuthzBackendResolveRoles) {
     ASSERT_TRUE(resolvedData.privileges.has_value());
     ASSERT_TRUE(resolvedData.restrictions.has_value());
 }
+using AuthorizationManagerTestDeathTest = AuthorizationManagerTest;
+
+TEST_F(AuthorizationManagerTest, UserRequestCtorWithMechanismRequiresUsername) {
+    ASSERT_THROWS_CODE(
+        UserRequestGeneral(UserName(""_sd, "admin"_sd), boost::none, "SCRAM-SHA-256"_sd),
+        DBException,
+        ErrorCodes::BadValue);
+}
+
 
 }  // namespace
 }  // namespace mongo

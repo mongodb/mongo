@@ -54,3 +54,11 @@ server_parameters:
         cpp_varname: allowRolesFromX509Certificates
         default: true
         redact: false
+
+    useInternalAuthzForX509:
+        description: "Use internal authorization for X.509 authentication"
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: useInternalAuthzForX509
+        default: false
+        redact: false

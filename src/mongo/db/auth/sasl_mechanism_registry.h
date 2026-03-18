@@ -43,6 +43,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
@@ -251,8 +252,16 @@ public:
      */
     virtual StatusWith<std::unique_ptr<UserRequest>> makeUserRequest(
         OperationContext* opCtx) const {
-        return std::unique_ptr<UserRequest>(std::make_unique<UserRequestGeneral>(
-            UserName(getPrincipalName(), getAuthenticationDatabase()), boost::none));
+        if (gFeatureFlagUseInternalAuthzInsteadOfLDAP.isEnabledUseLastLTSFCVWhenUninitialized(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            return std::make_unique<UserRequestGeneral>(
+                UserName(getPrincipalName(), getAuthenticationDatabase()),
+                boost::none,
+                mechanismName());
+        }
+        return std::make_unique<UserRequestGeneral>(
+            UserName(getPrincipalName(), getAuthenticationDatabase()), boost::none);
     }
 
 protected:

@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/auth/sasl_x509_server_conversation.h"
 
 #include "mongo/db/auth/auth_options_gen.h"
@@ -102,8 +101,20 @@ std::string getUserName(Client* client,
 
 StatusWith<std::unique_ptr<UserRequest>> SaslX509ServerMechanism::makeUserRequest(
     OperationContext* opCtx) const {
-    std::unique_ptr<UserRequest> request = std::make_unique<UserRequestGeneral>(
-        UserName(getPrincipalName(), getAuthenticationDatabase()), boost::none);
+    std::unique_ptr<UserRequest> request;
+    bool shouldInsertAuthenticatedMechanism =
+        gFeatureFlagUseInternalAuthzInsteadOfLDAP.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    if (shouldInsertAuthenticatedMechanism) {
+        request = std::make_unique<UserRequestGeneral>(
+            UserName(getPrincipalName(), getAuthenticationDatabase()),
+            boost::none,
+            mechanismName());
+    } else {
+        request = std::make_unique<UserRequestGeneral>(
+            UserName(getPrincipalName(), getAuthenticationDatabase()), boost::none);
+    }
 
     if (!opCtx || !opCtx->getClient()) {
         // Without an opCtx, we have no client, and none of the paths to
@@ -114,6 +125,10 @@ StatusWith<std::unique_ptr<UserRequest>> SaslX509ServerMechanism::makeUserReques
     auto session = opCtx->getClient()->session();
 
     if (isClusterMember(opCtx->getClient())) {
+        if (shouldInsertAuthenticatedMechanism) {
+            return std::make_unique<UserRequestGeneral>(
+                (*internalSecurity.getUser())->getName(), boost::none, mechanismName());
+        }
         return std::make_unique<UserRequestGeneral>((*internalSecurity.getUser())->getName(),
                                                     boost::none);
     }
@@ -137,7 +152,9 @@ StatusWith<std::unique_ptr<UserRequest>> SaslX509ServerMechanism::makeUserReques
     return UserRequestX509::makeUserRequestX509(
         UserName(getPrincipalName(), getAuthenticationDatabase()),
         std::move(requestRoles),
-        sslPeerInfo);
+        sslPeerInfo,
+        true,
+        shouldInsertAuthenticatedMechanism);
 }
 
 bool SaslX509ServerMechanism::isClusterMember(Client* client) const {
@@ -240,8 +257,12 @@ StatusWith<std::tuple<bool, std::string>> SaslX509ServerMechanism::stepImpl(
         // always succeed with the internal user. Therefore, we make an X.509 UserRequest via
         // UserRequestX509::makeUserRequestX509 so that we are checking for the X.509 user rather
         // than local.__system.
-        auto userRequest = uassertStatusOK(
-            UserRequestX509::makeUserRequestX509(username, boost::none, sslPeerInfo));
+        bool shouldInsertAuthenticatedMechanism =
+            gFeatureFlagUseInternalAuthzInsteadOfLDAP.isEnabledUseLastLTSFCVWhenUninitialized(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+        auto userRequest = uassertStatusOK(UserRequestX509::makeUserRequestX509(
+            username, boost::none, sslPeerInfo, shouldInsertAuthenticatedMechanism));
         bool userExists = am->acquireUser(opCtx, std::move(userRequest)).isOK();
         uassert(ErrorCodes::AuthenticationFailed,
                 "The provided certificate represents both a cluster member and an "

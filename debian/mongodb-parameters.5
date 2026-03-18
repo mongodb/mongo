@@ -55,6 +55,20 @@ This parameter is only available at startup. To set the
 parameter, use the \fBsetParameter\f1\f1 setting.
 .RE
 .PP
+\fBuseInternalAuthzForX509\f1
+.RS
+.PP
+Available for both \fBmongod\f1\f1 and \fBmongos\f1\f1\&.
+.PP
+\fIDefault\f1: false
+.PP
+A boolean flag that, if set to true, causes clients that authenticate with X.509 certificates to always use
+internal authorization, even when LDAP authorization is configured for X.509 users.
+.PP
+This parameter only affects X.509 authentication, and is only available at startup. To set the
+parameter, use the \fBsetParameter\f1\f1 setting.
+.RE
+.PP
 \fBauthenticationMechanisms\f1
 .RS
 .PP

@@ -52,6 +52,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/tenant_id.h"
@@ -852,12 +853,44 @@ std::vector<BSONObj> AuthorizationBackendLocal::performLookupWithPrivilegesAndRe
     OperationContext* opCtx, const UsersInfoCommand& cmd, const std::vector<UserName>& usernames) {
     std::vector<BSONObj> users;
 
+    auto authenticatedMechanism = cmd.getAuthenticatedMechanism();
+    if (authenticatedMechanism.has_value()) {
+        uassert(11241506,
+                "authenticatedMechanism should only be set when there is exactly one user",
+                usernames.size() == 1);
+    }
+    auto status = Status::OK();
+    bool matchedAuthenticatedUser = false;
+    bool shouldInsertAuthenticatedMechanism =
+        gFeatureFlagUseInternalAuthzInsteadOfLDAP.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     for (const auto& username : usernames) {
         BSONObj userDetails;
-        auto status = getUserDescription(opCtx,
-                                         UserRequestGeneral(username, boost::none),
-                                         &userDetails,
-                                         CurOp::get(opCtx)->getUserAcquisitionStats());
+        if (shouldInsertAuthenticatedMechanism && authenticatedMechanism.has_value()) {
+            matchedAuthenticatedUser = true;
+            // If the user being looked up is the authenticated user, pass in the mechanism
+            // they used to authenticate.
+            LOGV2_DEBUG(11241505,
+                        1,
+                        "usersInfo matched authenticated user, setting mechanism",
+                        "username"_attr = username,
+                        "mechanism"_attr = authenticatedMechanism.value());
+            status = getUserDescription(
+                opCtx,
+                UserRequestGeneral(username, boost::none, authenticatedMechanism.value()),
+                &userDetails,
+                CurOp::get(opCtx)->getUserAcquisitionStats());
+        } else {
+            LOGV2_DEBUG(11241507,
+                        1,
+                        "No authenticated user/mechanism, looking up without mechanism",
+                        "username"_attr = username);
+            status = getUserDescription(opCtx,
+                                        UserRequestGeneral(username, boost::none),
+                                        &userDetails,
+                                        CurOp::get(opCtx)->getUserAcquisitionStats());
+        }
         if (status.code() == ErrorCodes::UserNotFound) {
             continue;
         }
@@ -892,6 +925,13 @@ std::vector<BSONObj> AuthorizationBackendLocal::performLookupWithPrivilegesAndRe
             strippedUser.append(e);
         }
         users.push_back(strippedUser.obj());
+
+        // The authenticatedUser and authenticatedMechanism are only set from within the MongoDB
+        // server if the caller wanted information for that single user. Therefore, if we matched
+        // the authenticated user, we can stop processing now
+        if (matchedAuthenticatedUser) {
+            break;
+        }
     }
 
     return users;
