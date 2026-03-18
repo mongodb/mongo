@@ -57,7 +57,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_vartype: "Atomic<bool>"
         cpp_varname: gOverloadAwareServerSelectionEnabled
-        default: true
+        default: false
         redact: false
     connectTimeoutMs:
         description: Determines the connection timeout used in the replica set monitor.

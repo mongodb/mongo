@@ -59,8 +59,15 @@ function getShardingStats(conn) {
     return conn.getDB("admin").serverStatus().shardingStatistics.shards[shardId];
 }
 
-function runTestOnlyPrimaryFails(commandName, command, readPref, mongos, shard) {
-    jsTestLog("Running primary-failure test with command '" + commandName + "' and read preference '" + readPref + "'");
+function runTestOnlyPrimaryFails(commandName, command, readPref, mongos, shard, overloadRetargeting) {
+    jsTestLog(
+        "Running primary-failure test with command '" +
+            commandName +
+            "', read preference '" +
+            readPref +
+            "', retargeting: " +
+            overloadRetargeting,
+    );
 
     // Iniitial request must target the primary in these tests.
     assert(!readPref || ["primary", "primaryPreferred"].includes(readPref));
@@ -89,20 +96,26 @@ function runTestOnlyPrimaryFails(commandName, command, readPref, mongos, shard) 
     assert.eq(shardStatsDiff.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded, 1);
     assert.gt(shardStatsDiff.totalBackoffTimeMillis, 0);
 
-    if (!readPref || readPref == "primary") {
+    // Without overloadRetargeting, all commands are routed to the primary.
+    if (!readPref || readPref == "primary" || !overloadRetargeting) {
         assert.eq(shardStatsDiff.numRetriesDueToOverloadAttempted, kNumFailures);
         assert.eq(shardStatsDiff.numOverloadErrorsReceived, kNumFailures);
         assert.eq(shardStatsDiff.numRetriesRetargetedDueToOverload, 0);
-    } else if (readPref == "primaryPreferred") {
+    } else if (readPref == "primaryPreferred" && overloadRetargeting) {
         assert.eq(shardStatsDiff.numRetriesDueToOverloadAttempted, 1);
         assert.eq(shardStatsDiff.numOverloadErrorsReceived, 1);
         assert.eq(shardStatsDiff.numRetriesRetargetedDueToOverload, 1);
     }
 }
 
-function runTestAllNodesFail(commandName, command, readPref, mongos, shard) {
+function runTestAllNodesFail(commandName, command, readPref, mongos, shard, overloadRetargeting) {
     jsTestLog(
-        "Running all-nodes-failure test with command '" + commandName + "' and read preference '" + readPref + "'",
+        "Running all-nodes-failure test with command '" +
+            commandName +
+            "', read preference '" +
+            readPref +
+            "', retargeting: " +
+            overloadRetargeting,
     );
     const initialShardStats = getShardingStats(mongos);
 
@@ -131,25 +144,30 @@ function runTestAllNodesFail(commandName, command, readPref, mongos, shard) {
     assert.eq(shardStatsDiff.numOperationsRetriedAtLeastOnceDueToOverload, 1);
     assert.eq(shardStatsDiff.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded, 1);
     assert.gt(shardStatsDiff.totalBackoffTimeMillis, 0);
+    // Each error should be associated with a retry.
+    assert.eq(shardStatsDiff.numOverloadErrorsReceived, shardStatsDiff.numRetriesDueToOverloadAttempted);
 
-    if (!readPref || readPref === "primary") {
+    if (!readPref || readPref === "primary" || (readPref === "primaryPreferred" && !overloadRetargeting)) {
+        // All retries will be performed against the same primary.
         assert.eq(shardStatsDiff.numRetriesDueToOverloadAttempted, kNumFailures);
         assert.eq(shardStatsDiff.numRetriesRetargetedDueToOverload, 0);
-        assert.eq(shardStatsDiff.numOverloadErrorsReceived, kNumFailures);
-    } else if (readPref === "secondary") {
+    } else if (readPref === "secondary" && overloadRetargeting) {
         // If we can only retry on secondaries, we retry on each secondary once.
         assert.eq(shardStatsDiff.numRetriesDueToOverloadAttempted, shard.nodes.length - 1);
-        // One of these retries will be on a secondary we already attempted, since we will have run out of other secondaries to try.
+        // One of these retries will be on a secondary we already attempted, since we will have run out of
+        // other secondaries to try.
         assert.eq(shardStatsDiff.numRetriesRetargetedDueToOverload, shard.nodes.length - 1 - 1);
-        // Each secondary will have returned an overloaded error exactly once.
-        assert.eq(shardStatsDiff.numOverloadErrorsReceived, shard.nodes.length - 1);
-    } else {
-        // For all other read preferences, we retry once on each node.
+    } else if (overloadRetargeting) {
+        // All other read preferences can select all nodes, so with retargeting we retry once on each node.
         assert.eq(shardStatsDiff.numRetriesDueToOverloadAttempted, shard.nodes.length);
-        // Each retry will avoid a previously selected server except for the last one, which must choose an already deprioritized secondary.
+        // Each retry will avoid a previously selected server except for the last one, which must choose an already
+        // deprioritized secondary.
         assert.eq(shardStatsDiff.numRetriesRetargetedDueToOverload, shard.nodes.length - 1);
-        // Each node will have returned an overloaded error exactly once.
-        assert.eq(shardStatsDiff.numOverloadErrorsReceived, shard.nodes.length);
+    } else {
+        // Without retargeting, we retry at least kNumFailures times, which only occurs if we happen to
+        // reselect the same server.
+        assert.gte(shardStatsDiff.numRetriesDueToOverloadAttempted, kNumFailures);
+        assert.eq(shardStatsDiff.numRetriesRetargetedDueToOverload, 0);
     }
 }
 
@@ -198,7 +216,7 @@ function runTestSharded() {
         ]),
     );
 
-    const readPrefs = [null, "primary", "secondary", "secondaryPreferred", "nearest"];
+    const readPrefs = [null, "primary", "primaryPreferred", "secondary", "secondaryPreferred", "nearest"];
 
     const readCommands = [
         ["find", {find: kCollName, filter: {name: "test0"}}],
@@ -226,24 +244,29 @@ function runTestSharded() {
         ],
     ];
 
-    jsTestLog("Testing retry behavior when every node in the shard fails.");
-    for (let readPref of readPrefs) {
-        for (let readCommand of readCommands) {
-            runTestAllNodesFail(readCommand[0], readCommand[1], readPref, st.s, shard);
+    for (let overloadRetargeting of [false, true]) {
+        jsTestLog(
+            "Testing retry behavior when every node in the shard fails. (retargeting: " + overloadRetargeting + ")",
+        );
+        st.s.adminCommand({setParameter: 1, overloadAwareServerSelectionEnabled: overloadRetargeting});
+        for (let readPref of readPrefs) {
+            for (let readCommand of readCommands) {
+                runTestAllNodesFail(readCommand[0], readCommand[1], readPref, st.s, shard, overloadRetargeting);
+            }
         }
-    }
-    for (let writeCommand of writeCommands) {
-        runTestAllNodesFail(writeCommand[0], writeCommand[1], null, st.s, shard);
-    }
+        for (let writeCommand of writeCommands) {
+            runTestAllNodesFail(writeCommand[0], writeCommand[1], null, st.s, shard);
+        }
 
-    jsTestLog("Testing retry behavior when only the primary fails");
-    for (let readPref of [null, "primary", "primaryPreferred"]) {
-        for (let readCommand of readCommands) {
-            runTestOnlyPrimaryFails(readCommand[0], readCommand[1], readPref, st.s, shard);
+        jsTestLog("Testing retry behavior when only the primary fails");
+        for (let readPref of [null, "primary", "primaryPreferred"]) {
+            for (let readCommand of readCommands) {
+                runTestOnlyPrimaryFails(readCommand[0], readCommand[1], readPref, st.s, shard, overloadRetargeting);
+            }
         }
-    }
-    for (let writeCommand of writeCommands) {
-        runTestOnlyPrimaryFails(writeCommand[0], writeCommand[1], null, st.s, shard);
+        for (let writeCommand of writeCommands) {
+            runTestOnlyPrimaryFails(writeCommand[0], writeCommand[1], null, st.s, shard, overloadRetargeting);
+        }
     }
 
     st.stop();
