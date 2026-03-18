@@ -1287,7 +1287,7 @@ private:
     static constexpr size_t offsetVal = 2;
 
     MONGO_COMPILER_ALWAYS_INLINE_OPT
-    FastTuple<bool, value::TypeTags, value::Value> readTuple(uint8_t* ptr) noexcept {
+    FastTuple<bool, value::TypeTags, value::Value> readTuple(uint8_t* ptr) const noexcept {
         auto owned = readFromMemory<bool>(ptr + offsetOwned);
         auto tag = readFromMemory<value::TypeTags>(ptr + offsetTag);
         auto val = readFromMemory<value::Value>(ptr + offsetVal);
@@ -1310,6 +1310,12 @@ private:
         }
 
         return ret;
+    }
+
+    MONGO_COMPILER_ALWAYS_INLINE_OPT
+    value::TagValueView viewFromStack(size_t offset) const {
+        auto ret = readTuple(_argStackTop - offset * sizeOfElement);
+        return value::rawToView({ret.b, ret.c});
     }
 
     /**
