@@ -29,9 +29,11 @@ EXCLUDED_PATTERNS = [
     ".github/workflows/",
     "src/third_party/private/",
     "sbom.private.json",
+    ".agents/",
     ".cursor/",
     ".claude/",
     "AGENTS.md",
+    "CLAUDE.md",
     ".github/CODEOWNERS",
     "monguard/",
 ]

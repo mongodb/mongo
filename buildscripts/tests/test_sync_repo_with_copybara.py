@@ -311,9 +311,11 @@ class TestSkyExclusionChecks(unittest.TestCase):
                         ".github/workflows/**",
                         "src/third_party/private/**",
                         "sbom.private.json",
+                        ".agents/**",
                         ".cursor/**",
                         ".claude/**",
                         "AGENTS.md",
+                        "CLAUDE.md",
                         ".github/CODEOWNERS",
                         "monguard/**",
                     ])
@@ -335,9 +337,11 @@ class TestSkyExclusionChecks(unittest.TestCase):
                         ".github/workflows/**",
                         "src/third_party/private/**",
                         "sbom.private.json",
+                        ".agents/**",
                         ".cursor/**",
                         ".claude/**",
                         "AGENTS.md",
+                        "CLAUDE.md",
                         ".github/CODEOWNERS",
                         "monguard/**",
                     ])
