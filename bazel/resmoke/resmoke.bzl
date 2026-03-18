@@ -155,6 +155,7 @@ def resmoke_suite_test(
             "//buildscripts:bazel_local_resources",
         ] + select({
             "//bazel/resmoke:installed_dist_test_enabled": [],
+            "//bazel/resmoke:skip_deps_for_cquery_enabled": [],
             "//conditions:default": deps,
         }),
         main = resmoke_shim,
@@ -175,6 +176,7 @@ def resmoke_suite_test(
             "GIT_PYTHON_REFRESH": "quiet",  # Ignore "Bad git executable" error when importing git python. Git commands will still error if run.
         } | select({
             "//bazel/resmoke:installed_dist_test_enabled": {},
+            "//bazel/resmoke:skip_deps_for_cquery_enabled": {},
             "//conditions:default": {"DEPS_PATH": deps_path},
         }),
         exec_properties = exec_properties | test_exec_properties(tags),

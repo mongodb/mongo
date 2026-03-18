@@ -990,21 +990,22 @@ typing-extensions = ">=3.10.0"
 
 [[package]]
 name = "evergreen-py"
-version = "3.13.0"
+version = "3.15.0"
 description = "Python client for the Evergreen API"
 optional = false
-python-versions = "<4.0,>=3.9"
+python-versions = "<3.14,>=3.9"
 groups = ["testing"]
-markers = "platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\""
+markers = "python_version < \"3.14\" and (platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\")"
 files = [
-    {file = "evergreen_py-3.13.0-py3-none-any.whl", hash = "sha256:7728ce5bdbf27066879c4b59f9617197c76fa97d08bed9eb3cd67a2b2fd26bd8"},
-    {file = "evergreen_py-3.13.0.tar.gz", hash = "sha256:cde2802af94eb5245d9670643fccf9dea777a33bf1cceb5b4cfd57c1bc72054e"},
+    {file = "evergreen_py-3.15.0-py3-none-any.whl", hash = "sha256:ed172814276e2e62ecec040df3035735ea8feb933b51795f8e88504d919b1b4f"},
+    {file = "evergreen_py-3.15.0.tar.gz", hash = "sha256:9c000f4b3a3e14ca6b644062479607db6f39da2dc51b1ccba9879aa7bdcb115e"},
 ]
 
 [package.dependencies]
 Click = ">=8,<9"
 packaging = ">=25.0,<26.0"
 pydantic = ">=1"
+PyJWT = ">=2.0,<3.0"
 python-dateutil = ">=2"
 PyYAML = ">=5"
 requests = ">=2"
@@ -5821,4 +5822,4 @@ libdeps = ["cxxfilt", "eventlet", "flask", "flask-cors", "gevent", "lxml", "prog
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13,<4.0"
-content-hash = "8134d7948c4d99f5a2d8ce914b066b0d0565199a0b43e5296c15d473998047da"
+content-hash = "8f4f79d6d875f2e244797f8ffbd1cd35723a33394566103a3b2ee9e680e7d7c4"

@@ -23,6 +23,11 @@ function is_failure() {
     jq --exit-status '.testResult | select(.status != "PASSED")' <<<$1 >/dev/null
 }
 
+# Checks if a test result record indicates that the test timed out.
+function is_timeout() {
+    jq --exit-status '.testResult | select(.status == "TIMEOUT")' <<<$1 >/dev/null
+}
+
 # Returns a file-path safe prefix for an individual test execution.
 function target_prefix() {
     jq --raw-output '.id.testResult as $id | .testResult | "\(($id.label | ltrimstr("//") | gsub(":";"\/")))/shard_\($id.shard)"' <<<$1
@@ -34,14 +39,17 @@ function download_outputs() {
     local is_failure=$2
 
     jq --raw-output '.id.testResult as $id | .testResult.testActionOutput[] | "\t\($id.shard)\t\(.name)\t\(.uri)"' <<<"$test_result" | while IFS=$'\t' read -r shard name uri; do
-        # Always download test.outputs (zip file)
-        # If test failed, also download test.log and manifest
+        # Always download test.outputs (zip file) and test.log
+        # If test failed, also download manifest
         should_download=false
         if [[ "$name" == *'test.outputs'* && "$name" != *'manifest'* ]]; then
             should_download=true
         fi
+        if [[ "$name" == *'test.log'* ]]; then
+            should_download=true
+        fi
         if [[ "$is_failure" == "1" ]]; then
-            if [[ "$name" == *'test.log'* || "$name" == *'manifest__MANIFEST'* ]]; then
+            if [[ "$name" == *'manifest__MANIFEST'* ]]; then
                 should_download=true
             fi
         fi
@@ -74,12 +82,10 @@ function unzip_outputs() {
     if [[ -n "$zip_file" ]]; then
         local output_dir='test.outputs'
         mkdir -p "$output_dir"
-        echo "  Unzipping: $zip_file -> $output_dir/"
         unzip -o -q "$zip_file" -d "$output_dir"
 
         # If test passed, remove the zip file. If it failed, the whole thing is going to be attached to the task in Evergreen.
         if [[ "$is_failure" != '1' ]]; then
-            echo "  Removing: $zip_file"
             rm "$zip_file"
         fi
     fi
@@ -93,7 +99,6 @@ function symlink_test_logs() {
         return
     fi
 
-    echo "  Creating symlinks in ${workdir}/build/..."
     find "$build_dir" -type f | while read -r file; do
         # Get the relative path from the build directory
         rel_path="${file#$build_dir/}"
@@ -105,6 +110,59 @@ function symlink_test_logs() {
         abs_file=$(realpath "$file")
         ln -sf "$abs_file" "$target_path"
     done
+}
+
+# Displays a formatted summary of test results.
+function display_test_summary() {
+    echo "================================================================================"
+    echo "Test Results Summary"
+    echo "================================================================================"
+    echo "Target: ${test_label}"
+    echo "Total Shards: ${#shard_names[@]}"
+    echo "--------------------------------------------------------------------------------"
+
+    # Create a sorted list of indices based on shard names
+    local sorted_indices=()
+    for i in "${!shard_names[@]}"; do
+        sorted_indices+=("$i")
+    done
+
+    # Sort indices by extracting and comparing shard numbers
+    IFS=$'\n' sorted_indices=($(
+        for i in "${sorted_indices[@]}"; do
+            local shard_num=$(echo "${shard_names[$i]}" | grep -oP 'shard_\K\d+$')
+            echo "$shard_num $i"
+        done | sort -n | cut -d' ' -f2
+    ))
+
+    for i in "${sorted_indices[@]}"; do
+        local shard="${shard_names[$i]}"
+        local status="${shard_statuses[$i]}"
+        local test_counts="${shard_test_counts[$i]}"
+
+        # Format status with color indicators
+        case "$status" in
+        "PASSED")
+            echo "  ✓ $shard: PASSED ($test_counts tests passed)"
+            ;;
+        "FAILED")
+            if [[ "$test_counts" == "0/0" ]]; then
+                echo "  ✗ $shard: FAILED (no report generated)"
+            else
+                echo "  ✗ $shard: FAILED ($test_counts tests passed)"
+            fi
+            ;;
+        "TIMEOUT")
+            echo "  ⏱ $shard: TIMEOUT"
+            ;;
+        "NO_REPORT")
+            echo "  ✗ $shard: NO REPORT (no tests may have been run)"
+            ;;
+        esac
+    done
+
+    echo "================================================================================"
+    echo ""
 }
 
 # Combine all resmoke telemetry and place it where Evergreen expects it: ${workdir}/build/OTelTraces.
@@ -142,8 +200,6 @@ function combine_metrics() {
         # Update current size
         current_size=$((current_size + file_size + newline_size))
     done
-
-    echo 'Combined OTel metrics json'
 }
 
 # Combines all Resmoke test report JSONs into a single JSON.
@@ -164,11 +220,13 @@ function combine_reports() {
 
     local combined_report_file="${workdir}/report.json"
     echo "$combined_report" >"$combined_report_file"
-    echo "Combined report written to: $combined_report_file"
 
     local total_tests=$(echo "$combined_report" | jq '.results | length')
     local failures=$(echo "$combined_report" | jq '.failures')
-    echo "Summary: $total_tests tests, $failures failures"
+
+    echo ""
+    echo "Combined Report: ${total_tests} tests, ${failures} failures"
+    echo "Report written to: $combined_report_file"
 }
 
 # Writes a user-friendly bazel invocation for re-running this test target.
@@ -186,10 +244,33 @@ function write_test_failures_expansion() {
     echo "test_failures_exist: true" >"$output_file"
 }
 
-# Print the contents of all *test.log files.
+# Print the contents of all *test.log files with headers per shard.
 function print_executor_logs() {
-    echo "Executor logs for all failed shards:"
-    find "${workdir}/results" -name '*test.log' -type f -exec cat {} +
+    local log_files=$(find "${workdir}/results" -name '*test.log' -type f 2>/dev/null)
+
+    if [[ -z "$log_files" ]]; then
+        return
+    fi
+
+    # Sort log files by shard number
+    local sorted_log_files=$(echo "$log_files" | while IFS= read -r log_file; do
+        # Extract shard number from path (e.g., /workdir/results/foo/bar/shard_1/test.log -> 1)
+        local shard_num=$(echo "$log_file" | grep -oP 'shard_\K\d+(?=/)')
+        echo "$shard_num $log_file"
+    done | sort -n | cut -d' ' -f2-)
+
+    while IFS= read -r log_file; do
+        # Extract shard name from path (e.g., /workdir/results/foo/bar/shard_1/test.log -> foo/bar/shard_1)
+        local shard_path=$(echo "$log_file" | sed "s|${workdir}/results/||" | sed 's|/[^/]*$||')
+
+        echo "================================================================================"
+        echo "Shard $shard_path log:"
+        echo "================================================================================"
+        cat "$log_file"
+        echo ""
+        echo "================================================================================"
+        echo ""
+    done <<<"$sorted_log_files"
 }
 
 # Resolves a file path from a list of candidate locations. Returns the first existing file path found.
@@ -238,15 +319,29 @@ if [ ! -f "$ENGFLOW_KEY" ]; then
 fi
 
 fail_task=0
+result_count=0
+missing_report=0
+shard_names=()
+shard_statuses=()
+shard_test_counts=()
+
+echo "Fetching test results for ${test_label}..."
+
 while IFS= read -r test_result; do
+    ((result_count++))
     target_prefix=$(target_prefix "$test_result")
     target_dir="${workdir}/results/$target_prefix"
-    echo "Fetching results for $target_prefix"
     mkdir -p "$target_dir"
     pushd "$target_dir" >/dev/null
 
     is_failure_flag=0
-    if is_failure "$test_result"; then
+    is_timeout_flag=0
+    if is_timeout "$test_result"; then
+        is_timeout_flag=1
+        is_failure_flag=1
+        fail_task=1
+        write_test_failures_expansion
+    elif is_failure "$test_result"; then
         is_failure_flag=1
         fail_task=1
         write_test_failures_expansion
@@ -256,8 +351,50 @@ while IFS= read -r test_result; do
     unzip_outputs "$is_failure_flag"
     symlink_test_logs
 
+    # Record shard information
+    shard_names+=("$target_prefix")
+    # Check if any report*.json files exist
+    if compgen -G "test.outputs/report*.json" >/dev/null; then
+        # Extract test counts from the report
+        report_file=$(compgen -G "test.outputs/report*.json" | head -n 1)
+        total_tests=$(jq '.results | length' "$report_file" 2>/dev/null || echo "0")
+        failed_tests=$(jq '.results | map(select(.status == "fail" or .status == "timeout")) | length' "$report_file" 2>/dev/null || echo "0")
+        passed_tests=$(jq '.results | map(select(.status == "pass")) | length' "$report_file" 2>/dev/null || echo "0")
+
+        shard_test_counts+=("$passed_tests/$total_tests")
+
+        if [[ "$is_timeout_flag" -eq 1 ]]; then
+            shard_statuses+=("TIMEOUT")
+        elif [[ "$is_failure_flag" -eq 1 ]]; then
+            shard_statuses+=("FAILED")
+        else
+            shard_statuses+=("PASSED")
+        fi
+    else
+        # No report file found - check if we have bazel-level status information
+        if [[ "$is_timeout_flag" -eq 1 ]]; then
+            shard_statuses+=("TIMEOUT")
+            shard_test_counts+=("0/0")
+        else
+            shard_statuses+=("NO_REPORT")
+            shard_test_counts+=("0/0")
+            missing_report=1
+        fi
+    fi
+
     popd >/dev/null
 done < <(enumerate_test_results)
+
+# Check if any results were found
+if [[ "$result_count" -eq 0 ]]; then
+    echo "Error: No test results found for target '${test_label}' in '$BEP_FILE'." >&2
+    echo "The test may have failed to build. Check the logs from the resmoke_tests task." >&2
+    exit 1
+fi
+
+print_executor_logs
+
+display_test_summary
 
 combine_metrics
 
@@ -265,17 +402,27 @@ failures=$(combine_reports)
 
 write_bazel_invocation
 
-# If there are failures, let Evergreen mark the test as failed by the test results by exiting 0 here.
-# If there are no failures in the combined report, but the bazel test failed, report
-# it as a system failure by returning $fail_task.
-if [[ "$failures" == 'No report.json files found' ]]; then
-    if [[ "$fail_task" -eq 1 ]]; then
-        echo 'No report/test logs were found, but the bazel test failed. Check the test executor logs below.'
+# Check for system-level failures (TIMEOUT or NO_REPORT)
+for status in "${shard_statuses[@]}"; do
+    if [[ "$status" == "TIMEOUT" || "$status" == "NO_REPORT" ]]; then
+        echo "Error: One or more shards had TIMEOUT or NO_REPORT status. Not all tests ran or were reported." >&2
+        write_test_failures_expansion
+        exit 1
     fi
+done
+
+# Check for test failures
+# If there are test failures, write the expansion and exit 0 to let Evergreen mark as failed via test results
+has_test_failures=0
+for status in "${shard_statuses[@]}"; do
+    if [[ "$status" == "FAILED" ]]; then
+        has_test_failures=1
+        break
+    fi
+done
+
+if [[ "$has_test_failures" -eq 1 ]]; then
     write_test_failures_expansion
-    print_executor_logs
-    exit $fail_task
-else
-    print_executor_logs
-    exit 0
 fi
+
+exit 0

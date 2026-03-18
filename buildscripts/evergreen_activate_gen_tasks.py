@@ -33,7 +33,6 @@ LOGGER = structlog.getLogger(__name__)
 EVG_CONFIG_FILE = "./.evergreen.yml"
 BURN_IN_TAGS = "burn_in_tags"
 BURN_IN_TESTS = "burn_in_tests"
-BAZEL_BURN_IN_TESTS = r"resmoke_tests_burn_in*"
 BURN_IN_VARIANT_SUFFIX = "generated-by-burn-in-tags"
 
 
@@ -92,7 +91,7 @@ def activate_task(expansions: EvgExpansions, evg_api: EvergreenApi) -> None:
                             tasks_not_activated.append(task.task_id)
             else:
                 for task in task_list:
-                    if re.match(BAZEL_BURN_IN_TESTS, task.display_name):
+                    if re.match(BURN_IN_TESTS, task.display_name):
                         LOGGER.info(
                             "Activating task", task_id=task.task_id, task_name=task.display_name
                         )

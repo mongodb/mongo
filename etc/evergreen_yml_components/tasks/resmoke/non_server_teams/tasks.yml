@@ -124,12 +124,15 @@ tasks:
       - func: "get engflow creds"
       - func: "set up then check workstation script"
 
-  - <<: *gen_burn_in_task_template
-    name: burn_in_tags_gen
+  - name: burn_in_tags_gen
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
     patch_only: true
+    depends_on:
+      - name: version_burn_in_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
     commands:
-      - func: "generate resmoke tasks"
+      - func: "activate burn in tags tasks"
 
   - <<: *gen_burn_in_task_template
     name: burn_in_tests_gen
@@ -599,67 +602,13 @@ task_groups:
       - func: "configure evergreen api credentials"
       - func: "set up credentials"
       - func: "get engflow creds"
-    # Remove teardown_task_timeout_secs after SERVER-120810, restoring default teardown timeout. generate.tasks can
-    # stall as it waits for the Evergreen job to run the actual task generation. During this time, generate.tasks
-    # is sleeping/polling for completion. In unlucky cases where there are other task generation jobs on the
-    # same version, they run serially and can take a long time complete. A slow task here is better than the task not
-    # displaying all test results.
-    teardown_task_timeout_secs: 3600
     teardown_task:
-      - command: s3.put
-        params:
-          optional: true
-          aws_key: ${aws_key}
-          aws_secret: ${aws_secret}
-          local_file: src/generated_tasks.json
-          remote_file: ${project}/${version_id}/${build_variant}/${task_name}/generated_tasks.json
-          bucket: mciuploads
-          permissions: private
-          visibility: signed
-          content_type: application/json
-      - command: s3.put
-        params:
-          optional: true
-          aws_key: ${aws_key}
-          aws_secret: ${aws_secret}
-          local_file: src/build_events.json
-          remote_file: ${project}/${version_id}/${build_variant}/${task_name}/build_events.json
-          bucket: mciuploads
-          permissions: private
-          visibility: signed
-          content_type: application/json
-      - func: "f_expansions_write"
-      - command: subprocess.exec
-        display_name: "collect bazel debug logs"
-        params:
-          binary: bash
-          args:
-            - "src/evergreen/collect_bazel_debug_logs.sh"
-      - command: s3.put
-        params:
-          optional: true
-          aws_key: ${aws_key}
-          aws_secret: ${aws_secret}
-          local_file: src/bazel-debug-logs.zip
-          remote_file: ${project}/${version_id}/${build_variant}/${task_name}/bazel-debug-logs-${execution}.zip
-          bucket: mciuploads
-          permissions: private
-          visibility: signed
-          content_type: application/zip
+      - func: "s3.put bazel build events"
+      - func: "collect bazel debug logs"
       - func: "debug full disk"
       - func: "attach bazel invocation"
       - func: "save failed tests"
       - func: "f_expansions_write"
       - func: "kill processes"
-
-      # generate.tasks should be the last command run. In the event the job Evergreen runs to perform
-      # the actual task generation is significantly delayed and the command times out, this will ensure
-      # that the other teardown actions still are run. When the command times out, the job still exists
-      # and the generate tasks will still be created.
-      - command: generate.tasks
-        params:
-          optional": true
-          files:
-            - generated_tasks.json
     tasks:
       - resmoke_tests
