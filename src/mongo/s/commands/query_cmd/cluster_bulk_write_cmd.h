@@ -30,33 +30,22 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/client/read_preference.h"
-#include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/basic_types_gen.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/query_cmd/bulk_write_common.h"
 #include "mongo/db/commands/query_cmd/bulk_write_gen.h"
 #include "mongo/db/commands/query_cmd/bulk_write_parser.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/database_name.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
-#include "mongo/db/query/find_common.h"
 #include "mongo/db/query/shard_key_diagnostic_printer.h"
-#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/router_role/collection_routing_info_targeter.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/session/logical_session_id_gen.h"
-#include "mongo/db/sharding_environment/grid.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/s/cluster_write.h"
@@ -65,24 +54,17 @@
 #include "mongo/s/commands/query_cmd/cluster_write_cmd.h"
 #include "mongo/s/commands/query_cmd/populate_cursor.h"
 #include "mongo/s/query/exec/cluster_client_cursor.h"
-#include "mongo/s/query/exec/cluster_client_cursor_guard.h"
-#include "mongo/s/query/exec/cluster_client_cursor_impl.h"
-#include "mongo/s/query/exec/cluster_client_cursor_params.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
-#include "mongo/s/query/exec/cluster_query_result.h"
 #include "mongo/s/query/exec/router_exec_stage.h"
-#include "mongo/s/query/exec/router_stage_queued_data.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/bulk_write_exec.h"
 #include "mongo/s/write_ops/unified_write_executor/stats.h"
 #include "mongo/s/write_ops/unified_write_executor/unified_write_executor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/modules.h"
 
-#include <cstddef>
-#include <cstdint>
-#include <limits>
 #include <memory>
 #include <set>
 #include <string>
@@ -96,9 +78,12 @@
 namespace mongo {
 
 template <typename Impl>
-class ClusterBulkWriteCmd : public Command {
+class ClusterBulkWriteCmd : public TypedCommand<ClusterBulkWriteCmd<Impl>> {
 public:
-    ClusterBulkWriteCmd() : Command(Impl::kName) {}
+    using TC = TypedCommand<ClusterBulkWriteCmd<Impl>>;
+    using Request = BulkWriteCommandRequest;
+    using Reply = BulkWriteCommandRequest::Reply;
+    ClusterBulkWriteCmd() : TC(Impl::kName) {}
 
     bool adminOnly() const final {
         return true;
@@ -108,16 +93,8 @@ public:
         return Impl::getApiVersions();
     }
 
-    std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
-                                             const OpMsgRequest& request) final {
-        auto parsedRequest =
-            BulkWriteCommandRequest::parse(request, IDLParserContext{"clusterBulkWriteParse"});
-        bulk_write_exec::addIdsForInserts(parsedRequest);
-        return std::make_unique<Invocation>(this, request, std::move(parsedRequest));
-    }
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kNever;
+    typename TC::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return TC::AllowedOnSecondary::kNever;
     }
 
     bool supportsRetryableWrite() const final {
@@ -128,8 +105,8 @@ public:
         return true;
     }
 
-    ReadWriteType getReadWriteType() const final {
-        return Command::ReadWriteType::kWrite;
+    typename TC::ReadWriteType getReadWriteType() const final {
+        return TC::ReadWriteType::kWrite;
     }
 
     bool collectsResourceConsumptionMetrics() const final {
@@ -152,91 +129,25 @@ public:
         return true;
     }
 
-    class Invocation : public CommandInvocation {
+    class Invocation : public TC::InvocationBase {
+        using TC::InvocationBase::request;
+        using TC::InvocationBase::unparsedRequest;
+
     public:
-        Invocation(const ClusterBulkWriteCmd* command,
-                   const OpMsgRequest& request,
-                   BulkWriteCommandRequest bulkRequest)
-            : CommandInvocation(command),
-              _opMsgRequest{&request},
-              _request{std::move(bulkRequest)} {
+        Invocation(OperationContext* opCtx, Command* cmd, const OpMsgRequest& opMsgRequest)
+            : TC::InvocationBase(opCtx, cmd, opMsgRequest) {
             uassert(ErrorCodes::CommandNotSupported,
                     "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",
                     gFeatureFlagBulkWriteCommand.isEnabled());
 
-            bulk_write_common::validateRequest(_request, /*isRouter=*/true);
+            bulk_write_exec::addIdsForInserts(request());
+            bulk_write_common::validateRequest(request(), /*isRouter=*/true);
         }
 
-        const BulkWriteCommandRequest& getBulkRequest() const {
-            return _request;
-        }
-
-        bool getBypass() const {
-            return _request.getBypassDocumentValidation();
-        }
-
-        const GenericArguments& getGenericArguments() const override {
-            return _request.getGenericArguments();
-        }
-
-    private:
-        void preRunImplHook(OperationContext* opCtx) const {
-            Impl::checkCanRunHere(opCtx);
-        }
-
-        void preExplainImplHook(OperationContext* opCtx) const {
-            Impl::checkCanExplainHere(opCtx);
-        }
-
-        void doCheckAuthorizationHook(AuthorizationSession* authzSession) const {
-            Impl::doCheckAuthorization(authzSession, getBypass(), getBulkRequest());
-        }
-
-        NamespaceString ns() const final {
-            return NamespaceString(_request.getDbName());
-        }
-
-        std::vector<NamespaceString> allNamespaces() const final {
-            const auto& nsInfos = _request.getNsInfo();
-            std::vector<NamespaceString> result(nsInfos.size());
-
-            for (auto& nsInfo : nsInfos) {
-                result.emplace_back(nsInfo.getNs());
-            }
-
-            return result;
-        }
-
-        const DatabaseName& db() const final {
-            return _request.getDbName();
-        }
-
-        bool supportsWriteConcern() const override {
-            return true;
-        }
-
-        bool supportsRawData() const override {
-            return true;
-        }
-
-        void doCheckAuthorization(OperationContext* opCtx) const final {
-            try {
-                doCheckAuthorizationHook(AuthorizationSession::get(opCtx->getClient()));
-            } catch (const DBException& e) {
-                NotPrimaryErrorTracker::get(opCtx->getClient()).recordError(e.code());
-                throw;
-            }
-        }
-
-        const ClusterBulkWriteCmd* command() const {
-            return static_cast<const ClusterBulkWriteCmd*>(definition());
-        }
-
-        bool runImpl(OperationContext* opCtx,
-                     const OpMsgRequest& request,
-                     BulkWriteCommandRequest& bulkRequest,
-                     BSONObjBuilder& result) const {
+        Reply typedRun(OperationContext* opCtx) {
+            preRunImplHook(opCtx);
             BulkWriteCommandReply response;
+            auto& bulkRequest = request();
             // We pre-create the targeters to pass in, as having access to the targeters is
             // necessary for handling WouldChangeOwningShard errors, as for TS views we need to be
             // able to obtain the bucket namespace to write to which we get via targeter.
@@ -315,19 +226,43 @@ public:
                 uweStats.updateMetrics(opCtx, updatedShardKey);
             }
 
-            response = populateCursorReply(opCtx, bulkRequest, request.body, std::move(replyInfo));
+            response = populateCursorReply(
+                opCtx, bulkRequest, unparsedRequest().body, std::move(replyInfo));
+            return response;
+        }
 
-            result.appendElements(response.toBSON());
+    private:
+        void preRunImplHook(OperationContext* opCtx) const {
+            Impl::checkCanRunHere(opCtx);
+        }
+
+        void preExplainImplHook(OperationContext* opCtx) const {
+            Impl::checkCanExplainHere(opCtx);
+        }
+
+        void doCheckAuthorizationHook(AuthorizationSession* authzSession) const {
+            Impl::doCheckAuthorization(
+                authzSession, request().getBypassDocumentValidation(), request());
+        }
+
+        NamespaceString ns() const final {
+            return NamespaceString(request().getDbName());
+        }
+
+        bool supportsWriteConcern() const override {
             return true;
         }
 
-        void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
-            preRunImplHook(opCtx);
+        bool supportsRawData() const override {
+            return true;
+        }
 
-            BSONObjBuilder bob = result->getBodyBuilder();
-            bool ok = runImpl(opCtx, *_opMsgRequest, _request, bob);
-            if (!ok) {
-                CommandHelpers::appendSimpleCommandStatus(bob, ok);
+        void doCheckAuthorization(OperationContext* opCtx) const final {
+            try {
+                doCheckAuthorizationHook(AuthorizationSession::get(opCtx->getClient()));
+            } catch (const DBException& e) {
+                NotPrimaryErrorTracker::get(opCtx->getClient()).recordError(e.code());
+                throw;
             }
         }
 
@@ -348,7 +283,7 @@ public:
                 return boost::none;
             }
 
-            auto batchSize = _request.getOps().size();
+            auto batchSize = request().getOps().size();
             for (auto& replyItem : response.replyItems) {
                 if (replyItem.getStatus() == ErrorCodes::WouldChangeOwningShard) {
                     if (batchSize != 1) {
@@ -476,22 +411,25 @@ public:
 
             uassert(ErrorCodes::InvalidLength,
                     "explained bulkWrite must be of size 1",
-                    _request.getOps().size() == 1U);
+                    request().getOps().size() == 1U);
 
-            auto op = BulkWriteCRUDOp(_request.getOps()[0]);
+            auto op = BulkWriteCRUDOp(request().getOps()[0]);
             BatchedCommandRequest batchedRequest = [&]() {
                 auto type = op.getType();
                 if (type == BulkWriteCRUDOp::kInsert) {
                     return BatchedCommandRequest::buildInsertOp(
-                        _request.getNsInfo()[op.getNsInfoIdx()].getNs(),
+                        request().getNsInfo()[op.getNsInfoIdx()].getNs(),
                         {op.getInsert()->getDocument()});
                 } else if (type == BulkWriteCRUDOp::kUpdate) {
                     return BatchedCommandRequest(
                         bulk_write_common::makeUpdateCommandRequestFromUpdateOp(
-                            opCtx, op.getUpdate(), _request, 0));
+                            opCtx, op.getUpdate(), request(), 0));
                 } else if (type == BulkWriteCRUDOp::kDelete) {
                     return BatchedCommandRequest(bulk_write_common::makeDeleteCommandRequestForFLE(
-                        opCtx, op.getDelete(), _request, _request.getNsInfo()[op.getNsInfoIdx()]));
+                        opCtx,
+                        op.getDelete(),
+                        request(),
+                        request().getNsInfo()[op.getNsInfoIdx()]));
                 } else {
                     MONGO_UNREACHABLE;
                 }
@@ -500,9 +438,6 @@ public:
             ClusterWriteCmd::executeWriteOpExplain(
                 opCtx, batchedRequest, batchedRequest.toBSON(), verbosity, result);
         }
-
-        const OpMsgRequest* _opMsgRequest;
-        BulkWriteCommandRequest _request;
     };
 };
 
