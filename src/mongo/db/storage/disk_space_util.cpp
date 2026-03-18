@@ -53,11 +53,11 @@ int64_t getAvailableDiskSpaceBytes(const boost::filesystem::path& path) {
     boost::system::error_code ec;
     boost::filesystem::space_info spaceInfo = boost::filesystem::space(path, ec);
     if (ec) {
-        LOGV2(7333403,
-              "Failed to query filesystem disk stats",
-              "error"_attr = ec.message(),
-              "errorCode"_attr = ec.value());
-        // We don't want callers to take any action if we can't collect stats.
+        LOGV2_WARNING(7333403,
+                      "Failed to query filesystem disk stats",
+                      "error"_attr = ec.message(),
+                      "errorCode"_attr = ec.value());
+        // TODO(SERVER-121744): Change return value according to appropriate fallback.
         return std::numeric_limits<int64_t>::max();
     }
     return static_cast<int64_t>(spaceInfo.available);
