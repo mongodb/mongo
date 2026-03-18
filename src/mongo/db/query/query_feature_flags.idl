@@ -435,3 +435,4 @@ feature_flags:
         cpp_varname: gFeatureFlagExtensionsInsideHybridSearch
         default: false
         fcv_gated: false
+        incremental_rollout_phase: in_development
