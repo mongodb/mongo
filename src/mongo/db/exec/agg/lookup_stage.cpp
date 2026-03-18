@@ -92,15 +92,14 @@ void addCacheStageAndOptimize(boost::intrusive_ptr<DocumentSource> source,
     pipeline_optimization::optimizeContainer(*pipeline.getContext(), &container);
 
     // We want to ensure the cache has been optimized prior to any calls to optimize().
-    auto itr = (&container)->begin();
-    while (itr != (&container)->end()) {
+    for (auto itr = container.begin(); itr != container.end();) {
         if (auto* sequentialCache =
-                dynamic_cast<DocumentSourceSequentialDocumentCache*>(itr->get())) {
-            if (!sequentialCache->hasOptimizedPos()) {
-                sequentialCache->optimizeAt(itr, &container);
-            }
+                dynamic_cast<DocumentSourceSequentialDocumentCache*>(itr->get());
+            sequentialCache && !sequentialCache->hasOptimizedPos()) {
+            itr = sequentialCache->optimizeAt(itr, &container);
+        } else {
+            itr = std::next(itr);
         }
-        itr = std::next(itr);
     }
 
     // Optimize the pipeline, with the cache in its correct position if it exists.

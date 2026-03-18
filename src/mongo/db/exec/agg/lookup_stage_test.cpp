@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_lookup_test_util.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
 
@@ -317,5 +318,54 @@ TEST_F(LookupStageTest, ShouldAbandonCacheIfMaxSizeIsExceededAfterFirstSubPipeli
         secondResult.getDocument());
 }
 
+TEST_F(LookupStageTest, AddingCacheStageWorksWithDisablePipelineRewrites) {
+    // Disable pipeline rewrites.
+    RAIIServerParameterControllerForTest controller("internalQueryMaxPipelineRewrites", 0);
+
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+
+    // Build lookup stage.
+    constexpr auto json = R"(
+    {
+        $lookup: {
+            from: "coll",
+            let: {var1: "$_id"},
+            pipeline: [
+                {$match: {$expr: {$eq: ["$_id", "$$var1"]}}},
+                {$project: {y: 1, computed: {$add: ["$y", 1]}}},
+                {$sort: {y: 1}}
+            ],
+            as: "joined"
+        }
+    }
+    )";
+    auto lookupDS = makeLookUpFromJson(json, expCtx);
+    auto lookupStage = buildLookUpStage(lookupDS);
+
+    // Prepare the mocked local and foreign sources.
+    std::deque<DocumentSource::GetNextResult> mockForeignContents{
+        Document{{"_id", 1}, {"y", 10}},
+        Document{{"_id", 2}, {"y", 20}},
+        Document{{"_id", 3}, {"y", 30}},
+    };
+
+    expCtx->setMongoProcessInterface(
+        std::make_shared<DocumentSourceLookupMockMongoInterface>(mockForeignContents));
+
+    auto mockLocalStage = exec::agg::MockStage::createForTest({Document{{"_id", 1}, {"x", 1}},
+                                                               Document{{"_id", 2}, {"x", 2}},
+                                                               Document{{"_id", 3}, {"x", 3}}},
+                                                              expCtx);
+
+    lookupStage->setSource(mockLocalStage.get());
+
+    // buildPipeline adds the cache stage.
+    auto subPipeline =
+        lookupStage->buildPipeline(lookupDS->getSubpipelineExpCtx(), DOC("_id" << 1));
+    ASSERT(subPipeline);
+}
 }  // namespace
 }  // namespace mongo
