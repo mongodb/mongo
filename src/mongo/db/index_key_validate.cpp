@@ -47,6 +47,7 @@
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_options_gen.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
@@ -382,7 +383,8 @@ BSONObj repairIndexSpec(const NamespaceString& ns,
 StatusWith<BSONObj> validateIndexSpec(
     OperationContext* opCtx,
     const BSONObj& indexSpec,
-    const std::map<StringData, std::set<IndexType>>& allowedFieldNames) {
+    const std::map<StringData, std::set<IndexType>>& allowedFieldNames,
+    bool isUpgradeRepair) {
     bool hasKeyPatternField = false;
     bool hasIndexNameField = false;
     bool hasNamespaceField = false;
@@ -396,6 +398,7 @@ StatusWith<BSONObj> validateIndexSpec(
     bool prepareUnique = false;
     auto clusteredField = indexSpec[IndexDescriptor::kClusteredFieldName];
     bool apiStrict = opCtx && APIParameters::get(opCtx).getAPIStrict().value_or(false);
+    bool is2dIndexWithNonIntBits = false;
 
     auto fieldNamesValidStatus = validateIndexSpecFieldNames(indexSpec, allowedFieldNames);
     if (!fieldNamesValidStatus.isOK()) {
@@ -649,6 +652,18 @@ StatusWith<BSONObj> validateIndexSpec(
                     str::stream() << "The field '" << indexSpecElemFieldName
                                   << "' must be a number, but got "
                                   << typeName(indexSpecElem.type())};
+        } else if (IndexDescriptor::k2dIndexBitsFieldName == indexSpecElemFieldName) {
+            is2dIndexWithNonIntBits = indexSpecElem.type() != BSONType::numberInt;
+
+            // Prior to SERVER-120174, non-integer values could be stored for this parameter. During
+            // FCV upgrade, signal the repair path by returning an error here so that
+            // repairIndexSpec() will convert any such on-disk values to integers.
+            if (isUpgradeRepair && is2dIndexWithNonIntBits) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream()
+                            << "The field '" << indexSpecElemFieldName
+                            << "' must be an integer, but got " << typeName(indexSpecElem.type())};
+            }
         } else if (IndexDescriptor::kExpireAfterSecondsFieldName == indexSpecElemFieldName) {
             auto swType = validateExpireAfterSeconds(
                 indexSpecElem, ValidateExpireAfterSecondsMode::kSecondaryTTLIndex);
@@ -770,6 +785,14 @@ StatusWith<BSONObj> validateIndexSpec(
 
         BSONObj specToAdd =
             BSON(IndexDescriptor::kOriginalSpecFieldName << modifiedOriginalSpec.getValue());
+        modifiedSpec = modifiedSpec.addField(specToAdd.firstElement());
+    }
+
+    if (is2dIndexWithNonIntBits) {
+        // Store this field as an integer value.
+        BSONObj specToAdd =
+            BSON(IndexDescriptor::k2dIndexBitsFieldName
+                 << indexSpec[IndexDescriptor::k2dIndexBitsFieldName].safeNumberInt());
         modifiedSpec = modifiedSpec.addField(specToAdd.firstElement());
     }
 

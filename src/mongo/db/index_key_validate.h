@@ -82,12 +82,22 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
  * Validates the index specification 'indexSpec' and returns an equivalent index specification that
  * has any missing attributes filled in. If the index specification is malformed, then an error
  * status is returned.
+ *
+ * The 'isUpgradeRepair' parameter should be set to true only when this function is called during a
+ * setFCV upgrade operation. When true, certain fields that have historically been stored with
+ * invalid types on disk (e.g. a non-integer value for '2d' index 'bits') will cause a non-OK
+ * status to be returned, signaling to callers that a repair is needed.
+ * When false (the default), those same conditions are tolerated without error.
+ *
+ * TODO (SERVER-120350) Update the previous comment accordingly and consider removing the
+ * 'isUpgradeRepair' flag once 9.0 branches out.
  */
 StatusWith<BSONObj> validateIndexSpec(
     OperationContext* opCtx,
     const BSONObj& indexSpec,
     const std::map<StringData, std::set<IndexType>>& allowedFieldNames =
-        index_key_validate::kAllowedFieldNames);
+        index_key_validate::kAllowedFieldNames,
+    bool isUpgradeRepair = false);
 
 /**
  * Returns a new index spec with any unknown field names removed from 'indexSpec'.

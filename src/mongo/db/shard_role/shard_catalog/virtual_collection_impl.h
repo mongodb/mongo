@@ -369,7 +369,7 @@ public:
     }
 
     std::vector<std::string> repairInvalidIndexOptions(OperationContext* opCtx,
-                                                       bool removeDeprecatedFields) final {
+                                                       bool isUpgradeRepair) final {
         unimplementedTasserted();
         return {};
     }

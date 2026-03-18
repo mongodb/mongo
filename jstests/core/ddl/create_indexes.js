@@ -1,122 +1,176 @@
 /**
+ * Tests that createIndexes enforces index spec validation, and correctly updates the catalog on
+ * success while leaving it unchanged on failure.
+ *
  * @tags: [
  *   assumes_superuser_permissions,
  *   # simulate_atlas_proxy.js can't simulate req on config.transaction as tested
  *   simulate_atlas_proxy_incompatible,
  * ]
  */
+import {afterEach, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {IndexUtils} from "jstests/libs/index_utils.js";
 
-const dbTest = db.getSiblingDB("create_indexes_db");
-dbTest.dropDatabase();
+const dbName = jsTestName();
+const testDb = db.getSiblingDB(dbName);
+const collName = "collTest";
+const coll = testDb.getCollection(collName);
 
-const t = dbTest.create_indexes;
-dbTest.createCollection(t.getName());
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
 
-// Test that index creation fails with an empty list of specs.
-let res = t.runCommand("createIndexes", {indexes: []});
-assert.commandFailedWithCode(res, ErrorCodes.BadValue);
+describe("createIndexes", function () {
+    beforeEach(function () {
+        testDb.dropDatabase();
+        assert.commandWorked(testDb.createCollection(collName));
+    });
 
-// Test that index creation fails on specs that are missing required fields such as 'key'.
-res = t.runCommand("createIndexes", {indexes: [{}]});
-assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
+    describe("malformed index specs", function () {
+        afterEach(function () {
+            // Ensure that no indexes were created
+            IndexUtils.assertIndexes(coll, [{_id: 1}]);
+        });
 
-// Test that any malformed specs in the list causes the entire index creation to fail and
-// will not result in new indexes in the catalog.
-res = t.runCommand("createIndexes", {indexes: [{}, {key: {m: 1}, name: "asd"}]});
-assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
+        it("fails with an empty list of index specs", function () {
+            const res = coll.runCommand("createIndexes", {indexes: []});
+            assert.commandFailedWithCode(res, ErrorCodes.BadValue);
+        });
 
-IndexUtils.assertIndexes(t, [{_id: 1}]);
+        it("fails when the 'key' field is missing from an index spec", function () {
+            const res = coll.runCommand("createIndexes", {indexes: [{}]});
+            assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
+        });
 
-res = t.runCommand("createIndexes", {indexes: [{key: {"c": 1}, sparse: true, name: "c_1"}]});
-IndexUtils.assertIndexes(t, [{_id: 1}, {c: 1}]);
-assert.eq(
-    1,
-    t.getIndexes().filter(function (z) {
-        return z.sparse;
-    }).length,
-);
+        it("does not create any indexes when any spec in the list is malformed", function () {
+            const res = coll.runCommand("createIndexes", {indexes: [{}, {key: {m: 1}, name: "asd"}]});
+            assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
+        });
 
-// Test that index creation fails if we specify an unsupported index type.
-res = t.runCommand("createIndexes", {indexes: [{key: {"x": "invalid_index_type"}, name: "x_1"}]});
-assert.commandFailedWithCode(res, ErrorCodes.CannotCreateIndex);
+        it("fails with an unsupported index type", function () {
+            const res = coll.runCommand("createIndexes", {indexes: [{key: {x: "invalid_index_type"}, name: "x_1"}]});
+            assert.commandFailedWithCode(res, ErrorCodes.CannotCreateIndex);
+        });
 
-IndexUtils.assertIndexes(t, [{_id: 1}, {c: 1}]);
+        it("fails when the index name is empty", function () {
+            const res = coll.runCommand("createIndexes", {indexes: [{key: {x: 1}, name: ""}]});
+            assert.commandFailedWithCode(res, ErrorCodes.CannotCreateIndex);
+        });
 
-// Test that an index name, if provided by the user, cannot be empty.
-res = t.runCommand("createIndexes", {indexes: [{key: {"x": 1}, name: ""}]});
-assert.commandFailedWithCode(res, ErrorCodes.CannotCreateIndex);
+        it("fails with index version v0", function () {
+            const res = coll.runCommand("createIndexes", {indexes: [{key: {d: 1}, name: "d_1", v: 0}]});
+            assert.commandFailed(res, "v0 index creation should fail");
+        });
 
-IndexUtils.assertIndexes(t, [{_id: 1}, {c: 1}]);
+        it("fails with an invalid top-level field", function () {
+            const res = coll.runCommand("createIndexes", {indexes: [{key: {e: 1}, name: "e_1"}], invalidField: 1});
+            assert.commandFailedWithCode(res, ErrorCodes.IDLUnknownField);
+        });
 
-// Test that v0 indexes cannot be created.
-res = t.runCommand("createIndexes", {indexes: [{key: {d: 1}, name: "d_1", v: 0}]});
-assert.commandFailed(res, "v0 index creation should fail");
+        it("fails with an invalid field in an index spec (version V2)", function () {
+            const res = coll.runCommand("createIndexes", {
+                indexes: [{key: {e: 1}, name: "e_1", v: 2, invalidField: 1}],
+            });
+            assert.commandFailedWithCode(res, ErrorCodes.InvalidIndexSpecificationOption);
+        });
 
-IndexUtils.assertIndexes(t, [{_id: 1}, {c: 1}]);
+        it("fails with an invalid field in an index spec (version V1)", function () {
+            const res = coll.runCommand("createIndexes", {
+                indexes: [{key: {e: 1}, name: "e_1", v: 1, invalidField: 1}],
+            });
+            assert.commandFailedWithCode(res, ErrorCodes.InvalidIndexSpecificationOption);
+        });
 
-// Test that v1 indexes can be created explicitly.
-res = t.runCommand("createIndexes", {indexes: [{key: {d: 1}, name: "d_1", v: 1}]});
-assert.commandWorked(res, "v1 index creation should succeed");
+        it("fails with an index named '*'", function () {
+            const res = coll.runCommand("createIndexes", {indexes: [{key: {star: 1}, name: "*"}]});
+            assert.commandFailedWithCode(res, ErrorCodes.BadValue);
+        });
 
-IndexUtils.assertIndexes(t, [{_id: 1}, {c: 1}, {d: 1}]);
+        it("fails when an index key value is an empty string", function () {
+            const res = coll.runCommand("createIndexes", {indexes: [{key: {f: ""}, name: "f_1"}]});
+            assert.commandFailedWithCode(res, ErrorCodes.CannotCreateIndex);
+        });
 
-// Test that index creation fails with an invalid top-level field.
-res = t.runCommand("createIndexes", {indexes: [{key: {e: 1}, name: "e_1"}], "invalidField": 1});
-assert.commandFailedWithCode(res, ErrorCodes.IDLUnknownField);
+        it("fails with duplicate index names in the same request", function () {
+            const res = coll.runCommand("createIndexes", {
+                indexes: [
+                    {key: {g: 1}, name: "myidx"},
+                    {key: {h: 1}, name: "myidx"},
+                ],
+            });
+            assert.commandFailedWithCode(res, ErrorCodes.IndexKeySpecsConflict);
+        });
+    });
 
-// Test that index creation fails with an invalid field in the index spec for index version V2.
-res = t.runCommand("createIndexes", {indexes: [{key: {e: 1}, name: "e_1", "v": 2, "invalidField": 1}]});
-assert.commandFailedWithCode(res, ErrorCodes.InvalidIndexSpecificationOption);
+    it("successfully creates a sparse index and updates the catalog", function () {
+        assert.commandWorked(coll.runCommand("createIndexes", {indexes: [{key: {c: 1}, sparse: true, name: "c_1"}]}));
+        IndexUtils.assertIndexes(coll, [{_id: 1}, {c: 1}]);
+        assert.eq(1, coll.getIndexes().filter((z) => z.sparse).length);
+    });
 
-// Test that index creation fails with an invalid field in the index spec for index version V1.
-res = t.runCommand("createIndexes", {indexes: [{key: {e: 1}, name: "e_1", "v": 1, "invalidField": 1}]});
-assert.commandFailedWithCode(res, ErrorCodes.InvalidIndexSpecificationOption);
+    it("successfully creates a v1 index explicitly", function () {
+        assert.commandWorked(
+            coll.runCommand("createIndexes", {indexes: [{key: {d: 1}, name: "d_1", v: 1}]}),
+            "v1 index creation should succeed",
+        );
+        IndexUtils.assertIndexes(coll, [{_id: 1}, {d: 1}]);
+    });
 
-IndexUtils.assertIndexes(t, [{_id: 1}, {c: 1}, {d: 1}]);
+    it("createIndexes on a view fails with CollectionUUIDMismatch when collectionUUID is provided", function () {
+        assert.commandWorked(testDb.createView("toApple", "apple", []));
+        const res = testDb.runCommand({
+            createIndexes: "toApple",
+            collectionUUID: UUID(),
+            indexes: [{name: "_id_hashed", key: {_id: "hashed"}}],
+        });
+        assert.commandFailedWithCode(res, ErrorCodes.CollectionUUIDMismatch);
 
-// Test that index creation fails with an index named '*'.
-res = t.runCommand("createIndexes", {indexes: [{key: {star: 1}, name: "*"}]});
-assert.commandFailedWithCode(res, ErrorCodes.BadValue);
+        testDb.getCollection("toApple").drop();
+    });
 
-// Test that index creation fails with an index value of empty string.
-res = t.runCommand("createIndexes", {indexes: [{key: {f: ""}, name: "f_1"}]});
-assert.commandFailedWithCode(res, ErrorCodes.CannotCreateIndex);
+    it("createIndexes on a view fails with CommandNotSupportedOnView when no collectionUUID is provided", function () {
+        assert.commandWorked(testDb.createView("toApple", "apple", []));
+        const res = testDb.runCommand({
+            createIndexes: "toApple",
+            indexes: [{name: "_id_hashed", key: {_id: "hashed"}}],
+        });
+        assert.commandFailedWithCode(res, ErrorCodes.CommandNotSupportedOnView);
+    });
 
-// Test that index creation fails with duplicate index names in the index specs.
-res = t.runCommand("createIndexes", {
-    indexes: [
-        {key: {g: 1}, name: "myidx"},
-        {key: {h: 1}, name: "myidx"},
-    ],
+    describe("User is not allowed to create indexes in config.transactions", function () {
+        it("createIndexes on config.transactions fails with IllegalOperation", function () {
+            const configDB = db.getSiblingDB("config");
+            const res = configDB.runCommand({
+                createIndexes: "transactions",
+                indexes: [{key: {star: 1}, name: "star"}],
+            });
+            assert.commandFailedWithCode(res, ErrorCodes.IllegalOperation);
+        });
+
+        it("createIndexes on config.transactions fails with IllegalOperation even with an empty index list", function () {
+            const configDB = db.getSiblingDB("config");
+            const res = configDB.runCommand({createIndexes: "transactions", indexes: []});
+            assert.commandFailedWithCode(res, ErrorCodes.IllegalOperation);
+        });
+    });
+
+    describe("Bits parameter must be stored as an integer", function () {
+        it("bits parameter is stored as an integer", function () {
+            // TODO SERVER-120350: Remove this once v9.0 becomes last LTS
+            if (isMultiversion) {
+                jsTestLog(
+                    "Skipping test when running on mixed binary versions because the bits parameter may have been stored as a non-int",
+                );
+                return;
+            }
+
+            assert.commandWorked(
+                coll.runCommand("createIndexes", {indexes: [{key: {loc: "2d"}, name: "loc_2d", bits: 11.6}]}),
+            );
+            IndexUtils.assertIndexExists(coll, {loc: "2d"}, {bits: 11});
+            assert(
+                !IndexUtils.indexExists(coll, {loc: "2d"}, {bits: 11.6}),
+                "index with non-int bits should not exist",
+            );
+        });
+    });
 });
-assert.commandFailedWithCode(res, ErrorCodes.IndexKeySpecsConflict);
-
-IndexUtils.assertIndexes(t, [{_id: 1}, {c: 1}, {d: 1}]);
-
-// Test that creating an index on a view fails with CollectionUUIDMismatch if a collection UUID is
-// provided. CollectionUUIDMismatch has to prevail over CommandNotSupportedOnView for mongosync.
-assert.commandWorked(db.createView("toApple", "apple", []));
-res = db.runCommand({
-    createIndexes: "toApple",
-    collectionUUID: UUID(),
-    indexes: [{name: "_id_hashed", key: {_id: "hashed"}}],
-});
-assert.commandFailedWithCode(res, ErrorCodes.CollectionUUIDMismatch);
-
-// Test that creating an index on a view fails with CommandNotSupportedOnView if a collection UUID
-// is not provided
-assert.commandWorked(db.createView("toApple", "apple", []));
-res = db.runCommand({createIndexes: "toApple", indexes: [{name: "_id_hashed", key: {_id: "hashed"}}]});
-assert.commandFailedWithCode(res, ErrorCodes.CommandNotSupportedOnView);
-
-// Test that user is not allowed to create indexes in config.transactions.
-const configDB = db.getSiblingDB("config");
-res = configDB.runCommand({createIndexes: "transactions", indexes: [{key: {star: 1}, name: "star"}]});
-assert.commandFailedWithCode(res, ErrorCodes.IllegalOperation);
-
-// Test that providing an empty list of index spec for config.transactions should also fail with
-// IllegalOperation, rather than BadValue for a normal collection.
-// This is consistent with server behavior prior to 6.0.
-res = configDB.runCommand({createIndexes: "transactions", indexes: []});
-assert.commandFailedWithCode(res, ErrorCodes.IllegalOperation);

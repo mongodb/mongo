@@ -1055,23 +1055,20 @@ Status _collModInternal(OperationContext* opCtx,
             writableColl->setTimeseriesBucketingParametersChanged(opCtx, boost::none);
         }
 
-        // Fix any invalid index options for indexes belonging to this collection, only for empty
-        // collMod requests which are called during setFCV upgrade.
-        const auto removeDeprecatedFields = [&]() {
-            if (cmrNew.numModifications > 0) {
-                return false;
-            }
-
+        const auto isUpgrading = [&]() {
             if (!ServerGlobalParams::FCVSnapshot::isUpgradingOrDowngrading(version)) {
                 return false;
             }
-
             const auto transitionInfo = getTransitionFCVInfo(version);
             return transitionInfo.from < transitionInfo.to;
-        }();
+        };
+
+        // Indicates whether this is an empty collMod command invoked as part of a setFCV upgrade.
+        // Certain index repairs are performed exclusively during the upgrade process.
+        const bool isUpgradeRepair = (cmrNew.numModifications == 0) && isUpgrading();
 
         std::vector<std::string> indexesWithInvalidOptions =
-            writableColl->repairInvalidIndexOptions(opCtx, removeDeprecatedFields);
+            writableColl->repairInvalidIndexOptions(opCtx, isUpgradeRepair);
         for (const auto& indexWithInvalidOptions : indexesWithInvalidOptions) {
             const auto entry =
                 writableColl->getIndexCatalog()->findIndexByName(opCtx, indexWithInvalidOptions);

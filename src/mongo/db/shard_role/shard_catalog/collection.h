@@ -541,12 +541,19 @@ public:
 
     /**
      * Repairs invalid index options on all indexes in this collection. Returns a list of
-     * index names that were repaired. Specifying 'removeDeprecatedFields' as true, causes
-     * deprecated fields, which much be otherwise supported for backwards compatibility, to be
-     * removed when performing the repair.
+     * index names that were repaired.
+     *
+     * When 'isUpgradeRepair' is true, this function is being called as part of a setFCV upgrade
+     * operation. In that mode, deprecated index fields are also removed (fields that are otherwise
+     * kept for backwards compatibility), and stricter validation is applied so that index specs
+     * with historically-tolerated invalid values (e.g. non-integer '2d' index 'bits') are
+     * detected and corrected on disk.
+     *
+     * TODO (SERVER-120350) Update the previous comment accordingly and consider removing the
+     * 'isUpgradeRepair' flag once 9.0 branches out.
      */
-    virtual std::vector<std::string> repairInvalidIndexOptions(
-        OperationContext* opCtx, bool removeDeprecatedFields = false) = 0;
+    virtual std::vector<std::string> repairInvalidIndexOptions(OperationContext* opCtx,
+                                                               bool isUpgradeRepair = false) = 0;
 
     /**
      * Updates the 'temp' setting for this collection.

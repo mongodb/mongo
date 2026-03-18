@@ -1226,17 +1226,17 @@ private:
             rangedeletionutil::setPreMigrationShardVersionOnRangeDeletionTasks(opCtx);
         }
 
-        _cleanUpDeprecatedCatalogMetadata(opCtx);
+        _cleanUpIndexCatalogMetadataOnUpgrade(opCtx);
 
         FCVStepRegistry::get(opCtx->getServiceContext())
             .upgradeServerMetadata(opCtx, originalVersion, requestedVersion);
     }
 
     // TODO(SERVER-100328): remove after 9.0 is branched.
-    // WARNING: do not rely on this method to clean up metadata that can be created concurrently. It
-    // is fine to rely on this only when missing concurrently created collections is fine, when
-    // newly created collections no longer use the metadata format we wish to remove.
-    void _cleanUpDeprecatedCatalogMetadata(OperationContext* opCtx) {
+    // WARNING: do not rely on this method to clean up index metadata that can be created
+    // concurrently. It is fine to rely on this only when missing concurrently created collections
+    // is fine, when newly created collections no longer use the metadata format we wish to remove.
+    void _cleanUpIndexCatalogMetadataOnUpgrade(OperationContext* opCtx) {
         // We bypass the UserWritesBlock mode here in order to not see errors arising from the
         // block. The user already has permission to run FCV at this point and the writes performed
         // here aren't modifying any user data with the exception of fixing up the collection
@@ -1249,8 +1249,9 @@ private:
             Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
             catalog::forEachCollectionFromDb(
                 opCtx, dbName, MODE_X, [&](const Collection* collection) {
-                    // To remove deprecated catalog metadata, issue a collmod with no other options
-                    // set.
+                    // Issue a no-op collMod command to each collection to trigger removal of
+                    // deprecated catalog metadata and to correct any invalid value types previously
+                    // allowed in metadata.
                     BSONObjBuilder responseBuilder;
                     uassertStatusOK(processCollModCommand(opCtx,
                                                           collection->ns(),

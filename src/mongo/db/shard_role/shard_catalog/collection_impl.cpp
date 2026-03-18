@@ -1501,9 +1501,12 @@ void CollectionImpl::updatePrepareUniqueSetting(OperationContext* opCtx,
 }
 
 std::vector<std::string> CollectionImpl::repairInvalidIndexOptions(OperationContext* opCtx,
-                                                                   bool removeDeprecatedFields) {
+                                                                   bool isUpgradeRepair) {
     std::vector<std::string> indexesWithInvalidOptions;
-    const auto& allowedFieldNames = removeDeprecatedFields
+
+    // Deprecated fields are stripped from index specs only when repairing during an upgrade
+    // process.
+    const auto& allowedFieldNames = isUpgradeRepair
         ? index_key_validate::kNonDeprecatedAllowedFieldNames
         : index_key_validate::kAllowedFieldNames;
 
@@ -1512,9 +1515,9 @@ std::vector<std::string> CollectionImpl::repairInvalidIndexOptions(OperationCont
             if (index.isPresent()) {
                 BSONObj oldSpec = index.spec;
 
-                Status status =
-                    index_key_validate::validateIndexSpec(opCtx, oldSpec, allowedFieldNames)
-                        .getStatus();
+                Status status = index_key_validate::validateIndexSpec(
+                                    opCtx, oldSpec, allowedFieldNames, isUpgradeRepair)
+                                    .getStatus();
                 if (status.isOK()) {
                     continue;
                 }

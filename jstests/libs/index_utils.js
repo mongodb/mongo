@@ -56,6 +56,17 @@ export var IndexUtils = (function () {
         assert.sameMembers(expectedIndexes, actualIndexes, msg);
     }
 
+    function _indexExists(indexesList, indexKey, options = undefined) {
+        return indexesList.some(
+            (index) =>
+                bsonWoCompare(indexKey, index.key) === 0 &&
+                (!options ||
+                    Object.keys(options).every(
+                        (optionKey) => bsonWoCompare(options[optionKey], index[optionKey]) === 0,
+                    )),
+        );
+    }
+
     /**
      * Checks whether the specified index exists.
      *
@@ -63,21 +74,32 @@ export var IndexUtils = (function () {
      * To check that a field does not exist, you can use the syntax: { field: undefined }.
      */
     function indexExists(coll, indexKey, options = undefined) {
-        return coll
-            .getIndexes()
-            .some(
-                (index) =>
-                    bsonWoCompare(indexKey, index.key) === 0 &&
-                    (!options ||
-                        Object.keys(options).every(
-                            (optionKey) => bsonWoCompare(options[optionKey], index[optionKey]) === 0,
-                        )),
-            );
+        return _indexExists(coll.getIndexes(), indexKey, options);
+    }
+
+    /**
+     * Asserts that the specified index exists.
+     *
+     * If `options` are provided, only the specified fields will be verified.
+     * To check that a field does not exist, you can use the syntax: { field: undefined }.
+     */
+    function assertIndexExists(coll, indexKey, options = undefined) {
+        const indexes = coll.getIndexes();
+        assert(
+            _indexExists(indexes, indexKey, options),
+            "Index " +
+                tojson(indexKey) +
+                ", whith options " +
+                tojson(options) +
+                " does not exist. Indexes list: " +
+                tojson(indexes),
+        );
     }
 
     return {
         assertIndexes: assertIndexes,
         assertIndexesMatch: assertIndexesMatch,
+        assertIndexExists: assertIndexExists,
         indexExists: indexExists,
     };
 })();

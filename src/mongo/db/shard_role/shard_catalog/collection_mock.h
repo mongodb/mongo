@@ -389,7 +389,7 @@ public:
     }
 
     std::vector<std::string> repairInvalidIndexOptions(OperationContext* opCtx,
-                                                       bool removeDeprecatedFields) override {
+                                                       bool isUpgradeRepair) override {
         MONGO_UNREACHABLE;
     }
 

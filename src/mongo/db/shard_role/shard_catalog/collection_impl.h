@@ -351,7 +351,7 @@ public:
                                     bool prepareUnique) final;
 
     std::vector<std::string> repairInvalidIndexOptions(OperationContext* opCtx,
-                                                       bool removeDeprecatedFields) final;
+                                                       bool isUpgradeRepair) final;
 
     void setIsTemp(OperationContext* opCtx, bool isTemp) final;
 
