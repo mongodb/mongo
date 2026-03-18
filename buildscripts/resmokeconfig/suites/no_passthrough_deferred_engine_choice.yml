@@ -1,0 +1,54 @@
+test_kind: js_test
+description: |
+  Temporary no_passthrough suite for deferred get_executor project.
+
+selector:
+  roots:
+    - jstests/noPassthrough/**/*.js
+    - jstests/libs/property_test_helpers/self_tests/*.js
+    - src/mongo/db/modules/*/jstests/live_import/*.js
+    - src/mongo/db/modules/*/jstests/live_restore/*.js
+    - src/mongo/db/modules/*/jstests/no_passthrough/*.js
+
+    # Self-tests for the Concurrency testing framework are run as part of this test suite.
+    - jstests/concurrency/*.js
+  exclude_files:
+    - jstests/noPassthrough/libs/**/*.js
+
+    # TODO SERVER-121809 Add scoped debug info for query planner params in new get executor
+    - jstests/noPassthrough/query/query_planner_params_diagnostics.js
+
+    # TODO SERVER-119606 call CBR in new get_executor
+    - jstests/noPassthrough/query/cbr/**/*.js
+    - jstests/noPassthrough/query/queryStats/query_stats_cbr_metrics.js
+    - jstests/noPassthrough/query/plan_evaluation_coll_fraction.js
+    - jstests/noPassthrough/query/server_status/server_status_automaticCE.js
+    - jstests/noPassthrough/query/server_status/server_status_cbr.js
+
+    # TODO SERVER-117566 implement plan cache in new get executor
+    - jstests/noPassthrough/query/plan_cache/**/*.js
+    - jstests/noPassthrough/query/queryStats/query_stats_disk_usage_plan_cache.js
+    - jstests/noPassthrough/query/command_diagnostics_plan_cache.js
+    - jstests/noPassthrough/query/sbe_subplanning.js
+    - jstests/noPassthrough/timeseries/query/timeseries_in_sbe_uses_plan_cache.js
+
+    # TODO SERVER-122039 Investigate unknown failures
+    - jstests/noPassthrough/query/multiplanner/tie_breaking_index_prefix.js
+    - jstests/noPassthrough/query/server_status/server_status_subplanner.js
+
+  exclude_with_any_tags:
+
+# noPassthrough tests start their own mongod's.
+executor:
+  archive:
+    tests:
+      - jstests/noPassthrough/oplog_writes_only_permitted_on_standalone.js
+      - jstests/noPassthrough/wt_unclean_shutdown.js
+      - src/mongo/db/modules/*/jstests/live_restore/*.js
+  config:
+    shell_options:
+      nodb: ""
+      global_vars:
+        TestData:
+          setParameters:
+            featureFlagGetExecutorDeferredEngineChoice: true

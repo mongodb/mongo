@@ -2286,6 +2286,41 @@ tasks:
         vars:
           suite: query_get_exec_deferred_engine_choice_aggregation_passthrough
 
+  - <<: *gen_task_template
+    name: noPassthroughDeferredEngineChoice_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "common",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "incompatible_debug_mode",
+        "misc_js",
+        "requires_large_host",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: no_passthrough_deferred_engine_choice
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: noPassthroughWithMongodDeferredEngineChoice_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "common",
+        "misc_js",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: no_passthrough_with_mongod_deferred_engine_choice
+          use_large_distro: "true"
+
   ################################################
   #           Query Optimization tasks           #
   ################################################

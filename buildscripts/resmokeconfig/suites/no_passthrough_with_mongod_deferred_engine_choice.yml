@@ -1,0 +1,40 @@
+test_kind: js_test
+description: |
+  Temporary no_passthrough_with_mongod suite for deferred get_executor project.
+
+selector:
+  roots:
+    - jstests/noPassthroughWithMongod/**/*.js
+
+  exclude_files:
+    # TODO SERVER-121812 Investigate multiplan backup test failure in deferred get executor
+    - jstests/noPassthroughWithMongod/query/explain/explain_with_backup_plans.js
+
+    # TODO SERVER-122039 Investigate unknown failures
+    - jstests/noPassthroughWithMongod/query/plan_selection_no_results.js
+    - jstests/noPassthroughWithMongod/query/now_variable.js
+
+    # TODO SERVER-119606 call CBR in new get_executor
+    - jstests/noPassthroughWithMongod/query/plan_ranking/**/*.js
+    - jstests/noPassthroughWithMongod/query/cbr/**/*.js
+
+    # TODO SERVER-117566 implement plan cache in new get executor
+    - jstests/noPassthroughWithMongod/query/plan_cache_replanned_plan_is_cached_plan.js
+    - jstests/noPassthroughWithMongod/query/plan_cache_replanning.js
+    - jstests/noPassthroughWithMongod/query/sbe/sbe_index_count_scan_cache.js
+
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config: {}
+  hooks:
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 1
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagGetExecutorDeferredEngineChoice: true
