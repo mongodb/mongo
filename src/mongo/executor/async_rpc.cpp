@@ -30,12 +30,12 @@
 #include "mongo/executor/async_rpc.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/database_name_util.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/database_name_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"

@@ -41,6 +41,7 @@
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/database_name_util.h"
 #include "mongo/db/global_catalog/ddl/cluster_ddl.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -57,7 +58,6 @@
 #include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/database_name_util.h"
 #include "mongo/util/string_map.h"
 
 #include <set>

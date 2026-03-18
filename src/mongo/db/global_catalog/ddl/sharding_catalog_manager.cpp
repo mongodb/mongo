@@ -52,6 +52,7 @@
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/global_catalog/type_tags.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -95,7 +96,6 @@
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/log_and_backoff.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/scopeguard.h"
 

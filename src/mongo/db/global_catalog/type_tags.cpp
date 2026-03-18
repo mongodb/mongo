@@ -36,8 +36,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/global_catalog/type_chunk.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 
 #include <cstring>

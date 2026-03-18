@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/util/database_name_util.h"
+#include "mongo/db/database_name_util.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"

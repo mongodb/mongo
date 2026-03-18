@@ -30,6 +30,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
+#include "mongo/db/database_name_util.h"
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
@@ -44,7 +45,6 @@
 #include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/util/database_name_util.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {

@@ -41,6 +41,7 @@
 #include "mongo/db/global_catalog/ddl/shard_key_index_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_util.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/explain_options.h"
@@ -70,7 +71,6 @@
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/namespace_string_util.h"
 
 #include <memory>
 #include <string>

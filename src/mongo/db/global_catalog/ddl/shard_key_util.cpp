@@ -54,6 +54,7 @@
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/ddl/shard_key_index_util.h"
 #include "mongo/db/hasher.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/s/migration_destination_manager.h"
@@ -77,7 +78,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 

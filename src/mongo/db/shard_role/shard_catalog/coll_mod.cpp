@@ -44,6 +44,7 @@
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/index_key_validate.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/pipeline/change_stream_pre_and_post_images_options_gen.h"
 #include "mongo/db/profile_settings.h"
@@ -90,7 +91,6 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"

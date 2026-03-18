@@ -44,9 +44,11 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/database_name_util.h"
 #include "mongo/db/global_catalog/ddl/split_chunk.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/chunk_operation_precondition_checks.h"
 #include "mongo/db/service_context.h"
@@ -57,8 +59,6 @@
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/database_name_util.h"
-#include "mongo/util/namespace_string_util.h"
 
 #include <string>
 #include <utility>

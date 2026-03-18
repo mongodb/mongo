@@ -45,12 +45,12 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/namespace_string_util.h"
 
 #include <string>
 

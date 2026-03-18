@@ -35,10 +35,10 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/time_support.h"
 
 #include <mutex>

@@ -276,8 +276,6 @@ catalog_and_routing:
     - src/mongo/db/database_name[._]*
     - src/mongo/db/namespace_string[._]*
     - src/mongo/db/stats/system_buckets_metrics*
-    - src/mongo/util/namespace_string[._]*
-    - src/mongo/util/database_name[._]*
 
 catalog_and_routing.shard_role:
   meta:

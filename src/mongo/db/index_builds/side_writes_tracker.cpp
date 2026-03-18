@@ -42,6 +42,7 @@
 #include "mongo/db/index_builds/index_build_interceptor_gen.h"
 #include "mongo/db/index_builds/side_writes_tracker.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
@@ -59,7 +60,6 @@
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/timer.h"
 

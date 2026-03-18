@@ -33,6 +33,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/s/resharding/resharding_metrics_common.h"
 #include "mongo/db/s/resharding/resharding_metrics_field_names.h"
 #include "mongo/db/s/resharding/resharding_metrics_observer_impl.h"
@@ -43,7 +44,6 @@
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/namespace_string_util.h"
 
 #include <algorithm>
 #include <utility>

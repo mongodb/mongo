@@ -40,6 +40,7 @@
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/s/config/initial_split_policy.h"
@@ -52,7 +53,6 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>

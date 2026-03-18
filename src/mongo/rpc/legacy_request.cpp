@@ -33,9 +33,9 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

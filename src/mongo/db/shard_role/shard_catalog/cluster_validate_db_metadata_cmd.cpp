@@ -35,6 +35,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
@@ -49,7 +50,6 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/database_name_util.h"
 #include "mongo/util/decorable.h"
 
 #include <memory>

@@ -29,12 +29,12 @@
 
 #include "mongo/db/shard_role/shard_catalog/virtual_collection_impl.h"
 
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/virtual_collection/external_record_store.h"
 #include "mongo/db/shard_role/shard_catalog/collection_impl.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_impl.h"
-#include "mongo/util/namespace_string_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

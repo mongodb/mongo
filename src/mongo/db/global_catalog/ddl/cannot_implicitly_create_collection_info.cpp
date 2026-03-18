@@ -32,7 +32,7 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/util/namespace_string_util.h"
+#include "mongo/db/namespace_string_util.h"
 
 namespace mongo {
 namespace {

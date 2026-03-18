@@ -40,6 +40,7 @@
 #include "mongo/db/exec/classic/update_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/find_common.h"
@@ -57,7 +58,6 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
-#include "mongo/util/namespace_string_util.h"
 
 #include <cstddef>
 #include <memory>

@@ -38,9 +38,9 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/database_name_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/database_name_util.h"
 
 #include <vector>
 

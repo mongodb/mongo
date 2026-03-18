@@ -40,6 +40,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/global_catalog/type_shard_identity.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/member_state.h"
@@ -79,7 +80,6 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/uuid.h"
 
 #include <algorithm>

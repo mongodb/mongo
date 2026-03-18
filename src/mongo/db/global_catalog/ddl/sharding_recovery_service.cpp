@@ -38,6 +38,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -65,7 +66,6 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
-#include "mongo/util/namespace_string_util.h"
 
 #include <algorithm>
 #include <array>

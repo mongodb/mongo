@@ -36,6 +36,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/set_feature_compatibility_version_gen.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/database_name_util.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
@@ -46,7 +47,6 @@
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/database_name_util.h"
 #include "mongo/util/version/releases.h"
 
 #include <memory>

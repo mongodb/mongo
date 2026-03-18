@@ -32,9 +32,9 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/topology/remove_shard_draining_progress_gen.h"
 #include "mongo/util/modules.h"
-#include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
 

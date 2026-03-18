@@ -31,8 +31,8 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/namespace_string_util.h"
 
 #include <memory>
 #include <utility>

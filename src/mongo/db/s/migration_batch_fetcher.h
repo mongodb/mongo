@@ -34,6 +34,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/migration_batch_inserter.h"
 #include "mongo/db/s/migration_session_id.h"
@@ -45,7 +46,6 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/modules.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>

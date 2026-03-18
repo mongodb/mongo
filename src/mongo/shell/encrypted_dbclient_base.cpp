@@ -49,6 +49,7 @@
 #include "mongo/crypto/fle_data_frames.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/symmetric_crypto.h"
+#include "mongo/db/database_name_util.h"
 #include "mongo/db/matcher/schema/encrypt_schema_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
@@ -78,7 +79,6 @@
 #include "mongo/shell/kms_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
-#include "mongo/util/database_name_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
 

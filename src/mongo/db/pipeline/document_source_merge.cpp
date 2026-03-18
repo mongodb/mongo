@@ -33,6 +33,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source_merge_gen.h"
 #include "mongo/db/pipeline/document_source_merge_spec.h"
@@ -48,7 +49,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>

@@ -32,9 +32,9 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/validate/bson_utf8.h"
 #include "mongo/db/validate/validate_options.h"
-#include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
 

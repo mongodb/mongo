@@ -39,6 +39,7 @@
 #include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
 #include "mongo/db/global_catalog/type_shard_collection.h"
 #include "mongo/db/global_catalog/type_shard_identity.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/balancer_stats_registry.h"
@@ -64,7 +65,6 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/namespace_string_util.h"
 
 #include <memory>
 #include <utility>

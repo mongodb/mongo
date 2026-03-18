@@ -35,6 +35,7 @@
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
@@ -46,7 +47,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log_and_backoff.h"
-#include "mongo/util/namespace_string_util.h"
 
 #include <algorithm>
 #include <vector>

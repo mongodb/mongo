@@ -28,12 +28,12 @@
  */
 #pragma once
 
+#include "mongo/db/database_name_util.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/explain_utils.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
-#include "mongo/util/database_name_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 

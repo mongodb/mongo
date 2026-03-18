@@ -35,6 +35,7 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/client.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
@@ -45,7 +46,6 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/serialization_context.h"
 
 #include <vector>

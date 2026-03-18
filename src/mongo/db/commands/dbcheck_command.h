@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/repl/dbcheck/dbcheck.h"
 #include "mongo/db/repl/dbcheck/dbcheck_gen.h"
 #include "mongo/db/repl/dbcheck/dbcheck_idl.h"
@@ -37,7 +38,6 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/background.h"
 #include "mongo/util/modules.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

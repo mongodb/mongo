@@ -36,6 +36,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/database_name_util.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -44,7 +45,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 #include "mongo/util/bufreader.h"
-#include "mongo/util/database_name_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/str.h"

@@ -1317,6 +1317,7 @@ mongo_cc_library(
 mongo_cc_library(
     name = "server_base",
     srcs = [
+        "database_name_util.cpp",
         "feature_compatibility_version_parser.cpp",
         "feature_flag.cpp",
         "feature_flag_server_parameter.cpp",
@@ -1325,6 +1326,7 @@ mongo_cc_library(
         "index_names.cpp",
         "keypattern.cpp",
         "mirror_maestro_feature_flags_gen",
+        "namespace_string_util.cpp",
         "read_write_concern_provenance.cpp",
         "server_options.cpp",
         "shutdown_in_progress_quiesce_info.cpp",
@@ -1373,9 +1375,7 @@ mongo_cc_library(
         "//src/mongo/idl:generic_argument.cpp",
         "//src/mongo/idl:generic_argument_gen",
         "//src/mongo/rpc/metadata:audit_metadata_gen",
-        "//src/mongo/util:database_name_util.cpp",
         "//src/mongo/util:fail_point_server_parameter_gen",
-        "//src/mongo/util:namespace_string_util.cpp",
     ],
     deps = [
         ":cluster_role",
@@ -2937,8 +2937,8 @@ mongo_cc_unit_test(
 mongo_cc_unit_test(
     name = "server_base_test",
     srcs = [
-        "//src/mongo/util:database_name_util_test.cpp",
-        "//src/mongo/util:namespace_string_util_test.cpp",
+        "database_name_util_test.cpp",
+        "namespace_string_util_test.cpp",
     ],
     tags = ["mongo_unittest_sixth_group"],
     deps = [

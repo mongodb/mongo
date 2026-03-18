@@ -38,6 +38,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/database_name_util.h"
 #include "mongo/db/dbcommands_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
@@ -47,7 +48,6 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/database_name_util.h"
 #include "mongo/util/decorable.h"
 
 #include <string>

@@ -42,6 +42,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/database_name_util.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
@@ -63,7 +64,6 @@
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/database_name_util.h"
 #include "mongo/util/future_impl.h"
 
 #include <tuple>

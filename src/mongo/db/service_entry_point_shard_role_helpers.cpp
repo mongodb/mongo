@@ -29,13 +29,13 @@
 
 #include "mongo/db/service_entry_point_shard_role_helpers.h"
 
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/router_role/gossiped_routing_cache_gen.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/transaction/transaction_participant_gen.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/namespace_string_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

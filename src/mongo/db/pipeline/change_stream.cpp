@@ -30,8 +30,8 @@
 #include "mongo/db/pipeline/change_stream.h"
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/namespace_string_util.h"
 
 #include <iostream>
 

@@ -34,10 +34,10 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/database_name_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/database_name_util.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/string_map.h"
 

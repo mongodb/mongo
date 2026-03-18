@@ -43,6 +43,7 @@
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/global_catalog/type_collection_gen.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
@@ -58,7 +59,6 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
-#include "mongo/util/namespace_string_util.h"
 
 #include <memory>
 #include <string>

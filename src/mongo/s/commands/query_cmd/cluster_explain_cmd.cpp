@@ -34,6 +34,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/query_cmd/explain_cmd_helpers.h"
 #include "mongo/db/commands/query_cmd/explain_gen.h"
+#include "mongo/db/database_name_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"

@@ -43,6 +43,7 @@
 #include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
@@ -53,7 +54,6 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/out_of_line_executor.h"
 
 #include <memory>

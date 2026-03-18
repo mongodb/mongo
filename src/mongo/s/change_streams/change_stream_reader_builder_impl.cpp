@@ -30,7 +30,9 @@
 #include "mongo/s/change_streams/change_stream_reader_builder_impl.h"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/database_name_util.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/change_streams/all_databases_change_stream_shard_targeter_impl.h"
@@ -39,8 +41,6 @@
 #include "mongo/s/change_streams/database_change_stream_shard_targeter_impl.h"
 #include "mongo/s/change_streams/historical_placement_fetcher_impl.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/database_name_util.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/pcre_util.h"
 
 #include <fmt/format.h>

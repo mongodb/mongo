@@ -36,6 +36,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_insert_listener.h"
@@ -48,7 +49,6 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/time_support.h"
 

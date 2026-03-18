@@ -41,6 +41,7 @@
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/server_parameter_with_storage.h"
 #include "mongo/db/shard_role/ddl/create_gen.h"
@@ -58,7 +59,6 @@
 #include "mongo/rpc/unique_message.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"
-#include "mongo/util/namespace_string_util.h"
 
 #include <string>
 #include <tuple>

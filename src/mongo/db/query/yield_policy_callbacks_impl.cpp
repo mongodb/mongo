@@ -33,11 +33,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/time_support.h"
 
 #include <string>

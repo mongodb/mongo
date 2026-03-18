@@ -51,6 +51,7 @@
 #include "mongo/db/global_catalog/type_shard_database_gen.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_context_group.h"
@@ -79,7 +80,6 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/timer.h"
 

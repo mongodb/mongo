@@ -34,8 +34,6 @@ filegroup(
         "safe_num.h",
         "scoped_unlock.h",
         "serialization_context.h",
-        "//src/mongo/util:database_name_util.h",
-        "//src/mongo/util:namespace_string_util.h",
     ],
 )
 

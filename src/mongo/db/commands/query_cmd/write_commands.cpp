@@ -48,6 +48,7 @@
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/local_executor.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/variables.h"
@@ -90,7 +91,6 @@
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/str.h"
 

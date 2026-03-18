@@ -29,6 +29,7 @@
 
 #include "mongo/db/pipeline/lite_parsed_union_with.h"
 
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/document_source_documents.h"       // for kStageName in validation
 #include "mongo/db/pipeline/document_source_queue.h"           // for kStageName in validation
 #include "mongo/db/pipeline/document_source_union_with_gen.h"  // UnionWithSpec IDL
@@ -36,7 +37,6 @@
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 
 #include <iterator>

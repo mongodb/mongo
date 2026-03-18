@@ -42,6 +42,7 @@
 #include "mongo/db/extension/sdk/query_shape_opts_handle.h"
 #include "mongo/db/extension/sdk/tests/fruits_test_stage.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_documents.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
@@ -51,7 +52,6 @@
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/serialization_context.h"
 
 namespace mongo::extension {

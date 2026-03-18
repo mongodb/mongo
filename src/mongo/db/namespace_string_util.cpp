@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/util/namespace_string_util.h"
+#include "mongo/db/namespace_string_util.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"

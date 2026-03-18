@@ -29,9 +29,9 @@
 
 #include "mongo/db/shard_role/lock_manager/resource_catalog.h"
 
+#include "mongo/db/database_name_util.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/database_name_util.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/static_immortal.h"
 
 #include <mutex>

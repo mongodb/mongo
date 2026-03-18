@@ -42,7 +42,9 @@
 #include "mongo/db/auth/validated_tenancy_scope_factory.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/database_name_util.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
@@ -51,8 +53,6 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/database_name_util.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 
 #include <memory>

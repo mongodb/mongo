@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -42,7 +43,6 @@
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
-#include "mongo/util/namespace_string_util.h"
 
 #include <set>
 #include <utility>

@@ -42,6 +42,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog.h"
@@ -56,7 +57,6 @@
 #include "mongo/db/views/util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 
 #include <string>

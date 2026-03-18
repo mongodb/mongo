@@ -47,6 +47,7 @@
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/sasl_payload.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -55,7 +56,6 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/database_name_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 

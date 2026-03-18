@@ -36,6 +36,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/query/canonical_query.h"
@@ -57,7 +58,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 
 #include <algorithm>

@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/s/balancer_stats_registry.h"
@@ -57,7 +58,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 

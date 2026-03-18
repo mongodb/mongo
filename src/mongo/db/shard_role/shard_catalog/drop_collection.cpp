@@ -34,6 +34,7 @@
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -66,7 +67,6 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 
 #include <functional>

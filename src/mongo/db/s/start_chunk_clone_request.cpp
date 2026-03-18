@@ -36,8 +36,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/util/namespace_string_util.h"
 
 #include <string>
 #include <utility>

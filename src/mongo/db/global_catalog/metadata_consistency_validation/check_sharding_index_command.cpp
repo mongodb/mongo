@@ -38,13 +38,13 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/global_catalog/ddl/shard_key_index_util.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/util/namespace_string_util.h"
 
 #include <string>
 

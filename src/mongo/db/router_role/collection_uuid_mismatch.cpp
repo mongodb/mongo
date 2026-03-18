@@ -37,6 +37,7 @@
 #include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/client.h"
+#include "mongo/db/database_name_util.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/service_context.h"
@@ -48,7 +49,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/database_name_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 

@@ -34,8 +34,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/database_name_util.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/util/database_name_util.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>

@@ -37,6 +37,7 @@
 #include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_ast_util.h"
@@ -56,7 +57,6 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/namespace_string_util.h"
 
 #include <cstddef>
 #include <cstdint>

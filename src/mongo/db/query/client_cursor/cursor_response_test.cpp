@@ -34,12 +34,12 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/namespace_string_util.h"
 
 #include <boost/none.hpp>
 

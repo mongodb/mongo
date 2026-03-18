@@ -31,7 +31,7 @@
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/database_name.h"
-#include "mongo/util/database_name_util.h"
+#include "mongo/db/database_name_util.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"

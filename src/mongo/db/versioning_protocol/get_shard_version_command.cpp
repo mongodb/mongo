@@ -44,6 +44,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
@@ -56,7 +57,6 @@
 #include "mongo/db/versioning_protocol/catalog_cache_diagnostics_helpers.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/uuid.h"
 
 #include <string>
