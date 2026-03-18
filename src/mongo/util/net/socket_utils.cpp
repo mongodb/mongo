@@ -57,11 +57,11 @@
 
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/concurrency/value.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/quick_exit.h"
+#include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
 #include "mongo/util/winutil.h"
 
@@ -306,8 +306,6 @@ std::string hostbyname(const char* hostname) {
 
 //  --- my --
 
-DiagStr& _hostNameCached = *(new DiagStr);  // this is also written to from commands/cloud.cpp
-
 std::string getHostName() {
     char buf[256];
     int ec = gethostname(buf, 127);
@@ -321,12 +319,8 @@ std::string getHostName() {
 
 /** we store our host name once */
 std::string getHostNameCached() {
-    std::string temp = _hostNameCached.get();
-    if (_hostNameCached.empty()) {
-        temp = getHostName();
-        _hostNameCached = temp;
-    }
-    return temp;
+    static StaticImmortal name = getHostName();
+    return *name;
 }
 
 std::string prettyHostNameAndPort(int port) {
