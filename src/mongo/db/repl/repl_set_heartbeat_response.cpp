@@ -223,19 +223,20 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
                       str::stream() << "Response to replSetHeartbeat missing required \""
                                     << kConfigVersionFieldName << "\" field");
     }
-    if (configVersionElement.type() != NumberInt) {
+    if (configVersionElement.type() != NumberInt && configVersionElement.type() != NumberLong) {
         return Status(ErrorCodes::TypeMismatch,
                       str::stream() << "Expected \"" << kConfigVersionFieldName
                                     << "\" field in response to replSetHeartbeat to have "
-                                       "type NumberInt, but found "
+                                       "type NumberInt/NumberLong, but found "
                                     << typeName(configVersionElement.type()));
     }
-    _configVersion = configVersionElement.numberInt();
+    _configVersion = configVersionElement.numberLong();
 
     // Allow a missing term field for backward compatibility.
     const BSONElement configTermElement = doc[kConfigTermFieldName];
-    if (!configTermElement.eoo() && configVersionElement.type() == NumberInt) {
-        _configTerm = configTermElement.numberInt();
+    if (!configTermElement.eoo() &&
+        (configTermElement.type() == NumberInt || configTermElement.type() == NumberLong)) {
+        _configTerm = configTermElement.numberLong();
     }
 
     const BSONElement syncingToElement = doc[kSyncSourceFieldName];
