@@ -50,7 +50,7 @@ class MONGO_MOD_NEEDS_REPLACEMENT RouterUptimeReporter {
 
 public:
     RouterUptimeReporter() = default;
-    ~RouterUptimeReporter() = default;
+    ~RouterUptimeReporter();
 
     static RouterUptimeReporter& get(ServiceContext* serviceContext);
 

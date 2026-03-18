@@ -68,6 +68,24 @@
 namespace mongo {
 namespace {
 
+struct CV {
+    std::mutex mutex;
+    stdx::condition_variable cv;
+    bool intentionalWakeup{false};
+
+    bool waitFor(const Nanoseconds& time) {
+        std::unique_lock lk(mutex);
+        cv.wait_for(lk, std::chrono::nanoseconds(time.count()), [&] { return intentionalWakeup; });
+        return intentionalWakeup;
+    }
+
+    void notifyAll() {
+        std::lock_guard lk(mutex);
+        intentionalWakeup = true;
+        cv.notify_all();
+    }
+} destructionInitiated;
+
 MONGO_FAIL_POINT_DEFINE(disableShardingUptimeReporting);
 
 const auto getRouterUptimeReporter = ServiceContext::declareDecoration<RouterUptimeReporter>();
@@ -122,6 +140,13 @@ void reportStatus(OperationContext* opCtx,
 
 }  // namespace
 
+RouterUptimeReporter::~RouterUptimeReporter() {
+    destructionInitiated.notifyAll();
+    if (_thread.joinable()) {
+        _thread.join();
+    }
+}
+
 RouterUptimeReporter& RouterUptimeReporter::get(ServiceContext* serviceContext) {
     return getRouterUptimeReporter(serviceContext);
 }
@@ -166,7 +191,9 @@ void RouterUptimeReporter::startPeriodicThread(ServiceContext* serviceContext) {
             }
 
             MONGO_IDLE_THREAD_BLOCK;
-            sleepFor(kUptimeReportInterval);
+            if (destructionInitiated.waitFor(kUptimeReportInterval)) {
+                return;
+            }
         }
     });
 }
