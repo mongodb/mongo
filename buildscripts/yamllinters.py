@@ -3,6 +3,7 @@
 
 import os
 import runpy
+import shutil
 import subprocess
 import sys
 
@@ -45,9 +46,9 @@ def main():
     # Evaluate evergreen configs
     # Set up environment with extended PATH for evergreen command
     env = os.environ.copy()
-    home_dir = env.get("HOME", "")
 
-    evergreen_cmd_base = [f"{home_dir}/evergreen", "evaluate"]
+    evergreen_bin = shutil.which("evergreen") or os.path.join(env.get("HOME", ""), "evergreen")
+    evergreen_cmd_base = [evergreen_bin, "evaluate"]
 
     run_command(
         evergreen_cmd_base + ["etc/evergreen.yml"],
