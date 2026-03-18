@@ -605,7 +605,8 @@ def get_prod_pinned_source_ref(config_file: str) -> str:
 
 def get_prod_copybara_config_from_master(current_dir: str) -> str:
     source_config_file = os.path.join(current_dir, "copy.bara.sky")
-    source_ref = get_prod_pinned_source_ref(source_config_file)
+    #source_ref = get_prod_pinned_source_ref(source_config_file)
+    source_ref = "v8.2.6-hotfix-sync"
     run_command(
         f"git fetch origin refs/heads/{source_ref}:refs/remotes/origin/{source_ref}"
     )
