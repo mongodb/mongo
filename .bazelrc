@@ -675,3 +675,21 @@ try-import %workspace%/.bazelrc.fuzztest
 
 # Repository root absolute path to set --execution_log_compact_file
 #try-import %workspace%/.bazelrc.exec_log_file
+
+# ============================================================
+# macOS Cross-Compilation Configuration
+# ============================================================
+# To cross-compile for macOS from Linux, you need:
+# LLVM and the macOS SDK are automatically downloaded from S3.
+# To override with local paths, set LLVM_PATH and/or MACOS_SDK_PATH env vars.
+#
+# The toolchain is hermetic (LLVM tools + SDK placed into the repo),
+# so both local and remote execution work.
+#
+# Cross-compile for macOS arm64
+build:macos-cross-arm64 --platforms=//bazel/platforms:macos_arm64_cross
+build:macos-cross-arm64 --copt=-w
+
+# Cross-compile for macOS x86_64
+build:macos-cross-x86_64 --platforms=//bazel/platforms:macos_x86_64_cross
+build:macos-cross-x86_64 --copt=-w

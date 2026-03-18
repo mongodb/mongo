@@ -93,6 +93,25 @@ platform(
     ],
 )
 
+# Cross-compilation platforms for building macOS binaries on Linux
+# These use the same target constraints as native macOS but are intended
+# for use when building from a Linux host.
+platform(
+    name = "macos_arm64_cross",
+    constraint_values = [
+        "@platforms//cpu:arm64",
+        "@platforms//os:macos",
+    ],
+)
+
+platform(
+    name = "macos_x86_64_cross",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:macos",
+    ],
+)
+
 platform(
     name = "linux_ppc64le",
     constraint_values = [

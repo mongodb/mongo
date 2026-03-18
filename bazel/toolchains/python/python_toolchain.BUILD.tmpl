@@ -35,7 +35,10 @@ py_runtime_pair(
 toolchain(
     name = "python_toolchain",
     exec_compatible_with = [{constraints}],
-    target_compatible_with = [{constraints}],
+    # NOTE: Do NOT set target_compatible_with for Python toolchains.
+    # Python is used for exec (build-time) actions only, not for producing
+    # target artifacts. Setting target_compatible_with breaks cross-compilation
+    # because Bazel would try to find a Python that runs on the target platform.
     toolchain = ":py_runtime_pair",
     toolchain_type = "@rules_python//python:toolchain_type",
 )

@@ -1,14 +1,13 @@
 load("@//bazel/toolchains/cc/mongo_windows:mongo_windows_cc_toolchain_config.bzl", "mongo_windows_cc_toolchain_config")
 load("@//bazel/toolchains/cc:mongo_defines.bzl", "MONGO_GLOBAL_DEFINES")
+load(
+    "@//bazel/toolchains/cc:mongo_toolchain_selects.bzl",
+    "WARNINGS_AS_ERRORS_ENABLED",
+)
 
 SMALLER_BINARY = select({
     "@//bazel/config:msvc_opt": True,
     "//conditions:default": False,
-})
-
-WARNINGS_AS_ERRORS_ENABLED = select({
-    "@//bazel/config:warnings_as_errors_enabled": True,
-    "@//conditions:default": False,
 })
 
 OPT_DEBUG = select({

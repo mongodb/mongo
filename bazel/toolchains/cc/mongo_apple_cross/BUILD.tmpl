@@ -1,0 +1,143 @@
+"""Build file for macOS cross-compilation toolchain from Linux."""
+
+package(default_visibility = ["//visibility:public"])
+
+load(
+    "@//bazel/toolchains/cc/mongo_apple_cross:mongo_apple_cross_cc_toolchain_config.bzl",
+    "mongo_apple_cross_cc_toolchain_config",
+)
+load("@//bazel/toolchains/cc/mongo_apple_cross:mongo_apple_cross_toolchain.bzl", "get_supported_apple_cross_archs")
+load("@//bazel/toolchains/cc:mongo_defines.bzl", "MONGO_GLOBAL_DEFINES")
+load(
+    "@//bazel/toolchains/cc:mongo_custom_features.bzl",
+    "FEATURES_ATTR_NAMES",
+    "get_common_features_attrs",
+)
+load(
+    "@//bazel/toolchains/cc:mongo_toolchain_selects.bzl",
+    "COMPRESS_DEBUG_ENABLED",
+    "COVERAGE_ENABLED",
+    "DEBUG_LEVEL",
+    "INTERNAL_THIN_LTO_ENABLED",
+    "LINKSTATIC_ENABLED",
+    "WARNINGS_AS_ERRORS_ENABLED",
+)
+
+# Hermetic toolchain filegroups - these are the files Bazel ships to remote workers.
+# LLVM tools + headers + SDK are symlinked into this repo by the repository rule.
+
+filegroup(
+    name = "compiler_files",
+    srcs = glob([
+        "tools/clang",
+        "tools/clang++",
+        "tools/clang-*",
+        "include/**",
+        "sysroot/usr/include/**",
+        "sysroot/System/Library/Frameworks/**/*.h",
+        "sysroot/System/Library/Frameworks/**/*.modulemap",
+    ]),
+)
+
+filegroup(
+    name = "linker_files",
+    srcs = glob([
+        "tools/clang",
+        "tools/clang++",
+        "tools/ld.lld",
+        "tools/ld64.lld",
+        "tools/lld",
+        "sysroot/usr/lib/**",
+        "sysroot/System/Library/Frameworks/**/*.tbd",
+    ]),
+)
+
+filegroup(
+    name = "ar_files",
+    srcs = glob(["tools/llvm-ar"]),
+)
+
+filegroup(
+    name = "strip_files",
+    srcs = glob(["tools/llvm-strip"]),
+)
+
+filegroup(
+    name = "all_files",
+    srcs = [
+        ":ar_files",
+        ":compiler_files",
+        ":linker_files",
+        ":strip_files",
+    ] + glob([
+        "tools/llvm-*",
+    ]),
+)
+
+filegroup(
+    name = "empty",
+    srcs = [],
+)
+
+feature_attrs = get_common_features_attrs()
+
+# Generate cc_toolchain for each supported architecture
+[
+    cc_toolchain(
+        name = "cc-compiler-apple-cross-" + arch,
+        all_files = ":all_files",
+        ar_files = ":ar_files",
+        as_files = ":compiler_files",
+        compiler_files = ":compiler_files",
+        dwp_files = ":empty",
+        linker_files = ":linker_files",
+        objcopy_files = ":empty",
+        strip_files = ":strip_files",
+        supports_header_parsing = 1,
+        supports_param_files = 1,
+        toolchain_config = "cross_llvm_" + arch,
+        toolchain_identifier = "apple_cross_clang_toolchain_" + arch,
+    )
+    for arch, cpu in get_supported_apple_cross_archs().items()
+]
+
+# Generate toolchain configs for each architecture
+[
+    mongo_apple_cross_cc_toolchain_config(
+        name = "cross_llvm_" + arch,
+        cpu = cpu,
+        compiler = "clang",
+        toolchain_identifier = "apple_cross_clang_toolchain_" + arch,
+        target_libc = "macosx",
+        abi_version = arch,
+        abi_libc_version = arch,
+        llvm_version = "%{llvm_version}",
+        min_macos_version = "%{min_macos_version}",
+        execroot_prefix = "%{execroot_prefix}",
+        tool_paths = {
+            "ar": "tools/llvm-ar",
+            "cpp": "tools/clang-cpp",
+            "ld": "tools/ld.lld",
+            "dwp": "tools/llvm-dwp",
+            "gcc": "tools/clang",
+            "g++": "tools/clang++",
+            "gcov": "tools/llvm-profdata",
+            "llvm-cov": "tools/llvm-cov",
+            "llvm-profdata": "tools/llvm-profdata",
+            "nm": "tools/llvm-nm",
+            "objcopy": "tools/llvm-objcopy",
+            "objdump": "tools/llvm-objdump",
+            "strip": "tools/llvm-strip",
+        },
+        optimization_level = feature_attrs[FEATURES_ATTR_NAMES.OPT_LEVEL],
+        debug_level = DEBUG_LEVEL,
+        supports_start_end_lib = False,
+        internal_thin_lto_enabled = INTERNAL_THIN_LTO_ENABLED,
+        coverage_enabled = COVERAGE_ENABLED,
+        compress_debug_enabled = COMPRESS_DEBUG_ENABLED,
+        warnings_as_errors_enabled = WARNINGS_AS_ERRORS_ENABLED,
+        linkstatic = LINKSTATIC_ENABLED,
+        global_defines = MONGO_GLOBAL_DEFINES,
+    )
+    for arch, cpu in get_supported_apple_cross_archs().items()
+]

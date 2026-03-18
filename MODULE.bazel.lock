@@ -491,6 +491,34 @@
         ]
       }
     },
+    "//bazel/toolchains/cc/mongo_apple_cross:mongo_apple_cross_toolchain.bzl%setup_mongo_apple_cross_toolchain_extension": {
+      "general": {
+        "bzlTransitiveDigest": "oskcsYFrmneRRo1v+AhRS4kSzDQ2d421jHvWL0A1SRA=",
+        "usagesDigest": "EVkQddf0MbwFmuJ26u4/NZd4P4Z0AhChzItbpAItozs=",
+        "recordedFileInputs": {},
+        "recordedDirentsInputs": {},
+        "envVariables": {},
+        "generatedRepoSpecs": {
+          "mongo_apple_cross_toolchain": {
+            "bzlFile": "@@//bazel/toolchains/cc/mongo_apple_cross:mongo_apple_cross_toolchain.bzl",
+            "ruleClassName": "mongo_apple_cross_toolchain_config",
+            "attributes": {}
+          },
+          "mongo_apple_cross_toolchain_files": {
+            "bzlFile": "@@//bazel/toolchains/cc/mongo_apple_cross:mongo_apple_cross_toolchain.bzl",
+            "ruleClassName": "mongo_apple_cross_toolchain_files_config",
+            "attributes": {}
+          }
+        },
+        "recordedRepoMappingEntries": [
+          [
+            "",
+            "build_bazel_apple_support",
+            "apple_support~"
+          ]
+        ]
+      }
+    },
     "//bazel/toolchains/cc/mongo_windows:mongo_toolchain.bzl%setup_mongo_windows_toolchain_extension": {
       "general": {
         "bzlTransitiveDigest": "dHLyfzMhaUTIIP7LsjQxVGJHz6n+z1RfQNYH+/O+1Iw=",

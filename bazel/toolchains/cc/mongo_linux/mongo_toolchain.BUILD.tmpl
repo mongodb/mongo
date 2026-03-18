@@ -12,7 +12,8 @@ load("@mongo_toolchain_{version}//:mongo_toolchain_flags.bzl",
 load(
     "@//bazel/toolchains/cc:mongo_custom_features.bzl",
     "FEATURES_ATTR_NAMES",
-    "get_common_features_attrs")
+    "get_common_features_attrs",
+)
 load(
     "@//bazel/toolchains/cc:mongo_errors.bzl",
     "REQUIRED_SETTINGS_SANITIZER_ERROR_MESSAGE",
@@ -20,6 +21,15 @@ load(
     "THREAD_SANITIZER_ERROR_MESSAGE",
 )
 load("@//bazel/toolchains/cc:mongo_defines.bzl", "MONGO_GLOBAL_DEFINES")
+load(
+    "@//bazel/toolchains/cc:mongo_toolchain_selects.bzl",
+    "COMPRESS_DEBUG_ENABLED",
+    "COVERAGE_ENABLED",
+    "DEBUG_LEVEL",
+    "INTERNAL_THIN_LTO_ENABLED",
+    "LINKSTATIC_ENABLED",
+    "WARNINGS_AS_ERRORS_ENABLED",
+)
 
 package(default_visibility = ["//visibility:public"])
 
@@ -64,11 +74,6 @@ CHOSEN_LINKER = select(
     }
 )
 
-LINKSTATIC_ENABLED = select({
-    "@//bazel/config:linkstatic_enabled": True,
-    "@//conditions:default": False,
-})
-
 SHARED_ARCHIVE_ENABLED = select({
     "@//bazel/config:shared_archive_enabled": True,
     "@//conditions:default": False,
@@ -83,13 +88,6 @@ DWARF_VERSION = select({
 FISSION_ENABLED = select({
     "@//bazel/config:fission_enabled": True,
     "@//conditions:default": False,
-})
-
-DEBUG_LEVEL = select({
-    "@//bazel/config:gcc_or_clang_dbg_level_0": 0,
-    "@//bazel/config:gcc_or_clang_dbg_level_1": 1,
-    "@//bazel/config:gcc_or_clang_dbg_level_2": 2,
-    "@//bazel/config:gcc_or_clang_dbg_level_3": 3,
 })
 
 DISABLE_DEBUG_SYMBOLS = select({
@@ -186,26 +184,6 @@ IS_S390X = select({
 
 IS_X86_64 = select({
     "@//bazel/config:linux_x86_64": True,
-    "@//conditions:default": False,
-})
-
-INTERNAL_THIN_LTO_ENABLED = select({
-    "@//bazel/config:thin_lto_enabled": True,
-    "@//conditions:default": False,
-})
-
-COVERAGE_ENABLED = select({
-    "@//bazel/config:gcov_enabled": True,
-    "@//conditions:default": False,
-})
-
-COMPRESS_DEBUG_ENABLED = select({
-    "@//bazel/config:compress_debug_compile_enabled": True,
-    "@//conditions:default": False,
-})
-
-WARNINGS_AS_ERRORS_ENABLED = select({
-    "@//bazel/config:warnings_as_errors_enabled": True,
     "@//conditions:default": False,
 })
 

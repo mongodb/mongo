@@ -267,6 +267,14 @@ register_toolchains(
     "@mongo_apple_toolchain//...",
 )
 
+# Cross-compilation toolchain for building macOS binaries on Linux
+setup_mongo_apple_cross_toolchains_extension = use_extension("//bazel/toolchains/cc/mongo_apple_cross:mongo_apple_cross_toolchain.bzl", "setup_mongo_apple_cross_toolchain_extension")
+use_repo(setup_mongo_apple_cross_toolchains_extension, "mongo_apple_cross_toolchain", "mongo_apple_cross_toolchain_files")
+
+register_toolchains(
+    "@mongo_apple_cross_toolchain//...",
+)
+
 setup_mongo_python_toolchains = use_extension("//bazel:bzlmod.bzl", "setup_mongo_python_toolchains")
 use_repo(
     setup_mongo_python_toolchains,

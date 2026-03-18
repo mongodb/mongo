@@ -17,7 +17,22 @@ ICU4C_DEFINES = [
     "U_USING_ICU_NAMESPACE=0",
 ]
 
-ICU4C_COPTS = select({
+# On macOS (native or cross-compiled), the SDK includes system ICU headers
+# under /usr/include/unicode/ that can shadow our bundled ICU 57.1 headers.
+# We add explicit -I flags to ensure the bundled headers are found first.
+# The -iquote flag ensures quoted includes like "unicode/localpointer.h"
+# search our bundled directory before the system include paths.
+ICU4C_MACOS_INCLUDE_COPTS = select({
+    "@platforms//os:macos": [
+        "-iquote",
+        "src/third_party/icu4c-57.1/source/common",
+        "-iquote",
+        "src/third_party/icu4c-57.1/source/i18n",
+    ],
+    "//conditions:default": [],
+})
+
+ICU4C_COPTS = ICU4C_MACOS_INCLUDE_COPTS + select({
     "//bazel/config:gcc_or_clang": [
         # TODO: Omit this flag when a resolution for cxxopts vs copts issue is achieved.
         "-w",
