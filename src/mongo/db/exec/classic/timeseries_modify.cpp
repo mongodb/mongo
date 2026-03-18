@@ -629,8 +629,12 @@ PlanStage::StageState TimeseriesModifyStage::_getNextBucket(WorkingSetID& id) {
         expCtx(),
         "TimeseriesModifyStage:: ensureStillMatches",
         [&] {
-            docStillMatches = write_stage_common::ensureStillMatches(
-                collectionPtr(), opCtx(), _ws, id, _params.canonicalQuery);
+            docStillMatches = write_stage_common::ensureStillMatches(collectionPtr(),
+                                                                     opCtx(),
+                                                                     _ws,
+                                                                     id,
+                                                                     _params.canonicalQuery,
+                                                                     _specificStats.docsFetched);
             return PlanStage::NEED_TIME;
         },
         [&] {

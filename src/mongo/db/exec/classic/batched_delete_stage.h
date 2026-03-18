@@ -177,6 +177,8 @@ private:
     void _prepareToRetryDrainAfterYield(WorkingSetID* out,
                                         const std::set<WorkingSetID>& recordsThatNoLongerMatch);
 
+    bool _ensureStillMatchesAndUpdateStats(WorkingSetID id);
+
     BatchedDeleteStats _specificStats;
 
     // Returns true if one or more of the batch targets are met and it is time to delete the batch.

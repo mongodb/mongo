@@ -440,6 +440,9 @@ struct MONGO_MOD_NEEDS_REPLACEMENT DeleteStats : public SpecificStats {
 
     size_t docsDeleted = 0u;
     size_t bytesDeleted = 0u;
+
+    // The number of documents fetched by write_stage_common::ensureStillMatches.
+    size_t docsFetched = 0;
 };
 
 /**
@@ -1021,6 +1024,9 @@ struct UpdateStats : public SpecificStats {
 
     // The object that was inserted. This is an empty document if no insert was performed.
     BSONObj objInserted;
+
+    // The number of documents fetched by write_stage_common::ensureStillMatches.
+    size_t docsFetched = 0;
 };
 
 struct TextMatchStats : public SpecificStats {
@@ -1292,6 +1298,9 @@ struct TimeseriesModifyStats final : public SpecificStats {
 
     // True iff this is a $mod update.
     bool isModUpdate;
+
+    // The number of documents fetched by write_stage_common::ensureStillMatches.
+    size_t docsFetched = 0;
 };
 
 struct SampleFromTimeseriesBucketStats final : public SpecificStats {

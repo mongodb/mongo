@@ -197,6 +197,15 @@ size_t getDocsExamined(StageType type, const SpecificStats* specific) {
         // the 'docsExamined' value.
         const DistinctScanStats* spec = static_cast<const DistinctScanStats*>(specific);
         return spec->docsExamined;
+    } else if (STAGE_DELETE == type || STAGE_BATCHED_DELETE == type) {
+        const DeleteStats* spec = static_cast<const DeleteStats*>(specific);
+        return spec->docsFetched;
+    } else if (STAGE_UPDATE == type) {
+        const UpdateStats* spec = static_cast<const UpdateStats*>(specific);
+        return spec->docsFetched;
+    } else if (STAGE_TIMESERIES_MODIFY == type) {
+        const TimeseriesModifyStats* spec = static_cast<const TimeseriesModifyStats*>(specific);
+        return spec->docsFetched;
     }
 
     return 0;

@@ -132,21 +132,6 @@ struct BatchedDeletesSSS : ServerStatusSection {
 auto& batchedDeletesSSS =
     *ServerStatusSectionBuilder<BatchedDeletesSSS>("batchedDeletes").forShard();
 
-// Wrapper for write_stage_common::ensureStillMatches() which also updates the 'refetchesDueToYield'
-// serverStatus metric. As with ensureStillMatches, if false is returned, the WorkingSetMember
-// referenced by 'id' is no longer valid, and must not be used except for freeing the WSM.
-bool ensureStillMatchesAndUpdateStats(const CollectionPtr& collection,
-                                      OperationContext* opCtx,
-                                      WorkingSet* ws,
-                                      WorkingSetID id,
-                                      const CanonicalQuery* cq) {
-    WorkingSetMember* member = ws->get(id);
-    if (shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId() != member->doc.snapshotId()) {
-        incrementSSSMetricNoOverflow(batchedDeletesSSS.refetchesDueToYield, 1);
-    }
-    return write_stage_common::ensureStillMatches(collection, opCtx, ws, id, cq);
-}
-
 BatchedDeleteStage::BatchedDeleteStage(
     ExpressionContext* expCtx,
     DeleteStageParams params,
@@ -382,8 +367,7 @@ long long BatchedDeleteStage::_commitBatch(WorkingSetID* out,
             const PreWriteFilter::Action action = [&]() {
                 // The PlanExecutor YieldPolicy may change snapshots between calls to 'doWork()'.
                 // Different documents may have different snapshots.
-                const bool docStillMatches = ensureStillMatchesAndUpdateStats(
-                    collectionPtr(), opCtx(), _ws, workingSetMemberID, _params.canonicalQuery);
+                const bool docStillMatches = _ensureStillMatchesAndUpdateStats(workingSetMemberID);
 
                 // Warning: if docStillMatches is false, the WSM's underlying Document/BSONObj is no
                 // longer valid.
@@ -471,6 +455,19 @@ long long BatchedDeleteStage::_commitBatch(WorkingSetID* out,
     wuow.commit();
     return batchTimer.millis();
 }
+
+// Wrapper for write_stage_common::ensureStillMatches() which also updates the 'refetchesDueToYield'
+// serverStatus metric. As with ensureStillMatches, if false is returned, the WorkingSetMember
+// referenced by 'id' is no longer valid, and must not be used except for freeing the WSM.
+bool BatchedDeleteStage::_ensureStillMatchesAndUpdateStats(WorkingSetID id) {
+    WorkingSetMember* member = _ws->get(id);
+    if (shard_role_details::getRecoveryUnit(opCtx())->getSnapshotId() != member->doc.snapshotId()) {
+        incrementSSSMetricNoOverflow(batchedDeletesSSS.refetchesDueToYield, 1);
+    }
+    return write_stage_common::ensureStillMatches(
+        collectionPtr(), opCtx(), _ws, id, _params.canonicalQuery, _specificStats.docsFetched);
+}
+
 
 PlanStage::StageState BatchedDeleteStage::_doStaging(WorkingSetID* idToReturn) {
     auto status = child()->work(idToReturn);

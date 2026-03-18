@@ -171,12 +171,15 @@ private:
  *
  * May throw a WriteConflictException if there was a conflict while searching to see if the document
  * still exists.
+ *
+ * If the fetch is successful, increments docsFetchedCounter by 1.
  */
 bool ensureStillMatches(const CollectionPtr& collection,
                         OperationContext* opCtx,
                         WorkingSet* ws,
                         WorkingSetID id,
-                        const CanonicalQuery* cq);
+                        const CanonicalQuery* cq,
+                        size_t& docsFetchedCounter);
 
 /**
  * Returns true if we are running retryable write or retryable internal multi-document transaction.

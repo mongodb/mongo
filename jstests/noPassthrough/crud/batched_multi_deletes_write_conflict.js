@@ -56,9 +56,11 @@ const profileObj = getLatestProfilerEntry(testDB, {"command.comment": commentID}
 assert(profileObj.writeConflicts);
 jsTest.log(`The batched delete encountered ${profileObj.writeConflicts} writeConflicts`);
 
-assert.eq(profileObj.execStats.stage, "BATCHED_DELETE");
-assert.eq(collCount, profileObj.docsExamined);
-assert.eq(collCount, profileObj.ndeleted);
+assert.eq(profileObj.execStats.stage, "BATCHED_DELETE", profileObj);
+assert.eq(collCount, profileObj.keysExamined, profileObj);
+// On yield, batch delete stage must again fetch documents in the current batch to check if they still match the predicate.
+assert.lte(collCount + profileObj.writeConflicts, profileObj.docsExamined, profileObj);
+assert.eq(collCount, profileObj.ndeleted, profileObj);
 
 assert.eq(0, coll.find().itcount());
 

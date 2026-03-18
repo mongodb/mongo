@@ -118,7 +118,8 @@ function testMetaFieldUpdateRecordedOnMongos(testDB, coll, collName) {
 
     assertAggregatedMetricsSingleExec(entry, {
         keysExamined: 2,
-        docsExamined: 2,
+        // Extra documents are examined due to write_stage_common::ensureStillMatches
+        docsExamined: 4,
         hasSortStage: false,
         usedDisk: false,
         fromMultiPlanner: false,

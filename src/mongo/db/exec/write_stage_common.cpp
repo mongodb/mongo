@@ -143,7 +143,8 @@ bool ensureStillMatches(const CollectionPtr& collection,
                         OperationContext* opCtx,
                         WorkingSet* ws,
                         WorkingSetID id,
-                        const CanonicalQuery* cq) {
+                        const CanonicalQuery* cq,
+                        size_t& docsFetchedCounter) {
     // If the snapshot changed, then we have to make sure we have the latest copy of the doc and
     // that it still matches.
     WorkingSetMember* member = ws->get(id);
@@ -154,6 +155,7 @@ bool ensureStillMatches(const CollectionPtr& collection,
             // Doc is already deleted.
             return false;
         }
+        ++docsFetchedCounter;
 
         // Make sure the re-fetched doc still matches the predicate.
         if (cq &&

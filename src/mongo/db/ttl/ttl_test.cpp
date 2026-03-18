@@ -465,8 +465,10 @@ TEST_F(TTLTest, TTLPassSingleCollectionMultipleDeletes) {
     ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments + docCount);
     ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys + docCount);
 
-    // The query planner only reports docs/keys examined to find documents to delete.
-    ASSERT_EQ(getTTLExaminedDocuments(), initTTLExaminedDocuments + docCount);
+    // The query planner can report more docs examined in case of write conflict retries or when
+    // checking if document still matches after yielding.
+    ASSERT_GTE(getTTLExaminedDocuments(), initTTLExaminedDocuments + docCount);
+    ASSERT_LTE(getTTLExaminedDocuments(), initTTLExaminedDocuments + 2 * docCount);
     ASSERT_EQ(getTTLExaminedKeys(), initTTLExaminedKeys + docCount);
 }
 

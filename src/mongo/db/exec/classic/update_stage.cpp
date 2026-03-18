@@ -227,8 +227,13 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
             expCtx(),
             "UpdateStage ensureStillMatches",
             [&] {
-                docStillMatches = write_stage_common::ensureStillMatches(
-                    collectionPtr(), opCtx(), _ws, id, _params.canonicalQuery);
+                docStillMatches =
+                    write_stage_common::ensureStillMatches(collectionPtr(),
+                                                           opCtx(),
+                                                           _ws,
+                                                           id,
+                                                           _params.canonicalQuery,
+                                                           _specificStats.docsFetched);
                 return PlanStage::NEED_TIME;
             },
             [&] {
