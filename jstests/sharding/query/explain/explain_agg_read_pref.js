@@ -1,5 +1,6 @@
 /**
  * Tests that readPref applies on an explain for an aggregation command.
+ * @tags: [requires_profiling]
  */
 import {profilerHasAtLeastOneMatchingEntryOrThrow} from "jstests/libs/profiler.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
