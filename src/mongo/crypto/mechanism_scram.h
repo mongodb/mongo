@@ -208,7 +208,7 @@ public:
         (*_ptr)->storedKey = uassertStatusOK(HashBlock::fromBuffer(
             reinterpret_cast<const unsigned char*>(stored.data()), stored.size()));
         (*_ptr)->serverKey = uassertStatusOK(HashBlock::fromBuffer(
-            reinterpret_cast<const unsigned char*>(server.data()), stored.size()));
+            reinterpret_cast<const unsigned char*>(server.data()), server.size()));
     }
 
     Secrets(const HashBlock& saltedPassword) : _ptr(std::make_shared<MemoryPolicy<HashBlock>>()) {
