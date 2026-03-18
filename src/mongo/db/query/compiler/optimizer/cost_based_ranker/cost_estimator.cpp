@@ -372,9 +372,9 @@ CostEstimate CostEstimator::filterCost(StageType stage,
     return filterIncrement * ce + incrementalFilterLeafCost * (numIncrementalFilterLeaves * ce);
 }
 
-const CostCoefficient CostEstimator::fetchFilterIncrement = makeCostCoefficient(435.38ns);
-const CostCoefficient CostEstimator::indexFilterIncrement = makeCostCoefficient(132.60ns);
-const CostCoefficient CostEstimator::collScanFilterIncrement = makeCostCoefficient(202.32ns);
+const CostCoefficient CostEstimator::fetchFilterIncrement = makeCostCoefficient(nsec(435.38));
+const CostCoefficient CostEstimator::indexFilterIncrement = makeCostCoefficient(nsec(132.60));
+const CostCoefficient CostEstimator::collScanFilterIncrement = makeCostCoefficient(nsec(202.32));
 
 // TODO(SERVER-114546): Use the calibrated coefficients once we estimate the number of
 // filter leaf evaluations.
@@ -382,56 +382,57 @@ const CostCoefficient CostEstimator::incrementalFetchFilterLeafCost = minCC;
 const CostCoefficient CostEstimator::incrementalIndexFilterLeafCost = minCC;
 const CostCoefficient CostEstimator::incrementalCollScanFilterLeafCost = minCC;
 
-const CostCoefficient CostEstimator::collScanForwardIncrement = makeCostCoefficient(399.23ns);
-const CostCoefficient CostEstimator::collScanBackwardIncrement = makeCostCoefficient(404.0ns);
+const CostCoefficient CostEstimator::collScanForwardIncrement = makeCostCoefficient(nsec(399.23));
+const CostCoefficient CostEstimator::collScanBackwardIncrement = makeCostCoefficient(nsec(404.0));
 
-const CostCoefficient CostEstimator::indexScanForwardExamineKey = makeCostCoefficient(435.55ns);
-const CostCoefficient CostEstimator::indexScanBackwardExamineKey = makeCostCoefficient(459.68ns);
-const CostCoefficient CostEstimator::incrementalFieldCost = makeCostCoefficient(51.25ns);
-const CostCoefficient CostEstimator::indexForwardSeek = makeCostCoefficient(1134.71ns);
-const CostCoefficient CostEstimator::indexBackwardSeek = makeCostCoefficient(1211.58ns);
+const CostCoefficient CostEstimator::indexScanForwardExamineKey = makeCostCoefficient(nsec(435.55));
+const CostCoefficient CostEstimator::indexScanBackwardExamineKey =
+    makeCostCoefficient(nsec(459.68));
+const CostCoefficient CostEstimator::incrementalFieldCost = makeCostCoefficient(nsec(51.25));
+const CostCoefficient CostEstimator::indexForwardSeek = makeCostCoefficient(nsec(1134.71));
+const CostCoefficient CostEstimator::indexBackwardSeek = makeCostCoefficient(nsec(1211.58));
 
-const CostCoefficient CostEstimator::fetchIncrement = makeCostCoefficient(1232.20ns);
+const CostCoefficient CostEstimator::fetchIncrement = makeCostCoefficient(nsec(1232.20));
 
-const CostCoefficient CostEstimator::andHashBuild = makeCostCoefficient(216.05ns);
-const CostCoefficient CostEstimator::andHashProbe = makeCostCoefficient(180.35ns);
-const CostCoefficient CostEstimator::andHashOutput = makeCostCoefficient(281.46ns);
+const CostCoefficient CostEstimator::andHashBuild = makeCostCoefficient(nsec(216.05));
+const CostCoefficient CostEstimator::andHashProbe = makeCostCoefficient(nsec(180.35));
+const CostCoefficient CostEstimator::andHashOutput = makeCostCoefficient(nsec(281.46));
 
-const CostCoefficient CostEstimator::sortDefaultStartup = makeCostCoefficient(24067.01ns);
-const CostCoefficient CostEstimator::sortDefaultIncrement = makeCostCoefficient(216.73ns);
-const CostCoefficient CostEstimator::sortDefaultSpillIncrement = makeCostCoefficient(653.83ns);
-const CostCoefficient CostEstimator::sortDefaultLimitStartup = makeCostCoefficient(23761.57ns);
-const CostCoefficient CostEstimator::sortDefaultLimitC1 = makeCostCoefficient(764.58ns);
-const CostCoefficient CostEstimator::sortDefaultLimitC2 = makeCostCoefficient(15.81ns);
-const CostCoefficient CostEstimator::sortDefaultLimitC3 = makeCostCoefficient(233.36ns);
+const CostCoefficient CostEstimator::sortDefaultStartup = makeCostCoefficient(nsec(24067.01));
+const CostCoefficient CostEstimator::sortDefaultIncrement = makeCostCoefficient(nsec(216.73));
+const CostCoefficient CostEstimator::sortDefaultSpillIncrement = makeCostCoefficient(nsec(653.83));
+const CostCoefficient CostEstimator::sortDefaultLimitStartup = makeCostCoefficient(nsec(23761.57));
+const CostCoefficient CostEstimator::sortDefaultLimitC1 = makeCostCoefficient(nsec(764.58));
+const CostCoefficient CostEstimator::sortDefaultLimitC2 = makeCostCoefficient(nsec(15.81));
+const CostCoefficient CostEstimator::sortDefaultLimitC3 = makeCostCoefficient(nsec(233.36));
 
-const CostCoefficient CostEstimator::sortSimpleStartup = makeCostCoefficient(22324.54ns);
-const CostCoefficient CostEstimator::sortSimpleIncrement = makeCostCoefficient(163.56ns);
-const CostCoefficient CostEstimator::sortSimpleSpillIncrement = makeCostCoefficient(297.03ns);
-const CostCoefficient CostEstimator::sortSimpleLimitStartup = makeCostCoefficient(21813.35ns);
-const CostCoefficient CostEstimator::sortSimpleLimitC1 = makeCostCoefficient(739.81ns);
-const CostCoefficient CostEstimator::sortSimpleLimitC2 = makeCostCoefficient(11.67ns);
-const CostCoefficient CostEstimator::sortSimpleLimitC3 = makeCostCoefficient(164.50ns);
+const CostCoefficient CostEstimator::sortSimpleStartup = makeCostCoefficient(nsec(22324.54));
+const CostCoefficient CostEstimator::sortSimpleIncrement = makeCostCoefficient(nsec(163.56));
+const CostCoefficient CostEstimator::sortSimpleSpillIncrement = makeCostCoefficient(nsec(297.03));
+const CostCoefficient CostEstimator::sortSimpleLimitStartup = makeCostCoefficient(nsec(21813.35));
+const CostCoefficient CostEstimator::sortSimpleLimitC1 = makeCostCoefficient(nsec(739.81));
+const CostCoefficient CostEstimator::sortSimpleLimitC2 = makeCostCoefficient(nsec(11.67));
+const CostCoefficient CostEstimator::sortSimpleLimitC3 = makeCostCoefficient(nsec(164.50));
 
-const CostCoefficient CostEstimator::sortedMergeInput = makeCostCoefficient(481.48ns);
-const CostCoefficient CostEstimator::sortedMergeOutput = makeCostCoefficient(254.03ns);
+const CostCoefficient CostEstimator::sortedMergeInput = makeCostCoefficient(nsec(481.48));
+const CostCoefficient CostEstimator::sortedMergeOutput = makeCostCoefficient(nsec(254.03));
 
-const CostCoefficient CostEstimator::simpleProjectionIncrement = makeCostCoefficient(317.60ns);
-const CostCoefficient CostEstimator::coveredProjectionIncrement = makeCostCoefficient(216.77ns);
-const CostCoefficient CostEstimator::defaultProjectionIncrement = makeCostCoefficient(768.21ns);
+const CostCoefficient CostEstimator::simpleProjectionIncrement = makeCostCoefficient(nsec(317.60));
+const CostCoefficient CostEstimator::coveredProjectionIncrement = makeCostCoefficient(nsec(216.77));
+const CostCoefficient CostEstimator::defaultProjectionIncrement = makeCostCoefficient(nsec(768.21));
 
-const CostCoefficient CostEstimator::limitIncrement = makeCostCoefficient(109.50ns);
+const CostCoefficient CostEstimator::limitIncrement = makeCostCoefficient(nsec(109.50));
 
-const CostCoefficient CostEstimator::skipIncrement = makeCostCoefficient(127.41ns);
-const CostCoefficient CostEstimator::passIncrement = makeCostCoefficient(113.94ns);
+const CostCoefficient CostEstimator::skipIncrement = makeCostCoefficient(nsec(127.41));
+const CostCoefficient CostEstimator::passIncrement = makeCostCoefficient(nsec(113.94));
 
-const CostCoefficient CostEstimator::orIncrement = makeCostCoefficient(211.52ns);
+const CostCoefficient CostEstimator::orIncrement = makeCostCoefficient(nsec(211.52));
 
-const CostCoefficient CostEstimator::andSortedInput = makeCostCoefficient(183.34ns);
-const CostCoefficient CostEstimator::andSortedOutput = makeCostCoefficient(362.22ns);
+const CostCoefficient CostEstimator::andSortedInput = makeCostCoefficient(nsec(183.34));
+const CostCoefficient CostEstimator::andSortedOutput = makeCostCoefficient(nsec(362.22));
 
 // Virtual scan costs are not calibrated.
-const CostCoefficient CostEstimator::virtScanStartup = makeCostCoefficient(200.0ns);
-const CostCoefficient CostEstimator::virtScanIncrement = makeCostCoefficient(100.3ns);
+const CostCoefficient CostEstimator::virtScanStartup = makeCostCoefficient(nsec(200.0));
+const CostCoefficient CostEstimator::virtScanIncrement = makeCostCoefficient(nsec(100.3));
 
 }  // namespace mongo::cost_based_ranker

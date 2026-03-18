@@ -44,7 +44,12 @@
 
 namespace mongo::cost_based_ranker {
 
-using std::literals::chrono_literals::operator""ns;
+/**
+ * We're using the `nsec(123.45)` constructor to avoid `""ns`,
+ * because floating point UDLs are not constexpr on PPC,
+ * due to a gcc bug handling `long double`.
+ */
+using nsec = std::chrono::duration<double, std::nano>;
 
 template <typename Rep, typename Period>
 constexpr double toDoubleMillis(std::chrono::duration<Rep, Period> d) {
@@ -141,10 +146,10 @@ struct CostCoefficientTagParam {
     // The smallest cost coefficient is equal to the cost of the fastest QE
     // operation. This is typically the cost of a simple binary comparison of a
     // scalar value.
-    static constexpr double kMin = toDoubleMillis(11.67ns);
+    static constexpr double kMin = toDoubleMillis(nsec(11.67));
     // The maximum value of a cost coefficient is the most expensive operation per
     // document according to the cost model.
-    static constexpr double kMax = toDoubleMillis(1e6ns);
+    static constexpr double kMax = toDoubleMillis(nsec(1e6));
     // TODO (SERVER-94981): Define this value based on cost model sensitivity.
     static constexpr double kEpsilon = 1.0e-5;
 };

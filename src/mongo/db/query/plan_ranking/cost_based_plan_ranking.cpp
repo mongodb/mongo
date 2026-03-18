@@ -53,8 +53,8 @@ CostEstimate estimateCBRCost(const CanonicalQuery& query,
     auto sampleSize = ce::SamplingEstimatorImpl::calculateSampleSize(
         qkc.getConfidenceInterval(), qkc.getSamplingMarginOfError());
 
-    const auto randomSampleInc = makeCostCoefficient(1400ns);
-    const auto matchExprInc = makeCostCoefficient(160ns);
+    const auto randomSampleInc = makeCostCoefficient(nsec(1400));
+    const auto matchExprInc = makeCostCoefficient(nsec(160));
     const CardinalityEstimate sampleCE{CardinalityType{static_cast<double>(sampleSize)},
                                        EstimationSource::Code};
 

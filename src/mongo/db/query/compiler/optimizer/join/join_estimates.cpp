@@ -33,7 +33,7 @@ namespace mongo::join_ordering {
 
 // These coefficients were calibrated in /buildscripts/cost_model/join_start.py,
 // which indicated that processing a single document takes 612 nanoseconds.
-const CostCoefficient docProcessCpuIncremental = makeCostCoefficient(612.0ns);
+const CostCoefficient docProcessCpuIncremental = makeCostCoefficient(nsec(612.0));
 const CostCoefficient ioSeqIncremental{
     CostCoefficientType{docProcessCpuIncremental.toDouble() * 261.1}};
 const CostCoefficient ioRandIncremental{
