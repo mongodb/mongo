@@ -303,40 +303,6 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags
         adminDB.runCommand({setFeatureCompatibilityVersion: binVersionToFCV(lastVersion), confirm: true}),
     );
     MongoRunner.stopMongod(conn);
-
-    // TODO SERVER-115604 investigate usage of internalValidateFeaturesAsPrimary, and confirm if we
-    // should remove this or fix query validation.
-    /*conn = MongoRunner.runMongod({
-        dbpath: dbpath,
-        binVersion: "latest",
-        noCleanData: true,
-        setParameter: "internalValidateFeaturesAsPrimary=false",
-    });
-    assert.neq(null, conn, "mongod was unable to start up");
-
-    testDB = conn.getDB(testName);
-
-    testCases.forEach(function (test, i) {
-        const coll = testDB["coll3" + i];
-        // Even though the feature compatibility version is the last version, we should still
-        // be able to add a validator using new query features, because
-        // internalValidateFeaturesAsPrimary is false.
-        assert.commandWorked(
-            testDB.createCollection(coll.getName(), {validator: test.validator}),
-            `Expected to be able to create collection with validator ${tojson(test.validator)}`,
-        );
-
-        // We should also be able to modify a collection to have a validator using new query
-        // features.
-        coll.drop();
-        assert.commandWorked(testDB.createCollection(coll.getName()));
-        assert.commandWorked(
-            testDB.runCommand({collMod: coll.getName(), validator: test.validator}),
-            `Expected to be able to modify collection validator to be ${tojson(test.validator)}`,
-        );
-    });
-
-    MongoRunner.stopMongod(conn);*/
 }
 
 testCollectionValidatorFCVBehavior("last-lts", testCasesLastStable);

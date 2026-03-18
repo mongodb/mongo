@@ -183,7 +183,7 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
         );
     });
 
-    // TODO SERVER-115604 enable when internalFeatureAsPrimary work is investigated.
+    // TODO SERVER-121897: Add stricter enforcement of this requirement.
     // Trying to create a new view in the same database as existing invalid view should fail,
     // even if the new view doesn't use any new query features.
     /*assert.commandFailedWithCode(
@@ -287,38 +287,6 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
         testDB.adminCommand({setFeatureCompatibilityVersion: binVersionToFCV(lastVersion), confirm: true}),
     );
     MongoRunner.stopMongod(conn);
-
-    // TODO SERVER-115604 investigate usages of internalValidateFeaturesAsPrimary
-    /*conn = MongoRunner.runMongod({
-        dbpath: dbpath,
-        binVersion: "latest",
-        noCleanData: true,
-        setParameter: "internalValidateFeaturesAsPrimary=false",
-    });
-    assert.neq(null, conn, "mongod was unable to start up");
-    testDB = conn.getDB(testName);
-
-    testCases.forEach(function (pipe, i) {
-        // Even though the feature compatibility version is the last version, we should still be
-        // able to create a view using new query features, because
-        // internalValidateFeaturesAsPrimary is false.
-        assert.commandWorked(
-            testDB.createView("thirdView" + i, "coll", pipe),
-            `Expected to be able to create view with pipeline ${tojson(pipe)} while in FCV` +
-                ` ${binVersionToFCV(lastVersion)} with internalValidateFeaturesAsPrimary=false`,
-        );
-
-        // We should also be able to modify a view to use new query features.
-        assert(testDB["thirdView" + i].drop(), `Drop of view with pipeline ${tojson(pipe)} failed`);
-        assert.commandWorked(testDB.createView("thirdView" + i, "coll", []));
-        assert.commandWorked(
-            testDB.runCommand({collMod: "thirdView" + i, viewOn: "coll", pipeline: pipe}),
-            `Expected to be able to modify view to use pipeline ${tojson(pipe)} while in FCV` +
-                ` ${binVersionToFCV(lastVersion)} with internalValidateFeaturesAsPrimary=false`,
-        );
-    });
-
-    MongoRunner.stopMongod(conn);*/
 
     // Starting up the last version of mongod with new query features should succeed.
     conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: lastVersion, noCleanData: true});
