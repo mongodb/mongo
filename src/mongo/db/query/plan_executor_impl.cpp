@@ -293,8 +293,8 @@ void PlanExecutorImpl::logWriteConflictAndBackoff(size_t numAttempts) {
     if (MONGO_unlikely(planExecutorHangBeforeLogAndBackoff.shouldFail())) {
         planExecutorHangBeforeLogAndBackoff.pauseWhileSet(_opCtx);
     }
-    logAndRecordWriteConflictAndBackoff(
-        _opCtx, numAttempts, "plan execution", ""_sd, NamespaceStringOrUUID(_nss));
+    mongo::logWriteConflictAndBackoff(
+        numAttempts, "plan execution", ""_sd, NamespaceStringOrUUID(_nss));
 }
 
 /**
