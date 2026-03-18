@@ -889,7 +889,8 @@ StatusWith<std::vector<ChunkType>> ShardingCatalogClientImpl::getChunks(
     repl::ReadConcernLevel readConcern,
     const boost::optional<BSONObj>& hint) {
     invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||
-              readConcern == repl::ReadConcernLevel::kMajorityReadConcern);
+              readConcern == repl::ReadConcernLevel::kMajorityReadConcern ||
+              readConcern == repl::ReadConcernLevel::kSnapshotReadConcern);
 
     // Convert boost::optional<int> to boost::optional<long long>.
     auto longLimit = limit ? boost::optional<long long>(*limit) : boost::none;

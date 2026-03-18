@@ -64,8 +64,8 @@ enums:
             kMissingDatabaseMetadataInShardCatalog: "MissingDatabaseMetadataInShardCatalog"
             kMissingDatabaseMetadataInShardCatalogCache: "MissingDatabaseMetadataInShardCatalogCache"
             kMisplacedDatabaseMetadataInShardCatalog: "MisplacedDatabaseMetadataInShardCatalog"
-            kShardCatalogCacheCollectionMetadataMismatch: "ShardCatalogCacheCollectionMetadataMismatch"
             kMalformedTimeseriesBucketsCollection: "MalformedTimeseriesBucketsCollection"
+            kInconsistentShardCatalogCollectionMetadata: "InconsistentShardCatalogCollectionMetadata"
             kIncompatibleUniqueIndexOnShardedCollection: "IncompatibleUniqueIndexOnShardedCollection"
 
     MetadataInconsistencyDescription:
@@ -97,8 +97,8 @@ enums:
             kMissingDatabaseMetadataInShardCatalog: "Found database metadata in the global catalog but not in the shard catalog or not in a consistent state"
             kMissingDatabaseMetadataInShardCatalogCache: "Found database metadata in the global catalog but not in shard catalog cache"
             kMisplacedDatabaseMetadataInShardCatalog: "Found some database metadata in the shard catalog that is not owned by this shard"
-            kShardCatalogCacheCollectionMetadataMismatch: "Found inconsistencies between collection information in the global catalog and the shard catalog cache"
             kMalformedTimeseriesBucketsCollection: "Found malformed timeseries collection"
+            kInconsistentShardCatalogCollectionMetadata: "Found inconsistencies between collection metadata in the global catalog and the shard catalog"
             kIncompatibleUniqueIndexOnShardedCollection: "Found incompatible index options with uniqueness in a sharded collection"
 
     MetadataConsistencyCommandLevel:
@@ -526,8 +526,8 @@ structs:
                 description: "The shard that the shard catalog thinks is the primary shard for the database."
                 type: shard_id
 
-    ShardCatalogCacheCollectionMetadataMismatchDetails:
-        description: "Details about mismatched collection information between the shard catalog cache and the global catalog"
+    InconsistentShardCatalogCollectionMetadataDetails:
+        description: "Details about mismatched collection metadata between the shard catalog and the global catalog"
         strict: false
         fields:
             namespace:
@@ -538,8 +538,10 @@ structs:
                 type: uuid
                 description: "The UUID of the collection."
             details:
-                type: array<object>
-                description: "A list of the different mismatched information between the two locations."
+                type: object
+                description: >-
+                    Specific details about the mismatch, such as the differing field and its values
+                    in both catalogs, or the reason for the inconsistency.
 
     MalformedTimeseriesBucketsCollectionDetails:
         description: "Details about a malformed timeseries collection."

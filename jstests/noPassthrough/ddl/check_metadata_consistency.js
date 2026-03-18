@@ -495,13 +495,17 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
 
     // Database level mode command
     let inconsistencies = db.checkMetadataConsistency().toArray();
-    assert.eq(2, inconsistencies.length, tojson(inconsistencies));
+    assert.eq(3, inconsistencies.length, tojson(inconsistencies));
     assert(
         inconsistencies.some((object) => object.type === "RoutingTableRangeOverlap"),
         tojson(inconsistencies),
     );
     assert(
         inconsistencies.some((object) => object.type === "ZonesRangeOverlap"),
+        tojson(inconsistencies),
+    );
+    assert(
+        inconsistencies.some((object) => object.type === "InconsistentShardCatalogCollectionMetadata"),
         tojson(inconsistencies),
     );
 
@@ -512,6 +516,11 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
 })();
 
 (function testMissingRoutingTableInconsistency() {
+    if (jsTest.options().storageEngine === "inMemory") {
+        jsTestLog("Skipping testMissingRoutingTableInconsistency because we need persistance to restart nodes");
+        return;
+    }
+
     const db = getNewDb();
     const kSourceCollName = "missing_chunks";
     const ns = db[kSourceCollName].getFullName();
@@ -525,14 +534,19 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     // Restart nodes to clear filtering metadata to trigger a refresh with following operations.
     // We do this so that we also test that, in addition to finding the MissingRoutingTable
     // inconsistency, all inconsistency checks deal with a chunk metadata inconsistency gracefully.
-    if (jsTest.options().storageEngine !== "inMemory") {
-        st.restartShardRS(0);
-    }
+    st.restartShardRS(0);
 
     // Cluster level mode command
     let inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
-    assert.eq(1, inconsistencies.length, tojson(inconsistencies));
-    assert.eq("MissingRoutingTable", inconsistencies[0].type, tojson(inconsistencies[0]));
+    assert.eq(2, inconsistencies.length, tojson(inconsistencies));
+    assert(
+        inconsistencies.some((object) => object.type === "MissingRoutingTable"),
+        tojson(inconsistencies),
+    );
+    assert(
+        inconsistencies.some((object) => object.type === "InconsistentShardCatalogCollectionMetadata"),
+        tojson(inconsistencies),
+    );
 
     // Clean up the database to pass the hooks that detect inconsistencies
     db.dropDatabase();
