@@ -62,6 +62,10 @@ patch_aliases:
   variant: '.*'
   task: "^(convert_and_run_bazel|convert_and_run_bazel_windows)$"
 
+- alias: blocking-emergency-atlas-release-tasks
+  description: "Run variants that would potentially block an emergency release"
+  variant_tags: ["emergency_release"]
+  task: ".*"
 
 commit_queue_aliases:
 - variant: "commit-queue"

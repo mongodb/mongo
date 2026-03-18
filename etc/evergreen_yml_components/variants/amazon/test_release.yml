@@ -52,6 +52,7 @@ buildvariants:
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - amazon2-latest-small
+  tags: ["emergency_release"]
   expansions:
     additional_package_targets: >-
       archive-mongocryptd-stripped
@@ -180,7 +181,7 @@ buildvariants:
 
 - name: enterprise-amazon2023
   display_name: "Enterprise Amazon Linux 2023"
-  tags: []
+  tags: ["emergency_release"]
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - amazon2023.3-small
@@ -301,7 +302,7 @@ buildvariants:
 - &enterprise-amazon2023-arm64-template
   name: enterprise-amazon2023-arm64
   display_name: "Enterprise Amazon Linux 2023 arm64"
-  tags: []
+  tags: ["emergency_release"]
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - amazon2023.3-arm64-small
@@ -377,7 +378,7 @@ buildvariants:
 
 - name: enterprise-amazon2-arm64
   display_name: "Enterprise Amazon Linux 2 arm64"
-  tags: []
+  tags: ["emergency_release"]
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - amazon2-arm64-latest-m8g-xlarge

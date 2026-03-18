@@ -404,7 +404,7 @@ buildvariants:
 - &rhel8-debug-ubsan-all-feature-flags-template
   name: &rhel8-debug-ubsan-all-feature-flags rhel8-debug-ubsan-all-feature-flags
   display_name: "* Shared Library UBSAN Enterprise RHEL 8 DEBUG (all feature flags)"
-  tags: ["suggested"]
+  tags: ["suggested", "emergency_release"]
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel8.8-large
@@ -447,7 +447,7 @@ buildvariants:
   <<: *linux_debug_aubsan_compile_variant_dependency
   name: &rhel8-debug-aubsan-lite-all-feature-flags-required rhel8-debug-aubsan-lite-all-feature-flags-required
   display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (all feature flags)"
-  tags: ["required"]
+  tags: ["required", "emergency_release"]
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   run_on:
   - rhel8.8-large
@@ -467,7 +467,7 @@ buildvariants:
 - <<: *rhel8-debug-aubsan-lite-all-feature-flags-required-template
   name: &rhel8-debug-aubsan-all-feature-flags rhel8-debug-aubsan-all-feature-flags
   display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (all feature flags)"
-  tags: ["suggested"]
+  tags: ["suggested", "emergency_release"]
   cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
   expansions:
     <<: *aubsan-lite-required-expansions

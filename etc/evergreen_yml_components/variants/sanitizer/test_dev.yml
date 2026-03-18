@@ -182,7 +182,7 @@ buildvariants:
   <<: *linux_debug_aubsan_compile_variant_dependency
   name: &rhel8-debug-aubsan-lite rhel8-debug-aubsan-lite
   display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG"
-  tags: ["required"]
+  tags: ["required", "emergency_release"]
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   run_on:
   - rhel8.8-large
@@ -442,7 +442,7 @@ buildvariants:
 - &enterprise-rhel8-debug-tsan-template
   name: &enterprise-rhel8-debug-tsan enterprise-rhel8-debug-tsan
   display_name: "* TSAN Enterprise RHEL 8 DEBUG"
-  tags: ["suggested"]
+  tags: ["suggested", "emergency_release"]
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel8.8-large
