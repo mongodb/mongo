@@ -173,11 +173,30 @@ alias(
     }),
 )
 
+mongo_cc_library(
+    name = "bridge",
+    srcs = [
+        "//src/mongo/scripting/mozjs/wasm/bridge:bridge.cpp",
+        "//src/mongo/scripting/mozjs/wasm/bridge:wasm_helpers.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/scripting/mozjs/wasm/bridge:bridge.h",
+        "//src/mongo/scripting/mozjs/wasm/bridge:wasm_helpers.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "@crates//:wasmtime_c",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "wasm_mozjs_test",
     size = "large",
     timeout = "long",
-    srcs = ["//src/mongo/scripting/mozjs/wasm/engine:engine_test.cpp"],
+    srcs = [
+        "//src/mongo/scripting/mozjs/wasm/bridge:bridge_test.cpp",
+        "//src/mongo/scripting/mozjs/wasm/engine:engine_test.cpp",
+    ],
     auto_header = False,
     data = [":mozjs_wasm_api_data"],
     tags = [
@@ -189,6 +208,7 @@ mongo_cc_unit_test(
     ],
     target_compatible_with = ["@platforms//os:linux"],
     deps = [
+        ":bridge",
         "//src/mongo:base",
         "@crates//:wasmtime_c",
     ],
