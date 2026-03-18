@@ -208,9 +208,6 @@
     /*  Namespace used for storing the list of sharded collections on the CSRS. */                 \
     X(kConfigsvrCollectionsNamespace, DatabaseName::kConfig, "collections"_sd)                     \
                                                                                                    \
-    /*  Namespace used for storing the collection catalog on the shards. */                        \
-    X(kShardCollectionCatalogNamespace, DatabaseName::kConfig, "shard.collections"_sd)             \
-                                                                                                   \
     /*  Namespace used for storing NamespacePlacementType docs on the CSRS. */                     \
     X(kConfigsvrPlacementHistoryNamespace, DatabaseName::kConfig, "placementHistory"_sd)           \
                                                                                                    \

@@ -602,14 +602,6 @@ mongo_cc_library(
 )
 
 idl_generator(
-    name = "shard_authoritative_catalog_gen",
-    src = "shard_authoritative_catalog.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-    ],
-)
-
-idl_generator(
     name = "type_oplog_catalog_metadata_gen",
     src = "type_oplog_catalog_metadata.idl",
     deps = [

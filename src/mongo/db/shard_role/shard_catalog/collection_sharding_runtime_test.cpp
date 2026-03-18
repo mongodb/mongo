@@ -1234,8 +1234,6 @@ class CollectionShardingRuntimeWithCatalogTest
 public:
     void setUp() override {
         CollectionShardingRuntimeWithRangeDeleterTest::setUp();
-        DBDirectClient client(operationContext());
-        client.createCollection(NamespaceString::kShardCollectionCatalogNamespace);
     }
 
     void tearDown() override {

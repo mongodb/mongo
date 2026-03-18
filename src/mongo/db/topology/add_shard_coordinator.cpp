@@ -636,8 +636,7 @@ bool AddShardCoordinator::_hasShardingDataOnReplicaSet(OperationContext* opCtx) 
     }
 
     for (const auto& nss :
-         std::vector<NamespaceString>{NamespaceString::kShardCollectionCatalogNamespace,
-                                      NamespaceString::kConfigShardCatalogDatabasesNamespace,
+         std::vector<NamespaceString>{NamespaceString::kConfigShardCatalogDatabasesNamespace,
                                       NamespaceString::kConfigShardCatalogCollectionsNamespace,
                                       NamespaceString::kConfigShardCatalogChunksNamespace,
                                       NamespaceString::kVectorClockNamespace,

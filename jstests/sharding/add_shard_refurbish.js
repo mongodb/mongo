@@ -27,7 +27,6 @@ describe("add shard with refurbished replicaset", function () {
 
         this.dropMetadata = (rs) => {
             const config = rs.getPrimary().getDB("config");
-            assert(config.getCollection("shard.collections").drop());
             assert(config.getCollection("shard.catalog.databases").drop());
             assert(config.getCollection("shard.catalog.collections").drop());
             assert(config.getCollection("shard.catalog.chunks").drop());

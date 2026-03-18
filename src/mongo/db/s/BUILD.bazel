@@ -457,7 +457,6 @@ mongo_cc_library(
         "//src/mongo/db/shard_role/shard_catalog:database_sharding_runtime.cpp",
         "//src/mongo/db/shard_role/shard_catalog:database_sharding_state_factory_shard.cpp",
         "//src/mongo/db/shard_role/shard_catalog:metadata_manager.cpp",
-        "//src/mongo/db/shard_role/shard_catalog:shard_authoritative_catalog_gen",
         "//src/mongo/db/shard_role/shard_catalog:shard_filtering_metadata_refresh.cpp",
         "//src/mongo/db/shard_role/shard_catalog:stale_shard_exception_handler.cpp",
         "//src/mongo/db/shard_role/shard_catalog:type_oplog_catalog_metadata_gen",
