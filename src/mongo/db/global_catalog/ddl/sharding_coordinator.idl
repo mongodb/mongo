@@ -36,8 +36,8 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
-    - "mongo/db/session/logical_session_id.idl"
     - "mongo/db/versioning_protocol/database_version.idl"
+    - "mongo/db/global_catalog/ddl/coordinator_session.idl"
 
 enums:
     CoordinatorType:
@@ -112,15 +112,6 @@ structs:
                 description: "Type of the sharding coordinator."
                 type: CoordinatorType
 
-    ShardingCoordinatorSession:
-        description: "Container for coordinator session."
-        strict: true
-        fields:
-            lsid:
-                type: LogicalSessionId
-            txnNumber:
-                type: TxnNumber
-
     ShardingCoordinatorMetadata:
         description: "Common metadata for all sharding coordinator."
         generate_comparison_operators: false
@@ -139,7 +130,7 @@ structs:
                 type: DatabaseVersion
                 optional: true
             session:
-                type: ShardingCoordinatorSession
+                type: CoordinatorSession
                 optional: true
             bucketNss:
                 description: "In case of sharded timeseries this variable will hold the underlying bucket namespace"

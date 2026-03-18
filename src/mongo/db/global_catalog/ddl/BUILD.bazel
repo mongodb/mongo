@@ -52,11 +52,20 @@ idl_generator(
 )
 
 idl_generator(
+    name = "coordinator_session_gen",
+    src = "coordinator_session.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/session:logical_session_id_gen",
+    ],
+)
+
+idl_generator(
     name = "configsvr_coordinator_gen",
     src = "configsvr_coordinator.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db/session:logical_session_id_gen",
+        "//src/mongo/db/global_catalog/ddl:coordinator_session_gen",
     ],
 )
 
@@ -222,7 +231,7 @@ idl_generator(
     src = "sharding_coordinator.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db/session:logical_session_id_gen",
+        "//src/mongo/db/global_catalog/ddl:coordinator_session_gen",
         "//src/mongo/db/versioning_protocol:database_version_gen",
     ],
 )

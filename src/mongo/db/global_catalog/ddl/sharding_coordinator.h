@@ -566,8 +566,7 @@ private:
         }
         auto newDoc = _getDoc();
         auto newMetadata = newDoc.getShardingCoordinatorMetadata();
-        newMetadata.setSession(
-            ShardingCoordinatorSession(*osi->getSessionId(), *osi->getTxnNumber()));
+        newMetadata.setSession(CoordinatorSession(*osi->getSessionId(), *osi->getTxnNumber()));
         newDoc.setShardingCoordinatorMetadata(std::move(newMetadata));
         _updateStateDocument(opCtx, std::move(newDoc));
     }

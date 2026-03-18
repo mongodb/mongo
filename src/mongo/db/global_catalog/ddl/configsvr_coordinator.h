@@ -209,8 +209,7 @@ protected:
         }
         _updateStateDocumentWith(opCtx, [&](StateDoc& doc) {
             ConfigsvrCoordinatorMetadata newMetadata = doc.getConfigsvrCoordinatorMetadata();
-            newMetadata.setSession(
-                ConfigsvrCoordinatorSession(*osi->getSessionId(), *osi->getTxnNumber()));
+            newMetadata.setSession(CoordinatorSession(*osi->getSessionId(), *osi->getTxnNumber()));
             doc.setConfigsvrCoordinatorMetadata(newMetadata);
         });
     }

@@ -1,4 +1,4 @@
-# Copyright (C) 2022-present MongoDB, Inc.
+# Copyright (C) 2026-present MongoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
@@ -26,44 +26,24 @@
 # it in the license file.
 #
 
+# This file defines the struct for coordinator session.
+
 global:
     cpp_namespace: "mongo"
-    mod_visibility: needs_replacement
+    mod_visibility: public
 
 imports:
     - "mongo/db/basic_types.idl"
-    - "mongo/db/global_catalog/ddl/coordinator_session.idl"
-
-enums:
-    ConfigsvrCoordinatorType:
-        description: "Coordinator type"
-        type: string
-        values:
-            kSetUserWriteBlockMode: "setUserWriteBlockMode"
-            kSetClusterParameter: "setClusterParameter"
+    - "mongo/db/session/logical_session_id.idl"
 
 structs:
-    ConfigsvrCoordinatorId:
-        description: "Identifier for a specific instance of ConfigsvrCoordinator"
-        generate_comparison_operators: false
-        strict: false
+    CoordinatorSession:
+        description:
+            "Container for coordinator session used for guaranteeing remote
+            command idempotency."
+        strict: true
         fields:
-            coordinatorType:
-                description: "Type of the ConfigsvrCoordinator"
-                type: ConfigsvrCoordinatorType
-            subId:
-                description: "Identifier to distinguish from other instances of same type"
-                type: string
-                optional: true
-
-    ConfigsvrCoordinatorMetadata:
-        description: "Common metadata for all ConfigsvrCoordinators"
-        generate_comparison_operators: false
-        strict: false
-        fields:
-            _id:
-                cpp_name: id
-                type: ConfigsvrCoordinatorId
-            session:
-                type: CoordinatorSession
-                optional: true
+            lsid:
+                type: LogicalSessionId
+            txnNumber:
+                type: TxnNumber
