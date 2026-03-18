@@ -51,19 +51,22 @@ function crudTest(fn, addStartingMeasurements = true) {
 
 // aggregate()
 crudTest(() => {
-    const agg = getTimeseriesCollForRawOps(coll).aggregate([{$match: {"control.count": 2}}], kRawOperationSpec);
-    assert.eq(agg.toArray().length, 1);
+    let aggRes = getTimeseriesCollForRawOps(coll)
+        .aggregate([{$match: {"control.count": 2}}], kRawOperationSpec)
+        .toArray();
+    assert.eq(aggRes.length, 1);
 
-    assert.eq(
-        getTimeseriesCollForRawOps(coll)
-            .aggregate([{$indexStats: {}}, {$match: {name: "m_1_t_1"}}], kRawOperationSpec)
-            .toArray()[0].key,
-        {
-            meta: 1,
-            "control.min.t": 1,
-            "control.max.t": 1,
-        },
-    );
+    aggRes = getTimeseriesCollForRawOps(coll)
+        .aggregate([{$indexStats: {}}, {$match: {name: "m_1_t_1"}}], kRawOperationSpec)
+        .toArray();
+    assert.gte(aggRes.length, 1);
+    const indexStat = aggRes[0];
+    assert.hasFields(indexStat, ["key"]);
+    assert.eq(indexStat.key, {
+        meta: 1,
+        "control.min.t": 1,
+        "control.max.t": 1,
+    });
 });
 
 // count()
