@@ -51,7 +51,6 @@ class DuplicateKeyTracker {
 
 public:
     DuplicateKeyTracker(OperationContext* opCtx,
-                        const IndexCatalogEntry* indexCatalogEntry,
                         StringData ident,
                         LazyRecordStore::CreateMode createMode);
 

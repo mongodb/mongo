@@ -125,6 +125,7 @@ mongo_cc_library(
         "//src/mongo/db:index_repair",
         "//src/mongo/db:server_base",
         "//src/mongo/db/index:multikey_paths",
+        "//src/mongo/db/index_builds/primary_driven:primary_driven_index_builds",
         "//src/mongo/db/query/query_stats",
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/repl:timestamp_block",

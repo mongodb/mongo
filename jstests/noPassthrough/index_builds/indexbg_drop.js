@@ -5,6 +5,7 @@
  *   requires_replication,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
@@ -54,8 +55,10 @@ jsTest.log("Starting background indexing for test of: " + tojson(dc));
 primaryDB.getCollection(collection).createIndex({b: 1});
 primaryDB.getCollection(collection).createIndex({i: 1});
 
-// Make sure the index build has started on the secondary.
-IndexBuildTest.waitForIndexBuildToStart(secondDB);
+if (!FeatureFlagUtil.isPresentAndEnabled(secondDB, "PrimaryDrivenIndexBuilds")) {
+    // Make sure the index build has started on the secondary.
+    IndexBuildTest.waitForIndexBuildToStart(secondDB);
+}
 
 jsTest.log("Dropping indexes");
 primaryDB.runCommand({dropIndexes: collection, index: "*"});

@@ -7,6 +7,7 @@
  *   requires_replication,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
@@ -34,9 +35,11 @@ IndexBuildTest.pauseIndexBuilds(primary);
 const createIdx1 = IndexBuildTest.startIndexBuild(primary, primaryColl1.getFullName(), {a: 1});
 const createIdx2 = IndexBuildTest.startIndexBuild(primary, primaryColl2.getFullName(), {a: 1});
 
-// Waiting for secondary to start the index builds
-IndexBuildTest.waitForIndexBuildToStart(secondaryDB, collName1);
-IndexBuildTest.waitForIndexBuildToStart(secondaryDB, collName2);
+if (!FeatureFlagUtil.isPresentAndEnabled(secondaryDB, "PrimaryDrivenIndexBuilds")) {
+    // Waiting for secondary to start the index builds
+    IndexBuildTest.waitForIndexBuildToStart(secondaryDB, collName1);
+    IndexBuildTest.waitForIndexBuildToStart(secondaryDB, collName2);
+}
 
 // Waiting for secondary to register the indexes in durable catalog.
 IndexBuildTest.assertIndexesSoon(secondaryDB.getCollection(collName1), 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});

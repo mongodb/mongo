@@ -3,6 +3,8 @@
  * the primary eventually. If we get a commitIndexBuild oplog entry instead, the secondary should
  * crash.
  * @tags: [
+ *   # Secondaries do not build indexes themselves with primary-driven index builds.
+ *   primary_driven_index_builds_incompatible,
  *   requires_replication,
  * ]
  */

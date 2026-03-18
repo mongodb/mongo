@@ -66,9 +66,9 @@
 namespace mongo {
 
 IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
-                                             const IndexCatalogEntry* entry,
                                              const IndexBuildInfo& indexBuildInfo,
                                              LazyRecordStore::CreateMode createMode,
+                                             bool unique,
                                              bool generateTableWrites)
     : _generateTableWrites(generateTableWrites),
       _sideWritesTracker([&]() {
@@ -83,12 +83,12 @@ IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
               opCtx, *indexBuildInfo.skippedRecordsTrackerIdent, createMode);
       }()),
       _skipNumAppliedCheck(createMode == LazyRecordStore::CreateMode::openExisting) {
-    if (entry->descriptor()->unique()) {
+    if (unique) {
         uassert(10709203,
                 "constraintViolationsTrackerIdent is not provided",
                 indexBuildInfo.constraintViolationsTrackerIdent);
         _duplicateKeyTracker = std::make_unique<DuplicateKeyTracker>(
-            opCtx, entry, *indexBuildInfo.constraintViolationsTrackerIdent, createMode);
+            opCtx, *indexBuildInfo.constraintViolationsTrackerIdent, createMode);
     }
     // TODO(SERVER-110289): Use utility function instead of checking fcvSnapshot.
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
@@ -98,8 +98,8 @@ IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
     if (isPrimaryDrivenIndexBuild) {
         uassert(11411100, "sorterIdent is not provided", indexBuildInfo.sorterIdent);
         uassert(11411101,
-                "Primary-driven index builds require immediate table creation",
-                createMode == LazyRecordStore::CreateMode::immediate);
+                "Primary-driven index builds cannot use deferred table creation",
+                createMode != LazyRecordStore::CreateMode::deferred);
         _sorterTable = LazyRecordStore(opCtx, *indexBuildInfo.sorterIdent, createMode);
     }
 }

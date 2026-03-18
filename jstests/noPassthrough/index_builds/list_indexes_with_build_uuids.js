@@ -5,6 +5,7 @@
  *   requires_replication,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
@@ -54,8 +55,10 @@ replSet.awaitReplication();
 assert.commandWorked(primaryDB.runCommand({createIndexes: collName, indexes: [{key: {i: 1}, name: firstIndexName}]}));
 replSet.awaitReplication();
 
+const primaryDriven = FeatureFlagUtil.isPresentAndEnabled(secondaryDB, "PrimaryDrivenIndexBuilds");
+
 // Start hanging index builds on the secondary.
-IndexBuildTest.pauseIndexBuilds(secondary);
+IndexBuildTest.pauseIndexBuilds(primaryDriven ? primary : secondary);
 
 // Build and hang on the second index. This should be run in the background if we pause index
 // builds on the primary because the createIndexes command will block.
@@ -63,7 +66,7 @@ const coll = primaryDB.getCollection(collName);
 const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {j: 1}, {name: secondIndexName});
 
 // Wait for index builds to start on the secondary.
-const opId = IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
+const opId = IndexBuildTest.waitForIndexBuildToStart(primaryDriven ? primaryDB : secondaryDB);
 jsTestLog("Index builds started on secondary. Op ID of one of the builds: " + opId);
 
 // Retry until the oplog applier is done with the entry, and the index is visible to listIndexes.
@@ -91,7 +94,7 @@ assert.eq(indexes[2].spec.name, "second");
 assert(indexes[2].hasOwnProperty("buildUUID"));
 
 // Allow the replica set to finish the index build.
-IndexBuildTest.resumeIndexBuilds(secondary);
+IndexBuildTest.resumeIndexBuilds(primaryDriven ? primary : secondary);
 createIdx();
 
 replSet.awaitReplication();

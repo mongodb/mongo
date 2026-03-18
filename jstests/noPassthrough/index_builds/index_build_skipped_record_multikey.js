@@ -5,6 +5,8 @@
  * as to flip the index to multikey.
  *
  * @tags: [
+ *   # Secondaries do not build indexes themselves with primary-driven index builds.
+ *   primary_driven_index_builds_incompatible,
  *   requires_replication,
  * ]
  */
@@ -92,12 +94,9 @@ const awaitCreateIndex = startParallelShell(
 );
 fpSecondaryDrain.wait();
 
-// Secondaries do not build indexes, so they do not drain side writes.
-if (!FeatureFlagUtil.isPresentAndEnabled(primaryDB, "PrimaryDrivenIndexBuilds")) {
-    // Two documents are scanned but only one key is inserted.
-    checkLog.containsJson(secondary, 20391, {namespace: coll.getFullName(), totalRecords: 2});
-    checkLog.containsJson(secondary, 20685, {namespace: coll.getFullName(), keysInserted: 1});
-}
+// Two documents are scanned but only one key is inserted.
+checkLog.containsJson(secondary, 20391, {namespace: coll.getFullName(), totalRecords: 2});
+checkLog.containsJson(secondary, 20685, {namespace: coll.getFullName(), keysInserted: 1});
 
 // Allows 'a.loc' to be indexed as a 2dsphere and flips the index to multikey.
 assert.commandWorked(

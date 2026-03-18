@@ -323,6 +323,11 @@ public:
                              bool isResumable);
 
     /**
+     * Keeps the temporary tables upon destruction, rather than cleaning them up.
+     */
+    void keepTemporaryTables(OperationContext* opCtx);
+
+    /**
      * Returns true if this build block supports background writes while building an index. This is
      * true for the kHybrid method.
      */

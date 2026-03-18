@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,33 +29,38 @@
 
 #pragma once
 
-#include "mongo/bson/bsonobj.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/index_builds/index_builds_common.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
-#include <string>
-#include <tuple>
+#include <mutex>
 #include <vector>
 
-namespace MONGO_MOD_PUBLIC mongo {
+MONGO_MOD_PUBLIC;
+namespace mongo::index_builds::primary_driven {
 
-/**
- * Describes an index build on a collection.
- */
-struct IndexBuildsEntry {
-    DatabaseName dbName;
+class Registry {
+public:
+    struct Entry {
+        DatabaseName dbName;
+        UUID collectionUUID;
+        std::vector<IndexBuildInfo> indexes;
+    };
 
-    // Collection UUID.
-    const UUID collUUID;
+    void add(UUID buildUUID,
+             DatabaseName dbName,
+             UUID collectionUUID,
+             std::vector<IndexBuildInfo> indexes);
 
-    // Index specs for the build.
-    std::vector<std::tuple<BSONObj, std::string>> indexSpecsAndIdents;
+    void remove(UUID buildUUID);
+
+    std::vector<std::pair<UUID, Entry>> all() const;
+
+private:
+    mutable std::mutex _mutex;
+    stdx::unordered_map<UUID, Entry, UUID::Hash> _entries;  // Keyed by index build UUID.
 };
 
-/**
- * IndexBuilds is a mapping from index build UUID to details about how to start the index build.
- */
-using IndexBuilds = stdx::unordered_map<UUID, IndexBuildsEntry, UUID::Hash>;
-
-}  // namespace MONGO_MOD_PUBLIC mongo
+}  // namespace mongo::index_builds::primary_driven

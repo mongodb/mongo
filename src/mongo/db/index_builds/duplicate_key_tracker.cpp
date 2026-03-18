@@ -66,12 +66,9 @@ static constexpr StringData kKeyField = "key"_sd;
 }
 
 DuplicateKeyTracker::DuplicateKeyTracker(OperationContext* opCtx,
-                                         const IndexCatalogEntry* entry,
                                          StringData ident,
                                          LazyRecordStore::CreateMode createMode)
-    : _keyConstraintsTable(opCtx, ident, createMode) {
-    invariant(entry->descriptor()->unique());
-}
+    : _keyConstraintsTable(opCtx, ident, createMode) {}
 
 void DuplicateKeyTracker::keepTemporaryTable(OperationContext* opCtx) {
     _keyConstraintsTable.keepTemporaryTable(opCtx);

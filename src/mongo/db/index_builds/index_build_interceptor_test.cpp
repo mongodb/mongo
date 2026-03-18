@@ -105,11 +105,12 @@ protected:
         const IndexBuildInfo& indexBuildInfo,
         LazyRecordStore::CreateMode createMode = LazyRecordStore::CreateMode::deferred) {
         WriteUnitOfWork wuow(operationContext());
-        auto interceptor = std::make_unique<IndexBuildInterceptor>(operationContext(),
-                                                                   createIndex(indexBuildInfo.spec),
-                                                                   indexBuildInfo,
-                                                                   createMode,
-                                                                   /*generateTableWrites=*/true);
+        auto interceptor = std::make_unique<IndexBuildInterceptor>(
+            operationContext(),
+            indexBuildInfo,
+            createMode,
+            createIndex(indexBuildInfo.spec)->descriptor()->unique(),
+            /*generateTableWrites=*/true);
         wuow.commit();
         return interceptor;
     }
@@ -611,9 +612,9 @@ TEST_F(IndexBuilderInterceptorTest, KeepTemporaryTablesCreatesMissingTables) {
     // Creating a new interceptor in openExisting mode should work
     interceptor.reset();
     IndexBuildInterceptor(operationContext(),
-                          getIndexEntry("a_1"),
                           indexBuildInfo,
                           LazyRecordStore::CreateMode::openExisting,
+                          getIndexEntry("a_1")->descriptor()->unique(),
                           /*generateTableWrites=*/true);
 }
 
@@ -650,9 +651,9 @@ TEST_F(IndexBuilderInterceptorTest, OpenExistingPreservesExistingData) {
 
     // Creating a new interceptor in openExisting mode should preserve the existing data.
     IndexBuildInterceptor interceptor(operationContext(),
-                                      getIndexEntry("a_1"),
                                       indexBuildInfo,
                                       LazyRecordStore::CreateMode::openExisting,
+                                      getIndexEntry("a_1")->descriptor()->unique(),
                                       /*generateTableWrites=*/true);
 
     ASSERT_EQ(1, getSideWritesTableContents(indexBuildInfo).size());

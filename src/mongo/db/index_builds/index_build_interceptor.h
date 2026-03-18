@@ -72,9 +72,9 @@ public:
      * uses the existing temporary tables that were previously created.
      */
     IndexBuildInterceptor(OperationContext* opCtx,
-                          const IndexCatalogEntry* entry,
                           const IndexBuildInfo& indexBuildInfo,
                           LazyRecordStore::CreateMode createMode,
+                          bool unique,
                           bool generateTableWrites);
 
     /**

@@ -2,6 +2,9 @@
  * Confirms slow currentOp logging does not conflict with processing commitIndexBuild, which may
  * block replication.
  * @tags: [
+ *   # Primary-driven index builds do not have a separate operation processing commitIndexBuild on
+ *   # secondaries.
+ *   primary_driven_index_builds_incompatible,
  *   requires_replication,
  * ]
  */

@@ -5,6 +5,7 @@
  *   requires_replication,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getCachedPlan} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
@@ -70,7 +71,11 @@ function runTest({rst, readDB, writeDB}) {
 
     // Enable a failpoint that will cause an index build to block just after start. This will
     // allow us to examine PlanCache contents while index creation is in flight.
-    assert.commandWorked(readDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "alwaysOn"}));
+    const primaryDriven = FeatureFlagUtil.isPresentAndEnabled(readDB, "PrimaryDrivenIndexBuilds");
+    const failPointDB = primaryDriven ? writeDB : readDB;
+    assert.commandWorked(
+        failPointDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "alwaysOn"}),
+    );
 
     // Build a "most selective" index in the background.
     TestData.dbName = dbName;
@@ -87,7 +92,16 @@ function runTest({rst, readDB, writeDB}) {
     }, writeDB.getMongo().port);
 
     // Confirm that the index build has started.
-    IndexBuildTest.waitForIndexBuildToStart(readDB, collName, "most_selective");
+    if (primaryDriven) {
+        IndexBuildTest.assertIndexesSoon(
+            readColl,
+            4,
+            ["_id_", "less_selective", "least_selective"],
+            ["most_selective"],
+        );
+    } else {
+        IndexBuildTest.waitForIndexBuildToStart(readDB, collName, "most_selective");
+    }
 
     // Confirm that there are no cached plans post index build start.
     assertDoesNotHaveCachedPlan(readColl, filter);
@@ -97,9 +111,13 @@ function runTest({rst, readDB, writeDB}) {
     assert.eq("less_selective", getIndexNameForCachedPlan(readColl, filter));
 
     // Disable the hang and wait for the index build to complete.
-    assert.commandWorked(readDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "off"}));
+    assert.commandWorked(failPointDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "off"}));
 
-    IndexBuildTest.waitForIndexBuildToStop(readDB, collName, "most_selective");
+    if (primaryDriven) {
+        IndexBuildTest.assertIndexesSoon(readColl, 4, ["_id_", "less_selective", "least_selective", "most_selective"]);
+    } else {
+        IndexBuildTest.waitForIndexBuildToStop(readDB, collName, "most_selective");
+    }
     createIdxShell({checkExitSuccess: true});
 
     rst.awaitReplication();

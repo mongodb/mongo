@@ -2,6 +2,8 @@
  * If a user attempts to shut down the server using the shutdown command without the force: true
  * option while there is an index build in progress, we should reject the shutdown request.
  * @tags: [
+ *   # Secondaries do not build indexes themselves with primary-driven index builds.
+ *   primary_driven_index_builds_incompatible,
  *   requires_replication,
  * ]
  */

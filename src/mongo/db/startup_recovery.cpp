@@ -46,6 +46,8 @@
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/index_builds/multi_index_block.h"
+#include "mongo/db/index_builds/primary_driven/registry.h"
+#include "mongo/db/index_builds/primary_driven/util.h"
 #include "mongo/db/index_builds/rebuild_indexes.h"
 #include "mongo/db/index_builds/resumable_index_builds_gen.h"
 #include "mongo/db/mongod_options_storage_gen.h"
@@ -567,6 +569,21 @@ void reconcileCatalogAndRestartUnfinishedIndexBuilds(
             "Any unfinished index builds will not be resumed nor restarted due to standalone mode",
             "numIndexBuildsToRestart"_attr = reconcileResult.indexBuildsToRestart.size(),
             "numIndexBuildsToResume"_attr = reconcileResult.indexBuildsToResume.size());
+        return;
+    }
+
+    if (feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        for (auto&& [buildUUID, entry] : reconcileResult.indexBuildsToRestart) {
+            std::vector<IndexBuildInfo> builds;
+            builds.reserve(entry.indexSpecsAndIdents.size());
+            for (auto&& [spec, ident] : entry.indexSpecsAndIdents) {
+                builds.emplace_back(spec, ident, *opCtx->getServiceContext()->getStorageEngine());
+            }
+            index_builds::primary_driven::registry(opCtx->getServiceContext())
+                .add(buildUUID, entry.dbName, entry.collUUID, std::move(builds));
+        }
         return;
     }
 

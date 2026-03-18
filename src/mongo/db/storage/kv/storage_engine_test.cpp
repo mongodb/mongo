@@ -933,10 +933,12 @@ TEST_F(StorageEngineTest, ReconcileTwoPhaseIndexBuilds) {
     ASSERT_EQ(buildUUID, toRestartBuildUUID);
 
     // Both specs should be listed within the same build.
-    auto& specs = toRestart.indexSpecs;
-    ASSERT_EQ(2UL, specs.size());
-    ASSERT_EQ(indexA, specs[0]["name"].str());
-    ASSERT_EQ(indexB, specs[1]["name"].str());
+    auto& specsAndIdents = toRestart.indexSpecsAndIdents;
+    ASSERT_EQ(2UL, specsAndIdents.size());
+    ASSERT_EQ(indexA, std::get<BSONObj>(specsAndIdents[0])["name"].str());
+    ASSERT_EQ(indexB, std::get<BSONObj>(specsAndIdents[1])["name"].str());
+    ASSERT_EQ(indexIdentA, std::get<std::string>(specsAndIdents[0]));
+    ASSERT_EQ(indexIdentB, std::get<std::string>(specsAndIdents[1]));
 
     // There should be no index builds to resume.
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToResume.size());

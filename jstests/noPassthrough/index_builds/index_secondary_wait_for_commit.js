@@ -3,6 +3,8 @@
  * committing.
  * Requires two phase index builds to be enabled via the twoPhaseIndexBuild server parameter.
  * @tags: [
+ *   # Secondaries do not build indexes themselves with primary-driven index builds.
+ *   primary_driven_index_builds_incompatible,
  *   requires_replication,
  * ]
  */

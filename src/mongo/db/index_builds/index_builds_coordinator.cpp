@@ -45,6 +45,7 @@
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/index_builds_manager.h"
 #include "mongo/db/index_builds/multi_index_block.h"
+#include "mongo/db/index_builds/primary_driven/util.h"
 #include "mongo/db/index_builds/repl_index_build_state.h"
 #include "mongo/db/index_builds/two_phase_index_build_knobs_gen.h"
 #include "mongo/db/op_observer/op_observer.h"
@@ -1335,9 +1336,10 @@ void IndexBuildsCoordinator::applyCommitIndexBuild(OperationContext* opCtx,
          storageGlobalParams.magicRestore)) {
         // Restart the 'paused' index build in the background.
         IndexBuilds buildsToRestart;
-        IndexBuildsEntry details{collUUID};
+        IndexBuildsEntry details{.dbName = nss.dbName(), .collUUID = collUUID};
         for (const auto& indexBuildInfo : oplogEntry.indexes) {
-            details.indexSpecs.emplace_back(indexBuildInfo.spec.getOwned());
+            details.indexSpecsAndIdents.emplace_back(indexBuildInfo.spec.getOwned(),
+                                                     indexBuildInfo.indexIdent);
         }
         buildsToRestart.insert({buildUUID, details});
 
@@ -2080,6 +2082,20 @@ void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
                                                  Status{ErrorCodes::InterruptedDueToReplStateChange,
                                                         "aborting all two-phase index builds"});
         }
+        for (auto&& [buildUUID, build] :
+             index_builds::primary_driven::registry(opCtx->getServiceContext()).all()) {
+            uassertStatusOK(index_builds::primary_driven::abort(
+                opCtx,
+                build.dbName,
+                build.collectionUUID,
+                buildUUID,
+                build.indexes,
+                {ErrorCodes::InterruptedDueToReplStateChange,
+                 "Aborting primary-driven index build upon step up"}));
+            LOGV2(11130400,
+                  "Aborted primary-driven index build upon step up",
+                  "buildUUID"_attr = buildUUID);
+        }
 
         auto builds = activeIndexBuilds.getAllIndexBuilds();
         forEachIndexBuild(builds,
@@ -2123,12 +2139,13 @@ IndexBuilds IndexBuildsCoordinator::stopIndexBuildsForRollback(OperationContext*
             return;
         }
 
-        IndexBuildsEntry aborted{replState->collectionUUID};
+        IndexBuildsEntry aborted{.dbName = replState->dbName,
+                                 .collUUID = replState->collectionUUID};
         // Record the index builds aborted due to rollback. This allows any rollback algorithm
         // to efficiently restart all unfinished index builds without having to scan all indexes
         // in all collections.
-        for (const auto& spec : toIndexSpecs(replState->getIndexes())) {
-            aborted.indexSpecs.emplace_back(spec.getOwned());
+        for (auto&& index : replState->getIndexes()) {
+            aborted.indexSpecsAndIdents.emplace_back(index.spec.getOwned(), index.indexIdent);
         }
         buildsStopped.insert({replState->buildUUID, aborted});
     };
@@ -2286,8 +2303,8 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
 
         // Convert each index spec into a corresponding IndexBuildInfo instance.
         std::vector<IndexBuildInfo> indexes;
-        indexes.reserve(build.indexSpecs.size());
-        for (const auto& spec : build.indexSpecs) {
+        indexes.reserve(build.indexSpecsAndIdents.size());
+        for (auto&& [spec, ident] : build.indexSpecsAndIdents) {
             IndexBuildInfo indexBuildInfo(spec, boost::none);
             indexes.push_back(std::move(indexBuildInfo));
         }

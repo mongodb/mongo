@@ -396,9 +396,9 @@ protected:
         IndexBuildInfo indexBuildInfo(spec, *storageEngine, _autoDb->getDb()->name());
         indexBuildInfo.indexIdent = entry->getIdent();
         return std::make_unique<IndexBuildInterceptor>(&_opCtx,
-                                                       entry,
                                                        indexBuildInfo,
                                                        LazyRecordStore::CreateMode::immediate,
+                                                       entry->descriptor()->unique(),
                                                        /*generateTableWrites=*/true);
     }
 

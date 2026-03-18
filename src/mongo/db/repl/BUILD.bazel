@@ -830,6 +830,7 @@ mongo_cc_library(
         "//src/mongo/db/commands:txn_cmd_request",
         "//src/mongo/db/index_builds:index_build_oplog_entry",
         "//src/mongo/db/index_builds:index_builds_coordinator",
+        "//src/mongo/db/index_builds/primary_driven:primary_driven_index_builds",
         "//src/mongo/db/op_observer",
         "//src/mongo/db/op_observer:op_observer_util",
         "//src/mongo/db/pipeline:change_stream_preimage",

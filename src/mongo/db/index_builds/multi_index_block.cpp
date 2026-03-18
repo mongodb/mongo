@@ -1440,6 +1440,14 @@ void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx,
     _buildIsCleanedUp = true;
 }
 
+void MultiIndexBlock::keepTemporaryTables(OperationContext* opCtx) {
+    invariant(!_buildIsCleanedUp);
+    for (auto& index : _indexes) {
+        index.block->keepTemporaryTables(opCtx);
+    }
+    _buildIsCleanedUp = true;
+}
+
 void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx,
                                         const CollectionPtr& collection,
                                         RecordStore& rs) const {

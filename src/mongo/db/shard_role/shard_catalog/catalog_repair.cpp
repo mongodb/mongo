@@ -34,6 +34,7 @@
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/mdb_catalog.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/fail_point.h"
@@ -309,11 +310,11 @@ StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
                 auto existingIt = reconcileResult.indexBuildsToRestart.find(buildUUID);
                 if (existingIt == reconcileResult.indexBuildsToRestart.end()) {
                     reconcileResult.indexBuildsToRestart.insert(
-                        {buildUUID, IndexBuildsEntry(*collUUID)});
+                        {buildUUID, {.dbName = entry.nss.dbName(), .collUUID = *collUUID}});
                     existingIt = reconcileResult.indexBuildsToRestart.find(buildUUID);
                 }
 
-                existingIt->second.indexSpecs.emplace_back(indexMetaData.spec);
+                existingIt->second.indexSpecsAndIdents.emplace_back(indexMetaData.spec, indexIdent);
                 continue;
             }
 
@@ -346,6 +347,12 @@ StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
             collection->replaceMetadata(opCtx, std::move(md));
             wuow.commit();
         }
+    }
+
+    if (feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return reconcileResult;
     }
 
     // Drop any internal ident that we won't need.

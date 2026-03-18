@@ -3,6 +3,8 @@
  * indexed. Since we expect the index build on the primary to fail, the secondary should wait for
  * the primary's abortIndexBuild oplog entry.
  * @tags: [
+ *   # Secondaries do not build indexes themselves with primary-driven index builds.
+ *   primary_driven_index_builds_incompatible,
  *   requires_replication,
  * ]
  */

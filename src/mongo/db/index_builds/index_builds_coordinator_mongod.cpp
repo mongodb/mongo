@@ -254,16 +254,15 @@ void IndexBuildsCoordinatorMongod::shutdown(OperationContext* opCtx) {
 
     // Primary-driven index builds interrupted by stepdown have already exited
     // _runIndexBuildInner(). If they are still pending here, they did not receive the external
-    // abort they are awaiting, and have to be aborted now to unblock shutdown. Two-phase index
-    // builds on the other hand are all working inside _runIndexBuildInner() and will be interrupted
-    // by shutdown there.
+    // abort they are awaiting, and have to be unregistered now. Two-phase index builds on the other
+    // hand are all working inside _runIndexBuildInner() and will be interrupted by shutdown there.
     if (usingPrimaryDrivenIndexBuilds) {
         auto indexBuildFilter = [&](const auto& replState) {
             return replState.isAwaitingPrimaryAbort();
         };
         for (const auto& replState : activeIndexBuilds.filterIndexBuilds(indexBuildFilter)) {
-            // No need to acquire the collection since no writes are performed.
-            _completeAbortForShutdown(opCtx, replState, CollectionPtr::null);
+            _indexBuildsManager.keepTemporaryTables(opCtx, replState->buildUUID);
+            activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
         }
     }
 

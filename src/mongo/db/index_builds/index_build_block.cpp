@@ -134,9 +134,9 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
 
     _indexBuildInterceptor =
         std::make_unique<IndexBuildInterceptor>(opCtx,
-                                                writableEntry,
                                                 indexBuildInfo,
                                                 LazyRecordStore::CreateMode::openExisting,
+                                                writableEntry->descriptor()->unique(),
                                                 generateTableWrites);
     writableEntry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
 
@@ -192,8 +192,12 @@ Status IndexBuildBlock::init(OperationContext* opCtx,
         auto indexCatalog = collection->getIndexCatalog();
         auto indexCatalogEntry = indexCatalog->getWritableEntryByName(
             opCtx, getIndexName(), IndexCatalog::InclusionPolicy::kUnfinished);
-        _indexBuildInterceptor = std::make_unique<IndexBuildInterceptor>(
-            opCtx, indexCatalogEntry, *_indexBuildInfo, mode, generateTableWrites);
+        _indexBuildInterceptor =
+            std::make_unique<IndexBuildInterceptor>(opCtx,
+                                                    *_indexBuildInfo,
+                                                    mode,
+                                                    indexCatalogEntry->descriptor()->unique(),
+                                                    generateTableWrites);
         indexCatalogEntry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
     }
 

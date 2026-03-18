@@ -11,6 +11,7 @@
  *   requires_replication,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 import {SecondaryReadsTest} from "jstests/replsets/libs/secondary_reads_test.js";
 
@@ -42,7 +43,9 @@ const awaitIndexBuild = IndexBuildTest.startIndexBuild(testDB.getMongo(), coll.g
     ErrorCodes.IndexBuildAborted,
 ]);
 IndexBuildTest.waitForIndexBuildToScanCollection(testDB, collName, "a_1");
-IndexBuildTest.waitForIndexBuildToStart(secondaryReadsTest.getSecondaryDB(), collName, "a_1");
+if (!FeatureFlagUtil.isPresentAndEnabled(secondaryReadsTest.getSecondaryDB(), "PrimaryDrivenIndexBuilds")) {
+    IndexBuildTest.waitForIndexBuildToStart(secondaryReadsTest.getSecondaryDB(), collName, "a_1");
+}
 
 // Test secondary reads during oplog application.
 // Prevent a batch from completing on the secondary.

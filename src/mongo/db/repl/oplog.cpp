@@ -52,6 +52,7 @@
 #include "mongo/db/index_builds/index_build_oplog_entry.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/index_builds/index_builds_manager.h"
+#include "mongo/db/index_builds/primary_driven/util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_util.h"
@@ -1065,6 +1066,17 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
               }
           }
 
+          if (mongo::feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds
+                  .isEnabledUseLastLTSFCVWhenUninitialized(
+                      VersionContext::getDecoration(opCtx),
+                      serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+              return index_builds::primary_driven::start(opCtx,
+                                                         entry.getNss().dbName(),
+                                                         oplogEntry.collUUID,
+                                                         oplogEntry.buildUUID,
+                                                         oplogEntry.indexes);
+          }
+
           IndexBuildsCoordinator::ApplicationMode applicationMode =
               IndexBuildsCoordinator::ApplicationMode::kNormal;
           if (mode == OplogApplication::Mode::kInitialSync) {
@@ -1096,8 +1108,22 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
               return swOplogEntry.getStatus().withContext(
                   "Error parsing 'commitIndexBuild' oplog entry");
           }
+          auto oplogEntry = std::move(swOplogEntry.getValue());
+
+          if (mongo::feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds
+                  .isEnabledUseLastLTSFCVWhenUninitialized(
+                      VersionContext::getDecoration(opCtx),
+                      serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+              return index_builds::primary_driven::commit(opCtx,
+                                                          entry.getNss().dbName(),
+                                                          oplogEntry.collUUID,
+                                                          oplogEntry.buildUUID,
+                                                          oplogEntry.indexes,
+                                                          oplogEntry.multikey);
+          }
+
           auto* indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx);
-          indexBuildsCoordinator->applyCommitIndexBuild(opCtx, swOplogEntry.getValue());
+          indexBuildsCoordinator->applyCommitIndexBuild(opCtx, oplogEntry);
           return Status::OK();
       },
       {ErrorCodes::IndexAlreadyExists,
@@ -1117,7 +1143,21 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
               return swOplogEntry.getStatus().withContext(
                   "Error parsing 'abortIndexBuild' oplog entry");
           }
-          IndexBuildsCoordinator::get(opCtx)->applyAbortIndexBuild(opCtx, swOplogEntry.getValue());
+          auto oplogEntry = std::move(swOplogEntry.getValue());
+
+          if (mongo::feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds
+                  .isEnabledUseLastLTSFCVWhenUninitialized(
+                      VersionContext::getDecoration(opCtx),
+                      serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+              return index_builds::primary_driven::abort(opCtx,
+                                                         op->getNss().dbName(),
+                                                         oplogEntry.collUUID,
+                                                         oplogEntry.buildUUID,
+                                                         oplogEntry.indexes,
+                                                         *oplogEntry.cause);
+          }
+
+          IndexBuildsCoordinator::get(opCtx)->applyAbortIndexBuild(opCtx, oplogEntry);
           return Status::OK();
       },
       {ErrorCodes::NamespaceNotFound}}},

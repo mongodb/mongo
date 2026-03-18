@@ -7,6 +7,7 @@
  *   requires_replication,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
@@ -46,7 +47,11 @@ const indexName = "a_1";
 const createIndexCmd = IndexBuildTest.startIndexBuild(primary, primaryColl.getFullName(), indexSpec, {}, [
     ErrorCodes.InterruptedDueToReplStateChange,
 ]);
-IndexBuildTest.waitForIndexBuildToStart(secondaryDB, collName, indexName);
+if (FeatureFlagUtil.isPresentAndEnabled(secondaryDB, "PrimaryDrivenIndexBuilds")) {
+    IndexBuildTest.assertIndexesSoon(secondaryDB[collName], 2, ["_id_"], [indexName]);
+} else {
+    IndexBuildTest.waitForIndexBuildToStart(secondaryDB, collName, indexName);
+}
 
 // Wait until the write is included in the stable checkpoint.
 jsTest.log("Wait for stable checkpoint.");

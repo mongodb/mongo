@@ -7,6 +7,7 @@
  *   requires_replication,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
@@ -55,11 +56,13 @@ const indexi = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {i: 1
 const indexx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {x: 1});
 const indexy = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {y: 1});
 
-// Wait for build to start on the secondary.
-jsTestLog("Waiting for all index builds to start on the secondary");
-IndexBuildTest.waitForIndexBuildToStart(secondaryDB, coll.getName(), "i_1");
-IndexBuildTest.waitForIndexBuildToStart(secondaryDB, coll.getName(), "x_1");
-IndexBuildTest.waitForIndexBuildToStart(secondaryDB, coll.getName(), "y_1");
+if (!FeatureFlagUtil.isPresentAndEnabled(secondaryDB, "PrimaryDrivenIndexBuilds")) {
+    // Wait for build to start on the secondary.
+    jsTestLog("Waiting for all index builds to start on the secondary");
+    IndexBuildTest.waitForIndexBuildToStart(secondaryDB, coll.getName(), "i_1");
+    IndexBuildTest.waitForIndexBuildToStart(secondaryDB, coll.getName(), "x_1");
+    IndexBuildTest.waitForIndexBuildToStart(secondaryDB, coll.getName(), "y_1");
+}
 
 replTest.stop(secondary);
 replTest.start(
