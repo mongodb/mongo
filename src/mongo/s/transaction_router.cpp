@@ -727,11 +727,16 @@ void TransactionRouter::Router::processParticipantResponse(OperationContext* opC
                 return;
             }
 
+            // Additional participants may not have the most up to date information, so we relax the
+            // assertion in this case. If a node is recruited to perform read-only work as part of a
+            // read operation on a shard it will always report that shard as read-only. If that
+            // shard then performs writes later that could cause this assertion to trigger without
+            // relaxing the constraint.
             uassert(51113,
                     str::stream() << "Participant shard " << shardIdToUpdate
                                   << " claimed to be read-only for a transaction after previously "
                                      "claiming to have done a write for the transaction",
-                    readOnlyCurrent == Participant::ReadOnly::kReadOnly);
+                    readOnlyCurrent == Participant::ReadOnly::kReadOnly || isAdditionalParticipant);
             return;
         }
 
