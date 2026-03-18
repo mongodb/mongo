@@ -13,6 +13,7 @@ mongo_cc_library(
     name = "change_streams",
     srcs = [
         "all_databases_change_stream_shard_targeter_impl.cpp",
+        "all_databases_change_stream_state_event_handler.cpp",
         "change_stream_db_absent_state_event_handler.cpp",
         "change_stream_db_present_state_event_handler.cpp",
         "change_stream_reader_builder_impl.cpp",
@@ -54,6 +55,8 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "change_streams_test",
     srcs = [
+        "all_databases_change_stream_shard_targeter_impl_test.cpp",
+        "all_databases_change_stream_state_event_handler_test.cpp",
         "change_stream_reader_builder_impl_test.cpp",
         "collection_change_stream_db_absent_state_event_handler_test.cpp",
         "collection_change_stream_db_present_state_event_handler_test.cpp",
