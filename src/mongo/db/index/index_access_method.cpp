@@ -1233,22 +1233,25 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
 
     int64_t iterations = 0;
 
-    size_t numKeysInBatch = 0;
+    std::vector<key_string::Value> batch;
     size_t bytesInBatch = 0;
-    boost::optional<WriteUnitOfWork> wunit;
-    auto commitAndResetWunit = [&wunit, &numKeysInBatch, &bytesInBatch]() {
-        wunit->commit();
-        wunit.reset();
-        numKeysInBatch = 0;
+
+    auto commitBatch = [&]() {
+        if (batch.empty()) {
+            return;
+        }
+        writeConflictRetry(opCtx, "addingKey", _ns, [&] {
+            WriteUnitOfWork wunit(opCtx);
+            for (auto&& key : batch) {
+                _addKeyForCommit(opCtx, ru, *collection, key);
+            }
+            wunit.commit();
+        });
+        batch.clear();
         bytesInBatch = 0;
     };
-    // Handles when we don't commit the wunit and exit the while-loop early. For example, if we
-    // encounter duplicate multikey metadata keys.
-    ScopeGuard commitAndResetWunitOuterGuard([&] {
-        if (wunit) {
-            commitAndResetWunit();
-        }
-    });
+    ON_BLOCK_EXIT([&] { commitBatch(); });
+
     while (it && it->more()) {
         opCtx->checkForInterrupt();
 
@@ -1310,49 +1313,29 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
 
         _previousKey = data.first;
 
+        if (isDup) {
+            if (auto status = onDuplicateKeyInserted(*collection, data.first); !status.isOK())
+                return status;
+        }
+
         try {
-            // TODO SERVER-118845: Move the writeConflictRetry to a higher level to correctly
-            // resolve batched write conflict failures.
-            writeConflictRetry(opCtx, "addingKey", _ns, [&] {
-                ScopeGuard commitAndResetWunitInnerGuard([&] {
-                    invariant(wunit);
-                    commitAndResetWunit();
-                });
-                if (!wunit) {
-                    wunit.emplace(opCtx);
-                }
-                _addKeyForCommit(opCtx, ru, *collection, data.first);
-                numKeysInBatch++;
-                bytesInBatch += data.first.getSize();
-                if (numKeysInBatch == keyBatchSize || bytesInBatch >= keyBatchBytes ||
-                    !it->more()) {
-                    invariant(wunit);
-                    commitAndResetWunit();
-                }
-                commitAndResetWunitInnerGuard.dismiss();
-            });
-        } catch (DBException& e) {
-            if (wunit) {
-                wunit.reset();
-                numKeysInBatch = 0;
-                bytesInBatch = 0;
+            bytesInBatch += data.first.getSize();
+            batch.push_back(std::move(data.first));
+            if (batch.size() >= keyBatchSize || bytesInBatch >= keyBatchBytes || !it->more()) {
+                commitBatch();
             }
+        } catch (DBException& e) {
+            batch.clear();
+            bytesInBatch = 0;
             Status status = e.toStatus();
             // Duplicates are checked before inserting.
             invariant(status.code() != ErrorCodes::DuplicateKey);
             return status;
         }
 
-        if (isDup) {
-            if (auto status = onDuplicateKeyInserted(*collection, data.first); !status.isOK())
-                return status;
-        }
-
         // Yield locks every 'yieldIterations' key insertions.
         if (yieldIterations > 0 && (++iterations % yieldIterations == 0)) {
-            if (wunit) {
-                commitAndResetWunit();
-            }
+            commitBatch();
             std::tie(collection, entry) = yieldFn(opCtx);
         }
 
