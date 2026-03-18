@@ -526,6 +526,12 @@ void computeShapeAndRegisterQueryStats(OperationContext* opCtx,
     });
 }
 
+void saveStatsOnConflict(PlanExecutor* exec, CurOp* curOp) {
+    PlanSummaryStats partialStats;
+    exec->getPlanExplainer().getSummaryStats(&partialStats);
+    curOp->debug().setPlanSummaryMetrics(std::move(partialStats));
+}
+
 }  // namespace
 
 bool handleError(OperationContext* opCtx,
@@ -966,16 +972,24 @@ UpdateResult performUpdate(OperationContext* opCtx,
         CurOp::get(opCtx)->setPlanSummary(lk, exec->getPlanExplainer().getPlanSummary());
     }
 
-    if (updateRequest->shouldReturnAnyDocs()) {
-        docFound = exec->executeFindAndModify();
-        curOp->debug().getAdditiveMetrics().nreturned = docFound ? 1 : 0;
-    } else {
-        // The 'UpdateResult' object will be obtained later, so discard the return value.
-        (void)exec->executeUpdate();
+    try {
+        if (updateRequest->shouldReturnAnyDocs()) {
+            docFound = exec->executeFindAndModify();
+            curOp->debug().getAdditiveMetrics().nreturned = docFound ? 1 : 0;
+        } else {
+            // The 'UpdateResult' object will be obtained later, so discard the return value.
+            (void)exec->executeUpdate();
+        }
+    } catch (ExceptionFor<ErrorCodes::WriteConflict>&) {
+        saveStatsOnConflict(exec.get(), curOp);
+        throw;
+    } catch (ExceptionFor<ErrorCodes::TemporarilyUnavailable>&) {
+        saveStatsOnConflict(exec.get(), curOp);
+        throw;
     }
 
-    // Nothing after executing the plan executor should throw a WriteConflictException, so the
-    // following bookkeeping with execution stats won't end up being done multiple times.
+    // Accumulate execution stats from prior write-conflict retries (if any) plus this final
+    // successful attempt.
 
     PlanSummaryStats summaryStats;
     auto&& explainer = exec->getPlanExplainer();
@@ -1098,17 +1112,25 @@ long long performDelete(OperationContext* opCtx,
         CurOp::get(opCtx)->setPlanSummary(lk, exec->getPlanExplainer().getPlanSummary());
     }
 
-    if (deleteRequest->getReturnDeleted()) {
-        docFound = exec->executeFindAndModify();
-        curOp->debug().getAdditiveMetrics().nreturned = docFound ? 1 : 0;
-    } else {
-        // The number of deleted documents will be obtained from the plan executor later, so discard
-        // the return value.
-        (void)exec->executeDelete();
+    try {
+        if (deleteRequest->getReturnDeleted()) {
+            docFound = exec->executeFindAndModify();
+            curOp->debug().getAdditiveMetrics().nreturned = docFound ? 1 : 0;
+        } else {
+            // The number of deleted documents will be obtained from the plan executor later, so
+            // discard the return value.
+            (void)exec->executeDelete();
+        }
+    } catch (ExceptionFor<ErrorCodes::WriteConflict>&) {
+        saveStatsOnConflict(exec.get(), curOp);
+        throw;
+    } catch (ExceptionFor<ErrorCodes::TemporarilyUnavailable>&) {
+        saveStatsOnConflict(exec.get(), curOp);
+        throw;
     }
 
-    // Nothing after executing the PlanExecutor should throw a WriteConflictException, so the
-    // following bookkeeping with execution stats won't end up being done multiple times.
+    // Accumulate execution stats from prior write-conflict retries (if any) plus this final
+    // successful attempt.
 
     PlanSummaryStats summaryStats;
     exec->getPlanExplainer().getSummaryStats(&summaryStats);
@@ -1441,7 +1463,17 @@ static SingleWriteResult performSingleUpdateOpNoRetry(OperationContext* opCtx,
         CurOp::get(opCtx)->setPlanSummary(lk, exec->getPlanExplainer().getPlanSummary());
     }
 
-    auto updateResult = exec->executeUpdate();
+    const UpdateResult updateResult = [&] {
+        try {
+            return exec->executeUpdate();
+        } catch (ExceptionFor<ErrorCodes::WriteConflict>&) {
+            saveStatsOnConflict(exec.get(), &curOp);
+            throw;
+        } catch (ExceptionFor<ErrorCodes::TemporarilyUnavailable>&) {
+            saveStatsOnConflict(exec.get(), &curOp);
+            throw;
+        }
+    }();
 
     PlanSummaryStats summary;
     auto&& explainer = exec->getPlanExplainer();

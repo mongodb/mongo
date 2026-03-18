@@ -79,6 +79,10 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
+namespace {
+MONGO_FAIL_POINT_DEFINE(hangBeforeUpdaterEnsureDocStillMatchesAndYield);
+}  // namespace
+
 namespace mongo {
 
 namespace {
@@ -219,6 +223,13 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
             // Found a RecordId that refers to a document we had already updated. Note that
             // we can never remove from _updatedRecordIds because updates by other clients
             // could cause us to encounter a document again later.
+            return PlanStage::NEED_TIME;
+        }
+
+        if (MONGO_unlikely(hangBeforeUpdaterEnsureDocStillMatchesAndYield.shouldFail())) {
+            hangBeforeUpdaterEnsureDocStillMatchesAndYield.pauseWhileSet();
+            memberFreer.dismiss();
+            prepareToRetryWSM(id, out);
             return PlanStage::NEED_TIME;
         }
 
