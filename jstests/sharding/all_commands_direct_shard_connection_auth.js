@@ -28,6 +28,7 @@ const requiresMongoS = "command only allowed via mongoS";
 
 const allCommands = {
     _addShard: {skip: isAnInternalCommand},
+    _internalClearCollectionShardingMetadata: {skip: isAnInternalCommand},
     _clusterQueryWithoutShardKey: {skip: isAnInternalCommand},
     _clusterWriteWithoutShardKey: {skip: isAnInternalCommand},
     _configsvrAbortReshardCollection: {skip: isAnInternalCommand},

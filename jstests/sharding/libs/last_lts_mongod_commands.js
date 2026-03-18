@@ -73,4 +73,5 @@ export const commandsAddedToMongodSinceLastLTS = [
     "_shardsvrTimeseriesUpgradeDowngradePrepare",
     "_shardsvrTimeseriesUpgradeDowngradeCommit",
     "persistenceProviderProperties",
+    "_internalClearCollectionShardingMetadata",
 ];

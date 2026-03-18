@@ -602,6 +602,15 @@ mongo_cc_library(
 )
 
 idl_generator(
+    name = "internal_clear_collection_sharding_metadata_gen",
+    src = "internal_clear_collection_sharding_metadata.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
     name = "type_oplog_catalog_metadata_gen",
     src = "type_oplog_catalog_metadata.idl",
     deps = [

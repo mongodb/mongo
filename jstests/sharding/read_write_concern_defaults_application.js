@@ -79,6 +79,7 @@ let validateTestCase = function (test) {
 
 let testCases = {
     _addShard: {skip: "internal command"},
+    _internalClearCollectionShardingMetadata: {skip: "internal command"},
     _cloneCollectionOptionsFromPrimaryShard: {skip: "internal command"},
     _clusterQueryWithoutShardKey: {skip: "internal command"},
     _clusterWriteWithoutShardKey: {skip: "internal command"},

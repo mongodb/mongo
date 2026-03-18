@@ -709,6 +709,8 @@ mongo_cc_library(
         "//src/mongo/db/shard_role/ddl:clone_catalog_data_command.cpp",
         "//src/mongo/db/shard_role/shard_catalog:flush_database_cache_updates_command.cpp",
         "//src/mongo/db/shard_role/shard_catalog:flush_routing_table_cache_updates_command.cpp",
+        "//src/mongo/db/shard_role/shard_catalog:internal_clear_collection_sharding_metadata_cmd.cpp",
+        "//src/mongo/db/shard_role/shard_catalog:internal_clear_collection_sharding_metadata_gen",
         "//src/mongo/db/shard_role/shard_catalog:shardsvr_cleanup_structured_encryption_data_command.cpp",
         "//src/mongo/db/shard_role/shard_catalog:shardsvr_clone_authoritative_metadata_command.cpp",
         "//src/mongo/db/shard_role/shard_catalog:shardsvr_compact_structured_encryption_data_command.cpp",

@@ -31,6 +31,7 @@ const cannotRunWhileDowngrading = "cannot run command while downgrading";
 
 const allCommands = {
     _addShard: {skip: isAnInternalCommand},
+    _internalClearCollectionShardingMetadata: {skip: isAnInternalCommand},
     _clusterQueryWithoutShardKey: {skip: isAnInternalCommand},
     _clusterWriteWithoutShardKey: {skip: isAnInternalCommand},
     _configsvrAbortReshardCollection: {skip: isAnInternalCommand},

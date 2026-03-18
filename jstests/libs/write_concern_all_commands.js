@@ -79,6 +79,7 @@ let getShardKey = (coll, fullNs) => {
 // All commands in the server.
 const wcCommandsTests = {
     _addShard: {skip: "internal command"},
+    _internalClearCollectionShardingMetadata: {skip: "internal command"},
     _cloneCollectionOptionsFromPrimaryShard: {skip: "internal command"},
     _clusterQueryWithoutShardKey: {skip: "internal command"},
     _clusterWriteWithoutShardKey: {skip: "internal command"},
@@ -3332,6 +3333,7 @@ const wcCommandsTests = {
 
 const wcTimeseriesViewsCommandsTests = {
     _addShard: {skip: "internal command"},
+    _internalClearCollectionShardingMetadata: {skip: "internal command"},
     _cloneCollectionOptionsFromPrimaryShard: {skip: "internal command"},
     _clusterQueryWithoutShardKey: {skip: "internal command"},
     _clusterWriteWithoutShardKey: {skip: "internal command"},
