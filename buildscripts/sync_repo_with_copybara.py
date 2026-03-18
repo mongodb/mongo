@@ -724,7 +724,7 @@ def main():
             print("ERROR: prod workflow should not be run in patch builds!")
             sys.exit(1)
         test_args = []
-        branch = "master"
+        branch = "v8.3"
         config_file = get_prod_copybara_config_from_master(current_dir)
     else:
         raise Exception(f"invalid workflow {args.workflow}")

@@ -460,8 +460,8 @@ buildvariants:
             variant: generate-tasks-for-version
 
   - <<: *linux_debug_aubsan_compile_variant_dependency
-    name: linux-debug-aubsan-lite-all-feature-flags-required
-    display_name: "! Amazon Linux 2023 arm64 {A,UB}SAN Enterprise DEBUG (all feature flags)"
+    name: linux-debug-aubsan-lite-required
+    display_name: "! Amazon Linux 2023 arm64 {A,UB}SAN Enterprise DEBUG"
     tags: ["required"]
     cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
@@ -474,7 +474,6 @@ buildvariants:
       # fcv_upgrade_downgrade tests, when concurrent FCV upgrade/downgrades can keep batch write
       # operations from making progress on slow sanitizer variants.
       test_flags: >-
-        --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_aubsan
         --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000, maxRoundsWithoutProgressParameter: 20}"
     tasks:
@@ -572,20 +571,20 @@ buildvariants:
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"
         --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"
     tasks:
-      - name: .development_critical !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.requires_all_feature_flags
-      - name: .development_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.requires_all_feature_flags
+      - name: .development_critical !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags !.requires_all_feature_flags
+      - name: .development_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags !.requires_all_feature_flags
         distros:
           - rhel8.8-large
-      - name: .release_critical !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.requires_all_feature_flags
-      - name: .release_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.requires_all_feature_flags
+      - name: .release_critical !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags !.requires_all_feature_flags
+      - name: .release_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags !.requires_all_feature_flags
         distros:
           - rhel8.8-large
-      - name: .default !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.requires_all_feature_flags
-      - name: .default !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.requires_all_feature_flags
+      - name: .default !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags !.requires_all_feature_flags
+      - name: .default !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags !.requires_all_feature_flags
         distros:
           - rhel8.8-large
-      - name: .non_deterministic !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.requires_all_feature_flags
-      - name: .non_deterministic !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.requires_all_feature_flags
+      - name: .non_deterministic !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags !.requires_all_feature_flags
+      - name: .non_deterministic !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags !.requires_all_feature_flags
         distros:
           - rhel8.8-large
 
@@ -830,32 +829,32 @@ buildvariants:
         --excludeWithAnyTags=tsan_incompatible
         --disableUnreleasedIFRFlags
     tasks:
-      - name: .development_critical !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.requires_all_feature_flags
-      - name: .development_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.requires_all_feature_flags
+      - name: .development_critical !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags !.requires_all_feature_flags
+      - name: .development_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags !.requires_all_feature_flags
         distros:
           - *enterprise-rhel8-debug-tsan-large-distro-name
-      - name: .development_critical !.requires_extra_system_deps .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.requires_all_feature_flags
+      - name: .development_critical !.requires_extra_system_deps .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags !.requires_all_feature_flags
         distros:
           - *enterprise-rhel8-debug-tsan-large-distro-name
-      - name: .release_critical !.requires_extra_system_deps !.requires_large_host .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.requires_all_feature_flags
-      - name: .release_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.requires_all_feature_flags
+      - name: .release_critical !.requires_extra_system_deps !.requires_large_host .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags !.requires_all_feature_flags
+      - name: .release_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags !.requires_all_feature_flags
         distros:
           - *enterprise-rhel8-debug-tsan-large-distro-name
-      - name: .release_critical !.requires_extra_system_deps .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.requires_all_feature_flags
+      - name: .release_critical !.requires_extra_system_deps .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags !.requires_all_feature_flags
         distros:
           - *enterprise-rhel8-debug-tsan-large-distro-name
-      - name: .default !.requires_extra_system_deps !.requires_large_host !.requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.requires_all_feature_flags
-      - name: .default !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.requires_all_feature_flags
+      - name: .default !.requires_extra_system_deps !.requires_large_host !.requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags !.requires_all_feature_flags
+      - name: .default !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags !.requires_all_feature_flags
         distros:
           - *enterprise-rhel8-debug-tsan-large-distro-name
-      - name: .default !.requires_extra_system_deps .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.requires_all_feature_flags
+      - name: .default !.requires_extra_system_deps .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags !.requires_all_feature_flags
         distros:
           - *enterprise-rhel8-debug-tsan-large-distro-name
-      - name: .non_deterministic !.requires_extra_system_deps !.requires_large_host !.requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.requires_all_feature_flags
-      - name: .non_deterministic !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.requires_all_feature_flags
+      - name: .non_deterministic !.requires_extra_system_deps !.requires_large_host !.requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags !.requires_all_feature_flags
+      - name: .non_deterministic !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags !.requires_all_feature_flags
         distros:
           - *enterprise-rhel8-debug-tsan-large-distro-name
-      - name: .non_deterministic !.requires_extra_system_deps .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags !.requires_all_feature_flags
+      - name: .non_deterministic !.requires_extra_system_deps .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags !.requires_all_feature_flags
         distros:
           - *enterprise-rhel8-debug-tsan-large-distro-name
 

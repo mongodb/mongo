@@ -13,11 +13,9 @@ include:
   #
   - filename: evergreen/system_perf/master/base.yml
     module: dsi
-  - filename: evergreen/system_perf/master/compiles.yml
+  - filename: evergreen/system_perf/8.3/compiles.yml
     module: dsi
-  - filename: evergreen/system_perf/master/variants.yml
-    module: dsi
-  - filename: evergreen/system_perf/master/master_variants.yml
+  - filename: evergreen/system_perf/8.3/variants.yml
     module: dsi
   - filename: evergreen/system_perf/shared_tasks.yml
     module: dsi
