@@ -447,3 +447,8 @@ buildvariants:
   tasks:
   - name: sync_repo_with_copybara
     priority: 50
+
+patch_aliases:
+  - alias: coverity_scan
+    variant: bv_coverity_analysis
+    task: run_coverity
