@@ -493,7 +493,7 @@
     },
     "//bazel/toolchains/cc/mongo_apple_cross:mongo_apple_cross_toolchain.bzl%setup_mongo_apple_cross_toolchain_extension": {
       "general": {
-        "bzlTransitiveDigest": "oskcsYFrmneRRo1v+AhRS4kSzDQ2d421jHvWL0A1SRA=",
+        "bzlTransitiveDigest": "0i1efTsqX+QAW3/VcIkiaihfsl1MV7TqwG6iLosnXGU=",
         "usagesDigest": "EVkQddf0MbwFmuJ26u4/NZd4P4Z0AhChzItbpAItozs=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
