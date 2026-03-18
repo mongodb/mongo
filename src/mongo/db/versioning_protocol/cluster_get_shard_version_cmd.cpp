@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -50,6 +49,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/versioning_protocol/catalog_cache_diagnostics_helpers.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/logv2/log.h"
@@ -115,59 +115,16 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbName, cmdObj));
-        const auto catalogCache = Grid::get(opCtx)->catalogCache();
-
-        if (nss.coll().empty()) {
-            // Return the database's information.
-            auto cachedDbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.dbName()));
-            result.append("primaryShard", cachedDbInfo->getPrimary().toString());
-            result.append("version", cachedDbInfo->getVersion().toBSON());
+        bool fullMetadata = cmdObj["fullMetadata"].trueValue();
+        // On a router, we expose two options. By default, we get the cached information in a way
+        // which may trigger a refresh. Alternatively, providing the "latestCached" option will
+        // return whatever information is currently in the catalog cache.
+        if (cmdObj["latestCached"].trueValue()) {
+            catalog_cache_diagnostics_helpers::appendLatestCachedCollInfo(
+                opCtx, &result, nss, fullMetadata);
         } else {
-            // Return the collection's information.
-            const auto cri = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
-            const auto& cm = cri.getChunkManager();
-            uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << "Collection " << nss.toStringForErrorMsg()
-                                  << " does not have a routing table.",
-                    cm.hasRoutingTable());
-
-            result.appendTimestamp("version", cm.getVersion().toLong());
-            result.append("versionEpoch", cm.getVersion().epoch());
-            result.append("versionTimestamp", cm.getVersion().getTimestamp());
-            // Added to the result bson if the max bson size is exceeded
-            BSONObjBuilder exceededSizeElt(BSON("exceededSize" << true));
-
-            if (cmdObj["fullMetadata"].trueValue()) {
-                BSONArrayBuilder chunksArrBuilder;
-                bool exceedsSizeLimit = false;
-
-                LOGV2(22753,
-                      "Routing info requested by getShardVersion",
-                      "routingInfo"_attr = redact(cm.toString()));
-
-                cm.forEachChunk([&](const auto& chunk) {
-                    if (!exceedsSizeLimit) {
-                        BSONArrayBuilder chunkBB(chunksArrBuilder.subarrayStart());
-                        chunkBB.append(chunk.getMin());
-                        chunkBB.append(chunk.getMax());
-                        chunkBB.done();
-                        if (chunksArrBuilder.len() + result.len() + exceededSizeElt.len() >
-                            BSONObjMaxUserSize) {
-                            exceedsSizeLimit = true;
-                        }
-                    }
-
-                    return true;
-                });
-
-                if (!exceedsSizeLimit) {
-                    result.append("chunks", chunksArrBuilder.arr());
-                }
-
-                if (exceedsSizeLimit) {
-                    result.appendElements(exceededSizeElt.done());
-                }
-            }
+            catalog_cache_diagnostics_helpers::appendCatalogCacheInfo(
+                opCtx, &result, nss, fullMetadata);
         }
 
         return true;

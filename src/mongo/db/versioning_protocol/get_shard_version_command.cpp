@@ -53,6 +53,7 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/versioning_protocol/catalog_cache_diagnostics_helpers.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/namespace_string_util.h"
@@ -68,6 +69,58 @@
 
 namespace mongo {
 namespace {
+
+void appendFilteringMetadataCacheInfo(OperationContext* opCtx,
+                                      BSONObjBuilder* builder,
+                                      const NamespaceString& nss,
+                                      bool fullMetadata) {
+    builder->append(
+        "configServer",
+        Grid::get(opCtx)->shardRegistry()->getConfigServerConnectionString().toString());
+
+    AutoGetCollection autoColl(
+        opCtx,
+        nss,
+        MODE_IS,
+        auto_get_collection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
+    const auto scopedCsr =
+        CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
+
+    auto optMetadata = scopedCsr->getCurrentMetadataIfKnown();
+    if (!optMetadata) {
+        catalog_cache_diagnostics_helpers::appendWhenUnknown(builder, fullMetadata);
+    } else {
+        const auto& metadata = *optMetadata;
+        builder->appendTimestamp("global", metadata.getShardPlacementVersion().toLong());
+
+        if (fullMetadata) {
+            BSONObjBuilder metadataBuilder(builder->subobjStart("metadata"));
+            if (metadata.isSharded()) {
+                metadataBuilder.appendTimestamp("collVersion",
+                                                metadata.getCollPlacementVersion().toLong());
+                metadataBuilder.append("collVersionEpoch",
+                                       metadata.getCollPlacementVersion().epoch());
+                metadataBuilder.append("collVersionTimestamp",
+                                       metadata.getCollPlacementVersion().getTimestamp());
+
+                metadataBuilder.appendTimestamp(
+                    "shardVersion", metadata.getShardPlacementVersionForLogging().toLong());
+                metadataBuilder.append("shardVersionEpoch",
+                                       metadata.getShardPlacementVersionForLogging().epoch());
+                metadataBuilder.append(
+                    "shardVersionTimestamp",
+                    metadata.getShardPlacementVersionForLogging().getTimestamp());
+
+                metadataBuilder.append("keyPattern", metadata.getShardKeyPattern().toBSON());
+
+                BSONArrayBuilder chunksArr(metadataBuilder.subarrayStart("chunks"));
+                metadata.toBSONChunks(&chunksArr);
+                chunksArr.doneFast();
+            }
+            metadataBuilder.doneFast();
+        }
+    }
+}
 
 class GetShardVersion : public BasicCommand {
 public:
@@ -114,56 +167,15 @@ public:
         const NamespaceString nss(parseNs(dbName, cmdObj));
 
         ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
+        bool fullMetadata = cmdObj["fullMetadata"].trueValue();
 
-        result.append(
-            "configServer",
-            Grid::get(opCtx)->shardRegistry()->getConfigServerConnectionString().toString());
-
-        AutoGetCollection autoColl(opCtx,
-                                   nss,
-                                   MODE_IS,
-                                   auto_get_collection::Options{}.viewMode(
-                                       auto_get_collection::ViewMode::kViewsPermitted));
-        const auto scopedCsr =
-            CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
-
-        auto optMetadata = scopedCsr->getCurrentMetadataIfKnown();
-        if (!optMetadata) {
-            result.append("global", "UNKNOWN");
-
-            if (cmdObj["fullMetadata"].trueValue()) {
-                result.append("metadata", BSONObj());
-            }
+        // On shard servers we can dump either the routing info or the filtering info, controlled
+        // via the "latestCached" argument.
+        if (cmdObj["latestCached"].trueValue()) {
+            catalog_cache_diagnostics_helpers::appendLatestCachedCollInfo(
+                opCtx, &result, nss, fullMetadata);
         } else {
-            const auto& metadata = *optMetadata;
-            result.appendTimestamp("global", metadata.getShardPlacementVersion().toLong());
-
-            if (cmdObj["fullMetadata"].trueValue()) {
-                BSONObjBuilder metadataBuilder(result.subobjStart("metadata"));
-                if (metadata.isSharded()) {
-                    metadataBuilder.appendTimestamp("collVersion",
-                                                    metadata.getCollPlacementVersion().toLong());
-                    metadataBuilder.append("collVersionEpoch",
-                                           metadata.getCollPlacementVersion().epoch());
-                    metadataBuilder.append("collVersionTimestamp",
-                                           metadata.getCollPlacementVersion().getTimestamp());
-
-                    metadataBuilder.appendTimestamp(
-                        "shardVersion", metadata.getShardPlacementVersionForLogging().toLong());
-                    metadataBuilder.append("shardVersionEpoch",
-                                           metadata.getShardPlacementVersionForLogging().epoch());
-                    metadataBuilder.append(
-                        "shardVersionTimestamp",
-                        metadata.getShardPlacementVersionForLogging().getTimestamp());
-
-                    metadataBuilder.append("keyPattern", metadata.getShardKeyPattern().toBSON());
-
-                    BSONArrayBuilder chunksArr(metadataBuilder.subarrayStart("chunks"));
-                    metadata.toBSONChunks(&chunksArr);
-                    chunksArr.doneFast();
-                }
-                metadataBuilder.doneFast();
-            }
+            appendFilteringMetadataCacheInfo(opCtx, &result, nss, fullMetadata);
         }
 
         return true;

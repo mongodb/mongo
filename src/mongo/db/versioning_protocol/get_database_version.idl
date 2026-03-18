@@ -42,3 +42,7 @@ commands:
         namespace: type
         api_version: ""
         type: string
+        fields:
+            latestCached:
+                type: bool
+                default: false

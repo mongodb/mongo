@@ -506,5 +506,50 @@ TEST_F(ShardRegistryTest, FlushShardRegistryReloadForRecovery) {
         << "host3 should now belong to shard2 after reassignment";
 }
 
+TEST_F(ShardRegistryTest, toBSONEmptyRegistry) {
+    reloadAndWait();
+
+    BSONObjBuilder builder;
+    shardRegistry()->toBSON(&builder);
+    auto result = builder.obj();
+
+    ASSERT_TRUE(result.hasField("map"));
+    ASSERT_TRUE(result.hasField("hosts"));
+    ASSERT_TRUE(result.hasField("connStrings"));
+    auto map = result["map"].Obj();
+    // With no shards, the map should only contain the config shard
+    ASSERT_EQ(map.nFields(), 1);
+
+    ASSERT_TRUE(result.hasField("timeInStore"));
+    std::string timeInStoreStr = result["timeInStore"].String();
+    ASSERT_TRUE(timeInStoreStr.find("forceReloadIncrement") != std::string::npos);
+    ASSERT_TRUE(timeInStoreStr.find("topologyTime") != std::string::npos);
+}
+
+TEST_F(ShardRegistryTest, toBSONWithShards) {
+    addShard({"shard0"}, kAdvanceTopologyTime);
+    addShard({"shard1"}, kAdvanceTopologyTime);
+
+    auto future = launchAsync([this] { assertShardIdsFromRegistry(getData()->getAllShardIds()); });
+    expectCSRSLookup();
+    future.default_timed_get();
+
+    BSONObjBuilder builder;
+    shardRegistry()->toBSON(&builder);
+    auto result = builder.obj();
+
+    ASSERT_TRUE(result.hasField("map"));
+    ASSERT_TRUE(result.hasField("hosts"));
+    ASSERT_TRUE(result.hasField("connStrings"));
+    auto map = result["map"].Obj();
+    ASSERT_GTE(map.nFields(), 2);
+    ASSERT_TRUE(map.hasField("shard0"));
+    ASSERT_TRUE(map.hasField("shard1"));
+
+    ASSERT_TRUE(result.hasField("timeInStore"));
+    std::string timeInStoreStr = result["timeInStore"].String();
+    ASSERT_TRUE(timeInStoreStr.find("topologyTime") != std::string::npos);
+}
+
 }  // namespace
 }  // namespace mongo

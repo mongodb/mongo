@@ -685,6 +685,14 @@ boost::optional<ChunkVersion> CatalogCache::peekCollectionCacheVersion(const Nam
     }
 }
 
+RoutingTableHistoryValueHandle CatalogCache::peekCollectionCacheEntry(const NamespaceString& nss) {
+    return _collectionCache.peekLatestCached(nss);
+}
+
+DatabaseTypeValueHandle CatalogCache::peekDatabaseCacheEntry(const DatabaseName& dbName) {
+    return _databaseCache.peekLatestCached(dbName);
+}
+
 void CatalogCache::Stats::report(BSONObjBuilder* builder) const {
     builder->append("countStaleConfigErrors", countStaleConfigErrors.load());
 

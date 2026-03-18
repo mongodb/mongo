@@ -45,6 +45,7 @@ mongo_cc_library(
     srcs = [
         "document_shard_key_update_util.cpp",
         "strategy.cpp",
+        "//src/mongo/db/versioning_protocol:catalog_cache_diagnostics_helpers.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_explain.cpp",
         "//src/mongo/s/commands/query_cmd:cluster_write_cmd.cpp",
     ],
@@ -66,6 +67,7 @@ mongo_cc_library(
         "//src/mongo/otel/traces:tracing",
         "//src/mongo/rpc:metadata",
         "//src/mongo/rpc:rewrite_state_change_errors",
+        "//src/mongo/s:grid",
         "//src/mongo/s:load_balancer_support",
         "//src/mongo/s:mongos_topology_coordinator",
         "//src/mongo/s:sharding_api",

@@ -61,6 +61,10 @@ structs:
             dbVersion:
                 description: Version known by the node for the given database.
                 type: database_version
+            timeInStore:
+                description: Time in the catalog cache for the given information.
+                type: string
+                optional: true
 
 commands:
     createDatabase:
@@ -155,3 +159,7 @@ commands:
         type: database_name
         api_version:
         strict: false
+        fields:
+            latestCached:
+                type: bool
+                default: false

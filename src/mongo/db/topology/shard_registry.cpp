@@ -575,6 +575,7 @@ void ShardRegistry::toBSON(BSONObjBuilder* result) const {
     BSONObjBuilder connStrings;
     if (auto data = _getCachedData()) {
         data->toBSON(&map, &hosts, &connStrings);
+        result->append("timeInStore", data.getTime().toString());
     }
     {
         stdx::lock_guard lk(_mutex);

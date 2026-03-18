@@ -469,6 +469,18 @@ public:
      */
     boost::optional<ChunkVersion> peekCollectionCacheVersion(const NamespaceString& nss);
 
+    /**
+     * Returns the current value in the collection cache for the specified namespace. Never blocks
+     * waiting for a refresh.
+     */
+    RoutingTableHistoryValueHandle peekCollectionCacheEntry(const NamespaceString& nss);
+
+    /**
+     * Returns the current value in the database cache for the specified database name. Never blocks
+     * waiting for a refresh.
+     */
+    DatabaseTypeValueHandle peekDatabaseCacheEntry(const DatabaseName& dbName);
+
 private:
     class DatabaseCache : public DatabaseTypeCache {
     public:

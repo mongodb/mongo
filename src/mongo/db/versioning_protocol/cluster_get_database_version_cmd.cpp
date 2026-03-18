@@ -31,6 +31,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/sharding_environment/cluster_commands_gen.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/versioning_protocol/catalog_cache_diagnostics_helpers.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -49,9 +50,20 @@ public:
         using InvocationBase::InvocationBase;
 
         Response typedRun(OperationContext* opCtx) {
-            auto catalogCache = Grid::get(opCtx)->catalogCache();
-            const auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, ns().dbName()));
-            return {dbInfo->getPrimary(), dbInfo->getVersion()};
+            if (request().getLatestCached()) {
+                BSONObjBuilder responseBuilder;
+                catalog_cache_diagnostics_helpers::appendLatestCachedDbInfo(
+                    opCtx, &responseBuilder, ns().dbName());
+                uassert(ErrorCodes::NamespaceNotFound,
+                        "Database not found in the catalog cache",
+                        !responseBuilder.hasField("global"));
+                return Response::parse(responseBuilder.obj());
+            } else {
+                auto catalogCache = Grid::get(opCtx)->catalogCache();
+                const auto dbInfo =
+                    uassertStatusOK(catalogCache->getDatabase(opCtx, ns().dbName()));
+                return {dbInfo->getPrimary(), dbInfo->getVersion()};
+            }
         }
 
     private:

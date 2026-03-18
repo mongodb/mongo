@@ -45,6 +45,7 @@
 #include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/versioning_protocol/catalog_cache_diagnostics_helpers.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/get_database_version_gen.h"
 #include "mongo/rpc/op_msg.h"
@@ -63,6 +64,37 @@
 
 
 namespace mongo {
+
+namespace {
+
+void appendFilteringMetadataCacheInfo(OperationContext* opCtx,
+                                      rpc::ReplyBuilderInterface* result,
+                                      const DatabaseName& dbName) {
+    auto [dbPrimaryShard, dbVersion] = [&] {
+        const auto scopedDsr = DatabaseShardingRuntime::acquireShared(opCtx, dbName);
+
+        // GetDatabaseVersion command can bypass the critical section to read database
+        // metadata as it is a command used for troubleshooting and inspect the insights of
+        // the DatabaseShardingRuntime.
+        BypassDatabaseMetadataAccess bypassDbMetadataAccess(
+            opCtx, BypassDatabaseMetadataAccess::Type::kReadOnly);  // NOLINT
+
+        return std::make_pair(scopedDsr->getDbPrimaryShard(opCtx), scopedDsr->getDbVersion(opCtx));
+    }();
+
+    if (!dbVersion) {
+        result->getBodyBuilder().append("dbVersion", BSONObj());
+        return;
+    }
+
+    result->getBodyBuilder().append("dbVersion", dbVersion->toBSON());
+
+    if (dbPrimaryShard && ShardingState::get(opCtx)->shardId() == *dbPrimaryShard) {
+        result->getBodyBuilder().append("isPrimaryShardForDb", true);
+    }
+}
+
+}  // namespace
 
 class GetDatabaseVersionCmd final : public TypedCommand<GetDatabaseVersionCmd> {
 public:
@@ -97,29 +129,13 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << definition()->getName() << " can only be run on shard servers",
                     serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
-
-            auto [dbPrimaryShard, dbVersion] = [&] {
-                const auto scopedDsr = DatabaseShardingRuntime::acquireShared(opCtx, _targetDb());
-
-                // GetDatabaseVersion command can bypass the critical section to read database
-                // metadata as it is a command used for troubleshooting and inspect the insights of
-                // the DatabaseShardingRuntime.
-                BypassDatabaseMetadataAccess bypassDbMetadataAccess(
-                    opCtx, BypassDatabaseMetadataAccess::Type::kReadOnly);  // NOLINT
-
-                return std::make_pair(scopedDsr->getDbPrimaryShard(opCtx),
-                                      scopedDsr->getDbVersion(opCtx));
-            }();
-
-            if (!dbVersion) {
-                result->getBodyBuilder().append("dbVersion", BSONObj());
-                return;
-            }
-
-            result->getBodyBuilder().append("dbVersion", dbVersion->toBSON());
-
-            if (dbPrimaryShard && ShardingState::get(opCtx)->shardId() == *dbPrimaryShard) {
-                result->getBodyBuilder().append("isPrimaryShardForDb", true);
+            if (request().getLatestCached()) {
+                auto builder = result->getBodyBuilder();
+                catalog_cache_diagnostics_helpers::appendLatestCachedDbInfo(
+                    opCtx, &builder, _targetDb());
+                builder.done();
+            } else {
+                appendFilteringMetadataCacheInfo(opCtx, result, _targetDb());
             }
         }
 
