@@ -51,8 +51,12 @@ class CodeMergeStatus(Enum):
 class SummaryMsg(Enum):
     BELOW_THRESHOLDS = "All metrics are within 100% of their thresholds. All merges are allowed."
     THRESHOLD_EXCEEDED = (
-        "At least one metric exceeds 100% of its threshold. "
+        "At least one team exceeds 100% of its threshold. "
         "Approve only changes that fix BFs, Bugs, and Performance Regressions in the following scopes:"
+    )
+    ZERO_QUOTA_EXCEEDED = (
+        "The following triage queues should be kept empty but currently have issues. "
+        "Route or resolve these immediately:"
     )
 
 
@@ -76,13 +80,15 @@ class MonitorBuildStatusOrchestrator:
                 scope_percentages: dict[str, list[float]] = {}
 
                 issue_report = self._make_report(scopes_config)
-                issue_count_status_msg, issue_count_percentages = self._get_issue_counts_status(
-                    scopes_config.name, issue_report, notification_config
+                issue_count_status_msg, issue_count_percentages, zero_quota_labels = (
+                    self._get_issue_counts_status(
+                        scopes_config.name, issue_report, notification_config
+                    )
                 )
                 status_message = f"{status_message}{issue_count_status_msg}\n"
                 scope_percentages.update(issue_count_percentages)
 
-                summary = self._summarize(scopes_config.name, scope_percentages)
+                summary = self._summarize(scopes_config.name, scope_percentages, zero_quota_labels)
                 summaries = f"{summaries}{summary}\n"
 
             status_message = f"{status_message}{summaries}"
@@ -131,9 +137,10 @@ class MonitorBuildStatusOrchestrator:
 
     def _get_issue_counts_status(
         self, scope_name: str, issue_report: IssueReport, notification_config: NotificationsConfig
-    ) -> tuple[str, dict[str, list[float]]]:
+    ) -> tuple[str, dict[str, list[float]], set[str]]:
         now = datetime.now(timezone.utc)
         percentages: dict[str, list[float]] = {}
+        zero_quota_labels: set[str] = set()
 
         headers = [scope_name, "Hot Issues", "Cold Issues"]
         table_data = []
@@ -171,6 +178,10 @@ class MonitorBuildStatusOrchestrator:
                     cold_bf_percentage_str = "0"
 
             label = f"{sub_scope_name} {' '.join(slack_tags)}"
+            if (thresholds.hot.count == 0 and hot_issue_count > 0) or (
+                thresholds.cold.count == 0 and cold_issue_count > 0
+            ):
+                zero_quota_labels.add(label)
             percentages[label] = [hot_bf_percentage, cold_bf_percentage]
 
             if (
@@ -253,24 +264,36 @@ class MonitorBuildStatusOrchestrator:
         )
         message = f"```\n{table_str}\n```"
 
-        return message, percentages
+        return message, percentages, zero_quota_labels
 
     @staticmethod
-    def _summarize(scope_name: str, scope_percentages: dict[str, list[float]]) -> str:
+    def _summarize(
+        scope_name: str,
+        scope_percentages: dict[str, list[float]],
+        zero_quota_labels: set[str],
+    ) -> str:
         summary = f"`SUMMARY [{scope_name}]`"
 
-        red_sub_scopes = []
+        normal_red = []
+        zero_quota_red = []
         for sub_scope, percentages in scope_percentages.items():
-            status = CodeMergeStatus.from_threshold_percentages(percentages)
-            if status == CodeMergeStatus.RED:
-                red_sub_scopes.append(sub_scope)
+            if CodeMergeStatus.from_threshold_percentages(percentages) == CodeMergeStatus.RED:
+                if sub_scope in zero_quota_labels:
+                    zero_quota_red.append(sub_scope)
+                else:
+                    normal_red.append(sub_scope)
 
-        if len(red_sub_scopes) == 0:
+        if not normal_red and not zero_quota_red:
             summary = f"{summary} {SummaryMsg.BELOW_THRESHOLDS.value}"
         else:
-            summary = f"{summary} {SummaryMsg.THRESHOLD_EXCEEDED.value}"
-            for sub_scope in red_sub_scopes:
-                summary = f"{summary}\n\t- {sub_scope}"
+            if normal_red:
+                summary = f"{summary} {SummaryMsg.THRESHOLD_EXCEEDED.value}"
+                for sub_scope in normal_red:
+                    summary = f"{summary}\n\t- {sub_scope}"
+            if zero_quota_red:
+                summary = f"{summary}\n{SummaryMsg.ZERO_QUOTA_EXCEEDED.value}"
+                for sub_scope in zero_quota_red:
+                    summary = f"{summary}\n\t- {sub_scope}"
 
         return summary
 
