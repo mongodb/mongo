@@ -46,9 +46,11 @@
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/lite_parsed_union_with.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/stub_lookup_single_document_process_interface.h"
 #include "mongo/db/pipeline/serverless_aggregation_context_fixture.h"
+#include "mongo/db/pipeline/stage_params_to_document_source_registry.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
@@ -769,9 +771,9 @@ TEST_F(DocumentSourceUnionWithServerlessTest,
     std::vector<BSONObj> pipeline;
 
     auto stageSpec = BSON("$unionWith" << "some_coll");
-    auto liteParsedLookup = DocumentSourceUnionWith::LiteParsed::parse(
-        nss, stageSpec.firstElement(), LiteParserOptions{});
-    auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
+    auto liteParsedUnionWith =
+        LiteParsedUnionWith::parse(nss, stageSpec.firstElement(), LiteParserOptions{});
+    auto namespaceSet = liteParsedUnionWith->getInvolvedNamespaces();
     ASSERT_EQ(1, namespaceSet.size());
     ASSERT_EQ(1ul,
               namespaceSet.count(
@@ -779,9 +781,9 @@ TEST_F(DocumentSourceUnionWithServerlessTest,
 
     stageSpec = BSON("$unionWith" << BSON("coll" << "some_coll"
                                                  << "pipeline" << BSONArray()));
-    liteParsedLookup = DocumentSourceUnionWith::LiteParsed::parse(
-        nss, stageSpec.firstElement(), LiteParserOptions{});
-    namespaceSet = liteParsedLookup->getInvolvedNamespaces();
+    liteParsedUnionWith =
+        LiteParsedUnionWith::parse(nss, stageSpec.firstElement(), LiteParserOptions{});
+    namespaceSet = liteParsedUnionWith->getInvolvedNamespaces();
     ASSERT_EQ(1, namespaceSet.size());
     ASSERT_EQ(1ul,
               namespaceSet.count(
@@ -816,6 +818,208 @@ TEST_F(DocumentSourceUnionWithServerlessTest,
     involvedNssSet = pipeline->getInvolvedCollections();
     ASSERT_EQ(involvedNssSet.size(), 1UL);
     ASSERT_EQ(1ul, involvedNssSet.count(unionWithNs));
+}
+
+// ---- Tests for custom UnionWithStageParams and builder function ----
+
+TEST_F(DocumentSourceUnionWithTest, StageParamsCarriesParsedData) {
+    auto expCtx = getExpCtx();
+    NamespaceString nss = expCtx->getNamespaceString();
+
+    // Object spec with pipeline: carries namespace, pipeline BSON, and desugared LPP.
+    {
+        auto bson =
+            BSON("$unionWith" << BSON("coll" << "target_coll"
+                                             << "pipeline"
+                                             << BSON_ARRAY(BSON("$addFields" << BSON("a" << 1)))));
+        auto liteParsed = LiteParsedUnionWith::parse(nss, bson.firstElement(), LiteParserOptions{});
+        auto stageParams = liteParsed->getStageParams();
+        auto* params = dynamic_cast<UnionWithStageParams*>(stageParams.get());
+        ASSERT(params);
+        ASSERT_EQ(params->unionNss.coll(), "target_coll");
+        ASSERT_EQ(params->unionNss.dbName(), nss.dbName());
+        ASSERT_EQ(params->pipeline.size(), 1U);
+        ASSERT_FALSE(params->hasForeignDB);
+        ASSERT_TRUE(params->liteParsedPipeline.has_value());
+        ASSERT_EQ(params->liteParsedPipeline->getStages().size(), 1U);
+    }
+
+    // String spec (collection name only): no LPP since there's no subpipeline.
+    {
+        auto bson = BSON("$unionWith" << "target_coll");
+        auto liteParsed = LiteParsedUnionWith::parse(nss, bson.firstElement(), LiteParserOptions{});
+        auto stageParams = liteParsed->getStageParams();
+        auto* params = dynamic_cast<UnionWithStageParams*>(stageParams.get());
+        ASSERT(params);
+        ASSERT_EQ(params->unionNss.coll(), "target_coll");
+        ASSERT_TRUE(params->pipeline.empty());
+        ASSERT_FALSE(params->hasForeignDB);
+        ASSERT_FALSE(params->liteParsedPipeline.has_value());
+    }
+
+    // Foreign DB sets hasForeignDB, even if it matches the current DB.
+    {
+        auto bson = BSON("$unionWith" << BSON("db" << "other_db"
+                                                   << "coll" << "target_coll"
+                                                   << "pipeline" << BSONArray()));
+        auto liteParsed = LiteParsedUnionWith::parse(nss, bson.firstElement(), LiteParserOptions{});
+        auto stageParams = liteParsed->getStageParams();
+        auto* params = dynamic_cast<UnionWithStageParams*>(stageParams.get());
+        ASSERT(params);
+        ASSERT_EQ(params->unionNss.dbName().db(OmitTenant{}), "other_db");
+        ASSERT_TRUE(params->hasForeignDB);
+    }
+    {
+        auto bson = BSON("$unionWith" << BSON("db" << nss.dbName().db(OmitTenant{}) << "coll"
+                                                   << "target_coll"
+                                                   << "pipeline" << BSONArray()));
+        auto liteParsed = LiteParsedUnionWith::parse(nss, bson.firstElement(), LiteParserOptions{});
+        auto stageParams = liteParsed->getStageParams();
+        auto* params = dynamic_cast<UnionWithStageParams*>(stageParams.get());
+        ASSERT(params);
+        ASSERT_TRUE(params->hasForeignDB);
+    }
+
+    // Object spec with empty pipeline: LPP present but has zero stages.
+    {
+        auto bson = BSON("$unionWith" << BSON("coll" << "target_coll"
+                                                     << "pipeline" << BSONArray()));
+        auto liteParsed = LiteParsedUnionWith::parse(nss, bson.firstElement(), LiteParserOptions{});
+        auto stageParams = liteParsed->getStageParams();
+        auto* params = dynamic_cast<UnionWithStageParams*>(stageParams.get());
+        ASSERT(params);
+        ASSERT_TRUE(params->liteParsedPipeline.has_value());
+        ASSERT_EQ(params->liteParsedPipeline->getStages().size(), 0U);
+    }
+
+    // Multi-stage pipeline: LPP carries all stages.
+    {
+        auto bson = BSON("$unionWith"
+                         << BSON("coll" << "target_coll"
+                                        << "pipeline"
+                                        << BSON_ARRAY(BSON("$match" << BSON("x" << 1))
+                                                      << BSON("$addFields" << BSON("y" << 2)))));
+        auto liteParsed = LiteParsedUnionWith::parse(nss, bson.firstElement(), LiteParserOptions{});
+        auto stageParams = liteParsed->getStageParams();
+        auto* params = dynamic_cast<UnionWithStageParams*>(stageParams.get());
+        ASSERT(params);
+        ASSERT_TRUE(params->liteParsedPipeline.has_value());
+        ASSERT_EQ(params->liteParsedPipeline->getStages().size(), 2U);
+    }
+}
+
+TEST_F(DocumentSourceUnionWithTest, BuilderRejectsForeignDBInViewAndRouter) {
+    auto expCtx = getExpCtx();
+    NamespaceString nss = expCtx->getNamespaceString();
+    auto foreignDBSpec = BSON("$unionWith" << BSON("db" << "other_db"
+                                                        << "coll" << "target_coll"
+                                                        << "pipeline" << BSONArray()));
+
+    // Rejected in view definitions.
+    {
+        auto viewExpCtx = getExpCtx();
+        viewExpCtx->setIsParsingViewDefinition(true);
+        auto liteParsed =
+            LiteParsedUnionWith::parse(nss, foreignDBSpec.firstElement(), LiteParserOptions{});
+        ASSERT_THROWS_CODE(buildDocumentSource(*liteParsed, viewExpCtx),
+                           AssertionException,
+                           ErrorCodes::FailedToParse);
+    }
+
+    // Rejected when fromRouter is set.
+    {
+        auto routerExpCtx = getExpCtx();
+        routerExpCtx->setFromRouter(true);
+        auto liteParsed =
+            LiteParsedUnionWith::parse(nss, foreignDBSpec.firstElement(), LiteParserOptions{});
+        ASSERT_THROWS_CODE(buildDocumentSource(*liteParsed, routerExpCtx),
+                           AssertionException,
+                           ErrorCodes::FailedToParse);
+    }
+
+    // Rejected when inRouter is set.
+    {
+        auto routerExpCtx = getExpCtx();
+        routerExpCtx->setInRouter(true);
+        auto liteParsed =
+            LiteParsedUnionWith::parse(nss, foreignDBSpec.firstElement(), LiteParserOptions{});
+        ASSERT_THROWS_CODE(buildDocumentSource(*liteParsed, routerExpCtx),
+                           AssertionException,
+                           ErrorCodes::FailedToParse);
+    }
+
+    // Same-DB without explicit db field is allowed even in view definitions.
+    {
+        auto viewExpCtx = getExpCtx();
+        NamespaceString nsToUnionWith = NamespaceString::createNamespaceString_forTest(
+            viewExpCtx->getNamespaceString().dbName(), "target_coll");
+        viewExpCtx->setResolvedNamespaces(
+            ResolvedNamespaceMap{{nsToUnionWith, {nsToUnionWith, std::vector<BSONObj>()}}});
+        viewExpCtx->setIsParsingViewDefinition(true);
+
+        auto sameDBSpec = BSON("$unionWith" << BSON("coll" << "target_coll"
+                                                           << "pipeline" << BSONArray()));
+        auto liteParsed = LiteParsedUnionWith::parse(
+            viewExpCtx->getNamespaceString(), sameDBSpec.firstElement(), LiteParserOptions{});
+        auto docSources = buildDocumentSource(*liteParsed, viewExpCtx);
+        ASSERT_EQ(docSources.size(), 1U);
+    }
+}
+
+TEST_F(DocumentSourceUnionWithTest, BuilderRoundTripMatchesCreateFromBson) {
+    auto expCtx = getExpCtx();
+
+    auto verifyRoundTrip = [&](const BSONObj& bson, const NamespaceString& nsToUnionWith) {
+        expCtx->setResolvedNamespaces(
+            ResolvedNamespaceMap{{nsToUnionWith, {nsToUnionWith, std::vector<BSONObj>()}}});
+
+        auto liteParsed = LiteParsedUnionWith::parse(
+            expCtx->getNamespaceString(), bson.firstElement(), LiteParserOptions{});
+        auto docSources = buildDocumentSource(*liteParsed, expCtx);
+        ASSERT_EQ(docSources.size(), 1U);
+        ASSERT(docSources.front()->getSourceName() == DocumentSourceUnionWith::kStageName);
+
+        std::vector<Value> builderSerialized;
+        docSources.front()->serializeToArray(builderSerialized);
+
+        auto fromBson = DocumentSourceUnionWith::createFromBson(bson.firstElement(), expCtx);
+        std::vector<Value> legacySerialized;
+        fromBson->serializeToArray(legacySerialized);
+
+        ASSERT_EQ(builderSerialized.size(), legacySerialized.size());
+        for (size_t i = 0; i < builderSerialized.size(); ++i) {
+            ASSERT_VALUE_EQ(builderSerialized[i], legacySerialized[i]);
+        }
+    };
+
+    // With pipeline.
+    {
+        auto nsToUnionWith = NamespaceString::createNamespaceString_forTest(
+            expCtx->getNamespaceString().dbName(), "target_coll");
+        verifyRoundTrip(
+            BSON("$unionWith" << BSON(
+                     "coll" << "target_coll"
+                            << "pipeline"
+                            << BSON_ARRAY(BSON("$addFields" << BSON("a" << BSON("$const" << 3)))))),
+            nsToUnionWith);
+    }
+
+    // String spec.
+    {
+        auto nsToUnionWith = NamespaceString::createNamespaceString_forTest(
+            expCtx->getNamespaceString().dbName(), "target_coll");
+        verifyRoundTrip(BSON("$unionWith" << "target_coll"), nsToUnionWith);
+    }
+
+    // With foreign DB.
+    {
+        auto nsToUnionWith =
+            NamespaceString::createNamespaceString_forTest(boost::none, "crossDB", "target_coll");
+        verifyRoundTrip(BSON("$unionWith" << BSON("db" << "crossDB"
+                                                       << "coll" << "target_coll"
+                                                       << "pipeline" << BSONArray())),
+                        nsToUnionWith);
+    }
 }
 
 }  // namespace

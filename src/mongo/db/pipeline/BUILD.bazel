@@ -415,6 +415,7 @@ mongo_cc_library(
         "group_processor.cpp",
         "group_processor_base.cpp",
         "hybrid_search_pipeline_builder.cpp",
+        "lite_parsed_union_with.cpp",
         "match_processor.cpp",
         "merge_processor.cpp",
         "pipeline.cpp",

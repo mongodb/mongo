@@ -283,13 +283,23 @@ HybridSearchPipelineBuilder::constructDesugaredOutput(
             auto unionWithPipeline = Pipeline::create(initialStagesInInputPipeline, pExpCtx);
             std::vector<BSONObj> bsonPipeline = unionWithPipeline->serializeToBson();
 
-            auto collName = pExpCtx->getUserNss().coll();
-
-            BSONObj inputToUnionWith =
-                BSON("$unionWith" << BSON("coll" << collName << "pipeline" << bsonPipeline));
-            auto unionWithStage =
-                DocumentSourceUnionWith::createFromBson(inputToUnionWith.firstElement(), pExpCtx);
-            outputStages.emplace_back(unionWithStage);
+            // TODO SERVER-120179 Remove the feature flag guard and the createFromBson path.
+            // TODO SERVER-121091 This should have been moved into the LiteParsedDesugarer so the
+            // check should be redundant.
+            if (feature_flags::gFeatureFlagExtensionViewsAndUnionWith.isEnabled()) {
+                auto unionNss = pExpCtx->getUserNss();
+                UnionWithStageParams params(
+                    std::move(unionNss), std::move(bsonPipeline), false, true, BSONElement());
+                auto docSources = DocumentSourceUnionWith::createFromStageParams(params, pExpCtx);
+                outputStages.emplace_back(docSources.front());
+            } else {
+                auto collName = pExpCtx->getUserNss().coll();
+                BSONObj inputToUnionWith =
+                    BSON("$unionWith" << BSON("coll" << collName << "pipeline" << bsonPipeline));
+                auto unionWithStage = DocumentSourceUnionWith::createFromBson(
+                    inputToUnionWith.firstElement(), pExpCtx);
+                outputStages.emplace_back(unionWithStage);
+            }
         }
     }
     // Build all remaining stages to perform the fusion. After all the pipelines have been

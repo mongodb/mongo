@@ -331,13 +331,21 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
                      {"$project", Doc{{"_id", false}, {chunksLookupOutputFieldName, true}}}}}}}};
     };
 
-    stages.emplace_back(DocumentSourceUnionWith::createFromBson(
-        Doc{{"$unionWith", buildUnionWithFn(true /* incremental */)}}.toBson().firstElement(),
-        expCtx));
+    auto buildUnionWithStage = [&](bool incremental) -> boost::intrusive_ptr<DocumentSource> {
+        // TODO SERVER-120179 Remove the feature flag guard and the createFromBson path.
+        if (feature_flags::gFeatureFlagExtensionViewsAndUnionWith.isEnabled()) {
+            auto bsonDoc = Doc{{"$unionWith", buildUnionWithFn(incremental)}}.toBson();
+            auto liteParsed = LiteParsedUnionWith::parse(
+                expCtx->getNamespaceString(), bsonDoc.firstElement(), LiteParserOptions{});
+            return DocumentSource::parseFromLiteParsed(expCtx, *liteParsed).front();
+        } else {
+            return DocumentSourceUnionWith::createFromBson(
+                Doc{{"$unionWith", buildUnionWithFn(incremental)}}.toBson().firstElement(), expCtx);
+        }
+    };
 
-    stages.emplace_back(DocumentSourceUnionWith::createFromBson(
-        Doc{{"$unionWith", buildUnionWithFn(false /* incremental */)}}.toBson().firstElement(),
-        expCtx));
+    stages.emplace_back(buildUnionWithStage(true /* incremental */));
+    stages.emplace_back(buildUnionWithStage(false /* incremental */));
 
     auto pipeline = Pipeline::create(std::move(stages), expCtx);
     auto serializedPipeline = pipeline->serializeToBson();

@@ -45,12 +45,16 @@
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_union_with_gen.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/pipeline/lite_parsed_desugarer.h"
+#include "mongo/db/pipeline/lite_parsed_union_with.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/views/pipeline_resolver.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -68,13 +72,52 @@
 
 namespace mongo {
 
-REGISTER_LITE_PARSED_DOCUMENT_SOURCE(unionWith,
-                                     DocumentSourceUnionWith::LiteParsed::parse,
-                                     AllowedWithApiStrict::kAlways);
+DocumentSourceContainer DocumentSourceUnionWith::createFromStageParams(
+    UnionWithStageParams& params, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    if (params.hasForeignDB) {
+        uassert(ErrorCodes::FailedToParse,
+                "db cannot be specified in $unionWith in a view",
+                !expCtx->getIsParsingViewDefinition());
+        uassert(ErrorCodes::FailedToParse,
+                "db cannot be specified in $unionWith on mongos, namespace:" +
+                    expCtx->getNamespaceString().toStringForErrorMsg(),
+                !expCtx->getInRouter() && !expCtx->getFromRouter());
+    }
 
-REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(unionWith,
-                                                   DocumentSourceUnionWith,
-                                                   UnionWithStageParams);
+    // TODO SERVER-121087 Move to LPDS validation.
+    if (hybrid_scoring_util::isHybridSearchPipeline(params.pipeline) || params.isHybridSearch) {
+        hybrid_scoring_util::assertForeignCollectionIsNotTimeseries(params.unionNss, expCtx);
+    }
+
+    // It is possible to specify a $unionWith with *only* a collection in order to do a
+    // COLLSCAN; thus, not every $unionWith stage will have a subpipeline.
+    if (params.liteParsedPipeline) {
+        return {make_intrusive<DocumentSourceUnionWith>(expCtx,
+                                                        std::move(params.unionNss),
+                                                        std::move(*params.liteParsedPipeline),
+                                                        std::move(params.pipeline),
+                                                        params.hasForeignDB)};
+    }
+
+    return {make_intrusive<DocumentSourceUnionWith>(
+        expCtx, std::move(params.unionNss), std::move(params.pipeline), params.hasForeignDB)};
+}
+
+DocumentSourceContainer unionWithStageParamsToDocumentSourceFn(
+    const std::unique_ptr<StageParams>& stageParams,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    auto* typedParams = dynamic_cast<UnionWithStageParams*>(stageParams.get());
+    tassert(11786200, "Expected UnionWithStageParams for unionWith stage", typedParams != nullptr);
+
+    // TODO SERVER-120179 Remove when the feature flag is enabled by default.
+    if (!feature_flags::gFeatureFlagExtensionViewsAndUnionWith.isEnabled()) {
+        return {DocumentSourceUnionWith::createFromBson(typedParams->getOriginalBson(), expCtx)};
+    }
+
+    return DocumentSourceUnionWith::createFromStageParams(*typedParams, expCtx);
+}
+
+ALLOCATE_AND_REGISTER_STAGE_PARAMS(unionWith, UnionWithStageParams)
 
 ALLOCATE_DOCUMENT_SOURCE_ID(unionWith, DocumentSourceUnionWith::id)
 
@@ -91,26 +134,14 @@ MONGO_COMPILER_NOINLINE void logShardedViewFound(
                 "new_pipe"_attr = pipeline);
 }
 
-void validateUnionWithCollectionlessPipeline(
-    const boost::optional<std::vector<mongo::BSONObj>>& pipeline) {
-    const auto errMsg =
-        "$unionWith stage without explicit collection must have a pipeline with $documents as "
-        "first stage";
-
-    uassert(ErrorCodes::FailedToParse, errMsg, pipeline && pipeline->size() > 0);
-    const auto firstStageBson = (*pipeline)[0];
-    LOGV2_DEBUG(5909700,
-                4,
-                "$unionWith validating collectionless pipeline",
-                "pipeline"_attr = Pipeline::serializePipelineForLogging(*pipeline),
-                "first"_attr = redact(firstStageBson));
-    uassert(ErrorCodes::FailedToParse,
-            errMsg,
-            (firstStageBson.hasField(DocumentSourceDocuments::kStageName) ||
-             firstStageBson.hasField(DocumentSourceQueue::kStageName))
-
-    );
-}
+void assertAllStagesAllowedInUnionWith(const Pipeline& pipeline) {
+    for (const auto& src : pipeline.getSources()) {
+        uassert(31441,
+                str::stream() << src->getSourceName()
+                              << " is not allowed within a $unionWith's sub-pipeline",
+                src->constraints().isAllowedInUnionPipeline());
+    }
+};
 }  // namespace
 
 UnionWithSharedState::UnionWithSharedState(std::unique_ptr<Pipeline> pipeline,
@@ -224,6 +255,60 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
     _userPipeline = std::move(pipeline);
 }
 
+DocumentSourceUnionWith::DocumentSourceUnionWith(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    NamespaceString unionNss,
+    LiteParsedPipeline desugaredPipeline,
+    std::vector<BSONObj> userPipeline,
+    bool hasForeignDB)
+    : DocumentSource(kStageName, expCtx) {
+    _hasForeignDB = hasForeignDB;
+    boost::optional<ResolvedNamespace> resolvedUnionNs;
+    try {
+        auto resolvedNamespaces = expCtx->getResolvedNamespaces();
+        auto it = resolvedNamespaces.find(unionNss);
+
+        if (it != resolvedNamespaces.end()) {
+            resolvedUnionNs = it->second;
+            _sharedState = std::make_shared<UnionWithSharedState>(
+                parsePipelineFromLPPWithMaybeViewDefinition(
+                    expCtx, *resolvedUnionNs, desugaredPipeline, userPipeline, unionNss),
+                nullptr,
+                UnionWithSharedState::ExecutionProgress::kIteratingSource);
+        } else {
+            auto shared_pipeline = Pipeline::parseFromLiteParsed(
+                desugaredPipeline, expCtx, assertAllStagesAllowedInUnionWith);
+            _sharedState = std::make_shared<UnionWithSharedState>(
+                std::move(shared_pipeline),
+                nullptr,
+                UnionWithSharedState::ExecutionProgress::kIteratingSource);
+        }
+    } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
+        logShardedViewFound(e, userPipeline);
+        resolvedUnionNs = ResolvedNamespace{e->getNamespace(), e->getPipeline()};
+        // Fall back to BSON-based parsing for the sharded view case since the view pipeline
+        // is discovered dynamically from the exception and needs full re-parsing.
+        _sharedState = std::make_shared<UnionWithSharedState>(
+            parsePipelineWithMaybeViewDefinition(expCtx, *resolvedUnionNs, userPipeline, unionNss),
+            nullptr,
+            UnionWithSharedState::ExecutionProgress::kIteratingSource);
+    }
+
+    if (!_sharedState->_pipeline->getContext()->getNamespaceString().isOnInternalDb()) {
+        serviceOpCounters(getExpCtx()->getOperationContext()).gotNestedAggregate();
+    }
+    _sharedState->_pipeline->getContext()->setInUnionWith(true);
+
+    if (expCtx->getExplain() &&
+        expCtx->getExplain().value() != explain::VerbosityEnum::kQueryPlanner &&
+        resolvedUnionNs.has_value() && !resolvedUnionNs->pipeline.empty()) {
+        _resolvedNsForView = resolvedUnionNs;
+    }
+
+    _userNss = std::move(unionNss);
+    _userPipeline = std::move(userPipeline);
+}
+
 DocumentSourceUnionWith::~DocumentSourceUnionWith() {
     // When in explain command, the sub-pipeline was not disposed in 'doDispose()', so we need to
     // dispose it here.
@@ -241,78 +326,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::clone(
     // At this point the ExpressionContext already has info about any resolved namespaces, so there
     // is no need to resolve them again when creating the clone.
     return make_intrusive<DocumentSourceUnionWith>(*this, newExpCtx);
-}
-
-std::unique_ptr<DocumentSourceUnionWith::LiteParsed> DocumentSourceUnionWith::LiteParsed::parse(
-    const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
-    uassert(ErrorCodes::FailedToParse,
-            str::stream()
-                << "the $unionWith stage specification must be an object or string, but found "
-                << typeName(spec.type()),
-            spec.type() == BSONType::object || spec.type() == BSONType::string);
-
-    NamespaceString unionNss;
-    boost::optional<LiteParsedPipeline> liteParsedPipeline;
-    if (spec.type() == BSONType::string) {
-        unionNss = NamespaceStringUtil::deserialize(nss.dbName(), spec.valueStringData());
-    } else {
-        auto unionWithSpec =
-            UnionWithSpec::parse(spec.embeddedObject(), IDLParserContext(kStageName));
-        if (unionWithSpec.getColl()) {
-            if (unionWithSpec.getDb()) {
-                // For LiteParsing, we just assume this is not a view definition, and thus do not
-                // assert when 'db' is specified.
-                const auto tenantId = nss.dbName().tenantId();
-                auto dbName = DatabaseNameUtil::deserialize(
-                    tenantId, *unionWithSpec.getDb(), SerializationContext::stateDefault());
-                unionNss = NamespaceStringUtil::deserialize(dbName, *unionWithSpec.getColl());
-            } else {
-                unionNss = NamespaceStringUtil::deserialize(nss.dbName(), *unionWithSpec.getColl());
-            }
-        } else {
-            // If no collection specified, it must have $documents as first field in pipeline.
-            validateUnionWithCollectionlessPipeline(unionWithSpec.getPipeline());
-            unionNss = NamespaceString::makeCollectionlessAggregateNSS(nss.dbName());
-        }
-
-        // Recursively lite parse the nested pipeline, if one exists.
-        if (auto pipeline = unionWithSpec.getPipeline()) {
-            // The pipeline returned to us by the IDL is owned by us, but since it is a local
-            // variable, it will not be saved after parse() returns. We call makeOwned() so that the
-            // LiteParsedPipeline will own the BSON after this point.
-            auto optsCopy = options;
-            optsCopy.makeSubpipelineOwned = true;
-            liteParsedPipeline = LiteParsedPipeline(unionNss, *pipeline, false, optsCopy);
-        }
-    }
-
-    return std::make_unique<DocumentSourceUnionWith::LiteParsed>(
-        spec, std::move(unionNss), std::move(liteParsedPipeline));
-}
-
-PrivilegeVector DocumentSourceUnionWith::LiteParsed::requiredPrivileges(
-    bool isMongos, bool bypassDocumentValidation) const {
-    PrivilegeVector requiredPrivileges;
-    tassert(11282960,
-            str::stream() << "$unionWith only supports 1 subpipeline, got " << _pipelines.size(),
-            _pipelines.size() <= 1);
-    tassert(11282959, "Missing foreignNss", _foreignNss);
-    // If no pipeline is specified, then assume that we're reading directly from the collection.
-    // Otherwise check whether the pipeline starts with an "initial source" indicating that we don't
-    // require the "find" privilege.
-    if (_pipelines.empty() || !_pipelines[0].startsWithInitialSource()) {
-        Privilege::addPrivilegeToPrivilegeVector(
-            &requiredPrivileges,
-            Privilege(ResourcePattern::forExactNamespace(*_foreignNss), ActionType::find));
-    }
-
-    // Add the sub-pipeline privileges, if one was specified.
-    if (!_pipelines.empty()) {
-        const LiteParsedPipeline& pipeline = _pipelines[0];
-        Privilege::addPrivilegesToPrivilegeVector(
-            &requiredPrivileges, pipeline.requiredPrivileges(isMongos, bypassDocumentValidation));
-    }
-    return requiredPrivileges;
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::createFromBson(
@@ -361,7 +374,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::createFromBson(
             }
         } else {
             // if no collection specified, it must have $documents as first field in pipeline
-            validateUnionWithCollectionlessPipeline(unionWithSpec.getPipeline());
+            LiteParsedUnionWith::validateUnionWithCollectionlessPipeline(
+                unionWithSpec.getPipeline());
             unionNss = NamespaceString::makeCollectionlessAggregateNSS(
                 expCtx->getNamespaceString().dbName());
         }
@@ -642,17 +656,9 @@ std::unique_ptr<Pipeline> DocumentSourceUnionWith::parsePipelineWithMaybeViewDef
     const ResolvedNamespace& resolvedNs,
     std::vector<BSONObj> currentPipeline,
     const NamespaceString& userNss) {
-    auto validatorCallback = [](const Pipeline& pipeline) {
-        for (const auto& src : pipeline.getSources()) {
-            uassert(31441,
-                    str::stream() << src->getSourceName()
-                                  << " is not allowed within a $unionWith's sub-pipeline",
-                    src->constraints().isAllowedInUnionPipeline());
-        }
-    };
     // We will call optimize() when finalizing the pipeline in 'doGetNext()'.
     auto opts = pipeline_factory::kDesugarOnly;
-    opts.validator = validatorCallback;
+    opts.validator = assertAllStagesAllowedInUnionWith;
 
     boost::intrusive_ptr<ExpressionContext> subExpCtx = makeCopyForSubPipelineFromExpressionContext(
         expCtx, resolvedNs.ns, resolvedNs.uuid, userNss);
@@ -665,6 +671,66 @@ std::unique_ptr<Pipeline> DocumentSourceUnionWith::parsePipelineWithMaybeViewDef
 
     return pipeline_factory::makePipelineFromViewDefinition(
         subExpCtx, resolvedNs, std::move(currentPipeline), opts, userNss);
+}
+
+// TODO SERVER-118954 Move this function into LiteParsed.
+std::unique_ptr<Pipeline> DocumentSourceUnionWith::parsePipelineFromLPPWithMaybeViewDefinition(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const ResolvedNamespace& resolvedNs,
+    LiteParsedPipeline& desugaredPipeline,
+    const std::vector<BSONObj>& rawPipeline,
+    const NamespaceString& userNss) {
+
+    boost::intrusive_ptr<ExpressionContext> subExpCtx = makeCopyForSubPipelineFromExpressionContext(
+        expCtx, resolvedNs.ns, resolvedNs.uuid, userNss);
+    subExpCtx->setInUnionWith(true);
+
+    // TODO SERVER-117882 Remove this call once $lookup forwards its desugared LPP subpipeline in
+    // StageParams.
+    LiteParsedDesugarer::desugar(&desugaredPipeline);
+
+    if (resolvedNs.ns.isTimeseriesBucketsCollection() &&
+        isRawDataOperation(expCtx->getOperationContext())) {
+        // Raw Data operations on timeseries collections operate without the timeseries view.
+        // Fall back to Pipeline::parseFromLiteParsed without view resolution.
+        return Pipeline::parseFromLiteParsed(
+            desugaredPipeline, subExpCtx, assertAllStagesAllowedInUnionWith);
+    }
+
+    subExpCtx->setNamespaceString(resolvedNs.ns);
+
+    if (resolvedNs.pipeline.empty()) {
+        return Pipeline::parseFromLiteParsed(
+            desugaredPipeline, subExpCtx, assertAllStagesAllowedInUnionWith);
+    }
+
+    // For search views, fall back to the BSON-based path since search view handling
+    // requires raw BSON pipeline inspection.
+    if (search_helper_bson_obj::isMongotPipeline(subExpCtx->getIfrContext(), rawPipeline)) {
+        auto opts = pipeline_factory::kDesugarOnly;
+        opts.validator = assertAllStagesAllowedInUnionWith;
+        return pipeline_factory::makePipelineFromViewDefinition(
+            subExpCtx, resolvedNs, std::vector<BSONObj>(rawPipeline), opts, userNss);
+    }
+
+    {
+        // Add resolved namespaces from view pipeline.
+        LiteParsedPipeline viewLiteParsedPipeline(resolvedNs.ns, resolvedNs.pipeline);
+        subExpCtx->addResolvedNamespaces(viewLiteParsedPipeline.getInvolvedNamespaces());
+    }
+
+    // Apply the view to the desugared LPP.
+    const ResolvedView resolvedView{resolvedNs.ns, resolvedNs.pipeline, BSONObj()};
+    PipelineResolver::applyViewToLiteParsed(
+        &desugaredPipeline,
+        resolvedView,
+        userNss,
+        subExpCtx->getResolvedNamespaces(),
+        LiteParserOptions{.ifrContext = subExpCtx->getIfrContext()});
+
+    // Parse from the modified LiteParsedPipeline (already desugared, view already applied).
+    return Pipeline::parseFromLiteParsed(
+        desugaredPipeline, subExpCtx, assertAllStagesAllowedInUnionWith);
 }
 
 }  // namespace mongo

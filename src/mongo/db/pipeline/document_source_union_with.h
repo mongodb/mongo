@@ -42,6 +42,7 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/lite_parsed_document_source_nested_pipelines.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/lite_parsed_union_with.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
@@ -105,7 +106,6 @@ struct UnionWithSharedState {
     VariablesParseState _variablesParseState;
 };
 
-DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(UnionWith);
 
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceUnionWith final : public DocumentSource {
 public:
@@ -114,38 +114,23 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    class LiteParsed final : public LiteParsedDocumentSourceNestedPipelines<LiteParsed> {
-    public:
-        static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
-                                                 const BSONElement& spec,
-                                                 const LiteParserOptions& options);
-
-        LiteParsed(const BSONElement& spec,
-                   NamespaceString foreignNss,
-                   boost::optional<LiteParsedPipeline> pipeline)
-            : LiteParsedDocumentSourceNestedPipelines(
-                  spec, std::move(foreignNss), std::move(pipeline)) {}
-
-        PrivilegeVector requiredPrivileges(bool isMongos,
-                                           bool bypassDocumentValidation) const final;
-
-        bool requiresAuthzChecks() const override {
-            return false;
-        }
-
-        std::unique_ptr<StageParams> getStageParams() const override {
-            return std::make_unique<UnionWithStageParams>(_originalBson);
-        }
-
-        bool hasExtensionVectorSearchStage() const override {
-            return !_pipelines.empty() && _pipelines[0].hasExtensionVectorSearchStage();
-        }
-    };
+    // Builds a DocumentSourceUnionWith from pre-parsed StageParams.
+    // Performs expCtx-dependent validations (hasForeignDB, hybrid search timeseries).
+    static DocumentSourceContainer createFromStageParams(
+        UnionWithStageParams& params, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     DocumentSourceUnionWith(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                             NamespaceString unionNss,
                             std::vector<BSONObj> pipeline,
                             bool hasForeignDB = false);
+
+    // Constructor that accepts a pre-desugared LiteParsedPipeline for the subpipeline.
+    // Uses Pipeline::parseFromLiteParsed instead of re-parsing from BSON.
+    DocumentSourceUnionWith(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                            NamespaceString unionNss,
+                            LiteParsedPipeline desugaredPipeline,
+                            std::vector<BSONObj> userPipeline,
+                            bool hasForeignDB);
 
     // Expose a constructor that skips the parsing step for testing purposes.
     DocumentSourceUnionWith(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -255,6 +240,13 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const ResolvedNamespace& resolvedNs,
         std::vector<BSONObj> currentPipeline,
+        const NamespaceString& userNss);
+
+    static std::unique_ptr<Pipeline> parsePipelineFromLPPWithMaybeViewDefinition(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const ResolvedNamespace& resolvedNs,
+        LiteParsedPipeline& desugaredPipeline,
+        const std::vector<BSONObj>& rawPipeline,
         const NamespaceString& userNss);
 
     DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
