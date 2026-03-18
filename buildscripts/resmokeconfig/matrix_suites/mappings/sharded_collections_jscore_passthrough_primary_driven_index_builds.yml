@@ -1,0 +1,13 @@
+# Run all tests in the sharding jscore passthrough suite with PrimaryDrivenIndexBuilds
+# feature flag enabled. This provides coverage of general jscore/passthrough workloads
+# (CRUD, queries, aggregations) against sharded collections with primary-driven index
+# build semantics, beyond just tests that explicitly build indexes.
+#
+# TODO(SERVER-108818): remove this temporary suite and all its usages.
+base_suite: sharded_collections_jscore_passthrough_base
+overrides:
+  - "primary_driven_index_builds.enable_primary_driven_index_builds_feature_flag_mongod"
+  - "primary_driven_index_builds.enable_primary_driven_index_builds_feature_flag_mongos"
+
+excludes:
+  - "primary_driven_index_builds.exclude_primary_driven_index_builds_incompatible_tag"

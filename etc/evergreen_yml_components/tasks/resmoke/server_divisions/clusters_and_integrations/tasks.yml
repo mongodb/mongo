@@ -2735,6 +2735,22 @@ tasks:
             --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
             --disableFeatureFlags=featureFlagBlockDirectSystemBucketsAccess
 
+  # TODO(SERVER-111646): Remove this temporary suite.
+  - <<: *gen_task_template
+    name: sharded_collections_jscore_passthrough_primary_driven_index_builds_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_execution",
+        "default",
+        "jscore",
+        "sharding",
+        "primary_driven_index_builds",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
   # TODO(SERVER-108818): Remove this temporary suite.
   - <<: *gen_task_template
     name: sharding_primary_driven_index_builds_gen
