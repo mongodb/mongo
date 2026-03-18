@@ -349,7 +349,7 @@ export function runPlanStabilityCommands(db, commands, resultsetRepresentation =
         const winningPlan = queryPlanner.winningPlan;
         const queryPlan = winningPlan.queryPlan !== undefined ? [winningPlan.queryPlan] : [winningPlan];
 
-        if (explain.stages.length > 1) {
+        if (explain.stages !== undefined && explain.stages.length > 1) {
             // If there are any classic stages after the SBE stage,
             // we include them in the query plan so that they will be dumped.
             queryPlan.push(...explain.stages.slice(1));

@@ -52,6 +52,7 @@ export function joinPlanToString(stage, indent = 0) {
         const classicalStageName = Object.keys(stage).find((k) => k.startsWith("$"));
         switch (classicalStageName) {
             case "$project":
+            case "$match":
             case "$sort":
             case "$group":
                 result += `${classicalStageName}\n`;

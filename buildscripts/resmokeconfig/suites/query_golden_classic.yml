@@ -6,6 +6,7 @@ selector:
   exclude_files:
     - jstests/query_golden/libs/**/*.js
     - jstests/query_golden/test_inputs/**/*.js
+    - jstests/query_golden/join_opt/plan_stability*.js
 executor:
   archive:
     hooks:
