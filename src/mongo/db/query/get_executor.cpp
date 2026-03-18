@@ -401,7 +401,9 @@ public:
     StatusWith<std::unique_ptr<ResultType>> finishPrepare() {
         plannerInvocationCount.increment();
 
-        if (SubplanStage::needsSubplanning(*_cq)) {
+        // TODO SERVER-120492: Investigate if we can remove the replanning restriction on
+        // subplanning. If not, add a descriptive comment here about why.
+        if (!isReplanning() && SubplanStage::needsSubplanning(*_cq)) {
             LOGV2_DEBUG(20924,
                         2,
                         "Running query as sub-queries",
