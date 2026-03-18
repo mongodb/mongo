@@ -157,7 +157,6 @@ buildvariants:
       build_mongot: true
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2
-        --disable_streams=True
       has_packages: false
       target_resmoke_time: 10
       max_sub_suites: 5
@@ -223,7 +222,6 @@ buildvariants:
       build_mongot: true
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2
-        --disable_streams=True
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source
         --runAllFeatureFlagTests
