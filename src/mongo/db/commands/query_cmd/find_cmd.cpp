@@ -758,6 +758,9 @@ public:
 
             boost::optional<CollectionOrViewAcquisition> collectionOrView =
                 acquireCollectionOrViewMaybeLockFree(opCtx, acquisitionRequest);
+            const auto origNss = collectionOrView->nss();
+            // TODO SERVER-121185: Remove if(isRawDataOperation) branch and the namespace
+            // translation once 9.0 becomes last LTS
             if (isRawDataOperation(opCtx)) {
                 auto [isTimeseriesViewRequest, translatedNs] =
                     timeseries::isTimeseriesViewRequest(opCtx, *_cmdRequest);
@@ -914,7 +917,7 @@ public:
                 boost::optional<CursorMetrics> metrics = includeMetrics
                     ? boost::make_optional(CurOp::get(opCtx)->debug().getCursorMetrics())
                     : boost::none;
-                builder.done(cursorId, nss, metrics, respSc);
+                builder.done(cursorId, origNss, metrics, respSc);
                 return;
             }
 
@@ -965,14 +968,14 @@ public:
                 ClientCursorPin pinnedCursor = CursorManager::get(opCtx)->registerCursor(
                     opCtx,
                     {std::move(exec),
-                     nss,
+                     origNss,
                      AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName(),
                      APIParameters::get(opCtx),
                      opCtx->getWriteConcern(),
                      repl::ReadConcernArgs::get(opCtx),
                      ReadPreferenceSetting::get(opCtx),
                      _request.body,
-                     {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)}});
+                     {Privilege(ResourcePattern::forExactNamespace(origNss), ActionType::find)}});
                 ScopeGuard deleteCursorOnError([&] {
                     // In case of an error while creating and stashing the cursor we have to delete
                     // the underlying resources since they might have been left in an inconsistent
@@ -1024,11 +1027,11 @@ public:
             boost::optional<CursorMetrics> metrics = includeMetrics
                 ? boost::make_optional(CurOp::get(opCtx)->debug().getCursorMetrics())
                 : boost::none;
-            firstBatch.done(cursorId, nss, metrics, respSc);
+            firstBatch.done(cursorId, origNss, metrics, respSc);
 
             query_request_helper::validateCursorResponse(replyBuilder->getBodyBuilder().asTempObj(),
                                                          auth::ValidatedTenancyScope::get(opCtx),
-                                                         nss.tenantId(),
+                                                         origNss.tenantId(),
                                                          respSc);
         }
 

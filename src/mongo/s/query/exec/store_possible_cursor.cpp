@@ -142,7 +142,12 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
     if (incomingCursorResponse.getCursorId() == CursorId(0)) {
         opDebug.cursorExhausted = true;
         collectQueryStatsMongos(opCtx, std::move(opDebug.getQueryStatsInfo().key));
-        return incomingCursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
+        CursorResponse exhaustedResponse(requestedNss,
+                                         CursorId(0),
+                                         incomingCursorResponse.releaseBatch(),
+                                         incomingCursorResponse.getAtClusterTime(),
+                                         incomingCursorResponse.getPostBatchResumeToken());
+        return exhaustedResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
     }
 
     ClusterClientCursorParams params(incomingCursorResponse.getNSS(),

@@ -141,12 +141,34 @@ IndexSpecsWithNamespaceString getIndexSpecsWithNamespaceString(OperationContext*
     const auto& nss = collAcq.nss();
     auto indexList = listIndexesInLock(opCtx, collAcq, additionalInclude);
 
-    if (collectionPtr->isTimeseriesCollection() && !timeseries::isRawDataRequest(opCtx, cmd)) {
-        indexList = timeseries::createTimeseriesIndexesFromBucketsIndexes(
-            *collectionPtr->getTimeseriesOptions(), indexList);
+    if (collectionPtr->isTimeseriesCollection()) {
+        if (!timeseries::isRawDataRequest(opCtx, cmd)) {
+            indexList = timeseries::createTimeseriesIndexesFromBucketsIndexes(
+                *collectionPtr->getTimeseriesOptions(), indexList);
+        }
 
-        if (!collectionPtr->isNewTimeseriesWithoutView()) {
-            // For legacy timeseries collections we need to return the view namespace
+        // The cursor namespace should match the namespace the user originally addressed.
+        // For legacy timeseries, we rewrite the cursor namespace to the view namespace
+        // unless the user directly targeted system.buckets.
+        //
+        // There are two reasons origNssOrUUID can be a system.buckets namespace:
+        // 1. The user directly targeted system.buckets (with or without rawData),
+        //    in this case isTimeseriesNamespace is not set, so we preserve the buckets ns.
+        // 2. The router (sharded path) translated the view namespace to system.buckets
+        //    and set isTimeseriesNamespace, in this case we must rewrite back to the
+        //    view namespace.
+        //
+        // Viewless timeseries collections skip this since their resolved namespace
+        // is already user-facing.
+        // TODO SERVER-121186: Always use the main nss once 9.0 becomes last LTS.
+        const bool shouldUseViewNamespace =
+            (origNssOrUUID.isNamespaceString() &&
+             !origNssOrUUID.nss().isTimeseriesBucketsCollection()) ||
+            cmd.getIsTimeseriesNamespace();
+
+        if (!collectionPtr->isNewTimeseriesWithoutView() && shouldUseViewNamespace) {
+            // For legacy timeseries collections we need to return the view namespace,
+            // unless the request targeted system.buckets directly
             return std::make_pair(std::move(indexList), nss.getTimeseriesViewNamespace());
         }
     }

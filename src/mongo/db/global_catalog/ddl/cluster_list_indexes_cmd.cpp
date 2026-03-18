@@ -73,15 +73,18 @@
 namespace mongo {
 namespace {
 
+// TODO SERVER-120795 Once all timeseries are viewless (9.0 is last LTS), translatedNss and origNss
+// will always be the same and can be collapsed into one namespace (nss)
 ListIndexesReply cursorCommandPassthroughShardWithMinKeyChunk(OperationContext* opCtx,
                                                               RoutingContext& routingCtx,
-                                                              const NamespaceString& nss,
+                                                              const NamespaceString& translatedNss,
+                                                              const NamespaceString& origNss,
                                                               const BSONObj& cmdObj,
                                                               const PrivilegeVector& privileges) {
     auto response = executeCommandAgainstShardWithMinKeyChunk(
         opCtx,
         routingCtx,
-        nss,
+        translatedNss,
         CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
         ReadPreferenceSetting::get(opCtx),
         Shard::RetryPolicy::kIdempotent);
@@ -92,7 +95,7 @@ ListIndexesReply cursorCommandPassthroughShardWithMinKeyChunk(OperationContext* 
                             response.shardId,
                             *response.shardHostAndPort,
                             cmdResponse.data,
-                            nss,
+                            origNss,
                             Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
                             Grid::get(opCtx)->getCursorManager(),
                             privileges));
@@ -181,6 +184,7 @@ public:
                                 opCtx,
                                 routingCtx,
                                 targeter.getNS(),
+                                ns(),
                                 cmdToBeSent,
                                 {Privilege(ResourcePattern::forExactNamespace(ns()),
                                            ActionType::listIndexes)});

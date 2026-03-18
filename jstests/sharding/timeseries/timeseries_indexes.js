@@ -135,11 +135,16 @@ function generateDoc(time, metaValue) {
             ...getRawOperationSpec(mongosDB),
         }),
     );
-    assert.eq(
-        getTimeseriesCollForDDLOps(mongosDB, coll).getFullName(),
-        outputOnRawBuckets.cursor.ns,
-        outputOnRawBuckets,
-    );
+    // The rawData listIndexes cursor.ns fix was introduced in 8.3 (SERVER-120476).
+    const buildInfo = mongosDB.adminCommand({buildInfo: 1});
+    const isMongos83OrNewer = MongoRunner.compareBinVersions(buildInfo.version, "8.3") >= 0;
+    if (isMongos83OrNewer) {
+        assert.eq(
+            getTimeseriesCollForRawOps(mongosDB, coll).getFullName(),
+            outputOnRawBuckets.cursor.ns,
+            outputOnRawBuckets,
+        );
+    }
 
     assert.commandWorked(
         getTimeseriesCollForRawOps(mongosDB, coll).dropIndexes({"meta.subField1": 1}, getRawOperationSpec(mongosDB)),

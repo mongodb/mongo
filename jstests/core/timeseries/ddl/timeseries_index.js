@@ -15,7 +15,7 @@ import {
     kRawOperationSpec,
 } from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {isShardedTimeseries, getTimeseriesBucketsColl} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {add2dsphereVersionIfNeededForSpec, has2dsphereIndex} from "jstests/libs/query/geo_index_version_helpers.js";
 
 const isMultiversion =
@@ -181,11 +181,12 @@ TimeseriesTest.run((insert) => {
         cursorDoc = assert.commandWorked(
             db.runCommand(Object.extend({listIndexes: getTimeseriesCollForRawOps(coll).getName()}, kRawOperationSpec)),
         ).cursor;
-        // TODO(SERVER-120476): Change this assertion to cursorDoc.ns === coll.getFullName().
-        assert(
-            cursorDoc.ns === coll.getFullName() || cursorDoc.ns === getTimeseriesBucketsColl(coll).getFullName(),
-            tojson(cursorDoc),
-        );
+        // The rawData listIndexes cursor.ns fix was introduced in 8.3 (SERVER-120476).
+        const buildInfo = db.adminCommand({buildInfo: 1});
+        const isBinary83OrNewer = MongoRunner.compareBinVersions(buildInfo.version, "8.3") >= 0;
+        if (isBinary83OrNewer) {
+            assert.eq(getTimeseriesCollForRawOps(coll).getFullName(), cursorDoc.ns, tojson(cursorDoc));
+        }
         assert.eq(numIndexesToCheck, cursorDoc.firstBatch.length, tojson(cursorDoc));
         assert.contains(
             bucketSpec,
@@ -424,7 +425,6 @@ TimeseriesTest.run((insert) => {
     // to drop non-existent indexes. Older versions still throw the error, causing test
     // inconsistency in multiversion environments.
     // TODO: SERVER-108814 Remove this multiversion check once v9.0 branches out
-    const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
     if (!isMultiversion) {
         const indexList = coll.getIndexes();
         assert.eq(

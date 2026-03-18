@@ -260,7 +260,8 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
                                  const CanonicalQuery& query,
                                  const ReadPreferenceSetting& readPref,
                                  std::vector<BSONObj>* results,
-                                 bool* partialResultsReturned) {
+                                 bool* partialResultsReturned,
+                                 const NamespaceString& origNss) {
     const auto& findCommand = query.getFindCommandRequest();
     const auto& nss = query.nss();
     const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
@@ -289,7 +290,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     params.tailableMode = query_request_helper::getTailableMode(findCommand);
     params.isAllowPartialResults = findCommand.getAllowPartialResults();
     params.originatingPrivileges = {
-        Privilege(ResourcePattern::forExactNamespace(query.nss()), ActionType::find)};
+        Privilege(ResourcePattern::forExactNamespace(origNss), ActionType::find)};
     params.requestQueryStatsFromRemotes = requestQueryStatsFromRemotes;
 
     // This is the batchSize passed to each subsequent getMore command issued by the cursor. We
@@ -509,7 +510,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     collectQueryStatsMongos(opCtx, ccc);
 
     auto cursorId = uassertStatusOK(cursorManager->registerCursor(
-        opCtx, ccc.releaseCursor(), nss, cursorType, cursorLifetime, authUser));
+        opCtx, ccc.releaseCursor(), origNss, cursorType, cursorLifetime, authUser));
 
     // Record the cursorID in CurOp.
     opDebug.cursorid = cursorId;
@@ -837,8 +838,13 @@ void ClusterFind::runQuery(OperationContext* opCtx,
 
                     // Do the work to generate the first batch of results. This blocks waiting to
                     // get responses from the shard(s).
-                    auto cursorId = runQueryWithoutRetrying(
-                        opCtx, routingCtx, *query, readPref, &batch, &partialResultsReturned);
+                    auto cursorId = runQueryWithoutRetrying(opCtx,
+                                                            routingCtx,
+                                                            *query,
+                                                            readPref,
+                                                            &batch,
+                                                            &partialResultsReturned,
+                                                            origNss);
                     CursorResponseBuilder::Options options;
                     options.isInitialResponse = true;
                     if (!opCtx->inMultiDocumentTransaction()) {
@@ -850,7 +856,7 @@ void ClusterFind::runQuery(OperationContext* opCtx,
                         firstBatch.append(obj);
                     }
                     firstBatch.setPartialResultsReturned(partialResultsReturned);
-                    firstBatch.done(cursorId, query->nss());
+                    firstBatch.done(cursorId, origNss);
                 } catch (
                     const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
                     auto bodyBuilder = result->getBodyBuilder();
