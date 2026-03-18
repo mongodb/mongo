@@ -138,6 +138,7 @@ rules:
           - incompatible_inmemory
           - incompatible_all_feature_flags
           - incompatible_development_variant
+          - requires_replicated_fast_count_recovery
           - incompatible_disaggregated_storage
           - requires_compile_variant
           - requires_large_host

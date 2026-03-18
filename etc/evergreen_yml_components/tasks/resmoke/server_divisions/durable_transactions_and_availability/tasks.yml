@@ -434,6 +434,7 @@ tasks:
         "initsync",
         "large",
         "sharded",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -505,6 +506,7 @@ tasks:
         "stepdowns",
         "kill_terminate",
         "sharded",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -965,6 +967,7 @@ tasks:
         "multiversion",
         "no_multiversion_generate_tasks",
         "future_git_tag_incompatible",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -983,6 +986,7 @@ tasks:
         "misc_js",
         "requires_execution_on_windows_patch_build",
         "requires_large_host",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1090,6 +1094,7 @@ tasks:
         "replica_sets",
         "san",
         "large",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1105,6 +1110,7 @@ tasks:
         "replica_sets",
         "san",
         "large",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1150,6 +1156,7 @@ tasks:
         "replica_sets",
         "san",
         "large",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2195,6 +2202,7 @@ tasks:
         "incompatible_ppc",
         "incompatible_s390x",
         "incompatible_aubsan",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "do setup"
@@ -2292,7 +2300,12 @@ tasks:
   - <<: *gen_task_template
     name: noPassthroughWithMongod_gen
     tags:
-      ["assigned_to_jira_team_server_execution", "release_critical", "misc_js"]
+      [
+        "assigned_to_jira_team_server_execution",
+        "release_critical",
+        "misc_js",
+        "requires_replicated_fast_count_recovery",
+      ]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -2301,8 +2314,7 @@ tasks:
 
   - <<: *gen_task_template
     name: noPassthrough_gen
-    tags:
-      [
+    tags: [
         "assigned_to_jira_team_server_execution",
         "release_critical",
         "incompatible_mac",
@@ -2312,6 +2324,8 @@ tasks:
         "misc_js",
         "requires_execution_on_windows_patch_build",
         "requires_large_host",
+        # TODO(SERVER-121665): Remove this tag.
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2349,7 +2363,13 @@ tasks:
 
   - <<: *task_template
     name: read_only_sharded
-    tags: ["assigned_to_jira_team_server_execution", "default", "read_only"]
+    tags:
+      [
+        "assigned_to_jira_team_server_execution",
+        "default",
+        "read_only",
+        "requires_replicated_fast_count_recovery",
+      ]
     commands:
       - func: "do setup"
       - func: "run tests"

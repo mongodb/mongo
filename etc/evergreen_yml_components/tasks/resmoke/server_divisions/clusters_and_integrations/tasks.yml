@@ -674,6 +674,7 @@ tasks:
         "auth",
         "audit",
         "patch_build",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "do setup"
@@ -681,7 +682,13 @@ tasks:
 
   - <<: *gen_task_template
     name: auth_gen
-    tags: ["assigned_to_jira_team_server_security", "release_critical", "auth"]
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "auth",
+        "requires_replicated_fast_count_recovery",
+      ]
     commands:
       - func: "generate resmoke tasks"
 
@@ -710,6 +717,7 @@ tasks:
         "incompatible_community",
         "encrypt",
         "patch_build",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "do setup"
@@ -1106,6 +1114,7 @@ tasks:
         "encrypt",
         "ssl",
         "patch_build",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1149,6 +1158,7 @@ tasks:
         "encrypt",
         "ssl",
         "patch_build",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "do setup"
@@ -1305,6 +1315,7 @@ tasks:
         "default",
         "multi_shard",
         "common",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1318,6 +1329,7 @@ tasks:
         "multi_shard",
         "multi_stmt",
         "common",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1334,6 +1346,7 @@ tasks:
         "multi_shard",
         "multi_stmt",
         "common",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1383,7 +1396,12 @@ tasks:
 
   - <<: *gen_task_template
     name: replica_sets_transition_to_csrs_jscore_passthrough_gen
-    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "requires_replicated_fast_count_recovery",
+      ]
     commands:
       - func: "generate resmoke tasks"
         # The hardcoded timeout is to overrule history-based timeout at the beginning of the suite
@@ -1777,6 +1795,7 @@ tasks:
         "common",
         "csrs",
         "non_live_record",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1793,6 +1812,7 @@ tasks:
         "incompatible_mac",
         "sharding",
         "common",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1936,6 +1956,7 @@ tasks:
         "sharding",
         "jscore",
         "common",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1998,6 +2019,7 @@ tasks:
         "default",
         "random_multiversion_ds",
         "multiversion",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "initialize multiversion tasks"
@@ -2369,6 +2391,7 @@ tasks:
         "stepdowns",
         "large",
         "sharded",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2428,7 +2451,12 @@ tasks:
   - <<: *gen_task_template
     name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
     tags:
-      ["assigned_to_jira_team_server_catalog_and_routing", "default", "jscore"]
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "jscore",
+        "requires_replicated_fast_count_recovery",
+      ]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -2447,6 +2475,7 @@ tasks:
         # we already have `fcv_upgrade_downgrade_replica_sets_jscore_passthrough` in required variants
         # thus we only include this in `suggested` variants
         "suggested_excluding_required__for_devprod_mitigation_only",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2454,7 +2483,12 @@ tasks:
   - <<: *gen_task_template
     name: fcv_upgrade_downgrade_primary_step_down_passthrough_gen
     tags:
-      ["assigned_to_jira_team_server_catalog_and_routing", "default", "jscore"]
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "jscore",
+        "requires_replicated_fast_count_recovery",
+      ]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -2532,6 +2566,7 @@ tasks:
         "incompatible_mac",
         "sharding",
         "common",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2550,6 +2585,7 @@ tasks:
         "replica_sets",
         "san",
         "large",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2602,6 +2638,7 @@ tasks:
         "misc_js",
         "requires_execution_on_windows_patch_build",
         "requires_large_host",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2658,6 +2695,7 @@ tasks:
         "execution_control_with_prioritization",
         "default",
         "auth",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2683,6 +2721,7 @@ tasks:
         "assigned_to_jira_team_server_catalog_and_routing",
         "default",
         "sharding",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2718,6 +2757,7 @@ tasks:
         "assigned_to_jira_team_server_catalog_and_routing",
         "default",
         "sharding",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2750,6 +2790,7 @@ tasks:
         "assigned_to_jira_team_server_catalog_and_routing",
         "default",
         "sharding",
+        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "generate resmoke tasks"

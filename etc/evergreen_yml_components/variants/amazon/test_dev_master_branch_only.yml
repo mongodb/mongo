@@ -715,14 +715,16 @@ buildvariants:
         --additionalFeatureFlags=featureFlagReplicatedFastCount
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,incompatible_with_atlas_environment,m8g_incompatible,disables_test_commands
     tasks:
-      - name: concurrency_gen
-      - name: concurrency_replication_gen
-      - name: concurrency_sharded_replication_gen
-      - name: concurrency_sharded_replication_primary_driven_index_builds_gen
-      - name: replica_sets_jscore_passthrough_gen
-      - name: replica_sets_jscore_passthrough_primary_driven_index_builds_gen
-      - name: replica_sets_uninitialized_fcv_jscore_passthrough_gen
-      - name: sharded_collections_jscore_passthrough_gen
-      - name: sharding_jscore_passthrough_gen
-      - name: jsCore
-      - name: jsCore_txns
+      - name: .development_critical !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.requires_replicated_fast_count_recovery
+      - name: .development_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.requires_replicated_fast_count_recovery
+        distros:
+          - amazon2023-arm64-atlas-latest-m8g-2xlarge
+      - name: .release_critical !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.requires_replicated_fast_count_recovery
+      - name: .release_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.requires_replicated_fast_count_recovery
+        distros:
+          - amazon2023-arm64-atlas-latest-m8g-2xlarge
+      - name: .default !.requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.requires_replicated_fast_count_recovery
+      - name: .default .requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.requires_replicated_fast_count_recovery
+        distros:
+          - amazon2023-arm64-atlas-latest-m8g-2xlarge
+      - name: .fuzzer_deterministic
