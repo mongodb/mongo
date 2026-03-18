@@ -1,6 +1,7 @@
 import unittest
+from unittest.mock import Mock
 
-from buildscripts.resmokelib.hang_analyzer.extractor import get_dwarf_version
+from buildscripts.resmokelib.hang_analyzer.extractor import filter_core_dumps, get_dwarf_version
 
 
 class TestExtractor(unittest.TestCase):
@@ -65,6 +66,85 @@ dist-test/bin/mongod.debug:     file format elf64-x86-64
 """
 
         self.assertEqual(get_dwarf_version(dwarf_dump), 5)
+
+
+class TestFilterCoreDumpsHelper(unittest.TestCase):
+    """Unit tests for the filter_core_dumps helper function."""
+
+    def _artifact(self, filename):
+        return Mock(url=f"https://s3.example.com/artifacts/{filename}")
+
+    def test_no_filtering_when_no_boring_pids(self):
+        """Test that all cores are returned when no boring PIDs provided."""
+        artifacts = [
+            self._artifact("dump_mongod.123.core.gz"),
+            self._artifact("dump_mongos.456.core.gz"),
+        ]
+        logger = Mock()
+
+        result = filter_core_dumps(artifacts, None, 50, logger)
+
+        self.assertEqual(result, artifacts)
+
+    def test_filters_out_boring_pids(self):
+        """Test that cores with boring PIDs are filtered out."""
+        a1 = self._artifact("dump_mongod.123.core.gz")  # boring
+        a2 = self._artifact("dump_mongos.456.core.gz")  # interesting
+        a3 = self._artifact("dump_mongod.789.core.gz")  # boring
+        boring_pids = {"123", "789"}
+        logger = Mock()
+
+        result = filter_core_dumps([a1, a2, a3], boring_pids, 50, logger)
+
+        self.assertEqual(len(result), 1)
+        self.assertIn(a2, result)
+
+    def test_applies_cap(self):
+        """Test that maximum cap is applied."""
+        artifacts = [self._artifact(f"dump_mongod.{i}.core.gz") for i in range(100)]
+        logger = Mock()
+
+        result = filter_core_dumps(artifacts, None, 20, logger)
+
+        self.assertEqual(len(result), 20)
+
+    def test_filter_then_cap(self):
+        """Test that filtering happens before capping."""
+        interesting = [self._artifact(f"dump_mongod.{i}.core.gz") for i in range(10)]
+        boring = [self._artifact(f"dump_mongos.{i + 100}.core.gz") for i in range(10)]
+        boring_pids = {str(i + 100) for i in range(10)}
+        logger = Mock()
+
+        result = filter_core_dumps(interesting + boring, boring_pids, 5, logger)
+
+        self.assertEqual(len(result), 5)
+        for artifact in result:
+            self.assertIn(artifact, interesting)
+
+    def test_unparseable_filenames_treated_as_interesting(self):
+        """Test that cores with unparseable names are kept."""
+        a1 = self._artifact("dump_mongod.123.core.gz")  # boring, parseable
+        a2 = self._artifact("weird_name.core.gz")  # unparseable -> interesting
+        a3 = self._artifact("another.file.core.gz")  # unparseable -> interesting
+        boring_pids = {"123"}
+        logger = Mock()
+
+        result = filter_core_dumps([a1, a2, a3], boring_pids, 50, logger)
+
+        self.assertEqual(len(result), 2)
+        self.assertIn(a2, result)
+        self.assertIn(a3, result)
+
+    def test_empty_result_after_filtering(self):
+        """Test handling when all cores are filtered out."""
+        a1 = self._artifact("dump_mongod.123.core.gz")
+        a2 = self._artifact("dump_mongos.456.core.gz")
+        boring_pids = {"123", "456"}
+        logger = Mock()
+
+        result = filter_core_dumps([a1, a2], boring_pids, 50, logger)
+
+        self.assertEqual(len(result), 0)
 
 
 if __name__ == "__main__":

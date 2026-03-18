@@ -92,6 +92,7 @@ class CoreAnalyzer(Subcommand):
                     dumpers.dbg,
                     multiversion_dir,
                     self.execution,
+                    boring_core_dump_pids=self.boring_core_dump_pids,
                 ):
                     self.root_logger.error("Artifacts were not found.")
                     current_span.set_attributes(
@@ -126,7 +127,6 @@ class CoreAnalyzer(Subcommand):
             multiversion_dir,
             sysroot_dir,
             self.gdb_index_cache,
-            self.boring_core_dump_pids,
         )
 
         if self.options["generate_report"]:
