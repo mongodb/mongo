@@ -201,6 +201,7 @@ let viewsCommandTests = {
     _shardsvrRecreateRangeDeletionTasks: {skip: isAnInternalCommand},
     _shardsvrRecreateRangeDeletionTasksParticipant: {skip: isAnInternalCommand},
     _shardsvrRefineCollectionShardKey: {skip: isAnInternalCommand},
+    _shardsvrCommitRefineCollectionShardKey: {skip: isAnInternalCommand},
     _shardsvrRenameCollection: {skip: isAnInternalCommand},
     _shardsvrRenameCollectionParticipant: {skip: isAnInternalCommand},
     _shardsvrRenameCollectionParticipantUnblock: {skip: isAnInternalCommand},

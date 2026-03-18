@@ -137,6 +137,7 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
     const BSONObj& reason,
     const WriteConcernOptions& writeConcern,
     bool clearDbMetadata,
+    bool clearCollMetadata,
     boost::optional<Milliseconds> lockAcquisitionTimeout) {
     LOGV2_DEBUG(5656600,
                 3,
@@ -226,6 +227,7 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
         // in-mem)
         CollectionCriticalSectionDocument newDoc(nss, reason, false /* blockReads */);
         newDoc.setClearDbInfo(clearDbMetadata);
+        newDoc.setClearCollMetadata(clearCollMetadata);
 
         const auto commandResponse = dbClient.runCommand([&] {
             write_ops::InsertCommandRequest insertOp(
@@ -539,6 +541,8 @@ void ShardingRecoveryService::onReplicationRollback(
 
     static const std::array kShardingRecoveryTriggerNamespaces{
         NamespaceString::kConfigShardCatalogDatabasesNamespace,
+        NamespaceString::kConfigShardCatalogCollectionsNamespace,
+        NamespaceString::kConfigShardCatalogChunksNamespace,
         NamespaceString::kCollectionCriticalSectionsNamespace,
     };
     if (std::ranges::any_of(kShardingRecoveryTriggerNamespaces, [&](const NamespaceString& nss) {
@@ -653,6 +657,7 @@ void ShardingRecoveryService::_resetInMemoryStates(OperationContext* opCtx) {
         auto scopedCsr =
             CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss);
         scopedCsr->exitCriticalSectionNoChecks(opCtx);
+        scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
     }
 
     // ShardingRecoveryService can bypass the critical section to recover database metadata as there

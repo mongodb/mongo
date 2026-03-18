@@ -380,6 +380,18 @@ MONGO_MOD_NEEDS_REPLACEMENT void sendFetchCollMetadataToShards(
     const CancellationToken& token);
 
 /**
+ *  Commits a refineCollectionShardKey operations to the shard catalog by sending the command
+ * `_shardsvrCommitRefineCollectionShardKey` to all given shards.
+ */
+MONGO_MOD_PRIVATE void commitRefineCollectionShardKeyToShardCatalog(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const std::vector<ShardId>& shardIds,
+    const OperationSessionInfo& osi,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token);
+
+/**
  * Based on the FCV, get the where the DDL needs to act accordingly to the database
  * authoritativeness.
  */

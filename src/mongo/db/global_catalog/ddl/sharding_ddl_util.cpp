@@ -882,6 +882,26 @@ void sendFetchCollMetadataToShards(OperationContext* opCtx,
     sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 
+void commitRefineCollectionShardKeyToShardCatalog(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const std::vector<ShardId>& shardIds,
+    const OperationSessionInfo& osi,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
+    ShardsvrCommitRefineCollectionShardKey request(nss);
+    request.setDbName(DatabaseName::kAdmin);
+
+    generic_argument_util::setMajorityWriteConcern(request);
+    generic_argument_util::setOperationSessionInfo(request, osi);
+
+    auto opts =
+        std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrCommitRefineCollectionShardKey>>(
+            **executor, token, std::move(request));
+
+    sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
+}
+
 AuthoritativeMetadataAccessLevelEnum getGrantedAuthoritativeMetadataAccessLevel(
     const VersionContext& vCtx, const ServerGlobalParams::FCVSnapshot& snapshot) {
     const bool isAuthoritativeDDLEnabled =

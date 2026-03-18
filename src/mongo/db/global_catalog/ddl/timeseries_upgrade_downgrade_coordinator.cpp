@@ -220,7 +220,6 @@ void TimeseriesUpgradeDowngradeCoordinator::_releaseCriticalSectionFor(
     ShardsvrParticipantBlock unblockCRUDOperationsRequest(nss);
     unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
     unblockCRUDOperationsRequest.setReason(_critSecReason);
-    unblockCRUDOperationsRequest.setClearFilteringMetadata(true);
 
     generic_argument_util::setMajorityWriteConcern(unblockCRUDOperationsRequest);
     generic_argument_util::setOperationSessionInfo(unblockCRUDOperationsRequest,

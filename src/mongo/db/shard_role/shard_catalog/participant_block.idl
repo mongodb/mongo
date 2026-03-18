@@ -70,16 +70,12 @@ commands:
                     this metadata is needed. When the shard is database authoritative, it is no
                     longer necessary to clear the filtering metadata.
                 default: true
-            # TODO SERVER-79600: Remove once the release of the critical section clears the
-            # filtering metaddata. WARNING: new parameter, do not use in DDLCoordinators unless
-            # it's drained.
-            clearFilteringMetadata:
-                type: bool
+            clearCollMetadata:
+                type: safeBool
                 description: >-
-                    (NOTE: this field has been deprecated in 8.0:
-                     - starting from such a release, filtering metadata are always cleared when blockType == kUnblock;
-                     - requestors should still specify a value to maintain operability with remote nodes running a legacy binary)
-                    If true the filtering metadata will be cleared, forcing a refresh the next time
-                    the collection metadata is needed.
-                optional: true
+                    If true, and this critical section is acting on a collection level, the
+                    filtering collection metadata will be cleared, forcing a refresh the next time
+                    this metadata is needed. When the shard is collection authoritative, it is no
+                    longer necessary to clear the filtering metadata.
+                default: true
         reply_type: OkReply

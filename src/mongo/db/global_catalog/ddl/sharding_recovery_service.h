@@ -110,8 +110,8 @@ public:
      * for db/collection lock acquisition. If unable to acquire the locks within the specified time
      * limit, then a LockTimeout exception is thrown.
      *
-     * NOTE: If the `clearDbMetadata` flag is set, at the time of releasing the database critical
-     * section it will also clear the filtering database information. This flag is only used by
+     * NOTE: If the `clearDbMetadata|clearCollMetadata` flag is set, at the time of releasing the
+     * critical section it will also clear the filtering metadata. This flag is only used by
      * secondary nodes.
      */
     void acquireRecoverableCriticalSectionBlockWrites(
@@ -120,6 +120,7 @@ public:
         const BSONObj& reason,
         const WriteConcernOptions& writeConcern,
         bool clearDbMetadata = true,
+        bool clearCollMetadata = true,
         boost::optional<Milliseconds> lockAcquisitionTimeout = boost::none);
 
     /**

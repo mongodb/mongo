@@ -1483,7 +1483,6 @@ void CreateCollectionCoordinator::_exitCriticalSectionOnShards(
     ShardsvrParticipantBlock unblockCRUDOperationsRequest(nss());
     unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
     unblockCRUDOperationsRequest.setReason(_critSecReason);
-    unblockCRUDOperationsRequest.setClearFilteringMetadata(true);
     unblockCRUDOperationsRequest.setThrowIfReasonDiffers(throwIfReasonDiffers);
     generic_argument_util::setMajorityWriteConcern(unblockCRUDOperationsRequest);
     generic_argument_util::setOperationSessionInfo(unblockCRUDOperationsRequest,

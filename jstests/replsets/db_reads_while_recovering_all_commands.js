@@ -139,6 +139,7 @@ const allCommands = {
     _shardsvrReshardRecipientClone: {skip: isPrimaryOnly},
     _shardsvrReshardRecipientCriticalSectionStarted: {skip: isPrimaryOnly},
     _shardsvrRefineCollectionShardKey: {skip: isPrimaryOnly},
+    _shardsvrCommitRefineCollectionShardKey: {skip: isPrimaryOnly},
     _shardsvrSetAllowMigrations: {skip: isPrimaryOnly},
     _shardsvrSetClusterParameter: {skip: isAnInternalCommand},
     _shardsvrSetUserWriteBlockMode: {skip: isPrimaryOnly},

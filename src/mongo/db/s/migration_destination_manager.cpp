@@ -1850,6 +1850,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                     critSecReason,
                     defaultMajorityWriteConcernDoNotUse(),
                     true, /* (default) clearDbMetadata */
+                    true, /* (default) clearCollMetadata */
                     Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
 
                 LOGV2(5899114,

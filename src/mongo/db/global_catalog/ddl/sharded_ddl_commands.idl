@@ -1053,3 +1053,13 @@ commands:
             uuid:
                 type: uuid
                 description: "UUID of the collection"
+
+    _shardsvrCommitRefineCollectionShardKey:
+        command_name: _shardsvrCommitRefineCollectionShardKey
+        cpp_name: ShardsvrCommitRefineCollectionShardKey
+        description: "Internal command to commit refine collection shard key into the shard catalog."
+        strict: false
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        reply_type: OkReply

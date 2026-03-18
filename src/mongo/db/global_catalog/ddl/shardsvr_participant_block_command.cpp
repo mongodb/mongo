@@ -114,11 +114,16 @@ public:
                     case CriticalSectionBlockTypeEnum::kUnblock: {
                         std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction>
                             actionPtr;
-                        if (ns().isDbOnly() && !request().getClearDbInfo()) {
-                            actionPtr = std::make_unique<ShardingRecoveryService::NoCustomAction>();
-                        } else {
+
+                        const bool shouldClearMetadata = ns().isDbOnly()
+                            ? request().getClearDbInfo()
+                            : request().getClearCollMetadata();
+
+                        if (shouldClearMetadata) {
                             actionPtr = std::make_unique<
                                 ShardingRecoveryService::FilteringMetadataClearer>();
+                        } else {
+                            actionPtr = std::make_unique<ShardingRecoveryService::NoCustomAction>();
                         }
 
                         service->releaseRecoverableCriticalSection(
@@ -136,7 +141,8 @@ public:
                             ns(),
                             reason,
                             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-                            request().getClearDbInfo());
+                            request().getClearDbInfo(),
+                            request().getClearCollMetadata());
                         break;
                     default:
                         service->acquireRecoverableCriticalSectionBlockWrites(
@@ -144,7 +150,8 @@ public:
                             ns(),
                             reason,
                             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-                            request().getClearDbInfo());
+                            request().getClearDbInfo(),
+                            request().getClearCollMetadata());
                         service->promoteRecoverableCriticalSectionToBlockAlsoReads(
                             opCtx,
                             ns(),

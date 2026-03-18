@@ -1069,6 +1069,7 @@ const allTestCases = {
         _shardsvrRecreateRangeDeletionTasks: {skip: "TODO"},
         _shardsvrRecreateRangeDeletionTasksParticipant: {skip: "TODO"},
         _shardsvrRefineCollectionShardKey: {skip: "TODO"},
+        _shardsvrCommitRefineCollectionShardKey: {skip: "internal command"},
         _shardsvrRenameCollection: {skip: "TODO"},
         _shardsvrRenameCollectionParticipant: {skip: "TODO"},
         _shardsvrRenameCollectionParticipantUnblock: {skip: "TODO"},

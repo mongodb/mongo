@@ -795,6 +795,12 @@ const internalCommandsMap = {
         testname: "_shardsvrRefineCollectionShardKey",
         command: {_shardsvrRefineCollectionShardKey: "test.x", newShardKey: {}},
     },
+    _shardsvrCommitRefineCollectionShardKey: {
+        testname: "_shardsvrCommitRefineCollectionShardKey",
+        command: {
+            _shardsvrCommitRefineCollectionShardKey: "test.x",
+        },
+    },
     _shardsvrSetAllowMigrations: {
         testname: "_shardsvrSetAllowMigrations",
         command: {_shardsvrSetAllowMigrations: "db.collection", allowMigrations: true},
