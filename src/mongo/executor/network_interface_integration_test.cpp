@@ -882,7 +882,10 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
 
     // check that the request timeout uses the smaller of the operation context deadline and
     // the timeout specified in the request constructor.
-    ASSERT_GTE(result.elapsed.value() + createRequestDelay, requestTimeout);
+    // The absolute deadline is calculated in the RemoteCommandRequest constructor, while the
+    // request timer starts in `runCommand`. `createRequestDelay` may be slightly too low to capture
+    // this discrepancy, so we add some headroom to the final assertion here.
+    ASSERT_GTE(result.elapsed.value() + createRequestDelay + Milliseconds(1), requestTimeout);
     ASSERT_LT(result.elapsed.value() + networkStartCommandDelay, opCtxDeadline);
 
     // Sleep has timed out but _killOperations may still be running. We can't use
