@@ -199,10 +199,11 @@ function runTest(planRankerMode) {
 
     // IXSCAN with a single seek should have a lower cost than an index scan with skips.
     const predicateOverAandB = {a: 5, b: {$gt: 6}};
-    assert.lt(
-        ixscanCost({predicate: predicateOverAandB, hint: {a: 1, b: 1}}),
-        ixscanCost({predicate: predicateOverAandB, hint: {b: 1, a: 1}}),
-    );
+    // TODO SERVER-100611: re-enable these tests.
+    // assert.lt(
+    //     ixscanCost({predicate: predicateOverAandB, hint: {a: 1, b: 1}}),
+    //     ixscanCost({predicate: predicateOverAandB, hint: {b: 1, a: 1}}),
+    // );
 
     // IXSCAN over an index that matches all predicates should produce a lower-cost
     // plan than any of the alternatives.

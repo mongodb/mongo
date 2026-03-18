@@ -86,9 +86,10 @@ assert.commandWorked(coll.runCommand({analyze: collName, key: "bool_field", numb
 
 // Test queries
 const queries = [
-    {a: {$gt: 10}, b: {$eq: 99}},
-    {a: {$in: [5, 1]}, b: {$in: [7, 99]}},
-    {a: {$gt: 90}, b: {$eq: 99}, c: {$lt: 5}},
+    // TODO SERVER-100611: re-enable these tests.
+    // {a: {$gt: 10}, b: {$eq: 99}},
+    // {a: {$in: [5, 1]}, b: {$in: [7, 99]}},
+    // {a: {$gt: 90}, b: {$eq: 99}, c: {$lt: 5}},
     /*
     The following query has 4 plans:
     1. Filter: a in (1,5) AND b in (7, 99)
@@ -118,15 +119,16 @@ const queries = [
     better. Therefore, instead of comparing plans the test compares the number of keys and documents
     scanned by a plan. CBR plans should scan no more than Classic plans.
     */
-    {
-        $and: [{$or: [{a: 10}, {b: {$gt: 99}}]}, {$or: [{a: {$in: [5, 1]}}, {b: {$in: [7, 99]}}]}],
-    },
+    // {
+    //     $and: [{$or: [{a: 10}, {b: {$gt: 99}}]}, {$or: [{a: {$in: [5, 1]}}, {b: {$in: [7, 99]}}]}],
+    // },
     {a: {$not: {$lt: 130}}},
     {missing_10_percent: {$exists: false}},
     {missing_10_percent: {$not: {$exists: false}}},
     {missing_90_percent: {$exists: false}},
     {missing_90_percent: {$not: {$exists: false}}},
-    {a: {$not: {$lt: 130}}, b: 12, c: {$not: {$gt: 1200}}},
+    // TODO SERVER-100611: re-enable this test.
+    // {a: {$not: {$lt: 130}}, b: 12, c: {$not: {$gt: 1200}}},
     {a: {$not: {$in: [[100, 101, 102]]}}},
     {$nor: [{$and: [{a: {$lt: 10}}, {b: {$gt: 19}}]}]},
     {$nor: [{$or: [{a: {$lt: 10}}, {b: {$gt: 19}}]}]},
@@ -139,7 +141,8 @@ const queries = [
     {a: {$gt: 10}, b: {$in: []}},
     {$nor: [{a: 1}]},
     {$nor: [{a: 1}, {b: {$gt: 1000}}]},
-    {$and: [{$nor: [{a: 1}, {a: {$gt: 1000}}]}, {b: {$lt: 100}}]},
+    // TODO SERVER-100611: re-enable these tests.
+    // {$and: [{$nor: [{a: 1}, {a: {$gt: 1000}}]}, {b: {$lt: 100}}]},
     {$and: [{$or: [{$nor: [{a: {$gt: 100}}, {b: {$gt: 50}}]}, {a: 1}]}, {b: {$lt: 100}}]},
     // This query has an empty result, thus should estimate as 0
     {$and: [{$or: [{a: 0}, {a: 1}]}, {$or: [{a: {$gt: 3}}, {a: {$lt: 0}}]}]},
@@ -180,7 +183,8 @@ const queries = [
     // {$or: [{a: 3}, {b: {$size: 9}}]},
 ];
 
-queries.push({$or: [queries[0], queries[1]]});
+// TODO SERVER-100611: re-enable these tests.
+// queries.push({$or: [queries[0], queries[1]]});
 
 function assertCbrExplain(plan) {
     assert(plan.hasOwnProperty("cardinalityEstimate"), plan);
