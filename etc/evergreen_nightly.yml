@@ -58,3 +58,8 @@ parameters:
 - key: evergreen_config_file_path
   value: "etc/evergreen_nightly.yml"
   description: "path to this file"
+
+patch_aliases:
+  - alias: coverity_scan
+    variant: bv_coverity_analysis
+    task: run_coverity

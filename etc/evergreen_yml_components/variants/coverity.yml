@@ -4,8 +4,8 @@ buildvariants:
     # Don't run Coverity analysis as part of patch builds
     patchable: false
     allow_for_git_tag: false
-    # Run at 4 am UTC everyday
-    cron: "0 4 * * *"
+    # Don't run Coverity on commits, it will be run only as  part of nightly periodic build
+    activate: false
     run_on: ubuntu2404-xlarge
     modules:
       - devprod_coverity
