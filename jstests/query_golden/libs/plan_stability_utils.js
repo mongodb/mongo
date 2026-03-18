@@ -6,8 +6,20 @@ import {
     trimPlanToStagesAndIndexes,
 } from "jstests/query_golden/libs/pretty_printers.js";
 
+export const ResultsetRepresentation = Object.freeze({
+    ROW_COUNT: 0,
+    FULL: 1,
+});
+
 export function padNumber(num, width = 6) {
     return num.toString().padStart(width, " ");
+}
+
+/**
+ * Sort an array (such as a resultset) based on the JSON.stringify() representation of its elements.
+ */
+export function sortJsonStringify(arr) {
+    return arr.toSorted((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
 }
 
 /**
@@ -273,7 +285,7 @@ export function runPlanStabilityPipelines(db, collName, pipelines) {
  * Produce the output for plan stability golden tests that target Join Optimization
  */
 
-export function runPlanStabilityCommands(db, commands) {
+export function runPlanStabilityCommands(db, commands, resultsetRepresentation = ResultsetRepresentation.ROW_COUNT) {
     let totalKeys = 0;
     let totalDocs = 0;
     let totalRows = 0;
@@ -335,7 +347,13 @@ export function runPlanStabilityCommands(db, commands) {
         const queryPlanner =
             explain.queryPlanner !== undefined ? explain.queryPlanner : explain.stages[0]["$cursor"].queryPlanner;
         const winningPlan = queryPlanner.winningPlan;
-        const queryPlan = winningPlan.queryPlan !== undefined ? winningPlan.queryPlan : winningPlan;
+        const queryPlan = winningPlan.queryPlan !== undefined ? [winningPlan.queryPlan] : [winningPlan];
+
+        if (explain.stages.length > 1) {
+            // If there are any classic stages after the SBE stage,
+            // we include them in the query plan so that they will be dumped.
+            queryPlan.push(...explain.stages.slice(1));
+        }
 
         let winningPlanString = joinPlanToString(queryPlan).trimEnd();
         for (const planPrettyPrinter of [jsonifyMultilineString]) {
@@ -348,7 +366,20 @@ export function runPlanStabilityCommands(db, commands) {
         print(`    "winningPlan": [\n${winningPlanString}],`);
         print(`    "keys" : ${padNumber(keys, 9)},`);
         print(`    "docs" : ${padNumber(docs, 9)},`);
-        print(`    "rows" : ${padNumber(nReturned, 9)}}${separator}`);
+
+        switch (resultsetRepresentation) {
+            case ResultsetRepresentation.ROW_COUNT: {
+                print(`    "rows" : ${padNumber(nReturned, 9)}}${separator}`);
+                break;
+            }
+            case ResultsetRepresentation.FULL: {
+                const result = db[command["aggregate"]].aggregate(command["pipeline"]).toArray();
+                print(`    "result" :`);
+                printjson(sortJsonStringify(result));
+                print(`}${separator}`);
+                break;
+            }
+        }
         print();
     });
     print("],");

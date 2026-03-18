@@ -1,0 +1,1505 @@
+
+
+[jsTest] ----
+[jsTest] See README.plan_stability.join_opt.md for more information.
+[jsTest] ----
+
+{">>>commands":[
+{">>>command": {"idx":"1","aggregate":"lineitem","pipeline":[
+{"$match":{"$expr":{"$lte":["$l_shipdate",{"$dateSubtract":{"startDate":"1998-12-01T00:00:00.000Z","unit":"day","amount":90}}]}}},
+{"$group":{"_id":{"l_returnflag":"$l_returnflag","l_linestatus":"$l_linestatus"},"sum_qty":{"$sum":"$l_quantity"},"sum_base_price":{"$sum":"$l_extendedprice"},"sum_disc_price":{"$sum":{"$multiply":["$l_extendedprice",{"$subtract":[1,"$l_discount"]}]}},"sum_charge":{"$sum":{"$multiply":["$l_extendedprice",{"$subtract":[1,"$l_discount"]},{"$add":[1,"$l_tax"]}]}},"avg_qty":{"$avg":"$l_quantity"},"avg_price":{"$avg":"$l_extendedprice"},"avg_disc":{"$avg":"$l_discount"},"count_order":{"$count":{}}}},
+{"$project":{"_id":0,"l_returnflag":"$_id.l_returnflag","l_linestatus":"$_id.l_linestatus","sum_qty":1,"sum_base_price":1,"sum_disc_price":1,"sum_charge":1,"avg_qty":1,"avg_price":1,"avg_disc":1,"count_order":1}},
+{"$sort":{"l_returnflag":1,"l_linestatus":1}}]},
+    "winningPlan": [
+"PROJECTION_DEFAULT",
+"  -> GROUP",
+"      -> FETCH: plan_stability_tpch_official.lineitem {'$expr':{'$lte':['$l_shipdate',{'$const':'1998-09-02T00:00:00.000Z'}]}} ",
+"          -> IXSCAN: plan_stability_tpch_official.lineitem l_shipdate_1 {'l_shipdate':['[MinKey, new Date(904694400000)]']}",
+"$sort"],
+    "keys" :    591856,
+    "docs" :    591856,
+    "result" :
+[
+	{
+		"sum_qty" : 3774200,
+		"sum_base_price" : 5320753880.69,
+		"sum_disc_price" : 5054096266.6828,
+		"sum_charge" : 5256751331.449234,
+		"avg_qty" : 25.537587116854997,
+		"avg_price" : 36002.12382901414,
+		"avg_disc" : 0.05014459706340077,
+		"count_order" : 147790,
+		"l_returnflag" : "A",
+		"l_linestatus" : "F"
+	},
+	{
+		"sum_qty" : 3785523,
+		"sum_base_price" : 5337950526.47,
+		"sum_disc_price" : 5071818532.942,
+		"sum_charge" : 5274405503.049367,
+		"avg_qty" : 25.5259438574251,
+		"avg_price" : 35994.029214030925,
+		"avg_disc" : 0.04998927856184382,
+		"count_order" : 148301,
+		"l_returnflag" : "R",
+		"l_linestatus" : "F"
+	},
+	{
+		"sum_qty" : 7459297,
+		"sum_base_price" : 10512270008.9,
+		"sum_disc_price" : 9986238338.3847,
+		"sum_charge" : 10385578376.585466,
+		"avg_qty" : 25.545537671232875,
+		"avg_price" : 36000.9246880137,
+		"avg_disc" : 0.05009595890410959,
+		"count_order" : 292000,
+		"l_returnflag" : "N",
+		"l_linestatus" : "O"
+	},
+	{
+		"sum_qty" : 95257,
+		"sum_base_price" : 133737795.84,
+		"sum_disc_price" : 127132372.6512,
+		"sum_charge" : 132286291.229445,
+		"avg_qty" : 25.30066401062417,
+		"avg_price" : 35521.32691633466,
+		"avg_disc" : 0.04939442231075697,
+		"count_order" : 3765,
+		"l_returnflag" : "N",
+		"l_linestatus" : "F"
+	}
+]
+},
+
+{">>>command": {"idx":"3","aggregate":"customer","pipeline":[
+{"$match":{"$expr":{"$eq":["$c_mktsegment","BUILDING"]}}},
+{"$lookup":{"from":"orders","localField":"c_custkey","foreignField":"o_custkey","as":"orders","pipeline":[
+{"$match":{"$expr":{"$lt":["$o_orderdate","1995-03-15T00:00:00.000Z"]}}}]}},
+{"$unwind":"$orders"},
+{"$lookup":{"from":"lineitem","localField":"orders.o_orderkey","foreignField":"l_orderkey","as":"lineitem","pipeline":[
+{"$match":{"$expr":{"$gt":["$l_shipdate","1995-03-15T00:00:00.000Z"]}}}]}},
+{"$unwind":"$lineitem"},
+{"$group":{"_id":{"l_orderkey":"$lineitem.l_orderkey","o_orderdate":"$orders.o_orderdate","o_shippriority":"$orders.o_shippriority"},"revenue":{"$sum":{"$multiply":["$lineitem.l_extendedprice",{"$subtract":[1,"$lineitem.l_discount"]}]}}}},
+{"$project":{"_id":0,"l_orderkey":"$_id.l_orderkey","o_orderdate":"$_id.o_orderdate","o_shippriority":"$_id.o_shippriority","revenue":1}},
+{"$sort":{"revenue":-1,"o_orderdate":1}},
+{"$limit":10}]},
+    "winningPlan": [
+"HJ orders.o_orderkey = l_orderkey",
+"  -> [none] HJ c_custkey = o_custkey",
+"      -> [none] PROJECTION_SIMPLE",
+"          -> COLLSCAN: plan_stability_tpch_official.customer {'$and':[{'$expr':{'$eq':['$c_mktsegment',{'$const':'BUILDING'}]}}]} ",
+"      -> [orders] COLLSCAN: plan_stability_tpch_official.orders {'$and':[{'$expr':{'$lt':['$o_orderdate',{'$const':'1995-03-15T00:00:00.000Z'}]}}]} ",
+"  -> [lineitem] COLLSCAN: plan_stability_tpch_official.lineitem {'$and':[{'$expr':{'$gt':['$l_shipdate',{'$const':'1995-03-15T00:00:00.000Z'}]}}]} ",
+"$group",
+"$project",
+"$sort"],
+    "keys" :         0,
+    "docs" :    765572,
+    "result" :
+[
+	{
+		"revenue" : 309728.93059999996,
+		"l_orderkey" : 178727,
+		"o_orderdate" : ISODate("1995-02-25T00:00:00Z"),
+		"o_shippriority" : 0
+	},
+	{
+		"revenue" : 312604.542,
+		"l_orderkey" : 462502,
+		"o_orderdate" : ISODate("1995-03-08T00:00:00Z"),
+		"o_shippriority" : 0
+	},
+	{
+		"revenue" : 314967.0754,
+		"l_orderkey" : 108514,
+		"o_orderdate" : ISODate("1995-02-20T00:00:00Z"),
+		"o_shippriority" : 0
+	},
+	{
+		"revenue" : 318576.4154,
+		"l_orderkey" : 121604,
+		"o_orderdate" : ISODate("1995-03-07T00:00:00Z"),
+		"o_shippriority" : 0
+	},
+	{
+		"revenue" : 321075.581,
+		"l_orderkey" : 506021,
+		"o_orderdate" : ISODate("1995-03-10T00:00:00Z"),
+		"o_shippriority" : 0
+	},
+	{
+		"revenue" : 349181.7426,
+		"l_orderkey" : 554757,
+		"o_orderdate" : ISODate("1995-03-14T00:00:00Z"),
+		"o_shippriority" : 0
+	},
+	{
+		"revenue" : 351238.277,
+		"l_orderkey" : 573861,
+		"o_orderdate" : ISODate("1995-03-09T00:00:00Z"),
+		"o_shippriority" : 0
+	},
+	{
+		"revenue" : 353125.4577,
+		"l_orderkey" : 405063,
+		"o_orderdate" : ISODate("1995-03-03T00:00:00Z"),
+		"o_shippriority" : 0
+	},
+	{
+		"revenue" : 354494.7318,
+		"l_orderkey" : 584291,
+		"o_orderdate" : ISODate("1995-02-21T00:00:00Z"),
+		"o_shippriority" : 0
+	},
+	{
+		"revenue" : 355369.0698,
+		"l_orderkey" : 223140,
+		"o_orderdate" : ISODate("1995-03-14T00:00:00Z"),
+		"o_shippriority" : 0
+	}
+]
+},
+
+{">>>command": {"idx":"5","aggregate":"customer","pipeline":[
+{"$lookup":{"from":"orders","localField":"c_custkey","foreignField":"o_custkey","as":"orders","pipeline":[
+{"$match":{"$and":[{"$expr":{"$gte":["$o_orderdate","1994-01-01T00:00:00.000Z"]}},{"$expr":{"$lt":["$o_orderdate",{"$dateAdd":{"startDate":"1994-01-01T00:00:00.000Z","unit":"year","amount":1}}]}}]}}]}},
+{"$unwind":"$orders"},
+{"$lookup":{"from":"lineitem","localField":"orders.o_orderkey","foreignField":"l_orderkey","as":"lineitem"}},
+{"$unwind":"$lineitem"},
+{"$lookup":{"from":"supplier","localField":"lineitem.l_suppkey","foreignField":"s_suppkey","as":"supplier","let":{"c_nationkey":"$c_nationkey"},"pipeline":[
+{"$match":{"$expr":{"$eq":["$s_nationkey","$$c_nationkey"]}}}]}},
+{"$unwind":"$supplier"},
+{"$lookup":{"from":"nation","localField":"supplier.s_nationkey","foreignField":"n_nationkey","as":"nation"}},
+{"$unwind":"$nation"},
+{"$lookup":{"from":"region","localField":"nation.n_regionkey","foreignField":"r_regionkey","as":"region","pipeline":[
+{"$match":{"$expr":{"$eq":["$r_name","ASIA"]}}}]}},
+{"$unwind":"$region"},
+{"$group":{"_id":"$nation.n_name","revenue":{"$sum":{"$multiply":["$lineitem.l_extendedprice",{"$subtract":[1,"$lineitem.l_discount"]}]}}}},
+{"$project":{"_id":0,"n_name":"$_id","revenue":1}},
+{"$sort":{"revenue":-1}}]},
+    "winningPlan": [
+"HJ s_suppkey = lineitem.l_suppkey, s_nationkey $= c_nationkey, s_nationkey = nation.n_nationkey",
+"  -> [supplier] COLLSCAN: plan_stability_tpch_official.supplier ",
+"  -> [none] HJ orders.o_orderkey = l_orderkey",
+"      -> [none] INLJ c_custkey = o_custkey",
+"          -> [none] HJ nation.n_nationkey = c_nationkey",
+"              -> [none] NLJ r_regionkey = n_regionkey",
+"                  -> [region] COLLSCAN: plan_stability_tpch_official.region {'$and':[{'$expr':{'$eq':['$r_name',{'$const':'ASIA'}]}}]} ",
+"                  -> [nation] COLLSCAN: plan_stability_tpch_official.nation ",
+"              -> [none] PROJECTION_SIMPLE",
+"                  -> COLLSCAN: plan_stability_tpch_official.customer ",
+"          -> [orders] FETCH: plan_stability_tpch_official.orders {'$and':[{'$expr':{'$gte':['$o_orderdate',{'$const':'1994-01-01T00:00:00.000Z'}]}},{'$expr':{'$lt':['$o_orderdate',{'$const':'1995-01-01T00:00:00.000Z'}]}},{'o_orderdate':{'$_internalExprGte':'1994-01-01T00:00:00.000Z'}},{'o_orderdate':{'$_internalExprLt':'1995-01-01T00:00:00.000Z'}}]} ",
+"              -> INDEX_PROBE_NODE: plan_stability_tpch_official.orders o_custkey_1",
+"      -> [lineitem] COLLSCAN: plan_stability_tpch_official.lineitem ",
+"$group",
+"$project",
+"$sort"],
+    "keys" :     30173,
+    "docs" :    646775,
+    "result" :
+[
+	{
+		"revenue" : 4497840.5466,
+		"n_name" : "VIETNAM"
+	},
+	{
+		"revenue" : 5580475.4026999995,
+		"n_name" : "INDONESIA"
+	},
+	{
+		"revenue" : 6000077.2184,
+		"n_name" : "JAPAN"
+	},
+	{
+		"revenue" : 6376121.5084999995,
+		"n_name" : "INDIA"
+	},
+	{
+		"revenue" : 7822103,
+		"n_name" : "CHINA"
+	}
+]
+},
+
+{">>>command": {"idx":"7","aggregate":"supplier","pipeline":[
+{"$lookup":{"from":"lineitem","localField":"s_suppkey","foreignField":"l_suppkey","as":"lineitem","pipeline":[
+{"$match":{"$and":[{"$expr":{"$gte":["$l_shipdate","1995-01-01T00:00:00.000Z"]}},{"$expr":{"$lte":["$l_shipdate","1996-12-31T00:00:00.000Z"]}}]}}]}},
+{"$unwind":"$lineitem"},
+{"$lookup":{"from":"orders","localField":"lineitem.l_orderkey","foreignField":"o_orderkey","as":"orders"}},
+{"$unwind":"$orders"},
+{"$lookup":{"from":"customer","localField":"orders.o_custkey","foreignField":"c_custkey","as":"customer"}},
+{"$unwind":"$customer"},
+{"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","as":"n1"}},
+{"$unwind":"$n1"},
+{"$lookup":{"from":"nation","localField":"customer.c_nationkey","foreignField":"n_nationkey","as":"n2","let":{"n1_name":"$n1.n_name"},"pipeline":[
+{"$match":{"$expr":{"$or":[{"$and":[{"$eq":["$$n1_name","FRANCE"]},{"$eq":["$n_name","GERMANY"]}]},{"$and":[{"$eq":["$$n1_name","GERMANY"]},{"$eq":["$n_name","FRANCE"]}]}]}}}]}},
+{"$unwind":"$n2"},
+{"$project":{"supp_nation":"$n1.n_name","cust_nation":"$n2.n_name","l_year":{"$year":"$lineitem.l_shipdate"},"volume":{"$multiply":["$lineitem.l_extendedprice",{"$subtract":[1,"$lineitem.l_discount"]}]}}},
+{"$group":{"_id":{"supp_nation":"$supp_nation","cust_nation":"$cust_nation","l_year":"$l_year"},"revenue":{"$sum":"$volume"}}},
+{"$project":{"_id":0,"supp_nation":"$_id.supp_nation","cust_nation":"$_id.cust_nation","l_year":"$_id.l_year","revenue":1}},
+{"$sort":{"supp_nation":1,"cust_nation":1,"l_year":1}}]},
+    "winningPlan": [
+"HJ c_custkey = orders.o_custkey",
+"  -> [customer] COLLSCAN: plan_stability_tpch_official.customer ",
+"  -> [none] HJ o_orderkey = lineitem.l_orderkey",
+"      -> [orders] COLLSCAN: plan_stability_tpch_official.orders ",
+"      -> [none] HJ s_suppkey = l_suppkey",
+"          -> [none] HJ n_nationkey = s_nationkey",
+"              -> [n1] COLLSCAN: plan_stability_tpch_official.nation ",
+"              -> [none] PROJECTION_SIMPLE",
+"                  -> COLLSCAN: plan_stability_tpch_official.supplier ",
+"          -> [lineitem] COLLSCAN: plan_stability_tpch_official.lineitem {'$and':[{'$expr':{'$gte':['$l_shipdate',{'$const':'1995-01-01T00:00:00.000Z'}]}},{'$expr':{'$lte':['$l_shipdate',{'$const':'1996-12-31T00:00:00.000Z'}]}}]} ",
+"$lookup nation n_nationkey_1",
+"$project",
+"$group",
+"$project",
+"$sort"],
+    "keys" :     15631,
+    "docs" :    782228,
+    "result" :
+[
+	{
+		"revenue" : 4637235.1501,
+		"supp_nation" : "FRANCE",
+		"cust_nation" : "GERMANY",
+		"l_year" : 1995
+	},
+	{
+		"revenue" : 5224779.5736,
+		"supp_nation" : "FRANCE",
+		"cust_nation" : "GERMANY",
+		"l_year" : 1996
+	},
+	{
+		"revenue" : 5557312.1121,
+		"supp_nation" : "GERMANY",
+		"cust_nation" : "FRANCE",
+		"l_year" : 1996
+	},
+	{
+		"revenue" : 6232818.7037,
+		"supp_nation" : "GERMANY",
+		"cust_nation" : "FRANCE",
+		"l_year" : 1995
+	}
+]
+},
+
+{">>>command": {"idx":"8","aggregate":"part","pipeline":[
+{"$match":{"$expr":{"$eq":["$p_type","ECONOMY ANODIZED STEEL"]}}},
+{"$lookup":{"from":"supplier","as":"supplier","pipeline":[]}},
+{"$unwind":"$supplier"},
+{"$lookup":{"from":"lineitem","localField":"p_partkey","foreignField":"l_partkey","as":"lineitem","let":{"s_suppkey":"$supplier.s_suppkey"},"pipeline":[
+{"$match":{"$expr":{"$eq":["$l_suppkey","$$s_suppkey"]}}}]}},
+{"$unwind":"$lineitem"},
+{"$lookup":{"from":"orders","localField":"lineitem.l_orderkey","foreignField":"o_orderkey","as":"orders","pipeline":[
+{"$match":{"$and":[{"$expr":{"$gte":["$o_orderdate","1995-01-01T00:00:00.000Z"]}},{"$expr":{"$lte":["$o_orderdate","1996-12-31T00:00:00.000Z"]}}]}}]}},
+{"$unwind":"$orders"},
+{"$lookup":{"from":"customer","localField":"orders.o_custkey","foreignField":"c_custkey","as":"customer"}},
+{"$unwind":"$customer"},
+{"$lookup":{"from":"nation","localField":"customer.c_nationkey","foreignField":"n_nationkey","as":"n1"}},
+{"$unwind":"$n1"},
+{"$lookup":{"from":"nation","localField":"supplier.s_nationkey","foreignField":"n_nationkey","as":"n2"}},
+{"$unwind":"$n2"},
+{"$lookup":{"from":"region","localField":"n1.n_regionkey","foreignField":"r_regionkey","as":"region","pipeline":[
+{"$match":{"$expr":{"$eq":["$r_name","AMERICA"]}}}]}},
+{"$unwind":"$region"},
+{"$project":{"o_year":{"$year":"$orders.o_orderdate"},"volume":{"$multiply":["$lineitem.l_extendedprice",{"$subtract":[{"$literal":1},"$lineitem.l_discount"]}]},"nation":"$n2.n_name"}},
+{"$group":{"_id":"$o_year","total_volume":{"$sum":"$volume"},"nation_volume":{"$sum":{"$cond":{"if":{"$eq":["$nation","BRAZIL"]},"then":"$volume","else":0}}}}},
+{"$project":{"_id":0,"o_year":"$_id","mkt_share":{"$divide":["$nation_volume","$total_volume"]}}},
+{"$sort":{"o_year":1}}]},
+    "winningPlan": [
+"HJ n_nationkey = supplier.s_nationkey",
+"  -> [n2] COLLSCAN: plan_stability_tpch_official.nation ",
+"  -> [none] HJ lineitem.l_suppkey $= s_suppkey",
+"      -> [none] HJ r_regionkey = n1.n_regionkey",
+"          -> [region] COLLSCAN: plan_stability_tpch_official.region {'$and':[{'$expr':{'$eq':['$r_name',{'$const':'AMERICA'}]}}]} ",
+"          -> [none] HJ n_nationkey = customer.c_nationkey",
+"              -> [n1] COLLSCAN: plan_stability_tpch_official.nation ",
+"              -> [none] HJ orders.o_custkey = c_custkey",
+"                  -> [none] HJ lineitem.l_orderkey = o_orderkey",
+"                      -> [none] HJ p_partkey = l_partkey",
+"                          -> [none] PROJECTION_SIMPLE",
+"                              -> COLLSCAN: plan_stability_tpch_official.part {'$and':[{'$expr':{'$eq':['$p_type',{'$const':'ECONOMY ANODIZED STEEL'}]}}]} ",
+"                          -> [lineitem] COLLSCAN: plan_stability_tpch_official.lineitem ",
+"                      -> [orders] COLLSCAN: plan_stability_tpch_official.orders {'$and':[{'$expr':{'$gte':['$o_orderdate',{'$const':'1995-01-01T00:00:00.000Z'}]}},{'$expr':{'$lte':['$o_orderdate',{'$const':'1996-12-31T00:00:00.000Z'}]}}]} ",
+"                  -> [customer] COLLSCAN: plan_stability_tpch_official.customer ",
+"      -> [supplier] COLLSCAN: plan_stability_tpch_official.supplier ",
+"$project",
+"$group",
+"$project",
+"$sort"],
+    "keys" :         0,
+    "docs" :    786627,
+    "result" :
+[
+	{
+		"o_year" : 1995,
+		"mkt_share" : 0.02864874130561755
+	},
+	{
+		"o_year" : 1996,
+		"mkt_share" : 0.018250279107962147
+	}
+]
+},
+
+{">>>command": {"idx":"9","aggregate":"part","pipeline":[
+{"$match":{"p_name":{"$regex":"green"}}},
+{"$lookup":{"from":"supplier","as":"supplier","pipeline":[]}},
+{"$unwind":"$supplier"},
+{"$lookup":{"from":"lineitem","localField":"supplier.s_suppkey","foreignField":"l_suppkey","as":"lineitem","let":{"p_partkey":"$p_partkey"},"pipeline":[
+{"$match":{"$expr":{"$eq":["$l_partkey","$$p_partkey"]}}}]}},
+{"$unwind":"$lineitem"},
+{"$lookup":{"from":"partsupp","localField":"lineitem.l_suppkey","foreignField":"ps_suppkey","let":{"l_partkey":"$lineitem.l_partkey"},"as":"partsupp","pipeline":[
+{"$match":{"$expr":{"$eq":["$ps_partkey","$$l_partkey"]}}}]}},
+{"$unwind":"$partsupp"},
+{"$lookup":{"from":"orders","localField":"lineitem.l_orderkey","foreignField":"o_orderkey","as":"orders"}},
+{"$unwind":"$orders"},
+{"$lookup":{"from":"nation","localField":"supplier.s_nationkey","foreignField":"n_nationkey","as":"nation"}},
+{"$unwind":"$nation"},
+{"$project":{"nation":"$nation.n_name","o_year":{"$year":"$orders.o_orderdate"},"amount":{"$subtract":[{"$multiply":["$lineitem.l_extendedprice",{"$subtract":[1,"$lineitem.l_discount"]}]},{"$multiply":["$partsupp.ps_supplycost","$lineitem.l_quantity"]}]}}},
+{"$group":{"_id":{"nation":"$nation","o_year":"$o_year"},"sum_profit":{"$sum":"$amount"}}},
+{"$project":{"_id":0,"nation":"$_id.nation","o_year":"$_id.o_year","sum_profit":1}},
+{"$sort":{"nation":1,"o_year":-1}}]},
+    "winningPlan": [
+"HJ lineitem.l_orderkey = o_orderkey",
+"  -> [none] HJ supplier.s_suppkey = l_suppkey, p_partkey $= l_partkey, partsupp.ps_suppkey = l_suppkey, partsupp.ps_partkey $= l_partkey",
+"      -> [none] HJ n_nationkey = supplier.s_nationkey",
+"          -> [nation] COLLSCAN: plan_stability_tpch_official.nation ",
+"          -> [none] HJ s_suppkey = partsupp.ps_suppkey",
+"              -> [supplier] COLLSCAN: plan_stability_tpch_official.supplier ",
+"              -> [none] HJ p_partkey = ps_partkey",
+"                  -> [none] PROJECTION_SIMPLE",
+"                      -> COLLSCAN: plan_stability_tpch_official.part {'p_name':{'$regex':'green'}} ",
+"                  -> [partsupp] COLLSCAN: plan_stability_tpch_official.partsupp ",
+"      -> [lineitem] COLLSCAN: plan_stability_tpch_official.lineitem ",
+"  -> [orders] COLLSCAN: plan_stability_tpch_official.orders ",
+"$project",
+"$group",
+"$project",
+"$sort"],
+    "keys" :         0,
+    "docs" :    851597,
+    "result" :
+[
+	{
+		"sum_profit" : 1620428.7345999999,
+		"nation" : "MOZAMBIQUE",
+		"o_year" : 1998
+	},
+	{
+		"sum_profit" : 1811488.0719,
+		"nation" : "JORDAN",
+		"o_year" : 1998
+	},
+	{
+		"sum_profit" : 1815334.818,
+		"nation" : "MOROCCO",
+		"o_year" : 1998
+	},
+	{
+		"sum_profit" : 1849535.0802,
+		"nation" : "JAPAN",
+		"o_year" : 1998
+	},
+	{
+		"sum_profit" : 1924313.4862,
+		"nation" : "VIETNAM",
+		"o_year" : 1998
+	},
+	{
+		"sum_profit" : 1953927.2682,
+		"nation" : "ETHIOPIA",
+		"o_year" : 1998
+	},
+	{
+		"sum_profit" : 1992773.6811,
+		"nation" : "ROMANIA",
+		"o_year" : 1998
+	},
+	{
+		"sum_profit" : 2036430.3602,
+		"nation" : "PERU",
+		"o_year" : 1998
+	},
+	{
+		"sum_profit" : 2194509.0465,
+		"nation" : "CANADA",
+		"o_year" : 1998
+	},
+	{
+		"sum_profit" : 2238771.5581,
+		"nation" : "UNITED STATES",
+		"o_year" : 1998
+	},
+	{
+		"sum_profit" : 2252021.5137,
+		"nation" : "UNITED KINGDOM",
+		"o_year" : 1998
+	},
+	{
+		"sum_profit" : 2321785.3682,
+		"nation" : "ALGERIA",
+		"o_year" : 1998
+	},
+	{
+		"sum_profit" : 2333148.3334,
+		"nation" : "EGYPT",
+		"o_year" : 1998
+	},
+	{
+		"sum_profit" : 2338859.4099,
+		"nation" : "IRAQ",
+		"o_year" : 1998
+	},
+	{
+		"sum_profit" : 2339865.6635,
+		"nation" : "RUSSIA",
+		"o_year" : 1998
+	},
+	{
+		"sum_profit" : 2409955.1755,
+		"nation" : "MOZAMBIQUE",
+		"o_year" : 1996
+	},
+	{
+		"sum_profit" : 2417892.0921,
+		"nation" : "JORDAN",
+		"o_year" : 1994
+	},
+	{
+		"sum_profit" : 2548226.2158,
+		"nation" : "MOZAMBIQUE",
+		"o_year" : 1994
+	},
+	{
+		"sum_profit" : 2556114.1692999997,
+		"nation" : "VIETNAM",
+		"o_year" : 1993
+	},
+	{
+		"sum_profit" : 2556501.0943,
+		"nation" : "MOZAMBIQUE",
+		"o_year" : 1992
+	},
+	{
+		"sum_profit" : 2579075.4189999998,
+		"nation" : "KENYA",
+		"o_year" : 1998
+	},
+	{
+		"sum_profit" : 2591288.1874,
+		"nation" : "INDIA",
+		"o_year" : 1998
+	},
+	{
+		"sum_profit" : 2604373.8805,
+		"nation" : "FRANCE",
+		"o_year" : 1998
+	},
+	{
+		"sum_profit" : 2685983.8005,
+		"nation" : "ARGENTINA",
+		"o_year" : 1998
+	},
+	{
+		"sum_profit" : 2721203.2355,
+		"nation" : "ETHIOPIA",
+		"o_year" : 1992
+	},
+	{
+		"sum_profit" : 2771602.6274,
+		"nation" : "MOZAMBIQUE",
+		"o_year" : 1995
+	},
+	{
+		"sum_profit" : 2778730.3931,
+		"nation" : "BRAZIL",
+		"o_year" : 1998
+	},
+	{
+		"sum_profit" : 2802166.6473,
+		"nation" : "MOZAMBIQUE",
+		"o_year" : 1997
+	},
+	{
+		"sum_profit" : 2843748.9052999998,
+		"nation" : "MOZAMBIQUE",
+		"o_year" : 1993
+	},
+	{
+		"sum_profit" : 2854639.868,
+		"nation" : "ROMANIA",
+		"o_year" : 1997
+	},
+	{
+		"sum_profit" : 2929194.2317,
+		"nation" : "KENYA",
+		"o_year" : 1997
+	},
+	{
+		"sum_profit" : 2951297.8678,
+		"nation" : "JORDAN",
+		"o_year" : 1997
+	},
+	{
+		"sum_profit" : 3008978.2676999997,
+		"nation" : "ETHIOPIA",
+		"o_year" : 1993
+	},
+	{
+		"sum_profit" : 3029274.442,
+		"nation" : "ROMANIA",
+		"o_year" : 1992
+	},
+	{
+		"sum_profit" : 3037409.4359999998,
+		"nation" : "ETHIOPIA",
+		"o_year" : 1994
+	},
+	{
+		"sum_profit" : 3094900.1597,
+		"nation" : "INDONESIA",
+		"o_year" : 1998
+	},
+	{
+		"sum_profit" : 3107641.7661,
+		"nation" : "JORDAN",
+		"o_year" : 1993
+	},
+	{
+		"sum_profit" : 3139337.3029,
+		"nation" : "ROMANIA",
+		"o_year" : 1996
+	},
+	{
+		"sum_profit" : 3214864.1209,
+		"nation" : "IRAN",
+		"o_year" : 1998
+	},
+	{
+		"sum_profit" : 3221813.999,
+		"nation" : "JORDAN",
+		"o_year" : 1995
+	},
+	{
+		"sum_profit" : 3222153.3776,
+		"nation" : "ROMANIA",
+		"o_year" : 1995
+	},
+	{
+		"sum_profit" : 3222844.319,
+		"nation" : "ROMANIA",
+		"o_year" : 1994
+	},
+	{
+		"sum_profit" : 3285786.3266,
+		"nation" : "ETHIOPIA",
+		"o_year" : 1997
+	},
+	{
+		"sum_profit" : 3289224.1138,
+		"nation" : "UNITED STATES",
+		"o_year" : 1994
+	},
+	{
+		"sum_profit" : 3291023.2964999997,
+		"nation" : "GERMANY",
+		"o_year" : 1998
+	},
+	{
+		"sum_profit" : 3302528.3067,
+		"nation" : "JORDAN",
+		"o_year" : 1996
+	},
+	{
+		"sum_profit" : 3304641.834,
+		"nation" : "KENYA",
+		"o_year" : 1992
+	},
+	{
+		"sum_profit" : 3316379.0585,
+		"nation" : "JORDAN",
+		"o_year" : 1992
+	},
+	{
+		"sum_profit" : 3373762.3334999997,
+		"nation" : "EGYPT",
+		"o_year" : 1992
+	},
+	{
+		"sum_profit" : 3386948.9564,
+		"nation" : "SAUDI ARABIA",
+		"o_year" : 1998
+	},
+	{
+		"sum_profit" : 3398578.0001,
+		"nation" : "CHINA",
+		"o_year" : 1998
+	},
+	{
+		"sum_profit" : 3436195.3709,
+		"nation" : "VIETNAM",
+		"o_year" : 1997
+	},
+	{
+		"sum_profit" : 3482197.9521,
+		"nation" : "CANADA",
+		"o_year" : 1997
+	},
+	{
+		"sum_profit" : 3488994.0288,
+		"nation" : "ROMANIA",
+		"o_year" : 1993
+	},
+	{
+		"sum_profit" : 3515127.1402,
+		"nation" : "MOROCCO",
+		"o_year" : 1995
+	},
+	{
+		"sum_profit" : 3525028.7952,
+		"nation" : "ETHIOPIA",
+		"o_year" : 1996
+	},
+	{
+		"sum_profit" : 3531013.1981,
+		"nation" : "FRANCE",
+		"o_year" : 1994
+	},
+	{
+		"sum_profit" : 3541051.3865,
+		"nation" : "ALGERIA",
+		"o_year" : 1993
+	},
+	{
+		"sum_profit" : 3542096.1563999997,
+		"nation" : "ARGENTINA",
+		"o_year" : 1994
+	},
+	{
+		"sum_profit" : 3542889.1087,
+		"nation" : "KENYA",
+		"o_year" : 1995
+	},
+	{
+		"sum_profit" : 3566508.0818,
+		"nation" : "EGYPT",
+		"o_year" : 1994
+	},
+	{
+		"sum_profit" : 3569129.5619,
+		"nation" : "KENYA",
+		"o_year" : 1996
+	},
+	{
+		"sum_profit" : 3599199.6679,
+		"nation" : "MOROCCO",
+		"o_year" : 1993
+	},
+	{
+		"sum_profit" : 3614468.7484999998,
+		"nation" : "JAPAN",
+		"o_year" : 1993
+	},
+	{
+		"sum_profit" : 3621649.2246999997,
+		"nation" : "IRAN",
+		"o_year" : 1996
+	},
+	{
+		"sum_profit" : 3622479.2413,
+		"nation" : "FRANCE",
+		"o_year" : 1996
+	},
+	{
+		"sum_profit" : 3622681.5642999997,
+		"nation" : "IRAQ",
+		"o_year" : 1997
+	},
+	{
+		"sum_profit" : 3624013.266,
+		"nation" : "UNITED STATES",
+		"o_year" : 1996
+	},
+	{
+		"sum_profit" : 3626170.2028,
+		"nation" : "UNITED STATES",
+		"o_year" : 1993
+	},
+	{
+		"sum_profit" : 3637792.1333,
+		"nation" : "FRANCE",
+		"o_year" : 1992
+	},
+	{
+		"sum_profit" : 3644054.1371999998,
+		"nation" : "VIETNAM",
+		"o_year" : 1995
+	},
+	{
+		"sum_profit" : 3661244.2731,
+		"nation" : "EGYPT",
+		"o_year" : 1997
+	},
+	{
+		"sum_profit" : 3685016.8589,
+		"nation" : "ALGERIA",
+		"o_year" : 1997
+	},
+	{
+		"sum_profit" : 3688049.0691,
+		"nation" : "IRAN",
+		"o_year" : 1997
+	},
+	{
+		"sum_profit" : 3693214.8447,
+		"nation" : "MOROCCO",
+		"o_year" : 1997
+	},
+	{
+		"sum_profit" : 3712231.2813999997,
+		"nation" : "CANADA",
+		"o_year" : 1996
+	},
+	{
+		"sum_profit" : 3713988.9708,
+		"nation" : "KENYA",
+		"o_year" : 1993
+	},
+	{
+		"sum_profit" : 3725283.7747,
+		"nation" : "EGYPT",
+		"o_year" : 1993
+	},
+	{
+		"sum_profit" : 3731301.7813999997,
+		"nation" : "IRAN",
+		"o_year" : 1993
+	},
+	{
+		"sum_profit" : 3754635.0078,
+		"nation" : "PERU",
+		"o_year" : 1992
+	},
+	{
+		"sum_profit" : 3765371.2368,
+		"nation" : "EGYPT",
+		"o_year" : 1996
+	},
+	{
+		"sum_profit" : 3772067.4041,
+		"nation" : "RUSSIA",
+		"o_year" : 1996
+	},
+	{
+		"sum_profit" : 3781674.8910999997,
+		"nation" : "ETHIOPIA",
+		"o_year" : 1995
+	},
+	{
+		"sum_profit" : 3787069.6045,
+		"nation" : "CANADA",
+		"o_year" : 1993
+	},
+	{
+		"sum_profit" : 3830077.9910999998,
+		"nation" : "IRAQ",
+		"o_year" : 1993
+	},
+	{
+		"sum_profit" : 3864849.9521,
+		"nation" : "ALGERIA",
+		"o_year" : 1994
+	},
+	{
+		"sum_profit" : 3892244.5172,
+		"nation" : "UNITED STATES",
+		"o_year" : 1995
+	},
+	{
+		"sum_profit" : 3907867.0102999997,
+		"nation" : "ARGENTINA",
+		"o_year" : 1996
+	},
+	{
+		"sum_profit" : 3938636.4874,
+		"nation" : "IRAQ",
+		"o_year" : 1992
+	},
+	{
+		"sum_profit" : 3949965.9388,
+		"nation" : "ARGENTINA",
+		"o_year" : 1993
+	},
+	{
+		"sum_profit" : 3958335.4224,
+		"nation" : "MOROCCO",
+		"o_year" : 1992
+	},
+	{
+		"sum_profit" : 3978688.8830999997,
+		"nation" : "UNITED KINGDOM",
+		"o_year" : 1992
+	},
+	{
+		"sum_profit" : 3982872.0488,
+		"nation" : "FRANCE",
+		"o_year" : 1997
+	},
+	{
+		"sum_profit" : 3983095.3994,
+		"nation" : "KENYA",
+		"o_year" : 1994
+	},
+	{
+		"sum_profit" : 3993973.4997,
+		"nation" : "UNITED STATES",
+		"o_year" : 1992
+	},
+	{
+		"sum_profit" : 4003072.1119999997,
+		"nation" : "MOROCCO",
+		"o_year" : 1994
+	},
+	{
+		"sum_profit" : 4014814.8476,
+		"nation" : "CANADA",
+		"o_year" : 1995
+	},
+	{
+		"sum_profit" : 4017288.8926999997,
+		"nation" : "VIETNAM",
+		"o_year" : 1996
+	},
+	{
+		"sum_profit" : 4044774.7597,
+		"nation" : "JAPAN",
+		"o_year" : 1996
+	},
+	{
+		"sum_profit" : 4054677.105,
+		"nation" : "UNITED KINGDOM",
+		"o_year" : 1993
+	},
+	{
+		"sum_profit" : 4064142.4091,
+		"nation" : "PERU",
+		"o_year" : 1997
+	},
+	{
+		"sum_profit" : 4068678.5671,
+		"nation" : "PERU",
+		"o_year" : 1996
+	},
+	{
+		"sum_profit" : 4068688.8537,
+		"nation" : "JAPAN",
+		"o_year" : 1997
+	},
+	{
+		"sum_profit" : 4086437.3102,
+		"nation" : "FRANCE",
+		"o_year" : 1993
+	},
+	{
+		"sum_profit" : 4090524.4905,
+		"nation" : "VIETNAM",
+		"o_year" : 1992
+	},
+	{
+		"sum_profit" : 4094744.2925,
+		"nation" : "EGYPT",
+		"o_year" : 1995
+	},
+	{
+		"sum_profit" : 4114717.0568,
+		"nation" : "JAPAN",
+		"o_year" : 1994
+	},
+	{
+		"sum_profit" : 4116175.923,
+		"nation" : "MOROCCO",
+		"o_year" : 1996
+	},
+	{
+		"sum_profit" : 4135581.5734,
+		"nation" : "UNITED STATES",
+		"o_year" : 1997
+	},
+	{
+		"sum_profit" : 4141277.6665,
+		"nation" : "VIETNAM",
+		"o_year" : 1994
+	},
+	{
+		"sum_profit" : 4144006.661,
+		"nation" : "PERU",
+		"o_year" : 1993
+	},
+	{
+		"sum_profit" : 4145304.4855,
+		"nation" : "CANADA",
+		"o_year" : 1994
+	},
+	{
+		"sum_profit" : 4153619.5423999997,
+		"nation" : "RUSSIA",
+		"o_year" : 1997
+	},
+	{
+		"sum_profit" : 4168009.4200999998,
+		"nation" : "CANADA",
+		"o_year" : 1992
+	},
+	{
+		"sum_profit" : 4189476.3065,
+		"nation" : "UNITED KINGDOM",
+		"o_year" : 1996
+	},
+	{
+		"sum_profit" : 4242147.8124,
+		"nation" : "ARGENTINA",
+		"o_year" : 1997
+	},
+	{
+		"sum_profit" : 4266694.47,
+		"nation" : "JAPAN",
+		"o_year" : 1992
+	},
+	{
+		"sum_profit" : 4276597.4253,
+		"nation" : "ALGERIA",
+		"o_year" : 1996
+	},
+	{
+		"sum_profit" : 4310013.3482,
+		"nation" : "ALGERIA",
+		"o_year" : 1992
+	},
+	{
+		"sum_profit" : 4321398.4388,
+		"nation" : "INDIA",
+		"o_year" : 1993
+	},
+	{
+		"sum_profit" : 4343926.8026,
+		"nation" : "UNITED KINGDOM",
+		"o_year" : 1997
+	},
+	{
+		"sum_profit" : 4373984.6523,
+		"nation" : "IRAN",
+		"o_year" : 1994
+	},
+	{
+		"sum_profit" : 4410094.6263999995,
+		"nation" : "UNITED KINGDOM",
+		"o_year" : 1994
+	},
+	{
+		"sum_profit" : 4414623.1548999995,
+		"nation" : "INDONESIA",
+		"o_year" : 1992
+	},
+	{
+		"sum_profit" : 4417133.3662,
+		"nation" : "IRAN",
+		"o_year" : 1992
+	},
+	{
+		"sum_profit" : 4418370.4154,
+		"nation" : "ALGERIA",
+		"o_year" : 1995
+	},
+	{
+		"sum_profit" : 4420783.4205,
+		"nation" : "IRAN",
+		"o_year" : 1995
+	},
+	{
+		"sum_profit" : 4428195.1019,
+		"nation" : "GERMANY",
+		"o_year" : 1993
+	},
+	{
+		"sum_profit" : 4469569.8829,
+		"nation" : "UNITED KINGDOM",
+		"o_year" : 1995
+	},
+	{
+		"sum_profit" : 4479082.8694,
+		"nation" : "RUSSIA",
+		"o_year" : 1994
+	},
+	{
+		"sum_profit" : 4479939.702,
+		"nation" : "FRANCE",
+		"o_year" : 1995
+	},
+	{
+		"sum_profit" : 4502344.8657,
+		"nation" : "BRAZIL",
+		"o_year" : 1995
+	},
+	{
+		"sum_profit" : 4506731.6411,
+		"nation" : "SAUDI ARABIA",
+		"o_year" : 1995
+	},
+	{
+		"sum_profit" : 4521180.4695,
+		"nation" : "ARGENTINA",
+		"o_year" : 1992
+	},
+	{
+		"sum_profit" : 4530304.6034,
+		"nation" : "BRAZIL",
+		"o_year" : 1996
+	},
+	{
+		"sum_profit" : 4533465.559,
+		"nation" : "RUSSIA",
+		"o_year" : 1992
+	},
+	{
+		"sum_profit" : 4555556.459199999,
+		"nation" : "GERMANY",
+		"o_year" : 1994
+	},
+	{
+		"sum_profit" : 4558092.7359,
+		"nation" : "IRAQ",
+		"o_year" : 1995
+	},
+	{
+		"sum_profit" : 4573560.015,
+		"nation" : "SAUDI ARABIA",
+		"o_year" : 1992
+	},
+	{
+		"sum_profit" : 4605921.5011,
+		"nation" : "ARGENTINA",
+		"o_year" : 1995
+	},
+	{
+		"sum_profit" : 4642037.4687,
+		"nation" : "BRAZIL",
+		"o_year" : 1997
+	},
+	{
+		"sum_profit" : 4656148.4204,
+		"nation" : "GERMANY",
+		"o_year" : 1992
+	},
+	{
+		"sum_profit" : 4657694.8412,
+		"nation" : "PERU",
+		"o_year" : 1995
+	},
+	{
+		"sum_profit" : 4687478.6531,
+		"nation" : "BRAZIL",
+		"o_year" : 1993
+	},
+	{
+		"sum_profit" : 4698658.7425,
+		"nation" : "SAUDI ARABIA",
+		"o_year" : 1994
+	},
+	{
+		"sum_profit" : 4704988.8607,
+		"nation" : "RUSSIA",
+		"o_year" : 1995
+	},
+	{
+		"sum_profit" : 4731959.4655,
+		"nation" : "PERU",
+		"o_year" : 1994
+	},
+	{
+		"sum_profit" : 4762291.8722,
+		"nation" : "IRAQ",
+		"o_year" : 1996
+	},
+	{
+		"sum_profit" : 4767719.9791,
+		"nation" : "RUSSIA",
+		"o_year" : 1993
+	},
+	{
+		"sum_profit" : 4793005.8027,
+		"nation" : "JAPAN",
+		"o_year" : 1995
+	},
+	{
+		"sum_profit" : 4799810.4577,
+		"nation" : "GERMANY",
+		"o_year" : 1996
+	},
+	{
+		"sum_profit" : 4875806.5015,
+		"nation" : "BRAZIL",
+		"o_year" : 1994
+	},
+	{
+		"sum_profit" : 4951604.1699,
+		"nation" : "IRAQ",
+		"o_year" : 1994
+	},
+	{
+		"sum_profit" : 5035200.046399999,
+		"nation" : "BRAZIL",
+		"o_year" : 1992
+	},
+	{
+		"sum_profit" : 5139337.3443,
+		"nation" : "GERMANY",
+		"o_year" : 1997
+	},
+	{
+		"sum_profit" : 5148208.7902,
+		"nation" : "INDIA",
+		"o_year" : 1995
+	},
+	{
+		"sum_profit" : 5159562.7033,
+		"nation" : "INDIA",
+		"o_year" : 1997
+	},
+	{
+		"sum_profit" : 5164001.9582,
+		"nation" : "INDIA",
+		"o_year" : 1994
+	},
+	{
+		"sum_profit" : 5227607.1677,
+		"nation" : "SAUDI ARABIA",
+		"o_year" : 1996
+	},
+	{
+		"sum_profit" : 5266783.489899999,
+		"nation" : "INDONESIA",
+		"o_year" : 1995
+	},
+	{
+		"sum_profit" : 5297703.6935,
+		"nation" : "INDIA",
+		"o_year" : 1992
+	},
+	{
+		"sum_profit" : 5307258.3049,
+		"nation" : "INDIA",
+		"o_year" : 1996
+	},
+	{
+		"sum_profit" : 5405785.7978,
+		"nation" : "GERMANY",
+		"o_year" : 1995
+	},
+	{
+		"sum_profit" : 5425980.3373,
+		"nation" : "SAUDI ARABIA",
+		"o_year" : 1997
+	},
+	{
+		"sum_profit" : 5470762.8729,
+		"nation" : "INDONESIA",
+		"o_year" : 1994
+	},
+	{
+		"sum_profit" : 5493626.5285,
+		"nation" : "SAUDI ARABIA",
+		"o_year" : 1993
+	},
+	{
+		"sum_profit" : 5719773.0358,
+		"nation" : "INDONESIA",
+		"o_year" : 1997
+	},
+	{
+		"sum_profit" : 5765034.1194,
+		"nation" : "CHINA",
+		"o_year" : 1993
+	},
+	{
+		"sum_profit" : 6037238.5993,
+		"nation" : "INDONESIA",
+		"o_year" : 1996
+	},
+	{
+		"sum_profit" : 6174776.2113,
+		"nation" : "CHINA",
+		"o_year" : 1995
+	},
+	{
+		"sum_profit" : 6189826.6613,
+		"nation" : "INDONESIA",
+		"o_year" : 1993
+	},
+	{
+		"sum_profit" : 6324034.2379,
+		"nation" : "CHINA",
+		"o_year" : 1992
+	},
+	{
+		"sum_profit" : 6358959.3338,
+		"nation" : "CHINA",
+		"o_year" : 1997
+	},
+	{
+		"sum_profit" : 6385751.0812,
+		"nation" : "CHINA",
+		"o_year" : 1994
+	},
+	{
+		"sum_profit" : 6435158.3229,
+		"nation" : "CHINA",
+		"o_year" : 1996
+	}
+]
+},
+
+{">>>command": {"idx":"10","aggregate":"customer","pipeline":[
+{"$lookup":{"from":"orders","localField":"c_custkey","foreignField":"o_custkey","as":"orders","pipeline":[
+{"$match":{"$and":[{"$expr":{"$gte":["$o_orderdate","1993-10-01T00:00:00.000Z"]}},{"$expr":{"$lt":["$o_orderdate",{"$dateAdd":{"startDate":"1993-10-01T00:00:00.000Z","unit":"month","amount":3}}]}}]}}]}},
+{"$unwind":"$orders"},
+{"$lookup":{"from":"lineitem","localField":"orders.o_orderkey","foreignField":"l_orderkey","as":"lineitem","pipeline":[
+{"$match":{"$expr":{"$eq":["$l_returnflag","R"]}}}]}},
+{"$unwind":"$lineitem"},
+{"$lookup":{"from":"nation","localField":"c_nationkey","foreignField":"n_nationkey","as":"nation"}},
+{"$unwind":"$nation"},
+{"$group":{"_id":{"c_custkey":"$c_custkey","c_name":"$c_name","c_acctbal":"$c_acctbal","c_phone":"$c_phone","n_name":"$nation.n_name","c_address":"$c_address","c_comment":"$c_comment"},"revenue":{"$sum":{"$multiply":["$lineitem.l_extendedprice",{"$subtract":[1,"$lineitem.l_discount"]}]}}}},
+{"$project":{"_id":0,"c_custkey":"$_id.c_custkey","c_name":"$_id.c_name","revenue":1,"c_acctbal":"$_id.c_acctbal","n_name":"$_id.n_name","c_address":"$_id.c_address","c_phone":"$_id.c_phone","c_comment":"$_id.c_comment"}},
+{"$sort":{"revenue":-1}},
+{"$limit":20}]},
+    "winningPlan": [
+"HJ n_nationkey = c_nationkey",
+"  -> [nation] COLLSCAN: plan_stability_tpch_official.nation ",
+"  -> [none] HJ orders.o_custkey = c_custkey",
+"      -> [none] HJ o_orderkey = l_orderkey",
+"          -> [orders] FETCH: plan_stability_tpch_official.orders {'$and':[{'$expr':{'$gte':['$o_orderdate',{'$const':'1993-10-01T00:00:00.000Z'}]}},{'$expr':{'$lt':['$o_orderdate',{'$const':'1994-01-01T00:00:00.000Z'}]}}]} ",
+"              -> IXSCAN: plan_stability_tpch_official.orders o_orderdate_1 {'o_orderdate':['[new Date(749433600000), new Date(757382400000))']}",
+"          -> [lineitem] COLLSCAN: plan_stability_tpch_official.lineitem {'$and':[{'$expr':{'$eq':['$l_returnflag',{'$const':'R'}]}}]} ",
+"      -> [none] PROJECTION_SIMPLE",
+"          -> COLLSCAN: plan_stability_tpch_official.customer ",
+"$group",
+"$project",
+"$sort"],
+    "keys" :      5677,
+    "docs" :    621274,
+    "result" :
+[
+	{
+		"revenue" : 395513.1358,
+		"c_custkey" : 13478,
+		"c_name" : "Customer#000013478",
+		"c_acctbal" : -778.11,
+		"n_name" : "KENYA",
+		"c_address" : "9VIsvIeZrJpC6OOdYheMC2vdtq8Ai0Rt",
+		"c_phone" : "24-983-202-8240",
+		"c_comment" : "r theodolites. slyly unusual pinto beans sleep fluffily against the asymptotes. quickly r"
+	},
+	{
+		"revenue" : 396271.1036,
+		"c_custkey" : 14819,
+		"c_name" : "Customer#000014819",
+		"c_acctbal" : 7308.39,
+		"n_name" : "FRANCE",
+		"c_address" : "w8StIbymUXmLCcUag6sx6LUIp8E3pA,Ux",
+		"c_phone" : "16-769-398-7926",
+		"c_comment" : "ss, final asymptotes use furiously slyly ironic dependencies. special, express dugouts according to the dep"
+	},
+	{
+		"revenue" : 396562.0295,
+		"c_custkey" : 9151,
+		"c_name" : "Customer#000009151",
+		"c_acctbal" : 5691.95,
+		"n_name" : "IRAQ",
+		"c_address" : "7gIdRdaxB91EVdyx8DyPjShpMD",
+		"c_phone" : "21-834-147-4906",
+		"c_comment" : "ajole fluffily. furiously regular accounts are special, silent account"
+	},
+	{
+		"revenue" : 399883.42569999996,
+		"c_custkey" : 623,
+		"c_name" : "Customer#000000623",
+		"c_acctbal" : 7887.6,
+		"n_name" : "INDONESIA",
+		"c_address" : "HXiFb9oWlgqZXrJPUCEJ6zZIPxAM4m6",
+		"c_phone" : "19-113-202-7085",
+		"c_comment" : " requests. dolphins above the busily regular dependencies cajole after"
+	},
+	{
+		"revenue" : 400968.3751,
+		"c_custkey" : 14299,
+		"c_name" : "Customer#000014299",
+		"c_acctbal" : 6595.97,
+		"n_name" : "RUSSIA",
+		"c_address" : "7lFczTya0iM1bhEWT",
+		"c_phone" : "32-156-618-1224",
+		"c_comment" : " carefully regular requests. quickly ironic accounts against the ru"
+	},
+	{
+		"revenue" : 401198.1737,
+		"c_custkey" : 961,
+		"c_name" : "Customer#000000961",
+		"c_acctbal" : 6963.68,
+		"n_name" : "JAPAN",
+		"c_address" : "5,81YDLFuRR47KKzv8GXdmi3zyP37PlPn",
+		"c_phone" : "22-989-463-6089",
+		"c_comment" : "e final requests: busily final accounts believe a"
+	},
+	{
+		"revenue" : 401402.2391,
+		"c_custkey" : 12595,
+		"c_name" : "Customer#000012595",
+		"c_acctbal" : -6.92,
+		"n_name" : "INDIA",
+		"c_address" : "LmeaX5cR,w9NqKugl yRm98",
+		"c_phone" : "18-186-132-3352",
+		"c_comment" : "o the busy accounts. blithely special gifts maintain a"
+	},
+	{
+		"revenue" : 405055.34569999995,
+		"c_custkey" : 1465,
+		"c_name" : "Customer#000001465",
+		"c_acctbal" : 9365.93,
+		"n_name" : "INDIA",
+		"c_address" : "tDRaTC7UgFbBX7VF6cVXYQA0",
+		"c_phone" : "18-807-487-1074",
+		"c_comment" : "s lose blithely ironic, regular packages. regular, final foxes haggle c"
+	},
+	{
+		"revenue" : 408575.36,
+		"c_custkey" : 14398,
+		"c_name" : "Customer#000014398",
+		"c_acctbal" : -602.24,
+		"n_name" : "UNITED STATES",
+		"c_address" : "GWRCgIPHajtU21vICVvbJJerFu2cUk",
+		"c_phone" : "34-814-111-5424",
+		"c_comment" : "s. blithely even accounts cajole blithely. even foxes doubt-- "
+	},
+	{
+		"revenue" : 412506.00619999995,
+		"c_custkey" : 1565,
+		"c_name" : "Customer#000001565",
+		"c_acctbal" : 1820.03,
+		"n_name" : "BRAZIL",
+		"c_address" : "EWQO5Ck,nMuHVQimqL8dLrixRP6QKveXcz9QgorW",
+		"c_phone" : "12-402-178-2007",
+		"c_comment" : "ously regular accounts wake slyly ironic idea"
+	},
+	{
+		"revenue" : 412797.51,
+		"c_custkey" : 8501,
+		"c_name" : "Customer#000008501",
+		"c_acctbal" : 6906.7,
+		"n_name" : "ARGENTINA",
+		"c_address" : "776af4rOa mZ66hczs",
+		"c_phone" : "11-317-552-5840",
+		"c_comment" : "y final deposits after the fluffily even accounts are slyly final, regular"
+	},
+	{
+		"revenue" : 417913.4142,
+		"c_custkey" : 11026,
+		"c_name" : "Customer#000011026",
+		"c_acctbal" : 7738.76,
+		"n_name" : "ALGERIA",
+		"c_address" : "XorIktoJOAEJkpNNMx",
+		"c_phone" : "10-184-163-4632",
+		"c_comment" : "ly even dolphins eat along the blithely even instructions. express attainments cajole slyly. busy dolphins in"
+	},
+	{
+		"revenue" : 444059.0382,
+		"c_custkey" : 1966,
+		"c_name" : "Customer#000001966",
+		"c_acctbal" : 1937.72,
+		"n_name" : "ALGERIA",
+		"c_address" : "jPv1 UHra5JLALR5Isci5u0636RoAu7t vH",
+		"c_phone" : "10-973-269-8886",
+		"c_comment" : "the blithely even accounts. final deposits cajole around the blithely final packages. "
+	},
+	{
+		"revenue" : 446316.5104,
+		"c_custkey" : 13984,
+		"c_name" : "Customer#000013984",
+		"c_acctbal" : 3482.28,
+		"n_name" : "IRAN",
+		"c_address" : "qZXwuapCHvxbX",
+		"c_phone" : "20-981-264-2952",
+		"c_comment" : "y unusual courts could wake furiously"
+	},
+	{
+		"revenue" : 457855.94670000003,
+		"c_custkey" : 8530,
+		"c_name" : "Customer#000008530",
+		"c_acctbal" : 9734.95,
+		"n_name" : "MOROCCO",
+		"c_address" : "GMQyte94oDM7eD7exnkj 4hH9yq3",
+		"c_phone" : "25-736-932-5850",
+		"c_comment" : "slyly asymptotes. quickly final deposits in"
+	},
+	{
+		"revenue" : 479414.21329999994,
+		"c_custkey" : 12106,
+		"c_name" : "Customer#000012106",
+		"c_acctbal" : 5342.11,
+		"n_name" : "UNITED STATES",
+		"c_address" : "wth3twOmu6vy",
+		"c_phone" : "34-905-346-4472",
+		"c_comment" : "ly after the blithely regular foxes. accounts haggle carefully alongside of the blithely even ideas."
+	},
+	{
+		"revenue" : 481592.4053,
+		"c_custkey" : 2455,
+		"c_name" : "Customer#000002455",
+		"c_acctbal" : 2070.99,
+		"n_name" : "GERMANY",
+		"c_address" : "RVn1ZSRtLqPlJLIZxvpmsbgC02",
+		"c_phone" : "17-946-225-9977",
+		"c_comment" : "al asymptotes. finally ironic accounts cajole furiously. permanently unusual theodolites aro"
+	},
+	{
+		"revenue" : 512500.9641,
+		"c_custkey" : 11032,
+		"c_name" : "Customer#000011032",
+		"c_acctbal" : 8496.93,
+		"n_name" : "UNITED KINGDOM",
+		"c_address" : "WIKHC7K3Cn7156iNOyfVG3cZ7YqkgsR,Ly",
+		"c_phone" : "33-102-772-3533",
+		"c_comment" : "posits-- furiously ironic accounts are again"
+	},
+	{
+		"revenue" : 557400.3053,
+		"c_custkey" : 7714,
+		"c_name" : "Customer#000007714",
+		"c_acctbal" : 9799.98,
+		"n_name" : "IRAN",
+		"c_address" : "SnnIGB,SkmnWpX3",
+		"c_phone" : "20-922-418-6024",
+		"c_comment" : "arhorses according to the blithely express re"
+	},
+	{
+		"revenue" : 622786.7297,
+		"c_custkey" : 8242,
+		"c_name" : "Customer#000008242",
+		"c_acctbal" : 6322.09,
+		"n_name" : "ETHIOPIA",
+		"c_address" : "P2n4nJhy,UqSo2s43YfSvYJDZ6lk",
+		"c_phone" : "15-792-676-1184",
+		"c_comment" : "slyly regular packages haggle carefully ironic ideas. courts are furiously. furiously unusual theodolites cajole. i"
+	}
+]
+}
+
+],
+">>>totals": {"commands": 7, "keys":    643337, "docs":   5045929, "rows":       220}
+}
+
+
+[jsTest] ----
+[jsTest] See README.plan_stability.join_opt.md for more information.
+[jsTest] ----
+

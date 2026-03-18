@@ -38,6 +38,33 @@ function joinStageToString(stage, indent) {
  */
 export function joinPlanToString(stage, indent = 0) {
     let result = "";
+
+    // If the plan comes from the "stages" array, we iterate over each stage
+    if (Array.isArray(stage)) {
+        for (const subStage of stage) {
+            result += joinPlanToString(subStage, indent);
+        }
+        return result;
+    }
+
+    // We are dealing with a classical execution engine stage
+    if (!stage.hasOwnProperty("stage")) {
+        const classicalStageName = Object.keys(stage).find((k) => k.startsWith("$"));
+        switch (classicalStageName) {
+            case "$project":
+            case "$sort":
+            case "$group":
+                result += `${classicalStageName}\n`;
+                break;
+            case "$lookup":
+                result += `${classicalStageName} ${stage["$lookup"].from} ${stage.indexesUsed}\n`;
+                break;
+            default:
+                throw new Error(`Unknown classical stage: ${classicalStageName} ${tojson(stage)}`);
+        }
+        return result;
+    }
+
     let filter = stage.filter && Object.keys(stage.filter).length > 0 ? JSON.stringify(stage.filter) + " " : "";
 
     switch (stage.stage) {
@@ -63,7 +90,9 @@ export function joinPlanToString(stage, indent = 0) {
             result += `INDEX_PROBE_NODE: ${stage.nss} ${filter}${stage.indexName}\n`;
             break;
         case "PROJECTION_SIMPLE":
+        case "PROJECTION_DEFAULT":
         case "SUBPLAN":
+        case "GROUP":
             result += `${stage.stage}\n`;
             result += indentString(indent + 1) + "-> ";
             result += joinPlanToString(stage.inputStage, indent + 2);
@@ -76,7 +105,7 @@ export function joinPlanToString(stage, indent = 0) {
             result += joinPlanToString(stage.inputStages[1], indent + 2);
             break;
         default:
-            throw new Error(`Unknown stage: ${stage.stage}`);
+            throw new Error(`Unknown stage: ${stage.stage} ${tojson(stage)}`);
     }
     return result;
 }
@@ -104,12 +133,12 @@ export function jsonifyMultilineString(str) {
 }
 
 /**
- * Return a pipeline where each of $match, $lookup, $unwind starts on a new line.
+ * Return a pipeline where each of the major stages starts on a new line.
  *
  * This increases the readability of joins while keeping nested $and, $or, etc. on a single line
  */
 export function newlineBeforeEachStage(str) {
-    return str.replace(/(?=\{"\$(match|lookup|unwind)")/g, "\n");
+    return str.replace(/(?=\{"\$(match|lookup|unwind|project|group|sort|limit|skip)")/g, "\n");
 }
 
 /**
