@@ -58,7 +58,7 @@ with open(repo_root / ".github" / "pull_request_template.md", "r") as r:
 
 BANNED_STRINGS = ["https://spruce.mongodb.com", "https://evergreen.mongodb.com", pr_template]
 
-VALID_SUMMARY = re.compile(r'(?:Revert ")?(?:([A-Z]+)-[0-9]+|Import wiredtiger)')
+VALID_SUMMARY = re.compile(r'(?:Revert ")?(?:([A-Z]+)-([A-Z0-9]+)|Import wiredtiger)')
 
 # The allowed jira projects and their corresponding allowed file paths.
 # allowed file paths are in gitignore format
@@ -70,7 +70,7 @@ ALLOWED_JIRA_PROJECTS = {
 RETRY_INSTRUCTIONS = "If you are seeing this on a PR, after changing the required field, you will need to restart the failed validate_commit_message task in Evergreen before being able to submit your PR."
 
 
-def is_valid_commit(commit: Commit, changed_files: list[str] = []) -> bool:
+def is_valid_commit(commit: Commit, changed_files: list[str] = [], requester: str = "") -> bool:
     # Valid values look like:
     # 1. SERVER-\d+
     # 2. Revert "SERVER-\d+
@@ -89,8 +89,27 @@ The decision to add this check was made in SERVER-101443, please feel free to le
 
     # get the jira project from the regex, this will be none for wiredtiger imports
     jira_project = match.group(1)
+    ticket_suffix = match.group(2)
     if jira_project:
-        # if there is a jira project, check that it is in the allowed list
+        if requester == "github_pr":
+            # For github_pr requests, the suffix can be alphanumeric (3-6 characters)
+            # This is to allow SERVER-XXXX tickets that will be auto-replaced after PR creation.
+            if not (3 <= len(ticket_suffix) <= 6):
+                LOGGER.error(
+                    f"""PR summary ticket suffix must be 3-6 characters, got {len(ticket_suffix)}: {ticket_suffix}
+{RETRY_INSTRUCTIONS}"""
+                )
+                return False
+        else:
+            # For non-github_pr requests, the suffix must be purely numeric.
+            if not ticket_suffix.isdigit():
+                LOGGER.error(
+                    f"""PR summary ticket suffix must be numeric, got: {ticket_suffix}
+{RETRY_INSTRUCTIONS}"""
+                )
+                return False
+
+        # Check that the jira project is in the allowed list
         if jira_project not in ALLOWED_JIRA_PROJECTS:
             LOGGER.error(
                 f"""PR summary contains an invalid Jira project {jira_project}; it must be one of: {list(ALLOWED_JIRA_PROJECTS.keys())}
@@ -242,7 +261,7 @@ def main(
 
     changed_files = get_changed_files("../expansions.yml", diff_filter=None)
     for commit in commits:
-        if not is_valid_commit(commit, changed_files):
+        if not is_valid_commit(commit, changed_files, requester):
             LOGGER.error("Invalid commit, unable to merge")
             raise typer.Exit(code=STATUS_ERROR)
 

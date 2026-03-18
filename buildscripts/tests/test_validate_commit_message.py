@@ -132,6 +132,58 @@ class ValidateCommitMessageTest(unittest.TestCase):
 
         self.assertFalse(is_valid_commit(commit, changed_files))
 
+    def test_github_pr_allows_alphanumeric_suffix(self):
+        """Test that github_pr allows alphanumeric suffixes of 3-6 characters."""
+        fake_repo = Repo()
+        messages = [
+            Commit(
+                repo=fake_repo, binsha=b"deadbeefdeadbeefdead", message="SERVER-12345 Some change"
+            ),
+            Commit(
+                repo=fake_repo, binsha=b"deadbeefdeadbeefdead", message="SERVER-123 Some change"
+            ),
+        ]
+
+        self.assertTrue(all(is_valid_commit(m, [], requester="github_pr") for m in messages))
+
+    def test_github_pr_rejects_short_suffix(self):
+        """Test that github_pr rejects suffixes shorter than 3 characters."""
+        fake_repo = Repo()
+        commit = Commit(
+            repo=fake_repo, binsha=b"deadbeefdeadbeefdead", message="SERVER-12 Some change"
+        )
+
+        self.assertFalse(is_valid_commit(commit, [], requester="github_pr"))
+
+    def test_github_pr_rejects_long_suffix(self):
+        """Test that github_pr rejects suffixes longer than 6 characters."""
+        fake_repo = Repo()
+        commit = Commit(
+            repo=fake_repo, binsha=b"deadbeefdeadbeefdead", message="SERVER-1234567 Some change"
+        )
+
+        self.assertFalse(is_valid_commit(commit, [], requester="github_pr"))
+
+    def test_github_pr_still_validates_project(self):
+        """Test that github_pr still checks ALLOWED_JIRA_PROJECTS."""
+        fake_repo = Repo()
+        commit = Commit(
+            repo=fake_repo, binsha=b"deadbeefdeadbeefdead", message="ABC-12345 Some change"
+        )
+
+        self.assertFalse(is_valid_commit(commit, [], requester="github_pr"))
+
+    def test_github_pr_still_validates_file_paths(self):
+        """Test that github_pr still enforces file path restrictions."""
+        fake_repo = Repo()
+        commit = Commit(
+            repo=fake_repo, binsha=b"deadbeefdeadbeefdead", message="GUARD-12345 Update monguard"
+        )
+
+        changed_files = ["src/mongo/db/query.cpp"]
+
+        self.assertFalse(is_valid_commit(commit, changed_files, requester="github_pr"))
+
     def test_wiredtiger_import_no_path_validation(self):
         """Test that wiredtiger imports don't trigger path validation."""
         fake_repo = Repo()
