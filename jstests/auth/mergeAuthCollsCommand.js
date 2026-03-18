@@ -19,6 +19,15 @@ function runTest(conn) {
     let db = conn.getDB("test");
     let admin = conn.getDB("admin");
 
+    assert.commandFailedWithCode(
+        admin.runCommand({
+            _mergeAuthzCollections: 1,
+            db: "",
+            drop: false,
+        }),
+        ErrorCodes.BadValue,
+    );
+
     jsTestLog("Creating users and roles in temp collections");
     db.createUser({user: "spencer", pwd: "pwd", roles: ["read"]});
     admin.createUser({user: "andreas", pwd: "pwd", roles: ["read"]});

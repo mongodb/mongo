@@ -966,10 +966,6 @@ public:
     using Reply = typename RequestT::Reply;
     using TC = TypedCommand<CmdUMCTyped<RequestT, Params>>;
 
-    bool requiresAuthzChecks() const final {
-        return false;
-    }
-
     class Invocation final : public TC::InvocationBase {
     public:
         using TC::InvocationBase::InvocationBase;
@@ -2116,7 +2112,6 @@ public:
     }
 
     bool allowedWithSecurityToken() const final {
-        // TODO (SERVER-TBD) Support mergeAuthzCollections in multitenancy
         return false;
     }
 };
@@ -2445,7 +2440,7 @@ void CmdMergeAuthzCollections::Invocation::typedRun(OperationContext* opCtx) {
     const auto tempRolesColl = cmd.getTempRolesCollection();
 
     uassert(ErrorCodes::BadValue,
-            "Must provide at least one of \"tempUsersCollection\" and \"tempRolescollection\"",
+            "Must provide at least one of \"tempUsersCollection\" and \"tempRolesCollection\"",
             !tempUsersColl.empty() || !tempRolesColl.empty());
 
     auto* service = opCtx->getClient()->getService();

@@ -221,16 +221,19 @@ void checkAuthForTypedCommand(OperationContext* opCtx, const UpdateUserCommand& 
     auto* as = AuthorizationSession::get(opCtx->getClient());
 
     UserName userName(request.getCommandParameter(), dbname);
-    bool canChangePassword = isAuthorizedToChangeOwnPasswordAsUser(as, userName) ||
-        as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
-                                             ActionType::changePassword);
+    auto canChangePassword = [&]() {
+        return isAuthorizedToChangeOwnPasswordAsUser(as, userName) ||
+            as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
+                                                 ActionType::changePassword);
+    };
+
     uassert(ErrorCodes::Unauthorized,
             str::stream() << "Not authorized to change password of user: " << userName,
-            (request.getPwd() == boost::none) || canChangePassword);
+            (request.getPwd() == boost::none) || canChangePassword());
 
     uassert(ErrorCodes::Unauthorized,
             str::stream() << "Not authorized to change mechanisms of user: " << userName,
-            (request.getMechanisms() == boost::none) || canChangePassword);
+            (request.getMechanisms() == boost::none) || canChangePassword());
 
     uassert(ErrorCodes::Unauthorized,
             str::stream() << "Not authorized to change customData of user: " << userName,
@@ -400,16 +403,15 @@ void checkAuthForTypedCommand(OperationContext* opCtx, const UsersInfoCommand& r
                                 ActionType::internal));
             }
 
-            if (as->lookupUser(userName)) {
-                // Can always view users you are logged in as.
-                continue;
-            }
+            // Can always view users you are logged in as, but for mandatory authorization, ensure
+            // the privilege check happens before we check that this is for the authenticated user.
             uassert(ErrorCodes::Unauthorized,
                     str::stream() << "Not authorized to view users from the "
                                   << dbname.toStringForErrorMsg() << " database",
-                    as->isAuthorizedForActionsOnResource(
-                        ResourcePattern::forDatabaseName(userName.getDatabaseName()),
-                        ActionType::viewUser));
+                    (as->isAuthorizedForActionsOnResource(
+                         ResourcePattern::forDatabaseName(userName.getDatabaseName()),
+                         ActionType::viewUser) ||
+                     as->lookupUser(userName)));
         }
     }
 }
@@ -448,16 +450,15 @@ void checkAuthForTypedCommand(OperationContext* opCtx, const RolesInfoCommand& r
         invariant(arg.isExact());
         auto roles = arg.getElements(dbname);
         for (const auto& role : roles) {
-            if (as->isAuthenticatedAsUserWithRole(role)) {
-                continue;  // Can always see roles that you are a member of
-            }
-
+            // Can always see roles that you are a member of, but for mandatory authorization,
+            // ensure the privilege check happens before exempting the authenticated user.
             uassert(ErrorCodes::Unauthorized,
                     str::stream() << "Not authorized to view roles from the " << role.getDB()
                                   << " database",
                     as->isAuthorizedForActionsOnResource(
                         ResourcePattern::forDatabaseName(role.getDatabaseName()),
-                        ActionType::viewRole));
+                        ActionType::viewRole) ||
+                        as->isAuthenticatedAsUserWithRole(role));
         }
     }
 }

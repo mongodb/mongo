@@ -195,6 +195,7 @@ updateUserAsUser(test, "user", {mechanisms: ["SCRAM-SHA-256"]}, kSetMechsUser);
 checkUser("user", "passAll", false, true);
 updateUserThrowsAsUser(test, "user", {mechanisms: ["SCRAM-SHA-256"]}, kReadOnlyUser);
 updateUserThrowsAsUser(test, "user", {mechanisms: ["SCRAM-SHA-256"]}, kSetOwnMechsUser);
+updateUserThrowsAsUser(test, kSetOwnMechsUser, {mechanisms: ["SCRAM-SHA-256"]}, kReadOnlyUser);
 
 // Succeed when changing own user's mechanisms field if can changeOwnPassword or changePassword
 updateUserAsUser(test, kSetMechsUser, {mechanisms: ["SCRAM-SHA-256"]}, kSetMechsUser);

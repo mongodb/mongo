@@ -227,6 +227,10 @@ export function runAllUserManagementCommandsTests(conn, writeConcern) {
 
         jsTestLog("Testing usersInfo");
 
+        jsTestLog("Running without viewUsers privilege can only view authenticated user's info");
+        assert.commandWorked(db.runCommand({usersInfo: {user: "spencer", db: "test"}}));
+        assert.commandFailedWithCode(db.runCommand({usersInfo: {user: "andy", db: "test"}}), ErrorCodes.Unauthorized);
+
         jsTestLog("Running exact usersInfo with default options on username only");
         let res = testUserAdmin.runCommand({usersInfo: "spencer"});
         printjson(res);

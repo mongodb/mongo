@@ -252,6 +252,11 @@ export function runAllRoleManagementCommandsTests(conn, writeConcern) {
     (function testRolesInfo() {
         jsTestLog("Testing rolesInfo");
 
+        // At this stage, testUser has testRole2 role. Verify testUser can see testRole2 info, but
+        // not others.
+        assert.commandWorked(db.runCommand({rolesInfo: "testRole2"}));
+        assert.commandFailedWithCode(db.runCommand({rolesInfo: "testRole1"}), ErrorCodes.Unauthorized);
+
         let res = testUserAdmin.runCommand({rolesInfo: "testRole1"});
         assert.eq(1, res.roles.length);
         assert.eq("testRole1", res.roles[0].role);
