@@ -391,10 +391,6 @@ void NetworkInterfaceTL::_registerCommand(const TaskExecutor::CallbackHandle& cb
         _inProgress.insert({cbHandle, cmdState});
     }
 
-    if (cmdState->request.deadline != RemoteCommandRequest::kNoDeadline) {
-        cmdState->stopwatch.start();
-    }
-
     // Okay to inline this callback since all it does is log.
     cmdState->cancelSource.token().onCancel().unsafeToInlineFuture().getAsync(
         [id = cmdState->request.id](Status s) {

@@ -218,7 +218,7 @@ private:
 
         TaskExecutor::CallbackHandle cbHandle;
 
-        ClockSource::StopWatch stopwatch;
+        Timer stopwatch;
         Date_t deadline = kNoExpirationDate;
         Milliseconds poolTimeout = RemoteCommandRequest::kNoTimeout;
 
