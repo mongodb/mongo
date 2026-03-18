@@ -62,7 +62,7 @@ try {
             {
                 $match: {
                     shard: primaryShardName,
-                    desc: {$regex: "^ShardingDDLCoordinator"},
+                    desc: {$regex: "^Sharding(DDL)?Coordinator"},
                     "command.comment": jsTestName(),
                 },
             },

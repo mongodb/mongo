@@ -39,8 +39,8 @@ ddlCoordinatorFailPoint.wait();
 
 // Run fsync command, should fail when DDL op is in progress
 let fsyncLockCommand = assert.commandFailed(st.s.adminCommand({fsync: 1, lock: true}));
-const errmsg = "Cannot take lock while DDL operation is in progress";
-assert.eq(fsyncLockCommand.errmsg.includes(errmsg), true);
+const errmsgRegex = /Cannot take lock while (DDL operation is|sharding coordinators are) in progress/;
+assert(errmsgRegex.test(fsyncLockCommand.errmsg), fsyncLockCommand.errmsg);
 
 ddlCoordinatorFailPoint.off();
 ddlOpThread.join();

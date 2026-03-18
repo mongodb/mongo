@@ -36,8 +36,8 @@
 #include "mongo/db/global_catalog/ddl/collmod_coordinator_document_gen.h"
 #include "mongo/db/global_catalog/ddl/sharded_collmod_gen.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/write_ops/write_ops.h"
@@ -67,7 +67,7 @@ public:
     using StateDoc = CollModCoordinatorDocument;
     using Phase = CollModCoordinatorPhaseEnum;
 
-    CollModCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState);
+    CollModCoordinator(ShardingCoordinatorService* service, const BSONObj& initialState);
 
     void checkIfOptionsConflict(const BSONObj& doc) const override;
 

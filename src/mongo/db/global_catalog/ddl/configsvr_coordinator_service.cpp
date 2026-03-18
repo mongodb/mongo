@@ -37,7 +37,7 @@
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_catalog/ddl/configsvr_coordinator.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/topology/cluster_parameters/set_cluster_parameter_coordinator.h"
@@ -161,7 +161,7 @@ void ConfigsvrCoordinatorService::checkIfConflictsWithOtherInstances(
         }
     }
 
-    const auto service = ShardingDDLCoordinatorService::getService(opCtx);
+    const auto service = ShardingCoordinatorService::getService(opCtx);
     if (!service) {
         return;
     }
@@ -169,7 +169,7 @@ void ConfigsvrCoordinatorService::checkIfConflictsWithOtherInstances(
     uassert(ErrorCodes::AddOrRemoveShardInProgress,
             fmt::format("Cannot start {} because a topology change is in progress",
                         idl::serialize(op.getId().getCoordinatorType())),
-            service->areAllCoordinatorsOfTypeFinished(opCtx, DDLCoordinatorTypeEnum::kAddShard));
+            service->areAllCoordinatorsOfTypeFinished(opCtx, CoordinatorTypeEnum::kAddShard));
 }
 
 }  // namespace mongo

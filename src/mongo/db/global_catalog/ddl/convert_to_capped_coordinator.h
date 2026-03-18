@@ -43,8 +43,7 @@ public:
     using StateDoc = ConvertToCappedCoordinatorDocument;
     using Phase = ConvertToCappedCoordinatorPhaseEnum;
 
-    ConvertToCappedCoordinator(ShardingDDLCoordinatorService* service,
-                               const BSONObj& initialStateDoc)
+    ConvertToCappedCoordinator(ShardingCoordinatorService* service, const BSONObj& initialStateDoc)
         : RecoverableShardingDDLCoordinator(service, "ConvertToCappedCoordinator", initialStateDoc),
           _request(_doc.getShardsvrConvertToCappedRequest()),
           _critSecReason(BSON("convertToCapped" << NamespaceStringUtil::serialize(

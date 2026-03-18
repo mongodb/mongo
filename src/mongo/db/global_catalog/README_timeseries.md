@@ -161,7 +161,7 @@ in [query/timeseries/README](../query/timeseries/README.md).
 Users run DDL operations (`collMod`, `createIndexes`, `listIndexes`, `dropIndexes`, and etc...) on the
 **view** namespace. The buckets collection is meant to be invisible to the end user: special permissions are
 required to run DDL operations directly on it. The DDL coordinator translates the operation to the
-buckets namespace using the function `setBucketNss`, stores it in the `ShardingDDLCoordinatorMetadata`,
+buckets namespace using the function `setBucketNss`, stores it in the `ShardingCoordinatorMetadata`,
 and sets the `isTimeseriesNamespace` flag. Specific DDL coordinators will do further time-series rewrites
 as necessary. For example, the `CreateCollectionCoordinator` will check for the presence of `timeseriesFields`
 in the `ChunkManager` to decide if the shard key needs to be rewritten before forwarding the request to the shards.

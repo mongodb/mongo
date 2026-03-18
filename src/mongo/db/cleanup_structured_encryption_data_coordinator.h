@@ -36,8 +36,8 @@
 #include "mongo/db/cleanup_structured_encryption_data_coordinator_gen.h"
 #include "mongo/db/commands/fle2_cleanup_gen.h"
 #include "mongo/db/commands/fle2_compact.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
@@ -65,7 +65,7 @@ public:
     using StateDoc = CleanupStructuredEncryptionDataState;
     using Phase = CleanupStructuredEncryptionDataPhaseEnum;
 
-    CleanupStructuredEncryptionDataCoordinator(ShardingDDLCoordinatorService* service,
+    CleanupStructuredEncryptionDataCoordinator(ShardingCoordinatorService* service,
                                                const BSONObj& doc)
         : RecoverableShardingDDLCoordinator(
               service, "CleanupStructuredEncryptionDataCoordinator", doc) {}

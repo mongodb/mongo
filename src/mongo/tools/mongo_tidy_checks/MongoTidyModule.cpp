@@ -38,7 +38,7 @@
 #include "MongoFCVConstantCheck.h"
 #include "MongoHeaderBracketCheck.h"
 #include "MongoHeaderIncludePathCheck.h"
-#include "MongoInvariantDDLCoordinatorCheck.h"
+#include "MongoInvariantShardingCoordinatorCheck.h"
 #include "MongoInvariantStatusIsOKCheck.h"
 #include "MongoMacroDefinitionLeaksCheck.h"
 #include "MongoNoUniqueAddressCheck.h"
@@ -89,8 +89,8 @@ public:
         CheckFactories.registerCheck<MongoRWMutexCheck>("mongo-rwmutex-check");
         CheckFactories.registerCheck<MongoInvariantStatusIsOKCheck>(
             "mongo-invariant-status-is-ok-check");
-        CheckFactories.registerCheck<InvariantDDLCoordinatorCheck>(
-            "mongo-invariant-ddl-coordinator-check");
+        CheckFactories.registerCheck<InvariantShardingCoordinatorCheck>(
+            "mongo-invariant-sharding-coordinator-check");
         CheckFactories.registerCheck<MongoBypassDatabaseMetadataAccessCheck>(
             "mongo-bypass-database-metadata-access-check");
         CheckFactories.registerCheck<MongoBannedCatalogAccessFromQueryCodeCheck>(

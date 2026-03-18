@@ -43,8 +43,8 @@
 #include "mongo/db/compact_structured_encryption_data_coordinator_gen.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_gen.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -111,13 +111,13 @@ public:
             }
 
             auto compactCoordinator =
-                [&]() -> std::shared_ptr<ShardingDDLCoordinatorService::Instance> {
+                [&]() -> std::shared_ptr<ShardingCoordinatorService::Instance> {
                 FixedFCVRegion fixedFcvRegion(opCtx);
                 auto compact = writeConflictRetry(opCtx,
                                                   Request::kCommandName,
                                                   request().getNamespace(),
                                                   [&]() { return makeRequest(opCtx); });
-                return ShardingDDLCoordinatorService::getService(opCtx)->getOrCreateInstance(
+                return ShardingCoordinatorService::getService(opCtx)->getOrCreateInstance(
                     opCtx, compact.toBSON(), fixedFcvRegion);
             }();
 
@@ -188,8 +188,8 @@ public:
                 }
             }
 
-            compact.setShardingDDLCoordinatorMetadata(
-                {{nss, DDLCoordinatorTypeEnum::kCompactStructuredEncryptionData}});
+            compact.setShardingCoordinatorMetadata(
+                {{nss, CoordinatorTypeEnum::kCompactStructuredEncryptionData}});
             compact.setEscNss(namespaces.escNss);
             compact.setEcocNss(namespaces.ecocNss);
             compact.setEcocRenameNss(namespaces.ecocRenameNss);

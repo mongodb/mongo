@@ -40,8 +40,8 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -111,7 +111,7 @@ public:
                                 UserWritesRecoverableCriticalSectionService::
                                     kGlobalUserWritesNamespace);
 
-                        // Wait for ongoing ShardingDDLCoordinators to finish. This ensures that all
+                        // Wait for ongoing ShardingCoordinators to finish. This ensures that all
                         // coordinators that started before enabling blocking have finish, and that
                         // any new coordinator that is started after this point will see the
                         // blocking is enabled. Wait only for coordinators that don't have the
@@ -119,7 +119,7 @@ public:
                         // write blocking don't care about the write blocking state.
                         {
                             const auto shouldWaitPred =
-                                [](const ShardingDDLCoordinator& coordinatorInstance) -> bool {
+                                [](const ShardingCoordinator& coordinatorInstance) -> bool {
                                 // No need to wait for coordinators that do not modify user data.
                                 if (coordinatorInstance.canAlwaysStartWhenUserWritesAreDisabled()) {
                                     return false;
@@ -135,7 +135,7 @@ public:
                                 return true;
                             };
 
-                            ShardingDDLCoordinatorService::getService(opCtx)
+                            ShardingCoordinatorService::getService(opCtx)
                                 ->waitForOngoingCoordinatorsToFinish(opCtx, shouldWaitPred);
                         }
                         break;

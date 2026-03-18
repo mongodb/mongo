@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator.h"
 
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_external_state_for_test.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_external_state_for_test.h"
 #include "mongo/db/shard_role/lock_manager/locker.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
@@ -38,9 +38,9 @@
 
 namespace mongo {
 
-class ShardingDDLCoordinatorTest : public ShardServerTestFixture {
+class ShardingCoordinatorTest : public ShardServerTestFixture {
 public:
-    ShardingDDLCoordinatorTest() : ShardServerTestFixture(makeOptions()) {}
+    ShardingCoordinatorTest() : ShardServerTestFixture(makeOptions()) {}
 
     void setUp() override {
         ShardServerTestFixture::setUp();
@@ -49,17 +49,16 @@ public:
         _network = network.get();
         executor::ThreadPoolMock::Options thread_pool_options;
         thread_pool_options.onCreateThread = [] {
-            Client::initThread("ShardingDDLCoordinatorTest",
-                               getGlobalServiceContext()->getService());
+            Client::initThread("ShardingCoordinatorTest", getGlobalServiceContext()->getService());
         };
 
         _executor = makeThreadPoolTestExecutor(std::move(network), thread_pool_options);
         _executor->startup();
 
         _scopedExecutor = std::make_shared<executor::ScopedTaskExecutor>(_executor);
-        _service = std::make_unique<ShardingDDLCoordinatorService>(
+        _service = std::make_unique<ShardingCoordinatorService>(
             getServiceContext(),
-            std::make_unique<ShardingDDLCoordinatorExternalStateFactoryForTest>());
+            std::make_unique<ShardingCoordinatorExternalStateFactoryForTest>());
 
         DDLLockManager::get(getServiceContext())->setRecoverable(_service.get());
     }
@@ -76,22 +75,22 @@ protected:
     executor::NetworkInterfaceMock* _network;
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
     std::shared_ptr<executor::ScopedTaskExecutor> _scopedExecutor;
-    std::unique_ptr<ShardingDDLCoordinatorService> _service;
+    std::unique_ptr<ShardingCoordinatorService> _service;
 
-    class TestShardingDDLCoordinator : public ShardingDDLCoordinator {
+    class TestShardingCoordinator : public ShardingCoordinator {
     public:
-        TestShardingDDLCoordinator(ShardingDDLCoordinatorService* service,
-                                   ShardingDDLCoordinatorMetadata coordinatorMetadata,
-                                   std::set<NamespaceString> additionalNss)
-            : ShardingDDLCoordinator(service, coordinatorMetadata.toBSON()),
-              _shardingDDLCoordinatorMetadata(coordinatorMetadata),
+        TestShardingCoordinator(ShardingCoordinatorService* service,
+                                ShardingCoordinatorMetadata coordinatorMetadata,
+                                std::set<NamespaceString> additionalNss)
+            : ShardingCoordinator(service, coordinatorMetadata.toBSON()),
+              _shardingCoordinatorMetadata(coordinatorMetadata),
               _additionalNss(additionalNss) {}
 
-        ShardingDDLCoordinatorMetadata const& metadata() const override {
-            return _shardingDDLCoordinatorMetadata;
+        ShardingCoordinatorMetadata const& metadata() const override {
+            return _shardingCoordinatorMetadata;
         }
 
-        void setMetadata(ShardingDDLCoordinatorMetadata&& metadata) override {}
+        void setMetadata(ShardingCoordinatorMetadata&& metadata) override {}
 
         boost::optional<BSONObj> reportForCurrentOp(
             MongoProcessInterface::CurrentOpConnectionsMode connMode,
@@ -110,8 +109,8 @@ protected:
             return ExecutorFuture<void>(**executor);
         }
 
-        using ShardingDDLCoordinator::_acquireAllLocksAsync;
-        using ShardingDDLCoordinator::_locker;
+        using ShardingCoordinator::_acquireAllLocksAsync;
+        using ShardingCoordinator::_locker;
 
         void fulfillPromises() {
             _constructionCompletionPromise.emplaceValue();
@@ -119,7 +118,7 @@ protected:
         }
 
     protected:
-        ShardingDDLCoordinatorMetadata _shardingDDLCoordinatorMetadata;
+        ShardingCoordinatorMetadata _shardingCoordinatorMetadata;
         std::set<NamespaceString> _additionalNss;
     };
 
@@ -141,24 +140,24 @@ protected:
     }
 };
 
-TEST_F(ShardingDDLCoordinatorTest, AcquiresDDLLocks) {
+TEST_F(ShardingCoordinatorTest, AcquiresDDLLocks) {
     auto testDDLLocksAcquired = [&](NamespaceString mainNss,
                                     std::set<NamespaceString> additionalNss,
                                     std::set<DatabaseName> expectedDbLocks,
                                     std::set<NamespaceString> expectedCollLocks) {
-        // Create a dummy ShardingDDLCoordinator.
-        ShardingDDLCoordinatorMetadata coordinatorMetadata(
-            ShardingDDLCoordinatorId(mainNss, DDLCoordinatorTypeEnum::kDropCollection));
+        // Create a dummy ShardingCoordinator.
+        ShardingCoordinatorMetadata coordinatorMetadata(
+            ShardingCoordinatorId(mainNss, CoordinatorTypeEnum::kDropCollection));
         coordinatorMetadata.setForwardableOpMetadata(ForwardableOperationMetadata{});
 
-        auto coordinator = std::make_shared<TestShardingDDLCoordinator>(
+        auto coordinator = std::make_shared<TestShardingCoordinator>(
             _service.get(), coordinatorMetadata, std::set<NamespaceString>({additionalNss}));
         coordinator->fulfillPromises();
         CancellationSource cancellationSource;
 
         coordinator->_locker = std::make_unique<Locker>(getServiceContext());
 
-        // Just run the '_acquireAllLocksAsync()' bit of ShardingDDLCoordinator::run().
+        // Just run the '_acquireAllLocksAsync()' bit of ShardingCoordinator::run().
         ExecutorFuture<void>(**_scopedExecutor)
             .then([scopedExecutor = _scopedExecutor,
                    coordinator = coordinator,

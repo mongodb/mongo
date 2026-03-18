@@ -38,9 +38,10 @@
 
 namespace mongo::tidy {
 
-class InvariantDDLCoordinatorCheck : public clang::tidy::ClangTidyCheck {
+class InvariantShardingCoordinatorCheck : public clang::tidy::ClangTidyCheck {
 public:
-    InvariantDDLCoordinatorCheck(clang::StringRef Name, clang::tidy::ClangTidyContext* Context);
+    InvariantShardingCoordinatorCheck(clang::StringRef Name,
+                                      clang::tidy::ClangTidyContext* Context);
     void registerMatchers(clang::ast_matchers::MatchFinder* Finder) override;
     void check(const clang::ast_matchers::MatchFinder::MatchResult& Result) override;
     void onEndOfTranslationUnit() override;

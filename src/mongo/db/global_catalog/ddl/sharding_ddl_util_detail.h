@@ -54,8 +54,7 @@ void preprocessCommand(OperationContext* opCtx, CommandType& cmd) {
     if (auto meta = rpc::getAuditAttrsToAuditMetadata(opCtx)) {
         cmd.setDollarAudit(*meta);
     }
-    // TODO SERVER-99655: hasOperationFCV() will always be true once DDL coordinators always use
-    // OFCV
+    // TODO SERVER-99655: hasOperationFCV() will always be true once coordinators always use OFCV
     if (auto& vCtx = VersionContext::getDecoration(opCtx); vCtx.hasOperationFCV()) {
         tassert(11144300,
                 "Expected VersionContext with propagation across shards",

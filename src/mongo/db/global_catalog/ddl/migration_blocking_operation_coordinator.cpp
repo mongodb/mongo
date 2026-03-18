@@ -73,12 +73,12 @@ MigrationBlockingOperationCoordinator::getOrCreate(OperationContext* opCtx,
                                                    const NamespaceString& nss) {
     auto coordinatorDoc = [&] {
         StateDoc doc;
-        doc.setShardingDDLCoordinatorMetadata(
-            {{nss, DDLCoordinatorTypeEnum::kMigrationBlockingOperation}});
+        doc.setShardingCoordinatorMetadata(
+            {{nss, CoordinatorTypeEnum::kMigrationBlockingOperation}});
         return doc.toBSON();
     }();
 
-    auto service = ShardingDDLCoordinatorService::getService(opCtx);
+    auto service = ShardingCoordinatorService::getService(opCtx);
     return checked_pointer_cast<MigrationBlockingOperationCoordinator>(
         service->getOrCreateInstance(opCtx, std::move(coordinatorDoc), FixedFCVRegion{opCtx}));
 }
@@ -86,11 +86,11 @@ MigrationBlockingOperationCoordinator::getOrCreate(OperationContext* opCtx,
 boost::optional<std::shared_ptr<MigrationBlockingOperationCoordinator>>
 MigrationBlockingOperationCoordinator::get(OperationContext* opCtx, const NamespaceString& nss) {
     auto coordinatorId = [&] {
-        ShardingDDLCoordinatorId id{nss, DDLCoordinatorTypeEnum::kMigrationBlockingOperation};
+        ShardingCoordinatorId id{nss, CoordinatorTypeEnum::kMigrationBlockingOperation};
         return BSON("_id" << id.toBSON());
     }();
-    auto service = ShardingDDLCoordinatorService::getService(opCtx);
-    auto [maybeInstance, _] = ShardingDDLCoordinator::lookup(opCtx, service, coordinatorId);
+    auto service = ShardingCoordinatorService::getService(opCtx);
+    auto [maybeInstance, _] = ShardingCoordinator::lookup(opCtx, service, coordinatorId);
     if (!maybeInstance) {
         return boost::none;
     }
@@ -98,7 +98,7 @@ MigrationBlockingOperationCoordinator::get(OperationContext* opCtx, const Namesp
 }
 
 MigrationBlockingOperationCoordinator::MigrationBlockingOperationCoordinator(
-    ShardingDDLCoordinatorService* service, const BSONObj& initialState)
+    ShardingCoordinatorService* service, const BSONObj& initialState)
     : RecoverableShardingDDLCoordinator(
           service, "MigrationBlockingOperationCoordinator", initialState),
       _operations{populateOperations(_getDoc())},

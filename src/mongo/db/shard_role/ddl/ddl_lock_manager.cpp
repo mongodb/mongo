@@ -116,7 +116,7 @@ void DDLLockManager::_lock(OperationContext* opCtx,
             uasserted(ErrorCodes::LockTimeout,
                       fmt::format(
                           "Failed to acquire DDL lock for namespace '{}' in mode {} after {} with "
-                          "reason '{}' while waiting recovery of DDLCoordinatorService",
+                          "reason '{}' while waiting recovery of ShardingCoordinatorService",
                           ns,
                           modeName(mode),
                           waitingTime.elapsed().toString(),

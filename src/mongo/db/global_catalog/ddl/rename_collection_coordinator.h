@@ -35,8 +35,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/global_catalog/ddl/sharded_rename_collection_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/write_ops/write_ops.h"
@@ -61,8 +61,7 @@ public:
     using StateDoc = RenameCollectionCoordinatorDocument;
     using Phase = RenameCollectionCoordinatorPhaseEnum;
 
-    RenameCollectionCoordinator(ShardingDDLCoordinatorService* service,
-                                const BSONObj& initialState);
+    RenameCollectionCoordinator(ShardingCoordinatorService* service, const BSONObj& initialState);
 
     void checkIfOptionsConflict(const BSONObj& doc) const override;
 

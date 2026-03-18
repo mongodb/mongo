@@ -38,8 +38,8 @@
 #include "mongo/db/global_catalog/ddl/set_allow_migrations_coordinator.h"
 #include "mongo/db/global_catalog/ddl/set_allow_migrations_coordinator_document_gen.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_gen.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -96,11 +96,11 @@ public:
                 request().getSetAllowMigrationsRequest();
             auto nss = ns();
             auto coordinatorDoc = SetAllowMigrationsCoordinatorDocument();
-            coordinatorDoc.setShardingDDLCoordinatorMetadata(
-                {{std::move(nss), DDLCoordinatorTypeEnum::kSetAllowMigrations}});
+            coordinatorDoc.setShardingCoordinatorMetadata(
+                {{std::move(nss), CoordinatorTypeEnum::kSetAllowMigrations}});
             coordinatorDoc.setSetAllowMigrationsRequest(std::move(setAllowMigationsCmdRequest));
 
-            auto service = ShardingDDLCoordinatorService::getService(opCtx);
+            auto service = ShardingCoordinatorService::getService(opCtx);
             auto setAllowMigrationsCoordinator =
                 checked_pointer_cast<SetAllowMigrationsCoordinator>(service->getOrCreateInstance(
                     opCtx, coordinatorDoc.toBSON(), FixedFCVRegion{opCtx}));

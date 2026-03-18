@@ -67,7 +67,7 @@ MONGO_FAIL_POINT_DEFINE(hangAfterLockingNewShard);
 MONGO_FAIL_POINT_DEFINE(hangAfterShardingInitialization);
 MONGO_FAIL_POINT_DEFINE(hangAfterDrainingDDLOperations);
 
-AddShardCoordinator::AddShardCoordinator(ShardingDDLCoordinatorService* service,
+AddShardCoordinator::AddShardCoordinator(ShardingCoordinatorService* service,
                                          const BSONObj& initialState)
     : RecoverableShardingDDLCoordinator(service, "AddShardCoordinator", initialState),
       _critSecReason(BSON("addShard" << "")) {
@@ -548,15 +548,15 @@ std::shared_ptr<AddShardCoordinator> AddShardCoordinator::create(
     coordinatorDoc.setIsConfigShard(isConfigShard);
     coordinatorDoc.setProposedName(name);
     coordinatorDoc.setPreExistingDatabasesOnPromotion(std::vector<mongo::DatabaseName>());
-    auto metadata = ShardingDDLCoordinatorMetadata(
-        {{NamespaceString::kConfigsvrShardsNamespace, DDLCoordinatorTypeEnum::kAddShard}});
+    auto metadata = ShardingCoordinatorMetadata(
+        {{NamespaceString::kConfigsvrShardsNamespace, CoordinatorTypeEnum::kAddShard}});
     auto fwdOpCtx = metadata.getForwardableOpMetadata();
     if (!fwdOpCtx) {
         fwdOpCtx = ForwardableOperationMetadata(opCtx);
     }
     fwdOpCtx->setMayBypassWriteBlocking(true);
     metadata.setForwardableOpMetadata(fwdOpCtx);
-    coordinatorDoc.setShardingDDLCoordinatorMetadata(metadata);
+    coordinatorDoc.setShardingCoordinatorMetadata(metadata);
 
     const auto apiParameters = APIParameters::get(opCtx);
     if (apiParameters.getParamsPassed()) {
@@ -564,7 +564,7 @@ std::shared_ptr<AddShardCoordinator> AddShardCoordinator::create(
     }
 
     return checked_pointer_cast<AddShardCoordinator>(
-        ShardingDDLCoordinatorService::getService(opCtx)->getOrCreateInstance(
+        ShardingCoordinatorService::getService(opCtx)->getOrCreateInstance(
             opCtx, coordinatorDoc.toBSON(), fcvRegion));
 }
 

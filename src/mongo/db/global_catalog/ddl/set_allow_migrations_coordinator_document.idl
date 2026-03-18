@@ -35,7 +35,7 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
-    - "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.idl"
+    - "mongo/db/global_catalog/ddl/sharding_coordinator.idl"
     - "mongo/db/global_catalog/ddl/sharded_ddl_commands.idl"
 
 structs:
@@ -44,5 +44,5 @@ structs:
         generate_comparison_operators: false
         strict: false
         chained_structs:
-            ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
+            ShardingCoordinatorMetadata: ShardingCoordinatorMetadata
             SetAllowMigrationsRequest: SetAllowMigrationsRequest

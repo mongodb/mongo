@@ -34,8 +34,8 @@
 #include "mongo/db/global_catalog/ddl/set_allow_migrations_coordinator_document_gen.h"
 #include "mongo/db/global_catalog/ddl/set_allow_migrations_gen.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/util/cancellation.h"
@@ -50,12 +50,12 @@
 namespace mongo {
 
 class SetAllowMigrationsCoordinator final
-    : public ShardingDDLCoordinatorImpl<SetAllowMigrationsCoordinatorDocument> {
+    : public NonRecoverableShardingDDLCoordinator<SetAllowMigrationsCoordinatorDocument> {
 
 public:
-    SetAllowMigrationsCoordinator(ShardingDDLCoordinatorService* service,
-                                  const BSONObj& initialState)
-        : ShardingDDLCoordinatorImpl(service, "SetAllowMigrationsCoordinator", initialState),
+    SetAllowMigrationsCoordinator(ShardingCoordinatorService* service, const BSONObj& initialState)
+        : NonRecoverableShardingDDLCoordinator(
+              service, "SetAllowMigrationsCoordinator", initialState),
           _allowMigrations(_doc.getAllowMigrations()) {}
 
     void checkIfOptionsConflict(const BSONObj& coorDoc) const override;

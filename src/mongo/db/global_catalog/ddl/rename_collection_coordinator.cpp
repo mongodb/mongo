@@ -517,7 +517,7 @@ void checkExpectedTargetIndexesMatch(OperationContext* opCtx,
 }
 }  // namespace
 
-RenameCollectionCoordinator::RenameCollectionCoordinator(ShardingDDLCoordinatorService* service,
+RenameCollectionCoordinator::RenameCollectionCoordinator(ShardingCoordinatorService* service,
                                                          const BSONObj& initialState)
     : RecoverableShardingDDLCoordinator(service, "RenameCollectionCoordinator", initialState),
       _request(_doc.getRenameCollectionRequest()) {}

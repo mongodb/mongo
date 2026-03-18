@@ -35,9 +35,9 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/global_catalog/ddl/drop_database_coordinator_document_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_gen.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -62,7 +62,7 @@ public:
     using StateDoc = DropDatabaseCoordinatorDocument;
     using Phase = DropDatabaseCoordinatorPhaseEnum;
 
-    DropDatabaseCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState)
+    DropDatabaseCoordinator(ShardingCoordinatorService* service, const BSONObj& initialState)
         : RecoverableShardingDDLCoordinator(service, "DropDatabaseCoordinator", initialState),
           _dbName(nss().dbName()),
           _critSecReason(BSON("dropDatabase" << DatabaseNameUtil::serialize(

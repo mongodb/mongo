@@ -43,7 +43,7 @@ public:
     using StateDoc = CloneAuthoritativeMetadataCoordinatorDocument;
     using Phase = CloneAuthoritativeMetadataCoordinatorPhaseEnum;
 
-    CloneAuthoritativeMetadataCoordinator(ShardingDDLCoordinatorService* service,
+    CloneAuthoritativeMetadataCoordinator(ShardingCoordinatorService* service,
                                           const BSONObj& initialStateDoc)
         : RecoverableShardingDDLCoordinator(
               service, "CloneAuthoritativeMetadataCoordinator", initialStateDoc) {};

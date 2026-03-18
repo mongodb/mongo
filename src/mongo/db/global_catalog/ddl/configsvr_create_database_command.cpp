@@ -163,15 +163,15 @@ public:
                     return Response(dbt.getVersion());
                 } else {
                     CreateDatabaseCoordinatorDocument coordinatorDoc;
-                    coordinatorDoc.setShardingDDLCoordinatorMetadata(
-                        {{NamespaceString(dbName), DDLCoordinatorTypeEnum::kCreateDatabase}});
+                    coordinatorDoc.setShardingCoordinatorMetadata(
+                        {{NamespaceString(dbName), CoordinatorTypeEnum::kCreateDatabase}});
                     coordinatorDoc.setPrimaryShard(optResolvedPrimaryShard);
                     coordinatorDoc.setUserSelectedPrimary(optResolvedPrimaryShard.is_initialized());
                     coordinatorDoc.setAuthoritativeMetadataAccessLevel(
                         authoritativeMetadataAccessLevel);
                     auto createDatabaseCoordinator =
                         checked_pointer_cast<CreateDatabaseCoordinator>(
-                            ShardingDDLCoordinatorService::getService(opCtx)->getOrCreateInstance(
+                            ShardingCoordinatorService::getService(opCtx)->getOrCreateInstance(
                                 opCtx, coordinatorDoc.toBSON(), *fixedFcvRegion));
 
                     fixedFcvRegion.reset();

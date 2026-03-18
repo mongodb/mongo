@@ -30,7 +30,7 @@
 #include "mongo/db/global_catalog/ddl/migration_blocking_operation_coordinator.h"
 
 #include "mongo/db/global_catalog/ddl/migration_blocking_operation_coordinator_gen.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_external_state_for_test.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_external_state_for_test.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/stdx/thread.h"
@@ -50,7 +50,7 @@ constexpr auto kHangBeforeRemovingCoordinatorDocument = "hangBeforeRemovingCoord
 
 class MigrationBlockingOperationCoordinatorTest : public repl::PrimaryOnlyServiceMongoDTest {
 protected:
-    using Service = ShardingDDLCoordinatorService;
+    using Service = ShardingCoordinatorService;
     using Instance = MigrationBlockingOperationCoordinator;
 
     const NamespaceString kNamespace =
@@ -58,22 +58,21 @@ protected:
     const DatabaseVersion kDbVersion{UUID::gen(), Timestamp(1, 0)};
 
     MigrationBlockingOperationCoordinatorTest() {
-        _externalState = std::make_shared<ShardingDDLCoordinatorExternalStateForTest>();
+        _externalState = std::make_shared<ShardingCoordinatorExternalStateForTest>();
         _externalStateFactory =
-            std::make_unique<ShardingDDLCoordinatorExternalStateFactoryForTest>(_externalState);
+            std::make_unique<ShardingCoordinatorExternalStateFactoryForTest>(_externalState);
     }
 
     std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
         return std::make_unique<Service>(serviceContext, std::move(_externalStateFactory));
     }
 
-    ShardingDDLCoordinatorId getCoordinatorId() const {
-        return ShardingDDLCoordinatorId{kNamespace,
-                                        DDLCoordinatorTypeEnum::kMigrationBlockingOperation};
+    ShardingCoordinatorId getCoordinatorId() const {
+        return ShardingCoordinatorId{kNamespace, CoordinatorTypeEnum::kMigrationBlockingOperation};
     }
 
-    ShardingDDLCoordinatorMetadata createMetadata() const {
-        ShardingDDLCoordinatorMetadata metadata(getCoordinatorId());
+    ShardingCoordinatorMetadata createMetadata() const {
+        ShardingCoordinatorMetadata metadata(getCoordinatorId());
         metadata.setForwardableOpMetadata(ForwardableOperationMetadata(_opCtx));
         metadata.setDatabaseVersion(kDbVersion);
         return metadata;
@@ -82,7 +81,7 @@ protected:
     MigrationBlockingOperationCoordinatorDocument createStateDocument() const {
         MigrationBlockingOperationCoordinatorDocument doc;
         auto metadata = createMetadata();
-        doc.setShardingDDLCoordinatorMetadata(metadata);
+        doc.setShardingCoordinatorMetadata(metadata);
         return doc;
     }
 
@@ -214,8 +213,8 @@ protected:
     ServiceContext::UniqueOperationContext _opCtxHolder;
     OperationContext* _opCtx;
     std::vector<UUID> _operations;
-    std::unique_ptr<ShardingDDLCoordinatorExternalStateFactoryForTest> _externalStateFactory;
-    std::shared_ptr<ShardingDDLCoordinatorExternalStateForTest> _externalState;
+    std::unique_ptr<ShardingCoordinatorExternalStateFactoryForTest> _externalStateFactory;
+    std::shared_ptr<ShardingCoordinatorExternalStateForTest> _externalState;
 };
 
 TEST_F(MigrationBlockingOperationCoordinatorTest, CreateAndDeleteStateDocument) {

@@ -38,8 +38,8 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/global_catalog/ddl/cluster_ddl.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_gen.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/resharding/reshard_collection_coordinator.h"
@@ -154,10 +154,10 @@ public:
                     request().getReshardCollectionRequest();
                 auto coordinatorDoc = ReshardCollectionCoordinatorDocument();
                 coordinatorDoc.setReshardCollectionRequest(std::move(reshardCollectionRequest));
-                coordinatorDoc.setShardingDDLCoordinatorMetadata(
-                    {{ns(), DDLCoordinatorTypeEnum::kReshardCollection}});
+                coordinatorDoc.setShardingCoordinatorMetadata(
+                    {{ns(), CoordinatorTypeEnum::kReshardCollection}});
 
-                auto service = ShardingDDLCoordinatorService::getService(opCtx);
+                auto service = ShardingCoordinatorService::getService(opCtx);
                 auto reshardCollectionCoordinator =
                     checked_pointer_cast<ReshardCollectionCoordinator>(service->getOrCreateInstance(
                         opCtx, coordinatorDoc.toBSON(), FixedFCVRegion{opCtx}));

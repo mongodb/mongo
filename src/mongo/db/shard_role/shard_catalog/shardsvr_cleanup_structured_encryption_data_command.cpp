@@ -43,8 +43,8 @@
 #include "mongo/db/commands/fle2_compact.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_gen.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -110,13 +110,13 @@ public:
             }
 
             auto cleanupCoordinator =
-                [&]() -> std::shared_ptr<ShardingDDLCoordinatorService::Instance> {
+                [&]() -> std::shared_ptr<ShardingCoordinatorService::Instance> {
                 FixedFCVRegion fixedFcvRegion(opCtx);
                 auto cleanup = writeConflictRetry(opCtx,
                                                   Request::kCommandName,
                                                   request().getNamespace(),
                                                   [&]() { return makeRequest(opCtx); });
-                return ShardingDDLCoordinatorService::getService(opCtx)->getOrCreateInstance(
+                return ShardingCoordinatorService::getService(opCtx)->getOrCreateInstance(
                     opCtx, cleanup.toBSON(), fixedFcvRegion);
             }();
 
@@ -188,8 +188,8 @@ public:
                 }
             }
 
-            cleanup.setShardingDDLCoordinatorMetadata(
-                {{nss, DDLCoordinatorTypeEnum::kCleanupStructuredEncryptionData}});
+            cleanup.setShardingCoordinatorMetadata(
+                {{nss, CoordinatorTypeEnum::kCleanupStructuredEncryptionData}});
             cleanup.setEscNss(namespaces.escNss);
             cleanup.setEcocNss(namespaces.ecocNss);
             cleanup.setEcocRenameNss(namespaces.ecocRenameNss);

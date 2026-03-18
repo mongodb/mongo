@@ -39,8 +39,8 @@
 #include "mongo/db/global_catalog/ddl/drop_collection_coordinator.h"
 #include "mongo/db/global_catalog/ddl/drop_collection_coordinator_document_gen.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_gen.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/namespace_string.h"
@@ -117,11 +117,11 @@ public:
                     .getDatabaseProfileLevel(ns().dbName()));
 
             auto coordinatorDoc = DropCollectionCoordinatorDocument();
-            coordinatorDoc.setShardingDDLCoordinatorMetadata(
-                {{ns(), DDLCoordinatorTypeEnum::kDropCollection}});
+            coordinatorDoc.setShardingCoordinatorMetadata(
+                {{ns(), CoordinatorTypeEnum::kDropCollection}});
             coordinatorDoc.setCollectionUUID(request().getCollectionUUID());
 
-            auto service = ShardingDDLCoordinatorService::getService(opCtx);
+            auto service = ShardingCoordinatorService::getService(opCtx);
             auto dropCollCoordinator =
                 checked_pointer_cast<DropCollectionCoordinator>(service->getOrCreateInstance(
                     opCtx, coordinatorDoc.toBSON(), FixedFCVRegion{opCtx}));

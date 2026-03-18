@@ -29,8 +29,8 @@
 
 #pragma once
 
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/untrack_unsplittable_collection_coordinator_document_gen.h"
 #include "mongo/util/modules.h"
 
@@ -42,7 +42,7 @@ class UntrackUnsplittableCollectionCoordinator final
 public:
     using CoordDoc = UntrackUnsplittableCollectionCoordinatorDocument;
     using Phase = UntrackUnsplittableCollectionCoordinatorPhaseEnum;
-    UntrackUnsplittableCollectionCoordinator(ShardingDDLCoordinatorService* service,
+    UntrackUnsplittableCollectionCoordinator(ShardingCoordinatorService* service,
                                              const BSONObj& initialState)
         : RecoverableShardingDDLCoordinator(
               service, "UntrackUnsplittableCollectionCoordinator", initialState),

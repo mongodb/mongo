@@ -39,8 +39,8 @@
 #include "mongo/db/global_catalog/ddl/rename_collection_coordinator.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/global_catalog/ddl/sharded_rename_collection_gen.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_gen.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -116,11 +116,11 @@ public:
             auto renameCollectionCoordinator = [&]() {
                 auto coordinatorDoc = RenameCollectionCoordinatorDocument();
                 coordinatorDoc.setRenameCollectionRequest(req.getRenameCollectionRequest());
-                coordinatorDoc.setShardingDDLCoordinatorMetadata(
-                    {{fromNss, DDLCoordinatorTypeEnum::kRenameCollection}});
+                coordinatorDoc.setShardingCoordinatorMetadata(
+                    {{fromNss, CoordinatorTypeEnum::kRenameCollection}});
                 coordinatorDoc.setAllowEncryptedCollectionRename(
                     req.getAllowEncryptedCollectionRename().value_or(false));
-                auto service = ShardingDDLCoordinatorService::getService(opCtx);
+                auto service = ShardingCoordinatorService::getService(opCtx);
                 auto coordinator =
                     checked_pointer_cast<RenameCollectionCoordinator>(service->getOrCreateInstance(
                         opCtx, coordinatorDoc.toBSON(), FixedFCVRegion{opCtx}));

@@ -41,8 +41,8 @@
 #include "mongo/db/global_catalog/ddl/collmod_coordinator.h"
 #include "mongo/db/global_catalog/ddl/collmod_coordinator_document_gen.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_gen.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_settings.h"
@@ -127,9 +127,9 @@ public:
 
         auto coordinatorDoc = CollModCoordinatorDocument();
         coordinatorDoc.setCollModRequest(cmd.getCollModRequest());
-        coordinatorDoc.setShardingDDLCoordinatorMetadata(
-            {{cmd.getNamespace(), DDLCoordinatorTypeEnum::kCollMod}});
-        auto service = ShardingDDLCoordinatorService::getService(opCtx);
+        coordinatorDoc.setShardingCoordinatorMetadata(
+            {{cmd.getNamespace(), CoordinatorTypeEnum::kCollMod}});
+        auto service = ShardingCoordinatorService::getService(opCtx);
         auto collModCoordinator = checked_pointer_cast<CollModCoordinator>(
             service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON(), FixedFCVRegion{opCtx}));
 

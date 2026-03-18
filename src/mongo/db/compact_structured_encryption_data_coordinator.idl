@@ -33,7 +33,7 @@ imports:
     - "mongo/crypto/fle_field_schema.idl"
     - "mongo/db/basic_types.idl"
     - "mongo/db/commands/fle2_compact.idl"
-    - "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.idl"
+    - "mongo/db/global_catalog/ddl/sharding_coordinator.idl"
 
 enums:
     CompactStructuredEncryptionDataPhase:
@@ -54,7 +54,7 @@ structs:
         strict: false
         mod_visibility: pub
         chained_structs:
-            ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
+            ShardingCoordinatorMetadata: ShardingCoordinatorMetadata
         fields:
             phase:
                 description: "Current phase"
@@ -108,7 +108,7 @@ structs:
         description: "Represents the state of the compactStructuredEncryptionData pipeline"
         strict: false
         chained_structs:
-            ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
+            ShardingCoordinatorMetadata: ShardingCoordinatorMetadata
         fields:
             phase:
                 description: "Current phase"

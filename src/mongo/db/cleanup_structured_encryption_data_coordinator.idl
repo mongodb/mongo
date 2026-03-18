@@ -32,7 +32,7 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/commands/fle2_cleanup.idl"
-    - "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.idl"
+    - "mongo/db/global_catalog/ddl/sharding_coordinator.idl"
 
 enums:
     CleanupStructuredEncryptionDataPhase:
@@ -54,7 +54,7 @@ structs:
         strict: false
         mod_visibility: pub
         chained_structs:
-            ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
+            ShardingCoordinatorMetadata: ShardingCoordinatorMetadata
         fields:
             phase:
                 description: "Current phase"

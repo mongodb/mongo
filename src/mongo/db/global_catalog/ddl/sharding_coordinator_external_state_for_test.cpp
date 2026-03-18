@@ -27,54 +27,53 @@
  *    it in the license file.
  */
 
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_external_state_for_test.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_external_state_for_test.h"
 
 namespace mongo {
 
-ShardingDDLCoordinatorExternalStateForTest::ShardingDDLCoordinatorExternalStateForTest() {
+ShardingCoordinatorExternalStateForTest::ShardingCoordinatorExternalStateForTest() {
     allowMigrationsResponse = MockCommandResponse();
     migrationsAllowedResponse = MockCommandResponse();
 }
 
-void ShardingDDLCoordinatorExternalStateForTest::checkShardedDDLAllowedToStart(
+void ShardingCoordinatorExternalStateForTest::checkShardedDDLAllowedToStart(
     OperationContext* opCtx, const NamespaceString& nss) const {}
 
-void ShardingDDLCoordinatorExternalStateForTest::waitForVectorClockDurable(
+void ShardingCoordinatorExternalStateForTest::waitForVectorClockDurable(
     OperationContext* opCtx) const {}
 
-void ShardingDDLCoordinatorExternalStateForTest::assertIsPrimaryShardForDb(
+void ShardingCoordinatorExternalStateForTest::assertIsPrimaryShardForDb(
     OperationContext* opCtx, const DatabaseName& dbName) const {}
 
-bool ShardingDDLCoordinatorExternalStateForTest::isTrackedTimeseries(
+bool ShardingCoordinatorExternalStateForTest::isTrackedTimeseries(
     OperationContext* opCtx, const NamespaceString& bucketNss) const {
     return false;
 }
 
-void ShardingDDLCoordinatorExternalStateForTest::allowMigrations(OperationContext* opCtx,
-                                                                 const NamespaceString& nss,
-                                                                 bool allowMigrations) {
+void ShardingCoordinatorExternalStateForTest::allowMigrations(OperationContext* opCtx,
+                                                              const NamespaceString& nss,
+                                                              bool allowMigrations) {
     allowMigrationsResponse.getNext();
     migrationsAllowed = allowMigrations;
 }
 
-bool ShardingDDLCoordinatorExternalStateForTest::checkAllowMigrations(OperationContext* opCtx,
-                                                                      const NamespaceString& nss) {
+bool ShardingCoordinatorExternalStateForTest::checkAllowMigrations(OperationContext* opCtx,
+                                                                   const NamespaceString& nss) {
     migrationsAllowedResponse.getNext();
     return migrationsAllowed;
 }
 
-ShardingDDLCoordinatorExternalStateFactoryForTest::
-    ShardingDDLCoordinatorExternalStateFactoryForTest(
-        std::shared_ptr<ShardingDDLCoordinatorExternalStateForTest> externalState) {
+ShardingCoordinatorExternalStateFactoryForTest::ShardingCoordinatorExternalStateFactoryForTest(
+    std::shared_ptr<ShardingCoordinatorExternalStateForTest> externalState) {
     _externalState = std::move(externalState);
 }
 
-std::shared_ptr<ShardingDDLCoordinatorExternalState>
-ShardingDDLCoordinatorExternalStateFactoryForTest::create() const {
+std::shared_ptr<ShardingCoordinatorExternalState>
+ShardingCoordinatorExternalStateFactoryForTest::create() const {
     if (_externalState != nullptr) {
-        return std::move(_externalState);
+        return _externalState;
     }
-    return std::make_shared<ShardingDDLCoordinatorExternalStateForTest>();
+    return std::make_shared<ShardingCoordinatorExternalStateForTest>();
 }
 
 }  // namespace mongo

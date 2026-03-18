@@ -45,7 +45,7 @@ public:
     using StateDoc = DropIndexesCoordinatorDocument;
     using Phase = DropIndexesCoordinatorPhaseEnum;
 
-    DropIndexesCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState);
+    DropIndexesCoordinator(ShardingCoordinatorService* service, const BSONObj& initialState);
 
     void checkIfOptionsConflict(const BSONObj& doc) const override;
 

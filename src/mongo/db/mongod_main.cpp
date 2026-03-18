@@ -74,7 +74,7 @@
 #include "mongo/db/ftdc/util.h"
 #include "mongo/db/global_catalog/ddl/configsvr_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/rename_collection_participant_service.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/global_catalog/metadata_consistency_validation/periodic_sharded_index_consistency_checker.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
@@ -443,11 +443,11 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
     }
 
     if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
-        auto shardingDDLCoordinatorService =
-            std::make_unique<ShardingDDLCoordinatorService>(serviceContext);
-        DDLLockManager::get(serviceContext)->setRecoverable(shardingDDLCoordinatorService.get());
+        auto shardingCoordinatorService =
+            std::make_unique<ShardingCoordinatorService>(serviceContext);
+        DDLLockManager::get(serviceContext)->setRecoverable(shardingCoordinatorService.get());
 
-        services.emplace_back(std::move(shardingDDLCoordinatorService));
+        services.emplace_back(std::move(shardingCoordinatorService));
         services.push_back(std::make_unique<RenameCollectionParticipantService>(serviceContext));
         services.push_back(std::make_unique<ReshardingDonorService>(serviceContext));
         services.push_back(std::make_unique<ReshardingRecipientService>(serviceContext));

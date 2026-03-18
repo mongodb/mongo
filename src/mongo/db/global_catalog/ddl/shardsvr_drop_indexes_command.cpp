@@ -161,14 +161,13 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
         if (useCoordinator) {
             auto coordinatorDoc = [&] {
                 auto doc = DropIndexesCoordinatorDocument();
-                doc.setShardingDDLCoordinatorMetadata(
-                    {{ns(), DDLCoordinatorTypeEnum::kDropIndexes}});
+                doc.setShardingCoordinatorMetadata({{ns(), CoordinatorTypeEnum::kDropIndexes}});
                 doc.setDropIndexesRequest(request().getDropIndexesRequest());
                 return doc;
             }();
 
             const auto coordinator = [&] {
-                auto service = ShardingDDLCoordinatorService::getService(opCtx);
+                auto service = ShardingCoordinatorService::getService(opCtx);
                 return checked_pointer_cast<DropIndexesCoordinator>(service->getOrCreateInstance(
                     opCtx, coordinatorDoc.toBSON(), *optFixedFcvRegion, false /*checkOptions*/));
             }();

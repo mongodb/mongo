@@ -38,7 +38,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/global_catalog/type_collection.h"
@@ -120,7 +120,7 @@ void _appendResponseCollModIndexChanges(
 
 }  // namespace
 
-CollModCoordinator::CollModCoordinator(ShardingDDLCoordinatorService* service,
+CollModCoordinator::CollModCoordinator(ShardingCoordinatorService* service,
                                        const BSONObj& initialState)
     : RecoverableShardingDDLCoordinator(service, "CollModCoordinator", initialState),
       _request{_doc.getCollModRequest()} {}

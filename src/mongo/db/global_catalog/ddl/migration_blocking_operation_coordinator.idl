@@ -32,7 +32,7 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
-    - "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.idl"
+    - "mongo/db/global_catalog/ddl/sharding_coordinator.idl"
 
 enums:
     MigrationBlockingOperationCoordinatorPhase:
@@ -46,7 +46,7 @@ structs:
     MigrationBlockingOperationCoordinatorDocument:
         description: State documents for a MigrationBlockingOperationCoordinator.
         chained_structs:
-            ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
+            ShardingCoordinatorMetadata: ShardingCoordinatorMetadata
         fields:
             phase:
                 type: MigrationBlockingOperationCoordinatorPhase

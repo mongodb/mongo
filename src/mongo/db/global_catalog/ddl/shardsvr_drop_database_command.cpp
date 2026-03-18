@@ -36,8 +36,8 @@
 #include "mongo/db/global_catalog/ddl/drop_database_coordinator.h"
 #include "mongo/db/global_catalog/ddl/drop_database_coordinator_document_gen.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_gen.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -101,7 +101,7 @@ public:
 
             const auto requestVersion =
                 OperationShardingState::get(opCtx).getDbVersion(ns().dbName());
-            const auto service = ShardingDDLCoordinatorService::getService(opCtx);
+            const auto service = ShardingCoordinatorService::getService(opCtx);
 
             const auto dropDatabaseCoordinatorFuture = [&] {
                 while (true) {
@@ -120,8 +120,8 @@ public:
                                 fcvRegion->acquireFCVSnapshot());
 
                         DropDatabaseCoordinatorDocument coordinatorDoc;
-                        coordinatorDoc.setShardingDDLCoordinatorMetadata(
-                            {{ns(), DDLCoordinatorTypeEnum::kDropDatabase}});
+                        coordinatorDoc.setShardingCoordinatorMetadata(
+                            {{ns(), CoordinatorTypeEnum::kDropDatabase}});
                         coordinatorDoc.setAuthoritativeMetadataAccessLevel(
                             authoritativeMetadataAccessLevel);
 

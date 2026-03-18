@@ -76,10 +76,10 @@ public:
             const auto& nss = ns();
 
             auto coordinatorDoc = UntrackUnsplittableCollectionCoordinatorDocument();
-            coordinatorDoc.setShardingDDLCoordinatorMetadata(
-                {{nss, DDLCoordinatorTypeEnum::kUntrackUnsplittableCollection}});
+            coordinatorDoc.setShardingCoordinatorMetadata(
+                {{nss, CoordinatorTypeEnum::kUntrackUnsplittableCollection}});
 
-            auto service = ShardingDDLCoordinatorService::getService(opCtx);
+            auto service = ShardingCoordinatorService::getService(opCtx);
             auto coordinator = checked_pointer_cast<UntrackUnsplittableCollectionCoordinator>(
                 service->getOrCreateInstance(
                     opCtx, coordinatorDoc.toBSON(), FixedFCVRegion{opCtx}));

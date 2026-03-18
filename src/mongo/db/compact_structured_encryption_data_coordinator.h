@@ -36,8 +36,8 @@
 #include "mongo/db/commands/fle2_compact.h"
 #include "mongo/db/commands/fle2_compact_gen.h"
 #include "mongo/db/compact_structured_encryption_data_coordinator_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
@@ -66,7 +66,7 @@ public:
     using StateDoc = CompactStructuredEncryptionDataState;
     using Phase = CompactStructuredEncryptionDataPhaseEnum;
 
-    CompactStructuredEncryptionDataCoordinator(ShardingDDLCoordinatorService* service,
+    CompactStructuredEncryptionDataCoordinator(ShardingCoordinatorService* service,
                                                const BSONObj& doc)
         : RecoverableShardingDDLCoordinator(
               service, "CompactStructuredEncryptionDataCoordinator", doc) {}

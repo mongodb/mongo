@@ -421,12 +421,12 @@ local FCV document to the fully upgraded or downgraded version.
 `_shardServerPhase1Tasks`: This helper function is only for any actions that should be done specifically on
 shard servers during phase 1 of the 3-phase setFCV protocol for sharded clusters.
 For example, before completing phase 1, we must wait for backward incompatible
-ShardingDDLCoordinators to finish. This is important in order to ensure that no
+ShardingCoordinators to finish. This is important in order to ensure that no
 shard that is currently a participant of such a backward-incompatible
-ShardingDDLCoordinator can transition to the fully downgraded state (and thus,
+ShardingCoordinator can transition to the fully downgraded state (and thus,
 possibly downgrade its binary) while the coordinator is still in progress.
 The fact that the FCV has already transitioned to kDowngrading ensures that no
-new backward-incompatible ShardingDDLCoordinators can start.
+new backward-incompatible ShardingCoordinators can start.
 We do not expect any other feature-specific work to be done in the 'start' phase.
 
 `_prepareToUpgrade` performs all actions and checks that need to be done before proceeding to make
@@ -1061,10 +1061,10 @@ Under this model, the rules for feature flag checks are simplified as follows:
   - setFCV waits for `OperationContext`s with an old Operation FCV to complete before cleaning up Server metadata
     ([SERVER-111447](https://jira.mongodb.org/browse/SERVER-111447)).
 - For distributed operations, the result can be reused across multiple `OperationContext`s.
-  - setFCV waits for `ShardingDDLCoordinator`s with an old Operation FCV to complete before
+  - setFCV waits for `ShardingCoordinator`s with an old Operation FCV to complete before
     the config server coordinates Server metadata cleanup ([SERVER-101537](https://jira.mongodb.org/browse/SERVER-101537)).
 
-Operation FCV is currently only used by DDLs on a sharded cluster (`ShardingDDLCoordinator`) and
+Operation FCV is currently only used by coordinators on a sharded cluster (`ShardingCoordinator`) and
 by some replica set DDLs (e.g. `create`), but it's intended to eventually extend to all operations.
 
 ### Feature Flag Gating in Tests

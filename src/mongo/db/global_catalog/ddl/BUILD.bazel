@@ -25,7 +25,7 @@ idl_generator(
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/global_catalog/ddl:sharded_ddl_commands_gen",
-        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_coordinator_gen",
     ],
 )
 
@@ -34,7 +34,7 @@ idl_generator(
     src = "collmod_coordinator_document.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_coordinator_gen",
         "//src/mongo/db/shard_role/ddl:coll_mod_gen",
         "//src/mongo/db/sharding_environment:sharding_types_gen",
     ],
@@ -75,7 +75,7 @@ idl_generator(
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/global_catalog/ddl:sharded_ddl_commands_gen",
-        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_coordinator_gen",
     ],
 )
 
@@ -86,7 +86,7 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/global_catalog:type_collection_common_types_gen",
         "//src/mongo/db/global_catalog/ddl:sharded_ddl_commands_gen",
-        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_coordinator_gen",
     ],
 )
 
@@ -95,7 +95,7 @@ idl_generator(
     src = "create_database_coordinator_document.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_coordinator_gen",
         "//src/mongo/db/sharding_environment:sharding_types_gen",
     ],
 )
@@ -105,7 +105,7 @@ idl_generator(
     src = "drop_collection_coordinator_document.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_coordinator_gen",
         "//src/mongo/db/sharding_environment:sharding_types_gen",
     ],
 )
@@ -115,7 +115,7 @@ idl_generator(
     src = "drop_database_coordinator_document.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_coordinator_gen",
         "//src/mongo/db/sharding_environment:sharding_types_gen",
     ],
 )
@@ -125,7 +125,7 @@ idl_generator(
     src = "drop_indexes_coordinator_document.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_coordinator_gen",
         "//src/mongo/db/shard_role/ddl:drop_indexes_gen",
         "//src/mongo/db/sharding_environment:sharding_types_gen",
     ],
@@ -136,7 +136,7 @@ idl_generator(
     src = "migration_blocking_operation_coordinator.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_coordinator_gen",
     ],
 )
 
@@ -145,7 +145,7 @@ idl_generator(
     src = "move_primary_coordinator_document.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_coordinator_gen",
         "//src/mongo/db/sharding_environment:sharding_types_gen",
     ],
 )
@@ -165,7 +165,7 @@ idl_generator(
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/global_catalog/ddl:sharded_ddl_commands_gen",
-        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_coordinator_gen",
     ],
 )
 
@@ -184,7 +184,7 @@ idl_generator(
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/global_catalog/ddl:sharded_ddl_commands_gen",
-        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_coordinator_gen",
     ],
 )
 
@@ -203,7 +203,7 @@ idl_generator(
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/global_catalog/ddl:sharded_ddl_commands_gen",
-        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_coordinator_gen",
     ],
 )
 
@@ -213,13 +213,13 @@ idl_generator(
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/global_catalog/ddl:sharded_ddl_commands_gen",
-        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_coordinator_gen",
     ],
 )
 
 idl_generator(
-    name = "sharding_ddl_coordinator_gen",
-    src = "sharding_ddl_coordinator.idl",
+    name = "sharding_coordinator_gen",
+    src = "sharding_coordinator.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/session:logical_session_id_gen",
@@ -233,7 +233,7 @@ idl_generator(
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/global_catalog/ddl:sharded_ddl_commands_gen",
-        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_coordinator_gen",
     ],
 )
 
@@ -336,7 +336,7 @@ idl_generator(
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/global_catalog/ddl:sharded_ddl_commands_gen",
-        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_coordinator_gen",
     ],
 )
 
@@ -403,7 +403,7 @@ idl_generator(
     src = "initialize_placement_history_coordinator_document.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_coordinator_gen",
     ],
 )
 

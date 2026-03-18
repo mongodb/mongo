@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
 #include "mongo/db/global_catalog/ddl/migration_blocking_operation_coordinator.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_external_state_for_test.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_external_state_for_test.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
@@ -62,19 +62,19 @@
 
 namespace mongo {
 
-class ShardingDDLCoordinatorServiceTest : public repl::PrimaryOnlyServiceMongoDTest {
+class ShardingCoordinatorServiceTest : public repl::PrimaryOnlyServiceMongoDTest {
 public:
     using FCV = multiversion::FeatureCompatibilityVersion;
 
-    ShardingDDLCoordinatorServiceTest() {
-        _externalState = std::make_shared<ShardingDDLCoordinatorExternalStateForTest>();
+    ShardingCoordinatorServiceTest() {
+        _externalState = std::make_shared<ShardingCoordinatorExternalStateForTest>();
         _externalStateFactory =
-            std::make_unique<ShardingDDLCoordinatorExternalStateFactoryForTest>(_externalState);
+            std::make_unique<ShardingCoordinatorExternalStateFactoryForTest>(_externalState);
     }
 
     std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
-        return std::make_unique<ShardingDDLCoordinatorService>(serviceContext,
-                                                               std::move(_externalStateFactory));
+        return std::make_unique<ShardingCoordinatorService>(serviceContext,
+                                                            std::move(_externalStateFactory));
     }
 
     void setUp() override {
@@ -95,15 +95,15 @@ public:
         PrimaryOnlyServiceMongoDTest::tearDown();
     }
 
-    ShardingDDLCoordinatorService* ddlService() {
-        return static_cast<ShardingDDLCoordinatorService*>(_service);
+    ShardingCoordinatorService* ddlService() {
+        return static_cast<ShardingCoordinatorService*>(_service);
     }
 
     std::shared_ptr<executor::TaskExecutor> makeTestExecutor() {
         ThreadPool::Options threadPoolOptions;
         threadPoolOptions.maxThreads = 1;
-        threadPoolOptions.threadNamePrefix = "ShardingDDLCoordinatorServiceTest-";
-        threadPoolOptions.poolName = "ShardingDDLCoordinatorServiceTestThreadPool";
+        threadPoolOptions.threadNamePrefix = "ShardingCoordinatorServiceTest-";
+        threadPoolOptions.poolName = "ShardingCoordinatorServiceTestThreadPool";
         threadPoolOptions.onCreateThread = [](const std::string& threadName) {
             Client::initThread(threadName, getGlobalServiceContext()->getService());
         };
@@ -111,7 +111,7 @@ public:
         auto executor = executor::ThreadPoolTaskExecutor::create(
             std::make_unique<ThreadPool>(threadPoolOptions),
             executor::makeNetworkInterface(
-                "ShardingDDLCoordinatorServiceTestNetwork", nullptr, nullptr));
+                "ShardingCoordinatorServiceTestNetwork", nullptr, nullptr));
         executor->startup();
         return executor;
     }
@@ -119,27 +119,27 @@ public:
     void printState() {
         std::string stateStr;
         switch (ddlService()->_state) {
-            case ShardingDDLCoordinatorService::State::kPaused:
+            case ShardingCoordinatorService::State::kPaused:
                 stateStr = "kPaused";
                 break;
-            case ShardingDDLCoordinatorService::State::kRecovered:
+            case ShardingCoordinatorService::State::kRecovered:
                 stateStr = "kRecovered";
                 break;
-            case ShardingDDLCoordinatorService::State::kRecovering:
+            case ShardingCoordinatorService::State::kRecovering:
                 stateStr = "kRecovering";
                 break;
             default:
                 MONGO_UNREACHABLE;
         }
-        LOGV2(7646301, "ShardingDDLCoordinatorService::_state", "state"_attr = stateStr);
+        LOGV2(7646301, "ShardingCoordinatorService::_state", "state"_attr = stateStr);
     }
 
     void assertStateIsPaused() {
-        ASSERT_EQ(ShardingDDLCoordinatorService::State::kPaused, ddlService()->_state);
+        ASSERT_EQ(ShardingCoordinatorService::State::kPaused, ddlService()->_state);
     }
 
     void assertStateIsRecovered() {
-        ASSERT_EQ(ShardingDDLCoordinatorService::State::kRecovered, ddlService()->_state);
+        ASSERT_EQ(ShardingCoordinatorService::State::kRecovered, ddlService()->_state);
     }
 
     void assertNumActiveCoordinatorsWithGivenOfcv(boost::optional<FCV> ofcvToCount,
@@ -199,8 +199,8 @@ protected:
     MigrationBlockingOperationCoordinatorDocument createMBOCDoc(
         OperationContext* opCtx, NamespaceString nss, boost::optional<FCV> ofcv = boost::none) {
         const auto coordinatorId =
-            ShardingDDLCoordinatorId{nss, DDLCoordinatorTypeEnum::kMigrationBlockingOperation};
-        ShardingDDLCoordinatorMetadata metadata(coordinatorId);
+            ShardingCoordinatorId{nss, CoordinatorTypeEnum::kMigrationBlockingOperation};
+        ShardingCoordinatorMetadata metadata(coordinatorId);
         ForwardableOperationMetadata fom(opCtx);
         if (ofcv) {
             fom.setVersionContext(VersionContext{ofcv.value()});
@@ -208,7 +208,7 @@ protected:
         metadata.setForwardableOpMetadata(fom);
         metadata.setDatabaseVersion(DatabaseVersion{UUID::gen(), Timestamp(1, 0)});
         MigrationBlockingOperationCoordinatorDocument doc;
-        doc.setShardingDDLCoordinatorMetadata(metadata);
+        doc.setShardingCoordinatorMetadata(metadata);
         return doc;
     }
 
@@ -230,11 +230,11 @@ protected:
     }
 
     std::shared_ptr<executor::TaskExecutor> _testExecutor;
-    std::unique_ptr<ShardingDDLCoordinatorExternalStateFactoryForTest> _externalStateFactory;
-    std::shared_ptr<ShardingDDLCoordinatorExternalStateForTest> _externalState;
+    std::unique_ptr<ShardingCoordinatorExternalStateFactoryForTest> _externalStateFactory;
+    std::shared_ptr<ShardingCoordinatorExternalStateForTest> _externalState;
 };
 
-TEST_F(ShardingDDLCoordinatorServiceTest, StateTransitions) {
+TEST_F(ShardingCoordinatorServiceTest, StateTransitions) {
     auto opCtx = makeOperationContext();
 
     // Reaching a steady state to start the test
@@ -251,7 +251,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest, StateTransitions) {
     assertStateIsRecovered();
 }
 
-TEST_F(ShardingDDLCoordinatorServiceTest, WaitingWhileKpaused) {
+TEST_F(ShardingCoordinatorServiceTest, WaitingWhileKpaused) {
     auto opCtx = makeOperationContext();
 
     // Reaching a steady state to start the test
@@ -270,7 +270,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest, WaitingWhileKpaused) {
                        ErrorCodes::NotWritablePrimary);
 }
 
-TEST_F(ShardingDDLCoordinatorServiceTest,
+TEST_F(ShardingCoordinatorServiceTest,
        DDLLocksCanOnlyBeAcquiredOnceShardingDDLCoordinatorServiceIsRecovered) {
     auto opCtx = makeOperationContext();
     opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
@@ -298,7 +298,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest,
     // Only DDL coordinators can acquire DDL locks during recovery, otherwise trying to acquire a
     // DDL lock will throw a LockTimeout error
     auto pauseOnRecoveryFailPoint =
-        globalFailPointRegistry().find("pauseShardingDDLCoordinatorServiceOnRecovery");
+        globalFailPointRegistry().find("pauseShardingCoordinatorServiceOnRecovery");
     const auto fpCount = pauseOnRecoveryFailPoint->setMode(FailPoint::alwaysOn);
     stepUp(opCtx.get());
     pauseOnRecoveryFailPoint->waitForTimesEntered(fpCount + 1);
@@ -311,7 +311,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest,
         opCtx.get(), nss, reason, MODE_X, 0 /*timeoutMillisec*/));
 
     // 3- Ending Recovery and enter on Recovered state
-    // Once ShardingDDLCoordinatorService is recovered, anyone can aquire a DDL lock
+    // Once ShardingCoordinatorService is recovered, anyone can aquire a DDL lock
     pauseOnRecoveryFailPoint->setMode(FailPoint::off);
     ddlService()->waitForRecovery(opCtx.get());
 
@@ -321,7 +321,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest,
         opCtx.get(), nss, reason, MODE_X, 0 /*timeoutMillisec*/));
 }
 
-TEST_F(ShardingDDLCoordinatorServiceTest, DDLLockMustBeEventuallyAcquiredAfterAStepUp) {
+TEST_F(ShardingCoordinatorServiceTest, DDLLockMustBeEventuallyAcquiredAfterAStepUp) {
     auto opCtx = makeOperationContext();
     opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
@@ -343,7 +343,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest, DDLLockMustBeEventuallyAcquiredAfterAS
     // Start an async task to step up
     auto stepUpFuture = ExecutorFuture<void>(_testExecutor).then([this, &syncPoint]() {
         auto pauseOnRecoveryFailPoint =
-            globalFailPointRegistry().find("pauseShardingDDLCoordinatorServiceOnRecovery");
+            globalFailPointRegistry().find("pauseShardingCoordinatorServiceOnRecovery");
         const auto fpCount = pauseOnRecoveryFailPoint->setMode(FailPoint::alwaysOn);
 
 
@@ -366,7 +366,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest, DDLLockMustBeEventuallyAcquiredAfterAS
     ASSERT(stepUpFuture.isReady());
 }
 
-TEST_F(ShardingDDLCoordinatorServiceTest, CoordinatorCreationMustFailOnSecondaries) {
+TEST_F(ShardingCoordinatorServiceTest, CoordinatorCreationMustFailOnSecondaries) {
     auto opCtx = makeOperationContext();
 
     // Reaching a steady state to start the test
@@ -383,7 +383,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest, CoordinatorCreationMustFailOnSecondari
         ddlService()->waitForRecovery(opCtx.get()), DBException, ErrorCodes::NotWritablePrimary);
 }
 
-TEST_F(ShardingDDLCoordinatorServiceTest, StepdownDuringServiceRebuilding) {
+TEST_F(ShardingCoordinatorServiceTest, StepdownDuringServiceRebuilding) {
     auto opCtx = makeOperationContext();
 
     // Reaching a steady state to start the test
@@ -392,7 +392,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest, StepdownDuringServiceRebuilding) {
     stepDown();
 
     auto pauseOnRecoveryFailPoint =
-        globalFailPointRegistry().find("pauseShardingDDLCoordinatorServiceOnRecovery");
+        globalFailPointRegistry().find("pauseShardingCoordinatorServiceOnRecovery");
     const auto fpCount = pauseOnRecoveryFailPoint->setMode(FailPoint::alwaysOn);
 
     stepUp(opCtx.get());
@@ -409,7 +409,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest, StepdownDuringServiceRebuilding) {
     ddlService()->waitForRecovery(opCtx.get());
 }
 
-TEST_F(ShardingDDLCoordinatorServiceTest, StepdownStepupWhileCreatingCoordinator) {
+TEST_F(ShardingCoordinatorServiceTest, StepdownStepupWhileCreatingCoordinator) {
     auto opCtx = makeOperationContext();
 
     spawnMigrationBlockingOperationCoordinator(
@@ -423,7 +423,7 @@ TEST_F(ShardingDDLCoordinatorServiceTest, StepdownStepupWhileCreatingCoordinator
     ddlService()->waitForRecovery(opCtx.get());
 }
 
-TEST_F(ShardingDDLCoordinatorServiceTest, TrackCoordinatorsWithGivenOfcvAndType) {
+TEST_F(ShardingCoordinatorServiceTest, TrackCoordinatorsWithGivenOfcvAndType) {
     auto opCtxHolder = makeOperationContext();
     auto opCtx = opCtxHolder.get();
 

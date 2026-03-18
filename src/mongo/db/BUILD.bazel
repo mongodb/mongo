@@ -3557,7 +3557,7 @@ idl_generator(
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/commands:fle2_cleanup_gen",
-        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_coordinator_gen",
     ],
 )
 
@@ -3568,7 +3568,7 @@ idl_generator(
         "//src/mongo/crypto:fle_field_schema_gen",
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/commands:fle2_compact_gen",
-        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_coordinator_gen",
     ],
 )
 

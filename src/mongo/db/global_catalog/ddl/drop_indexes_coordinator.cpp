@@ -37,7 +37,7 @@
 
 namespace mongo {
 
-DropIndexesCoordinator::DropIndexesCoordinator(ShardingDDLCoordinatorService* service,
+DropIndexesCoordinator::DropIndexesCoordinator(ShardingCoordinatorService* service,
                                                const BSONObj& initialState)
     : RecoverableShardingDDLCoordinator(service, "DropIndexesCoordinator", initialState),
       _request(_doc.getDropIndexesRequest()) {}

@@ -132,16 +132,16 @@ public:
         }
     }
 
-    void checkForInProgressDDLOperations(OperationContext* opCtx) {
+    void checkForInProgressCoordinators(OperationContext* opCtx) {
         DBDirectClient client(opCtx);
         const auto numDDLDocuments =
             client.count(NamespaceString::kShardingDDLCoordinatorsNamespace);
 
         if (numDDLDocuments != 0) {
-            LOGV2_WARNING(781541, "Cannot take lock while DDL operations is in progress");
+            LOGV2_WARNING(781541, "Cannot take lock while sharding coordinators are in progress");
             releaseLock();
             uasserted(ErrorCodes::IllegalOperation,
-                      "Cannot take lock while DDL operation is in progress");
+                      "Cannot take lock while sharding coordinators are in progress");
         }
     }
 
@@ -214,7 +214,7 @@ public:
             // The check must be performed only if the fsync+lock command has been issued for backup
             // purposes (through monogs). There are valid cases where fsync+lock can be invoked on
             // the mongod while DDLs are in progress.
-            checkForInProgressDDLOperations(opCtx);
+            checkForInProgressCoordinators(opCtx);
         }
 
         LOGV2(20462,

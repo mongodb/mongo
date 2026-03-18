@@ -35,8 +35,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/global_catalog/ddl/move_primary_coordinator_document_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -66,7 +66,7 @@ public:
     using StateDoc = MovePrimaryCoordinatorDocument;
     using Phase = MovePrimaryCoordinatorPhaseEnum;
 
-    MovePrimaryCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState);
+    MovePrimaryCoordinator(ShardingCoordinatorService* service, const BSONObj& initialState);
     ~MovePrimaryCoordinator() override = default;
 
     void checkIfOptionsConflict(const BSONObj& doc) const override;

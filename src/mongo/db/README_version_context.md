@@ -1,7 +1,7 @@
 # VersionContext in MongoDB
 
 This document details the `VersionContext`, a crucial component for managing Feature Compatibility
-Version (FCV) during DDL operations in the MongoDB codebase.
+Version (FCV) in sharding coordinators in the MongoDB codebase.
 
 ## What is VersionContext?
 
@@ -10,7 +10,7 @@ with a given operation. The `VersionContext` serves as an indirection to store a
 making the code more flexible for future needs. It is defined as a decoration of the
 `OperationContext` class.
 
-> Please Note: The VersionContext is only available for use for DDL operations. SPM-4227 plans to
+> Please Note: The VersionContext is only available for use for sharding coordinators. SPM-4227 plans to
 > extend this concept to more operations (see [warnings section](#warnings-and-future-outlook)).
 
 ## How to Use VersionContext
@@ -29,9 +29,9 @@ The `VersionContext` provides the following methods:
 
 ### Initialization, Persistence, and Recovery
 
-The OFCV for a DDL operation is created within the
-`ShardingDDLCoordinatorService::getOrCreateInstance` function, where the node’s local FCV is
-captured and set on a `VersionContext` instance. This value is then passed to a spawned DDL
+The OFCV for a sharding coordinator is created within the
+`ShardingCoordinatorService::getOrCreateInstance` function, where the node’s local FCV is
+captured and set on a `VersionContext` instance. This value is then passed to a spawned sharding
 coordinator through a specific field within the coordinator state document, extending the
 `ForwardableOperationMetadata` definition to ensure propagation between subsequent coordinator
 phases. This mechanism ensures persistence across various stages and allows for recovery in case of
@@ -58,31 +58,32 @@ used by primaries and secondaries when applying related oplog entries.
 ### Feature Flag Checks
 
 The OFCV value in the `VersionContext` serves as the baseline for all feature flag checks during the
-execution of DDL coordinators and participants. FCV-gated feature flags (represented by
+execution of sharding coordinators and participants. FCV-gated feature flags (represented by
 `FCVGatedFeatureFlag`) will use an `isEnabled` method that incorporates a `VersionContext` parameter
 to accommodate OFCV-based checks. Non-FCV-gated feature flags (represented by
 `BinaryCompatibleFeatureFlag`) will use a parameterless `isEnabled()` method.
 
 ## Warnings and Future Outlook
 
-Currently, the OFCV is primarily applied to DDL operations. Non-DDL operations can run across FCV
+Currently, the OFCV is primarily applied to sharding coordinators. Other operations can run across FCV
 change boundaries, which requires careful handling. A transitional API is in place for FCV-gated
 feature flag checks, relying on `FCVSnapshot` if no OFCV is available.
 
-Future work aims to enable non-DDL operations to:
+Future work aims to enable non-ShardingCoordinator operations to:
 
 1. Store an FCV snapshot (OFCV) on the `VersionContext`.
 2. Check that the FCV has not transitioned when acquiring a write lock or `FixedFCVRegion`.
 3. If the FCV has transitioned, kill the operation or allow callers to decide the resolution.
 
-Once these capabilities are introduced for non-DDL operations, the feature flag API can be
+Once these capabilities are introduced for non-ShardingCoordinator operations, the feature flag API can be
 streamlined to directly use `VersionContext::getDecoration(opCtx)` for
 `FCVGatedFeatureFlag::isEnabled` calls.
 
 ## Multiversion Considerations
 
 Changes related to `VersionContext` are controlled by a `SnapshotFCVInDDLCoordinators` feature flag,
-enabled with FCV \>= 9.0. This flag determines if the OFCV is set upon DDL coordinator startup. DDL
+enabled with FCV \>= 9.0. Note that despite the flag name, it affects all sharding coordinators, not
+just DDL coordinators. This flag determines if the OFCV is set upon sharding coordinator startup. Sharding
 coordinators and participants will then distinguish between old and new behaviors based on the OFCV
 value itself:
 
@@ -94,6 +95,6 @@ binaries are involved.
 
 ## Diagnosis/Debuggability
 
-Information about the associated OFCV will be introduced to `config.changelog` logs for each DDL
-operation and to general sharding logs for DDL startup, participant requests, and other FCV-related
+Information about the associated OFCV will be introduced to `config.changelog` logs for each sharding
+coordinator and to general sharding logs for cordinator startup, participant requests, and other FCV-related
 cases. The OFCV for a given operation will also be added to the output of the `currentOp` command.

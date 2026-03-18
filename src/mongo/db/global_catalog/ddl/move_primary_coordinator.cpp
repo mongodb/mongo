@@ -124,7 +124,7 @@ bool isMovableUnshardedCollection(const NamespaceString& nss, bool timeseriesRes
 
 }  // namespace
 
-MovePrimaryCoordinator::MovePrimaryCoordinator(ShardingDDLCoordinatorService* service,
+MovePrimaryCoordinator::MovePrimaryCoordinator(ShardingCoordinatorService* service,
                                                const BSONObj& initialState)
     : RecoverableShardingDDLCoordinator(service, "MovePrimaryCoordinator", initialState),
       _dbName(nss().dbName()),

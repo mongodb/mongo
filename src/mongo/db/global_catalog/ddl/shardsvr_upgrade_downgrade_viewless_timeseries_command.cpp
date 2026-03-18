@@ -81,10 +81,10 @@ public:
             auto coordinatorDoc = TimeseriesUpgradeDowngradeCoordinatorDocument();
             coordinatorDoc.setTimeseriesUpgradeDowngradeRequest(
                 request().getTimeseriesUpgradeDowngradeRequest());
-            coordinatorDoc.setShardingDDLCoordinatorMetadata(
-                {{nss, DDLCoordinatorTypeEnum::kTimeseriesUpgradeDowngrade}});
+            coordinatorDoc.setShardingCoordinatorMetadata(
+                {{nss, CoordinatorTypeEnum::kTimeseriesUpgradeDowngrade}});
 
-            auto service = ShardingDDLCoordinatorService::getService(opCtx);
+            auto service = ShardingCoordinatorService::getService(opCtx);
             auto coordinator = checked_pointer_cast<TimeseriesUpgradeDowngradeCoordinator>(
                 service->getOrCreateInstance(
                     opCtx, coordinatorDoc.toBSON(), FixedFCVRegion{opCtx}));

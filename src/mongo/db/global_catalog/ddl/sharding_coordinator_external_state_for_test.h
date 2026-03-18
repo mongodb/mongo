@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_external_state.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_external_state.h"
 #include "mongo/db/global_catalog/ddl/sharding_test_helpers.h"
 #include "mongo/util/modules.h"
 
@@ -38,9 +38,9 @@ namespace mongo {
 using Fault = sharding_test_helpers::Fault;
 using MockCommandResponse = sharding_test_helpers::FaultGenerator;
 
-class ShardingDDLCoordinatorExternalStateForTest : public ShardingDDLCoordinatorExternalState {
+class ShardingCoordinatorExternalStateForTest : public ShardingCoordinatorExternalState {
 public:
-    ShardingDDLCoordinatorExternalStateForTest();
+    ShardingCoordinatorExternalStateForTest();
     void checkShardedDDLAllowedToStart(OperationContext* opCtx,
                                        const NamespaceString& nss) const override;
     void waitForVectorClockDurable(OperationContext* opCtx) const override;
@@ -58,17 +58,17 @@ public:
     bool migrationsAllowed = true;
 };
 
-class ShardingDDLCoordinatorExternalStateFactoryForTest
-    : public ShardingDDLCoordinatorExternalStateFactory {
+class ShardingCoordinatorExternalStateFactoryForTest
+    : public ShardingCoordinatorExternalStateFactory {
 public:
-    ShardingDDLCoordinatorExternalStateFactoryForTest() {}
-    ShardingDDLCoordinatorExternalStateFactoryForTest(
-        std::shared_ptr<ShardingDDLCoordinatorExternalStateForTest> externalState);
+    ShardingCoordinatorExternalStateFactoryForTest() {}
+    ShardingCoordinatorExternalStateFactoryForTest(
+        std::shared_ptr<ShardingCoordinatorExternalStateForTest> externalState);
 
-    std::shared_ptr<ShardingDDLCoordinatorExternalState> create() const override;
+    std::shared_ptr<ShardingCoordinatorExternalState> create() const override;
 
 private:
-    std::shared_ptr<ShardingDDLCoordinatorExternalStateForTest> _externalState;
+    std::shared_ptr<ShardingCoordinatorExternalStateForTest> _externalState;
 };
 
 }  // namespace mongo

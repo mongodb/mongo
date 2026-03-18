@@ -34,9 +34,9 @@
 #include "mongo/util/modules.h"
 
 namespace mongo {
-class ShardingDDLCoordinatorExternalState {
+class ShardingCoordinatorExternalState {
 public:
-    virtual ~ShardingDDLCoordinatorExternalState() = default;
+    virtual ~ShardingCoordinatorExternalState() = default;
     virtual void checkShardedDDLAllowedToStart(OperationContext* opCtx,
                                                const NamespaceString& nss) const = 0;
     virtual void waitForVectorClockDurable(OperationContext* opCtx) const = 0;
@@ -52,7 +52,7 @@ public:
 private:
 };
 
-class ShardingDDLCoordinatorExternalStateImpl : public ShardingDDLCoordinatorExternalState {
+class ShardingCoordinatorExternalStateImpl : public ShardingCoordinatorExternalState {
 public:
     void checkShardedDDLAllowedToStart(OperationContext* opCtx,
                                        const NamespaceString& nss) const override;
@@ -67,16 +67,15 @@ public:
     bool checkAllowMigrations(OperationContext* opCtx, const NamespaceString& nss) override;
 };
 
-class ShardingDDLCoordinatorExternalStateFactory {
+class ShardingCoordinatorExternalStateFactory {
 public:
-    virtual ~ShardingDDLCoordinatorExternalStateFactory() = default;
-    virtual std::shared_ptr<ShardingDDLCoordinatorExternalState> create() const = 0;
+    virtual ~ShardingCoordinatorExternalStateFactory() = default;
+    virtual std::shared_ptr<ShardingCoordinatorExternalState> create() const = 0;
 };
 
-class ShardingDDLCoordinatorExternalStateFactoryImpl
-    : public ShardingDDLCoordinatorExternalStateFactory {
+class ShardingCoordinatorExternalStateFactoryImpl : public ShardingCoordinatorExternalStateFactory {
 public:
-    std::shared_ptr<ShardingDDLCoordinatorExternalState> create() const override;
+    std::shared_ptr<ShardingCoordinatorExternalState> create() const override;
 };
 
 

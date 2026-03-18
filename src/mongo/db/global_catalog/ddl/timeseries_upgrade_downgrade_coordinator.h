@@ -34,8 +34,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/timeseries_upgrade_downgrade_coordinator_document_gen.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/util/cancellation.h"
@@ -56,7 +56,7 @@ public:
     using StateDoc = TimeseriesUpgradeDowngradeCoordinatorDocument;
     using Phase = TimeseriesUpgradeDowngradeCoordinatorPhaseEnum;
 
-    TimeseriesUpgradeDowngradeCoordinator(ShardingDDLCoordinatorService* service,
+    TimeseriesUpgradeDowngradeCoordinator(ShardingCoordinatorService* service,
                                           const BSONObj& initialState)
         : RecoverableShardingDDLCoordinator(
               service, "TimeseriesUpgradeDowngradeCoordinator", initialState),

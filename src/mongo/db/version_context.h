@@ -135,7 +135,7 @@ public:
     private:
         friend class VersionContextTest;
         friend class FCVGatedFeatureFlagBase;
-        friend class ShardingDDLCoordinator;
+        friend class ShardingCoordinator;
         friend class ServerParameter;
         Passkey() = default;
         ~Passkey() = default;
@@ -164,7 +164,7 @@ public:
     /**
      * If true, this instance can be serialized in network commands to shards in a sharded cluster.
      *
-     * It may only be enabled by durable operations (e.g. ShardingDDLCoordinator), which setFCV can
+     * It may only be enabled by durable operations (e.g. ShardingCoordinator), which setFCV can
      * reliably track and drain. In contrast, standalone operations can not safely enable this flag,
      * because it may be killed, and setFCV is unaware that it may still be serialized in a command.
      *

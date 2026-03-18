@@ -34,8 +34,8 @@
 #include "mongo/db/global_catalog/ddl/refine_collection_shard_key_coordinator.h"
 #include "mongo/db/global_catalog/ddl/refine_collection_shard_key_coordinator_document_gen.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_gen.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -81,12 +81,12 @@ public:
 
             auto refineCoordinator = [&] {
                 auto coordinatorDoc = RefineCollectionShardKeyCoordinatorDocument();
-                coordinatorDoc.setShardingDDLCoordinatorMetadata(
-                    {{ns(), DDLCoordinatorTypeEnum::kRefineCollectionShardKey}});
+                coordinatorDoc.setShardingCoordinatorMetadata(
+                    {{ns(), CoordinatorTypeEnum::kRefineCollectionShardKey}});
                 coordinatorDoc.setRefineCollectionShardKeyRequest(
                     request().getRefineCollectionShardKeyRequest());
 
-                auto service = ShardingDDLCoordinatorService::getService(opCtx);
+                auto service = ShardingCoordinatorService::getService(opCtx);
                 return checked_pointer_cast<RefineCollectionShardKeyCoordinator>(
                     service->getOrCreateInstance(
                         opCtx, coordinatorDoc.toBSON(), FixedFCVRegion{opCtx}));

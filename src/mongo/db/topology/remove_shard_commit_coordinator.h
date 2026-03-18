@@ -31,8 +31,8 @@
 
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
 #include "mongo/db/topology/remove_shard_commit_coordinator_document_gen.h"
 #include "mongo/util/modules.h"
 
@@ -44,8 +44,7 @@ public:
     using StateDoc = RemoveShardCommitCoordinatorDocument;
     using Phase = RemoveShardCommitCoordinatorPhaseEnum;
 
-    RemoveShardCommitCoordinator(ShardingDDLCoordinatorService* service,
-                                 const BSONObj& initialState)
+    RemoveShardCommitCoordinator(ShardingCoordinatorService* service, const BSONObj& initialState)
         : RecoverableShardingDDLCoordinator(service, "RemoveShardCommitCoordinator", initialState) {
     }
 

@@ -31,8 +31,8 @@
 
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
 #include "mongo/db/sharding_environment/sharding_task_executor.h"
 #include "mongo/db/topology/add_shard_coordinator_document_gen.h"
 #include "mongo/db/topology/topology_change_helpers.h"
@@ -46,7 +46,7 @@ public:
     using StateDoc = AddShardCoordinatorDocument;
     using Phase = AddShardCoordinatorPhaseEnum;
 
-    AddShardCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState);
+    AddShardCoordinator(ShardingCoordinatorService* service, const BSONObj& initialState);
 
     ~AddShardCoordinator() override = default;
 

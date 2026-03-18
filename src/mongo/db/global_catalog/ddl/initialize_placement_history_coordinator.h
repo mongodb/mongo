@@ -41,7 +41,7 @@ class InitializePlacementHistoryCoordinator final
 public:
     using Phase = InitializePlacementHistoryPhaseEnum;
 
-    InitializePlacementHistoryCoordinator(ShardingDDLCoordinatorService* service,
+    InitializePlacementHistoryCoordinator(ShardingCoordinatorService* service,
                                           const BSONObj& initialState)
         : RecoverableShardingDDLCoordinator(
               service, "InitializePlacementHistoryCoordinator", initialState) {}

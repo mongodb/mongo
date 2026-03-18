@@ -32,8 +32,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_external_state.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_external_state.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/primary_only_service.h"
@@ -57,25 +57,25 @@
 
 namespace mongo {
 
-class ShardingDDLCoordinator;
+class ShardingCoordinator;
 
-class MONGO_MOD_NEEDS_REPLACEMENT ShardingDDLCoordinatorService final
+class MONGO_MOD_NEEDS_REPLACEMENT ShardingCoordinatorService final
     : public repl::PrimaryOnlyService,
       public DDLLockManager::Recoverable {
 public:
-    static constexpr StringData kServiceName = "ShardingDDLCoordinator"_sd;
+    static constexpr StringData kServiceName = "ShardingCoordinator"_sd;
 
-    explicit ShardingDDLCoordinatorService(
+    explicit ShardingCoordinatorService(
         ServiceContext* serviceContext,
-        std::unique_ptr<ShardingDDLCoordinatorExternalStateFactory> externalStateFactory =
-            std::make_unique<ShardingDDLCoordinatorExternalStateFactoryImpl>())
+        std::unique_ptr<ShardingCoordinatorExternalStateFactory> externalStateFactory =
+            std::make_unique<ShardingCoordinatorExternalStateFactoryImpl>())
         : PrimaryOnlyService(serviceContext),
           _externalStateFactory(std::move(externalStateFactory)) {}
 
 
-    ~ShardingDDLCoordinatorService() override = default;
+    ~ShardingCoordinatorService() override = default;
 
-    static ShardingDDLCoordinatorService* getService(OperationContext* opCtx);
+    static ShardingCoordinatorService* getService(OperationContext* opCtx);
 
     using repl::PrimaryOnlyService::getAllInstances;
     using FCV = multiversion::FeatureCompatibilityVersion;
@@ -85,6 +85,9 @@ public:
     }
 
     NamespaceString getStateDocumentsNS() const override {
+        // Even though the class is no longer named `ShardingDDLCoordinatorService` and the
+        // coordinator instances are not necessarily DDL coordinators, the namespace is still
+        // `config.system.sharding_ddl_coordinators` for backward compatibility reasons.
         return NamespaceString::kShardingDDLCoordinatorsNamespace;
     }
 
@@ -102,7 +105,7 @@ public:
 
     std::shared_ptr<Instance> constructInstance(BSONObj initialState) override;
 
-    std::shared_ptr<ShardingDDLCoordinatorExternalState> createExternalState() const;
+    std::shared_ptr<ShardingCoordinatorExternalState> createExternalState() const;
 
     std::shared_ptr<Instance> getOrCreateInstance(OperationContext* opCtx,
                                                   BSONObj initialState,
@@ -116,18 +119,17 @@ public:
 
     // TODO SERVER-99655: remove once gSnapshotFCVInDDLCoordinators is enabled on last LTS
     void waitForCoordinatorsOfGivenTypeToComplete(OperationContext* opCtx,
-                                                  DDLCoordinatorTypeEnum type) const;
+                                                  CoordinatorTypeEnum type) const;
 
     /**
      * Waits for all currently running coordinators matching the predicate 'pred' to finish. While
      * waiting here, new coordinators may start, but they will not be waited for.
      */
-    void waitForOngoingCoordinatorsToFinish(
-        OperationContext* opCtx,
-        std::function<bool(const ShardingDDLCoordinator&)> pred = {
-            [](const ShardingDDLCoordinator&) {
-                return true;
-            }});
+    void waitForOngoingCoordinatorsToFinish(OperationContext* opCtx,
+                                            std::function<bool(const ShardingCoordinator&)> pred = {
+                                                [](const ShardingCoordinator&) {
+                                                    return true;
+                                                }});
 
     void waitForRecovery(OperationContext* opCtx) const override;
 
@@ -138,10 +140,10 @@ public:
      * that stability if needed.
      */
     bool areAllCoordinatorsOfTypeFinished(OperationContext* opCtx,
-                                          DDLCoordinatorTypeEnum coordinatorType);
+                                          CoordinatorTypeEnum coordinatorType);
 
 private:
-    friend class ShardingDDLCoordinatorServiceTest;
+    friend class ShardingCoordinatorServiceTest;
 
     ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                          const CancellationToken& token) override;
@@ -150,7 +152,7 @@ private:
     void _onServiceTermination() override;
 
     size_t _countActiveCoordinators(
-        std::function<bool(DDLCoordinatorTypeEnum, boost::optional<FCV>)> pred) const;
+        std::function<bool(CoordinatorTypeEnum, boost::optional<FCV>)> pred) const;
     size_t _countCoordinatorDocs(OperationContext* opCtx) const;
 
     void _transitionToRecovered(WithLock lk, OperationContext* opCtx);
@@ -178,10 +180,10 @@ private:
     size_t _numCoordinatorsToWait{0};
 
     // TODO SERVER-99655: make the 'FCV' key non-optional
-    stdx::unordered_map<std::pair<DDLCoordinatorTypeEnum, boost::optional<FCV>>, size_t>
+    stdx::unordered_map<std::pair<CoordinatorTypeEnum, boost::optional<FCV>>, size_t>
         _numActiveCoordinatorsPerTypeAndOfcv;
 
-    std::unique_ptr<ShardingDDLCoordinatorExternalStateFactory> _externalStateFactory;
+    std::unique_ptr<ShardingCoordinatorExternalStateFactory> _externalStateFactory;
 };
 
 }  // namespace mongo

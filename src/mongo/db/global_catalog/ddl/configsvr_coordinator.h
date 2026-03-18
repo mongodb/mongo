@@ -101,7 +101,7 @@ protected:
     void _removeStateDocument(OperationContext* opCtx);
 
     /**
-     * Create an `OperationContext`. Provided for consistency with `ShardingDDLCoordinator`,
+     * Create an `OperationContext`. Provided for consistency with `ShardingCoordinator`,
      * which provides a similar method which also sets the `ForwardableOperationMetadata`.
      * Prefer this to `cc().makeOperationContext()`.
      */

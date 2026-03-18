@@ -30,8 +30,8 @@
 
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_gen.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/topology/remove_shard_commit_coordinator.h"
 #include "mongo/db/topology/remove_shard_commit_coordinator_document_gen.h"
@@ -61,10 +61,9 @@ RemoveShardProgress runCoordinatorRemoveShard(
         // The Operation FCV is currently propagated only for DDL operations,
         // which cannot be nested. Therefore, the VersionContext shouldn't have an OFCV yet.
         invariant(!VersionContext::getDecoration(opCtx).hasOperationFCV());
-        coordinatorDoc.setShardingDDLCoordinatorMetadata(
-            {{NamespaceString::kConfigsvrShardsNamespace,
-              DDLCoordinatorTypeEnum::kRemoveShardCommit}});
-        auto service = ShardingDDLCoordinatorService::getService(opCtx);
+        coordinatorDoc.setShardingCoordinatorMetadata({{NamespaceString::kConfigsvrShardsNamespace,
+                                                        CoordinatorTypeEnum::kRemoveShardCommit}});
+        auto service = ShardingCoordinatorService::getService(opCtx);
         auto coordinator = checked_pointer_cast<RemoveShardCommitCoordinator>(
             service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON(), *fcvRegion));
         return coordinator;
@@ -126,12 +125,12 @@ RemoveShardProgress removeShard(OperationContext* opCtx, const ShardId& shardId)
                 // downgrade. We need to release the DDL lock before waiting for that
                 // coordinator to complete, so we throw ConflictingOperationInProgress and retry
                 // after waiting.
-                uassert(ErrorCodes::ConflictingOperationInProgress,
-                        "Post FCV downgrade remove shard must wait for ongoing remove shard "
-                        "coordinators to complete before executing",
-                        ShardingDDLCoordinatorService::getService(opCtx)
-                            ->areAllCoordinatorsOfTypeFinished(
-                                opCtx, DDLCoordinatorTypeEnum::kRemoveShardCommit));
+                uassert(
+                    ErrorCodes::ConflictingOperationInProgress,
+                    "Post FCV downgrade remove shard must wait for ongoing remove shard "
+                    "coordinators to complete before executing",
+                    ShardingCoordinatorService::getService(opCtx)->areAllCoordinatorsOfTypeFinished(
+                        opCtx, CoordinatorTypeEnum::kRemoveShardCommit));
                 fixedFCV.reset();
                 return shardingCatalogManager->removeShard(opCtx, shardId);
             }
@@ -141,9 +140,8 @@ RemoveShardProgress removeShard(OperationContext* opCtx, const ShardId& shardId)
                   "shardId"_attr = shardId,
                   "error"_attr = redact(ex));
 
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(
-                    opCtx, DDLCoordinatorTypeEnum::kRemoveShardCommit);
+            ShardingCoordinatorService::getService(opCtx)->waitForCoordinatorsOfGivenTypeToComplete(
+                opCtx, CoordinatorTypeEnum::kRemoveShardCommit);
         }
     }
 }

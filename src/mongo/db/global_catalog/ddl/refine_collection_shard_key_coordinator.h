@@ -35,8 +35,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/global_catalog/ddl/refine_collection_shard_key_coordinator_document_gen.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/executor/scoped_task_executor.h"
@@ -60,7 +60,7 @@ public:
     using StateDoc = RefineCollectionShardKeyCoordinatorDocument;
     using Phase = RefineCollectionShardKeyCoordinatorPhaseEnum;
 
-    RefineCollectionShardKeyCoordinator(ShardingDDLCoordinatorService* service,
+    RefineCollectionShardKeyCoordinator(ShardingCoordinatorService* service,
                                         const BSONObj& initialState);
 
     void checkIfOptionsConflict(const BSONObj& coorDoc) const override;

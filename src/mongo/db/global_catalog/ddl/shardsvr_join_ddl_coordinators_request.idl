@@ -37,7 +37,7 @@ commands:
     _shardsvrJoinDDLCoordinators:
         command_name: _shardsvrJoinDDLCoordinators
         cpp_name: ShardsvrJoinDDLCoordinators
-        description: "Waits for all ongoing ShardingDDLCoordinators on this shard to complete"
+        description: "Waits for all ongoing ShardingCoordinators on this shard to complete"
         namespace: ignored
         api_version: ""
         strict: false
@@ -45,6 +45,6 @@ commands:
             types:
                 type: array<string>
                 description: >-
-                    Array with values from the enumeration DDLCoordinatorTypeEnum. If present, only
+                    Array with values from the enumeration CoordinatorTypeEnum. If present, only
                     coordinators of these types will be waited for.
                 optional: true

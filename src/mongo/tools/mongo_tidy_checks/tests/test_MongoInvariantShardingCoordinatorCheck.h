@@ -27,18 +27,27 @@
  *    it in the license file.
  */
 
-#include "test_MongoInvariantDDLCoordinatorCheck.h"
+template <typename T>
+inline void invariantWithLocation(const T& testOK) {}
+
+#define invariant(...) invariantWithLocation(__VA_ARGS__)
 
 namespace mongo {
-void MyCoordinator::doSomething() {
+
+void helperFun() {
     invariant(true);
 }
 
-int fun() {
-    MyCoordinator c;
-    c.doSomething();
-    helperFun();
-    invariant(true);
-    return 0;
-}
+class ShardingCoordinator {};
+
+class RecoverableShardingDDLCoordinator : public ShardingCoordinator {
+public:
+    virtual void doSomething() = 0;
+};
+
+class MyCoordinator : public RecoverableShardingDDLCoordinator {
+public:
+    void doSomething() override;
+};
+
 }  // namespace mongo

@@ -112,7 +112,7 @@ protected:
         TransactionCoordinatorService::get(operationContext())
             ->initializeIfNeeded(operationContext(), /* term */ 1);
 
-        // Updating the cluster cardinality parameter and blocking ShardingDDLCoordinators require
+        // Updating the cluster cardinality parameter and blocking ShardingCoordinators require
         // the primary only services to have been set up.
         _skipUpdatingCardinalityParamFP =
             globalFailPointRegistry().find("skipUpdatingClusterCardinalityParameterAfterAddShard");

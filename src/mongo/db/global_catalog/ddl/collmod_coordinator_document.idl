@@ -38,7 +38,7 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/shard_role/ddl/coll_mod.idl"
-    - "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.idl"
+    - "mongo/db/global_catalog/ddl/sharding_coordinator.idl"
     - "mongo/db/sharding_environment/sharding_types.idl"
 
 enums:
@@ -58,7 +58,7 @@ structs:
         generate_comparison_operators: false
         strict: false
         chained_structs:
-            ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
+            ShardingCoordinatorMetadata: ShardingCoordinatorMetadata
         fields:
             phase:
                 type: CollModCoordinatorPhase

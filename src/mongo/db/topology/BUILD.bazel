@@ -14,7 +14,7 @@ idl_generator(
     src = "add_shard_coordinator_document.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_coordinator_gen",
     ],
 )
 
@@ -23,7 +23,7 @@ idl_generator(
     src = "remove_shard_commit_coordinator_document.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_coordinator_gen",
         "//src/mongo/db/sharding_environment:sharding_types_gen",
     ],
 )

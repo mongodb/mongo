@@ -131,7 +131,7 @@ std::vector<ShardId> getShardsWithDataForCollection(OperationContext* opCtx,
 }  // namespace
 
 RefineCollectionShardKeyCoordinator::RefineCollectionShardKeyCoordinator(
-    ShardingDDLCoordinatorService* service, const BSONObj& initialState)
+    ShardingCoordinatorService* service, const BSONObj& initialState)
     : RecoverableShardingDDLCoordinator(
           service, "RefineCollectionShardKeyCoordinator", initialState),
       _request(_doc.getRefineCollectionShardKeyRequest()),

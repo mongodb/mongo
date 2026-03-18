@@ -32,8 +32,8 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/shardsvr_join_ddl_coordinators_request_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/member_state.h"
@@ -58,7 +58,7 @@ public:
     }
 
     std::string help() const override {
-        return "Internal command invoked by the config server to join any ShardingDDLCoordinator "
+        return "Internal command invoked by the config server to join any ShardingCoordinator "
                "activity other than add and remove shard executed by the shard";
     }
 
@@ -80,26 +80,26 @@ public:
             {
                 Lock::GlobalLock lk(opCtx, MODE_IX);
                 uassert(ErrorCodes::InterruptedDueToReplStateChange,
-                        "Not primary while trying to join ongoing DDL coordinators",
+                        "Not primary while trying to join ongoing coordinators",
                         repl::ReplicationCoordinator::get(opCtx)->getMemberState().primary());
             }
 
             const auto& types = request().getTypes();
             IDLParserContext parserContext(Request::kTypesFieldName);
 
-            ShardingDDLCoordinatorService::getService(opCtx)->waitForOngoingCoordinatorsToFinish(
-                opCtx, [&](const ShardingDDLCoordinator& coordinatorInstance) -> bool {
+            ShardingCoordinatorService::getService(opCtx)->waitForOngoingCoordinatorsToFinish(
+                opCtx, [&](const ShardingCoordinator& coordinatorInstance) -> bool {
                     const auto opType = coordinatorInstance.operationType();
                     // Disregard DDL types that use this command as part of their workflow.
-                    if (opType == DDLCoordinatorTypeEnum::kRemoveShardCommit ||
-                        opType == DDLCoordinatorTypeEnum::kAddShard ||
-                        opType == DDLCoordinatorTypeEnum::kInitializePlacementHistory) {
+                    if (opType == CoordinatorTypeEnum::kRemoveShardCommit ||
+                        opType == CoordinatorTypeEnum::kAddShard ||
+                        opType == CoordinatorTypeEnum::kInitializePlacementHistory) {
                         return false;
                     }
                     // If the submitter specified a subset of types, only join those.
                     if (types) {
                         return std::ranges::any_of(*types, [&](StringData type) {
-                            return idl::deserialize<DDLCoordinatorTypeEnum>(type, parserContext) ==
+                            return idl::deserialize<CoordinatorTypeEnum>(type, parserContext) ==
                                 opType;
                         });
                     }

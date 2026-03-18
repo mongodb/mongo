@@ -31,8 +31,8 @@
 
 #include "mongo/db/global_catalog/ddl/create_database_coordinator_document_gen.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/util/modules.h"
 
@@ -44,7 +44,7 @@ public:
     using StateDoc = CreateDatabaseCoordinatorDocument;
     using Phase = CreateDatabaseCoordinatorPhaseEnum;
 
-    CreateDatabaseCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState)
+    CreateDatabaseCoordinator(ShardingCoordinatorService* service, const BSONObj& initialState)
         : RecoverableShardingDDLCoordinator(service, "CreateDatabaseCoordinator", initialState),
           _critSecReason(BSON("createDatabase" << DatabaseNameUtil::serialize(
                                   nss().dbName(), SerializationContext::stateCommandRequest()))) {}

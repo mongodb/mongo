@@ -37,7 +37,7 @@
 #include "mongo/db/global_catalog/ddl/initialize_placement_history_coordinator_document_gen.h"
 #include "mongo/db/global_catalog/ddl/placement_history_commands_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
@@ -104,11 +104,11 @@ public:
             }
 
             InitializePlacementHistoryCoordinatorDocument coordinatorDoc;
-            coordinatorDoc.setShardingDDLCoordinatorMetadata(
+            coordinatorDoc.setShardingCoordinatorMetadata(
                 {{NamespaceString::kConfigsvrPlacementHistoryNamespace,
-                  DDLCoordinatorTypeEnum::kInitializePlacementHistory}});
+                  CoordinatorTypeEnum::kInitializePlacementHistory}});
 
-            auto service = ShardingDDLCoordinatorService::getService(opCtx);
+            auto service = ShardingCoordinatorService::getService(opCtx);
             auto initializePlacementHistoryCoordinator =
                 checked_pointer_cast<InitializePlacementHistoryCoordinator>(
                     service->getOrCreateInstance(

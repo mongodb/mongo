@@ -88,11 +88,11 @@
 
 namespace mongo {
 
-ReshardCollectionCoordinator::ReshardCollectionCoordinator(ShardingDDLCoordinatorService* service,
+ReshardCollectionCoordinator::ReshardCollectionCoordinator(ShardingCoordinatorService* service,
                                                            const BSONObj& initialState)
     : ReshardCollectionCoordinator(service, initialState, true /* persistCoordinatorDocument */) {}
 
-ReshardCollectionCoordinator::ReshardCollectionCoordinator(ShardingDDLCoordinatorService* service,
+ReshardCollectionCoordinator::ReshardCollectionCoordinator(ShardingCoordinatorService* service,
                                                            const BSONObj& initialState,
                                                            bool persistCoordinatorDocument)
     : RecoverableShardingDDLCoordinator(service, "ReshardCollectionCoordinator", initialState),

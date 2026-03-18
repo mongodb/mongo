@@ -1621,7 +1621,7 @@ void blockDDLCoordinatorsAndDrain(OperationContext* opCtx, bool persistRecoveryD
         return;
     }
 
-    // Before we block new ShardingDDLCoordinator creations, first do a best-effort check that
+    // Before we block new ShardingCoordinator creations, first do a best-effort check that
     // there's no currently running one. If there is any, we wait until there is none. This is to
     // reduce impact to concurrent DDL operations.
     waitUntilReadyToBlockNewDDLCoordinators(opCtx);

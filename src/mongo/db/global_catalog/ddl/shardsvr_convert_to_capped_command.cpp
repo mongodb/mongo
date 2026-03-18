@@ -81,10 +81,10 @@ public:
             auto coordinatorDoc = ConvertToCappedCoordinatorDocument();
             coordinatorDoc.setShardsvrConvertToCappedRequest(
                 request().getShardsvrConvertToCappedRequest());
-            coordinatorDoc.setShardingDDLCoordinatorMetadata(
-                {{nss, DDLCoordinatorTypeEnum::kConvertToCapped}});
+            coordinatorDoc.setShardingCoordinatorMetadata(
+                {{nss, CoordinatorTypeEnum::kConvertToCapped}});
 
-            auto service = ShardingDDLCoordinatorService::getService(opCtx);
+            auto service = ShardingCoordinatorService::getService(opCtx);
             auto coordinator =
                 checked_pointer_cast<ConvertToCappedCoordinator>(service->getOrCreateInstance(
                     opCtx, coordinatorDoc.toBSON(), FixedFCVRegion{opCtx}));

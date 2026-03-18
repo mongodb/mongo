@@ -39,8 +39,8 @@
 #include "mongo/db/global_catalog/ddl/move_primary_coordinator.h"
 #include "mongo/db/global_catalog/ddl/move_primary_coordinator_document_gen.h"
 #include "mongo/db/global_catalog/ddl/move_primary_gen.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_gen.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -117,15 +117,15 @@ public:
 
                 auto coordinatorDoc = [&] {
                     MovePrimaryCoordinatorDocument doc;
-                    doc.setShardingDDLCoordinatorMetadata(
-                        {{dbNss, DDLCoordinatorTypeEnum::kMovePrimary}});
+                    doc.setShardingCoordinatorMetadata(
+                        {{dbNss, CoordinatorTypeEnum::kMovePrimary}});
                     doc.setToShardId(toShard->getId());
                     doc.setAuthoritativeMetadataAccessLevel(authoritativeMetadataAccessLevel);
                     return doc.toBSON();
                 }();
 
                 const auto coordinator = [&] {
-                    auto service = ShardingDDLCoordinatorService::getService(opCtx);
+                    auto service = ShardingCoordinatorService::getService(opCtx);
                     return checked_pointer_cast<MovePrimaryCoordinator>(
                         service->getOrCreateInstance(opCtx, std::move(coordinatorDoc), fcvRegion));
                 }();

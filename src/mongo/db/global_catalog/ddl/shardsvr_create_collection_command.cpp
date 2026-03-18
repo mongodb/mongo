@@ -41,8 +41,8 @@
 #include "mongo/db/global_catalog/ddl/create_collection_coordinator.h"
 #include "mongo/db/global_catalog/ddl/create_collection_coordinator_document_gen.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_gen.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -293,10 +293,9 @@ public:
                 }
 
                 auto coordinatorDoc = [&] {
-                    const DDLCoordinatorTypeEnum coordType =
-                        DDLCoordinatorTypeEnum::kCreateCollection;
+                    const CoordinatorTypeEnum coordType = CoordinatorTypeEnum::kCreateCollection;
                     auto doc = CreateCollectionCoordinatorDocument();
-                    doc.setShardingDDLCoordinatorMetadata({{ns(), coordType}});
+                    doc.setShardingCoordinatorMetadata({{ns(), coordType}});
                     doc.setShardsvrCreateCollectionRequest(requestToForward);
                     if (useNewCoordinatorPathForSessionsColl) {
                         doc.setCreateSessionsCollectionRemotelyOnFirstShard(true);
@@ -305,7 +304,7 @@ public:
                 }();
 
                 const auto coordinator = [&] {
-                    auto service = ShardingDDLCoordinatorService::getService(opCtx);
+                    auto service = ShardingCoordinatorService::getService(opCtx);
                     return checked_pointer_cast<CreateCollectionCoordinator>(
                         service->getOrCreateInstance(opCtx,
                                                      coordinatorDoc.copy(),

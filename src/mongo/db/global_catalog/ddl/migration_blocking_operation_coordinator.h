@@ -43,14 +43,14 @@ public:
     using Phase = MigrationBlockingOperationCoordinatorPhaseEnum;
     using UUIDSet = stdx::unordered_set<UUID, UUID::Hash>;
     using StateDoc = MigrationBlockingOperationCoordinatorDocument;
-    using ShardingDDLCoordinator::getOrCreate;
+    using ShardingCoordinator::getOrCreate;
 
     static std::shared_ptr<MigrationBlockingOperationCoordinator> getOrCreate(
         OperationContext* opCtx, const NamespaceString& nss);
     static boost::optional<std::shared_ptr<MigrationBlockingOperationCoordinator>> get(
         OperationContext* opCtx, const NamespaceString& nss);
 
-    MigrationBlockingOperationCoordinator(ShardingDDLCoordinatorService* service,
+    MigrationBlockingOperationCoordinator(ShardingCoordinatorService* service,
                                           const BSONObj& initialState);
 
     void checkIfOptionsConflict(const BSONObj& stateDoc) const override;

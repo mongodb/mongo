@@ -355,9 +355,9 @@ protected:
     friend class DDLLockManagerTest;
     friend class ShardingCatalogManager;
     friend class ReplicaSetDDLTracker;
-    friend class ShardingDDLCoordinator;
-    friend class ShardingDDLCoordinatorService;
-    friend class ShardingDDLCoordinatorServiceTest;
+    friend class ShardingCoordinator;
+    friend class ShardingCoordinatorService;
+    friend class ShardingCoordinatorServiceTest;
     // TODO (SERVER-102647): Remove this friend declaration.
     friend class ConfigSvrCreateDatabaseCommand;
 };

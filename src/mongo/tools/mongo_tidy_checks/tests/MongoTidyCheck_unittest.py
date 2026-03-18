@@ -315,8 +315,8 @@ class MongoTidyTests(unittest.TestCase):
 
         self.run_clang_tidy()
 
-    def test_MongoInvariantDDLCoordinatorCheck(self):
-        errmsg = "Use 'tassert' instead of 'invariant' in DDL coordinator code. Invariants in DDL coordinators are prone to crash loops."
+    def test_MongoInvariantShardingCoordinatorCheck(self):
+        errmsg = "Use 'tassert' instead of 'invariant' in sharding coordinator code. Invariants in sharding coordinators are prone to crash loops."
         self.expected_output = [
             f".cpp:34:5: error: {errmsg}",
             f".cpp:41:5: error: {errmsg}",

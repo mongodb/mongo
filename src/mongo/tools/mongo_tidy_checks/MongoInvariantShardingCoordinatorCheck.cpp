@@ -27,21 +27,21 @@
  *    it in the license file.
  */
 
-#include "MongoInvariantDDLCoordinatorCheck.h"
+#include "MongoInvariantShardingCoordinatorCheck.h"
 
 using namespace clang::ast_matchers;
 
 namespace mongo::tidy {
 
-InvariantDDLCoordinatorCheck::InvariantDDLCoordinatorCheck(clang::StringRef Name,
-                                                           clang::tidy::ClangTidyContext* Context)
+InvariantShardingCoordinatorCheck::InvariantShardingCoordinatorCheck(
+    clang::StringRef Name, clang::tidy::ClangTidyContext* Context)
     : ClangTidyCheck(Name, Context) {}
 
-void InvariantDDLCoordinatorCheck::registerMatchers(MatchFinder* Finder) {
+void InvariantShardingCoordinatorCheck::registerMatchers(MatchFinder* Finder) {
     Finder->addMatcher(cxxMethodDecl(ofClass(cxxRecordDecl(anyOf(
-                                         isSameOrDerivedFrom(hasName("ShardingDDLCoordinator")),
+                                         isSameOrDerivedFrom(hasName("ShardingCoordinator")),
                                          isSameOrDerivedFrom(hasName("ConfigsvrCoordinator"))))))
-                           .bind("ddl_coordinator_method"),
+                           .bind("sharding_coordinator_method"),
                        this);
 
     // Note: invariant() is a macro, translated by the preprocessor to these functions.
@@ -52,13 +52,13 @@ void InvariantDDLCoordinatorCheck::registerMatchers(MatchFinder* Finder) {
         this);
 }
 
-void InvariantDDLCoordinatorCheck::check(const MatchFinder::MatchResult& Result) {
+void InvariantShardingCoordinatorCheck::check(const MatchFinder::MatchResult& Result) {
     const auto& sourceManager = *Result.SourceManager;
 
-    const auto* ddlCoordinatorMethod =
-        Result.Nodes.getNodeAs<clang::CXXMethodDecl>("ddl_coordinator_method");
-    if (ddlCoordinatorMethod) {
-        auto filename = sourceManager.getFilename(ddlCoordinatorMethod->getLocation());
+    const auto* shardingCoordinatorMethod =
+        Result.Nodes.getNodeAs<clang::CXXMethodDecl>("sharding_coordinator_method");
+    if (shardingCoordinatorMethod) {
+        auto filename = sourceManager.getFilename(shardingCoordinatorMethod->getLocation());
         files[filename].hasCoordinatorMethod = true;
     }
 
@@ -69,13 +69,13 @@ void InvariantDDLCoordinatorCheck::check(const MatchFinder::MatchResult& Result)
     }
 }
 
-void InvariantDDLCoordinatorCheck::onEndOfTranslationUnit() {
+void InvariantShardingCoordinatorCheck::onEndOfTranslationUnit() {
     for (const auto& [_, fileContext] : files) {
         if (fileContext.hasCoordinatorMethod) {
             for (const auto* invariantCall : fileContext.invariantCalls) {
                 diag(invariantCall->getBeginLoc(),
-                     "Use 'tassert' instead of 'invariant' in DDL coordinator code. "
-                     "Invariants in DDL coordinators are prone to crash loops.");
+                     "Use 'tassert' instead of 'invariant' in sharding coordinator code. "
+                     "Invariants in sharding coordinators are prone to crash loops.");
             }
         }
     }

@@ -221,7 +221,7 @@ void OperationFCVOnlyFCVGatedFeatureFlag::assertCheckingAgainstOFCV(
         return;
     }
 
-    // This operation could be part of a ShardingDDLCoordinator started on FCV 8.0, which do not
+    // This operation could be part of a ShardingCoordinator started on FCV 8.0, which do not
     // have an OFCV. In this case, tolerate checking it against the global server FCV.
     if (!feature_flags::gStrictlyEnforceOperationFCVOnlyFCVGatedFeatureFlags
              .isEnabledUseLatestFCVWhenUninitialized(vCtx, globalFcv)) {

@@ -82,11 +82,11 @@ public:
             VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
 
             auto coordinatorDoc = CloneAuthoritativeMetadataCoordinatorDocument();
-            coordinatorDoc.setShardingDDLCoordinatorMetadata(
+            coordinatorDoc.setShardingCoordinatorMetadata(
                 {{NamespaceString::kConfigShardCatalogDatabasesNamespace,
-                  DDLCoordinatorTypeEnum::kCloneAuthoritativeMetadata}});
+                  CoordinatorTypeEnum::kCloneAuthoritativeMetadata}});
 
-            auto service = ShardingDDLCoordinatorService::getService(opCtx);
+            auto service = ShardingCoordinatorService::getService(opCtx);
             auto coordinator = checked_pointer_cast<CloneAuthoritativeMetadataCoordinator>(
                 service->getOrCreateInstance(
                     opCtx, coordinatorDoc.toBSON(), FixedFCVRegion{opCtx}));
