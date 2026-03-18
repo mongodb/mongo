@@ -246,3 +246,6 @@ filters:
   - "timeseries_write_pbt.yml":
     approvers:
       - 10gen/server-timeseries-testing
+  - "sharding_csrs_continuous_config_stepdown.yml":
+    approvers:
+      - 10gen/server-cluster-scalability

@@ -225,6 +225,9 @@ selector:
     - jstests/sharding/move_primary_failpoint.js
     - jstests/sharding/catalog_shard_secondary_reads.js
 
+    # Asserts cumulative resharding metrics which are not stable across config stepdowns.
+    - jstests/sharding/abort_rewrite_collection_basic.js
+
     # Expects reshardCollection executes without config server stepdown
     - jstests/sharding/shard_encrypted_collection.js
 
