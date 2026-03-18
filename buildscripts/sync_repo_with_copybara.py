@@ -71,7 +71,7 @@ class CopybaraConfig(NamedTuple):
         )
 
     @classmethod
-    def from_copybara_sky_file(cls, workflow: str, branch: str, file_path: str) -> CopybaraConfig:
+    def from_copybara_sky_file(cls, workflow: str, src_branch: str, dest_branch: str, file_path: str) -> CopybaraConfig:
         with open(file_path, "r") as file:
             content = file.read()
             # Drop inline comments so key/value regexes do not match commented-out config.
@@ -108,12 +108,12 @@ class CopybaraConfig(NamedTuple):
                 source=CopybaraRepoConfig(
                     git_url=source_git_url,
                     repo_name=source_repo_name_match.group(1),
-                    branch=branch,
+                    branch=src_branch,
                 ),
                 destination=CopybaraRepoConfig(
                     git_url=destination_git_url,
                     repo_name=destination_repo_name_match.group(1),
-                    branch=branch,
+                    branch=dest_branch,
                 ),
             )
 
@@ -614,7 +614,7 @@ def get_prod_copybara_config_from_master(current_dir: str) -> str:
     sky_contents = run_command(f"git --no-pager show {source_commit_sha}:copy.bara.sky")
     Path(config_file).write_text(sky_contents)
     pin_prod_workflow_ref_to_commit(config_file, source_commit_sha)
-    return config_file
+    return config_file, source_ref
 
 
 def delete_remote_branch(remote_url: str, branch_name: str):
@@ -720,14 +720,14 @@ def main():
         test_args = ["--init-history", f"--last-rev={expansions['revision']}"]
         branch = f"copybara_test_branch_{expansions['version_id']}"
         test_branch_str = 'testBranch = "copybara_test_branch"'
-        config_file = f"{current_dir}/copy.bara.sky"
+        config_file, source_ref = f"{current_dir}/copy.bara.sky", "copybara_test_branch"
     elif args.workflow == "prod":
         # if expansions["is_patch"] == "true":
         #     print("ERROR: prod workflow should not be run in patch builds!")
         #     sys.exit(1)
         test_args = []
         branch = "v8.2.6-hotfix"
-        config_file = get_prod_copybara_config_from_master(current_dir)
+        config_file, source_ref = get_prod_copybara_config_from_master(current_dir)
     else:
         raise Exception(f"invalid workflow {args.workflow}")
 
@@ -771,7 +771,7 @@ def main():
             )
             sys.exit(1)
 
-    copybara_config = CopybaraConfig.from_copybara_sky_file(args.workflow, branch, config_file)
+    copybara_config = CopybaraConfig.from_copybara_sky_file(args.workflow, source_ref, branch, config_file)
 
     if args.workflow == "test":
         push_test_branches(copybara_config, expansions)
