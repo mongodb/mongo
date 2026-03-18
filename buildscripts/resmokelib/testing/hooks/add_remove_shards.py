@@ -21,6 +21,7 @@ from buildscripts.resmokelib.testing.retry import (
     retryable_code_names as retryable_network_err_names,
 )
 from buildscripts.resmokelib.testing.retry import retryable_codes as retryable_network_errs
+from buildscripts.resmokelib.utils import version_comparison
 
 # The possible number of seconds to wait before initiating a transition.
 TRANSITION_INTERVALS = [10]
@@ -203,6 +204,27 @@ class _AddRemoveShardThread(threading.Thread):
                 return self.CONFIG_SHARD
 
         return self.DEDICATED
+
+    def _get_fcv_version(self):
+        """Return the cluster FCV string from admin.system.version, or None if not found."""
+        try:
+            doc = self._client.admin["system.version"].find_one(
+                {"_id": "featureCompatibilityVersion"}
+            )
+            return doc["version"] if doc else None
+        except Exception as e:
+            self.logger.debug(f"Could not read FCV: {e}")
+            return None
+
+    def _is_fcv_at_least(self, min_version):
+        """
+        Return True if the cluster FCV is >= min_version (same semantics as MongoRunner.compareBinVersions).
+        Returns False if FCV cannot be read.
+        """
+        fcv = self._get_fcv_version()
+        if fcv is None:
+            return False
+        return version_comparison.compare_bin_versions(fcv, min_version) >= 0
 
     def _pick_shard_to_add_remove(self):
         if not self._add_remove_random_shards:
@@ -755,7 +777,7 @@ class _AddRemoveShardThread(threading.Thread):
 
         return latest_status, prev_round_interrupted
 
-    def _transition_to_dedicated_or_remove_shard(self, shard_id):
+    def _transition_to_dedicated_or_remove_shard_old_api(self, shard_id):
         if shard_id == "config":
             self.logger.info("Starting transition from " + self._current_config_mode)
         else:
@@ -868,6 +890,190 @@ class _AddRemoveShardThread(threading.Thread):
                 prev_round_interrupted = True
                 self.logger.info("Ignoring error when " + msg + " : " + str(err))
 
+    def _check_new_api_timeout(self, start_time, step_name, shard_id=None):
+        """Raise ServerFailure if transition timeout exceeded. step_name and shard_id used for log."""
+        if time.time() - start_time <= self.TRANSITION_TIMEOUT_SECS:
+            return
+        msg = f"Timed out during {step_name}" + (
+            f" for {shard_id}" if shard_id and shard_id != "config" else ""
+        )
+        self.logger.error(msg)
+        self._dump_stacks_on_timeout(msg)
+        raise errors.ServerFailure(msg)
+
+    def _is_shard_in_cluster(self, shard_id):
+        """Return True if shard_id still appears in listShards output."""
+        try:
+            res = self._client.admin.command({"listShards": 1})
+            return any(s["_id"] == shard_id for s in res["shards"])
+        except Exception as e:
+            self.logger.debug(f"Could not verify shard presence via listShards: {e}")
+            return None
+
+    def _handle_new_api_operation_failure(
+        self,
+        err,
+        step_name,
+        shard_id,
+        *,
+        last_shard_returns_false=False,
+    ):
+        """Handle OperationFailure for new API steps. Returns 'return_true', 'return_false', 'retry', or None (re-raise)."""
+        subject = "Config shard" if shard_id == "config" else f"Shard {shard_id}"
+        if err.code == self._SHARD_NOT_FOUND:
+            still_present = self._is_shard_in_cluster(shard_id)
+            if still_present is False:
+                self.logger.info(
+                    f"{subject} not found during {step_name} and confirmed absent from "
+                    "listShards, assuming already removed/transitioned"
+                )
+                return "return_true"
+            if still_present is True:
+                self.logger.info(
+                    f"{subject} returned ShardNotFound during {step_name} but still "
+                    "appears in listShards, will retry"
+                )
+                return "retry"
+            self.logger.info(
+                f"{subject} returned ShardNotFound during {step_name} and listShards "
+                "check was inconclusive, will retry"
+            )
+            return "retry"
+        if err.code in set(retryable_network_errs):
+            self.logger.info(f"Network error during {step_name}, will retry. err: {err}")
+            return "retry"
+        if (
+            last_shard_returns_false
+            and err.code in [self._ILLEGAL_OPERATION]
+            and "would remove the last shard" in str(err)
+        ):
+            return "return_false"
+        # It's possible that the shard is not completely drained even after the drainingComplete
+        # status is returned. This can happen when a new unsplittable collection is created on the
+        # draining shard, when for example a failpoint like
+        # createUnshardedCollectionRandomizeDataShard places a collection on a random shard.
+        if err.code == self._ILLEGAL_OPERATION and "isn't completely drained" in str(err):
+            self.logger.info(
+                f"{subject} not fully drained during {step_name}, will retry. err: {err}"
+            )
+            return "retry"
+        if err.code == self._FAILED_TO_SATISFY_READ_PREFERENCE:
+            self.logger.info(f"Primary not found during {step_name}, will retry. err: {err}")
+            return "retry"
+        if self._is_expected_transition_error_code(err.code):
+            self.logger.info(f"Expected error during {step_name}: {err}")
+            return "retry"
+        return None
+
+    def _execute_phase_command(self, command, cmd_name, shard_id, start_time, **error_flags):
+        """Execute a single-shot command phase (start or commit) with retry logic."""
+        while True:
+            self._check_new_api_timeout(start_time, cmd_name, shard_id)
+            try:
+                self._client.admin.command(command)
+                return None
+            except pymongo.errors.AutoReconnect:
+                self.logger.info(f"AutoReconnect during {cmd_name}, retrying...")
+                time.sleep(0.1)
+            except pymongo.errors.OperationFailure as err:
+                action = self._handle_new_api_operation_failure(
+                    err, cmd_name, shard_id, **error_flags
+                )
+                if action == "return_true":
+                    return True
+                if action == "return_false":
+                    return False
+                if action == "retry":
+                    time.sleep(1)
+                    continue
+                raise
+
+    def _transition_to_dedicated_or_remove_shard_new_api(self, shard_id):
+        """New removeShard API (8.3+) using three-phase protocol: start -> status -> commit."""
+
+        is_config = shard_id == "config"
+
+        commands = {
+            "start": {"startTransitionToDedicatedConfigServer": 1}
+            if is_config
+            else {"startShardDraining": shard_id},
+            "status": {"getTransitionToDedicatedConfigServerStatus": 1}
+            if is_config
+            else {"shardDrainingStatus": shard_id},
+            "commit": {"commitTransitionToDedicatedConfigServer": 1}
+            if is_config
+            else {"commitShardRemoval": shard_id},
+        }
+
+        if is_config:
+            self.logger.info("Starting transition from " + self._current_config_mode + " (new API)")
+        else:
+            self.logger.info("Starting removal of " + shard_id + " (new API)")
+
+        start_time = time.time()
+
+        # Step 1: start draining
+        cmd_name = next(iter(commands["start"]))
+        result = self._execute_phase_command(
+            commands["start"], cmd_name, shard_id, start_time, last_shard_returns_false=True
+        )
+        if result is not None:
+            return result
+        self.logger.info(f"Successfully started draining {shard_id}")
+
+        # Step 2: poll draining status until drainingComplete
+        cmd_name = next(iter(commands["status"]))
+        num_draining_rounds = 0
+        while True:
+            self._check_new_api_timeout(start_time, cmd_name, shard_id)
+            try:
+                res = self._client.admin.command(commands["status"])
+                if "state" in res and res["state"] == "drainingComplete":
+                    self.logger.info(f"Draining complete for shard {shard_id}")
+                    break
+                num_draining_rounds += 1
+                if "dbsToMove" in res:
+                    self._drain_shard_for_ongoing_transition(num_draining_rounds, res, shard_id)
+                time.sleep(1)
+            except pymongo.errors.AutoReconnect:
+                self.logger.info(f"AutoReconnect during {cmd_name}, retrying...")
+                time.sleep(0.1)
+            except pymongo.errors.OperationFailure as err:
+                action = self._handle_new_api_operation_failure(
+                    err,
+                    cmd_name,
+                    shard_id,
+                )
+                if action == "return_true":
+                    return True
+                if action == "retry":
+                    time.sleep(1)
+                    continue
+                raise
+
+        # Step 3: commit shard removal
+        cmd_name = next(iter(commands["commit"]))
+        result = self._execute_phase_command(
+            commands["commit"],
+            cmd_name,
+            shard_id,
+            start_time,
+        )
+        if result is not None:
+            return result
+        self.logger.info(f"Successfully committed shard removal {shard_id}")
+        return True
+
+    def _transition_to_dedicated_or_remove_shard(self, shard_id):
+        """Choose between old and new API based on use_new_api flag."""
+        # Adds random choice to use new API or old API
+        use_new_api = self._is_fcv_at_least("8.3") and random.random() > 0.5
+
+        if use_new_api:
+            return self._transition_to_dedicated_or_remove_shard_new_api(shard_id)
+        else:
+            return self._transition_to_dedicated_or_remove_shard_old_api(shard_id)
+
     def _transition_to_config_shard_or_add_shard(self, shard_id, shard_host):
         if shard_id == "config":
             self.logger.info("Starting transition from " + self._current_config_mode)
@@ -940,7 +1146,11 @@ class _AddRemoveShardThread(threading.Thread):
         res = self._client.admin.command({"listShards": 1})
 
         if len(res["shards"]) < 2:
-            msg = "Did not find a shard different from " + shard_id
+            msg = (
+                "Did not find a shard different from " + shard_id
+                if shard_id is not None
+                else "Did not find enough shards (need at least 2)"
+            )
             self.logger.error(msg)
             raise errors.ServerFailure(msg)
 

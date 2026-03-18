@@ -26,6 +26,7 @@ py_library(
         "runtime_recorder.py",
         "self_test_fakes.py",
         "sharded_cluster_util.py",
+        "version_comparison.py",
     ],
     visibility = ["//visibility:public"],
     deps = [
