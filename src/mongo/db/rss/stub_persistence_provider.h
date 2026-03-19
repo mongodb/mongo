@@ -245,6 +245,11 @@ public:
         uasserted(mongo::ErrorCodes::NotImplemented,
                   "StubPersistenceProvider::oplogHasBeenTruncated() method not implemented");
     }
+
+    bool supportsColdCollections() const override {
+        uasserted(mongo::ErrorCodes::NotImplemented,
+                  "StubPersistenceProvider::supportsColdCollections() method not implemented");
+    }
 };
 
 }  // namespace mongo::rss

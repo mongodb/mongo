@@ -260,7 +260,7 @@ CreateCommand makeCreateCommand(OperationContext* opCtx,
 CollectionOptions makeCollectionOptions(OperationContext* opCtx,
                                         const ShardsvrCreateCollectionRequest& request) {
     return CollectionOptions::fromCreateCommand(
-        create_collection_util::makeCreateCommand(opCtx, {}, request));
+        opCtx, create_collection_util::makeCreateCommand(opCtx, {}, request));
 }
 }  // namespace create_collection_util
 

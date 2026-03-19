@@ -613,6 +613,13 @@ public:
                                                             StringData flagName) const = 0;
 
     /**
+     * Append `disaggregated.storage_tier` in the storage engine BSON object of a collection /
+     * index. Returns the updated storage engine options BSON object with the new value set.
+     */
+    [[nodiscard]] virtual BSONObj setStorageTierToStorageOptions(
+        const BSONObj& storageEngineOptions, StringData value) const = 0;
+
+    /**
      * Returns the input storage engine options, sanitized to remove options that may not apply to
      * this node, such as encryption. Might be called for both collection and index options. See
      * SERVER-68122.

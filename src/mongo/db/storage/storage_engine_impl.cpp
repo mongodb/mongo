@@ -1210,6 +1210,11 @@ BSONObj StorageEngineImpl::setFlagToStorageOptions(const BSONObj& storageEngineO
     return _engine->setFlagToStorageOptions(storageEngineOptions, flagName, flagValue);
 }
 
+BSONObj StorageEngineImpl::setStorageTierToStorageOptions(const BSONObj& storageEngineOptions,
+                                                          StringData value) const {
+    return _engine->setStorageTierToStorageOptions(storageEngineOptions, value);
+}
+
 BSONObj StorageEngineImpl::getSanitizedStorageOptionsForSecondaryReplication(
     const BSONObj& options) const {
     return _engine->getSanitizedStorageOptionsForSecondaryReplication(options);

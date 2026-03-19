@@ -287,6 +287,11 @@ public:
         return boost::none;
     }
 
+    [[nodiscard]] BSONObj setStorageTierToStorageOptions(const BSONObj& storageEngineOptions,
+                                                         StringData value) const override {
+        return storageEngineOptions;
+    }
+
     BSONObj getSanitizedStorageOptionsForSecondaryReplication(const BSONObj& options) const final {
         return options;
     }

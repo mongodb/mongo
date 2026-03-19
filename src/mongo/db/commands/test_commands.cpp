@@ -485,7 +485,8 @@ public:
     BOOL_FIELD_BUILDER_FN(supportsOplogSampling)                             \
     BOOL_FIELD_BUILDER_FN(supportsPreservingPreparedTxnInPreciseCheckpoints) \
     BOOL_FIELD_BUILDER_FN(supportsTableLogging)                              \
-    BOOL_FIELD_BUILDER_FN(supportsUnstableCheckpoints)
+    BOOL_FIELD_BUILDER_FN(supportsUnstableCheckpoints)                       \
+    BOOL_FIELD_BUILDER_FN(supportsColdCollections)
 
         // For each method listed in PERSISTENCE_PROVIDER_BOOL_CAPABILITIES, call the method and
         // append the result with the method name.

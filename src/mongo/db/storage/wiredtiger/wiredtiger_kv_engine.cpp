@@ -3122,6 +3122,38 @@ boost::optional<bool> WiredTigerKVEngine::getFlagFromStorageOptions(
     return getFlagFromWiredTigerStorageOptions(storageEngineOptions, flagName);
 }
 
+BSONObj WiredTigerKVEngine::setStorageTierToStorageOptions(const BSONObj& storageEngineOptions,
+                                                           StringData value) const {
+    const auto configString =
+        WiredTigerUtil::getConfigStringFromStorageOptions(storageEngineOptions);
+
+    if (configString) {
+        WiredTigerConfigParser parser(*configString);
+        WT_CONFIG_ITEM disaggValue;
+        if (parser.get("disaggregated", &disaggValue) == 0) {
+            uassert(ErrorCodes::InvalidOptions,
+                    "Storage tier options must be set either via the create command 'storageTier' "
+                    "argument or via the WT config string, no mix allowed",
+                    !str::contains(StringData(disaggValue.str, disaggValue.len), "storage_tier"));
+        }
+    }
+
+    const std::string disaggConfigString = "disaggregated=(storage_tier=" + value + ")";
+
+    const auto newConfigString =
+        (configString ? WiredTigerUtil::concatConfigs(disaggConfigString, *configString)
+                      : disaggConfigString);
+
+    auto isValidConfigStringStatus = WiredTigerUtil::checkTableCreationOptions(
+        BSON(WiredTigerUtil::kConfigStringField << newConfigString).firstElement());
+    tassert(ErrorCodes::InvalidOptions,
+            str::stream() << "Invalid WiredTiger configuration string: "
+                          << isValidConfigStringStatus.toString(),
+            isValidConfigStringStatus.isOK());
+
+    return WiredTigerUtil::setConfigStringToStorageOptions(storageEngineOptions, newConfigString);
+}
+
 BSONObj WiredTigerKVEngine::getSanitizedStorageOptionsForSecondaryReplication(
     const BSONObj& options) const {
 

@@ -256,6 +256,11 @@ public:
      * persistence providers.
      */
     virtual bool oplogHasBeenTruncated(const BSONObj& firstOplogEntry) const = 0;
+
+    /**
+     * If true, the provider supports cold collections.
+     */
+    virtual bool supportsColdCollections() const = 0;
 };
 
 }  // namespace rss

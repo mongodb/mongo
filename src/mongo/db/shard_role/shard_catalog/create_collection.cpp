@@ -1361,7 +1361,7 @@ StatusWith<CollectionOptions> parseCollectionOptionsFromCreateCmdObj(
 std::pair<CollectionOptions, boost::optional<BSONObj>> getCollectionOptionsFromCreateCmd(
     OperationContext* opCtx, const CreateCommand& cmd) {
 
-    auto options = CollectionOptions::fromCreateCommand(cmd);
+    auto options = CollectionOptions::fromCreateCommand(opCtx, cmd);
     auto idIndex = std::exchange(options.idIndex, {});
     bool hasExplicitlyDisabledClustering = cmd.getClusteredIndex() &&
         holds_alternative<bool>(*cmd.getClusteredIndex()) && !get<bool>(*cmd.getClusteredIndex());

@@ -217,6 +217,11 @@ public:
      * message (the initialization entry in attached storage).
      */
     bool oplogHasBeenTruncated(const BSONObj& firstOplogEntry) const override;
+
+    /**
+     * Attached storage does not support cold collections.
+     */
+    bool supportsColdCollections() const override;
 };
 
 }  // namespace mongo::rss

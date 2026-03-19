@@ -194,6 +194,11 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    [[nodiscard]] BSONObj setStorageTierToStorageOptions(const BSONObj& storageEngineOptions,
+                                                         StringData value) const override {
+        MONGO_UNREACHABLE;
+    }
+
     void dump() const override {
         MONGO_UNREACHABLE;
     }

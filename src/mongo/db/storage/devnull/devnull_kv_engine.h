@@ -231,6 +231,11 @@ public:
         return boost::none;
     }
 
+    [[nodiscard]] BSONObj setStorageTierToStorageOptions(const BSONObj& storageEngineOptions,
+                                                         StringData value) const override {
+        return storageEngineOptions;
+    }
+
     void dump() const override {}
 
     Status insertIntoIdent(RecoveryUnit& ru,

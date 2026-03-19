@@ -4,10 +4,10 @@
 // ]
 
 // Tests for the "create" command.
-import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 
 // "create" command rejects invalid options.
 assert.commandWorked(db.runCommand({drop: "create_collection"}));
@@ -197,20 +197,102 @@ assert.commandFailedWithCode(
 );
 
 // Testing storage tier create parameter
-if (FeatureFlagUtil.isPresentAndEnabled(db, "CreateSupportsStorageTierOptions")) {
-    let i = 0;
-    function getCollectionName() {
-        return "with_storage_tier" + i++;
+let storageTierCollIndex = 0;
+function getCollectionName() {
+    return "with_storage_tier" + storageTierCollIndex++;
+}
+
+if (
+    FeatureFlagUtil.isPresentAndEnabled(db, "CreateSupportsStorageTierOptions") &&
+    !TestData.isRunningFCVUpgradeDowngradeSuite
+) {
+    function getConfigString(collectionName) {
+        const listCollResult = assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collectionName}}))
+            .cursor.firstBatch[0];
+        if (listCollResult.options.storageEngine && listCollResult.options.storageEngine.wiredTiger) {
+            return listCollResult.options.storageEngine.wiredTiger.configString;
+        }
+
+        // No configString found, return empty string
+        // This happens when the collection is created without specifying storage engine options or
+        // when default options are used, like `storageTier: {collection: "hot"}`.
+        return "";
     }
 
-    // Valid values for storageTier.collection and/or storageTier.indexes
-    assert.commandWorked(db.createCollection(getCollectionName(), {storageTier: {collection: "hot"}}));
-    assert.commandWorked(db.createCollection(getCollectionName(), {storageTier: {collection: "cold"}}));
-    assert.commandWorked(db.createCollection(getCollectionName(), {storageTier: {indexes: {defaultTier: "cold"}}}));
-    assert.commandWorked(db.createCollection(getCollectionName(), {storageTier: {indexes: {defaultTier: "hot"}}}));
-    assert.commandWorked(
-        db.createCollection(getCollectionName(), {storageTier: {collection: "cold", indexes: {defaultTier: "hot"}}}),
+    // Create hot collection should always succeed
+    let collName = getCollectionName();
+    assert.commandWorked(db.createCollection(collName, {storageTier: {collection: "hot"}}));
+    assert(!getConfigString(collName).includes("disaggregated")); // hot is the default, no option set
+
+    // Test valid values for storageTier.collection and/or storageTier.indexes
+    const storageTierSettable = PersistenceProviderUtil.allNodesHavePropertyWithValue(
+        db,
+        "supportsColdCollections",
+        true,
     );
+    if (storageTierSettable) {
+        // Create cold collection
+        collName = getCollectionName();
+        assert.commandWorked(db.createCollection(collName, {storageTier: {collection: "cold"}}));
+        assert(getConfigString(collName).includes("disaggregated=(storage_tier=cold)"));
+
+        // Create cold collection (append to existing config string)
+        collName = getCollectionName();
+        const validOriginalConfigString = "app_metadata=(foo=bar)";
+        assert.commandWorked(
+            db.createCollection(collName, {
+                storageTier: {collection: "cold"},
+                storageEngine: {wiredTiger: {configString: validOriginalConfigString}},
+            }),
+        );
+        assert(getConfigString(collName).includes(validOriginalConfigString));
+        assert(getConfigString(collName).includes("disaggregated=(storage_tier=cold)"));
+
+        // Cannot specify storage_tier into the config string if storageTier is already specified as a top-level option
+        collName = getCollectionName();
+        const disaggAlreadySetConfigString = "disaggregated=(storage_tier=cold)";
+        assert.commandFailedWithCode(
+            db.createCollection(collName, {
+                storageTier: {collection: "cold"},
+                storageEngine: {wiredTiger: {configString: disaggAlreadySetConfigString}},
+            }),
+            ErrorCodes.InvalidOptions,
+        );
+
+        // It is valid to specify a disaggregated config string together with storageTier if it doesn't contain storage_tier
+        collName = getCollectionName();
+        const disaggConfigStringWithoutStorageTier = "disaggregated=(page_log=)";
+        assert.commandWorked(
+            db.createCollection(collName, {
+                storageTier: {collection: "cold"},
+                storageEngine: {wiredTiger: {configString: disaggConfigStringWithoutStorageTier}},
+            }),
+        );
+        assert(getConfigString(collName).includes(disaggConfigStringWithoutStorageTier));
+        assert(getConfigString(collName).includes("disaggregated=(storage_tier=cold)"));
+
+        // TODO SERVER-116438 test that setting `defaultTier` works
+        assert.commandFailedWithCode(
+            db.createCollection(getCollectionName(), {storageTier: {indexes: {defaultTier: "cold"}}}),
+            11598800,
+        );
+        assert.commandFailedWithCode(
+            db.createCollection(getCollectionName(), {storageTier: {indexes: {defaultTier: "hot"}}}),
+            11598800,
+        );
+        assert.commandFailedWithCode(
+            db.createCollection(getCollectionName(), {
+                storageTier: {collection: "cold", indexes: {defaultTier: "hot"}},
+            }),
+            11598800,
+        );
+    } else {
+        const errMsg = assert.commandFailedWithCode(
+            db.createCollection(getCollectionName(), {storageTier: {collection: "cold"}}),
+            ErrorCodes.BadValue,
+        ).errmsg;
+        assert(errMsg.includes("Cold collections only supported when disaggregated storage is enabled"));
+    }
 
     // Invalid values for storageTier, storageTier.collection and/or storageTier.indexes
     assert.commandFailed(db.createCollection(getCollectionName(), {storageTier: 100}));
@@ -226,4 +308,11 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "CreateSupportsStorageTierOptions"))
     assert.commandFailed(
         db.createCollection(getCollectionName(), {storageTier: {collection: "hot", indexes: {defaultTier: "lol"}}}),
     );
+} else if (!TestData.isRunningFCVUpgradeDowngradeSuite) {
+    assert.commandFailedWithCode(db.createCollection(getCollectionName(), {storageTier: {collection: "cold"}}), [
+        // We expect InvalidOptions when the we storageTier options is known but the feature flag is disabled
+        ErrorCodes.InvalidOptions,
+        // We expect IDLUnknownField when the binary is old and doesn't know about the storageTier option
+        ErrorCodes.IDLUnknownField,
+    ]);
 }

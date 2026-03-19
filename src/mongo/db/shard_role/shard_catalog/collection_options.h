@@ -88,7 +88,7 @@ struct MONGO_MOD_PUBLIC CollectionOptions {
     /**
      * Converts a client "create" command invocation.
      */
-    static CollectionOptions fromCreateCommand(const CreateCommand& cmd);
+    static CollectionOptions fromCreateCommand(OperationContext* opCtx, const CreateCommand& cmd);
 
     static StatusWith<long long> checkAndAdjustCappedSize(long long cappedSize);
     static StatusWith<long long> checkAndAdjustCappedMaxDocs(long long cappedMaxDocs);

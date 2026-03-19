@@ -222,4 +222,8 @@ bool AttachedPersistenceProvider::oplogHasBeenTruncated(const BSONObj& firstOplo
         parser.getObject().getStringField(repl::kNewPrimaryMsgField) != repl::kInitiatingSetMsg;
 }
 
+bool AttachedPersistenceProvider::supportsColdCollections() const {
+    return false;
+}
+
 }  // namespace mongo::rss

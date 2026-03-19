@@ -37,9 +37,12 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/ddl/create_gen.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options_validation.h"
+#include "mongo/db/version_context.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -339,7 +342,8 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
     return collectionOptions;
 }
 
-CollectionOptions CollectionOptions::fromCreateCommand(const CreateCommand& cmd) {
+CollectionOptions CollectionOptions::fromCreateCommand(OperationContext* opCtx,
+                                                       const CreateCommand& cmd) {
     CollectionOptions options;
 
     options.validationLevel = cmd.getValidationLevel();
@@ -412,6 +416,27 @@ CollectionOptions CollectionOptions::fromCreateCommand(const CreateCommand& cmd)
 
     if (auto recordIdsReplicated = cmd.getRecordIdsReplicated()) {
         options.recordIdsReplicated = *recordIdsReplicated;
+    }
+
+    if (auto storageTier = cmd.getStorageTier()) {
+        uassert(ErrorCodes::InvalidOptions,
+                "'storageTier' option may not be used without "
+                "featureFlagCreateSupportsStorageTierOptions enabled",
+                gFeatureFlagCreateSupportsStorageTierOptions.isEnabled(
+                    VersionContext::getDecoration(opCtx)));
+
+        // Only set `storage_tier` upon creation when the collection is cold (hot is the default)
+        if (storageTier->getCollection() == StorageTierLevelEnum::cold) {
+            auto storageEngine = getGlobalServiceContext()->getStorageEngine();
+            options.storageEngine = storageEngine->setStorageTierToStorageOptions(
+                options.storageEngine, idlSerialize(StorageTierLevelEnum::cold));
+        }
+
+        if (storageTier->getIndexes().has_value()) {
+            // TODO SERVER-116438 Set the default index tier for indexes when the option will
+            // be supported by the storage engine.
+            uasserted(11598800, "storageTier.indexes options are not supported yet");
+        }
     }
 
     return options;
