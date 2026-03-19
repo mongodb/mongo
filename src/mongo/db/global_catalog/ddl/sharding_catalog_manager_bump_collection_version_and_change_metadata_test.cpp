@@ -87,7 +87,7 @@ class ShardingCatalogManagerBumpCollectionPlacementVersionAndChangeMetadataTest
         client.createCollection(NamespaceString::kSessionTransactionsTableNamespace);
         client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace,
                              {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
-        client.createCollection(CollectionType::ConfigNS);
+        client.createCollection(NamespaceString::kConfigsvrCollectionsNamespace);
 
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
         TransactionCoordinatorService::get(operationContext())

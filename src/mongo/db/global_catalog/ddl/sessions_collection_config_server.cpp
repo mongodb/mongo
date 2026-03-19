@@ -101,7 +101,7 @@ void SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext* 
 
     Lock::GlobalLock lock(opCtx, MODE_IX);
     if (const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        replCoord->canAcceptWritesFor(opCtx, CollectionType::ConfigNS)) {
+        replCoord->canAcceptWritesFor(opCtx, NamespaceString::kConfigsvrCollectionsNamespace)) {
         auto filterQuery =
             BSON("_id" << NamespaceStringUtil::serialize(NamespaceString::kLogicalSessionsNamespace,
                                                          SerializationContext::stateDefault())
@@ -126,7 +126,7 @@ void SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext* 
 
         uassertStatusOK(catalogClient->updateConfigDocument(
             opCtx,
-            CollectionType::ConfigNS,
+            NamespaceString::kConfigsvrCollectionsNamespace,
             filterQuery,
             updateQuery,
             false,

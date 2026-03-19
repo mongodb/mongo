@@ -361,7 +361,7 @@ public:
         client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace,
                              {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
         client.createCollection(NamespaceString::kConfigReshardingOperationsNamespace);
-        client.createCollection(CollectionType::ConfigNS);
+        client.createCollection(NamespaceString::kConfigsvrCollectionsNamespace);
 
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
         TransactionCoordinatorService::get(operationContext())
@@ -490,7 +490,7 @@ public:
     CollectionType getTemporaryCollectionCatalogEntry(
         OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
         DBDirectClient client(opCtx);
-        auto doc = client.findOne(CollectionType::ConfigNS,
+        auto doc = client.findOne(NamespaceString::kConfigsvrCollectionsNamespace,
                                   BSON(CollectionType::kNssFieldName
                                        << coordinatorDoc.getTempReshardingNss().ns_forTest()));
         return CollectionType{std::move(doc)};
@@ -698,7 +698,8 @@ public:
             reshardingFields,
             std::move(epoch),
             opCtx->getServiceContext()->getPreciseClockSource()->now());
-        client.insert(CollectionType::ConfigNS, originalNssCatalogEntry.toBSON());
+        client.insert(NamespaceString::kConfigsvrCollectionsNamespace,
+                      originalNssCatalogEntry.toBSON());
 
         DatabaseType dbDoc(coordinatorDoc.getSourceNss().dbName(),
                            coordinatorDoc.getDonorShards().front().getId(),
@@ -1532,7 +1533,7 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpEachTransition) {
         // config.collections should not have the document with the old UUID.
         std::vector<ChunkType> foundCollections;
         auto collection =
-            client.findOne(CollectionType::ConfigNS,
+            client.findOne(NamespaceString::kConfigsvrCollectionsNamespace,
                            BSON(CollectionType::kNssFieldName << doc.getSourceNss().ns_forTest()));
 
         ASSERT_EQUALS(collection.isEmpty(), false);
@@ -1616,7 +1617,7 @@ TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorFailsIfMigrationNo
 
     {
         DBDirectClient client(opCtx);
-        client.update(CollectionType::ConfigNS,
+        client.update(NamespaceString::kConfigsvrCollectionsNamespace,
                       BSON(CollectionType::kNssFieldName << _originalNss.ns_forTest()),
                       BSON("$set" << BSON(CollectionType::kAllowMigrationsFieldName << false)));
     }
@@ -1628,7 +1629,7 @@ TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorFailsIfMigrationNo
     {
         DBDirectClient client(opCtx);
         CollectionType collDoc(
-            client.findOne(CollectionType::ConfigNS,
+            client.findOne(NamespaceString::kConfigsvrCollectionsNamespace,
                            BSON(CollectionType::kNssFieldName << _originalNss.ns_forTest())));
         ASSERT_FALSE(collDoc.getAllowMigrations());
     }

@@ -134,7 +134,7 @@ protected:
 
     BSONObj getCollectionDocument(NamespaceString nss) {
         return findOneOnConfigCollection(operationContext(),
-                                         CollectionType::ConfigNS,
+                                         NamespaceString::kConfigsvrCollectionsNamespace,
                                          BSON(CollectionType::kNssFieldName << nss.ns_forTest()))
             .getValue();
     }

@@ -199,7 +199,7 @@ protected:
         }
         ASSERT_OK(
             updateToConfigCollection(operationContext(),
-                                     CollectionType::ConfigNS,
+                                     NamespaceString::kConfigsvrCollectionsNamespace,
                                      BSON(CollectionType::kNssFieldName << nss.toString_forTest()),
                                      BSON("$set" << setBuilder.obj()),
                                      false /*upsert*/));

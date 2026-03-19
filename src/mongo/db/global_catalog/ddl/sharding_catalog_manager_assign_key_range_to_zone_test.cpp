@@ -89,8 +89,9 @@ public:
         CollectionType shardedCollection(
             shardedNS(), OID::gen(), Timestamp(1, 1), Date_t::now(), UUID::gen(), BSON("x" << 1));
 
-        ASSERT_OK(insertToConfigCollection(
-            operationContext(), CollectionType::ConfigNS, shardedCollection.toBSON()));
+        ASSERT_OK(insertToConfigCollection(operationContext(),
+                                           NamespaceString::kConfigsvrCollectionsNamespace,
+                                           shardedCollection.toBSON()));
 
         CollectionType unsplittableCollection(unshardedNS(),
                                               OID::gen(),
@@ -99,8 +100,9 @@ public:
                                               UUID::gen(),
                                               BSON("_id" << 1));
         unsplittableCollection.setUnsplittable(true);
-        ASSERT_OK(insertToConfigCollection(
-            operationContext(), CollectionType::ConfigNS, unsplittableCollection.toBSON()));
+        ASSERT_OK(insertToConfigCollection(operationContext(),
+                                           NamespaceString::kConfigsvrCollectionsNamespace,
+                                           unsplittableCollection.toBSON()));
     }
 
     /**
@@ -298,8 +300,9 @@ TEST_F(AssignKeyRangeToZoneTestFixture, MinThatIsAShardKeyPrefixShouldConvertToF
     CollectionType shardedCollection(
         ns, OID::gen(), Timestamp(1, 1), Date_t::now(), UUID::gen(), BSON("x" << 1 << "y" << 1));
 
-    ASSERT_OK(insertToConfigCollection(
-        operationContext(), CollectionType::ConfigNS, shardedCollection.toBSON()));
+    ASSERT_OK(insertToConfigCollection(operationContext(),
+                                       NamespaceString::kConfigsvrCollectionsNamespace,
+                                       shardedCollection.toBSON()));
 
     const ChunkRange newRange(BSON("x" << 0), BSON("x" << 10 << "y" << 10));
     ShardingCatalogManager::get(operationContext())
@@ -315,8 +318,9 @@ TEST_F(AssignKeyRangeToZoneTestFixture, MaxThatIsAShardKeyPrefixShouldConvertToF
     CollectionType shardedCollection(
         ns, OID::gen(), Timestamp(1, 1), Date_t::now(), UUID::gen(), BSON("x" << 1 << "y" << 1));
 
-    ASSERT_OK(insertToConfigCollection(
-        operationContext(), CollectionType::ConfigNS, shardedCollection.toBSON()));
+    ASSERT_OK(insertToConfigCollection(operationContext(),
+                                       NamespaceString::kConfigsvrCollectionsNamespace,
+                                       shardedCollection.toBSON()));
 
     const ChunkRange newRange(BSON("x" << 0 << "y" << 0), BSON("x" << 10));
     ShardingCatalogManager::get(operationContext())
@@ -367,8 +371,9 @@ TEST_F(AssignKeyRangeToZoneTestFixture, MinMaxThatIsAShardKeyPrefixShouldSucceed
     CollectionType shardedCollection(
         ns, OID::gen(), Timestamp(1, 1), Date_t::now(), UUID::gen(), BSON("x" << 1 << "y" << 1));
 
-    ASSERT_OK(insertToConfigCollection(
-        operationContext(), CollectionType::ConfigNS, shardedCollection.toBSON()));
+    ASSERT_OK(insertToConfigCollection(operationContext(),
+                                       NamespaceString::kConfigsvrCollectionsNamespace,
+                                       shardedCollection.toBSON()));
 
     const ChunkRange newRange(BSON("x" << 0 << "y" << 0), BSON("x" << 10 << "y" << 10));
     ShardingCatalogManager::get(operationContext())
@@ -418,8 +423,9 @@ TEST_F(AssignKeyRangeToZoneTestFixture, TimeseriesCollMustHaveTimeKeyRangeMinKey
     timeseriesFields.setTimeseriesOptions(timeseriesOptions);
     shardedCollection.setTimeseriesFields(timeseriesFields);
 
-    ASSERT_OK(insertToConfigCollection(
-        operationContext(), CollectionType::ConfigNS, shardedCollection.toBSON()));
+    ASSERT_OK(insertToConfigCollection(operationContext(),
+                                       NamespaceString::kConfigsvrCollectionsNamespace,
+                                       shardedCollection.toBSON()));
 
     const ChunkRange newRange1(BSON(metaField << 1 << controlTimeField << 1),
                                BSON(metaField << 10 << controlTimeField << 10));
@@ -569,8 +575,9 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewRangeOverlappingWithDifferentNSShou
                                      UUID::gen(),
                                      BSON("x" << 1));
 
-    ASSERT_OK(insertToConfigCollection(
-        operationContext(), CollectionType::ConfigNS, shardedCollection.toBSON()));
+    ASSERT_OK(insertToConfigCollection(operationContext(),
+                                       NamespaceString::kConfigsvrCollectionsNamespace,
+                                       shardedCollection.toBSON()));
 
     ShardingCatalogManager::get(operationContext())
         ->assignKeyRangeToZone(operationContext(),
@@ -789,8 +796,9 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveWithPartialMinPrefixShouldRemove
     CollectionType shardedCollection(
         ns, OID::gen(), Timestamp(1, 1), Date_t::now(), UUID::gen(), BSON("x" << 1 << "y" << 1));
 
-    ASSERT_OK(insertToConfigCollection(
-        operationContext(), CollectionType::ConfigNS, shardedCollection.toBSON()));
+    ASSERT_OK(insertToConfigCollection(operationContext(),
+                                       NamespaceString::kConfigsvrCollectionsNamespace,
+                                       shardedCollection.toBSON()));
 
     const ChunkRange existingRange(fromjson("{ x: 0, y: { $minKey: 1 }}"),
                                    BSON("x" << 10 << "y" << 10));
@@ -812,8 +820,9 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveWithPartialMaxPrefixShouldRemove
     CollectionType shardedCollection(
         ns, OID::gen(), Timestamp(1, 1), Date_t::now(), UUID::gen(), BSON("x" << 1 << "y" << 1));
 
-    ASSERT_OK(insertToConfigCollection(
-        operationContext(), CollectionType::ConfigNS, shardedCollection.toBSON()));
+    ASSERT_OK(insertToConfigCollection(operationContext(),
+                                       NamespaceString::kConfigsvrCollectionsNamespace,
+                                       shardedCollection.toBSON()));
 
     const ChunkRange existingRange(BSON("x" << 0 << "y" << 0),
                                    fromjson("{ x: 10, y: { $minKey: 1 }}"));

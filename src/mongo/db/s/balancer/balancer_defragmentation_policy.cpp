@@ -1582,7 +1582,7 @@ void BalancerDefragmentationPolicy::_persistPhaseUpdate(OperationContext* opCtx,
                                                         DefragmentationPhaseEnum phase,
                                                         const UUID& uuid) {
     DBDirectClient dbClient(opCtx);
-    write_ops::UpdateCommandRequest updateOp(CollectionType::ConfigNS);
+    write_ops::UpdateCommandRequest updateOp(NamespaceString::kConfigsvrCollectionsNamespace);
     updateOp.setUpdates({[&] {
         write_ops::UpdateOpEntry entry;
         entry.setQ(BSON(CollectionType::kUuidFieldName << uuid));
@@ -1618,7 +1618,7 @@ void BalancerDefragmentationPolicy::_clearDefragmentationState(OperationContext*
 
     // Clear defragmentation phase and defragmenting flag from collection
     write_ops::checkWriteErrors(dbClient.update(write_ops::UpdateCommandRequest(
-        CollectionType::ConfigNS, {[&] {
+        NamespaceString::kConfigsvrCollectionsNamespace, {[&] {
             write_ops::UpdateOpEntry entry;
             entry.setQ(BSON(CollectionType::kUuidFieldName << uuid));
             entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(BSON(

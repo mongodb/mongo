@@ -178,9 +178,10 @@ TEST_F(ReshardingCoordinatorServiceUtilTest,
                     coordinatorDoc.getTempReshardingNss(), SerializationContext::stateDefault()));
             BSONObj expectedDeletes = BSON("q" << expectedQuery << "limit" << 1);
 
-            BSONObj expectedBSON = BSON(
-                "delete" << CollectionType::ConfigNS.coll() << "bypassDocumentValidation" << false
-                         << "ordered" << true << "deletes" << BSON_ARRAY(expectedDeletes));
+            BSONObj expectedBSON =
+                BSON("delete" << NamespaceString::kConfigsvrCollectionsNamespace.coll()
+                              << "bypassDocumentValidation" << false << "ordered" << true
+                              << "deletes" << BSON_ARRAY(expectedDeletes));
 
             auto requestBSON = request.toBSON();
             ASSERT_BSONOBJ_EQ(requestBSON, expectedBSON);
@@ -216,7 +217,7 @@ TEST_F(ReshardingCoordinatorServiceUtilTest,
 TEST_F(ReshardingCoordinatorServiceUtilTest,
        AssertResultIsValidForWriteToConfigCollectionsForTempNssTestDeleteRequest) {
     auto request = BatchedCommandRequest::buildDeleteOp(
-        CollectionType::ConfigNS,
+        NamespaceString::kConfigsvrCollectionsNamespace,
         BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
                  NamespaceString::createNamespaceString_forTest("db.foo"),
                  SerializationContext::stateDefault())),
@@ -242,7 +243,7 @@ TEST_F(ReshardingCoordinatorServiceUtilTest,
 TEST_F(ReshardingCoordinatorServiceUtilTest,
        AssertResultIsValidForWriteToConfigCollectionsForTempNssTestUpdateRequest) {
     auto request = BatchedCommandRequest::buildUpdateOp(
-        CollectionType::ConfigNS,
+        NamespaceString::kConfigsvrCollectionsNamespace,
         BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
                  NamespaceString::createNamespaceString_forTest("db.foo"),
                  SerializationContext::stateDefault())),
@@ -271,7 +272,8 @@ TEST_F(ReshardingCoordinatorServiceUtilTest,
 TEST_F(ReshardingCoordinatorServiceUtilTest,
        AssertResultIsValidForWriteToConfigCollectionsForTempNssTestInsertRequest) {
     auto request = BatchedCommandRequest::buildInsertOp(
-        CollectionType::ConfigNS, std::vector<BSONObj>{BSON("key" << 1 << "value" << 2)});
+        NamespaceString::kConfigsvrCollectionsNamespace,
+        std::vector<BSONObj>{BSON("key" << 1 << "value" << 2)});
     BSONObj result;
 
     // We do not need to add anything to the result because we do not validate the result on insert.

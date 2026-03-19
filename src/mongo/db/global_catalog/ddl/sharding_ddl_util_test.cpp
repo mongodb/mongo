@@ -90,7 +90,7 @@ private:
         client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace,
                              {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
         client.createCollection(NamespaceString::kConfigReshardingOperationsNamespace);
-        client.createCollection(CollectionType::ConfigNS);
+        client.createCollection(NamespaceString::kConfigsvrCollectionsNamespace);
 
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
         TransactionCoordinatorService::get(operationContext())

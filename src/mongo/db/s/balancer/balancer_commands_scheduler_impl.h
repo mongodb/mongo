@@ -194,7 +194,7 @@ public:
         updateCmd.append("$set", BSON("noBalance" << true));
 
         const auto updateOp = BatchedCommandRequest::buildUpdateOp(
-            CollectionType::ConfigNS,
+            NamespaceString::kConfigsvrCollectionsNamespace,
             BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
                      getNameSpace(), SerializationContext::stateDefault())) /* query */,
             updateCmd.obj() /* update */,

@@ -119,7 +119,8 @@ TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
             auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
             // Ensure the query is correct
-            ASSERT_EQ(query->getNamespaceOrUUID().nss(), CollectionType::ConfigNS);
+            ASSERT_EQ(query->getNamespaceOrUUID().nss(),
+                      NamespaceString::kConfigsvrCollectionsNamespace);
             ASSERT_BSONOBJ_EQ(
                 query->getFilter(),
                 BSON(CollectionType::kNssFieldName << expectedColl.getNss().ns_forTest()));
@@ -831,7 +832,8 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
         auto opMsg = static_cast<OpMsgRequest>(request);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->getNamespaceOrUUID().nss(), CollectionType::ConfigNS);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss(),
+                  NamespaceString::kConfigsvrCollectionsNamespace);
         ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
 
@@ -887,7 +889,8 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsWithDb) {
         auto opMsg = static_cast<OpMsgRequest>(request);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->getNamespaceOrUUID().nss(), CollectionType::ConfigNS);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss(),
+                  NamespaceString::kConfigsvrCollectionsNamespace);
         {
             BSONObjBuilder b;
             b.appendRegex(CollectionType::kNssFieldName, "^test\\.");
@@ -929,7 +932,8 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsInvalidCollectionType) {
         auto opMsg = static_cast<OpMsgRequest>(request);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->getNamespaceOrUUID().nss(), CollectionType::ConfigNS);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss(),
+                  NamespaceString::kConfigsvrCollectionsNamespace);
         {
             BSONObjBuilder b;
             b.appendRegex(CollectionType::kNssFieldName, "^test\\.");

@@ -115,7 +115,8 @@ ExecutorFuture<void> SetAllowMigrationsCoordinator::_runImpl(
         const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
         BatchedCommandRequest updateRequest([&]() {
-            write_ops::UpdateCommandRequest updateOp(CollectionType::ConfigNS);
+            write_ops::UpdateCommandRequest updateOp(
+                NamespaceString::kConfigsvrCollectionsNamespace);
             updateOp.setUpdates({[&] {
                 write_ops::UpdateOpEntry entry;
                 entry.setQ(BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(

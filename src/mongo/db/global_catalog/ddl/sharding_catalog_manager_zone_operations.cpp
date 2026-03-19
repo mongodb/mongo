@@ -153,7 +153,7 @@ ChunkRange includeFullShardKey(OperationContext* opCtx,
                 opCtx,
                 kConfigPrimarySelector,
                 repl::ReadConcernLevel::kLocalReadConcern,
-                CollectionType::ConfigNS,
+                NamespaceString::kConfigsvrCollectionsNamespace,
                 BSON(CollectionType::kNssFieldName
                      << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
                      << CollectionType::kUnsplittableFieldName << BSON("$ne" << true)),

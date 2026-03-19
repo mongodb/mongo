@@ -329,7 +329,7 @@ void ShardingTestFixture::expectUpdateCollection(const HostAndPort& expectedHost
 
         const auto opMsgRequest = static_cast<OpMsgRequest>(request);
         const auto updateOp = UpdateOp::parse(opMsgRequest);
-        ASSERT_EQUALS(CollectionType::ConfigNS, updateOp.getNamespace());
+        ASSERT_EQUALS(NamespaceString::kConfigsvrCollectionsNamespace, updateOp.getNamespace());
 
         const auto& updates = updateOp.getUpdates();
         ASSERT_EQUALS(1U, updates.size());

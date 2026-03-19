@@ -182,7 +182,7 @@ protected:
 
         const UUID& uuid = chunkList.at(0).getCollectionUUID();
         ASSERT_OK(updateToConfigCollection(operationContext(),
-                                           CollectionType::ConfigNS,
+                                           NamespaceString::kConfigsvrCollectionsNamespace,
                                            BSON(CollectionType::kUuidFieldName << uuid),
                                            updateClause,
                                            false));
@@ -209,7 +209,8 @@ protected:
 
     BSONObj getConfigCollectionEntry(const UUID& uuid) {
         DBDirectClient client(operationContext());
-        FindCommandRequest findRequest{NamespaceStringOrUUID{CollectionType::ConfigNS}};
+        FindCommandRequest findRequest{
+            NamespaceStringOrUUID{NamespaceString::kConfigsvrCollectionsNamespace}};
         findRequest.setFilter(BSON(CollectionType::kUuidFieldName << uuid));
         auto cursor = client.find(std::move(findRequest));
         if (!cursor || !cursor->more())
@@ -288,7 +289,7 @@ protected:
         const UUID& uuid,
         boost::optional<DefragmentationPhaseEnum> expectedPhase) {
         auto configDoc = findOneOnConfigCollection(opCtx,
-                                                   CollectionType::ConfigNS,
+                                                   NamespaceString::kConfigsvrCollectionsNamespace,
                                                    BSON(CollectionType::kUuidFieldName << uuid))
                              .getValue();
         if (expectedPhase.has_value()) {
@@ -345,7 +346,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestAddCollectionWhenCollectionRemoved
     _defragmentationPolicy.startCollectionDefragmentations(operationContext());
     ASSERT_FALSE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
     auto configDoc = findOneOnConfigCollection(operationContext(),
-                                               CollectionType::ConfigNS,
+                                               NamespaceString::kConfigsvrCollectionsNamespace,
                                                BSON(CollectionType::kUuidFieldName << kUuid1));
     ASSERT_EQ(configDoc.getStatus(), Status(ErrorCodes::NoMatchingDocument, "No document found"));
 }
@@ -520,7 +521,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestRemoveCollectionEndsDefragmentatio
 
     // Remove collection entry from config.collections
     ASSERT_OK(deleteToConfigCollection(
-        operationContext(), CollectionType::ConfigNS, coll.toBSON(), false));
+        operationContext(), NamespaceString::kConfigsvrCollectionsNamespace, coll.toBSON(), false));
 
     // getCollection should fail with NamespaceNotFound and end defragmentation on the collection.
     nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());

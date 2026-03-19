@@ -665,7 +665,7 @@ TEST_F(BalancerChunkSelectionTest, DontSelectChunksFromCollectionsWithBalancingD
 
     // Disable balancing on collection 1
     ASSERT_OK(updateToConfigCollection(operationContext(),
-                                       CollectionType::ConfigNS,
+                                       NamespaceString::kConfigsvrCollectionsNamespace,
                                        BSON(CollectionType::kUuidFieldName << uuid1),
                                        BSON("$set" << BSON("noBalance" << true)),
                                        false));

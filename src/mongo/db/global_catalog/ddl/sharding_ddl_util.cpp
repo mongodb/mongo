@@ -170,7 +170,7 @@ void deleteCollection(OperationContext* opCtx,
                  << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
                  << CollectionType::kUuidFieldName << uuid);
 
-        write_ops::DeleteCommandRequest deleteOp(CollectionType::ConfigNS);
+        write_ops::DeleteCommandRequest deleteOp(NamespaceString::kConfigsvrCollectionsNamespace);
         deleteOp.setDeletes({[&]() {
             write_ops::DeleteOpEntry entry;
             entry.setMulti(false);
@@ -514,7 +514,7 @@ bool checkAllowMigrations(OperationContext* opCtx, const NamespaceString& nss) {
                             opCtx,
                             ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet{}),
                             repl::ReadConcernLevel::kMajorityReadConcern,
-                            CollectionType::ConfigNS,
+                            NamespaceString::kConfigsvrCollectionsNamespace,
                             BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
                                      nss, SerializationContext::stateDefault())),
                             BSONObj(),
@@ -715,7 +715,8 @@ std::vector<BatchedCommandRequest> getOperationsToCreateOrShardCollectionOnShard
         return wcb;
     }());
 
-    write_ops::UpdateCommandRequest upsertCollection(CollectionType::ConfigNS);
+    write_ops::UpdateCommandRequest upsertCollection(
+        NamespaceString::kConfigsvrCollectionsNamespace);
     upsertCollection.setUpdates({[&] {
         auto updateQuery =
             BSON(CollectionType::kNssFieldName
@@ -1007,7 +1008,7 @@ bool deleteTrackedCollectionInTransaction(const txn_api::TransactionClient& txnC
              << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
              << CollectionType::kUuidFieldName << *uuid);
 
-    write_ops::DeleteCommandRequest deleteOp(CollectionType::ConfigNS);
+    write_ops::DeleteCommandRequest deleteOp(NamespaceString::kConfigsvrCollectionsNamespace);
     deleteOp.setDeletes({[&]() {
         write_ops::DeleteOpEntry entry;
         entry.setMulti(false);
@@ -1050,7 +1051,7 @@ void upsertTrackedCollectionInTransaction(const txn_api::TransactionClient& txnC
     auto query = BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
                           collType.getNss(), SerializationContext::stateDefault()));
 
-    write_ops::UpdateCommandRequest updateOp(CollectionType::ConfigNS);
+    write_ops::UpdateCommandRequest updateOp(NamespaceString::kConfigsvrCollectionsNamespace);
     updateOp.setUpdates({[&] {
         write_ops::UpdateOpEntry entry;
         entry.setQ(query);

@@ -208,9 +208,9 @@ AggregateCommandRequest createInitPlacementHistoryAggregationRequest(
     const auto kTimestamp = std::string{NamespacePlacementType::kTimestampFieldName};
 
     auto pipeline = PipelineBuilder(opCtx,
-                                    CollectionType::ConfigNS,
+                                    NamespaceString::kConfigsvrCollectionsNamespace,
                                     {NamespaceString::kConfigsvrChunksNamespace,
-                                     CollectionType::ConfigNS,
+                                     NamespaceString::kConfigsvrCollectionsNamespace,
                                      NamespaceString::kConfigDatabasesNamespace,
                                      NamespaceString::kConfigsvrPlacementHistoryNamespace});
 

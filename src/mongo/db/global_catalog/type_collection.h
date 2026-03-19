@@ -139,9 +139,6 @@ public:
     using CollectionTypeBase::setUuid;
     using CollectionTypeBase::toBSON;
 
-    // Name of the collections collection in the config server.
-    static const NamespaceString ConfigNS;
-
     CollectionType(NamespaceString nss,
                    OID epoch,
                    Timestamp creationTime,

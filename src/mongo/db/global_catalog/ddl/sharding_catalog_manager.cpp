@@ -534,9 +534,10 @@ Status ShardingCatalogManager::_initConfigCollections(OperationContext* opCtx) {
     // collection for the first time) but not in yet in the committed snapshot).
     DBDirectClient client(opCtx);
 
-    BSONObj cmd = BSON("create" << CollectionType::ConfigNS.coll());
+    BSONObj cmd = BSON("create" << NamespaceString::kConfigsvrCollectionsNamespace.coll());
     BSONObj result;
-    const bool ok = client.runCommand(CollectionType::ConfigNS.dbName(), cmd, result);
+    const bool ok =
+        client.runCommand(NamespaceString::kConfigsvrCollectionsNamespace.dbName(), cmd, result);
     if (!ok) {  // create returns error NamespaceExists if collection already exists
         Status status = getStatusFromCommandResult(result);
         if (status != ErrorCodes::NamespaceExists) {

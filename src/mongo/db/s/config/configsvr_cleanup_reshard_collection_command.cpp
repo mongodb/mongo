@@ -86,7 +86,7 @@ auto constructFinalMetadataRemovalUpdateOperation(OperationContext* opCtx,
 
     auto update = BSON("$unset" << collEntryFieldsToUnset << "$set" << collEntryFieldsToUpdate);
 
-    return BatchedCommandRequest::buildUpdateOp(CollectionType::ConfigNS,
+    return BatchedCommandRequest::buildUpdateOp(NamespaceString::kConfigsvrCollectionsNamespace,
                                                 query,
                                                 update,
                                                 false,  // upsert
@@ -122,7 +122,10 @@ public:
                     opCtx, ns(), [&](OperationContext* opCtx, TxnNumber txnNumber) {
                         auto update = constructFinalMetadataRemovalUpdateOperation(opCtx, ns());
                         auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
-                            opCtx, CollectionType::ConfigNS, update, txnNumber);
+                            opCtx,
+                            NamespaceString::kConfigsvrCollectionsNamespace,
+                            update,
+                            txnNumber);
                     });
 
             auto collEntry =

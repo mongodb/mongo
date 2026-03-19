@@ -327,7 +327,7 @@ StatusWith<std::pair<CollectionType, ChunkVersion>> getCollectionAndVersion(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kLocalReadConcern,
-        CollectionType::ConfigNS,
+        NamespaceString::kConfigsvrCollectionsNamespace,
         BSON(CollectionType::kNssFieldName
              << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
         {},
@@ -398,7 +398,7 @@ void bumpCollectionMinorVersion(OperationContext* opCtx,
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kLocalReadConcern,
-        CollectionType::ConfigNS,
+        NamespaceString::kConfigsvrCollectionsNamespace,
         BSON(CollectionType::kNssFieldName
              << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
         {},
@@ -1522,7 +1522,7 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kLocalReadConcern,
-        CollectionType::ConfigNS,
+        NamespaceString::kConfigsvrCollectionsNamespace,
         BSON(CollectionType::kNssFieldName
              << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
         {},
@@ -1929,7 +1929,7 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kLocalReadConcern,
-        CollectionType::ConfigNS,
+        NamespaceString::kConfigsvrCollectionsNamespace,
         BSON(CollectionType::kNssFieldName
              << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
         {},
@@ -2055,7 +2055,7 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             repl::ReadConcernLevel::kLocalReadConcern,
-            CollectionType::ConfigNS,
+            NamespaceString::kConfigsvrCollectionsNamespace,
             BSON(CollectionType::kEpochFieldName << version.epoch()),
             {} /* sort */,
             1));
@@ -2286,7 +2286,7 @@ void ShardingCatalogManager::splitOrMarkJumbo(OperationContext* opCtx,
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                 repl::ReadConcernLevel::kLocalReadConcern,
-                CollectionType::ConfigNS,
+                NamespaceString::kConfigsvrCollectionsNamespace,
                 BSON(CollectionType::kNssFieldName
                      << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
                 {},
@@ -2360,7 +2360,8 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
     auto updateCollectionAndChunkFn = [allowMigrations, &nss, &collectionUUID](
                                           const txn_api::TransactionClient& txnClient,
                                           ExecutorPtr txnExec) {
-        write_ops::UpdateCommandRequest updateCollOp(CollectionType::ConfigNS);
+        write_ops::UpdateCommandRequest updateCollOp(
+            NamespaceString::kConfigsvrCollectionsNamespace);
         updateCollOp.setUpdates([&] {
             write_ops::UpdateOpEntry entry;
             const auto update = allowMigrations
@@ -2385,7 +2386,7 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
                               << updateCollResponse.getN(),
                 updateCollResponse.getN() == 1);
 
-        FindCommandRequest collQuery{CollectionType::ConfigNS};
+        FindCommandRequest collQuery{NamespaceString::kConfigsvrCollectionsNamespace};
         collQuery.setFilter(BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
                                      nss, SerializationContext::stateDefault())));
         collQuery.setLimit(1);

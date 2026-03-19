@@ -271,7 +271,7 @@ void refineCollectionShardKeyInTxn(OperationContext* opCtx,
 
     auto updateCollectionAndChunksFn = [&](const txn_api::TransactionClient& txnClient,
                                            ExecutorPtr txnExec) -> SemiFuture<void> {
-        FindCommandRequest collQuery{CollectionType::ConfigNS};
+        FindCommandRequest collQuery{NamespaceString::kConfigsvrCollectionsNamespace};
         BSONObjBuilder builder;
         builder.append(CollectionType::kNssFieldName,
                        NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
@@ -299,7 +299,7 @@ void refineCollectionShardKeyInTxn(OperationContext* opCtx,
 
         // Update the config.collections entry for the given namespace.
         auto catalogUpdateRequest = BatchedCommandRequest::buildUpdateOp(
-            CollectionType::ConfigNS,
+            NamespaceString::kConfigsvrCollectionsNamespace,
             BSON(CollectionType::kNssFieldName
                  << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
             collType.toBSON(),
@@ -520,19 +520,20 @@ void ShardingCatalogManager::configureCollectionBalancing(
         Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
         withTransaction(opCtx,
-                        CollectionType::ConfigNS,
+                        NamespaceString::kConfigsvrCollectionsNamespace,
                         [this, &nss, &update](OperationContext* opCtx, TxnNumber txnNumber) {
                             const auto query = BSON(
                                 CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
                                     nss, SerializationContext::stateDefault()));
                             const auto res = writeToConfigDocumentInTxn(
                                 opCtx,
-                                CollectionType::ConfigNS,
-                                BatchedCommandRequest::buildUpdateOp(CollectionType::ConfigNS,
-                                                                     query,
-                                                                     update /* update */,
-                                                                     false /* upsert */,
-                                                                     false /* multi */),
+                                NamespaceString::kConfigsvrCollectionsNamespace,
+                                BatchedCommandRequest::buildUpdateOp(
+                                    NamespaceString::kConfigsvrCollectionsNamespace,
+                                    query,
+                                    update /* update */,
+                                    false /* upsert */,
+                                    false /* multi */),
                                 txnNumber);
                             const auto numDocsModified = UpdateOp::parseResponse(res).getN();
                             uassert(ErrorCodes::NamespaceNotSharded,
@@ -587,7 +588,7 @@ void ShardingCatalogManager::updateTimeSeriesBucketingParameters(
 
     withTransaction(
         opCtx,
-        CollectionType::ConfigNS,
+        NamespaceString::kConfigsvrCollectionsNamespace,
         [this, &nss, &timeseriesParameters, &bucketsMayHaveMixedSchemaData, &shardIds](
             OperationContext* opCtx, TxnNumber txnNumber) {
             auto granularityFieldName = CollectionType::kTimeseriesFieldsFieldName + "." +
@@ -639,9 +640,9 @@ void ShardingCatalogManager::updateTimeSeriesBucketingParameters(
 
             writeToConfigDocumentInTxn(
                 opCtx,
-                CollectionType::ConfigNS,
+                NamespaceString::kConfigsvrCollectionsNamespace,
                 BatchedCommandRequest::buildUpdateOp(
-                    CollectionType::ConfigNS,
+                    NamespaceString::kConfigsvrCollectionsNamespace,
                     BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
                              nss, SerializationContext::stateDefault())) /* query */,
                     update,

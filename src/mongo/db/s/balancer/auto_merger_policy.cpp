@@ -284,8 +284,8 @@ AutoMergerPolicy::_getNamespacesWithMergeableChunksPerShard(OperationContext* op
         ResolvedNamespaceMap resolvedNamespaces;
         resolvedNamespaces[NamespaceString::kConfigsvrChunksNamespace] = {
             NamespaceString::kConfigsvrChunksNamespace, std::vector<BSONObj>()};
-        resolvedNamespaces[CollectionType::ConfigNS] = {CollectionType::ConfigNS,
-                                                        std::vector<BSONObj>()};
+        resolvedNamespaces[NamespaceString::kConfigsvrCollectionsNamespace] = {
+            NamespaceString::kConfigsvrCollectionsNamespace, std::vector<BSONObj>()};
 
         DocumentSourceContainer stages;
         auto expCtx = ExpressionContextBuilder{}
@@ -355,8 +355,8 @@ AutoMergerPolicy::_getNamespacesWithMergeableChunksPerShard(OperationContext* op
             BSON("$unwind" << BSON("path" << "$chunks")).firstElement(), expCtx));
 
         auto pipeline = Pipeline::create(std::move(stages), expCtx);
-        auto aggRequest =
-            AggregateCommandRequest(CollectionType::ConfigNS, pipeline->serializeToBson());
+        auto aggRequest = AggregateCommandRequest(NamespaceString::kConfigsvrCollectionsNamespace,
+                                                  pipeline->serializeToBson());
         aggRequest.setReadConcern(repl::ReadConcernArgs::kMajority);
 
         auto cursor = uassertStatusOKWithContext(

@@ -156,7 +156,7 @@ protected:
         client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace,
                              {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
         client.createCollection(NamespaceString::kConfigReshardingOperationsNamespace);
-        client.createCollection(CollectionType::ConfigNS);
+        client.createCollection(NamespaceString::kConfigsvrCollectionsNamespace);
         client.createIndex(TagsType::ConfigNS, BSON("ns" << 1 << "min" << 1));
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
         TransactionCoordinatorService::get(operationContext())
@@ -321,7 +321,8 @@ protected:
             reshardingFields,
             std::move(epoch),
             opCtx->getServiceContext()->getPreciseClockSource()->now());
-        client.insert(CollectionType::ConfigNS, originalNssCatalogEntry.toBSON());
+        client.insert(NamespaceString::kConfigsvrCollectionsNamespace,
+                      originalNssCatalogEntry.toBSON());
 
         auto tempNssCatalogEntry =
             createTempReshardingCollectionType(opCtx,
@@ -329,7 +330,8 @@ protected:
                                                ChunkVersion({OID::gen(), Timestamp(1, 2)}, {1, 1}),
                                                BSONObj(),
                                                boost::none);
-        client.insert(CollectionType::ConfigNS, tempNssCatalogEntry.toBSON());
+        client.insert(NamespaceString::kConfigsvrCollectionsNamespace,
+                      tempNssCatalogEntry.toBSON());
 
         return coordinatorDoc;
     }
@@ -431,8 +433,8 @@ protected:
         CollectionType expectedCollType,
         const ReshardingCoordinatorDocument& expectedCoordinatorDoc) {
         DBDirectClient client(opCtx);
-        CollectionType onDiskEntry(
-            client.findOne(CollectionType::ConfigNS, BSON("_id" << _originalNss.ns_forTest())));
+        CollectionType onDiskEntry(client.findOne(NamespaceString::kConfigsvrCollectionsNamespace,
+                                                  BSON("_id" << _originalNss.ns_forTest())));
 
         ASSERT_EQUALS(onDiskEntry.getAllowMigrations(), expectedCollType.getAllowMigrations());
 
@@ -491,7 +493,8 @@ protected:
     void assertTemporaryCollectionCatalogEntryMatchesExpected(
         OperationContext* opCtx, boost::optional<CollectionType> expectedCollType) {
         DBDirectClient client(opCtx);
-        auto doc = client.findOne(CollectionType::ConfigNS, BSON("_id" << _tempNss.ns_forTest()));
+        auto doc = client.findOne(NamespaceString::kConfigsvrCollectionsNamespace,
+                                  BSON("_id" << _tempNss.ns_forTest()));
         if (!expectedCollType) {
             ASSERT(doc.isEmpty());
             return;
@@ -686,7 +689,8 @@ protected:
             reshardingFields,
             _originalEpoch,
             opCtx->getServiceContext()->getPreciseClockSource()->now());
-        client.insert(CollectionType::ConfigNS, originalNssCatalogEntry.toBSON());
+        client.insert(NamespaceString::kConfigsvrCollectionsNamespace,
+                      originalNssCatalogEntry.toBSON());
 
         client.createCollection(NamespaceString::kConfigsvrChunksNamespace);
         client.createCollection(TagsType::ConfigNS);

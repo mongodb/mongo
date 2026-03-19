@@ -513,7 +513,7 @@ void updateConfigCollectionsForOriginalNss(OperationContext* opCtx,
         opCtx, coordinatorDoc, newCollectionEpoch, newCollectionTimestamp);
 
     auto request = BatchedCommandRequest::buildUpdateOp(
-        CollectionType::ConfigNS,
+        NamespaceString::kConfigsvrCollectionsNamespace,
         BSON(CollectionType::kNssFieldName
              << NamespaceStringUtil::serialize(coordinatorDoc.getSourceNss(),
                                                SerializationContext::stateDefault())),  // query
@@ -523,7 +523,7 @@ void updateConfigCollectionsForOriginalNss(OperationContext* opCtx,
     );
 
     auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
-        opCtx, CollectionType::ConfigNS, request, txnNumber);
+        opCtx, NamespaceString::kConfigsvrCollectionsNamespace, request, txnNumber);
 
     assertNumDocsMatchedEqualsExpected(request, res, 1 /* expected */);
 }
@@ -690,7 +690,7 @@ void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
         [&](OperationContext* opCtx, TxnNumber txnNumber) {
             auto doc = ShardingCatalogManager::get(opCtx)->findOneConfigDocumentInTxn(
                 opCtx,
-                CollectionType::ConfigNS,
+                NamespaceString::kConfigsvrCollectionsNamespace,
                 txnNumber,
                 BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
                          coordinatorDoc.getSourceNss(), SerializationContext::stateDefault())));
@@ -847,7 +847,7 @@ ReshardingCoordinatorDocument removeOrQuiesceCoordinatorDocAndRemoveReshardingFi
 
         uassertStatusOK(catalogClient->removeConfigDocuments(
             opCtx,
-            CollectionType::ConfigNS,
+            NamespaceString::kConfigsvrCollectionsNamespace,
             BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
                      coordinatorDoc.getTempReshardingNss(), SerializationContext::stateDefault())),
             resharding::kMajorityWriteConcern));
@@ -1081,7 +1081,7 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
         opCtx, coordinatorDoc, chunkVersion, collation, isUnsplittable);
 
     auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
-        opCtx, CollectionType::ConfigNS, request, txnNumber);
+        opCtx, NamespaceString::kConfigsvrCollectionsNamespace, request, txnNumber);
 
     assertResultIsValidForUpdatesAndDeletes(request, res);
 }
@@ -1098,8 +1098,9 @@ BatchedCommandRequest generateBatchedCommandRequestForConfigCollectionsForTempNs
             // Insert new entry for the temporary nss into config.collections
             auto collType = resharding::createTempReshardingCollectionType(
                 opCtx, coordinatorDoc, chunkVersion.value(), collation.value(), isUnsplittable);
-            return BatchedCommandRequest::buildInsertOp(CollectionType::ConfigNS,
-                                                        std::vector<BSONObj>{collType.toBSON()});
+            return BatchedCommandRequest::buildInsertOp(
+                NamespaceString::kConfigsvrCollectionsNamespace,
+                std::vector<BSONObj>{collType.toBSON()});
         }
         case CoordinatorStateEnum::kCloning: {
             // Update the 'state', 'donorShards', 'approxCopySize', and 'cloneTimestamp' fields
@@ -1114,7 +1115,7 @@ BatchedCommandRequest generateBatchedCommandRequestForConfigCollectionsForTempNs
             }
 
             return BatchedCommandRequest::buildUpdateOp(
-                CollectionType::ConfigNS,
+                NamespaceString::kConfigsvrCollectionsNamespace,
                 BSON(CollectionType::kNssFieldName
                      << NamespaceStringUtil::serialize(coordinatorDoc.getTempReshardingNss(),
                                                        SerializationContext::stateDefault())),
@@ -1136,7 +1137,7 @@ BatchedCommandRequest generateBatchedCommandRequestForConfigCollectionsForTempNs
         case CoordinatorStateEnum::kCommitting:
             // Remove the entry for the temporary nss
             return BatchedCommandRequest::buildDeleteOp(
-                CollectionType::ConfigNS,
+                NamespaceString::kConfigsvrCollectionsNamespace,
                 BSON(CollectionType::kNssFieldName
                      << NamespaceStringUtil::serialize(coordinatorDoc.getTempReshardingNss(),
                                                        SerializationContext::stateDefault())),
@@ -1163,7 +1164,7 @@ BatchedCommandRequest generateBatchedCommandRequestForConfigCollectionsForTempNs
             }
 
             return BatchedCommandRequest::buildUpdateOp(
-                CollectionType::ConfigNS,
+                NamespaceString::kConfigsvrCollectionsNamespace,
                 BSON(CollectionType::kNssFieldName
                      << NamespaceStringUtil::serialize(coordinatorDoc.getTempReshardingNss(),
                                                        SerializationContext::stateDefault())),

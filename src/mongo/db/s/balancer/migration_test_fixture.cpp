@@ -65,8 +65,10 @@ void MigrationTestFixture::setUpCollection(
     CollectionType coll(
         collName, version.epoch(), version.getTimestamp(), Date_t::now(), collUUID, kKeyPattern);
     coll.setTimeseriesFields(std::move(timeseriesFields));
-    ASSERT_OK(catalogClient()->insertConfigDocument(
-        operationContext(), CollectionType::ConfigNS, coll.toBSON(), kMajorityWriteConcern));
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    NamespaceString::kConfigsvrCollectionsNamespace,
+                                                    coll.toBSON(),
+                                                    kMajorityWriteConcern));
 }
 
 CollectionType MigrationTestFixture::setUpUnsplittableCollection(

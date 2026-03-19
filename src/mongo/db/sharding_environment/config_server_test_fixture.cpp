@@ -342,8 +342,8 @@ CollectionType ConfigServerTestFixture::setupCollection(
                         shardKey);
     collectionCustomizer(coll);
 
-    ASSERT_OK(
-        insertToConfigCollection(operationContext(), CollectionType::ConfigNS, coll.toBSON()));
+    ASSERT_OK(insertToConfigCollection(
+        operationContext(), NamespaceString::kConfigsvrCollectionsNamespace, coll.toBSON()));
 
     for (const auto& chunk : chunks) {
         ASSERT_OK(insertToConfigCollection(
@@ -381,8 +381,10 @@ StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(OperationContext* opC
 
 StatusWith<ChunkVersion> ConfigServerTestFixture::getCollectionPlacementVersion(
     OperationContext* opCtx, const NamespaceString& nss) {
-    auto collectionDoc = findOneOnConfigCollection(
-        opCtx, CollectionType::ConfigNS, BSON(CollectionType::kNssFieldName << nss.ns_forTest()));
+    auto collectionDoc =
+        findOneOnConfigCollection(opCtx,
+                                  NamespaceString::kConfigsvrCollectionsNamespace,
+                                  BSON(CollectionType::kNssFieldName << nss.ns_forTest()));
     if (!collectionDoc.isOK())
         return collectionDoc.getStatus();
 

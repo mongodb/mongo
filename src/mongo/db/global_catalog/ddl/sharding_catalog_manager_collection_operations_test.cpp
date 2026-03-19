@@ -122,7 +122,7 @@ protected:
     CollectionType getConfigCollectionEntry(NamespaceString nss) {
         return CollectionType(
             findOneOnConfigCollection(operationContext(),
-                                      CollectionType::ConfigNS,
+                                      NamespaceString::kConfigsvrCollectionsNamespace,
                                       BSON(CollectionType::kNssFieldName << nss.ns_forTest()))
                 .getValue());
     }
