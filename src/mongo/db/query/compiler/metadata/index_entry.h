@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/exec/container_size_helper.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
@@ -39,7 +40,6 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/container_size_helper.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>

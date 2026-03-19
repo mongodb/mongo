@@ -30,9 +30,9 @@
 #pragma once
 
 #include "mongo/db/commands/server_status/server_status_metric.h"
+#include "mongo/db/exec/container_size_helper.h"
 #include "mongo/db/partitioned.h"
 #include "mongo/db/query/lru_key_value.h"
-#include "mongo/util/container_size_helper.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {

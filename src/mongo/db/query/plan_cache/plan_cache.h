@@ -44,6 +44,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
+#include "mongo/db/exec/container_size_helper.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/partitioned.h"
@@ -59,7 +60,6 @@
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/container_size_helper.h"
 #include "mongo/util/time_support.h"
 
 #include <functional>

@@ -35,9 +35,9 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/exec/container_size_helper.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/container_size_helper.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>

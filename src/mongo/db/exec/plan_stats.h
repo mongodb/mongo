@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/container_size_helper.h"
 #include "mongo/db/exec/plan_stats_visitor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/pipeline/spilling/spilling_stats.h"
@@ -37,7 +38,6 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
 #include "mongo/db/query/record_id_bound.h"
-#include "mongo/util/container_size_helper.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>

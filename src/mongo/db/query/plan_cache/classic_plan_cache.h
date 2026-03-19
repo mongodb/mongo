@@ -29,13 +29,13 @@
 
 #pragma once
 
+#include "mongo/db/exec/container_size_helper.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/plan_cache/plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_info.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/container_size_helper.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>

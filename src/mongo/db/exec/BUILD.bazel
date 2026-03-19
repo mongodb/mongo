@@ -124,6 +124,7 @@ mongo_cc_unit_test(
     name = "db_exec_test",
     srcs = [
         "add_fields_projection_executor_test.cpp",
+        "container_size_helper_test.cpp",
         "exclusion_projection_executor_test.cpp",
         "find_projection_executor_test.cpp",
         "inclusion_projection_executor_test.cpp",

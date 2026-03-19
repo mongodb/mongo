@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/util/container_size_helper.h"
+#include "mongo/db/exec/container_size_helper.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"

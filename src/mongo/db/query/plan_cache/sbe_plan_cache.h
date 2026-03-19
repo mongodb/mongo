@@ -31,6 +31,7 @@
 
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/exec/container_size_helper.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/operation_context.h"
@@ -41,7 +42,6 @@
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/container_size_helper.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 

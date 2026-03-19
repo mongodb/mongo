@@ -29,9 +29,9 @@
 
 #pragma once
 
+#include "mongo/db/exec/container_size_helper.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
-#include "mongo/util/container_size_helper.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/overloaded_visitor.h"
 
