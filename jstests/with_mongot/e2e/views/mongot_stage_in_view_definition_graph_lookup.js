@@ -1,7 +1,7 @@
 /**
  * Test that $graphLookup can run on a view containing a $search or $vectorSearch stage.
  */
-import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 import {
     getAirportData,
     getAirportNameEmbeddingById,

@@ -1,4 +1,4 @@
-import {queryIDS} from "jstests/libs/fts.js";
+import {queryIDS} from "jstests/libs/query_integration_search/fts.js";
 
 const coll = db.text_spanish;
 coll.drop();

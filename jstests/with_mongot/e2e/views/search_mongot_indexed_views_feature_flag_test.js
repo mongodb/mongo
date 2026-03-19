@@ -3,7 +3,7 @@
  * feature flag is turned turned off.
  */
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {createSearchIndex, dropSearchIndex, updateSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex, dropSearchIndex, updateSearchIndex} from "jstests/libs/query_integration_search/search.js";
 
 // TODO SERVER-92932 Remove this test when 'featureFlagMongotIndexedViews' is removed.
 const hasFeatureFlagMongotIndexedViewsEnabled = assert.commandWorked(

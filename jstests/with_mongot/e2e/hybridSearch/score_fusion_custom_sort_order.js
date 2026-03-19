@@ -5,7 +5,7 @@
  * pipeline criteria specified, then codify the results as an ordered list of document ids.
  * @tags: [ featureFlagSearchHybridScoringFull, requires_fcv_82 ]
  */
-import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 import {getRentalData, getRentalSearchIndexSpec} from "jstests/with_mongot/e2e_lib/data/rentals.js";
 import {
     assertDocArrExpectedFuzzy,

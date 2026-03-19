@@ -4,7 +4,7 @@
  */
 
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
-import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 import {
     getMovieData,
     getMoviePlotEmbeddingById,

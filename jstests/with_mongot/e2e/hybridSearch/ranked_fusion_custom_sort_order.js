@@ -6,7 +6,7 @@
  * @tags: [ featureFlagRankFusionBasic, requires_fcv_81 ]
  */
 
-import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 import {getRentalData, getRentalSearchIndexSpec} from "jstests/with_mongot/e2e_lib/data/rentals.js";
 import {
     assertDocArrExpectedFuzzy,

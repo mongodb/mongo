@@ -5,7 +5,7 @@
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {updateSearchIndex} from "jstests/libs/search.js";
+import {updateSearchIndex} from "jstests/libs/query_integration_search/search.js";
 import {
     createSearchIndexesAndExecuteTests,
     validateSearchExplain,

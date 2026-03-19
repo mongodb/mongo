@@ -17,7 +17,7 @@
  * ]
  */
 import {setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
-import {createSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex} from "jstests/libs/query_integration_search/search.js";
 
 export const $config = (function () {
     // Test data configuration

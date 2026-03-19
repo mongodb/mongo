@@ -7,7 +7,7 @@
  * @tags: [ requires_fcv_81 ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const coll = testDb.underlyingSourceCollection;

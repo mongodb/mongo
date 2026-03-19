@@ -2,7 +2,7 @@
  * Test the optimization where a $search/$vectorSearch/$_internalSearchIdLookup stage absorbs a pipeline skip + limit.
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 import {
     getMovieData,
     getMoviePlotEmbeddingById,

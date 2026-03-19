@@ -1,7 +1,7 @@
 /**
  * This test validates that updateSearchIndex works for standalone and sharded configurations.
  */
-import {createSearchIndex, dropSearchIndex, updateSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex, dropSearchIndex, updateSearchIndex} from "jstests/libs/query_integration_search/search.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const coll = testDb.underlyingSourceCollection;

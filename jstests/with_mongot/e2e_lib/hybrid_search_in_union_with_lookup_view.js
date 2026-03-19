@@ -7,7 +7,7 @@
  * @tags: [featureFlagSearchHybridScoringFull, requires_fcv_82]
  */
 
-import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 import {assertDocArrExpectedFuzzy} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
 const collName = jsTestName();

@@ -7,7 +7,7 @@
  *  ]
  */
 
-import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 
 const collName = jsTestName();
 const coll = db.getCollection(collName);

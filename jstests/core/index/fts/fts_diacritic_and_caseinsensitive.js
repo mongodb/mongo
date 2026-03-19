@@ -1,6 +1,6 @@
 // Integration tests for no case or diacritic options to $text query operator.
 
-import {queryIDS} from "jstests/libs/fts.js";
+import {queryIDS} from "jstests/libs/query_integration_search/fts.js";
 
 let coll = db.fts_diacritic_and_caseinsensitive;
 

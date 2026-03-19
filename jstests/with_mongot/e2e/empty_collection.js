@@ -1,5 +1,5 @@
 // This test confirms behavior when a search query is executed on an empty and non-existent collection.
-import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 
 let collName = jsTestName();
 let coll = db[collName];

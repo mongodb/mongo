@@ -8,7 +8,7 @@
  */
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 import {findMatchingLogLine} from "jstests/libs/log.js";
-import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 
 const collName = "search_profiling";
 const coll = db[collName];

@@ -11,8 +11,8 @@ import {
     expectCreateSearchIndexFails,
     expectDropSearchIndexFails,
     expectUpdateSearchIndexFails,
-} from "jstests/libs/search.js";
-import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+} from "jstests/libs/query_integration_search/search.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 
 const timeFieldName = "time";
 const metaFieldName = "tags";

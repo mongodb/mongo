@@ -6,7 +6,7 @@
  * Sigmoid and MinMaxScaler.
  */
 
-import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 import {
     getMovieData,
     getMoviePlotEmbeddingById,

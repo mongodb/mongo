@@ -1,4 +1,4 @@
-import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 import {checkForExistingIndex, datasets} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
 // Plot embeddings for 17 movies where array index corresponds to the _id of the movie, or null if

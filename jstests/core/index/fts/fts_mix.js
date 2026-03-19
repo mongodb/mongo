@@ -1,5 +1,5 @@
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
-import {getIDS, queryIDS} from "jstests/libs/fts.js";
+import {getIDS, queryIDS} from "jstests/libs/query_integration_search/fts.js";
 
 // test collection
 const tc = db.text_mix;

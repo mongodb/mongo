@@ -4,7 +4,7 @@
  * rank or other window fields, where a sort expression is required.
  * @tags: [featureFlagRankFusionFull, requires_fcv_81]
  */
-import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 import {
     getMovieData,
     getMoviePlotEmbeddingById,

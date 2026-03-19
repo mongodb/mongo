@@ -1,6 +1,6 @@
 // Integration tests for version 2 text index, ensuring that it maintains old behavior.
 
-import {queryIDS} from "jstests/libs/fts.js";
+import {queryIDS} from "jstests/libs/query_integration_search/fts.js";
 
 let coll = db.fts_index_version2;
 

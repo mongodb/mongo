@@ -1,6 +1,6 @@
 // Integration tests for {$diacriticSensitive: true} option to $text query operator.
 
-import {queryIDS} from "jstests/libs/fts.js";
+import {queryIDS} from "jstests/libs/query_integration_search/fts.js";
 
 let coll = db.fts_diacriticsensitive;
 

@@ -1,5 +1,5 @@
 // This test ensures correct error handling for the createSearchIndex shell command
-import {createSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex} from "jstests/libs/query_integration_search/search.js";
 const coll = db[jsTestName()];
 coll.drop();
 

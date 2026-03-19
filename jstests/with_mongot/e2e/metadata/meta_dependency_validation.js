@@ -26,7 +26,7 @@
 
 import {assertErrCodeAndErrMsgContains} from "jstests/aggregation/extras/utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 const collName = jsTestName();

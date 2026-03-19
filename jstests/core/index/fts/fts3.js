@@ -1,4 +1,4 @@
-import {queryIDS} from "jstests/libs/fts.js";
+import {queryIDS} from "jstests/libs/query_integration_search/fts.js";
 
 let t = db.text3;
 t.drop();

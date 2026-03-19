@@ -1,7 +1,7 @@
 // This test asserts that search e2e suites were correctly configured to spin up mongot(s) by
 // checking that the mongotHost server parameter is set. Search indexes are created and a search
 // query is ran to assert that no errors are thrown.
-import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 
 const coll = db.foo;
 coll.drop();

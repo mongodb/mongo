@@ -33,9 +33,6 @@ filters:
   - "dateutil.js":
     approvers:
       - 10gen/query-execution
-  - "fts.js":
-    approvers:
-      - 10gen/query-integration-search
   - "local_reads.js":
     approvers:
       - 10gen/query-integration-observability
@@ -54,9 +51,6 @@ filters:
   - "stats.js":
     approvers:
       - 10gen/query-integration-observability
-  - "search.js":
-    approvers:
-      - 10gen/query-integration-search
   - "shard_targeting_util.js":
     approvers:
       - 10gen/query-optimization

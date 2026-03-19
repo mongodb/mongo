@@ -2,7 +2,7 @@
  * Utility functions for creating and querying a generic vector search index.
  */
 
-import {createSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex} from "jstests/libs/query_integration_search/search.js";
 import {checkForExistingIndex} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
 /**

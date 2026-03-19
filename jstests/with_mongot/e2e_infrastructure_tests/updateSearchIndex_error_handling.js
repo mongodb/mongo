@@ -1,6 +1,6 @@
 // This test ensures correct error handling for the updateSearchIndex shell command.
 
-import {updateSearchIndex} from "jstests/libs/search.js";
+import {updateSearchIndex} from "jstests/libs/query_integration_search/search.js";
 
 const coll = db[jsTestName()];
 coll.drop();

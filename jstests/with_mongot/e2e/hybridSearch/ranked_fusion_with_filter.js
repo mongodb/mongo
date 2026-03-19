@@ -3,7 +3,7 @@
  * @tags: [ requires_fcv_81 ]
  */
 
-import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 import {
     getMovieData,
     getMoviePlotEmbeddingById,

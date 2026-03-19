@@ -1,7 +1,7 @@
 /**
  * Tests the use of $searchMeta in a subpipeline--namely, in $lookup and in $unionWith.
  */
-import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 
 const coll = db[jsTestName()];
 coll.drop();

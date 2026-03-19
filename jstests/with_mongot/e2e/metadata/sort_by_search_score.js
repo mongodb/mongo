@@ -4,7 +4,7 @@
  * window fields, where a sort expression is required.
  * @tags: [featureFlagRankFusionFull, requires_fcv_81]
  */
-import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 
 // Main testing function that runs all sub-tests.
 // Input parameter is the name of the meta field that should be sorted on

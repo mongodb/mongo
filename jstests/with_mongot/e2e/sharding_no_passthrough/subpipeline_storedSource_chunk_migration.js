@@ -10,7 +10,7 @@
  * @tags: [ requires_sharding, assumes_unsharded_collection ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 import {getShardNames} from "jstests/libs/sharded_cluster_fixture_helpers.js";
 
 const testDb = db.getSiblingDB(jsTestName());

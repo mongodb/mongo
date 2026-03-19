@@ -2,7 +2,11 @@
  * Contains common test utilities for e2e search tests involving mongot.
  */
 import {stringifyArray} from "jstests/aggregation/extras/utils.js";
-import {createSearchIndex, dropSearchIndex, waitForSearchIndexQueryable} from "jstests/libs/search.js";
+import {
+    createSearchIndex,
+    dropSearchIndex,
+    waitForSearchIndexQueryable,
+} from "jstests/libs/query_integration_search/search.js";
 import {getMovieData, getMovieDataWithEnrichedTitle} from "jstests/with_mongot/e2e_lib/data/movies.js";
 import {getRentalData} from "jstests/with_mongot/e2e_lib/data/rentals.js";
 import {assertViewAppliedCorrectly, assertViewNotApplied} from "jstests/with_mongot/e2e_lib/explain_utils.js";

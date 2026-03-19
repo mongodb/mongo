@@ -6,7 +6,7 @@
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {createSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex} from "jstests/libs/query_integration_search/search.js";
 import {
     createSearchIndexesAndExecuteTests,
     validateSearchExplain,
