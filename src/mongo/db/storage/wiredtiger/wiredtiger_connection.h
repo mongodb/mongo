@@ -102,7 +102,8 @@ public:
     /**
      * As above but does not propagate interrupts
      */
-    WiredTigerManagedSession getUninterruptibleSession(const char* config = nullptr);
+    WiredTigerManagedSession getUninterruptibleSession(const char* config = nullptr,
+                                                       bool isInternal = true);
 
     /**
      * Get the maximum number of sessions allowed in the cache.
@@ -227,6 +228,23 @@ private:
      */
     void _releaseSession(std::unique_ptr<WiredTigerSession> session);
 
+    /*
+     * Closes the given session by decrementing the appropriate session counters.
+     */
+    void _closeSession(bool isInternalSession);
+
+    /**
+     * Increments the total session count and, for internal sessions, also increments
+     * the reserved internal session count.
+     */
+    void _incrementSessionCount(bool isInternalSession);
+
+    /**
+     * Decrements the total session count and, for internal sessions, also decrements
+     * the reserved internal session count.
+     */
+    void _decrementSessionCount(bool isInternalSession);
+
     friend class WiredTigerSession;
     friend class WiredTigerManagedSession;
     WT_CONNECTION* _conn;             // not owned
@@ -261,6 +279,9 @@ private:
     stdx::mutex _prepareCommittedOrAbortedMutex;
     stdx::condition_variable _prepareCommittedOrAbortedCond;
     AtomicWord<std::uint64_t> _prepareCommitOrAbortCounter{0};
+
+    Atomic<int> _openSessions{0};
+    Atomic<int> _openUserSessions{0};
 };
 
 static constexpr char kWTRepairMsg[] =

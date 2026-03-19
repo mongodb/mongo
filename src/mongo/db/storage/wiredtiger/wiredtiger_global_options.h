@@ -60,6 +60,7 @@ public:
     double cacheSizePct;
     size_t statisticsLogDelaySecs;
     int32_t sessionMax{0};
+    int32_t reservedSessionMax{0};
     double evictionDirtyTargetGB{0};
     double evictionDirtyTriggerGB{0};
     double evictionUpdatesTriggerGB{0};

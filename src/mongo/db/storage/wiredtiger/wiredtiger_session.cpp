@@ -44,9 +44,11 @@ WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection)
 WiredTigerSession::WiredTigerSession(WiredTigerConnection* connection,
                                      uint64_t engineEpoch,
                                      uint64_t rtsEpoch,
-                                     const char* config)
+                                     const char* config,
+                                     const bool isInternal)
     : _engineEpoch(engineEpoch),
       _rtsEpoch(rtsEpoch),
+      _isInternalSession(isInternal),
       _session(connection->_openSession(this, nullptr, config)),
       _cursorGen(0),
       _cursorsOut(0),
@@ -90,6 +92,8 @@ WiredTigerSession::~WiredTigerSession() {
     if (_session) {
         invariantWTOK(_session->close(_session, nullptr), nullptr);
     }
+
+    _connection->_closeSession(_isInternalSession);
 }
 
 void WiredTigerSession::_openCursor(WT_SESSION* session,

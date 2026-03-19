@@ -35,6 +35,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_server_status.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/system_clock_source.h"
@@ -319,6 +320,100 @@ TEST(WiredTigerConnectionTest, RecordsEngineTime) {
 
     // Once returned, we have the times from the 2 cached sessions, and not the uncached one.
     ASSERT_EQ(connection->getTotalEngineTime(), Microseconds{2});
+}
+
+TEST(WiredTigerConnectionTest, ThrowsWhenCreatingMoreThanSessionMax) {
+    constexpr auto maxSessionCount = 50;
+    RAIIServerParameterControllerForTest sessionMax{"wiredTigerSessionMax", maxSessionCount};
+    RAIIServerParameterControllerForTest reservedSession{"wiredTigerReservedSessionMax", 10};
+
+    WiredTigerConnectionHarnessHelper helper("", 10);
+    WiredTigerConnection* const connection = helper.getConnection();
+
+    std::vector<std::unique_ptr<WiredTigerSession>> sessions;
+    sessions.reserve(maxSessionCount);
+
+    for (int i = 0; i < maxSessionCount; ++i) {
+        sessions.emplace_back(std::make_unique<WiredTigerSession>(connection));
+    }
+
+    ASSERT_THROWS_CODE(WiredTigerSession(connection), AssertionException, 10828100);
+}
+
+TEST(WiredTigerConnectionTest, ThrowsWhenCreatingMoreThanAllowedUserSessions) {
+    constexpr auto maxSessionCount = 50;
+    constexpr auto reservedSessionCount = 10;
+    RAIIServerParameterControllerForTest sessionMax{"wiredTigerSessionMax", maxSessionCount};
+    RAIIServerParameterControllerForTest reservedSession{"wiredTigerReservedSessionMax",
+                                                         reservedSessionCount};
+
+    WiredTigerConnectionHarnessHelper helper("", 10);
+    WiredTigerConnection* const connection = helper.getConnection();
+
+    std::vector<std::unique_ptr<WiredTigerSession>> sessions;
+    sessions.reserve(maxSessionCount);
+
+    constexpr auto maxAllowedUserSessions = maxSessionCount - reservedSessionCount;
+    for (int i = 0; i < maxAllowedUserSessions; ++i) {
+        // Create user sessions.
+        sessions.emplace_back(
+            std::make_unique<WiredTigerSession>(connection, 0, 0, nullptr, false));
+    }
+
+    ASSERT_THROWS_CODE(
+        WiredTigerSession(connection, 0, 0, nullptr, false), AssertionException, 10828101);
+}
+
+TEST(WiredTigerConnectionTest, DecrementsSessionCountWhenSessionIsDestroyed) {
+    constexpr auto maxSessionCount = 50;
+    RAIIServerParameterControllerForTest sessionMax{"wiredTigerSessionMax", maxSessionCount};
+    RAIIServerParameterControllerForTest reservedSession{"wiredTigerReservedSessionMax", 10};
+
+    WiredTigerConnectionHarnessHelper helper("", 10);
+    WiredTigerConnection* const connection = helper.getConnection();
+
+    std::vector<std::unique_ptr<WiredTigerSession>> sessions;
+    sessions.reserve(maxSessionCount);
+
+    for (int i = 0; i < maxSessionCount; ++i) {
+        sessions.emplace_back(std::make_unique<WiredTigerSession>(connection));
+    }
+
+    sessions.pop_back();
+
+    // Should not throw.
+    sessions.emplace_back(std::make_unique<WiredTigerSession>(connection));
+}
+
+TEST(WiredTigerConnectionTest, RollsBackWhenAssertionTriggers) {
+    constexpr auto maxSessionCount = 50;
+    constexpr auto reservedSessionCount = 10;
+    RAIIServerParameterControllerForTest sessionMax{"wiredTigerSessionMax", maxSessionCount};
+    RAIIServerParameterControllerForTest reservedSession{"wiredTigerReservedSessionMax",
+                                                         reservedSessionCount};
+
+    WiredTigerConnectionHarnessHelper helper("", 10);
+    WiredTigerConnection* const connection = helper.getConnection();
+
+    std::vector<std::unique_ptr<WiredTigerSession>> sessions;
+    sessions.reserve(maxSessionCount);
+
+    constexpr auto maxAllowedUserSessions = maxSessionCount - reservedSessionCount;
+    for (int i = 0; i < maxAllowedUserSessions; ++i) {
+        // Create user sessions.
+        sessions.emplace_back(
+            std::make_unique<WiredTigerSession>(connection, 0, 0, nullptr, false));
+    }
+
+    // Should decrement the counter upon unsuccessful session creation.
+    ASSERT_THROWS_CODE(
+        WiredTigerSession(connection, 0, 0, nullptr, false), AssertionException, 10828101);
+
+    // Lower the counter further to allow an additional session to be opened.
+    sessions.pop_back();
+
+    // Should not throw as the counter is now below threshold.
+    sessions.emplace_back(std::make_unique<WiredTigerSession>(connection, 0, 0, nullptr, false));
 }
 
 }  // namespace mongo

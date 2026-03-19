@@ -109,7 +109,16 @@ server_parameters:
         description: "WiredTiger session max"
         set_at: startup
         cpp_varname: "wiredTigerGlobalOptions.sessionMax"
-        default: 33000
+        default: 16000
+        validator:
+            gte: 1
+        redact: false
+
+    wiredTigerReservedSessionMax:
+        description: "Reserved WiredTiger internal session"
+        set_at: startup
+        cpp_varname: "wiredTigerGlobalOptions.reservedSessionMax"
+        default: 1000
         validator:
             gte: 1
         redact: false

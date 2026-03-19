@@ -1101,6 +1101,7 @@ TEST_F(WiredTigerKVEngineTest, CheckSessionCacheMax) {
 
     RAIIServerParameterControllerForTest sessionCacheMax{"wiredTigerSessionCacheMaxPercentage", 20};
     RAIIServerParameterControllerForTest sessionMax{"wiredTigerSessionMax", 150};
+    RAIIServerParameterControllerForTest reservedSession{"wiredTigerReservedSessionMax", 10};
     _helper->restartEngine();
 
     auto* engine = _helper->getWiredTigerKVEngine();

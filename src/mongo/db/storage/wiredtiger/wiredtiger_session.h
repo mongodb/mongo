@@ -77,11 +77,14 @@ public:
      * @param connection Wrapped WT connection
      * @param engineEpoch In which session epoch was this session instantiated.
      * @param rtsEpoch In which rollback to stable epoch was this session instantiated.
+     * @param config configuration string used to open the session with.
+     * @param isInternal Mark current session as internal if true.
      */
     WiredTigerSession(WiredTigerConnection* connection,
                       uint64_t engineEpoch,
                       uint64_t rtsEpoch,
-                      const char* config);
+                      const char* config,
+                      bool isInternal);
 
     /**
      * Creates a new WT session on the specified connection. This session will not be cached.
@@ -278,6 +281,10 @@ public:
         _tickSource = tickSource;
     }
 
+    bool isInternalSession() const {
+        return _isInternalSession;
+    }
+
 private:
     class CachedCursor {
     public:
@@ -316,6 +323,7 @@ private:
     const uint64_t _engineEpoch;
     const uint64_t _rtsEpoch;
 
+    bool _isInternalSession = true;
 
     WT_SESSION* _session;  // owned
     CursorCache _cursors;  // owned

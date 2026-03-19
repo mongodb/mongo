@@ -190,12 +190,14 @@ bool WiredTigerConnection::isEphemeral() {
 
 WiredTigerManagedSession WiredTigerConnection::getSession(OperationContext& opCtx,
                                                           const char* config) {
-    auto session = getUninterruptibleSession(config);
+    const auto isInternal = opCtx.getClient()->isInternalClient();
+    auto session = getUninterruptibleSession(config, isInternal);
     session->attachOperationContext(opCtx);
     return session;
 }
 
-WiredTigerManagedSession WiredTigerConnection::getUninterruptibleSession(const char* config) {
+WiredTigerManagedSession WiredTigerConnection::getUninterruptibleSession(const char* config,
+                                                                         const bool isInternal) {
     // We should never be able to get here after _shuttingDown is set, because no new
     // operations should be allowed to start.
     invariant(!(_shuttingDown.load() & kShuttingDownMask));
@@ -214,8 +216,8 @@ WiredTigerManagedSession WiredTigerConnection::getUninterruptibleSession(const c
     }
 
     // Outside of the cache partition lock, but on release will be put back on the cache
-    return WiredTigerManagedSession(
-        std::make_unique<WiredTigerSession>(this, _engineEpoch.load(), _rtsEpoch.load(), config));
+    return WiredTigerManagedSession(std::make_unique<WiredTigerSession>(
+        this, _engineEpoch.load(), _rtsEpoch.load(), config, isInternal));
 }
 
 int32_t WiredTigerConnection::getSessionCacheMax() const {
@@ -305,10 +307,53 @@ WT_SESSION* WiredTigerConnection::_openSessionInternal(WiredTigerSession* sessio
                                                        const char* config,
                                                        WT_CONNECTION* conn) {
     WT_SESSION* rawSession;
+
+    _incrementSessionCount(session->isInternalSession());
+    ScopeGuard rollback([&] { _decrementSessionCount(session->isInternalSession()); });
+
+    const auto sessionMax = wiredTigerGlobalOptions.sessionMax;
+    uassert(10828100,
+            str::stream() << "Exceeded configured WiredTiger session_max=" << sessionMax
+                          << " while opening a WiredTiger session",
+            _openSessions.loadRelaxed() <= sessionMax);
+
+
+    const auto reserved = wiredTigerGlobalOptions.reservedSessionMax;
+    const auto maxOpenUserSession = sessionMax - reserved;
+    if ((!session->isInternalSession()) && (_openUserSessions.loadRelaxed() > maxOpenUserSession)) {
+        uasserted(10828101,
+                  str::stream() << "Exceeded configured maximum WiredTiger user session "
+                                << "wiredTigerReservedSessionMax=" << reserved
+                                << " while opening a WiredTiger user session");
+    }
+
     uassert(8268800,
             "Failed to open a session",
             conn->open_session(conn, handler, config, &rawSession) == 0);
+
+    rollback.dismiss();
+
     return rawSession;
+}
+
+void WiredTigerConnection::_closeSession(const bool isInternalSession) {
+    _decrementSessionCount(isInternalSession);
+}
+
+void WiredTigerConnection::_incrementSessionCount(const bool isInternalSession) {
+    _openSessions.fetchAndAdd(1);
+
+    if (!isInternalSession) {
+        _openUserSessions.fetchAndAdd(1);
+    }
+}
+
+void WiredTigerConnection::_decrementSessionCount(const bool isInternalSession) {
+    _openSessions.fetchAndSubtractRelaxed(1);
+
+    if (!isInternalSession) {
+        _openUserSessions.fetchAndSubtractRelaxed(1);
+    }
 }
 
 }  // namespace mongo
