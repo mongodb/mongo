@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
+#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/views/resolved_view.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
@@ -360,6 +361,24 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipelineFromViewDefinition(
                                                 boost::none,
                                                 boost::none,
                                                 ViewInfo(_fromNs, resolvedNs, viewPipeline));
+
+    // TODO SERVER-122035 Remove this workaround once viewless timeseries collections become the
+    // default after 9.0 branching.
+    // When a $lookup resolves a sharded timeseries view, the ResolvedView may arrive with
+    // timeseriesUsesExtendedRange=false because the view was resolved on a different shard
+    // (e.g. after movePrimary relocated system.views) that never received extended-range
+    // inserts and therefore has the per-node in-memory flag unset. Check the local buckets
+    // collection, which has the authoritative flag if this shard owns the data.
+    if (resolvedNs.isTimeseriesBucketsCollection() &&
+        !_fromExpCtx->getRequiresTimeseriesExtendedRangeSupport()) {
+        auto catalog = CollectionCatalog::get(_fromExpCtx->getOperationContext());
+        auto bucketsPtr = catalog->establishConsistentCollection(
+            _fromExpCtx->getOperationContext(), resolvedNs, boost::none);
+        if (bucketsPtr && bucketsPtr->getRequiresTimeseriesExtendedRangeSupport()) {
+            _fromExpCtx->setRequiresTimeseriesExtendedRangeSupport(true);
+        }
+    }
+
     _fromExpCtx->addResolvedNamespaces(liteParsedPipeline.getInvolvedNamespaces());
 
     // Parse the new pipeline and prepare it again. We must resolve the view before entering
