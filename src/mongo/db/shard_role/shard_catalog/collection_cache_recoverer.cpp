@@ -163,6 +163,10 @@ void CollectionCacheRecoverer::start(OperationContext* opCtx, ExecutorPtr execut
     // the recovery process. This will ensure that all oplog entries that come after
     // will see the recovery process in place and enqueue themselves.
     _timestampToReadAt = repl::ReplicationCoordinator::get(opCtx)->getMyLastWrittenOpTime();
+    LOGV2_INFO(12195302,
+               "Recovering collection sharding metadata from disk",
+               "nss"_attr = _nss,
+               "recoveryTimestamp"_attr = _timestampToReadAt);
     _collMetadata =
         repl::ReplicationCoordinator::get(opCtx)
             ->registerWaiterForMajorityReadOpTime(opCtx, _timestampToReadAt)
@@ -199,8 +203,13 @@ void CollectionCacheRecoverer::start(OperationContext* opCtx, ExecutorPtr execut
 void CollectionCacheRecoverer::onOplogEntry(OperationContext* opCtx,
                                             Timestamp entryTs,
                                             const InvalidateCollectionMetadataOplogEntry& entry) {
+
+    LOGV2_INFO(12195301,
+               "Received oplog entry for invalidation",
+               "nss"_attr = _nss,
+               "timestamp"_attr = entryTs);
     stdx::lock_guard lk(_mutex);
-    if (_timestampToReadAt.getTimestamp() < entryTs) {
+    if (entryTs < _timestampToReadAt.getTimestamp()) {
         return;
     }
     _entriesToApply.emplace(entryTs, entry);
@@ -209,8 +218,12 @@ void CollectionCacheRecoverer::onOplogEntry(OperationContext* opCtx,
 void CollectionCacheRecoverer::onOplogEntry(OperationContext* opCtx,
                                             Timestamp entryTs,
                                             const CollectionShardingStateDeltaOplogEntry& entry) {
+    LOGV2_INFO(12195300,
+               "Received oplog entry for delta application",
+               "nss"_attr = _nss,
+               "timestamp"_attr = entryTs);
     stdx::lock_guard lk(_mutex);
-    if (_timestampToReadAt.getTimestamp() < entryTs) {
+    if (entryTs < _timestampToReadAt.getTimestamp()) {
         return;
     }
     _entriesToApply.emplace(entryTs, entry);

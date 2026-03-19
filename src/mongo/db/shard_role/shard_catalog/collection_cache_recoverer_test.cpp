@@ -186,10 +186,12 @@ TEST_F(RecovererFixture, CacheRecovererCanRecoverFromDiskWithConcurrentOplogEntr
     auto collMetadata = [&]() {
         recoverer.start(operationContext(), getExecutor());
         ASSERT_OK(recoverer.waitForInitialPass(operationContext()));
+        auto recoveryTimestamp =
+            repl::ReplicationCoordinator::get(operationContext())->getMyLastWrittenOpTime();
         // We now add an oplog entry that invalidates the previous recovery.
         recoverer.onOplogEntry(
             operationContext(),
-            Timestamp(Date_t::now()),
+            recoveryTimestamp.getTimestamp() + 1,
             InvalidateCollectionMetadataOplogEntry{std::string(kTestNss.coll())});
         auto collMetadata = recoverer.drainAndApply(operationContext());
         // This should've encountered an invalidate entry which triggers a new round of wait +
