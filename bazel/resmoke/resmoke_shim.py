@@ -2,6 +2,8 @@ import os
 import pathlib
 import signal
 import sys
+import tempfile
+import uuid
 from functools import cache
 
 import psutil
@@ -18,7 +20,7 @@ from buildscripts.resmokelib.logging.loggers import new_resmoke_logger
 @cache
 def get_volatile_status() -> dict:
     volatile_status = {}
-    with open("bazel/resmoke/volatile-status.txt", "rt") as f:
+    with open(os.path.join("bazel", "resmoke", "volatile-status.txt"), "rt") as f:
         for line in f:
             key, val = line.strip().split(" ", 1)[:2]
             volatile_status[key] = val
@@ -55,15 +57,35 @@ def add_evergreen_build_info(args):
 class ResmokeShimContext:
     def __init__(self):
         self.links = []
+        self.tmpdir_symlink = None
+        self.outputs_symlink = None
         self.resource_monitor = None
+
+    def create_short_symlinks(self):
+        """Create short symlinks in the original tmpdir to avoid long path issues."""
+        original_tmpdir = tempfile.gettempdir()
+
+        # Create a short symlink to TEST_TMPDIR
+        test_tempdir = os.environ.get("TEST_TMPDIR")
+        if test_tempdir:
+            self.tmpdir_symlink = os.path.join(original_tmpdir, f"resmoke_tmp_{uuid.uuid1()}")
+            os.symlink(test_tempdir, self.tmpdir_symlink)
+            self.links.append(self.tmpdir_symlink)
+
+        # Create a short symlink to TEST_UNDECLARED_OUTPUTS_DIR
+        undeclared_outputs_dir = os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR")
+        if undeclared_outputs_dir:
+            self.outputs_symlink = os.path.join(original_tmpdir, f"resmoke_out_{uuid.uuid1()}")
+            os.symlink(undeclared_outputs_dir, self.outputs_symlink)
+            self.links.append(self.outputs_symlink)
 
     def __enter__(self):
         # Use the Bazel provided TEST_TMPDIR. Note this must occur after uses of acquire_local_resource
         # which relies on a shared temporary directory among all test shards.
-        test_tempdir = os.environ.get("TEST_TMPDIR")
-        os.environ["TMPDIR"] = test_tempdir
-        os.environ["TMP"] = test_tempdir
-        os.environ["TEMP"] = test_tempdir
+        if self.tmpdir_symlink:
+            os.environ["TMPDIR"] = self.tmpdir_symlink
+            os.environ["TMP"] = self.tmpdir_symlink
+            os.environ["TEMP"] = self.tmpdir_symlink
 
         # Bazel will send SIGTERM on a test timeout. If all processes haven't terminated
         # after –-local_termination_grace_seconds (default 15s), Bazel will SIGKILL them instead.
@@ -116,9 +138,9 @@ class ResmokeShimContext:
 
 
 if __name__ == "__main__":
-    sys.argv[0] = (
-        "buildscripts/resmoke.py"  # Ensure resmoke's local invocation is printed using resmoke.py directly
-    )
+    sys.argv[0] = os.path.join(
+        "buildscripts", "resmoke.py"
+    )  # Ensure resmoke's local invocation is printed using resmoke.py directly
     resmoke_args = sys.argv
 
     # If there was an extra --suites argument added as a --test_arg in the bazel invocation, rewrite
@@ -154,19 +176,24 @@ if __name__ == "__main__":
             ]
         )
 
+    ctx = ResmokeShimContext()
+    ctx.create_short_symlinks()
+
     undeclared_output_dir = os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR")
-    resmoke_args.append(f"--taskWorkDir={undeclared_output_dir}")
-    resmoke_args.append(f"--reportFile={os.path.join(undeclared_output_dir, 'report.json')}")
-    os.chdir(undeclared_output_dir)
+
+    outputs_dir = ctx.outputs_symlink if ctx.outputs_symlink else undeclared_output_dir
+
+    resmoke_args.append(f"--taskWorkDir={outputs_dir}")
+    resmoke_args.append(f"--reportFile={os.path.join(outputs_dir, 'report.json')}")
+    os.chdir(outputs_dir)
 
     # Locally, it is nice for the data directory to preserved in the test output. However, we
     # don't want to save it in CI since we explicitly archive the data directory for failed
     # tests already. It will add to the output tree size in remote execution which is wasteful.
-    dbpath = (
-        os.environ.get("TEST_TMPDIR")
-        if "--log=evg" in resmoke_args
-        else os.path.join(undeclared_output_dir, "data")
-    )
+    if "--log=evg" in resmoke_args:
+        dbpath = ctx.tmpdir_symlink if ctx.tmpdir_symlink else os.environ.get("TEST_TMPDIR")
+    else:
+        dbpath = os.path.join(outputs_dir, "data")
     resmoke_args.append(f"--dbpathPrefix={dbpath}")
 
     if os.environ.get("TEST_SHARD_INDEX") and os.environ.get("TEST_TOTAL_SHARDS"):
@@ -184,22 +211,22 @@ if __name__ == "__main__":
         resmoke_args.append("--shardCount=1")
 
         report = "report.json"
-    resmoke_args.append(f"--reportFile={os.path.join(undeclared_output_dir, report)}")
+    resmoke_args.append(f"--reportFile={os.path.join(outputs_dir, report)}")
 
     lock, base_port = acquire_local_resource("port_block")
     resmoke_args.append(f"--basePort={base_port}")
 
-    resmoke_args.append(
-        f"--archiveDirectory={os.path.join(os.environ.get('TEST_UNDECLARED_OUTPUTS_DIR'), 'data_archives')}"
-    )
+    resmoke_args.append(f"--archiveDirectory={os.path.join(outputs_dir, 'data_archives')}")
 
     if (
-        os.path.isfile("bazel/resmoke/test_runtimes.json")
-        and os.path.getsize("bazel/resmoke/test_runtimes.json") != 0
+        os.path.isfile(os.path.join("bazel", "resmoke", "test_runtimes.json"))
+        and os.path.getsize(os.path.join("bazel", "resmoke", "test_runtimes.json")) != 0
     ):
-        resmoke_args.append("--historicTestRuntimes=bazel/resmoke/test_runtimes.json")
+        resmoke_args.append(
+            f"--historicTestRuntimes={os.path.join('bazel', 'resmoke', 'test_runtimes.json')}"
+        )
 
-    with ResmokeShimContext() as ctx:
+    with ctx:
         cli.main(resmoke_args)
 
     lock.release()

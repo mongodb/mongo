@@ -1354,6 +1354,7 @@ tasks:
         "incompatible_ppc",
         "incompatible_s390x",
         "requires_large_host",
+        "has_bazel_target",
       ]
     commands:
       - func: "do setup"
@@ -1373,6 +1374,7 @@ tasks:
         "incompatible_ppc",
         "incompatible_s390x",
         "requires_large_host",
+        "has_bazel_target",
       ]
     commands:
       - func: "do setup"
