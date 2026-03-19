@@ -35,12 +35,14 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -52,6 +54,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/logv2/log_component.h"
@@ -644,6 +647,57 @@ TEST_F(ApplyOpsTest, ApplyOpsCreateWithRecordIdsReplicatedRridDisabled) {
         "featureFlagRecordIdsReplicated", false};
     ASSERT_EQ(ErrorCodes::CommandNotSupported,
               applyOps(opCtx.get(), nss.dbName(), applyOpsCmdObj, mode, &resultBuilder));
+}
+
+TEST_F(ApplyOpsTest, ContainerOpsRequireFeatureFlagAndTestCommands) {
+    auto opCtx = cc().makeOperationContext();
+    auto mode = OplogApplication::Mode::kApplyOpsCmd;
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.ContainerOpsTest");
+    ASSERT_OK(_storage->createCollection(opCtx.get(), nss, {}));
+
+    auto* storageEngine = getServiceContext()->getStorageEngine();
+    std::string containerIdent = storageEngine->generateNewInternalIdent();
+    auto ru = storageEngine->newRecoveryUnit();
+    StorageWriteTransaction swt(*ru);
+    auto rs = storageEngine->getEngine()->makeTemporaryRecordStore(
+        *ru, containerIdent, KeyFormat::String);
+    swt.commit();
+
+    auto makeApplyOpsCmd = [&](OpTime opTime) {
+        auto entry = makeContainerInsertOplogEntry(opTime,
+                                                   nss,
+                                                   containerIdent,
+                                                   BSONBinData("K", 1, BinDataGeneral),
+                                                   BSONBinData("V", 1, BinDataGeneral));
+        auto containerInsertOp = entry.getEntry().toBSON();
+        return BSON("applyOps" << BSON_ARRAY(containerInsertOp));
+    };
+
+    auto testContainerOps =
+        [&](bool featureFlagEnabled, bool testCommandsEnabled, bool commandSucceeds) {
+            RAIIServerParameterControllerForTest featureFlagController{
+                "featureFlagPrimaryDrivenIndexBuilds", featureFlagEnabled};
+            setTestCommandsEnabled(testCommandsEnabled);
+
+            BSONObjBuilder resultBuilder;
+            auto status = applyOps(opCtx.get(),
+                                   nss.dbName(),
+                                   makeApplyOpsCmd(OpTime(Timestamp(1, 1), 1)),
+                                   mode,
+                                   &resultBuilder);
+            if (commandSucceeds) {
+                ASSERT_OK(status);
+            } else {
+                ASSERT_EQ(status.code(), ErrorCodes::InvalidOptions);
+                ASSERT_EQ(status.reason(), "Container ops are not enabled");
+            }
+        };
+
+    testContainerOps(false, false, false);
+    testContainerOps(false, true, false);
+    testContainerOps(true, false, false);
+    testContainerOps(true, true, true);
 }
 
 TEST_F(ApplyOpsTest, ApplyOpsCreateWithoutRecordIdsReplicatedRridEnabled) {

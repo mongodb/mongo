@@ -133,14 +133,15 @@ Status _applyOps(OperationContext* opCtx,
                     switch (entry.getOpType()) {
                         case OpTypeEnum::kContainerInsert:
                         case OpTypeEnum::kContainerDelete: {
-                            if (const auto fcv =
-                                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-                                !(fcv.isVersionInitialized() &&
-                                  ::mongo::feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds
-                                      .isEnabled(VersionContext::getDecoration(opCtx), fcv)) &&
-                                oplogApplicationMode == OplogApplication::Mode::kApplyOpsCmd) {
-                                uasserted(ErrorCodes::InvalidOptions,
-                                          "Container ops are not enabled");
+                            if (oplogApplicationMode == OplogApplication::Mode::kApplyOpsCmd) {
+                                uassert(ErrorCodes::InvalidOptions,
+                                        "Container ops are not enabled",
+                                        ::mongo::feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds
+                                                .isEnabledUseLatestFCVWhenUninitialized(
+                                                    VersionContext::getDecoration(opCtx),
+                                                    serverGlobalParams.featureCompatibility
+                                                        .acquireFCVSnapshot()) &&
+                                            getTestCommandsEnabled());
                             }
                             auto coll = acquireCollection(opCtx,
                                                           {nss,
