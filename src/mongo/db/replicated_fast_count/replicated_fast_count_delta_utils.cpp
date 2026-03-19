@@ -29,6 +29,7 @@
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
 
+#include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/idl/idl_parser.h"
@@ -62,6 +63,18 @@ int32_t computeCountDeltaForOp(repl::OpTypeEnum opType) {
             MONGO_UNREACHABLE;
     }
 }
+
+// Updates the 'sizeCountDeltasOut' to track the new 'sizeCountDelta' for 'uuid'.
+void recordCollectionSizeCountDelta(
+    const UUID& uuid,
+    const CollectionSizeCount& sizeCountDelta,
+    stdx::unordered_map<UUID, CollectionSizeCount>& sizeCountDeltasOut) {
+    auto [it, inserted] = sizeCountDeltasOut.try_emplace(uuid, sizeCountDelta);
+    if (!inserted) {
+        // Entry exists, so update as needed.
+        it->second = it->second + sizeCountDelta;
+    }
+}
 }  // namespace
 
 namespace replicated_fast_count {
@@ -92,6 +105,43 @@ boost::optional<CollectionSizeCount> extractSizeCountDeltaForOp(
     const int32_t countDelta = computeCountDeltaForOp(opType);
     return CollectionSizeCount{.size = sizeDelta, .count = countDelta};
 }
+
+stdx::unordered_map<UUID, CollectionSizeCount> extractSizeCountDeltasForApplyOps(
+    const repl::OplogEntry& applyOpsEntry) {
+    massert(12116000,
+            str::stream() << "Unexpected input: Expected applyOps oplog entry for extracting size "
+                             "metadata, instead received entry of command type '"
+                          << idl::serialize(applyOpsEntry.getCommandType())
+                          << "'. Received entry: " << redact(applyOpsEntry.toBSONForLogging()),
+            applyOpsEntry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
+
+    // Stores the aggregate deltas for each 'uuid' with replicated size and count.
+    stdx::unordered_map<UUID, CollectionSizeCount> sizeCountDeltas;
+    std::vector<repl::OplogEntry> innerEntries;
+    repl::ApplyOps::extractOperationsTo(
+        applyOpsEntry, applyOpsEntry.getEntry().toBSON(), &innerEntries);
+    for (const auto& op : innerEntries) {
+        if (op.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
+            const auto nestedOpRes = extractSizeCountDeltasForApplyOps(op);
+            for (const auto& [uuid, sizeCountDelta] : nestedOpRes) {
+                recordCollectionSizeCountDelta(uuid, sizeCountDelta, sizeCountDeltas);
+            }
+            continue;
+        }
+        if (auto sizeCountDelta = extractSizeCountDeltaForOp(op); sizeCountDelta.has_value()) {
+            const auto& uuid = op.getUuid();
+            massert(12116001,
+                    str::stream()
+                        << "Unexpected input: Missing 'ui' field for inner applyOps operation '"
+                        << redact(op.toBSONForLogging())
+                        << "' which tracks replicated size and count",
+                    uuid.has_value());
+            recordCollectionSizeCountDelta(*uuid, *sizeCountDelta, sizeCountDeltas);
+        }
+    }
+    return sizeCountDeltas;
+}
+
 }  // namespace replicated_fast_count
 
 

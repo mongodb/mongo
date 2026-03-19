@@ -41,14 +41,18 @@ namespace replicated_fast_count {
  * This function expects to be called on an oplog entry for a single operation. For 'applyOps'
  * entries, the top-level entry cannot have an 'm' (size metadata) field; however, the inner
  * operations within the 'applyOps' array can and should be parsed separately.
- *
- * // TODO SERVER-121160: Provide concrete function to call instead.
- * To process 'applyOps' entries, iterate over the array of inner ops and use this function for each
- * op with an 'm' field.
- *
- * Throws if the opType is not compatible with size/count tracking.
  */
 boost::optional<CollectionSizeCount> extractSizeCountDeltaForOp(const repl::OplogEntry& oplogEntry);
+
+/**
+ * Returns cumulative size and count deltas for each uuid across the inner operations of the
+ * 'applyOpsEntry'.
+ *
+ * The OplogEntry provided must be of type 'repl::OplogEntry::CommandType::kApplyOps'; otherwise,
+ * the method throws and terminates the current operation.
+ */
+stdx::unordered_map<UUID, CollectionSizeCount> extractSizeCountDeltasForApplyOps(
+    const repl::OplogEntry& applyOpsEntry);
 
 }  // namespace replicated_fast_count
 

@@ -442,4 +442,24 @@ boost::optional<repl::OplogEntry> getMostRecentOplogEntry(OperationContext* opCt
     }
     return boost::none;  // No oplog entry found.
 }
+
+CollectionSizeCount scanForAccurateSizeCount(OperationContext* opCtx, const NamespaceString& nss) {
+    auto collAcq = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IS);
+
+    auto cursor = collAcq.getCollectionPtr()->getCursor(opCtx, /*forward*/ true);
+
+    CollectionSizeCount sizeCount;
+    for (auto record = cursor->next(); record; record = cursor->next()) {
+        sizeCount.count++;
+        sizeCount.size += record->data.size();
+    }
+    return sizeCount;
+}
+
 }  // namespace mongo::replicated_fast_count_test_helpers

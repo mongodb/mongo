@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/util/modules.h"
+#include "mongo/util/str.h"
 
 #include <cstdint>
 
@@ -41,6 +42,24 @@ namespace mongo {
 struct MONGO_MOD_PUBLIC CollectionSizeCount {
     int64_t size{0};
     int64_t count{0};
+
+    bool operator==(const CollectionSizeCount& other) const {
+        return size == other.size && count == other.count;
+    }
+    CollectionSizeCount operator+(const CollectionSizeCount& other) const {
+        return CollectionSizeCount{size + other.size, count + other.count};
+    }
+    CollectionSizeCount operator-(const CollectionSizeCount& other) const {
+        return CollectionSizeCount{size - other.size, count - other.count};
+    }
+
+    std::string toString() const {
+        return str::stream() << "size: " << size << ", count: " << count;
+    }
 };
+
+inline std::ostream& operator<<(std::ostream& s, const CollectionSizeCount& collectionSizeCount) {
+    return (s << collectionSizeCount.toString());
+}
 
 }  // namespace mongo

@@ -37,6 +37,7 @@
 #include "mongo/db/repl/mock_repl_coord_server_fixture.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
@@ -93,6 +94,10 @@ protected:
 
         ASSERT_OK(createCollection(_opCtx, _nss1.dbName(), BSON("create" << _nss1.coll())));
         ASSERT_OK(createCollection(_opCtx, _nss2.dbName(), BSON("create" << _nss2.coll())));
+        AutoGetCollection coll1(_opCtx, _nss1, LockMode::MODE_IS);
+        AutoGetCollection coll2(_opCtx, _nss2, LockMode::MODE_IS);
+        _uuid1 = coll1->uuid();
+        _uuid2 = coll2->uuid();
     }
 
     void tearDown() override {
@@ -197,6 +202,8 @@ protected:
         NamespaceString::createNamespaceString_forTest("replicated_fast_count_test", "coll1");
     NamespaceString _nss2 =
         NamespaceString::createNamespaceString_forTest("replicated_fast_count_test", "coll2");
+    UUID _uuid1 = UUID::gen();
+    UUID _uuid2 = UUID::gen();
 };
 
 TEST_F(ReplicatedFastCountTxnFixture,
@@ -377,11 +384,16 @@ TEST_F(ReplicatedFastCountTxnFixture, ApplyOpsOplogEntryContainsSizeDeltaMetadat
 TEST_F(ReplicatedFastCountTxnFixture, ApplyOpsOplogEntryContainsSizeDeltaMetadata) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
 
-    auto doc = BSON("_id" << 0 << "x" << 1);
-    std::vector<replicated_fast_count_test_helpers::OpValidationSpec> expectedOps{};
+    // Both collections begin empty.
+    ASSERT_EQ(CollectionSizeCount{},
+              replicated_fast_count_test_helpers::scanForAccurateSizeCount(_opCtx, _nss1));
+    ASSERT_EQ(CollectionSizeCount{},
+              replicated_fast_count_test_helpers::scanForAccurateSizeCount(_opCtx, _nss2));
 
-    auto sessionId = makeLogicalSessionIdForTest();
-    TxnNumber txnNumber(0);
+    std::vector<replicated_fast_count_test_helpers::OpValidationSpec> expectedOps{};
+    const auto doc = BSON("_id" << 0 << "x" << 1);
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const TxnNumber txnNumber(0);
 
     // Perform ops on 2 separate collections as a part of the same multi-doc transaction.
     beginTxn(sessionId, txnNumber, [&](OperationContext* opCtx1) {
@@ -450,10 +462,31 @@ TEST_F(ReplicatedFastCountTxnFixture, ApplyOpsOplogEntryContainsSizeDeltaMetadat
     // The applyOps should cover both namespaces, so searching by _nss1 should be sufficient.
     const auto applyOpsOplogEntry =
         replicated_fast_count_test_helpers::getLatestApplyOpsForNss(_opCtx, _nss1);
+
+    // Validate the logging of the sizeMetadata.
     std::vector<repl::OplogEntry> innerEntries;
     repl::ApplyOps::extractOperationsTo(
         applyOpsOplogEntry, applyOpsOplogEntry.getEntry().toBSON(), &innerEntries);
     replicated_fast_count_test_helpers::assertOpsMatchSpecs(innerEntries, expectedOps);
+
+    // Validate the logged sizeMetadata can be parsed back into to accurate size and count.
+    //
+    // The total count and size for each collection should be equal to aggregated deltas given the
+    // collection began empty before the transaction.
+    const auto deltas =
+        replicated_fast_count::extractSizeCountDeltasForApplyOps(applyOpsOplogEntry);
+    // 2 UUIDs had replicated size count information updated from the transaction.
+    ASSERT_EQ(2u, deltas.size());
+
+    const auto expectedDeltasColl1 =
+        replicated_fast_count_test_helpers::scanForAccurateSizeCount(_opCtx, _nss1);
+    ASSERT_TRUE(deltas.contains(_uuid1));
+    ASSERT_EQ(expectedDeltasColl1, deltas.at(_uuid1));
+
+    const auto expectedDeltasColl2 =
+        replicated_fast_count_test_helpers::scanForAccurateSizeCount(_opCtx, _nss2);
+    ASSERT_TRUE(deltas.contains(_uuid2));
+    ASSERT_EQ(expectedDeltasColl2, deltas.at(_uuid2));
 }
 
 }  // namespace
