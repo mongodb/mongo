@@ -176,11 +176,7 @@ export var FixtureHelpers = (function () {
             return 1;
         }
         const collMetadata = db.getSiblingDB("config").collections.findOne({_id: coll.getFullName()});
-        if (collMetadata.timestamp) {
-            return db.getSiblingDB("config").chunks.distinct("shard", {uuid: collMetadata.uuid}).length;
-        } else {
-            return db.getSiblingDB("config").chunks.distinct("shard", {ns: coll.getFullName()}).length;
-        }
+        return db.getSiblingDB("config").chunks.distinct("shard", {uuid: collMetadata.uuid}).length;
     }
 
     /**

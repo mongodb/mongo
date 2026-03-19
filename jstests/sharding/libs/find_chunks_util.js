@@ -1,3 +1,5 @@
+import {findTimeseriesConfigCollectionsDocument} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+
 /*
  * Utilities for looking up chunk metadata
  */
@@ -5,20 +7,18 @@ export var findChunksUtil = (function () {
     /**
      * Performs a find() on config.chunks on 'configDB', targeting chunks for the collection 'ns',
      * and the optional 'extraQuery' and 'projection'.
-     * Chooses to query chunks by their 'ns' or uuid' fields according to it's config.collection
-     * entry having 'timestamp' or not.
      */
     let findChunksByNs = function (configDB, ns, extraQuery = null, projection = null) {
-        const collection = configDB.collections.findOne({_id: ns});
-        if (collection.timestamp) {
-            const collectionUUID = configDB.collections.findOne({_id: ns}).uuid;
-            assert.neq(collectionUUID, null);
-            const chunksQuery = Object.assign({uuid: collectionUUID}, extraQuery);
-            return configDB.chunks.find(chunksQuery, projection);
-        } else {
-            const chunksQuery = Object.assign({ns: ns}, extraQuery);
-            return configDB.chunks.find(chunksQuery, projection);
+        let collection = configDB.collections.findOne({_id: ns});
+
+        // TODO SERVER-101609 remove once 9.0 becomes last LTS
+        if (!collection && configDB.getMongo().getCollection(ns).getMetadata().type === "timeseries") {
+            collection = findTimeseriesConfigCollectionsDocument(configDB.getMongo().getCollection(ns));
         }
+
+        assert.neq(collection.uuid, null);
+        const chunksQuery = Object.assign({uuid: collection.uuid}, extraQuery);
+        return configDB.chunks.find(chunksQuery, projection);
     };
 
     /**
@@ -27,16 +27,8 @@ export var findChunksUtil = (function () {
      * or uuid' fields according to it's config.collection entry having 'timestamp' or not.
      */
     let findOneChunkByNs = function (configDB, ns, extraQuery = null, projection = null) {
-        const collection = configDB.collections.findOne({_id: ns});
-        if (collection.timestamp) {
-            const collectionUUID = configDB.collections.findOne({_id: ns}).uuid;
-            assert.neq(collectionUUID, null);
-            const chunksQuery = Object.assign({uuid: collectionUUID}, extraQuery);
-            return configDB.chunks.findOne(chunksQuery, projection);
-        } else {
-            const chunksQuery = Object.assign({ns: ns}, extraQuery);
-            return configDB.chunks.findOne(chunksQuery, projection);
-        }
+        const q = findChunksByNs(configDB, ns, extraQuery, projection).limit(1);
+        return q.hasNext() ? q.next() : null;
     };
 
     /**
@@ -54,11 +46,7 @@ export var findChunksUtil = (function () {
      */
     let getChunksJoinClause = function (configDB, ns) {
         const collMetadata = configDB.collections.findOne({_id: ns});
-        if (collMetadata.timestamp) {
-            return {uuid: collMetadata.uuid};
-        } else {
-            return {ns: collMetadata._id};
-        }
+        return {uuid: collMetadata.uuid};
     };
 
     return {

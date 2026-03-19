@@ -17,8 +17,9 @@
  */
 import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
 import {
-    getTimeseriesCollForDDLOps,
     isShardedTimeseries,
+    numberOfShardsForTimeseriesCollection,
+    runTimeseriesChunkCommand,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
@@ -73,35 +74,37 @@ for (const collection of [coll, collIndexed]) {
         // Our example data has documents between 2000-2003, and these dates are non-wrapping.
         // So this goes on the primary shard, and everything else goes on the non-primary.
         assert.commandWorked(
-            sh.splitAt(getTimeseriesCollForDDLOps(testDB, collection).getFullName(), {
-                "control.min.t": ISODate("2000-01-01"),
+            runTimeseriesChunkCommand(testDB, {
+                split: collection.getFullName(),
+                middle: {"control.min.t": ISODate("2000-01-01")},
             }),
         );
         assert.commandWorked(
-            sh.splitAt(getTimeseriesCollForDDLOps(testDB, collection).getFullName(), {
-                "control.min.t": ISODate("2003-01-01"),
+            runTimeseriesChunkCommand(testDB, {
+                split: collection.getFullName(),
+                middle: {"control.min.t": ISODate("2003-01-01")},
             }),
         );
         assert.commandWorked(
-            sh.moveChunk(
-                getTimeseriesCollForDDLOps(testDB, collection).getFullName(),
-                {"control.min.t": ISODate("1969-01-01")},
-                shardName1,
-            ),
+            runTimeseriesChunkCommand(testDB, {
+                moveChunk: collection.getFullName(),
+                find: {"control.min.t": ISODate("1969-01-01")},
+                to: shardName1,
+            }),
         );
         assert.commandWorked(
-            sh.moveChunk(
-                getTimeseriesCollForDDLOps(testDB, collection).getFullName(),
-                {"control.min.t": ISODate("2000-01-01")},
-                shardName0,
-            ),
+            runTimeseriesChunkCommand(testDB, {
+                moveChunk: collection.getFullName(),
+                find: {"control.min.t": ISODate("2000-01-01")},
+                to: shardName0,
+            }),
         );
         assert.commandWorked(
-            sh.moveChunk(
-                getTimeseriesCollForDDLOps(testDB, collection).getFullName(),
-                {"control.min.t": ISODate("2003-01-01")},
-                shardName1,
-            ),
+            runTimeseriesChunkCommand(testDB, {
+                moveChunk: collection.getFullName(),
+                find: {"control.min.t": ISODate("2003-01-01")},
+                to: shardName1,
+            }),
         );
     }
 }
@@ -176,11 +179,7 @@ function checkAgainstReferenceBoundedSortUnexpected(collection, reference, pipel
         const blocking = getAggPlanStages(plan, "$sort");
         assert.gt(blocking.length, 0, {bounded, blocking, plan});
         if (!TestData.hasRandomShardsAddedRemoved)
-            assert.lt(
-                bounded.length,
-                FixtureHelpers.numberOfShardsForCollection(getTimeseriesCollForDDLOps(testDB, coll)),
-                {bounded, blocking, plan},
-            );
+            assert.lt(bounded.length, numberOfShardsForTimeseriesCollection(coll), {bounded, blocking, plan});
     } else {
         const stages = getAggPlanStages(plan, "$_internalBoundedSort");
         assert.eq([], stages, plan);

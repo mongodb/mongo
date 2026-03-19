@@ -5,13 +5,14 @@
  *   requires_timeseries,
  *   # we need 2 shards to perform moveRange
  *   requires_2_or_more_shards,
- *   assumes_no_implicit_collection_creation_on_get_collection,
  *   # TODO SERVER-107141 re-enable this test in stepdown suites
  *   does_not_support_stepdowns,
+ *   # moveRange fails with ConflictingOperationInProgress if the balancer is active.
+ *   assumes_balancer_off,
  * ]
  */
 
-import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {runTimeseriesChunkCommand} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {getRandomShardName, getShardNames, setupDbName} from "jstests/libs/sharded_cluster_fixture_helpers.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
@@ -20,12 +21,10 @@ const timeField = "t";
 
 function numChunksOnShard(shardId) {
     const configDB = db.getSiblingDB("config");
-    return findChunksUtil.countChunksForNs(configDB, getTimeseriesCollForDDLOps(db, coll).getFullName(), {
-        shard: shardId,
-    });
+    return findChunksUtil.countChunksForNs(configDB, coll.getFullName(), {shard: shardId});
 }
 
-coll.drop();
+assert.commandWorked(db.runCommand({drop: coll.getName()}));
 
 assert.commandWorked(
     db.adminCommand({
@@ -45,8 +44,8 @@ assert.eq(0, coll.countDocuments({}));
 
 // Move chunk with docs >= year 2000 to otherShard
 assert.commandWorked(
-    db.adminCommand({
-        moveRange: getTimeseriesCollForDDLOps(db, coll).getFullName(),
+    runTimeseriesChunkCommand(db, {
+        moveRange: coll.getFullName(),
         min: {[`control.min.${timeField}`]: ISODate("2000-01-01")},
         max: {[`control.min.${timeField}`]: MaxKey},
         toShard: otherShardId,
@@ -76,8 +75,8 @@ assert.sameMembers([...docsBefore2000, ...docsAfter2000], coll.find({}, {_id: 0}
 
 // Move chunk with docs >= year 2000 back to primaryShard
 assert.commandWorked(
-    db.adminCommand({
-        moveRange: getTimeseriesCollForDDLOps(db, coll).getFullName(),
+    runTimeseriesChunkCommand(db, {
+        moveRange: coll.getFullName(),
         min: {[`control.min.${timeField}`]: ISODate("2000-01-01")},
         max: {[`control.min.${timeField}`]: MaxKey},
         toShard: primaryShardId,

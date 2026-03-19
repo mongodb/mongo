@@ -1,10 +1,7 @@
 // Helper functions for testing time-series collections.
 
 import {documentEq} from "jstests/aggregation/extras/utils.js";
-import {
-    getTimeseriesCollForDDLOps,
-    isShardedTimeseries,
-} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {isShardedTimeseries, runTimeseriesChunkCommand} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {isStableFCVSuite} from "jstests/libs/feature_compatibility_version.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
@@ -257,9 +254,7 @@ export var TimeseriesTest = class {
             const timeFieldName = db.getCollectionInfos({name: coll.getName()})[0].options.timeseries.timeField;
 
             const splitPoint = {[`control.min.${timeFieldName}`]: splitPointDate};
-            assert.commandWorked(
-                db.adminCommand({split: getTimeseriesCollForDDLOps(db, coll).getFullName(), middle: splitPoint}),
-            );
+            assert.commandWorked(runTimeseriesChunkCommand(db, {split: coll.getFullName(), middle: splitPoint}));
 
             const allShards = db
                 .getSiblingDB("config")
@@ -283,8 +278,8 @@ export var TimeseriesTest = class {
                 assert(otherShard);
 
                 assert.commandWorked(
-                    db.adminCommand({
-                        movechunk: getTimeseriesCollForDDLOps(db, coll).getFullName(),
+                    runTimeseriesChunkCommand(db, {
+                        movechunk: coll.getFullName(),
                         find: splitPoint,
                         to: otherShard,
                         _waitForDelete: true,

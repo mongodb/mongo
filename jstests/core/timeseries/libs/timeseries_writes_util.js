@@ -2,7 +2,10 @@
  * Helpers for testing timeseries arbitrary writes.
  */
 
-import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {
+    getTimeseriesCollForDDLOps,
+    runTimeseriesChunkCommand,
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {getExecutionStages, getPlanStage, getQueryPlanner} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -158,13 +161,11 @@ export function prepareShardedCollection({
         splitPoint = includeMeta ? splitMetaPointBetweenTwoShards : splitTimePointBetweenTwoShards;
     }
     // [MinKey, splitPoint) and [splitPoint, MaxKey) are the two chunks after the split.
-    assert.commandWorked(
-        dbToUse.adminCommand({split: getTimeseriesCollForDDLOps(dbToUse, coll).getFullName(), middle: splitPoint}),
-    );
+    assert.commandWorked(runTimeseriesChunkCommand(dbToUse, {split: coll.getFullName(), middle: splitPoint}));
 
     assert.commandWorked(
-        dbToUse.adminCommand({
-            moveChunk: getTimeseriesCollForDDLOps(dbToUse, coll).getFullName(),
+        runTimeseriesChunkCommand(dbToUse, {
+            moveChunk: coll.getFullName(),
             find: splitPoint,
             to: otherShard.shardName,
             _waitForDelete: true,

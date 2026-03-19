@@ -22,9 +22,10 @@ TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 /*
  * Runs moveChunk on the host to move the chunk to the given shard.
  */
-function runMoveChunk(host, ns, fromShard, toShard, findOneChunkFunction) {
+async function runMoveChunk(host, ns, fromShard, toShard) {
+    const {findChunksUtil} = await import("jstests/sharding/libs/find_chunks_util.js");
     const mongos = new Mongo(host);
-    const chunk = findOneChunkFunction(mongos.getDB("config"), ns, {shard: fromShard});
+    const chunk = findChunksUtil.findOneChunkByNs(mongos.getDB("config"), ns, {shard: fromShard});
     let res, hasRetriableError;
     do {
         hasRetriableError = false;
@@ -50,14 +51,7 @@ function assertCommandAbortsConcurrentOutgoingMigration(st, stepName, ns, cmdFun
 
     // Turn on the fail point and wait for moveChunk to hit the fail point.
     pauseMoveChunkAtStep(fromShard, stepName);
-    let moveChunkThread = new Thread(
-        runMoveChunk,
-        st.s.host,
-        ns,
-        fromShard.shardName,
-        toShard.shardName,
-        findChunksUtil.findOneChunkByNs,
-    );
+    let moveChunkThread = new Thread(runMoveChunk, st.s.host, ns, fromShard.shardName, toShard.shardName);
     moveChunkThread.start();
     waitForMoveChunkStep(fromShard, stepName);
 

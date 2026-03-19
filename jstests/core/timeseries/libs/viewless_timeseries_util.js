@@ -3,6 +3,7 @@
  * By then only viewless timeseries will exists so we won't need these functionalities
  */
 
+import {getCommandName} from "jstests/libs/cmd_object_utils.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {isFCVlt, isStableFCVSuite} from "jstests/libs/feature_compatibility_version.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
@@ -92,7 +93,62 @@ export function getTimeseriesCollForDDLOps(db, coll) {
     return getTimeseriesBucketsColl(coll);
 }
 
-function findTimeseriesConfigCollectionsDocument(coll) {
+// Runs a chunk command (split, moveChunk, moveRange, etc.) on a timeseries collection, targeting
+// the right namespace ("ts" for viewless timeseries, "system.buckets.ts" for viewful timeseries).
+// During FCV transitions, it attempts the operation on both namespaces until it works.
+// TODO SERVER-101609 once 9.0 becomes last LTS replace this with `db.adminCommand(cmdObj)`.
+export function runTimeseriesChunkCommand(db, cmdObj) {
+    const cmdName = getCommandName(cmdObj);
+    const originalNs = cmdObj[cmdName];
+    const coll = db.getMongo().getCollection(originalNs);
+
+    // If the FCV is stable, we don't need to go through the retry loop.
+    if (isStableFCVSuite()) {
+        const resolvedNs = getTimeseriesCollForDDLOps(db, coll).getFullName();
+        return assert.commandWorked(db.adminCommand({...cmdObj, [cmdName]: resolvedNs}));
+    }
+
+    const bucketsNs = getTimeseriesBucketsColl(coll).getFullName();
+
+    const expectedErrorCodes = [
+        // The wrong namespace was targeted (specific error depends on the command & the point at which it fails).
+        ErrorCodes.NamespaceNotFound,
+        ErrorCodes.NamespaceNotSharded,
+        ErrorCodes.CommandNotSupportedOnView,
+        ErrorCodes.StaleConfig,
+        // Failed because migrations are blocked during viewless timeseries upgrade/downgrade.
+        ErrorCodes.ConflictingOperationInProgress,
+    ];
+
+    let lastRes;
+    assert.soon(
+        () => {
+            jsTest.log.info(`Trying timeseries chunk operation ${cmdName} on ${originalNs}`);
+            lastRes = db.adminCommand(cmdObj);
+            if (lastRes.ok || !expectedErrorCodes.includes(lastRes.code)) {
+                return true;
+            }
+
+            jsTest.log.info(`Trying timeseries chunk operation ${cmdName} on ${bucketsNs}`);
+            lastRes = db.adminCommand({...cmdObj, [cmdName]: bucketsNs});
+            if (
+                lastRes.ok ||
+                (!expectedErrorCodes.includes(lastRes.code) &&
+                    lastRes.code !== ErrorCodes.CommandNotSupportedOnLegacyTimeseriesBucketsNamespace)
+            ) {
+                return true;
+            }
+
+            jsTest.log.info(`Backing off because timeseries chunk operation ${cmdName} failed on both namespaces`);
+            return false;
+        },
+        () => `Chunk command failed for ${originalNs}: ${tojson(lastRes)}`,
+    );
+    assert.commandWorked(lastRes);
+    return lastRes;
+}
+
+export function findTimeseriesConfigCollectionsDocument(coll) {
     // We must use snapshot read concern to avoid racing with viewless timeseries upgrade/downgrade,
     // so bypass overrides, which may want to impose a different read concern (e.g. majority).
     return OverrideHelpers.withPreOverrideRunCommand(() => {
@@ -136,6 +192,18 @@ export function isShardedTimeseries(coll) {
  */
 export function isTrackedTimeseries(coll) {
     return findTimeseriesConfigCollectionsDocument(coll) !== null;
+}
+
+/**
+ * TODO SERVER-101609 once 9.0 becomes last LTS we can remove this function and directly use
+ * FixtureHelpers::numberOfShardsForCollection on the given collection.
+ */
+export function numberOfShardsForTimeseriesCollection(coll) {
+    const collEntry = findTimeseriesConfigCollectionsDocument(coll);
+    if (collEntry === null) {
+        return 1;
+    }
+    return coll.getDB().getSiblingDB("config").chunks.distinct("shard", {uuid: collEntry.uuid}).length;
 }
 
 /**

@@ -10,7 +10,7 @@
  * ]
  */
 
-import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {runTimeseriesChunkCommand} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {getRandomShardName} from "jstests/libs/sharded_cluster_fixture_helpers.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
@@ -20,9 +20,7 @@ const metaField = "m";
 
 function numChunksOnShard(shardId) {
     const configDB = db.getSiblingDB("config");
-    return findChunksUtil.countChunksForNs(configDB, getTimeseriesCollForDDLOps(db, coll).getFullName(), {
-        shard: shardId,
-    });
+    return findChunksUtil.countChunksForNs(configDB, coll.getFullName(), {shard: shardId});
 }
 
 assert.commandWorked(db.runCommand({drop: coll.getName()}));
@@ -46,8 +44,8 @@ assert.commandWorked(coll.insertMany(allDocs));
 
 // Split at meta "b".
 assert.commandWorked(
-    db.adminCommand({
-        split: getTimeseriesCollForDDLOps(db, coll).getFullName(),
+    runTimeseriesChunkCommand(db, {
+        split: coll.getFullName(),
         middle: {meta: "b"},
     }),
 );
@@ -57,8 +55,8 @@ assert.sameMembers(allDocs, coll.find({}, {_id: 0}).toArray());
 
 // moveChunk: move the "b" chunk to otherShard.
 assert.commandWorked(
-    db.adminCommand({
-        moveChunk: getTimeseriesCollForDDLOps(db, coll).getFullName(),
+    runTimeseriesChunkCommand(db, {
+        moveChunk: coll.getFullName(),
         find: {meta: "b"},
         to: otherShardId,
     }),
@@ -69,8 +67,8 @@ assert.sameMembers(allDocs, coll.find({}, {_id: 0}).toArray());
 
 // Move it back so we can merge.
 assert.commandWorked(
-    db.adminCommand({
-        moveChunk: getTimeseriesCollForDDLOps(db, coll).getFullName(),
+    runTimeseriesChunkCommand(db, {
+        moveChunk: coll.getFullName(),
         find: {meta: "b"},
         to: primaryShardId,
     }),
@@ -81,8 +79,8 @@ assert.sameMembers(allDocs, coll.find({}, {_id: 0}).toArray());
 
 // Merge all chunks back together.
 assert.commandWorked(
-    db.adminCommand({
-        mergeChunks: getTimeseriesCollForDDLOps(db, coll).getFullName(),
+    runTimeseriesChunkCommand(db, {
+        mergeChunks: coll.getFullName(),
         bounds: [{meta: MinKey}, {meta: MaxKey}],
     }),
 );
