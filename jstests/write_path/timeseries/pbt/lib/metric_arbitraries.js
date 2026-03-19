@@ -141,9 +141,12 @@ export function makeMetricArb(types, ranges = {}) {
     }
     if (typeList.includes("timestamp")) {
         // Timestamp(seconds, increment)
+        // In regular collections, the special value of Timestamp(0, 0) will generate a server-side timestamp.
+        // This value needs to be avoided to keep the two collection types in sync, and is a known difference
+        // between regular and Timeseries colleciton behavior.
         bsonPrimitiveMetricTypes.push(
             fc
-                .tuple(fc.integer({min: 0, max: 0x7fffffff}), fc.integer({min: 0, max: 0x7fffffff}))
+                .tuple(fc.integer({min: 0, max: 0x7fffffff}), fc.integer({min: 1, max: 0x7fffffff}))
                 .map(([t, i]) => Timestamp(t, i)),
         );
     }
