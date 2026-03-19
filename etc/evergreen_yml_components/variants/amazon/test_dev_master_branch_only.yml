@@ -128,6 +128,7 @@ buildvariants:
   - &enterprise-amazon-linux2023-arm64-all-feature-flags-template
     <<: *amazon_linux2023_arm64_static_compile_variant_dependency
     name: enterprise-amazon-linux2023-arm64-all-feature-flags
+    modules: ["asp-js-engine"]
     display_name: "! Amazon Linux 2023 arm64 Atlas Enterprise (all feature flags)"
     tags: ["required", "forbid_tasks_tagged_with_experimental"]
     cron: "0 1,5,9,13,17,21 * * *" # From the ${project_required_suggested_cron} parameter
@@ -146,10 +147,14 @@ buildvariants:
       max_sub_suites: 5
       idle_timeout_factor: 1.5
       exec_timeout_factor: 1.5
+      streams_variant_tag: "-atlas"
       test_flags: >-
         --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,incompatible_with_atlas_environment,m8g_incompatible
     tasks:
+      - name: streams_build_and_push
+        distros:
+          - amazon2023-arm64-latest-m8g-4xlarge
       - name: .development_critical !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
       - name: .development_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
         distros:
@@ -164,6 +169,8 @@ buildvariants:
           - amazon2023-arm64-atlas-latest-m8g-2xlarge
       - name: .fuzzer_deterministic
       - name: .streams_release_test !.requires_extra_system_deps !streams_kafka_gen !streams_kafka_benchmark !streams_kafka_gwproxy !streams_kinesis
+        depends_on:
+          - name: streams_build_and_push
 
   - <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
     name: enterprise-amazon-linux2023-arm64-all-feature-flags-extra-system-deps
@@ -176,6 +183,7 @@ buildvariants:
       tss_enabled: false
       large_distro_name: amazon2023-arm64-latest-m8g-4xlarge
       core_analyzer_distro_name: amazon2023-arm64-latest-xlarge
+      streams_variant_tag: "-atlas-extra-deps"
       # featureFlagStreams is added to support streams commands and aggregations in auth test suites
       test_flags: >-
         --runAllFeatureFlagTests
@@ -197,8 +205,12 @@ buildvariants:
       - name: query_golden_disagg_gen
       - name: query_golden_sharding_disagg_gen
       - name: no_passthrough_disagg_override_gen
-      - name: streams_build_only_gen
+      - name: streams_build_and_push
+        distros:
+          - amazon2023-arm64-latest-m8g-4xlarge
       - name: .streams_release_test .requires_extra_system_deps
+        depends_on:
+          - name: streams_build_and_push
 
   - name: amazon-linux2023-arm64-tests-lto-pgo-bolt
     display_name: "Amazon Linux 2023 arm64 Atlas Enterprise (all feature flags) LTO/PGO/BOLT"

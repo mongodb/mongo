@@ -53,8 +53,12 @@ buildvariants:
       - name: aggregation_sharded_collections_passthrough
       - name: change_streams_mongos_sessions_passthrough
       - name: fle2_sharding
-      # All streams jstest tasks excluding some that are not compatible at the moment.
-      - name: .streams_release_test !.requires_extra_system_deps
+      # Streams sanitizer tasks use archive_dist_test binaries (compatible with coverage-instrumented builds)
+      - name: streams_sanitizer_gen
+      - name: streams_https_sanitizer
+      - name: streams_lambda_sanitizer
+      - name: streams_kinesis_sanitizer
+      - name: streams_s3_sanitizer
 
   # Variant to support Code Coverage on amd64/x86_64
   - name: &rhel-93-64-bit-coverage rhel-93-64-bit-coverage

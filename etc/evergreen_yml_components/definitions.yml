@@ -427,6 +427,62 @@ functions:
       local_file: src/mongodb-jstestshell.tgz
       optional: true
 
+  "fetch streams binaries": &fetch_streams_binaries
+    command: s3.get
+    display_name: "fetch streams binaries"
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: ${streams_binaries}
+      bucket: mciuploads
+      local_file: src/streams-binaries.tgz
+
+  "fetch streams image tag": &fetch_streams_image_tag
+    command: s3.get
+    display_name: "fetch streams image tag"
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: ${streams_image_tag}
+      bucket: mciuploads
+      local_file: src/streams-image-tag.txt
+      optional: true
+
+  "extract streams binaries": &extract_streams_binaries
+    command: subprocess.exec
+    display_name: "extract streams binaries"
+    params:
+      binary: bash
+      args:
+        - "src/evergreen/run_python_script.sh"
+        - "evergreen/functions/binaries_extract.py"
+        - "--tarball=streams-binaries.tgz"
+        - "--extraction-command=tar -zxvf"
+        - "--change-dir=${extraction_change_dir}"
+
+  "set streams image tag expansion": &set_streams_image_tag_expansion
+    command: subprocess.exec
+    display_name: "set streams image tag expansion"
+    params:
+      binary: bash
+      args:
+        - "-c"
+        - |
+          set -o errexit
+          if [ -f src/streams-image-tag.txt ]; then
+            IMAGE_TAG=$(cat src/streams-image-tag.txt)
+            echo "mongostream_image: $IMAGE_TAG" > streams_image_expansion.yml
+            echo "Set mongostream_image=$IMAGE_TAG"
+          else
+            echo "No streams-image-tag.txt found, skipping"
+            touch streams_image_expansion.yml
+          fi
+
+  "update streams image tag expansion": &update_streams_image_tag_expansion
+    command: expansions.update
+    params:
+      file: streams_image_expansion.yml
+
   "verify jstestshell sha": &verify_jstestshell_sha
     command: subprocess.exec
     params:
@@ -810,6 +866,10 @@ functions:
           value: corpora-${project}-${build_variant}.${ext|tgz}
         - key: skip_tests
           value: skip_test-${build_id}
+        - key: streams_binaries
+          value: ${project}/${compile_variant}/${version_id}/streams${streams_variant_tag|}/binaries-${revision_order_id}.tgz
+        - key: streams_image_tag
+          value: ${project}/${compile_variant}/${version_id}/streams${streams_variant_tag|}/image-tag-streams_build_and_push-${revision_order_id}.txt
 
   "set up venv": &set_up_venv
     command: subprocess.exec
@@ -921,6 +981,32 @@ functions:
     - *extract_jstestshell
     - *f_expansions_write
     - *get_buildnumber
+    - *f_expansions_write
+    - *set_up_credentials
+    - *run_diskstats
+    - *monitor_process_threads
+    - *collect_system_resource_info
+    - *collect_ulimit_info
+
+  "do setup for streams":
+    - *f_expansions_write
+    - *generate_github_token
+    - *conditionally_clone_repo
+    - *set_task_expansion_macros
+    - *f_expansions_write
+    - *fetch_artifacts
+    - *fetch_artifacts_zstd
+    - *extract_artifacts
+    - *kill_processes
+    - *cleanup_environment
+    - *fetch_venv
+    - *adjust_venv
+    - *fetch_streams_binaries
+    - *extract_streams_binaries
+    - *fetch_streams_image_tag
+    - *fetch_jstestshell
+    - *verify_jstestshell_sha
+    - *extract_jstestshell
     - *f_expansions_write
     - *set_up_credentials
     - *run_diskstats
@@ -1159,81 +1245,6 @@ functions:
         files:
           - powercycle_tasks.json
 
-  "streams build":
-    - command: manifest.load
-    - *git_get_shallow_project
-    - *f_expansions_write
-    - *restore_git_history_and_tags
-    - *add_git_tag
-    - *kill_processes
-    - *cleanup_environment
-    - *set_up_venv
-    - *upload_pip_requirements
-    - *configure_evergreen_api_credentials
-    - command: subprocess.exec
-      params:
-        binary: bash
-        args:
-          - "src/evergreen/run_python_script.sh"
-          - "buildscripts/evergreen_gen_streams_build_and_push_task.py"
-          - "../expansions.yml"
-          - "--output-file=../${streams_output_file}"
-          - ${push_arg|}
-          - ${break_glass_arg|}
-    - command: s3.put
-      display_name: "upload ${streams_output_file}"
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: ${streams_output_file}
-        remote_file: ${project}/${build_variant}/${revision}/${streams_s3_path}/${task_name}-${build_id}.json
-        bucket: mciuploads
-        permissions: public-read
-        content_type: application/gzip
-        display_name: Generated Task Config - Execution ${execution}
-    - command: generate.tasks
-      display_name: "generate.tasks ${streams_output_file}"
-      params:
-        files:
-          - ${streams_output_file}
-
-  "streams publish manifest":
-    - command: manifest.load
-    - *git_get_shallow_project
-    - *f_expansions_write
-    - *restore_git_history_and_tags
-    - *add_git_tag
-    - *kill_processes
-    - *cleanup_environment
-    - *set_up_venv
-    - *upload_pip_requirements
-    - *configure_evergreen_api_credentials
-    - command: subprocess.exec
-      params:
-        binary: bash
-        args:
-          - "src/evergreen/run_python_script.sh"
-          - "buildscripts/evergreen_gen_streams_publish_manifest_task.py"
-          - "../expansions.yml"
-          - "--output-file=../streams_publish_manifest.json"
-          - ${break_glass_arg|}
-    - command: s3.put
-      display_name: "upload streams_publish_manifest.json"
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: streams_publish_manifest.json
-        remote_file: ${project}/${build_variant}/${revision}/streams_publish_manifest/${task_name}-${build_id}.json
-        bucket: mciuploads
-        permissions: public-read
-        content_type: application/gzip
-        display_name: Generated Task Config - Execution ${execution}
-    - command: generate.tasks
-      display_name: "generate.tasks streams_publish_manifest.json"
-      params:
-        files:
-          - streams_publish_manifest.json
-
   "run powercycle sentinel":
     - command: manifest.load
     - *git_get_shallow_project
@@ -1310,6 +1321,7 @@ functions:
         # Path to the asp-js-engine module cloned via Evergreen modules
         ASP_JS_ENGINE_PATH: ${workdir}/asp-js-engine
         HAS_JS_ENGINE: ${HAS_JS_ENGINE|}
+        MONGOSTREAM_IMAGE: ${mongostream_image|}
 
   "execute resmoke tests via bazel sh": &execute_resmoke_tests_via_bazel_sh
     command: subprocess.exec
@@ -1359,6 +1371,24 @@ functions:
     command: ec2.assume_role
     params:
       role_arn: "${disagg_storage_ecr_arn}"
+
+  "assume streams ECR role": &assume_streams_ecr_role
+    command: ec2.assume_role
+    params:
+      role_arn: "arn:aws:iam::664315256653:role/mongo-tf-project"
+
+  "login to streams ECR": &login_to_streams_ecr
+    command: subprocess.exec
+    display_name: "login to streams ECR"
+    params:
+      binary: bash
+      add_expansions_to_env: true
+      args:
+        - "-c"
+        - |
+          set -o errexit
+          REGISTRY="664315256653.dkr.ecr.us-east-1.amazonaws.com"
+          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $REGISTRY
 
   "fetch module images": &fetch_module_images
     command: subprocess.exec
@@ -1763,7 +1793,6 @@ functions:
     - *f_expansions_write
     - *git_get_shallow_streams_project
     - *restore_git_history_and_tags
-    # Copy asp-js-engine module from src/ to workdir where ASP_JS_ENGINE_PATH expects it
     - command: subprocess.exec
       display_name: "copy asp-js-engine to workdir"
       params:
@@ -1773,19 +1802,11 @@ functions:
           - |
             set -o errexit
             set -o verbose
-            # git.get_project clones into src/, so asp-js-engine module is at src/asp-js-engine/asp-js-engine
-            # ASP_JS_ENGINE_PATH expects it at ${workdir}/asp-js-engine with package.json at root
             rm -rf asp-js-engine
             cp -r src/asp-js-engine/asp-js-engine asp-js-engine
-    - *fetch_binaries
-    - *fetch_binaries_zstd
-    - *fetch_tgz_binary_shas
-    - *fetch_and_verify_binaries_sha
-    - *fetch_and_verify_binaries_sha_zstd
-    - *fetch_jstestshell
-    - *verify_jstestshell_sha
-    - *extract_binaries
-    - *extract_jstestshell
+    - *fetch_streams_binaries
+    - *extract_streams_binaries
+    - *fetch_streams_image_tag
     - *configure_evergreen_api_credentials
     - *determine_task_timeout
     - *update_task_timeout_expansions
@@ -1815,8 +1836,11 @@ functions:
     - *configure_evergreen_api_credentials
     - *sign_macos_dev_binaries
     - *multiversion_exclude_tags_generate
-    - *assume_ecr_role
-    - *fetch_module_images
+    - *assume_streams_ecr_role
+    - *login_to_streams_ecr
+    - *set_streams_image_tag_expansion
+    - *update_streams_image_tag_expansion
+    - *f_expansions_write
     - *execute_resmoke_tests_with_asp_js_engine_token
       # The existence of the "run_tests_infrastructure_failure" file indicates this failure isn't
       # directly actionable. We use type=setup rather than type=system or type=test for this command
@@ -3749,6 +3773,307 @@ functions:
   "save tracing data":
     - *tar_tracing_data
     - *archive_tracing_data
+
+  "streams build and push":
+    - command: manifest.load
+    - *f_expansions_write
+    - *git_get_shallow_streams_project
+    - *add_git_tag
+    - *kill_processes
+    - *cleanup_environment
+    - *set_up_venv
+    - *upload_pip_requirements
+    - *get_engflow_key
+    - *get_engflow_cert
+    - *get_engflow_release_key
+    - *get_engflow_release_cert
+    - *f_expansions_write
+    - *generate_evergreen_bazelrc
+    - *generate_version_expansions
+    - *apply_version_expansions
+    - *f_expansions_write
+    - command: expansions.update
+      params:
+        updates:
+          - key: targets
+            value: "//src/mongo/db:mongod //src/mongo/shell:mongo"
+          - key: bazel_args
+            value: "--config=evg --config=opt_profiled --features=strip_debug --separate_debug=False --simple_build_id=True --streams_release_build=True"
+    - *f_expansions_write
+    - *bazel_compile_sh
+    - *set_up_remote_credentials
+    - command: ec2.assume_role
+      params:
+        role_arn: "arn:aws:iam::664315256653:role/mongo-tf-project"
+    - command: subprocess.exec
+      params:
+        add_expansions_to_env: true
+        binary: bash
+        args:
+          - "./src/evergreen/streams_image_build_and_push.sh"
+          - ${push_arg|}
+          - ${break_glass_arg|}
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/streams-binaries.tgz
+        remote_file: ${project}/${compile_variant}/${version_id}/streams${streams_variant_tag|}/binaries-${revision_order_id}.tgz
+        bucket: mciuploads
+        permissions: private
+        visibility: signed
+        content_type: application/gzip
+        display_name: Streams Binaries
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/streams-image-tag.txt
+        remote_file: ${project}/${compile_variant}/${version_id}/streams${streams_variant_tag|}/image-tag-${task_name}-${revision_order_id}.txt
+        bucket: mciuploads
+        permissions: private
+        visibility: signed
+        content_type: text/plain
+        display_name: Streams Image Tag
+        optional: true
+    - *set_task_expansion_macros
+    - *f_expansions_write
+    - command: subprocess.exec
+      display_name: "generate sha256 for streams binaries"
+      params:
+        binary: bash
+        add_expansions_to_env: true
+        args:
+          - "src/evergreen/run_python_script.sh"
+          - "buildscripts/s3_binary/sha256sum.py"
+          - "streams-binaries.tgz"
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/streams-binaries.tgz
+        remote_file: ${mongo_binaries}
+        bucket: mciuploads
+        permissions: ${mciuploads_binary_permissions|private}
+        visibility: ${mciuploads_binary_visibility|signed}
+        content_type: application/gzip
+        display_name: Binaries (from streams build)
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/streams-binaries.tgz.sha256
+        remote_file: ${mongo_binaries}.sha256
+        bucket: mciuploads
+        permissions: ${mciuploads_binary_permissions|private}
+        visibility: ${mciuploads_binary_visibility|signed}
+        content_type: text/plain
+        display_name: Binaries SHA256 (from streams build)
+    - command: archive.targz_pack
+      params:
+        target: "venv.tgz"
+        source_dir: "./"
+        include:
+          - "./venv/**"
+          - "./venv_readme.txt"
+    - *set_task_expansion_macros
+    - *f_expansions_write
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: venv.tgz
+        remote_file: ${mongo_venv}
+        bucket: mciuploads
+        permissions: private
+        visibility: signed
+        content_type: application/tar
+        display_name: Python venv
+    - command: subprocess.exec
+      display_name: "gen feature flags"
+      type: test
+      params:
+        binary: bash
+        args:
+          - "src/evergreen/gen_feature_flags.sh"
+    - command: subprocess.exec
+      display_name: "generate resmoke constants"
+      type: test
+      params:
+        binary: bash
+        args:
+          - "src/evergreen/get_bin_and_fcv_versions.sh"
+        env:
+          OTEL_TRACE_ID: ${otel_trace_id}
+          OTEL_PARENT_ID: ${otel_parent_id}
+          OTEL_COLLECTOR_DIR: "../build/OTelTraces/"
+    - command: subprocess.exec
+      display_name: "bazel run archive_artifacts"
+      type: test
+      params:
+        binary: bash
+        env:
+          evergreen_remote_exec: ${evergreen_remote_exec|off}
+          author_email: ${author_email}
+          github_pr_head_branch: ${github_pr_head_branch}
+          github_pr_base_branch: ${github_pr_base_branch}
+          otel_parent_id: ${otel_parent_id}
+          otel_trace_id: ${otel_trace_id}
+          target: >-
+            //buildscripts:archive_artifacts --
+            --output=artifacts.tgz
+            --exclude="*_test.pdb"
+            --base_dir=".."
+            "./**/*.gcno"
+            "src/.bazel*"
+            "src/.npmrc"
+            "src/.resmoke_mongo_release_values.yml"
+            "src/.resmoke_mongo_version.yml"
+            "src/BUILD.bazel"
+            "src/MODULE.bazel"
+            "src/WORKSPACE.bazel"
+            "src/bazel/**"
+            "src/buildscripts/**"
+            "src/docker_compose/**"
+            "src/etc/BUILD.bazel"
+            "src/etc/*san.denylist"
+            "src/etc/*san.suppressions"
+            "src/etc/backports_required_for_multiversion_tests.yml"
+            "src/etc/evergreen.yml"
+            "src/etc/evergreen_nightly.yml"
+            "src/etc/evergreen_timeouts.yml"
+            "src/etc/evergreen_yml_components/**"
+            "src/etc/expansions.default.yml"
+            "src/etc/macos_dev_entitlements.xml"
+            "src/etc/repo_config.yaml"
+            "src/evergreen/**"
+            "src/jsconfig.json"
+            "src/jstests/**"
+            "src/package.json"
+            "src/patch_files.txt"
+            "src/patch_test_tags.tgz"
+            "src/pnpm-lock.yaml"
+            "src/poetry.lock"
+            "src/poetry_requirements.txt"
+            "src/pyproject.toml"
+            "src/src/**/*.idl"
+            "src/src/**/*.yml"
+            "src/src/mongo/client/sdam/json_tests/sdam_tests/**"
+            "src/src/mongo/client/sdam/json_tests/server_selection_tests/**"
+            "src/src/mongo/db/extension/test_examples/aggregation_stage_fallback_parsers.json"
+            "src/src/mongo/db/extension/test_examples/test_extensions_signing_keys/test_extensions_signing_public_key.asc"
+            "src/src/mongo/db/modules/atlas/evergreen/**"
+            "src/src/mongo/db/modules/atlas/jstests/**"
+            "src/src/mongo/db/modules/enterprise/docs/**"
+            "src/src/mongo/db/modules/enterprise/jstests/**"
+            "src/src/mongo/db/modules/enterprise/src/streams/build/*"
+            "src/src/mongo/db/modules/enterprise/src/streams/aspio/**"
+            "src/src/mongo/db/modules/subscription/jstests/**"
+            "src/src/mongo/db/query/benchmark/data_generator/**"
+            "src/src/mongo/db/query/query_tester/tests/**"
+            "src/src/mongo/util/options_parser/test_config_files/**"
+            "src/src/mongo/util/version/**"
+            "src/monguard/.evergreen/**"
+            "src/src/third_party/JSON-Schema-Test-Suite/tests/draft4/**"
+            "src/src/third_party/abseil-cpp/**"
+            "src/src/third_party/cares/**"
+            "src/src/third_party/boringssl_replacement/**"
+            "src/src/third_party/googletest/**"
+            "src/src/third_party/grpc/**"
+            "src/src/third_party/mock_ocsp_responder/**"
+            "src/src/third_party/protobuf/**"
+            "src/src/third_party/re2/**"
+            "src/src/third_party/schemastore.org/**"
+            "src/src/third_party/zlib/**"
+            "src/.tmp/_placeholder_"
+            "src/tools/**"
+            "src/x509/**"
+        args:
+          - "src/evergreen/bazel_run.sh"
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: artifacts.tgz
+        remote_file: ${mongo_artifacts}
+        bucket: mciuploads
+        permissions: private
+        visibility: signed
+        content_type: application/tar
+        display_name: Artifacts
+    - command: subprocess.exec
+      display_name: "generate version expansions"
+      type: test
+      params:
+        binary: bash
+        args:
+          - "src/evergreen/functions/version_expansions_generate.sh"
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/version_expansions.yml
+        remote_file: ${project}/${version_id}/version_expansions.yml
+        bucket: mciuploads
+        permissions: public-read
+        content_type: text/yaml
+        display_name: Version Expansions
+
+  "streams build debug":
+    - command: manifest.load
+    - *f_expansions_write
+    - *git_get_shallow_streams_project
+    - *add_git_tag
+    - *kill_processes
+    - *cleanup_environment
+    - *set_up_venv
+    - *upload_pip_requirements
+    - *get_engflow_key
+    - *get_engflow_cert
+    - *get_engflow_release_key
+    - *get_engflow_release_cert
+    - *f_expansions_write
+    - *generate_evergreen_bazelrc
+    - *generate_version_expansions
+    - *apply_version_expansions
+    - *f_expansions_write
+    - command: expansions.update
+      params:
+        updates:
+          - key: targets
+            value: "//src/mongo/db:mongod //src/mongo/shell:mongo"
+          - key: bazel_args
+            value: "--config=evg --config=opt_profiled --simple_build_id=True --separate_debug=True"
+    - *f_expansions_write
+    - *bazel_compile_sh
+
+  "upload streams debugsymbols":
+    - command: subprocess.exec
+      display_name: "package streams debugsymbols"
+      params:
+        binary: bash
+        args:
+          - "-c"
+          - |
+            set -o errexit
+            set -o verbose
+            cd src
+            mkdir -p streams-debug
+            cp bazel-bin/src/mongo/db/mongod.debug streams-debug/mongod.debug
+            cp bazel-bin/src/mongo/shell/mongo.debug streams-debug/mongo.debug
+            tar czvf bazel-bin/streams-debug.tgz -C streams-debug .
+    - command: s3.put
+      display_name: "upload streams debugsymbols"
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/bazel-bin/streams-debug.tgz
+        remote_file: ${project}/${build_variant}/${revision}/streams-debugsymbols-${build_id}.tgz
+        bucket: mciuploads
+        permissions: ${mciuploads_binary_permissions|private}
+        visibility: ${mciuploads_binary_visibility|signed}
+        content_type: application/gzip
+        display_name: Streams Debugsymbols
 
   "s3.put bazel build events":
     command: s3.put

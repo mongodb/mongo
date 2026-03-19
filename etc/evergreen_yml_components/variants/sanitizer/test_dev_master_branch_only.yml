@@ -228,6 +228,9 @@ buildvariants:
       - name: .release_critical .requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
           - *enterprise-rhel-8-64-bit-dynamic-debug-mode-large-distro-name
+      - name: streams_build_and_push
+        distros:
+          - *enterprise-rhel-8-64-bit-dynamic-debug-mode-large-distro-name
       - name: .default !.requires_large_host !.requires_large_host_debug_mode !.requires_extra_system_deps !.incompatible_development_variant !.incompatible_debug_mode !.incompatible_system_allocator !.requires_all_feature_flags
       - name: .default .requires_large_host !.requires_extra_system_deps !.incompatible_development_variant !.incompatible_debug_mode !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
@@ -504,9 +507,11 @@ buildvariants:
       - name: .non_deterministic .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
         distros:
           - rhel8.8-xlarge
-      - name: .streams_release_test !.requires_extra_system_deps !streams_kafka_gen !streams_kafka_benchmark !streams_kafka_gwproxy
-        distros:
-          - rhel8.8-xlarge
+      - name: streams_sanitizer_gen
+      - name: streams_https_sanitizer
+      - name: streams_lambda_sanitizer
+      - name: streams_kinesis_sanitizer
+      - name: streams_s3_sanitizer
 
   - <<: *rhel8_debug_aubsan_compile_variant_dependency
     name: rhel8-debug-aubsan-experimental-all-feature-flags
@@ -648,9 +653,10 @@ buildvariants:
       - name: .non_deterministic .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
         distros:
           - *enterprise-rhel8-debug-tsan-large-distro-name
-      - name: .streams_release_test !.requires_extra_system_deps !streams_kafka_gen !streams_kafka_benchmark !streams_kafka_gwproxy !streams_s3
-        distros:
-          - *enterprise-rhel8-debug-tsan-large-distro-name
+      - name: streams_sanitizer_gen
+      - name: streams_https_sanitizer
+      - name: streams_lambda_sanitizer
+      - name: streams_kinesis_sanitizer
 
   - <<: *enterprise-rhel8-debug-tsan-compile-dependency
     name: enterprise-rhel8-debug-tsan-all-non-rollback-feature-flags
