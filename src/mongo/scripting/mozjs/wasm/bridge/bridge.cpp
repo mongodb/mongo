@@ -49,7 +49,7 @@ constexpr std::string_view kInvokeMap = "invoke-map";
 constexpr std::string_view kDrainEmitBuffer = "drain-emit-buffer";
 constexpr std::string_view kGetGlobal = "get-global";
 constexpr std::string_view kGetReturnValueBson = "get-return-value-bson";
-constexpr std::string kReturnValue = "__returnValue";
+constexpr std::string_view kReturnValue = "__returnValue";
 
 std::shared_ptr<WasmEngineContext> WasmEngineContext::create(const std::vector<uint8_t>& bytes) {
     wt::Config config;
