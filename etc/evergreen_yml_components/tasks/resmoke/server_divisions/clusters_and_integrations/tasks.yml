@@ -2492,10 +2492,6 @@ tasks:
     commands:
       - func: "generate resmoke tasks"
         vars:
-          # TODO(SERVER-109882): Enable viewless timeseries in upgrade/downgrade suites
-          resmoke_args: >-
-            --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
-            --disableFeatureFlags=featureFlagBlockDirectSystemBucketsAccess
 
   # TODO(SERVER-108818): Remove this temporary suite.
   - <<: *gen_task_template
