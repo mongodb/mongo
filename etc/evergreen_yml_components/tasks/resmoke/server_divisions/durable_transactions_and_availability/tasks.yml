@@ -1846,6 +1846,23 @@ tasks:
           use_large_distro: "true"
 
   - <<: *gen_task_template
+    name: disagg_multi_stmt_txn_jscore_passthrough_with_migration_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_repl",
+        "default",
+        "large",
+        "clustered_collections",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: disagg_multi_stmt_txn_jscore_passthrough_with_migration
+          use_large_distro: "true"
+          resmoke_jobs_max: 2
+
+  - <<: *gen_task_template
     name: disagg_multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough_gen
     tags:
       [
