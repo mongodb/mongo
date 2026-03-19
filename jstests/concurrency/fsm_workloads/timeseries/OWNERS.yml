@@ -30,6 +30,10 @@ filters:
     approvers:
       - 10gen/server-catalog-and-routing-ddl
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "timeseries_reads_subpipelines_setFCV.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "timeseries_reshard_with_inserts.js":
     approvers:
       - 10gen/server-cluster-scalability

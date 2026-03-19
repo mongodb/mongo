@@ -6,12 +6,6 @@
 - name: common_exclude_files
   value:
     exclude_files:
-      # TODO SERVER-120235 re-enable tests that uses timeseries sub-pipeline (e.g. graphLookup)
-      # on timeseries collections
-      - jstests/core/timeseries/query/timeseries_graph_lookup.js
-      - jstests/core/timeseries/geo/timeseries_geonear_lookup.js
-      - jstests/core/timeseries/query/timeseries_lookup.js
-
       # This test assumes no buckets will be closed during insertion.
       # In the FCV upgrade/downgrade suite this can actually happen when we upgrade/downgrade the timeseries collection.
       - jstests/core/timeseries/query/timeseries_lastpoint.js
