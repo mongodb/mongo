@@ -59,4 +59,11 @@ HierarchicalCancelableOperationContextFactory::createSharedChild() {
             _cancelToken, _executor, _hierarchyDepth + 1));
 }
 
+CancelableOperationContext HierarchicalCancelableOperationContextFactory::makeOperationContext(
+    Client* client, std::function<void(OperationContext*)> opCtxModifier) const {
+    auto opCtx = client->makeOperationContext();
+    opCtxModifier(opCtx.get());
+    return CancelableOperationContext{std::move(opCtx), _cancelToken, _executor};
+}
+
 }  // namespace mongo

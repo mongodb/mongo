@@ -768,12 +768,12 @@ double calculateExponentialMovingAverage(double prevAvg, double currVal, double 
 
 CancelableOperationContext makeReshardingOperationContext(
     const HierarchicalCancelableOperationContextFactory& factory, bool nonDeprioritizable) {
-    auto opCtx = cc().makeOperationContext();
-    if (nonDeprioritizable) {
-        ExecutionAdmissionContext::get(&*opCtx).setTaskType(
-            &*opCtx, ExecutionAdmissionContext::TaskType::NonDeprioritizable);
-    }
-    return factory.makeCancelable(std::move(opCtx));
+    return factory.makeOperationContext(&cc(), [nonDeprioritizable](OperationContext* opCtx) {
+        if (nonDeprioritizable) {
+            ExecutionAdmissionContext::get(opCtx).setTaskType(
+                opCtx, ExecutionAdmissionContext::TaskType::NonDeprioritizable);
+        }
+    });
 }
 
 }  // namespace resharding

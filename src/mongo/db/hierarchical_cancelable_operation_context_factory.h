@@ -77,14 +77,9 @@ public:
         return _cancelToken;
     }
 
-    CancelableOperationContext makeOperationContext(Client* client) const {
-        return CancelableOperationContext{client->makeOperationContext(), _cancelToken, _executor};
-    }
-
-    CancelableOperationContext makeCancelable(
-        ServiceContext::UniqueOperationContext&& opCtx) const {
-        return CancelableOperationContext{std::move(opCtx), _cancelToken, _executor};
-    }
+    CancelableOperationContext makeOperationContext(
+        Client* client,
+        std::function<void(OperationContext*)> opCtxModifier = [](OperationContext*) {}) const;
 
 private:
     HierarchicalCancelableOperationContextFactory(CancellationToken parentCancelToken,
