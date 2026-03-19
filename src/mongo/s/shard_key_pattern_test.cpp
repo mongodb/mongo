@@ -536,7 +536,7 @@ TEST_F(ShardKeyPatternTest, ExtractQueryShardKeyHashed) {
 }
 
 static bool indexComp(const ShardKeyPattern& pattern, const BSONObj& indexPattern) {
-    return pattern.isIndexUniquenessCompatible(indexPattern);
+    return pattern.isIndexUniquenessAndCollationCompatible(indexPattern, BSONObj());
 }
 
 TEST_F(ShardKeyPatternTest, UniqueIndexCompatibleSingle) {
@@ -1020,6 +1020,20 @@ TEST_F(ShardKeyPatternTest, IsExtendedBy) {
     // { a : 1, b : "hashed " } is extended by { a : 1, b : "hashed", c : "1" } but not viceversa
     ASSERT_TRUE(shardKeyPatternHashed2_1.isExtendedBy(shardKeyPatternHashed3_1));
     ASSERT_FALSE(shardKeyPatternHashed3_1.isExtendedBy(shardKeyPatternHashed2_1));
+}
+
+TEST_F(ShardKeyPatternTest, NonSimpleCollationUniqueIndexesForbidden) {
+    auto shardKeyBSON = BSON("x" << 1);
+    auto collationBSON = BSON("locale"
+                              << "en_US");
+    auto simpleCollationBSON = BSON("locale"
+                                    << "simple");
+    ShardKeyPattern shardKeyPattern(shardKeyBSON);
+    ASSERT_TRUE(shardKeyPattern.isIndexUniquenessAndCollationCompatible(shardKeyBSON, BSONObj()));
+    ASSERT_TRUE(
+        shardKeyPattern.isIndexUniquenessAndCollationCompatible(shardKeyBSON, simpleCollationBSON));
+    ASSERT_FALSE(
+        shardKeyPattern.isIndexUniquenessAndCollationCompatible(shardKeyBSON, collationBSON));
 }
 
 }  // namespace
