@@ -99,16 +99,100 @@ def _format_elapsed(reference_time):
     return f"{int(hours)}h {int(minutes)}m {seconds:.1f}s"
 
 
-def _log_progress(message):
-    line = f"[compiledb +{_format_elapsed(COMPILEDB_START_TIME)}] {message}"
+def _get_output_stream():
     for stream in [sys.stdout, sys.stderr, sys.__stderr__]:
         if not stream:
             continue
         try:
-            print(line, file=stream, flush=True)
-            return
+            if not stream.writable():
+                continue
+            return stream
         except (ValueError, OSError):
             continue
+    return None
+
+
+def _log_progress(message):
+    line = f"[compiledb +{_format_elapsed(COMPILEDB_START_TIME)}] {message}"
+    stream = _get_output_stream()
+    if stream:
+        try:
+            print(line, file=stream, flush=True)
+        except (ValueError, OSError):
+            pass
+
+
+def _run_build_command(cmd):
+    """Run a bazel build, streaming output directly to the terminal.
+
+    Uses a PTY so bazel sees a real terminal (colors, progress bar
+    overwrites).  Both stdout and stderr are routed through the PTY
+    and echoed to the wrapper's output stream so the output is visible
+    even when tools/bazel has redirected the default fds to a log file.
+
+    Falls back to a plain subprocess when no output stream is available
+    or the ``pty`` module is missing (e.g. Windows).
+    """
+
+    stream = _get_output_stream()
+    out_fd = None
+    if stream:
+        try:
+            out_fd = stream.fileno()
+        except (AttributeError, OSError):
+            pass
+
+    if out_fd is None:
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False)
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"Command failed (rc={proc.returncode}): {' '.join(cmd)}\n"
+                f"--- output ---\n{proc.stdout.decode(errors='replace')}"
+            )
+        return
+
+    try:
+        import pty
+
+        parent_fd, child_fd = pty.openpty()
+        proc = subprocess.Popen(cmd, stdout=child_fd, stderr=child_fd, stdin=child_fd)
+        os.close(child_fd)
+        captured = b""
+        try:
+            while True:
+                try:
+                    data = os.read(parent_fd, 4096)
+                except OSError as e:
+                    if e.errno != errno.EIO:
+                        raise
+                    break
+                if not data:
+                    break
+                captured += data
+                try:
+                    os.write(out_fd, data)
+                except OSError:
+                    pass
+        finally:
+            os.close(parent_fd)
+        returncode = proc.wait()
+        stdout = captured.decode(errors="replace")
+    except ModuleNotFoundError:
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        captured = b""
+        for chunk in iter(lambda: proc.stdout.read(4096), b""):
+            captured += chunk
+            try:
+                os.write(out_fd, chunk)
+            except OSError:
+                pass
+        returncode = proc.wait()
+        stdout = captured.decode(errors="replace")
+
+    if returncode != 0:
+        raise RuntimeError(
+            f"Command failed (rc={returncode}): {' '.join(cmd)}\n" f"--- output ---\n{stdout}"
+        )
 
 
 def clear_compiledb_posthook_state():
@@ -203,6 +287,15 @@ def _resolve_compiledb_targets(target_scope_override=None, requested_targets=Non
         target_scope_expr = "set(" + " ".join(build_targets) + ")"
 
     return default_target_scope, build_targets, target_scope_expr
+
+
+def _resolve_extra_build_targets(extra_build_targets=None, setup_clang_tidy=False):
+    resolved_targets = list(extra_build_targets or [])
+    if setup_clang_tidy:
+        for target in SETUP_CLANG_TIDY_BUILD_TARGETS:
+            if target not in resolved_targets:
+                resolved_targets.append(target)
+    return resolved_targets
 
 
 def _resolve_compiledb_flags(compiledb_config, requested_build_flags=None):
@@ -523,10 +616,14 @@ def _collect_aspect_fragment_paths(
     compiledb_bazelrc,
     compiledb_config,
     target_scope_expr,
+    forwarded_startup_args=None,
 ):
     query_cmd = (
         [bazel_bin]
-        + ([f"--output_base={output_base}"] if persistent_compdb else [])
+        + (
+            forwarded_startup_args
+            or ([f"--output_base={output_base}"] if persistent_compdb else [])
+        )
         + compiledb_bazelrc
         + ["aquery"]
         + ([f"--symlink_prefix={symlink_prefix}"] if persistent_compdb else [])
@@ -745,7 +842,10 @@ def _generate_compiledb_via_aspect(
         target_scope_override=target_scope_override,
         requested_targets=requested_targets,
     )
-    extra_build_targets = list(extra_build_targets or [])
+    extra_build_targets = _resolve_extra_build_targets(
+        extra_build_targets=extra_build_targets,
+        setup_clang_tidy=setup_clang_tidy,
+    )
     build_flags = _resolve_compiledb_flags(
         compiledb_config,
         requested_build_flags=requested_build_flags,
@@ -756,13 +856,25 @@ def _generate_compiledb_via_aspect(
         with tempfile.NamedTemporaryFile(delete=False) as buildevents:
             buildevents_path = buildevents.name
 
+    # Build the startup args for the compiledb build invocation.
+    # When persistent_compdb, we use a dedicated output_base (overrides any
+    # --output_user_root in the original startup_args, which is fine).
+    # Otherwise, forward the caller's startup_args so the build resolves to
+    # the same output tree (e.g. CI passes --output_user_root).
+    forwarded_startup_args = list(startup_args or [])
+    if persistent_compdb:
+        forwarded_startup_args = [
+            arg for arg in forwarded_startup_args if not arg.startswith("--output_base=")
+        ]
+        forwarded_startup_args.append(f"--output_base={output_base}")
+
     try:
         if not skip_build:
             build_start = time.monotonic()
             _log_progress("Generating compiledb command fragments via aspect...")
             build_cmd = (
                 [bazel_bin]
-                + ([f"--output_base={output_base}"] if persistent_compdb else [])
+                + forwarded_startup_args
                 + compiledb_bazelrc
                 + ["build"]
                 + ([f"--symlink_prefix={symlink_prefix}"] if persistent_compdb else [])
@@ -771,9 +883,8 @@ def _generate_compiledb_via_aspect(
                     f"--build_event_json_file={buildevents_path}",
                 ]
                 + build_targets
-                + extra_build_targets
             )
-            run_pty_command(build_cmd)
+            _run_build_command(build_cmd)
             _log_progress(
                 "Generated compiledb command fragments via aspect "
                 f"in {_format_elapsed(build_start)}"
@@ -795,6 +906,7 @@ def _generate_compiledb_via_aspect(
                 compiledb_bazelrc=compiledb_bazelrc,
                 compiledb_config=build_flags,
                 target_scope_expr=target_scope_expr,
+                forwarded_startup_args=forwarded_startup_args,
             )
             raw_entries = load_compile_command_fragments_from_paths(fragment_paths)
         if not raw_entries:
@@ -825,6 +937,23 @@ def _generate_compiledb_via_aspect(
 
         output_json.sort(key=compile_command_sort_key)
         write_compile_commands(output_json, REPO_ROOT / "compile_commands.json")
+        if setup_clang_tidy and extra_build_targets:
+            _log_progress("Building clang-tidy IDE targets...")
+            tidy_build_cmd = (
+                [bazel_bin]
+                + forwarded_startup_args
+                + compiledb_bazelrc
+                + ["build"]
+                + ([f"--symlink_prefix={symlink_prefix}"] if persistent_compdb else [])
+                + extra_build_targets
+            )
+            try:
+                _run_build_command(tidy_build_cmd)
+            except RuntimeError:
+                _log_progress(
+                    "Warning: failed to build clang-tidy targets; " "skipping clang-tidy IDE setup."
+                )
+                setup_clang_tidy = False
         if setup_clang_tidy:
             setup_clang_tidy_from_built_outputs()
     finally:

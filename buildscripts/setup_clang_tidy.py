@@ -15,30 +15,9 @@ PLUGIN_CANDIDATES = [
 ]
 
 
-def _linux_distribution_id_version() -> tuple[str | None, str | None]:
-    if platform.system() != "Linux":
-        return None, None
-
-    os_release = pathlib.Path("/etc/os-release")
-    if not os_release.exists():
-        return None, None
-
-    metadata: dict[str, str] = {}
-    for line in os_release.read_text(encoding="utf-8").splitlines():
-        if "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        metadata[key] = value.strip().strip('"').strip("'")
-
-    return metadata.get("ID"), metadata.get("VERSION_ID")
-
-
 def mongo_tidy_checks_supported_platform() -> bool:
     if platform.system() != "Linux":
         return False
-
-    distro_id, version_id = _linux_distribution_id_version()
-    return not (distro_id == "ubuntu" and version_id == "18.04")
 
 
 def clang_tidy_setup_recovery_message() -> str:
@@ -72,7 +51,9 @@ def materialize_clang_tidy_ide_files(
     plugin_src: pathlib.Path,
 ) -> tuple[bool, bool]:
     config_changed = _copy_if_changed(config_src, repo_root / ".clang-tidy")
-    marker_changed = _write_if_changed(repo_root / ".mongo_checks_module_path", str(plugin_src))
+    marker_changed = _write_if_changed(
+        repo_root / ".mongo_checks_module_path", str(plugin_src.resolve())
+    )
     return config_changed, marker_changed
 
 

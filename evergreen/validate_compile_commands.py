@@ -15,6 +15,14 @@ from typing import Any, Iterator
 
 STANDARD_COMPILE_COMMAND_KEYS = frozenset({"arguments", "command", "directory", "file", "output"})
 COMPILEDB_GENERATION_TARGETS = ["compiledb", "install-wiredtiger"]
+MONGO_TIDY_PLUGIN_CANDIDATES = frozenset(
+    [
+        "libmongo_tidy_checks.so",
+        "libmongo_tidy_checks.dylib",
+        "mongo_tidy_checks.dll",
+        "libmongo_tidy_checks.dll",
+    ]
+)
 
 
 def _get_workspace_dir() -> str:
@@ -36,6 +44,48 @@ def _ensure_compiledb_exists(compdb_path: str) -> None:
         f"'bazel build {' '.join(COMPILEDB_GENERATION_TARGETS)}' to generate it.\n"
     )
     subprocess.run(["bazel", "build", *COMPILEDB_GENERATION_TARGETS], check=True)
+
+
+def _mongo_tidy_checks_supported_platform() -> bool:
+    if platform.system() != "Linux":
+        return False
+
+
+def _validate_clang_tidy_setup(workspace_dir: str) -> None:
+    if not _mongo_tidy_checks_supported_platform():
+        return
+
+    config_path = os.path.join(workspace_dir, ".clang-tidy")
+    if not os.path.isfile(config_path):
+        raise ValueError(
+            "Expected '.clang-tidy' to exist in the workspace root after generating "
+            "compile_commands.json on this platform."
+        )
+
+    plugin_marker_path = os.path.join(workspace_dir, ".mongo_checks_module_path")
+    if not os.path.isfile(plugin_marker_path):
+        raise ValueError(
+            "Expected '.mongo_checks_module_path' to exist in the workspace root after "
+            "generating compile_commands.json on this platform."
+        )
+
+    with open(plugin_marker_path, "r", encoding="utf-8") as marker_file:
+        plugin_path = marker_file.read().strip()
+
+    if not plugin_path:
+        raise ValueError("'.mongo_checks_module_path' must contain a plugin path.")
+
+    plugin_name = os.path.basename(plugin_path)
+    if plugin_name not in MONGO_TIDY_PLUGIN_CANDIDATES:
+        raise ValueError(
+            f"'.mongo_checks_module_path' points to an unexpected plugin file: {plugin_name}"
+        )
+
+    if not os.path.isfile(plugin_path):
+        raise ValueError(
+            f"The mongo_tidy_checks plugin file recorded in '.mongo_checks_module_path' "
+            f"does not exist: {plugin_path}"
+        )
 
 
 def _parse_repo_env_from_bazelrc(bazelrc_path: str, var_name: str) -> str | None:
@@ -718,6 +768,11 @@ def main() -> int:
     cli_args = _parse_args()
     compdb_path = "compile_commands.json"
     _ensure_compiledb_exists(compdb_path)
+    try:
+        _validate_clang_tidy_setup(workspace_dir)
+    except ValueError as e:
+        sys.stderr.write(f"ERROR: {e}\n")
+        return 1
     try:
         selection_count = _determine_selection_count(
             default_count=10,
