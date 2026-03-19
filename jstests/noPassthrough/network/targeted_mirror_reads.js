@@ -4,7 +4,6 @@
  * @tags: [
  *   requires_replication,
  *   requires_fcv_82,
-     # TODO (SERVER-107500): Remove this tag once the test is compatible with gRPC.
  *   grpc_incompatible,
  * ]
  */
