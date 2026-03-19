@@ -25,8 +25,9 @@ Use VSCode's Debugger UI with resmoke's `--shellJSDebugMode` flag.
 
 - Step functionality (step, step in, step out) is not supported. Each currently redirects to the Continue functionality.
 - Watching variables is not supported.
-- Deeply nested variables are truncated in the Variables sidebar display, with only 1 level of expansion. Use the Debug Console to inspect more.
-- Breakpoints can't be changed while the debugger is already attached to a running shell. Users will see a Toast UI when this occurs, and breakpoints will be applied on the _next_ shell launch.
+- Deeply nested variables are truncated in the Variables sidebar display, with only 1 level of expansion. Use the Debug Console to inspect more. See [SERVER-121664](https://jira.mongodb.org/browse/SERVER-121664).
+- Breakpoints set while the shell is paused take effect immediately. Breakpoints set while the shell is running will apply the next time a breakpoint is hit (the shell is not interrupted mid-execution).
+- Files can't be edited/modified while paused in a breakpoint (technically, they _can_ be edited, but that will cause the debugger to error). See [SERVER-122188](https://jira.mongodb.org/browse/SERVER-122188).
 - The debugger uses port 9229, the default Chrome debugging port. Any open Chrome debuggers (eg. Developer Tools open in a Chrome tab) will conflict with this VSCode Debugger.
 
 ## Install
@@ -130,9 +131,23 @@ Extension 'mongo-shell-debugger-1.0.0.vsix' was successfully installed.
 **Initialization**
 
 1. VSCode starts → session.js creates TCP server on :9229
-2. Shell starts with --shellJSDebugMode → adapter.cpp connects to :9229
-3. Shells waits for a "handshake" from the adapter
-4. session.js sends queued breakpoints via "setBreakpoints" request
+2. Shell starts with `--shellJSDebugMode` → adapter.cpp connects to :9229
+3. Shell waits for a "handshake" (configurationDone) from session.js
+4. session.js sends all known breakpoints to the shell, then sends configurationDone
+5. Shell begins execution, pausing on any breakpoints it encounters
+
+**Breakpoints set before shell connects**
+
+session.js stores breakpoints as `Breakpoint` objects with locally-assigned IDs and responds
+to VSCode immediately with unverified status. When the shell connects, step 4 above delivers
+them all. The shell responds with verified status, and session.js emits `BreakpointEvent("changed")`
+using the same IDs so VSCode updates the gutter indicators.
+
+**Breakpoints set after shell connects**
+
+`setBreakpoints` is forwarded to the shell immediately. The shell applies them retroactively
+to any already-loaded scripts (via `debugger.findScripts()`) and to any scripts that load in
+the future (via `onNewScript`). The shell's response is passed directly back to VSCode.
 
 **Breakpoint Hit**
 
@@ -159,12 +174,22 @@ Newline-delimited JSON over TCP, eg:
 - Main compartment: runs user JS, is observed by Debugger
 - Debugger compartment: owns Debugger instance, separate from debuggee
 
+> MozJS prohibits compartment "re-entry": we can spin-wait in JS and call C++, but that can't call back into JS execution. It can get/set properties, but it can't invoke any execution.
+
 **Breakpoint Mechanism**
 
-1. Pending breakpoints stored in `_pendingBreakpoints` map
-2. `onNewScript` callback fires when scripts load
-3. Apply breakpoints via `script.setBreakpoint(offset, {hit: handler})`
-4. Handler stores location, invokes C++ pause logic
+`_breakpoints` (source URL → set of line numbers) is the canonical server-side state. It is
+always up to date regardless of when breakpoints were set.
+
+- **New scripts**: `onNewScript` fires, reads from `_breakpoints`, calls `script.setBreakpoint(offset, {hit: handler})`
+- **Already-loaded scripts**: when `setBreakpoints` arrives while running, the URL is queued in
+  `_pendingBPUpdateUrls`. The shared `__spinwait` (defined in `helpers.js`) detects this flag
+  while paused in any scenario (breakpoint hit, exception, or `debugger;` statement), calls
+  `debugger.findScripts({url})`, clears stale breakpoints, and re-applies the current set.
+- **Hit handler**: stores location, invokes C++ pause logic, then calls shared `__spinwait`
+
+Shared pause logic (`__spinwait`, `__processScopes`, `__storeCallStack`, `__applyPendingBPUpdates`)
+lives in `helpers.js` and is used by all three handler files.
 
 **Execution Control**
 

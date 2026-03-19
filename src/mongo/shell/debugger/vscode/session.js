@@ -32,8 +32,10 @@ class MongoShellDebugSession extends DebugSession {
         this.debugServer = null;
         this.connected = false;
 
-        // Handles for variables
+        // Breakpoint storage: path → { source, breakpoints: [{id, line, column, condition, verified}] }
+        // IDs are stable across connection state, verified status reflects what the shell confirmed.
         this.breakpoints = new Map();
+        this.nextBpId = 1;
 
         // Request tracking
         this.messageSeq = 1;
@@ -123,15 +125,11 @@ class MongoShellDebugSession extends DebugSession {
         this.sendDeferredConfigurationDoneRequest();
     }
 
-    // Send the stored configurationDone request to the attached shells
+    // Forward configurationDone to the shell so it knows initial breakpoints are set.
     sendDeferredConfigurationDoneRequest() {
-        const response = {}; // just an acknowledgement
-        this.sendCommand("configurationDone", {})
-            .then(() => this.sendResponse(response))
-            .catch((err) => {
-                this.log(`ConfigurationDone failed: ${err.message}`, "stderr");
-                this.sendErrorResponse(response, 1011, `Configuration failed: ${err.message}`);
-            });
+        this.sendCommand("configurationDone", {}).catch((err) => {
+            this.log(`ConfigurationDone failed: ${err.message}`, "stderr");
+        });
     }
 
     // Helper to send output to debug console
@@ -171,32 +169,50 @@ class MongoShellDebugSession extends DebugSession {
      * @overload
      */
     setBreakPointsRequest(response, args) {
-        // Store these in the map to be sent when a new shell connects.
-        // When a breakpoint is set/removed from a file, this method fires with the list of ALL breakpoints
-        // in that file, so updating it keyed off the filename is sufficient here; no need to track individual lines.
-        this.breakpoints.set(args.source.path, [response, args]);
+        // DAP always sends the full list for a file, replacing any previous breakpoints.
+        // Assign fresh IDs — they only need to be consistent between this response and the
+        // subsequent BreakpointEvent("changed") that verifies them, which uses the same objects.
+        const breakpoints = (args.breakpoints ?? []).map((bp) => {
+            const stored = new Breakpoint(false, bp.line, bp.column);
+            stored.id = this.nextBpId++;
+            stored.condition = bp.condition; // carry condition for forwarding to the shell
+            return stored;
+        });
+        this.breakpoints.set(args.source.path, {source: args.source, breakpoints});
 
         if (this.connected) {
-            // The UI still marks this as a red dot in the file, which can be confusing when a test is rerun and it's not hit.
-            // Would be ideal if we could either not mark the breakpoint, or at least mark it unverified.
-            // These are still stored in the map above, so new shells will appropriately honor them.
-            // TODO SERVER-120754: Add JS breakpoints after script is already loaded
-            this.sendErrorResponse(
-                response,
-                1016,
-                "New breakpoints are not supported while a shell is connected.\n" +
-                    "Any new/changed breakpoints will be applied when the next shell launches.",
-            );
-        }
-    }
-
-    // Send breakpoints that were set before shell connected
-    sendQueuedBreakpoints() {
-        for (const [response, args] of this.breakpoints.values()) {
             this.sendCommand("setBreakpoints", args)
                 .then((result) => {
                     response.body = result;
                     this.sendResponse(response);
+                })
+                .catch((err) => {
+                    this.log(`Failed to set breakpoints: ${err.message}`, "stderr");
+                });
+        } else {
+            // Respond immediately with unverified breakpoints so VSCode doesn't hang.
+            // IDs are already assigned above; BreakpointEvent("changed") will verify them later.
+            response.body = {breakpoints};
+            this.sendResponse(response);
+        }
+    }
+
+    // Send all known breakpoints to the shell on connection, then verify them via BreakpointEvent.
+    sendQueuedBreakpoints() {
+        for (const {source, breakpoints} of this.breakpoints.values()) {
+            const args = {
+                source,
+                breakpoints: breakpoints.map(({line, column, condition}) => ({line, column, condition})),
+            };
+            this.sendCommand("setBreakpoints", args)
+                .then((result) => {
+                    for (const [i, bp] of (result.breakpoints ?? []).entries()) {
+                        const stored = breakpoints[i];
+                        if (!stored) continue;
+                        stored.verified = bp.verified;
+                        if (bp.line) stored.line = bp.line;
+                        this.sendEvent(new BreakpointEvent("changed", stored));
+                    }
                 })
                 .catch((err) => {
                     this.log(`Failed to set queued breakpoints: ${err.message}`, "stderr");

@@ -83,7 +83,9 @@ private:
     static bool storeScopesCallback(JSContext* cx, unsigned argc, JS::Value* vp);
     static bool storeVariablesCallback(JSContext* cx, unsigned argc, JS::Value* vp);
     static bool storeStackFramesCallback(JSContext* cx, unsigned argc, JS::Value* vp);
-    static bool getPendingBreakpointsCallback(JSContext* cx, unsigned argc, JS::Value* vp);
+    static bool getBreakpointsCallback(JSContext* cx, unsigned argc, JS::Value* vp);
+    static bool hasBPUpdateRequestCallback(JSContext* cx, unsigned argc, JS::Value* vp);
+    static bool getBPUpdatedUrlsCallback(JSContext* cx, unsigned argc, JS::Value* vp);
     static bool fromInteractiveREPL(JSContext* cx, unsigned argc, JS::Value* vp);
 
     static bool hasEvalRequest(JSContext* cx, unsigned argc, JS::Value* vp);
@@ -114,6 +116,9 @@ public:
     // Set the "onNewScript" callback in the compartment
     // https://firefox-source-docs.mozilla.org/devtools-user/debugger-api/debugger/index.html
     Status setOnNewScriptCallback(JS::RootedObject const& global);
+
+    // Evaluate helpers.js to install shared JS utilities (__spinwait, __processScopes, etc.)
+    Status setupHelpers(JS::RootedObject const& global);
 
     // Set breakpoints for the given request
     void setBreakpoints(SetBreakpointsRequest request);

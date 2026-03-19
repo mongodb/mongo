@@ -47,6 +47,7 @@ namespace mongo {
 
 // Forward declarations for generated JS files
 namespace JSFiles {
+extern const JSFile helpers;
 extern const JSFile onDebuggerStatement;
 extern const JSFile onExceptionUnwind;
 extern const JSFile onNewScript;
@@ -82,8 +83,13 @@ std::vector<protocol::StackFrame> _capturedStackFrames;
 // Debugger state
 static std::unique_ptr<DebuggerObject> _debuggerObject;
 
-// Pending breakpoints: map from source URL to set of line numbers
-static std::map<std::string, std::set<int>> _pendingBreakpoints;
+// Canonical breakpoint map: source URL → set of line numbers.
+// This is the persistent source of truth; applied on new script load and retroactively.
+static std::map<std::string, std::set<int>> _breakpoints;
+
+// URLs that were updated after scripts may have already loaded (for retroactive application)
+static std::vector<std::string> _pendingBPUpdateUrls;
+static AtomicWord<bool> _hasBPUpdateRequest{false};
 
 /**
  *  DebuggerObject
@@ -183,10 +189,10 @@ bool DebuggerObject::fromInteractiveREPL(JSContext* cx, unsigned argc, JS::Value
 }
 
 /**
- * Get pending breakpoints for a given source URL.
+ * Get breakpoints for a given source URL from the canonical breakpoint map.
  * Returns an array of line numbers.
  */
-bool DebuggerObject::getPendingBreakpointsCallback(JSContext* cx, unsigned argc, JS::Value* vp) {
+bool DebuggerObject::getBreakpointsCallback(JSContext* cx, unsigned argc, JS::Value* vp) {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
     if (argc < 1 || !args[0].isString()) {
@@ -203,9 +209,8 @@ bool DebuggerObject::getPendingBreakpointsCallback(JSContext* cx, unsigned argc,
 
     std::string url(urlChars.get());
 
-    // Look up any pending breakpoints for this URL
-    auto it = _pendingBreakpoints.find(url);
-    if (it == _pendingBreakpoints.end() || it->second.empty()) {
+    auto it = _breakpoints.find(url);
+    if (it == _breakpoints.end() || it->second.empty()) {
         // none found
         args.rval().setUndefined();
         return true;
@@ -228,6 +233,42 @@ bool DebuggerObject::getPendingBreakpointsCallback(JSContext* cx, unsigned argc,
     }
 
     args.rval().setObject(*linesArray);
+    return true;
+}
+
+/**
+ * Returns true if there are pending retroactive breakpoint updates to apply.
+ */
+bool DebuggerObject::hasBPUpdateRequestCallback(JSContext* cx, unsigned argc, JS::Value* vp) {
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    args.rval().setBoolean(_hasBPUpdateRequest.load());
+    return true;
+}
+
+/**
+ * Returns the list of URLs that have pending breakpoint updates, then clears the list.
+ * JS uses these URLs with debugger.findScripts({url}) to update already-loaded scripts.
+ */
+bool DebuggerObject::getBPUpdatedUrlsCallback(JSContext* cx, unsigned argc, JS::Value* vp) {
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+
+    JS::RootedObject urlsArray(cx, JS::NewArrayObject(cx, _pendingBPUpdateUrls.size()));
+    if (!urlsArray) {
+        args.rval().setUndefined();
+        return true;
+    }
+
+    uint32_t i = 0;
+    for (const auto& url : _pendingBPUpdateUrls) {
+        JS::RootedString urlStr(cx, JS_NewStringCopyZ(cx, url.c_str()));
+        JS::RootedValue urlVal(cx, JS::StringValue(urlStr));
+        JS_SetElement(cx, urlsArray, i++, urlVal);
+    }
+
+    _pendingBPUpdateUrls.clear();
+    _hasBPUpdateRequest.store(false);
+
+    args.rval().setObject(*urlsArray);
     return true;
 }
 
@@ -619,14 +660,42 @@ Status DebuggerObject::setOnDebuggerStatementCallback(JS::RootedObject const& gl
     return status;
 }
 
-Status DebuggerObject::setOnNewScriptCallback(JS::RootedObject const& global) {
+Status DebuggerObject::setupHelpers(JS::RootedObject const& global) {
     Status status = Status::OK();
 
-    status = registerNativeFunction(
-        _cx, global, "__getPendingBreakpoints", DebuggerObject::getPendingBreakpointsCallback, 1);
+    // Evaluate helpers.js for its side effects: installs __spinwait, __applyPendingBPUpdates,
+    // __storeCallStack, and __processScopes onto globalThis.
+    JS::RootedValue unused(_cx);
+    status = compileJSCodeBlock(::mongo::JSFiles::helpers, &unused);
     if (!status.isOK()) {
         return status;
     }
+
+    // Set up native functions that it can use
+
+    status = registerNativeFunction(
+        _cx, global, "__getBreakpoints", DebuggerObject::getBreakpointsCallback, 1);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    status = registerNativeFunction(
+        _cx, global, "__hasBPUpdateRequest", DebuggerObject::hasBPUpdateRequestCallback, 0);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    status = registerNativeFunction(
+        _cx, global, "__getBPUpdatedUrls", DebuggerObject::getBPUpdatedUrlsCallback, 0);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    return Status::OK();
+}
+
+Status DebuggerObject::setOnNewScriptCallback(JS::RootedObject const& global) {
+    Status status = Status::OK();
 
     status = registerNativeFunction(
         _cx, global, "__onScriptSetBreakpoint", DebuggerScript::breakpointHandler, 1);
@@ -649,15 +718,18 @@ Status DebuggerObject::setOnNewScriptCallback(JS::RootedObject const& global) {
 
 void DebuggerObject::setBreakpoints(SetBreakpointsRequest request) {
 
-    // Assume that all breakpoints are set before running the shell.
-    // This means that the scripts that the breakpoints are in have not been loaded yet.
-    // Store these pending breakpoints to register later via debugger.onNewScript.
-    _pendingBreakpoints[request.source].clear();
+    // Store/update in the map
+    _breakpoints[request.source].clear();
     for (int line : request.lines) {
-        _pendingBreakpoints[request.source].insert(line);
+        _breakpoints[request.source].insert(line);
     }
 
-    // TODO: Try to apply to already-loaded scripts, where users add more breakpoints as they go
+    // Signal JS to retroactively apply/update these breakpoints to any already-loaded scripts
+    // that have already been configured with onNewScript.
+    // spinwait polls __hasBPUpdateRequest() and applies changes via debugger.findScripts().
+    // During initial setup this is a no-op (spinwait hasn't run yet).
+    _pendingBPUpdateUrls.push_back(request.source);
+    _hasBPUpdateRequest.store(true);
 }
 
 std::string evaluateInREPL(std::string expression) {
@@ -978,6 +1050,12 @@ Status DebuggerGlobal::init(JSContext* cx) {
 
         // Set up onDebuggerStatement hook
         status = _debuggerObject->setOnDebuggerStatementCallback(debuggerGlobal);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        // Install shared JS helpers (__spinwait, __applyPendingBPUpdates, etc.)
+        status = _debuggerObject->setupHelpers(debuggerGlobal);
         if (!status.isOK()) {
             return status;
         }
