@@ -40,6 +40,7 @@
 #include "mongo/db/basic_types.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/extension/host/extension_vector_search_server_status.h"
 #include "mongo/db/feature_flag.h"
@@ -131,6 +132,9 @@ constexpr unsigned ClusterAggregate::kMaxViewRetries;
 using sharded_agg_helpers::PipelineDataSource;
 
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(hangBeforeRetryingAggregateAfterViewKickback);
+
 // Ticks for server-side Javascript deprecation log messages.
 Rarely _samplerAccumulatorJs, _samplerFunctionJs;
 
@@ -1063,6 +1067,31 @@ Status runAggregateImpl(OperationContext* opCtx,
     return status;
 }
 
+boost::optional<ResolvedView> chainViews(boost::optional<ResolvedView> currentView,
+                                         ResolvedView newView) {
+    // Multiple view kickbacks can occur if the collection changes after the first view
+    // kickback. If we already have a resolved view, we must compose the two resolved
+    // pipelines to avoid losing the pipeline accumulated from the first kickback.
+    if (!currentView) {
+        return newView;
+    }
+
+    std::vector<BSONObj> composedPipeline = newView.getPipeline();
+    const std::vector<BSONObj>& toPrepend = currentView->getPipeline();
+    composedPipeline.insert(composedPipeline.end(), toPrepend.begin(), toPrepend.end());
+
+    // All views seen during the resolution will have the same collation, so we can just use the
+    // current view's collation.
+    return ResolvedView(newView.getNamespace(),
+                        std::move(composedPipeline),
+                        currentView->getDefaultCollation(),
+                        newView.getTimeseriesOptions(),
+                        newView.getMayContainMixedData() || currentView->getMayContainMixedData(),
+                        newView.getUsesExtendedRange() || currentView->getUsesExtendedRange(),
+                        newView.getFixedBuckets() || currentView->getFixedBuckets());
+}
+
+
 }  // namespace
 
 
@@ -1455,12 +1484,19 @@ Status ClusterAggregate::runAggregate(
     auto onViewError =
         [&](const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex,
             RetryState& state) {
+            CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                &hangBeforeRetryingAggregateAfterViewKickback,
+                opCtx,
+                "hangBeforeRetryingAggregateAfterViewKickback");
+
             // Save the resolved view in the state.
-            state.resolvedView = *ex.extraInfo<ResolvedView>();
-            // Pre-disable vector search extension for views. This is an optimization, because we
-            // know that the vector search extension is not eligible to run on views. If we do not
-            // implement this optimization, we will eventually throw the IFR flag kickback retry and
-            // end up restarting ClusterAggregate again.
+            state.resolvedView =
+                chainViews(std::move(state.resolvedView), std::move(*ex.extraInfo<ResolvedView>()));
+
+            // Pre-disable vector search extension for views. This is an optimization,
+            // because we know that the vector search extension is not eligible to run on
+            // views. If we do not implement this optimization, we will eventually throw the
+            // IFR flag kickback retry and end up restarting ClusterAggregate again.
             if (ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagVectorSearchExtension) &&
                 !feature_flags::gFeatureFlagExtensionViewsAndUnionWith.isEnabled()) {
                 state.ifrFlagsToDisableOnRetries.insert(

@@ -110,6 +110,22 @@ public:
         return _timeseriesOptions.has_value();
     }
 
+    const boost::optional<TimeseriesOptions>& getTimeseriesOptions() const {
+        return _timeseriesOptions;
+    }
+
+    const boost::optional<bool>& getMayContainMixedData() const {
+        return _timeseriesMayContainMixedData;
+    }
+
+    const boost::optional<bool>& getUsesExtendedRange() const {
+        return _timeseriesUsesExtendedRange;
+    }
+
+    const boost::optional<bool>& getFixedBuckets() const {
+        return _timeseriesfixedBuckets;
+    }
+
     // ErrorExtraInfo API
     static constexpr auto code = ErrorCodes::CommandOnShardedViewNotSupportedOnMongod;
     static constexpr StringData kTimeseriesMayContainMixedData = "timeseriesMayContainMixedData"_sd;
