@@ -30,11 +30,11 @@
 /**
  * Unit tests for the MozJS WASM component API via wasmtime.
  *
- * These tests load the compiled mozjs_wasm_api.wasm component,
- * instantiate it in a wasmtime runtime, and exercise the WIT
- * interface functions (initialize-engine, create-function,
- * invoke-function, invoke-predicate, invoke-map,
- * get-return-value-bson, shutdown-engine).
+ * These tests load the AOT pre-compiled mozjs_wasm_api.cwasm component
+ * (embedded into the binary via objcopy at build time), instantiate it
+ * in a wasmtime runtime, and exercise the WIT interface functions
+ * (initialize-engine, create-function, invoke-function, invoke-predicate,
+ * invoke-map, get-return-value-bson, shutdown-engine).
  *
  */
 
@@ -47,9 +47,8 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
 
-#include <cstdlib>
+#include <cstdint>
 #include <cstring>
-#include <fstream>
 #include <set>
 #include <string>
 #include <vector>
@@ -58,6 +57,13 @@
 
 #include <wasmtime/component.hh>
 #include <wasmtime/component/val.h>
+
+// Symbols produced by objcopy from the AOT-compiled mozjs_wasm_api.cwasm.
+// See the embed_mozjs_wasm_obj genrule in BUILD.bazel.
+extern "C" {
+extern const uint8_t _binary_mozjs_wasm_api_cwasm_start[];
+extern const uint8_t _binary_mozjs_wasm_api_cwasm_end[];
+}
 
 namespace wt = wasmtime;
 namespace wc = wasmtime::component;
@@ -69,23 +75,6 @@ namespace {
 
 // TODO SERVER-115423: Replace raw usages of the Wasmtime API with the
 // MozJS Wasm Bridge implementation.
-static std::vector<uint8_t> readWasmFile(const std::string& path) {
-    std::ifstream f(path, std::ios::binary | std::ios::ate);
-    if (!f) {
-        return {};
-    }
-    auto pos = f.tellg();
-    if (pos < 0) {
-        return {};
-    }
-    auto size = static_cast<size_t>(pos);
-    f.seekg(0);
-    std::vector<uint8_t> buf(size);
-    if (!f.read(reinterpret_cast<char*>(buf.data()), static_cast<std::streamsize>(size))) {
-        return {};
-    }
-    return buf;
-}
 
 static wc::List makeListU8(const uint8_t* data, size_t len) {
     wasmtime_component_vallist_t raw;
@@ -218,58 +207,22 @@ static std::optional<WasmError> extractError(const wc::Val& result) {
     return error;
 }
 
-static std::string resolveWasmPath() {
-    // 1. Explicit env var
-    if (const char* envPath = std::getenv("WASM_MODULE_PATH")) {
-        return envPath;
-    }
-    // 2. Bazel TEST_SRCDIR runfiles
-    if (const char* srcdir = std::getenv("TEST_SRCDIR")) {
-        for (const char* candidate : {
-                 "/_main/src/mongo/scripting/mozjs/wasm/mozjs_wasm_api.wasm",
-                 "/_main~_repo_rules~mozjs_wasm/file/mozjs_wasm_api.wasm",
-             }) {
-            std::string p = std::string(srcdir) + candidate;
-            std::ifstream check(p);
-            if (check.good())
-                return p;
-        }
-    }
-    // 3. Bazel-bin output directory (when built separately with --config=wasi)
-    {
-        // Try relative path that works when run from repo root via bazel test
-        for (const char* candidate : {
-                 "bazel-bin/src/mongo/scripting/mozjs/wasm/mozjs_wasm_api.wasm",
-                 "src/mongo/scripting/mozjs/wasm/mozjs_wasm_api.wasm",
-             }) {
-            std::ifstream check(candidate);
-            if (check.good())
-                return candidate;
-        }
-    }
-    // 4. Last attempt
-    return "src/mongo/scripting/mozjs/wasm/mozjs_wasm_api.wasm";
-}
-
 // Shares wasmtime engine + compiled component across all tests.
 // Only the store (and thus instance) are recreated per test to provide isolation.
 class WasmMozJSTest : public unittest::Test {
 public:
-    // One-time setup: compile the WASM component (expensive, ~40s).
+    // One-time setup: deserialize the AOT pre-compiled component (near-instant).
     static void SetUpTestSuite() {
-        s_wasmPath = resolveWasmPath();
-        auto wasmBytes = readWasmFile(s_wasmPath);
-        if (wasmBytes.empty()) {
-            return;
-        }
+        std::vector<uint8_t> cwasmBytes(_binary_mozjs_wasm_api_cwasm_start,
+                                        _binary_mozjs_wasm_api_cwasm_end);
 
         wt::Config config;
         config.wasm_component_model(true);
 
         s_engine.emplace(std::move(config));
 
-        wt::Span<uint8_t> wasmSpan(wasmBytes.data(), wasmBytes.size());
-        auto componentResult = wc::Component::compile(*s_engine, wasmSpan);
+        auto componentResult = wc::Component::deserialize(
+            *s_engine, wt::Span<uint8_t>(cwasmBytes.data(), cwasmBytes.size()));
         if (!componentResult) {
             return;
         }
@@ -535,15 +488,13 @@ private:
     std::optional<wt::Store> _store;
     std::optional<wc::Instance> _instance;
 
-    // Shared across all tests (expensive to create)
-    static std::string s_wasmPath;
+    // Shared across all tests
     static bool s_suiteReady;
     static std::optional<wt::Engine> s_engine;
     static std::optional<wc::Component> s_component;
 };
 
 // Static member definitions
-std::string WasmMozJSTest::s_wasmPath;
 bool WasmMozJSTest::s_suiteReady = false;
 std::optional<wt::Engine> WasmMozJSTest::s_engine;
 std::optional<wc::Component> WasmMozJSTest::s_component;

@@ -359,6 +359,52 @@ crate.annotation(
     extra_aliased_targets = {"wasmtime_c": "wasmtime_c"},
     gen_build_script = "off",
 )
+
+# Disable default features and re-enable everything except "objdump/explore" so we don't pull in capstone/capstone-sys.
+# Can be renabled when it uses a version of capstone containing this commit - https://github.com/capstone-rust/capstone-rs/commit/28a6eb15fdc6fb988d13c663e8b4af4d7870d263
+crate.spec(
+    default_features = False,
+    features = [
+        "run",
+        "compile",
+        "serve",
+        "wast",
+        "config",
+        "completion",
+        "wizer",
+        "wasi-nn",
+        "wasi-threads",
+        "wasi-http",
+        "wasi-config",
+        "wasi-keyvalue",
+        "wasi-tls",
+        "wat",
+        "parallel-compilation",
+        "pooling-allocator",
+        "cache",
+        "logging",
+        "demangle",
+        "cranelift",
+        "profiling",
+        "coredump",
+        "addr2line",
+        "debug-builtins",
+        "component-model",
+        "component-model-async",
+        "threads",
+        "stack-switching",
+        "winch",
+        "pulley",
+    ],
+    package = "wasmtime-cli",
+    version = "=40.0.2",
+)
+
+# This causes us to build the actual binary and not just the rlib
+crate.annotation(
+    crate = "wasmtime-cli",
+    gen_binaries = ["wasmtime"],
+)
 crate.spec(
     package = "zstd-sys",
     version = "=2.0.16+zstd.1.5.7",
@@ -385,7 +431,7 @@ crate.annotation_select(
 
 # Update the lock file using "CARGO_BAZEL_REPIN=1 bazel sync --only=crates"
 crate.from_specs(
-    cargo_lockfile = "//bazel:crates.lock",
+    cargo_lockfile = "//bazel:crates.toml",
     lockfile = "//bazel:crates.lock",
 )
 use_repo(crate, "crates")

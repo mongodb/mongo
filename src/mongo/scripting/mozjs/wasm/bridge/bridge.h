@@ -41,6 +41,8 @@ struct WasmEngineContext {
     WasmEngineContext& operator=(WasmEngineContext&&) = delete;
 
     static std::shared_ptr<WasmEngineContext> create(const std::vector<uint8_t>& bytes);
+    static std::shared_ptr<WasmEngineContext> createFromPrecompiled(const uint8_t* data,
+                                                                    size_t size);
 
 private:
     WasmEngineContext(wt::Engine engine, wc::Component component)

@@ -30,10 +30,11 @@
 /**
  * Unit tests for the MozJS Wasm component API via wasmtime.
  *
- * These tests load the compiled mozjs_wasm_api.wasm component,
- * instantiate it in a wasmtime runtime, and exercise the WIT
- * interface functions (initialize-engine, create-function,
- * invoke-function, get-return-value-bson, shutdown-engine).
+ * These tests load the AOT pre-compiled mozjs_wasm_api.cwasm component
+ * (embedded into the binary via objcopy at build time), instantiate it
+ * in a wasmtime runtime, and exercise the WIT interface functions
+ * (initialize-engine, create-function, invoke-function,
+ * get-return-value-bson, shutdown-engine etc).
  *
  */
 
@@ -48,58 +49,33 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
 
-#include <cstdlib>
+#include <cstdint>
 #include <cstring>
-#include <fstream>
 #include <set>
 #include <string>
 #include <vector>
+
+// Symbols produced by objcopy from the AOT-compiled mozjs_wasm_api.cwasm.
+// See the embed_mozjs_wasm_obj genrule in BUILD.bazel.
+extern "C" {
+extern const uint8_t _binary_mozjs_wasm_api_cwasm_start[];
+extern const uint8_t _binary_mozjs_wasm_api_cwasm_end[];
+}
 
 namespace mongo {
 namespace mozjs {
 namespace wasm {
 namespace {
 
-static std::string resolveWasmPath() {
-    // 1. Explicit env var
-    if (const char* envPath = std::getenv("WASM_MODULE_PATH")) {
-        return envPath;
-    }
-    // 2. Bazel TEST_SRCDIR runfiles
-    if (const char* srcdir = std::getenv("TEST_SRCDIR")) {
-        for (const char* candidate : {
-                 "/_main/src/mongo/scripting/mozjs/wasm/mozjs_wasm_api.wasm",
-                 "/_main~_repo_rules~mozjs_wasm/file/mozjs_wasm_api.wasm",
-             }) {
-            std::string p = std::string(srcdir) + candidate;
-            std::ifstream check(p);
-            if (check.good())
-                return p;
-        }
-    }
-    // 3. Bazel-bin output directory (when built separately with --config=wasi)
-    {
-        for (const char* candidate : {
-                 "bazel-bin/src/mongo/scripting/mozjs/wasm/mozjs_wasm_api.wasm",
-                 "src/mongo/scripting/mozjs/wasm/mozjs_wasm_api.wasm",
-             }) {
-            std::ifstream check(candidate);
-            if (check.good())
-                return candidate;
-        }
-    }
-    // 4. Last attempt
-    return "src/mongo/scripting/mozjs/wasm/mozjs_wasm_api.wasm";
-}
-
 // Shares wasmtime engine + compiled component across all tests via WasmEngineContext.
 // Each test gets a fresh MozJSWasmBridge (store + instance) for isolation.
 class WasmMozJSBridgeTest : public unittest::Test {
 public:
-    // One-time suite setup: read the Wasm file and compile the component (~40s).
     static void SetUpTestSuite() {
-        auto bytes = wasm_helpers::readWasmFile(resolveWasmPath());
-        _s_engineCtx = WasmEngineContext::create(bytes);
+        size_t size = static_cast<size_t>(_binary_mozjs_wasm_api_cwasm_end -
+                                          _binary_mozjs_wasm_api_cwasm_start);
+        _s_engineCtx =
+            WasmEngineContext::createFromPrecompiled(_binary_mozjs_wasm_api_cwasm_start, size);
     }
 
 protected:

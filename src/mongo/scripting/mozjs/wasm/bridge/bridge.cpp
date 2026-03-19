@@ -70,6 +70,21 @@ std::shared_ptr<WasmEngineContext> WasmEngineContext::create(const std::vector<u
         new WasmEngineContext(std::move(engine), result.ok()));
 }
 
+std::shared_ptr<WasmEngineContext> WasmEngineContext::createFromPrecompiled(const uint8_t* data,
+                                                                            size_t size) {
+    wt::Config config;
+    config.wasm_component_model(true);
+
+    wt::Engine engine(std::move(config));
+
+    wt::Span<uint8_t> span(const_cast<uint8_t*>(data), size);
+    auto result = wc::Component::deserialize(engine, span);
+    invariant(result);
+
+    return std::shared_ptr<WasmEngineContext>(
+        new WasmEngineContext(std::move(engine), result.ok()));
+}
+
 MozJSWasmBridge::MozJSWasmBridge(std::shared_ptr<WasmEngineContext> ctx) : _ctx(std::move(ctx)) {
     _store = wt::Store(_ctx->_engine);
     auto storeCtx = _store->context();

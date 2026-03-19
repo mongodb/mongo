@@ -1914,6 +1914,7 @@ def _impl(ctx):
                     "-Wno-uninitialized",
                     "-Wno-sign-compare",
                     "-Wno-unused-result",
+                    "-Wno-missing-include-dirs",
                 ])],
             ),
         ],
