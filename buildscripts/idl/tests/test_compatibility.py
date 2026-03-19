@@ -2221,7 +2221,24 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             "newUnstableRequiredParameterAdded",
         )
 
-        self.assertEqual(error_collection.count(), 214)
+        removed_parameter_error = error_collection.get_error_by_error_id(
+            idl_compatibility_errors.ERROR_ID_REMOVED_PARAMETER
+        )
+        self.assertTrue(
+            removed_parameter_error.error_id == idl_compatibility_errors.ERROR_ID_REMOVED_PARAMETER
+        )
+        self.assertRegex(str(removed_parameter_error), "testRemovedParameter")
+
+        duplicate_parameter_name_error = error_collection.get_error_by_error_id(
+            idl_compatibility_errors.ERROR_ID_DUPLICATE_PARAMETER_NAME
+        )
+        self.assertTrue(
+            duplicate_parameter_name_error.error_id
+            == idl_compatibility_errors.ERROR_ID_DUPLICATE_PARAMETER_NAME
+        )
+        self.assertRegex(str(duplicate_parameter_name_error), "testDuplicateParameter")
+
+        self.assertEqual(error_collection.count(), 216)
 
     def test_generic_argument_compatibility_pass(self):
         """Tests that compatible old and new generic_argument.idl files should pass."""

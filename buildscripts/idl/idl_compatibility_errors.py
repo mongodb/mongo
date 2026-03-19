@@ -127,6 +127,8 @@ ERROR_ID_NEW_COMMAND_PARAM_FIELD_ADDED_AS_STABLE = "ID0087"
 ERROR_ID_NEW_COMMAND_TYPE_FIELD_ADDED_AS_STABLE = "ID0088"
 ERROR_ID_NEW_COMMAND_TYPE_FIELD_ADDED_AS_UNSTABLE_REQUIRED = "ID0089"
 ERROR_ID_NEW_COMMAND_PARAM_FIELD_ADDED_AS_UNSTABLE_REQUIRED = "ID0090"
+ERROR_ID_DUPLICATE_PARAMETER_NAME = "ID0091"
+ERROR_ID_REMOVED_PARAMETER = "ID0092"
 
 
 class IDLCompatibilityCheckerError(Exception):
@@ -305,6 +307,15 @@ class IDLCompatibilityContext(object):
             file,
         )
 
+    def add_parameter_removed_error(self, parameter_name: str, file: str) -> None:
+        """Add an error about a parameter that was removed."""
+        self._add_error(
+            ERROR_ID_REMOVED_PARAMETER,
+            parameter_name,
+            "The parameter '%s' was present in the stable API but was removed." % (parameter_name),
+            file,
+        )
+
     def add_command_strict_true_error(self, command_name: str, file: str) -> None:
         """Add an error about a command that changes from strict: false to strict: true."""
         self._add_error(
@@ -321,6 +332,17 @@ class IDLCompatibilityContext(object):
             ERROR_ID_DUPLICATE_COMMAND_NAME,
             command_name,
             "'%s' has duplicate command: '%s'" % (dir_name, command_name),
+            file,
+        )
+
+    def add_duplicate_parameter_name_error(
+        self, parameter_name: str, dir_name: str, file: str
+    ) -> None:
+        """Add an error about a duplicate parameter name within a directory."""
+        self._add_error(
+            ERROR_ID_DUPLICATE_PARAMETER_NAME,
+            parameter_name,
+            "'%s' has duplicate parameter: '%s'" % (dir_name, parameter_name),
             file,
         )
 

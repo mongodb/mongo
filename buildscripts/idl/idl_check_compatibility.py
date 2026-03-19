@@ -82,6 +82,7 @@ RENAMED_COMPLEX_ACCESS_CHECKS: dict[str, str] = rules["RENAMED_COMPLEX_ACCESS_CH
 ALLOWED_NEW_COMPLEX_ACCESS_CHECKS: dict[str, list[str]] = rules["ALLOWED_NEW_COMPLEX_ACCESS_CHECKS"]
 CHANGED_ACCESS_CHECKS_TYPE: dict[str, list[str]] = rules["CHANGED_ACCESS_CHECKS_TYPE"]
 ALLOW_FIELD_VALUE_REMOVAL_LIST: dict[str, list[str]] = rules["ALLOW_FIELD_VALUE_REMOVAL_LIST"]
+IGNORE_REMOVED_PARAMETERS_LIST: list[str] = rules["IGNORE_REMOVED_PARAMETERS_LIST"]
 
 SKIPPED_FILES = [
     "unittest.idl",
@@ -186,6 +187,9 @@ def get_new_commands(
     new_commands: dict[str, syntax.Command] = dict()
     new_command_file: dict[str, syntax.IDLParsedSpec] = dict()
     new_command_file_path: dict[str, str] = dict()
+    new_parameters: dict[str, syntax.ServerParameter] = dict()
+    new_parameters_file: dict[str, syntax.IDLParsedSpec] = dict()
+    new_parameters_file_path: dict[str, str] = dict()
 
     for dirpath, _, filenames in os.walk(new_idl_dir):
         for new_filename in filenames:
@@ -226,7 +230,27 @@ def get_new_commands(
                     new_command_file[new_cmd.command_name] = new_idl_file
                     new_command_file_path[new_cmd.command_name] = new_idl_file_path
 
-    return new_commands, new_command_file, new_command_file_path
+                for new_param in new_idl_file.spec.server_parameters:
+                    # Ignore imported parameters as they will be processed in their own file.
+                    for name in [new_param.name] + new_param.deprecated_name:
+                        if name in new_parameters:
+                            ctxt.add_duplicate_parameter_name_error(
+                                name, new_idl_dir, new_idl_file_path
+                            )
+                            continue
+
+                        new_parameters[name] = new_param
+                        new_parameters_file[name] = new_idl_file
+                        new_parameters_file_path[name] = new_idl_file_path
+
+    return (
+        new_commands,
+        new_command_file,
+        new_command_file_path,
+        new_parameters,
+        new_parameters_file,
+        new_parameters_file_path,
+    )
 
 
 def get_chained_struct(
@@ -1717,14 +1741,20 @@ def check_compatibility(
     """Check IDL compatibility between old and new IDL commands."""
     ctxt = IDLCompatibilityContext(old_idl_dir, new_idl_dir, IDLCompatibilityErrorCollection())
 
-    new_commands, new_command_file, new_command_file_path = get_new_commands(
-        ctxt, new_idl_dir, new_import_directories
-    )
+    (
+        new_commands,
+        new_command_file,
+        new_command_file_path,
+        new_parameters,
+        new_parameters_file,
+        new_parameters_file_path,
+    ) = get_new_commands(ctxt, new_idl_dir, new_import_directories)
 
     # Check new commands' compatibility with old ones.
     # Note, a command can be added to V1 at any time, it's ok if a
     # new command has no corresponding old command.
     old_commands: dict[str, syntax.Command] = dict()
+    old_parameters: dict[str, syntax.ServerParameter] = dict()
     for dirpath, _, filenames in os.walk(old_idl_dir):
         for old_filename in filenames:
             if not old_filename.endswith(".idl") or old_filename in SKIPPED_FILES:
@@ -1821,6 +1851,29 @@ def check_compatibility(
                     check_security_access_checks(
                         ctxt, old_cmd.access_check, new_cmd.access_check, old_cmd, new_idl_file_path
                     )
+
+                # Make sure no server parameters were removed
+                for old_param in old_idl_file.spec.server_parameters:
+                    # we don't care if test only parameters are removed
+                    if old_param.test_only:
+                        continue
+
+                    for name in [old_param.name] + old_param.deprecated_name:
+                        if name in old_commands:
+                            ctxt.add_duplicate_parameter_name_error(
+                                name, old_idl_dir, old_idl_file_path
+                            )
+                            continue
+
+                        old_parameters[name] = old_param
+
+                        if name not in new_parameters:
+                            # Can't remove a parameter unless it's in the ignore list
+                            if (
+                                not IGNORE_REMOVED_PARAMETERS_LIST
+                                or name not in IGNORE_REMOVED_PARAMETERS_LIST
+                            ):
+                                ctxt.add_parameter_removed_error(name, old_idl_file_path)
 
     ctxt.errors.dump_errors()
     return ctxt.errors

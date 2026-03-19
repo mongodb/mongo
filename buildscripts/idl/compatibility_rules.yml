@@ -361,3 +361,130 @@ RENAMED_COMPLEX_ACCESS_CHECKS:
   get_single_user: "get_authenticated_user"
   get_authenticated_usernames: "get_authenticated_username"
   get_impersonated_usernames: "get_impersonated_username"
+
+# List of server parameters that have been removed and should not trigger compatibility errors.
+# Parameters removed in 8.0 can remain here indefinitely as they're no longer supported.
+# Parameters removed in later versions should have associated tickets for documentation/deprecation.
+IGNORE_REMOVED_PARAMETERS_LIST:
+  # Parameters removed between 8.0.18 and 8.2.4, we are assuming these have been removed long enough
+  # to not cause any problems
+  # These can be deleted from this list when we no longer check against 8.0 (this should be after we branch 9.0)
+
+  # Change streams parameters
+  - "changeCollectionTruncateMarkersMinBytes"
+  # TTL parameters
+  - "ttlCollLowPrioritySubpassLimit"
+  # Storage engine concurrency parameters (8.0 only)
+  - "lowPriorityAdmissionBypassThreshold"
+  # Query optimizer parameters
+  - "internalQueryPlanEvaluationWorksSbe"
+  - "internalQueryPlanEvaluationCollFractionSbe"
+  - "internalQuerySlotBasedExecutionHashAggForceIncreasedSpilling"
+  - "enableUnionWithVectorSearch"
+  - "internalQueryCardinalityEstimatorMode"
+  # Cascades optimizer parameters
+  - "internalCascadesOptimizerDisableScan"
+  - "internalCascadesOptimizerDisableIndexes"
+  - "internalCascadesOptimizerDisableMergeJoinRIDIntersect"
+  - "internalCascadesOptimizerDisableHashJoinRIDIntersect"
+  - "internalCascadesOptimizerDisableGroupByAndUnionRIDIntersect"
+  - "internalCascadesOptimizerDisableSargableWhenNoIndexes"
+  - "internalCascadesOptimizerFastIndexNullHandling"
+  - "internalCascadesOptimizerSampleChunks"
+  - "internalCascadesOptimizerRepeatableSample"
+  - "internalCascadesOptimizerSampleSizeMin"
+  - "internalCascadesOptimizerSampleSizeMax"
+  - "internalCascadesOptimizerSampleIndexedFields"
+  - "internalCascadesOptimizerSampleTwoFields"
+  - "internalCascadesOptimizerEnableSqrtSampleSize"
+  - "internalCascadesOptimizerDisableYieldingTolerantPlans"
+  - "internalCascadesOptimizerMinIndexEqPrefixes"
+  - "internalCascadesOptimizerMaxIndexEqPrefixes"
+  - "internalCascadesOptimizerEnableNotPushdown"
+  - "internalCascadesOptimizerSamplingCEFallBackForFilterNode"
+  - "internalCascadesOptimizerDisableFastPath"
+  - "internalCascadesOptimizerEnableParameterization"
+  # Column scan parameters
+  - "internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan"
+  - "internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan"
+  - "internalCostModelCoefficients"
+  - "internalQueryColumnScanMinCollectionSizeBytes"
+  - "internalQueryColumnScanMinAvgDocSizeBytes"
+  - "internalQueryColumnRowstoreScanMinBatchSize"
+  - "internalQueryColumnRowstoreScanMaxBatchSize"
+  - "internalQueryColumnScanMinNumColumnFilters"
+  # Query execution parameters
+  - "internalUseRoaringBitmapsForRecordIDDeduplication"
+  - "deprioritizeUnboundedUserCollectionScans"
+  - "deprioritizeUnboundedUserIndexScans"
+  - "internalQueryEnableSbeForNaryExpression"
+  # Replication parameters
+  - "forceRollbackViaRefetch"
+  - "tenantApplierBatchSizeBytes"
+  - "tenantApplierBatchSizeOps"
+  - "minOplogEntriesPerThread"
+  - "tenantApplierThreadCount"
+  - "tenantMigrationGarbageCollectionDelayMS"
+  - "tenantMigrationExternalKeysRemovalBufferSecs"
+  - "tenantMigrationOplogBufferPeekCacheSize"
+  - "tenantMigrationOplogFetcherBatchSize"
+  - "maxTenantMigrationRecipientThreadPoolSize"
+  - "minTenantMigrationRecipientThreadPoolSize"
+  - "maxTenantMigrationDonorServiceThreadPoolSize"
+  - "minTenantMigrationDonorServiceThreadPoolSize"
+  - "importQuorumTimeoutSeconds"
+  - "maxShardSplitDonorServiceThreadPoolSize"
+  - "minShardSplitDonorServiceThreadPoolSize"
+  - "shardSplitTimeoutMS"
+  - "tenantMigrationBlockingStateTimeoutMS"
+  - "tenantMigrationDisableX509Auth"
+  - "tenantMigrationExcludeDonorHostTimeoutMS"
+  - "shardSplitGarbageCollectionDelayMS"
+  # Sharding parameters
+  - "autoMergerMaxTimeProcessingChunksMS:"
+  - "rangeDeleterHighPriority"
+  # Global index parameters
+  - "globalIndexClonerServiceMaxThreadCount"
+  - "globalIndexClonerServiceFetchBatchMaxSizeBytes"
+  # Resharding parameters
+  - "reshardingCollectionClonerBatchSizeInBytes"
+  - "reshardingOplogFetcherSleepMillis"
+  # Resource consumption parameters
+  - "aggregateOperationResourceConsumptionMetrics"
+  - "profileOperationResourceConsumptionMetrics"
+  - "documentUnitSizeBytes"
+  - "indexEntryUnitSizeBytes"
+  - "totalUnitWriteSizeBytes"
+  # Storage parameters
+  - "maintainValidCursorsAcrossSBEReadCommands"
+  - "maintainValidCursorsAcrossSBEYield"
+  - "wiredTigerMaxCacheOverflowSizeGB"
+  # Catalog parameters
+  - "catalogCacheIndexMaxEntries"
+  # Scripting parameters
+  - "disableJavaScriptJIT"
+  # Service executor parameters
+  - "initialServiceExecutorUseDedicatedThread"
+  - "fixedServiceExecutorThreadLimit"
+
+  # Parameters removed since 8.2.4
+
+  # this was converted to a Incremental Feature Rollout and was locked behind a feature flag
+  - "internalQueryUnifiedWriteExecutor"
+  # These parameters were part of an unreleased project and were locked behind a feature flag
+  - "AbortOldestTransactionSessionCheckoutTimeoutMilliseconds"
+  - "AbortOldestTransactionSessionKillLimitPerBatch"
+  - "AbortOldestTransactionMemoryClearLimitPerBatch"
+  # Idl file was not part of the build graph and was removed in a drive-by code cleanup
+  - "connectionAcquisitionToWireLoggingRate"
+  # Confirmed that no atlas clusters had this parameter enabled when it was removed
+  - "enableTemporarilyUnavailableExceptions"
+  # Confirmed that no atlas clusters had this parameter enabled when it was removed
+  - "ShadingTaskExecutorPoolBaseEstablishmentBackoffMS"
+  - "ShardingTaskExecutorPoolMaxEstablishmentBackoffMS"
+  # This was a test only parameter.
+  - "planRankerMode"
+
+  # anything added below this comment is added after the initial parameter check was added.
+  # Please be specic about why this parameter should be removed instead of deprecated.
+  # Ideally this list should not grow and parameters are not removed.

@@ -403,6 +403,7 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
 
     files_with_targets = list_files_with_targets(bazel_bin)
     lr.list_files_without_targets(files_with_targets, "C++", "cpp", ["src/mongo"])
+    lr.list_files_without_targets(files_with_targets, "idl", "idl", ["src"])
     lr.list_files_without_targets(
         files_with_targets,
         "javascript",
