@@ -212,9 +212,11 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
                 Lock::ResourceLock heldUntilEndOfWUOW{
                     opCtx(), ResourceId(RESOURCE_METADATA, collectionPtr()->ns()), MODE_X};
             }
-            auto oplogInfo = LocalOplogInfo::get(opCtx());
-            auto oplogSlots = oplogInfo->getNextOpTimes(opCtx(), /*batchSize=*/1);
-            insertStmt.oplogSlot = oplogSlots.front();
+            if (!wunit.isGroupingOplogEntries()) {
+                auto oplogInfo = LocalOplogInfo::get(opCtx());
+                auto oplogSlots = oplogInfo->getNextOpTimes(opCtx(), /*batchSize=*/1);
+                insertStmt.oplogSlot = oplogSlots.front();
+            }
         }
 
         uassertStatusOK(collection_internal::insertDocument(opCtx(),
