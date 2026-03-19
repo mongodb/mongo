@@ -89,6 +89,7 @@ const expectedGlobalVars = [
     "assert",
     "bsonBinaryEqual",
     "bsonObjToArray",
+    "bsonToBase64",
     "bsonUnorderedFieldsCompare",
     "bsonWoCompare",
     "buildInfo",

@@ -47,6 +47,7 @@
 #include "mongo/scripting/mozjs/common/valuereader.h"
 #include "mongo/scripting/mozjs/common/valuewriter.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/base64.h"
 #include "mongo/util/string_map.h"
 
 #include <cstddef>
@@ -73,11 +74,12 @@ namespace mozjs {
 
 const char* const BSONInfo::className = "BSON";
 
-const JSFunctionSpec BSONInfo::freeFunctions[5] = {
+const JSFunctionSpec BSONInfo::freeFunctions[6] = {
     MONGO_ATTACH_JS_FUNCTION(bsonWoCompare),
     MONGO_ATTACH_JS_FUNCTION(bsonUnorderedFieldsCompare),
     MONGO_ATTACH_JS_FUNCTION(bsonBinaryEqual),
     MONGO_ATTACH_JS_FUNCTION(bsonObjToArray),
+    MONGO_ATTACH_JS_FUNCTION(bsonToBase64),
     JS_FS_END,
 };
 
@@ -388,6 +390,18 @@ void BSONInfo::Functions::bsonBinaryEqual::call(JSContext* cx, JS::CallArgs args
     BSONObj bsonObject2 = getBSONFromArg(cx, args.get(1), isBSON);
 
     args.rval().setBoolean(bsonObject1.binaryEqual(bsonObject2));
+}
+
+void BSONInfo::Functions::bsonToBase64::call(JSContext* cx, JS::CallArgs args) {
+    if (args.length() != 1)
+        uasserted(ErrorCodes::BadValue, "bsonToBase64 needs 1 argument");
+
+    auto* runtime = getCommonRuntime(cx);
+    bool isBSON = getProto<BSONInfo>(runtime).instanceOf(args.get(0));
+    BSONObj bsonObject = getBSONFromArg(cx, args.get(0), isBSON);
+
+    auto encoded = mongo::base64::encode(StringData(bsonObject.objdata(), bsonObject.objsize()));
+    ValueReader(cx, args.rval()).fromStringData(encoded);
 }
 
 void BSONInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto) {

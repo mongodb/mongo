@@ -4096,17 +4096,15 @@ function checkOplogs(rst, msgPrefix = "checkOplogs", secondaries) {
         if (!bsonBinaryEqual(oplogEntry0, oplogEntry1)) {
             const query = prevOplogEntry ? {ts: {$lte: prevOplogEntry.ts}} : {};
             rst.nodes.forEach((node) => rst.dumpOplog(node, query, 100));
-            const log =
-                msgPrefix +
-                ", non-matching oplog entries for the following nodes: \n" +
-                reader0.mongo.host +
-                ": " +
-                tojsononeline(oplogEntry0) +
-                "\n" +
-                reader1.mongo.host +
-                ": " +
-                tojsononeline(oplogEntry1);
-            assert(false, log);
+            const logLines = [
+                `${msgPrefix}, non-matching oplog entries for the following nodes:`,
+                `${reader0.mongo.host}: ${tojsononeline(oplogEntry0)}`,
+                `${reader1.mongo.host}: ${tojsononeline(oplogEntry1)}`,
+                `non-matching oplog entries base64-encoded raw BSON:`,
+                `${reader0.mongo.host}: ${bsonToBase64(oplogEntry0)}`,
+                `${reader1.mongo.host}: ${bsonToBase64(oplogEntry1)}`,
+            ];
+            assert(false, logLines.join("\n"));
         }
     }
 
