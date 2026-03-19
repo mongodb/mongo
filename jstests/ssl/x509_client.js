@@ -148,7 +148,7 @@ const x509_options = {
 // forwards X.509 identity via PROXY protocol v2 TLVs over a Unix domain socket.
 // Architecture:  [shell] --TLS--> [proxy] --PP2+UDS--> [mongod/mongos]
 // ============================================================================
-if (!isWindows) {
+if (!isWindows && !jsTestOptions().shellGRPC) {
     /**
      * Creates a proxy protocol server that terminates TLS on ingress, extracts the client cert DN
      * (and roles if present) from the TLS handshake, and forwards them as PP2 TLVs to the target's

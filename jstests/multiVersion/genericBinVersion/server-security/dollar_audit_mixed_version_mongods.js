@@ -155,7 +155,7 @@ function testDollarAuditPropagation(st, fcv, isLoadBalanced = false, proxy_serve
     st.stop();
 }
 
-{
+if (!_isWindows() && !jsTestOptions().shellGRPC) {
     // Test the expected metadata is propagated in a load balanced cluster using the latestFCV.
     jsTest.log(
         `Testing FCV ${latestFCV} metadata propagation in sharded cluster with mixed versions with a load balanced connection`,

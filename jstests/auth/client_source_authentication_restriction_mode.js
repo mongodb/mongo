@@ -13,6 +13,12 @@ if (!isLinux()) {
     quit();
 }
 
+// Proxy protocol is not supported over gRPC.
+if (jsTestOptions().shellGRPC) {
+    jsTestLog("Test is not compatible with gRPC.");
+    quit();
+}
+
 function runTest(mongosCon, mode, proxyIngressAddress, proxyIngressPort, restrictionAddress) {
     // Use a direct, non-proxied connection to the server to run setup operations.
     const adminMongo = new Mongo(mongosCon.host);

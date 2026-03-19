@@ -161,7 +161,7 @@ jsTest.log.info("4. Testing x.509 auth to mongos with x509 roles disabled");
 // forwards X.509 identity (DN + roles) via PROXY protocol v2 TLVs over a Unix domain socket.
 // Architecture:  [shell] --TLS--> [proxy] --PP2+UDS--> [mongod/mongos]
 // ============================================================================
-if (!isWindows) {
+if (!isWindows && !jsTestOptions().shellGRPC) {
     /**
      * Creates a proxy protocol server that terminates TLS on ingress, extracts the client cert DN
      * and mongoRoles extension from the TLS handshake, and forwards them as PP2 TLVs to the

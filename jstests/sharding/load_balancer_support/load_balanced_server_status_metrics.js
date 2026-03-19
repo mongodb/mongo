@@ -3,6 +3,7 @@
  * @tags: [
  *   # TODO (SERVER-85629): Re-enable this test once redness is resolved in multiversion suites.
  *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
+ *   grpc_incompatible,
  *   requires_fcv_80,
  * ]
  */

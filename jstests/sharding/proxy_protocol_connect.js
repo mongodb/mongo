@@ -1,6 +1,7 @@
 /**
  * Validate we can connect over the proxy protocol port with the protocol appended.
  * @tags: [
+ *   grpc_incompatible,
  *   requires_fcv_52,
  * ]
  */
