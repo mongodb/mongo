@@ -103,6 +103,7 @@ roles:
           - dropIndex
           - dropSearchIndex
           - createIndex
+          - performRawDataOperations
           - createSearchIndexes
           - enableProfiler
           - listCollections
