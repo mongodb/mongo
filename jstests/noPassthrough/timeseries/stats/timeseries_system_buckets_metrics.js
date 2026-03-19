@@ -8,7 +8,10 @@
  * ]
  */
 
-import {getTimeseriesBucketsColl} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {
+    areViewlessTimeseriesEnabled,
+    getTimeseriesBucketsColl,
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -101,6 +104,56 @@ function testDirectBucketTargeting({name, primaryConn, otherConns}) {
     );
 }
 
+// TODO SERVER-119235: Remove once chunk-related sharding commands support rawData.
+function testShardingCommandsNotCounted(st) {
+    jsTest.log.info("Testing that sharding commands allowed to target system.buckets do not increment the counter");
+
+    if (areViewlessTimeseriesEnabled(st.s.getDB("admin"))) {
+        return;
+    }
+
+    const dbName = `${jsTestName()}_sharding_cmds`;
+    const testDB = st.s.getDB(dbName);
+    const coll = testDB.getCollection("ts");
+    const bucketNss = getTimeseriesBucketsColl(coll).getFullName();
+
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({
+            shardCollection: coll.getFullName(),
+            key: {[metaField]: 1},
+            timeseries: {timeField, metaField},
+        }),
+    );
+
+    const allConns = [st.s, st.rs0.getPrimary(), st.rs1.getPrimary()];
+    const baselines = allConns.map((conn) => getNumSystemBucketsCommands(conn));
+
+    assert.commandWorked(st.s.adminCommand({split: bucketNss, middle: {meta: 0}}));
+    assert.commandWorked(st.s.adminCommand({clearJumboFlag: bucketNss, find: {meta: -1}}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: bucketNss, find: {meta: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+    );
+    assert.commandWorked(
+        st.s.adminCommand({moveRange: bucketNss, min: {meta: 0}, max: {meta: MaxKey}, toShard: st.shard0.shardName}),
+    );
+    assert.commandWorked(st.s.adminCommand({mergeChunks: bucketNss, bounds: [{meta: MinKey}, {meta: MaxKey}]}));
+    assert.commandWorked(st.s.adminCommand({mergeAllChunksOnShard: bucketNss, shard: st.shard0.shardName}));
+    assert.commandWorked(st.rs0.getPrimary().adminCommand({cleanupOrphaned: bucketNss}));
+    assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: bucketNss}));
+    assert.commandWorked(st.s.adminCommand({configureCollectionBalancing: bucketNss}));
+
+    for (let i = 0; i < allConns.length; i++) {
+        assert.eq(
+            baselines[i],
+            getNumSystemBucketsCommands(allConns[i]),
+            `Sharding command incremented system.buckets counter on ${allConns[i].host}`,
+        );
+    }
+
+    assert.commandWorked(testDB.dropDatabase());
+}
+
 // Standalone mongod.
 {
     const mongod = MongoRunner.runMongod();
@@ -132,6 +185,7 @@ function testDirectBucketTargeting({name, primaryConn, otherConns}) {
             primaryConn: st.s,
             otherConns: [st.rs0.getPrimary(), st.rs1.getPrimary()],
         });
+        testShardingCommandsNotCounted(st);
     } finally {
         st.stop();
     }

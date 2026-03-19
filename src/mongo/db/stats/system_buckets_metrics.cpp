@@ -42,11 +42,16 @@
 
 namespace mongo {
 
-// TODO SERVER-119235: Remove this once these commands support rawData.
-static const StringDataSet kCommandsAllowedToTargetBuckets = {
-    "moveChunk"_sd,
-    "split"_sd,
-};
+// TODO SERVER-119235: Remove chunk-related commands once they support rawData.
+static const StringDataSet kCommandsAllowedToTargetBuckets = {"moveChunk"_sd,
+                                                              "split"_sd,
+                                                              "mergeChunks"_sd,
+                                                              "moveRange"_sd,
+                                                              "clearJumboFlag"_sd,
+                                                              "cleanupOrphaned"_sd,
+                                                              "mergeAllChunksOnShard"_sd,
+                                                              "configureCollectionBalancing"_sd,
+                                                              "balancerCollectionStatus"_sd};
 
 SystemBucketsMetricsCommandHooks::SystemBucketsMetricsCommandHooks() {
     _commandsExecuted = &*MetricBuilder<Counter64>("numCommandsTargetingSystemBuckets");
