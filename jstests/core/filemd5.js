@@ -24,4 +24,25 @@ assert.commandWorked(db.fs.chunks.insert({files_id: 2, n: 0}));
 assert.commandFailedWithCode(db.runCommand({filemd5: 2, root: "fs"}), 50848);
 assert.commandWorked(db.fs.chunks.update({files_id: 2, n: 0}, {$set: {data: 5}}));
 assert.commandFailedWithCode(db.runCommand({filemd5: 2, root: "fs"}), 50849);
-}());
+
+{
+    const result = assert.commandWorked(
+        db.runCommand({
+            filemd5: ObjectId("000000000000000000000000"),
+            root: "fs",
+            partialOk: true,
+        }),
+    );
+
+    assert(result.md5state !== undefined,
+           "Expected md5state in filemd5 response with partialOk: true");
+    const hex = result.md5state.hex();
+    const totalBytes = hex.length / 2;
+    assert.gt(totalBytes, 72, "md5state expected to be larger than 72 bytes");
+
+    const checkFromByte = 72;
+    const paddingHex = hex.substring(checkFromByte * 2);
+    const allZeros = "0".repeat(paddingHex.length);
+    assert.eq(paddingHex, allZeros, "md5state expected to be zero padded");
+}
+})();
