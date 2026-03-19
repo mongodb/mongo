@@ -35,6 +35,7 @@
 namespace mongo {
 
 void md5_init_state(md5_state_t* pms) {
+    memset(pms, 0, sizeof(md5_state_t));
     md5_init(pms);
 }
 
