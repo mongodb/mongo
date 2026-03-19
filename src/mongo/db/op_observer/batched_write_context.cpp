@@ -78,7 +78,6 @@ void BatchedWriteContext::setWritesAreBatched(bool batched) {
 }
 
 void BatchedWriteContext::setDefaultFromMigrate(bool defaultFromMigrate) {
-    invariant(_defaultFromMigrate == defaultFromMigrate || _batchedOperations.isEmpty());
     _defaultFromMigrate = defaultFromMigrate;
 }
 

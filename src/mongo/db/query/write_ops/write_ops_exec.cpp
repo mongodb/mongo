@@ -379,8 +379,8 @@ void insertDocumentsAtomically(OperationContext* opCtx,
         Lock::ResourceLock heldUntilEndOfWUOW{
             opCtx, ResourceId(RESOURCE_METADATA, collection.getCollectionPtr()->ns()), MODE_X};
     }
-    if (oplogEntryGroupType != WriteUnitOfWork::kGroupForPossiblyRetryableOperations &&
-        !inTransaction && !oplogDisabled && collection.getCollectionPtr()->isCapped()) {
+    if (!wuow.isGroupingOplogEntries() && !inTransaction && !oplogDisabled &&
+        collection.getCollectionPtr()->isCapped()) {
         acquireOplogSlotsForInserts(opCtx, collection, begin, end);
     }
 
