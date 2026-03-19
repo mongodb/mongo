@@ -345,3 +345,19 @@ const runScoreFusionViewTest = (testName, inputPipelines, viewPipeline, checkCor
     };
     testHybridSearchViewWithSubsequentUnionOnDifferentView(scoreFusionInputPipelines, createScoreFusionPipeline);
 })();
+
+// $scoreFusion with an empty input pipeline should trigger the correct error.
+(function testScoreFusionEmptyPipelineOnView() {
+    const collName = jsTestName() + "_empty_pipeline_coll";
+    const viewName = jsTestName() + "_empty_pipeline_view";
+    db[collName].drop();
+    assert.commandWorked(db.createView(viewName, collName, []));
+    assert.commandFailedWithCode(
+        db.runCommand({
+            aggregate: viewName,
+            pipeline: [{$scoreFusion: {input: {pipelines: {p: []}, normalization: "none"}}}],
+            cursor: {},
+        }),
+        9402503,
+    );
+})();
