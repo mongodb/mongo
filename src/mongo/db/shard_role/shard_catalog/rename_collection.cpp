@@ -728,7 +728,7 @@ Status copySourceToTemporaryCollectionOnTargetDB(
                                   isGroupedOplogEntries ? WriteUnitOfWork::kGroupForTransaction
                                                         : WriteUnitOfWork::kDontGroup);
 
-            if (!isOplogDisabledForTmpColl && !isGroupedOplogEntries) {
+            if (!isOplogDisabledForTmpColl && !wunit.isGroupingOplogEntries()) {
                 if (autoTmpColl->needsCappedLock()) {
                     // We do not expect any concurrency here, we acquire this lock to be
                     // consistent with behavior in other inserts into non-clustered capped
