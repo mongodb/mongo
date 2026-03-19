@@ -139,7 +139,7 @@ constexpr StringData kLastTimeBetweenCommitOplogAndCommitMillisRestore =
  */
 void checkShardKeyRestrictions(OperationContext* opCtx,
                                const NamespaceString& nss,
-                               const BSONObj& newIdxKey) {
+                               const BSONObj& spec) {
     CollectionCatalog::get(opCtx)->invariantHasExclusiveAccessToCollection(opCtx, nss);
 
     const auto collDesc = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
@@ -148,10 +148,13 @@ void checkShardKeyRestrictions(OperationContext* opCtx,
         return;
 
     const ShardKeyPattern shardKeyPattern(collDesc.getKeyPattern());
+    auto collation = spec["collation"].ok() ? spec["collation"].Obj() : BSONObj();
     uassert(ErrorCodes::CannotCreateIndex,
             str::stream() << "cannot create index with 'unique' or 'prepareUnique' option over "
-                          << newIdxKey << " with shard key pattern " << shardKeyPattern.toBSON(),
-            shardKeyPattern.isIndexUniquenessCompatible(newIdxKey));
+                          << spec[kKeyFieldName].Obj() << " with shard key pattern "
+                          << shardKeyPattern.toBSON() << " and collation " << collation,
+            shardKeyPattern.isIndexUniquenessAndCollationCompatible(spec[kKeyFieldName].Obj(),
+                                                                    collation));
 }
 
 /**
@@ -3546,7 +3549,7 @@ std::vector<BSONObj> IndexBuildsCoordinator::prepareSpecListForCreate(
     // Verify that each spec is compatible with the collection's sharding state.
     for (const BSONObj& spec : resultSpecs) {
         if (spec[kUniqueFieldName].trueValue() || spec[kPrepareUniqueFieldName].trueValue()) {
-            checkShardKeyRestrictions(opCtx, nss, spec[kKeyFieldName].Obj());
+            checkShardKeyRestrictions(opCtx, nss, spec);
         }
     }
 

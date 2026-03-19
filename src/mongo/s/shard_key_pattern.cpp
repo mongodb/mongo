@@ -30,11 +30,12 @@
 #include "mongo/s/shard_key_pattern.h"
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/db/field_ref_set.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/path_internal.h"
+#include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -403,12 +404,14 @@ BSONObj ShardKeyPattern::emplaceMissingShardKeyValuesForDocument(const BSONObj d
     return fullDocBuilder.obj();
 }
 
-bool ShardKeyPattern::isIndexUniquenessCompatible(const BSONObj& indexPattern) const {
+bool ShardKeyPattern::isIndexUniquenessAndCollationCompatible(const BSONObj& indexPattern,
+                                                              const BSONObj& collation) const {
     if (!indexPattern.isEmpty() && indexPattern.firstElementFieldName() == kIdField) {
         return true;
     }
-
-    return _keyPattern.toBSON().isFieldNamePrefixOf(indexPattern);
+    const bool hasSimpleCollation = collation.isEmpty() ||
+        SimpleBSONObjComparator::kInstance.evaluate(collation == CollationSpec::kSimpleSpec);
+    return _keyPattern.toBSON().isFieldNamePrefixOf(indexPattern) && hasSimpleCollation;
 }
 
 size_t ShardKeyPattern::getApproximateSize() const {
