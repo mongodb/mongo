@@ -5,6 +5,7 @@
  */
 
 import {getUriForColl} from "jstests/disk/libs/wt_file_helper.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const baseName = "wt_repair_orphaned_idents";
 const dbpath = MongoRunner.dataPath + baseName + "/";
@@ -74,7 +75,10 @@ for (let entry of res.cursor.firstBatch) {
     assert(collName.startsWith("recovered") || collName == importantCollName);
 
     // Assert _id index has been successfully created.
-    assert("idIndex" in entry);
+    // TODO(SERVER-121765): Remove this check when replicated fast count no longer uses collections.
+    if (!FeatureFlagUtil.isPresentAndEnabled(mongod, "featureFlagReplicatedFastCount")) {
+        assert("idIndex" in entry);
+    }
 
     // Make sure we can interact with the recovered collections.
     assert.commandWorked(testDb.runCommand({find: collName}));
