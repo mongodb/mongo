@@ -1856,10 +1856,10 @@ Status performAtomicTimeseriesWrites(
 
         // Since this bypasses the usual write path, size validation is needed.
         if (MONGO_unlikely(updated.objsize() > BSONObjMaxUserSize)) {
-            invariant(false);
-            // This block isn't expected to be hit on v7.0 because the object
+            // This block isn't generally expected to be hit on v7.0 because the object
             // would have failed BSON construction via exception earlier in the write
-            // path. Keeping this here for completeness.
+            // path. However, there is a narrow window of generated update documents sized
+            // between BSONObjMaxUserSize and BSONObjMaxInternalSize that can hit this path.
             LOGV2_WARNING(
                 10856505,
                 "Ordered time-series bucket update is too large. Will internally retry write on "
@@ -2526,7 +2526,6 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
         } else if (auto error = write_ops_exec::generateError(
                        opCtx, output.result.getStatus(), start + index, errors->size())) {
             if (output.result.getStatus() == ErrorCodes::BSONObjectTooLarge) {
-                invariant(false);
                 LOGV2_WARNING(10856507,
                               "Unordered time-series bucket update is too large.",
                               "statusMsg"_attr = output.result.getStatus().reason());
