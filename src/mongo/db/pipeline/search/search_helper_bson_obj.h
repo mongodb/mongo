@@ -59,28 +59,39 @@ inline bool isMongotPipeline(const std::vector<BSONObj> pipeline) {
     //    }
     //}) will become the first stage in the final desugared ouput. Thus, there is an extra recursive
     // call to check for this.
-    if (pipeline.size() >= 1 &&
-        (pipeline[0][DocumentSourceSearch::kStageName] ||
-         pipeline[0][DocumentSourceVectorSearch::kStageName] ||
-         pipeline[0][DocumentSourceSearchMeta::kStageName] ||
-         pipeline[0][DocumentSourceListSearchIndexes::kStageName] ||
-         (pipeline[0][DocumentSourceRankFusion::kStageName] &&
-          isMongotPipeline(std::vector<BSONObj>{
-              pipeline[0][DocumentSourceRankFusion::kStageName][RankFusionSpec::kInputFieldName]
+    if (pipeline.empty()) {
+        return false;
+    }
+    const auto& firstStage = pipeline[0];
+    if (firstStage[DocumentSourceSearch::kStageName] ||
+        firstStage[DocumentSourceVectorSearch::kStageName] ||
+        firstStage[DocumentSourceSearchMeta::kStageName] ||
+        firstStage[DocumentSourceListSearchIndexes::kStageName]) {
+        return true;
+    }
+    if (firstStage[DocumentSourceRankFusion::kStageName]) {
+        auto rankFusionFirstPipeline =
+            firstStage[DocumentSourceRankFusion::kStageName][RankFusionSpec::kInputFieldName]
                       [RankFusionInputSpec::kPipelinesFieldName]
                           .Obj()
                           .firstElement()
-                          .Array()[0]
-                          .Obj()})) ||
-         (pipeline[0][DocumentSourceScoreFusion::kStageName] &&
-          isMongotPipeline(std::vector<BSONObj>{
-              pipeline[0][DocumentSourceScoreFusion::kStageName][ScoreFusionSpec::kInputFieldName]
+                          .Array();
+        if (rankFusionFirstPipeline.empty()) {
+            return false;
+        }
+        return isMongotPipeline(std::vector<BSONObj>{rankFusionFirstPipeline[0].Obj()});
+    }
+    if (firstStage[DocumentSourceScoreFusion::kStageName]) {
+        auto scoreFusionFirstPipeline =
+            firstStage[DocumentSourceScoreFusion::kStageName][ScoreFusionSpec::kInputFieldName]
                       [ScoreFusionInputsSpec::kPipelinesFieldName]
                           .Obj()
                           .firstElement()
-                          .Array()[0]
-                          .Obj()})))) {
-        return true;
+                          .Array();
+        if (scoreFusionFirstPipeline.empty()) {
+            return false;
+        }
+        return isMongotPipeline(std::vector<BSONObj>{scoreFusionFirstPipeline[0].Obj()});
     }
     return false;
 }
