@@ -5,6 +5,7 @@
  *  # TODO (SERVER-55909): make WUOW 'groupOplogEntries' the only mode of operation.
  *  does_not_support_transactions,
  *  exclude_from_large_txns,
+ *  requires_replicated_fast_count_recovery,
  *  requires_replication,
  *  requires_fcv_61
  * ]

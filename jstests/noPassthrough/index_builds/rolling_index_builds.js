@@ -5,6 +5,7 @@
  *
  * @tags: [
  *   requires_persistence,
+ *   requires_replicated_fast_count_recovery,
  *   requires_replication,
  *   rolling_index_builds,
  * ]

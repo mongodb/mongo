@@ -725,7 +725,7 @@ buildvariants:
       test_flags: >-
         --runAllFeatureFlagTests
         --additionalFeatureFlags=featureFlagReplicatedFastCount
-        --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,incompatible_with_atlas_environment,m8g_incompatible,disables_test_commands
+        --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,incompatible_with_atlas_environment,m8g_incompatible,disables_test_commands,requires_replicated_fast_count_recovery
     tasks:
       - name: .development_critical !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.requires_replicated_fast_count_recovery
       - name: .development_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.requires_replicated_fast_count_recovery

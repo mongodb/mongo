@@ -6,6 +6,7 @@
  * 'ephemeralForTest' storage engines that do not support queryable backup (read-only) mode.
  * @tags: [
  *   requires_persistence,
+ *   requires_replicated_fast_count_recovery,
  *   requires_replication,
  *   requires_scripting
  * ]

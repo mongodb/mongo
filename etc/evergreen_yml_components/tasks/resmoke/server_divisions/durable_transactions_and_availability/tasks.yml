@@ -2314,7 +2314,8 @@ tasks:
 
   - <<: *gen_task_template
     name: noPassthrough_gen
-    tags: [
+    tags:
+      [
         "assigned_to_jira_team_server_execution",
         "release_critical",
         "incompatible_mac",
@@ -2324,8 +2325,6 @@ tasks:
         "misc_js",
         "requires_execution_on_windows_patch_build",
         "requires_large_host",
-        # TODO(SERVER-121665): Remove this tag.
-        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "generate resmoke tasks"
