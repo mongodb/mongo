@@ -34,6 +34,7 @@ global:
 
 imports:
     - "mongo/s/resharding/common_types.idl"
+    - "mongo/db/global_catalog/ddl/coordinator_session.idl"
 
 structs:
     DonorShardEntry:
@@ -196,4 +197,7 @@ structs:
                     for quick demo of reshardCollection operation"
             telemetryContext:
                 type: object_owned
+                optional: true
+            session:
+                type: CoordinatorSession
                 optional: true

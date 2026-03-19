@@ -142,6 +142,9 @@ public:
         Status abortReason,
         boost::optional<TxnNumber> txnNumber = boost::none);
 
+    ReshardingCoordinatorDocument updateSession(OperationContext* opCtx,
+                                                const CoordinatorSession& newSession);
+
 private:
     const UUID _reshardingUUID;
     std::unique_ptr<DaoStorageClientFactory> _clientFactory;

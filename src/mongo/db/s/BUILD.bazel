@@ -600,7 +600,6 @@ mongo_cc_library(
         "//src/mongo/db/global_catalog/ddl:configsvr_split_chunk_command.cpp",
         "//src/mongo/db/global_catalog/ddl:convert_to_capped_coordinator.cpp",
         "//src/mongo/db/global_catalog/ddl:convert_to_capped_coordinator_document_gen",
-        "//src/mongo/db/global_catalog/ddl:coordinator_session_gen",
         "//src/mongo/db/global_catalog/ddl:create_collection_coordinator.cpp",
         "//src/mongo/db/global_catalog/ddl:create_collection_coordinator_document_gen",
         "//src/mongo/db/global_catalog/ddl:create_database_coordinator.cpp",

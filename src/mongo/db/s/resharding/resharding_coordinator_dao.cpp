@@ -353,6 +353,18 @@ BSONObjBuilder ReshardingCoordinatorDao::_documentsCopyUpdateBuilder(
     return updateBuilder;
 }
 
+ReshardingCoordinatorDocument ReshardingCoordinatorDao::updateSession(
+    OperationContext* opCtx, const CoordinatorSession& newSession) {
+    auto client = _clientFactory->createDaoStorageClient(boost::none);
+
+    BSONObjBuilder updateBuilder;
+    {
+        BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
+        setBuilder.append(ReshardingCoordinatorDocument::kSessionFieldName, newSession.toBSON());
+    }
+
+    return buildAndExecuteRequest(opCtx, std::move(client), _reshardingUUID, updateBuilder);
+}
 
 }  // namespace resharding
 }  // namespace mongo

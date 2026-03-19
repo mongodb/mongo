@@ -125,6 +125,13 @@ protected:
         ASSERT_BSONOBJ_EQ_UNORDERED(updates, wrapUpdate(testCase.set, testCase.unset));
     }
 
+    CoordinatorSession makeSession(LogicalSessionId lsid, TxnNumber txnNumber) {
+        CoordinatorSession s;
+        s.setLsid(std::move(lsid));
+        s.setTxnNumber(txnNumber);
+        return s;
+    }
+
     UUID _uuid{UUID::gen()};
     OperationContext* _opCtx = nullptr;
     std::unique_ptr<ClockSourceMock> _clock = std::make_unique<ClockSourceMock>();
@@ -458,6 +465,38 @@ DEATH_TEST_F(ReshardingCoordinatorDaoFixtureDeathTest,
         .initialPhase = CoordinatorStateEnum::kCommitting, .transitionFn = [&]() {
             _dao->transitionToAbortingPhase(_opCtx, now, abortReason);
         }});
+}
+
+TEST_F(ReshardingCoordinatorDaoFixture, UpdateSessionSetsSessionField) {
+    auto session = makeSession(makeLogicalSessionIdForTest(), TxnNumber(1));
+
+    runPhaseTransitionTest(PhaseTransitionTestCase{
+        .initialPhase = CoordinatorStateEnum::kPreparingToDonate,
+        .transitionFn = [&]() { _dao->updateSession(_opCtx, session); },
+        .set = BSON(ReshardingCoordinatorDocument::kSessionFieldName << session.toBSON())});
+}
+
+TEST_F(ReshardingCoordinatorDaoFixture, UpdateSessionOverwritesPreviousSession) {
+    _state->document.setSession(makeSession(makeLogicalSessionIdForTest(), TxnNumber(1)));
+
+    auto newSession = makeSession(makeLogicalSessionIdForTest(), TxnNumber(2));
+
+    runPhaseTransitionTest(PhaseTransitionTestCase{
+        .initialPhase = CoordinatorStateEnum::kCloning,
+        .transitionFn = [&]() { _dao->updateSession(_opCtx, newSession); },
+        .set = BSON(ReshardingCoordinatorDocument::kSessionFieldName << newSession.toBSON())});
+}
+
+TEST_F(ReshardingCoordinatorDaoFixture, UpdateSessionIncrementsTxnNumberWithSameLsid) {
+    auto lsid = makeLogicalSessionIdForTest();
+    _state->document.setSession(makeSession(lsid, TxnNumber(5)));
+
+    auto newSession = makeSession(lsid, TxnNumber(6));
+
+    runPhaseTransitionTest(PhaseTransitionTestCase{
+        .initialPhase = CoordinatorStateEnum::kApplying,
+        .transitionFn = [&]() { _dao->updateSession(_opCtx, newSession); },
+        .set = BSON(ReshardingCoordinatorDocument::kSessionFieldName << newSession.toBSON())});
 }
 
 }  // namespace resharding
