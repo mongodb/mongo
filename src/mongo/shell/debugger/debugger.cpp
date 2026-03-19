@@ -693,7 +693,24 @@ std::string DebuggerObject::evaluate(EvaluateRequest request) {
 }
 
 std::string DebuggerObject::setVariable(SetVariableRequest request) {
-    return evaluateInREPL(request.name + " = " + request.value);
+    // Try evaluating the value as a JS expression (42, true, "str", {x:1}, etc.).
+    // If it produces a SyntaxError, fall back to treating it as a plain string literal so the
+    // user can type `hello world` without needing to add quotes manually.
+    std::string result = evaluateInREPL(request.name + " = " + request.value);
+    if (result.rfind("SyntaxError:", 0) != 0) {
+        return result;
+    }
+
+    // Escape the raw value as a JS template literal and retry.
+    // Template literals allow literal newlines, so only `, \, and $ need escaping.
+    std::string quoted = "`";
+    for (char c : request.value) {
+        if (c == '`' || c == '\\' || c == '$')
+            quoted += '\\';
+        quoted += c;
+    }
+    quoted += '`';
+    return evaluateInREPL(request.name + " = " + quoted);
 }
 
 Status DebuggerObject::compileJSCodeBlock(JSFile jsfile, JS::MutableHandleValue out) {
