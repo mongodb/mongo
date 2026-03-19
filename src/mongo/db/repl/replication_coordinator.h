@@ -1052,7 +1052,7 @@ public:
     virtual WriteConcernOptions populateUnsetWriteConcernOptionsSyncMode(
         WriteConcernOptions wc) = 0;
 
-    virtual Status stepUpIfEligible(bool skipDryRun) = 0;
+    virtual Status stepUpIfEligible(OperationContext* opCtx, bool skipDryRun) = 0;
 
     virtual ServiceContext* getServiceContext() = 0;
 

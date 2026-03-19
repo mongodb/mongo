@@ -382,7 +382,7 @@ public:
 
     WriteConcernOptions populateUnsetWriteConcernOptionsSyncMode(WriteConcernOptions wc) override;
 
-    Status stepUpIfEligible(bool skipDryRun) override;
+    Status stepUpIfEligible(OperationContext* opCtx, bool skipDryRun) override;
 
     /**
      * Sets the return value for calls to getConfig.
