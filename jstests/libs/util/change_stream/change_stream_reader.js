@@ -13,6 +13,21 @@ import {ChangeStreamTest, ChangeStreamWatchMode, isInvalidated} from "jstests/li
 import {Thread} from "jstests/libs/parallelTester.js";
 
 /**
+ * Best-effort cursor cleanup. The server kills cursors after invalidate, so
+ * killCursors may fail with "cursor not found" — that's expected and benign.
+ */
+function tryCleanUp(cst, instanceName) {
+    try {
+        cst.cleanUp();
+    } catch (e) {
+        jsTest.log.info("ChangeStreamReader cleanUp failed (benign)", {
+            instanceName,
+            error: e.message,
+        });
+    }
+}
+
+/**
  * Reading mode constants.
  */
 const ChangeStreamReadingMode = {
@@ -104,6 +119,7 @@ class ChangeStreamReader {
      *   - numberOfEventsToRead: Number of events to read before stopping.
      *   - readingMode: ChangeStreamReadingMode value. Default: Continuous.
      *   - showExpandedEvents: Optional boolean to show expanded events (default: true).
+     *   - showSystemEvents: Optional boolean to show system events (default: false).
      *   - batchSize: Optional cursor batch size for getMore operations (default: 1).
      *   - excludeOperationTypes: Optional array of operation types to filter out at the
      *       pipeline level (e.g., ["createIndexes", "dropIndexes"]). Use this for tests
@@ -149,6 +165,7 @@ class ChangeStreamReader {
 
         const changeStreamSpec = {
             showExpandedEvents: config.showExpandedEvents ?? true,
+            ...(config.showSystemEvents ? {showSystemEvents: true} : {}),
         };
         if (config.version) {
             changeStreamSpec.version = config.version;
@@ -202,9 +219,23 @@ class ChangeStreamReader {
         const readEventTypes = [];
 
         for (let count = 0; count < cfg.numberOfEventsToRead; count++) {
-            // Always use skipFirst=false to check the current batch before issuing getMore.
-            // This ensures we don't miss events in firstBatch (after open) or nextBatch.
-            const changeEvent = cst.getNextChanges(cursor, 1, false /* skipFirst */)[0];
+            let changeEvent;
+            try {
+                // Always use skipFirst=false to check the current batch before issuing getMore.
+                // This ensures we don't miss events in firstBatch (after open) or nextBatch.
+                changeEvent = cst.getNextChanges(cursor, 1, false /* skipFirst */)[0];
+            } catch (e) {
+                // getNextChanges() throws on getMore timeout. This can happen when the FSM
+                // produces fewer events than numberOfEventsToRead. Stop reading and let the
+                // verifier layer detect and report the mismatch.
+                jsTest.log.info("ChangeStreamReader Timed out waiting for event", {
+                    instanceName: cfg.instanceName,
+                    eventIndex: count + 1,
+                    total: cfg.numberOfEventsToRead,
+                    error: e.message,
+                });
+                break;
+            }
 
             assert(changeEvent, `Expected change event at index ${count}, but got none`);
             assert(changeEvent._id, `Change event at index ${count} missing _id (resume token)`);
@@ -226,9 +257,15 @@ class ChangeStreamReader {
             });
 
             if (isInvalidate) {
-                // Cursor is already killed by server after invalidate, no need to call cleanUp().
-                // Must use startAfter (not resumeAfter) when resuming from invalidate.
-                ({cst, cursor} = ChangeStreamReader._openChangeStream(conn, cfg, changeEvent._id, true));
+                tryCleanUp(cst, cfg.instanceName);
+                const reopened = ChangeStreamReader._openChangeStream(
+                    conn,
+                    cfg,
+                    changeEvent._id,
+                    /* useStartAfter */ true,
+                );
+                cst = reopened.cst;
+                cursor = reopened.cursor;
             }
         }
 
@@ -236,7 +273,7 @@ class ChangeStreamReader {
             instanceName: cfg.instanceName,
             readEventTypes,
         });
-        cst.cleanUp();
+        tryCleanUp(cst, cfg.instanceName);
     }
 
     /**
@@ -275,10 +312,9 @@ class ChangeStreamReader {
             });
 
             resumeToken = changeEvent._id;
-            // Must use startAfter (not resumeAfter) when resuming from invalidate.
             useStartAfter = isInvalidate;
 
-            cst.cleanUp();
+            tryCleanUp(cst, cfg.instanceName);
         }
 
         jsTest.log.info("ChangeStreamReader Read events", {

@@ -3,7 +3,14 @@
  * Validates that the ShardingCommandGenerator produces correct command sequences
  * and that Writers can execute them both sequentially and concurrently.
  *
- * @tags: [assumes_balancer_off, uses_change_streams]
+ * @tags: [
+ *   assumes_balancer_off,
+ *   # The test spins up a multi-shard cluster and runs DDL commands; too slow for
+ *   # sanitizer builds that add significant overhead.
+ *   incompatible_aubsan,
+ *   tsan_incompatible,
+ *   uses_change_streams,
+ * ]
  */
 import {Action} from "jstests/libs/util/change_stream/change_stream_action.js";
 import {CollectionTestModel} from "jstests/libs/util/change_stream/change_stream_collection_test_model.js";
@@ -37,7 +44,7 @@ import {after, afterEach, before, describe, it} from "jstests/libs/mochalite.js"
  */
 function generateCommands(seed, params) {
     const generator = new ShardingCommandGenerator(seed);
-    const testModel = new CollectionTestModel().setStartState(State.DATABASE_ABSENT);
+    const testModel = new CollectionTestModel(State.DATABASE_ABSENT);
     return generator.generateCommands(testModel, params);
 }
 
@@ -59,8 +66,8 @@ describe("ShardingCommandGenerator", function () {
         const gen1 = new ShardingCommandGenerator(TEST_SEED);
         const gen2 = new ShardingCommandGenerator(TEST_SEED);
 
-        const model1 = new CollectionTestModel().setStartState(State.DATABASE_ABSENT);
-        const model2 = new CollectionTestModel().setStartState(State.DATABASE_ABSENT);
+        const model1 = new CollectionTestModel(State.DATABASE_ABSENT);
+        const model2 = new CollectionTestModel(State.DATABASE_ABSENT);
 
         const params1 = new ShardingCommandGeneratorParams("repro_db_1", "repro_coll", this.shards);
         const params2 = new ShardingCommandGeneratorParams("repro_db_2", "repro_coll", this.shards);
@@ -77,7 +84,7 @@ describe("ShardingCommandGenerator", function () {
 
     it("should generate commands", () => {
         const generator = new ShardingCommandGenerator(TEST_SEED);
-        const testModel = new CollectionTestModel().setStartState(State.DATABASE_ABSENT);
+        const testModel = new CollectionTestModel(State.DATABASE_ABSENT);
         const params = new ShardingCommandGeneratorParams("test_db_gen", "test_coll", this.shards);
 
         const commands = generator.generateCommands(testModel, params);
@@ -134,9 +141,12 @@ describe("ShardingCommandGenerator", function () {
         Writer.run(this.st.s, writerA, commandsA, TEST_SEED);
         Writer.run(this.st.s, writerB, commandsB, TEST_SEED);
 
-        Connector.waitForDone(this.st.s, writerA);
+        // Parallel DDL commands compete for cluster-wide locks, so the cumulative
+        // time for both writers can exceed the default 90s locally.
+        const waitTimeoutMs = TestData?.inEvergreen ? undefined : 5 * 60 * 1000;
+        Connector.waitForDone(this.st.s, writerA, waitTimeoutMs);
         const countA = this.st.s.getDB(dbNameA).getCollection(collName).countDocuments({});
-        Connector.waitForDone(this.st.s, writerB);
+        Connector.waitForDone(this.st.s, writerB, waitTimeoutMs);
         const countB = this.st.s.getDB(dbNameB).getCollection(collName).countDocuments({});
 
         assert.eq(countA, countB, "Both writers should produce same document count");
@@ -154,7 +164,7 @@ describe("ShardingCommandGenerator", function () {
         // Clean database.
         assert.commandWorked(this.st.s.getDB(dbName).dropDatabase());
 
-        const model = new CollectionTestModel().setStartState(State.DATABASE_ABSENT);
+        const model = new CollectionTestModel(State.DATABASE_ABSENT);
         const params = new ShardingCommandGeneratorParams(dbName, collName, this.shards);
         const generator = new ShardingCommandGenerator(TEST_SEED);
         const commands = generator.generateCommands(model, params);
@@ -356,10 +366,11 @@ describe("ChangeStreamReader integration", function () {
         // Get cluster time strictly AFTER the create event.
         const clusterTime = getCurrentClusterTime(ctx.st.s, dbName);
 
-        // Execute inserts using Writer.
-        const numInserts = 3;
+        // Execute inserts using Writer. Each InsertDocCommand inserts numDocs documents.
+        const numCommands = 3;
+        const numTotalInserts = numCommands * InsertDocCommand.numDocs;
         const insertCommands = [];
-        for (let i = 0; i < numInserts; i++) {
+        for (let i = 0; i < numCommands; i++) {
             insertCommands.push(new InsertDocCommand(dbName, collName, ctx.shards, {exists: true, nonEmpty: i > 0}));
         }
         Writer.run(ctx.st.s, writerInstanceName, insertCommands, TEST_SEED);
@@ -370,7 +381,7 @@ describe("ChangeStreamReader integration", function () {
             watchMode: ChangeStreamWatchMode.kCollection,
             dbName: dbName,
             collName: collName,
-            numberOfEventsToRead: numInserts,
+            numberOfEventsToRead: numTotalInserts,
             readingMode: readingMode,
             startAtClusterTime: clusterTime,
             showExpandedEvents: false,
@@ -382,8 +393,12 @@ describe("ChangeStreamReader integration", function () {
         // Read captured events.
         const capturedRecords = Connector.readAllChangeEvents(ctx.st.s, readerInstanceName);
 
-        assert.eq(capturedRecords.length, numInserts, `Expected ${numInserts} events, got ${capturedRecords.length}`);
-        for (let i = 0; i < numInserts; i++) {
+        assert.eq(
+            capturedRecords.length,
+            numTotalInserts,
+            `Expected ${numTotalInserts} events, got ${capturedRecords.length}`,
+        );
+        for (let i = 0; i < numTotalInserts; i++) {
             const event = capturedRecords[i].changeEvent;
             assert.eq(event.operationType, "insert", `Event ${i} should be insert`);
             assert(event.fullDocument._id, `Event ${i} should have _id`);
@@ -414,10 +429,10 @@ describe("ChangeStreamReader integration", function () {
 
         jsTest.log.info(`\n========== ChangeStreamReader Invalidate Test ==========`);
 
-        // Expected events: 3 inserts + drop (which triggers invalidate).
-        const expectedEventTypes = ["insert", "insert", "insert", "drop", "invalidate"];
+        // Expected events: 3 InsertDocCommands (2 inserts each) + drop (which triggers invalidate).
+        const expectedEventTypes = ["insert", "insert", "insert", "insert", "insert", "insert", "drop", "invalidate"];
 
-        // Build commands: 3 inserts + drop.
+        // Build commands: 3 InsertDocCommands + drop.
         const collectionCtx = {exists: true, nonEmpty: false};
         const commands = [
             new InsertDocCommand(dbName, collName, this.shards, collectionCtx),
@@ -513,10 +528,10 @@ describe("ChangeStreamReader integration", function () {
 
         jsTest.log.info(`\n========== ChangeStreamReader FetchOneAndResume + Invalidate ==========`);
 
-        // Expected events: 2 inserts + drop + invalidate.
-        const expectedEventTypes = ["insert", "insert", "drop", "invalidate"];
+        // Expected events: 2 InsertDocCommands (2 inserts each) + drop + invalidate.
+        const expectedEventTypes = ["insert", "insert", "insert", "insert", "drop", "invalidate"];
 
-        // Build commands: 2 inserts + drop.
+        // Build commands: 2 InsertDocCommands + drop.
         const collectionCtx = {exists: true, nonEmpty: false};
         const commands = [
             new InsertDocCommand(dbName, collName, this.shards, collectionCtx),
@@ -607,10 +622,10 @@ describe("ChangeStreamReader integration", function () {
 
         jsTest.log.info(`\n========== ChangeStreamReader Database Watch ==========`);
 
-        // Expected: inserts into both collections.
-        const expectedEventTypes = ["insert", "insert", "insert", "insert"];
+        // Expected: 4 InsertDocCommands (2 inserts each) into both collections.
+        const expectedEventTypes = ["insert", "insert", "insert", "insert", "insert", "insert", "insert", "insert"];
 
-        // Build commands: 2 inserts into each collection (interleaved).
+        // Build commands: 2 InsertDocCommands into each collection (interleaved).
         const collectionCtx = {exists: true, nonEmpty: false};
         const commands = [
             new InsertDocCommand(dbName, collName1, this.shards, collectionCtx),

@@ -141,6 +141,7 @@ class ShardingCommandGenerator {
                     unvisitedActions,
                     shortestPaths,
                 );
+
                 assert(targetState !== null, "State machine has unreachable states with unvisited actions");
 
                 const path = shortestPaths.get(currentState).get(targetState).path;
@@ -292,43 +293,36 @@ class ShardingCommandGenerator {
             exists: false,
             nonEmpty: false,
             shardKeySpec: null, // Collection's current shard key (null if not sharded)
-            isSharded: false,
+            isUnsplittable: false, // True if the collection is unsplittable (tracked placement)
         };
     }
 
     /**
      * Initialize collection context based on the starting state.
-     * collectionCtx tracks: exists, nonEmpty, shardKeySpec, isSharded.
+     * collectionCtx tracks: exists, nonEmpty, shardKeySpec, isUnsplittable.
      * shardKeySpec represents the collection's CURRENT shard key.
      * Note: Even if starting from a collection-present state, we assume the collection
      * is empty (nonEmpty: false) since we don't know its actual contents.
      */
     _initialCollectionCtxForState(state) {
         const ctx = ShardingCommandGenerator._emptyCollectionCtx();
+        const set = (overrides) => Object.assign(ctx, overrides);
 
         switch (state) {
             case State.DATABASE_ABSENT:
-                // Nothing exists.
-                break;
-            case State.DATABASE_PRESENT:
-                // Database exists but no collection.
+            case State.DATABASE_PRESENT_COLLECTION_ABSENT:
                 break;
             case State.COLLECTION_PRESENT_UNTRACKED:
-                ctx.exists = true;
+                set({exists: true});
                 break;
             case State.COLLECTION_PRESENT_UNSPLITTABLE:
-                ctx.exists = true;
-                // Unsplittable collections are tracked but not sharded in the traditional sense.
+                set({exists: true, isUnsplittable: true});
                 break;
             case State.COLLECTION_PRESENT_SHARDED_RANGE:
-                ctx.exists = true;
-                ctx.isSharded = true;
-                ctx.shardKeySpec = getShardKeySpec(ShardingType.RANGE);
+                set({exists: true, shardKeySpec: getShardKeySpec(ShardingType.RANGE)});
                 break;
             case State.COLLECTION_PRESENT_SHARDED_HASHED:
-                ctx.exists = true;
-                ctx.isSharded = true;
-                ctx.shardKeySpec = getShardKeySpec(ShardingType.HASHED);
+                set({exists: true, shardKeySpec: getShardKeySpec(ShardingType.HASHED)});
                 break;
             default:
                 assert(false, `Unknown state: ${state}. Add handling for this state.`);
@@ -343,61 +337,72 @@ class ShardingCommandGenerator {
      * Updates shardKeySpec to reflect the collection's new shard key after the action.
      */
     _updateCollectionCtxForAction(action, ctx) {
+        const set = (overrides) => Object.assign(ctx, overrides);
+        const rangeKey = getShardKeySpec(ShardingType.RANGE);
+        const hashedKey = getShardKeySpec(ShardingType.HASHED);
+
         switch (action) {
             case Action.INSERT_DOC:
-                ctx.exists = true;
-                ctx.nonEmpty = true;
+                set({exists: true, nonEmpty: true});
                 break;
             case Action.CREATE_SHARDED_COLLECTION_RANGE:
             case Action.SHARD_COLLECTION_RANGE:
-                ctx.exists = true;
-                ctx.shardKeySpec = getShardKeySpec(ShardingType.RANGE);
-                ctx.isSharded = true;
+                set({exists: true, shardKeySpec: rangeKey, isUnsplittable: false});
                 break;
             case Action.CREATE_SHARDED_COLLECTION_HASHED:
             case Action.SHARD_COLLECTION_HASHED:
-                ctx.exists = true;
-                ctx.shardKeySpec = getShardKeySpec(ShardingType.HASHED);
-                ctx.isSharded = true;
+                // Hashed sharding with presplitHashedZones distributes chunks across all shards.
+                set({
+                    exists: true,
+                    shardKeySpec: hashedKey,
+                    isUnsplittable: false,
+                });
                 break;
             case Action.RESHARD_COLLECTION_TO_RANGE:
-            case Action.RESHARD_COLLECTION_TO_HASHED: {
-                // Reshard: old index is explicitly dropped in _appendAction, new index is explicitly created.
                 assert(ctx.shardKeySpec, "Reshard requires existing shard key");
-                const newShardKey =
-                    action === Action.RESHARD_COLLECTION_TO_RANGE
-                        ? getShardKeySpec(ShardingType.RANGE)
-                        : getShardKeySpec(ShardingType.HASHED);
-                ctx.shardKeySpec = newShardKey;
-                ctx.isSharded = true;
+                set({shardKeySpec: rangeKey, isUnsplittable: false});
                 break;
-            }
+            case Action.RESHARD_COLLECTION_TO_HASHED:
+                assert(ctx.shardKeySpec, "Reshard requires existing shard key");
+                set({shardKeySpec: hashedKey, isUnsplittable: false});
+                break;
             case Action.CREATE_UNSPLITTABLE_COLLECTION:
+                set({
+                    exists: true,
+                    nonEmpty: false,
+                    isUnsplittable: true,
+                    shardKeySpec: null,
+                });
+                break;
             case Action.CREATE_UNTRACKED_COLLECTION:
-                ctx.exists = true;
-                ctx.nonEmpty = false;
-                ctx.isSharded = false;
-                ctx.shardKeySpec = null;
+                set({
+                    exists: true,
+                    nonEmpty: false,
+                    isUnsplittable: false,
+                    shardKeySpec: null,
+                });
                 break;
             case Action.UNSHARD_COLLECTION:
-                // Collection becomes unsplittable (single-shard) but still exists.
-                // Old shard key index is explicitly dropped in _appendAction.
                 assert(ctx.shardKeySpec, "Unshard requires existing shard key");
-                ctx.shardKeySpec = null;
-                ctx.isSharded = false;
+                set({shardKeySpec: null, isUnsplittable: true});
+                break;
+            case Action.MOVE_COLLECTION:
+                set({isUnsplittable: true});
+                break;
+            case Action.MOVE_CHUNK:
+            case Action.MOVE_PRIMARY:
+            case Action.CREATE_DATABASE:
                 break;
             case Action.DROP_COLLECTION:
-            case Action.DROP_DATABASE:
             case Action.RENAME_TO_NON_EXISTENT_SAME_DB:
             case Action.RENAME_TO_EXISTENT_SAME_DB:
             case Action.RENAME_TO_NON_EXISTENT_DIFFERENT_DB:
             case Action.RENAME_TO_EXISTENT_DIFFERENT_DB:
-                // Collection no longer exists (dropped or renamed away).
-                Object.assign(ctx, ShardingCommandGenerator._emptyCollectionCtx());
+            case Action.DROP_DATABASE:
+                set(ShardingCommandGenerator._emptyCollectionCtx());
                 break;
             default:
-                // Other actions do not modify collection context.
-                break;
+                assert(false, `Unhandled action in _updateCollectionCtxForAction: ${action}`);
         }
     }
 
@@ -468,7 +473,6 @@ class ShardingCommandGenerator {
             );
             // Update context - collection is now sharded
             ctx.exists = true;
-            ctx.isSharded = true;
             ctx.shardKeySpec = targetShardKey;
             return; // Skip index creation and main command - already done
         }

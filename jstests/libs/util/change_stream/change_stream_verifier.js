@@ -112,6 +112,11 @@ class VerifierContext {
         return matcher;
     }
 
+    getCommandTrace(instanceName) {
+        const cfg = this.changeStreamReaderConfigs[instanceName];
+        return cfg ? cfg.debugCommandTrace || [] : [];
+    }
+
     /**
      * Get all unique cluster times from the oplog across all shards.
      * @private
@@ -184,6 +189,39 @@ class VerifierContext {
 }
 
 /**
+ * Assert that the matcher consumed all expected events, with detailed diagnostics on failure.
+ * Logs the FSM command trace and reports the first mismatch point.
+ */
+function assertMatcherDone(matcher, events, ctx, readerInstanceName) {
+    if (matcher.isDone()) {
+        return;
+    }
+
+    const mismatch = matcher.getMismatch();
+    const commandTrace = ctx.getCommandTrace(readerInstanceName);
+    const actualTypes = events.map((rec) => rec.changeEvent.operationType);
+    const expectedTypes = matcher.getExpectedOperationTypes();
+    const expectedInline = `[${expectedTypes.join(", ")}]`;
+    const actualInline = `[${actualTypes.join(", ")}]`;
+
+    jsTest.log.info("FSM command trace (on mismatch)", {
+        instanceName: readerInstanceName,
+        commandsCount: commandTrace.length,
+        commands: commandTrace,
+    });
+
+    assert(
+        false,
+        (mismatch
+            ? `Event mismatch at index ${mismatch.index}: expected '${mismatch.expected}', got '${mismatch.actual}'`
+            : `Matched ${matcher.getMatchedCount()} of ${expectedTypes.length}`) +
+            `\nexpected(${expectedTypes.length}): ${expectedInline}` +
+            `\nactual(${actualTypes.length}): ${actualInline}` +
+            `\nGrep logs for "FSM command trace (on mismatch)" to see the full command sequence.`,
+    );
+}
+
+/**
  * Test case that compares two sequential fetching strategies.
  *
  * This test case is reusable for:
@@ -214,157 +252,14 @@ class SequentialPairwiseFetchingTestCase {
         const controlEvents = ctx.getChangeEvents(conn, this._controlInstanceName);
         const experimentEvents = ctx.getChangeEvents(conn, this._experimentInstanceName);
 
-        // Build summary lists for debugging (operationType @ clusterTime).
-        const controlSummary = controlEvents.map(formatEventSummary);
-        const experimentSummary = experimentEvents.map(formatEventSummary);
-
-        // Both readers should read the same number of events.
-        assert.eq(
-            experimentEvents.length,
-            controlEvents.length,
-            `${this._controlInstanceName} (${controlEvents.length} events) and ` +
-                `${this._experimentInstanceName} (${experimentEvents.length} events) should have same event count.\n` +
-                `Control events: ${tojson(controlSummary)}\n` +
-                `Experiment events: ${tojson(experimentSummary)}`,
-        );
-
-        // Extract just the changeEvent and cursorClosed from each record for comparison.
-        // Exclude storage _id since each reader stores events with different document IDs.
-        const extractComparable = (rec) => ({changeEvent: rec.changeEvent, cursorClosed: rec.cursorClosed});
-        const experimentComparable = experimentEvents.map(extractComparable);
-        const controlComparable = controlEvents.map(extractComparable);
-
-        // Verify experiment events exactly match control events.
-        let firstMismatchIdx = -1;
-        for (let i = 0; i < experimentComparable.length; i++) {
-            if (bsonUnorderedFieldsCompare(experimentComparable[i], controlComparable[i]) !== 0) {
-                firstMismatchIdx = i;
-                break;
-            }
-        }
-
-        assert(
-            firstMismatchIdx === -1,
-            `${this._controlInstanceName} and ${this._experimentInstanceName} outputs differ at event ${firstMismatchIdx}`,
-        );
-
-        // Verify that change event sequence produced by '_experimentInstanceName' matches
-        // the expectations defined by mutation generator.
-        const matcher = ctx.getChangeStreamMatcher(this._experimentInstanceName);
-        for (let i = 0; i < experimentEvents.length; i++) {
-            const rec = experimentEvents[i];
-            matcher.matches(rec.changeEvent, rec.cursorClosed);
-        }
-
-        // Accept partial match if the experiment reader stopped before trailing
-        // invalidate/rename/drop events (which cannot be resumed for collection-level streams).
-        const lastEvent = experimentEvents[experimentEvents.length - 1];
-        const endsWithInvalidate =
-            lastEvent && lastEvent.changeEvent && lastEvent.changeEvent.operationType === "invalidate";
-        if (!endsWithInvalidate) {
-            matcher.assertDone();
-        }
-    }
-}
-
-/**
- * Test case that compares two readers but filters out duplicate events before comparison.
- *
- * WHY THIS IS NEEDED:
- * In sharded clusters, certain DDL operations (like dropIndexes) can emit multiple change
- * stream events with the same clusterTime and operationType - one per shard that participates
- * in the operation. When using the Continuous reading mode, all these duplicate events are
- * captured because the cursor stays open.
- *
- * However, when using FetchOneAndResume mode (open cursor, read one event, close, resume),
- * the `resumeAfter` token-based resumption cannot reliably distinguish between events that
- * share the same clusterTime. This causes FetchOneAndResume to skip some of these duplicates.
- *
- * To compare Continuous vs FetchOneAndResume fairly, this test case filters out duplicate
- * events (same clusterTime.t + clusterTime.i + operationType) from the Control (Continuous)
- * stream before comparing with the Experiment (FetchOneAndResume) stream.
- *
- * EXAMPLE:
- * - Continuous sees: [dropIndexes@t1, dropIndexes@t1, insert@t2] (3 events)
- * - FetchOneAndResume sees: [dropIndexes@t1, insert@t2] (2 events, second dropIndexes skipped)
- * - After filtering Control: [dropIndexes@t1, insert@t2] → now both match
- */
-class DuplicateFilteringPairwiseTestCase {
-    /**
-     * Create a duplicate-filtering pairwise test case.
-     * @param {string} controlInstanceName - Instance name for control reader (Continuous)
-     * @param {string} experimentInstanceName - Instance name for experiment reader (FetchOneAndResume)
-     */
-    constructor(controlInstanceName, experimentInstanceName) {
-        this._controlInstanceName = controlInstanceName;
-        this._experimentInstanceName = experimentInstanceName;
-    }
-
-    /**
-     * Run the duplicate-filtering comparison test.
-     * @param {Mongo} conn - MongoDB connection
-     * @param {VerifierContext} ctx - Verifier context
-     */
-    run(conn, ctx) {
-        const controlEvents = ctx.getChangeEvents(conn, this._controlInstanceName);
-        const experimentEvents = ctx.getChangeEvents(conn, this._experimentInstanceName);
-
-        // Filter Control events to remove per-shard duplicate DDL events.
-        // In sharded clusters, DDL operations like createIndexes/dropIndexes emit one event
-        // per shard. We deduplicate only these DDL event types to get a single logical event.
-        // DML events (insert/update/delete) are NOT deduplicated since concurrent operations
-        // on different shards at the same clusterTime are legitimate distinct events.
-        const ddlEventTypes = new Set([
-            "createIndexes",
-            "dropIndexes",
-            "shardCollection",
-            "reshardCollection",
-            "create",
-            "drop",
-            "rename",
-            "dropDatabase",
-            "modify",
-            "refineCollectionShardKey",
-        ]);
-        const seenKeys = new Set();
-        const filteredControlEvents = [];
-        for (const rec of controlEvents) {
-            const e = rec.changeEvent;
-            // Only deduplicate DDL events; pass through all DML events.
-            if (ddlEventTypes.has(e.operationType)) {
-                const key = `${e.clusterTime.t},${e.clusterTime.i},${e.operationType}`;
-                if (!seenKeys.has(key)) {
-                    seenKeys.add(key);
-                    filteredControlEvents.push(rec);
-                }
-            } else {
-                filteredControlEvents.push(rec);
-            }
-        }
-
-        // Build summary lists for debugging.
-        const controlSummary = filteredControlEvents.map(formatEventSummary);
-        const experimentSummary = experimentEvents.map(formatEventSummary);
-
-        // Verify counts match.
-        assert.eq(
-            filteredControlEvents.length,
-            experimentEvents.length,
-            `Event count mismatch after filtering duplicates: Control=${filteredControlEvents.length}, Experiment=${experimentEvents.length}`,
-        );
-
-        // Compare each event (operationType and clusterTime).
-        for (let i = 0; i < experimentEvents.length; i++) {
-            const control = filteredControlEvents[i].changeEvent;
-            const experiment = experimentEvents[i].changeEvent;
-
-            assert(
-                control.operationType === experiment.operationType &&
-                    control.clusterTime.t === experiment.clusterTime.t &&
-                    control.clusterTime.i === experiment.clusterTime.i,
-                `Event ${i} mismatch: Control=${control.operationType}@${control.clusterTime.t},${control.clusterTime.i}, ` +
-                    `Experiment=${experiment.operationType}@${experiment.clusterTime.t},${experiment.clusterTime.i}`,
-            );
+        // Verify both readers' events match the expectations defined by the mutation generator.
+        for (const [instanceName, events] of [
+            [this._controlInstanceName, controlEvents],
+            [this._experimentInstanceName, experimentEvents],
+        ]) {
+            const matcher = ctx.getChangeStreamMatcher(instanceName);
+            events.every((rec) => matcher.matches(rec.changeEvent, rec.cursorClosed));
+            assertMatcherDone(matcher, events, ctx, instanceName);
         }
     }
 }
@@ -394,13 +289,11 @@ class SingleReaderVerificationTestCase {
     run(conn, ctx) {
         const events = ctx.getChangeEvents(conn, this._readerInstanceName);
 
-        // Verify that change event sequence matches the expectations.
+        // every() short-circuits on the first mismatch (matches() returns false), so
+        // the matcher stops advancing and records the failure point.
         const matcher = ctx.getChangeStreamMatcher(this._readerInstanceName);
-
-        for (const rec of events) {
-            matcher.matches(rec.changeEvent, rec.cursorClosed);
-        }
-        matcher.assertDone();
+        events.every((rec) => matcher.matches(rec.changeEvent, rec.cursorClosed));
+        assertMatcherDone(matcher, events, ctx, this._readerInstanceName);
     }
 }
 
@@ -506,11 +399,11 @@ class PrefixReadTestCase {
 
         // Verify that change event sequence produced by '_readerInstanceName' matches
         // the expectations defined by mutation generator.
+        // every() short-circuits on the first mismatch (matches() returns false), so
+        // the matcher stops advancing and records the failure point.
         const matcher = ctx.getChangeStreamMatcher(this._readerInstanceName);
-        for (const rec of events) {
-            matcher.matches(rec.changeEvent, rec.cursorClosed);
-        }
-        matcher.assertDone();
+        events.every((rec) => matcher.matches(rec.changeEvent, rec.cursorClosed));
+        assertMatcherDone(matcher, events, ctx, this._readerInstanceName);
     }
 }
 
@@ -550,7 +443,6 @@ class Verifier {
 export {
     VerifierContext,
     SequentialPairwiseFetchingTestCase,
-    DuplicateFilteringPairwiseTestCase,
     SingleReaderVerificationTestCase,
     PrefixReadTestCase,
     Verifier,

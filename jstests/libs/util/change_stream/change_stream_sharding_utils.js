@@ -7,6 +7,7 @@ import {CollectionTestModel} from "jstests/libs/util/change_stream/change_stream
 import {ShardingCommandGenerator} from "jstests/libs/util/change_stream/change_stream_sharding_command_generator.js";
 import {ShardingCommandGeneratorParams} from "jstests/libs/util/change_stream/change_stream_sharding_command_generator_params.js";
 import {State} from "jstests/libs/util/change_stream/change_stream_state.js";
+import {CreateDatabaseCommand} from "jstests/libs/util/change_stream/change_stream_commands.js";
 import {Writer} from "jstests/libs/util/change_stream/change_stream_writer.js";
 import {Connector} from "jstests/libs/util/change_stream/change_stream_connector.js";
 import {ChangeEventMatcher} from "jstests/libs/util/change_stream/change_stream_event.js";
@@ -51,11 +52,11 @@ function getCurrentClusterTime(conn, dbName) {
  * - Periodic no-ops enabled for oplog freshness
  * - Balancer disabled for test stability
  * @param {number} [mongos=1] - Number of mongos instances
- * @param {number} [shards=2] - Number of shards
+ * @param {number} [shards=3] - Number of shards (3 enables moveChunk across shards)
  * @param {number} [rsNodes=1] - Number of replica set nodes per shard
  * @returns {ShardingTest} The configured sharding test
  */
-function createShardingTest(mongos = 1, shards = 2, rsNodes = 1) {
+function createShardingTest(mongos = 1, shards = 3, rsNodes = 1) {
     return new ShardingTest({
         shards: shards,
         mongos: mongos,
@@ -69,6 +70,12 @@ function createShardingTest(mongos = 1, shards = 2, rsNodes = 1) {
         },
         other: {
             enableBalancer: false,
+            configOptions: {
+                setParameter: {
+                    writePeriodicNoops: true,
+                    periodicNoopIntervalSecs: 1,
+                },
+            },
         },
     });
 }
@@ -92,12 +99,61 @@ function cleanupTestDatabase(mongos, dbName = TEST_DB) {
 }
 
 /**
+ * Compute expected change stream events from commands (after Writer.run()) and log them.
+ * Event prediction runs after execution so move commands can use runtime state.
+ * @param {string} testName - Test name for logging
+ * @param {Array} commands - Executed commands with collectionCtx and getChangeEvents()
+ * @returns {Array<{event: Object, cursorClosed: boolean}>} Expected events for the matcher
+ */
+function computeAndLogExpectedEvents(testName, commands) {
+    const expectedEvents = commands
+        .flatMap((cmd) => cmd.getChangeEvents(ChangeStreamWatchMode.kCollection))
+        .map((e) => ({event: e, cursorClosed: e.operationType === "invalidate"}));
+
+    jsTest.log.info("FSM expected events", {
+        testName,
+        count: expectedEvents.length,
+        types: expectedEvents.map((e) => e.event.operationType),
+    });
+    for (let i = 0; i < commands.length; i++) {
+        const cmd = commands[i];
+        const events = cmd.getChangeEvents(ChangeStreamWatchMode.kCollection);
+        jsTest.log.info("FSM cmd", {
+            testName,
+            cmdIndex: i,
+            cmdName: cmd.constructor.name,
+            events: events.map((e) => e.operationType),
+            ctx: cmd.collectionCtx ?? null,
+        });
+    }
+    return expectedEvents;
+}
+
+function buildCommandTrace(commands) {
+    return commands.map((cmd, i) => {
+        const shardIds = Array.isArray(cmd.shardSet) ? cmd.shardSet.map((s) => s._id) : [];
+        return {
+            cmdIndex: i,
+            cmdName: cmd.constructor.name,
+            events: cmd.getChangeEvents(ChangeStreamWatchMode.kCollection).map((e) => e.operationType),
+            ctx: cmd.collectionCtx ?? null,
+            shardSet: shardIds,
+            primaryShard: cmd.primaryShard ? cmd.primaryShard._id : null,
+            targetShardKey: cmd.targetShardKey ?? null,
+        };
+    });
+}
+
+/**
  * Set up an FSM test with generated commands and reader configuration.
  * @param {Object} ctx - Test context with fsmSt, fsmShards, fsmInstancesToCleanup
  * @param {string} testName - Unique test name for logging and instance naming
+ * @param {Object} [options] - Optional configuration
+ * @param {number} [options.startState] - FSM start state (default: DATABASE_ABSENT)
  * @returns {Object} Setup result with dbName, collName, commands, expectedEvents, baseReaderConfig, createInstanceName
  */
-function setupFsmTest(ctx, testName) {
+function setupFsmTest(ctx, testName, options = {}) {
+    const startState = options.startState || State.DATABASE_ABSENT;
     jsTest.log.info(`FSM ${testName}: using seed ${TEST_SEED}`);
     Random.setRandomSeed(TEST_SEED);
     const dbName = TEST_DB;
@@ -106,25 +162,31 @@ function setupFsmTest(ctx, testName) {
 
     const params = new ShardingCommandGeneratorParams(dbName, collName, ctx.fsmShards);
     const generator = new ShardingCommandGenerator(TEST_SEED);
-    const testModel = new CollectionTestModel().setStartState(State.DATABASE_ABSENT);
+    const testModel = new CollectionTestModel(startState);
+
+    // Ensure database exists for non-absent start states.
+    if (startState !== State.DATABASE_ABSENT) {
+        ctx.fsmSt.s.getDB(dbName).dropDatabase();
+        new CreateDatabaseCommand(dbName, collName, ctx.fsmShards).execute(ctx.fsmSt.s);
+    }
+
     const commands = generator.generateCommands(testModel, params);
 
-    const expectedEvents = commands
-        .flatMap((cmd) => cmd.getChangeEvents(ChangeStreamWatchMode.kCollection))
-        .map((e) => ({event: e, cursorClosed: e.operationType === "invalidate"}));
-
-    const numberOfEventsToRead = expectedEvents.length;
-
-    jsTest.log.info(
-        `FSM ${testName}: shards=${ctx.fsmShards.length}, commands=${commands.length}, ` +
-            `expectedEvents=${expectedEvents.length}`,
-    );
+    jsTest.log.info("FSM setup", {
+        testName,
+        shards: ctx.fsmShards.length,
+        commands: commands.length,
+    });
 
     const startTime = getCurrentClusterTime(ctx.fsmSt.s, dbName);
 
     const writerInstanceName = `writer_${testName}_${ts}`;
     ctx.fsmInstancesToCleanup.push(writerInstanceName);
     Writer.run(ctx.fsmSt.s, writerInstanceName, commands, TEST_SEED);
+
+    const expectedEvents = computeAndLogExpectedEvents(testName, commands);
+    const commandTrace = buildCommandTrace(commands);
+    const numberOfEventsToRead = expectedEvents.length;
 
     const createInstanceName = (prefix) => {
         const name = `${prefix}_${testName}_${ts}`;
@@ -140,20 +202,13 @@ function setupFsmTest(ctx, testName) {
         startAtClusterTime: startTime,
         numberOfEventsToRead,
         excludeOperationTypes: kExcludedOperationTypes,
+        // Used by verifier to print richer mismatch diagnostics.
+        debugCommandTrace: commandTrace,
     };
 
-    return {dbName, collName, commands, expectedEvents, baseReaderConfig, createInstanceName};
+    return {dbName, collName, commands, expectedEvents, commandTrace, baseReaderConfig, createInstanceName};
 }
 
-/**
- * Run an FSM test with automatic cluster setup and teardown.
- * Creates a ShardingTest, sets up the FSM test, runs the test function, and cleans up.
- * @param {string} testName - Unique test name
- * @param {Function} testFn - Test function receiving (fsmSt, setupResult, instancesToCleanup)
- * @param {number} [mongos=1] - Number of mongos instances
- * @param {number} [shards=1] - Number of shards
- * @param {number} [rsNodes=1] - Number of replica set nodes per shard
- */
 /**
  * Run each teardown step independently so one failure doesn't prevent the rest.
  * Collects all errors and throws a combined error at the end.
@@ -174,14 +229,26 @@ function runTeardownSteps(...steps) {
     }
 }
 
-function runWithFsmCluster(testName, testFn, mongos = 1, shards = 1, rsNodes = 1) {
+/**
+ * Run an FSM test with automatic cluster setup and teardown.
+ * Creates a ShardingTest, sets up the FSM test, runs the test function, and cleans up.
+ * @param {string} testName - Unique test name
+ * @param {Function} testFn - Test function receiving (fsmSt, setupResult, instancesToCleanup)
+ * @param {Object} [options] - Optional configuration
+ * @param {number} [options.mongos=1] - Number of mongos instances
+ * @param {number} [options.shards=3] - Number of shards
+ * @param {number} [options.rsNodes=1] - Number of replica set nodes per shard
+ * @param {number} [options.startState] - FSM start state (passed to setupFsmTest)
+ */
+function runWithFsmCluster(testName, testFn, options = {}) {
+    const {mongos = 1, shards = 3, rsNodes = 1} = options;
     const fsmSt = createShardingTest(mongos, shards, rsNodes);
     const fsmShards = assert.commandWorked(fsmSt.s.adminCommand({listShards: 1})).shards;
     const instancesToCleanup = [];
 
     try {
         const ctx = {fsmSt, fsmShards, fsmInstancesToCleanup: instancesToCleanup};
-        const setupResult = setupFsmTest(ctx, testName);
+        const setupResult = setupFsmTest(ctx, testName, options);
         testFn(fsmSt, setupResult, instancesToCleanup);
     } finally {
         runTeardownSteps(

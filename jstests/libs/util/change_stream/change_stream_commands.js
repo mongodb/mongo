@@ -73,7 +73,8 @@ class Command {
         throw new Error("execute() method must be implemented by subclasses");
     }
 
-    static kRetryableDDLErrors = [ErrorCodes.ReshardCollectionInProgress];
+    // Transient errors from concurrent DDL on the same namespace (e.g. parallel reshards or moves).
+    static kRetryableDDLErrors = [ErrorCodes.ReshardCollectionInProgress, ErrorCodes.ConflictingOperationInProgress];
 
     /**
      * Wrap a DDL operation with retry logic to handle transient conflicts
@@ -86,7 +87,7 @@ class Command {
                 return true;
             },
             Command.kRetryableDDLErrors,
-            `${this.toString()}: timed out after retries`,
+            `${this.toString()} on ${this.dbName}.${this.collName}: timed out after retries`,
         );
     }
 
@@ -135,22 +136,34 @@ class Command {
 /**
  * Insert document command.
  * The insertion behavior differs depending on whether the collection already exists.
+ * By default inserts 2 documents with distinct shard-key values; pass a custom array
+ * to override (e.g. for targeted shard-key placement tests).
  */
 class InsertDocCommand extends Command {
-    constructor(dbName, collName, shardSet, collectionCtx) {
+    static numDocs = 2;
+
+    constructor(dbName, collName, shardSet, collectionCtx, documents = null) {
         super(dbName, collName, shardSet, collectionCtx);
-        // Use ObjectId().str to get the unique hex string. The ObjectId BSON wrapper
-        // itself becomes `{}` when passed through Thread boundaries, but the extracted
-        // string survives serialization and is globally unique.
-        const id = new ObjectId().str;
-        this.document = {
-            _id: id,
-            data: `data_${id}`,
-        };
+        if (documents) {
+            this.documents = documents;
+        } else {
+            // Use ObjectId().str to get the unique hex string. The ObjectId BSON wrapper
+            // itself becomes `{}` when passed through Thread boundaries, but the extracted
+            // string survives serialization and is globally unique.
+            this.documents = [];
+            for (let i = 0; i < InsertDocCommand.numDocs; i++) {
+                const id = new ObjectId().str;
+                this.documents.push({
+                    _id: id,
+                    data: `data_${id}_${i}`,
+                });
+            }
+        }
     }
 
     execute(connection) {
-        assert.commandWorked(connection.getDB(this.dbName).getCollection(this.collName).insertOne(this.document));
+        const coll = connection.getDB(this.dbName).getCollection(this.collName);
+        assert.commandWorked(coll.insertMany(this.documents));
     }
 
     toString() {
@@ -163,17 +176,21 @@ class InsertDocCommand extends Command {
         if (!this.collectionCtx.exists) {
             events.push(_createCollectionEventSpec(this.dbName, this.collName));
         }
-        events.push({
-            operationType: "insert",
-            ns: {db: this.dbName, coll: this.collName},
-            fullDocument: this.document,
-        });
+        for (const doc of this.documents) {
+            events.push({
+                operationType: "insert",
+                ns: {db: this.dbName, coll: this.collName},
+                fullDocument: doc,
+            });
+        }
         return events;
     }
 }
 
 /**
  * Create database command.
+ *
+ * Does not pin a primary shard — the server picks one automatically.
  */
 class CreateDatabaseCommand extends Command {
     execute(connection) {
@@ -192,20 +209,18 @@ class CreateDatabaseCommand extends Command {
 
 /**
  * Create unsplittable collection command.
+ * TODO SERVER-121676: Pins to the DB primary shard to avoid v2 shard-targeting
+ * issues on resume. Once fixed, this can target a random shard again.
  */
 class CreateUnsplittableCollectionCommand extends Command {
     execute(connection) {
-        assert(
-            this.shardSet && this.shardSet.length > 0,
-            "Shard set must be provided for CreateUnsplittableCollectionCommand",
-        );
-        const targetShard = this.shardSet[Random.randInt(this.shardSet.length)];
-
+        const dbDoc = connection.getDB("config").databases.findOne({_id: this.dbName});
+        assert(dbDoc, `${this}: database ${this.dbName} not in config.databases`);
         const db = connection.getDB(this.dbName);
         assert.commandWorked(
             db.runCommand({
                 createUnsplittableCollection: this.collName,
-                dataShard: targetShard._id,
+                dataShard: dbDoc.primary,
             }),
         );
     }
@@ -572,7 +587,8 @@ class ShardCollectionCommand extends Command {
 /**
  * Unshard collection command.
  * Converts a sharded collection to an unsplittable (single-shard) collection.
- * Picks a random shard as the destination.
+ * TODO SERVER-121676: Pins to the DB primary shard to avoid v2 shard-targeting
+ * issues on resume. Once fixed, this can target a random shard again.
  *
  * CHANGE STREAM EVENT BEHAVIOR:
  * ============================
@@ -597,16 +613,13 @@ class UnshardCollectionCommand extends Command {
 
     execute(connection) {
         this._executeWithDDLRetry(connection, (conn) => {
-            assert(
-                this.shardSet && this.shardSet.length > 0,
-                "Shard set must be provided for UnshardCollectionCommand",
-            );
-            const targetShard = this.shardSet[Random.randInt(this.shardSet.length)];
+            const dbDoc = conn.getDB("config").databases.findOne({_id: this.dbName});
+            assert(dbDoc, `${this}: database ${this.dbName} not in config.databases`);
             const ns = `${this.dbName}.${this.collName}`;
             assert.commandWorked(
                 conn.adminCommand({
                     unshardCollection: ns,
-                    toShard: targetShard._id,
+                    toShard: dbDoc.primary,
                 }),
             );
         });
@@ -728,14 +741,19 @@ class RenameCommand extends Command {
         const targetDb = this.crossDatabase ? `${this.dbName}_target` : this.dbName;
         const targetColl = `${this.collName}_renamed`;
 
+        if (this.targetShouldExist) {
+            assert.commandWorked(connection.getDB(targetDb).createCollection(targetColl));
+        }
+
         assert.commandWorked(
             connection.adminCommand({
                 renameCollection: `${this.dbName}.${this.collName}`,
                 to: `${targetDb}.${targetColl}`,
+                dropTarget: this.targetShouldExist,
             }),
         );
 
-        // Drop the renamed collection to ensure the target doesn't already exist for subsequent renames.
+        // Drop the renamed collection to clean up for subsequent renames.
         assert.commandWorked(connection.getDB(targetDb).runCommand({drop: targetColl}));
     }
 
@@ -812,12 +830,14 @@ class RenameToExistentDifferentDbCommand extends RenameCommand {
  */
 class MoveCommandBase extends Command {
     /**
-     * Get the target shard for the move operation.
-     * @param {Object} connection - The MongoDB connection.
-     * @returns {string|null} The target shard ID, or null if no suitable shard exists.
+     * Get the shard to move from (the "source" shard for this operation).
+     * For movePrimary: the current DB primary.
+     * For moveCollection: the shard owning the collection (config.chunks for
+     *   unsplittable, DB primary for untracked).
+     * For moveChunk: not used (overrides execute() directly).
      */
-    _getTargetShard(connection) {
-        throw new Error("_getTargetShard() method must be implemented by subclasses");
+    _getCurrentShard(connection) {
+        throw new Error("_getCurrentShard() method must be implemented by subclasses");
     }
 
     /**
@@ -829,34 +849,65 @@ class MoveCommandBase extends Command {
         throw new Error("_buildMoveCommand() method must be implemented by subclasses");
     }
 
+    /**
+     * Look up the collection document and find the shard owning a chunk.
+     * @param {Object} connection - The MongoDB connection.
+     * @param {Object} [sort] - Optional sort for chunk lookup (default: no sort, returns any chunk).
+     * @returns {string} The shard ID owning the chunk.
+     */
+    _getShardFromChunks(connection, sort = null) {
+        const ns = `${this.dbName}.${this.collName}`;
+        const configDb = connection.getDB("config");
+        const collDoc = configDb.collections.findOne({_id: ns});
+        assert(collDoc, `${this}: collection ${ns} not in config.collections`);
+        const query = configDb.chunks.find({uuid: collDoc.uuid});
+        const chunk = sort ? query.sort(sort).limit(1).next() : query.next();
+        assert(chunk, `${this}: no chunks for ${ns}`);
+        return chunk.shard;
+    }
+
+    /**
+     * Get the DB primary shard.
+     * @param {Object} connection - The MongoDB connection.
+     * @returns {string} The primary shard ID.
+     */
+    _getDbPrimary(connection) {
+        const dbDoc = connection.getDB("config").databases.findOne({_id: this.dbName});
+        assert(dbDoc, `${this}: database ${this.dbName} not in config.databases`);
+        return dbDoc.primary;
+    }
+
+    /**
+     * Pick a target shard different from the current shard.
+     */
+    _getTargetShard(connection) {
+        assert(this.shardSet && this.shardSet.length > 1, `${this} requires a shard set with at least 2 shards`);
+        const currentShard = this._getCurrentShard(connection);
+        const otherShards = this.shardSet.filter((s) => s._id !== currentShard);
+        assert.gt(otherShards.length, 0, `${this}: no other shard to move to (currently on ${currentShard})`);
+        return otherShards[Random.randInt(otherShards.length)]._id;
+    }
+
     execute(connection) {
-        // No-op: Move operations are not critical for state machine testing since.
-        // sharding is not actually set up.
-        // In a real implementation, this would execute:
-        //   const targetShardId = this._getTargetShard(connection);
-        //   const moveCommand = this._buildMoveCommand(targetShardId);
-        //   assert.commandWorked(connection.adminCommand(moveCommand));
+        const targetShardId = this._getTargetShard(connection);
+        const moveCommand = this._buildMoveCommand(targetShardId);
+        this._executeWithDDLRetry(connection, (conn) => {
+            assert.commandWorked(conn.adminCommand(moveCommand));
+        });
     }
 }
 
 /**
  * Move primary command.
+ * TODO SERVER-122025: disabled in the FSM model — breaks cross-db rename.
  */
 class MovePrimaryCommand extends MoveCommandBase {
-    _getTargetShard(connection) {
-        assert(this.shardSet && this.shardSet.length > 0, "Shard set must be provided for MovePrimaryCommand");
-        assert.gt(this.shardSet.length, 1, "MovePrimaryCommand requires at least 2 shards");
-        const dbInfo = assert.commandWorked(connection.adminCommand({getDatabaseVersion: this.dbName}));
-        const otherShards = this.shardSet.filter((s) => s._id !== dbInfo.primary);
-        assert.gt(
-            otherShards.length,
-            0,
-            `MovePrimaryCommand requires at least one shard other than primary (${dbInfo.primary})`,
-        );
-        return otherShards[Random.randInt(otherShards.length)]._id;
+    _getCurrentShard(connection) {
+        return this._getDbPrimary(connection);
     }
 
     _buildMoveCommand(targetShardId) {
+        assert(targetShardId, `MovePrimaryCommand: invalid target shard (got ${targetShardId})`);
         return {
             movePrimary: this.dbName,
             to: targetShardId,
@@ -868,22 +919,33 @@ class MovePrimaryCommand extends MoveCommandBase {
     }
 
     getChangeEvents(watchMode) {
-        // movePrimary does not emit change stream events.
         return [];
     }
 }
 
 /**
  * Move collection command.
+ * TODO SERVER-121676: Currently disabled in the FSM model. Once shard-targeting on
+ * resume is fixed, re-enable and allow random target shard selection.
+ *
+ * Resolves where the collection lives via _getCurrentShard: unsplittable → from
+ * config.chunks, untracked → DB primary. The base _getTargetShard picks a different shard.
+ *
+ * CHANGE STREAM EVENT BEHAVIOR:
+ * ============================
+ * moveCollection uses reshard machinery internally and always emits a 'reshardCollection'
+ * event.
  */
 class MoveCollectionCommand extends MoveCommandBase {
-    _getTargetShard(connection) {
-        assert(this.shardSet && this.shardSet.length > 0, "Shard set must be provided for MoveCollectionCommand");
-        assert.gt(this.shardSet.length, 1, "MoveCollectionCommand requires at least 2 shards");
-        return this.shardSet[Random.randInt(this.shardSet.length)]._id;
+    _getCurrentShard(connection) {
+        if (this.collectionCtx.isUnsplittable) {
+            return this._getShardFromChunks(connection);
+        }
+        return this._getDbPrimary(connection);
     }
 
     _buildMoveCommand(targetShardId) {
+        assert(targetShardId, `MoveCollectionCommand: invalid target shard (got ${targetShardId})`);
         return {
             moveCollection: `${this.dbName}.${this.collName}`,
             toShard: targetShardId,
@@ -895,28 +957,223 @@ class MoveCollectionCommand extends MoveCommandBase {
     }
 
     getChangeEvents(watchMode) {
-        // moveCollection does not emit change stream events (it's a no-op in tests).
-        return [];
+        // moveCollection always emits reshardCollection.
+        return [
+            {
+                operationType: "reshardCollection",
+                ns: {db: this.dbName, coll: this.collName},
+            },
+        ];
     }
 }
 
 /**
  * Move chunk command.
- * TODO: SERVER-114858 - Improve chunk selection logic.
+ * Inserts documents, splits into multiple chunks, then drains all chunks off the
+ * donor shard (round-robin across other shards) so the donor ends up with zero
+ * chunks. Exercises the "shard has no data for this collection" scenario, which
+ * is important for change stream shard targeting.
+ *
+ * Interleaved inserts happen between chunk moves to verify change streams remain
+ * functional during migrations. All inserted documents (initial + interleaved)
+ * are reported by getChangeEvents().
  */
 class MoveChunkCommand extends MoveCommandBase {
-    _getTargetShard(connection) {
-        assert(this.shardSet && this.shardSet.length > 0, "Shard set must be provided for MoveChunkCommand");
-        assert.gt(this.shardSet.length, 1, "MoveChunkCommand requires at least 2 shards");
-        return this.shardSet[Random.randInt(this.shardSet.length)]._id;
+    constructor(dbName, collName, shardSet, collectionCtx) {
+        super(dbName, collName, shardSet, collectionCtx);
+        // Always insert enough documents for proper chunk distribution,
+        // even when the collection already has data — prior inserts may
+        // have fewer docs than shardSet.length requires for splitting.
+        const numDocs = Math.max(shardSet.length + 1, InsertDocCommand.numDocs);
+        this.documentsToInsert = [];
+        for (let i = 0; i < numDocs; i++) {
+            const id = new ObjectId().str;
+            this.documentsToInsert.push({_id: id, data: `data_${id}_${i}`});
+        }
+
+        this.interleavedDocuments = [];
+        for (let i = 0; i < InsertDocCommand.numDocs; i++) {
+            const id = new ObjectId().str;
+            this.interleavedDocuments.push({_id: id, data: `interleave_${id}_${i}`});
+        }
     }
 
-    _buildMoveCommand(targetShardId) {
+    /**
+     * Identify the donor shard (the shard with the most chunks).
+     * With balancer off, all chunks are on the primary shard for range sharding.
+     * For hashed sharding with presplitHashedZones, chunks may be distributed
+     * across shards at creation time.
+     */
+    _getDonorShardId(connection) {
+        assert(this.shardSet && this.shardSet.length > 1, `${this} requires at least 2 shards`);
+        const ns = `${this.dbName}.${this.collName}`;
+        const configDb = connection.getDB("config");
+        const collDoc = configDb.collections.findOne({_id: ns});
+        assert(collDoc, `${this}: collection ${ns} not in config.collections`);
+        const chunks = configDb.chunks.find({uuid: collDoc.uuid}).sort({"min": 1}).toArray();
+        assert.gt(chunks.length, 0, `${this}: no chunks for ${ns}`);
+
+        const chunksByShard = new Map();
+        for (const c of chunks) {
+            if (!chunksByShard.has(c.shard)) chunksByShard.set(c.shard, 0);
+            chunksByShard.set(c.shard, chunksByShard.get(c.shard) + 1);
+        }
+
+        let donorShardId = null;
+        let maxChunkCount = -1;
+        for (const [shardId, chunkCount] of chunksByShard.entries()) {
+            if (chunkCount > maxChunkCount) {
+                maxChunkCount = chunkCount;
+                donorShardId = shardId;
+            }
+        }
+        assert(donorShardId !== null, `${this}: no shards have chunks for ${ns}`);
+        return donorShardId;
+    }
+
+    /**
+     * Split into multiple chunks if the collection doesn't have enough.
+     * Exits early when chunkCount >= shardSet.length (same check for range and hashed).
+     * Hashed collections with presplitHashedZones typically already have enough chunks
+     * at creation time, so this is usually a no-op for them.
+     */
+    _ensureMultipleChunks(connection) {
+        const ns = `${this.dbName}.${this.collName}`;
+        const configDb = connection.getDB("config");
+        const collDoc = configDb.collections.findOne({_id: ns});
+        assert(collDoc, `${this}: collection ${ns} not in config.collections`);
+
+        const chunkCount = configDb.chunks.countDocuments({uuid: collDoc.uuid});
+        if (chunkCount >= this.shardSet.length) {
+            return;
+        }
+
+        const shardKeyField = Object.keys(collDoc.key)[0];
+        if (isHashedShardKey(collDoc.key)) {
+            this._splitHashedChunks(connection, ns, shardKeyField, configDb, collDoc);
+        } else {
+            this._splitRangeChunks(connection, ns, shardKeyField);
+        }
+    }
+
+    /**
+     * Split a hashed collection using `find`-based splits. MongoDB hashes
+     * the document value, locates the containing chunk, and splits at its
+     * median. This avoids the problem of arbitrary NumberLong split points
+     * (e.g. 1000, 2000) clustering near zero in the int64 hash range and
+     * leaving the middle chunk nearly empty.
+     */
+    _splitHashedChunks(connection, ns, shardKeyField, configDb, collDoc) {
+        const coll = connection.getDB(this.dbName).getCollection(this.collName);
+        const docs = coll.find({}, {[shardKeyField]: 1, _id: 0}).toArray();
+
+        for (const doc of docs) {
+            if (configDb.chunks.countDocuments({uuid: collDoc.uuid}) >= this.shardSet.length) {
+                break;
+            }
+            assert.commandWorked(
+                connection.adminCommand({
+                    split: ns,
+                    find: {[shardKeyField]: doc[shardKeyField]},
+                }),
+            );
+        }
+    }
+
+    /**
+     * Split a range collection at actual data values so every chunk contains
+     * documents. Numeric split points don't work because data values are
+     * strings and BSON orders Numbers < Strings, which puts all data into
+     * a single chunk.
+     */
+    _splitRangeChunks(connection, ns, shardKeyField) {
+        const coll = connection.getDB(this.dbName).getCollection(this.collName);
+        const values = coll
+            .find({}, {[shardKeyField]: 1, _id: 0})
+            .sort({[shardKeyField]: 1})
+            .toArray()
+            .map((doc) => doc[shardKeyField]);
+
+        assert.gte(
+            values.length,
+            this.shardSet.length,
+            `${this}: need >= ${this.shardSet.length} docs for splitting, got ${values.length}`,
+        );
+
+        for (let i = 1; i < this.shardSet.length; i++) {
+            const idx = Math.floor((i * values.length) / this.shardSet.length);
+            assert.commandWorked(
+                connection.adminCommand({
+                    split: ns,
+                    middle: {[shardKeyField]: values[idx]},
+                }),
+            );
+        }
+    }
+
+    _buildMoveChunkCmd(ns, chunk, targetShardId) {
+        // Use `bounds` (not `find`) to identify the chunk by its exact
+        // [min, max) range. `find` doesn't work for hashed shard keys
+        // because it re-hashes the value, resolving to the wrong chunk.
         return {
-            moveChunk: `${this.dbName}.${this.collName}`,
-            find: {_id: MinKey},
+            moveChunk: ns,
+            bounds: [chunk.min, chunk.max],
             to: targetShardId,
+            _waitForDelete: true,
         };
+    }
+
+    execute(connection) {
+        const coll = connection.getDB(this.dbName).getCollection(this.collName);
+        assert.commandWorked(coll.insertMany(this.documentsToInsert));
+
+        this._ensureMultipleChunks(connection);
+
+        const ns = `${this.dbName}.${this.collName}`;
+        const configDb = connection.getDB("config");
+        const collDoc = configDb.collections.findOne({_id: ns});
+        assert(collDoc, `${this}: collection ${ns} not in config.collections`);
+
+        const donorShardId = this._getDonorShardId(connection);
+        const otherShardIds = this.shardSet.filter((s) => s._id !== donorShardId).map((s) => s._id);
+        assert.gt(otherShardIds.length, 0, `${this}: no recipient shards to drain donor ${donorShardId}`);
+
+        this._drainChunksFromDonor(connection, ns, configDb, collDoc, donorShardId, otherShardIds);
+    }
+
+    /**
+     * Move all chunks off the donor shard round-robin across recipients.
+     * Inserts interleaved documents after the first move, then re-queries
+     * the donor to catch any chunks that appeared during the insert.
+     */
+    _drainChunksFromDonor(connection, ns, configDb, collDoc, donorShardId, otherShardIds) {
+        let moved = 0;
+        let donorChunks = configDb.chunks.find({uuid: collDoc.uuid, shard: donorShardId}).sort({min: 1}).toArray();
+
+        while (donorChunks.length > 0) {
+            for (let i = 0; i < donorChunks.length; i++) {
+                const recipient = otherShardIds[(moved + i) % otherShardIds.length];
+                this._executeWithDDLRetry(connection, (conn) => {
+                    assert.commandWorked(conn.adminCommand(this._buildMoveChunkCmd(ns, donorChunks[i], recipient)));
+                });
+
+                if (moved + i === 0 && this.interleavedDocuments.length > 0) {
+                    const coll = connection.getDB(this.dbName).getCollection(this.collName);
+                    assert.commandWorked(coll.insertMany(this.interleavedDocuments));
+                }
+            }
+            moved += donorChunks.length;
+
+            // Re-query to catch any chunks that appeared on the donor
+            // (e.g. from auto-splitting triggered by the interleaved insert).
+            donorChunks = configDb.chunks.find({uuid: collDoc.uuid, shard: donorShardId}).sort({min: 1}).toArray();
+        }
+
+        assert.eq(
+            configDb.chunks.countDocuments({uuid: collDoc.uuid, shard: donorShardId}),
+            0,
+            `${this}: donor ${donorShardId} still has chunks after drain`,
+        );
     }
 
     toString() {
@@ -924,9 +1181,11 @@ class MoveChunkCommand extends MoveCommandBase {
     }
 
     getChangeEvents(watchMode) {
-        // TODO SERVER-114858: moveChunk only emits change stream events in showSystemEvents mode,
-        // which we don't use in our tests. For normal change streams, it's invisible.
-        return [];
+        return [...this.documentsToInsert, ...this.interleavedDocuments].map((doc) => ({
+            operationType: "insert",
+            ns: {db: this.dbName, coll: this.collName},
+            fullDocument: doc,
+        }));
     }
 }
 

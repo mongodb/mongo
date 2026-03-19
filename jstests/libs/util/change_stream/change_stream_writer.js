@@ -72,7 +72,15 @@ class Writer {
             const spec = config.commandSpecs[i];
             const cmd = Command.fromSpec(spec);
             jsTest.log.info(`Writer [${config.instanceName}]: cmd[${i}] ${spec.type}`);
-            cmd.execute(conn);
+            try {
+                cmd.execute(conn);
+            } catch (e) {
+                jsTest.log.error(`Writer [${config.instanceName}]: cmd[${i}] ${spec.type} FAILED`, {
+                    error: e.toString(),
+                    spec: spec,
+                });
+                throw e;
+            }
         }
 
         jsTest.log.info(`Writer [${config.instanceName}]: all ${config.commandSpecs.length} commands completed`);

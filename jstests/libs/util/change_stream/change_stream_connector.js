@@ -60,11 +60,20 @@ class Connector {
 
     /**
      * Wait for a test instance to complete.
+     * TODO SERVER-121782: Replace timeout-based waitForDone with heartbeat-driven
+     * progress tracking.
      * @param {Mongo} conn - MongoDB connection.
      * @param {string} instanceName - Name of the test instance.
+     * @param {number} [timeoutMs] - Optional timeout in ms. Defaults to assert.soon's
+     *   built-in default (90s locally, 10min on Evergreen). Raise for tests with
+     *   parallel writers running moveChunk or sharding DDL that can exceed 90s locally.
      */
-    static waitForDone(conn, instanceName) {
-        assert.soonNoExcept(() => Connector.isDone(conn, instanceName));
+    static waitForDone(conn, instanceName, timeoutMs = undefined) {
+        assert.soonNoExcept(
+            () => Connector.isDone(conn, instanceName),
+            `Timed out waiting for ${instanceName} to complete`,
+            timeoutMs,
+        );
     }
 
     /**
