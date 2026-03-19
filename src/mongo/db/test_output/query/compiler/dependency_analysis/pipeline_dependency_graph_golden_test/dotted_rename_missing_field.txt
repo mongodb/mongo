@@ -1,0 +1,83 @@
+VARIATION DottedRenameMissingField
+input: {
+    "pipeline": [
+        {
+            "$replaceRoot": {
+                "newRoot": {
+                    "$const": {}
+                }
+            }
+        },
+        {
+            "$set": {
+                "a": "$b.c",
+                "d": "$e.f.g",
+                "h": {
+                    "i": "$j.k"
+                }
+            }
+        }
+    ]
+}
+output: {
+    "$replaceRoot:0": {
+        "scope:0": {
+            "exhaustiveScope": "scope:0",
+            "fields": {
+                "<missing>:0": {
+                    "declaringScope": "scope:0",
+                    "dependencies": []
+                }
+            }
+        },
+        "dependencies": []
+    },
+    "$set:1": {
+        "scope:1": {
+            "exhaustiveScope": "scope:0",
+            "fields": {
+                "<missing>:1": {
+                    "declaringScope": "scope:1",
+                    "dependencies": []
+                },
+                "a:2": {
+                    "declaringScope": "scope:1",
+                    "dependencies": [
+                        "<missing>:0"
+                    ]
+                },
+                "d:3": {
+                    "declaringScope": "scope:1",
+                    "dependencies": [
+                        "<missing>:0"
+                    ]
+                },
+                "h:4": {
+                    "declaringScope": "scope:1",
+                    "scope:2": {
+                        "exhaustiveScope": "scope:0",
+                        "fields": {
+                            "<missing>:5": {
+                                "declaringScope": "scope:2",
+                                "dependencies": []
+                            },
+                            "i:6": {
+                                "declaringScope": "scope:2",
+                                "dependencies": [
+                                    "<missing>:0"
+                                ]
+                            }
+                        }
+                    },
+                    "dependencies": [
+                        "i:6"
+                    ]
+                }
+            }
+        },
+        "dependencies": [
+            "<missing>:0"
+        ]
+    }
+}
+

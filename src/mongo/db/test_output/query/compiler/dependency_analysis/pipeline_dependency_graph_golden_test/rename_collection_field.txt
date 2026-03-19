@@ -1,0 +1,33 @@
+VARIATION RenameCollectionField
+input: {
+    "pipeline": [
+        {
+            "$set": {
+                "a": "$b"
+            }
+        }
+    ]
+}
+output: {
+    "$set:0": {
+        "scope:0": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:0": {
+                    "declaringScope": "scope:0",
+                    "dependencies": []
+                },
+                "a:1": {
+                    "declaringScope": "scope:0",
+                    "dependencies": [
+                        "<base document>:-1"
+                    ]
+                }
+            }
+        },
+        "dependencies": [
+            "<base document>:-1"
+        ]
+    }
+}
+

@@ -1,0 +1,64 @@
+VARIATION DottedRenameCollectionField
+input: {
+    "pipeline": [
+        {
+            "$set": {
+                "a": "$b.c",
+                "d": "$e.f.g",
+                "h": {
+                    "i": "$j.k"
+                }
+            }
+        }
+    ]
+}
+output: {
+    "$set:0": {
+        "scope:0": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:0": {
+                    "declaringScope": "scope:0",
+                    "dependencies": []
+                },
+                "a:1": {
+                    "declaringScope": "scope:0",
+                    "dependencies": [
+                        "<base document>:-1"
+                    ]
+                },
+                "d:2": {
+                    "declaringScope": "scope:0",
+                    "dependencies": [
+                        "<base document>:-1"
+                    ]
+                },
+                "h:3": {
+                    "declaringScope": "scope:0",
+                    "scope:1": {
+                        "exhaustiveScope": "scope:-1",
+                        "fields": {
+                            "<missing>:4": {
+                                "declaringScope": "scope:1",
+                                "dependencies": []
+                            },
+                            "i:5": {
+                                "declaringScope": "scope:1",
+                                "dependencies": [
+                                    "<base document>:-1"
+                                ]
+                            }
+                        }
+                    },
+                    "dependencies": [
+                        "i:5"
+                    ]
+                }
+            }
+        },
+        "dependencies": [
+            "<base document>:-1"
+        ]
+    }
+}
+

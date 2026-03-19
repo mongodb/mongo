@@ -203,5 +203,68 @@ TEST_F(PipelineDependencyGraphGoldenTest, DottedRenamesReuseParentScope) {
     });
 }
 
+TEST_F(PipelineDependencyGraphGoldenTest, ComplexRename) {
+    runVariation({
+        .name = "ComplexRename",
+        .pipeline = "[{$set: { 'a.b': 1 }},"
+                    "{$set: { c: '$a.b' }}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, DottedRename) {
+    runVariation({
+        .name = "DottedRename",
+        .pipeline = "[{$set: { 'a.b.c': 1, 'd.e': 1 }},"
+                    "{$set: { f: '$a.b.c', g: '$d.e.h', 'i.j': '$a' }}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, RenameShadowedField) {
+    runVariation({
+        .name = "DottedRename",
+        .pipeline = "[{$set: { 'a.b': 1 }},"
+                    "{$set: { 'a': 1 }},"
+                    "{$set: { d: '$a.b' }}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, RenameMissingField) {
+    runVariation({
+        .name = "RenameMissingField",
+        .pipeline = "[{$replaceWith: {}},"
+                    "{$set: { a: '$b' }}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, DottedRenameMissingField) {
+    runVariation({
+        .name = "DottedRenameMissingField",
+        .pipeline = "[{$replaceWith: {}},"
+                    "{$set: { a: '$b.c', d: '$e.f.g', 'h.i': '$j.k' }}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, RenameCollectionField) {
+    runVariation({
+        .name = "RenameCollectionField",
+        .pipeline = "[{$set: { a: '$b' }}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, DottedRenameCollectionField) {
+    runVariation({
+        .name = "DottedRenameCollectionField",
+        .pipeline = "[{$set: { a: '$b.c', d: '$e.f.g', 'h.i': '$j.k' }}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, RenameSameFieldsTwice) {
+    runVariation({
+        .name = "RenameSameFieldsTwice",
+        .pipeline = "[{$set: { a: 1 }},"
+                    " {$set: { b: '$a', c: '$a', d: '$f', e: '$f' }}]",
+    });
+}
+
 }  // namespace
 }  // namespace mongo::pipeline::dependency_graph

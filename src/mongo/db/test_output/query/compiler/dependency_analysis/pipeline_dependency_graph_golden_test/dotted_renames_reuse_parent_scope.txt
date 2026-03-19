@@ -106,7 +106,9 @@ output: {
                                                                             },
                                                                             "f1:11": {
                                                                                 "declaringScope": "scope:5",
-                                                                                "dependencies": []
+                                                                                "dependencies": [
+                                                                                    "<base document>:-1"
+                                                                                ]
                                                                             }
                                                                         }
                                                                     },
@@ -140,11 +142,15 @@ output: {
                 },
                 "b:12": {
                     "declaringScope": "scope:0",
-                    "dependencies": []
+                    "dependencies": [
+                        "<base document>:-1"
+                    ]
                 }
             }
         },
-        "dependencies": []
+        "dependencies": [
+            "<base document>:-1"
+        ]
     },
     "$set:1": {
         "scope:6": {
@@ -203,6 +209,7 @@ output: {
                                                                             "f2:24": {
                                                                                 "declaringScope": "scope:11",
                                                                                 "dependencies": [
+                                                                                    "<base document>:-1",
                                                                                     "f1:11"
                                                                                 ]
                                                                             }
@@ -240,18 +247,21 @@ output: {
             }
         },
         "dependencies": [
+            "<base document>:-1",
             "f1:11"
         ]
     },
     "$match:2": {
         "scope:6": "scope:6",
         "dependencies": [
+            "<base document>:-1",
             "f2:24"
         ]
     },
     "$match:3": {
         "scope:6": "scope:6",
         "dependencies": [
+            "<base document>:-1",
             "a2:14"
         ]
     }

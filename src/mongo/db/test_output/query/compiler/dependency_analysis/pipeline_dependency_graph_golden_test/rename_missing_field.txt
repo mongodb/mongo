@@ -1,0 +1,52 @@
+VARIATION RenameMissingField
+input: {
+    "pipeline": [
+        {
+            "$replaceRoot": {
+                "newRoot": {
+                    "$const": {}
+                }
+            }
+        },
+        {
+            "$set": {
+                "a": "$b"
+            }
+        }
+    ]
+}
+output: {
+    "$replaceRoot:0": {
+        "scope:0": {
+            "exhaustiveScope": "scope:0",
+            "fields": {
+                "<missing>:0": {
+                    "declaringScope": "scope:0",
+                    "dependencies": []
+                }
+            }
+        },
+        "dependencies": []
+    },
+    "$set:1": {
+        "scope:1": {
+            "exhaustiveScope": "scope:0",
+            "fields": {
+                "<missing>:1": {
+                    "declaringScope": "scope:1",
+                    "dependencies": []
+                },
+                "a:2": {
+                    "declaringScope": "scope:1",
+                    "dependencies": [
+                        "<missing>:0"
+                    ]
+                }
+            }
+        },
+        "dependencies": [
+            "<missing>:0"
+        ]
+    }
+}
+

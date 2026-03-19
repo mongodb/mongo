@@ -1,0 +1,79 @@
+VARIATION RenameSameFieldsTwice
+input: {
+    "pipeline": [
+        {
+            "$set": {
+                "a": {
+                    "$const": 1
+                }
+            }
+        },
+        {
+            "$set": {
+                "b": "$a",
+                "c": "$a",
+                "d": "$f",
+                "e": "$f"
+            }
+        }
+    ]
+}
+output: {
+    "$set:0": {
+        "scope:0": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:0": {
+                    "declaringScope": "scope:0",
+                    "dependencies": []
+                },
+                "a:1": {
+                    "declaringScope": "scope:0",
+                    "dependencies": []
+                }
+            }
+        },
+        "dependencies": []
+    },
+    "$set:1": {
+        "scope:1": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:2": {
+                    "declaringScope": "scope:1",
+                    "dependencies": []
+                },
+                "a:1": "a:1",
+                "b:3": {
+                    "declaringScope": "scope:1",
+                    "dependencies": [
+                        "a:1"
+                    ]
+                },
+                "c:4": {
+                    "declaringScope": "scope:1",
+                    "dependencies": [
+                        "a:1"
+                    ]
+                },
+                "d:5": {
+                    "declaringScope": "scope:1",
+                    "dependencies": [
+                        "<base document>:-1"
+                    ]
+                },
+                "e:6": {
+                    "declaringScope": "scope:1",
+                    "dependencies": [
+                        "<base document>:-1"
+                    ]
+                }
+            }
+        },
+        "dependencies": [
+            "<base document>:-1",
+            "a:1"
+        ]
+    }
+}
+

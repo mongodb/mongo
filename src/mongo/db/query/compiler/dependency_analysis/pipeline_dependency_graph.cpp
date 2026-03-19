@@ -607,31 +607,34 @@ private:
                     auto parsedOldPath = internPath(p.getOldPath());
                     auto parsedNewPath = internPath(p.getNewPath());
 
-                    BSONDepthIndex oldPathArrays = p.getOldPathMaxArrayTraversals();
-                    BSONDepthIndex newPathArrays = p.getNewPathMaxArrayTraversals();
-
-                    if (oldPathArrays == 0 && newPathArrays == 0) {
-                        if (parentScope) {
-                            if (auto dependency = lookupFullPath(parentScope, parsedOldPath)) {
-                                // We know exactly which 1 field this one depends on.
-                                declareField(scopeId, parsedNewPath, {dependency});
-                            } else {
-                                declareField(scopeId, parsedNewPath, depsFromStage);
-                            }
-                        } else {
-                            tasserted(11937303, "Unimplemented renames when no parent scope");
-                        }
-                    } else if (oldPathArrays == 0 && newPathArrays == 1) {
-                        if (parentScope) {
-                            tasserted(11937305, "Unimplemented complex renames");
-                        } else {
-                            tasserted(11937304,
-                                      "Unimplemented complex renames when no parent scope");
-                        }
+                    FieldDependencies deps;
+                    bool isCollectionField = false;
+                    if (parentScope) {
+                        // The found field could be either:
+                        // - exact field from parent scope
+                        // - a shadowing field
+                        // - the <missing> field from an exhaustive scope
+                        // Example 1: [{$replaceWith: {}}, {$set: {a: "$b"}}]
+                        // 'a' depends on the $replaceWith stage's <missing> field.
+                        // Example 2: [{$set: {'b': 1}}, {$set: {a: '$b.c'}}]
+                        // 'a' depends on 'b'
+                        auto [oldPathField, shadowed] = lookupField(parentScope, parsedOldPath);
+                        isCollectionField = oldPathField == FieldId::none();
+                        deps.insert(oldPathField);
                     } else {
-                        // Treat potential reshaping as path modification, not as rename.
-                        declareField(scopeId, parsedNewPath, depsFromStage);
+                        isCollectionField = true;
+                        deps.insert(FieldId::none());
                     }
+
+                    if (isCollectionField) {
+                        // We represent all collection field references as FieldId::none(), without
+                        // distinguishing between them.
+                        // TODO(119384): Query Path Arrayness API.
+                    }
+
+                    // Each rename modifies the new field and depends on the previous field.
+                    declareField(scopeId, parsedNewPath, std::move(deps));
+                    // TODO(SERVER-119384): Compute & store arrayness for each field along the path.
                 },
             },
             ds);
@@ -659,11 +662,17 @@ private:
         if (parentScopeId) {
             for (auto&& path : dsInfo.getPathDependencies()) {
                 auto parsedPath = internPath(path);
-                auto fieldId = lookupFullPath(parentScopeId, parsedPath);
-                if (fieldId) {
-                    dependencies.insert(fieldId);
-                }
+                // The dependency could be:
+                // - exact field
+                // - shadowing field
+                // - <missing> field
+                // - collection field / FieldId::none()
+                auto fieldId = lookupField(parentScopeId, parsedPath).fieldId;
+                dependencies.insert(fieldId);
             }
+        } else if (!dsInfo.getPathDependencies().empty()) {
+            // Any dependency in the first stage is always a collection field.
+            dependencies.insert(FieldId::none());
         }
         const auto nextNewScopeId = _scopes.getNextId();
         auto scopeId = processScope(dsInfo, stageId, parentScopeId, dependencies);
@@ -951,6 +960,9 @@ private:
     }
 
     std::string resolveFieldName(FieldId fieldId) const {
+        if (!fieldId) {
+            return "<base document>";
+        }
         const auto& field = _graph._fields[fieldId];
         // The field doesn't know the field name. We need to find the name from the declaring scope,
         // which contains a mapping from field name to field id.

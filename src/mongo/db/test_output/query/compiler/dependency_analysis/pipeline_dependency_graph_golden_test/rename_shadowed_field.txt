@@ -1,4 +1,4 @@
-VARIATION ParentOverwritesEmbeddedScope
+VARIATION DottedRename
 input: {
     "pipeline": [
         {
@@ -6,9 +6,6 @@ input: {
                 "a": {
                     "b": {
                         "$const": 1
-                    },
-                    "c": {
-                        "$const": 2
                     }
                 }
             }
@@ -16,13 +13,13 @@ input: {
         {
             "$set": {
                 "a": {
-                    "$const": 3
+                    "$const": 1
                 }
             }
         },
         {
-            "$match": {
-                "a.b": 1
+            "$set": {
+                "d": "$a.b"
             }
         }
     ]
@@ -50,18 +47,11 @@ output: {
                                 "dependencies": [
                                     "<base document>:-1"
                                 ]
-                            },
-                            "c:4": {
-                                "declaringScope": "scope:1",
-                                "dependencies": [
-                                    "<base document>:-1"
-                                ]
                             }
                         }
                     },
                     "dependencies": [
-                        "b:3",
-                        "c:4"
+                        "b:3"
                     ]
                 }
             }
@@ -74,11 +64,11 @@ output: {
         "scope:2": {
             "exhaustiveScope": "scope:-1",
             "fields": {
-                "<missing>:5": {
+                "<missing>:4": {
                     "declaringScope": "scope:2",
                     "dependencies": []
                 },
-                "a:6": {
+                "a:5": {
                     "declaringScope": "scope:2",
                     "dependencies": []
                 }
@@ -86,10 +76,25 @@ output: {
         },
         "dependencies": []
     },
-    "$match:2": {
-        "scope:2": "scope:2",
+    "$set:2": {
+        "scope:3": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:6": {
+                    "declaringScope": "scope:3",
+                    "dependencies": []
+                },
+                "a:5": "a:5",
+                "d:7": {
+                    "declaringScope": "scope:3",
+                    "dependencies": [
+                        "a:5"
+                    ]
+                }
+            }
+        },
         "dependencies": [
-            "a:6"
+            "a:5"
         ]
     }
 }
