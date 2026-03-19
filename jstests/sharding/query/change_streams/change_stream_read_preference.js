@@ -2,6 +2,7 @@
 // user.
 // @tags: [
 //   requires_majority_read_concern,
+//   requires_profiling,
 //   uses_change_streams,
 // ]
 import {enableLocalReadLogs, getLocalReadCount} from "jstests/libs/local_reads.js";
