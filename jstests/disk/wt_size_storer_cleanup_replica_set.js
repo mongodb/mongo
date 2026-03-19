@@ -53,7 +53,7 @@ primary = replTest.getPrimary();
 const collIdent = getUriForColl(coll());
 const indexIdent = getUriForIndex(coll(), "_id_");
 
-// TODO SERVER-120753: Re-enable this test when replicated fast count is correctly persisted on step
+// TODO SERVER-121845: Re-enable this test when replicated fast count is correctly persisted on step
 // down.
 if (!FeatureFlagUtil.isPresentAndEnabled(primary, "featureFlagReplicatedFastCount")) {
     assert.eq(coll().count(), 1);
