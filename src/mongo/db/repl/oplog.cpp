@@ -1473,6 +1473,35 @@ Status withKey(const BSONElement& k, auto&& f) {
     }
 }
 
+// Throws with the error message including the information of the oplog entry, the document found by
+// the _id field, and its record id.
+void assertOnInconsistentDocuments(OperationContext* opCtx,
+                                   const CollectionPtr& coll,
+                                   const BSONObj& oplogEntry,
+                                   const OplogEntry& op,
+                                   const BSONElement& idField,
+                                   uint64_t msgId,
+                                   const std::string& reason) {
+    BSONObj docById;
+    auto rid = Helpers::findById(opCtx, coll, idField.wrap());
+    if (!rid.isNull()) {
+        Snapshotted<BSONObj> snap;
+        if (coll->findDoc(opCtx, rid, &snap)) {
+            docById = snap.value();
+        }
+    }
+
+    uasserted(msgId,
+              fmt::format("While applying an oplog entry: '{}' during steady state replication "
+                          "with timestamp: '{}' and term: '{}' to a replicated record id "
+                          "collection, {}. Existing document with _id: '{}' has recordId: '{}'",
+                          oplogEntry.toString(),
+                          op.getTimestamp().toString(),
+                          op.getTerm().has_value() ? op.getTerm().value() : -1,
+                          reason,
+                          !docById.isEmpty() ? redact(docById).toString() : "Not found",
+                          rid.toString()));
+}
 }  // namespace
 
 constexpr StringData OplogApplication::kInitialSyncOplogApplicationMode;
@@ -1642,13 +1671,13 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
             // This error is always fatal regardless of steady state constraints. We throw an error
             // here instead of deferring to the typical numMatched = 0 handling since this should
             // be a fatal error for capped collections.
-            uasserted(11902401,
-                      fmt::format("While applying an update oplog entry : '{}' during steady state "
-                                  "replication with timestamp : '{}' and term : '{}' to a "
-                                  "replicated record id collection, the record was not found",
-                                  opObj.toString(),
-                                  op.getTimestamp().toString(),
-                                  op.getTerm().has_value() ? op.getTerm().value() : -1));
+            assertOnInconsistentDocuments(opCtx,
+                                          collPtr,
+                                          opObj,
+                                          op,
+                                          idField,
+                                          /*msgId=*/11902401,
+                                          /*reason=*/"the record was not found");
         }
         return {false, /* existing */
                 false, /* modifiers */
@@ -1666,9 +1695,8 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
         preImage = obj.value().copy();
     }
 
-    // Check for a mismatch between the _id in the oplog entry and the _id
-    // in the fetched record. A difference during steady state replication
-    // is indicative of data corruption.
+    // Check for a mismatch between the _id in the oplog entry and the _id in the fetched record. A
+    // difference during steady state replication is indicative of data corruption.
     auto fetchedIdField = obj.value()["_id"];
     if (!idField.binaryEqual(fetchedIdField)) {
         if (mode == OplogApplication::Mode::kSecondary) {
@@ -1684,16 +1712,16 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
             // This error is always fatal regardless of steady state constraints. We throw an error
             // here instead of deferring to the typical numMatched = 0 handling since this should
             // also be a fatal error for capped collections.
-            uasserted(
-                7834902,
-                fmt::format(
-                    "While applying an update oplog entry : '{}' during steady state replication "
-                    "with timestamp : '{}' and term : '{}' to a replicated record id collection, "
-                    "the record : '{}' had a different _id than we were expecting.",
-                    opObj.toString(),
-                    op.getTimestamp().toString(),
-                    op.getTerm().has_value() ? op.getTerm().value() : -1,
-                    redact(obj.value()).toString()));
+            assertOnInconsistentDocuments(
+                opCtx,
+                collPtr,
+                opObj,
+                op,
+                idField,
+                /*msgId=*/7834902,
+                /*reason=*/
+                fmt::format("the record: '{}' has a different _id than we were expecting",
+                            redact(obj.value()).toString()));
         }
         return {false, /* existing */
                 false, /* modifiers */
@@ -1789,13 +1817,13 @@ DeleteResult deleteObjectByRid(OperationContext* opCtx,
             // config.image_collection.
             // TODO SERVER-119691 Do we need these exceptions for change streams pre-images or
             // config.image_collection.
-            uasserted(11902400,
-                      fmt::format("While applying a delete oplog entry : '{}' during steady state "
-                                  "replication with timestamp : '{}' and term : '{}' to a "
-                                  "replicated record id collection, the record was not found",
-                                  opObj.toString(),
-                                  op.getTimestamp().toString(),
-                                  op.getTerm().has_value() ? op.getTerm().value() : -1));
+            assertOnInconsistentDocuments(opCtx,
+                                          collPtr,
+                                          opObj,
+                                          op,
+                                          idField,
+                                          /*msgId=*/11902400,
+                                          /*reason=*/"the record was not found");
         }
         return {.nDeleted = 0};
     }
@@ -1818,16 +1846,16 @@ DeleteResult deleteObjectByRid(OperationContext* opCtx,
             // This error is always fatal regardless of steady state constraints. We throw an error
             // here instead of deferring to the typical nDeleted = 0 handling since this should also
             // be a fatal error for capped collections.
-            uasserted(
-                7835001,
-                fmt::format(
-                    "While applying an oplog entry : '{}' during steady state replication with "
-                    "timestamp : '{}' and term : '{}'  to a replicated record id collection, the "
-                    "record : '{}' had a different _id than we were expecting.",
-                    opObj.toString(),
-                    op.getTimestamp().toString(),
-                    op.getTerm().has_value() ? op.getTerm().value() : -1,
-                    redact(preImage.value()).toString()));
+            assertOnInconsistentDocuments(
+                opCtx,
+                collPtr,
+                opObj,
+                op,
+                idField,
+                /*msgId=*/7835001,
+                /*reason=*/
+                fmt::format("the record: '{}' has a different _id than we were expecting",
+                            redact(preImage.value()).toString()));
         }
         return {.nDeleted = 0};
     }
@@ -2300,11 +2328,32 @@ Status applyOperation_inlock(OperationContext* opCtx,
                             // For collections with replicated recordIds we are taking the hard
                             // stance in steady state that getting a DuplicatedKey error while
                             // applying an insert oplog entry is a constraint violation.
-                            LOGV2_FATAL_NOTRACE(8830900,
-                                                "Got DuplicateKey error while applying insert "
-                                                "oplog entry with recordId",
-                                                "oplogEntry"_attr = redact(op.toBSONForLogging()),
-                                                "opTime"_attr = op.getOpTime());
+                            BSONObj docByRid;
+                            Snapshotted<BSONObj> snapRidDoc;
+                            if (collection->findDoc(opCtx, *opRid, &snapRidDoc)) {
+                                docByRid = snapRidDoc.value();
+                            }
+
+                            BSONObj docById;
+                            auto ridOfDocById =
+                                Helpers::findById(opCtx, collection, o["_id"].wrap());
+                            if (!ridOfDocById.isNull()) {
+                                Snapshotted<BSONObj> snapIdDoc;
+                                if (collection->findDoc(opCtx, ridOfDocById, &snapIdDoc)) {
+                                    docById = snapIdDoc.value();
+                                }
+                            }
+                            LOGV2_FATAL_NOTRACE(
+                                8830900,
+                                "Got DuplicateKey error while applying insert "
+                                "oplog entry with recordId",
+                                "oplogEntry"_attr = redact(op.toBSONForLogging()),
+                                "existingDocByOpRid"_attr =
+                                    !docByRid.isEmpty() ? redact(docByRid).toString() : "Not found",
+                                "existingDocByOpId"_attr =
+                                    !docById.isEmpty() ? redact(docById).toString() : "Not found",
+                                "existingDocByIdRecordId"_attr = ridOfDocById,
+                                "opTime"_attr = op.getOpTime());
                         } else {
                             // Continue to the next block to retry the operation as an upsert.
                             needToDoUpsert = true;
