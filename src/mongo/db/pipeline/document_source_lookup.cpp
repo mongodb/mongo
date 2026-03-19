@@ -368,8 +368,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(const DocumentSourceLookUp& original,
       _fromExpCtx(original._fromExpCtx->copyWith(_resolvedNs, original._fromExpCtx->uuid)),
       _resolvedPipeline(original._resolvedPipeline),
       _userPipeline(original._userPipeline),
-      _resolvedIntrospectionPipeline(original._resolvedIntrospectionPipeline->clone(_fromExpCtx)),
-      _letVariables(original._letVariables) {
+      _resolvedIntrospectionPipeline(original._resolvedIntrospectionPipeline->clone(_fromExpCtx)) {
     if (!_localField && !_foreignField) {
         _cache.emplace(internalDocumentSourceCursorBatchSizeBytes.load());
     }
@@ -379,11 +378,23 @@ DocumentSourceLookUp::DocumentSourceLookUp(const DocumentSourceLookUp& original,
     if (original._unwindSrc) {
         _unwindSrc = static_cast<DocumentSourceUnwind*>(original._unwindSrc->clone(pExpCtx).get());
     }
+    // clone let variables with new expCtx in case the original expCtx is deleted.
+    copyLetVariablesWithNewExpCtx(original._letVariables, newExpCtx.get());
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::clone(
     const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const {
     return make_intrusive<DocumentSourceLookUp>(*this, newExpCtx);
+}
+
+void DocumentSourceLookUp::copyLetVariablesWithNewExpCtx(const std::vector<LetVariable>& src,
+                                                         ExpressionContext* newExpCtx) {
+    _letVariables.clear();
+    _letVariables.reserve(src.size());
+
+    for (const auto& var : src) {
+        _letVariables.emplace_back(var.cloneUsingNewExpCtx(newExpCtx));
+    }
 }
 
 void validateLookupCollectionlessPipeline(const std::vector<BSONObj>& pipeline) {

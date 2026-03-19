@@ -1036,7 +1036,6 @@ TEST_F(DocumentSourceGraphLookupServerlessTest,
     ASSERT_EQ(1ul, involvedNssSet.count(graphLookupNs));
 }
 
-
 TEST_F(DocumentSourceGraphLookUpTest, CheckFrontierMemoryUsage) {
     auto expCtx = getExpCtx();
     auto inputMock = DocumentSourceMock::createForTest({}, expCtx);
@@ -1111,6 +1110,44 @@ TEST_F(DocumentSourceGraphLookUpTest, CheckFrontierMemoryUsageInternalAllocs) {
     //
     graphLookupStage->frontierInsertWithMemoryTracking_forTest(Value(1));
     ASSERT_EQ(graphLookupStage->getFrontierUsageBytes_forTest(), 32UL + v.getApproximateSize());
+}
+
+TEST_F(DocumentSourceGraphLookUpTest, StartWithCloneRebindsExpressionContext) {
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
+    auto resolvedNss = ResolvedNamespaceMap{{nss, {nss, std::vector<BSONObj>()}}};
+
+    auto opCtx = getOpCtx();
+    auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx, nss);
+    expCtx->setResolvedNamespaces(resolvedNss);
+
+    auto spec = fromjson(R"({
+        "$graphLookup": {
+            "from": "coll",
+            "startWith": { "$cond": [ { "$eq": ["$f", "v"] }, "$f", "$$REMOVE" ] },
+            "connectFromField": "f",
+            "connectToField": "f",
+            "as": "j"
+        }
+    })");
+
+    auto ds = DocumentSourceGraphLookUp::createFromBson(spec.firstElement(), expCtx);
+    DocumentSourceGraphLookUp* docSource = static_cast<DocumentSourceGraphLookUp*>(ds.get());
+
+    // docSource points to the ExpressionContext
+    ASSERT_EQ(docSource->getStartWithField()->getExpressionContext(), expCtx);
+
+    // Clone with a new top-level ExpressionContext
+    auto newExpCtx = make_intrusive<ExpressionContextForTest>(getOpCtx(), nss);
+    newExpCtx->setResolvedNamespaces(resolvedNss);
+    auto dsClone = docSource->clone(newExpCtx);
+    DocumentSourceGraphLookUp* docSourceClone =
+        static_cast<DocumentSourceGraphLookUp*>(dsClone.get());
+
+    // docSource still points to the original ExpressionContext
+    ASSERT_EQ(docSource->getStartWithField()->getExpressionContext(), expCtx);
+    // clonedDocSource points to the new ExpressionContext
+    ASSERT_EQ(docSourceClone->getStartWithField()->getExpressionContext(), newExpCtx);
 }
 
 }  // namespace
