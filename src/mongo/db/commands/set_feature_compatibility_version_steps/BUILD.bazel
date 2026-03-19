@@ -13,7 +13,6 @@ mongo_cc_library(
     name = "set_feature_compatibility_version_steps",
     srcs = [
         "fcv_step.cpp",
-        "legacy_fcv_step.cpp",
     ],
     deps = [
         "//src/mongo:base",
