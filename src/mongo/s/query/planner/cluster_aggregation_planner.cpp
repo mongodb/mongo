@@ -48,6 +48,7 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -70,6 +71,7 @@
 #include "mongo/db/router_role/collection_uuid_mismatch.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/shard_role/ddl/list_collections_gen.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
@@ -190,27 +192,34 @@ AsyncRequestsSender::Response establishMergingShardCursor(OperationContext* opCt
  * sharding catalog (at this point, it wont't be necessary to contact the primary shard for
  * collation information).
  */
-BSONObj getUntrackedCollectionCollation(OperationContext* opCtx,
-                                        const CollectionRoutingInfo& cri,
-                                        const NamespaceString& nss) {
-    auto shard = uassertStatusOK(
-        Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cri.getDbPrimaryShardId()));
-    BSONObj cmdObj = BSON("listCollections" << 1 << "filter" << BSON("name" << nss.coll())
-                                            << "cursor" << BSONObj());
-    auto cursorResult = uassertStatusOK(
-        shard->runExhaustiveCursorCommand(opCtx,
-                                          ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-                                          nss.dbName(),
-                                          cmdObj,
-                                          Milliseconds(-1)));
-    std::vector<BSONObj> all = cursorResult.docs;
+BSONObj getUntrackedCollectionCollation(OperationContext* opCtx, const NamespaceString& nss) {
+    ListCollections listCollectionsCmd;
+    listCollectionsCmd.setDbName(nss.dbName());
+    listCollectionsCmd.setFilter(BSON("name" << nss.coll()));
+
+    sharding::router::DBPrimaryRouter router(opCtx, nss.dbName());
+    const auto collectionsList = router.route(
+        "getUntrackedCollectionCollation"_sd,
+        [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
+            generic_argument_util::setDbVersionIfPresent(listCollectionsCmd, cdb->getVersion());
+
+            auto shard = uassertStatusOK(
+                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cdb->getPrimary()));
+            auto cursorResult = uassertStatusOK(shard->runExhaustiveCursorCommand(
+                opCtx,
+                ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+                nss.dbName(),
+                listCollectionsCmd.toBSON(),
+                opCtx->hasDeadline() ? opCtx->getRemainingMaxTimeMillis() : Milliseconds(-1)));
+            return cursorResult.docs;
+        });
 
     // Collection or collection info does not exist; return an empty collation object.
-    if (all.empty() || all.front().isEmpty()) {
+    if (collectionsList.empty() || collectionsList.front().isEmpty()) {
         return BSONObj();
     }
 
-    auto collectionInfo = all.front();
+    auto collectionInfo = collectionsList.front();
 
     // We inspect 'info' to infer the collection default collation.
     BSONObj collationToReturn = CollationSpec::kSimpleSpec;
@@ -313,7 +322,7 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
                             hasSpecificMergeShard);
 
                 if (auto untrackedDefaultCollation =
-                        getUntrackedCollectionCollation(mergeCtx->getOperationContext(), *cri, nss);
+                        getUntrackedCollectionCollation(mergeCtx->getOperationContext(), nss);
                     !untrackedDefaultCollation.isEmpty()) {
                     return Value(untrackedDefaultCollation);
                 }
@@ -998,7 +1007,7 @@ std::pair<BSONObj, ExpressionContextCollationMatchesDefault> getCollation(
             return {collation, ExpressionContextCollationMatchesDefault::kNo};
         }
         if (requiresCollationForParsingUnshardedAggregate) {
-            return {getUntrackedCollectionCollation(opCtx, *cri, nss),
+            return {getUntrackedCollectionCollation(opCtx, nss),
                     ExpressionContextCollationMatchesDefault::kYes};
         }
         return {BSONObj(), ExpressionContextCollationMatchesDefault::kYes};
