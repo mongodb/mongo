@@ -66,6 +66,15 @@ namespace SorterTests {
 using test::ContainerTraits;
 using test::FileTraits;
 
+template <typename Traits>
+void skipContainerBasedTestInDebugBuild() {
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
+    if constexpr (std::is_same_v<Traits, ContainerTraits>) {
+        GTEST_SKIP() << "Skipping container based instantiation due to being a debug build";
+    }
+#endif
+}
+
 class SortedFileWriterAndFileIteratorTests : public unittest::Test {
 protected:
     int appendToFile(const SortOptions& opts,
@@ -687,7 +696,10 @@ TYPED_TEST(SorterTypedTest, Limit) {
 
 TYPED_TEST(SorterTypedTest, DuplicateValues) {
     KeyList input = makeInputData(kSmallNumberOfKeys, ShuffleMode::kShuffle);
-    input.insert(input.end(), input.begin(), input.end());
+    KeyList copy = input;
+    input.reserve(input.size() + copy.size());
+    // Concatenate input with itself.
+    input.insert(input.end(), copy.begin(), copy.end());
     this->assertSortAndMerge(this->opts(), input);
 }
 
@@ -722,6 +734,8 @@ TYPED_TEST(SorterTypedTest, LimitExtremes) {
 }
 
 TYPED_TEST(SorterTypedTest, AggressiveSpilling) {
+    skipContainerBasedTestInDebugBuild<TypeParam>();
+
     for (auto shuffleMode : {ShuffleMode::kNoShuffle, ShuffleMode::kShuffle}) {
         this->resetFixtureSpillDir();
         const auto context = fmt::format(
@@ -738,6 +752,8 @@ TYPED_TEST(SorterTypedTest, AggressiveSpilling) {
 }
 
 TYPED_TEST(SorterTypedTest, LotsOfDataWithLimit) {
+    skipContainerBasedTestInDebugBuild<TypeParam>();
+
     constexpr auto limits = std::array{1ull, 100ull, 5000ull};
 
     for (auto limit : limits) {
