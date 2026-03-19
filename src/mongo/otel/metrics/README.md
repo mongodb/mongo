@@ -14,7 +14,7 @@ Metrics are created by calling the `create*` functions on the
 #include "mongo/otel/metrics/metrics_service.h"
 
 namespace {
-Counter<int64_t>& operationsCounter = otel::metrics::MetricsService::instance().createInt64Counter(
+auto& operationsCounter = otel::metrics::MetricsService::instance().createInt64Counter(
     otel::metrics::MetricNames::kQueryCount,  // name
     "Number of queries executed",             // description
     otel::metrics::MetricUnit::kQueries);     // unit
@@ -101,8 +101,8 @@ auto& counter = otel::metrics::MetricsService::instance().createInt64Counter(
     "Total number of operations performed",
     otel::metrics::MetricUnit::kOperations);
 
-counter->add(1);  // Increment by 1
-counter->add(10); // Increment by 10
+counter.add(1);  // Increment by 1
+counter.add(10); // Increment by 10
 ```
 
 **Important:** Counter values must only increase. Attempting to add a negative value will throw an
@@ -186,7 +186,7 @@ Counter<int64_t>& counter = MetricsService::instance().createInt64Counter(...);
 }  // namespace
 
 void doWork() {
-    counter->add(1);
+    counter.add(1);
 }
 ```
 
@@ -194,7 +194,7 @@ void doWork() {
 // BAD: Creates/looks up metric on every call
 void doWork() {
     auto& counter = MetricsService::instance().createInt64Counter(...);  // Slow: acquires lock
-    counter->add(1);
+    counter.add(1);
 }
 ```
 
@@ -224,7 +224,7 @@ TEST(MyFeatureTest, RecordsMetrics) {
         otel::metrics::MetricNames::kMyFeatureEvents,
         "Number of events processed",
         otel::metrics::MetricUnit::kOperations);
-    counter->add(5);
+    counter.add(5);
 
     // Some variants don't currently include otel (notably Windows and some suse variants) so
     // always condition on if metrics can be read if your tests will run in one of those variants.
