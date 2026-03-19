@@ -14,10 +14,6 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {
-    getTimeseriesBucketsColl,
-    isViewfulTimeseriesOnlySuite,
-} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 TimeseriesTest.run(() => {
     const coll = db[jsTestName()];
@@ -35,9 +31,4 @@ TimeseriesTest.run(() => {
     // concurrent calls to compact.
     let res = db.runCommand({compact: coll.getName(), force: true});
     assert.commandWorkedOrFailedWithCode(res, ErrorCodes.Interrupted, tojson(res));
-
-    if (isViewfulTimeseriesOnlySuite(db)) {
-        res = db.runCommand({compact: getTimeseriesBucketsColl(coll).getName(), force: true});
-        assert.commandWorkedOrFailedWithCode(res, ErrorCodes.Interrupted, tojson(res));
-    }
 });

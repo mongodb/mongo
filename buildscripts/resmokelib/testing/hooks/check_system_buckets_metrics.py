@@ -24,41 +24,28 @@ class CheckSystemBucketsMetrics(interface.Hook):
 
     IS_BACKGROUND = False
 
-    # TODO(SERVER-118887): Investigate tests in this list and decide if they should be excluded or not.
-    # Tests that intentionally target system.buckets collections directly
+    # Tests that intentionally target system.buckets collections directly should be skipped.
     SKIP_TESTS = [
-        # Calls collMod on system.buckets collection.
-        "jstests/core/timeseries/ddl/timeseries_collmod.js",
-        # Calls drop on system.buckets collection.
-        "jstests/core/timeseries/ddl/timeseries_drop.js",
-        "jstests/core/catalog/list_catalog_stage_consistency.js",
+        # Legacy timeseries tests testing commands on system.buckets.*
+        "jstests/core/timeseries/ddl/timeseries_collmod_legacy.js",
         "jstests/core/timeseries/ddl/timeseries_drop_legacy.js",
-        # Calls multiple commands on system.buckets collection.
-        "jstests/core/timeseries/ddl/timeseries_user_system_buckets.js",
-        "jstests/core/timeseries/ddl/timeseries_list_catalog.js",
-        # Calls rename on system.buckets collection.
         "jstests/core/timeseries/ddl/rename_timeseries_legacy.js",
-        # Calls getPlanCache.list on system.buckets collection.
+        "jstests/core/timeseries/ddl/timeseries_clustered_index_options_legacy.js",
+        "jstests/core/timeseries/ddl/timeseries_user_system_buckets.js",
+        # Verifies that commands (drop, collMod) targeting system.buckets are rejected in viewless.
+        "jstests/core/timeseries/ddl/timeseries_direct_buckets_access.js",
+        # Uses a validator library that runs listIndexes and $listCatalog on system.buckets.
+        "jstests/core/catalog/list_catalog_stage_consistency.js",
+        # Uses aggregate with $listCatalog on system.buckets.
+        "jstests/core/timeseries/ddl/timeseries_list_catalog.js",
+        # Uses getPlanCache().list() which runs aggregate with $planCacheStats on system.buckets.
+        # $planCacheStats has PositionRequirement::kFirst, having $_internalUnpackBucket prepended before it makes it fail.
         "jstests/core/timeseries/query/bucket_unpacking_with_sort_plan_cache.js",
-        # Calls createCollection on system.buckets collection.
-        "jstests/core/timeseries/ddl/timeseries_clustered_index_options.js",
-        # calls TimeseriesTest.bucketsMayHaveMixedSchemaData which
-        # internally calls aggregate on system.buckets collection
-        "jstests/core/timeseries/write/timeseries_update_mixed_schema_bucket.js",
-        "jstests/core/timeseries/query/timeseries_mixed_bucket_schema.js",
-        "jstests/core/timeseries/write/timeseries_insert_mixed_schema_bucket.js",
-        # Calls compact on system.buckets collection.
-        "jstests/core/timeseries/ddl/timeseries_compact.js",
-        # Calls updateZoneKeyRange on system.buckets collection.
-        "jstests/core_sharding/resharding/reshard_collection_timeseries.js",
+        # updateZoneKeyRange does not support timeseries namespaces, these tests target system.buckets directly.
         "jstests/core_sharding/zones/zone_timeseries_basic.js",
-        # Calls moveRange on system.buckets collection.
-        "jstests/core_sharding/chunk_migration/move_range_timeseries.js",
+        "jstests/core_sharding/resharding/reshard_collection_timeseries.js",
         # Calls moveChunk/split/mergeChunks on system.buckets collection.
         "jstests/core_sharding/chunk_migration/move_chunk_split_merge_timeseries.js",
-        # Calls collStats on system.buckets collection from getTimeseriesBucketsColl
-        "jstests/core/timeseries/ddl/timeseries_list_collections.js",
-        "jstests/core/timeseries/ddl/timeseries_create_collection.js",
     ]
 
     if _IS_WINDOWS:
