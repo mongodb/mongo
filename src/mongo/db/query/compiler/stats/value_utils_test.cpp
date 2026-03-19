@@ -70,8 +70,8 @@ public:
 };
 
 void assertSameTypeBracketedInterval(const Interval& interval) {
-    auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
-    auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
+    auto [startTag, startVal] = sbe::bson::convertToOwned(interval.start).releaseToRaw();
+    auto [endTag, endVal] = sbe::bson::convertToOwned(interval.end).releaseToRaw();
     sbe::value::ValueGuard startGuard{startTag, startVal};
     sbe::value::ValueGuard endGuard{endTag, endVal};
 
@@ -256,7 +256,7 @@ TEST_F(ValueUtilsTest, GetMinBoundAlignsWithAppendMinForType) {
         builder.appendMinForType("", stdx::to_underlying(bsonType));
         auto obj = builder.obj();
         auto elem = obj.firstElement();
-        auto expected = sbe::bson::convertFrom<false>(elem);
+        auto expected = sbe::bson::convertToOwned(elem).releaseToRaw();
         sbe::value::ValueGuard guard{expected};
 
         auto res = stats::compareValues(
@@ -284,7 +284,7 @@ TEST_F(ValueUtilsTest, GetMaxBoundAlignsWithAppendMaxForType) {
         builder.appendMaxForType("", stdx::to_underlying(bsonType));
         auto obj = builder.obj();
         auto elem = obj.firstElement();
-        auto expected = sbe::bson::convertFrom<false>(elem);
+        auto expected = sbe::bson::convertToOwned(elem).releaseToRaw();
         sbe::value::ValueGuard guard{expected};
 
         auto res = stats::compareValues(
@@ -331,8 +331,8 @@ TEST_F(ValueUtilsTest, ReturnsTrueForFullBracketIntervals) {
         // Converts to SBE values.
         bool startInclusive = interval.startInclusive;
         bool endInclusive = interval.endInclusive;
-        auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
-        auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
+        auto [startTag, startVal] = sbe::bson::convertToOwned(interval.start).releaseToRaw();
+        auto [endTag, endVal] = sbe::bson::convertToOwned(interval.end).releaseToRaw();
         sbe::value::ValueGuard startGuard{startTag, startVal};
         sbe::value::ValueGuard endGuard{endTag, endVal};
 

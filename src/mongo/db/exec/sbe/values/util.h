@@ -50,7 +50,7 @@ bool arrayAny(TypeTags tag, Value val, const Cb& cb) {
         while (cur != end - 1) {
             auto* fieldName = bson::fieldNameRaw(cur);
             size_t keySize = TinyStrHelpers::strlen(fieldName);
-            auto [elemTag, elemVal] = bson::convertFrom<true>(cur, end, keySize);
+            auto [elemTag, elemVal] = bson::convertToView(cur, end, keySize);
 
             if (cb(elemTag, elemVal)) {
                 return true;
@@ -116,7 +116,7 @@ inline void arrayForEach(TypeTags tag, Value val, const Cb& cb) {
         while (cur != end - 1) {
             auto* fieldName = bson::fieldNameRaw(cur);
             size_t keySize = TinyStrHelpers::strlen(fieldName);
-            auto [elemTag, elemVal] = bson::convertFrom<true>(cur, end, keySize);
+            auto [elemTag, elemVal] = bson::convertToView(cur, end, keySize);
 
             if constexpr (MoveOrCopy) {
                 std::tie(elemTag, elemVal) = value::copyValue(elemTag, elemVal);
@@ -179,7 +179,7 @@ inline void objectForEach(TypeTags tag, Value val, const Cb& cb) {
         bool done = false;
         while (!done && (cur != end - 1)) {
             StringData currFieldName = bson::fieldNameAndLength(cur);
-            auto [eltTag, eltVal] = bson::convertFrom<true>(cur, end, currFieldName.size());
+            auto [eltTag, eltVal] = bson::convertToView(cur, end, currFieldName.size());
             done = cb(currFieldName, eltTag, eltVal, cur);
             cur = bson::advance(cur, currFieldName.size());
         }

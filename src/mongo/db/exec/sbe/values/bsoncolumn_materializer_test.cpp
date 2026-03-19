@@ -116,7 +116,7 @@ public:
 
         // Finally, show that the BSONElement -> SBE translation matches what the generic (and
         // presumably slower) conversion does.
-        Element converted = bson::convertFrom<true /* view */>(elem);
+        Element converted = bson::convertToView(elem);
         assertSbeValueEquals(vec.back(), converted, true);
     }
 
@@ -318,7 +318,7 @@ TEST_F(BSONColumnMaterializerTest, SBEMaterializerOtherTypes) {
     assertSbeValueEquals(
         vec.back(),
         Element({value::TypeTags::bsonCodeWScope, value::bitcastFrom<const char*>(bytes)}));
-    assertSbeValueEquals(vec.back(), bson::convertFrom<true /* view */>(bsonElem));
+    assertSbeValueEquals(vec.back(), bson::convertToView(bsonElem));
     // Since we are making a copy and storing it in the BSONElementStorage, the address of the data
     // should not be the same.
     ASSERT_NOT_EQUALS(
@@ -329,7 +329,7 @@ TEST_F(BSONColumnMaterializerTest, SBEMaterializerOtherTypes) {
     collector.appendPreallocated(bsonElem);
     ASSERT_EQ(vec.back(),
               Element({value::TypeTags::bsonCodeWScope, value::bitcastFrom<const char*>(bytes)}));
-    ASSERT_EQ(vec.back(), bson::convertFrom<true /* view */>(bsonElem));
+    ASSERT_EQ(vec.back(), Element(bson::convertToView(bsonElem)));
 }
 
 TEST_F(BSONColumnMaterializerTest, SBEMaterializerMissing) {
@@ -339,7 +339,7 @@ TEST_F(BSONColumnMaterializerTest, SBEMaterializerMissing) {
 
     collector.appendMissing();
     ASSERT_EQ(vec.back(), Element({value::TypeTags::Nothing, 0}));
-    ASSERT_EQ(vec.back(), bson::convertFrom<true /* view */>(BSONElement{}));
+    ASSERT_EQ(vec.back(), Element(bson::convertToView(BSONElement{})));
 }
 
 // Basic test for decompressIterative. There will be more exhaustive tests in bsoncolumn_test.cpp.

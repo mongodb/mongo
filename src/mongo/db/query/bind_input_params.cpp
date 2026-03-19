@@ -283,7 +283,7 @@ private:
         // This is an unowned value which is a view into the BSON owned by the MatchExpression. This
         // is acceptable because the 'MatchExpression' is held by the 'CanonicalQuery', and the
         // 'CanonicalQuery' lives for the lifetime of the query.
-        auto&& [typeTag, val] = sbe::bson::convertFrom<true>(expr->getData());
+        auto [typeTag, val] = sbe::bson::convertToView(expr->getData());
         bindParam(*slotId, false /*owned*/, typeTag, val);
     }
 

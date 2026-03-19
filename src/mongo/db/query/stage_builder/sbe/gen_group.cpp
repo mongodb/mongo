@@ -387,7 +387,7 @@ std::variant<Expression*, TagAndValue> getTopBottomNValueExprHelper(
         // `outputField` may reference data in objBson, so must not outlive it.
         auto outputField = objBson.getField(AccumulatorN::kFieldNameOutput);
         if (outputField.ok()) {
-            return sbe::bson::convertFrom<false /* not a view */>(outputField);
+            return sbe::bson::convertToOwned(outputField).releaseToRaw();
         }
     }
 

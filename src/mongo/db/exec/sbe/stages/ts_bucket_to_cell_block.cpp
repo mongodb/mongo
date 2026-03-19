@@ -237,7 +237,7 @@ void TsBucketToCellBlockStage::initCellBlocks() {
     BSONObj bucketObj(value::getRawPointerView(bucketVal));
     if (_metaOutSlotId) {
         auto metaElt = bucketObj[timeseries::kBucketMetaFieldName];
-        auto [metaTag, metaVal] = bson::convertFrom<true>(metaElt);
+        auto [metaTag, metaVal] = bson::convertToView(metaElt);
         _metaOutAccessor.reset(false, metaTag, metaVal);
     }
 

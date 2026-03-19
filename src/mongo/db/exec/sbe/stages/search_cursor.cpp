@@ -374,11 +374,11 @@ PlanState SearchCursorStage::doGetNext() {
 
             auto elemName = elem.fieldNameStringData();
             if (size_t pos = _metadataNames.findPos(elemName); pos != StringListSet::npos) {
-                auto [tag, val] = bson::convertFrom<true>(elem);
+                auto [tag, val] = bson::convertToView(elem);
                 _metadataAccessors[pos].reset(false, tag, val);
             }
             if (_idSlot && elemName == "_id") {
-                auto [tag, val] = bson::convertFrom<true>(elem);
+                auto [tag, val] = bson::convertToView(elem);
                 _idAccessor.reset(false, tag, val);
             }
         }
@@ -401,7 +401,7 @@ PlanState SearchCursorStage::doGetNext() {
                 for (auto& elem : *_resultObj) {
                     auto elemName = elem.fieldNameStringData();
                     if (size_t pos = _fieldNames.findPos(elemName); pos != StringListSet::npos) {
-                        auto [tag, val] = bson::convertFrom<true>(elem);
+                        auto [tag, val] = bson::convertToView(elem);
                         _fieldAccessors[pos].reset(false, tag, val);
                     }
                 }

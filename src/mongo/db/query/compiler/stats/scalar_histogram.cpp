@@ -146,8 +146,8 @@ ScalarHistogram ScalarHistogram::make(const StatsHistogram& histogram) {
         // that of the histogram. In the case of a larger type, e.g. BigString/bsonString, we need
         // to copy over the entire string as well, not just a pointer to memory which may be
         // deallocated before we need it.
-        auto value = sbe::bson::convertFrom<false>(bound.getElement());
-        bounds.push_back(value.first, value.second);
+        auto [valTag, valVal] = sbe::bson::convertToOwned(bound.getElement()).releaseToRaw();
+        bounds.push_back(valTag, valVal);
     }
 
     // Note: no need to validate this histogram when its being loaded from the stats collection, as

@@ -78,7 +78,7 @@ MONGO_COMPILER_ALWAYS_INLINE inline void placeFieldsFromRecordInAccessors(
             auto accessor = getFieldAccessor(scanFieldNames, scanFieldAccessors, field);
 
             if (accessor != nullptr) {
-                auto [tag, val] = bson::convertFrom<true>(bsonElement, end, field.size());
+                auto [tag, val] = bson::convertToView(bsonElement, end, field.size());
                 accessor->reset(false, tag, val);
                 if ((--fieldsToMatch) == 0) {
                     // No need to scan any further so bail out early.

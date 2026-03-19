@@ -220,7 +220,7 @@ void MakeObjStageBase<MakeObjOutputType::Object>::produceObject() {
 
                     if (projectIdx == std::numeric_limits<size_t>::max()) {
                         if (found == isInclusion) {
-                            auto [fieldTag, fieldVal] = bson::convertFrom<true>(be, end, sv.size());
+                            auto [fieldTag, fieldVal] = bson::convertToView(be, end, sv.size());
                             auto [copyTag, copyVal] = value::copyValue(fieldTag, fieldVal);
                             obj->push_back(sv, copyTag, copyVal);
                         }
@@ -252,7 +252,7 @@ void MakeObjStageBase<MakeObjOutputType::Object>::produceObject() {
                 while (be != end - 1) {
                     auto sv = bson::fieldNameAndLength(be);
 
-                    auto [fieldTag, fieldVal] = bson::convertFrom<true>(be, end, sv.size());
+                    auto [fieldTag, fieldVal] = bson::convertToView(be, end, sv.size());
                     auto [copyTag, copyVal] = value::copyValue(fieldTag, fieldVal);
                     obj->push_back(sv, copyTag, copyVal);
 

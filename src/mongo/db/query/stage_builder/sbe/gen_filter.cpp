@@ -1406,7 +1406,7 @@ SbExpr generateComparisonExpr(StageBuilderState& state,
     SbExprBuilder b(state);
 
     const auto& rhs = expr->getData();
-    auto [tagView, valView] = sbe::bson::convertFrom<true>(
+    auto [tagView, valView] = sbe::bson::convertToView(
         rhs.rawdata(), rhs.rawdata() + rhs.size(), rhs.fieldNameSize() - 1);
 
     ValueExpressionFn<SbExpr> makeValExpr = [&](sbe::value::TypeTags tag, sbe::value::Value val) {

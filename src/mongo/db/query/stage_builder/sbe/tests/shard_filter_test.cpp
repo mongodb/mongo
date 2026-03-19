@@ -252,7 +252,7 @@ public:
             for (size_t index = 0; index < shardKeyPaths.size(); ++index) {
                 auto path = shardKeyPaths[index].getPart(0);
                 BSONElement elem = document.getField(path);
-                const auto& [tag, val] = sbe::bson::convertFrom<true>(elem);
+                const auto [tag, val] = sbe::bson::convertToView(elem);
                 slotAccessors[index].reset(tag, val);
             }
             BSONObj classicShardKey = shardKeyPattern.extractShardKeyFromDoc(document);

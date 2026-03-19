@@ -43,16 +43,15 @@
 namespace mongo {
 namespace sbe {
 namespace bson {
-template <bool View>
-MONGO_MOD_NEEDS_REPLACEMENT std::pair<value::TypeTags, value::Value> convertFrom(
-    const char* be, const char* end, size_t fieldNameSize);
+MONGO_MOD_NEEDS_REPLACEMENT value::TagValueView convertToView(const char* be,
+                                                              const char* end,
+                                                              size_t fieldNameSize);
+MONGO_MOD_NEEDS_REPLACEMENT value::TagValueView convertToView(const BSONElement& elem);
 
-template <bool View>
-MONGO_MOD_NEEDS_REPLACEMENT std::pair<value::TypeTags, value::Value> convertFrom(
-    const BSONElement& elem) {
-    return convertFrom<View>(
-        elem.rawdata(), elem.rawdata() + elem.size(), elem.fieldNameSize() - 1);
-}
+MONGO_MOD_NEEDS_REPLACEMENT value::TagValueOwned convertToOwned(const char* be,
+                                                                const char* end,
+                                                                size_t fieldNameSize);
+MONGO_MOD_NEEDS_REPLACEMENT value::TagValueOwned convertToOwned(const BSONElement& elem);
 
 /**
  * Advance table specifies how to change the pointer to skip current BSON value (so that pointer
@@ -165,7 +164,7 @@ inline std::pair<value::TypeTags, value::Value> getField(const char* be,
                     break;
             }
             if (match) {
-                return bson::convertFrom<true>(be, end, targetSize);
+                return convertToView(be, end, targetSize);
             }
         }
         be = bson::advance(be, size);

@@ -96,7 +96,7 @@ public:
         // Populate '_hashSet' if there are any elements that are eligible to use the hash.
         if (_hashSetSbeTagMask != 0) {
             for (const auto& elem : elems) {
-                auto [tag, val] = bson::convertFrom<true>(elem);
+                auto [tag, val] = bson::convertToView(elem);
 
                 if (isNonStringShallowType(tag) || tag == value::TypeTags::NumberDecimal ||
                     ((elem.type() == BSONType::string || elem.type() == BSONType::symbol) &&

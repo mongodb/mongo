@@ -68,20 +68,22 @@ bool HistogramEstimator::canEstimateInterval(const stats::CEHistogram& hist,
                                              const mongo::Interval& interval) {
     bool startInclusive = interval.startInclusive;
     bool endInclusive = interval.endInclusive;
-    auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
-    auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
-    sbe::value::ValueGuard startGuard{startTag, startVal};
-    sbe::value::ValueGuard endGuard{endTag, endVal};
+    auto start = sbe::bson::convertToOwned(interval.start);
+    auto end = sbe::bson::convertToOwned(interval.end);
 
     // If the interval is not in the ascending order, then reverse it.
-    if (reversedInterval(startTag, startVal, endTag, endVal)) {
+    if (reversedInterval(start.tag(), start.value(), end.tag(), end.value())) {
         std::swap(startInclusive, endInclusive);
-        std::swap(startTag, endTag);
-        std::swap(startVal, endVal);
+        std::swap(start, end);
     }
 
-    return ::mongo::ce::canEstimateInterval(
-        hist.isArray(), startInclusive, startTag, startVal, endInclusive, endTag, endVal);
+    return ::mongo::ce::canEstimateInterval(hist.isArray(),
+                                            startInclusive,
+                                            start.tag(),
+                                            start.value(),
+                                            endInclusive,
+                                            end.tag(),
+                                            end.value());
 }
 
 }  // namespace mongo::ce

@@ -78,7 +78,7 @@ value::SortKeyComponentVector* SortSpec::generateSortKeyComponentVector(
     {
         size_t i = 0;
         for (auto& elt : _localBsonEltStorage) {
-            _localSortKeyComponentStorage.elts[i++] = bson::convertFrom<true>(elt);
+            _localSortKeyComponentStorage.elts[i++] = bson::convertToView(elt);
         }
     }
     return &_localSortKeyComponentStorage;

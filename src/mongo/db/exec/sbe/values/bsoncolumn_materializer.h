@@ -129,7 +129,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT SBEColumnMaterializer {
     static inline SBEColumnMaterializer::Element materializePreallocated(BSONElement val) {
         // Return an SBE value that is a view. It will reference memory that decompression has
         // pre-allocated in BSONElementStorage memory.
-        return bson::convertFrom<true /* view */>(val);
+        return bson::convertToView(val);
     }
 
     static inline Element materializeMissing(BSONElementStorage& allocator) {
@@ -276,7 +276,7 @@ inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize(
     // BSONElementStorage instance.
     auto allocatedElem = allocator.allocate(val.type(), "", val.valuesize());
     memcpy(allocatedElem.value(), val.value(), val.valuesize());
-    return bson::convertFrom<true /* view */>(allocatedElem.element());
+    return bson::convertToView(allocatedElem.element());
 }
 
 template <>

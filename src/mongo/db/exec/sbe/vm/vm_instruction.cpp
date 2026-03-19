@@ -78,7 +78,7 @@ std::pair<value::TypeTags, value::Value> collComparisonKey(value::TypeTags tag,
     auto ptr = outputView.objdata();
     auto be = ptr + 4;
     auto end = ptr + ConstDataView(ptr).read<LittleEndian<uint32_t>>();
-    return bson::convertFrom<false>(be, end, 0);
+    return bson::convertToOwned(be, end, 0).releaseToRaw();
 }
 }  // namespace
 

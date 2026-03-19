@@ -79,7 +79,7 @@ public:
         return _name;
     }
     MONGO_COMPILER_ALWAYS_INLINE std::pair<value::TypeTags, value::Value> value() const {
-        return bson::convertFrom<true>(bsonElement());
+        return bson::convertToView(bsonElement());
     }
     MONGO_COMPILER_ALWAYS_INLINE void appendTo(BsonObjWriter& bob) const {
         bob.appendBsonElement(bsonElement());

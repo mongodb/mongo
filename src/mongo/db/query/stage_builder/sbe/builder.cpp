@@ -163,7 +163,7 @@ void prepareSearchQueryParameters(PlanStageData* data, const CanonicalQuery& cq)
         // Variables on the cursor must be an object.
         auto varsObj = remoteVars->getField(name);
         if (varsObj.ok()) {
-            auto [tag, val] = sbe::bson::convertFrom<false /* View */>(varsObj);
+            auto [tag, val] = sbe::bson::convertToOwned(varsObj).releaseToRaw();
             env->resetSlot(env->getSlot(name), tag, val, true /* owned */);
             // Both the SBE and the classic portions of the query can reference the same value,
             // and this is the only place to set the value if using SBE so we don't worry about
@@ -3942,9 +3942,9 @@ public:
                 auto array = expr->getValue().getArray();
                 auto bson = BSON("x" << array[0] << "y" << array[1]);
                 auto [argXTag, argXVal] =
-                    sbe::bson::convertFrom<false /* View */>(bson.getField("x"));
+                    sbe::bson::convertToOwned(bson.getField("x")).releaseToRaw();
                 auto [argYTag, argYVal] =
-                    sbe::bson::convertFrom<false /* View */>(bson.getField("y"));
+                    sbe::bson::convertToOwned(bson.getField("y")).releaseToRaw();
 
                 addRemoveInputs = std::make_unique<AddCovarianceInputs>(
                     b.makeConstant(argXTag, argXVal), b.makeConstant(argYTag, argYVal));
@@ -3994,7 +3994,7 @@ public:
                 auto outputField = objBson.getField(AccumulatorN::kFieldNameOutput);
                 if (outputField.ok()) {
                     auto [outputTag, outputVal] =
-                        sbe::bson::convertFrom<false /* View */>(outputField);
+                        sbe::bson::convertToOwned(outputField).releaseToRaw();
                     auto outputExpr = b.makeConstant(outputTag, outputVal);
                     valueExpr = b.makeFillEmptyNull(std::move(outputExpr));
                 }

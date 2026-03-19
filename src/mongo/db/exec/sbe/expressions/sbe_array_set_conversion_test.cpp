@@ -72,7 +72,7 @@ public:
 
         size_t expectedItems = 0;
         for (auto elem : expectedValues) {
-            auto [tag, val] = bson::convertFrom<true>(elem);
+            auto [tag, val] = bson::convertToView(elem);
 
             ASSERT_NE(values.end(), values.find(std::make_pair(tag, val)))
                 << "Value " << std::make_pair(tag, val) << " not found in result";
@@ -89,7 +89,7 @@ public:
         value::Array* arrView = value::getArrayView(arrVal);
 
         for (auto elem : arr) {
-            auto [tag, val] = bson::convertFrom<false>(elem);
+            auto [tag, val] = bson::convertToOwned(elem).releaseToRaw();
             arrView->push_back(tag, val);
         }
         return {arrTag, arrVal};

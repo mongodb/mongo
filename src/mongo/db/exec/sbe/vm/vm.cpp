@@ -533,7 +533,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::setField() {
                     auto sv = bson::fieldNameAndLength(be);
 
                     if (sv != fieldName) {
-                        auto [tag, val] = bson::convertFrom<false>(be, end, sv.size());
+                        auto [tag, val] = bson::convertToOwned(be, end, sv.size()).releaseToRaw();
                         objOutput->push_back(sv, tag, val);
                     }
 
@@ -574,7 +574,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::setField() {
                 auto sv = bson::fieldNameAndLength(be);
 
                 if (sv != fieldName) {
-                    auto [tag, val] = bson::convertFrom<false>(be, end, sv.size());
+                    auto [tag, val] = bson::convertToOwned(be, end, sv.size()).releaseToRaw();
                     objOutput->push_back(sv, tag, val);
                 }
 

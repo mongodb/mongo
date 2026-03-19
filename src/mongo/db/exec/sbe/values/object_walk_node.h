@@ -326,7 +326,7 @@ void walkBsonObj(ObjectWalkNode<ProjectionRecorder>* node,
     while (numChildrenWalked < node->numChildren() && be != end - 1) {
         auto fieldName = bson::fieldNameAndLength(be);
         if (auto child = node->findChild(fieldName); child != nullptr) {
-            auto [eltTag, eltVal] = bson::convertFrom<true>(be, end, fieldName.size());
+            auto [eltTag, eltVal] = bson::convertToView(be, end, fieldName.size());
             walkField<ProjectionRecorder>(child, eltTag, eltVal, be, cb, traverseArrays);
             numChildrenWalked++;
         }

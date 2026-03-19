@@ -549,7 +549,7 @@ struct TagValueView {
     TypeTags tag = TypeTags::Nothing;
     Value value = 0;
 
-    operator std::pair<TypeTags, Value>() {
+    operator std::pair<TypeTags, Value>() const {
         return {tag, value};
     }
 
@@ -653,6 +653,11 @@ public:
         _value = 0;
     }
 
+    void swap(TagValueOwned& o) noexcept {
+        std::swap(_tag, o._tag);
+        std::swap(_value, o._value);
+    }
+
 private:
     void release() {
         releaseValue(_tag, _value);
@@ -661,6 +666,10 @@ private:
     TypeTags _tag;
     Value _value;
 };
+
+inline void swap(TagValueOwned& a, TagValueOwned& b) noexcept {
+    a.swap(b);
+}
 
 /**
  * A value which behaves like a view or an owned value depending on 'owned' flag provided at
@@ -772,6 +781,12 @@ public:
         _owned = false;
     }
 
+    void swap(TagValueMaybeOwned& o) noexcept {
+        std::swap(_owned, o._owned);
+        std::swap(_tag, o._tag);
+        std::swap(_value, o._value);
+    }
+
     void makeOwned() {
         if (!_owned) {
             std::tie(_tag, _value) = value::copyValue(_tag, _value);
@@ -790,6 +805,10 @@ private:
     TypeTags _tag;
     Value _value;
 };
+
+inline void swap(TagValueMaybeOwned& a, TagValueMaybeOwned& b) noexcept {
+    a.swap(b);
+}
 
 static_assert(sizeof(TagValueMaybeOwned) <= 16ULL,
               "TagValueMaybeOwned should not be larger than 16 bytes");

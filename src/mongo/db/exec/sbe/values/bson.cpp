@@ -275,13 +275,20 @@ std::pair<value::TypeTags, value::Value> convertFrom(const char* be,
     }
 }
 
-template std::pair<value::TypeTags, value::Value> convertFrom<false>(const char* be,
-                                                                     const char* end,
-                                                                     size_t fieldNameSize);
-
-template std::pair<value::TypeTags, value::Value> convertFrom<true>(const char* be,
-                                                                    const char* end,
-                                                                    size_t fieldNameSize);
+value::TagValueView convertToView(const char* be, const char* end, size_t fieldNameSize) {
+    return value::rawToView(convertFrom<true>(be, end, fieldNameSize));
+}
+value::TagValueView convertToView(const BSONElement& elem) {
+    return value::rawToView(
+        convertFrom<true>(elem.rawdata(), elem.rawdata() + elem.size(), elem.fieldNameSize() - 1));
+}
+value::TagValueOwned convertToOwned(const char* be, const char* end, size_t fieldNameSize) {
+    return value::TagValueOwned::fromRaw(convertFrom<false>(be, end, fieldNameSize));
+}
+value::TagValueOwned convertToOwned(const BSONElement& elem) {
+    return value::TagValueOwned::fromRaw(
+        convertFrom<false>(elem.rawdata(), elem.rawdata() + elem.size(), elem.fieldNameSize() - 1));
+}
 
 template <class ArrayBuilder>
 void convertToBsonArr(ArrayBuilder& builder, value::ArrayEnumerator arr) {

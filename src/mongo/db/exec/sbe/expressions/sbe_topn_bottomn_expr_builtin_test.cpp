@@ -91,7 +91,7 @@ protected:
         auto objView = value::getObjectView(objVal);
 
         for (auto elem : sortSpecBson) {
-            auto [tag, val] = bson::convertFrom<false>(elem);
+            auto [tag, val] = bson::convertToOwned(elem).releaseToRaw();
             objView->push_back(elem.fieldNameStringData(), tag, val);
         }
         return {objTag, objVal};
@@ -253,7 +253,7 @@ protected:
         auto objView = value::getObjectView(objVal);
 
         for (auto elem : sortSpecBson) {
-            auto [tag, val] = bson::convertFrom<false>(elem);
+            auto [tag, val] = bson::convertToOwned(elem).releaseToRaw();
             objView->push_back(elem.fieldNameStringData(), tag, val);
         }
         return {objTag, objVal};
@@ -395,7 +395,7 @@ protected:
         auto objView = value::getObjectView(objVal);
 
         for (auto elem : sortSpecBson) {
-            auto [tag, val] = bson::convertFrom<false>(elem);
+            auto [tag, val] = bson::convertToOwned(elem).releaseToRaw();
             objView->push_back(elem.fieldNameStringData(), tag, val);
         }
         return {objTag, objVal};
@@ -499,7 +499,7 @@ protected:
         auto objView = value::getObjectView(objVal);
 
         for (auto elem : sortSpecBson) {
-            auto [tag, val] = bson::convertFrom<false>(elem);
+            auto [tag, val] = bson::convertToOwned(elem).releaseToRaw();
             objView->push_back(elem.fieldNameStringData(), tag, val);
         }
         return {objTag, objVal};

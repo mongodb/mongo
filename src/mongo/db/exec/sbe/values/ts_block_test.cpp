@@ -84,15 +84,14 @@ std::unique_ptr<value::TsBlock> makeTsBlockFromBucket(const BSONObj& bucket, Str
         }
     }();
 
-    auto [columnTag, columnVal] = bson::convertFrom<true /* View */>(bucketElem);
+    auto [columnTag, columnVal] = bson::convertToView(bucketElem);
 
-    const auto nothing =
-        std::pair<value::TypeTags, value::Value>(value::TypeTags::Nothing, value::Value{0u});
+    const auto nothing = value::TagValueView{};
 
     const auto [min, max] = [&]() {
         if (bucket["control"]["min"]) {
-            return std::pair(bson::convertFrom<true>(bucket["control"]["min"][fieldName]),
-                             bson::convertFrom<true>(bucket["control"]["max"][fieldName]));
+            return std::pair(bson::convertToView(bucket["control"]["min"][fieldName]),
+                             bson::convertToView(bucket["control"]["max"][fieldName]));
         }
         return std::pair(nothing, nothing);
     }();
@@ -200,10 +199,10 @@ TEST_F(TsSbeValueTest, TsBlockMinMaxV1Schema) {
 
         auto& valBlock = cellBlockId->getValueBlock();
 
-        const auto expectedMinId = bson::convertFrom<true>(kBucketWithMinMaxV1["data"]["_id"]["0"]);
-        const auto expectedMaxId = bson::convertFrom<true>(kBucketWithMinMaxV1["data"]["_id"]["2"]);
-        invariant(expectedMinId.first != value::TypeTags::Nothing);
-        invariant(expectedMaxId.first != value::TypeTags::Nothing);
+        const auto expectedMinId = bson::convertToView(kBucketWithMinMaxV1["data"]["_id"]["0"]);
+        const auto expectedMaxId = bson::convertToView(kBucketWithMinMaxV1["data"]["_id"]["2"]);
+        invariant(expectedMinId.tag != value::TypeTags::Nothing);
+        invariant(expectedMaxId.tag != value::TypeTags::Nothing);
 
         {
             auto [minTag, minVal] = valBlock.tryMin();
@@ -237,9 +236,8 @@ TEST_F(TsSbeValueTest, TsBlockMinMaxV1Schema) {
         auto& valBlock = cellBlockTime->getValueBlock();
 
         const auto expectedLowerBoundTime =
-            bson::convertFrom<true>(kBucketWithMinMaxV1["control"]["min"]["time"]);
-        const auto expectedMaxTime =
-            bson::convertFrom<true>(kBucketWithMinMaxV1["data"]["time"]["2"]);
+            bson::convertToView(kBucketWithMinMaxV1["control"]["min"]["time"]);
+        const auto expectedMaxTime = bson::convertToView(kBucketWithMinMaxV1["data"]["time"]["2"]);
 
         {
             auto [minTag, minVal] = valBlock.tryMin();
@@ -281,10 +279,10 @@ TEST_F(TsSbeValueTest, TsBlockMinMaxV2Schema) {
 
         auto& valBlock = cellBlockId->getValueBlock();
 
-        const auto expectedMinId = bson::convertFrom<true>(kBucketWithMinMaxV1["data"]["_id"]["0"]);
-        const auto expectedMaxId = bson::convertFrom<true>(kBucketWithMinMaxV1["data"]["_id"]["2"]);
-        invariant(expectedMinId.first != value::TypeTags::Nothing);
-        invariant(expectedMaxId.first != value::TypeTags::Nothing);
+        const auto expectedMinId = bson::convertToView(kBucketWithMinMaxV1["data"]["_id"]["0"]);
+        const auto expectedMaxId = bson::convertToView(kBucketWithMinMaxV1["data"]["_id"]["2"]);
+        invariant(expectedMinId.tag != value::TypeTags::Nothing);
+        invariant(expectedMaxId.tag != value::TypeTags::Nothing);
 
         {
             auto [minTag, minVal] = valBlock.tryMin();
@@ -315,12 +313,10 @@ TEST_F(TsSbeValueTest, TsBlockMinMaxV2Schema) {
 
         auto& valBlock = cellBlockTime->getValueBlock();
 
-        const auto expectedMinTime =
-            bson::convertFrom<true>(kBucketWithMinMaxV1["data"]["time"]["0"]);
-        const auto expectedMaxTime =
-            bson::convertFrom<true>(kBucketWithMinMaxV1["data"]["time"]["2"]);
+        const auto expectedMinTime = bson::convertToView(kBucketWithMinMaxV1["data"]["time"]["0"]);
+        const auto expectedMaxTime = bson::convertToView(kBucketWithMinMaxV1["data"]["time"]["2"]);
         const auto expectedLowerBoundTime =
-            bson::convertFrom<true>(kBucketWithMinMaxV1["control"]["min"]["time"]);
+            bson::convertToView(kBucketWithMinMaxV1["control"]["min"]["time"]);
 
         {
             // The min time field value for v2 buckets can be determined in O(1), so tryMin() should
@@ -374,8 +370,8 @@ TEST_F(TsSbeValueTest, TsBlockMinMaxV3Schema) {
 
         auto& valBlock = cellBlockId->getValueBlock();
 
-        const auto expectedMinId = bson::convertFrom<true>(kBucketWithMinMaxV1["data"]["_id"]["0"]);
-        const auto expectedMaxId = bson::convertFrom<true>(kBucketWithMinMaxV1["data"]["_id"]["2"]);
+        const auto expectedMinId = bson::convertToView(kBucketWithMinMaxV1["data"]["_id"]["0"]);
+        const auto expectedMaxId = bson::convertToView(kBucketWithMinMaxV1["data"]["_id"]["2"]);
 
         {
             auto [minTag, minVal] = valBlock.tryMin();
@@ -406,10 +402,9 @@ TEST_F(TsSbeValueTest, TsBlockMinMaxV3Schema) {
 
         auto& valBlock = cellBlockTime->getValueBlock();
 
-        const auto expectedMaxTime =
-            bson::convertFrom<true>(kBucketWithMinMaxV1["data"]["time"]["2"]);
+        const auto expectedMaxTime = bson::convertToView(kBucketWithMinMaxV1["data"]["time"]["2"]);
         const auto expectedLowerBoundTime =
-            bson::convertFrom<true>(kBucketWithMinMaxV1["control"]["min"]["time"]);
+            bson::convertToView(kBucketWithMinMaxV1["control"]["min"]["time"]);
 
         {
             {
@@ -474,9 +469,9 @@ TEST_F(TsSbeValueTest, TsBlockMaxTimePre1970) {
 
     auto& valBlock = cellBlockTime->getValueBlock();
     const auto expectedLowerBoundTime =
-        bson::convertFrom<true>(kBucketWithMinMaxPre1970["control"]["min"]["time"]);
+        bson::convertToView(kBucketWithMinMaxPre1970["control"]["min"]["time"]);
     const auto expectedUpperBoundTime =
-        bson::convertFrom<true>(kBucketWithMinMaxPre1970["control"]["max"]["time"]);
+        bson::convertToView(kBucketWithMinMaxPre1970["control"]["max"]["time"]);
 
     {
         auto [minTag, minVal] = valBlock.tryMin();

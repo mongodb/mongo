@@ -2506,7 +2506,7 @@ public:
         auto arrView = sbe::value::getArrayView(arrVal);
 
         for (auto elem : arr) {
-            auto [tag, val] = sbe::bson::convertFrom<false>(elem);
+            auto [tag, val] = sbe::bson::convertToOwned(elem).releaseToRaw();
             arrView->push_back(tag, val);
         }
         return {arrTag, arrVal};
@@ -2534,7 +2534,8 @@ public:
             auto fieldName = sbe::bson::fieldNameAndLength(bsonElt);
 
             // Convert the BSON value to an SBE value and put it inside the input slot.
-            auto [tag, val] = sbe::bson::convertFrom<false>(bsonElt, bsonEnd, fieldName.size());
+            auto [tag, val] =
+                sbe::bson::convertToOwned(bsonElt, bsonEnd, fieldName.size()).releaseToRaw();
             _inputAccessor.reset(true, tag, val);
 
             // Run the agg function, and put the result in the slot holding the aggregate value.
@@ -2583,7 +2584,7 @@ public:
         auto arrView = sbe::value::getArrayView(arrVal);
 
         for (auto elem : arr) {
-            auto [tag, val] = sbe::bson::convertFrom<false>(elem);
+            auto [tag, val] = sbe::bson::convertToOwned(elem).releaseToRaw();
             arrView->push_back(tag, val);
         }
         return {arrTag, arrVal};

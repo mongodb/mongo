@@ -64,10 +64,10 @@ public:
 
     // Overloads of operator() that compare a BSONElement with a TagValuePair.
     inline bool operator()(const BSONElement& lhs, TagValuePair rhs) const {
-        return compareImpl(sbe::bson::convertFrom<true>(lhs), rhs);
+        return compareImpl(sbe::bson::convertToView(lhs), rhs);
     }
     inline bool operator()(TagValuePair lhs, const BSONElement& rhs) const {
-        return compareImpl(lhs, sbe::bson::convertFrom<true>(rhs));
+        return compareImpl(lhs, sbe::bson::convertToView(rhs));
     }
 
     // Overloads of operator() that compare a BSONElement's type with a BSONType.

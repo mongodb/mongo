@@ -799,7 +799,7 @@ TagValueView ArrayEnumerator::getViewOfValue() const {
     } else if (_arrayMultiSet) {
         return {_arrayMultiSetIter->first, _arrayMultiSetIter->second};
     } else {
-        return rawToView(bson::convertFrom<true>(_arrayCurrent, _arrayEnd, _fieldNameSize));
+        return bson::convertToView(_arrayCurrent, _arrayEnd, _fieldNameSize);
     }
 }
 
@@ -839,7 +839,7 @@ TagValueView ObjectEnumerator::getViewOfValue() const {
         return _object->getAt(_index);
     } else {
         auto sv = bson::fieldNameAndLength(_objectCurrent);
-        return rawToView(bson::convertFrom<true>(_objectCurrent, _objectEnd, sv.size()));
+        return bson::convertToView(_objectCurrent, _objectEnd, sv.size());
     }
 }
 

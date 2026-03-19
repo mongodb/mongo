@@ -68,7 +68,7 @@ public:
         const char* end = be + obj.objsize();
         while (*be != 0) {
             auto sv = bson::fieldNameAndLength(be);
-            auto [tag, val] = bson::convertFrom<false>(be, end, sv.size());
+            auto [tag, val] = bson::convertToOwned(be, end, sv.size()).releaseToRaw();
             be = bson::advance(be, sv.size());
 
             objView->push_back(sv, tag, val);

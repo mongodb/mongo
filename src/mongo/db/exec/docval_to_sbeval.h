@@ -46,7 +46,7 @@ inline std::pair<sbe::value::TypeTags, sbe::value::Value> makeValue(const ::mong
     auto obj = bob.done();
     auto be = obj.objdata();
     auto end = be + obj.objsize();
-    return sbe::bson::convertFrom<false>(be + 4, end, 0);
+    return sbe::bson::convertToOwned(be + 4, end, 0).releaseToRaw();
 }
 
 }  // namespace mongo::sbe::value

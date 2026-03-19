@@ -66,7 +66,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDropFields(Arity
             auto sv = bson::fieldNameAndLength(be);
 
             if (restrictFieldsSet.count(sv) == 0) {
-                auto [tag, val] = bson::convertFrom<false>(be, end, sv.size());
+                auto [tag, val] = bson::convertToOwned(be, end, sv.size()).releaseToRaw();
                 obj->push_back(sv, tag, val);
             }
 
@@ -123,7 +123,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinKeepFields(Arity
             auto sv = bson::fieldNameAndLength(be);
 
             if (keepFieldsSet.count(sv) == 1) {
-                auto [tag, val] = bson::convertFrom<true>(be, end, sv.size());
+                auto [tag, val] = bson::convertToView(be, end, sv.size());
                 auto [copyTag, copyVal] = value::copyValue(tag, val);
                 obj->push_back(sv, copyTag, copyVal);
             }

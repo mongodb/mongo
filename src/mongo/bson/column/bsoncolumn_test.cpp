@@ -507,7 +507,8 @@ public:
 
     static void convertAndAssertSBEEquals(sbe::bsoncolumn::SBEColumnMaterializer::Element& actual,
                                           const BSONElement& expected) {
-        auto expectedSBE = sbe::bson::convertFrom<true>(expected);
+        sbe::bsoncolumn::SBEColumnMaterializer::Element expectedSBE =
+            sbe::bson::convertToView(expected);
         if (actual.first == sbe::value::TypeTags::StringSmall) {
             // Generic conversion won't produce StringSmall from BSONElements, but
             // SBEColumnMaterializer will, don't compare the type tag for that case.

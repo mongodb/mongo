@@ -160,7 +160,7 @@ protected:
             // Verifies meta field.
             if (metaAccessor) {
                 auto metaTagVal = metaAccessor->getViewOfValue();
-                auto expectedTagVal = bson::convertFrom<true>(expectedData[i]["tag"]);
+                auto expectedTagVal = bson::convertToView(expectedData[i]["tag"]);
                 ASSERT_THAT(expectedTagVal, ValueEq(metaTagVal))
                     << fmt::format("for {}th 'tag'", i);
             }
@@ -168,7 +168,7 @@ protected:
             // Verifies rows.
             for (size_t j = 0; j < cellPaths.size(); ++j) {
                 auto actualTagVal = outAccessors[j]->getViewOfValue();
-                auto expectedTagVal = bson::convertFrom<true>(expectedData[i][cellPaths[j]]);
+                auto expectedTagVal = bson::convertToView(expectedData[i][cellPaths[j]]);
 
                 ASSERT_THAT(expectedTagVal, ValueEq(actualTagVal))
                     << fmt::format("for {}th path '{}'", i, cellPaths[j]);
@@ -272,7 +272,7 @@ TEST_F(BlockStagesTest, TsBucketToCellBlockStageTest) {
          st = tsBucketStage->getNext(), ++i) {
         // Verifies meta field.
         auto metaTagVal = metaAccessor->getViewOfValue();
-        auto expectedTagVal = bson::convertFrom<true>(expectedData[i]["meta"]);
+        auto expectedTagVal = bson::convertToView(expectedData[i]["meta"]);
         ASSERT_THAT(expectedTagVal, ValueEq(metaTagVal));
 
         // Verifies that cell blocks are produced for requested 'cellPaths'.

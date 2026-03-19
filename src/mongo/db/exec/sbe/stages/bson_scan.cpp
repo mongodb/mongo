@@ -122,7 +122,7 @@ PlanState BSONScanStage::getNext() {
                 if (auto it = _scanFieldAccessors.find(fieldName);
                     it != _scanFieldAccessors.end()) {
                     // Found the field so convert it to Value.
-                    auto [tag, val] = bson::convertFrom</*View = */ true>(element);
+                    auto [tag, val] = bson::convertToView(element);
                     it->second->reset(tag, val);
 
                     if ((--fieldsToMatch) == 0) {

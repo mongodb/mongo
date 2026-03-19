@@ -264,7 +264,7 @@ TsBucketPathExtractor::ExtractResult TsBucketPathExtractor::extractCellBlocks(
     for (auto elt : bucketDataElem.embeddedObject()) {
         auto it = _topLevelFieldToIdxes.find(elt.fieldNameStringData());
         if (it != _topLevelFieldToIdxes.end()) {
-            auto [blockTag, blockVal] = bson::convertFrom<true>(elt);
+            auto [blockTag, blockVal] = bson::convertToView(elt);
             tassert(7796400,
                     "Unsupported type for timeseries bucket data",
                     blockTag == value::TypeTags::bsonObject ||
@@ -316,12 +316,12 @@ TsBucketPathExtractor::ExtractResult TsBucketPathExtractor::extractCellBlocks(
 
         // The set of indexes in _pathReqs which begin with this top level field.
         const auto& pathIndexesForCurrentField = _topLevelFieldToIdxes[topLevelField];
-        auto [columnTag, columnVal] = bson::convertFrom<true /*View*/>(fieldInfo.data);
+        auto [columnTag, columnVal] = bson::convertToView(fieldInfo.data);
 
         BSONElement fieldMin = fieldInfo.min;
         BSONElement fieldMax = fieldInfo.max;
-        std::pair<TypeTags, Value> controlMin = bson::convertFrom<true /*View*/>(fieldMin);
-        std::pair<TypeTags, Value> controlMax = bson::convertFrom<true /*View*/>(fieldMax);
+        std::pair<TypeTags, Value> controlMin = bson::convertToView(fieldMin);
+        std::pair<TypeTags, Value> controlMax = bson::convertToView(fieldMax);
 
         // The time field cannot be nothing.
         const bool isTimeField = topLevelField == _timeField;
@@ -562,7 +562,7 @@ void TsBlock::deblockFromBsonColumn() {
         // This prevents us from using HomogeneousBlock, but lets us avoid the copy.
 
         for (size_t i = 0; i < _count; ++i) {
-            auto [tag, val] = bson::convertFrom</*View*/ true>(*it);
+            auto [tag, val] = bson::convertToView(*it);
 
             // No copy.
 
@@ -636,7 +636,7 @@ value::TagValueView TsBlock::tryMin() const {
             // time, so we can easily get the true min by reading the first element in the block.
             auto blockColumn = BSONColumn(getBinData());
             auto it = blockColumn.begin();
-            auto [trueMinTag, trueMinVal] = bson::convertFrom</*View*/ true>(*it);
+            auto [trueMinTag, trueMinVal] = bson::convertToView(*it);
 
             tassert(10801301,
                     "Expected time field in a time-series collection to always contain a date",

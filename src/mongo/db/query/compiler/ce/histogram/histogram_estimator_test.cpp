@@ -506,8 +506,8 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsAllString) {
     {  // {$and: [{a: {$gte: ""}},{a: {$lt: {}}}]}
         Interval interval(fromjson("{'': \"\", '': {}}"), true, false);
 
-        stats::SBEValue start = sbe::bson::convertFrom<false>(interval.start);
-        stats::SBEValue end = sbe::bson::convertFrom<false>(interval.end);
+        auto start = sbe::bson::convertToOwned(interval.start);
+        auto end = sbe::bson::convertToOwned(interval.end);
 
         ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
 

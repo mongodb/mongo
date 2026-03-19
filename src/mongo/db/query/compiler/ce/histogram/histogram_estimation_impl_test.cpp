@@ -2031,16 +2031,16 @@ TEST(CEHistogramEstimatorCanEstimateTest, EstimateViaTypeCountsBooleanMixInclusi
 
     {  // {a: {$eq: false}}
         Interval interval(fromjson("{'': false, '': false}"), true, true);
-        auto [valTag, val] = sbe::bson::convertFrom<false>(interval.start);
-        auto estimation = estimateCardinalityEqViaTypeCounts(*ceHist, valTag, val);
+        auto val = sbe::bson::convertToOwned(interval.start);
+        auto estimation = estimateCardinalityEqViaTypeCounts(*ceHist, val.tag(), val.value());
         ASSERT_TRUE(estimation);
         ASSERT_EQ(falseValues, estimation.get().card);
     }
 
     {  // {a: {$eq: true}}
         Interval interval(fromjson("{'': true, '': true}"), true, true);
-        auto [valTag, val] = sbe::bson::convertFrom<false>(interval.start);
-        auto estimation = estimateCardinalityEqViaTypeCounts(*ceHist, valTag, val);
+        auto val = sbe::bson::convertToOwned(interval.start);
+        auto estimation = estimateCardinalityEqViaTypeCounts(*ceHist, val.tag(), val.value());
         ASSERT_TRUE(estimation);
         ASSERT_EQ(trueValues, estimation.get().card);
     }
@@ -2049,10 +2049,15 @@ TEST(CEHistogramEstimatorCanEstimateTest, EstimateViaTypeCountsBooleanMixInclusi
         Interval interval(fromjson("{'': false, '': true}"), true, true);
         bool startInclusive = interval.startInclusive;
         bool endInclusive = interval.endInclusive;
-        auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
-        auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
-        auto estimation = estimateCardinalityRangeViaTypeCounts(
-            *ceHist, startInclusive, startTag, startVal, endInclusive, endTag, endVal);
+        auto start = sbe::bson::convertToOwned(interval.start);
+        auto end = sbe::bson::convertToOwned(interval.end);
+        auto estimation = estimateCardinalityRangeViaTypeCounts(*ceHist,
+                                                                startInclusive,
+                                                                start.tag(),
+                                                                start.value(),
+                                                                endInclusive,
+                                                                end.tag(),
+                                                                end.value());
         ASSERT_TRUE(estimation);
         ASSERT_EQ(size, estimation.get().card);
     }
@@ -2078,10 +2083,15 @@ TEST(CEHistogramEstimatorCanEstimateTest, EstimateViaTypeCountsBooleanMixNotIncl
         Interval interval(fromjson("{'': false, '': true}"), true, false);
         bool startInclusive = interval.startInclusive;
         bool endInclusive = interval.endInclusive;
-        auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
-        auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
-        auto estimation = estimateCardinalityRangeViaTypeCounts(
-            *ceHist, startInclusive, startTag, startVal, endInclusive, endTag, endVal);
+        auto start = sbe::bson::convertToOwned(interval.start);
+        auto end = sbe::bson::convertToOwned(interval.end);
+        auto estimation = estimateCardinalityRangeViaTypeCounts(*ceHist,
+                                                                startInclusive,
+                                                                start.tag(),
+                                                                start.value(),
+                                                                endInclusive,
+                                                                end.tag(),
+                                                                end.value());
         ASSERT_TRUE(estimation);
         ASSERT_EQ(falseValues, estimation.get().card);
     }
@@ -2090,10 +2100,15 @@ TEST(CEHistogramEstimatorCanEstimateTest, EstimateViaTypeCountsBooleanMixNotIncl
         Interval interval(fromjson("{'': false, '': true}"), false, true);
         bool startInclusive = interval.startInclusive;
         bool endInclusive = interval.endInclusive;
-        auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
-        auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
-        auto estimation = estimateCardinalityRangeViaTypeCounts(
-            *ceHist, startInclusive, startTag, startVal, endInclusive, endTag, endVal);
+        auto start = sbe::bson::convertToOwned(interval.start);
+        auto end = sbe::bson::convertToOwned(interval.end);
+        auto estimation = estimateCardinalityRangeViaTypeCounts(*ceHist,
+                                                                startInclusive,
+                                                                start.tag(),
+                                                                start.value(),
+                                                                endInclusive,
+                                                                end.tag(),
+                                                                end.value());
         ASSERT_TRUE(estimation);
         ASSERT_EQ(trueValues, estimation.get().card);
     }
@@ -2121,12 +2136,17 @@ DEATH_TEST(CEHistogramEstimatorCanEstimateTestDeathTest,
         Interval interval(fromjson("{'': true, '': false}"), true, true);
         bool startInclusive = interval.startInclusive;
         bool endInclusive = interval.endInclusive;
-        auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
-        auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
+        auto start = sbe::bson::convertToOwned(interval.start);
+        auto end = sbe::bson::convertToOwned(interval.end);
 
         // This should fail using tassert 9163900.
-        auto estimation = estimateCardinalityRangeViaTypeCounts(
-            *ceHist, startInclusive, startTag, startVal, endInclusive, endTag, endVal);
+        auto estimation = estimateCardinalityRangeViaTypeCounts(*ceHist,
+                                                                startInclusive,
+                                                                start.tag(),
+                                                                start.value(),
+                                                                endInclusive,
+                                                                end.tag(),
+                                                                end.value());
     }
 }
 
@@ -2152,12 +2172,17 @@ DEATH_TEST(CEHistogramEstimatorCanEstimateTestDeathTest,
         Interval interval(fromjson("{'': true, '': false}"), false, true);
         bool startInclusive = interval.startInclusive;
         bool endInclusive = interval.endInclusive;
-        auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
-        auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
+        auto start = sbe::bson::convertToOwned(interval.start);
+        auto end = sbe::bson::convertToOwned(interval.end);
 
         // This should fail using tassert 9163900.
-        auto estimation = estimateCardinalityRangeViaTypeCounts(
-            *ceHist, startInclusive, startTag, startVal, endInclusive, endTag, endVal);
+        auto estimation = estimateCardinalityRangeViaTypeCounts(*ceHist,
+                                                                startInclusive,
+                                                                start.tag(),
+                                                                start.value(),
+                                                                endInclusive,
+                                                                end.tag(),
+                                                                end.value());
     }
 }
 
@@ -2183,12 +2208,17 @@ DEATH_TEST(CEHistogramEstimatorCanEstimateTestDeathTest,
         Interval interval(fromjson("{'': false, '': false}"), true, false);
         bool startInclusive = interval.startInclusive;
         bool endInclusive = interval.endInclusive;
-        auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
-        auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
+        auto start = sbe::bson::convertToOwned(interval.start);
+        auto end = sbe::bson::convertToOwned(interval.end);
 
         // This should fail using tassert 9163900.
-        auto estimation = estimateCardinalityRangeViaTypeCounts(
-            *ceHist, startInclusive, startTag, startVal, endInclusive, endTag, endVal);
+        auto estimation = estimateCardinalityRangeViaTypeCounts(*ceHist,
+                                                                startInclusive,
+                                                                start.tag(),
+                                                                start.value(),
+                                                                endInclusive,
+                                                                end.tag(),
+                                                                end.value());
     }
 }
 
@@ -2214,12 +2244,17 @@ DEATH_TEST(CEHistogramEstimatorCanEstimateTestDeathTest,
         Interval interval(fromjson("{'': false, '': false}"), false, true);
         bool startInclusive = interval.startInclusive;
         bool endInclusive = interval.endInclusive;
-        auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
-        auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
+        auto start = sbe::bson::convertToOwned(interval.start);
+        auto end = sbe::bson::convertToOwned(interval.end);
 
         // This should fail using tassert 9163900.
-        auto estimation = estimateCardinalityRangeViaTypeCounts(
-            *ceHist, startInclusive, startTag, startVal, endInclusive, endTag, endVal);
+        auto estimation = estimateCardinalityRangeViaTypeCounts(*ceHist,
+                                                                startInclusive,
+                                                                start.tag(),
+                                                                start.value(),
+                                                                endInclusive,
+                                                                end.tag(),
+                                                                end.value());
     }
 }
 
@@ -2245,12 +2280,17 @@ DEATH_TEST(CEHistogramEstimatorCanEstimateTestDeathTest,
         Interval interval(fromjson("{'': true, '': true}"), true, false);
         bool startInclusive = interval.startInclusive;
         bool endInclusive = interval.endInclusive;
-        auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
-        auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
+        auto start = sbe::bson::convertToOwned(interval.start);
+        auto end = sbe::bson::convertToOwned(interval.end);
 
         // This should fail using tassert 9163900.
-        auto estimation = estimateCardinalityRangeViaTypeCounts(
-            *ceHist, startInclusive, startTag, startVal, endInclusive, endTag, endVal);
+        auto estimation = estimateCardinalityRangeViaTypeCounts(*ceHist,
+                                                                startInclusive,
+                                                                start.tag(),
+                                                                start.value(),
+                                                                endInclusive,
+                                                                end.tag(),
+                                                                end.value());
     }
 }
 
@@ -2276,12 +2316,17 @@ DEATH_TEST(CEHistogramEstimatorCanEstimateTestDeathTest,
         Interval interval(fromjson("{'': true, '': true}"), false, true);
         bool startInclusive = interval.startInclusive;
         bool endInclusive = interval.endInclusive;
-        auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
-        auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
+        auto start = sbe::bson::convertToOwned(interval.start);
+        auto end = sbe::bson::convertToOwned(interval.end);
 
         // This should fail using tassert 9163900.
-        auto estimation = estimateCardinalityRangeViaTypeCounts(
-            *ceHist, startInclusive, startTag, startVal, endInclusive, endTag, endVal);
+        auto estimation = estimateCardinalityRangeViaTypeCounts(*ceHist,
+                                                                startInclusive,
+                                                                start.tag(),
+                                                                start.value(),
+                                                                endInclusive,
+                                                                end.tag(),
+                                                                end.value());
     }
 }
 
@@ -2302,8 +2347,8 @@ TEST(CEHistogramEstimatorCanEstimateTest, EstimateViaTypeCountsNull) {
 
     {  // {a: {$eq: null}}
         Interval interval(fromjson("{'': null, '': null}"), true, true);
-        auto [valTag, val] = sbe::bson::convertFrom<false>(interval.start);
-        auto estimation = estimateCardinalityEqViaTypeCounts(*ceHist, valTag, val);
+        auto val = sbe::bson::convertToOwned(interval.start);
+        auto estimation = estimateCardinalityEqViaTypeCounts(*ceHist, val.tag(), val.value());
 
         ASSERT_TRUE(estimation);
         ASSERT_EQ(size, estimation.get().card);
@@ -2314,13 +2359,16 @@ TEST(CEHistogramEstimatorCanEstimateTest, EstimateViaTypeCountsNull) {
         Interval interval(fromjson("{'': null, '': NaN}"), true, false);
         bool startInclusive = interval.startInclusive;
         bool endInclusive = interval.endInclusive;
-        auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
-        auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
-        sbe::value::ValueGuard startGuard{startTag, startVal};
-        sbe::value::ValueGuard endGuard{endTag, endVal};
+        auto start = sbe::bson::convertToOwned(interval.start);
+        auto end = sbe::bson::convertToOwned(interval.end);
 
-        auto estimation = estimateCardinalityRangeViaTypeCounts(
-            *ceHist, startInclusive, startTag, startVal, endInclusive, endTag, endVal);
+        auto estimation = estimateCardinalityRangeViaTypeCounts(*ceHist,
+                                                                startInclusive,
+                                                                start.tag(),
+                                                                start.value(),
+                                                                endInclusive,
+                                                                end.tag(),
+                                                                end.value());
 
         ASSERT_TRUE(estimation);
         ASSERT_EQ(size, estimation.get().card);
@@ -2349,8 +2397,8 @@ TEST(CEHistogramEstimatorCanEstimateTest, EstimateViaTypeCountsNaN) {
 
     {  // {a: {$eq: NaN}}
         Interval interval(fromjson("{'': NaN, '': NaN}"), true, true);
-        auto [valTag, val] = sbe::bson::convertFrom<false>(interval.start);
-        auto estimation = estimateCardinalityEqViaTypeCounts(*ceHist, valTag, val);
+        auto val = sbe::bson::convertToOwned(interval.start);
+        auto estimation = estimateCardinalityEqViaTypeCounts(*ceHist, val.tag(), val.value());
 
         ASSERT_TRUE(estimation);
         ASSERT_EQ(sizeNaN, estimation.get().card);
@@ -2381,13 +2429,16 @@ TEST(CEHistogramEstimatorCanEstimateTest, EstimateViaTypeCountsAllString) {
 
         bool startInclusive = interval.startInclusive;
         bool endInclusive = interval.endInclusive;
-        auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
-        auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
-        sbe::value::ValueGuard startGuard{startTag, startVal};
-        sbe::value::ValueGuard endGuard{endTag, endVal};
+        auto start = sbe::bson::convertToOwned(interval.start);
+        auto end = sbe::bson::convertToOwned(interval.end);
 
-        auto estimation = estimateCardinalityRangeViaTypeCounts(
-            *ceHist, startInclusive, startTag, startVal, endInclusive, endTag, endVal);
+        auto estimation = estimateCardinalityRangeViaTypeCounts(*ceHist,
+                                                                startInclusive,
+                                                                start.tag(),
+                                                                start.value(),
+                                                                endInclusive,
+                                                                end.tag(),
+                                                                end.value());
 
         ASSERT_TRUE(estimation);
         ASSERT_EQ(size, estimation.get().card);
@@ -2437,8 +2488,8 @@ TEST(CEHistogramEstimatorCanEstimateTest, EstimateViaTypeCountsMixTypes) {
 
     {  // {a: {$eq: true}}
         Interval interval(fromjson("{'': true, '': true}"), true, true);
-        auto [valTag, val] = sbe::bson::convertFrom<false>(interval.start);
-        auto estimation = estimateCardinalityEqViaTypeCounts(*ceHist, valTag, val);
+        auto val = sbe::bson::convertToOwned(interval.start);
+        auto estimation = estimateCardinalityEqViaTypeCounts(*ceHist, val.tag(), val.value());
         ASSERT_TRUE(estimation);
         ASSERT_EQ(trueValues, estimation.get().card);
     }
@@ -2446,16 +2497,16 @@ TEST(CEHistogramEstimatorCanEstimateTest, EstimateViaTypeCountsMixTypes) {
 
     {  // {a: {$eq: false}}
         Interval interval(fromjson("{'': false, '': false}"), true, true);
-        auto [valTag, val] = sbe::bson::convertFrom<false>(interval.start);
-        auto estimation = estimateCardinalityEqViaTypeCounts(*ceHist, valTag, val);
+        auto val = sbe::bson::convertToOwned(interval.start);
+        auto estimation = estimateCardinalityEqViaTypeCounts(*ceHist, val.tag(), val.value());
         ASSERT_TRUE(estimation);
         ASSERT_EQ(falseValues, estimation.get().card);
     }
 
     {  // {a: {$eq: NaN}}
         Interval interval(fromjson("{'': NaN, '': NaN}"), true, true);
-        auto [valTag, val] = sbe::bson::convertFrom<false>(interval.start);
-        auto estimation = estimateCardinalityEqViaTypeCounts(*ceHist, valTag, val);
+        auto val = sbe::bson::convertToOwned(interval.start);
+        auto estimation = estimateCardinalityEqViaTypeCounts(*ceHist, val.tag(), val.value());
         ASSERT_TRUE(estimation);
         ASSERT_EQ(sizeNaN, estimation.get().card);
     }
@@ -2464,13 +2515,16 @@ TEST(CEHistogramEstimatorCanEstimateTest, EstimateViaTypeCountsMixTypes) {
         Interval interval(fromjson("{'': \"\", '': {}}"), true, false);
         bool startInclusive = interval.startInclusive;
         bool endInclusive = interval.endInclusive;
-        auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
-        auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
-        sbe::value::ValueGuard startGuard{startTag, startVal};
-        sbe::value::ValueGuard endGuard{endTag, endVal};
+        auto start = sbe::bson::convertToOwned(interval.start);
+        auto end = sbe::bson::convertToOwned(interval.end);
 
-        auto estimation = estimateCardinalityRangeViaTypeCounts(
-            *ceHist, startInclusive, startTag, startVal, endInclusive, endTag, endVal);
+        auto estimation = estimateCardinalityRangeViaTypeCounts(*ceHist,
+                                                                startInclusive,
+                                                                start.tag(),
+                                                                start.value(),
+                                                                endInclusive,
+                                                                end.tag(),
+                                                                end.value());
         ASSERT_TRUE(estimation);
         ASSERT_EQ(strCount, estimation.get().card);
     }

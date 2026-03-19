@@ -105,7 +105,7 @@ public:
         auto objView = value::getObjectView(objVal);
 
         for (auto elem : obj) {
-            auto [tag, val] = bson::convertFrom<false>(elem);
+            auto [tag, val] = bson::convertToOwned(elem).releaseToRaw();
             objView->push_back(elem.fieldNameStringData(), tag, val);
         }
         return {objTag, objVal};
@@ -116,7 +116,7 @@ public:
         auto arrView = value::getArrayView(arrVal);
 
         for (auto elem : arr) {
-            auto [tag, val] = bson::convertFrom<false>(elem);
+            auto [tag, val] = bson::convertToOwned(elem).releaseToRaw();
             arrView->push_back(tag, val);
         }
         return {arrTag, arrVal};

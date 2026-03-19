@@ -591,23 +591,30 @@ CardinalityEstimate estimateIntervalCardinality(const stats::CEHistogram& ceHist
 
     bool startInclusive = interval.startInclusive;
     bool endInclusive = interval.endInclusive;
-    auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
-    auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
-    sbe::value::ValueGuard startGuard{startTag, startVal};
-    sbe::value::ValueGuard endGuard{endTag, endVal};
+    auto start = sbe::bson::convertToOwned(interval.start);
+    auto end = sbe::bson::convertToOwned(interval.end);
 
     // If the interval is not in the ascending order, then reverse it.
-    if (reversedInterval(startTag, startVal, endTag, endVal)) {
+    if (reversedInterval(start.tag(), start.value(), end.tag(), end.value())) {
+        using std::swap;
         std::swap(startInclusive, endInclusive);
-        std::swap(startTag, endTag);
-        std::swap(startVal, endVal);
+        std::swap(start, end);
     }
 
-    if (canEstimateInterval(
-            ceHist.isArray(), startInclusive, startTag, startVal, endInclusive, endTag, endVal)) {
+    if (canEstimateInterval(ceHist.isArray(),
+                            startInclusive,
+                            start.tag(),
+                            start.value(),
+                            endInclusive,
+                            end.tag(),
+                            end.value())) {
         CardinalityEstimate ce{cost_based_ranker::zeroCE};
-        for (const auto& interval : stats::bracketizeInterval(
-                 startTag, startVal, startInclusive, endTag, endVal, endInclusive)) {
+        for (const auto& interval : stats::bracketizeInterval(start.tag(),
+                                                              start.value(),
+                                                              startInclusive,
+                                                              end.tag(),
+                                                              end.value(),
+                                                              endInclusive)) {
             ce += estimateIntervalCardinality(ceHist,
                                               interval.first.second,
                                               interval.first.first.getTag(),
