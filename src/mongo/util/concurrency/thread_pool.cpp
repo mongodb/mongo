@@ -125,6 +125,10 @@ public:
     void setMaxThreads(size_t maxThreads);
     void setMinThreads(size_t minThreads);
 
+    uint64_t joinedThreadsCount_forTest() const {
+        return _joinedThreadsCount.loadRelaxed();
+    }
+
 private:
     /**
      * Representation of the stage of life of a thread pool.
@@ -245,6 +249,8 @@ private:
 
     // The last time that _pendingTasks.size() grew to be at least _threads.size().
     Date_t _lastFullUtilizationDate;
+
+    mutable Atomic<uint64_t> _joinedThreadsCount;
 };
 
 ThreadPool::Impl::Impl(Options options) : _options(cleanUpOptions(std::move(options))) {}
@@ -315,8 +321,7 @@ void ThreadPool::Impl::_joinRetired_inlock() {
     while (!_retiredThreads.empty()) {
         auto& t = _retiredThreads.front();
         t.join();
-        if (_options.onJoinRetiredThread)
-            _options.onJoinRetiredThread(t);
+        _joinedThreadsCount.fetchAndAdd(1);
         _retiredThreads.pop_front();
     }
 }
@@ -715,6 +720,10 @@ void ThreadPool::setMinThreads(size_t minThreads) {
 
 void ThreadPool::setMaxThreads(size_t maxThreads) {
     _impl->setMaxThreads(maxThreads);
+}
+
+uint64_t ThreadPool::joinedThreadsCount_forTest() const {
+    return _impl->joinedThreadsCount_forTest();
 }
 
 }  // namespace mongo

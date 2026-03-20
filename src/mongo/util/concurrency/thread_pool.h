@@ -105,16 +105,6 @@ public:
 
         /** If callable, called before each worker thread begins consuming tasks. */
         std::function<void(const std::string&)> onCreateThread;
-
-        /**
-         * If callable, called after joining each retired thread.
-         * These joins happen when a thread completes a task, and there is no more work in the
-         * thread pool. That is, they will be done by a single thread (the function does not need to
-         * be thread safe unless it will also be called in other places).
-         * Since there could be multiple calls to this function in a single critical section, avoid
-         * complex logic in the callback.
-         */
-        std::function<void(const stdx::thread&)> onJoinRetiredThread;
     };
 
     /**
@@ -192,6 +182,8 @@ public:
      * the maximum are running.
      */
     void setMaxThreads(size_t maxThreads);
+
+    uint64_t joinedThreadsCount_forTest() const;
 
 private:
     class Impl;
