@@ -80,7 +80,15 @@ def activate_task(expansions: EvgExpansions, evg_api: EvergreenApi) -> None:
                             "Activating task", task_id=task.task_id, task_name=task.display_name
                         )
                         try:
-                            evg_api.configure_task(task.task_id, activated=True)
+                            retry_call(
+                                evg_api.configure_task,
+                                fargs=[task.task_id],
+                                fkwargs={"activated": True},
+                                tries=3,
+                                delay=5,
+                                backoff=2,
+                                exceptions=Exception,
+                            )
                         except Exception:
                             LOGGER.error(
                                 "Could not activate task",
@@ -96,7 +104,15 @@ def activate_task(expansions: EvgExpansions, evg_api: EvergreenApi) -> None:
                             "Activating task", task_id=task.task_id, task_name=task.display_name
                         )
                         try:
-                            evg_api.configure_task(task.task_id, activated=True)
+                            retry_call(
+                                evg_api.configure_task,
+                                fargs=[task.task_id],
+                                fkwargs={"activated": True},
+                                tries=3,
+                                delay=5,
+                                backoff=2,
+                                exceptions=Exception,
+                            )
                         except Exception:
                             LOGGER.error(
                                 "Could not activate task",
@@ -117,7 +133,15 @@ def activate_task(expansions: EvgExpansions, evg_api: EvergreenApi) -> None:
             if task.display_name == expansions.task:
                 LOGGER.info("Activating task", task_id=task.task_id, task_name=task.display_name)
                 try:
-                    evg_api.configure_task(task.task_id, activated=True)
+                    retry_call(
+                        evg_api.configure_task,
+                        fargs=[task.task_id],
+                        fkwargs={"activated": True},
+                        tries=3,
+                        delay=5,
+                        backoff=2,
+                        exceptions=Exception,
+                    )
                 except Exception:
                     LOGGER.error(
                         "Could not activate task",
