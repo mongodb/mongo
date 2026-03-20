@@ -607,7 +607,7 @@ resource contention in the storage engine. This exception is the base of excepti
 concurrency (`WriteConflict`) and to those related to cache pressure (`TemporarilyUnavailable` and
 `TransactionTooLargeForCache`).
 
-We recommend using the [writeConflictRetry](https://github.com/10gen/mongo/blob/9381db6748aada1d9a0056cea0e9899301e7f70b/src/mongo/db/concurrency/exception_util.h#L140)
+We recommend using the [writeConflictRetry](https://github.com/mongodb/mongo/blob/9381db6748aada1d9a0056cea0e9899301e7f70b/src/mongo/db/concurrency/exception_util.h#L140)
 helper which transparently handles all exceptions related to this error category.
 
 ### WriteConflictException

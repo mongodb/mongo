@@ -1626,7 +1626,7 @@ Before the data clone phase begins, the node will do the following:
    node restarts while this flag is set, it will restart initial sync even though it may already
    have data because it means that initial sync didn't complete. We also check this flag to prevent
    reading from the oplog while initial sync is in progress.
-2. [Reset the in-memory FCV to `kUnsetDefaultLastLTSBehavior`.](https://github.com/10gen/mongo/blob/b718dc1aa3ffb3e6df4f61a30d54cda578cf2830/src/mongo/db/repl/initial_syncer.cpp#L689). This is to ensure compatibility between the sync source and sync
+2. [Reset the in-memory FCV to `kUnsetDefaultLastLTSBehavior`.](https://github.com/mongodb/mongo/blob/b718dc1aa3ffb3e6df4f61a30d54cda578cf2830/src/mongo/db/repl/initial_syncer.cpp#L689). This is to ensure compatibility between the sync source and sync
 target. If the sync source is actually in a different feature compatibility version, we will find
 out when we clone from the sync source.
 3. Find a sync source.
@@ -1646,7 +1646,7 @@ out when we clone from the sync source.
    or the timestamp that it begins applying oplog entries at once it has completed the data clone
    phase. If there was no active transaction on the sync source, the `beginFetchingTimestamp` will
    be the same as the `beginApplyingTimestamp`.
-9. [Set the in-memory FCV to the sync source's FCV.](https://github.com/10gen/mongo/blob/b718dc1aa3ffb3e6df4f61a30d54cda578cf2830/src/mongo/db/repl/initial_syncer.cpp#L1153). This is because during the cloning phase, we do expect to clone the sync source's "admin.system.version" collection eventually (which contains the FCV document), but we can't guarantee that we will clone "admin.system.version" first. Setting the in-memory FCV value to the sync source's FCV first will ensure that we clone collections using the same FCV as the sync source. However, we won't persist the FCV to disk nor will we update our minWireVersion until we clone the actual document.
+9. [Set the in-memory FCV to the sync source's FCV.](https://github.com/mongodb/mongo/blob/b718dc1aa3ffb3e6df4f61a30d54cda578cf2830/src/mongo/db/repl/initial_syncer.cpp#L1153). This is because during the cloning phase, we do expect to clone the sync source's "admin.system.version" collection eventually (which contains the FCV document), but we can't guarantee that we will clone "admin.system.version" first. Setting the in-memory FCV value to the sync source's FCV first will ensure that we clone collections using the same FCV as the sync source. However, we won't persist the FCV to disk nor will we update our minWireVersion until we clone the actual document.
 10. Create an `OplogFetcher` and start fetching and buffering oplog entries from the sync source
    to be applied later. Operations are buffered to a collection so that they are not limited by the
    amount of memory available.
@@ -1941,7 +1941,7 @@ oplog, the node will [set the `oplogTruncateAfterPoint` to the `lastApplied` tim
 If the node shuts down before it finishes writing the batch, then during startup recovery the node will truncate
 the oplog back to the point saved before the batch application began. If the node successfully
 finishes writing the batch to the oplog, it will
-[reset the `oplogTruncateAfterPoint` to null](https://github.com/10gen/mongo/blob/r6.0.0/src/mongo/db/repl/oplog_applier_impl.cpp#L499)
+[reset the `oplogTruncateAfterPoint` to null](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/oplog_applier_impl.cpp#L499)
 since there are no oplog holes and the oplog will not need to be truncated if the node restarts.
 
 The second scenario for setting the `oplogTruncateAfterPoint` is while primary. A primary allows
@@ -1949,7 +1949,7 @@ secondaries to replicate one of its oplog entries as soon as there are no oplog 
 behind the entry. However, secondaries do not have to wait for the oplog entry to make it to disk
 on the primary nor for there to be no holes behind it on disk on the primary. Therefore, some
 already replicated writes may disappear from the primary if the primary crashes. The primary will
-continually [update the `oplogTruncateAfterPoint`](https://github.com/10gen/mongo/blob/r6.0.0/src/mongo/db/repl/replication_coordinator_external_state_impl.cpp#L1150-L1154)
+continually [update the `oplogTruncateAfterPoint`](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/replication_coordinator_external_state_impl.cpp#L1150-L1154)
 in order to track and forward the no oplog holes
 point on disk, in case of an unclean shutdown. Then startup recovery can take care of any oplog
 inconsistency with the rest of the replica set.
