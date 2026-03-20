@@ -274,9 +274,12 @@ export function ChangeStreamTest(_db, options) {
         const collName = collection instanceof DBCollection ? collection.getName() : collection;
 
         return runInFixture(() => {
-            let maxRetries = 3;
+            // Maximum number of tries, i.e. 1 initial attempt + 3 retries.
+            // If adjusting this value in the future, be sure to constraint the maximum backoff time
+            // below to avoid overly long sleeps.
+            const maxTries = 4;
             let res;
-            for (let attemptNumber = 1; attemptNumber <= maxRetries; attemptNumber++) {
+            for (let attemptNumber = 1; attemptNumber <= maxTries; attemptNumber++) {
                 try {
                     res = assert.commandWorked(
                         runCommandChangeStreamPassthroughAware(
@@ -287,9 +290,12 @@ export function ChangeStreamTest(_db, options) {
                     );
                     break;
                 } catch (e) {
-                    if (attemptNumber === maxRetries || !isResumableChangeStreamError(e)) {
+                    if (attemptNumber === maxTries || !isResumableChangeStreamError(e)) {
                         throw e;
                     }
+
+                    // Exponential backoff, sleep for 10, 100, 1000ms before retrying.
+                    sleep(Math.pow(10, attemptNumber));
                 }
             }
             assert.neq(res.cursor.id, 0);
