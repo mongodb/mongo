@@ -33,6 +33,9 @@ filters:
   - "run_check_shard_filtering_metadata.js":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "run_validate_find_and_modify_image_collection_not_exist.js":
+    approvers:
+      - 10gen/server-replication-reviewers
   - "*validate_collections*.js":
     approvers:
       - 10gen/server-validate

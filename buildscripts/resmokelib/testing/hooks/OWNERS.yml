@@ -76,6 +76,9 @@ filters:
     approvers:
       - 10gen/server-validate
       - 10gen/devprod-correctness
+  - "validate_find_and_modify_image_collection_not_exist.py":
+    approvers:
+      - 10gen/server-replication-reviewers
   - "simulate_crash.py":
     approvers:
       - 10gen/query-execution-router
