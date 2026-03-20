@@ -74,7 +74,8 @@ export class WorkloadManyCollectionsInLookupUnwind extends LongPipelineWorkload 
     // Many $lookup-$unwind-s where each new collection is joined to the same column.
     // Unwind each lookup result immediately after.
     scale() {
-        return Math.min(500, super.scale());
+        // TODO SERVER-122257: Change it back to 500.
+        return Math.min(350, super.scale());
     }
 
     pipeline() {
