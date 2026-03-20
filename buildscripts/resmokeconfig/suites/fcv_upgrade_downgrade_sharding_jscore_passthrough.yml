@@ -9,6 +9,7 @@ selector:
     - jstests/fle2/**/*.js
     - jstests/core_sharding/**/*.js
     - jstests/aggregation/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
 
   exclude_files:
     # The following tests fail because a certain command or functionality is not supported on
@@ -92,7 +93,6 @@ selector:
     - assumes_against_mongod_not_mongos
     # system.profile collection doesn't exist on mongos.
     - requires_profiling
-    - featureFlagFLE2CleanupCommand
     # TODO: SERVER-66393 Remove Feature Flag for PM-2919.
     - featureFlagTimeseriesUpdatesSupport
     # TODO: SERVER-78068 Remove Feature Flag for PM-2983
