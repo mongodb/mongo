@@ -1,0 +1,199 @@
+load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
+load("//jstests/suites/query-execution:common.bzl", "CORE_DATA")
+
+resmoke_suite_test(
+    name = "sharded_collections_jscore_passthrough_rate_limited",
+    srcs = [
+        "//jstests/core:all_subpackage_javascript_files",
+        "//jstests/core_sharding:all_subpackage_javascript_files",
+        "//jstests/fle2:all_subpackage_javascript_files",
+        "//src/mongo/db/modules/enterprise/jstests/fle2:all_subpackage_javascript_files",
+    ],
+    config = "//buildscripts/resmokeconfig:suites/sharded_collections_jscore_passthrough_rate_limited.yml",
+    data = [
+        "//jstests/sharding/analyze_shard_key/libs:all_subpackage_javascript_files",
+        "//jstests/sharding/libs:all_subpackage_javascript_files",
+    ] + CORE_DATA,
+    exclude_files = [
+        # These tests run in the jscore_txn passthrough suites.
+        "//jstests/core/txns:all_subpackage_javascript_files",
+
+        # The following tests fail because a certain command or functionality is not supported by
+        # mongos. This command or functionality is placed in a comment next to the failing test.
+        "//jstests/core/query/api:apitest_db.js",  # serverStatus output doesn't have storageEngine.
+        "//jstests/core/query:awaitdata_getmore_cmd.js",  # capped collections.
+        "//jstests/core/query/doc_validation:bypass_doc_validation.js",  # sharded $out output not permitted
+        "//jstests/core/administrative:check_shard_index.js",  # checkShardingIndex.
+        "//jstests/core/administrative:compact_keeps_indexes.js",  # compact.
+        "//jstests/core/administrative/current_op:currentop.js",  # uses fsync.
+        "//jstests/core/diagnostics:dbhash.js",  # dbhash.
+        "//jstests/core/administrative/fsync:fsync.js",  # uses fsync.
+        "//jstests/core/index/geo:geo_s2cursorlimitskip.js",  # profiling.
+        "//jstests/core/index/geo:geo_update_btree2.js",  # notablescan.
+        "//jstests/core/query:queryoptimizera.js",  # "local" database.
+        "//jstests/core/diagnostics:startup_log.js",  # "local" database.
+        "//jstests/core/query/cursor:tailable_cursor_invalidation.js",  # capped collections.
+        "//jstests/core/query/cursor:tailable_getmore_batch_size.js",  # capped collections.
+        "//jstests/core/query/cursor:tailable_skip_limit.js",  # capped collections.
+        "//jstests/core/query/top:top.js",  # top.
+
+        # The following tests fail because mongos behaves differently from mongod when testing certain
+        # functionality. The differences are in a comment next to the failing test.
+        "//jstests/core/index/geo:geo_2d_explain.js",  # executionSuccess in different spot in explain().
+        "//jstests/core/index/geo:geo_s2explain.js",  # inputStage in different spot in explain().
+        "//jstests/core/index/geo:geo_s2sparse.js",  # keysPerIndex in different spot in validate().
+        "//jstests/core/diagnostics:operation_latency_histogram.js",  # Stats are counted differently on mongos, SERVER-24880.
+
+        # The following tests fail because they count indexes. These counts do not take into account the
+        # additional hashed shard key indexes that are automatically added by this passthrough.
+        "//jstests/core/query/api:apitest_dbcollection.js",
+        "//jstests/core/ddl:bad_index_plugin.js",
+        "//jstests/core/ddl:create_indexes.js",
+        "//jstests/core/txns:create_indexes.js",
+        "//jstests/core/catalog:list_indexes_non_existent_ns.js",
+        "//jstests/core/query/map_reduce:mr_preserve_indexes.js",
+
+        # TODO: Remove after fixing SERVER-103278. executionStats.nReturned is incorrect for sharded distinct commands.
+        "//jstests/core/query/distinct:distinct_index1.js",
+
+        # TODO SERVER-32311: These tests use plan stage helpers which can't handle sharded explain output.
+        "//jstests/core/index:index_multikey.js",
+        "//jstests/core/query/expr:expr_index_use.js",
+        "//jstests/core/query/explain:optimized_match_explain.js",
+        "//jstests/core/query/sort:sort_array.js",
+    ],
+    exclude_with_any_tags = [
+        "assumes_standalone_mongod",
+        "assumes_against_mongod_not_mongos",
+
+        # This passthrough implicitly shards the accessed collections. Do not run tests where collections
+        # can't be created on `getCollection` call.
+        "assumes_no_implicit_collection_creation_on_get_collection",
+
+        # Tests tagged with the following will fail because they assume collections are not sharded.
+        "assumes_no_implicit_collection_creation_after_drop",
+        "assumes_no_implicit_index_creation",
+        "assumes_unsharded_collection",
+        "cannot_create_unique_index_when_using_hashed_shard_key",
+
+        # system.profile collection doesn't exist on mongos.
+        "requires_profiling",
+
+        # Capped collections cannot be sharded
+        "requires_capped",
+    ],
+    shard_count = 20,
+    tags = [
+        "ci-release-critical",
+        "jscore",
+        "sharding",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_jscore_passthrough_with_balancer_rate_limited",
+    srcs = [
+        "//jstests/core:all_subpackage_javascript_files",
+        "//jstests/core_sharding:all_subpackage_javascript_files",
+        "//jstests/fle2:all_subpackage_javascript_files",
+        "//src/mongo/db/modules/enterprise/jstests/fle2:all_subpackage_javascript_files",
+    ],
+    config = "//buildscripts/resmokeconfig:suites/sharding_jscore_passthrough_with_balancer_rate_limited.yml",
+    data = [
+        "//jstests/sharding/analyze_shard_key/libs:all_subpackage_javascript_files",
+        "//jstests/sharding/libs:all_subpackage_javascript_files",
+    ] + CORE_DATA,
+    exclude_files = [
+        # These tests use chunk migration, and they expect the balancer to be disabled.
+        "//jstests/core_sharding/chunk_migration:all_javascript_files",
+
+        # These tests are run in sharded_jscore_txns.
+        "//jstests/core/txns:all_subpackage_javascript_files",
+
+        # TODO SERVER-87108 re-enable all map reduce tests
+        "//jstests/core/query/map_reduce:all_javascript_files",
+
+        # The following tests fail because a certain command or functionality is not supported on
+        # mongos. This command or functionality is placed in a comment next to the failing test.
+        "//jstests/core/query/api:apitest_db.js",  # serverStatus output doesn't have storageEngine.
+        "//jstests/core/administrative:check_shard_index.js",  # checkShardingIndex.
+        "//jstests/core/administrative:compact_keeps_indexes.js",  # compact.
+        "//jstests/core/administrative/current_op:currentop.js",  # uses fsync.
+        "//jstests/core/diagnostics:dbhash.js",  # dbhash.
+        "//jstests/core/administrative/fsync:fsync.js",  # uses fsync.
+        "//jstests/core/index/geo:geo_s2cursorlimitskip.js",  # profiling.
+        "//jstests/core/index/geo:geo_update_btree2.js",  # notablescan.
+        "//jstests/core/query:queryoptimizera.js",  # "local" database.
+        "//jstests/core/diagnostics:startup_log.js",  # "local" database.
+        "//jstests/core/query/top:top.js",  # top.
+
+        # The following tests fail because mongos behaves differently from mongod when testing certain
+        # functionality. The differences are in a comment next to the failing test.
+        "//jstests/core/index/geo:geo_2d_explain.js",  # executionSuccess in different spot in explain().
+        "//jstests/core/index/geo:geo_s2sparse.js",  # inputStage in different spot in explain().
+        "//jstests/core/index/geo:geo_s2explain.js",  # keysPerIndex in different spot in validate().
+        "//jstests/core/diagnostics:operation_latency_histogram.js",  # Stats are counted differently on mongos, SERVER-24880.
+
+        # override library is not able to intercept createIndex commands executed inside benchRun
+        "//jstests/core/shell:bench_test1.js",
+
+        # moveCollection will drop indexes which will reset index statistics this test asserts on.
+        "//jstests/core/index:index_stats.js",
+
+        # moveCollection and the many deleteMany commands in this test block each other and can easily cause the test to time out.
+        # This is caused by the pauseMigrationsDuringMultiUpdates cluster parameter and the random migrations failpoint both being enabled for this suite.
+        # TODO SERVER-91655: re-enable this test in this suite or potentially in a noPassthrough suite.
+        "//jstests/core/timeseries/query:timeseries_predicates.js",
+
+        # moveCollection and the many multi updates in this test block each other and can easily cause the test to time out.
+        # This is caused by the pauseMigrationsDuringMultiUpdates cluster parameter and the random migrations failpoint both being enabled for this suite.
+        # TODO SERVER-91722: re-enable this test in this suite or potentially in a noPassthrough suite.
+        "//jstests/core/index/geo:geo_update_btree.js",
+
+        # TODO SERVER-88275: A moveCollection command changes the UUID of the targeted collection.
+        # Any query using an auto yielding policy will likely return a QueryPlanKilled error if a moveCollection commit happens during the query execution.
+        "//jstests/core/timeseries/geo:timeseries_geonear_random_measurements.js",
+        "//jstests/core/timeseries/query:timeseries_homogeneous_top_bottom.js",
+    ],
+    exclude_with_any_tags = [
+        "assumes_standalone_mongod",
+        "assumes_against_mongod_not_mongos",
+        "assumes_balancer_off",
+
+        # system.profile collection doesn't exist on mongos.
+        "requires_profiling",
+
+        # fsync lock is not compatible with migrations since it
+        # can't be executed while DDL lock is being held.
+        "requires_fsync",
+
+        # This suite performs balancing of unsharded collection in background
+        # using moveCollection that changes collections UUID
+        "assumes_stable_collection_uuid",
+
+        # implicitly_retry_on_migration_in_progress.js alters find/aggregate commands
+        # so that the whole result set is returned through a single batch
+        "assumes_no_implicit_cursor_exhaustion",
+    ],
+    shard_count = 20,
+    tags = [
+        "ci-release-critical",
+        "common",
+        "jscore",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
