@@ -152,7 +152,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     std::vector<JoinOptPlan> rejectedJoinPlans,
     std::unique_ptr<RemoteCursorMap> remoteCursors,
     std::unique_ptr<RemoteExplainVector> remoteExplains,
-    std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage) {
+    std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage,
+    boost::optional<PlanExplainerData> maybeExplainData) {
     auto&& [rootStage, data] = root;
     sbe::DebugPrintInfo debugPrintInfo{};
     LOGV2_DEBUG(4822860,
@@ -181,7 +182,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                                  collections,
                                  usedJoinOpt,
                                  std::move(estimates),
-                                 std::move(rejectedJoinPlans)),
+                                 std::move(rejectedJoinPlans),
+                                 std::move(maybeExplainData)),
              PlanExecutor::Deleter{opCtx}}};
 }
 

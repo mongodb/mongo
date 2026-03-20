@@ -75,5 +75,6 @@ std::unique_ptr<PlanExplainer> make(
     RemoteExplainVector* remoteExplains = nullptr,
     bool usedJoinOpt = false,
     cost_based_ranker::EstimateMap estimates = {},
-    std::vector<JoinOptPlan> rejectedPlans = {});
+    std::vector<JoinOptPlan> rejectedPlans = {},
+    boost::optional<PlanExplainerData> maybeExplainData = boost::none);
 }  // namespace mongo::plan_explainer_factory

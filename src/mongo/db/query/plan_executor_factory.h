@@ -146,7 +146,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     std::vector<JoinOptPlan> rejectedJoinPlans = {},
     std::unique_ptr<RemoteCursorMap> remoteCursors = nullptr,
     std::unique_ptr<RemoteExplainVector> remoteExplains = nullptr,
-    std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage = nullptr);
+    std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage = nullptr,
+    boost::optional<PlanExplainerData> maybeExplainData = boost::none);
 
 /**
  * Similar to the factory function above in that it also constructs an executor for the winning SBE

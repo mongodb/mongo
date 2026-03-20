@@ -70,7 +70,8 @@ std::unique_ptr<PlanExplainer> make(
     RemoteExplainVector* remoteExplains,
     bool usedJoinOpt,
     cost_based_ranker::EstimateMap estimates,
-    std::vector<JoinOptPlan> rejectedPlans) {
+    std::vector<JoinOptPlan> rejectedPlans,
+    boost::optional<PlanExplainerData> maybeExplainData) {
     if (!debugInfoSBE) {
         debugInfoSBE = std::make_shared<const plan_cache_debug_info::DebugInfoSBE>(
             plan_cache_util::buildDebugInfo(nss, solution));
@@ -87,6 +88,7 @@ std::unique_ptr<PlanExplainer> make(
         remoteExplains,
         usedJoinOpt,
         std::move(estimates),
-        std::move(rejectedPlans));
+        std::move(rejectedPlans),
+        std::move(maybeExplainData));
 }
 }  // namespace mongo::plan_explainer_factory

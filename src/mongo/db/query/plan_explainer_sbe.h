@@ -162,7 +162,8 @@ public:
         RemoteExplainVector* remoteExplains,
         bool usedJoinOpt = false,
         cost_based_ranker::EstimateMap estimates = {},
-        std::vector<JoinOptPlan> rejectedPlans = {});
+        std::vector<JoinOptPlan> rejectedPlans = {},
+        boost::optional<PlanExplainerData> maybeExplainData = boost::none);
 
     PlanStatsDetails getWinningPlanTrialStats() const final;
     std::vector<PlanStatsDetails> getRejectedPlansStats(

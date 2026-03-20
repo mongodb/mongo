@@ -97,7 +97,8 @@ public:
                     const MultipleCollectionAccessor& mca,
                     bool usedJoinOpt = false,
                     cost_based_ranker::EstimateMap estimates = {},
-                    std::vector<JoinOptPlan> rejectedJoinPlans = {});
+                    std::vector<JoinOptPlan> rejectedJoinPlans = {},
+                    boost::optional<PlanExplainerData> maybeExplainData = boost::none);
 
     CanonicalQuery* getCanonicalQuery() const override {
         return _cq.get();
