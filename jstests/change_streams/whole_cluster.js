@@ -5,6 +5,7 @@
 // ]
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 import {
     assertInvalidChangeStreamNss,
@@ -92,8 +93,14 @@ validSystemColls.forEach((collName) => {
 // or 'config' databases.
 const filteredDBs = ["admin", "local", "config"];
 filteredDBs.forEach((dbName) => {
-    // Not allowed to use 'local' db through mongos.
-    if (FixtureHelpers.isMongos(testDb) && dbName == "local") return;
+    // Not allowed to use 'local' db through mongos or on DSC.
+    if (
+        dbName == "local" &&
+        (FixtureHelpers.isMongos(testDb) ||
+            PersistenceProviderUtil.allNodesHavePropertyWithValue(testDb, "supportsLocalCollections", false))
+    ) {
+        return;
+    }
 
     assert.commandWorked(testDb.getSiblingDB(dbName).test.insert({_id: 0, a: 1}));
     // Insert to the test collection to ensure that the change stream has something to
