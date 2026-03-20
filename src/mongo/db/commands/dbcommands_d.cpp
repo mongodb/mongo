@@ -340,7 +340,8 @@ public:
                     int len;
                     const char* data = owned["data"].binDataClean(len);
                     // This is potentially an expensive operation, so do it out of the lock
-                    md5_append(&st, (const md5_byte_t*)(data), len);
+                    if (len > 0)
+                        md5_append(&st, reinterpret_cast<const md5_byte_t*>(data), len);
                     n++;
 
                     CurOpFailpointHelpers::waitWhileFailPointEnabled(
