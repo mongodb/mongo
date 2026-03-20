@@ -26,6 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+import os
+
 from test_gc01 import test_gc_base
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
@@ -115,6 +117,13 @@ class test_gc02(test_gc_base):
         # Checkpoint to ensure that the history store is cleaned.
         self.session.checkpoint()
         self.check_gc_stats()
+        c = self.session.open_cursor('statistics:')
+        self.assertGreater(c[stat.conn.cc_handle_processed][2], 0)
+        # Some Windows machines lack the time granularity to detect microseconds.
+        # Skip the time check on Windows.
+        if not os.name == "nt":
+            self.assertGreater(c[stat.conn.cc_duration][2], 0)
+        c.close()
 
         # Check that the new updates are only seen after the update timestamp.
         self.check(bigvalue, uri, nrows, 200)

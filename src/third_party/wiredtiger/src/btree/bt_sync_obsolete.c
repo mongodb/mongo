@@ -270,6 +270,7 @@ __wt_sync_obsolete_cleanup(WT_SESSION_IMPL *session, WT_REF *parent)
 {
     WT_PAGE_INDEX *pindex;
     WT_REF *ref;
+    uint64_t time_start, time_stop;
     uint32_t slot;
 
     WT_ASSERT_ALWAYS(session, WT_PAGE_IS_INTERNAL(parent->page),
@@ -279,6 +280,7 @@ __wt_sync_obsolete_cleanup(WT_SESSION_IMPL *session, WT_REF *parent)
       "%p: traversing the internal page %p for obsolete child pages", (void *)parent,
       (void *)parent->page);
 
+    time_start = __wt_clock(session);
     WT_INTL_INDEX_GET(session, parent->page, pindex);
     for (slot = 0; slot < pindex->entries; slot++) {
         ref = pindex->index[slot];
@@ -286,7 +288,9 @@ __wt_sync_obsolete_cleanup(WT_SESSION_IMPL *session, WT_REF *parent)
         WT_RET(__sync_obsolete_cleanup_one(session, ref));
     }
 
+    time_stop = __wt_clock(session);
     WT_STAT_CONN_DATA_INCRV(session, cc_pages_visited, pindex->entries);
+    WT_STAT_CONN_INCRV(session, cc_duration, WT_CLOCKDIFF_US(time_stop, time_start));
 
     return (0);
 }

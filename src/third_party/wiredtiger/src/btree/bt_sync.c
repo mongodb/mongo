@@ -346,6 +346,9 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
             internal_cleanup = false;
         }
 
+        if (internal_cleanup)
+            WT_STAT_CONN_INCR(session, cc_handle_processed);
+
         if (!F_ISSET(txn, WT_READ_VISIBLE_ALL))
             LF_SET(WT_READ_VISIBLE_ALL);
 
