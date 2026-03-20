@@ -4,7 +4,7 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 set -o errexit
 
 REGISTRY="664315256653.dkr.ecr.us-east-1.amazonaws.com"
-REPO="${streams_ecr_repo:-mongo/mongostream-testing}"
+REPO="mongo/mongostream"
 IMAGE="$REGISTRY/$REPO"
 GITSHA="$github_commit"
 DISTRO="$packager_distro"
