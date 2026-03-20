@@ -1285,7 +1285,7 @@ struct SortNode : public QuerySolutionNodeWithSortSet {
     // The maximum number of bytes of memory we're willing to use during execution of the sort. If
     // this limit is exceeded and we're not allowed to spill to disk, the query will fail at
     // execution time. Otherwise, the data will be spilled to disk.
-    uint64_t maxMemoryUsageBytes = _loadMaxMemoryUsageBytes();
+    const uint64_t maxMemoryUsageBytes = _loadMaxMemoryUsageBytes();
 
 protected:
     void cloneSortData(SortNode* copy) const;
@@ -2203,8 +2203,9 @@ struct UnpackTsBucketNode : public QuerySolutionNode {
     std::unique_ptr<QuerySolutionNode> clone() const final {
         return std::make_unique<UnpackTsBucketNode>(children[0]->clone(),
                                                     bucketSpec,
-                                                    eventFilter->clone(),
-                                                    wholeBucketFilter->clone(),
+                                                    eventFilter ? eventFilter->clone() : nullptr,
+                                                    wholeBucketFilter ? wholeBucketFilter->clone()
+                                                                      : nullptr,
                                                     includeMeta);
     }
 

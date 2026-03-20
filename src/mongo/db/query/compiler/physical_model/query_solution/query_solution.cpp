@@ -443,18 +443,21 @@ std::unique_ptr<QuerySolutionNode> CollectionScanNode::clone() const {
     cloneBaseData(copy.get());
 
     copy->nss = this->nss;
-    copy->tailable = this->tailable;
-    copy->direction = this->direction;
-    copy->isClustered = this->isClustered;
     copy->minRecord = this->minRecord;
     copy->maxRecord = this->maxRecord;
     copy->clusteredIndex = this->clusteredIndex;
-    copy->isOplog = this->isOplog;
+    copy->hasCompatibleCollation = this->hasCompatibleCollation;
+    copy->requestResumeToken = this->requestResumeToken;
+    copy->resumeScanPoint = this->resumeScanPoint;
+    copy->tailable = this->tailable;
     copy->shouldTrackLatestOplogTimestamp = this->shouldTrackLatestOplogTimestamp;
     copy->assertTsHasNotFallenOff = this->assertTsHasNotFallenOff;
+    copy->direction = this->direction;
+    copy->isClustered = this->isClustered;
+    copy->isOplog = this->isOplog;
+    copy->boundInclusion = this->boundInclusion;
     copy->shouldWaitForOplogVisibility = this->shouldWaitForOplogVisibility;
-    copy->clusteredIndex = this->clusteredIndex;
-    copy->hasCompatibleCollation = this->hasCompatibleCollation;
+    copy->stopApplyingFilterAfterFirstMatch = this->stopApplyingFilterAfterFirstMatch;
     return copy;
 }
 
@@ -1276,10 +1279,14 @@ std::unique_ptr<QuerySolutionNode> IndexScanNode::clone() const {
     auto copy = std::make_unique<IndexScanNode>(this->nss, this->index);
     cloneBaseData(copy.get());
 
+    // nss and index fields are initialized in the constructor
     copy->direction = this->direction;
     copy->addKeyMetadata = this->addKeyMetadata;
+    copy->shouldDedup = this->shouldDedup;
     copy->bounds = this->bounds;
     copy->queryCollator = this->queryCollator;
+    copy->multikeyFields = this->multikeyFields;
+    copy->iets = this->iets;
 
     return copy;
 }
@@ -1689,10 +1696,13 @@ std::unique_ptr<QuerySolutionNode> DistinctNode::clone() const {
     auto copy = std::make_unique<DistinctNode>(this->nss, this->index);
     cloneBaseData(copy.get());
 
-    copy->direction = this->direction;
+    // nss and inedx are copied in the constructor.
     copy->bounds = this->bounds;
     copy->queryCollator = this->queryCollator;
     copy->fieldNo = this->fieldNo;
+    copy->direction = this->direction;
+    copy->isShardFiltering = this->isShardFiltering;
+    copy->isFetching = this->isFetching;
 
     return copy;
 }
@@ -1730,6 +1740,7 @@ std::unique_ptr<QuerySolutionNode> CountScanNode::clone() const {
     copy->startKeyInclusive = this->startKeyInclusive;
     copy->endKey = this->endKey;
     copy->endKeyInclusive = this->endKeyInclusive;
+    copy->iets = this->iets;
 
     return copy;
 }
@@ -1808,6 +1819,7 @@ std::unique_ptr<QuerySolutionNode> TextMatchNode::clone() const {
     auto copy = std::make_unique<TextMatchNode>(nss, index, ftsQuery->clone(), wantTextScore);
     cloneBaseData(copy.get());
     copy->indexPrefix = indexPrefix;
+    copy->numPrefixFields = numPrefixFields;
     return copy;
 }
 
