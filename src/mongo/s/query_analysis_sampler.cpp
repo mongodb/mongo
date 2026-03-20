@@ -225,28 +225,24 @@ double QueryAnalysisSampler::QueryStats::_calculateExponentialMovingAverage(
 }
 
 void QueryAnalysisSampler::QueryStats::refreshTotalCount() {
+    const auto& thisNodesClusterRole = serverGlobalParams.clusterRole;
     long long newTotalCount = [&] {
-        if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer)) {
-            auto& opCountersToUse = serviceOpCounters(ClusterRole::RouterServer);
-            return opCountersToUse.getUpdate()->load() +  //
-                opCountersToUse.getDelete()->load() +     //
-                opCountersToUse.getQuery()->load() +      //
-                _lastFindAndModifyQueriesCount +          //
-                _lastAggregateQueriesCount +              //
-                _lastCountQueriesCount +                  //
+        if (thisNodesClusterRole.hasExclusively(ClusterRole::RouterServer) ||
+            thisNodesClusterRole.has(ClusterRole::None)) {
+            // This node represents the 'front door' for queries entering the cluster.
+            return globalOpCounters().getUpdate()->load() +  //
+                globalOpCounters().getDelete()->load() +     //
+                globalOpCounters().getQuery()->load() +      //
+                _lastFindAndModifyQueriesCount +             //
+                _lastAggregateQueriesCount +                 //
+                _lastCountQueriesCount +                     //
                 _lastDistinctQueriesCount;
-
-        } else if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
-            auto& opCountersToUse = serviceOpCounters(ClusterRole::ShardServer);
-            return opCountersToUse.getUpdate()->load() +  //
-                opCountersToUse.getDelete()->load() +     //
-                opCountersToUse.getQuery()->load() +      //
-                _lastFindAndModifyQueriesCount +          //
-                _lastAggregateQueriesCount +              //
-                _lastCountQueriesCount +                  //
-                _lastDistinctQueriesCount;
-        } else if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
-            return serviceOpCounters(ClusterRole::ShardServer).getNestedAggregate()->load();
+        } else if (thisNodesClusterRole.has(ClusterRole::ShardServer)) {
+            // This node captures mostly internal traffic, which has already been routed and
+            // performed shard targeting and the like. However, for queries in sub-pipelines, this
+            // shard may still act as a router and need to perform nested shard targeting. So we
+            // count these operations.
+            return globalOpCounters().getNestedAggregate()->load();
         }
         MONGO_UNREACHABLE;
     }();

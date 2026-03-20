@@ -186,7 +186,7 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
         std::move(pipeline), nullptr, UnionWithSharedState::ExecutionProgress::kIteratingSource);
 
     if (!_sharedState->_pipeline->getContext()->getNamespaceString().isOnInternalDb()) {
-        serviceOpCounters(getExpCtx()->getOperationContext()).gotNestedAggregate();
+        globalOpCounters().gotNestedAggregate();
     }
     _sharedState->_pipeline->getContext()->setInUnionWith(true);
     tassert(10577701,
@@ -237,7 +237,7 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
     }
 
     if (!_sharedState->_pipeline->getContext()->getNamespaceString().isOnInternalDb()) {
-        serviceOpCounters(getExpCtx()->getOperationContext()).gotNestedAggregate();
+        globalOpCounters().gotNestedAggregate();
     }
     _sharedState->_pipeline->getContext()->setInUnionWith(true);
 
@@ -295,7 +295,7 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
     }
 
     if (!_sharedState->_pipeline->getContext()->getNamespaceString().isOnInternalDb()) {
-        serviceOpCounters(getExpCtx()->getOperationContext()).gotNestedAggregate();
+        globalOpCounters().gotNestedAggregate();
     }
     _sharedState->_pipeline->getContext()->setInUnionWith(true);
 

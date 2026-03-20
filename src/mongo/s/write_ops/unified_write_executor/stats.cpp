@@ -105,11 +105,11 @@ void Stats::incrementOpCounters(OperationContext* opCtx,
                                 WriteCommandRef::OpRef op,
                                 bool statusOkOrNotWCOS) {
     if (op.isInsertOp()) {
-        serviceOpCounters(ClusterRole::RouterServer).gotInsert();
+        globalOpCounters().gotInsert();
 
     } else if (op.isUpdateOp()) {
         if (statusOkOrNotWCOS) {
-            serviceOpCounters(ClusterRole::RouterServer).gotUpdate();
+            globalOpCounters().gotUpdate();
         }
 
         auto updateRef = op.getUpdateOp();
@@ -123,7 +123,7 @@ void Stats::incrementOpCounters(OperationContext* opCtx,
                                                            updateRef.getArrayFilters(),
                                                            false /* isMulti */);
     } else if (op.isDeleteOp()) {
-        serviceOpCounters(ClusterRole::RouterServer).gotDelete();
+        globalOpCounters().gotDelete();
     }
 }
 }  // namespace unified_write_executor

@@ -1744,14 +1744,14 @@ void ExecCommandDatabase::_initiateCommand() {
     }
 
     if (command->shouldAffectCommandCounter()) {
-        serviceOpCounters(opCtx).gotCommand();
+        globalOpCounters().gotCommand();
         if (analyze_shard_key::supportsSamplingQueries(opCtx)) {
             analyze_shard_key::QueryAnalysisSampler::get(opCtx).gotCommand(command->getName());
         }
     }
 
     if (command->shouldAffectQueryCounter()) {
-        serviceOpCounters(opCtx).gotQuery();
+        globalOpCounters().gotQuery();
     }
 
     auto [requestOrDefaultMaxTimeMS, usesDefaultMaxTimeMS] = getRequestOrDefaultMaxTimeMS(

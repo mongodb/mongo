@@ -732,7 +732,7 @@ MONGO_REGISTER_COMMAND(CmdIsMaster).forShard();
 auto& replOpCounterServerStatusSection =
     *ServerStatusSectionBuilder<OpCounterServerStatusSection>("opcountersRepl")
          .forShard()
-         .bind(&replOpCounters);
+         .bind(&replOpCounters());
 
 }  // namespace
 

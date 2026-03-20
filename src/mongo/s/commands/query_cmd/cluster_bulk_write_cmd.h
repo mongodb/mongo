@@ -372,7 +372,7 @@ public:
 
             // See BulkWriteOp::generateReplyInfo, it is easier to handle this metric for
             // WouldChangeOwningShardError here.
-            serviceOpCounters(opCtx).gotUpdate();
+            globalOpCounters().gotUpdate();
 
             if (updatedShardKey) {
                 // Remove the WCOS error from the count. Since this write must have been sent in its

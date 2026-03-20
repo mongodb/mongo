@@ -208,7 +208,7 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
             opDebug->getAdditiveMetrics().incrementKeysDeleted(keysDeleted);
             opDebug->getAdditiveMetrics().incrementNdeleted(1);
         }
-        serviceOpCounters(opCtx).gotDelete();
+        globalOpCounters().gotDelete();
     }
 
     if (isReplicatedFastCountEnabled(opCtx)) {

@@ -819,7 +819,7 @@ bool handleGroupedInserts(OperationContext* opCtx,
         // Revisit any conditions that may have caused the batch to be flushed. In those cases,
         // append the appropriate result to the output.
         if (!fixedDoc.isOK()) {
-            serviceOpCounters(opCtx).gotInsert();
+            globalOpCounters().gotInsert();
             try {
                 uassertStatusOK(fixedDoc.getStatus());
                 MONGO_UNREACHABLE;
@@ -1101,7 +1101,7 @@ bool handleDeleteOp(OperationContext* opCtx,
         lastOpFixer.startingOp(nsString);
         return writeConflictRetry(opCtx, "bulkWriteDelete", nsString, [&] {
             boost::optional<BSONObj> docFound;
-            serviceOpCounters(opCtx).gotDelete();
+            globalOpCounters().gotDelete();
             ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForDelete(
                 opCtx->getWriteConcern());
             const auto [preConditions, isTimeseriesLogicalRequest] =
@@ -1728,7 +1728,7 @@ bool handleUpdateOp(OperationContext* opCtx,
             for (;;) {
                 try {
                     boost::optional<BSONObj> docFound;
-                    serviceOpCounters(opCtx).gotUpdate();
+                    globalOpCounters().gotUpdate();
                     ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForUpdate(
                         opCtx->getWriteConcern());
                     const auto [preConditions, isTimeseriesLogicalRequest] =

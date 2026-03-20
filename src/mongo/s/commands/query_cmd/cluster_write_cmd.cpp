@@ -727,13 +727,13 @@ bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,
     switch (_batchedRequest.getBatchType()) {
         case BatchedCommandRequest::BatchType_Insert:
             for (size_t i = 0; i < numAttempts; ++i) {
-                serviceOpCounters(opCtx).gotInsert();
+                globalOpCounters().gotInsert();
             }
             debug.getAdditiveMetrics().ninserted = response.getN();
             break;
         case BatchedCommandRequest::BatchType_Update:
             for (size_t i = 0; i < numAttempts; ++i) {
-                serviceOpCounters(opCtx).gotUpdate();
+                globalOpCounters().gotUpdate();
             }
 
             // The response.getN() count is the sum of documents matched and upserted.
@@ -757,7 +757,7 @@ bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,
             break;
         case BatchedCommandRequest::BatchType_Delete:
             for (size_t i = 0; i < numAttempts; ++i) {
-                serviceOpCounters(opCtx).gotDelete();
+                globalOpCounters().gotDelete();
             }
             debug.getAdditiveMetrics().ndeleted = response.getN();
             break;

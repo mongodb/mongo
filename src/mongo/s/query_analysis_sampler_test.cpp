@@ -439,8 +439,7 @@ public:
         getServiceContext()->setPeriodicRunner(std::move(runner));
 
         // Reset the counters since each test assumes that the count starts at 0.
-        serviceOpCounters(ClusterRole::ShardServer).resetForTest();
-        serviceOpCounters(ClusterRole::RouterServer).resetForTest();
+        globalOpCounters().resetForTest();
     }
 
     void tearDown() override {
@@ -501,7 +500,7 @@ protected:
     void setUpConfigurations(
         QueryAnalysisSampler* sampler,
         const std::vector<CollectionQueryAnalyzerConfiguration>& configurations) {
-        serviceOpCounters(ClusterRole::RouterServer).gotQuery();
+        globalOpCounters().gotQuery();
         sampler->refreshQueryStatsForTest();
 
         auto queryStats = sampler->getQueryStatsForTest();
@@ -570,7 +569,7 @@ protected:
     void testInsertsTrackedByOpCounters(bool shouldCount, ClusterRole::Value role) {
         auto& sampler = QueryAnalysisSampler::get(operationContext());
         auto numInserts = 3;
-        serviceOpCounters(role).gotInserts(numInserts);
+        globalOpCounters().gotInserts(numInserts);
         sampler.refreshQueryStatsForTest();
 
         auto queryStats = sampler.getQueryStatsForTest();
@@ -582,7 +581,7 @@ protected:
 
     void testUpdatesTrackedByOpCounters(bool shouldCount, ClusterRole::Value role) {
         auto& sampler = QueryAnalysisSampler::get(operationContext());
-        serviceOpCounters(role).gotUpdate();
+        globalOpCounters().gotUpdate();
         sampler.refreshQueryStatsForTest();
 
         auto queryStats = sampler.getQueryStatsForTest();
@@ -594,7 +593,7 @@ protected:
 
     void testDeletesTrackedByOpCounters(bool shouldCount, ClusterRole::Value role) {
         auto& sampler = QueryAnalysisSampler::get(operationContext());
-        serviceOpCounters(role).gotDelete();
+        globalOpCounters().gotDelete();
         sampler.refreshQueryStatsForTest();
 
         auto queryStats = sampler.getQueryStatsForTest();
@@ -618,7 +617,7 @@ protected:
 
     void testQueriesTrackedByOpCounters(bool shouldCount, ClusterRole::Value role) {
         auto& sampler = QueryAnalysisSampler::get(operationContext());
-        serviceOpCounters(role).gotQuery();
+        globalOpCounters().gotQuery();
         sampler.refreshQueryStatsForTest();
 
         auto queryStats = sampler.getQueryStatsForTest();
@@ -630,7 +629,7 @@ protected:
 
     void testCommandsTrackedByOpCounters(bool shouldCount, ClusterRole::Value role) {
         auto& sampler = QueryAnalysisSampler::get(operationContext());
-        serviceOpCounters(role).gotCommand();
+        globalOpCounters().gotCommand();
         sampler.refreshQueryStatsForTest();
 
         auto queryStats = sampler.getQueryStatsForTest();
@@ -678,7 +677,7 @@ protected:
 
     void testNestedAggregates(bool shouldCount, ClusterRole::Value role) {
         auto& sampler = QueryAnalysisSampler::get(operationContext());
-        serviceOpCounters(role).gotNestedAggregate();
+        globalOpCounters().gotNestedAggregate();
         sampler.refreshQueryStatsForTest();
 
         auto queryStats = sampler.getQueryStatsForTest();
@@ -905,8 +904,8 @@ TEST_F(QueryAnalysisSamplerTest, RefreshQueryStatsAndConfigurations) {
 
     // The per-second counts after: [0, 2].
     std::cout << "XXX role " << toString(operationContext()->getService()->role()) << std::endl;
-    serviceOpCounters(ClusterRole::RouterServer).gotUpdate();
-    serviceOpCounters(ClusterRole::RouterServer).gotDelete();
+    globalOpCounters().gotUpdate();
+    globalOpCounters().gotDelete();
     sampler.refreshQueryStatsForTest();
 
     auto queryStats2 = sampler.getQueryStatsForTest();
@@ -938,7 +937,7 @@ TEST_F(QueryAnalysisSamplerTest, RefreshQueryStatsAndConfigurations) {
     ASSERT_EQ(it->second.getSamplesPerSecond(), refreshedConfigurations2[0].getSamplesPerSecond());
 
     // The per-second counts after: [0, 2, 5].
-    serviceOpCounters(ClusterRole::RouterServer).gotQuery();
+    globalOpCounters().gotQuery();
     sampler.gotCommand("findandmodify");
     sampler.gotCommand("aggregate");
     sampler.gotCommand("count");

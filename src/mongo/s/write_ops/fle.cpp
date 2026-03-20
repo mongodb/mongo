@@ -146,7 +146,7 @@ bulk_write_exec::BulkWriteReplyInfo processFLEResponse(OperationContext* opCtx,
     switch (firstOpType) {
         // We support only 1 update or 1 delete or multiple inserts for FLE bulkWrites.
         case BulkWriteCRUDOp::kInsert:
-            serviceOpCounters(ClusterRole::RouterServer).gotInserts(response.getN());
+            globalOpCounters().gotInserts(response.getN());
             break;
         case BulkWriteCRUDOp::kUpdate: {
             const auto& updateRequest = request.getUpdateRequest();
@@ -160,7 +160,7 @@ bulk_write_exec::BulkWriteReplyInfo processFLEResponse(OperationContext* opCtx,
             break;
         }
         case BulkWriteCRUDOp::kDelete:
-            serviceOpCounters(ClusterRole::RouterServer).gotDelete();
+            globalOpCounters().gotDelete();
             break;
         default:
             MONGO_UNREACHABLE

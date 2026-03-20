@@ -232,7 +232,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
       _variablesParseState(_variables.useIdGenerator()),
       _sharedState(std::make_shared<LookUpSharedState>()) {
     if (!_fromNs.isOnInternalDb()) {
-        serviceOpCounters(expCtx->getOperationContext()).gotNestedAggregate();
+        globalOpCounters().gotNestedAggregate();
     }
     const auto& resolvedNamespace = expCtx->getResolvedNamespace(_fromNs);
     _resolvedNs = resolvedNamespace.ns;

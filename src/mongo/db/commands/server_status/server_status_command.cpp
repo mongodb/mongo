@@ -248,15 +248,9 @@ MONGO_REGISTER_COMMAND(CmdServerStatus).forRouter().forShard();
 
 }  // namespace
 
-auto& shardRoleGlobalOpCounterServerStatusSection =
+auto globalOpCounterServerStatusSection =
     *ServerStatusSectionBuilder<OpCounterServerStatusSection>("opcounters")
-         .forShard()
-         .bind(&serviceOpCounters(ClusterRole::ShardServer));
-
-auto& routerRoleGlobalOpCounterServerStatusSection =
-    *ServerStatusSectionBuilder<OpCounterServerStatusSection>("opcounters")
-         .forRouter()
-         .bind(&serviceOpCounters(ClusterRole::RouterServer));
+         .bind(&globalOpCounters());
 
 namespace {
 

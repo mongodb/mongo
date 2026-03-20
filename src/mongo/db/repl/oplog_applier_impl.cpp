@@ -1116,7 +1116,7 @@ Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
                                                                            oplogApplicationMode,
                                                                            isDataConsistent,
                                                                            incrementOpsAppliedStats,
-                                                                           &replOpCounters);
+                                                                           &replOpCounters());
 
     auto op = entryOrGroupedInserts.getOp();
     if (op->getOpType() == OpTypeEnum::kKeyMaterial) {

@@ -753,7 +753,7 @@ public:
             };
 
             // Counted as a getMore, not as a command.
-            serviceOpCounters(opCtx).gotGetMore();
+            globalOpCounters().gotGetMore();
             auto curOp = CurOp::get(opCtx);
             NamespaceString nss = ns();
 

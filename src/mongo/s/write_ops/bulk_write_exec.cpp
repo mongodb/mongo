@@ -1399,7 +1399,7 @@ BulkWriteReplyInfo BulkWriteOp::generateReplyInfo() {
         if (writeOpState == WriteOpState_Completed || writeOpState == WriteOpState_Error) {
             switch (writeOp.getWriteItem().getOpType()) {
                 case BatchedCommandRequest::BatchType_Insert:
-                    serviceOpCounters(ClusterRole::RouterServer).gotInsert();
+                    globalOpCounters().gotInsert();
                     break;
                 case BatchedCommandRequest::BatchType_Update: {
                     // It is easier to handle the metric in handleWouldChangeOwningShardError for
@@ -1409,7 +1409,7 @@ BulkWriteReplyInfo BulkWriteOp::generateReplyInfo() {
                     if (writeOpState != WriteOpState_Error ||
                         writeOp.getOpError().getStatus() != ErrorCodes::WouldChangeOwningShard ||
                         _writeOps.size() > 1) {
-                        serviceOpCounters(ClusterRole::RouterServer).gotUpdate();
+                        globalOpCounters().gotUpdate();
                     }
 
                     UpdateOpRef updateRef = writeOp.getWriteItem().getUpdateOp();
@@ -1428,7 +1428,7 @@ BulkWriteReplyInfo BulkWriteOp::generateReplyInfo() {
                     break;
                 }
                 case BatchedCommandRequest::BatchType_Delete:
-                    serviceOpCounters(ClusterRole::RouterServer).gotDelete();
+                    globalOpCounters().gotDelete();
                     break;
                 default:
                     MONGO_UNREACHABLE

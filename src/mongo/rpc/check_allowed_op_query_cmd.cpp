@@ -71,7 +71,7 @@ void checkAllowedOpQueryCommand(Client& client, StringData cmd) {
     }
 
     if (isTemporarilyAllowed) {
-        serviceOpCounters(client.getService()->role()).gotQueryDeprecated();
+        globalOpCounters().gotQueryDeprecated();
     }
 }
 

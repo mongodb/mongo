@@ -296,19 +296,16 @@ void ServiceEntryPointTestFixture::testHelpField() {
 }
 
 void ServiceEntryPointTestFixture::testCommandServiceCounters(ClusterRole serviceRole) {
-    auto opCounters = [&]() -> OpCounters& {
-        return serviceOpCounters(serviceRole);
-    };
-    auto initialCommandCounter = opCounters().getCommand()->load();
-    auto initialQueryCounter = opCounters().getQuery()->load();
+    auto initialCommandCounter = globalOpCounters().getCommand()->load();
+    auto initialQueryCounter = globalOpCounters().getQuery()->load();
 
     // Test that when commands that return false for `shouldAffect(Query/Command)Counter` are
     // run, the global command and query counters do not increment.
     {
         runCommandTestWithResponse(BSON(TestCmdSucceeds::kCommandName << 1));
 
-        ASSERT_EQ(opCounters().getCommand()->load(), initialCommandCounter);
-        ASSERT_EQ(opCounters().getQuery()->load(), initialQueryCounter);
+        ASSERT_EQ(globalOpCounters().getCommand()->load(), initialCommandCounter);
+        ASSERT_EQ(globalOpCounters().getQuery()->load(), initialQueryCounter);
     }
 
     // Test that when commands that return true for `shouldAffectCommandCounter` are run, the global
@@ -316,8 +313,8 @@ void ServiceEntryPointTestFixture::testCommandServiceCounters(ClusterRole servic
     {
         runCommandTestWithResponse(BSON(TestCmdSucceedsAffectsCommandCounters::kCommandName << 1));
 
-        ASSERT_EQ(opCounters().getCommand()->load(), initialCommandCounter + 1);
-        ASSERT_EQ(opCounters().getQuery()->load(), initialQueryCounter);
+        ASSERT_EQ(globalOpCounters().getCommand()->load(), initialCommandCounter + 1);
+        ASSERT_EQ(globalOpCounters().getQuery()->load(), initialQueryCounter);
     }
 
     // Test that when commands that return true for `shouldAffectQueryCounter` are run, the global
@@ -325,8 +322,8 @@ void ServiceEntryPointTestFixture::testCommandServiceCounters(ClusterRole servic
     {
         runCommandTestWithResponse(BSON(TestCmdSucceedsAffectsQueryCounters::kCommandName << 1));
 
-        ASSERT_EQ(opCounters().getCommand()->load(), initialCommandCounter + 1);
-        ASSERT_EQ(opCounters().getQuery()->load(), initialQueryCounter + 1);
+        ASSERT_EQ(globalOpCounters().getCommand()->load(), initialCommandCounter + 1);
+        ASSERT_EQ(globalOpCounters().getQuery()->load(), initialQueryCounter + 1);
     }
 }
 

@@ -72,9 +72,6 @@
 namespace mongo {
 namespace {
 
-auto& opCounters() {
-    return serviceOpCounters(ClusterRole::ShardServer);
-}
 
 using unittest::assertGet;
 
@@ -266,10 +263,10 @@ TEST_F(WriteOpsRetryability, PerformInsertsSuccess) {
 
 TEST_F(WriteOpsRetryability, OpCountersInsertSuccess) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
-    auto globalDeletesCountBeforeInsert = opCounters().getDelete()->load();
-    auto globalInsertsCountBeforeInsert = opCounters().getInsert()->load();
-    auto globalUpdatesCountBeforeInsert = opCounters().getUpdate()->load();
-    auto globalCommandsCountBeforeInsert = opCounters().getCommand()->load();
+    auto globalDeletesCountBeforeInsert = globalOpCounters().getDelete()->load();
+    auto globalInsertsCountBeforeInsert = globalOpCounters().getInsert()->load();
+    auto globalUpdatesCountBeforeInsert = globalOpCounters().getUpdate()->load();
+    auto globalCommandsCountBeforeInsert = globalOpCounters().getCommand()->load();
     auto opCtxRaii = makeOperationContext();
     // Use an unreplicated write block to avoid setting up more structures.
     repl::UnreplicatedWritesBlock unreplicated(opCtxRaii.get());
@@ -284,10 +281,10 @@ TEST_F(WriteOpsRetryability, OpCountersInsertSuccess) {
     ASSERT_EQ(2, result.results.size());
     ASSERT_TRUE(result.results[0].isOK());
     ASSERT_TRUE(result.results[1].isOK());
-    auto globalCommandsCountAfterInsert = opCounters().getCommand()->load();
-    auto globalDeletesCountAfterInsert = opCounters().getDelete()->load();
-    auto globalInsertsCountAfterInsert = opCounters().getInsert()->load();
-    auto globalUpdatesCountAfterInsert = opCounters().getUpdate()->load();
+    auto globalCommandsCountAfterInsert = globalOpCounters().getCommand()->load();
+    auto globalDeletesCountAfterInsert = globalOpCounters().getDelete()->load();
+    auto globalInsertsCountAfterInsert = globalOpCounters().getInsert()->load();
+    auto globalUpdatesCountAfterInsert = globalOpCounters().getUpdate()->load();
     ASSERT_EQ(2, globalInsertsCountAfterInsert - globalInsertsCountBeforeInsert);
     ASSERT_EQ(0, globalDeletesCountAfterInsert - globalDeletesCountBeforeInsert);
     ASSERT_EQ(0, globalCommandsCountAfterInsert - globalCommandsCountBeforeInsert);
@@ -296,10 +293,10 @@ TEST_F(WriteOpsRetryability, OpCountersInsertSuccess) {
 
 TEST_F(WriteOpsRetryability, OpCountersUpdateSuccess) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
-    auto globalDeletesCountBeforeUpdate = opCounters().getDelete()->load();
-    auto globalInsertsCountBeforeUpdate = opCounters().getInsert()->load();
-    auto globalUpdatesCountBeforeUpdate = opCounters().getUpdate()->load();
-    auto globalCommandsCountBeforeUpdate = opCounters().getCommand()->load();
+    auto globalDeletesCountBeforeUpdate = globalOpCounters().getDelete()->load();
+    auto globalInsertsCountBeforeUpdate = globalOpCounters().getInsert()->load();
+    auto globalUpdatesCountBeforeUpdate = globalOpCounters().getUpdate()->load();
+    auto globalCommandsCountBeforeUpdate = globalOpCounters().getCommand()->load();
     auto opCtxRaii = makeOperationContext();
     // Use an unreplicated write block to avoid setting up more structures.
     repl::UnreplicatedWritesBlock unreplicated(opCtxRaii.get());
@@ -316,10 +313,10 @@ TEST_F(WriteOpsRetryability, OpCountersUpdateSuccess) {
     }()});
     write_ops_exec::WriteResult result =
         write_ops_exec::performUpdates(opCtxRaii.get(), updateOp, /*preConditions=*/boost::none);
-    auto globalCommandsCountAfterUpdate = opCounters().getCommand()->load();
-    auto globalDeletesCountAfterUpdate = opCounters().getDelete()->load();
-    auto globalInsertsCountAfterUpdate = opCounters().getInsert()->load();
-    auto globalUpdatesCountAfterUpdate = opCounters().getUpdate()->load();
+    auto globalCommandsCountAfterUpdate = globalOpCounters().getCommand()->load();
+    auto globalDeletesCountAfterUpdate = globalOpCounters().getDelete()->load();
+    auto globalInsertsCountAfterUpdate = globalOpCounters().getInsert()->load();
+    auto globalUpdatesCountAfterUpdate = globalOpCounters().getUpdate()->load();
     ASSERT_EQ(0, globalInsertsCountAfterUpdate - globalInsertsCountBeforeUpdate);
     ASSERT_EQ(0, globalDeletesCountAfterUpdate - globalDeletesCountBeforeUpdate);
     ASSERT_EQ(0, globalCommandsCountAfterUpdate - globalCommandsCountBeforeUpdate);
@@ -340,10 +337,10 @@ TEST_F(WriteOpsRetryability, OpCountersDeleteSuccess) {
     write_ops_exec::WriteResult result = write_ops_exec::performInserts(opCtxRaii.get(), insertOp);
 
     // Test that the delete operation will only increase the delete count.
-    auto globalDeletesCountBeforeDelete = opCounters().getDelete()->load();
-    auto globalInsertsCountBeforeDelete = opCounters().getInsert()->load();
-    auto globalUpdatesCountBeforeDelete = opCounters().getUpdate()->load();
-    auto globalCommandsCountBeforeDelete = opCounters().getCommand()->load();
+    auto globalDeletesCountBeforeDelete = globalOpCounters().getDelete()->load();
+    auto globalInsertsCountBeforeDelete = globalOpCounters().getInsert()->load();
+    auto globalUpdatesCountBeforeDelete = globalOpCounters().getUpdate()->load();
+    auto globalCommandsCountBeforeDelete = globalOpCounters().getCommand()->load();
     write_ops::DeleteCommandRequest deleteOp(nss);
     deleteOp.setDeletes({[&] {
         write_ops::DeleteOpEntry entry;
@@ -353,10 +350,10 @@ TEST_F(WriteOpsRetryability, OpCountersDeleteSuccess) {
     }()});
     result =
         write_ops_exec::performDeletes(opCtxRaii.get(), deleteOp, /*preConditions=*/boost::none);
-    auto globalCommandsCountAfterDelete = opCounters().getCommand()->load();
-    auto globalDeletesCountAfterDelete = opCounters().getDelete()->load();
-    auto globalInsertsCountAfterDelete = opCounters().getInsert()->load();
-    auto globalUpdatesCountAfterDelete = opCounters().getUpdate()->load();
+    auto globalCommandsCountAfterDelete = globalOpCounters().getCommand()->load();
+    auto globalDeletesCountAfterDelete = globalOpCounters().getDelete()->load();
+    auto globalInsertsCountAfterDelete = globalOpCounters().getInsert()->load();
+    auto globalUpdatesCountAfterDelete = globalOpCounters().getUpdate()->load();
     ASSERT_EQ(0, globalInsertsCountAfterDelete - globalInsertsCountBeforeDelete);
     ASSERT_EQ(1, globalDeletesCountAfterDelete - globalDeletesCountBeforeDelete);
     ASSERT_EQ(0, globalCommandsCountAfterDelete - globalCommandsCountBeforeDelete);

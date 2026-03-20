@@ -353,19 +353,20 @@ void AuthCounter::append(BSONObjBuilder* b) {
     b->append("totalEgressAuthenticationTimeMicros", totalEgressAuthenticationTimeMicros);
 }
 
-OpCounters& serviceOpCounters(ClusterRole role) {
-    static StaticImmortal<OpCounters> routerOpCounters;
-    static StaticImmortal<OpCounters> shardOpCounters;
-    if (role.hasExclusively(ClusterRole::RouterServer)) {
-        return *routerOpCounters;
-    }
-    if (role.hasExclusively(ClusterRole::ShardServer)) {
-        return *shardOpCounters;
-    }
-    MONGO_UNREACHABLE;
+namespace {
+OpCounters opCounterInstance;
+OpCounters replOpCounterInstance;
+}  // namespace
+
+OpCounters& globalOpCounters() {
+    return opCounterInstance;
 }
 
-OpCounters replOpCounters;
+OpCounters& replOpCounters() {
+    return replOpCounterInstance;
+}
+
+
 NetworkCounter networkCounter;
 AuthCounter authCounter;
 AggStageCounters aggStageCounters{"aggStageCounters."};

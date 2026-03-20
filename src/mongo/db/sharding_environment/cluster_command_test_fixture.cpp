@@ -409,9 +409,9 @@ void ClusterCommandTestFixture::testIncludeQueryStatsMetrics(BSONObj cmd, bool i
 }
 
 void ClusterCommandTestFixture::testOpcountersAreCorrect(BSONObj cmd, BSONObj expectedMetrics) {
-    serviceOpCounters(ClusterRole::RouterServer).resetForTest();
+    globalOpCounters().resetForTest();
     testNoErrors(cmd);
-    ASSERT_BSONOBJ_EQ(serviceOpCounters(ClusterRole::RouterServer).getObj(), expectedMetrics);
+    ASSERT_BSONOBJ_EQ(globalOpCounters().getObj(), expectedMetrics);
 }
 
 void ClusterCommandTestFixture::appendTxnResponseMetadata(BSONObjBuilder& bob) {

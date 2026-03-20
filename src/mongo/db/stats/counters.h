@@ -189,13 +189,17 @@ private:
     CacheExclusive<AtomicWord<long long>> _queryDeprecated;
 };
 
-OpCounters& serviceOpCounters(ClusterRole role);
-/** Convenience overload to fetch the serviceOpCounters for the role the opCtx is running under. */
-inline OpCounters& serviceOpCounters(OperationContext* opCtx) {
-    return serviceOpCounters(opCtx->getService()->role());
-}
+/**
+ * Process-global op counters. Exposed via a function in case we need to change initialization or
+ * anything later without impacting call sites.
+ */
+OpCounters& globalOpCounters();
 
-extern OpCounters replOpCounters;
+/**
+ * A separate process-global OpCounters instance for tracking replication related ops. Exposed via a
+ * function in case we need to change initialization or anything later without impacting call sites.
+ */
+OpCounters& replOpCounters();
 
 class NetworkCounter {
 public:

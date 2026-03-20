@@ -125,7 +125,7 @@ public:
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
             // Counted as a getMore, not as a command.
-            serviceOpCounters(opCtx).gotGetMore();
+            globalOpCounters().gotGetMore();
 
             Impl::checkCanRunHere(opCtx);
 

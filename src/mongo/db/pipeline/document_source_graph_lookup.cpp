@@ -314,7 +314,7 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
       _variables(expCtx->variables),
       _variablesParseState(expCtx->variablesParseState.copyWith(_variables.useIdGenerator())) {
     if (!getFromNs().isOnInternalDb()) {
-        serviceOpCounters(expCtx->getOperationContext()).gotNestedAggregate();
+        globalOpCounters().gotNestedAggregate();
     }
 
     const auto& resolvedNamespace = getExpCtx()->getResolvedNamespace(getFromNs());
