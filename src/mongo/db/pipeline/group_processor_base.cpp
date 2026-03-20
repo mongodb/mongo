@@ -45,6 +45,22 @@ GroupProcessorBase::GroupProcessorBase(const boost::intrusive_ptr<ExpressionCont
           *expCtx, expCtx->getAllowDiskUse() && !expCtx->getInRouter(), maxMemoryUsageBytes)},
       _groups(expCtx->getValueComparator().makeUnorderedValueMap<Accumulators>()) {}
 
+GroupProcessorBase::GroupProcessorBase(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                       MemoryUsageTracker memoryTracker)
+    : _expCtx(std::move(expCtx)),
+      _memoryTracker(std::move(memoryTracker)),
+      _groups(_expCtx->getValueComparator().makeUnorderedValueMap<Accumulators>()) {}
+
+GroupProcessorBase GroupProcessorBase::makeFreshGroupProcessorBase() const {
+    GroupProcessorBase fresh(_expCtx, _memoryTracker.makeFreshMemoryUsageTracker());
+    fresh._idFieldNames = _idFieldNames;
+    fresh._idExpressions = _idExpressions;
+    fresh._accumulatedFields = _accumulatedFields;
+    fresh._doingMerge = _doingMerge;
+    fresh._willBeMerged = _willBeMerged;
+    return fresh;
+}
+
 void GroupProcessorBase::addAccumulationStatement(AccumulationStatement accumulationStatement) {
     tassert(7801002, "Can't mutate accumulated fields after initialization", !_executionStarted);
     _accumulatedFields.push_back(accumulationStatement);

@@ -52,18 +52,15 @@ public:
                        int64_t maxMemoryUsageBytes);
 
     GroupProcessorBase(GroupProcessorBase&& other) = default;
-    GroupProcessorBase(const GroupProcessorBase& other)
-        : _expCtx(other._expCtx),
-          _idFieldNames(other._idFieldNames),
-          _idExpressions(other._idExpressions),
-          _accumulatedFields(other._accumulatedFields),
-          _accumulatedFieldMemoryTrackers(other._accumulatedFieldMemoryTrackers),
-          _doingMerge(other._doingMerge),
-          _willBeMerged(other._willBeMerged),
-          _memoryTracker(other._memoryTracker.makeFreshMemoryUsageTracker()),
-          _executionStarted(other._executionStarted),
-          _groups(other._groups),
-          _stats(other._stats) {}
+    GroupProcessorBase(const GroupProcessorBase& other) = delete;
+
+    /**
+     * Returns a new GroupProcessorBase with only the configuration fields copied from this
+     * instance. The returned object has fresh (empty) state: no accumulated groups, no stats, and
+     * execution has not started. Use this instead of copy construction to avoid unintentionally
+     * copying potentially large group maps or stale accumulated state.
+     */
+    GroupProcessorBase makeFreshGroupProcessorBase() const;
 
     /**
      * Sets the expression to use to determine the group id of each document.
@@ -247,6 +244,12 @@ protected:
 
     GroupsMap _groups;
     GroupStats _stats;
+
+private:
+    // Constructor used by makeFreshGroupProcessorBase() to create a GroupProcessorBase with a
+    // pre-constructed MemoryUsageTracker (e.g. one created via makeFreshMemoryUsageTracker()).
+    GroupProcessorBase(boost::intrusive_ptr<ExpressionContext> expCtx,
+                       MemoryUsageTracker memoryTracker);
 };
 
 }  // namespace mongo
