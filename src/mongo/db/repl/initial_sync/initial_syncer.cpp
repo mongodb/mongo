@@ -240,7 +240,8 @@ InitialSyncer::InitialSyncer(
       _onCompletion(onCompletion),
       _createClientFn(
           [] { return std::make_unique<DBClientConnection>(true /* autoReconnect */); }),
-      _createOplogFetcherFn(CreateOplogFetcherFn::get()) {
+      _createOplogFetcherFn(CreateOplogFetcherFn::get()),
+      _currentPhase(Phase::kNotStarted) {
     uassert(ErrorCodes::BadValue, "task executor cannot be null", _exec);
     uassert(ErrorCodes::BadValue, "invalid storage interface", _storage);
     uassert(ErrorCodes::BadValue, "invalid replication process", _replicationProcess);
@@ -430,6 +431,9 @@ BSONObj InitialSyncer::getInitialSyncProgress() const {
 void InitialSyncer::_appendInitialSyncProgressMinimal(WithLock lk, BSONObjBuilder* bob) const {
     bob->append("method", "logical");
     _stats.append(bob);
+    if (_currentPhase != Phase::kNotStarted) {
+        bob->append("phase", phaseToString(_currentPhase));
+    }
     if (!_initialSyncState) {
         return;
     }
@@ -541,6 +545,7 @@ void InitialSyncer::waitForCloner_forTest() {
 void InitialSyncer::_setUp(WithLock lk,
                            OperationContext* opCtx,
                            std::uint32_t initialSyncMaxAttempts) {
+
     // 'opCtx' is passed through from startup().
     _replicationProcess->getConsistencyMarkers()->setInitialSyncFlag(opCtx);
     _replicationProcess->getConsistencyMarkers()->clearInitialSyncId(opCtx);
@@ -656,7 +661,8 @@ void InitialSyncer::_startInitialSyncAttemptCallback(
     // Lock guard must be declared after completion guard because completion guard destructor
     // has to run outside lock.
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-
+    _phaseTransitions.clear();
+    _setPhase(lock, Phase::kInitializing);
     _oplogApplier = {};
 
     LOGV2_DEBUG(
@@ -727,6 +733,7 @@ void InitialSyncer::_chooseSyncSourceCallback(
     }
 
     stdx::unique_lock<stdx::mutex> lock(_mutex);
+    _setPhase(lock, Phase::kSelectingSyncSource);
     // Cancellation should be treated the same as other errors. In this case, the most likely cause
     // of a failed _chooseSyncSourceCallback() task is a cancellation triggered by
     // InitialSyncer::shutdown() or the task executor shutting down.
@@ -790,6 +797,7 @@ void InitialSyncer::_chooseSyncSourceCallback(
     // There is no need to schedule separate task to create oplog collection since we are already in
     // a callback and we are certain there's no existing operation context (required for creating
     // collections and dropping user databases) attached to the current thread.
+    _setPhase(lock, Phase::kPreparingStorage);
     status = _truncateOplogAndDropReplicatedDatabases();
     if (!status.isOK()) {
         onCompletionGuard->setResultAndCancelRemainingWork(lock, status);
@@ -859,6 +867,7 @@ Status InitialSyncer::_truncateOplogAndDropReplicatedDatabases() {
 void InitialSyncer::_rollbackCheckerResetCallback(
     const RollbackChecker::Result& result, std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
+    _setPhase(lock, Phase::kCheckingSourceRollback);
     auto status = _checkForShutdownAndConvertStatus(
         lock, result.getStatus(), "error while getting base rollback ID");
     if (!status.isOK()) {
@@ -889,6 +898,7 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForDefaultBeginFetchingOpTime(
     const StatusWith<Fetcher::QueryResponse>& result,
     std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
+    _setPhase(lock, Phase::kDeterminingStartOpTime);
     auto status = _checkForShutdownAndConvertStatus(
         lock, result.getStatus(), "error while getting last oplog entry for begin timestamp");
     if (!status.isOK()) {
@@ -1103,6 +1113,8 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
                                         const OpTime& lastOpTime,
                                         OpTime& beginFetchingOpTime) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
+    _setPhase(lock, Phase::kFetchingFCV);
+
     auto status = _checkForShutdownAndConvertStatus(
         lock, result.getStatus(), "error while getting the remote feature compatibility version");
     if (!status.isOK()) {
@@ -1301,6 +1313,7 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
             // shutdown case.
             onCompletionGuard.reset();
         });
+    _setPhase(lock, Phase::kCloningData);
     lock.unlock();
     // Start (and therefore finish) the cloners outside the lock.  This ensures onCompletion
     // is not run with the mutex held, which would result in self-deadlock.
@@ -1397,6 +1410,8 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
     OpTimeAndWallTime resultOpTimeAndWallTime = {OpTime(), Date_t()};
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
+        _setPhase(lock, Phase::kDeterminingStopTimestamp);
+
         auto status = _checkForShutdownAndConvertStatus(
             lock, result.getStatus(), "error fetching last oplog entry for stop timestamp");
         if (_shouldRetryError(lock, status)) {
@@ -1615,6 +1630,8 @@ void InitialSyncer::_multiApplierCallback(const Status& multiApplierStatus,
                                           std::uint32_t numApplied,
                                           std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
+    _setPhase(lock, Phase::kApplyingOplog);
+
     auto status =
         _checkForShutdownAndConvertStatus(lock, multiApplierStatus, "error applying batch");
 
@@ -1652,6 +1669,8 @@ void InitialSyncer::_multiApplierCallback(const Status& multiApplierStatus,
 void InitialSyncer::_rollbackCheckerCheckForRollbackCallback(
     const RollbackChecker::Result& result, std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
+    _setPhase(lock, Phase::kCheckingFinalRollback);
+
     auto status = _checkForShutdownAndConvertStatus(
         lock, result.getStatus(), "error while getting last rollback ID");
     if (_shouldRetryError(lock, status)) {
@@ -1737,13 +1756,42 @@ void InitialSyncer::_finishInitialSyncAttempt(const StatusWith<OpTimeAndWallTime
         result = Status(ErrorCodes::InternalError, "failAndHangInitialSync fail point enabled");
     }
 
-    _stats.initialSyncAttemptInfos.emplace_back(
-        InitialSyncer::InitialSyncAttemptInfo{runTime,
-                                              result.getStatus(),
-                                              _syncSource,
-                                              rollBackId,
-                                              operationsRetried,
-                                              totalTimeUnreachableMillis});
+    if (result.isOK()) {
+        _setPhase(lock, Phase::kComplete);
+    }
+    // Collect phase durations for stats.
+    //
+    // On success, Phase::kComplete is the last entry, so each phase's end time is
+    // the next phase's start time. The loop stops before kComplete (i < size() - 1),
+    // so kComplete itself is not included.
+    //
+    // On failure, there is no kComplete entry; the last phase's duration runs until now.
+    std::vector<std::pair<Phase, int>> phaseDurations;
+
+    for (size_t i = 0; !_phaseTransitions.empty() && i < _phaseTransitions.size() - 1; i++) {
+        const auto& [phase, startTime] = _phaseTransitions[i];
+        auto endTime = _phaseTransitions[i + 1].second;
+        phaseDurations.emplace_back(phase, durationCount<Milliseconds>(endTime - startTime));
+    }
+    if (!result.isOK() && !_phaseTransitions.empty()) {
+        const auto& [phase, startTime] = _phaseTransitions.back();
+        const auto now = _exec->now();
+
+        phaseDurations.emplace_back(phase, durationCount<Milliseconds>(now - startTime));
+    }
+
+    _stats.initialSyncAttemptInfos.emplace_back(InitialSyncer::InitialSyncAttemptInfo{
+        runTime,
+        result.getStatus(),
+        _syncSource,
+        rollBackId,
+        operationsRetried,
+        totalTimeUnreachableMillis,
+        _currentPhase,
+        static_cast<unsigned>(time(nullptr) - serverGlobalParams.started),
+        std::move(phaseDurations)});
+    _phaseTransitions.clear();
+
 
     if (!result.isOK()) {
         // This increments the number of failed attempts for the current initial sync request.
@@ -1754,6 +1802,21 @@ void InitialSyncer::_finishInitialSyncAttempt(const StatusWith<OpTimeAndWallTime
     }
 
     bool hasRetries = _stats.failedInitialSyncAttempts < _stats.maxFailedInitialSyncAttempts;
+
+    // Capture throughput stats for top level initial sync stats object
+    if (_initialSyncState && _initialSyncState->allDatabaseCloner) {
+        const auto allDbClonerStats = _initialSyncState->allDatabaseCloner->getStats();
+        _stats.approxTotalDataSize = static_cast<std::uint64_t>(allDbClonerStats.dataSize);
+
+        std::uint64_t approxTotalBytesCopied = 0;
+        for (auto&& dbClonerStats : allDbClonerStats.databaseStats) {
+            for (auto&& collClonerStats : dbClonerStats.collectionStats) {
+                approxTotalBytesCopied +=
+                    static_cast<std::uint64_t>(collClonerStats.approxBytesCopied);
+            }
+        }
+        _stats.approxTotalBytesCopied = approxTotalBytesCopied;
+    }
 
     initial_sync_common_stats::LogInitialSyncAttemptStats(
         result, hasRetries, _getInitialSyncProgress(lock));
@@ -2181,7 +2244,9 @@ void InitialSyncer::Stats::append(BSONObjBuilder* builder) const {
                           static_cast<long long>(failedInitialSyncAttempts));
     builder->appendNumber("maxFailedInitialSyncAttempts",
                           static_cast<long long>(maxFailedInitialSyncAttempts));
+    builder->append("totalAttempts", static_cast<long long>(initialSyncAttemptInfos.size()));
 
+    long long elapsedMillis = 0;
     auto e = exec.lock();
     if (initialSyncStart != Date_t()) {
         builder->appendDate("initialSyncStart", initialSyncStart);
@@ -2190,16 +2255,54 @@ void InitialSyncer::Stats::append(BSONObjBuilder* builder) const {
             builder->appendDate("initialSyncEnd", initialSyncEnd);
             elapsedDurationEnd = initialSyncEnd;
         }
-        long long elapsedMillis =
-            duration_cast<Milliseconds>(elapsedDurationEnd - initialSyncStart).count();
+        elapsedMillis = duration_cast<Milliseconds>(elapsedDurationEnd - initialSyncStart).count();
         builder->appendNumber("totalInitialSyncElapsedMillis", elapsedMillis);
     }
+
+    double bytesPerSecond = 0.0;
+    if (elapsedMillis > 0 && approxTotalBytesCopied > 0) {
+        bytesPerSecond = (static_cast<double>(approxTotalBytesCopied) * 1000.0) /
+            static_cast<double>(elapsedMillis);
+    }
+    builder->append("bytesPerSecond", bytesPerSecond);
 
     BSONArrayBuilder arrBuilder(builder->subarrayStart("initialSyncAttempts"));
     for (unsigned int i = 0; i < initialSyncAttemptInfos.size(); ++i) {
         arrBuilder.append(initialSyncAttemptInfos[i].toBSON());
     }
     arrBuilder.doneFast();
+}
+
+StringData InitialSyncer::phaseToString(Phase phase) {
+    switch (phase) {
+        case Phase::kNotStarted:
+            return "notStarted"_sd;
+        case Phase::kUntracked:
+            return "untracked"_sd;
+        case Phase::kInitializing:
+            return "initializing"_sd;
+        case Phase::kSelectingSyncSource:
+            return "selectingSyncSource"_sd;
+        case Phase::kPreparingStorage:
+            return "preparingStorage"_sd;
+        case Phase::kCheckingSourceRollback:
+            return "checkingSourceRollback"_sd;
+        case Phase::kDeterminingStartOpTime:
+            return "determiningStartOpTime"_sd;
+        case Phase::kFetchingFCV:
+            return "fetchingFCV"_sd;
+        case Phase::kCloningData:
+            return "cloningData"_sd;
+        case Phase::kDeterminingStopTimestamp:
+            return "determiningStopTimestamp"_sd;
+        case Phase::kApplyingOplog:
+            return "applyingOplog"_sd;
+        case Phase::kCheckingFinalRollback:
+            return "checkingFinalRollback"_sd;
+        case Phase::kComplete:
+            return "complete"_sd;
+    }
+    MONGO_UNREACHABLE;
 }
 
 BSONObj InitialSyncer::InitialSyncAttemptInfo::toBSON() const {
@@ -2217,6 +2320,16 @@ void InitialSyncer::InitialSyncAttemptInfo::append(BSONObjBuilder* builder) cons
     }
     builder->append("operationsRetried", operationsRetried);
     builder->append("totalTimeUnreachableMillis", totalTimeUnreachableMillis);
+    builder->append("phase", InitialSyncer::phaseToString(phase));
+    builder->appendNumber("nodeUptimeSecs", static_cast<long long>(nodeUptimeSecs));
+    {
+        BSONArrayBuilder arr(builder->subarrayStart("phaseDurations"));
+        for (const auto& [entryPhase, durationMs] : phaseDurations) {
+            BSONObjBuilder entry(arr.subobjStart());
+            entry.append("phase", InitialSyncer::phaseToString(entryPhase));
+            entry.appendNumber("durationMillis", durationMs);
+        }
+    }
 }
 
 bool InitialSyncer::OplogFetcherRestartDecisionInitialSyncer::shouldContinue(OplogFetcher* fetcher,
@@ -2237,5 +2350,12 @@ void InitialSyncer::OplogFetcherRestartDecisionInitialSyncer::fetchSuccessful(
     _defaultDecision.fetchSuccessful(fetcher);
 }
 
+void InitialSyncer::_setPhase(WithLock, Phase phase) {
+    if (_currentPhase == phase) {
+        return;
+    }
+    _currentPhase = phase;
+    _phaseTransitions.emplace_back(phase, _exec->now());
+}
 }  // namespace repl
 }  // namespace mongo

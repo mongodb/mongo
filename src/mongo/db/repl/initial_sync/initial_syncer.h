@@ -117,6 +117,28 @@ public:
      */
     using OnCompletionGuard = CallbackCompletionGuard<StatusWith<OpTimeAndWallTime>>;
 
+    /**
+     * Represents the high-level phase of a logical initial sync attempt.
+     * The string representation of each enumerator is what appears in BSON output and log 21192.
+     */
+    enum class Phase {
+        kNotStarted,
+        kUntracked,  // Used by non-logical sync implementations that do not track phases.
+        kInitializing,
+        kSelectingSyncSource,
+        kPreparingStorage,
+        kCheckingSourceRollback,
+        kDeterminingStartOpTime,
+        kFetchingFCV,
+        kCloningData,
+        kDeterminingStopTimestamp,
+        kApplyingOplog,
+        kCheckingFinalRollback,
+        kComplete,
+    };
+
+    static StringData phaseToString(Phase phase);
+
     struct InitialSyncAttemptInfo {
         int durationMillis;
         Status status;
@@ -124,6 +146,9 @@ public:
         int rollBackId;
         int operationsRetried;
         int totalTimeUnreachableMillis;
+        Phase phase;
+        unsigned nodeUptimeSecs;
+        std::vector<std::pair<Phase, int>> phaseDurations;  // {phase, durationMillis}
 
         BSONObj toBSON() const;
         void append(BSONObjBuilder* builder) const;
@@ -154,6 +179,10 @@ public:
     struct Stats {
         std::uint32_t failedInitialSyncAttempts{0};
         std::uint32_t maxFailedInitialSyncAttempts{0};
+
+        std::uint64_t approxTotalDataSize{0};
+        std::uint64_t approxTotalBytesCopied{0};
+
         Date_t initialSyncStart;
         Date_t initialSyncEnd;
         std::vector<InitialSyncer::InitialSyncAttemptInfo> initialSyncAttemptInfos;
@@ -730,6 +759,15 @@ private:
 
     // The initial sync attempt has been canceled
     bool _attemptCanceled = false;  // (X)
+
+    // Current phase of initial sync.
+    Phase _currentPhase;  // (M)
+
+    // Records {phase, entryTime} for each phase in the current attempt. (M)
+    std::vector<std::pair<Phase, Date_t>> _phaseTransitions;  // (M)
+
+    // Sets _currentPhase and records the transition timestamp. Caller must hold _mutex.
+    void _setPhase(WithLock, Phase phase);
 };
 
 }  // namespace repl

@@ -4525,7 +4525,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
         auto progress = initialSyncer->getInitialSyncProgress();
         LOGV2(24168, "Progress after first failed response", "progress"_attr = progress);
-        ASSERT_EQUALS(progress.nFields(), 12) << progress;
+        ASSERT_EQUALS(progress.nFields(), 15) << progress;
         ASSERT_EQUALS(progress.getField("method").String(), "logical") << progress;
         ASSERT_FALSE(progress.hasField("remainingInitialSyncEstimatedMillis"));
         ASSERT_FALSE(progress.hasField("InitialSyncEnd"));
@@ -4542,6 +4542,9 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
         ASSERT_BSONOBJ_EQ(progress.getObjectField("databases"),
                           BSON("databasesToClone" << 0 << "databasesCloned" << 0));
         ASSERT_EQUALS(progress.getIntField("totalTimeUnreachableMillis"), 0);
+        ASSERT_EQUALS(progress.getStringField("phase"),
+                      InitialSyncer::phaseToString(InitialSyncer::Phase::kCloningData))
+            << progress;
 
         // Inject the listDatabases failure.
         _mockServer->setCommandReply(
@@ -4595,7 +4598,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
         auto progress = initialSyncer->getInitialSyncProgress();
         LOGV2(24171, "Progress after failure", "progress"_attr = progress);
-        ASSERT_EQUALS(progress.nFields(), 12) << progress;
+        ASSERT_EQUALS(progress.nFields(), 15) << progress;
         ASSERT_FALSE(progress.hasField("remainingInitialSyncEstimatedMillis"));
         ASSERT_FALSE(progress.hasField("InitialSyncEnd"));
         ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1) << progress;
@@ -4610,11 +4613,14 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
         ASSERT_BSONOBJ_EQ(progress.getObjectField("databases"),
                           BSON("databasesToClone" << 0 << "databasesCloned" << 0));
         ASSERT_EQUALS(progress.getIntField("totalTimeUnreachableMillis"), 0);
+        ASSERT_EQUALS(progress.getStringField("phase"),
+                      InitialSyncer::phaseToString(InitialSyncer::Phase::kCloningData))
+            << progress;
 
         BSONObj attempts = progress["initialSyncAttempts"].Obj();
         ASSERT_EQUALS(attempts.nFields(), 1) << attempts;
         BSONObj attempt0 = attempts["0"].Obj();
-        ASSERT_EQUALS(attempt0.nFields(), 6) << attempt0;
+        ASSERT_EQUALS(attempt0.nFields(), 9) << attempt0;
         const std::string expectedlistDatabaseFailure =
             "FailedToParse: error cloning databases :: caused by :: Command 'listDatabases' "
             "failed.";
@@ -4628,6 +4634,9 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
         ASSERT_EQUALS(attempt0.getIntField("rollBackId"), 1) << attempt0;
         ASSERT_EQUALS(attempt0.getIntField("operationsRetried"), 0) << attempt0;
         ASSERT_EQUALS(attempt0.getIntField("totalTimeUnreachableMillis"), 0) << attempt0;
+        ASSERT_EQUALS(attempt0.getStringField("phase"),
+                      InitialSyncer::phaseToString(InitialSyncer::Phase::kCloningData))
+            << attempt0;
 
         // Set up the successful cloner run.
         // listDatabases: a
@@ -4699,7 +4708,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
     auto progress = initialSyncer->getInitialSyncProgress();
     LOGV2(24173, "Progress after all but last successful response", "progress"_attr = progress);
-    ASSERT_EQUALS(progress.nFields(), 14) << progress;
+    ASSERT_EQUALS(progress.nFields(), 17) << progress;
     ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1) << progress;
     ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
     ASSERT_EQUALS(progress["totalInitialSyncElapsedMillis"].type(), BSONType::numberInt)
@@ -4734,7 +4743,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     auto attempts = progress["initialSyncAttempts"].Obj();
     ASSERT_EQUALS(attempts.nFields(), 1) << progress;
     auto attempt0 = attempts["0"].Obj();
-    ASSERT_EQUALS(attempt0.nFields(), 6) << attempt0;
+    ASSERT_EQUALS(attempt0.nFields(), 9) << attempt0;
     const std::string expectedlistDatabaseFailure =
         "FailedToParse: error cloning databases :: caused by :: Command 'listDatabases' failed.";
     ASSERT_EQUALS(std::string(attempt0.getStringField("status"))
@@ -4747,6 +4756,9 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     ASSERT_EQUALS(attempt0.getIntField("rollBackId"), 1) << attempt0;
     ASSERT_EQUALS(attempt0.getIntField("operationsRetried"), 0) << attempt0;
     ASSERT_EQUALS(attempt0.getIntField("totalTimeUnreachableMillis"), 0) << attempt0;
+    ASSERT_EQUALS(attempt0.getStringField("phase"),
+                  InitialSyncer::phaseToString(InitialSyncer::Phase::kCloningData))
+        << attempt0;
 
     // Play last successful response.
     {
@@ -4777,7 +4789,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
     progress = initialSyncer->getInitialSyncProgress();
     LOGV2(24175, "Progress at end", "progress"_attr = progress);
-    ASSERT_EQUALS(progress.nFields(), 15) << progress;
+    ASSERT_EQUALS(progress.nFields(), 18) << progress;
     ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1) << progress;
     ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
     ASSERT_EQUALS(progress["initialSyncStart"].type(), BSONType::date) << progress;
@@ -4796,12 +4808,15 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     ASSERT_EQUALS(progress.getIntField("approxTotalBytesCopied"), 10) << progress;
     // Expected applied ops to be a superset of this range: Timestamp(2,1) ... Timestamp(7,1).
     ASSERT_GREATER_THAN_OR_EQUALS(progress.getIntField("appliedOps"), 6) << progress;
+    ASSERT_EQUALS(progress.getStringField("phase"),
+                  InitialSyncer::phaseToString(InitialSyncer::Phase::kComplete))
+        << progress;
 
     attempts = progress["initialSyncAttempts"].Obj();
     ASSERT_EQUALS(attempts.nFields(), 2) << attempts;
 
     attempt0 = attempts["0"].Obj();
-    ASSERT_EQUALS(attempt0.nFields(), 6) << attempt0;
+    ASSERT_EQUALS(attempt0.nFields(), 9) << attempt0;
     ASSERT_EQUALS(std::string(attempt0.getStringField("status"))
                       .substr(0, expectedlistDatabaseFailure.length()),
                   expectedlistDatabaseFailure)
@@ -4812,9 +4827,12 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     ASSERT_EQUALS(attempt0.getIntField("rollBackId"), 1) << attempt0;
     ASSERT_EQUALS(attempt0.getIntField("operationsRetried"), 0) << attempt0;
     ASSERT_EQUALS(attempt0.getIntField("totalTimeUnreachableMillis"), 0) << attempt0;
+    ASSERT_EQUALS(attempt0.getStringField("phase"),
+                  InitialSyncer::phaseToString(InitialSyncer::Phase::kCloningData))
+        << attempt0;
 
     BSONObj attempt1 = attempts["1"].Obj();
-    ASSERT_EQUALS(attempt1.nFields(), 6) << attempt1;
+    ASSERT_EQUALS(attempt1.nFields(), 9) << attempt1;
     ASSERT_EQUALS(attempt1.getStringField("status"), std::string("OK")) << attempt1;
     ASSERT_EQUALS(attempt1["durationMillis"].type(), BSONType::numberInt) << attempt1;
     ASSERT_EQUALS(attempt1.getStringField("syncSource"), std::string("localhost:27017"))
@@ -4822,6 +4840,9 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     ASSERT_EQUALS(attempt1.getIntField("rollBackId"), 1) << attempt1;
     ASSERT_EQUALS(attempt1.getIntField("operationsRetried"), 0) << attempt1;
     ASSERT_EQUALS(attempt1.getIntField("totalTimeUnreachableMillis"), 0) << attempt1;
+    ASSERT_EQUALS(attempt1.getStringField("phase"),
+                  InitialSyncer::phaseToString(InitialSyncer::Phase::kComplete))
+        << attempt1;
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(net);
@@ -5074,6 +5095,111 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressOmitsClonerStatsIfClonerStatsExc
     executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
 
     initialSyncer->join();
+}
+
+// Tests that the 'phase' field in getInitialSyncProgress() correctly reflects
+// the running phase while initial sync is active.
+TEST_F(InitialSyncerTest, GetInitialSyncProgressShowsCurrentPhase) {
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+
+    auto net = getNet();
+    {
+        FailPointEnableBlock clonerFailpoint("hangBeforeClonerStage", kListDatabasesFailPointData);
+        {
+            executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+            // Base rollback ID.
+            net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+
+            // Oplog entry associated with the defaultBeginFetchingTimestamp.
+            processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+            // Send an empty optime as the response to the beginFetchingOptime find request, which
+            // will cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
+            auto request = net->scheduleSuccessfulResponse(makeCursorResponse(
+                0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+            assertRemoteCommandNameEquals("find", request);
+            net->runReadyNetworkOperations();
+
+            // Oplog entry associated with the beginApplyingTimestamp.
+            processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+            // Feature Compatibility Version.
+            processSuccessfulFCVFetcherResponseLastLTS();
+
+            // Deliver cancellation to OplogFetcher.
+            net->runReadyNetworkOperations();
+        }
+
+        // While paused inside the cloner stage, the progress should report
+        // "cloningData" as the current phase.
+        auto progress = initialSyncer->getInitialSyncProgress();
+        ASSERT_EQUALS(progress.getStringField("phase"),
+                      InitialSyncer::phaseToString(InitialSyncer::Phase::kCloningData))
+            << progress;
+
+        // Shut down initial sync while the cloner failpoint is still active.
+        ASSERT_OK(initialSyncer->shutdown());
+    }
+
+    executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
+    initialSyncer->join();
+
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
+}
+
+// Tests that when an initial sync attempt fails, the 'phase' field in the
+// InitialSyncAttemptInfo correctly records the phase in which the failure
+// occurred.
+TEST_F(InitialSyncerTest, InitialSyncAttemptInfoRecordsPhaseAtFailure) {
+    // Verify that the phase in effect when an attempt fails is recorded in the
+    // attempt info. We fail during the "cloningData" phase so that
+    // _initialSyncState is non-null at the time of failure, making
+    // getInitialSyncProgress() return the full progress object.
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+
+    _mock
+        ->expect(
+            BSON("find" << "oplog.rs"),
+            makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+        .times(2);
+
+    // FCV response.
+    _mock
+        ->expect([](auto& request) { return request["find"].str() == "system.version"; },
+                 makeCursorResponse(
+                     0LL, NamespaceString::kServerConfigurationNamespace, {getLastLTSBson()}))
+        .times(1);
+
+    // Pause the cloner so we can simulate an OplogFetcher error while cloning is active.
+    FailPointEnableBlock clonerFailpoint("hangAfterClonerStage", kListDatabasesFailPointData);
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+    _mock->runUntilExpectationsSatisfied();
+
+    // Simulate an error in the OplogFetcher while the cloner is paused.
+    // The "cloningData" phase should be captured in the attempt info.
+    getOplogFetcher()->simulateResponseError(
+        Status(ErrorCodes::OperationFailed, "oplog fetcher failed during cloning"));
+
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+
+    // The attempt info should record the "cloningData" phase.
+    auto progress = initialSyncer->getInitialSyncProgress();
+    ASSERT_FALSE(progress.isEmpty()) << "expected progress to be non-empty after failure";
+    BSONObj attempts = progress["initialSyncAttempts"].Obj();
+    ASSERT_EQUALS(attempts.nFields(), 1) << attempts;
+    BSONObj attempt0 = attempts["0"].Obj();
+    ASSERT_EQUALS(attempt0.getStringField("phase"),
+                  InitialSyncer::phaseToString(InitialSyncer::Phase::kCloningData))
+        << attempt0;
 }
 
 }  // namespace
