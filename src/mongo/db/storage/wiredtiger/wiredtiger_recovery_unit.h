@@ -61,6 +61,8 @@
 
 namespace mongo {
 
+class WiredTigerKVEngineBase;
+
 using RoundUpPreparedTimestamps = WiredTigerBeginTxnBlock::RoundUpPreparedTimestamps;
 using RoundUpReadTimestamp = WiredTigerBeginTxnBlock::RoundUpReadTimestamp;
 
@@ -238,6 +240,7 @@ private:
 
     void _abort();
     void _commit();
+    void _commitAndPublishTables(WiredTigerKVEngineBase* kvEngine, Timestamp commitTime);
 
     void _ensureSession();
     void _txnClose(bool commit);

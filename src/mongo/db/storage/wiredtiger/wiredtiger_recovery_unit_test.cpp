@@ -61,6 +61,7 @@
 
 #include <wiredtiger.h>
 
+#include "gmock/gmock.h"
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -68,9 +69,10 @@
 namespace mongo {
 namespace {
 
-class WiredTigerRecoveryUnitHarnessHelper final : public RecoveryUnitHarnessHelper {
+template <typename EngineT = WiredTigerKVEngine>
+class WiredTigerRecoveryUnitHarnessHelperT final : public RecoveryUnitHarnessHelper {
 public:
-    WiredTigerRecoveryUnitHarnessHelper() : _dbpath("wt_test") {
+    WiredTigerRecoveryUnitHarnessHelperT() : _dbpath("wt_test") {
         auto& provider =
             rss::ReplicatedStorageService::get(serviceContext()).getPersistenceProvider();
         WiredTigerKVEngineBase::WiredTigerConfig wtConfig =
@@ -79,22 +81,21 @@ public:
 
         // Use a replica set so that writes to replicated collections are not journaled and thus
         // retain their timestamps.
-        _engine =
-            std::make_unique<WiredTigerKVEngine>(std::string{kWiredTigerEngineName},
-                                                 _dbpath.path(),
-                                                 &_cs,
-                                                 std::move(wtConfig),
-                                                 WiredTigerExtensions::get(serviceContext()),
-                                                 provider,
-                                                 false /* repair */,
-                                                 true /* isReplSet */,
-                                                 false /* shouldRecoverFromOplogAsStandalone */,
-                                                 false /* inStandaloneMode */);
+        _engine = std::make_unique<EngineT>(std::string{kWiredTigerEngineName},
+                                            _dbpath.path(),
+                                            &_cs,
+                                            std::move(wtConfig),
+                                            WiredTigerExtensions::get(serviceContext()),
+                                            provider,
+                                            false /* repair */,
+                                            true /* isReplSet */,
+                                            false /* shouldRecoverFromOplogAsStandalone */,
+                                            false /* inStandaloneMode */);
 
         _engine->notifyStorageStartupRecoveryComplete();
     }
 
-    ~WiredTigerRecoveryUnitHarnessHelper() override {
+    ~WiredTigerRecoveryUnitHarnessHelperT() override {
 #if __has_feature(address_sanitizer)
         constexpr bool memLeakAllowed = false;
 #else
@@ -121,7 +122,7 @@ public:
         return _engine->getRecordStore(opCtx, nss, ident, RecordStore::Options{}, UUID::gen());
     }
 
-    WiredTigerKVEngine* getEngine() {
+    EngineT* getEngine() {
         return _engine.get();
     }
 
@@ -132,8 +133,10 @@ public:
 private:
     unittest::TempDir _dbpath;
     ClockSourceMock _cs;
-    std::unique_ptr<WiredTigerKVEngine> _engine;
+    std::unique_ptr<EngineT> _engine;
 };
+
+using WiredTigerRecoveryUnitHarnessHelper = WiredTigerRecoveryUnitHarnessHelperT<>;
 
 std::unique_ptr<RecoveryUnitHarnessHelper> makeWTRUHarnessHelper() {
     return std::make_unique<WiredTigerRecoveryUnitHarnessHelper>();
@@ -142,6 +145,7 @@ std::unique_ptr<RecoveryUnitHarnessHelper> makeWTRUHarnessHelper() {
 MONGO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {
     mongo::registerRecoveryUnitHarnessHelperFactory(makeWTRUHarnessHelper);
 }
+
 
 class WiredTigerRecoveryUnitTestFixture : public unittest::Test {
 public:
@@ -169,6 +173,10 @@ public:
         invariantWTOK(session.open_cursor(wt_uri, nullptr, nullptr, &cursor), session);
     }
 
+    WiredTigerKVEngine* getEngine() {
+        return static_cast<WiredTigerRecoveryUnitHarnessHelper*>(harnessHelper.get())->getEngine();
+    }
+
     void setUp() override {
         harnessHelper = std::make_unique<WiredTigerRecoveryUnitHarnessHelper>();
         clientAndCtx1 = makeClientAndOpCtx(harnessHelper.get(), "writer");
@@ -179,11 +187,11 @@ public:
         ru2 = checked_cast<WiredTigerRecoveryUnit*>(
             shard_role_details::getRecoveryUnit(clientAndCtx2.second.get()));
         ru2->setOperationContext(clientAndCtx2.second.get());
-        snapshotManager = static_cast<WiredTigerSnapshotManager*>(
-            harnessHelper->getEngine()->getSnapshotManager());
+        snapshotManager =
+            static_cast<WiredTigerSnapshotManager*>(getEngine()->getSnapshotManager());
     }
 
-    std::unique_ptr<WiredTigerRecoveryUnitHarnessHelper> harnessHelper;
+    std::unique_ptr<RecoveryUnitHarnessHelper> harnessHelper;
     ClientAndCtx clientAndCtx1, clientAndCtx2;
     WiredTigerRecoveryUnit *ru1, *ru2;
     WiredTigerSnapshotManager* snapshotManager;
@@ -490,7 +498,7 @@ DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixtureDeathTest,
                    PrepareTimestampOlderThanStableTimestamp,
                    "prepare timestamp .* is not newer than the stable timestamp") {
     ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
-    harnessHelper->getEngine()->setStableTimestamp({2, 1}, false);
+    getEngine()->setStableTimestamp({2, 1}, false);
     ru1->setPrepareTimestamp({1, 1});
     // It is illegal to set the prepare timestamp older than the stable timestamp.
     ru1->prepareUnitOfWork();
@@ -501,7 +509,7 @@ DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixtureDeathTest,
                    "commit timestamp .* is less than the prepare timestamp") {
     ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
     ru1->setDurableTimestamp({4, 1});  // Newer than the prepare timestamp.
-    harnessHelper->getEngine()->setStableTimestamp({2, 1}, false);
+    getEngine()->setStableTimestamp({2, 1}, false);
     ru1->setPrepareTimestamp({3, 1});  // Newer than the stable timestamp.
     ru1->prepareUnitOfWork();
     ru1->setCommitTimestamp({1, 1});
@@ -514,7 +522,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, RoundUpPreparedTimestamps) {
     RecoveryUnit::OpenSnapshotOptions roundUp{.roundUpPreparedTimestamps = true};
     ru1->preallocateSnapshot(roundUp);
     ru1->setDurableTimestamp({4, 1});
-    harnessHelper->getEngine()->setStableTimestamp({3, 1}, false);
+    getEngine()->setStableTimestamp({3, 1}, false);
     // Check setting a prepared transaction timestamp earlier than the
     // stable timestamp is valid with roundUpPreparedTimestamps option.
     ru1->setPrepareTimestamp({2, 1});
@@ -1181,6 +1189,98 @@ DEATH_TEST_F(WiredTigerRecoveryUnitTestFixtureDeathTest,
 
     ru1->pinReadSource();
     ru1->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
+}
+
+/**
+ * A WiredTigerKVEngine subclass that allows overriding shouldTimestampTableCreations() and
+ * mocking publishIdent() for testing the recovery unit's commit/abort behavior.
+ */
+class MockWiredTigerKVEngine : public WiredTigerKVEngine {
+public:
+    using WiredTigerKVEngine::WiredTigerKVEngine;
+
+    bool shouldTimestampTableCreations() const override {
+        return _shouldTimestampTableCreations;
+    }
+
+    MOCK_METHOD(void,
+                publishIdent,
+                (WiredTigerRecoveryUnit & ru, StringData ident, Timestamp publishTimestamp),
+                (override));
+
+    bool _shouldTimestampTableCreations = false;
+};
+
+class WiredTigerRecoveryUnitPublishTableCreationTest : public WiredTigerRecoveryUnitTestFixture {
+public:
+    void setUp() override {
+        harnessHelper =
+            std::make_unique<WiredTigerRecoveryUnitHarnessHelperT<MockWiredTigerKVEngine>>();
+
+        clientAndCtx1 = makeClientAndOpCtx(harnessHelper.get(), "test");
+        ru1 = checked_cast<WiredTigerRecoveryUnit*>(
+            shard_role_details::getRecoveryUnit(clientAndCtx1.second.get()));
+        ru1->setOperationContext(clientAndCtx1.second.get());
+    }
+
+    MockWiredTigerKVEngine* mockEngine() {
+        return static_cast<WiredTigerRecoveryUnitHarnessHelperT<MockWiredTigerKVEngine>*>(
+                   harnessHelper.get())
+            ->getEngine();
+    }
+};
+
+TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest,
+       CommitCallsPublishWhenTimestampTableCreationsEnabled) {
+    mockEngine()->_shouldTimestampTableCreations = true;
+
+    {
+        EXPECT_CALL(*mockEngine(), publishIdent(testing::_, testing::_, Timestamp(2, 0))).Times(1);
+        StorageWriteTransaction txn(*ru1);
+        ASSERT_OK(ru1->setTimestamp(Timestamp(2, 0)));
+        ru1->onCreateTable("my-table");
+        txn.commit();
+    }
+
+    // A subsequent WUOW should not see stale _createdTables from the prior commit.
+    EXPECT_CALL(*mockEngine(), publishIdent(testing::_, testing::_, testing::_)).Times(0);
+
+    {
+        StorageWriteTransaction txn(*ru1);
+        ASSERT_OK(ru1->setTimestamp(Timestamp(3, 0)));
+        txn.commit();
+    }
+}
+
+TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest, AbortDoesNotCallPublish) {
+    mockEngine()->_shouldTimestampTableCreations = true;
+
+    EXPECT_CALL(*mockEngine(), publishIdent(testing::_, testing::_, testing::_)).Times(0);
+
+    {
+        StorageWriteTransaction txn(*ru1);
+        ru1->onCreateTable("my-table");
+        // txn goes out of scope without commit, triggering abort.
+    }
+
+    // A subsequent WUOW should not see stale _createdTables from the prior abort.
+    {
+        StorageWriteTransaction txn(*ru1);
+        ASSERT_OK(ru1->setTimestamp(Timestamp(2, 0)));
+        txn.commit();
+    }
+}
+
+TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest,
+       CommitDoesNotCallPublishWhenTimestampTableCreationsDisabled) {
+    mockEngine()->_shouldTimestampTableCreations = false;
+
+    EXPECT_CALL(*mockEngine(), publishIdent(testing::_, testing::_, testing::_)).Times(0);
+
+    StorageWriteTransaction txn(*ru1);
+    ASSERT_OK(ru1->setTimestamp(Timestamp(2, 0)));
+    ru1->onCreateTable("my-table");
+    txn.commit();
 }
 
 }  // namespace

@@ -239,6 +239,18 @@ mongo_cc_benchmark(
 )
 
 mongo_cc_benchmark(
+    name = "wiredtiger_all_durable_timestamp_bm",
+    srcs = [
+        "wiredtiger_all_durable_timestamp_bm.cpp",
+    ],
+    tags = ["storage_bm"],
+    deps = [
+        ":storage_wiredtiger_core",
+        "//src/mongo/db:service_context_d_test_fixture",
+    ],
+)
+
+mongo_cc_benchmark(
     name = "write_conflict_retry_bm",
     srcs = [
         "write_conflict_retry_bm.cpp",

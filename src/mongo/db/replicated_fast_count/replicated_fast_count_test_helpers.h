@@ -126,6 +126,10 @@ class ReplicatedFastCountTestPersistenceProvider : public rss::StubPersistencePr
     bool supportsColdCollections() const override {
         return false;
     }
+
+    bool shouldTimestampTableCreations() const override {
+        return false;
+    }
 };
 
 /**

@@ -48,6 +48,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
@@ -144,6 +145,33 @@ WiredTigerRecoveryUnit::~WiredTigerRecoveryUnit() {
     }
 }
 
+void WiredTigerRecoveryUnit::_commitAndPublishTables(WiredTigerKVEngineBase* kvEngine,
+                                                     Timestamp commitTime) {
+    {
+        // Pin the all_durable timestamp before committing to prevent the stable timestamp from
+        // advancing past our commit timestamp before we can publish the tables.
+        const uint64_t pinnedTs = kvEngine->getRawAllDurableTimestamp();
+        kvEngine->pinAllDurableTimestamp(pinnedTs);
+        ON_BLOCK_EXIT([&] { kvEngine->unpinAllDurableTimestamp(pinnedTs); });
+
+        _txnClose(true);
+
+        // After a successful commit, publish all tables created in this transaction so that
+        // they will be included in checkpoints at or after the commit timestamp.
+        for (const auto& table : _createdTables) {
+            kvEngine->publishIdent(*this, table, commitTime);
+        }
+    }
+
+    // Re-trigger the oplog visibility update now that the all_durable pin has been released. The
+    // initial trigger inside _txnClose() fires while the pin is still held, so the visibility
+    // thread may read a stale (pinned) all_durable value and skip the update. This second trigger
+    // ensures the visibility thread re-reads the true all_durable.
+    if (_oplogManager) {
+        _oplogManager->triggerOplogVisibilityUpdate();
+    }
+}
+
 void WiredTigerRecoveryUnit::_commit() {
     // Since we cannot have both a _lastTimestampSet and a _commitTimestamp, we set the
     // commit time as whichever is non-empty. If both are empty, then _lastTimestampSet will
@@ -152,7 +180,16 @@ void WiredTigerRecoveryUnit::_commit() {
 
     bool notifyDone = !_prepareTimestamp.isNull();
     if (_session && _isActive()) {
-        _txnClose(true);
+        // In disaggregated storage mode, if this transaction created tables and has a timestamp,
+        // pin all_durable before committing to prevent stable from advancing past our commit
+        // timestamp before we can publish the tables.
+        auto* kvEngine = _connection->getKVEngine();
+        if (!_createdTables.empty() && commitTime && !commitTime->isNull() &&
+            kvEngine->shouldTimestampTableCreations()) {
+            _commitAndPublishTables(kvEngine, *commitTime);
+        } else {
+            _txnClose(true);
+        }
     }
     _setState(State::kCommitting);
 
@@ -162,6 +199,7 @@ void WiredTigerRecoveryUnit::_commit() {
 
     commitRegisteredChanges(commitTime);
     _setState(State::kInactive);
+    _createdTables.clear();
 }
 
 void WiredTigerRecoveryUnit::_abort() {

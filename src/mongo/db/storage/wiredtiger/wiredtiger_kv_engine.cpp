@@ -649,6 +649,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
       _shouldRecoverFromOplogAsStandalone(shouldRecoverFromOplogAsStandalone),
       _inStandaloneMode(inStandaloneMode),
       _supportsTableLogging(provider.supportsTableLogging()),
+      _shouldTimestampTableCreations(provider.shouldTimestampTableCreations()),
       _provider(provider) {
     _pinnedOplogTimestamp.store(Timestamp::max().asULL());
     boost::filesystem::path journalPath = path;
@@ -2634,7 +2635,7 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(Interruptible
     return {stableTimestamp};
 }
 
-Timestamp WiredTigerKVEngine::getAllDurableTimestamp() const {
+uint64_t WiredTigerKVEngine::getRawAllDurableTimestamp() const {
     // Fetch the latest all_durable value from the storage engine. This value will be a
     // timestamp that has no holes (uncommitted transactions with lower timestamps) behind it.
     char buf[(2 * 8 /* bytes in hex */) + 1 /* null terminator */];
@@ -2642,10 +2643,38 @@ Timestamp WiredTigerKVEngine::getAllDurableTimestamp() const {
 
     uint64_t ts;
     fassert(38002, NumberParser{}.base(16)(buf, &ts));
+    return ts;
+}
 
+Timestamp WiredTigerKVEngine::getAllDurableTimestamp() const {
+    auto ts = getRawAllDurableTimestamp();
+    ts = std::min(ts, _minPinnedTimestamp.load());
     // If all_durable is 0, treat this as lowest possible timestamp; we need to see all
     // pre-existing data but no new (timestamped) data.
     return Timestamp{ts == 0 ? StorageEngine::kMinimumTimestamp : ts};
+}
+
+void WiredTigerKVEngine::pinAllDurableTimestamp(uint64_t ts) {
+    stdx::lock_guard<stdx::mutex> lock(_allDurablePinMutex);
+    _pinnedAllDurableTimestamps.insert(ts);
+    _minPinnedTimestamp.store(*_pinnedAllDurableTimestamps.begin());
+}
+
+void WiredTigerKVEngine::unpinAllDurableTimestamp(uint64_t ts) {
+    stdx::lock_guard<stdx::mutex> lock(_allDurablePinMutex);
+    auto it = _pinnedAllDurableTimestamps.find(ts);
+    invariant(it != _pinnedAllDurableTimestamps.end());
+    _pinnedAllDurableTimestamps.erase(it);
+    _minPinnedTimestamp.store(_pinnedAllDurableTimestamps.empty()
+                                  ? std::numeric_limits<uint64_t>::max()
+                                  : *_pinnedAllDurableTimestamps.begin());
+}
+
+void WiredTigerKVEngine::publishIdent(WiredTigerRecoveryUnit& ru,
+                                      StringData ident,
+                                      Timestamp publishTimestamp) {
+    // TODO: SERVER-122163: Call WT session->publish(uri, ts) when the API is available.
+    LOGV2_DEBUG(11928700, 1, "publishIdent", "ident"_attr = ident, "ts"_attr = publishTimestamp);
 }
 
 boost::optional<Timestamp> WiredTigerKVEngine::getRecoveryTimestamp() const {

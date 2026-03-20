@@ -1402,5 +1402,64 @@ DEATH_TEST_F(WiredTigerKVEngineTestWithPreciseCheckpointsDeathTest,
     // claiming the prepared transaction results in a crash.
 }
 
+TEST_F(WiredTigerKVEngineTest, PinAllDurableTimestamp) {
+    auto* engine = _helper->getWiredTigerKVEngine();
+
+    engine->setInitialDataTimestamp(Timestamp(1, 0));
+    engine->setOldestTimestamp(Timestamp(1, 0), /*force=*/false);
+    engine->setStableTimestamp(Timestamp(5, 0), /*force=*/false);
+
+    auto opCtx = _makeOperationContext();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+
+    // Do a timestamped write so all_durable advances past 0.
+    {
+        StorageWriteTransaction txn(ru);
+        ASSERT_OK(ru.setTimestamp(Timestamp(100, 0)));
+        txn.commit();
+    }
+
+    // Pin at the current all_durable.
+    auto pinnedTs = engine->getRawAllDurableTimestamp();
+    engine->pinAllDurableTimestamp(pinnedTs);
+
+    // Advance the raw all_durable with another timestamped write.
+    {
+        StorageWriteTransaction txn(ru);
+        ASSERT_OK(ru.setTimestamp(Timestamp(200, 0)));
+        txn.commit();
+    }
+
+    // The raw value advanced, but getAllDurableTimestamp() should still reflect the pin.
+    ASSERT_GTE(engine->getRawAllDurableTimestamp(), Timestamp(200, 0).asULL());
+    ASSERT_EQ(engine->getAllDurableTimestamp(), Timestamp(pinnedTs));
+
+    // A second pin at a higher value; the minimum pin should still win.
+    auto secondPinTs = Timestamp(200, 0).asULL();
+    engine->pinAllDurableTimestamp(secondPinTs);
+    ASSERT_EQ(engine->getAllDurableTimestamp(), Timestamp(pinnedTs));
+
+    // Removing the lower pin leaves the higher one in effect.
+    engine->unpinAllDurableTimestamp(pinnedTs);
+    ASSERT_EQ(engine->getAllDurableTimestamp(), Timestamp(200, 0));
+
+    // Duplicate pin at the same value requires two unpins.
+    engine->pinAllDurableTimestamp(secondPinTs);
+    engine->unpinAllDurableTimestamp(secondPinTs);
+    ASSERT_EQ(engine->getAllDurableTimestamp(), Timestamp(200, 0));
+
+    // Advance again past the remaining pin.
+    {
+        StorageWriteTransaction txn(ru);
+        ASSERT_OK(ru.setTimestamp(Timestamp(300, 0)));
+        txn.commit();
+    }
+    ASSERT_EQ(engine->getAllDurableTimestamp(), Timestamp(200, 0));
+
+    // Removing the last pin lets getAllDurableTimestamp() catch up.
+    engine->unpinAllDurableTimestamp(secondPinTs);
+    ASSERT_GTE(engine->getAllDurableTimestamp(), Timestamp(300, 0));
+}
+
 }  // namespace
 }  // namespace mongo

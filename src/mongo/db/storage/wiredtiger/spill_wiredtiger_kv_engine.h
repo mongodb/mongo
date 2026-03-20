@@ -203,6 +203,28 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    bool shouldTimestampTableCreations() const override {
+        return false;
+    }
+
+    uint64_t getRawAllDurableTimestamp() const override {
+        MONGO_UNREACHABLE;
+    }
+
+    void pinAllDurableTimestamp(uint64_t ts) override {
+        MONGO_UNREACHABLE;
+    }
+
+    void unpinAllDurableTimestamp(uint64_t ts) override {
+        MONGO_UNREACHABLE;
+    }
+
+    void publishIdent(WiredTigerRecoveryUnit& ru,
+                      StringData ident,
+                      Timestamp publishTimestamp) override {
+        MONGO_UNREACHABLE;
+    }
+
     void cleanShutdown(bool memLeakAllowed) override;
 
 private:
