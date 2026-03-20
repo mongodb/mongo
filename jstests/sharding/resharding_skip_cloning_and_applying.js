@@ -5,6 +5,7 @@
  * for it. In addition, test that after failover the skip is respected and the
  * 'approxDocumentsToCopy' and 'approxBytesToCopy' are restored correctly.
  * @tags: [
+ *  requires_fcv_83,
  *  featureFlagReshardingSkipCloningAndApplyingIfApplicable,
  *  # TODO (SERVER-104862): Re-enable this test in aubsan variants.
  *  incompatible_aubsan,

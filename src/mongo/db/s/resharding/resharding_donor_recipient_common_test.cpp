@@ -967,8 +967,6 @@ TEST_F(ReshardingDonorRecipientCommonTest,
 TEST_F(
     ReshardingDonorRecipientCommonTest,
     ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_PrimaryShard_SkipCloningAndApplyIfApplicable) {
-    RAIIServerParameterControllerForTest skipCloningAndApplyingFeatureFlagController(
-        "featureFlagReshardingSkipCloningAndApplyingIfApplicable", true);
     RAIIServerParameterControllerForTest skipCloningFeatureFlagController(
         "featureFlagReshardingSkipCloningIfApplicable", false);
 
@@ -996,6 +994,8 @@ TEST_F(
 
 TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_PrimaryShard_SkipCloningIfApplicable) {
+    RAIIServerParameterControllerForTest skipCloningAndApplyingFeatureFlagController(
+        "featureFlagReshardingSkipCloningAndApplyingIfApplicable", false);
     RAIIServerParameterControllerForTest skipCloningFeatureFlagController(
         "featureFlagReshardingSkipCloningIfApplicable", true);
 
@@ -1008,6 +1008,8 @@ TEST_F(ReshardingDonorRecipientCommonTest,
 
 TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_PrimaryShard_NotSkipCloningIfApplicable) {
+    RAIIServerParameterControllerForTest skipCloningAndApplyingFeatureFlagController(
+        "featureFlagReshardingSkipCloningAndApplyingIfApplicable", false);
     RAIIServerParameterControllerForTest skipCloningFeatureFlagController(
         "featureFlagReshardingSkipCloningIfApplicable", false);
 
