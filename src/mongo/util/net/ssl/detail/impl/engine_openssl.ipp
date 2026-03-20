@@ -173,7 +173,15 @@ void engine::purge_error_state() {
     if (es->bottom == es->top) {
         return;
     }
-#endif  // (OPENSSL_VERSION_NUMBER < 0x1010000fL)
+#else  // OPENSSL_VERSION_NUMBER >= 0x1010000fL
+    // For OpenSSL >= 1.1.0 (including 3.x) use ERR_peek_error() as a
+    // lightweight check. On the happy path (no SSL errors), the error
+    // stack is empty and we can skip the expensive ERR_clear_error()
+    // which iterates the entire 16-slot error ring buffer.
+    if (::ERR_peek_error() == 0) {
+        return;
+    }
+#endif
     ::ERR_clear_error();
 }
 
