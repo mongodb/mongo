@@ -9,16 +9,13 @@
         return;
     }
 
-    const url = frame.script?.url;
-    if (!url) {
-        // Shell is terminated or in the process of - don't pause.
-        // eg: This can occur from Mochalite exceptions that are running on shell exit,
-        // and the final "frame" is back in the C++ execution that invoked the runner.
+    // Only stop on uncaught exceptions
+    if (!isUncaughtInTestContent(frame)) {
         return;
     }
 
     globalThis.__pausedLocation = {
-        script: url,
+        script: frame.script?.url,
         line: frame.script.getOffsetLocation(frame.offset)?.lineNumber ?? 0,
     };
 
@@ -45,3 +42,38 @@
     globalThis.__onException();
     globalThis.__spinwait(frame, {onEval: () => globalThis.__processScopes(frame)});
 });
+
+function isUncaughtInTestContent(thrower) {
+    if (inFramework(thrower)) {
+        // skip framework throwers, regardless of caught or not
+        return;
+    }
+
+    const catcher = getCatchingFrame(thrower);
+    if (!catcher) {
+        return true;
+    }
+
+    // It will be caught somewhere, but we still consider it "uncaught" if it's the
+    // "default" catcher of the underlying framework (the user didn't try to catch this).
+    return inFramework(catcher);
+}
+
+function inFramework(frame) {
+    // Frameworks and test runners have builtin exception handling that wrap the content
+    const FRAMEWORK_SCRIPTS = ["mochalite.js"];
+
+    const url = frame.script?.url ?? "";
+    return FRAMEWORK_SCRIPTS.some((s) => url.endsWith(s));
+}
+
+function getCatchingFrame(frame) {
+    let f = frame;
+    while (f) {
+        if (f.script?.isInCatchScope(f.offset)) {
+            return f;
+        }
+        f = f.older;
+    }
+    return null;
+}
