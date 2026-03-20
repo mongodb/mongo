@@ -1896,10 +1896,22 @@ class RunPlugin(PluginInterface):
         )
 
         parser.add_argument(
-            "--shellJSDebugMode",
-            dest="shell_jsdebugmode",
+            "--jsdbg",
+            dest="jsdbg",
             action="store_true",
             help="Enable JavaScript debugger for spawned mongo shells.",
+        )
+
+        class _DeprecatedShellJSDebugMode(argparse.Action):
+            def __call__(self, parser, namespace, values, option_string=None):
+                parser.error("\nThe flag --shellJSDebugMode has been renamed. Use --jsdbg instead.")
+
+        parser.add_argument(
+            "--shellJSDebugMode",
+            dest="jsdbg",
+            nargs=0,
+            action=_DeprecatedShellJSDebugMode,
+            help=argparse.SUPPRESS,
         )
 
         parser.add_argument(

@@ -42,7 +42,7 @@ class TestJSDebugger(_ResmokeSelftest):
     """Test suite for JavaScript debugger functionality."""
 
     def test_debugger_without_flag(self):
-        """Test that debugger statements are no-ops when --shellJSDebugMode is not set."""
+        """Test that debugger statements are no-ops when --jsdbg is not set."""
         # Without the flag, debugger statements should be no-ops, so this test passes
         resmoke_args = [
             "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_debugger_nodb.yml",
@@ -61,7 +61,7 @@ class TestJSDebugger(_ResmokeSelftest):
             "buildscripts/resmoke.py",
             "run",
             f"--dbpathPrefix={self.test_dir}",
-            "--shellJSDebugMode",
+            "--jsdbg",
             "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_debugger_nodb.yml",
             "buildscripts/tests/resmoke_end2end/testfiles/debugger/debugger_statement.js",
         ]
@@ -110,7 +110,7 @@ class TestJSDebuggerInteractive(_ResmokeSelftest):
                 "buildscripts/resmoke.py",
                 "run",
                 f"--dbpathPrefix={self.test_dir}",
-                "--shellJSDebugMode",
+                "--jsdbg",
                 "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_debugger_nodb.yml",
                 test_file,
             ]

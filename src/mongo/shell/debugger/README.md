@@ -4,7 +4,7 @@
 >
 > The remainder documents the supported `debugger` statement callbacks.
 
-Use the `--shellJSDebugMode` flag for resmoke (or the `--jsDebugMode` flag directly on the mongo shell) to trigger an interactive debug prompt when `debugger` statements are hit in JS test code.
+Use the `--jsdbg` flag for resmoke (or the `--jsDebugMode` flag directly on the mongo shell) to trigger an interactive debug prompt when `debugger` statements are hit in JS test code.
 
 Sample JS Test:
 
@@ -31,10 +31,10 @@ Output:
 [js_test:my_test] Test Passed!
 ```
 
-Run with the `--shellJSDebugMode` flag:
+Run with the `--jsdbg` flag:
 
 ```bash
-buildscripts/resmoke.py run --suites=no_passthrough --shellJSDebugMode jstests/my_test.js
+buildscripts/resmoke.py run --suites=no_passthrough --jsdbg jstests/my_test.js
 ```
 
 Should pause first at line 5, and prompt the user for input:

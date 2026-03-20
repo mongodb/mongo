@@ -553,7 +553,7 @@ def mongo_shell_program(
     if config.SHELL_GRPC or mongod_set_parameters.get("useGrpcForSearch"):
         args.append("--gRPC")
 
-    if config.SHELL_JSDEBUGMODE:
+    if config.JSDBG:
         # relay to the shell flags
         kwargs["jsDebugMode"] = ""
 

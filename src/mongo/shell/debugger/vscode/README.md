@@ -1,6 +1,6 @@
 # VSCode Extension for Debugging JS in the Mongo Shell
 
-Use VSCode's Debugger UI with resmoke's `--shellJSDebugMode` flag.
+Use VSCode's Debugger UI with resmoke's `--jsdbg` flag.
 
 ![example.png](./example.png)
 
@@ -74,9 +74,9 @@ Extension 'mongo-shell-debugger-1.0.0.vsix' was successfully installed.
    ```
    Debug server listening on port 9229
    Waiting for mongo shell to connect on port 9229...
-   Use resmoke's --shellJSDebugMode flag when running a JS test file to stop on breakpoints.
+   Use resmoke's --jsdbg flag when running a JS test file to stop on breakpoints.
    ```
-4. Run resmoke with the `--shellJSDebugMode` flag to stop on the breakpoints.
+4. Run resmoke with the `--jsdbg` flag to stop on the breakpoints.
 5. Use VSCode's breakpoint UI to navigate (continue, inspect scope variables, etc).
 
 ## Architecture
@@ -130,7 +130,7 @@ Extension 'mongo-shell-debugger-1.0.0.vsix' was successfully installed.
 **Initialization**
 
 1. VSCode starts → session.js creates TCP server on :9229
-2. Shell starts with `--shellJSDebugMode` → adapter.cpp connects to :9229
+2. Shell starts with `--jsdbg` → adapter.cpp connects to :9229
 3. Shell waits for a "handshake" (configurationDone) from session.js
 4. session.js sends all known breakpoints to the shell, then sends configurationDone
 5. Shell begins execution, pausing on any breakpoints it encounters
