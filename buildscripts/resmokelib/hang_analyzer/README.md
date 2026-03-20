@@ -35,15 +35,15 @@ sequenceDiagram
     Hang Analyzer ->> Core Dumps: Attach to pid and generate core dumps
 ```
 
-When a task times out, it hits the [timeout](https://github.com/10gen/mongo/blob/a6e56a8e136fe554dc90565bf6acf5bf86f7a46e/etc/evergreen_yml_components/definitions.yml#L2694) section in the defined evergreen config.
-In this timeout section, we run [this](https://github.com/10gen/mongo/blob/a6e56a8e136fe554dc90565bf6acf5bf86f7a46e/etc/evergreen_yml_components/definitions.yml#L2302) task which runs the hang-analyzer with the following invocation:
+When a task times out, it hits the [timeout](https://github.com/mongodb/mongo/blob/a6e56a8e136fe554dc90565bf6acf5bf86f7a46e/etc/evergreen_yml_components/definitions.yml#L2694) section in the defined evergreen config.
+In this timeout section, we run [this](https://github.com/mongodb/mongo/blob/a6e56a8e136fe554dc90565bf6acf5bf86f7a46e/etc/evergreen_yml_components/definitions.yml#L2302) task which runs the hang-analyzer with the following invocation:
 
 ```
 python3 buildscripts/resmoke.py hang-analyzer -o file -o stdout -m exact -p python
 ```
 
 This tells the hang-analyzer to look for all of the python processes (we are specifically looking for resmoke) on the machine and to signal them.
-When resmoke is [signaled](https://github.com/10gen/mongo/blob/08a99b15eea7ae0952b2098710d565dd7f709ff6/buildscripts/resmokelib/sighandler.py#L25), it again invokes the hang analyzer with the specific pids of it's child processes.
+When resmoke is [signaled](https://github.com/mongodb/mongo/blob/08a99b15eea7ae0952b2098710d565dd7f709ff6/buildscripts/resmokelib/sighandler.py#L25), it again invokes the hang analyzer with the specific pids of it's child processes.
 It will look similar to this most of the time:
 
 ```
@@ -61,7 +61,7 @@ After investigation of the above issue, we found that compressing and uploading 
 2. Gzip is single threaded.
 3. Uploading a big file synchronously is not fast.
 
-We made a [script](https://github.com/10gen/mongo/blob/master/buildscripts/fast_archive.py) that gzips all of the core dumps in parallel and uploads them to S3 individually asynchronously.
+We made a [script](https://github.com/mongodb/mongo/blob/master/buildscripts/fast_archive.py) that gzips all of the core dumps in parallel and uploads them to S3 individually asynchronously.
 This solved all of the problems listed above.
 
 ### Generating the core analyzer task
@@ -75,8 +75,8 @@ sequenceDiagram
     Generated Task ->> Core Analyzer Output: Overwrite output with<br/> core dump analysis
 ```
 
-In the [post task](https://github.com/10gen/mongo/blob/709e3f4efc04b42e5d29a8ad2417a01d3610fc3f/etc/evergreen_yml_components/definitions.yml#L2665) section, we [define](https://github.com/10gen/mongo/blob/709e3f4efc04b42e5d29a8ad2417a01d3610fc3f/etc/evergreen_yml_components/definitions.yml#L2184) the evergreen function used to generate the core analyzer task.
-This [script](https://github.com/10gen/mongo/blob/709e3f4efc04b42e5d29a8ad2417a01d3610fc3f/buildscripts/resmokelib/hang_analyzer/gen_hang_analyzer_tasks.py) runs on every task (passing or failing) and is independent of anything else that happened prior in the task and does all of the checks to ensure it should run.
+In the [post task](https://github.com/mongodb/mongo/blob/709e3f4efc04b42e5d29a8ad2417a01d3610fc3f/etc/evergreen_yml_components/definitions.yml#L2665) section, we [define](https://github.com/mongodb/mongo/blob/709e3f4efc04b42e5d29a8ad2417a01d3610fc3f/etc/evergreen_yml_components/definitions.yml#L2184) the evergreen function used to generate the core analyzer task.
+This [script](https://github.com/mongodb/mongo/blob/709e3f4efc04b42e5d29a8ad2417a01d3610fc3f/buildscripts/resmokelib/hang_analyzer/gen_hang_analyzer_tasks.py) runs on every task (passing or failing) and is independent of anything else that happened prior in the task and does all of the checks to ensure it should run.
 These checks include:
 
 1. The task is being run on an operating system supported by the core analyzer.
@@ -86,7 +86,7 @@ These checks include:
 The output from this script is a json file in the format evergreen expects.
 We then pass this json file into the `generate.tasks` evergreen command to generate the task.
 
-After the task is generated, we have [another script](https://github.com/10gen/mongo/blob/709e3f4efc04b42e5d29a8ad2417a01d3610fc3f/etc/evergreen_yml_components/definitions.yml#L2213) that finds the task that was just generated and attaches it to the current task being ran.
+After the task is generated, we have [another script](https://github.com/mongodb/mongo/blob/709e3f4efc04b42e5d29a8ad2417a01d3610fc3f/etc/evergreen_yml_components/definitions.yml#L2213) that finds the task that was just generated and attaches it to the current task being ran.
 
 The reason we upload a temporary file to the original task is to attach that s3 file link to the task.
 Evergreen does not currently have a way to attach files to a task after it was ran so we need to upload something while the original task is in progress.

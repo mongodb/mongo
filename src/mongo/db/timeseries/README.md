@@ -421,7 +421,7 @@ they are run through the Internal Transaction API to make sure the two writes to
 ### Calculating Memory Usage
 
 Memory usage for Buckets, the BucketCatalog, and other aspects of time-series collection internals (Stripes, BucketMetadata, etc)
-is calculated using the [Timeseries Tracking Allocator](https://github.com/10gen/mongo/blob/f726b6db3a361122a87555dbea053d98b01685a3/src/mongo/db/timeseries/timeseries_tracking_allocator.h).
+is calculated using the [Timeseries Tracking Allocator](https://github.com/mongodb/mongo/blob/f726b6db3a361122a87555dbea053d98b01685a3/src/mongo/db/timeseries/timeseries_tracking_allocator.h).
 
 ### Freezing Buckets
 
