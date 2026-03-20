@@ -95,6 +95,18 @@ TEST(BSONElement, BinDataToString) {
               "62696E6172792064617461007769746820616E20756E6B6E6F776E2074797065)");
 }
 
+TEST(BSONElement, BinDataCleanWithByteArrayDeprecatedTooSmall) {
+    // ByteArrayDeprecated has a nonsense 4-byte redundant length field. We
+    // must handle the case where the element is too small to hold that field.
+    std::vector<uint8_t> input{'2', '0'};
+    int len;
+    BSONObjBuilder{}
+        .appendBinData("f", input.size(), ByteArrayDeprecated, input.data())
+        .obj()["f"]
+        .binDataClean(len);
+    ASSERT_EQ(len, 0);
+}
+
 std::string vecStr(std::vector<uint8_t> v) {
     std::string r = "[";
     StringData sep;
