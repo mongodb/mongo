@@ -41,6 +41,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/database.h"
 #include "mongo/db/shard_role/shard_catalog/database_holder.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_options.h"
@@ -268,10 +269,16 @@ void uassertCollectionExistsDuringApplyOps(const UpgradeDowngradeTimeseriesLocks
     //
     // If "ts" was not backed up, then neither the main nor buckets namespace exists, so throw
     // `NamespaceNotFound` to fail gracefully: The oplog applier catches and tolerates this error.
+    //
+    // We only check collectionExists() for the main and buckets namespaces, deliberately ignoring
+    // whether a view exists. During selective restore, a dangling view (pointing to a
+    // non-restored buckets collection) can be recreated by oplog replay before this command runs.
+    // Treating such a view as proof the collection exists would cause the upgrade to proceed
+    // and fail because the backing buckets collection is missing.
     uassert(ErrorCodes::NamespaceNotFound,
             "Timeseries collection to upgrade or downgrade not found during oplog application. "
             "This is expected during selective backup/restore.",
-            locks.mainAcq.collectionExists() || locks.mainAcq.isView() ||
+            !storageGlobalParams.restore || locks.mainAcq.collectionExists() ||
                 locks.bucketsAcq.collectionExists());
 }
 
