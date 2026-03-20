@@ -39,6 +39,7 @@ import os
 import random
 
 from data_generator import DataGenerator
+from database_instance import get_database_parameter
 from join_calibration_settings import (
     COLLECTION_CARDINALITY,
     join_data_generator,
@@ -52,20 +53,19 @@ from scipy.stats import trim_mean
 TRIMMED_MEAN_PROPORTION = 0.1
 
 
-async def calibrate_cpu(manager: MongodManager, num_runs: int = 30):
+async def measure_warm_scan_time(manager: MongodManager, num_runs: int = 30):
     """
-    Measures the pure CPU cost of processing one tuple (time_tuple).
+    Measures the time of scanning a single tuple in memory.
 
     After a cold restart, three full collection scans warm the WT cache so all
-    data pages are in memory. Subsequent scans incur zero disk I/O, isolating CPU
-    overhead.
+    data pages are in memory. Subsequent scans incur zero disk I/O.
 
-    The cost model charges a CPU cost for every processed *and* outputted document,
-    so time_tuple = (total scan time) / (2*N) where N is the collection cardinality.
+    The warm scan time is used by 'calibrate_sequential_io' to subtract the CPU
+    component from cold scan measurements, isolating the I/O cost.
 
-    Returns the per-tuple CPU cost in milliseconds.
+    Returns the mean warm scan time per tuple in milliseconds.
     """
-    print(f"\n=== CPU Calibration ({num_runs} warm scans on join_coll_1) ===")
+    print(f"\n=== Warm Scan Measurement ({num_runs} warm scans on join_coll_1) ===")
 
     manager.restart_cold()
     for _ in range(3):
@@ -79,15 +79,87 @@ async def calibrate_cpu(manager: MongodManager, num_runs: int = 30):
         times_ns.append(t)
         print(f"  [{i + 1}/{num_runs}] warm scan: {t / 1e6:.3f}ms")
 
-    mean_ns = trim_mean(times_ns, proportiontocut=TRIMMED_MEAN_PROPORTION)
-    time_tuple_ns = mean_ns / (2 * COLLECTION_CARDINALITY)
-    time_tuple_ms = time_tuple_ns / 1e6
+    warm_scan_ns = trim_mean(times_ns, proportiontocut=TRIMMED_MEAN_PROPORTION)
+    warm_scan_tuple_ns = warm_scan_ns / COLLECTION_CARDINALITY
+
+    print("\n--- Warm scan summary ---")
+    print(f"  Mean warm scan per tuple: {warm_scan_tuple_ns:.3f}ns")
+
+    return warm_scan_tuple_ns / 1e6
+
+
+async def calibrate_cpu(manager: MongodManager, num_runs: int = 30):
+    """
+    Measures the CPU cost of processing one tuple by running an in-memory hash
+    join, which exercises a broader mix of CPU operations (scan, build, probe)
+    than a pure collection scan.
+
+    Both join_coll_1 and join_coll_2 fit in the default WT cache (~100 MB
+    each), so the join is purely CPU-bound after warming. We also increase
+    the HJ spilling threshold to 200 MB to avoid any disk usage.
+
+    The cost model uses a single CPU factor for all tuple operations, for both
+    the processed and outputted documents.
+
+    For a fully in-memory HJ on 'random' (1:1, N = COLLECTION_CARDINALITY):
+        Left CollScan:   processed=N,  output=N   -> 2N
+        Right CollScan:  processed=N,  output=N   -> 2N
+        HJ node:         processed=2N, output=N   -> 3N
+        Total tuple operations: 7N
+
+    The cost model will attribute a total cost of (7N * cpuFactor) in terms of
+    CPU cost. So, we have to divide the total measured time for this join query
+    by 7 to obtain an "average" cpuFactor: cpu_tuple = time_join / (7 * N).
+
+    Returns the per-tuple CPU cost in milliseconds.
+    """
+    print(f"\n=== CPU Calibration ({num_runs} in-memory HJ runs on random) ===")
+
+    pipeline = [
+        {
+            "$lookup": {
+                "from": "join_coll_2",
+                "localField": "random",
+                "foreignField": "random",
+                "as": "joined",
+            }
+        },
+        {"$unwind": "$joined"},
+        {"$count": "total"},
+    ]
+
+    manager.restart_cold()
+    async with (
+        get_database_parameter(
+            manager.database,
+            "internalQuerySlotBasedExecutionHashJoinApproxMemoryUseInBytesBeforeSpill",
+        ) as spill_param,
+        get_database_parameter(manager.database, "internalJoinMethod") as algo_param,
+    ):
+        await spill_param.set(200 * 1024 * 1024)
+        await algo_param.set("HJ")
+
+        for _ in range(3):
+            await run_join_explain(manager.database, "join_coll_1", pipeline)
+        print("  WT cache warmed (3 HJ warmup runs)")
+
+        join_times_ms = []
+        for i in range(num_runs):
+            t, algo, used_disk = await run_join_explain(manager.database, "join_coll_1", pipeline)
+            assert algo == "HJ", f"Expected HJ but got {algo}"
+            assert not used_disk, "HJ spilled to disk during CPU calibration"
+
+            join_times_ms.append(t)
+            print(f"  [{i + 1}/{num_runs}] in-memory HJ: {t:.3f}ms")
+
+    mean_join_ms = trim_mean(join_times_ms, proportiontocut=TRIMMED_MEAN_PROPORTION)
+    cpu_tuple_ms = mean_join_ms / (7 * COLLECTION_CARDINALITY)
 
     print("\n--- CPU summary ---")
-    print(f"  Mean warm scan: {mean_ns / 1e6:.3f}ms")
-    print(f"  time_tuple: {time_tuple_ns:.1f}ns ({time_tuple_ms:.6f}ms)")
+    print(f"  Mean in-memory HJ: {mean_join_ms:.3f}ms")
+    print(f"  time_tuple: {(cpu_tuple_ms * 1e6):.1f}ns ({cpu_tuple_ms:.6f}ms)")
 
-    return time_tuple_ms
+    return cpu_tuple_ms
 
 
 async def calibrate_sequential_io(
@@ -247,7 +319,7 @@ async def calibrate_join_algorithms(manager: MongodManager, num_runs: int = 10):
             await manager.database.set_parameter("internalJoinMethod", "any")
             algo_freqs: dict[str, int] = {}
             for _ in range(num_runs):
-                _, algo = await run_join_explain(
+                _, algo, _ = await run_join_explain(
                     manager.database, "join_coll_1_large", pipeline, verbosity
                 )
                 algo_freqs[algo] = algo_freqs.get(algo, 0) + 1
@@ -265,7 +337,7 @@ async def calibrate_join_algorithms(manager: MongodManager, num_runs: int = 10):
                 await manager.database.set_parameter("internalJoinMethod", "INLJ")
                 inlj_times = []
                 for _ in range(num_runs):
-                    t, algo = await run_join_explain(
+                    t, algo, _ = await run_join_explain(
                         manager.database, "join_coll_1_large", pipeline
                     )
                     assert algo == "INLJ", f"Expected INLJ but got {algo}"
@@ -276,7 +348,7 @@ async def calibrate_join_algorithms(manager: MongodManager, num_runs: int = 10):
                 await manager.database.set_parameter("internalJoinMethod", "HJ")
                 hj_times = []
                 for _ in range(num_runs):
-                    t, algo = await run_join_explain(
+                    t, algo, _ = await run_join_explain(
                         manager.database, "join_coll_1_large", pipeline
                     )
                     assert algo == "HJ", f"Expected HJ but got {algo}"
@@ -326,21 +398,22 @@ async def main():
         generator = DataGenerator(manager.database, join_data_generator)
         await generator.populate_collections()
 
-        time_tuple_ms = await calibrate_cpu(manager)
+        warm_scan_tuple_ms = await measure_warm_scan_time(manager)
+        cpu_tuple_ms = await calibrate_cpu(manager)
         time_seq_page_ms = await calibrate_sequential_io(
-            manager, warm_scan_ms=2 * time_tuple_ms * COLLECTION_CARDINALITY
+            manager, warm_scan_ms=warm_scan_tuple_ms * COLLECTION_CARDINALITY
         )
         time_rand_page_ms = await calibrate_random_io(manager)
 
         print("\n=== Cost Coefficient Ratios ===")
-        print(f"  cpuFactor    = 1.0 ({time_tuple_ms:.6f}ms)")
+        print(f"  cpuFactor    = 1.0 ({cpu_tuple_ms:.6f}ms)")
         print(
-            f"  seqIOFactor  = {time_seq_page_ms / time_tuple_ms:.1f}"
-            f"  ({time_seq_page_ms:.4f}ms / {time_tuple_ms:.6f}ms)"
+            f"  seqIOFactor  = {time_seq_page_ms / cpu_tuple_ms:.1f}"
+            f"  ({time_seq_page_ms:.4f}ms / {cpu_tuple_ms:.6f}ms)"
         )
         print(
-            f"  randIOFactor = {time_rand_page_ms / time_tuple_ms:.1f}"
-            f"  ({time_rand_page_ms:.4f}ms / {time_tuple_ms:.6f}ms)"
+            f"  randIOFactor = {time_rand_page_ms / cpu_tuple_ms:.1f}"
+            f"  ({time_rand_page_ms:.4f}ms / {cpu_tuple_ms:.6f}ms)"
         )
 
         await calibrate_join_algorithms(manager)

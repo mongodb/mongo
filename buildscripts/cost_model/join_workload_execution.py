@@ -47,19 +47,24 @@ async def run_join_explain(
     collection_name: str,
     pipeline: list,
     verbosity: str = "executionStats",
-) -> tuple[float | None, str]:
+) -> tuple[float | None, str, bool | None]:
     """
-    Run an aggregation explain and return (exec_time_ms, algorithm).
+    Run an aggregation explain and return (exec_time_ms, algorithm, used_disk).
     If verbosity is 'queryPlanner', exec_time_ms will be None.
     """
     explain = await database.explain_aggregate(collection_name, pipeline, verbosity)
     cursor = explain["stages"][0]["$cursor"]
-    exec_time_ms = (
-        cursor["executionStats"]["executionTimeMillis"] if verbosity == "executionStats" else None
-    )
+    if verbosity == "executionStats":
+        stats = cursor["executionStats"]["executionStages"]
+        exec_time_ms = stats["executionTimeNanos"] / 1e6
+        used_disk = stats["inputStage"].get("usedDisk")
+    else:
+        exec_time_ms = None
+        used_disk = None
+
     query_plan = cursor["queryPlanner"]["winningPlan"]["queryPlan"]
     algorithm = abbreviate_stage(query_plan["stage"])
 
     assert query_plan["leftEmbeddingField"] == "none", f"Expected {collection_name} as outer table"
 
-    return exec_time_ms, algorithm
+    return exec_time_ms, algorithm, used_disk
