@@ -50,6 +50,7 @@
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database.h"
@@ -590,6 +591,7 @@ public:
                     "supported.",
                     !nss.isTimeseriesBucketsCollection());
 
+            staticValidateCollMod(opCtx, nss, cmd.getCollModRequest());
 
             // Updating granularity on sharded time-series collections is not allowed.
             auto catalogClient =

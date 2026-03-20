@@ -90,14 +90,6 @@ MONGO_FAIL_POINT_DEFINE(collModBeforeConfigServerUpdate);
 namespace {
 
 
-bool hasTimeSeriesBucketingUpdate(const CollModRequest& request) {
-    if (!request.getTimeseries().has_value()) {
-        return false;
-    }
-    auto& ts = request.getTimeseries();
-    return ts->getGranularity() || ts->getBucketMaxSpanSeconds() || ts->getBucketRoundingSeconds();
-}
-
 template <typename CommandType>
 std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandWithOsiToShards(
     OperationContext* opCtx,
@@ -278,6 +270,14 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
+        .then([this, anchor = shared_from_this()] {
+            if (_doc.getPhase() == Phase::kUnset) {
+                // Unpersisted phase executed only the first time we start the coordinator
+                auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+                staticValidateCollMod(opCtx, originalNss(), _request);
+            }
+        })
         .then([this, executor = executor, anchor = shared_from_this()] {
             auto opCtxHolder = cc().makeOperationContext();
             auto* opCtx = opCtxHolder.get();

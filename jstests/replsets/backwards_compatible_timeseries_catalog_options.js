@@ -23,9 +23,11 @@ assert.commandWorked(primaryDb.createCollection(collName, {timeseries: {timeFiel
 
 // Execute collMod to change the timeseries catalog options under testing
 assert.commandWorked(primaryDb.runCommand({
+	collMod: collName,
+	timeseries: {bucketMaxSpanSeconds: 5400, bucketRoundingSeconds: 5400}}));
+assert.commandWorked(primaryDb.runCommand({
     collMod: collName,
     timeseriesBucketsMayHaveMixedSchemaData: true,
-    timeseries: {bucketMaxSpanSeconds: 5400, bucketRoundingSeconds: 5400}
 }));
 
 // Double check that options have been correctly applied on the primary node
