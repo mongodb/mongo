@@ -13,7 +13,7 @@
  * ]
  */
 
-import {getRandomShardName, setupTestDatabase} from "jstests/libs/sharded_cluster_fixture_helpers.js";
+import {getRandomShardName, setupTestDatabase} from "jstests/libs/cluster_helpers/sharded_cluster_fixture_helpers.js";
 
 function checkRenameSucceeded(configDb, nssFrom, nssTo, expectedUuid, shard) {
     const collEntryFrom = configDb.collections.findOne({_id: nssFrom});

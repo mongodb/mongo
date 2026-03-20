@@ -21,7 +21,7 @@
  * ]
  */
 
-import {getRandomShardName} from "jstests/libs/sharded_cluster_fixture_helpers.js";
+import {getRandomShardName} from "jstests/libs/cluster_helpers/sharded_cluster_fixture_helpers.js";
 
 assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
 const primaryShard = db.getDatabasePrimaryShardId();

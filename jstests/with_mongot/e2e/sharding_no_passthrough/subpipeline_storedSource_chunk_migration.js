@@ -11,7 +11,7 @@
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
-import {getShardNames} from "jstests/libs/sharded_cluster_fixture_helpers.js";
+import {getShardNames} from "jstests/libs/cluster_helpers/sharded_cluster_fixture_helpers.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const shardNames = getShardNames(testDb.getMongo());

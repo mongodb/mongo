@@ -16,7 +16,10 @@
  *   cannot_run_during_upgrade_downgrade,
  * ]
  */
-import {getRandomShardName, verifyCollectionTrackingState} from "jstests/libs/sharded_cluster_fixture_helpers.js";
+import {
+    getRandomShardName,
+    verifyCollectionTrackingState,
+} from "jstests/libs/cluster_helpers/sharded_cluster_fixture_helpers.js";
 
 // Setup an untracked collection
 db.dropDatabase();

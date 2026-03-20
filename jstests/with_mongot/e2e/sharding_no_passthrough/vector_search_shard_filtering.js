@@ -13,7 +13,7 @@
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getShardNames} from "jstests/libs/sharded_cluster_fixture_helpers.js";
+import {getShardNames} from "jstests/libs/cluster_helpers/sharded_cluster_fixture_helpers.js";
 
 TestData.skipCheckOrphans = true;
 

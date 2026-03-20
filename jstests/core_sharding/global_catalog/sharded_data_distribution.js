@@ -14,7 +14,11 @@
  */
 
 import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
-import {getNumShards, getRandomShardName, setupTestDatabase} from "jstests/libs/sharded_cluster_fixture_helpers.js";
+import {
+    getNumShards,
+    getRandomShardName,
+    setupTestDatabase,
+} from "jstests/libs/cluster_helpers/sharded_cluster_fixture_helpers.js";
 
 // Runs $collStats and transforms its output to be easily comparable against
 // $shardedDataDistribution.

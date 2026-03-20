@@ -11,7 +11,7 @@
  * ]
  */
 
-import {setupTestDatabase} from "jstests/libs/sharded_cluster_fixture_helpers.js";
+import {setupTestDatabase} from "jstests/libs/cluster_helpers/sharded_cluster_fixture_helpers.js";
 
 const dbName = jsTestName();
 

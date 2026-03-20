@@ -7,7 +7,7 @@
  * ]
  */
 
-import {setupDbName} from "jstests/libs/sharded_cluster_fixture_helpers.js";
+import {setupDbName} from "jstests/libs/cluster_helpers/sharded_cluster_fixture_helpers.js";
 
 function checkDbNameExistenceOnConfigCatalog(dbName, shouldExist) {
     assert.eq(shouldExist ? 1 : 0, db.getSiblingDB("config").databases.countDocuments({_id: dbName}));

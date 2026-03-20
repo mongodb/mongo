@@ -17,7 +17,7 @@ import {
     isViewlessTimeseriesOnlySuite,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
-import {getShardNames} from "jstests/libs/sharded_cluster_fixture_helpers.js";
+import {getShardNames} from "jstests/libs/cluster_helpers/sharded_cluster_fixture_helpers.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 if (!isViewfulTimeseriesOnlySuite(db) && !isViewlessTimeseriesOnlySuite(db)) {

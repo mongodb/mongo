@@ -13,7 +13,7 @@
  */
 
 import {runTimeseriesChunkCommand} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
-import {getRandomShardName} from "jstests/libs/sharded_cluster_fixture_helpers.js";
+import {getRandomShardName} from "jstests/libs/cluster_helpers/sharded_cluster_fixture_helpers.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const coll = db[jsTestName()];

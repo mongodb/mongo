@@ -16,7 +16,7 @@
  *  ]
  */
 
-import {getRandomShardName, setupTestDatabase} from "jstests/libs/sharded_cluster_fixture_helpers.js";
+import {getRandomShardName, setupTestDatabase} from "jstests/libs/cluster_helpers/sharded_cluster_fixture_helpers.js";
 import {getUUIDFromConfigCollections} from "jstests/libs/uuid_util.js";
 
 const fromCollName = "from";

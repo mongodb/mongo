@@ -12,7 +12,7 @@
 
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/query_integration_search/search.js";
-import {getShardNames} from "jstests/libs/sharded_cluster_fixture_helpers.js";
+import {getShardNames} from "jstests/libs/cluster_helpers/sharded_cluster_fixture_helpers.js";
 
 // TODO SERVER-119626 Check if getSiblingDB() is still needed.
 const testDb = db.getSiblingDB(jsTestName());

@@ -14,7 +14,7 @@
  * ]
  */
 
-import {getRandomShardName} from "jstests/libs/sharded_cluster_fixture_helpers.js";
+import {getRandomShardName} from "jstests/libs/cluster_helpers/sharded_cluster_fixture_helpers.js";
 
 // The test attempts to verify the latest shard version is correct by querying a non-stale mongos.
 // pinToSingleMongos due to getShardVersion command.
