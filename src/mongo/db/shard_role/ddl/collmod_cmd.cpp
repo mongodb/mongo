@@ -175,10 +175,10 @@ public:
                                 .isEnabledUseLastLTSFCVWhenUninitialized(
                                     VersionContext::getDecoration(opCtx), fcvSnapshot));
                 }
-                if (cmd.getValidationLevel() == ValidationLevelEnum::validated) {
+                if (cmd.getValidationLevel() == ValidationLevelEnum::constraint) {
                     uassert(ErrorCodes::InvalidOptions,
-                            "Validation level 'validated' is not supported with current FCV",
-                            gFeatureFlagValidatedValidationLevel
+                            "Validation level 'constraint' is not supported with current FCV",
+                            gFeatureFlagConstraintValidationLevel
                                 .isEnabledUseLastLTSFCVWhenUninitialized(
                                     VersionContext::getDecoration(opCtx), fcvSnapshot));
                 }
