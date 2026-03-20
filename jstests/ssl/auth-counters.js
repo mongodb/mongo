@@ -34,10 +34,10 @@ function assertStats() {
     const mechStats = asAdmin({serverStatus: 1}).security.authentication.mechanisms[x509];
 
     try {
-        assert.eq(mechStats.ingress.authenticate.total, expected.ingress.authenticate.total);
-        assert.eq(mechStats.ingress.authenticate.successful, expected.ingress.authenticate.successful);
-        assert.eq(mechStats.ingress.clusterAuthenticate.total, expected.ingress.clusterAuthenticate.total);
-        assert.eq(mechStats.ingress.clusterAuthenticate.successful, expected.ingress.clusterAuthenticate.successful);
+        assert.eq(mechStats.authenticate.received, expected.authenticate.received);
+        assert.eq(mechStats.authenticate.successful, expected.authenticate.successful);
+        assert.eq(mechStats.clusterAuthenticate.received, expected.clusterAuthenticate.received);
+        assert.eq(mechStats.clusterAuthenticate.successful, expected.clusterAuthenticate.successful);
     } catch (e) {
         print("mechStats: " + tojson(mechStats));
         print("expected: " + tojson(expected));
@@ -48,14 +48,14 @@ function assertStats() {
 function assertSuccess(creds) {
     assert.eq(external.auth(creds), true);
     external.logout();
-    ++expected.ingress.authenticate.total;
-    ++expected.ingress.authenticate.successful;
+    ++expected.authenticate.received;
+    ++expected.authenticate.successful;
     assertStats();
 }
 
 function assertFailure(creds) {
     assert.eq(external.auth(creds), false);
-    ++expected.ingress.authenticate.total;
+    ++expected.authenticate.received;
     assertStats();
 }
 
@@ -79,10 +79,10 @@ function assertSuccessInternal() {
         ),
         0,
     );
-    ++expected.ingress.authenticate.total;
-    ++expected.ingress.authenticate.successful;
-    ++expected.ingress.clusterAuthenticate.total;
-    ++expected.ingress.clusterAuthenticate.successful;
+    ++expected.authenticate.received;
+    ++expected.authenticate.successful;
+    ++expected.clusterAuthenticate.received;
+    ++expected.clusterAuthenticate.successful;
     assertStats();
 }
 

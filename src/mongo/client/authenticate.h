@@ -71,7 +71,6 @@ constexpr auto kMechanismScramSha1 = "SCRAM-SHA-1"_sd;
 constexpr auto kMechanismScramSha256 = "SCRAM-SHA-256"_sd;
 constexpr auto kMechanismMongoAWS = "MONGODB-AWS"_sd;
 constexpr auto kMechanismMongoOIDC = "MONGODB-OIDC"_sd;
-extern const std::vector<std::string> kAllMechanisms;
 constexpr auto kInternalAuthFallbackMechanism = kMechanismScramSha1;
 
 constexpr auto kSaslSupportedMechanisms = "saslSupportedMechs"_sd;

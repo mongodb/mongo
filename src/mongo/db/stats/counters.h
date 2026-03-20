@@ -278,15 +278,11 @@ public:
     public:
         MechanismCounterHandle(MechanismData* data) : _data(data) {}
 
-        void incSpeculativeAuthenticateSent();
         void incSpeculativeAuthenticateReceived();
-        void incIngressSpeculativeAuthenticateSuccessful();
-        void incEgressSpeculativeAuthenticateSuccessful();
+        void incSpeculativeAuthenticateSuccessful();
 
-        void incAuthenticateSent();
         void incAuthenticateReceived();
-        void incIngressAuthenticateSuccessful();
-        void incEgressAuthenticateSuccessful();
+        void incAuthenticateSuccessful();
 
         void incClusterAuthenticateReceived();
         void incClusterAuthenticateSuccessful();
@@ -299,36 +295,31 @@ public:
 
     void incSaslSupportedMechanismsReceived();
 
-    void incIngressAuthenticationCumulativeTime(long long micros);
-
-    void incEgressAuthenticationCumulativeTime(long long micros);
+    void incAuthenticationCumulativeTime(long long micros);
 
     void append(BSONObjBuilder*);
 
     void initializeMechanismMap(const std::vector<std::string>&);
 
 private:
-    struct SuccessCounter {
-        AtomicWord<long long> total;
-        AtomicWord<long long> successful;
-        void appendAsSubobj(BSONObjBuilder& bob, StringData fieldName) const;
-    };
     struct MechanismData {
         struct {
-            SuccessCounter speculativeAuthenticate;
-            SuccessCounter authenticate;
-            SuccessCounter clusterAuthenticate;
-        } ingress;
+            AtomicWord<long long> received;
+            AtomicWord<long long> successful;
+        } speculativeAuthenticate;
         struct {
-            SuccessCounter speculativeAuthenticate;
-            SuccessCounter authenticate;
-        } egress;
+            AtomicWord<long long> received;
+            AtomicWord<long long> successful;
+        } authenticate;
+        struct {
+            AtomicWord<long long> received;
+            AtomicWord<long long> successful;
+        } clusterAuthenticate;
     };
     using MechanismMap = std::map<std::string, MechanismData>;
 
     AtomicWord<long long> _saslSupportedMechanismsReceived;
-    AtomicWord<long long> _ingressAuthenticationCumulativeMicros;
-    AtomicWord<long long> _egressAuthenticationCumulativeMicros;
+    AtomicWord<long long> _authenticationCumulativeMicros;
     // Mechanism maps are initialized at startup to contain all
     // mechanisms known to authenticationMechanisms setParam.
     // After that they are kept to a fixed size.

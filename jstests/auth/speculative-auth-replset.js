@@ -4,11 +4,10 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-const kIngressAuthenticationSuccessfulLogId = 5286306;
-const kIngressAuthenticationFailedLogId = 5286307;
-const kEgressSpeculativeAuthenticationSuccessfulLogId = 10748710;
+const kAuthenticationSuccessfulLogId = 5286306;
+const kAuthenticationFailedLogId = 5286307;
 
-function countIngressAuthInLog(conn) {
+function countAuthInLog(conn) {
     let logCounts = {speculative: 0, cluster: 0, speculativeCluster: 0};
 
     cat(conn.fullOptions.logFile)
@@ -17,7 +16,7 @@ function countIngressAuthInLog(conn) {
         .forEach((line) => {
             // Iterate through the log and verify our auth.
             const entry = JSON.parse(line);
-            if (entry.id === kIngressAuthenticationSuccessfulLogId) {
+            if (entry.id === kAuthenticationSuccessfulLogId) {
                 // Successful auth.
                 if (entry.attr.isSpeculative) {
                     logCounts.speculative += 1;
@@ -28,7 +27,7 @@ function countIngressAuthInLog(conn) {
                 if (entry.attr.isSpeculative && entry.attr.isClusterMember) {
                     logCounts.speculativeCluster += 1;
                 }
-            } else if (entry.id === kIngressAuthenticationFailedLogId) {
+            } else if (entry.id === kAuthenticationFailedLogId) {
                 // Authentication can fail legitimately because the secondary abandons the connection
                 // during shutdown - if we do encounter an authentication failure in the log, make sure
                 // that it is only of this type, fail anything else
@@ -41,24 +40,6 @@ function countIngressAuthInLog(conn) {
 
     print(`Found log entries for authentication in the following amounts: ${tojson(logCounts)}`);
     return logCounts;
-}
-
-function countEgressAuthInLog(conn) {
-    let speculateLogCount = 0;
-
-    cat(conn.fullOptions.logFile)
-        .trim()
-        .split("\n")
-        .forEach((line) => {
-            const entry = JSON.parse(line);
-            if (entry.id === kEgressSpeculativeAuthenticationSuccessfulLogId) {
-                // Successful speculative auth.
-                speculateLogCount += 1;
-            }
-        });
-
-    print(`Found ${speculateLogCount} log entries for egress speculative authentication`);
-    return speculateLogCount;
 }
 
 const rst = new ReplSetTest({
@@ -101,18 +82,15 @@ assert(initialMechStats["SCRAM-SHA-256"] !== undefined);
 // because we authenticated as `admin` using the shell helpers.
 // Because of the simple cluster topology, we should have no intracluster authentication attempts.
 Object.keys(initialMechStats).forEach(function (mech) {
-    const specIngressStats = initialMechStats[mech].ingress.speculativeAuthenticate;
-    const specEgressStats = initialMechStats[mech].egress.speculativeAuthenticate;
-    const clusterStats = initialMechStats[mech].ingress.clusterAuthenticate;
+    const specStats = initialMechStats[mech].speculativeAuthenticate;
+    const clusterStats = initialMechStats[mech].clusterAuthenticate;
 
     // No speculation has occured
-    assert.eq(specIngressStats.total, 0);
-    assert.eq(specEgressStats.total, 0);
+    assert.eq(specStats.received, 0);
 
     // Statistics should be consistent for all mechanisms
-    assert.eq(specIngressStats.total, specIngressStats.successful);
-    assert.eq(specEgressStats.total, specEgressStats.successful);
-    assert.eq(clusterStats.total, clusterStats.successful);
+    assert.eq(specStats.received, specStats.successful);
+    assert.eq(clusterStats.received, clusterStats.successful);
 });
 
 {
@@ -135,54 +113,32 @@ Object.keys(initialMechStats).forEach(function (mech) {
 }
 
 {
-    // Speculative and cluster auth counts should align with the authentication
-    // events in the server log.
-    let ingressLogCounts = countIngressAuthInLog(admin.getMongo());
-    let egressSpecLogCount = countEgressAuthInLog(admin.getMongo());
-
     // Capture new statistics, and assert that they're consistent.
     let newMechStats = getMechStats(admin);
     printjson(newMechStats);
 
     // Speculative and cluster statistics should be incremented by intracluster auth.
     assert.gt(
-        newMechStats["SCRAM-SHA-256"].ingress.speculativeAuthenticate.successful,
-        initialMechStats["SCRAM-SHA-256"].ingress.speculativeAuthenticate.successful,
+        newMechStats["SCRAM-SHA-256"].speculativeAuthenticate.successful,
+        initialMechStats["SCRAM-SHA-256"].speculativeAuthenticate.successful,
     );
     assert.gt(
-        newMechStats["SCRAM-SHA-256"].egress.speculativeAuthenticate.successful,
-        initialMechStats["SCRAM-SHA-256"].egress.speculativeAuthenticate.successful,
-    );
-    assert.gt(
-        newMechStats["SCRAM-SHA-256"].ingress.clusterAuthenticate.successful,
-        initialMechStats["SCRAM-SHA-256"].ingress.clusterAuthenticate.successful,
-    );
-    assert.gt(
-        newMechStats["SCRAM-SHA-256"].egress.authenticate.successful,
-        initialMechStats["SCRAM-SHA-256"].egress.authenticate.successful,
+        newMechStats["SCRAM-SHA-256"].clusterAuthenticate.successful,
+        initialMechStats["SCRAM-SHA-256"].clusterAuthenticate.successful,
     );
 
-    // Assert that the number of authentication logs is roughly equal to what the stats report. We are not strict with this because of the inevitable race between when we read the log and when we get server stats.
-    assert.lte(
-        Math.abs(
-            ingressLogCounts.speculative -
-                (newMechStats["SCRAM-SHA-256"].ingress.speculativeAuthenticate.successful -
-                    initialMechStats["SCRAM-SHA-256"].ingress.speculativeAuthenticate.successful),
-        ),
-        2,
-    );
+    // Speculative and cluster auth counts should align with the authentication
+    // events in the server log.
+    let logCounts = countAuthInLog(admin.getMongo());
 
-    assert.lte(
-        Math.abs(
-            egressSpecLogCount -
-                (newMechStats["SCRAM-SHA-256"].egress.speculativeAuthenticate.successful -
-                    initialMechStats["SCRAM-SHA-256"].egress.speculativeAuthenticate.successful),
-        ),
-        2,
+    assert.eq(
+        logCounts.speculative,
+        newMechStats["SCRAM-SHA-256"].speculativeAuthenticate.successful -
+            initialMechStats["SCRAM-SHA-256"].speculativeAuthenticate.successful,
     );
 
     assert.gt(
-        ingressLogCounts.speculativeCluster,
+        logCounts.speculativeCluster,
         0,
         "Expected to observe at least one speculative cluster authentication attempt",
     );
@@ -192,8 +148,8 @@ Object.keys(initialMechStats).forEach(function (mech) {
     const kClusterCountRetryIntervalMS = 5 * 1000;
     assert.retry(
         function () {
-            const logCount = ingressLogCounts.cluster;
-            const mechStatCount = newMechStats["SCRAM-SHA-256"].ingress.clusterAuthenticate.successful;
+            const logCount = logCounts.cluster;
+            const mechStatCount = newMechStats["SCRAM-SHA-256"].clusterAuthenticate.successful;
             if (logCount == mechStatCount) {
                 return true;
             }
@@ -203,7 +159,7 @@ Object.keys(initialMechStats).forEach(function (mech) {
             // Repoll values for a retry.
             jsTest.log("Cluster counts mismatched: " + logCount + " != " + mechStatCount);
             newMechStats = getMechStats(admin);
-            ingressLogCounts = countIngressAuthInLog(admin.getMongo());
+            logCounts = countAuthInLog(admin.getMongo());
             return false;
         },
         "Cluster counts never stabilized",

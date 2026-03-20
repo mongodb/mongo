@@ -37,12 +37,10 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
-#include "mongo/client/authenticate.h"
 #include "mongo/client/client_api_version_parameters_gen.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/auth/sasl_command_constants.h"
-#include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/tenant_id.h"
@@ -358,8 +356,6 @@ Status storeMongoShellOptions(const moe::Environment& params,
             }
         }
     }
-
-    saslGlobalParams.authenticationMechanisms = auth::kAllMechanisms;
 
     return Status::OK();
 }

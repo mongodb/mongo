@@ -329,12 +329,12 @@ void AuthenticationSession::_finish() {
 void AuthenticationSession::markSuccessful() {
     _finish();
 
-    _mechCounter->incIngressAuthenticateSuccessful();
+    _mechCounter->incAuthenticateSuccessful();
     if (_isClusterMember) {
         _mechCounter->incClusterAuthenticateSuccessful();
     }
     if (_isSpeculative) {
-        _mechCounter->incIngressSpeculativeAuthenticateSuccessful();
+        _mechCounter->incSpeculativeAuthenticateSuccessful();
     }
 
     auto event =
