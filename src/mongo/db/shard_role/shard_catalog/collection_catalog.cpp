@@ -59,7 +59,6 @@
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/collection_record_store_options.h"
 #include "mongo/db/shard_role/shard_catalog/durable_catalog.h"
-#include "mongo/db/shard_role/shard_catalog/server_parameters_gen.h"
 #include "mongo/db/shard_role/shard_catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/exceptions.h"
@@ -982,149 +981,6 @@ void CollectionCatalog::reloadViews(OperationContext* opCtx, const DatabaseName&
     PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
 }
 
-namespace {
-std::shared_ptr<Collection> createNewCollection(OperationContext* opCtx,
-                                                boost::optional<Timestamp> readTimestamp,
-                                                const durable_catalog::CatalogEntry& catalogEntry,
-                                                std::shared_ptr<Ident> newIdent = nullptr) {
-    // Instantiate a new collection without any shared state.
-    const auto nss = catalogEntry.metadata->nss;
-    LOGV2_DEBUG(6825401,
-                1,
-                "Instantiating a new collection",
-                logAttrs(nss),
-                "ident"_attr = catalogEntry.ident,
-                "md"_attr = catalogEntry.metadata->toBSON(),
-                "timestamp"_attr = readTimestamp);
-
-    const auto collectionOptions = catalogEntry.metadata->options;
-    std::unique_ptr<RecordStore> rs =
-        opCtx->getServiceContext()->getStorageEngine()->getEngine()->getRecordStore(
-            opCtx,
-            nss,
-            catalogEntry.ident,
-            getRecordStoreOptions(
-                nss, collectionOptions, catalogEntry.metadata->recordIdsReplicated),
-            collectionOptions.uuid);
-
-    if (newIdent) {
-        rs->setIdent(std::move(newIdent));
-    }
-
-    std::shared_ptr<Collection> collToReturn = Collection::Factory::get(opCtx)->make(
-        opCtx, nss, catalogEntry.catalogId, catalogEntry.metadata, std::move(rs));
-    Status status =
-        collToReturn->initFromExisting(opCtx, /*collection=*/nullptr, catalogEntry, readTimestamp);
-    if (!status.isOK()) {
-        LOGV2_DEBUG(
-            6857102, 1, "Failed to instantiate collection", "reason"_attr = status.reason());
-        return nullptr;
-    }
-
-    return collToReturn;
-}
-
-const auto exclusionCounterForDeepCopies = OperationContext::declareDecoration<int>();
-}  // namespace
-
-ExcludeTestOnlyCollectionInstantiation::ExcludeTestOnlyCollectionInstantiation(
-    OperationContext* opCtx)
-    : _opCtx(opCtx) {
-    exclusionCounterForDeepCopies(opCtx)++;
-}
-
-ExcludeTestOnlyCollectionInstantiation::~ExcludeTestOnlyCollectionInstantiation() {
-    exclusionCounterForDeepCopies(_opCtx)--;
-}
-
-const Collection* CollectionCatalog::_instantiateCollectionIfTesting(
-    OperationContext* opCtx,
-    const NamespaceStringOrUUID& nssOrUUID,
-    boost::optional<Timestamp> readTimestamp) const {
-    if (exclusionCounterForDeepCopies(opCtx) > 0) {
-        // The branch is running under exclusion rules temporarily while the code is fixed. Nothing
-        // to do here.
-        return nullptr;
-    }
-
-    static constexpr auto kIsSanitizerBuild = __has_feature(thread_sanitizer) ||
-        __has_feature(address_sanitizer) || __has_feature(memory_sanitizer);
-    if (!(kIsSanitizerBuild ||
-          MONGO_unlikely(gFeatureFlagPerformDeepCopyOfCollections.isEnabled()))) {
-        // Not a testing build or using the sanitizer, do an early exit since we don't have to do
-        // anything.
-        return nullptr;
-    }
-
-    // For Sanitizer/Testing builds we force the catalog to always read from disk and create a
-    // new collection instance. This will help detect any errors that would otherwise go
-    // unnoticed like storing pointers to inner fields of a collection instance resulting in
-    // undefined behaviour.
-    //
-    // An example of this failure is SERVER-105873 which resulted in a CVE being issued.
-    //
-    // Note that this should only be done for collections that are being used in a lock-free
-    // manner which means that unfortunately we'll have to make use of the locker here.
-    //
-    // We only have to focus on the happy path here since all non-happy paths have been explored
-    // by the _needsOpenCollection check.
-    const auto locker = shard_role_details::getLocker(opCtx);
-    bool shouldInstantiateCollection = nssOrUUID.isNamespaceString()
-        ? !locker->isCollectionLockedForMode(nssOrUUID.nss(), MODE_IS)
-        : false;
-    {
-        // Collections that are virtual cannot be instantiated from disk since they do not
-        // exist. Virtual collections do not have a valid catalog id.
-        auto collection = lookupCollectionByNamespaceOrUUID(opCtx, nssOrUUID);
-        shouldInstantiateCollection &= collection ? collection->getCatalogId().isValid() : true;
-    }
-    // TODO SERVER-122143: Some FLE tests are failing due to having to run aggregates that
-    // perform yield/restore in order to count documents. Those aggregates then fail since the
-    // shard role checks for untracked collections will detect that the collection is not the
-    // same as the latest one and cause a false positive failure.
-    shouldInstantiateCollection &=
-        nssOrUUID.isNamespaceString() && !nssOrUUID.nss().isFLE2StateCollection();
-    // TODO SERVER-122142: The oplog is handled specially here since it seems we would constantly
-    // start oplog visibility threads.
-    shouldInstantiateCollection &= nssOrUUID.isNamespaceString() && !nssOrUUID.nss().isOplog();
-    // Viewless timeseries upgrade/downgrade relies on a hack that for a brief window will make
-    // the durable state not correspond with what's in memory but expect the in-memory version
-    // to be returned. For more details see SERVER-115811.
-    bool isPartOfTimeseriesUpgradeDowngrade = [&] {
-        auto pending = _findPendingCommitCollection(nssOrUUID);
-        return pending && _hasPendingTimeseriesUpgradeDowngradeCommit(nssOrUUID, *pending);
-    }();
-    shouldInstantiateCollection &= !isPartOfTimeseriesUpgradeDowngrade;
-
-    if (!shouldInstantiateCollection) {
-        return nullptr;
-    }
-
-    auto& openedCollections = OpenedCollections::get(opCtx);
-    static constexpr auto doNotWriteIntoHistoricalCatalogIdTracker = false;
-    auto catalogEntry = _fetchPITCatalogEntry(
-        opCtx, nssOrUUID, readTimestamp, doNotWriteIntoHistoricalCatalogIdTracker);
-    if (!catalogEntry) {
-        // No collection could be found at the given PIT
-        return nullptr;
-    }
-
-    // TODO SERVER-121394: Timeseries cannot use PIT lookups here since there is a problem
-    // with extended ranges support. Namely, extended ranges are set on the latest
-    // collection instance. If we have to create a new collection from scratch then the
-    // extended ranges state is lost and invalid query results can be returned.
-    if (catalogEntry->metadata->options.timeseries) {
-        return nullptr;
-    }
-
-    auto newCollection = createNewCollection(opCtx, readTimestamp, *catalogEntry);
-    if (newCollection) {
-        openedCollections.store(newCollection, newCollection->ns(), newCollection->uuid());
-        return newCollection.get();
-    }
-    return nullptr;
-}
-
 ConsistentCollection CollectionCatalog::establishConsistentCollection(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nssOrUUID,
@@ -1139,12 +995,7 @@ ConsistentCollection CollectionCatalog::establishConsistentCollection(
         return ConsistentCollection{opCtx, coll};
     }
 
-    auto coll = _instantiateCollectionIfTesting(opCtx, nssOrUUID, readTimestamp);
-    if (coll) {
-        return ConsistentCollection{opCtx, coll};
-    }
-
-    coll = _lookupCollectionByNamespaceOrUUIDNoFindInstantiated(nssOrUUID).get();
+    auto coll = _lookupCollectionByNamespaceOrUUIDNoFindInstantiated(nssOrUUID).get();
     return ConsistentCollection{opCtx, coll};
 }
 
@@ -1591,8 +1442,7 @@ const Collection* CollectionCatalog::_openCollectionAtPointInTimeByNamespaceOrUU
 boost::optional<durable_catalog::CatalogEntry> CollectionCatalog::_fetchPITCatalogEntry(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nssOrUUID,
-    boost::optional<Timestamp> readTimestamp,
-    bool writeIntoCatalogIdTracker) const {
+    boost::optional<Timestamp> readTimestamp) const {
     auto [catalogId, result] = nssOrUUID.isNamespaceString()
         ? _catalogIdTracker.lookup(nssOrUUID.nss(), readTimestamp)
         : _catalogIdTracker.lookup(nssOrUUID.uuid(), readTimestamp);
@@ -1634,32 +1484,29 @@ boost::optional<durable_catalog::CatalogEntry> CollectionCatalog::_fetchPITCatal
 
     auto mdbCatalog = MDBCatalog::get(opCtx);
     if (result == HistoricalCatalogIdTracker::LookupResult::Existence::kUnknown) {
+        // We shouldn't receive kUnknown when we don't have a timestamp since no timestamp means
+        // we're operating on the latest.
+        invariant(readTimestamp);
+
         // Scan durable catalog when we don't have accurate catalogId mapping for this timestamp.
         gCollectionCatalogSection.numScansDueToMissingMapping.fetchAndAddRelaxed(1);
         auto catalogEntry = nssOrUUID.isNamespaceString()
             ? durable_catalog::scanForCatalogEntryByNss(opCtx, nssOrUUID.nss(), mdbCatalog)
             : durable_catalog::scanForCatalogEntryByUUID(opCtx, nssOrUUID.uuid(), mdbCatalog);
-        if (MONGO_likely(writeIntoCatalogIdTracker)) {
-            // We shouldn't receive kUnknown when we don't have a timestamp since no timestamp means
-            // we're operating on the latest.
-            invariant(readTimestamp);
-            writeCatalogIdAfterScan(catalogEntry);
-        }
+        writeCatalogIdAfterScan(catalogEntry);
         return catalogEntry;
     }
 
     auto catalogEntry = durable_catalog::getParsedCatalogEntry(opCtx, catalogId, mdbCatalog);
     if (!catalogEntry ||
         (nssOrUUID.isNamespaceString() && nssOrUUID.nss() != catalogEntry->metadata->nss)) {
+        invariant(readTimestamp);
         // If no entry is found or the entry contains a different namespace, the mapping might be
         // incorrect since it is incomplete after startup; scans durable catalog to confirm.
         auto catalogEntry = nssOrUUID.isNamespaceString()
             ? durable_catalog::scanForCatalogEntryByNss(opCtx, nssOrUUID.nss(), mdbCatalog)
             : durable_catalog::scanForCatalogEntryByUUID(opCtx, nssOrUUID.uuid(), mdbCatalog);
-        if (MONGO_likely(writeIntoCatalogIdTracker)) {
-            invariant(readTimestamp);
-            writeCatalogIdAfterScan(catalogEntry);
-        }
+        writeCatalogIdAfterScan(catalogEntry);
         return catalogEntry;
     }
     return catalogEntry;
@@ -1726,11 +1573,42 @@ std::shared_ptr<Collection> CollectionCatalog::_createNewPITCollection(
                     "ident"_attr = catalogEntry.ident);
         return nullptr;
     }
+
+    // Instantiate a new collection without any shared state.
+    const auto nss = catalogEntry.metadata->nss;
+    LOGV2_DEBUG(6825401,
+                1,
+                "Instantiating a new collection",
+                logAttrs(nss),
+                "ident"_attr = catalogEntry.ident,
+                "md"_attr = catalogEntry.metadata->toBSON(),
+                "timestamp"_attr = readTimestamp);
+
+    const auto collectionOptions = catalogEntry.metadata->options;
+    std::unique_ptr<RecordStore> rs =
+        opCtx->getServiceContext()->getStorageEngine()->getEngine()->getRecordStore(
+            opCtx,
+            nss,
+            catalogEntry.ident,
+            getRecordStoreOptions(
+                nss, collectionOptions, catalogEntry.metadata->recordIdsReplicated),
+            collectionOptions.uuid);
+
     // Set the ident to the one returned by the ident reaper. This is to prevent the ident from
     // being dropping prematurely.
-    auto collection = createNewCollection(opCtx, readTimestamp, catalogEntry, std::move(newIdent));
+    rs->setIdent(std::move(newIdent));
 
-    return collection;
+    std::shared_ptr<Collection> collToReturn = Collection::Factory::get(opCtx)->make(
+        opCtx, nss, catalogEntry.catalogId, catalogEntry.metadata, std::move(rs));
+    Status status =
+        collToReturn->initFromExisting(opCtx, /*collection=*/nullptr, catalogEntry, readTimestamp);
+    if (!status.isOK()) {
+        LOGV2_DEBUG(
+            6857102, 1, "Failed to instantiate collection", "reason"_attr = status.reason());
+        return nullptr;
+    }
+
+    return collToReturn;
 }
 
 void CollectionCatalog::onCreateCollection(OperationContext* opCtx,
