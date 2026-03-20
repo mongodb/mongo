@@ -106,8 +106,8 @@ PlanExplainerData MultiPlanner::extractExplainData() {
     return explainData;
 }
 
-void MultiPlanner::abandonTrialsExceptHashes(const boost::container::flat_set<size_t>& hashes) {
-    _multiplanStage->abandonTrialsExceptHashes(hashes);
+void MultiPlanner::abandonTrialsExceptHash(size_t hash) {
+    _multiplanStage->abandonTrialsExceptHash(hash);
 }
 
 void MultiPlanner::stopCollectingMetrics() {

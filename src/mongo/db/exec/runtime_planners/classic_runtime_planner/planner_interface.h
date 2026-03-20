@@ -259,9 +259,9 @@ public:
 
     /**
      * Abandons the trial period without picking a best plan thus rejecting all plans
-     * except for plans with the given hashes.
+     * except for plans with the given hash.
      */
-    void abandonTrialsExceptHashes(const boost::container::flat_set<size_t>& hashes);
+    void abandonTrialsExceptHash(size_t hash);
 
     const QuerySolution* querySolution() const override;
 
