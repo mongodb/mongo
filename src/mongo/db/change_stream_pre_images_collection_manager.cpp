@@ -64,6 +64,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(failPreimagesCollectionCreation);
+MONGO_FAIL_POINT_DEFINE(disableChangeStreamPreImagesRemover);
 
 const auto getPreImagesCollectionManager =
     ServiceContext::declareDecoration<ChangeStreamPreImagesCollectionManager>();
@@ -164,8 +165,12 @@ void ChangeStreamPreImagesCollectionManager::insertPreImage(OperationContext* op
 
 void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImagesRemovalPass(
     Client* client, bool useReplicatedTruncates) {
-    Timer timer;
+    // Failpoint to temporarily disable pre-images removal job for testing.
+    if (MONGO_unlikely(disableChangeStreamPreImagesRemover.shouldFail())) {
+        return;
+    }
 
+    Timer timer;
     const auto startTime = Date_t::now();
     ServiceContext::UniqueOperationContext opCtx;
     try {
@@ -215,6 +220,11 @@ void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImages
             return;
         }
 
+        LOGV2_DEBUG(12216000,
+                    1,
+                    "Periodic change stream expired pre-images removal job starting",
+                    "useReplicatedTruncates"_attr = useReplicatedTruncates);
+
         // The number of removals here can be an estimate based on collection size information,
         // which can be inaccurate.
         if (size_t estimatedNumberOfRemovals =
@@ -235,9 +245,21 @@ void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImages
                 "Periodic change stream expired pre-images removal job operation was interrupted",
                 "errorCode"_attr = interruptStatus);
         } else {
-            LOGV2_ERROR(5869106,
-                        "Periodic change stream expired pre-images removal job failed",
-                        "reason"_attr = exception.reason());
+            // Turn 'NotWritablePrimary' errors into info log messages, because they are expected in
+            // some situations.
+            if (useReplicatedTruncates && exception.code() == ErrorCodes::NotWritablePrimary) {
+                LOGV2_INFO(
+                    12216001,
+                    "Periodic change stream expired pre-images removal job failed because it "
+                    "executed on a non-primary. This can happen temporarily during step up, step "
+                    "down or FCV change.",
+                    "reason"_attr = exception.reason());
+            } else {
+                LOGV2_ERROR(5869106,
+                            "Periodic change stream expired pre-images removal job failed",
+                            "errorCode"_attr = exception.codeString(),
+                            "reason"_attr = exception.reason());
+            }
         }
     }
 
