@@ -381,6 +381,12 @@ private:
     }
 
     /**
+     * Clones the given vector of LetVariable objects using the newExpCtx.
+     */
+    void copyLetVariablesWithNewExpCtx(const std::vector<LetVariable>& src,
+                                       ExpressionContext* newExpCtx);
+
+    /**
      * Builds a parsed pipeline for introspection (e.g. constraints, dependencies). Any sub-$lookup
      * pipelines will be built recursively.
      */
