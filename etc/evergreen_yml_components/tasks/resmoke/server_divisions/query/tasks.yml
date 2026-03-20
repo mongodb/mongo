@@ -1554,6 +1554,7 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
+        "incompatible_amazon_linux2",
         "mongot_e2e_tests",
       ]
     commands:
@@ -1575,6 +1576,7 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
+        "incompatible_amazon_linux2",
         "mongot_e2e_tests",
       ]
     commands:
@@ -1594,6 +1596,7 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
+        "incompatible_amazon_linux2",
         "mongot_e2e_tests",
       ]
     commands:
@@ -1616,6 +1619,7 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
+        "incompatible_amazon_linux2",
         "mongot_e2e_tests",
         "requires_large_host",
       ]
@@ -1638,6 +1642,7 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
+        "incompatible_amazon_linux2",
         "mongot_e2e_tests",
         "requires_large_host",
       ]
@@ -1658,6 +1663,7 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
+        "incompatible_amazon_linux2",
         "mongot_e2e_tests",
         "requires_large_host",
       ]
@@ -1681,6 +1687,7 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
+        "incompatible_amazon_linux2",
         "mongot_e2e_tests",
         "requires_large_host",
       ]
@@ -1703,6 +1710,7 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
+        "incompatible_amazon_linux2",
         "mongot_e2e_tests",
         "requires_large_host",
       ]
@@ -1723,6 +1731,7 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
+        "incompatible_amazon_linux2",
         "mongot_e2e_tests",
         "requires_large_host",
       ]
@@ -1746,6 +1755,7 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
+        "incompatible_amazon_linux2",
         "mongot_e2e_tests",
         "requires_large_host",
       ]
@@ -1768,6 +1778,7 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
+        "incompatible_amazon_linux2",
         "mongot_e2e_tests",
         "requires_large_host",
       ]
@@ -1788,6 +1799,7 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
+        "incompatible_amazon_linux2",
         "mongot_e2e_tests",
         "requires_large_host",
       ]
@@ -1853,6 +1865,7 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
+        "incompatible_amazon_linux2",
         "mongot_e2e_tests",
       ]
     commands:
@@ -1874,6 +1887,7 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
+        "incompatible_amazon_linux2",
         "mongot_e2e_tests",
         "requires_large_host",
       ]
@@ -1896,6 +1910,7 @@ tasks:
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
+        "incompatible_amazon_linux2",
         "mongot_e2e_tests",
         "requires_large_host",
       ]
@@ -3196,6 +3211,7 @@ tasks:
         "extensions",
         "incompatible_windows",
         "incompatible_mac",
+        "incompatible_amazon_linux2",
       ]
     commands:
       - func: "do setup"
@@ -3210,6 +3226,7 @@ tasks:
         "extensions",
         "incompatible_windows",
         "incompatible_mac",
+        "incompatible_amazon_linux2",
       ]
     commands:
       - func: "do setup"
@@ -3224,6 +3241,7 @@ tasks:
         "extensions",
         "incompatible_windows",
         "incompatible_mac",
+        "incompatible_amazon_linux2",
       ]
     commands:
       - func: "do setup"
@@ -3238,6 +3256,7 @@ tasks:
         "extensions",
         "incompatible_windows",
         "incompatible_mac",
+        "incompatible_amazon_linux2",
       ]
     commands:
       - func: "do setup"
@@ -3252,6 +3271,7 @@ tasks:
         "extensions",
         "incompatible_windows",
         "incompatible_mac",
+        "incompatible_amazon_linux2",
       ]
     commands:
       - func: "do setup"
@@ -3266,6 +3286,7 @@ tasks:
         "extensions",
         "incompatible_windows",
         "incompatible_mac",
+        "incompatible_amazon_linux2",
       ]
     commands:
       - func: "do setup"

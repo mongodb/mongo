@@ -69,24 +69,20 @@ This cross-repo test infrastructure is temporary for the initial rollout of exte
 
 **To update the checksums:**
 
-1. Run the following to download each tarball and print its SHA256. Use **all four** so Evergreen and other developers have the correct hashes.
+1. Run the following to download each tarball and print its SHA256 so Evergreen and other developers have the correct hashes.
 
 ```bash
 VERSION=1.0.0  # replace with the new version
-for s in amazon2023-x86_64 amazon2023-aarch64 amazon2-x86_64 amazon2-aarch64; do
-  url="https://mongot-extension.s3.amazonaws.com/release/mongot-extension-${VERSION}-${s}.tgz"
-  curl -sL -o "/tmp/mongot-${s}.tgz" "$url"
-  echo "$url"
-  sha256sum "/tmp/mongot-${s}.tgz" | awk '{print $1}'
-done
+BASE="https://mongot-extension.s3.amazonaws.com/release/mongot-extension-${VERSION}"
+
+curl -sL "${BASE}-amazon2023-x86_64.tgz" | sha256sum | awk '{print $1}'
+curl -sL "${BASE}-amazon2023-aarch64.tgz" | sha256sum | awk '{print $1}'
 ```
 
-2. In `buildscripts/s3_binary/hashes.py`, replace the four mongot-extension **hash values** with the four printed hashes in the same order:
+2. In `buildscripts/s3_binary/hashes.py`, replace the mongot-extension **hash values** with the printed hashes in the same order:
 
 - `amazon2023-x86_64`
 - `amazon2023-aarch64`
-- `amazon2-x86_64`
-- `amazon2-aarch64`
 
 3. Commit the updated `hashes.py` so Evergreen and others use the new checksums.
 

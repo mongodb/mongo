@@ -169,8 +169,8 @@ buildvariants:
           - amazon2-arm64-latest-m8g-4xlarge
       # downstream_expansions.set() is noop for evergreen versions, so fine to define in cron-only variants for sake of shared yaml anchor.
       - name: set_downstream_expansions_for_mongot
-      - name: .mongot_e2e_tests !.requires_large_host
-      - name: .mongot_e2e_tests .requires_large_host
+      - name: .mongot_e2e_tests !.requires_large_host !.incompatible_amazon_linux2
+      - name: .mongot_e2e_tests .requires_large_host !.incompatible_amazon_linux2
         distros:
           - amazon2-arm64-latest-m8g-4xlarge
       # TODO SERVER-89721 remove search suites that use mongot mock.
@@ -240,7 +240,7 @@ buildvariants:
           - amazon2-latest-large
       # downstream_expansions.set() is noop for evergreen versions, so fine to define in cron-only variants for sake of shared yaml anchor.
       - name: set_downstream_expansions_for_mongot
-      - name: .mongot_e2e_tests
+      - name: .mongot_e2e_tests !.incompatible_amazon_linux2
       # TODO SERVER-89721 remove search suites that use mongot mock.
       - name: search
       - name: search_community

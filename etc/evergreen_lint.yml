@@ -131,6 +131,7 @@ rules:
           - incompatible_oscrypto
           - incompatible_ppc
           - incompatible_s390x
+          - incompatible_amazon_linux2
           - incompatible_aubsan
           - incompatible_tsan
           - incompatible_debug_mode
