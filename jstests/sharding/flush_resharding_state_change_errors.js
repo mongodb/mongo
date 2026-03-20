@@ -45,7 +45,7 @@ function validateFlushReshardingStateChangeMetrics(metrics) {
 
 function assertSoonFlushReshardingStateChangeStartRetryingOnRefreshErrors(conn) {
     let numTries = 0;
-    assert.soon(() => {
+    assert.soonRetryOnNetworkErrors(() => {
         numTries++;
         const metrics = getFlushReshardingStateChangeMetrics(conn);
         validateFlushReshardingStateChangeMetrics(metrics);
@@ -67,7 +67,7 @@ function assertSoonFlushReshardingStateChangeStopRetryingOnRefreshErrors(conn) {
     // retry.
     const timeout = null; // Use the default timeout.
     const interval = 1000;
-    assert.soon(
+    assert.soonRetryOnNetworkErrors(
         () => {
             numTries++;
             const currMetrics = getFlushReshardingStateChangeMetrics(conn);
