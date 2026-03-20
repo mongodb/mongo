@@ -132,6 +132,11 @@ mongo_cc_library(
         "load_stub_parsers.cpp",
         "//src/mongo/db/pipeline:document_source_list_extensions.cpp",
     ],
+    defines = select({
+        "//bazel/config:not_linux": [],
+        "//bazel/platforms:amazon_linux_2": [],
+        "//conditions:default": ["MONGO_HOST_RNP_SIG_VALIDATION_COMPATIBLE"],
+    }),
     deps = [
         ":extension_host",
         "//src/mongo:base",
@@ -139,7 +144,11 @@ mongo_cc_library(
         "//src/third_party/yaml-cpp:yaml",
     ] + select({
         "//bazel/config:not_linux": [],
-        "//conditions:default": [":signature_validator"],
+        "//bazel/platforms:amazon_linux_2": [],
+        "//conditions:default": [
+            ":signature_validator",
+            "//src/third_party/rnp",
+        ],
     }),
 )
 
@@ -162,6 +171,9 @@ mongo_cc_unit_test(
     }) + select({
         "@platforms//os:linux": [],
         "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//bazel/platforms:amazon_linux_2": ["@platforms//:incompatible"],
+        "//conditions:default": [],
     }),
     deps = [
         ":extension_loader",

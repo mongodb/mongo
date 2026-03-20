@@ -1,0 +1,19 @@
+# for test_ffi_op_verify_sig_count
+test_messages/message-32k-crlf.txt			-text
+test_messages/message-trailing-cr.txt			-text
+# for test_stream_signatures
+test_stream_signatures/source*.txt   			-text
+# for cleartext tests
+test_messages/message.txt            			-text
+# for test_ffi_enarmor_dearmor
+test_stream_key_load/rsa-rsa-pub.asc 			-text
+# for Misc.test_rnpkeys_lists
+test_cli_rnpkeys/*		     			-text
+# for Misc.test_rnp_single_export
+test_single_export_subkeys/list_key_export_single.txt	-text
+# for Misc.test_rnp_list_packets
+test_list_packets/*					-text
+# for Misc.test_rnp_list_packets_edge_cases
+test_key_edge_cases/*					-text
+# for test_ffi_dearmor_edge_cases
+test_stream_armor/blank_line_with_whitespace.asc	-text

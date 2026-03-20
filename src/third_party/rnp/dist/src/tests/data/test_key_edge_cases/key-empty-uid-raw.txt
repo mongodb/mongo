@@ -1,0 +1,91 @@
+:off 0: packet header 0x9833 (tag 6, len 51)
+:off 2: packet contents (51 bytes)
+    00000 | 04 5e c6 91 74 16 09 2b 06 01 04 01 da 47 0f 01  | .^..t..+.....G..
+    00016 | 01 07 40 6b 11 04 c2 03 24 19 05 23 f9 b0 35 2b  | ..@k....$..#..5+
+    00032 | 1d 0a 94 82 d7 96 30 77 3b 78 7e 5a 53 61 f3 c6  | ......0w;x~ZSa..
+    00048 | 84 56 e1                                         | .V.             
+
+Public key packet
+    version: 4
+    creation time: 1590071668 (??? ??? ?? ??:??:?? ????)
+    public key algorithm: 22 (EdDSA)
+    public key material:
+        ecc p: 263 bits
+        ecc curve: Ed25519
+    keyid: 0xc972affd358bf887
+:off 53: packet header 0xb400 (tag 13, len 0)
+:off 55: packet contents (first 146 bytes)
+    00000 | 88 90 04 13 16 08 00 38 16 21 04 75 3d 5b 94 7e  | .......8.!.u=[.~
+    00016 | 9a 2b 2e 01 14 7c 1f c9 72 af fd 35 8b f8 87 05  | .+...|..r..5....
+    00032 | 02 5e c6 91 74 02 1b 03 05 0b 09 08 07 02 06 15  | .^..t...........
+    00048 | 0a 09 08 0b 02 04 16 02 03 01 02 1e 01 02 17 80  | ................
+    00064 | 00 0a 09 10 c9 72 af fd 35 8b f8 87 de c3 00 fa  | .....r..5.......
+    00080 | 02 b2 e8 10 20 19 c4 f2 60 b0 d1 6b 5e 50 83 21  | .... ...`..k^P.!
+    00096 | b8 3a a4 cd c0 39 18 fa 66 23 29 e0 2b 09 90 fe  | .:...9..f#).+...
+    00112 | 01 00 cd 1f a9 5e 59 be ba c9 35 ce 45 76 2b 3a  | .....^Y...5.Ev+:
+    00128 | 4e 8c b8 7a 9f 06 77 15 dd e3 c2 d9 da e7 4e 5c  | N..z..w.......N\
+    00144 | b2 0f                                            | ..              
+
+UserID packet
+    id: 
+:off 55: packet header 0x8890 (tag 2, len 144)
+:off 57: packet contents (144 bytes)
+    00000 | 04 13 16 08 00 38 16 21 04 75 3d 5b 94 7e 9a 2b  | .....8.!.u=[.~.+
+    00016 | 2e 01 14 7c 1f c9 72 af fd 35 8b f8 87 05 02 5e  | ...|..r..5.....^
+    00032 | c6 91 74 02 1b 03 05 0b 09 08 07 02 06 15 0a 09  | ..t.............
+    00048 | 08 0b 02 04 16 02 03 01 02 1e 01 02 17 80 00 0a  | ................
+    00064 | 09 10 c9 72 af fd 35 8b f8 87 de c3 00 fa 02 b2  | ...r..5.........
+    00080 | e8 10 20 19 c4 f2 60 b0 d1 6b 5e 50 83 21 b8 3a  | .. ...`..k^P.!.:
+    00096 | a4 cd c0 39 18 fa 66 23 29 e0 2b 09 90 fe 01 00  | ...9..f#).+.....
+    00112 | cd 1f a9 5e 59 be ba c9 35 ce 45 76 2b 3a 4e 8c  | ...^Y...5.Ev+:N.
+    00128 | b8 7a 9f 06 77 15 dd e3 c2 d9 da e7 4e 5c b2 0f  | .z..w.......N\..
+
+Signature packet
+    version: 4
+    type: 19 (Positive User ID certification)
+    public key algorithm: 22 (EdDSA)
+    hash algorithm: 8 (SHA256)
+    hashed subpackets:
+        :type 33, len 21
+        :subpacket contents:
+            00000 | 04 75 3d 5b 94 7e 9a 2b 2e 01 14 7c 1f c9 72 af  | .u=[.~.+...|..r.
+            00016 | fd 35 8b f8 87                                   | .5...           
+        issuer fingerprint: 0x753d5b947e9a2b2e01147c1fc972affd358bf887 (20 bytes)
+        :type 2, len 4
+        :subpacket contents:
+            00000 | 5e c6 91 74                                      | ^..t            
+        signature creation time: 1590071668 (??? ??? ?? ??:??:?? ????)
+        :type 27, len 1
+        :subpacket contents:
+            00000 | 03                                               | .               
+        key flags: 0x03 ( certify sign )
+        :type 11, len 4
+        :subpacket contents:
+            00000 | 09 08 07 02                                      | ....            
+        preferred symmetric algorithms: AES-256, AES-192, AES-128, TripleDES (9, 8, 7, 2)
+        :type 21, len 5
+        :subpacket contents:
+            00000 | 0a 09 08 0b 02                                   | .....           
+        preferred hash algorithms: SHA512, SHA384, SHA256, SHA224, SHA1 (10, 9, 8, 11, 2)
+        :type 22, len 3
+        :subpacket contents:
+            00000 | 02 03 01                                         | ...             
+        preferred compression algorithms: ZLib, BZip2, ZIP (2, 3, 1)
+        :type 30, len 1
+        :subpacket contents:
+            00000 | 01                                               | .               
+        features: 0x01 ( mdc )
+        :type 23, len 1
+        :subpacket contents:
+            00000 | 80                                               | .               
+        key server preferences
+        no-modify: 1
+    unhashed subpackets:
+        :type 16, len 8
+        :subpacket contents:
+            00000 | c9 72 af fd 35 8b f8 87                          | .r..5...        
+        issuer key ID: 0xc972affd358bf887
+    lbits: 0xdec3
+    signature material:
+        ecc r: 250 bits
+        ecc s: 256 bits

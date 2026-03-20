@@ -1,0 +1,78 @@
+= Packaging
+
+== CentOS 7
+
+=== 1. Retrieve the source
+
+==== Tarball
+
+[source,console]
+--
+curl -LO https://github.com/rnpgp/rnp/archive/v0.9.0.tar.gz
+tar xzf v0.9.0.tar.gz
+cd rnp-0.9.0
+--
+
+==== Git
+
+[source,console]
+--
+git clone https://github.com/rnpgp/rnp
+cd rnp
+git checkout v0.9.0
+--
+
+=== 2. Launch a container
+
+[source,console]
+--
+docker run -ti --rm -v $PWD:/usr/local/rnp centos:7 bash
+--
+
+From this point, all commands are executed in the container.
+
+==== 3. Install pre-requisites
+
+[source,console]
+--
+# for newer cmake and other things
+yum -y install epel-release
+
+# rnp
+yum -y install git cmake3 make gcc-c++
+yum -y install bzip2-devel zlib-devel json-c12-devel
+
+# botan
+rpm --import https://github.com/riboseinc/yum/raw/master/ribose-packages.pub
+rpm --import https://github.com/riboseinc/yum/raw/master/ribose-packages-next.pub
+curl -L https://github.com/riboseinc/yum/raw/master/ribose.repo > /etc/yum.repos.d/ribose.repo
+yum -y install botan2-devel
+--
+
+=== 4. Build the RPM
+
+[source,console]
+--
+yum -y install rpm-build
+mkdir ~/build
+cd ~/build
+cmake3 -DBUILD_SHARED_LIBS=on -DBUILD_TESTING=off -DCPACK_GENERATOR=RPM /usr/local/rnp
+make package
+--
+
+=== 5. Check and Install the RPM
+
+It may be helpful to run `rpmlint` on the RPM and note new warnings or errors.
+
+[source,console]
+--
+yum -y install rpmlint
+rpmlint rnp-0.9.0-1.el7.centos.x86_64.rpm
+--
+
+At this point, you can test that the RPM installs successfully:
+
+[source,console]
+--
+yum localinstall rnp-0.9.0-1.el7.centos.x86_64.rpm
+--

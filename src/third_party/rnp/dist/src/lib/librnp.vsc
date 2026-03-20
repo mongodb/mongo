@@ -1,0 +1,4 @@
+{
+ global: rnp_*;
+ local: *;
+};

@@ -1,0 +1,10 @@
+{
+    "primary": {
+        "type": "EdDSA",
+        "userid": "test-eddsa"
+    },
+     "sub": {
+        "type": "Wrong"
+    }
+}
+  

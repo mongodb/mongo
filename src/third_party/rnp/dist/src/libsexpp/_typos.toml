@@ -1,0 +1,4 @@
+[files]
+extend-exclude = [
+    "tests/abi/libsexpp.0.abi"
+]

@@ -1,0 +1,459 @@
+= rnpkeys(1)
+RNP
+:doctype: manpage
+:release-version: {component-version}
+:man manual: RNP Manual
+:man source: RNP {release-version}
+
+== NAME
+
+RNPKEYS - OpenPGP key management utility.
+
+== SYNOPSIS
+
+*rnpkeys* [_--homedir_ _dir_] [_OPTIONS_] _COMMAND_
+
+== DESCRIPTION
+
+The _rnpkeys_ command-line utility is part of the _RNP_ suite and
+provides OpenPGP key management functionality, including:
+
+* key listing;
+* key generation;
+* key import/export; and
+* key editing.
+
+
+=== BASICS
+
+By default, *rnp* will apply a _COMMAND_, additionally configured with _OPTIONS_,
+to all _INPUT_FILE_(s) or _stdin_ if no _INPUT_FILE_ is given.
+There are some special cases for _INPUT_FILE_ :
+
+* _-_ (dash) substitutes to _stdin_
+* env:VARIABLE_NAME substitutes to the contents of environment variable VARIABLE_NAME
+
+Depending on the input, output may be written:
+
+* to the specified file with a removed or added file extension (_.pgp_, _.asc_, _.sig_); or
+* to _stdout_.
+
+Without the *--armor* option, output will be in binary.
+
+If _COMMAND_ requires public or private keys, *rnp* will look for the keyrings in *~/.rnp*. The options *--homedir* and *--keyfile* override this (see below).
+
+If _COMMAND_ needs a password, *rnp* will ask for it via *stdin* or *tty*,
+unless the *--password* or *--pass-fd* option was specified.
+
+
+By default, *rnpkeys* will use keyrings stored in the _~/.rnp_ directory.
+
+This behavior may be overridden with the _--homedir_ option.
+
+If _COMMAND_ needs a password, the command will prompt the caller
+via _stdin_ or _tty_, unless the *--password* or *--pass-fd*
+options were also used.
+
+=== SPECIFYING KEYS
+
+Most *rnpkeys* commands require a key locator or a filter,
+representing one or more keys.
+
+It may be specified in one of the following ways:
+
+*userid*::
+Or just part of the *userid*.
+For *"Alice <alice@rnpgp.com>"*, the following methods are considered identical:
+
+** _alice_
+** _alice@rnpgp_
+** _rnpgp.com_
+
+*keyid*::
+Or its right-most 8 characters. With or without _0x_ at the beginning and spaces/tabs inside. Such as:
+
+** _0x725F6F2D6D5F6120_
+** _"725F6F2D 6D5F6120"_
+** _0x6D5F6120_
+
+*key fingerprint*: The 40-character key fingerprint, such as:
+
+** _"0x416E746F 6E537669 72696465 6E6B6F20"_
+
+
+
+== COMMANDS
+
+=== INFORMATIONAL
+
+*-h*, *--help*::
+Displays a short help message. No options are expected.
+
+*-V*, *--version*::
+Displays version information. No options are expected.
+
+*-l*, *--list-keys*::
+List out keys and some brief information about each. +
++
+Additional options:
+
+*--with-sigs*:::
+Additionally display signatures of listed keys.
+
+
+=== KEY GENERATION
+
+*-g*, *--generate-key*::
+Generate a new keypair. +
++
+Without additional options, an RSA primary key pair with an RSA sub-key pair will be generated, and prompting for the encryption password afterwards.
++
+Additional options:
+
+*--numbits*:::
+Overrides the default key size. For RSA it is *3072* bits.
+
+*--expiration* _TIME_:::
+Set key and subkey expiration time, counting from the creation time. +
++
+By default generated keys do not expire. +
++
+Expiration time can be specified as:
+
+* expiration date in the ISO 8601:2019 date format (_yyyy-mm-dd_); or
+* hours/days/months/years since creation time with the syntax of _20h_/_30d_/_1m_/_1y_;
+* number of seconds.
+
+*--expert*:::
+Select key algorithms interactively and override default settings.
+
+*--userid*:::
+Specifies the _userid_ to be used in generation.
+
+*--hash*:::
+Specify the hash algorithm used in generation.
+
+*--cipher*:::
+Specify the encryption algorithm used in generation.
+
+*--s2k-iterations*:::
+Specify the number of iterations for the S2K (string-to-key) process. +
++
+This is used during the derivation of the symmetric key, which
+encrypts a secret key from the password. +
+
+*--s2k-msec*:::
+Specify that *rnpkeys* should automatically pick a
+*--s2k-iterations* value such that the single key derivation operation
+would take _NUMBER_ of milliseconds on the current system. +
++
+For example, setting it to _2000_ would mean that each secret key
+decryption operation would take around 2 seconds (on the current machine).
+
+*--allow-weak-hash*:::
+Allow usage of a weak hash algorithm.
+
+*--allow-sha1-key-sigs*:::
+Allow usage of a SHA-1 key signatures.
+
+
+=== KEY/SIGNATURE IMPORT
+
+*--import*, *--import-keys*, *--import-sigs*::
+Import keys or signatures. +
++
+While *rnpkeys* automatically detects the input data format,
+one may still wish to specify whether the input provides keys or signatures. +
++
+By default, the import process will stop on the first discovered
+erroneous key or signature. +
++
+Additional options:
+
+*--permissive*:::
+Skip errored or unsupported packets during the import process.
+
+=== KEY/SIGNATURE EXPORT
+
+*--export-key* [*--userid*=_FILTER_] [_FILTER_]::
+Export key(s). Only export keys that match _FILTER_ if _FILTER_ is given. +
++
+If filter matches a primary key, the subkeys of the primary key are also exported.
++
+By default, key data is written to _stdout_ in ASCII-armored format.
++
+Additional options:
+
+*--output* _PATH_:::
+Specifies output to be written to a file name instead of _stdout_.
+
+*--secret*:::
+Without this option specified, the command will only export public key(s).
+This option must be provided to export secret key(s).
+
+*--export-rev* _KEY_::
+Export the revocation signature for a specified secret key. +
++
+The revocation signature can be used later in a case of key loss or compromise.
++
+Additional options:
+
+*--rev-type*:::
+Specifies type of key revocation.
+
+*--rev-reason*:::
+Specifies reason for key revocation.
+
+
+=== KEY MANIPULATION
+
+*--revoke-key* _KEY_::
+Issue revocation signature for the secret key, and save it in the keyring. +
++
+Revoked keys cannot be used further. +
++
+Additional options:
+
+*--rev-type*:::
+Specifies type of key revocation, see *options* section for the available values.
+
+*--rev-reason*:::
+Specifies reason for key revocation.
+
+
+*--remove-key* _KEY_::
+Remove the specified key. +
++
+If a primary key is specified, then all of its subkeys are also removed. +
++
+If the specified key is a secret key, then it will not be deleted without
+confirmation.
++
+Additional options:
+
+*--force*:::
+Forces removal of a secret key without prompting the user.
+
+*--edit-key* _KEY_::
+Edit or update information, associated with a key. Should be accompanied with editing option. +
++
+Currently the following options are available: +
++
+*--add-subkey*:::
+Generate and add a new subkey to the existing primary key. All additional options for the
+*--generate-key* command apply for subkey generation as well, except *--userid*.
+
+*--check-cv25519-bits*:::
+Check whether least significant/most significant bits of Curve25519 ECDH subkey are correctly set.
+RNP internally sets those bits to required values (3 least significant bits and most significant bit must be zero) during decryption,
+however other implementations (GnuPG) may require those bits to be set in key material.
+_KEY_ must specify the exact subkey via keyid or fingerprint.
+
+*--fix-cv25519-bits*:::
+Set least significant/most significant bits of Curve25519 ECDH subkey to the correct values, and save a key.
+So later export of the key would ensure compatibility with other implementations (like GnuPG).
+This operation would require the password for your secret key.
+Since version 0.16.0 of RNP generated secret key is stored with bits set to a needed value,
+however, this may be needed to fix older keys or keys generated by other implementations.
+_KEY_ must specify the exact subkey via keyid or fingerprint.
+
+*--set-expire* _TIME_:::
+Set key expiration time. See the description of the *--expiration* option for possible time formats.
+Setting argument to 0 removes key expiration, the key would never expire. It is not recommended
+due to security reasons.
+
+=== OPTIONS
+
+*--homedir* _DIR_::
+Change homedir (where RNP looks for keyrings) to the specified value. +
++
+The default homedir is _~/.rnp_ .
+
+*--output* _PATH_::
+Write data processing related output to the file specified. +
++
+Combine it with *--overwrite* to overwrite file if it already exists.
+
+*--overwrite*::
+Overwrite output file if it already exists. +
++
+
+*--userid* _USERID_::
+Use the specified _userid_ during key generation and in some
+key-searching operations.
+
+*--numbits* _BITS_::
+Specify size in bits for the generated key and subkey. +
++
+_bits_ may be in range *1024*-*16384*, as long as the public key algorithm
+does not place additional limits.
+
+*--cipher* _ALGORITHM_::
+Set the key encryption algorithm. This is only used in key generation. +
++
+The default value is _AES256_.
+
+*--hash* _ALGORITHM_::
+Use the specified hash algorithm for signatures and derivation of the encrypting key from password for secret key encryption. +
++
+The default value is _SHA256_.
+
+*--expert*::
+Use the *expert key generation* mode, allowing the selection of
+key/subkey algorithms. +
++
+The following types of keys can be generated in this mode: +
++
+--
+** *DSA* key with *ElGamal* encryption subkey
+** *DSA* key with *RSA* subkey
+** *ECDSA* key with *ECDH* subkey
+** *EdDSA* key with *x25519* subkey
+** *SM2* key with subkey
+--
++
+Specifically, for *ECDSA* and *ECDH* the underlying curve can also be specified: +
++
+--
+** _NIST P-256_, _NIST P-384_, _NIST P-521_
+** _brainpoolP256r1_, _brainpoolP384r1_, _brainpoolP512r1_
+** _secp256k1_
+--
+
+*--pass-fd* _FD_::
+Specify a file descriptor to read passwords from instead of from _stdin_/_tty_. +
++
+Useful for automated or non-interactive sessions.
+
+*--password* _PASSWORD_::
+Use the specified password when it is needed. +
++
+WARNING: Not recommended for production use due to potential security issues.
+Use *--pass-fd* for batch operations instead.
+
+*--with-sigs*::
+Print signature information when listing keys via the *-l* command.
+
+*--force*::
+Force actions to happen without prompting the user. +
++
+This applies to cases such as secret key removal, revoking an already revoked key and so on.
+
+*--permissive*::
+Skip malformed or unknown keys/signatures during key import. +
++
+By default, *rnpkeys* will stop on the first erroring packet
+and exit with an error.
+
+*--rev-type* _TYPE_::
+Use the specified type during revocation signature generation instead of the default _0_. +
++
+The following values are supported: +
++
+--
+** 0, or "no": no revocation type specified.
+** 1, or "superseded": key was superseded with another key.
+** 2, or "compromised": key was compromised and no longer valid.
+** 3, or "retired": key is retired.
+--
++
+Please refer to *IETF RFC 4880* for details.
+
+*--rev-reason* _REASON_::
+Add the specified human-readable revocation _REASON_ to the
+signature instead of an empty string.
+
+*--s2k-iterations* _NUMBER_::
+Specify the number of iterations for the S2K (string-to-key) process. +
++
+This is used during the derivation of the symmetric key, which
+encrypts a secret key from the password. +
++
+Please refer to IETF RFC 4880 for further details.
+
+*--s2k-msec* _NUMBER_::
+Specify that *rnpkeys* should automatically pick a
+*--s2k-iterations* value such that the single key derivation operation
+would take _NUMBER_ of milliseconds on the current system. +
++
+For example, setting it to _2000_ would mean that each secret key
+decryption operation would take around 2 seconds (on the current machine).
+
+*--notty*::
+Disable use of tty. +
++
+By default RNP would detect whether TTY is attached and use it for user prompts. +
++
+This option overrides default behaviour so user input may be passed in batch mode.
+
+*--current-time* _TIME_::
+Override system's time with a specified value. +
++
+By default RNP uses system's time in all signature/key checks, however in some scenarios it could be needed to override this. +
++
+*TIME* could be specified in the ISO 8601-1:2019 date format (_yyyy-mm-dd_), or in the UNIX timestamp format.
+
+== EXIT STATUS
+
+_0_::
+  Success.
+
+_Non-zero_::
+  Failure.
+
+== EXAMPLES
+
+The following examples demonstrate method of usage of the _rnpkeys_ command.
+
+=== EXAMPLE 1: IMPORT EXISTING KEYS FROM THE GNUPG
+
+Following oneliner may be used to import all public keys from the GnuPG:
+
+*gpg* *-a* *--export* | *rnpkeys* *--import* _-_
+
+To import all secret keys the following command should be used (please note, that you'll be asked for secret key password(s)):
+
+*gpg* *-a* *--export-secret-keys* | *rnpkeys* *--import* _-_
+
+=== EXAMPLE 2: GENERATE A NEW KEY
+
+This example generates a new key with specified userid and expiration.
+Also it enables "expert" mode, allowing the selection of key/subkey algorithms.
+
+*rnpkeys* *--generate* *--userid* *"john@doe.com"* *--expert* *--expiration* *1y*
+
+== BUGS
+
+Please report _issues_ via the RNP public issue tracker at:
+https://github.com/rnpgp/rnp/issues.
+
+_Security reports_ or _security-sensitive feedback_ should be reported
+according to the instructions at:
+https://www.rnpgp.org/feedback.
+
+
+== AUTHORS
+
+*RNP* is an open source project led by Ribose and has
+received contributions from numerous individuals and
+organizations.
+
+
+== RESOURCES
+
+*Web site*: https://www.rnpgp.org
+
+*Source repository*: https://github.com/rnpgp/rnp
+
+
+== COPYING
+
+Copyright \(C) 2017-2021 Ribose.
+The RNP software suite is _freely licensed_:
+please refer to the *LICENSE* file for details.
+
+
+
+== SEE ALSO
+
+*rnp(1)*, *librnp(3)*

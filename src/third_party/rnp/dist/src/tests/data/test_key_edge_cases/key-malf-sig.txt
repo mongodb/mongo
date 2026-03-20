@@ -1,0 +1,15 @@
+:off 0: packet header 0x9833 (tag 6, len 51)
+Public key packet
+    version: 4
+    creation time: 1590071668 (??? ??? ?? ??:??:?? ????)
+    public key algorithm: 22 (EdDSA)
+    public key material:
+        ecc p: 263 bits
+        ecc curve: Ed25519
+    keyid: 0xc972affd358bf887
+:off 53: packet header 0xb400 (tag 13, len 0)
+UserID packet
+    id: 
+:off 55: packet header 0x8890 (tag 2, len 144)
+Signature packet
+    failed to parse

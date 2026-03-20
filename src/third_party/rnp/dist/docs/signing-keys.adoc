@@ -1,0 +1,5 @@
+
+= PGP keys used for signing source code
+
+The current OpenPGP key used for signing source code for RNP is hosted at
+https://www.rnpgp.org/openpgp_keys/[rnpgp.org^].

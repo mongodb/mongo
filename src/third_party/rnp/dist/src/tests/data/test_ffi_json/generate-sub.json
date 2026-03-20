@@ -1,0 +1,11 @@
+{
+   "sub": {
+      "primary": {
+          "grip": "PLACEHOLDER"
+      },
+      "type": "RSA",
+      "length": 1024,
+      "usage": ["encrypt"],
+      "hash": "SHA256"
+   }
+}

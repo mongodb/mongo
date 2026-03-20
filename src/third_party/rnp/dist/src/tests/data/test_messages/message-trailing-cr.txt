@@ -1,0 +1,3 @@
+Text line with 3 trailing CR characters
+Another line with CR at the beginning, should not be stripped.
+Last line with trailing CR and no LF.

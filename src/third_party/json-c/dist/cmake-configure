@@ -1,0 +1,100 @@
+#!/bin/bash
+
+# Wrapper around cmake to emulate useful options
+# from the previous autoconf-based configure script.
+
+RUNDIR=$(dirname "$0")
+RUNDIR=$(cd "$RUNDIR" && pwd)
+CURDIR=$(pwd)
+
+FLAGS=()
+
+usage()
+{
+	exitval="$1"
+	errmsg="$2"
+
+	if [ $exitval -ne 0 ] ; then
+		exec 1>&2
+	fi
+	if [ ! -z "$errmsg" ] ; then
+		echo "ERROR: $errmsg" 1>&2
+	fi
+	cat <<EOF
+$0 [<configure_options>] [-- [<cmake options>]]
+  --prefix=PREFIX         install architecture-independent files in PREFIX
+  --enable-threading      Enable code to support partly multi-threaded use
+  --enable-rdrand         Enable RDRAND Hardware RNG Hash Seed generation on
+                          supported x86/x64 platforms.
+  --enable-shared         build shared libraries [default=yes]
+  --enable-static         build static libraries [default=yes]
+  --disable-Bsymbolic     Avoid linking with -Bsymbolic-function
+  --disable-werror        Avoid treating compiler warnings as fatal errors
+  --disable-extra-libs    Avoid linking against extra libraries, such as libbsd
+
+EOF
+	exit
+}
+
+if [ "$CURDIR" = "$RUNDIR" ] ; then
+	usage 1 "Please mkdir some other build directory, and run this script from there."
+fi
+
+if ! cmake --version ; then
+	usage 1 "Unable to find a working cmake, please be sure you have it installed and on your PATH"
+fi
+
+while [ $# -gt 0 ] ; do
+	case "$1" in
+	-h|--help)
+		usage 0
+		;;
+	--prefix)
+		FLAGS+=(-DCMAKE_INSTALL_PREFIX="$2")
+		shift
+		;;
+	--prefix=*)
+		FLAGS+=(-DCMAKE_INSTALL_PREFIX="${1##--prefix=}")
+		;;
+	--enable-threading)
+		FLAGS+=(-DENABLE_THREADING=ON)
+		;;
+	--enable-rdrand)
+		FLAGS+=(-DENABLE_RDRAND=ON)
+		;;
+	--enable-shared)
+		FLAGS+=(-DBUILD_SHARED_LIBS=ON)
+		;;
+	--disable-shared)
+		FLAGS+=(-DBUILD_SHARED_LIBS=OFF)
+		;;
+	--enable-static)
+		FLAGS+=(-DBUILD_STATIC_LIBS=ON)
+		;;
+	--disable-static)
+		FLAGS+=(-DBUILD_STATIC_LIBS=OFF)
+		;;
+	--disable-Bsymbolic)
+		FLAGS+=(-DDISABLE_BSYMBOLIC=ON)
+		;;
+	--disable-werror)
+		FLAGS+=(-DDISABLE_WERROR=ON)
+		;;
+	--disable-extra-libs)
+		FLAGS+=(-DDISABLE_EXTRA_LIBS=ON)
+		;;
+	--)
+		shift
+		break
+		;;
+	-*)
+		usage 1 "Unknown arguments: $*"
+		;;
+	*)
+		break
+		;;
+	esac
+	shift
+done
+
+exec cmake "${FLAGS[@]}" "$@" "${RUNDIR}"

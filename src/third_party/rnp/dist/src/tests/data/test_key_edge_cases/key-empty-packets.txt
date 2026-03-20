@@ -1,0 +1,7 @@
+:off 0: packet header 0x9800 (tag 6, len 0)
+:off 2: packet header 0xb400 (tag 13, len 0)
+UserID packet
+    id: 
+:off 4: packet header 0x8800 (tag 2, len 0)
+Signature packet
+    failed to parse

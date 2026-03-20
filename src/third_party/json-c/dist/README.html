@@ -1,0 +1,41 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+	<head>
+		<title>JSON-C - A JSON implementation in C</title>
+		<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+	</head>
+	<body>
+		<h2>JSON-C - A JSON implementation in C</h2>
+
+		<h3>Overview</h3>
+		<p>JSON-C implements a reference counting object model that allows you to easily
+		construct JSON objects in C, output them as JSON formatted strings and parse
+		JSON formatted strings back into the C representation of JSON objects.
+		It aims to conform to <a href="https://tools.ietf.org/html/rfc7159">RFC 7159</a>.
+		</p>
+
+		<h3>Building</h3>
+		<p>To setup JSON-C to build on your system please run <tt>configure</tt> and <tt>make</tt>.</p>
+		<p>If you are on Win32 cmake is required, generally:</p>
+		<ul>
+		<li>mkdir build</li>
+		<li>cd build</li>
+		<li>cmake ..</li>
+		<li>msbuild "json-c.vcxproj" /m /verbosity:normal /p:OutDir=lib\</li>
+		<li>Or, open the project in Visual Studio</li>
+		</ul>
+
+		<h3>Documentation</h3>
+		<P>Doxygen generated documentation exists <a href="https://json-c.github.io/json-c/">here</a>.</P>
+
+		<h3><a href="https://github.com/json-c/json-c">GIT Reposository</a></h3>
+		<p><strong><code>git clone https://github.com/json-c/json-c.git</code></strong></p>
+
+		<h3><a href="https://groups.google.com/group/json-c">Mailing List</a></h3>
+                <pi>Send email to <strong><code>json-c <i>&lt;at&gt;</i> googlegroups <i>&lt;dot&gt;</i> com</code></strong></p>
+
+		<h3><a href="COPYING">License</a></h3>
+		<p>This program is free software; you can redistribute it and/or modify it under the terms of the MIT License.</p>
+		<hr/>
+	</body>
+</html>

@@ -1,0 +1,35 @@
+7 keys found
+
+sec   1024/RSA 7bc6709b15c23a4a 2017-07-20 [SC]
+      e95a3cbf583aa80a2ccc53aa7bc6709b15c23a4a
+uid           key0-uid0
+sig           7bc6709b15c23a4a 2017-07-20 key0-uid0
+uid           key0-uid1
+sig           7bc6709b15c23a4a 2017-07-20 key0-uid0
+uid           key0-uid2
+sig           7bc6709b15c23a4a 2017-07-20 key0-uid0
+ssb   1024/RSA 1ed63ee56fadc34d 2017-07-20 [E]
+      e332b27caf4742a11baa677f1ed63ee56fadc34d
+sig           7bc6709b15c23a4a 2017-07-20 key0-uid0
+ssb   1024/DSA 1d7e8a5393c997a8 2017-07-20 [S] [EXPIRED 2017-11-20]
+      c5b15209940a7816a7af3fb51d7e8a5393c997a8
+sig           7bc6709b15c23a4a 2017-07-20 key0-uid0
+ssb   1024/RSA 8a05b89fad5aded1 2017-07-20 [E]
+      5cd46d2a0bd0b8cfe0b130ae8a05b89fad5aded1
+sig           7bc6709b15c23a4a 2017-07-20 key0-uid0
+
+sec   1024/DSA 2fcadf05ffa501bb 2017-07-20 [SC] [EXPIRES >=2038-01-19]
+      be1c4ab951f4c2f6b604c7f82fcadf05ffa501bb
+uid           key1-uid0
+sig           2fcadf05ffa501bb 2017-07-29 key1-uid0
+uid           key1-uid2
+sig           2fcadf05ffa501bb 2017-07-20 key1-uid0
+uid           key1-uid1
+sig           2fcadf05ffa501bb 2017-07-20 key1-uid0
+ssb   1024/ElGamal 54505a936a4a970e 2017-07-20 [E] [EXPIRES >=2038-01-19]
+      a3e94de61a8cb229413d348e54505a936a4a970e
+sig           2fcadf05ffa501bb 2017-07-20 key1-uid0
+ssb   1024/ElGamal 326ef111425d14a5 2017-07-20 [E]
+      57f8ed6e5c197db63c60ffaf326ef111425d14a5
+sig           2fcadf05ffa501bb 2017-07-20 key1-uid0
+

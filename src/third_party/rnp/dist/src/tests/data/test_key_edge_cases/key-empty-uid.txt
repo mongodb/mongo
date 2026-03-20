@@ -1,0 +1,43 @@
+:off 0: packet header 0x9833 (tag 6, len 51)
+Public key packet
+    version: 4
+    creation time: 1590071668 (??? ??? ?? ??:??:?? ????)
+    public key algorithm: 22 (EdDSA)
+    public key material:
+        ecc p: 263 bits
+        ecc curve: Ed25519
+    keyid: 0xc972affd358bf887
+:off 53: packet header 0xb400 (tag 13, len 0)
+UserID packet
+    id: 
+:off 55: packet header 0x8890 (tag 2, len 144)
+Signature packet
+    version: 4
+    type: 19 (Positive User ID certification)
+    public key algorithm: 22 (EdDSA)
+    hash algorithm: 8 (SHA256)
+    hashed subpackets:
+        :type 33, len 21
+        issuer fingerprint: 0x753d5b947e9a2b2e01147c1fc972affd358bf887 (20 bytes)
+        :type 2, len 4
+        signature creation time: 1590071668 (??? ??? ?? ??:??:?? ????)
+        :type 27, len 1
+        key flags: 0x03 ( certify sign )
+        :type 11, len 4
+        preferred symmetric algorithms: AES-256, AES-192, AES-128, TripleDES (9, 8, 7, 2)
+        :type 21, len 5
+        preferred hash algorithms: SHA512, SHA384, SHA256, SHA224, SHA1 (10, 9, 8, 11, 2)
+        :type 22, len 3
+        preferred compression algorithms: ZLib, BZip2, ZIP (2, 3, 1)
+        :type 30, len 1
+        features: 0x01 ( mdc )
+        :type 23, len 1
+        key server preferences
+        no-modify: 1
+    unhashed subpackets:
+        :type 16, len 8
+        issuer key ID: 0xc972affd358bf887
+    lbits: 0xdec3
+    signature material:
+        ecc r: 250 bits
+        ecc s: 256 bits

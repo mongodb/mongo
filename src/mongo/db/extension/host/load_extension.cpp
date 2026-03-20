@@ -50,7 +50,7 @@
 #include <stdexcept>
 #include <string>
 
-#ifdef __linux
+#ifdef MONGO_HOST_RNP_SIG_VALIDATION_COMPATIBLE
 #include "mongo/db/extension/host/signature_validator.h"
 #endif
 
@@ -125,7 +125,7 @@ host_connector::ExtensionHandle getMongoExtension(SharedLibrary& extensionLib,
 stdx::unordered_map<std::string, LoadedExtension> ExtensionLoader::loadedExtensions;
 
 bool loadExtensions(const std::vector<std::string>& extensionNames) {
-#ifdef __linux
+#ifdef MONGO_HOST_RNP_SIG_VALIDATION_COMPATIBLE
     if (!feature_flags::gFeatureFlagExtensionsAPI.isEnabled()) {
         if (!extensionNames.empty()) {
             LOGV2_ERROR(10668500,
@@ -157,8 +157,7 @@ bool loadExtensions(const std::vector<std::string>& extensionNames) {
         LOGV2(10668503, "Successfully loaded extension", "extensionName"_attr = extension);
     }
 #else
-    LOGV2(11901200,
-          "Loading extensions on non-linux platforms is not supported - skipping loading.");
+    LOGV2(11901200, "Loading extensions is not supported on this platform - skipping loading.");
 #endif
     return true;
 }
@@ -207,16 +206,15 @@ ExtensionConfig ExtensionLoader::loadExtensionConfig(const std::string& extensio
 }
 
 void ExtensionLoader::load(const std::string& name, const ExtensionConfig& config) {
-#ifdef __linux
+#ifdef MONGO_HOST_RNP_SIG_VALIDATION_COMPATIBLE
     SignatureValidator signatureValidator;
     return ExtensionLoader::load(name, config, signatureValidator);
 #else
-    LOGV2(11901201,
-          "Loading extensions on non-linux platforms is not supported - skipping loading.");
+    LOGV2(11901201, "Loading extensions is not supported on this platform - skipping loading.");
 #endif
 }
 
-#ifdef __linux
+#ifdef MONGO_HOST_RNP_SIG_VALIDATION_COMPATIBLE
 void ExtensionLoader::load(const std::string& name,
                            const ExtensionConfig& config,
                            const SignatureValidator& signatureValidator) {

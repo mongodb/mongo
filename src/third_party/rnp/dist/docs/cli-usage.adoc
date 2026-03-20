@@ -1,0 +1,174 @@
+= Using the RNP command-line interface
+
+== Generating an RSA private key
+
+By default, `rnpkeys  --generate-key` generates a 3072-bit RSA key.
+
+[source,console]
+----
+export keydir=/tmp
+rnpkeys --generate-key --homedir=${keydir}
+----
+
+=>
+
+[source,console]
+----
+rnpkeys: generated keys in directory ${keydir}/6ed2d908150b82e7
+----
+
+NOTE: Here `6ed2d...` is the key fingerprint.
+
+In order to use fully-featured key-pair generation, the `--expert` flag
+should be used.
+
+With this flag added to `rnpkeys --generate-key`, the user will be
+able to generate a key-pair for any supported algorithm and/or key size.
+
+Example:
+
+[source,console]
+----
+> export keydir=/tmp
+> rnpkeys --generate-key --expert --homedir=${keydir}
+
+Please select what kind of key you want:
+    (1)  RSA (Encrypt or Sign)
+    (19) ECDSA
+    (22) EDDSA
+> 19
+
+Please select which elliptic curve you want:
+    (1) NIST P-256
+    (2) NIST P-384
+    (3) NIST P-521
+> 2
+
+Generating a new key...
+signature  384/ECDSA d45592277b75ada1 2017-06-21
+Key fingerprint: 4244 2969 07ca 42f7 b6d8 1636 d455 9227 7b75 ada1
+uid              ECDSA 384-bit key <flowher@localhost>
+rnp: generated keys in directory /tmp/.rnp
+Enter password for d45592277b75ada1:
+Repeat password for d45592277b75ada1:
+>
+----
+
+
+== Listing keys
+
+[source,console]
+----
+export keyringdir=${keydir}/MYFINGERPRINT
+rnpkeys --list-keys --homedir=${keyringdir}
+
+----
+
+=>
+
+[source,console]
+----
+1 key found
+...
+----
+
+
+== Signing a file
+
+
+=== Signing in binary format
+
+[source,console]
+----
+rnp --sign --homedir=${keyringdir} ${filename}
+----
+
+=>
+
+Creates `${filename}.gpg` which is an OpenPGP message that includes the
+message together with the signature as a 'signed message'.
+
+This type of file can be verified with:
+
+* `rnp --verify --homedir=${keyringdir} ${filename}.gpg`
+
+
+=== Signing in binary detached format
+
+[source,console]
+----
+rnp --sign --detach --homedir=${keyringdir} ${filename}
+----
+
+=>
+
+Creates `${filename}.sig` which is an OpenPGP message in binary
+format, that only contains the signature.
+
+This type of file can be verified with:
+
+* `rnp --verify --homedir=${keyringdir} ${filename}.sig`
+
+
+=== Signing in armored ("`ASCII-armored`") format
+
+[source,console]
+----
+rnp --sign --armor --homedir=${keyringdir} ${filename}
+----
+
+=>
+
+Creates `${filename}.asc` which is an OpenPGP message in ASCII-armored
+format, including the message together with the signature as a
+"`signed message`".
+
+This type of file can be verified with:
+
+* `rnp --verify --homedir=${keyringdir} ${filename}.asc`
+
+
+=== Other options
+
+`--clearsign`::
+appends a separate OpenPGP signature to the end of the newly
+signed message.
+
+`--detach`::
+saves the OpenPGP signature in a separate file from the newly
+signed message.
+
+
+== Encrypt
+
+
+[source,console]
+----
+rnp --encrypt --homedir=${keyringdir} ${filename}
+----
+
+=>
+
+Creates `${filename}.gpg`, which is an encrypted OpenPGP message.
+
+
+== Decrypt
+
+[source,console]
+----
+rnp --decrypt --homedir=${keyringdir} ${filename}.gpg
+----
+
+=>
+
+Creates `${filename}`, the decrypted form of the `${filename}.gpg`
+encrypted OpenPGP message.
+
+
+== Check version
+
+The output of `rnp --version` contains the `git` hash of the version
+the binary was built from, of which value is generated when `cmake` runs.
+
+Consequently, a release tarball generated with `make dist` will
+contain this hash version.

@@ -1,0 +1,13 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=@PKGCONFIG_LIBDIR@
+includedir=@PKGCONFIG_INCLUDEDIR@
+
+Name: rnp
+Description: @PACKAGE_DESCRIPTION_SHORT@
+Version: @PROJECT_VERSION@
+
+Libs: -L${libdir} -l@LIBRNP_OUTPUT_NAME@
+Libs.private: @LIBRNP_PRIVATE_LIBS@
+Cflags: -I${includedir}
+
