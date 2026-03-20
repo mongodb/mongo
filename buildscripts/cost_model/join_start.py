@@ -29,8 +29,8 @@
 Join Cost Model Calibration entry point.
 
 Assumptions:
-- The WiredTiger cache is large enough (≥ 100 MB) to contain the join
-  calibration collection. If the WT cache were too small, the CPU
+- The WiredTiger cache is large enough (≥ 100 MB) by default to contain the
+  join calibration collection. If the WT cache were too small, the CPU
   measurements would be invalid.
 """
 
@@ -44,6 +44,7 @@ from join_calibration_settings import (
     join_data_generator,
     join_database,
 )
+from join_workload_execution import run_join_explain
 from mongod_manager import MongodManager
 from scipy.stats import trim_mean
 
@@ -182,6 +183,124 @@ async def calibrate_random_io(manager: MongodManager, num_lookups: int = 100):
     return fetch_mean_ms
 
 
+async def calibrate_join_algorithms(manager: MongodManager, num_runs: int = 10):
+    """
+    Compares INLJ vs HJ by running $lookup queries across join fields and selectivities.
+
+    The WT cache is set to 256 MB so neither ~300 MB "large" collection fits entirely
+    in memory, forcing relatively realistic disk I/O during joins.
+
+    For each (join_field, predicate) combination we run three rounds, each after a
+    cold restart so cache conditions are comparable:
+      1. Any (algorithm chosen by optimizer)
+      2. Force INLJ
+      3. Force HJ
+
+    High-cardinality join fields (uniform_256, uniform_16) produce very large result
+    sets, so we don't actually run those join queries because they would take too long.
+    We just verify that the optimizer picks HJ, which is the best algorithm for these.
+
+    Prints a per-combination summary showing which algorithm is genuinely faster
+    and whether the optimizer's majority pick is correct.
+    """
+    print(f"\n=== Join Algorithm Calibration ({num_runs} runs per config) ===")
+
+    join_cache_args = ["--wiredTigerCacheSizeGB", "0.25"]
+    join_fields = [
+        # (name, low or high cardinality)
+        ("unique", "low"),
+        ("uniform_64k", "low"),
+        ("uniform_4k", "low"),
+        ("uniform_256", "high"),
+        ("uniform_16", "high"),
+    ]
+    predicate_constants = [256, 1024, 4096, 16384, 65536]
+
+    header = (
+        f"{'join_field':<16} {'pred':<8} {'optimizer_picks':<24} "
+        f"{'INLJ_ms':>10} {'HJ_ms':>10} {'faster':>8} {'correct':>10}"
+    )
+    separator = "-" * len(header)
+    print(header)
+    print(separator)
+
+    for join_field in join_fields:
+        for pred_const in predicate_constants:
+            pipeline = [
+                {"$match": {"random": {"$lte": pred_const}}},
+                {
+                    "$lookup": {
+                        "from": "join_coll_2_large",
+                        "localField": join_field[0],
+                        "foreignField": join_field[0],
+                        "as": "joined",
+                    }
+                },
+                {"$unwind": "$joined"},
+                {"$count": "total"},
+            ]
+            high_join_cardinality = join_field[1] == "high"
+            verbosity = "queryPlanner" if high_join_cardinality else "executionStats"
+
+            # Using the algorithm which the optimizer picks
+            manager.restart_cold(extra_start_args=join_cache_args)
+            await manager.database.set_parameter("internalJoinMethod", "any")
+            algo_freqs: dict[str, int] = {}
+            for _ in range(num_runs):
+                _, algo = await run_join_explain(
+                    manager.database, "join_coll_1_large", pipeline, verbosity
+                )
+                algo_freqs[algo] = algo_freqs.get(algo, 0) + 1
+
+            optimizer_picks_str = " ".join(
+                f"{algo} {freq}/{num_runs}"
+                for algo, freq in sorted(algo_freqs.items(), key=lambda x: -x[1])
+            )
+            majority_algo = max(algo_freqs, key=algo_freqs.get)
+
+            inlj_mean, hj_mean = None, None
+            if not high_join_cardinality:
+                # Forcing INLJ
+                manager.restart_cold(extra_start_args=join_cache_args)
+                await manager.database.set_parameter("internalJoinMethod", "INLJ")
+                inlj_times = []
+                for _ in range(num_runs):
+                    t, algo = await run_join_explain(
+                        manager.database, "join_coll_1_large", pipeline
+                    )
+                    assert algo == "INLJ", f"Expected INLJ but got {algo}"
+                    inlj_times.append(t)
+
+                # Forcing HJ
+                manager.restart_cold(extra_start_args=join_cache_args)
+                await manager.database.set_parameter("internalJoinMethod", "HJ")
+                hj_times = []
+                for _ in range(num_runs):
+                    t, algo = await run_join_explain(
+                        manager.database, "join_coll_1_large", pipeline
+                    )
+                    assert algo == "HJ", f"Expected HJ but got {algo}"
+                    hj_times.append(t)
+
+                inlj_mean = trim_mean(inlj_times, proportiontocut=TRIMMED_MEAN_PROPORTION)
+                hj_mean = trim_mean(hj_times, proportiontocut=TRIMMED_MEAN_PROPORTION)
+
+            # Print whether the optimizer is making the correct decision
+            faster = "HJ" if high_join_cardinality or hj_mean < inlj_mean else "INLJ"
+            correct = "✓" if majority_algo == faster else "✗"
+
+            def fmt_mean(v):
+                return f"{v:>10.1f}" if v is not None else f"{'-':>10}"
+
+            print(
+                f"{join_field[0]:<16} {pred_const:<8} {optimizer_picks_str:<24} "
+                f"{fmt_mean(inlj_mean)} {fmt_mean(hj_mean)} {faster:>8} {correct:>10}"
+            )
+
+    await manager.database.set_parameter("internalJoinMethod", "any")
+    print(separator)
+
+
 async def main():
     """Entry point function."""
     script_directory = os.path.abspath(os.path.dirname(__file__))
@@ -200,6 +319,8 @@ async def main():
             "all",
             "--setParameter",
             "internalMeasureQueryExecutionTimeInNanoseconds=true",
+            "--setParameter",
+            "internalEnableJoinOptimization=true",
         ],
     ) as manager:
         generator = DataGenerator(manager.database, join_data_generator)
@@ -221,6 +342,8 @@ async def main():
             f"  randIOFactor = {time_rand_page_ms / time_tuple_ms:.1f}"
             f"  ({time_rand_page_ms:.4f}ms / {time_tuple_ms:.6f}ms)"
         )
+
+        await calibrate_join_algorithms(manager)
 
     print("DONE!")
 

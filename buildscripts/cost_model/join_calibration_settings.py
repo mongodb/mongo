@@ -48,11 +48,13 @@ import config
 from random_generator import DataType, RandomDistribution, RangeGenerator, StringRandomDistribution
 
 COLLECTION_CARDINALITY = 100_000
-STRING_FILLER_LENGTH = 900
+DEFAULT_STRING_FILLER_LENGTH = 900
+LARGE_STRING_FILLER_LENGTH = 3_000
 
 
 def create_join_collection_template(
     name: str,
+    string_filler_length: int = DEFAULT_STRING_FILLER_LENGTH,
     create_indexes: bool = False,
 ) -> config.CollectionTemplate:
     """Create a collection template for join calibration."""
@@ -102,7 +104,7 @@ def create_join_collection_template(
             config.FieldTemplate(
                 name="string_filler",
                 data_type=DataType.STRING,
-                distribution=StringRandomDistribution(STRING_FILLER_LENGTH, pool_size=1000),
+                distribution=StringRandomDistribution(string_filler_length, pool_size=1000),
                 indexed=False,
             ),
         ],
@@ -115,9 +117,18 @@ join_coll_1 = create_join_collection_template(
     name="join_coll_1",
     create_indexes=False,
 )
-
+join_coll_1_large = create_join_collection_template(
+    name="join_coll_1_large",
+    string_filler_length=LARGE_STRING_FILLER_LENGTH,
+    create_indexes=False,
+)
 join_coll_2 = create_join_collection_template(
     name="join_coll_2",
+    create_indexes=True,
+)
+join_coll_2_large = create_join_collection_template(
+    name="join_coll_2_large",
+    string_filler_length=LARGE_STRING_FILLER_LENGTH,
     create_indexes=True,
 )
 
@@ -133,7 +144,7 @@ join_data_generator = config.DataGeneratorConfig(
     enabled=True,
     create_indexes=True,
     batch_size=COLLECTION_CARDINALITY,
-    collection_templates=[join_coll_1, join_coll_2],
+    collection_templates=[join_coll_1, join_coll_1_large, join_coll_2, join_coll_2_large],
     write_mode=config.WriteMode.REPLACE,
     collection_name_with_card=False,
 )

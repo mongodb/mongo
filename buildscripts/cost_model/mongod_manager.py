@@ -68,7 +68,7 @@ class MongodManager:
     def is_running(self):
         return self._proc is not None and self._proc.poll() is None
 
-    def start(self):
+    def start(self, extra_start_args=None):
         """Start the mongod process."""
         if self.is_running:
             raise RuntimeError("mongod is already running")
@@ -81,6 +81,7 @@ class MongodManager:
                     "--dbpath",
                     self.dbpath,
                     *self.extra_args,
+                    *(extra_start_args or []),
                 ],
                 stdout=log_fh,
                 stderr=subprocess.STDOUT,
@@ -103,11 +104,11 @@ class MongodManager:
         self._proc = None
         self._database = None
 
-    def restart_cold(self):
+    def restart_cold(self, extra_start_args=None):
         """Stop mongod, drop OS page cache, start fresh."""
         self.stop()
         self.flush_os_cache()
-        self.start()
+        self.start(extra_start_args=extra_start_args)
 
     def flush_os_cache(self):
         """Flush the OS page cache."""

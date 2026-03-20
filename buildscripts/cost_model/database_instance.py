@@ -99,6 +99,16 @@ class DatabaseInstance:
             verbosity="executionStats",
         )
 
+    async def explain_aggregate(
+        self, collection_name: str, pipeline: list, verbosity: str = "executionStats"
+    ) -> dict[str, any]:
+        """Return explain for the given aggregation pipeline."""
+        return await self.database.command(
+            "explain",
+            {"aggregate": collection_name, "pipeline": pipeline, "cursor": {}},
+            verbosity=verbosity,
+        )
+
     async def hide_index(self, collection_name: str, index_name: str) -> None:
         """Hide the given index from the query optimizer."""
         await self.database.command(
