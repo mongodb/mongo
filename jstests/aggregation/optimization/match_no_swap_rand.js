@@ -9,12 +9,12 @@
  *   # Explicitly testing optimization.
  *   requires_pipeline_optimization,
  *   # This test checks explain output exactly. In 7.2 an optimization was added to remove certain
- *   # imprecise predicates from the plan, so earlier versions witll have a slightly different
+ *   # imprecise predicates from the plan, so earlier versions will have a slightly different
  *   # explain.
  *   requires_fcv_72
  * ]
  */
-import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 function getWinningPlanForPipeline({coll, pipeline}) {
     const explain = assert.commandWorked(coll.explain().aggregate(pipeline));
@@ -23,14 +23,14 @@ function getWinningPlanForPipeline({coll, pipeline}) {
 
 function assertScanFilterEq({coll, pipeline, filter}) {
     const winningPlan = getWinningPlanForPipeline({coll, pipeline});
-    const collScan = getPlanStage(winningPlan, "COLLSCAN");
+    const collScan = getPlanStages(winningPlan, "COLLSCAN");
     assert(collScan);
     // Sometimes explain will have 'filter' set to an empty object, other times there will be no
     // 'filter'. If we are expecting there to be no filter on the COLLSCAN, either is acceptable.
     if (filter) {
-        assert.docEq(filter, collScan.filter);
+        assert.docEq(filter, collScan[0].filter);
     } else {
-        assert(!collScan.filter || Object.keys(collScan.filter).length == 0);
+        assert(!collScan[0].filter || Object.keys(collScan[0].filter).length == 0);
     }
 }
 

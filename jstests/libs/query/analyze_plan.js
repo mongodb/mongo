@@ -867,6 +867,33 @@ export function getLookupStage(root) {
 }
 
 /**
+ * Given an explain node representing a $lookup stage, identify the index used in an INLJ
+ * strategy and return its name and key pattern.
+ * TODO: SERVER-121842 Remove the check for the presence of the indexName field once all
+ * supported releases have featureFlagLookupWithPipelinesInSbe enabled
+ *
+ * @param {object} plan The explain plan node representing the $lookup stage.
+ * @returns {object} An object exposing indexName and indexKeyPattern from the INLJ strategy.
+ */
+export function getLookupStageIndexStrategy(plan) {
+    if (plan.hasOwnProperty("indexName")) {
+        return {
+            indexName: plan.indexName,
+            indexKeyPattern: plan.indexKeyPattern,
+        };
+    } else if (plan.hasOwnProperty("inputStages")) {
+        var ixscan = getPlanStage(plan.inputStages[1], "IXSCAN");
+        if (ixscan) {
+            return {
+                indexName: ixscan.indexName,
+                indexKeyPattern: ixscan.keyPattern,
+            };
+        }
+    }
+    return {indexName: null, indexKeyPattern: null};
+}
+
+/**
  * Given the root stage of agg explain's JSON representation of a query plan ('root'), returns
  * whether the plan has a stage called 'stage'. It could have more than one to allow for sharded
  * explain plans, and it can search for a query planner stage like "FETCH" or an agg stage like
@@ -1206,7 +1233,8 @@ export function flattenQueryPlanTree(winningPlan) {
     let stages = [];
     while (winningPlan) {
         stages.push(winningPlan.stage);
-        winningPlan = winningPlan.inputStage;
+        if (winningPlan.hasOwnProperty("inputStages")) winningPlan = winningPlan.inputStages[0];
+        else winningPlan = winningPlan.inputStage;
     }
     stages.reverse();
     return stages;

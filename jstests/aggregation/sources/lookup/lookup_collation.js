@@ -11,7 +11,11 @@
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getAggPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {
+    getAggPlanStages,
+    getLookupStageIndexStrategy,
+    getWinningPlanFromExplain,
+} from "jstests/libs/query/analyze_plan.js";
 
 // ToDo: SERVER-103530. Remove multiversion check when 9.0 becomes last-lts
 const isMultiversion =
@@ -153,7 +157,7 @@ let explain;
             if (winningPlan.stage === "EQ_LOOKUP") {
                 assert.eq(strategyName, winningPlan.strategy, explain);
                 if (indexName !== null) {
-                    assert.eq(indexName, winningPlan.indexName, explain);
+                    assert.eq(indexName, getLookupStageIndexStrategy(winningPlan).indexName, explain);
                 }
             }
         }
@@ -173,7 +177,11 @@ let explain;
                         // If we found the strategy, verify the index
                         if (expectedStrategy.index !== null) {
                             // We care about the index - must be an exact match
-                            assert.eq(expectedStrategy.index, winningPlan.indexName, explain);
+                            assert.eq(
+                                expectedStrategy.index,
+                                getLookupStageIndexStrategy(winningPlan).indexName,
+                                explain,
+                            );
                             break;
                         }
                     }

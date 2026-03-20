@@ -347,27 +347,21 @@ plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const NamespaceString& nss,
             }
             case STAGE_EQ_LOOKUP: {
                 auto eln = static_cast<const EqLookupNode*>(node);
-                auto& stats = getStatsForNss(eln->foreignCollection);
-                switch (eln->lookupStrategy) {
-                    case EqLookupNode::LookupStrategy::kNonExistentForeignCollection:
-                    case EqLookupNode::LookupStrategy::kHashJoin:
-                    case EqLookupNode::LookupStrategy::kNestedLoopJoin:
-                        stats.collectionScans++;
-                        break;
-                    case EqLookupNode::LookupStrategy::kDynamicIndexedLoopJoin: {
-                        tassert(8155502,
-                                "Dynamic indexed loop join lookup should have an index entry",
-                                eln->idxEntry);
-                        stats.indexesUsed.push_back(eln->idxEntry->identifier.catalogName);
-                        stats.collectionScans++;
-                        break;
-                    }
-                    case EqLookupNode::LookupStrategy::kIndexedLoopJoin: {
-                        tassert(
-                            6466200, "Index join lookup should have an index entry", eln->idxEntry);
-                        stats.indexesUsed.push_back(eln->idxEntry->identifier.catalogName);
-                        break;
-                    }
+                // We used to treat the EOF input stream as a collection scan.
+                if (eln->lookupStrategy ==
+                    EqLookupNode::LookupStrategy::kNonExistentForeignCollection) {
+                    auto& stats = getStatsForNss(eln->foreignCollection);
+                    stats.collectionScans++;
+                }
+                break;
+            }
+            case STAGE_EQ_LOOKUP_UNWIND: {
+                auto eln = static_cast<const EqLookupUnwindNode*>(node);
+                // We used to treat the EOF input stream as a collection scan.
+                if (eln->lookupStrategy ==
+                    EqLookupNode::LookupStrategy::kNonExistentForeignCollection) {
+                    auto& stats = getStatsForNss(eln->foreignCollection);
+                    stats.collectionScans++;
                 }
                 break;
             }

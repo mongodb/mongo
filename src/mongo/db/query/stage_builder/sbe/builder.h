@@ -653,7 +653,7 @@ public:
     // order.
     //
     // Note that the list returned will only contain explicit '{kField, N}' requirements. To get
-    // a list of all explicit and implicit '{kField, N}' requiremnts, use getNeededFieldSet().
+    // a list of all explicit and implicit '{kField, N}' requirements, use getNeededFieldSet().
     std::vector<std::string> getFields() const {
         return getOfType(kField);
     }

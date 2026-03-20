@@ -5,6 +5,7 @@ import {
     formatQueryPlanner,
     getAggPlanStages,
     getEngine,
+    getLookupStageIndexStrategy,
     getPlanStages,
     getQueryPlanners,
     getWinningPlanFromExplain,
@@ -169,7 +170,11 @@ export class QuerySettingsIndexHintsTests {
             return getQueryPlanners(explain)
                 .filter((queryPlanner) => queryPlanner.namespace == `${ns.db}.${ns.coll}`)
                 .map((queryPlan) => getWinningPlanFromExplain(queryPlan, false))
-                .flatMap((winningPlan) => getPlanStages(winningPlan, "IXSCAN"));
+                .flatMap((winningPlan) =>
+                    getPlanStages(winningPlan, "IXSCAN").filter(
+                        (plan) => !plan.hasOwnProperty("nss") || plan.nss.endsWith(`.${ns.coll}`),
+                    ),
+                );
         });
     }
 
@@ -189,7 +194,7 @@ export class QuerySettingsIndexHintsTests {
                     .map((queryPlan) => getWinningPlanFromExplain(queryPlan, false))
                     .flatMap((winningPlan) => getPlanStages(winningPlan, "EQ_LOOKUP"))
                     .map((stage) => {
-                        stage.keyPattern = stage.indexKeyPattern;
+                        stage.keyPattern = getLookupStageIndexStrategy(stage).indexKeyPattern;
                         return stage;
                     });
             },
@@ -217,11 +222,15 @@ export class QuerySettingsIndexHintsTests {
         });
     }
 
-    assertCollScanStage(cmd, allowedDirections) {
+    assertCollScanStage(cmd, allowedDirections, ns) {
         const explain = assert.commandWorked(this._db.runCommand(getExplainCommand(cmd)));
         const collscanStages = getQueryPlanners(explain)
             .map((queryPlan) => getWinningPlanFromExplain(queryPlan, false))
-            .flatMap((winningPlan) => getPlanStages(winningPlan, "COLLSCAN"));
+            .flatMap((winningPlan) =>
+                getPlanStages(winningPlan, "COLLSCAN").filter(
+                    (plan) => !plan.hasOwnProperty("nss") || plan.nss.endsWith(`.${ns.coll}`),
+                ),
+            );
         assert.gte(collscanStages.length, 1, explain);
         for (const collscanStage of collscanStages) {
             assert(allowedDirections.includes(collscanStage.direction), explain);
@@ -373,7 +382,7 @@ export class QuerySettingsIndexHintsTests {
             indexHints: [{ns, allowedIndexes: [naturalForwardScan]}, ...additionalHints],
         };
         this._qsutils.withQuerySettings(querySettingsQuery, naturalForwardSettings, () => {
-            this.assertCollScanStage(query, ["forward"]);
+            this.assertCollScanStage(query, ["forward"], ns);
             this.assertQuerySettingsInCacheForCommand(query, naturalForwardSettings);
             additionalAssertions();
         });
@@ -383,7 +392,7 @@ export class QuerySettingsIndexHintsTests {
             indexHints: [{ns, allowedIndexes: [naturalBackwardScan]}, ...additionalHints],
         };
         this._qsutils.withQuerySettings(querySettingsQuery, naturalBackwardSettings, () => {
-            this.assertCollScanStage(query, ["backward"]);
+            this.assertCollScanStage(query, ["backward"], ns);
             this.assertQuerySettingsInCacheForCommand(query, naturalBackwardSettings);
             additionalAssertions();
         });
@@ -392,7 +401,7 @@ export class QuerySettingsIndexHintsTests {
             indexHints: [{ns, allowedIndexes: [naturalForwardScan, naturalBackwardScan]}, ...additionalHints],
         };
         this._qsutils.withQuerySettings(querySettingsQuery, naturalAnyDirectionSettings, () => {
-            this.assertCollScanStage(query, ["forward", "backward"]);
+            this.assertCollScanStage(query, ["forward", "backward"], ns);
             this.assertQuerySettingsInCacheForCommand(query, naturalAnyDirectionSettings);
             additionalAssertions();
         });

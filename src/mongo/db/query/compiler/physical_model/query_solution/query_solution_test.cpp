@@ -1629,13 +1629,15 @@ TEST(QuerySolutionTest, EqLookupNodeWithIndexScan) {
     scanNode->bounds.startKey = BSON("a" << 1 << "b" << 1);
     scanNode->bounds.endKey = BSON("a" << 1 << "b" << 1);
 
-    EqLookupNode node(std::move(scanNode),
+    std::vector<std::unique_ptr<QuerySolutionNode>> children;
+    children.emplace_back(std::move(scanNode));
+    children.emplace_back(std::make_unique<CollectionScanNode>(foreignColl));
+    EqLookupNode node(std::move(children),
                       foreignColl,
                       "local",
                       "foreign",
                       "as",
                       EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                      boost::none /* idxEntry */,
                       false /* shouldProduceBson */);
 
     node.computeProperties();
@@ -1669,13 +1671,15 @@ TEST(QuerySolutionTest, EqLookupNodeWithIndexScanFieldOverwrite) {
     scanNode->bounds.endKey = BSON("a" << 1 << "b" << 1 << "c"
                                        << "1");
 
-    EqLookupNode node(std::move(scanNode),
+    std::vector<std::unique_ptr<QuerySolutionNode>> children;
+    children.emplace_back(std::move(scanNode));
+    children.emplace_back(std::make_unique<CollectionScanNode>(foreignColl));
+    EqLookupNode node(std::move(children),
                       foreignColl,
                       "local",
                       "foreign",
                       "b",
                       EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                      boost::none /* idxEntry */,
                       false /* shouldProduceBson */);
 
     node.computeProperties();
@@ -1744,14 +1748,16 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorOverSingleEqLookupNode) {
     const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
     const NamespaceString foreignColl =
         NamespaceString::createNamespaceString_forTest("db.foreign");
-    auto scanNode = std::make_unique<IndexScanNode>(mainNss, buildSimpleIndexEntry(BSON("a" << 1)));
-    auto root = std::make_unique<EqLookupNode>(std::move(scanNode),
+    std::vector<std::unique_ptr<QuerySolutionNode>> children;
+    children.emplace_back(
+        std::make_unique<IndexScanNode>(mainNss, buildSimpleIndexEntry(BSON("a" << 1))));
+    children.emplace_back(std::make_unique<CollectionScanNode>(foreignColl));
+    auto root = std::make_unique<EqLookupNode>(std::move(children),
                                                foreignColl,
                                                "local",
                                                "remote",
                                                "b",
                                                EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                                               boost::none /* idxEntry */,
                                                false /* shouldProduceBson */);
 
 
@@ -1768,15 +1774,16 @@ TEST(QuerySolutionTest, AssertSameHashes) {
         const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
         const NamespaceString foreignColl =
             NamespaceString::createNamespaceString_forTest("db.foreign");
-        auto scanNode =
-            std::make_unique<IndexScanNode>(mainNss, buildSimpleIndexEntry(BSON("a" << 1)));
-        auto root = std::make_unique<EqLookupNode>(std::move(scanNode),
+        std::vector<std::unique_ptr<QuerySolutionNode>> children;
+        children.emplace_back(
+            std::make_unique<IndexScanNode>(mainNss, buildSimpleIndexEntry(BSON("a" << 1))));
+        children.emplace_back(std::make_unique<CollectionScanNode>(foreignColl));
+        auto root = std::make_unique<EqLookupNode>(std::move(children),
                                                    foreignColl,
                                                    "local",
                                                    "remote",
                                                    "b",
                                                    EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                                                   boost::none /* idxEntry */,
                                                    false /* shouldProduceBson */);
 
 
@@ -1886,14 +1893,16 @@ TEST(QuerySolutionTest, AssertDifferentHashesForProbesOnDifferentIndexes) {
 
 TEST(QuerySolutionTest, GetSecondaryNamespaceVectorDeduplicatesMainNss) {
     const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
-    auto scanNode = std::make_unique<IndexScanNode>(mainNss, buildSimpleIndexEntry(BSON("a" << 1)));
-    auto root = std::make_unique<EqLookupNode>(std::move(scanNode),
+    std::vector<std::unique_ptr<QuerySolutionNode>> children;
+    children.emplace_back(
+        std::make_unique<IndexScanNode>(mainNss, buildSimpleIndexEntry(BSON("a" << 1))));
+    children.emplace_back(std::make_unique<CollectionScanNode>(mainNss));
+    auto root = std::make_unique<EqLookupNode>(std::move(children),
                                                mainNss,
                                                "local",
                                                "remote",
                                                "b",
                                                EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                                               boost::none /* idxEntry */,
                                                false /* shouldProduceBson */);
 
 
@@ -1912,25 +1921,29 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorOverNestedEqLookupNodes) {
         NamespaceString::createNamespaceString_forTest("db.foreign");
     const NamespaceString foreignCollTwo =
         NamespaceString::createNamespaceString_forTest("db.foreign2");
-    auto scanNode = std::make_unique<IndexScanNode>(mainNss, buildSimpleIndexEntry(BSON("a" << 1)));
+    std::vector<std::unique_ptr<QuerySolutionNode>> children1;
+    children1.emplace_back(
+        std::make_unique<IndexScanNode>(mainNss, buildSimpleIndexEntry(BSON("a" << 1))));
+    children1.emplace_back(std::make_unique<CollectionScanNode>(foreignCollOne));
     auto childEqLookupNode =
-        std::make_unique<EqLookupNode>(std::move(scanNode),
+        std::make_unique<EqLookupNode>(std::move(children1),
                                        foreignCollOne,
                                        "local",
                                        "remote",
                                        "b",
                                        EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                                       boost::none /* idxEntry */,
                                        false /* shouldProduceBson */);
 
+    std::vector<std::unique_ptr<QuerySolutionNode>> children2;
+    children2.emplace_back(std::move(childEqLookupNode));
+    children2.emplace_back(std::make_unique<CollectionScanNode>(foreignCollTwo));
     auto parentEqLookupNode =
-        std::make_unique<EqLookupNode>(std::move(childEqLookupNode),
+        std::make_unique<EqLookupNode>(std::move(children2),
                                        foreignCollTwo,
                                        "local",
                                        "remote",
                                        "b",
                                        EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                                       boost::none /* idxEntry */,
                                        false /* shouldProduceBson */);
 
     QuerySolution qs;
@@ -1947,25 +1960,29 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorDeduplicatesNestedEqLookupNod
     const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
     const NamespaceString foreignColl =
         NamespaceString::createNamespaceString_forTest("db.foreign");
-    auto scanNode = std::make_unique<IndexScanNode>(mainNss, buildSimpleIndexEntry(BSON("a" << 1)));
+    std::vector<std::unique_ptr<QuerySolutionNode>> children1;
+    children1.emplace_back(
+        std::make_unique<IndexScanNode>(mainNss, buildSimpleIndexEntry(BSON("a" << 1))));
+    children1.emplace_back(std::make_unique<CollectionScanNode>(foreignColl));
     auto childEqLookupNode =
-        std::make_unique<EqLookupNode>(std::move(scanNode),
+        std::make_unique<EqLookupNode>(std::move(children1),
                                        foreignColl,
                                        "local",
                                        "remote",
                                        "b",
                                        EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                                       boost::none /* idxEntry */,
                                        false /* shouldProduceBson */);
 
+    std::vector<std::unique_ptr<QuerySolutionNode>> children2;
+    children2.emplace_back(std::move(childEqLookupNode));
+    children2.emplace_back(std::make_unique<CollectionScanNode>(foreignColl));
     auto parentEqLookupNode =
-        std::make_unique<EqLookupNode>(std::move(childEqLookupNode),
+        std::make_unique<EqLookupNode>(std::move(children2),
                                        foreignColl,
                                        "local",
                                        "remote",
                                        "b",
                                        EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                                       boost::none /* idxEntry */,
                                        false /* shouldProduceBson */);
 
     QuerySolution qs;

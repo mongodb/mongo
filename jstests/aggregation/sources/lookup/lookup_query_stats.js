@@ -19,7 +19,7 @@
  *     does_not_support_config_fuzzer,
  * ]
  */
-import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStages, getLookupStageIndexStrategy} from "jstests/libs/query/analyze_plan.js";
 import {getQueryInfoAtTopLevelOrFirstStage, getSbePlanStages} from "jstests/libs/query/sbe_explain_helpers.js";
 import {
     checkSbeFullyEnabled,
@@ -141,8 +141,7 @@ let checkExplainOutputForVerLevel = function (explainOutput, expected, verbosity
             expectedQueryPlan.strategy == "IndexedLoopJoin" ||
             expectedQueryPlan.strategy === "DynamicIndexedLoopJoin"
         ) {
-            assert(lkpStage.hasOwnProperty("indexName"), lkpStage);
-            assert.eq(lkpStage.indexName, expectedQueryPlan.indexName);
+            assert.eq(getLookupStageIndexStrategy(lkpStage).indexName, expectedQueryPlan.indexName, lkpStage);
         }
 
         const expectedTopLevelJoinStage = expectedQueryPlan.strategy == "HashJoin" ? "hash_lookup" : "nlj";

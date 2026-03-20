@@ -462,11 +462,6 @@ void statsToBSON(const QuerySolutionNode* node,
             bob->append("foreignField", eln->joinFieldForeign.fullPath());
             bob->append("asField", eln->joinField.fullPath());
             bob->append("strategy", EqLookupNode::serializeLookupStrategy(eln->lookupStrategy));
-            if (eln->idxEntry) {
-                bob->append("indexName", eln->idxEntry->identifier.catalogName);
-                bob->append("indexKeyPattern", eln->idxEntry->keyPattern);
-            }
-            bob->append("scanDirection", toString(eln->scanDirection));
             break;
         }
         case STAGE_EQ_LOOKUP_UNWIND: {
@@ -479,11 +474,6 @@ void statsToBSON(const QuerySolutionNode* node,
             bob->append("foreignField", eln->joinFieldForeign.fullPath());
             bob->append("asField", eln->joinField.fullPath());
             bob->append("strategy", EqLookupNode::serializeLookupStrategy(eln->lookupStrategy));
-            if (eln->idxEntry) {
-                bob->append("indexName", eln->idxEntry->identifier.catalogName);
-                bob->append("indexKeyPattern", eln->idxEntry->keyPattern);
-            }
-            bob->append("scanDirection", toString(eln->scanDirection));
             break;
         }
         case STAGE_UNPACK_TS_BUCKET: {

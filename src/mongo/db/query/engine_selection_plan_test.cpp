@@ -66,15 +66,17 @@ TEST_F(EngineSelectionPlanFixture, LookupUnwind) {
     auto nssForeign = NamespaceString::createNamespaceString_forTest("testdb.collForeign");
 
     BSONObj indexFields = fromjson("{a: 1}");
-    auto indexScan = std::make_unique<IndexScanNode>(nssLocal, buildSimpleIndexEntry(indexFields));
+    std::vector<std::unique_ptr<QuerySolutionNode>> children;
+    children.emplace_back(
+        std::make_unique<IndexScanNode>(nssLocal, buildSimpleIndexEntry(indexFields)));
+    children.emplace_back(std::make_unique<CollectionScanNode>(nssForeign));
     auto lookupUnwind =
-        std::make_unique<EqLookupUnwindNode>(std::move(indexScan),
+        std::make_unique<EqLookupUnwindNode>(std::move(children),
                                              FieldPath("a"),
                                              nssForeign,
                                              FieldPath("b"),
                                              FieldPath("c"),
                                              EqLookupNode::LookupStrategy::kHashJoin,
-                                             boost::none,
                                              false,
                                              false,
                                              boost::none);

@@ -119,17 +119,16 @@ public:
                                     const std::string& foreignKey,
                                     const std::string& asKey) {
         // Documents from the local collection are provided using collection scan.
-        auto localScanNode = std::make_unique<CollectionScanNode>();
-        localScanNode->nss = _nss;
-
+        std::vector<std::unique_ptr<QuerySolutionNode>> children;
+        children.emplace_back(std::make_unique<CollectionScanNode>(_nss));
+        children.emplace_back(std::make_unique<CollectionScanNode>(_foreignNss));
         // Construct logical query solution.
-        auto lookupNode = std::make_unique<EqLookupNode>(std::move(localScanNode),
+        auto lookupNode = std::make_unique<EqLookupNode>(std::move(children),
                                                          _foreignNss,
                                                          localKey,
                                                          foreignKey,
                                                          asKey,
                                                          strategy,
-                                                         boost::none /* idxEntry */,
                                                          true /* shouldProduceBson */);
         auto solution = makeQuerySolution(std::move(lookupNode));
 
@@ -945,11 +944,8 @@ protected:
         const NamespaceString& rightCollectionName,
         const FieldPath& embeddingPath,
         const std::vector<std::pair<FieldPath, FieldPath>>& joinKeys) {
-        auto leftScanNode = std::make_unique<CollectionScanNode>();
-        leftScanNode->nss = leftCollectionName;
-
-        auto rightScanNode = std::make_unique<CollectionScanNode>();
-        rightScanNode->nss = rightCollectionName;
+        auto leftScanNode = std::make_unique<CollectionScanNode>(leftCollectionName);
+        auto rightScanNode = std::make_unique<CollectionScanNode>(rightCollectionName);
 
         std::vector<QSNJoinPredicate> predicateList;
         std::transform(joinKeys.begin(),
@@ -982,11 +978,8 @@ protected:
                                                       const FieldPath& embeddingPath,
                                                       const FieldPath& leftJoinKey,
                                                       const FieldPath& rightJoinKey) {
-        auto leftScanNode = std::make_unique<CollectionScanNode>();
-        leftScanNode->nss = leftCollectionName;
-
-        auto rightScanNode = std::make_unique<CollectionScanNode>();
-        rightScanNode->nss = rightCollectionName;
+        auto leftScanNode = std::make_unique<CollectionScanNode>(leftCollectionName);
+        auto rightScanNode = std::make_unique<CollectionScanNode>(rightCollectionName);
 
         auto solution = makeQuerySolution(std::make_unique<NestedLoopJoinEmbeddingNode>(
             std::move(leftScanNode),
@@ -1012,11 +1005,8 @@ protected:
                                                        const FieldPath& leftJoinKey,
                                                        const FieldPath& rightJoinKey,
                                                        BSONObj projection) {
-        auto leftScanNode = std::make_unique<CollectionScanNode>();
-        leftScanNode->nss = leftCollectionName;
-
-        auto rightScanNode = std::make_unique<CollectionScanNode>();
-        rightScanNode->nss = rightCollectionName;
+        auto leftScanNode = std::make_unique<CollectionScanNode>(leftCollectionName);
+        auto rightScanNode = std::make_unique<CollectionScanNode>(rightCollectionName);
 
         auto joinNode = std::make_unique<NestedLoopJoinEmbeddingNode>(
             std::move(leftScanNode),
@@ -1043,9 +1033,7 @@ protected:
                                       boost::optional<FieldPath> leftEmbeddingPath,
                                       std::vector<EquiJoinOperation> equiJoins) {
         auto rootNode = [&]() -> std::unique_ptr<QuerySolutionNode> {
-            auto collectionScan = std::make_unique<CollectionScanNode>();
-            collectionScan->nss = leftMostCollectionName;
-            return collectionScan;
+            return std::make_unique<CollectionScanNode>(leftMostCollectionName);
         }();
 
         // Of the involved collections (including the left-most), exactly one should have no
@@ -1066,8 +1054,7 @@ protected:
                 mainCollectionName = join.rightCollectionName;
             }
 
-            auto rightScanNode = std::make_unique<CollectionScanNode>();
-            rightScanNode->nss = join.rightCollectionName;
+            auto rightScanNode = std::make_unique<CollectionScanNode>(join.rightCollectionName);
 
             std::vector<QSNJoinPredicate> predicates = {{.op = QSNJoinPredicate::ComparisonOp::Eq,
                                                          .leftField = join.leftJoinKey,
@@ -1114,11 +1101,8 @@ protected:
         const NamespaceString& rightCollectionName,
         const FieldPath& embeddingPath,
         const std::vector<std::pair<FieldPath, FieldPath>>& joinKeys) {
-        auto leftScanNode = std::make_unique<CollectionScanNode>();
-        leftScanNode->nss = leftCollectionName;
-
-        auto rightScanNode = std::make_unique<CollectionScanNode>();
-        rightScanNode->nss = rightCollectionName;
+        auto leftScanNode = std::make_unique<CollectionScanNode>(leftCollectionName);
+        auto rightScanNode = std::make_unique<CollectionScanNode>(rightCollectionName);
 
         std::vector<QSNJoinPredicate> predicateList;
         std::transform(joinKeys.begin(),
@@ -1152,11 +1136,8 @@ protected:
         const FieldPath& embeddingPath,
         const FieldPath& leftJoinKey,
         const FieldPath& rightJoinKey) {
-        auto leftScanNode = std::make_unique<CollectionScanNode>();
-        leftScanNode->nss = leftCollectionName;
-
-        auto rightScanNode = std::make_unique<CollectionScanNode>();
-        rightScanNode->nss = rightCollectionName;
+        auto leftScanNode = std::make_unique<CollectionScanNode>(leftCollectionName);
+        auto rightScanNode = std::make_unique<CollectionScanNode>(rightCollectionName);
 
         auto solution = makeQuerySolution(std::make_unique<HashJoinEmbeddingNode>(
             std::move(leftScanNode),
@@ -2099,14 +2080,9 @@ TEST_F(BinaryJoinStageBuilderTest, RightDeepCollscanBaseLeftmost) {
         fromjson("{_id: 1, l1key: 1, x: {_id: 11, f1key: 1, l2key: 11}, z: {_id: 21, f2key: 11}}"),
     };
 
-    auto cs1 = std::make_unique<CollectionScanNode>();
-    cs1->nss = foreignCollectionName1;
-
-    auto cs2 = std::make_unique<CollectionScanNode>();
-    cs2->nss = foreignCollectionName2;
-
-    auto cs3 = std::make_unique<CollectionScanNode>();
-    cs3->nss = _nss;
+    auto cs1 = std::make_unique<CollectionScanNode>(foreignCollectionName1);
+    auto cs2 = std::make_unique<CollectionScanNode>(foreignCollectionName2);
+    auto cs3 = std::make_unique<CollectionScanNode>(_nss);
 
     auto hj = std::make_unique<HashJoinEmbeddingNode>(
         std::move(cs1),
@@ -2158,14 +2134,9 @@ TEST_F(BinaryJoinStageBuilderTest, JoinFilterBase) {
         fromjson("{_id: 0, l1key: 0, x: {_id: 10, f1key: 0, l2key: 10}, z: {_id: 20, f2key: 10}}"),
     };
 
-    auto cs1 = std::make_unique<CollectionScanNode>();
-    cs1->nss = foreignCollectionName1;
-
-    auto cs2 = std::make_unique<CollectionScanNode>();
-    cs2->nss = foreignCollectionName2;
-
-    auto cs3 = std::make_unique<CollectionScanNode>();
-    cs3->nss = _nss;
+    auto cs1 = std::make_unique<CollectionScanNode>(foreignCollectionName1);
+    auto cs2 = std::make_unique<CollectionScanNode>(foreignCollectionName2);
+    auto cs3 = std::make_unique<CollectionScanNode>(_nss);
 
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(
         new ExpressionContextForTest(operationContext(), _nss));
@@ -2236,17 +2207,10 @@ TEST_F(BinaryJoinStageBuilderTest, JoinOnNonEmbeddedSources) {
                  "{_id: 21, f2key: 11}}"),
     };
 
-    auto cs1 = std::make_unique<CollectionScanNode>();
-    cs1->nss = foreignCollectionName1;
-
-    auto cs2 = std::make_unique<CollectionScanNode>();
-    cs2->nss = foreignCollectionName2;
-
-    auto cs3 = std::make_unique<CollectionScanNode>();
-    cs3->nss = _nss;
-
-    auto cs4 = std::make_unique<CollectionScanNode>();
-    cs4->nss = foreignCollectionName3;
+    auto cs1 = std::make_unique<CollectionScanNode>(foreignCollectionName1);
+    auto cs2 = std::make_unique<CollectionScanNode>(foreignCollectionName2);
+    auto cs3 = std::make_unique<CollectionScanNode>(_nss);
+    auto cs4 = std::make_unique<CollectionScanNode>(foreignCollectionName3);
 
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(
         new ExpressionContextForTest(operationContext(), _nss));
@@ -2314,14 +2278,9 @@ TEST_F(BinaryJoinStageBuilderTest, JoinDeeplyNestedCondition) {
             "{_id: 1, l1key: 1, y: {_id: 21, f2key: 1}, z: {_id: 11, key: {f1key: 1}, l2key: 11}}"),
     };
 
-    auto cs1 = std::make_unique<CollectionScanNode>();
-    cs1->nss = _nss;
-
-    auto cs2 = std::make_unique<CollectionScanNode>();
-    cs2->nss = foreignCollectionName1;
-
-    auto cs3 = std::make_unique<CollectionScanNode>();
-    cs3->nss = foreignCollectionName2;
+    auto cs1 = std::make_unique<CollectionScanNode>(_nss);
+    auto cs2 = std::make_unique<CollectionScanNode>(foreignCollectionName1);
+    auto cs3 = std::make_unique<CollectionScanNode>(foreignCollectionName2);
 
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(
         new ExpressionContextForTest(operationContext(), _nss));

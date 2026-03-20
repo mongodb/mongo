@@ -225,7 +225,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT QuerySolutionNode {
     virtual FieldAvailability getFieldAvailability(const std::string& field) const = 0;
 
     /**
-     * Syntatic sugar on top of getFieldAvailability(). Returns true if the 'field' is fully
+     * Syntactic sugar on top of getFieldAvailability(). Returns true if the 'field' is fully
      * provided and false otherwise.
      */
     bool hasField(const std::string& field) const {
@@ -577,7 +577,7 @@ private:
 };
 
 struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
-    CollectionScanNode();
+    CollectionScanNode(NamespaceString nss = {});
     ~CollectionScanNode() override {}
 
     StageType getType() const override {
@@ -1846,24 +1846,32 @@ struct EqLookupNode : public QuerySolutionNode {
         }
     }
 
-    EqLookupNode(std::unique_ptr<QuerySolutionNode> child,
+    EqLookupNode(std::vector<std::unique_ptr<QuerySolutionNode>> children,
                  const NamespaceString& foreignCollection,
                  const FieldPath& joinFieldLocal,
                  const FieldPath& joinFieldForeign,
                  const FieldPath& joinField,
                  EqLookupNode::LookupStrategy lookupStrategy,
-                 boost::optional<IndexEntry> idxEntry,
-                 bool shouldProduceBson,
-                 NaturalOrderHint::Direction scanDirection = NaturalOrderHint::Direction::kForward)
-        : QuerySolutionNode(std::move(child)),
-          foreignCollection(foreignCollection),
+                 bool shouldProduceBson)
+        : foreignCollection(foreignCollection),
           joinFieldLocal(joinFieldLocal),
           joinFieldForeign(joinFieldForeign),
           joinField(joinField),
           lookupStrategy(lookupStrategy),
-          idxEntry(std::move(idxEntry)),
-          shouldProduceBson(shouldProduceBson),
-          scanDirection(scanDirection) {}
+          shouldProduceBson(shouldProduceBson) {
+        tassert(11801400, "EqLookupNode needs at least two input streams", children.size() > 1);
+        tassert(11801401,
+                "Index-based $lookup strategy must provide an indexed stream as second source",
+                (lookupStrategy != EqLookupNode::LookupStrategy::kIndexedLoopJoin &&
+                 lookupStrategy != EqLookupNode::LookupStrategy::kDynamicIndexedLoopJoin) ||
+                    children[1]->getType() == STAGE_FETCH);
+        tassert(
+            11801402,
+            "Dynamic index-based $lookup strategy must provide a fallback stream as third source",
+            lookupStrategy != EqLookupNode::LookupStrategy::kDynamicIndexedLoopJoin ||
+                children.size() == 3);
+        addChildren(std::move(children));
+    }
 
     StageType getType() const override {
         return STAGE_EQ_LOOKUP;
@@ -1925,21 +1933,10 @@ struct EqLookupNode : public QuerySolutionNode {
     LookupStrategy lookupStrategy = LookupStrategy::kNestedLoopJoin;
 
     /**
-     * The index to be used if we can answer the join predicate with an index on the foreign
-     * collection. Set to 'boost::none' by default and if a non-indexed strategy is chosen.
-     */
-    boost::optional<IndexEntry> idxEntry = boost::none;
-
-    /**
      * If set to true, generated SBE plan will produce result as BSON object. If false,
      * 'sbe::Object' is produced instead.
      */
     bool shouldProduceBson;
-
-    /**
-     * Scan direction if hinted, default forward.
-     */
-    NaturalOrderHint::Direction scanDirection;
 };  // struct EqLookupNode
 
 /**
@@ -1948,34 +1945,42 @@ struct EqLookupNode : public QuerySolutionNode {
  * like SQL join stages. They are more like $lookup than $unwind.
  */
 struct EqLookupUnwindNode : public QuerySolutionNode {
-    EqLookupUnwindNode(
-        std::unique_ptr<QuerySolutionNode> child,
-        // Shared data members.
-        const FieldPath& joinField,
-        // $lookup-specific data members.
-        const NamespaceString& foreignCollection,
-        const FieldPath& joinFieldLocal,
-        const FieldPath& joinFieldForeign,
-        EqLookupNode::LookupStrategy lookupStrategy,
-        boost::optional<IndexEntry> idxEntry,
-        bool shouldProduceBson,
-        // $unwind-specific data members.
-        bool preserveNullAndEmptyArrays,
-        const boost::optional<FieldPath>& indexPath,
-        NaturalOrderHint::Direction scanDirection = NaturalOrderHint::Direction::kForward)
-        : QuerySolutionNode(std::move(child)),
-          // Shared data members.
+    EqLookupUnwindNode(std::vector<std::unique_ptr<QuerySolutionNode>> children,
+                       // Shared data members.
+                       const FieldPath& joinField,
+                       // $lookup-specific data members.
+                       const NamespaceString& foreignCollection,
+                       const FieldPath& joinFieldLocal,
+                       const FieldPath& joinFieldForeign,
+                       EqLookupNode::LookupStrategy lookupStrategy,
+                       bool shouldProduceBson,
+                       // $unwind-specific data members.
+                       bool preserveNullAndEmptyArrays,
+                       const boost::optional<FieldPath>& indexPath)
+        :  // Shared data members.
           joinField{joinField},
           // $lookup-specific data members.
           foreignCollection(foreignCollection),
           joinFieldLocal(joinFieldLocal),
           joinFieldForeign(joinFieldForeign),
           lookupStrategy(lookupStrategy),
-          idxEntry(std::move(idxEntry)),
           shouldProduceBson(shouldProduceBson),
           // $unwind-specific data members.
-          unwindSpec{joinField /* fieldPath */, preserveNullAndEmptyArrays, indexPath},
-          scanDirection(scanDirection) {}
+          unwindSpec{joinField /* fieldPath */, preserveNullAndEmptyArrays, indexPath} {
+        tassert(
+            11801403, "EqLookupUnwindNode needs at least two input streams", children.size() > 1);
+        tassert(11801404,
+                "Index-based $lookup strategy must provide an indexed stream as second source",
+                (lookupStrategy != EqLookupNode::LookupStrategy::kIndexedLoopJoin &&
+                 lookupStrategy != EqLookupNode::LookupStrategy::kDynamicIndexedLoopJoin) ||
+                    children[1]->getType() == STAGE_FETCH);
+        tassert(
+            11801405,
+            "Dynamic index-based $lookup strategy must provide a fallback stream as third source",
+            lookupStrategy != EqLookupNode::LookupStrategy::kDynamicIndexedLoopJoin ||
+                children.size() == 3);
+        addChildren(std::move(children));
+    }
 
     StageType getType() const override {
         return STAGE_EQ_LOOKUP_UNWIND;
@@ -2037,10 +2042,6 @@ struct EqLookupUnwindNode : public QuerySolutionNode {
     // join as it's applicable independent of collection sizes or the availability of indexes.
     EqLookupNode::LookupStrategy lookupStrategy = EqLookupNode::LookupStrategy::kNestedLoopJoin;
 
-    // The index to be used if we can answer the join predicate with an index on the foreign
-    // collection. Set to 'boost::none' by default and if a non-indexed strategy is chosen.
-    boost::optional<IndexEntry> idxEntry = boost::none;
-
     // If set to true, generated SBE plan will produce result as BSON object. If false,
     // 'sbe::Object' is produced instead.
     bool shouldProduceBson;
@@ -2052,11 +2053,6 @@ struct EqLookupUnwindNode : public QuerySolutionNode {
     // Represents the absorbed $unwind stage, which may be used in the stage builder for this $LU
     // node.
     UnwindNode::UnwindSpec unwindSpec;
-
-    /**
-     * Scan direction if hinted, default forward.
-     */
-    NaturalOrderHint::Direction scanDirection;
 };  // struct EqLookupUnwindNode
 
 struct SentinelNode : public QuerySolutionNode {

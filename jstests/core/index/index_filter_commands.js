@@ -45,25 +45,27 @@
 import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
+    getEngine,
+    getLookupStageIndexStrategy,
     getPlanCacheKeyFromPipeline,
     getPlanCacheKeyFromShape,
     getPlanStage,
     getQueryPlanner,
     getSingleNodeExplain,
     getWinningPlanFromExplain,
-    isClusteredIxscan,
     isCollscan,
     isExpress,
     isIdhackOrExpress,
     isIxscan,
-    planHasStage,
 } from "jstests/libs/query/analyze_plan.js";
 import {sbePlanCacheEnabled, checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 // Flag indicating if index filter commands are running through the query settings interface.
 let isIndexFiltersToQuerySettings = TestData.isIndexFiltersToQuerySettings || false;
 
-const coll = db.jstests_index_filter_commands;
+// This test changes the settings for the collection, we must ensure we don't conflict when this
+// test is run in parallel mode.
+const coll = db[jsTestName()];
 coll.drop();
 
 const usingSbePlanCache = sbePlanCacheEnabled(db);
@@ -163,7 +165,7 @@ function planCacheEntryForPipeline(pipeline, collection) {
 // Utility function to list plans for a query.
 // Attempting to retrieve index filters on a non-existent collection
 // will return empty results.
-let missingCollection = db.jstests_index_filter_commands_missing;
+let missingCollection = db[jsTestName() + "_missing"];
 missingCollection.drop();
 assert.eq(
     0,
@@ -373,7 +375,7 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
     assert.commandWorked(coll.insert({a: 1, b: 1}));
 
     // Create a foreign collection with a set of indexes.
-    const foreignColl = db.index_filter_commands_foreign;
+    const foreignColl = db[jsTestName() + "_foreign"];
     foreignColl.drop();
     assert.commandWorked(foreignColl.insert({a: 1, b: 1}));
     assert.commandWorked(foreignColl.createIndex(indexA1, {name: "foreign_a_1"}));
@@ -421,16 +423,17 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
     // the 'foreign_a_1' one, rather than 'foreign_a_1_c_1' specified in the index filter, as the
     // INLJ heuristics always prefer an index with a narrower key pattern.
     explain = coll.explain().aggregate(pipeline);
+    assert.commandWorked(explain);
 
-    // Cannot check when pipeline is split, because we won't push down to SBE in this case.`
-    if (!explain.splitPipeline) {
-        assert.commandWorked(explain);
+    // The test could be running in a sharded environment where either the pipeline is split, or the
+    // foreign collection is not co-located; in these cases we won't push down to SBE.
+    if (getEngine(explain) == "sbe") {
         explain = getSingleNodeExplain(explain);
 
         let lookupStage = getPlanStage(explain, "EQ_LOOKUP");
         assert.neq(null, lookupStage, explain);
         assert.eq(lookupStage.strategy, "IndexedLoopJoin", explain);
-        assert.eq(lookupStage.indexName, "foreign_a_1");
+        assert.eq(getLookupStageIndexStrategy(lookupStage).indexName, "foreign_a_1", lookupStage);
 
         // Now, add the same set of indexes to the main collection as defined on the foreign
         // collection.
@@ -463,7 +466,7 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
             assert.eq(true, planAfterSetFilter.indexFilterSet, planAfterSetFilter);
         }
 
-        // Check that the inner side was still using the heursitics to select an INLJ plan, and the
+        // Check that the inner side was still using the heuristics to select an INLJ plan, and the
         // outer side honoured the index filter.
         explain = coll.explain().aggregate(pipeline);
         assert.commandWorked(explain);
@@ -471,9 +474,12 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
         lookupStage = getPlanStage(explain, "EQ_LOOKUP");
         assert.neq(null, lookupStage, explain);
         assert.eq(lookupStage.strategy, "IndexedLoopJoin", explain);
-        assert.eq(lookupStage.indexName, "foreign_a_1");
+        assert.eq(getLookupStageIndexStrategy(lookupStage).indexName, "foreign_a_1", lookupStage);
 
-        let ixscanStage = getPlanStage(explain, "IXSCAN");
+        let ixscanStage = getPlanStage(
+            lookupStage.hasOwnProperty("indexName") ? explain : lookupStage.inputStages[0],
+            "IXSCAN",
+        );
         assert.neq(null, ixscanStage, explain);
         assert.eq(ixscanStage.indexName, "main_a_1_c_1", explain);
 

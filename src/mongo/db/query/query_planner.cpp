@@ -1892,22 +1892,39 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
                     query.getExpCtx()->getAllowDiskUse(),
                     query.getCollator());
 
+            std::vector<std::unique_ptr<QuerySolutionNode>> children;
+            children.emplace_back(std::move(solnForAgg));
+            if (strategy == EqLookupNode::LookupStrategy::kNonExistentForeignCollection) {
+                children.emplace_back(
+                    std::make_unique<EofNode>(eof_node::EOFType::NonExistentNamespace));
+            }
+            if (strategy == EqLookupNode::LookupStrategy::kIndexedLoopJoin ||
+                strategy == EqLookupNode::LookupStrategy::kDynamicIndexedLoopJoin) {
+                children.emplace_back(std::make_unique<FetchNode>(
+                    std::make_unique<IndexScanNode>(lookupStage->getFromNs(), std::move(*idxEntry)),
+                    lookupStage->getFromNs()));
+            }
+            if (strategy == EqLookupNode::LookupStrategy::kHashJoin ||
+                strategy == EqLookupNode::LookupStrategy::kNestedLoopJoin ||
+                strategy == EqLookupNode::LookupStrategy::kDynamicIndexedLoopJoin) {
+                auto collScan = std::make_unique<CollectionScanNode>(lookupStage->getFromNs());
+                collScan->direction = isForward(scanDirection) ? 1 : -1;
+                children.emplace_back(std::move(collScan));
+            }
             if (!lookupStage->hasUnwindSrc()) {
                 solnForAgg =
-                    std::make_unique<EqLookupNode>(std::move(solnForAgg),
+                    std::make_unique<EqLookupNode>(std::move(children),
                                                    lookupStage->getFromNs(),
                                                    lookupStage->getLocalField()->fullPath(),
                                                    lookupStage->getForeignField()->fullPath(),
                                                    lookupStage->getAsField().fullPath(),
                                                    strategy,
-                                                   std::move(idxEntry),
-                                                   isLastSource /* shouldProduceBson */,
-                                                   scanDirection);
+                                                   isLastSource /* shouldProduceBson */);
             } else {
                 const boost::intrusive_ptr<DocumentSourceUnwind>& unwindSrc =
                     lookupStage->getUnwindSource();
                 solnForAgg =
-                    std::make_unique<EqLookupUnwindNode>(std::move(solnForAgg),
+                    std::make_unique<EqLookupUnwindNode>(std::move(children),
                                                          // Shared data members.
                                                          lookupStage->getAsField().fullPath(),
                                                          // $lookup-specific data members.
@@ -1915,12 +1932,10 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
                                                          lookupStage->getLocalField()->fullPath(),
                                                          lookupStage->getForeignField()->fullPath(),
                                                          strategy,
-                                                         std::move(idxEntry),
                                                          isLastSource /* shouldProduceBson */,
                                                          // $unwind-specific data members.
                                                          unwindSrc->preserveNullAndEmptyArrays(),
-                                                         unwindSrc->indexPath(),
-                                                         scanDirection);
+                                                         unwindSrc->indexPath());
             }
             continue;
         }

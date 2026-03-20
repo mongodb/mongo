@@ -916,8 +916,10 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
     auto [_1, orCt] = solution.getFirstNodeByType(STAGE_OR);
     auto [_2, nljCt] = solution.getFirstNodeByType(STAGE_NESTED_LOOP_JOIN_EMBEDDING_NODE);
     auto [_3, hjCt] = solution.getFirstNodeByType(STAGE_HASH_JOIN_EMBEDDING_NODE);
+    auto [_4, luCt] = solution.getFirstNodeByType(STAGE_EQ_LOOKUP_UNWIND);
+    auto [_5, lkCt] = solution.getFirstNodeByType(STAGE_EQ_LOOKUP);
     const unsigned long numCollscanStages = ct;
-    const unsigned long numMultiScanNodes = orCt + nljCt + hjCt;
+    const unsigned long numMultiScanNodes = orCt + nljCt + hjCt + luCt + lkCt;
     tassert(7182000,
             str::stream()
                 << "Found " << numCollscanStages

@@ -8,6 +8,7 @@ import {
     assertEngine,
     getAggPlanStage,
     getAggPlanStages,
+    getLookupStageIndexStrategy,
     hasRejectedPlans,
     planHasStage,
 } from "jstests/libs/query/analyze_plan.js";
@@ -62,7 +63,7 @@ function verifyEqLookupNodeStrategy(explain, eqLookupNodeIndex, expectedStrategy
 
     if (strategy === "IndexedLoopJoin") {
         assert(indexKeyPattern, "expected indexKeyPattern should be set for IndexedLoopJoin algorithm");
-        assert.docEq(indexKeyPattern, eqLookupNode.indexKeyPattern);
+        assert.docEq(indexKeyPattern, getLookupStageIndexStrategy(eqLookupNode).indexKeyPattern, eqLookupNode);
     }
 }
 
