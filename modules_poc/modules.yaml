@@ -171,6 +171,7 @@ query:
   meta:
     slack: TODO
     jira: TODO
+    fully_marked: true
   files:
     - src/mongo/db/aggregated_index_usage_tracker*
     - src/mongo/db/api_parameters*
@@ -276,6 +277,7 @@ catalog_and_routing:
     - src/mongo/db/database_name[._]*
     - src/mongo/db/namespace_string[._]*
     - src/mongo/db/stats/system_buckets_metrics*
+    - src/mongo/db/stats/direct_system_buckets_access.h
 
 catalog_and_routing.shard_role:
   meta:

@@ -33,6 +33,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 namespace mongo {

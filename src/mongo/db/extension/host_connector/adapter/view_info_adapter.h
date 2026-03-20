@@ -32,6 +32,7 @@
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::extension::host_connector {
 

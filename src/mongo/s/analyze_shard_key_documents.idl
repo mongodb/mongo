@@ -28,6 +28,8 @@
 
 global:
     cpp_namespace: "mongo::analyze_shard_key"
+    # TODO SERVER-118592: Determine the visibility of this idl once we move it out of the query module.
+    mod_visibility: needs_replacement
 
 imports:
     - "mongo/db/basic_types.idl"

@@ -33,6 +33,7 @@
 #include "mongo/db/query/compiler/optimizer/join/join_cost_estimator.h"
 #include "mongo/db/query/compiler/optimizer/join/join_estimates.h"
 #include "mongo/db/query/compiler/optimizer/join/join_plan.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::join_ordering {
 

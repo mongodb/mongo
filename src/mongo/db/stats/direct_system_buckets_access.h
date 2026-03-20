@@ -31,8 +31,9 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 constexpr inline auto kIsDirectSystemBucketsAccessFieldName = "isDirectSystemBucketsAccess"_sd;
 
@@ -49,4 +50,4 @@ constexpr inline auto kIsDirectSystemBucketsAccessFieldName = "isDirectSystemBuc
  */
 bool& isDirectSystemBucketsAccess(OperationContext*);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

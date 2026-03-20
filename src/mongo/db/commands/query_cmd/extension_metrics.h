@@ -33,6 +33,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/commands/query_cmd/cmd_specific_metric_helpers.h"
 #include "mongo/db/topology/cluster_role.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup_gen.h"
 #include "mongo/db/pipeline/stage_params.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

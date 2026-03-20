@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/query/compiler/dependency_analysis/document_transformation.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::document_transformation {
 

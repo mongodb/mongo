@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/counter.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::vector_search_metrics {
 

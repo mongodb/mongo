@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/query/plan_ranking/plan_ranker.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::plan_ranking {
 

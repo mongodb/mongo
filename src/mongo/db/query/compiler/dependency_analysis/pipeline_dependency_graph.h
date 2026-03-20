@@ -32,6 +32,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <string>

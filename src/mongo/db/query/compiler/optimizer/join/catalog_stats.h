@@ -32,6 +32,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::join_ordering {
 

@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/change_stream_pre_images_truncate_markers_sampling_strategy/sampling_strategy.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::pre_image_marker_initialization_internal {
 

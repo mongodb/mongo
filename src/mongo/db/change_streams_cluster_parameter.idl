@@ -27,6 +27,7 @@
 #
 
 global:
+    mod_visibility: private
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/change_streams_cluster_parameter.h"

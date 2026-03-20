@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/lite_parsed_document_source_nested_pipelines.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/stage_params.h"
+#include "mongo/util/modules.h"
 
 #include <list>
 #include <memory>
@@ -51,7 +52,7 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
 
 class UnionWithStageParams : public DefaultStageParams {
 public:
@@ -121,4 +122,4 @@ private:
     bool _isHybridSearch;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_NEEDS_REPLACEMENT mongo

@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/query/count_command_gen.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace count_cmd_helper {

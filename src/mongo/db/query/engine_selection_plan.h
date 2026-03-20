@@ -31,6 +31,7 @@
 
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/engine_selection.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

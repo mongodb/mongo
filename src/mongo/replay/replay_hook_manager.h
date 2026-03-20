@@ -31,6 +31,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/traffic_reader.h"
 #include "mongo/replay/replay_command.h"
+#include "mongo/util/modules.h"
 
 #include <concepts>
 #include <vector>
