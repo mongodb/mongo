@@ -15,10 +15,14 @@ RUN apt-get install -y curl
 # Install git
 RUN apt-get install -y git
 
-# Set up Python
-RUN apt-get install -y python3.10 python3-pip python3.10-venv
-RUN ln -f $(which python3.10) /usr/bin/python
-RUN ln -f $(which python3.10) /usr/bin/python3
+# Set up Python 3.13 via deadsnakes PPA (project requires >=3.13)
+RUN apt-get install -y software-properties-common \
+    && add-apt-repository ppa:deadsnakes/ppa \
+    && apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y python3.13 python3.13-venv python3.13-dev build-essential \
+    && python3.13 -m ensurepip --upgrade
+RUN ln -f $(which python3.13) /usr/bin/python
+RUN ln -f $(which python3.13) /usr/bin/python3
 
 RUN python -m pip install --upgrade pip wheel
 
