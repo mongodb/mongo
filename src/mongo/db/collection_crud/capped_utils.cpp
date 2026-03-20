@@ -230,9 +230,14 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
                     Lock::ResourceLock heldUntilEndOfWUOW{
                         opCtx, ResourceId(RESOURCE_METADATA, toNss), MODE_X};
                 }
-                auto oplogInfo = LocalOplogInfo::get(opCtx);
-                auto oplogSlots = oplogInfo->getNextOpTimes(opCtx, /*batchSize=*/1);
-                insertStmt.oplogSlot = oplogSlots.front();
+
+                // When grouping oplog entries, the op times are allocated in the correct order upon
+                // commit.
+                if (!wunit.isGroupingOplogEntries()) {
+                    auto oplogInfo = LocalOplogInfo::get(opCtx);
+                    auto oplogSlots = oplogInfo->getNextOpTimes(opCtx, /*batchSize=*/1);
+                    insertStmt.oplogSlot = oplogSlots.front();
+                }
             }
 
             uassertStatusOK(collection_internal::insertDocument(opCtx,
