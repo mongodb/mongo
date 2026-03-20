@@ -27,7 +27,6 @@ Use VSCode's Debugger UI with resmoke's `--shellJSDebugMode` flag.
 - Watching variables is not supported.
 - Deeply nested variables are truncated in the Variables sidebar display, with only 1 level of expansion. Use the Debug Console to inspect more. See [SERVER-121664](https://jira.mongodb.org/browse/SERVER-121664).
 - Breakpoints set while the shell is paused take effect immediately. Breakpoints set while the shell is running will apply the next time a breakpoint is hit (the shell is not interrupted mid-execution).
-- Files can't be edited/modified while paused in a breakpoint (technically, they _can_ be edited, but that will cause the debugger to error). See [SERVER-122188](https://jira.mongodb.org/browse/SERVER-122188).
 - The debugger uses port 9229, the default Chrome debugging port. Any open Chrome debuggers (eg. Developer Tools open in a Chrome tab) will conflict with this VSCode Debugger.
 
 ## Install

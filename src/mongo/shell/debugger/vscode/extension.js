@@ -24,6 +24,8 @@ function activate(context) {
             createDebugAdapterDescriptor: (session) => createDebugAdapter(context, session),
         }),
     );
+
+    registerFileSaveWarning(context);
 }
 
 function deactivate() {}
@@ -103,6 +105,59 @@ function findMongoRepo() {
         return workspaceFolders[0].uri.fsPath;
     }
     return null;
+}
+
+/**
+ * Warn when a file is saved while the debugger is paused at a breakpoint.
+ * Editing source mid-session causes line numbers reported by the shell to diverge from
+ * the editor, making the highlighted stop position and future breakpoints appear wrong.
+ */
+function registerFileSaveWarning(context) {
+    let sessionStopped = false;
+    context.subscriptions.push(
+        vscode.debug.registerDebugAdapterTrackerFactory("mongo-shell", {
+            createDebugAdapterTracker(_session) {
+                return {
+                    onDidSendMessage(message) {
+                        if (message.type === "event" && message.event === "stopped") sessionStopped = true;
+                    },
+                    onWillReceiveMessage(message) {
+                        if (
+                            message.type === "request" &&
+                            ["continue", "next", "stepIn", "stepOut"].includes(message.command)
+                        )
+                            sessionStopped = false;
+                    },
+                    onWillStopSession() {
+                        sessionStopped = false;
+                    },
+                };
+            },
+        }),
+    );
+    context.subscriptions.push(
+        vscode.workspace.onDidSaveTextDocument((doc) => {
+            if (!sessionStopped) return;
+            if (vscode.debug.activeDebugSession?.type !== "mongo-shell") return;
+
+            // Only warn if the saved file has breakpoints, otherwise this can be very distracting.
+            //
+            // This isn't perfect: users can still edit files with no breakpoints that have aleady
+            // loaded in the shell, and then set new breakpoints and the offsets aren't accurate.
+            //
+            // That's typical of any compiled code mid-execution, and this is a reasonable warning
+            // for users in context of breakpoints.
+            const hasBreakpointInFile = vscode.debug.breakpoints.some(
+                (bp) => bp instanceof vscode.SourceBreakpoint && bp.location.uri.toString() === doc.uri.toString(),
+            );
+            if (!hasBreakpointInFile) return;
+
+            vscode.window.showWarningMessage(
+                "Source file edited while paused. The highlighted line may not match the new source." +
+                    " Restart the debug session for accurate behavior.",
+            );
+        }),
+    );
 }
 
 module.exports = {activate, deactivate};
