@@ -926,6 +926,8 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
                                                       const UUID& buildUUID,
                                                       const ResumeIndexInfo& resumeInfo) {
     NamespaceStringOrUUID nssOrUuid{dbName, collectionUUID};
+    // Make a mutable copy to populate indexIdent from the catalog; the caller's vector is const.
+    auto mutableIndexes = indexes;
 
     if (MONGO_unlikely(failSetUpResumeIndexBuild.shouldFail())) {
         return {ErrorCodes::FailPointEnabled, "failSetUpResumeIndexBuild fail point is enabled"};
@@ -945,7 +947,7 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
     CollectionWriter collection(opCtx, resumeInfo.getCollectionUUID());
     invariant(collection);
     const auto mdbCatalog = MDBCatalog::get(opCtx);
-    for (const auto& indexBuildInfo : indexes) {
+    for (auto& indexBuildInfo : mutableIndexes) {
         if (indexBuildInfo.getIndexName().empty()) {
             return Status(ErrorCodes::CannotCreateIndex,
                           str::stream()
@@ -974,6 +976,10 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
             indexIdent.size() > 0);
         uassertStatusOK(collection->checkMetaDataForIndex(
             std::string{indexBuildInfo.getIndexName()}, indexBuildInfo.spec));
+
+        // Populate the index ident so it is available when writing the commitIndexBuild oplog
+        // entry during the commit phase of this resumed build.
+        indexBuildInfo.indexIdent = std::move(indexIdent);
     }
 
     if (!collection->isInitialized()) {
@@ -984,7 +990,7 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
 
     auto protocol = IndexBuildProtocol::kTwoPhase;
     auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
-        buildUUID, collection->uuid(), dbName, indexes, protocol, Date_t::now());
+        buildUUID, collection->uuid(), dbName, mutableIndexes, protocol, Date_t::now());
 
     Status status = activeIndexBuilds.registerIndexBuild(replIndexBuildState);
     if (!status.isOK()) {
@@ -995,8 +1001,13 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
     IndexBuildsManager::SetupOptions options;
     options.protocol = protocol;
     options.generateTableWrites = replIndexBuildState->getGenerateTableWrites();
-    status = _indexBuildsManager.setUpIndexBuild(
-        opCtx, collection, indexes, buildUUID, MultiIndexBlock::kNoopOnInitFn, options, resumeInfo);
+    status = _indexBuildsManager.setUpIndexBuild(opCtx,
+                                                 collection,
+                                                 mutableIndexes,
+                                                 buildUUID,
+                                                 MultiIndexBlock::kNoopOnInitFn,
+                                                 options,
+                                                 resumeInfo);
     if (!status.isOK()) {
         activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replIndexBuildState);
     }
