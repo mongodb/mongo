@@ -18,7 +18,7 @@ const bigCRS = {
     properties: {name: "urn:x-mongodb:crs:strictwinding:EPSG:4326"},
 };
 
-t.createIndex({loc: indexname}, add2dsphereVersionIfNeeded());
+assert.commandWorked(t.createIndex({loc: indexname}, add2dsphereVersionIfNeeded()));
 
 // parseFlatPoint
 let err = t.insert({loc: {type: "Point", coordinates: "hello"}});
