@@ -178,7 +178,7 @@ export var {withTxnAndAutoRetry, isKilledSessionCode, shouldRetryEntireTxnOnErro
                 print("withTxnAndAutoRetry has iterated " + iterations + " times.");
             }
             try {
-                func();
+                let result = func();
 
                 try {
                     const rand = Random.rand();
@@ -192,6 +192,7 @@ export var {withTxnAndAutoRetry, isKilledSessionCode, shouldRetryEntireTxnOnErro
                     hasCommitTxnError = true;
                     throw e;
                 }
+                return result;
             } catch (e) {
                 if (!hasCommitTxnError) {
                     // We need to call abortTransaction_forTesting() in order to update the mongo
