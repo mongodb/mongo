@@ -208,7 +208,7 @@ Status commit(OperationContext* opCtx,
         coll.nss(),
         collectionUUID,
         buildUUID,
-        toIndexSpecs(indexes),
+        indexes,
         multikeyPathsToObjs(indexes, multikey),
         /*fromMigrate=*/false);
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(

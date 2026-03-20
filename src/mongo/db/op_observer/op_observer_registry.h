@@ -172,7 +172,7 @@ public:
                             const NamespaceString& nss,
                             const UUID& collUUID,
                             const UUID& indexBuildUUID,
-                            const std::vector<BSONObj>& indexes,
+                            const std::vector<IndexBuildInfo>& indexes,
                             const std::vector<boost::optional<BSONObj>>& multikey,
                             bool fromMigrate,
                             bool isTimeseries) override {

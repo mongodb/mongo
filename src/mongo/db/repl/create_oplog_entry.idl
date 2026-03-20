@@ -83,8 +83,10 @@ structs:
                 description: "The internal idents assigned for this index build."
                 type: InternalIdents
                 optional: true
-    StartIndexBuildOplogEntryO2:
-        description: "In a 'startIndexBuild' oplog entry, defines the fields expected in the 'o2' subobject."
+    IndexBuildOplogEntryO2:
+        description:
+            "In a 'startIndexBuild' or 'commitIndexBuild' oplog entry, defines the fields
+            expected in the 'o2' subobject."
         strict: false
         fields:
             indexes:

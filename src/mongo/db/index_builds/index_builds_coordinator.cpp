@@ -356,7 +356,7 @@ void onCommitIndexBuild(OperationContext* opCtx,
 
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     const auto& collUUID = replState->collectionUUID;
-    const auto indexSpecs = toIndexSpecs(replState->getIndexes());
+    const auto& indexes = replState->getIndexes();
     auto fromMigrate = false;
 
     // Since two phase index builds are allowed to survive replication state transitions, we should
@@ -377,13 +377,13 @@ void onCommitIndexBuild(OperationContext* opCtx,
 
     std::vector<boost::optional<BSONObj>> multikeyObjs;
     if (!multikeys.empty()) {
-        invariant(multikeys.size() == indexSpecs.size());
+        invariant(multikeys.size() == indexes.size());
         multikeyObjs.reserve(multikeys.size());
         for (size_t i = 0; i < multikeys.size(); ++i) {
             if (multikeys[i]) {
                 multikeyObjs.push_back(
                     !multikeys[i]->empty()
-                        ? multikey_paths::serialize(indexSpecs[i]["key"].Obj(), *multikeys[i])
+                        ? multikey_paths::serialize(indexes[i].spec["key"].Obj(), *multikeys[i])
                         : BSONObj{});
             } else {
                 multikeyObjs.push_back(boost::none);
@@ -392,7 +392,7 @@ void onCommitIndexBuild(OperationContext* opCtx,
     }
 
     opObserver->onCommitIndexBuild(
-        opCtx, nss, collUUID, buildUUID, indexSpecs, multikeyObjs, fromMigrate, isTimeseries);
+        opCtx, nss, collUUID, buildUUID, indexes, multikeyObjs, fromMigrate, isTimeseries);
 }
 
 /**

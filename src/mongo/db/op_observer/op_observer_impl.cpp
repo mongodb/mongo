@@ -309,6 +309,45 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
     return opTimes;
 }
 
+/**
+ * Builds the vector of IndexIdents for the o2 field of a startIndexBuild or commitIndexBuild
+ * oplog entry. Each element carries the unique ident tag for the index, plus internal idents
+ * (sorter, side-writes, etc.) when primary-driven index builds are enabled.
+ */
+std::vector<repl::IndexIdents> buildIndexIdentsForO2(OperationContext* opCtx,
+                                                     const std::vector<IndexBuildInfo>& indexes,
+                                                     const NamespaceString& nss) {
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    std::vector<repl::IndexIdents> o2Indexes;
+    o2Indexes.reserve(indexes.size());
+    for (const auto& indexBuildInfo : indexes) {
+        auto indexIdentUniqueTag =
+            storageEngine->getIndexIdentUniqueTag(indexBuildInfo.indexIdent, nss.dbName());
+        repl::IndexIdents indexIdents;
+        indexIdents.setIndexIdent(std::string{indexIdentUniqueTag});
+
+        if (isPrimaryDrivenIndexBuildEnabled(VersionContext::getDecoration(opCtx))) {
+            invariant(indexBuildInfo.sorterIdent);
+            invariant(indexBuildInfo.sideWritesIdent);
+            invariant(indexBuildInfo.skippedRecordsTrackerIdent);
+
+            repl::InternalIdents internalIdents;
+            internalIdents.setSorterIdent(*indexBuildInfo.sorterIdent);
+            internalIdents.setSideWritesIdent(*indexBuildInfo.sideWritesIdent);
+            internalIdents.setSkippedRecordsTrackerIdent(
+                *indexBuildInfo.skippedRecordsTrackerIdent);
+            if (indexBuildInfo.constraintViolationsTrackerIdent) {
+                internalIdents.setConstraintViolationsTrackerIdent(
+                    *indexBuildInfo.constraintViolationsTrackerIdent);
+            }
+            indexIdents.setInternalIdents(std::move(internalIdents));
+        }
+
+        o2Indexes.push_back(std::move(indexIdents));
+    }
+    return o2Indexes;
+}
+
 bool shouldTimestampIndexBuildSinglePhase(OperationContext* opCtx, const NamespaceString& nss) {
     // This function returns whether a timestamp for a catalog write when beginning an index build,
     // or aborting an index build is necessary. There are four scenarios:
@@ -421,35 +460,6 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
     }
     oIndexesArr.done();
 
-    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    std::vector<repl::IndexIdents> o2Indexes;
-    o2Indexes.reserve(indexes.size());
-    for (const auto& indexBuildInfo : indexes) {
-        auto indexIdentUniqueTag =
-            storageEngine->getIndexIdentUniqueTag(indexBuildInfo.indexIdent, nss.dbName());
-        repl::IndexIdents indexIdents;
-        indexIdents.setIndexIdent(std::string{indexIdentUniqueTag});
-
-        if (isPrimaryDrivenIndexBuildEnabled(VersionContext::getDecoration(opCtx))) {
-            invariant(indexBuildInfo.sorterIdent);
-            invariant(indexBuildInfo.sideWritesIdent);
-            invariant(indexBuildInfo.skippedRecordsTrackerIdent);
-
-            repl::InternalIdents internalIdents;
-            internalIdents.setSorterIdent(*indexBuildInfo.sorterIdent);
-            internalIdents.setSideWritesIdent(*indexBuildInfo.sideWritesIdent);
-            internalIdents.setSkippedRecordsTrackerIdent(
-                *indexBuildInfo.skippedRecordsTrackerIdent);
-            if (indexBuildInfo.constraintViolationsTrackerIdent) {
-                internalIdents.setConstraintViolationsTrackerIdent(
-                    *indexBuildInfo.constraintViolationsTrackerIdent);
-            }
-            indexIdents.setInternalIdents(std::move(internalIdents));
-        }
-
-        o2Indexes.push_back(std::move(indexIdents));
-    }
-
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
     if (isTimeseries &&
@@ -464,8 +474,8 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
     oplogEntry.setObject(oplogEntryBuilder.done());
     if (shouldReplicateLocalCatalogIdentifiers(
             rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider())) {
-        repl::StartIndexBuildOplogEntryO2 o2;
-        o2.setIndexes(std::move(o2Indexes));
+        repl::IndexBuildOplogEntryO2 o2;
+        o2.setIndexes(buildIndexIdentsForO2(opCtx, indexes, nss));
         oplogEntry.setObject2(o2.toBSON());
     }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
@@ -496,7 +506,7 @@ void OpObserverImpl::onCommitIndexBuild(OperationContext* opCtx,
                                         const NamespaceString& nss,
                                         const UUID& collUUID,
                                         const UUID& indexBuildUUID,
-                                        const std::vector<BSONObj>& indexes,
+                                        const std::vector<IndexBuildInfo>& indexes,
                                         const std::vector<boost::optional<BSONObj>>& multikey,
                                         bool fromMigrate,
                                         bool isTimeseries) {
@@ -510,8 +520,8 @@ void OpObserverImpl::onCommitIndexBuild(OperationContext* opCtx,
     indexBuildUUID.appendToBuilder(&oplogEntryBuilder, "indexBuildUUID");
 
     BSONArrayBuilder indexesArr(oplogEntryBuilder.subarrayStart("indexes"));
-    for (const auto& indexDoc : indexes) {
-        indexesArr.append(indexDoc);
+    for (const auto& indexBuildInfo : indexes) {
+        indexesArr.append(indexBuildInfo.spec);
     }
     indexesArr.done();
 
@@ -543,6 +553,12 @@ void OpObserverImpl::onCommitIndexBuild(OperationContext* opCtx,
     oplogEntry.setNss(nss.getCommandNS());
     oplogEntry.setUuid(collUUID);
     oplogEntry.setObject(oplogEntryBuilder.done());
+    if (shouldReplicateLocalCatalogIdentifiers(
+            rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider())) {
+        repl::IndexBuildOplogEntryO2 o2;
+        o2.setIndexes(buildIndexIdentsForO2(opCtx, indexes, nss));
+        oplogEntry.setObject2(o2.toBSON());
+    }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
     logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
 }

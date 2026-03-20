@@ -188,8 +188,11 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* o
     invariant(collUUID, str::stream() << redact(entry.toBSONForLogging()));
 
     if (auto o2 = entry.getObject2(); o2 && parseO2) {
-        auto parsedO2 = repl::StartIndexBuildOplogEntryO2::parse(
-            *o2, IDLParserContext("startIndexBuildOplogEntryO2"));
+        // TODO(SERVER-121124): Enable abortIndexBuild to parse this.
+        invariant(commandType == repl::OplogEntry::CommandType::kStartIndexBuild ||
+                  commandType == repl::OplogEntry::CommandType::kCommitIndexBuild);
+        auto parsedO2 =
+            repl::IndexBuildOplogEntryO2::parse(*o2, IDLParserContext("indexBuildOplogEntryO2"));
         auto indexes = parsedO2.getIndexes();
 
         if (indexesVec.size() != indexes.size()) {

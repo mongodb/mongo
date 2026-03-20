@@ -63,7 +63,7 @@ public:
         NamespaceString ns;
         UUID collUUID;
         UUID buildUUID;
-        std::vector<BSONObj> indexes;
+        std::vector<IndexBuildInfo> indexes;
         std::vector<boost::optional<BSONObj>> multikey;
         bool fromMigrate;
         bool isTimeseries;
@@ -98,7 +98,7 @@ public:
                             const NamespaceString& ns,
                             const UUID& collUUID,
                             const UUID& buildUUID,
-                            const std::vector<BSONObj>& indexes,
+                            const std::vector<IndexBuildInfo>& indexes,
                             const std::vector<boost::optional<BSONObj>>& multikey,
                             bool fromMigrate,
                             bool isTimeseries) override {
@@ -275,8 +275,8 @@ TEST_F(UtilTest, Commit) {
     EXPECT_EQ(args.collUUID, collUUID);
     EXPECT_EQ(args.buildUUID, buildUUID);
     EXPECT_EQ(args.indexes.size(), 2);
-    ASSERT_BSONOBJ_EQ(args.indexes[0], indexes[0].spec);
-    ASSERT_BSONOBJ_EQ(args.indexes[1], indexes[1].spec);
+    ASSERT_BSONOBJ_EQ(args.indexes[0].spec, indexes[0].spec);
+    ASSERT_BSONOBJ_EQ(args.indexes[1].spec, indexes[1].spec);
     ASSERT_FALSE(args.multikey[0]);
     ASSERT_TRUE(args.multikey[1]);
     EXPECT_FALSE(args.fromMigrate);
