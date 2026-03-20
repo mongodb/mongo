@@ -67,20 +67,119 @@ def run_with_retries(
         time.sleep(retry_secs)
 
 
+def download_hang_analyzer_js_stacks(root_logger: Logger, task: Task, download_dir: str) -> bool:
+    """Extract debugger_jsscope_<pid>_<i>.txt files from the hang analyzer output into core-dumps/.
+
+    The hang analyzer captures JS stack traces from the live process and packages them in
+    mongo-hanganalyzer.tgz. Extracting them alongside the core dumps lets analyze_core include
+    them in the per-core analysis output.
+    """
+    hang_analyzer_artifact = None
+    for artifact in task.artifacts:
+        if artifact.name.startswith("Hang Analyzer Output"):
+            hang_analyzer_artifact = artifact
+            break
+
+    if hang_analyzer_artifact is None:
+        root_logger.info("No hang analyzer output artifact found, skipping JS stack extraction.")
+        return True
+
+    core_dumps_dir = os.path.join(download_dir, "core-dumps")
+    os.makedirs(core_dumps_dir, exist_ok=True)
+
+    tgz_path = os.path.join(download_dir, "mongo-hanganalyzer.tgz")
+    try:
+        root_logger.info("Downloading hang analyzer output from %s", hang_analyzer_artifact.url)
+        urllib.request.urlretrieve(hang_analyzer_artifact.url, tgz_path)
+
+        with tarfile.open(tgz_path, "r:gz") as tar:
+            for member in tar.getmembers():
+                filename = os.path.basename(member.name)
+                if not re.match(r"debugger_jsscope_\d+_\d+\.txt$", filename):
+                    continue
+                member.name = filename  # strip any path prefix before extracting
+                tar.extract(member, path=core_dumps_dir)
+                root_logger.info("Extracted JS stack trace file: %s", filename)
+        return True
+    except Exception as ex:
+        root_logger.error("Failed to extract JS stack traces from hang analyzer output: %s", ex)
+        return False
+    finally:
+        if os.path.exists(tgz_path):
+            os.remove(tgz_path)
+
+
+def filter_core_dumps(
+    artifacts: list,
+    boring_core_dump_pids: set,
+    max_core_dumps: int,
+    logger: Logger,
+) -> list:
+    """Filter core dump artifacts by removing boring PIDs and applying a maximum cap.
+
+    Expected URL suffix format: dump_<binary>.<pid>.core.gz
+    """
+    if not boring_core_dump_pids:
+        boring_core_dump_pids = set()
+
+    total = len(artifacts)
+    interesting = []
+    skipped_boring = []
+
+    for artifact in artifacts:
+        filename = artifact.url.split("/")[-1].split("?")[0]
+        # strip .gz → dump_mongod.808516.core, then split on '.'
+        parts = os.path.splitext(filename)[0].split(".")
+        pid = parts[-2] if len(parts) >= 3 and parts[-2].isdigit() else None
+        if pid and pid in boring_core_dump_pids:
+            skipped_boring.append(filename)
+        else:
+            interesting.append(artifact)
+
+    if skipped_boring:
+        logger.info("Skipping %d boring core dump(s): %s", len(skipped_boring), skipped_boring)
+
+    if len(interesting) > max_core_dumps:
+        logger.info(
+            "Capping download at %d core dumps (%d total interesting)",
+            max_core_dumps,
+            len(interesting),
+        )
+        interesting = interesting[:max_core_dumps]
+
+    # TODO: Keep the report/telemetry reporting from dumper.py if possible?
+    logger.info(
+        "Downloading %d of %d core dump(s) (%d boring skipped)",
+        len(interesting),
+        total,
+        len(skipped_boring),
+    )
+    return interesting
+
+
 @TRACER.start_as_current_span("core_analyzer.download_core_dumps")
 def download_core_dumps(
-    root_logger: Logger, task: Task, download_dir: str, debugger: Dumper, multiversion_versions: set
+    root_logger: Logger,
+    task: Task,
+    download_dir: str,
+    debugger: Dumper,
+    multiversion_versions: set,
+    boring_core_dump_pids: set = None,
+    max_core_dumps: int = 10,
 ) -> bool:
     root_logger.info("Looking for core dumps")
-    artifacts = task.artifacts
+    core_dump_artifacts = filter_core_dumps(
+        [a for a in task.artifacts if a.name.startswith("Core Dump")],
+        boring_core_dump_pids,
+        max_core_dumps,
+        root_logger,
+    )
+
     core_dumps_found = 0
     core_dumps_dir = os.path.join(download_dir, "core-dumps")
     os.makedirs(core_dumps_dir, exist_ok=True)
     current_span = get_default_current_span()
-    for artifact in artifacts:
-        if not artifact.name.startswith("Core Dump"):
-            continue
-
+    for artifact in core_dump_artifacts:
         file_name = artifact.url.split("/")[-1]
         extracted_name, _ = os.path.splitext(file_name)
         extract_path = os.path.join(core_dumps_dir, extracted_name)
@@ -515,6 +614,8 @@ def download_task_artifacts(
     execution: Optional[int] = None,
     retry_secs: int = 10,
     download_timeout_secs: int = 30 * 60,
+    boring_core_dump_pids: set = None,
+    max_core_dumps: int = 10,
 ) -> bool:
     if os.path.exists(download_dir):
         # quick sanity check to ensure we don't delete a repo
@@ -582,6 +683,8 @@ def download_task_artifacts(
                 download_dir=download_dir,
                 debugger=debugger,
                 multiversion_versions=multiversion_versions,
+                boring_core_dump_pids=boring_core_dump_pids,
+                max_core_dumps=max_core_dumps,
             )
         )
         futures.append(
@@ -610,6 +713,15 @@ def download_task_artifacts(
                 download_options=debugsymbols_download_options,
                 download_dir=download_dir,
                 name="debugsymbols",
+            )
+        )
+
+        futures.append(
+            executor.submit(
+                download_hang_analyzer_js_stacks,
+                root_logger=root_logger,
+                task=task_info,
+                download_dir=download_dir,
             )
         )
 

@@ -83,9 +83,15 @@
 #include "mongo/util/str.h"
 
 #include <algorithm>
+#include <fstream>
 #include <iostream>
 #include <memory>
-#include <mutex>
+
+#ifdef __linux__
+#include <unistd.h>
+
+#include <sys/syscall.h>
+#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -145,6 +151,18 @@ bool gFirstRuntimeCreated = false;
 
 bool closeToMaxMemory() {
     return mongo::sm::get_total_bytes() > (kInterruptGCThreshold * mongo::sm::get_max_bytes());
+}
+
+char* buildStackStringForGdb(MozJSImplScope* scope) {
+    auto stackStr = scope->buildStackString();
+    // We intentionally leak memory here to allow the value to be returned to a debugger without
+    // being destroyed.
+    char* ret = new char[stackStr.size() + 1];
+
+    std::memcpy(ret, stackStr.c_str(), stackStr.size());
+    ret[stackStr.size()] = '\0';
+
+    return ret;
 }
 
 /**
@@ -629,6 +647,29 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
 
 #endif
     currentJSScope = this;
+
+#ifdef __linux__
+    if (std::getenv("OUTPUT_DEBUG_JSSCOPE_ADDRESSES")) {
+        std::cout << "Starting new scope: currentJSScope = "
+                  << static_cast<void*>(currentJSScope.load()) << " buildStackStringForGdb = "
+                  << reinterpret_cast<void*>(&buildStackStringForGdb) << std::endl;
+
+        std::string filename = "./jsscope_debug_" + std::to_string(getpid()) + ".yml";
+
+        std::ofstream debugFile(filename, std::ios::app);
+        if (debugFile.is_open()) {
+            debugFile << "---\n"
+                      << "pid: " << getpid() << "\n"
+                      << "lwp: " << syscall(SYS_gettid) << "\n"
+                      << "thread_id: \"" << std::this_thread::get_id() << "\"\n"
+                      << "current_js_scope: \"" << static_cast<void*>(currentJSScope.load())
+                      << "\"\n"
+                      << "build_stack_string_for_gdb: \""
+                      << reinterpret_cast<void*>(&buildStackStringForGdb) << "\"\n";
+            debugFile.close();
+        }
+    }
+#endif
 }
 
 MozJSShellRuntimeInterface* getShellRuntime(JSContext* cx) {
