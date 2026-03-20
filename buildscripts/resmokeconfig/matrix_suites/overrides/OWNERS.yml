@@ -72,3 +72,6 @@ filters:
   - "drop_config_cache_collections_hook.yml":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "collection_sharding_metadata_cleanup.yml":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog

@@ -87,3 +87,6 @@ filters:
   - "generated_suites/sharded_collections_jscore_passthrough_with_balancer_drop_config_cache_collections.yml":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "generated_suites/sharded_collections_jscore_passthrough_random_clears.yml":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
