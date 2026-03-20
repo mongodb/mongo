@@ -187,7 +187,10 @@ void ReplicatedFastCountManager::shutdown(OperationContext* opCtx) {
     }
 
     // Shutdown background thread.
-    _isEnabled.store(false);
+    {
+        stdx::lock_guard lock(_metadataMutex);
+        _isEnabled.store(false);
+    }
     _backgroundThreadReadyForFlush.notify_one();
     _backgroundThread.join();
 
