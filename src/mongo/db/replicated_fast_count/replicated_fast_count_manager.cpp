@@ -162,7 +162,7 @@ void ReplicatedFastCountManager::startup(OperationContext* opCtx) {
 
     massert(11718600,
             "Expected fastcount collection to exist on startup",
-            _acquireSizeCountCollectionForRead(opCtx).has_value());
+            _acquireFastCountCollectionForRead(opCtx).has_value());
 
     LOGV2(12051100, "Starting up ReplicatedFastCountManager thread");
 
@@ -220,7 +220,7 @@ int ReplicatedFastCountManager::_hydrateMetadataFromDisk(
 
 void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
 
-    auto acquisition = _acquireSizeCountCollectionForRead(opCtx);
+    auto acquisition = _acquireFastCountCollectionForRead(opCtx);
 
     if (!acquisition.has_value()) {
         // This should only be the case on cold boot.
@@ -284,18 +284,16 @@ void ReplicatedFastCountManager::flushAsync() {
 
 void ReplicatedFastCountManager::flushSync(OperationContext* opCtx) {
     FastSizeCountMap dirtyMetadata;
-    Timestamp allDurableTs;
     {
         stdx::unique_lock lock(_metadataMutex);
         dirtyMetadata = _getAndClearSnapshotOfDirtyMetadata(lock);
-        allDurableTs = opCtx->getServiceContext()->getStorageEngine()->getAllDurableTimestamp();
     }
 
     if (MONGO_unlikely(hangAfterReplicatedFastCountSnapshot.shouldFail())) {
         hangAfterReplicatedFastCountSnapshot.pauseWhileSet();
     }
 
-    _acquireAndFlush(opCtx, dirtyMetadata, allDurableTs);
+    _acquireAndFlush(opCtx, dirtyMetadata);
 }
 
 void ReplicatedFastCountManager::disablePeriodicWrites_ForTest() {
@@ -309,34 +307,18 @@ bool ReplicatedFastCountManager::isRunning_ForTest() {
 }
 
 void ReplicatedFastCountManager::_acquireAndFlush(OperationContext* opCtx,
-                                                  const FastSizeCountMap& dirtyMetadata,
-                                                  Timestamp validAsOfTs) {
-    // TODO SERVER-121393: Revamp acquisition helpers so that we can easily acquire both internal
-    // collections and not have to perform as many checks at the callsite.
-    auto fastCountStoreAcquisition = _acquireSizeCountCollectionForWrite(opCtx);
-    massert(ErrorCodes::NamespaceNotFound,
-            "Expected fastcount collection to exist",
-            fastCountStoreAcquisition);
+                                                  const FastSizeCountMap& dirtyMetadata) {
+    auto acquisition = _acquireFastCountCollectionForWrite(opCtx);
+    massert(ErrorCodes::NamespaceNotFound, "Expected fastcount collection to exist", acquisition);
 
-    const CollectionPtr& fastCountColl = fastCountStoreAcquisition->getCollectionPtr();
+    const CollectionPtr& fastCountColl = acquisition->getCollectionPtr();
     invariant(fastCountColl,
               str::stream()
                   << "Expected to acquire fastcount store as a collection, not a view. isView : "
-                  << fastCountStoreAcquisition->isView());
-
-    auto timestampsStoreAcquisition = _acquireTimestampCollectionForWrite(opCtx);
-    massert(ErrorCodes::NamespaceNotFound,
-            "Expected fastcount timestamps collection to exist",
-            timestampsStoreAcquisition);
-
-    const CollectionPtr& timestampsColl = timestampsStoreAcquisition->getCollectionPtr();
-    invariant(timestampsColl,
-              str::stream() << "Expected to acquire fastcount timestamps store as a collection, "
-                               "not a view. isView : "
-                            << timestampsStoreAcquisition->isView());
+                  << acquisition->isView());
 
     try {
-        _doFlush(opCtx, fastCountColl, timestampsColl, dirtyMetadata, validAsOfTs);
+        _doFlush(opCtx, fastCountColl, dirtyMetadata);
     } catch (const DBException& ex) {
         replicatedFastCountSSS.flushFailureCount.addAndFetch(1);
         LOGV2_WARNING(7397500,
@@ -360,28 +342,22 @@ ReplicatedFastCountManager::_getAndClearSnapshotOfDirtyMetadata(WithLock metadat
 }
 
 void ReplicatedFastCountManager::_doFlush(OperationContext* opCtx,
-                                          const CollectionPtr& metadataStoreColl,
-                                          const CollectionPtr& metadataTimestampsColl,
-                                          const FastSizeCountMap& dirtyMetadata,
-                                          const Timestamp& validAsOfTs) {
-
+                                          const CollectionPtr& coll,
+                                          const FastSizeCountMap& dirtyMetadata) {
     if (MONGO_unlikely(failDuringFlush.shouldFail())) {
         uasserted(11550800, "Injected failure in _doFlush() for testing");
     }
 
     const Date_t startTime = Date_t::now();
-
     WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
     for (auto&& [metadataKey, metadataVal] : dirtyMetadata) {
-        _writeSizeCountEntry(opCtx,
-                             metadataStoreColl,
-                             metadataKey,
-                             metadataVal.sizeCount,
-                             metadataVal.validAsOf,
-                             _keyForUUID(metadataKey));
+        _writeOneMetadata(opCtx,
+                          coll,
+                          metadataKey,
+                          metadataVal.sizeCount,
+                          metadataVal.validAsOf,
+                          _keyForUUID(metadataKey));
     }
-    int32_t stripe = _getStripe();
-    _writeTimestampEntry(opCtx, metadataTimestampsColl, stripe, validAsOfTs);
     wuow.commit();
     replicatedFastCountSSS.writeTimeMsTotal.addAndFetch((Date_t::now() - startTime).count());
 }
@@ -404,7 +380,6 @@ void ReplicatedFastCountManager::_startBackgroundThread(ServiceContext* svcCtx) 
 void ReplicatedFastCountManager::_flushPeriodicallyOnSignal() {
     while (_isEnabled.load()) {
         FastSizeCountMap dirtyMetadata;
-        Timestamp allDurableTs;
         {
             stdx::unique_lock lock(_metadataMutex);
             _backgroundThreadReadyForFlush.wait(
@@ -416,13 +391,12 @@ void ReplicatedFastCountManager::_flushPeriodicallyOnSignal() {
             }
             // Get snapshot of metadata while still holding mutex from condition variable signal.
             dirtyMetadata = _getAndClearSnapshotOfDirtyMetadata(lock);
-            allDurableTs = cc().getServiceContext()->getStorageEngine()->getAllDurableTimestamp();
         }
 
         const Date_t flushStartTime = Date_t::now();
         try {
             auto opCtx = cc().makeOperationContext();
-            _acquireAndFlush(opCtx.get(), dirtyMetadata, allDurableTs);
+            _acquireAndFlush(opCtx.get(), dirtyMetadata);
         } catch (const DBException& ex) {
             if (ex.code() == ErrorCodes::InterruptedDueToReplStateChange) {
                 // Stepdown attempt interrupted us. We can continue here - if the stepdown did not
@@ -449,52 +423,37 @@ void ReplicatedFastCountManager::_flushPeriodicallyOnSignal() {
     }
 }
 
-void ReplicatedFastCountManager::_writeTimestampEntry(OperationContext* opCtx,
-                                                      const CollectionPtr& timestampColl,
-                                                      const int32_t stripe,
-                                                      const Timestamp& validAsOfTs) {
+void ReplicatedFastCountManager::_writeOneMetadata(OperationContext* opCtx,
+                                                   const CollectionPtr& fastCountColl,
+                                                   const UUID& uuid,
+                                                   const CollectionSizeCount& sizeCount,
+                                                   const Timestamp& validAsOfTS,
+                                                   const RecordId& recordId) {
     Snapshotted<BSONObj> doc;
-    const RecordId recordId = _keyForStripe(stripe);
-    const bool exists = timestampColl->findDoc(opCtx, recordId, &doc);
-    const BSONObj newDoc = _getTimestampDocForWrite(stripe, validAsOfTs);
-    const BSONObj criteria = BSON("_id" << stripe);
-
-    if (exists) {
-        _updateMetadata(opCtx, timestampColl, doc, newDoc, criteria, recordId);
-    } else {
-        _insertMetadata(opCtx, timestampColl, newDoc);
-    }
-}
-
-void ReplicatedFastCountManager::_writeSizeCountEntry(OperationContext* opCtx,
-                                                      const CollectionPtr& fastCountColl,
-                                                      const UUID& uuid,
-                                                      const CollectionSizeCount& sizeCount,
-                                                      const Timestamp& validAsOfTS,
-                                                      const RecordId& recordId) {
-    Snapshotted<BSONObj> doc;
-    const bool exists = fastCountColl->findDoc(opCtx, recordId, &doc);
-    const BSONObj newDoc = _getDocForWrite(uuid, sizeCount, validAsOfTS);
-    const BSONObj criteria = BSON("_id" << uuid);
+    bool exists = fastCountColl->findDoc(opCtx, recordId, &doc);
 
     if (exists) {
         replicatedFastCountSSS.updateCount.addAndFetch(1);
-        _updateMetadata(opCtx, fastCountColl, doc, newDoc, criteria, recordId);
+        _updateOneMetadata(opCtx, fastCountColl, doc, uuid, sizeCount, validAsOfTS, recordId);
     } else {
         replicatedFastCountSSS.insertCount.addAndFetch(1);
-        _insertMetadata(opCtx, fastCountColl, newDoc);
+        _insertOneMetadata(opCtx, fastCountColl, uuid, sizeCount, validAsOfTS);
     }
 }
 
-void ReplicatedFastCountManager::_updateMetadata(OperationContext* opCtx,
-                                                 const CollectionPtr& fastCountColl,
-                                                 const Snapshotted<BSONObj>& doc,
-                                                 const BSONObj& newDoc,
-                                                 const BSONObj& criteria,
-                                                 const RecordId& recordId) {
+void ReplicatedFastCountManager::_updateOneMetadata(OperationContext* opCtx,
+                                                    const CollectionPtr& fastCountColl,
+                                                    const Snapshotted<BSONObj>& doc,
+                                                    const UUID& uuid,
+                                                    const CollectionSizeCount& sizeCount,
+                                                    const Timestamp& validAsOfTS,
+                                                    const RecordId& recordId) {
     // TODO SERVER-117886: Manually performing update without query system. This would be nice to
     // avoid extra dependencies but might be too tricky to get right.
     CollectionUpdateArgs args(doc.value());
+    // TODO SERVER-117654: When we also store timestamp we should be able to recover/combine data
+    // from old doc to keep this accurate.
+    const BSONObj newDoc = _getDocForWrite(uuid, sizeCount, validAsOfTS);
 
     const auto diff = doc_diff::computeOplogDiff(doc.value(), newDoc, /*padding=*/0);
     invariant(
@@ -505,31 +464,30 @@ void ReplicatedFastCountManager::_updateMetadata(OperationContext* opCtx,
 
     if (!diff->isEmpty()) {
         args.update = update_oplog_entry::makeDeltaOplogEntry(*diff);
-        args.criteria = criteria;
+        args.criteria = BSON("_id" << uuid);
         collection_internal::updateDocument(
             opCtx, fastCountColl, recordId, doc, newDoc, &args.update, nullptr, nullptr, &args);
     } else {
         replicatedFastCountSSS.emptyUpdateCount.addAndFetch(1);
-        LOGV2(11648805,
-              "ReplicatedFastCountManager empty update",
-              "doc"_attr = doc.value(),
-              "newDoc"_attr = newDoc,
-              "criteria"_attr = criteria);
+        LOGV2(11648805, "ReplicatedFastCountManager empty update", "uuid"_attr = uuid);
     }
 }
 
-void ReplicatedFastCountManager::_insertMetadata(OperationContext* opCtx,
-                                                 const CollectionPtr& fastCountColl,
-                                                 const BSONObj& newDoc) {
+void ReplicatedFastCountManager::_insertOneMetadata(OperationContext* opCtx,
+                                                    const CollectionPtr& fastCountColl,
+                                                    const UUID& uuid,
+                                                    const CollectionSizeCount& sizeCount,
+                                                    const Timestamp& validAsOfTS) {
     // TODO SERVER-118529: Consider error handling more carefully here.
-    massertStatusOK(collection_internal::insertDocument(opCtx,
-                                                        fastCountColl,
-                                                        InsertStatement(newDoc),
-                                                        /*opDebug=*/nullptr));
+    massertStatusOK(collection_internal::insertDocument(
+        opCtx,
+        fastCountColl,
+        InsertStatement(_getDocForWrite(uuid, sizeCount, validAsOfTS)),
+        /*opDebug=*/nullptr));
 }
 
 boost::optional<CollectionOrViewAcquisition>
-ReplicatedFastCountManager::_acquireSizeCountCollectionForWrite(OperationContext* opCtx) {
+ReplicatedFastCountManager::_acquireFastCountCollectionForWrite(OperationContext* opCtx) {
     CollectionOrViewAcquisition acquisition = acquireCollectionOrView(
         opCtx,
         CollectionOrViewAcquisitionRequest::fromOpCtx(
@@ -546,7 +504,7 @@ ReplicatedFastCountManager::_acquireSizeCountCollectionForWrite(OperationContext
 }
 
 boost::optional<CollectionOrViewAcquisition>
-ReplicatedFastCountManager::_acquireSizeCountCollectionForRead(OperationContext* opCtx) {
+ReplicatedFastCountManager::_acquireFastCountCollectionForRead(OperationContext* opCtx) {
     CollectionOrViewAcquisition acquisition = acquireCollectionOrView(
         opCtx,
         CollectionOrViewAcquisitionRequest::fromOpCtx(
@@ -562,52 +520,11 @@ ReplicatedFastCountManager::_acquireSizeCountCollectionForRead(OperationContext*
     return boost::none;
 }
 
-boost::optional<CollectionOrViewAcquisition>
-ReplicatedFastCountManager::_acquireTimestampCollectionForWrite(OperationContext* opCtx) {
-    CollectionOrViewAcquisition acquisition =
-        acquireCollectionOrView(opCtx,
-                                CollectionOrViewAcquisitionRequest::fromOpCtx(
-                                    opCtx,
-                                    NamespaceString::makeGlobalConfigCollection(
-                                        NamespaceString::kReplicatedFastCountStoreTimestamps),
-                                    AcquisitionPrerequisites::OperationType::kWrite),
-                                LockMode::MODE_IX);
-
-    if (acquisition.getCollectionPtr()) {
-        return acquisition;
-    }
-
-    return boost::none;
-}
-
-boost::optional<CollectionOrViewAcquisition>
-ReplicatedFastCountManager::_acquireTimestampCollectionForRead(OperationContext* opCtx) {
-    CollectionOrViewAcquisition acquisition =
-        acquireCollectionOrView(opCtx,
-                                CollectionOrViewAcquisitionRequest::fromOpCtx(
-                                    opCtx,
-                                    NamespaceString::makeGlobalConfigCollection(
-                                        NamespaceString::kReplicatedFastCountStoreTimestamps),
-                                    AcquisitionPrerequisites::OperationType::kRead),
-                                LockMode::MODE_IS);
-
-    if (acquisition.getCollectionPtr()) {
-        return acquisition;
-    }
-
-    return boost::none;
-}
-
 BSONObj ReplicatedFastCountManager::_getDocForWrite(const UUID& uuid,
                                                     const CollectionSizeCount& sizeCount,
                                                     const Timestamp& validAsOfTS) const {
     return BSON("_id" << uuid << kValidAsOfKey << validAsOfTS << kMetaDataKey
                       << BSON(kCountKey << sizeCount.count << kSizeKey << sizeCount.size));
-}
-
-BSONObj ReplicatedFastCountManager::_getTimestampDocForWrite(int32_t stripe,
-                                                             const Timestamp& validAsOfTs) const {
-    return BSON("_id" << stripe << kValidAsOfKey << validAsOfTs);
 }
 
 RecordId ReplicatedFastCountManager::_keyForUUID(const UUID& uuid) const {
@@ -620,18 +537,6 @@ RecordId ReplicatedFastCountManager::_keyForUUID(const UUID& uuid) const {
 
 UUID ReplicatedFastCountManager::_UUIDForKey(const RecordId key) const {
     return UUID::parse(record_id_helpers::toBSONAs(key, "").firstElement()).getValue();
-}
-
-RecordId ReplicatedFastCountManager::_keyForStripe(int32_t stripe) const {
-    auto key =
-        record_id_helpers::keyForDoc(BSON("_id" << stripe),
-                                     clustered_util::makeDefaultClusteredIdIndex().getIndexSpec(),
-                                     /*collator=*/nullptr);
-    return key.getValue();
-}
-
-int32_t ReplicatedFastCountManager::_getStripe() const {
-    return 0;
 }
 
 }  // namespace mongo

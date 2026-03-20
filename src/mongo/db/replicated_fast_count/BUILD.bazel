@@ -104,7 +104,6 @@ mongo_cc_unit_test(
         "replicated_fast_count_uncommitted_changes",
         "//src/mongo/db/op_observer:operation_logger_impl",
         "//src/mongo/db/repl:mock_repl_coord_server_fixture",
-        "//src/mongo/db/repl:oplog_entry_test_helpers",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
     ],
 )
