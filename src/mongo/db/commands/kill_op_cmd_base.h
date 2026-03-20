@@ -39,8 +39,6 @@
 #include "mongo/db/operation_id.h"
 #include "mongo/db/service_context.h"
 
-#include <vector>
-
 namespace mongo {
 
 /**
@@ -86,12 +84,6 @@ protected:
      * taken care of here.
      */
     static unsigned int parseOpId(const BSONObj& cmdObj);
-
-    /**
-     * Extract the "op" field from 'cmdObj' and return a list of opIDs to kill. Accepts either a
-     * single opID or an array of opIDs.
-     */
-    static std::vector<unsigned int> parseOpIds(const BSONObj& cmdObj);
 
     /**
      * Extract the "errorCode" field from 'cmdObj' and convert the value to ErrorCodes::Error. If

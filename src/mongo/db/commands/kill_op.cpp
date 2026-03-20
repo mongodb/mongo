@@ -47,15 +47,13 @@ public:
              const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
-        auto opIds = KillOpCmdBase::parseOpIds(cmdObj);
+        long long opId = KillOpCmdBase::parseOpId(cmdObj);
         ErrorCodes::Error errorCode = KillOpCmdBase::parseErrorCode(opCtx, cmdObj);
 
         // Used by tests to check if auth checks passed.
         result.append("info", "attempting to kill op");
-        for (auto opId : opIds) {
-            LOGV2(20482, "Going to kill op", "opId"_attr = opId);
-            KillOpCmdBase::killLocalOperation(opCtx, opId, errorCode);
-        }
+        LOGV2(20482, "Going to kill op", "opId"_attr = opId);
+        KillOpCmdBase::killLocalOperation(opCtx, opId, errorCode);
         reportSuccessfulCompletion(opCtx, dbName, cmdObj);
 
         // killOp always reports success once past the auth check.
