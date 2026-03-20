@@ -69,7 +69,7 @@ describe("Geospatial Query Comparative Test for Timeseries", () => {
         fc.assert(
             fc
                 .property(programArb, (cmds) => {
-                    const model = makeEmptyModel();
+                    const model = makeEmptyModel(ctrlColl);
                     fc.modelRun(() => ({model: model, real: {tsColl, ctrlColl}}), cmds);
                     assertCollectionsMatch(tsColl, ctrlColl);
                 })
@@ -102,7 +102,7 @@ describe("Geospatial Query Comparative Test for Timeseries", () => {
                     programArb,
                     fc.array(makeGeospatialQueryArb(geoField, 10000), {minLength: 1, maxLength: 40}),
                     (cmds, queries) => {
-                        const model = makeEmptyModel();
+                        const model = makeEmptyModel(ctrlColl);
                         fc.modelRun(() => ({model: model, real: {tsColl, ctrlColl}}), cmds);
                         for (const query of queries) {
                             assertCollectionsMatch(tsColl, ctrlColl, query);
