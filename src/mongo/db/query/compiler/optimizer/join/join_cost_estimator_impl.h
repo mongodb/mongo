@@ -67,12 +67,49 @@ private:
 };
 
 /**
- * Estimate the number of random I/Os an index scan - fetch plan fragment will perform using the
- * Y_wap formula presented in "Index Scans Using a Finite LRU Buffer" by Mackert & Lohman in 1989
- * (https://dl.acm.org/doi/epdf/10.1145/68012.68016). Only considers non-multikey index scans.
+ * Estimate the number of distinct pages accessed when fetching 'numEntriesRequested' records/keys
+ * from a b-tree with 'numLeafPages' leaf pages. Assumes that each entry requested from the b-tree
+ * is uniformly distributed among the 'numLeafPages' pages.
+ * The formula used is presented in "Approximating Block AccessesIn Database Organizations" by Yao
+ * in 1977 (https://dl.acm.org/doi/epdf/10.1145/359461.359475).
  */
-double estimateMackertLohmanRandIO(double numPagesColl,
+double estimateYaoDistinctPages(double numLeafPages, double numEntriesRequested);
+
+/**
+ * Estimates the number of random disk I/Os required to read leaf pages from a b-tree, accounting
+ * for a finite LRU buffer (the WiredTiger cache). When the number of requested pages exceeds the
+ * cache capacity, previously loaded pages may be evicted and subsequently re-read from disk, so the
+ * estimated I/O count can exceed the number of distinct pages accessed.
+ *
+ * Implements the Y_wap formula from:
+ *   "Index Scans Using a Finite LRU Buffer", Mackert & Lohman, VLDB 1989
+ *   https://dl.acm.org/doi/epdf/10.1145/68012.68016
+ *
+ * Used to estimate the random I/O cost for:
+ *   1. Fetching documents from the collection during an index scan (IXSCAN + FETCH)
+ *   2. Fetching probe-side documents in an INLJ plan fragment
+ *   3. Accessing the probe-side index in an INLJ plan fragment
+ *
+ * Assumptions:
+ *   - Pages are accessed uniformly at random (totally unclustered index).
+ *   - The cache uses LRU eviction.
+ *   - Each output document resides on exactly one leaf page (one doc = one page request).
+ *   - Only leaf-page I/Os are modeled; internal b-tree node traversals are ignored.
+ *   - The entire WT cache is available for this b-tree (no contention from concurrent operations,
+ *     other collections, or other indexes sharing the cache).
+ *   - All leaf pages are the same size.
+ *   - No prefetching or read-ahead by the storage engine.
+ *
+ * 'numDistinctPagesNeededFromBtree' is the number of distinct leaf pages of the b-tree that the
+ * plan fragment will access. See 'estimateYaoDistinctPages' for details of how this is estimated.
+ * 'numPagesInStorageEngineCache' is the number of pages of the b-tree that can fit in the WT cache.
+ * 'numLogicalPageRequests' is the number of leaf page requests this plan fragment will make to the
+ * storage engine.
+ *
+ * Returns the estimated number of physical random disk reads.
+ */
+double estimateMackertLohmanRandIO(double numDistinctPagesNeededFromBtree,
                                    double numPagesInStorageEngineCache,
-                                   double numDocsOutput);
+                                   double numLogicalPageRequests);
 
 }  // namespace mongo::join_ordering

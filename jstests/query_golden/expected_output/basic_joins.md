@@ -758,20 +758,13 @@ rightEmbeddingField: "x"
 usedJoinOptimization: true
 
 ```
-INDEXED_NESTED_LOOP_JOIN_EMBEDDING [b = b]
+HASH_JOIN_EMBEDDING [b = b]
 leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
-  |  FETCH [test.basic_joins_md_foreign2]
+  |  COLLSCAN [test.basic_joins_md_foreign2]
   |  filter: { "b" : { "$gt" : "aaa" } }
-  |  |
-  |  INDEX_PROBE_NODE [test.basic_joins_md_foreign2]
-  |  keyPattern: { "b" : 1 }
-  |  indexName: "b_1"
-  |  isMultiKey: false
-  |  isUnique: false
-  |  isSparse: false
-  |  isPartial: false
+  |  direction: "forward"
   |
   HASH_JOIN_EMBEDDING [a = a]
   leftEmbeddingField: "x"
@@ -983,20 +976,13 @@ rightEmbeddingField: "x"
 usedJoinOptimization: true
 
 ```
-INDEXED_NESTED_LOOP_JOIN_EMBEDDING [b = b]
+HASH_JOIN_EMBEDDING [b = b]
 leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
-  |  FETCH [test.basic_joins_md_foreign2]
+  |  COLLSCAN [test.basic_joins_md_foreign2]
   |  filter: { "b" : { "$gt" : "aaa" } }
-  |  |
-  |  INDEX_PROBE_NODE [test.basic_joins_md_foreign2]
-  |  keyPattern: { "b" : 1 }
-  |  indexName: "b_1"
-  |  isMultiKey: false
-  |  isUnique: false
-  |  isSparse: false
-  |  isPartial: false
+  |  direction: "forward"
   |
   HASH_JOIN_EMBEDDING [a = a]
   leftEmbeddingField: "x"
@@ -2880,35 +2866,19 @@ rightEmbeddingField: "x"
   |  COLLSCAN [test.basic_joins_md_foreign1]
   |  direction: "forward"
   |
-  INDEXED_NESTED_LOOP_JOIN_EMBEDDING [a = _id,y._id = _id]
+  NESTED_LOOP_JOIN_EMBEDDING [a = _id,y._id = _id]
   leftEmbeddingField: "none"
   rightEmbeddingField: "z"
   |  |
-  |  FETCH [test.basic_joins_md_foreign3]
-  |  
-  |  |
-  |  INDEX_PROBE_NODE [test.basic_joins_md_foreign3]
-  |  keyPattern: { "_id" : 1 }
-  |  indexName: "_id_"
-  |  isMultiKey: false
-  |  isUnique: true
-  |  isSparse: false
-  |  isPartial: false
+  |  COLLSCAN [test.basic_joins_md_foreign3]
+  |  direction: "forward"
   |
-  INDEXED_NESTED_LOOP_JOIN_EMBEDDING [a = _id]
+  NESTED_LOOP_JOIN_EMBEDDING [a = _id]
   leftEmbeddingField: "none"
   rightEmbeddingField: "y"
   |  |
-  |  FETCH [test.basic_joins_md_foreign2]
-  |  
-  |  |
-  |  INDEX_PROBE_NODE [test.basic_joins_md_foreign2]
-  |  keyPattern: { "_id" : 1 }
-  |  indexName: "_id_"
-  |  isMultiKey: false
-  |  isUnique: true
-  |  isSparse: false
-  |  isPartial: false
+  |  COLLSCAN [test.basic_joins_md_foreign2]
+  |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md]
   filter: { "b" : { "$eq" : "foo" } }
@@ -2926,20 +2896,12 @@ rightEmbeddingField: "none"
   |  leftEmbeddingField: "z"
   |  rightEmbeddingField: "none"
   |  |  |
-  |  |  INDEXED_NESTED_LOOP_JOIN_EMBEDDING [a = _id]
+  |  |  NESTED_LOOP_JOIN_EMBEDDING [a = _id]
   |  |  leftEmbeddingField: "none"
   |  |  rightEmbeddingField: "y"
   |  |  |  |
-  |  |  |  FETCH [test.basic_joins_md_foreign2]
-  |  |  |  
-  |  |  |  |
-  |  |  |  INDEX_PROBE_NODE [test.basic_joins_md_foreign2]
-  |  |  |  keyPattern: { "_id" : 1 }
-  |  |  |  indexName: "_id_"
-  |  |  |  isMultiKey: false
-  |  |  |  isUnique: true
-  |  |  |  isSparse: false
-  |  |  |  isPartial: false
+  |  |  |  COLLSCAN [test.basic_joins_md_foreign2]
+  |  |  |  direction: "forward"
   |  |  |
   |  |  COLLSCAN [test.basic_joins_md]
   |  |  filter: { "b" : { "$eq" : "foo" } }
@@ -2962,35 +2924,19 @@ rightEmbeddingField: "x"
   |  COLLSCAN [test.basic_joins_md_foreign1]
   |  direction: "forward"
   |
-  INDEXED_NESTED_LOOP_JOIN_EMBEDDING [a = _id,y._id = _id]
+  NESTED_LOOP_JOIN_EMBEDDING [a = _id,y._id = _id]
   leftEmbeddingField: "none"
   rightEmbeddingField: "z"
   |  |
-  |  FETCH [test.basic_joins_md_foreign3]
-  |  
-  |  |
-  |  INDEX_PROBE_NODE [test.basic_joins_md_foreign3]
-  |  keyPattern: { "_id" : 1 }
-  |  indexName: "_id_"
-  |  isMultiKey: false
-  |  isUnique: true
-  |  isSparse: false
-  |  isPartial: false
+  |  COLLSCAN [test.basic_joins_md_foreign3]
+  |  direction: "forward"
   |
-  INDEXED_NESTED_LOOP_JOIN_EMBEDDING [a = _id]
+  NESTED_LOOP_JOIN_EMBEDDING [a = _id]
   leftEmbeddingField: "none"
   rightEmbeddingField: "y"
   |  |
-  |  FETCH [test.basic_joins_md_foreign2]
-  |  
-  |  |
-  |  INDEX_PROBE_NODE [test.basic_joins_md_foreign2]
-  |  keyPattern: { "_id" : 1 }
-  |  indexName: "_id_"
-  |  isMultiKey: false
-  |  isUnique: true
-  |  isSparse: false
-  |  isPartial: false
+  |  COLLSCAN [test.basic_joins_md_foreign2]
+  |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md]
   filter: { "b" : { "$eq" : "foo" } }
@@ -3095,50 +3041,26 @@ rightEmbeddingField: "x"
 usedJoinOptimization: true
 
 ```
-INDEXED_NESTED_LOOP_JOIN_EMBEDDING [a = a,y._id = a,z._id = a]
+NESTED_LOOP_JOIN_EMBEDDING [a = a,y._id = a,z._id = a]
 leftEmbeddingField: "none"
 rightEmbeddingField: "x"
   |  |
-  |  FETCH [test.basic_joins_md_foreign1]
-  |  
-  |  |
-  |  INDEX_PROBE_NODE [test.basic_joins_md_foreign1]
-  |  keyPattern: { "a" : 1 }
-  |  indexName: "a_1"
-  |  isMultiKey: false
-  |  isUnique: false
-  |  isSparse: false
-  |  isPartial: false
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  direction: "forward"
   |
-  INDEXED_NESTED_LOOP_JOIN_EMBEDDING [a = _id,y._id = _id]
+  NESTED_LOOP_JOIN_EMBEDDING [a = _id,y._id = _id]
   leftEmbeddingField: "none"
   rightEmbeddingField: "z"
   |  |
-  |  FETCH [test.basic_joins_md_foreign3]
-  |  
-  |  |
-  |  INDEX_PROBE_NODE [test.basic_joins_md_foreign3]
-  |  keyPattern: { "_id" : 1 }
-  |  indexName: "_id_"
-  |  isMultiKey: false
-  |  isUnique: true
-  |  isSparse: false
-  |  isPartial: false
+  |  COLLSCAN [test.basic_joins_md_foreign3]
+  |  direction: "forward"
   |
-  INDEXED_NESTED_LOOP_JOIN_EMBEDDING [a = _id]
+  NESTED_LOOP_JOIN_EMBEDDING [a = _id]
   leftEmbeddingField: "none"
   rightEmbeddingField: "y"
   |  |
-  |  FETCH [test.basic_joins_md_foreign2]
-  |  
-  |  |
-  |  INDEX_PROBE_NODE [test.basic_joins_md_foreign2]
-  |  keyPattern: { "_id" : 1 }
-  |  indexName: "_id_"
-  |  isMultiKey: false
-  |  isUnique: true
-  |  isSparse: false
-  |  isPartial: false
+  |  COLLSCAN [test.basic_joins_md_foreign2]
+  |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md]
   filter: { "b" : { "$eq" : "foo" } }

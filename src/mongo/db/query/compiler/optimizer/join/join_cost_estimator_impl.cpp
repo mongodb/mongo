@@ -185,17 +185,25 @@ JoinCostEstimate JoinCostEstimatorImpl::costINLJFragment(const JoinPlanNode& lef
     // numProbes * (rightBaseCard * joinPredSel)
     // The latter term, (rightBaseCard * joinPredSel), corresponds to the number of documents that a
     // single probe will return.
-    double numDocsOutputFromProbe = numProbes * rightBaseCard * joinPredSel;
-
-    CardinalityEstimate numRandIOs = CardinalityEstimate{
+    double numDocsReturnedFromProbe = numProbes * rightBaseCard * joinPredSel;
+    double numPagesAccessedColl = estimateYaoDistinctPages(numPagesColl, numDocsReturnedFromProbe);
+    CardinalityEstimate numRandIOsCollection = CardinalityEstimate{
         CardinalityType{estimateMackertLohmanRandIO(
-            numPagesColl, _jCtx.catStats.numPagesInStorageEngineCache, numDocsOutputFromProbe)},
+            numPagesAccessedColl,
+            _jCtx.catStats.numPagesInStorageEngineCache,
+            // In a MongoDB index, we append the RecordId (RID) to the index key. This means that a
+            // single index probe will read index keys for the same join key in RID order. Because
+            // MongoDB collections are clustered on RID, each fetch is not performing a truely
+            // random I/O but rather a sorted-sparse access pattern over the collection. For now, we
+            // ignore the I/O cost of this sorted-sparse and assume that each index probe only
+            // performs a single random I/O.
+            numProbes)},
         EstimationSource::Sampling};
 
     return JoinCostEstimate(numDocsProcessed,
                             numDocsOutput,
                             numSeqIOs,
-                            numRandIOs,
+                            numRandIOsCollection,
                             getNodeCost(left),
                             JoinCostEstimate(zeroCE, zeroCE, zeroCE, zeroCE));
 }
@@ -240,35 +248,58 @@ JoinCostEstimate JoinCostEstimatorImpl::costBaseCollectionAccess(NodeId baseNode
     MONGO_UNIMPLEMENTED_TASSERT(11729102);
 }
 
-double estimateMackertLohmanRandIO(double numPagesColl,
+double estimateYaoDistinctPages(double numLeafPages, double numEntriesRequested) {
+    if (numLeafPages <= 0 || numEntriesRequested <= 0) {
+        return 0;
+    }
+    numLeafPages = std::max(1.0, numLeafPages);
+    // Intuition:
+    // * The probability a specific page is never hit across all 'numEntriesRequested' fetches is:
+    //   (1 - (1 / numLeafPages)) ^ numEntriesRequested
+    // * The probability that a specific page is hit at least once is:
+    //   1 - ((1 - (1 / numLeafPages)) ^ numEntriesRequested)
+    // * Multiply by 'numLeafPages' to get the number of expected distinct pages
+    //   numLeafPages * (1 - ((1 - (1 / numLeafPages)) ^ numEntriesRequested))
+    //
+    // This formula has nice properties:
+    // * When numEntriesRequested << numLeafPages, formula ~= numEntriesRequested, indicating that
+    // every lookup requests a new page.
+    // * When numEntriesRequested >> numLeafPages, formula ~= numLeafPages, indicates that every
+    // page is eventually requested.
+    return numLeafPages * (1 - std::pow(1 - (1 / numLeafPages), numEntriesRequested));
+}
+
+double estimateMackertLohmanRandIO(double numDistinctPagesNeededFromBtree,
                                    double numPagesInStorageEngineCache,
-                                   double numDocsOutput) {
-    tassert(
-        11943801, "estimateMackertLohmanRandIO() expected numPagesColl >= 0", numPagesColl >= 0);
+                                   double numLogicalPageRequests) {
+    tassert(11943801,
+            "estimateMackertLohmanRandIO() expected numDistinctPagesNeededFromBtree >= 0",
+            numDistinctPagesNeededFromBtree >= 0);
     tassert(11943802,
             "estimateMackertLohmanRandIO() expected numPagesInStorageEngineCache > 0",
             numPagesInStorageEngineCache > 0);
-    tassert(
-        11943803, "estimateMackertLohmanRandIO() expected numDocsOutput >= 0", numDocsOutput >= 0);
+    tassert(11943803,
+            "estimateMackertLohmanRandIO() expected numLogicalPageRequests >= 0",
+            numLogicalPageRequests >= 0);
 
     // For ease of reference, the formula in the paper is:
     //         / min(Dx, T)                 when T <= b
     // Y_wap = | Dx                         when T > b  AND Dx <= b
     //         \ b + (Dx - b) * (T-b)/T     when T > b  AND Dx > b
-    // T = numPagesColl
+    // T = numDistinctPagesNeededFromBtree
     // b = numPagesInStorageEngineCache
-    // D*x = numDocsOutput
+    // D*x = numLogicalPageRequests
 
     // Case 1: The entire collection fits in the WT cache.
-    if (numPagesColl <= numPagesInStorageEngineCache) {
-        return std::min(numDocsOutput, numPagesColl);
+    if (numDistinctPagesNeededFromBtree <= numPagesInStorageEngineCache) {
+        return std::min(numLogicalPageRequests, numDistinctPagesNeededFromBtree);
     }
 
     // Case 2: The collection is bigger than the cache, but all the returned documents fit in the WT
     // cache. We assume that have a totally unclustered index, meaning that every key returned from
     // the index scan results in a random I/O.
-    if (numDocsOutput <= numPagesInStorageEngineCache) {
-        return numDocsOutput;
+    if (numLogicalPageRequests <= numPagesInStorageEngineCache) {
+        return numLogicalPageRequests;
     }
 
     // Case 3: The collection is bigger than the cache and the sum of pages that are fetched are
@@ -276,8 +307,9 @@ double estimateMackertLohmanRandIO(double numPagesColl,
     // page multiple times may result multiple random I/Os (whereas in the case of a smaller result
     // set, that page would be cached).
     return numPagesInStorageEngineCache +
-        (numDocsOutput - numPagesInStorageEngineCache) *
-        (numPagesColl - numPagesInStorageEngineCache) / numPagesColl;
+        (numLogicalPageRequests - numPagesInStorageEngineCache) *
+        (numDistinctPagesNeededFromBtree - numPagesInStorageEngineCache) /
+        numDistinctPagesNeededFromBtree;
 }
 
 }  // namespace mongo::join_ordering
