@@ -113,16 +113,18 @@ Status KillOpCmdBase::checkAuthForOperation(OperationContext* workerOpCtx,
     }
 
     if (isKillingLocalOp(cmdObj.getField("op"))) {
-        // Look up the OperationContext and see if we have permission to kill it. This is done once
+        // Look up each OperationContext and see if we have permission to kill it. This is done once
         // here and again in the command body. The check here in the checkAuthForOperation function
         // is necessary because if the check fails, it will be picked up by the auditing system.
-        long long opId = parseOpId(cmdObj);
-        auto target = worker->getServiceContext()->getLockedClient(opId);
-
-        if (opKiller.isAuthorizedToKill(target)) {
-            // We were authorized to interact with the target Client
-            return Status::OK();
+        // For an array of op IDs, authorize if the user is authorized to kill all of them.
+        auto opIds = parseOpIds(cmdObj);
+        for (auto opId : opIds) {
+            auto target = worker->getServiceContext()->getLockedClient(opId);
+            if (!opKiller.isAuthorizedToKill(target)) {
+                return Status(ErrorCodes::Unauthorized, "Unauthorized");
+            }
         }
+        return Status::OK();
     }
 
     return Status(ErrorCodes::Unauthorized, "Unauthorized");
@@ -135,7 +137,7 @@ void KillOpCmdBase::killLocalOperation(OperationContext* opCtx,
 }
 
 bool KillOpCmdBase::isKillingLocalOp(const BSONElement& opElem) {
-    return opElem.isNumber();
+    return opElem.isNumber() || opElem.type() == BSONType::array;
 }
 
 unsigned int KillOpCmdBase::parseOpId(const BSONObj& cmdObj) {
@@ -147,6 +149,32 @@ unsigned int KillOpCmdBase::parseOpId(const BSONObj& cmdObj) {
             (op >= std::numeric_limits<int>::min()) && (op <= std::numeric_limits<int>::max()));
 
     return static_cast<unsigned int>(op);
+}
+
+std::vector<unsigned int> KillOpCmdBase::parseOpIds(const BSONObj& cmdObj) {
+    auto opElem = cmdObj.getField("op");
+
+    if (opElem.isNumber()) {
+        return {parseOpId(cmdObj)};
+    }
+
+    uassert(12212701,
+            "\"op\" field must be a number or an array of numbers",
+            opElem.type() == BSONType::array);
+
+    std::vector<unsigned int> opIds;
+    for (auto&& elem : opElem.Array()) {
+        uassert(12212702, "Each element of the \"op\" array must be a number", elem.isNumber());
+        long long op = elem.safeNumberLong();
+        uassert(12212703,
+                str::stream() << "invalid op : " << op
+                              << ". Op ID cannot be represented with 32 bits",
+                (op >= std::numeric_limits<int>::min()) && (op <= std::numeric_limits<int>::max()));
+        opIds.push_back(static_cast<unsigned int>(op));
+    }
+
+    uassert(12212704, "\"op\" array must not be empty", !opIds.empty());
+    return opIds;
 }
 
 ErrorCodes::Error KillOpCmdBase::parseErrorCode(OperationContext* opCtx, const BSONObj& cmdObj) {
