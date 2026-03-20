@@ -74,6 +74,7 @@ export function makeInsertCommandArb(
  * @param {number} [maxFields=5]                 // max extra metric fields per doc
  * @param {number} [minDocs=1]                   // min docs in the batch
  * @param {number} [maxDocs=500]                 // max docs in the batch
+ * @param {number} [options.mixedSchemaChance=0.0]  // chance that a given field will have a mixed schema across the stream
  * @param {Object} [options]
  * @param {Object} [options.explicitArbitraries] Object mapping field names to specific arbitrary factories to inject into the test suite
  * @param {{intRange?: Range, dateRange?: Range}} [options.ranges]

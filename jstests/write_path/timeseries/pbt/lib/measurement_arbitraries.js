@@ -8,6 +8,7 @@ import {
     makeMetricArb,
     makeSensorDateMetricStreamArb,
     makeMetricStreamArb,
+    makeMixedTypeMetricStreamArb,
     makeRunnyMetricStreamArb,
 } from "jstests/write_path/timeseries/pbt/lib/metric_arbitraries.js";
 
@@ -150,6 +151,7 @@ export function makeMeasurementDocArb(
  * @param {number} [options.ranges.maxFields=5]
  * @param {number} [options.ranges.minDocs=0]
  * @param {number} [options.ranges.maxDocs=20]
+ * @param {number} [options.mixedSchemaChance=0.0]  // chance that a given field will have a mixed schema across the stream
  * @param {fc.Arbitrary<string>} [options.ranges.fieldNameArb]
  *
  * @returns {fc.Arbitrary<Object[]>}
@@ -160,6 +162,11 @@ export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaVa
     }
     if (typeof metaFieldname !== "string" || metaFieldname.length === 0) {
         throw new Error("makeMeasurementDocStreamArb: metaFieldname must be a non-empty string");
+    }
+
+    const mixedSchemaChance = options.mixedSchemaChance ?? 0.0;
+    if (typeof mixedSchemaChance !== "number" || mixedSchemaChance < 0 || mixedSchemaChance > 1) {
+        throw new Error("makeMeasurementDocStreamArb: mixedSchemaChance must be a number in [0, 1]");
     }
 
     const {
@@ -228,15 +235,24 @@ export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaVa
         // Extra fields: each gets a metric stream built via makeMetricStreamArb or makeRunnyMetricStreamArb. We set both minLength and maxLength
         // with minLength = maxLength = docCount, so every stream[i] is defined.
         let extraFieldStreamArbs = {};
+        const extraFieldRanges = {
+            intRange,
+            doubleRange,
+            longRange,
+            decimalRange,
+            dateRange: {min: dateMin, max: dateMax},
+        };
+
+        // Runny overrides mixed type, this should be fine for our use cases
         for (const fieldName of fieldNames) {
+            const plainArb = fc
+                .double({min: 0, max: 1, noNaN: true})
+                .chain((selector) =>
+                    selector < mixedSchemaChance
+                        ? makeMixedTypeMetricStreamArb(docCount, docCount, extraFieldRanges)
+                        : makeMetricStreamArb(docCount, docCount, extraFieldRanges),
+                );
             const runnyArb = makeRunnyMetricStreamArb(parentMetricArb, {minLength: docCount, maxLength: docCount});
-            const plainArb = makeMetricStreamArb(docCount, docCount, {
-                intRange,
-                doubleRange,
-                longRange,
-                decimalRange,
-                dateRange: {min: dateMin, max: dateMax},
-            });
             extraFieldStreamArbs[fieldName] = useRunnyMetricsArb.chain((useRunny) => (useRunny ? runnyArb : plainArb));
         }
 

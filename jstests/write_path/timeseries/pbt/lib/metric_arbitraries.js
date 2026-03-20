@@ -580,6 +580,35 @@ export function makeRunnyMetricStreamArb(metricArb, opts = {}) {
  * (metaValue omitted -> meta chosen from metric arb per doc/stream)
  */
 
+/**
+ * Stream generator for a single stream whose values are intentionally mixed-type.
+ *
+ * It chooses two distinct BSON metric types, generates one stream of each type,
+ * and then intermixes the resulting values position-by-position.
+ */
+export function makeMixedTypeMetricStreamArb(minLength = 0, maxLength = 20, ranges = {}) {
+    const distinctTypePairArb = fc
+        .tuple(fc.constantFrom(...allBsonMetricTypes), fc.constantFrom(...allBsonMetricTypes))
+        .filter(([lhsType, rhsType]) => lhsType !== rhsType);
+
+    return distinctTypePairArb.chain(([lhsType, rhsType]) => {
+        const lhsStreamArb = makeMetricTypeStreamArb(lhsType, minLength, maxLength, ranges);
+        const rhsStreamArb = makeMetricTypeStreamArb(rhsType, minLength, maxLength, ranges);
+
+        return fc.tuple(lhsStreamArb, rhsStreamArb).chain(([lhsStream, rhsStream]) => {
+            const streamLength = lhsStream.length < rhsStream.length ? lhsStream.length : rhsStream.length;
+
+            return fc.array(fc.boolean(), {minLength: streamLength, maxLength: streamLength}).map((chooseLhs) => {
+                const mixedStream = [];
+                for (let i = 0; i < streamLength; ++i) {
+                    mixedStream.push(chooseLhs[i] ? lhsStream[i] : rhsStream[i]);
+                }
+                return mixedStream;
+            });
+        });
+    });
+}
+
 export const simpleMetricArb = makeMetricArb(); // all types, default ranges
 
 export const simpleMetricStreamArb = makeMetricStreamArb(); // all types, default ranges
