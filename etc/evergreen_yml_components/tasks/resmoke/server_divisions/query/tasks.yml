@@ -128,6 +128,19 @@ tasks:
       - func: "run tests"
 
   - <<: *task_template
+    name: aggregation_high_yielding
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "aggregation",
+        "common",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
     name: aggregation_auth
     tags:
       [
@@ -913,6 +926,25 @@ tasks:
         vars:
           resmoke_jobs_max: 1
 
+  - <<: *task_template
+    name: concurrency_replication_high_yielding
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "concurrency",
+        "common",
+        "repl",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
   - <<: *gen_task_template
     name: aggregation_mongos_pqs_fallback_gen
     tags:
@@ -1205,6 +1237,24 @@ tasks:
 
   - <<: *task_template
     name: jsCore
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "development_critical",
+        "no_commit_queue",
+        "requires_large_host",
+        "jscore",
+        "common",
+        "has_bazel_target",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: core
+
+  - <<: *task_template
+    name: core_high_yielding
     tags:
       [
         "assigned_to_jira_team_server_query_execution",

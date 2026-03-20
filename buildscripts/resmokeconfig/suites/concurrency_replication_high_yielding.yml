@@ -1,0 +1,51 @@
+test_kind: fsm_workload_test
+
+selector:
+  roots:
+    - jstests/concurrency/fsm_workloads/**/*.js
+    - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
+  exclude_files:
+    ##
+    # Disabled due to MongoDB restrictions and/or workload restrictions
+    ##
+
+    # OOM kills on test hosts.
+
+  exclude_with_any_tags:
+    - requires_standalone
+    - requires_sharding
+
+executor:
+  archive:
+    hooks:
+      - RunDBCheckInBackground
+      - CheckReplDBHashInBackground
+      - ValidateCollectionsInBackground
+      - CheckReplDBHash
+      - ValidateCollections
+    tests: true
+  config: {}
+  hooks:
+    # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+    # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+    # validating the entire contents of the collection.
+    #
+    # TODO SERVER-26466: Add CheckReplOplogs hook to the concurrency suite.
+    - class: RunDBCheckInBackground
+    - class: CheckReplDBHashInBackground
+    - class: ValidateCollectionsInBackground
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanupConcurrencyWorkloads
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      oplogSize: 1024
+      set_parameters:
+        enableTestCommands: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        queryAnalysisWriterIntervalSecs: 1
+        roleGraphInvalidationIsFatal: 1
+        internalQueryExecYieldIterations: 1
+        internalQueryExecYieldPeriodMS: 1
+    num_nodes: 3

@@ -254,7 +254,7 @@ buildvariants:
         distros:
           - rhel8.8-medium
       - name: .encrypt !.requires_extra_system_deps
-      - name: .jscore .common !.requires_extra_system_deps !jsCore !.sbe_only !.feature_flag_guarded
+      - name: .jscore .common !.requires_extra_system_deps !jsCore !.sbe_only !.feature_flag_guarded !.requires_large_host
       - name: .jstestfuzz !.requires_extra_system_deps !.feature_flag_guarded
       - name: .misc_js !.requires_extra_system_deps !.requires_large_host
       - name: .misc_js .requires_large_host !.requires_extra_system_deps

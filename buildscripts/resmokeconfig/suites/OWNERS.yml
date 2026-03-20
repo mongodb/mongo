@@ -72,6 +72,9 @@ filters:
   - "fle*":
     approvers:
       - 10gen/query-integration-features
+  - "*high_yielding*":
+    approvers:
+      - 10gen/query-execution-yielding
   - "json_schema.yml":
     approvers:
       - 10gen/query-execution
