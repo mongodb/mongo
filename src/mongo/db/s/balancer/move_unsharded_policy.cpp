@@ -457,7 +457,7 @@ MigrateInfoVector MoveUnshardedPolicy::selectCollectionsToMove(
         auto drainingShardIter = std::find_if(
             allShards.begin(), allShards.end(), [](const auto& stat) { return stat.isDraining; });
         bool isDraining = drainingShardIter != allShards.end();
-        if (opCtx->getClient()->getPrng().nextCanonicalDouble() < 0.5 &&
+        if (opCtx->getClient()->getPrng().trueWithProbability(0.5) &&
             clusterHasShardedCollections(opCtx, isDraining)) {
             return result;
         }

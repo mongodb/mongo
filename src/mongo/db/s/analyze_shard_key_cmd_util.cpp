@@ -800,7 +800,7 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
         BSONObj recordVal;
         while (recordIds.size() < numRecordsToSample) {
             auto shouldSample =
-                (recordSampleRate == 1) || (prng.nextCanonicalDouble() < recordSampleRate);
+                (recordSampleRate == 1) || prng.trueWithProbability(recordSampleRate);
             auto execState = shouldSample
                 ? exec->getNext(scannedMultipleShardKeys ? nullptr : &recordVal, &recordId)
                 : exec->getNext(nullptr, nullptr);

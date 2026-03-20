@@ -668,8 +668,8 @@ TickSource::Tick CurOp::startTime() {
     // For top level operations, we decide whether or not to sample this operation for interrupt
     // tracking.
     if (gFeatureFlagRecordDelinquentMetrics.isEnabled() && !parent() &&
-        opCtx()->getClient()->getPrng().nextCanonicalDouble() <
-            gOverdueInterruptCheckSamplingRate.loadRelaxed()) {
+        opCtx()->getClient()->getPrng().trueWithProbability(
+            gOverdueInterruptCheckSamplingRate.loadRelaxed())) {
         opCtx()->trackOverdueInterruptChecks(startTime);
     }
 

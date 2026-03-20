@@ -234,6 +234,10 @@ public:
         return _prng.nextCanonicalDouble();
     }
 
+    bool trueWithProbability(double probability) {
+        return _prng.trueWithProbability(probability);
+    }
+
     void setInExhaust(bool inExhaust) {
         _inExhaust = inExhaust;
     }
@@ -405,7 +409,7 @@ Future<DbResponse> ServiceEntryPointBridge::handleRequest(OperationContext* opCt
             return Future<DbResponse>::makeReady({Message()});
         // Forward the message to 'dest' with probability '1 - hostSettings.loss'.
         case HostSettings::State::kDiscard:
-            if (dest.nextCanonicalDouble() < hostSettings.loss) {
+            if (dest.trueWithProbability(hostSettings.loss)) {
                 std::string hostName = dest.toString();
                 if (cmdRequest) {
                     LOGV2(22919,

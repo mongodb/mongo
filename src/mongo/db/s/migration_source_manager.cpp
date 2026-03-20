@@ -141,7 +141,7 @@ BSONObj computeOtherBound(OperationContext* opCtx,
     if (MONGO_unlikely(
             globalFailPointRegistry().find("balancerShouldReturnRandomMigrations")->shouldFail()) &&
         !random_migration_testing_utils::isCurrentShardDraining(opCtx) &&
-        opCtx->getClient()->getPrng().nextCanonicalDouble() < 0.5) {
+        opCtx->getClient()->getPrng().trueWithProbability(0.5)) {
         if (auto randomSplitPoint = random_migration_testing_utils::generateRandomSplitPoint(
                 opCtx, acquisition, skPattern.toBSON(), min, max)) {
             LOGV2(10587400,

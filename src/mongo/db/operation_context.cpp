@@ -217,11 +217,7 @@ bool opShouldFail(Client* client, const BSONObj& failPointInfo) {
     }
 
     // Return true with (approx) probability p = "chance".  Recall: 0 <= chance <= 1.
-    double next = client->getPrng().nextCanonicalDouble();
-    if (next > failPointInfo["chance"].numberDouble()) {
-        return false;
-    }
-    return true;
+    return client->getPrng().trueWithProbability(failPointInfo["chance"].numberDouble());
 }
 
 }  // namespace

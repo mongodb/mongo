@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/modules.h"
 
 #include <algorithm>
@@ -109,8 +110,13 @@ public:
         return _urbg;
     }
 
-    /** A random number in the range [0, 1). */
-    // TODO
+    /**
+     * A random number in the range [0, 1).
+     *
+     * WARNING: May invoke slow floating-point library calls (e.g. __logl_finite) that are
+     * software-emulated on some ARM64 platforms. Prefer trueWithProbability() rather than
+     * comparing this to a probability.
+     */
     MONGO_MOD_PUB double nextCanonicalDouble() {
         return std::uniform_real_distribution<double>{0, 1}(_urbg);
     }
@@ -153,6 +159,13 @@ public:
     /** A number in the half-open interval [0, max) */
     MONGO_MOD_PUB uint64_t nextUInt64(uint64_t max) {
         return std::uniform_int_distribution<uint64_t>(0, max - 1)(_urbg);
+    }
+
+    /** Returns true with the given probability in [0, 1]. */
+    MONGO_MOD_PUB bool trueWithProbability(double probability) {
+        dassert(0 <= probability && probability <= 1);
+        return nextUInt32(std::numeric_limits<uint32_t>::max()) <
+            uint32_t(probability * std::numeric_limits<uint32_t>::max());
     }
 
     /**
