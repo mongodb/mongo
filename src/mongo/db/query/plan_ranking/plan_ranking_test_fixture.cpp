@@ -57,12 +57,7 @@ CollectionAcquisition PlanRankingTestFixture::getCollection() {
         MODE_X);
 }
 
-void PlanRankingTestFixture::insertNDocuments(int count) {
-    std::vector<BSONObj> docs;
-    for (int i = 0; i < count; i++) {
-        BSONObj obj = BSON("_id" << i << "a" << i << "b" << i << "c" << i);
-        docs.push_back(obj);
-    }
+void PlanRankingTestFixture::insertDocuments(const std::vector<BSONObj>& docs) {
     std::vector<InsertStatement> inserts{docs.begin(), docs.end()};
 
     auto coll = getCollection();
@@ -77,6 +72,15 @@ void PlanRankingTestFixture::insertNDocuments(int count) {
     }
 }
 
+void PlanRankingTestFixture::insertNDocuments(int count) {
+    std::vector<BSONObj> docs;
+    for (int i = 0; i < count; i++) {
+        BSONObj obj = BSON("_id" << i << "a" << i << "b" << i << "c" << i);
+        docs.push_back(obj);
+    }
+    insertDocuments(docs);
+}
+
 void PlanRankingTestFixture::tearDown() {
     CatalogTestFixture::tearDown();
     expCtx.reset();
@@ -84,7 +88,8 @@ void PlanRankingTestFixture::tearDown() {
 
 void PlanRankingTestFixture::createIndexOnEmptyCollection(OperationContext* opCtx,
                                                           BSONObj index,
-                                                          std::string indexName) {
+                                                          std::string indexName,
+                                                          BSONObj options) {
     auto coll = getCollection();
     CollectionWriter collWriter(opCtx, &coll);
 
@@ -94,27 +99,29 @@ void PlanRankingTestFixture::createIndexOnEmptyCollection(OperationContext* opCt
     auto indexesBefore = indexCatalog->numIndexesReady();
 
     auto indexSpec =
-        BSON("v" << IndexConfig::kLatestIndexVersion << "key" << index << "name" << indexName);
-    ASSERT_OK(indexCatalog
-                  ->createIndexOnEmptyCollection(
-                      opCtx, collWriter.getWritableCollection(opCtx), indexSpec)
-                  .getStatus());
+        BSON("v" << IndexConfig::kLatestIndexVersion << "key" << index << "name" << indexName)
+            .addFields(options);
+    const auto insertedSpec = indexCatalog->createIndexOnEmptyCollection(
+        opCtx, collWriter.getWritableCollection(opCtx), indexSpec);
+    ASSERT_OK(insertedSpec.getStatus());
     wunit.commit();
     ASSERT_EQ(indexesBefore + 1, indexCatalog->numIndexesReady());
 
     // The QueryPlannerParams should also have information about the index to consider it when
     // actually doing the planning.
-    indices.push_back(IndexEntry(index,
-                                 IndexNames::nameToType(IndexNames::findPluginName(index)),
-                                 IndexConfig::kLatestIndexVersion,
-                                 false,
-                                 {},
-                                 {},
-                                 false,
-                                 false,
-                                 IndexEntry::Identifier{indexName},
-                                 BSONObj(),
-                                 nullptr));
+    indices.push_back(
+        IndexEntry(index,
+                   IndexNames::nameToType(IndexNames::findPluginName(index)),
+                   IndexConfig::kLatestIndexVersion,
+                   false,
+                   {},
+                   {},
+                   false,
+                   false,
+                   IndexEntry::Identifier{indexName},
+                   BSONObj(),
+                   nullptr,
+                   indexCatalog->findIndexByName(opCtx, indexName)->shared_from_this()));
 }
 
 std::pair<std::unique_ptr<CanonicalQuery>, PlannerData>

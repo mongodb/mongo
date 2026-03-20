@@ -234,7 +234,7 @@ TEST_F(CBRForNoMPResultsTest, NoResultsMultiPlannerUsesCBR) {
     ASSERT_TRUE(stats->earlyExit);
     ASSERT_EQ(stats->numResultsFound, 0);
     ASSERT_EQ(stats->numCandidatePlans, 2);
-    ASSERT_EQ(stats->totalWorks, 10002);
+    ASSERT_EQ(stats->totalWorks, 10001);
     ASSERT_EQ(status.getValue().needsWorksMeasuredForPlanCache, true);
 
     ASSERT_TRUE(status.getValue().execState);
@@ -246,13 +246,36 @@ TEST_F(CBRForNoMPResultsTest, NoResultsMultiPlannerUsesCBR) {
 TEST_F(CBRForNoMPResultsTest, CBRCannotDecideUsesMultiPlanner) {
     createIndexOnEmptyCollection(operationContext(), BSON("a" << 1), "a_1");
     createIndexOnEmptyCollection(operationContext(), BSON("b" << 1), "b_1");
-    insertNDocuments(10001);
+    createIndexOnEmptyCollection(operationContext(),
+                                 BSON("c" << 1),
+                                 "c_1",
+                                 BSON("partialFilterExpression" << BSON("b" << GTE << 0)));
+
+    // Insert documents into the collection
+    // Note that this makes b_1 the CBR loser
+    {
+        std::vector<BSONObj> docs;
+        for (int i = 0; i < 1000; i++) {
+            BSONObj obj = BSON("_id" << i << "b" << i);
+            docs.push_back(obj);
+        }
+        for (int i = 0; i < 10001; i++) {
+            BSONObj obj = BSON("_id" << i + 1000 << "a" << i << "b" << i << "c" << i);
+            docs.push_back(obj);
+        }
+        insertDocuments(docs);
+    }
+
+
     auto colls = getCollsAccessor();
 
-    auto [cq, plannerData] =
-        createCQAndPlannerData(colls,
-                               BSON("a" << GT << 0 << "b" << GT << 0 << "c" << -1),
-                               [](FindCommandRequest& findCmd) { findCmd.setReturnKey(true); });
+    // The query matches no documents so none of the plans will advance
+    // during the initial MP run, so the strategy will fall back to CBR.
+    // It will cost a_1 and b_1, and a_1 will win (because of the sequential sample).
+    // a_1 and c_1 will be multiplanned. Both will exit with neither EOF nor documents
+    // after 10000 works.
+    auto [cq, plannerData] = createCQAndPlannerData(
+        colls, BSON("a" << GT << 0 << "b" << GT << 0 << "c" << GT << 0 << "d" << 0));
 
     plannerData.plannerParams =
         makePlannerParams({.indices = indices,
@@ -264,26 +287,36 @@ TEST_F(CBRForNoMPResultsTest, CBRCannotDecideUsesMultiPlanner) {
     ASSERT_OK(status.getStatus());
     ASSERT_EQ(status.getValue().solutions.size(), 1);
     auto& explainData = status.getValue().maybeExplainData.value();
-    ASSERT_EQ(explainData.rejectedPlansWithStages.size(), 3);  // 1 from multiplanner + 2 from CBR
-    ASSERT_FALSE(explainData.rejectedPlansWithStages[0].solution == nullptr);
-    auto multiPlannerRejectedPlanStats =
-        explainData.rejectedPlansWithStages[0].planStage->getStats();
-    ASSERT_EQ(multiPlannerRejectedPlanStats->common.works, 10000);
-    ASSERT_EQ(multiPlannerRejectedPlanStats->common.advanced, 0);
-    ASSERT_EQ(explainData.estimates.size(),
-              0);  // Empty estimates map as setReturnKey cannot be estimated
-    ASSERT_FALSE(explainData.rejectedPlansWithStages[1].solution == nullptr);
-    ASSERT_TRUE(explainData.rejectedPlansWithStages[1].planStage ==
-                nullptr);  // No plan stage as CBR rejected
-    ASSERT_FALSE(explainData.rejectedPlansWithStages[2].solution == nullptr);
-    ASSERT_TRUE(explainData.rejectedPlansWithStages[2].planStage ==
-                nullptr);  // No plan stage as CBR rejected
+    ASSERT_EQ(explainData.rejectedPlansWithStages.size(),
+              5);  // 2 from multiplanner + 3 from CBR (we mark all plans considered by CBR as
+                   // rejected if it cannot decide)
+    // The winning plan must have made it all the way to the end of the collection
+    ASSERT_EQ(explainData.multiPlannerWinningPlanTrialStats->common.works, 10000);
+    ASSERT_EQ(explainData.multiPlannerWinningPlanTrialStats->common.advanced, 0);
+    // There must be two (ixscan + fetch) CBR estimates for the two costable plans.
+    ASSERT_EQ(explainData.estimates.size(), 4);
+
+    // CBR winner should make it into the second runTrials
+    ASSERT_EQ(explainData.rejectedPlansWithStages[0].planStage->getStats()->common.works, 10000);
+    ASSERT_EQ(explainData.rejectedPlansWithStages[0].planStage->getStats()->common.advanced, 0);
+    // CBR loser should get abandoned
+    ASSERT_EQ(explainData.rejectedPlansWithStages[1].planStage->getStats()->common.works, 3333);
+    ASSERT_EQ(explainData.rejectedPlansWithStages[1].planStage->getStats()->common.advanced, 0);
+    const std::string cbrLoserPlanString =
+        explainData.rejectedPlansWithStages[1].solution->toString();
+    // Make sure this candidate actually was the CBR loser
+    ASSERT_NE(cbrLoserPlanString.find("b_1"), std::string::npos);
+    // The rest should be CBR rejections
+    ASSERT(!explainData.rejectedPlansWithStages[2].planStage);
+    ASSERT(!explainData.rejectedPlansWithStages[3].planStage);
+    ASSERT(!explainData.rejectedPlansWithStages[4].planStage);
+
     ASSERT_TRUE(strategy.getMultiPlanner().has_value());
     auto stats = strategy.getMultiPlanner()->getSpecificStats();
     ASSERT_FALSE(stats->earlyExit);
     ASSERT_EQ(stats->numResultsFound, 0);
-    ASSERT_EQ(stats->numCandidatePlans, 2);
-    ASSERT_EQ(stats->totalWorks, 20000);
+    ASSERT_EQ(stats->numCandidatePlans, 3);
+    ASSERT_EQ(stats->totalWorks, 23333);  // 10000 + 10000 + 3333
 
     ASSERT_TRUE(status.getValue().execState);
 }

@@ -211,11 +211,11 @@ public:
     [[nodiscard]] PlanExplainerData extractPlanExplainerData();
 
     /**
-     * Rejects all candidate plans except those with the given hash without picking a best plan.
+     * Rejects all candidate plans except those with the given hashes without picking a best plan.
      * Needed before extracting rejected plans for explain when no best plan was chosen via MP.
      * Cannot be used if a best plan was already chosen.
      */
-    void abandonTrialsExceptHash(size_t hash);
+    void abandonTrialsExceptHashes(const boost::container::flat_set<size_t>& hashes);
 
     bool isStateSaved() {
         return _isStateSaved;

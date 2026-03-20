@@ -1314,6 +1314,7 @@ TEST_F(QueryStageMultiPlanTest, ExtractRejectedPlansAfterAbandonTrials) {
     // Expect one solution per index.
     ASSERT_EQ(solutions.size(), 3);
 
+    auto solution1Hash = solutions[0]->hash();
     auto solution2Hash = solutions[1]->hash();
 
     unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(
@@ -1327,6 +1328,11 @@ TEST_F(QueryStageMultiPlanTest, ExtractRejectedPlansAfterAbandonTrials) {
         mps->addPlan(std::move(solution), std::move(root), sharedWs.get());
     }
 
+    std::map<QuerySolutionNode*, PlanStage*> solutionToPlanStage;
+    for (size_t i = 0; i < solutions.size(); i++) {
+        solutionToPlanStage[mps->getCandidate(i).solution->root()] = mps->getChildren()[i].get();
+    }
+
     auto planYieldPolicy = makeClassicYieldPolicy(opCtx.get(),
                                                   nss,
                                                   static_cast<PlanStage*>(mps.get()),
@@ -1334,23 +1340,32 @@ TEST_F(QueryStageMultiPlanTest, ExtractRejectedPlansAfterAbandonTrials) {
 
     ASSERT_OK(mps->runTrials(planYieldPolicy.get()));
     // Abandon all except the second index scan
-    mps->abandonTrialsExceptHash(solution2Hash);
+    mps->abandonTrialsExceptHashes({solution1Hash, solution2Hash});
     ASSERT_FALSE(mps->bestPlanChosen());
+
+    ASSERT_OK(mps->pickBestPlan());
+    ASSERT(mps->bestPlanChosen());
 
     auto planExplainerData = mps->extractPlanExplainerData();
     auto& rejectedPlansWithStages = planExplainerData.rejectedPlansWithStages;
     // The rejected plans should be returned as rejected.
     ASSERT_EQ(rejectedPlansWithStages.size(), 2UL);
-    ASSERT_TRUE(rejectedPlansWithStages[0].solution);
-    ASSERT_TRUE(rejectedPlansWithStages[0].planStage);
-    ASSERT_TRUE(rejectedPlansWithStages[1].solution);
-    ASSERT_TRUE(rejectedPlansWithStages[1].planStage);
+    for (const auto& rejection : rejectedPlansWithStages) {
+        ASSERT_TRUE(rejection.solution);
+        ASSERT_TRUE(rejection.planStage);
+        // Must maintain the correspndence between solution <-> plan stage
+        ASSERT_EQ(solutionToPlanStage[rejection.solution->root()], rejection.planStage.get());
+    }
     // The MultiPlan stage should have one child (the non-rejected plan)
     ASSERT_EQ(mps->getChildren().size(), 1);
     // This relies on the non-rejected plan being moves to the first slot.
-    ASSERT_EQ(mps->getCandidate(0).solution->hash(), solution2Hash);
-    ASSERT_EQ(planExplainerData.multiPlannerWinningPlanTrialStats, nullptr);
-    ASSERT_EQ(planExplainerData.multiPlannerWinningPlanScore, boost::none);
+    ASSERT(
+        (std::set{solution1Hash, solution2Hash}).contains(mps->getCandidate(0).solution->hash()));
+    ASSERT(planExplainerData.multiPlannerWinningPlanTrialStats);
+    ASSERT(planExplainerData.multiPlannerWinningPlanScore);
+    // Also check the solution <-> plan stage coherence for the winning plan.
+    ASSERT_EQ(solutionToPlanStage[mps->getCandidate(0).solution->root()],
+              mps->getChildren()[0].get());
 }
 
 DEATH_TEST_REGEX_F(QueryStageMultiPlanDeathTest,
@@ -1416,7 +1431,7 @@ TEST_F(QueryStageMultiPlanTest, ManagesStateAroundAbandoningTrials) {
     ASSERT_FALSE(mps->isStateSaved());
     ASSERT_OK(mps->runTrials(planYieldPolicy.get()));
     ASSERT_TRUE(mps->isStateSaved());
-    mps->abandonTrialsExceptHash(createQuerySolution()->hash());
+    mps->abandonTrialsExceptHashes({createQuerySolution()->hash()});
     ASSERT_FALSE(mps->isStateSaved());
 }
 
@@ -1434,7 +1449,7 @@ DEATH_TEST_REGEX_F(QueryStageMultiPlanDeathTest,
 
     // No solution with this hash exists (no solution was added
     // in the first place). So this should assert.
-    mps->abandonTrialsExceptHash(12345);
+    mps->abandonTrialsExceptHashes({12345});
 }
 
 TEST_F(QueryStageMultiPlanTest, ManagesStateAroundPickingBestPlan) {
