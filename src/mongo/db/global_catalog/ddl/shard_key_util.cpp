@@ -441,7 +441,8 @@ void validateShardKeyIsNotEncrypted(OperationContext* opCtx,
 
 std::vector<BSONObj> ValidationBehaviorsShardCollection::loadIndexes(
     const NamespaceString& nss) const {
-    return listIndexesEmptyListIfMissing(_opCtx, nss, ListIndexesInclude::kNothing);
+    return listIndexesEmptyListIfMissing(
+        _opCtx, nss, ListIndexesInclude::kNothing, /*isRawDataRequest=*/true);
 }
 
 void ValidationBehaviorsShardCollection::verifyUsefulNonMultiKeyIndex(

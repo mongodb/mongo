@@ -114,7 +114,8 @@ std::vector<BSONObj> NonShardServerProcessInterface::getIndexSpecs(OperationCont
     return listIndexesEmptyListIfMissing(opCtx,
                                          ns,
                                          includeBuildUUIDs ? ListIndexesInclude::kBuildUUID
-                                                           : ListIndexesInclude::kNothing);
+                                                           : ListIndexesInclude::kNothing,
+                                         /*isRawDataRequest=*/true);
 }
 
 std::vector<FieldPath> NonShardServerProcessInterface::collectDocumentKeyFieldsActingAsRouter(

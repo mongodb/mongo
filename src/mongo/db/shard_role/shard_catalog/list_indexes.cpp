@@ -45,6 +45,7 @@
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
+#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
@@ -69,7 +70,8 @@ namespace mongo {
 
 std::vector<BSONObj> listIndexesInLock(OperationContext* opCtx,
                                        const CollectionAcquisition& collectionAcquisition,
-                                       ListIndexesInclude additionalInclude) {
+                                       ListIndexesInclude additionalInclude,
+                                       bool isRawDataRequest) {
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangBeforeListIndexes,
         opCtx,
@@ -82,6 +84,9 @@ std::vector<BSONObj> listIndexesInLock(OperationContext* opCtx,
     std::vector<std::string> indexNames;
     std::vector<BSONObj> indexSpecs;
     collection->getAllIndexes(&indexNames);
+
+    const bool convertBucketsIndexesToTimeseriesIndexes =
+        collection->isTimeseriesCollection() && !isRawDataRequest;
 
     if (collection->isClustered() && !collection->isTimeseriesCollection()) {
         BSONObj collation;
@@ -100,6 +105,16 @@ std::vector<BSONObj> listIndexesInLock(OperationContext* opCtx,
     }
     for (size_t i = 0; i < indexNames.size(); i++) {
         auto spec = collection->getIndexSpec(indexNames[i]);
+        if (convertBucketsIndexesToTimeseriesIndexes) {
+            auto timeseriesSpec = timeseries::createTimeseriesIndexFromBucketsIndex(
+                *collection->getTimeseriesOptions(), spec);
+            if (!timeseriesSpec) {
+                // This buckets index does not have an equivalent timeseries index (it may have been
+                // created directly over the bucket fields using rawData), so omit it from the list.
+                continue;
+            }
+            spec = *timeseriesSpec;
+        }
         auto durableBuildUUID = collection->getIndexBuildUUID(indexNames[i]);
         // The durable catalog will not have a build UUID for the given index name if it was
         // not being built with two-phase -- in this case we have no relevant index build info
@@ -157,7 +172,8 @@ std::vector<BSONObj> listIndexesInLock(OperationContext* opCtx,
 }
 std::vector<BSONObj> listIndexesEmptyListIfMissing(OperationContext* opCtx,
                                                    const NamespaceStringOrUUID& nss,
-                                                   ListIndexesInclude additionalInclude) {
+                                                   ListIndexesInclude additionalInclude,
+                                                   bool isRawDataRequest) {
     const auto collection = acquireCollectionMaybeLockFree(
         opCtx,
         CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead));
@@ -165,6 +181,6 @@ std::vector<BSONObj> listIndexesEmptyListIfMissing(OperationContext* opCtx,
         return {};
     }
 
-    return listIndexesInLock(opCtx, collection, additionalInclude);
+    return listIndexesInLock(opCtx, collection, additionalInclude, isRawDataRequest);
 }
 }  // namespace mongo

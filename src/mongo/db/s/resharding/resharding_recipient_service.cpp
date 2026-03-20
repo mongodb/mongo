@@ -1336,7 +1336,8 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                         const auto& tempCollIdxSpecs =
                             listIndexesEmptyListIfMissing(opCtx.get(),
                                                           _metadata.getTempReshardingNss(),
-                                                          ListIndexesInclude::kNothing);
+                                                          ListIndexesInclude::kNothing,
+                                                          /*isRawDataRequest=*/true);
                         resharding::verifyIndexSpecsMatch(sourceIdxSpecs.cbegin(),
                                                           sourceIdxSpecs.cend(),
                                                           tempCollIdxSpecs.cbegin(),

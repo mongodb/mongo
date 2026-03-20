@@ -505,19 +505,6 @@ boost::optional<BSONObj> createTimeseriesIndexFromBucketsIndex(
     return boost::none;
 }
 
-std::vector<BSONObj> createTimeseriesIndexesFromBucketsIndexes(
-    const TimeseriesOptions& timeseriesOptions, const std::vector<BSONObj>& bucketsIndexes) {
-    std::vector<BSONObj> indexSpecs;
-    for (const auto& bucketsIndex : bucketsIndexes) {
-        auto timeseriesIndex =
-            createTimeseriesIndexFromBucketsIndex(timeseriesOptions, bucketsIndex);
-        if (timeseriesIndex) {
-            indexSpecs.push_back(timeseriesIndex->getOwned());
-        }
-    }
-    return indexSpecs;
-}
-
 bool shouldIncludeOriginalSpec(const TimeseriesOptions& timeseriesOptions,
                                const BSONObj& bucketsIndex) {
     if (!bucketsIndex.hasField(kKeyFieldName)) {

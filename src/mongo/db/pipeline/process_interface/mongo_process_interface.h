@@ -285,6 +285,10 @@ public:
                                                 StringData host,
                                                 bool addShardName) = 0;
 
+    /**
+     * Returns the complete set of index specifications for the given namespace.
+     * For timeseries collections, returns index specs in their raw format.
+     */
     virtual std::vector<BSONObj> getIndexSpecs(OperationContext* opCtx,
                                                const NamespaceString& ns,
                                                bool includeBuildUUIDs) = 0;

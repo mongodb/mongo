@@ -236,14 +236,6 @@ export var IndexBuildTest = class {
         notReadyIndexes = notReadyIndexes || [];
         options = options || {};
 
-        // The translation logic for indexes on timeseries collections removes in-progress builds
-        // with includeBuildUUIDs: true. Work around it by using rawData mode.
-        // TODO(SERVER-106407): Remove this workaround
-        if (coll.getMetadata().type === "timeseries" && options.includeBuildUUIDs === true) {
-            coll = getTimeseriesCollForRawOps(coll.getDB(), coll);
-            options = {...options, ...getRawOperationSpec(coll.getDB())};
-        }
-
         let res = assert.commandWorked(coll.runCommand("listIndexes", options));
         assert.eq(
             numIndexes,

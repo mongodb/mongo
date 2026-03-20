@@ -45,14 +45,33 @@ namespace mongo {
  */
 enum class MONGO_MOD_NEEDS_REPLACEMENT ListIndexesInclude { kNothing, kBuildUUID, kIndexBuildInfo };
 
+/**
+ * Returns the list of indexes for the given collection.
+ *
+ * If 'isRawDataRequest' is true, indexes on timeseries collections are returned as raw bucket
+ * indexes (i.e. using internal bucket field names such as {control.min.x: 1, control.max.x: 1})
+ * rather than being translated to their user-visible timeseries form (e.g. {x: 1}).
+ */
 MONGO_MOD_PRIVATE std::vector<BSONObj> listIndexesInLock(
     OperationContext* opCtx,
     const CollectionAcquisition& collectionAcquisition,
-    ListIndexesInclude additionalInclude);
+    ListIndexesInclude additionalInclude,
+    bool isRawDataRequest);
 
+
+/**
+ * Retrieves all index specifications for the specified collection.
+ *
+ * If the collection does not exist, returns an empty list.
+ *
+ * If 'isRawDataRequest' is true, indexes on timeseries collections are returned as raw bucket
+ * indexes (i.e. using internal bucket field names such as {control.min.x: 1, control.max.x: 1})
+ * rather than being translated to their user-visible timeseries form (e.g. {x: 1}).
+ */
 MONGO_MOD_NEEDS_REPLACEMENT std::vector<BSONObj> listIndexesEmptyListIfMissing(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nss,
-    ListIndexesInclude additionalInclude);
+    ListIndexesInclude additionalInclude,
+    bool isRawDataRequest);
 
 }  // namespace mongo

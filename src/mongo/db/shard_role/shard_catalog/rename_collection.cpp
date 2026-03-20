@@ -385,8 +385,8 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
     }
     if (options.originalIndexes) {
         // Check target collection indexes match expected.
-        const auto currentIndexes =
-            listIndexesEmptyListIfMissing(opCtx, target, ListIndexesInclude::kNothing);
+        const auto currentIndexes = listIndexesEmptyListIfMissing(
+            opCtx, target, ListIndexesInclude::kNothing, /*isRawDataRequest=*/true);
         status = checkTargetCollectionIndexesMatch(
             target, options.originalIndexes.get(), currentIndexes);
 

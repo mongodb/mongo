@@ -82,14 +82,6 @@ boost::optional<BSONObj> createTimeseriesIndexFromBucketsIndex(
     const TimeseriesOptions& timeseriesOptions, const BSONObj& bucketsIndex);
 
 /**
- * Returns a list of time-series collection index specs equivalent to the given 'bucketsIndexSpecs'
- * using the time-series specifications provided in 'timeseriesOptions'. If any of the buckets
- * indexes is not supported on a time-series collection, it will be omitted from the results.
- */
-std::vector<BSONObj> createTimeseriesIndexesFromBucketsIndexes(
-    const TimeseriesOptions& timeseriesOptions, const std::vector<BSONObj>& bucketsIndexes);
-
-/**
  * Returns true if the original index specification should be included when creating an index on the
  * time-series buckets collection.
  */

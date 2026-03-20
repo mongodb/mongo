@@ -10,6 +10,7 @@
  *     # Persistent storage engine needed for resumable index builds.
  *     requires_persistence,
  *     requires_replication,
+ *     requires_timeseries,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
@@ -161,7 +162,6 @@ const conn = rst.getPrimary();
 const db = conn.getDB("test");
 const collName = jsTestName();
 const coll = db.getCollection(collName);
-coll.drop();
 db.createCollection(collName);
 
 // Add data to the collection so that we don't hit createIndexOnEmptyCollection. This is important
@@ -232,25 +232,19 @@ const buildingOpIdNonResumable = IndexBuildTest.waitForIndexBuildToScanCollectio
     buildingIndexNameNonResumable,
 );
 
-// Wait for the new indexes to appear in listIndexes output.
-// Additionally, wait for the most recent build to show up with a "collection scan" phase.
-assert.soonNoExcept(() => {
-    listIndexesDefaultOutput = assert.commandWorked(db.runCommand({listIndexes: collName})).cursor.firstBatch;
-    assert(listIndexesDefaultOutput.length == 4);
+listIndexesDefaultOutput = assert.commandWorked(db.runCommand({listIndexes: collName})).cursor.firstBatch;
+assert(listIndexesDefaultOutput.length == 4);
 
-    listIndexesIncludeIndexBuildInfoOutput = assert.commandWorked(
-        db.runCommand({listIndexes: collName, includeIndexBuildInfo: true}),
-    ).cursor.firstBatch;
-    const indexBuildWithCollectionScanPhase = listIndexesIncludeIndexBuildInfoOutput.find(
-        (indexInfo) =>
-            indexInfo.spec.name === buildingIndexNameNonResumable &&
-            indexInfo.indexBuildInfo &&
-            indexInfo.indexBuildInfo.phase === 1, // collection scan
-    );
-    assert(indexBuildWithCollectionScanPhase);
-
-    return true;
-});
+listIndexesIncludeIndexBuildInfoOutput = assert.commandWorked(
+    db.runCommand({listIndexes: collName, includeIndexBuildInfo: true}),
+).cursor.firstBatch;
+const indexBuildWithCollectionScanPhase = listIndexesIncludeIndexBuildInfoOutput.find(
+    (indexInfo) =>
+        indexInfo.spec.name === buildingIndexNameNonResumable &&
+        indexInfo.indexBuildInfo &&
+        indexInfo.indexBuildInfo.phase === 1, // collection scan
+);
+assert(indexBuildWithCollectionScanPhase);
 
 // Ensure that the format of the listIndexes output changes as expected in the in-progress index
 // case.
@@ -314,6 +308,88 @@ try {
     );
 } finally {
     fp.off();
+}
+
+// Test listIndexes with includeIndexBuildInfo on a time-series collection.
+//
+// Verifies that:
+//  - Ready indexes return the user-visible timeseries spec inside 'spec' (not the raw bucket spec).
+//  - Ready indexes carry no 'indexBuildInfo' field.
+//  - An in-progress index build on a timeseries collection does carry 'indexBuildInfo'.
+{
+    jsTestLog("Testing listIndexes with includeIndexBuildInfo on a time-series collection.");
+
+    const timeseriesCollName = jsTestName() + "_ts";
+    const timeFieldName = "tm";
+    const metaFieldName = "mm";
+    const tsDb = conn.getDB("test");
+    const tsColl = tsDb.getCollection(timeseriesCollName);
+
+    assert.commandWorked(
+        tsDb.createCollection(timeseriesCollName, {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
+    );
+    const tsReadyIndexName1 = `${metaFieldName}_1_${timeFieldName}_1`;
+
+    // Insert a document so that createIndex does not fast-path through the empty-collection path,
+    // which is important for the in-progress index build case below.
+    assert.commandWorked(tsColl.insert({[timeFieldName]: ISODate(), [metaFieldName]: {tag: "a"}, x: 1}));
+
+    // Create a ready index on the timeseries collection.
+    const tsReadyIndexName2 = "x_1";
+    assert.commandWorked(
+        tsDb.runCommand({
+            createIndexes: timeseriesCollName,
+            indexes: [{key: {x: 1}, name: tsReadyIndexName2}],
+        }),
+    );
+
+    // listIndexes without the flag returns flat index specs with user-visible timeseries keys.
+    const tsWithoutBuildInfo = assert.commandWorked(tsDb.runCommand({listIndexes: timeseriesCollName})).cursor
+        .firstBatch;
+
+    // listIndexes with includeIndexBuildInfo: true must wrap each spec under 'spec'.
+    const tsWithBuildInfo = assert.commandWorked(
+        tsDb.runCommand({listIndexes: timeseriesCollName, includeIndexBuildInfo: true}),
+    ).cursor.firstBatch;
+
+    assertListIndexesOutputsMatch(tsWithoutBuildInfo, tsWithBuildInfo, [tsReadyIndexName1, tsReadyIndexName2], []);
+
+    // Pause index builds and start a new one to exercise the in-progress case on a timeseries
+    // collection.
+    const tsBuildingIndexName = "mm_tag_1";
+    IndexBuildTest.pauseIndexBuilds(conn);
+    const tsAwaitIndexBuild = IndexBuildTest.startIndexBuild(
+        conn,
+        tsColl.getFullName(),
+        {[metaFieldName + ".tag"]: 1},
+        {name: tsBuildingIndexName},
+        [],
+        /*commitQuorum=*/ "votingMembers",
+    );
+    const tsBuildingOpId = IndexBuildTest.waitForIndexBuildToScanCollection(
+        tsDb,
+        timeseriesCollName,
+        tsBuildingIndexName,
+    );
+
+    const tsCurrWithoutBuildInfo = assert.commandWorked(tsDb.runCommand({listIndexes: timeseriesCollName})).cursor
+        .firstBatch;
+    const tsInProgressOutput = assert.commandWorked(
+        tsDb.runCommand({listIndexes: timeseriesCollName, includeIndexBuildInfo: true}),
+    ).cursor.firstBatch;
+    assertListIndexesOutputsMatch(
+        tsCurrWithoutBuildInfo,
+        tsInProgressOutput,
+        [tsReadyIndexName1, tsReadyIndexName2],
+        [tsBuildingIndexName],
+        {[tsBuildingIndexName]: {opid: tsBuildingOpId, resumable: true}},
+    );
+
+    IndexBuildTest.resumeIndexBuilds(conn);
+    IndexBuildTest.waitForIndexBuildToStop(tsDb, timeseriesCollName, tsBuildingIndexName);
+    tsAwaitIndexBuild();
 }
 
 rst.stopSet();

@@ -66,7 +66,6 @@
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/timeseries/catalog_helper.h"
-#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -137,16 +136,15 @@ IndexSpecsWithNamespaceString getIndexSpecsWithNamespaceString(OperationContext*
             fmt::format("ns does not exist: {}", origNssOrUUID.toStringForErrorMsg()),
             collAcq.exists());
 
-    const auto& collectionPtr = collAcq.getCollectionPtr();
     const auto& nss = collAcq.nss();
-    auto indexList = listIndexesInLock(opCtx, collAcq, additionalInclude);
 
+    auto indexList = listIndexesInLock(
+        opCtx, collAcq, additionalInclude, timeseries::isRawDataRequest(opCtx, cmd));
+
+    // For legacy timeseries collections we need to return the view namespace, unless the request
+    // targeted system.buckets directly
+    const auto& collectionPtr = collAcq.getCollectionPtr();
     if (collectionPtr->isTimeseriesCollection()) {
-        if (!timeseries::isRawDataRequest(opCtx, cmd)) {
-            indexList = timeseries::createTimeseriesIndexesFromBucketsIndexes(
-                *collectionPtr->getTimeseriesOptions(), indexList);
-        }
-
         // The cursor namespace should match the namespace the user originally addressed.
         // For legacy timeseries, we rewrite the cursor namespace to the view namespace
         // unless the user directly targeted system.buckets.
@@ -167,8 +165,6 @@ IndexSpecsWithNamespaceString getIndexSpecsWithNamespaceString(OperationContext*
             cmd.getIsTimeseriesNamespace();
 
         if (!collectionPtr->isNewTimeseriesWithoutView() && shouldUseViewNamespace) {
-            // For legacy timeseries collections we need to return the view namespace,
-            // unless the request targeted system.buckets directly
             return std::make_pair(std::move(indexList), nss.getTimeseriesViewNamespace());
         }
     }

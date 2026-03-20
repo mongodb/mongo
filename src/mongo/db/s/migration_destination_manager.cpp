@@ -1048,7 +1048,8 @@ void _dropLocalIndexes(OperationContext* opCtx,
     // Determine which indexes exist on the local collection that don't exist on the donor's
     // collection.
     DBDirectClient client(opCtx);
-    auto indexes = listIndexesEmptyListIfMissing(opCtx, nss, ListIndexesInclude::kNothing);
+    auto indexes = listIndexesEmptyListIfMissing(
+        opCtx, nss, ListIndexesInclude::kNothing, /*isRawDataRequest=*/true);
     for (auto&& recipientIndex : indexes) {
         bool dropIndex = true;
         for (auto&& donorIndex : indexSpecs) {
