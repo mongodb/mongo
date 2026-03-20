@@ -421,15 +421,22 @@ int insertBatch(OperationContext* opCtx,
         int numBytes = 0;
         WriteUnitOfWork wuow(opCtx);
 
-        // Populate 'slots' with new optimes for each insert.
-        // This also notifies the storage engine of each new timestamp.
-        auto oplogSlots = repl::getNextOpTimes(opCtx, batch.size());
-        for (auto [insert, slot] = std::make_pair(batch.begin(), oplogSlots.begin());
-             slot != oplogSlots.end();
-             ++insert, ++slot) {
-            invariant(insert != batch.end());
-            insert->oplogSlot = *slot;
-            numBytes += insert->doc.objsize();
+        // If grouping, the op times will automatically be reserved together on commit.
+        if (wuow.isGroupingOplogEntries()) {
+            for (auto&& insert : batch) {
+                numBytes += insert.doc.objsize();
+            }
+        } else {
+            // Populate 'slots' with new optimes for each insert.
+            // This also notifies the storage engine of each new timestamp.
+            auto oplogSlots = repl::getNextOpTimes(opCtx, batch.size());
+            for (auto [insert, slot] = std::make_pair(batch.begin(), oplogSlots.begin());
+                 slot != oplogSlots.end();
+                 ++insert, ++slot) {
+                invariant(insert != batch.end());
+                insert->oplogSlot = *slot;
+                numBytes += insert->doc.objsize();
+            }
         }
 
         uassertStatusOK(collection_internal::insertDocuments(
