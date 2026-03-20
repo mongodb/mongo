@@ -320,10 +320,4 @@ const char* jsSkipWhiteSpace(const char* raw);
 MONGO_MOD_PUB ScriptEngine* getGlobalScriptEngine();
 MONGO_MOD_PUB void setGlobalScriptEngine(ScriptEngine* impl);
 
-/**
- * Returns true if external scripting is enabled.
- * Default implementation returns false.
- * Enterprise module provides an override that returns the IDL-controlled value.
- */
-bool isExternalScriptingEnabled();
 }  // namespace mongo

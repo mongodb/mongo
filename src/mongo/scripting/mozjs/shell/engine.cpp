@@ -63,10 +63,6 @@ void DisableExtraThreads();
 
 namespace mongo {
 
-bool isExternalScriptingEnabled() {
-    return gEnableExternalScripting;
-}
-
 namespace {
 auto operationMozJSShellRuntimeInterfaceDecoration =
     OperationContext::declareDecoration<mozjs::MozJSImplScope*>();
@@ -74,14 +70,6 @@ auto operationMozJSShellRuntimeInterfaceDecoration =
 
 void ScriptEngine::setup(ExecutionEnvironment environment) {
     if (getGlobalScriptEngine()) {
-        return;
-    }
-
-    // If gEnableExternalScripting is true, don't set up the MozJS engine.
-    if (isExternalScriptingEnabled()) {
-        if (!serverGlobalParams.quiet.load()) {
-            LOGV2_INFO(8972601, "External scripting is enabled. Not setting up MozJS engine.");
-        }
         return;
     }
 
