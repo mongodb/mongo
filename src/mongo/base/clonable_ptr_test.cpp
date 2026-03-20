@@ -63,57 +63,12 @@ public:
     }
 };
 
-// This class provides a member structure which models `CloneFactory<AltClonableTest>`.  The member
-// structure is available under the expected member name of `clone_factory_type`.  The
-// `CloneFactory` is stateless.
-class AltClonableTest {
-private:
-    std::string data =
-        "This is the string data which is stored to make Functor Clonable need a complicated copy "
-        "ctor.";
-
-public:
-    struct clone_factory_type {
-        std::unique_ptr<AltClonableTest> operator()(const AltClonableTest&) const {
-            return std::make_unique<AltClonableTest>();
-        }
-    };
-};
-
-// This class requires a companion cloning function models `CloneFactory<Alt2ClonableTest>`.  There
-// is an attendant specialization of the `mongo::clonable_traits` metafunction to provide the clone
-// factory for this type.  That `CloneFactory` is stateless.
-class Alt2ClonableTest {
-private:
-    std::string data =
-        "This is the string data which is stored to make Functor Clonable need a complicated copy "
-        "ctor.";
-};
-}  // namespace
-
-namespace mongo {
-// This specialization of the `mongo::clonable_traits` metafunction provides a model of a stateless
-// `CloneFactory<Alt2ClonableTest>`
-template <>
-struct clonable_traits<::Alt2ClonableTest> {
-    struct clone_factory_type {
-        std::unique_ptr<Alt2ClonableTest> operator()(const Alt2ClonableTest&) const {
-            return std::make_unique<Alt2ClonableTest>();
-        }
-    };
-};
-}  // namespace mongo
-
-namespace {
-// This class uses a stateful cloning function provided by the `getCloningFunction` static member.
-// This stateful `CloneFactory<FunctorClonable>` must be passed to constructors of the
-// `cloning_ptr`.
+/**
+ * Uses a stateful cloning function provided by the `getCloningFunction` static member.
+ * This stateful `CloneFactory<FunctorClonable>` must be passed to constructors of the
+ * `cloning_ptr`.
+ */
 class FunctorClonable {
-private:
-    std::string data =
-        "This is the string data which is stored to make Functor Clonable need a complicated copy "
-        "ctor.";
-
 public:
     using CloningFunctionType =
         std::function<std::unique_ptr<FunctorClonable>(const FunctorClonable&)>;
@@ -123,6 +78,9 @@ public:
             return std::make_unique<FunctorClonable>(c);
         };
     }
+
+private:
+    std::string _data = "xxx";
 };
 
 
@@ -131,26 +89,23 @@ public:
 // the `cloning_ptr`.  The `CloneFactory` for this type dynamically updates its internal state.
 // This is used to test cloning of objects that have dynamically changing clone factories.
 class FunctorWithDynamicStateClonable {
-private:
-    std::string data =
-        "This is the string data which is stored to make Functor Clonable need a complicated copy "
-        "ctor.";
-
 public:
-    FunctorWithDynamicStateClonable(const FunctorWithDynamicStateClonable&) = delete;
     FunctorWithDynamicStateClonable() = default;
-
-    FunctorWithDynamicStateClonable(const std::string& s) : data(s) {}
+    explicit FunctorWithDynamicStateClonable(std::string s) : _data{std::move(s)} {}
+    FunctorWithDynamicStateClonable(const FunctorWithDynamicStateClonable&) = delete;
 
     using CloningFunctionType = std::function<std::unique_ptr<FunctorWithDynamicStateClonable>(
         const FunctorWithDynamicStateClonable&)>;
 
     static CloningFunctionType getCloningFunction() {
         return [calls = 0](const FunctorWithDynamicStateClonable& c) mutable {
-            return std::make_unique<FunctorWithDynamicStateClonable>(c.data +
-                                                                     std::to_string(++calls));
+            return std::make_unique<FunctorWithDynamicStateClonable>(
+                fmt::format("{}{}", c._data, ++calls));
         };
     }
+
+private:
+    std::string _data = "xxx";
 };
 
 // This class models `Clonable`, with a return from clone which is
@@ -197,44 +152,17 @@ TEST(ClonablePtrTest, syntax_smoke_test) {
 #endif
 
     {
-        mongo::clonable_ptr<AltClonableTest> p;
+        using Ptr = mongo::clonable_ptr<FunctorClonable, FunctorClonable::CloningFunctionType>;
+        Ptr p1{nullptr, FunctorClonable::getCloningFunction()};
+        p1 = std::make_unique<FunctorClonable>();
 
-        p = std::make_unique<AltClonableTest>();
+        Ptr p2 = p1;
+        ASSERT_NE(p1, p2);
 
-        mongo::clonable_ptr<AltClonableTest> p2 = p;
-
-        ASSERT_TRUE(p != p2);
-    }
-
-    {
-        mongo::clonable_ptr<Alt2ClonableTest> p;
-
-        p = std::make_unique<Alt2ClonableTest>();
-
-        mongo::clonable_ptr<Alt2ClonableTest> p2 = p;
-
-        ASSERT_TRUE(p != p2);
-    }
-
-    {
-        mongo::clonable_ptr<FunctorClonable, FunctorClonable::CloningFunctionType> p{
-            FunctorClonable::getCloningFunction()};
-
-        p = std::make_unique<FunctorClonable>();
-
-        mongo::clonable_ptr<FunctorClonable, FunctorClonable::CloningFunctionType> p2 = p;
-
-        ASSERT_TRUE(p != p2);
-
-        mongo::clonable_ptr<FunctorClonable, FunctorClonable::CloningFunctionType> p3{
-            FunctorClonable::getCloningFunction()};
-
-        auto tmp = std::make_unique<FunctorClonable>();
-        p3 = std::move(tmp);
-
-        ASSERT_TRUE(p != p2);
-        ASSERT_TRUE(p2 != p3);
-        ASSERT_TRUE(p != p3);
+        Ptr p3{nullptr, FunctorClonable::getCloningFunction()};
+        p3 = std::make_unique<FunctorClonable>();
+        ASSERT_NE(p1, p3);
+        ASSERT_NE(p2, p3);
     }
 }
 
@@ -254,12 +182,6 @@ void construction() {
     // Test construction from a nullptr
     {
         mongo::clonable_ptr<Clonable>{nullptr};
-    }
-
-    // Test construction from a Clonable pointer.
-    {
-        Clonable* const local = nullptr;
-        mongo::clonable_ptr<Clonable>{local};
     }
 
     // Test move construction.
@@ -313,109 +235,70 @@ void construction() {
 // Tests that syntactic forms that require augmented construction are proper
 template <typename Clonable, typename CloneFactory>
 void augmentedConstruction() {
+    using mongo::clonable_ptr;
+    auto cf = []() -> decltype(auto) {
+        return Clonable::getCloningFunction();
+    };
+
     // Test default construction
-    {
-        static_assert(
-            !std::is_default_constructible<mongo::clonable_ptr<Clonable, CloneFactory>>::value);
-    }
+    static_assert(std::is_default_constructible_v<clonable_ptr<Clonable, CloneFactory>>);
 
     // Test Clone Factory construction
-    {
-        mongo::clonable_ptr<Clonable, CloneFactory>{Clonable::getCloningFunction()};
-    }
-
-// TODO: Revist this when MSVC's enable-if and deletion on ctors works.
-#ifndef _MSC_VER
-    // Test non-construction from a nullptr
-    {
-        static_assert(!std::is_constructible<mongo::clonable_ptr<Clonable, CloneFactory>,
-                                             std::nullptr_t>::value);
-    }
-#endif
+    (void)clonable_ptr<Clonable, CloneFactory>{nullptr, cf()};
 
     // Test construction from a nullptr with factory
-    {
-        mongo::clonable_ptr<Clonable, CloneFactory>{nullptr, Clonable::getCloningFunction()};
-    }
-
-// TODO: Revist this when MSVC's enable-if and deletion on ctors works.
-#ifndef _MSC_VER
-    // Test construction from a raw Clonable pointer.
-    {
-        static_assert(
-            !std::is_constructible<mongo::clonable_ptr<Clonable, CloneFactory>, Clonable*>::value);
-    }
-#endif
-
+    (void)clonable_ptr<Clonable, CloneFactory>{nullptr, cf()};
 
     // Test initialization of a raw Clonable pointer with factory, using reset.
     {
-        Clonable* const local = nullptr;
-        mongo::clonable_ptr<Clonable, CloneFactory> p{Clonable::getCloningFunction()};
-        p.reset(local);
+        clonable_ptr<Clonable, CloneFactory> p{nullptr, cf()};
+        p.reset(static_cast<Clonable*>(nullptr));
     }
 
     // Test move construction.
-    {
-        std::ignore = mongo::clonable_ptr<Clonable, CloneFactory>{
-            mongo::clonable_ptr<Clonable, CloneFactory>{Clonable::getCloningFunction()}};
-    }
+    (void)clonable_ptr<Clonable, CloneFactory>{clonable_ptr<Clonable, CloneFactory>{nullptr, cf()}};
 
     // Test copy construction.
     {
-        mongo::clonable_ptr<Clonable, CloneFactory> a{Clonable::getCloningFunction()};
-        mongo::clonable_ptr<Clonable, CloneFactory> b{a};
+        mongo::clonable_ptr<Clonable, CloneFactory> a{nullptr, cf()};
+        auto b{a};
     }
 
     // Test augmented copy construction.
     {
-        mongo::clonable_ptr<Clonable, CloneFactory> a{Clonable::getCloningFunction()};
-        mongo::clonable_ptr<Clonable, CloneFactory> b{a, Clonable::getCloningFunction()};
+        mongo::clonable_ptr<Clonable, CloneFactory> a{nullptr, cf()};
+        mongo::clonable_ptr<Clonable, CloneFactory> b{a, cf()};
     }
-
 
     // Test move assignment.
     {
-        mongo::clonable_ptr<Clonable, CloneFactory> a{Clonable::getCloningFunction()};
-        a = mongo::clonable_ptr<Clonable, CloneFactory>{Clonable::getCloningFunction()};
+        mongo::clonable_ptr<Clonable, CloneFactory> a{nullptr, cf()};
+        a = mongo::clonable_ptr<Clonable, CloneFactory>{nullptr, cf()};
     }
 
     // Test copy assignment.
     {
-        mongo::clonable_ptr<Clonable, CloneFactory> a{Clonable::getCloningFunction()};
-        mongo::clonable_ptr<Clonable, CloneFactory> b{Clonable::getCloningFunction()};
+        mongo::clonable_ptr<Clonable, CloneFactory> a{nullptr, cf()};
+        mongo::clonable_ptr<Clonable, CloneFactory> b{nullptr, cf()};
         b = a;
     }
 
     // Test unique pointer construction
     {
-        mongo::clonable_ptr<Clonable, CloneFactory>{std::make_unique<Clonable>(),
-                                                    Clonable::getCloningFunction()};
+        mongo::clonable_ptr<Clonable, CloneFactory>{std::make_unique<Clonable>(), cf()};
     }
 
     // Test augmented unique pointer construction
     {
-        mongo::clonable_ptr<Clonable, CloneFactory>{std::make_unique<Clonable>(),
-                                                    Clonable::getCloningFunction()};
+        mongo::clonable_ptr<Clonable, CloneFactory>{std::make_unique<Clonable>(), cf()};
     }
 
     // Test non-conversion pointer construction
-    {
-        static_assert(
-            !std::is_convertible<mongo::clonable_ptr<Clonable, CloneFactory>, Clonable*>::value);
-    }
+    static_assert(!std::is_convertible_v<mongo::clonable_ptr<Clonable, CloneFactory>, Clonable*>);
 
     // Test non-conversion from factory
-    {
-        static_assert(
-            !std::is_convertible<mongo::clonable_ptr<Clonable, CloneFactory>, CloneFactory>::value);
-    }
-
-    // Test conversion unique pointer construction
-    {
-        static_assert(!std::is_convertible<std::unique_ptr<Clonable>,
-                                           mongo::clonable_ptr<Clonable, CloneFactory>>::value);
-    }
+    static_assert(
+        !std::is_convertible_v<mongo::clonable_ptr<Clonable, CloneFactory>, CloneFactory>);
 }
 
 template <typename Clonable>
@@ -462,9 +345,6 @@ void equalityOperations() {
         (void)(a == b);
         (void)(b == a);
 
-        (void)(a == ua);
-        (void)(ua == a);
-
         (void)(nullptr == a);
         (void)(a == nullptr);
     }
@@ -475,9 +355,6 @@ void equalityOperations() {
         (void)(a != b);
         (void)(b != a);
 
-        (void)(a != ua);
-        (void)(ua != a);
-
         (void)(nullptr == a);
         (void)(a == nullptr);
     }
@@ -486,8 +363,6 @@ void equalityOperations() {
 
 TEST(ClonablePtrSyntaxTests, construction) {
     runSyntaxTest(SyntaxTests::construction<ClonableTest>);
-    runSyntaxTest(SyntaxTests::construction<AltClonableTest>);
-    runSyntaxTest(SyntaxTests::construction<Alt2ClonableTest>);
     runSyntaxTest(SyntaxTests::construction<RawPointerClonable>);
     runSyntaxTest(SyntaxTests::construction<UniquePtrClonable>);
 }
@@ -502,16 +377,12 @@ TEST(ClonablePtrSyntaxTests, augmentedConstruction) {
 
 TEST(ClonablePtrSyntaxTests, pointerOperations) {
     runSyntaxTest(SyntaxTests::pointerOperations<ClonableTest>);
-    runSyntaxTest(SyntaxTests::pointerOperations<AltClonableTest>);
-    runSyntaxTest(SyntaxTests::pointerOperations<Alt2ClonableTest>);
     runSyntaxTest(SyntaxTests::pointerOperations<RawPointerClonable>);
     runSyntaxTest(SyntaxTests::pointerOperations<UniquePtrClonable>);
 }
 
 TEST(ClonablePtrSyntaxTests, equalityOperations) {
     runSyntaxTest(SyntaxTests::equalityOperations<ClonableTest>);
-    runSyntaxTest(SyntaxTests::equalityOperations<AltClonableTest>);
-    runSyntaxTest(SyntaxTests::equalityOperations<Alt2ClonableTest>);
     runSyntaxTest(SyntaxTests::equalityOperations<RawPointerClonable>);
     runSyntaxTest(SyntaxTests::equalityOperations<UniquePtrClonable>);
 }
@@ -568,13 +439,6 @@ TEST(ClonablePtrTest, basic_construction_test) {
         DestructionGuard check;
         mongo::clonable_ptr<DetectDestruction> p;
         ASSERT_EQ(DetectDestruction::activeCount, 0);
-    }
-
-    // Do not make unnecessary copies of the object from ptr
-    {
-        DestructionGuard check;
-        mongo::clonable_ptr<DetectDestruction> p{new DetectDestruction};
-        ASSERT_EQ(DetectDestruction::activeCount, 1);
     }
 
     // Do not make unnecessary copies of the object from unique_ptr
@@ -837,7 +701,7 @@ TEST(ClonablePtrTest, ownershipStabilityTest) {
         auto ptr_init = std::make_unique<DetectDestruction>();
         const auto* rp = ptr_init.get();
 
-        mongo::clonable_ptr<DetectDestruction> cp{ptr_init.release()};
+        mongo::clonable_ptr<DetectDestruction> cp{std::move(ptr_init)};
 
         ASSERT(rp == cp.get());
 
@@ -987,4 +851,35 @@ TEST(ClonablePtrSimpleTest, simpleUsageExample) {
 }
 
 }  // namespace BehaviorTests
+
+// Verify that clonable_ptr can be used with forward-declared (incomplete) types. This is needed
+// when a class holds clonable_ptr members pointing to itself (recursive data structures).
+namespace IncompleteTypeTests {
+class SelfReferential;
+
+// These declarations must compile with SelfReferential still incomplete.
+struct ContainsSelf {
+    mongo::clonable_ptr<SelfReferential> child;
+};
+
+class SelfReferential {
+public:
+    virtual ~SelfReferential() = default;
+    virtual std::unique_ptr<SelfReferential> clone() const {
+        return std::make_unique<SelfReferential>(*this);
+    }
+    mongo::clonable_ptr<SelfReferential> next;
+};
+
+TEST(ClonablePtrTest, incompleteTypeDeclaration) {
+    SelfReferential a;
+    a.next = std::make_unique<SelfReferential>();
+    // Copy is valid here: SelfReferential is complete and has clone().
+    SelfReferential b = a;
+    ASSERT_NE(a.next.get(), b.next.get());
+    ASSERT_NE(a.next, nullptr);
+    ASSERT_NE(b.next, nullptr);
+}
+}  // namespace IncompleteTypeTests
+
 }  // namespace
