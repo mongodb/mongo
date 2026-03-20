@@ -374,6 +374,207 @@ export function makeMetricStreamArb(minLength = 0, maxLength = 20, ranges = {}, 
     }
     return fc.oneof(...arbs);
 }
+
+/**
+ * Metric stream arbitrary that produces run* of values, where each run is either:
+ *  - a repetition of the same value, or
+ *  - a monotonic sequence (increasing or decreasing)
+ *
+ * @param {fc.Arbitrary<any>} metricArb - generates a single metric value
+ * @param {Object} [opts]
+ * @param {number} [opts.minLength=0]
+ * @param {number} [opts.maxLength=20]
+ * @param {number} [opts.maxRuns=6]
+ * @param {number} [opts.maxRunLength=8]
+ * @param {number} [opts.stepMax=10] - max absolute step for numeric/date/string monotone runs
+ * @param {number} [opts.maxMonoStringBytes=16] - max ASCII byte length treated as unsigned 16-byte integer
+ * @returns {fc.Arbitrary<any[]>}
+ */
+export function makeRunnyMetricStreamArb(metricArb, opts = {}) {
+    const {minLength = 0, maxLength = 20, maxRuns = 6, maxRunLength = 8, stepMax = 10, maxMonoStringBytes = 16} = opts;
+
+    assert(minLength >= 0, "minLength must be non-negative");
+
+    function isAsciiString(s) {
+        for (let i = 0; i < s.length; i++) {
+            if (s.charCodeAt(i) > 0x7f) return false;
+        }
+        return true;
+    }
+
+    /**
+     * Represent strings of 16 or less bytes  as an unsigned width-byte integer, big-endian, with s
+     * occupying the least-significant bytes (left pad with 0x00). This is intended to mirror the
+     * bsoncolumn encoding of short strings.
+     *
+     * @param {string} s
+     * @param {number} width
+     * @returns {bigint}
+     */
+    function string16ToBigInt(s, width) {
+        const bytes = new Array(width).fill(0);
+        const start = width - s.length;
+        for (let i = 0; i < s.length; i++) {
+            bytes[start + i] = s.charCodeAt(i) & 0xff;
+        }
+
+        let x = 0n;
+        for (const b of bytes) {
+            x = (x << 8n) | BigInt(b);
+        }
+        return x;
+    }
+
+    /**
+     * Inverse of string16ToBigInt, clamping into the width-byte space as needed.
+     *
+     * @param {bigint} x
+     * @param {number} width
+     * @returns {string}
+     */
+    function bigIntToString16(x, width) {
+        // Clamp into [0, 2^(8*width)-1] to keep fixed width.
+        const mod = 1n << BigInt(8 * width);
+        let y = x % mod;
+        if (y < 0) y += mod;
+
+        // Extract big-endian bytes.
+        const bytes = new Array(width);
+        for (let i = width - 1; i >= 0; i--) {
+            bytes[i] = Number(y & 0xffn);
+            y >>= 8n;
+        }
+
+        // Strip leading 0x00 padding.
+        let start = 0;
+        while (start < width && bytes[start] === 0) start++;
+
+        const slice = bytes.slice(start);
+        return String.fromCharCode(...slice);
+    }
+
+    /**
+     * Determine the "domain" of a metric value for the purposes of run generation. This determines how we
+     * convert to/from number for monotone step generation, and also determines when we degrade to repeat runs
+     *
+     * @param {object} v
+     * @returns {string} - "date", "number", "long", "decimal", "string16", or "other"
+     */
+    function domainOf(v) {
+        if (v instanceof Date) return "date";
+        if (typeof v === "number") return "number";
+        if (typeof NumberLong === "function" && v instanceof NumberLong) return "long";
+        if (typeof NumberDecimal === "function" && v instanceof NumberDecimal) return "decimal";
+        if (typeof v === "string" && isAsciiString(v) && v.length <= maxMonoStringBytes) return "string16";
+        return "other";
+    }
+
+    /**
+     * Convert a metric value to a number for the purposes of monotone step generation.
+     * @param {string} domain
+     * @returns {number|bigint}
+     */
+    function toNumber(v, domain) {
+        switch (domain) {
+            case "number":
+                return v;
+            case "date":
+                return v.getTime();
+            case "long":
+                return typeof v.toNumber === "function" ? v.toNumber() : Number(v);
+            case "decimal":
+                return Number(v.toString());
+            case "string16":
+                return string16ToBigInt(v, maxMonoStringBytes);
+            default:
+                return NaN;
+        }
+    }
+
+    /**
+     * Convert a number back to a metric value after monotone step generation.
+     *
+     * @param {number|bigint} x
+     * @param {string} domain
+     * @returns {object}
+     */
+    function fromNumber(x, domain) {
+        switch (domain) {
+            case "number":
+                return x;
+            case "date":
+                return new Date(Math.trunc(x));
+            case "long":
+                return NumberLong(String(Math.trunc(x)));
+            case "decimal":
+                return NumberDecimal(String(x));
+            case "string16":
+                return bigIntToString16(x, maxMonoStringBytes);
+            default:
+                return x;
+        }
+    }
+
+    const targetLenArb = fc.integer({min: minLength, max: maxLength});
+
+    const runDescArb = fc.record({
+        kind: fc.constantFrom("repeat", "mono"),
+        len: fc.integer({min: 1, max: maxRunLength}),
+        dir: fc.constantFrom(1, -1),
+        step: fc.integer({min: 0, max: stepMax}),
+    });
+
+    return targetLenArb.chain((targetLen) => {
+        if (targetLen === 0) return fc.constant([]);
+
+        const runsArb = fc.array(runDescArb, {minLength: 1, maxLength: maxRuns});
+
+        return fc.tuple(metricArb, runsArb).map(([seedValue, runs]) => {
+            const out = [];
+            let cur = seedValue;
+
+            // If the initial value isn't monotone-capable, all mono runs degrade to repeat.
+            const seedDomain = domainOf(seedValue);
+
+            for (const r of runs) {
+                if (out.length >= targetLen) break;
+
+                const remaining = targetLen - out.length;
+                const runLen = Math.min(r.len, remaining);
+
+                if (r.kind === "repeat" || seedDomain === "other") {
+                    for (let i = 0; i < runLen; i++) out.push(cur);
+                    continue;
+                }
+
+                const domain = domainOf(cur);
+                if (domain === "other") {
+                    for (let i = 0; i < runLen; i++) out.push(cur);
+                    continue;
+                }
+
+                let x = toNumber(cur, domain);
+
+                for (let i = 0; i < runLen; i++) {
+                    out.push(fromNumber(x, domain));
+                    if (domain === "string16") {
+                        x = x + BigInt(r.dir * r.step);
+                    } else {
+                        x = x + r.dir * r.step;
+                    }
+                }
+
+                cur = out[out.length - 1];
+            }
+
+            // If we didn't fill completely, pad by repeating the last value.
+            while (out.length < targetLen) out.push(cur);
+
+            return out;
+        });
+    });
+}
+
 /**
  * Simple defaults if you just want "some" ts-style docs.
  * (metaValue omitted -> meta chosen from metric arb per doc/stream)

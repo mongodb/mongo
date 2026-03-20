@@ -8,6 +8,7 @@ import {
     makeMetricArb,
     makeSensorDateMetricStreamArb,
     makeMetricStreamArb,
+    makeRunnyMetricStreamArb,
 } from "jstests/write_path/timeseries/pbt/lib/metric_arbitraries.js";
 
 /**
@@ -174,6 +175,7 @@ export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaVa
         fieldNameArb = fc.string({minLength: 1, maxLength: 8}),
         timeBucketing = "hours",
     } = options.ranges ?? {};
+    const runFrequency = options.runFrequency ?? 0;
     const explicitArbitraries = options.explicitArbitraries ?? {};
 
     const defaultDateMin = new Date("1970-01-01T00:00:00.000Z");
@@ -205,6 +207,9 @@ export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaVa
     // Arbitrary that picks the meta value used for this entire stream
     const metaValueArb = metaValue !== undefined ? fc.constant(metaValue) : parentMetricArb;
 
+    const rf = Math.max(0, Math.min(1, Number(runFrequency)));
+    const useRunnyMetricsArb = fc.double({min: 0, max: 1}).map((d) => d < rf);
+
     return fc.tuple(fieldNamesArb, docCountArb, metaValueArb).chain(([fieldNames, docCount, chosenMetaValue]) => {
         if (docCount === 0) {
             return fc.constant([]);
@@ -220,17 +225,19 @@ export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaVa
 
         const metaStreamArb = fc.array(fc.constant(chosenMetaValue), {minLength: docCount, maxLength: docCount});
 
-        // Extra fields: each gets a metric stream built via makeMetricStreamArb
+        // Extra fields: each gets a metric stream built via makeMetricStreamArb or makeRunnyMetricStreamArb. We set both minLength and maxLength
         // with minLength = maxLength = docCount, so every stream[i] is defined.
         let extraFieldStreamArbs = {};
         for (const fieldName of fieldNames) {
-            extraFieldStreamArbs[fieldName] = makeMetricStreamArb(docCount, docCount, {
+            const runnyArb = makeRunnyMetricStreamArb(parentMetricArb, {minLength: docCount, maxLength: docCount});
+            const plainArb = makeMetricStreamArb(docCount, docCount, {
                 intRange,
                 doubleRange,
                 longRange,
                 decimalRange,
                 dateRange: {min: dateMin, max: dateMax},
             });
+            extraFieldStreamArbs[fieldName] = useRunnyMetricsArb.chain((useRunny) => (useRunny ? runnyArb : plainArb));
         }
 
         for (const [fieldName, factory] of Object.entries(explicitArbitraries)) {
