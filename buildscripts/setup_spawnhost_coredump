@@ -48,6 +48,9 @@ bash $HOME_DIR/src/evergreen/functions/venv_setup.sh
 . $HOME_DIR/src/evergreen/prelude.sh
 activate_venv
 
+# Remote the `oauth` block from ~/.evergreen.yml, forcing the use of a static API key.
+$python -c "import yaml, pathlib; p = pathlib.Path.home() / '.evergreen.yml'; d = yaml.safe_load(p.read_text()); d.pop('oauth', None); p.write_text(yaml.dump(d))"
+
 # gdb is dynamically linked against libpython and therefore always uses the site-packages of the base installation. 
 # See SERVER-81122 for details
 ${TOOLCHAIN_ROOT}/bin/python3 -m pip install pymongo
