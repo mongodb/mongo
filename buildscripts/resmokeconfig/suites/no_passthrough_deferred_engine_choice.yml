@@ -15,6 +15,9 @@ selector:
   exclude_files:
     - jstests/noPassthrough/libs/**/*.js
 
+    # TODO SERVER-122318 Investigate failure when deferred engine selection flag is enabled.
+    - jstests/noPassthrough/timeseries/query/timeseries_group_bson_types.js
+
     # TODO SERVER-121809 Add scoped debug info for query planner params in new get executor
     - jstests/noPassthrough/query/query_planner_params_diagnostics.js
 
