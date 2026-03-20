@@ -307,6 +307,7 @@ private:
  */
 struct LetVariable {
     LetVariable(std::string name, boost::intrusive_ptr<Expression> expression, Variables::Id id);
+    LetVariable cloneUsingNewExpCtx(ExpressionContext* newExpCtx) const;
 
     std::string name;
     boost::intrusive_ptr<Expression> expression;

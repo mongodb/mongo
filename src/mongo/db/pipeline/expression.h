@@ -258,6 +258,14 @@ public:
     virtual boost::intrusive_ptr<Expression> clone() const = 0;
 
     /**
+     * Every node in the expression tree maintains an unowned pointer to the query's
+     * ExpressionContext. This variant of clone() creates a deep copy of the expression tree where
+     * every node in the tree points to newExprCtx (instead of whatever expression context it used
+     * to point to).
+     */
+    boost::intrusive_ptr<Expression> cloneUsingNewExpCtx(ExpressionContext* newExpCtx) const;
+
+    /**
      * Serialize the Expression tree recursively.
      *
      * If 'explain' is false, the returned Value must result in the same Expression when parsed by

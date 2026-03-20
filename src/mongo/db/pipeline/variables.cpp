@@ -524,4 +524,9 @@ std::pair<LegacyRuntimeConstants, BSONObj> VariablesParseState::transitionalComp
 
     return {vars.transitionalExtractRuntimeConstants(), bob.obj()};
 }
+
+LetVariable LetVariable::cloneUsingNewExpCtx(ExpressionContext* newExpCtx) const {
+    auto clonedExpr = expression ? expression->cloneUsingNewExpCtx(newExpCtx) : nullptr;
+    return {name, std::move(clonedExpr), id};
+}
 }  // namespace mongo

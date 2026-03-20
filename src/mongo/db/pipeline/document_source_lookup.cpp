@@ -412,7 +412,6 @@ DocumentSourceLookUp::DocumentSourceLookUp(const DocumentSourceLookUp& original,
                                                 boost::none,
                                                 original._fromExpCtx->getView())),
       _userPipeline(original._userPipeline),
-      _letVariables(original._letVariables),
       _sharedState(std::make_shared<LookUpSharedState>()) {
     _additionalFilter = original._additionalFilter;
     _sharedState->resolvedPipeline = original._sharedState->resolvedPipeline;
@@ -426,11 +425,23 @@ DocumentSourceLookUp::DocumentSourceLookUp(const DocumentSourceLookUp& original,
         _unwindSrc =
             static_cast<DocumentSourceUnwind*>(original._unwindSrc->clone(getExpCtx()).get());
     }
+    // clone let variables with new expCtx in case the original expCtx is deleted.
+    copyLetVariablesWithNewExpCtx(original._letVariables, newExpCtx.get());
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::clone(
     const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const {
     return make_intrusive<DocumentSourceLookUp>(*this, newExpCtx);
+}
+
+void DocumentSourceLookUp::copyLetVariablesWithNewExpCtx(const std::vector<LetVariable>& src,
+                                                         ExpressionContext* newExpCtx) {
+    _letVariables.clear();
+    _letVariables.reserve(src.size());
+
+    for (const auto& var : src) {
+        _letVariables.emplace_back(var.cloneUsingNewExpCtx(newExpCtx));
+    }
 }
 
 void validateLookupCollectionlessPipeline(const std::vector<BSONObj>& pipeline) {

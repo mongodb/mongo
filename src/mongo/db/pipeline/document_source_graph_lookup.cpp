@@ -343,6 +343,10 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
       _fromPipeline(original._fromPipeline),
       _variables(original._variables),
       _variablesParseState(original._variablesParseState.copyWith(_variables.useIdGenerator())) {
+    if (_params.startWith) {
+        // re-create startWith expression using newExpCtx.
+        _params.startWith = _params.startWith->cloneUsingNewExpCtx(newExpCtx.get());
+    }
     if (original._unwind) {
         _unwind =
             static_cast<DocumentSourceUnwind*>(original._unwind.value()->clone(getExpCtx()).get());
