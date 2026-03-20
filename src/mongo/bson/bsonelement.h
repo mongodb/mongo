@@ -639,8 +639,14 @@ public:
             return binData(len);
         } else {
             // Skip extra size
-            len = valuestrsize() - 4;
-            return value() + 5 + 4;
+            auto ssize = valuestrsize();
+            if (ssize >= 4) {
+                len = ssize - 4;
+                return value() + 5 + 4;
+            } else {
+                len = 0;
+                return nullptr;
+            }
         }
     }
 
