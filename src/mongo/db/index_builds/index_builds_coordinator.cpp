@@ -815,6 +815,13 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
                 const bool isRecoveringAsStandalone =
                     replCoord->getSettings().shouldRecoverFromOplogAsStandalone();
 
+                // If we're running magic restore, then we MUST be running magic restore in classic
+                // mode.
+                invariant(!storageGlobalParams.magicRestore ||
+                          (storageGlobalParams.magicRestore &&
+                           rss::ReplicatedStorageService::get(opCtx->getServiceContext())
+                               .getPersistenceProvider()
+                               .supportsClassicMagicRestore()));
                 // During standalone recovery and magic restore, there will be no oplog
                 // application to drive the index build to completion.
                 return isRecoveringAsStandalone || storageGlobalParams.magicRestore;
