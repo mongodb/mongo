@@ -90,6 +90,11 @@ public:
         // Disable table logging. When table logging is enabled, timestamps are discarded by the
         // storage engine.
         storageGlobalParams.forceDisableTableLogging = true;
+
+        // We advance the timestamp to whatever was last set for the stable timestamp.
+        auto stableTimestamp = _opCtx.getServiceContext()->getStorageEngine()->getStableTimestamp();
+        timestampToUse = std::max(stableTimestamp, timestampToUse);
+
         _opCtx.getServiceContext()->getStorageEngine()->setInitialDataTimestamp(timestampToUse);
     }
 

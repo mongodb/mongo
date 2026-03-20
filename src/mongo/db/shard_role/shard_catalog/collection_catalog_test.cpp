@@ -2079,6 +2079,60 @@ TEST_F(CollectionCatalogTimestampTest, CollectionLifetimeTiedToStorageTransactio
     }
 }
 
+TEST_F(CollectionCatalogTimestampTest, OpenCollectionAlwaysForTesting) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPerformDeepCopyOfCollections", true);
+
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+
+    {
+        const Timestamp readTimestamp(20, 20);
+        OneOffRead oor(opCtx.get(), readTimestamp);
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
+
+        auto coll = CollectionCatalog::get(opCtx.get())
+                        ->establishConsistentCollection(opCtx.get(), nss, readTimestamp);
+        ASSERT(coll);
+
+        const auto& openedColls = OpenedCollections::get(opCtx.get());
+        auto openedColl = openedColls.lookupByNamespace(nss);
+        ASSERT_EQ(openedColl->get(), coll.get());
+    }
+
+    const auto& openedColls = OpenedCollections::get(opCtx.get());
+    ASSERT_FALSE(openedColls.lookupByNamespace(nss));
+}
+
+#if __has_feature(thread_sanitizer) || __has_feature(address_sanitizer) || \
+    __has_feature(memory_sanitizer)
+TEST_F(CollectionCatalogTimestampTest, OpenCollectionAlwaysForSanitizerBuilds) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+
+    {
+        const Timestamp readTimestamp(20, 20);
+        OneOffRead oor(opCtx.get(), readTimestamp);
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
+
+        auto coll = CollectionCatalog::get(opCtx.get())
+                        ->establishConsistentCollection(opCtx.get(), nss, readTimestamp);
+        ASSERT(coll);
+
+        const auto& openedColls = OpenedCollections::get(opCtx.get());
+        auto openedColl = openedColls.lookupByNamespace(nss);
+        ASSERT_EQ(openedColl->get(), coll.get());
+    }
+
+    const auto& openedColls = OpenedCollections::get(opCtx.get());
+    ASSERT_FALSE(openedColls.lookupByNamespace(nss));
+}
+#endif
+
 TEST_F(CollectionCatalogTimestampTest, EstablishConsistentCollectionReadYourWrites) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     const Timestamp createCollectionTs = Timestamp(10, 10);

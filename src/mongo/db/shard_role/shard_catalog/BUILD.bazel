@@ -26,6 +26,15 @@ mongo_cc_library(
 )
 
 idl_generator(
+    name = "server_parameters_gen",
+    src = "server_parameters.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
     name = "collection_options_gen",
     src = "collection_options.idl",
     hdrs = [
@@ -101,6 +110,7 @@ mongo_cc_library(
     srcs = [
         "collection_catalog.cpp",
         "historical_catalogid_tracker.cpp",
+        "server_parameters_gen",
         "uncommitted_catalog_updates.cpp",
         "uncommitted_multikey.cpp",
         "views_for_database.cpp",
