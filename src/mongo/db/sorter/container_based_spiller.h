@@ -31,6 +31,7 @@
 
 #include "mongo/db/collection_crud/container_write.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_template_defs.h"
@@ -369,6 +370,7 @@ public:
                   opCtx, ru, collection, container, stats, 1, std::move(dbName), checksumVersion),
               minAvailableDiskBytesToSpill),
           _opCtx(opCtx),
+          _ru(ru),
           _batchSize(batchSize) {}
 
     void mergeSpills(const SortOptions& opts,
@@ -445,23 +447,28 @@ private:
         const SorterSpillerBase<Key, Value, Comparator>::Settings& settings,
         std::span<std::pair<Key, Value>> data) override {
         auto writer = this->_storage->makeWriter(opts, settings);
-        int64_t numAdded = 0;
-        boost::optional<WriteUnitOfWork> wuow{boost::in_place_init, &_opCtx};
-        for (auto&& [key, value] : data) {
-            writer->addAlreadySorted(key, value);
-            ++numAdded;
-            ++_current;
-            if (numAdded % _batchSize == 0) {
-                wuow->commit();
-                wuow.emplace(&_opCtx);
-            }
+
+        for (size_t i = 0; i < data.size(); i += _batchSize) {
+            auto batch =
+                data.subspan(i, i + _batchSize < data.size() ? _batchSize : std::dynamic_extent);
+            writeConflictRetry(
+                &_opCtx, _ru, "ContainerBasedSpiller::_spill", NamespaceString::kEmpty, [&] {
+                    WriteUnitOfWork wuow{&_opCtx};
+                    for (auto&& [key, value] : batch) {
+                        writer->addAlreadySorted(key, value);
+                    }
+                    wuow.commit();
+                });
         }
-        wuow->commit();
+
+        _current += data.size();
         _containerBasedStorage().updateCurrKey(_current);
+
         return std::move(writer);
     }
 
     OperationContext& _opCtx;
+    RecoveryUnit& _ru;
     int64_t _batchSize;
     int64_t _current = 1;
 };
