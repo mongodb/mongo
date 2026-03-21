@@ -325,10 +325,10 @@ private:
         bool errorAndLogValidationDisabled =
             (gFeatureFlagErrorAndLogValidationAction.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
                 requestedVersion, originalVersion));
-        bool constraintValidationLevelDisabled =
-            (gFeatureFlagConstraintValidationLevel.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
+        bool validatedValidationLevelDisabled =
+            (gFeatureFlagValidatedValidationLevel.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
                 requestedVersion, originalVersion));
-        if (errorAndLogValidationDisabled || constraintValidationLevelDisabled) {
+        if (errorAndLogValidationDisabled || validatedValidationLevelDisabled) {
             for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
                 Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
                 catalog::forEachCollectionFromDb(
@@ -347,13 +347,12 @@ private:
                         uassert(ErrorCodes::CannotDowngrade,
                                 fmt::format(
                                     "Cannot downgrade the cluster when there are collections with "
-                                    "'constraint' validation level. Please unset the option or "
+                                    "'validated' validation level. Please unset the option or "
                                     "drop the collection(s) before downgrading. First detected "
-                                    "collection with 'constraint' enabled: {} (UUID: {}).",
+                                    "collection with 'validated' enabled: {} (UUID: {}).",
                                     collection->ns().toStringForErrorMsg(),
                                     collection->uuid().toString()),
-                                collection->getValidationLevel() !=
-                                    ValidationLevelEnum::constraint);
+                                collection->getValidationLevel() != ValidationLevelEnum::validated);
 
                         return true;
                     });

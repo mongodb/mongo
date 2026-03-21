@@ -120,9 +120,9 @@ feature_flags:
         default: true
         version: 8.1
         fcv_gated: true
-    featureFlagConstraintValidationLevel:
-        description: "Enables the use of the constraint schema validation level."
-        cpp_varname: gFeatureFlagConstraintValidationLevel
+    featureFlagValidatedValidationLevel:
+        description: "Enables the use of the validated schema validation level."
+        cpp_varname: gFeatureFlagValidatedValidationLevel
         default: false
         fcv_gated: true
     featureFlagDistinguishMetadataInconsistencyFromConflictingOperation:

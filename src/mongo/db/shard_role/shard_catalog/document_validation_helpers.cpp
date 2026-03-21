@@ -40,10 +40,9 @@ Status checkValidationOptionsCanBeUsed(const CollectionOptions& opts,
     auto validationLevel = validationLevelOrCurrent(opts, newLevel);
     if (opts.encryptedFieldConfig) {
         if (!validationLevelIsMandatory(validationLevel)) {
-            return Status(
-                ErrorCodes::BadValue,
-                "Validation levels other than 'strict' or 'constraint' are not allowed on "
-                "encrypted collections");
+            return Status(ErrorCodes::BadValue,
+                          "Validation levels other than 'strict' or 'validated' are not allowed on "
+                          "encrypted collections");
         }
         if (validationAction == ValidationActionEnum::warn ||
             validationAction == ValidationActionEnum::errorAndLog) {
@@ -53,21 +52,21 @@ Status checkValidationOptionsCanBeUsed(const CollectionOptions& opts,
                 "collections");
         }
     }
-    if (validationLevel == ValidationLevelEnum::constraint) {
+    if (validationLevel == ValidationLevelEnum::validated) {
         if (validationAction == ValidationActionEnum::warn) {
             return Status(
                 ErrorCodes::BadValue,
-                "Validation action of 'warn' is not allowed when Validation level is 'constraint'");
+                "Validation action of 'warn' is not allowed when Validation level is 'validated'");
         }
         if (opts.uuid) {  // existing collection
-            if (opts.validationLevel != ValidationLevelEnum::constraint) {
+            if (opts.validationLevel != ValidationLevelEnum::validated) {
                 return Status(
                     ErrorCodes::BadValue,
-                    "Validation level 'constraint' can not be set on existing collections.");
+                    "Validation level 'validated' can not be set on existing collections.");
             }
             if (newValidator) {
                 return Status(ErrorCodes::BadValue,
-                              "Validator can not be changed when Validation level is 'constraint'");
+                              "Validator can not be changed when Validation level is 'validated'");
             }
         }
     }

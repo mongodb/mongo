@@ -43,7 +43,7 @@ enums:
             "off": "off"
             strict: strict
             moderate: moderate
-            constraint: constraint
+            validated: validated
 
     ValidationAction:
         description: "Determines an action on invalid documents being written:

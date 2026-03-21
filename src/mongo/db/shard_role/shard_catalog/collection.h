@@ -1013,11 +1013,11 @@ inline ValidationLevelEnum validationLevelOrCurrent(const CollectionOptions& opt
 
 /**
  * Mandatory level means that the schema validator is strictly enforced on all inserts and updates.
- * 'constraint' and 'strict' both forbid inserting/updating non-conforming documents.
+ * 'validated' and 'strict' both forbid inserting/updating non-conforming documents.
  */
 MONGO_MOD_PUBLIC
 inline bool validationLevelIsMandatory(ValidationLevelEnum level) {
-    return level == ValidationLevelEnum::strict || level == ValidationLevelEnum::constraint;
+    return level == ValidationLevelEnum::strict || level == ValidationLevelEnum::validated;
 }
 
 /**
