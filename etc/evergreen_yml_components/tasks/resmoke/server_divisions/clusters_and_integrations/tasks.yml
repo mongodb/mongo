@@ -2746,7 +2746,7 @@ tasks:
             --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
             --disableFeatureFlags=featureFlagBlockDirectSystemBucketsAccess
 
-  # TODO(SERVER-111646): Remove this temporary suite.
+  # TODO(SERVER-108818): Remove this temporary suite.
   - <<: *gen_task_template
     name: sharded_collections_jscore_passthrough_primary_driven_index_builds_gen
     tags:
