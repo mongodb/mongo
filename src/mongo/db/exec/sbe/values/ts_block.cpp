@@ -238,10 +238,17 @@ TsBucketPathExtractor::ExtractResult TsBucketPathExtractor::extractCellBlocks(
 
     const size_t noOfMeasurements = [&]() {
         if (auto ct = bucketControlObj[timeseries::kBucketControlCountFieldName]) {
-            return static_cast<size_t>(ct.numberLong());
+            const long long count = ct.numberLong();
+            tassert(12193300,
+                    "Measurement count in time-series bucket must be non-negative",
+                    count >= 0);
+            return static_cast<size_t>(count);
         }
-        return static_cast<size_t>(
-            timeseries::BucketUnpacker::computeMeasurementCount(bucketObj, StringData(_timeField)));
+        const int count =
+            timeseries::BucketUnpacker::computeMeasurementCount(bucketObj, StringData(_timeField));
+        tassert(
+            12193301, "Measurement count in time-series bucket must be non-negative", count >= 0);
+        return static_cast<size_t>(count);
     }();
 
     const int bucketVersion = bucketObj.getIntField(timeseries::kBucketControlVersionFieldName);
