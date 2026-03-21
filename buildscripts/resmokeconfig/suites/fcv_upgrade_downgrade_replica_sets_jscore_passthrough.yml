@@ -8,9 +8,9 @@ selector:
     - jstests/core/**/*.js
     - jstests/fle2/**/*.js
     - jstests/aggregation/**/*.js
-    - src/mongo/db/modules/*/jstests/fle2/**/*.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
+    - featureFlagFLE2CleanupCommand
     # TODO: SERVER-66393 Remove Feature Flag for PM-2919.
     - featureFlagTimeseriesUpdatesSupport
     # TODO: SERVER-78068 Remove Feature Flag for PM-2983
@@ -79,10 +79,6 @@ selector:
 
     # Queryable encryption uses internal transactions (which are aborted on fcv upgrade/downgrade).
     - jstests/core/query/queryable_encryption/**/*.js
-
-    # TODO: SERVER-122159 enable the tests below after fixing fle2 cleanup & compact
-    - src/mongo/db/modules/*/jstests/fle2/compact_*.js
-    - src/mongo/db/modules/*/jstests/fle2/cleanup_*.js
 
     # Tests that use profiling at level 2 are expecting to profile a specific command or a specific number
     # of commands. If they profile the setFCV command, this could cause the test to fail.

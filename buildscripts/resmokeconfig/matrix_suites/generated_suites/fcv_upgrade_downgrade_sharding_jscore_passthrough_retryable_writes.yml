@@ -116,6 +116,7 @@ selector:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos
     - requires_profiling
+    - featureFlagFLE2CleanupCommand
     - featureFlagTimeseriesUpdatesSupport
     - featureFlagRecordIdsReplicated
     - featureFlagRankFusionBasic
@@ -139,5 +140,4 @@ selector:
     - jstests/fle2/**/*.js
     - jstests/core_sharding/**/*.js
     - jstests/aggregation/**/*.js
-    - src/mongo/db/modules/*/jstests/fle2/**/*.js
 test_kind: js_test

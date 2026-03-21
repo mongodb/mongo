@@ -62,8 +62,6 @@ selector:
     - jstests/core/administrative/roles_info.js
     - jstests/core/catalog/views/views_all_commands.js
     - jstests/core/query/queryable_encryption/**/*.js
-    - src/mongo/db/modules/*/jstests/fle2/compact_*.js
-    - src/mongo/db/modules/*/jstests/fle2/cleanup_*.js
     - jstests/core/administrative/profile/profile_delete.js
     - jstests/core/administrative/profile/profile_sampling.js
     - jstests/core/administrative/profile/profile1.js
@@ -97,6 +95,7 @@ selector:
     - jstests/core/timeseries/query/timeseries_out_non_sharded.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
+    - featureFlagFLE2CleanupCommand
     - featureFlagTimeseriesUpdatesSupport
     - featureFlagRecordIdsReplicated
     - featureFlagRankFusionBasic
@@ -120,5 +119,4 @@ selector:
     - jstests/core/**/*.js
     - jstests/fle2/**/*.js
     - jstests/aggregation/**/*.js
-    - src/mongo/db/modules/*/jstests/fle2/**/*.js
 test_kind: js_test
