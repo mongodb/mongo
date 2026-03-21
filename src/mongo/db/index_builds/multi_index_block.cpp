@@ -695,6 +695,11 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
                           shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource()),
                       "error"_attr = ex);
 
+        // TODO (SERVER-119512): Support collection scan restart for primary-driven index builds.
+        uassert(12232700,
+                "Primary-driven index build cannot restart collection scan",
+                _method != IndexBuildMethodEnum::kPrimaryDriven);
+
         collection = shard_role_nocheck::acquireLocalCollectionNoConsistentCatalog(
             opCtx, nssOrUUID, AcquisitionPrerequisites::kUnreplicatedWrite, MODE_IX);
         tassert(7683101, "Expected collection to exist", collection->exists());
