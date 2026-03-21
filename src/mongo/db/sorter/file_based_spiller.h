@@ -527,14 +527,14 @@ public:
     boost::filesystem::path getSpillDir() override;
 
 private:
-    std::unique_ptr<SortedStorageWriter<Key, Value>> _spill(const SortOptions& opts,
-                                                            const Settings& settings,
-                                                            std::span<std::pair<Key, Value>> data,
-                                                            uint32_t idx) override {
+    std::unique_ptr<SortedStorageWriter<Key, Value>> _spill(
+        const SortOptions& opts,
+        const Settings& settings,
+        std::span<std::pair<Key, Value>> data) override {
         std::unique_ptr<SortedStorageWriter<Key, Value>> writer =
             this->_storage->makeWriter(opts, settings);
 
-        for (size_t i = idx; i < data.size(); ++i) {
+        for (size_t i = 0; i < data.size(); ++i) {
             writer->addAlreadySorted(data[i].first, data[i].second);
         }
         return std::move(writer);

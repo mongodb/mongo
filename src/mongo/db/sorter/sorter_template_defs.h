@@ -188,7 +188,7 @@ public:
             _spiller->getSpillDir(),
             static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.load())));
 
-        auto iterator = _spiller->spillUnique(opts, settings, _data, _index);
+        auto iterator = _spiller->spillUnique(opts, settings, std::span{_data}.subspan(_index));
 
         if (opts.sorterTracker) {
             opts.sorterTracker->spilledRanges.addAndFetch(1);
@@ -733,7 +733,7 @@ private:
 
         sort();
 
-        auto iterator = this->_spiller->spill(this->_opts, this->_settings, _data, /*idx=*/0);
+        auto iterator = this->_spiller->spill(this->_opts, this->_settings, _data);
 
         this->_stats.incrementSpilledKeyValuePairs(_data.size());
         _data.clear();
@@ -1088,7 +1088,7 @@ private:
         sort();
         updateCutoff();
 
-        auto iters = this->_spiller->spill(this->_opts, this->_settings, _data, /*idx=*/0);
+        auto iters = this->_spiller->spill(this->_opts, this->_settings, _data);
 
         this->_stats.incrementSpilledKeyValuePairs(_data.size());
         _data.clear();

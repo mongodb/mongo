@@ -443,12 +443,11 @@ private:
     std::unique_ptr<SortedStorageWriter<Key, Value>> _spill(
         const SortOptions& opts,
         const SorterSpillerBase<Key, Value, Comparator>::Settings& settings,
-        std::span<std::pair<Key, Value>> data,
-        uint32_t idx) override {
+        std::span<std::pair<Key, Value>> data) override {
         auto writer = this->_storage->makeWriter(opts, settings);
         int64_t numAdded = 0;
         boost::optional<WriteUnitOfWork> wuow{boost::in_place_init, &_opCtx};
-        for (auto&& [key, value] : data.subspan(idx)) {
+        for (auto&& [key, value] : data) {
             writer->addAlreadySorted(key, value);
             ++numAdded;
             ++_current;

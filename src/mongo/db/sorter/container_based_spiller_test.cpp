@@ -583,12 +583,10 @@ TEST_P(ContainerBasedSpillerTest, Spill) {
 
     auto it1 = spiller.spill(SortOptions{},
                              SorterSpiller<IntWrapper, NullValue, IWComparator>::Settings{},
-                             span.subspan(0, 2),
-                             0);
+                             span.subspan(0, 2));
     auto it2 = spiller.spill(SortOptions{},
                              SorterSpiller<IntWrapper, NullValue, IWComparator>::Settings{},
-                             span.subspan(2, 2),
-                             0);
+                             span.subspan(2, 2));
 
     ASSERT_TRUE(it1->more());
     EXPECT_EQ(it1->next().first, 50);
@@ -635,18 +633,15 @@ TEST_P(ContainerBasedSpillerTest, MergeSpills) {
     iterators.push_back(
         spiller.spill(SortOptions{},
                       SorterSpiller<IntWrapper, NullValue, IWComparator>::Settings{},
-                      span.subspan(0, 2),
-                      0));
+                      span.subspan(0, 2)));
     iterators.push_back(
         spiller.spill(SortOptions{},
                       SorterSpiller<IntWrapper, NullValue, IWComparator>::Settings{},
-                      span.subspan(2, 2),
-                      0));
+                      span.subspan(2, 2)));
     iterators.push_back(
         spiller.spill(SortOptions{},
                       SorterSpiller<IntWrapper, NullValue, IWComparator>::Settings{},
-                      span.subspan(4, 1),
-                      0));
+                      span.subspan(4, 1)));
 
     SorterStats sorterStats{nullptr};
     spiller.mergeSpills(SortOptions{},
@@ -718,8 +713,7 @@ TEST_P(ContainerBasedSpillerTest, MergeSpillsMultiplePasses) {
         iterators.push_back(
             spiller.spill(SortOptions{},
                           SorterSpiller<IntWrapper, NullValue, IWComparator>::Settings{},
-                          span.subspan(i, 1),
-                          0));
+                          span.subspan(i, 1)));
     }
 
     SorterStats sorterStats{nullptr};

@@ -566,13 +566,11 @@ public:
 
     virtual std::shared_ptr<Iterator> spill(const SortOptions& opts,
                                             const Settings& settings,
-                                            std::span<std::pair<Key, Value>> data,
-                                            uint32_t idx) = 0;
+                                            std::span<std::pair<Key, Value>> data) = 0;
 
     virtual std::unique_ptr<Iterator> spillUnique(const SortOptions& opts,
                                                   const Settings& settings,
-                                                  std::span<std::pair<Key, Value>> data,
-                                                  uint32_t idx) = 0;
+                                                  std::span<std::pair<Key, Value>> data) = 0;
 
     virtual std::shared_ptr<Iterator> spillWithHeap(
         const SortOptions& opts,
@@ -618,16 +616,14 @@ public:
 
     std::shared_ptr<Iterator> spill(const SortOptions& opts,
                                     const Settings& settings,
-                                    std::span<std::pair<Key, Value>> data,
-                                    uint32_t idx) override {
-        return _spill(opts, settings, data, idx)->done();
+                                    std::span<std::pair<Key, Value>> data) override {
+        return _spill(opts, settings, data)->done();
     }
 
     std::unique_ptr<Iterator> spillUnique(const SortOptions& opts,
                                           const Settings& settings,
-                                          std::span<std::pair<Key, Value>> data,
-                                          uint32_t idx) override {
-        return _spill(opts, settings, data, idx)->doneUnique();
+                                          std::span<std::pair<Key, Value>> data) override {
+        return _spill(opts, settings, data)->doneUnique();
     }
 
     std::shared_ptr<Iterator> spillWithHeap(
@@ -656,8 +652,7 @@ private:
     virtual std::unique_ptr<SortedStorageWriter<Key, Value>> _spill(
         const SortOptions& opts,
         const Settings& settings,
-        std::span<std::pair<Key, Value>> data,
-        uint32_t idx) = 0;
+        std::span<std::pair<Key, Value>> data) = 0;
 };
 
 /**
