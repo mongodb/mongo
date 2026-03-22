@@ -43,7 +43,7 @@ server_parameters:
 
     traceExceptions:
         description: "Configures mongod to log full code stack traces for every database and socket C++ exception"
-        set_at: runtime
+        set_at: ["startup", "runtime"]
         cpp_varname: "DBException::traceExceptions"
         redact: false
 
