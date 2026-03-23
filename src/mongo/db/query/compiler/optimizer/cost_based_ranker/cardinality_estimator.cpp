@@ -421,6 +421,8 @@ OrderedIntervalList makeOpenOil(std::string fieldName) {
 struct EqualityPrefix {
     std::unique_ptr<IndexBounds> eqPrefixPtr;
     bool isEqPrefix;
+    // TODO SERVER-100611: Remove this flag, and all references to it.
+    bool isIndexSkipScan;
 };
 
 /**
@@ -431,15 +433,21 @@ struct EqualityPrefix {
 EqualityPrefix equalityPrefix(const IndexBounds* node) {
     auto eqPrefix = std::make_unique<IndexBounds>();
     bool isEqPrefix = true;
+    bool isIndexSkipScan = false;
     for (auto&& oil : node->fields) {
         if (isEqPrefix) {
             eqPrefix->fields.push_back(oil);
             isEqPrefix = isEqPrefix && oil.isPoint();
         } else {
+            // We set the 'isIndexSkipScan' flag to true if at any point after 'isEqPrefix' is false
+            // we encounter a non-fully open interval.
+            if (!oil.isFullyOpen() && oil.intervals.size() >= 1) {
+                isIndexSkipScan = true;
+            }
             eqPrefix->fields.push_back(makeOpenOil(oil.name));
         }
     }
-    return EqualityPrefix{std::move(eqPrefix), isEqPrefix};
+    return EqualityPrefix{std::move(eqPrefix), isEqPrefix, isIndexSkipScan};
 }
 
 CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
@@ -507,6 +515,9 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
             // We can avoid computing input selectivity for sampling CE queries over
             // non-multikey fields without residual filter.
             auto prefix = equalityPrefix(&node->bounds);
+            if (prefix.isIndexSkipScan) {
+                return Status(ErrorCodes::UnsupportedCbrNode, "encountered index skip scan case");
+            }
             if (prefix.isEqPrefix) {
                 // If the prefix is equal to all the bounds, the number of keys scanned is equal to
                 // the resulting docs.
@@ -1165,6 +1176,9 @@ CEResult CardinalityEstimator::estimate(const IndexBounds* node) {
         // TODO: avoid copies to construct the equality prefix. We could do this by teaching
         // SamplingEstimator or IndexBounds about the equality prefix concept.
         auto eqPrefix = equalityPrefix(node);
+        if (eqPrefix.isIndexSkipScan) {
+            return Status(ErrorCodes::UnsupportedCbrNode, "encountered index skip scan case");
+        }
         const auto eqPrefixPtr = eqPrefix.eqPrefixPtr.get();
         return _ceCache.getOrCompute(std::move(eqPrefix.eqPrefixPtr), [&] {
             return _samplingEstimator->estimateKeysScanned(*eqPrefixPtr);
@@ -1201,6 +1215,10 @@ CEResult CardinalityEstimator::estimate(const IndexBounds* node) {
         if (isEqPrefix) {
             _conjSels.emplace_back(sel);
         } else {
+            // TODO SERVER-100611: Remove this code.
+            if (!oil->isFullyOpen() && oil->intervals.size() >= 1) {
+                return Status(ErrorCodes::UnsupportedCbrNode, "encountered index skip scan case");
+            }
             residualSels.emplace_back(sel);
         }
         isEqPrefix = isEqPrefix && oil->isPoint();

@@ -182,8 +182,9 @@ try {
         {query: {a: {$gt: 20, $lt: 40}}, expectedCE: 18.8},
         {query: {a: 20, b: 20}, expectedCE: 0.1},
         {query: {a: 20, b: {$gt: 20}}, expectedCE: 0.9},
-        {query: {a: {$gt: 20}, b: 20}, expectedCE: 0.9},
-        {query: {a: {$gt: 20}, b: {$gt: 20}}, expectedCE: 70.8},
+        // TODO SERVER-100611: re-enable these tests.
+        // {query: {a: {$gt: 20}, b: 20}, expectedCE: 0.9},
+        // {query: {a: {$gt: 20}, b: {$gt: 20}}, expectedCE: 70.8},
     ];
     testCases.forEach((tc) => assertQueryUsesHistograms(tc));
 } finally {

@@ -115,7 +115,8 @@ try {
     // In the presence of a compound index, it is chosen regardless of the selectivity of the
     // predicates.
     assert.contains(winningIndex({unique1: 1, unique2: 1}), ["unique1_1_unique2_1", "unique2_1_unique1_1"]);
-    assert.eq(winningIndex({unique1: {$gte: 0}, unique2: {$gte: 0}}), "unique1_1_unique2_1");
+    // TODO SERVER-100611: re-enable these tests.
+    // assert.eq(winningIndex({unique1: {$gte: 0}, unique2: {$gte: 0}}), "unique1_1_unique2_1");
     assert.eq(winningIndex({unique1: 1, unique2: {$gte: 0}}), "unique1_1_unique2_1");
 
     // TODO(SERVER-97933): assert.eq(winningIndex({unique1: {$lt: 0}, unique2: {$lt: 0}}),

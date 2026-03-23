@@ -119,60 +119,61 @@ describe("MultiPlanner exit condition metrics get updated correctly", function (
 
     if (planRankerMode === "automaticCE" && !isSBEEnabled) {
         describe("automaticCE (CBR) mode", function () {
-            describe("fallback to CBR", function () {
-                it("does not update multi-planner metrics when plan cache is disabled", function () {
-                    // We do not measure works for the chosen CBR plan, so MP metrics must not change.
-                    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: true}));
-
-                    assert.docEq(
-                        {
-                            hitEof: 0,
-                            hitResultsLimit: 0,
-                            hitWorksLimit: 0,
-                        },
-                        getStoppingCondition(0.1),
-                    );
-
-                    assert.docEq(
-                        {
-                            hitEof: 0,
-                            hitResultsLimit: 0,
-                            hitWorksLimit: 0,
-                        },
-                        getStoppingCondition(20.0),
-                    );
-                });
-
-                it("records hitWorksLimit when CBR fallback is measured with low collFraction", function () {
-                    // With plan cache enabled, we measure works for the CBR-chosen plan.
-                    // At low collFraction, CBR evaluation stops due to works budget, so hitWorksLimit should increment.
-                    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: false}));
-
-                    assert.docEq(
-                        {
-                            hitEof: 0,
-                            hitResultsLimit: 0,
-                            hitWorksLimit: 0,
-                        },
-                        getStoppingCondition(0.1),
-                    );
-                });
-
-                it("records hitEof when CBR fallback is measured with high collFraction", function () {
-                    // With a higher collFraction, CBR can run until EOF instead of hitting works limit.
-                    // With plan cache enabled, this should be reflected as hitEof.
-                    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: false}));
-
-                    assert.docEq(
-                        {
-                            hitEof: 0,
-                            hitResultsLimit: 0,
-                            hitWorksLimit: 0,
-                        },
-                        getStoppingCondition(20.0),
-                    );
-                });
-            });
+            // TODO SERVER-100611: re-enable these tests.
+            // describe("fallback to CBR", function () {
+            //     it("does not update multi-planner metrics when plan cache is disabled", function () {
+            //         // We do not measure works for the chosen CBR plan, so MP metrics must not change.
+            //         assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: true}));
+            //
+            //         assert.docEq(
+            //             {
+            //                 hitEof: 0,
+            //                 hitResultsLimit: 0,
+            //                 hitWorksLimit: 0,
+            //             },
+            //             getStoppingCondition(0.1),
+            //         );
+            //
+            //         assert.docEq(
+            //             {
+            //                 hitEof: 0,
+            //                 hitResultsLimit: 0,
+            //                 hitWorksLimit: 0,
+            //             },
+            //             getStoppingCondition(20.0),
+            //         );
+            //     });
+            //
+            //     it("records hitWorksLimit when CBR fallback is measured with low collFraction", function () {
+            //         // With plan cache enabled, we measure works for the CBR-chosen plan.
+            //         // At low collFraction, CBR evaluation stops due to works budget, so hitWorksLimit should increment.
+            //         assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: false}));
+            //
+            //         assert.docEq(
+            //             {
+            //                 hitEof: 0,
+            //                 hitResultsLimit: 0,
+            //                 hitWorksLimit: 0,
+            //             },
+            //             getStoppingCondition(0.1),
+            //         );
+            //     });
+            //
+            //     it("records hitEof when CBR fallback is measured with high collFraction", function () {
+            //         // With a higher collFraction, CBR can run until EOF instead of hitting works limit.
+            //         // With plan cache enabled, this should be reflected as hitEof.
+            //         assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: false}));
+            //
+            //         assert.docEq(
+            //             {
+            //                 hitEof: 0,
+            //                 hitResultsLimit: 0,
+            //                 hitWorksLimit: 0,
+            //             },
+            //             getStoppingCondition(20.0),
+            //         );
+            //     });
+            // });
 
             describe("no fallback to CBR", function () {
                 it("records EOF when multiplanning produces a result before exhausting works", function () {

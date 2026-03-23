@@ -64,20 +64,21 @@ TEST(CardinalityEstimator, ManyPointIntervals) {
     ASSERT_EQ(getPlanHeuristicCE(*plan, 100.0), makeCard(50.0));
 }
 
-TEST(CardinalityEstimator, CompoundIndex) {
-    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
-    IndexBounds bounds;
-    std::vector<std::string> indexFields = {"a", "b", "c", "d", "e"};
-    for (size_t i = 0; i < indexFields.size(); ++i) {
-        OrderedIntervalList oil(indexFields[i]);
-        for (size_t j = 0; j < 7; ++j) {
-            oil.intervals.push_back(IndexBoundsBuilder::makePointInterval(i * j));
-        }
-        bounds.fields.push_back(oil);
-    }
-    auto plan = makeIndexScanFetchPlan(testNss, std::move(bounds), indexFields);
-    ASSERT_EQ(getPlanHeuristicCE(*plan, 100.0), makeCard(51.2341));
-}
+// TODO SERVER-100611: re-enable this test.
+// TEST(CardinalityEstimator, CompoundIndex) {
+//     auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+//     IndexBounds bounds;
+//     std::vector<std::string> indexFields = {"a", "b", "c", "d", "e"};
+//     for (size_t i = 0; i < indexFields.size(); ++i) {
+//         OrderedIntervalList oil(indexFields[i]);
+//         for (size_t j = 0; j < 7; ++j) {
+//             oil.intervals.push_back(IndexBoundsBuilder::makePointInterval(i * j));
+//         }
+//         bounds.fields.push_back(oil);
+//     }
+//     auto plan = makeIndexScanFetchPlan(testNss, std::move(bounds), indexFields);
+//     ASSERT_EQ(getPlanHeuristicCE(*plan, 100.0), makeCard(51.2341));
+// }
 
 TEST(CardinalityEstimator, PointMoreSelectiveThanRange) {
     auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
@@ -990,6 +991,295 @@ TEST(CardinalityEstimator, SamplingCECompareIndexWithSample) {
         ASSERT_NE(samplingEstimator.estimateKeysScanned(*idxBounds).toDouble(),
                   samplingEstimator.estimateCardinality(matchExpr.get()).toDouble());
     }
+}
+
+// Helpers shared by EqualityPrefixHeuristicCETest and EqualityPrefixSamplingCETest.
+namespace {
+OrderedIntervalList makeFullyOpenOil(const std::string& fieldName) {
+    OrderedIntervalList oil(fieldName);
+    IndexBoundsBuilder::allValuesForField(BSON(fieldName << 1).firstElement(), &oil);
+    return oil;
+}
+
+OrderedIntervalList makeRangeOil(const std::string& fieldName) {
+    OrderedIntervalList oil(fieldName);
+    oil.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 3 << " " << 7), BoundInclusion::kIncludeBothStartAndEndKeys));
+    return oil;
+}
+
+OrderedIntervalList makePointOil(const std::string& fieldName) {
+    return makePointInterval(5.0, fieldName);
+}
+
+// An empty OIL represents an unsatisfiable predicate — no values can match.
+OrderedIntervalList makeEmptyOil(const std::string& fieldName) {
+    return OrderedIntervalList(fieldName);
+}
+
+// Non-fullyOpen OIL with multiple intervals, e.g. representing an $in predicate.
+OrderedIntervalList makeMultiIntervalOil(const std::string& fieldName) {
+    OrderedIntervalList oil(fieldName);
+    oil.intervals.push_back(IndexBoundsBuilder::makePointInterval(1.0));
+    oil.intervals.push_back(IndexBoundsBuilder::makePointInterval(3.0));
+    oil.intervals.push_back(IndexBoundsBuilder::makePointInterval(5.0));
+    return oil;
+}
+
+std::unique_ptr<QuerySolution> makeEqualityPrefixPlan(IndexBounds bounds) {
+    std::vector<std::string> indexFields;
+    for (const auto& oil : bounds.fields) {
+        indexFields.push_back(oil.name);
+    }
+    const auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+    return makeIndexScanFetchPlan(testNss, std::move(bounds), indexFields);
+}
+}  // namespace
+
+// Fixture for testing the index skip scan detection cases via heuristic CE.
+class EqualityPrefixHeuristicCETest : public unittest::Test {
+protected:
+    void assertSkipScan(IndexBounds bounds) {
+        auto plan = makeEqualityPrefixPlan(std::move(bounds));
+        const auto ceRes = getPlanCE(*plan, _collInfo, QueryPlanRankerModeEnum::kHeuristicCE);
+        ASSERT(!ceRes.isOK() && ceRes.getStatus().code() == ErrorCodes::UnsupportedCbrNode);
+    }
+
+    void assertNotSkipScan(IndexBounds bounds) {
+        auto plan = makeEqualityPrefixPlan(std::move(bounds));
+        const auto ceRes = getPlanCE(*plan, _collInfo, QueryPlanRankerModeEnum::kHeuristicCE);
+        ASSERT(ceRes.isOK());
+    }
+
+private:
+    const CollectionInfo _collInfo =
+        buildCollectionInfo({}, makeCollStatsWithHistograms({}, 100.0));
+};
+
+// Fixture for testing the index skip scan detection cases via sampling CE.
+// The skip scan check in the sampling path goes through equalityPrefix() directly (unlike the
+// heuristic path which has its own inline check).
+class EqualityPrefixSamplingCETest : public ce::SamplingEstimatorTest {
+protected:
+    void setUp() override {
+        ce::SamplingEstimatorTest::setUp();
+        _samplingEstimator.emplace(createSamplingEstimatorForTesting(100, 50, ce::NoProjection{}));
+    }
+
+    void assertSkipScan(IndexBounds bounds) {
+        auto plan = makeEqualityPrefixPlan(std::move(bounds));
+        EstimateMap qsnEstimates;
+        auto collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms({}, 100.0));
+        CardinalityEstimator estimator{
+            collInfo, &*_samplingEstimator, qsnEstimates, QueryPlanRankerModeEnum::kSamplingCE};
+        const auto ceRes = estimator.estimatePlan(*plan);
+        ASSERT(!ceRes.isOK() && ceRes.getStatus().code() == ErrorCodes::UnsupportedCbrNode);
+    }
+
+    void assertNotSkipScan(IndexBounds bounds) {
+        auto plan = makeEqualityPrefixPlan(std::move(bounds));
+        EstimateMap qsnEstimates;
+        auto collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms({}, 100.0));
+        CardinalityEstimator estimator{
+            collInfo, &*_samplingEstimator, qsnEstimates, QueryPlanRankerModeEnum::kSamplingCE};
+        const auto ceRes = estimator.estimatePlan(*plan);
+        ASSERT(ceRes.isOK());
+    }
+
+private:
+    boost::optional<ce::SamplingEstimatorForTesting> _samplingEstimator;
+};
+
+template <typename Fixture>
+class EqualityPrefixTypedTest : public Fixture {};
+
+using EqualityPrefixFixtures =
+    ::testing::Types<EqualityPrefixHeuristicCETest, EqualityPrefixSamplingCETest>;
+// The TYPED_TEST_SUITE allows the following tests to be run under both test fixtures enumerated.
+TYPED_TEST_SUITE(EqualityPrefixTypedTest, EqualityPrefixFixtures);
+
+// OIL list: [eqPrefix, fullyOpen, non-fullyOpen]
+TYPED_TEST(EqualityPrefixTypedTest, EqPrefix_FullyOpen_NonFullyOpen) {
+    IndexBounds bounds;
+    bounds.fields.push_back(makePointOil("a"));
+    bounds.fields.push_back(makeFullyOpenOil("b"));
+    bounds.fields.push_back(makeRangeOil("c"));
+    this->assertSkipScan(std::move(bounds));
+}
+
+// OIL list: [eqPrefix, non-fullyOpen, fullyOpen]
+TYPED_TEST(EqualityPrefixTypedTest, EqPrefix_NonFullyOpen_FullyOpen) {
+    IndexBounds bounds;
+    bounds.fields.push_back(makePointOil("a"));
+    bounds.fields.push_back(makeRangeOil("b"));
+    bounds.fields.push_back(makeFullyOpenOil("c"));
+    this->assertNotSkipScan(std::move(bounds));
+}
+
+// OIL list: [eqPrefix, fullyOpen]
+TYPED_TEST(EqualityPrefixTypedTest, EqPrefix_FullyOpen) {
+    IndexBounds bounds;
+    bounds.fields.push_back(makePointOil("a"));
+    bounds.fields.push_back(makeFullyOpenOil("b"));
+    this->assertNotSkipScan(std::move(bounds));
+}
+
+// OIL list: [eqPrefix, non-fullyOpen]
+TYPED_TEST(EqualityPrefixTypedTest, EqPrefix_NonFullyOpen) {
+    IndexBounds bounds;
+    bounds.fields.push_back(makePointOil("a"));
+    bounds.fields.push_back(makeRangeOil("b"));
+    this->assertNotSkipScan(std::move(bounds));
+}
+
+// OIL list: [fullyOpen, non-fullyOpen]
+TYPED_TEST(EqualityPrefixTypedTest, FullyOpen_NonFullyOpen) {
+    IndexBounds bounds;
+    bounds.fields.push_back(makeFullyOpenOil("a"));
+    bounds.fields.push_back(makeRangeOil("b"));
+    this->assertSkipScan(std::move(bounds));
+}
+
+// OIL list: [non-fullyOpen, fullyOpen]
+TYPED_TEST(EqualityPrefixTypedTest, NonFullyOpen_FullyOpen) {
+    IndexBounds bounds;
+    bounds.fields.push_back(makeRangeOil("a"));
+    bounds.fields.push_back(makeFullyOpenOil("b"));
+    this->assertNotSkipScan(std::move(bounds));
+}
+
+// OIL list: [non-fullyOpen, fullyOpen, non-fullyOpen]
+TYPED_TEST(EqualityPrefixTypedTest, NonFullyOpen_FullyOpen_NonFullyOpen) {
+    IndexBounds bounds;
+    bounds.fields.push_back(makeRangeOil("a"));
+    bounds.fields.push_back(makeFullyOpenOil("b"));
+    bounds.fields.push_back(makeRangeOil("c"));
+    this->assertSkipScan(std::move(bounds));
+}
+
+// OIL list: [non-fullyOpen, non-fullyOpen]
+TYPED_TEST(EqualityPrefixTypedTest, NonFullyOpen_NonFullyOpen) {
+    IndexBounds bounds;
+    bounds.fields.push_back(makeRangeOil("a"));
+    bounds.fields.push_back(makeRangeOil("b"));
+    this->assertSkipScan(std::move(bounds));
+}
+
+// OIL list: [eqPrefix, empty]
+TYPED_TEST(EqualityPrefixTypedTest, EqPrefix_Empty) {
+    IndexBounds bounds;
+    bounds.fields.push_back(makePointOil("a"));
+    bounds.fields.push_back(makeEmptyOil("b"));
+    this->assertNotSkipScan(std::move(bounds));
+}
+
+// OIL list: [fullyOpen, empty]
+TYPED_TEST(EqualityPrefixTypedTest, FullyOpen_Empty) {
+    IndexBounds bounds;
+    bounds.fields.push_back(makeFullyOpenOil("a"));
+    bounds.fields.push_back(makeEmptyOil("b"));
+    this->assertNotSkipScan(std::move(bounds));
+}
+
+// OIL list: [empty, range]
+TYPED_TEST(EqualityPrefixTypedTest, Empty_NonFullyOpen) {
+    IndexBounds bounds;
+    bounds.fields.push_back(makeEmptyOil("a"));
+    bounds.fields.push_back(makeRangeOil("b"));
+    this->assertSkipScan(std::move(bounds));
+}
+
+// OIL list: [empty, fullyOpen]
+TYPED_TEST(EqualityPrefixTypedTest, Empty_FullyOpen) {
+    IndexBounds bounds;
+    bounds.fields.push_back(makeEmptyOil("a"));
+    bounds.fields.push_back(makeFullyOpenOil("b"));
+    this->assertNotSkipScan(std::move(bounds));
+}
+
+// The following cases repeat the above patterns using a multi-interval non-fullyOpen OIL
+// (e.g. from an $in predicate) to confirm that the skip scan detection is not sensitive to
+// whether the non-fullyOpen OIL has one or many intervals.
+
+// OIL list: [eqPrefix, multiInterval]
+TYPED_TEST(EqualityPrefixTypedTest, EqPrefix_MultiInterval) {
+    IndexBounds bounds;
+    bounds.fields.push_back(makePointOil("a"));
+    bounds.fields.push_back(makeMultiIntervalOil("b"));
+    this->assertNotSkipScan(std::move(bounds));
+}
+
+// OIL list: [eqPrefix, fullyOpen, multiInterval]
+TYPED_TEST(EqualityPrefixTypedTest, EqPrefix_FullyOpen_MultiInterval) {
+    IndexBounds bounds;
+    bounds.fields.push_back(makePointOil("a"));
+    bounds.fields.push_back(makeFullyOpenOil("b"));
+    bounds.fields.push_back(makeMultiIntervalOil("c"));
+    this->assertSkipScan(std::move(bounds));
+}
+
+// OIL list: [fullyOpen, multiInterval]
+TYPED_TEST(EqualityPrefixTypedTest, FullyOpen_MultiInterval) {
+    IndexBounds bounds;
+    bounds.fields.push_back(makeFullyOpenOil("a"));
+    bounds.fields.push_back(makeMultiIntervalOil("b"));
+    this->assertSkipScan(std::move(bounds));
+}
+
+// OIL list: [multiInterval, fullyOpen]
+TYPED_TEST(EqualityPrefixTypedTest, MultiInterval_FullyOpen) {
+    IndexBounds bounds;
+    bounds.fields.push_back(makeMultiIntervalOil("a"));
+    bounds.fields.push_back(makeFullyOpenOil("b"));
+    this->assertNotSkipScan(std::move(bounds));
+}
+
+// OIL list: [multiInterval, multiInterval]
+TYPED_TEST(EqualityPrefixTypedTest, MultiInterval_MultiInterval) {
+    IndexBounds bounds;
+    bounds.fields.push_back(makeMultiIntervalOil("a"));
+    bounds.fields.push_back(makeMultiIntervalOil("b"));
+    this->assertSkipScan(std::move(bounds));
+}
+
+// OIL list: [eqPrefix, fullyOpen, fullyOpen, non-fullyOpen]
+TYPED_TEST(EqualityPrefixTypedTest, EqPrefix_FullyOpen_FullyOpen_NonFullyOpen) {
+    IndexBounds bounds;
+    bounds.fields.push_back(makePointOil("a"));
+    bounds.fields.push_back(makeFullyOpenOil("b"));
+    bounds.fields.push_back(makeFullyOpenOil("c"));
+    bounds.fields.push_back(makeRangeOil("d"));
+    this->assertSkipScan(std::move(bounds));
+}
+
+// OIL list: [eqPrefix, fullyOpen, fullyOpen, multiInterval]
+TYPED_TEST(EqualityPrefixTypedTest, EqPrefix_FullyOpen_FullyOpen_MultiInterval) {
+    IndexBounds bounds;
+    bounds.fields.push_back(makePointOil("a"));
+    bounds.fields.push_back(makeFullyOpenOil("b"));
+    bounds.fields.push_back(makeFullyOpenOil("c"));
+    bounds.fields.push_back(makeMultiIntervalOil("d"));
+    this->assertSkipScan(std::move(bounds));
+}
+
+// OIL list: [non-fullyOpen, fullyOpen, fullyOpen, non-fullyOpen]
+TYPED_TEST(EqualityPrefixTypedTest, NonFullyOpen_FullyOpen_FullyOpen_NonFullyOpen) {
+    IndexBounds bounds;
+    bounds.fields.push_back(makeRangeOil("a"));
+    bounds.fields.push_back(makeFullyOpenOil("b"));
+    bounds.fields.push_back(makeFullyOpenOil("c"));
+    bounds.fields.push_back(makeRangeOil("d"));
+    this->assertSkipScan(std::move(bounds));
+}
+
+// OIL list: [non-fullyOpen, fullyOpen, fullyOpen, multiInterval]
+TYPED_TEST(EqualityPrefixTypedTest, NonFullyOpen_FullyOpen_FullyOpen_MultiInterval) {
+    IndexBounds bounds;
+    bounds.fields.push_back(makeRangeOil("a"));
+    bounds.fields.push_back(makeFullyOpenOil("b"));
+    bounds.fields.push_back(makeFullyOpenOil("c"));
+    bounds.fields.push_back(makeMultiIntervalOil("d"));
+    this->assertSkipScan(std::move(bounds));
 }
 
 }  // unnamed namespace
