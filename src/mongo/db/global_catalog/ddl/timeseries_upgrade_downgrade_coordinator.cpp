@@ -153,10 +153,28 @@ void TimeseriesUpgradeDowngradeCoordinator::_checkPreconditions(OperationContext
 
     const auto& coll = collAcquisition.getCollectionPtr();
 
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "Collection " << originalNss().toStringForErrorMsg()
-                          << " is not a timeseries collection",
-            coll->isTimeseriesCollection());
+    if (!coll->isTimeseriesCollection()) {
+        // The main namespace exists but is not a timeseries collection.
+        // Check whether an orphan bucket collection also exists.
+        const auto bucketsNss = originalNss().makeTimeseriesBucketsNamespace();
+        auto bucketsAcq = acquireCollectionMaybeLockFree(
+            opCtx,
+            CollectionAcquisitionRequest(bucketsNss,
+                                         PlacementConcern::kPretendUnsharded,
+                                         repl::ReadConcernArgs::kLocal,
+                                         AcquisitionPrerequisites::kRead));
+        if (bucketsAcq.exists()) {
+            uasserted(ErrorCodes::UserDataInconsistent,
+                      str::stream() << "Collection " << originalNss().toStringForErrorMsg()
+                                    << " is a regular (non-timeseries) collection but an orphan "
+                                       "bucket collection "
+                                    << bucketsNss.toStringForErrorMsg()
+                                    << " exists - treating as metadata inconsistency");
+        }
+        uasserted(ErrorCodes::IllegalOperation,
+                  str::stream() << "Collection " << originalNss().toStringForErrorMsg()
+                                << " is not a timeseries collection");
+    }
 
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Timeseries upgrade/downgrade must be invoked on the "
