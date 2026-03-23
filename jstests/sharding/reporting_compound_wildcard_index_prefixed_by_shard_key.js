@@ -58,9 +58,11 @@ checkLogAndServerStatusMetrics(primaryShard, 1, 1);
 assert.commandWorked(
     st.s.adminCommand({moveChunk: coll.getFullName(), find: {skey: 0}, to: st.shard1.shardName}));
 checkLogAndServerStatusMetrics(primaryShard, 1, 2);
+checkLogAndServerStatusMetrics(st.shard1, 1, 1);
 
 assert.commandWorked(
     st.s.adminCommand({moveChunk: coll.getFullName(), find: {skey: 0}, to: st.shard2.shardName}));
-checkLogAndServerStatusMetrics(st.shard1, 1, 1);
+checkLogAndServerStatusMetrics(st.shard1, 1, 2);
+checkLogAndServerStatusMetrics(st.shard2, 1, 1);
 
 st.stop();
