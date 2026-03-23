@@ -7,5 +7,4 @@ excludes:
   - "retryable_writes.exclude_tags"
   - "retryable_writes.exclude_files"
   - "fcv_upgrade_downgrade_timeseries.common_exclude_files"
-  - "fcv_upgrade_downgrade_timeseries.sharded_collections_exclude_files"
   - "fcv_upgrade_downgrade_timeseries.exclude_tags"

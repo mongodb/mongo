@@ -221,7 +221,6 @@ selector:
     - jstests/core/**/batch_write_command_w0.js
     - jstests/core/timeseries/query/timeseries_lastpoint.js
     - jstests/core/timeseries/query/timeseries_out_non_sharded.js
-    - jstests/core/timeseries/query/timeseries_view_aggregate.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos

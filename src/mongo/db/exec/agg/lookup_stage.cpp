@@ -325,6 +325,9 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipelineFromViewDefinition(
     opts.attachCursorSource = false;
     opts.validator = mongo::lookupPipeValidator;
 
+    // Store the original size before the view pipeline is prepended.
+    size_t originalSize = _sharedState->resolvedPipeline.size();
+
     // Resolve the view definition.
     std::unique_ptr<mongo::Pipeline> resolvedPipeline =
         pipeline_factory::makePipelineFromViewDefinition(
@@ -347,10 +350,20 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipelineFromViewDefinition(
                 "new_pipe"_attr =
                     mongo::Pipeline::serializePipelineForLogging(_sharedState->resolvedPipeline));
 
-    // The index of the field join match stage needs to be set to the length of the view
-    // pipeline, as it is no longer the first stage in the resolved pipeline.
+    // The index of the field join match stage needs to be shifted forward by the number of
+    // stages prepended from the view pipeline.
     if (hasLocalFieldForeignFieldJoin()) {
-        _fieldMatchPipelineIdx = viewPipeline.size();
+        // A concurrent downgrade may transform a timeseries collection into a view, potentially
+        // causing multiple view kickbacks during the lifetime of $lookup. To handle these repeated
+        // view kickbacks, we need to increment '_fieldMatchPipelineIdx' to preserve the previously
+        // prepended view pipelines.
+        // TODO SERVER-121988 Remove 'isTimeseriesBucketsCollection' if this behavior should apply
+        // to all collections.
+        // TODO SERVER-111172: Remove (if there is) any timeseries handling after 9.0 is LTS.
+        _fieldMatchPipelineIdx = resolvedNs.isTimeseriesBucketsCollection()
+            ? _fieldMatchPipelineIdx.value_or(0) +
+                (_sharedState->resolvedPipeline.size() - originalSize)
+            : viewPipeline.size();
     }
 
     // Update the expression context with any new namespaces the resolved pipeline has

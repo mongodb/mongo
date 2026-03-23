@@ -13,13 +13,6 @@
       # TODO SERVER-112816 re-enable tests that uses out stage on timeseries collections
       - jstests/core/timeseries/query/timeseries_out_non_sharded.js
 
-- name: sharded_collections_exclude_files
-  value:
-    exclude_files:
-      # TODO SERVER-120567 include these tests once view over timeseries works properly
-      # when executed concurrently with FCV upgrade/downgrade
-      - jstests/core/timeseries/query/timeseries_view_aggregate.js
-
 - name: exclude_tags
   value:
     exclude_with_any_tags:
