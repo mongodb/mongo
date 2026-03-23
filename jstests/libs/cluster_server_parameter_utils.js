@@ -65,6 +65,7 @@ export const kNonTestOnlyClusterParameters = {
     configServerReadPreferenceForCatalogQueries: {
         default: {mustAlwaysUseNearest: false},
         testValues: [{mustAlwaysUseNearest: true}, {mustAlwaysUseNearest: false}],
+        minFCV: "8.0",
     }
 };
 
