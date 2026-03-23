@@ -37,6 +37,7 @@
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
+    getLookupStageIndexStrategy,
     getPlanCacheKeyFromPipeline,
     getPlanCacheKeyFromShape,
     getPlanCacheShapeHashFromObject,
@@ -229,7 +230,7 @@ if (!isUsingSbePlanCache) {
         const lookupStage = getPlanStage(explain, "EQ_LOOKUP");
         assert.neq(null, lookupStage, explain);
         assert.eq(lookupStage.strategy, "IndexedLoopJoin", explain);
-        assert.eq(lookupStage.indexName, "b_1");
+        assert.eq(getLookupStageIndexStrategy(lookupStage).indexName, "b_1", explain);
 
         // The '$planCacheStats' pipeline executed against the foreign collection shouldn't include
         // cached $lookup plans.
