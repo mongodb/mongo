@@ -588,6 +588,7 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "query_planner_test",
     srcs = [
+        "get_executor_deferred_engine_choice_lowering_test.cpp",
         "planner_access_test.cpp",
         "planner_analysis_test.cpp",
         "planner_ixselect_test.cpp",

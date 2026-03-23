@@ -81,10 +81,19 @@ public:
                     "Expected 1 query solutions for non-idhack queries",
                     _rankingResult.solutions.size() == 1);
         }
+
         auto solution = std::move(_rankingResult.solutions[0]);
-        if (solution->root()->getType() == STAGE_EOF) {
+
+        // There are two EOF-related optimizations:
+        //     - If a non-existent collection is queried, we may create an EOF plan.
+        //     - If multiplanning was used and a plan reached an EOF state, the query
+        //       has been fully answered and there's no more execution that needs to
+        //       happen. In this case we return a classic executor so that we don't
+        //       have to restart work using SBE.
+        if (solution->root()->getType() == STAGE_EOF || useEofOptimization()) {
             return makeClassicExecutor(std::move(solution));
         }
+
         const auto engine = attachPipelineStagesAndSelectEngine(solution);
         return engine == EngineChoice::kClassic ? makeClassicExecutor(std::move(solution))
                                                 : makeSbePlanExecutor(std::move(solution));
@@ -156,7 +165,18 @@ private:
         return _rankingResult.plannerParams.get();
     }
 
-    std::unique_ptr<MultiPlanStage> getMps() {
+    const MultiPlanStage* peekMps() const {
+        if (!_rankingResult.execState) {
+            return nullptr;
+        }
+        const PlanStage* planStage = _rankingResult.execState->root.get();
+        if (!planStage || planStage->stageType() != STAGE_MULTI_PLAN) {
+            return nullptr;
+        }
+        return static_cast<const MultiPlanStage*>(planStage);
+    }
+
+    std::unique_ptr<MultiPlanStage> extractMps() {
         if (!_rankingResult.execState) {
             return nullptr;
         }
@@ -165,6 +185,24 @@ private:
             return nullptr;
         }
         return std::unique_ptr<MultiPlanStage>(static_cast<MultiPlanStage*>(planStage.release()));
+    }
+
+    /*
+     * Analyzes the multiplan stage (if present) to see if the query is eligible for an
+     * optimization where a plan that reaches EOF can skip engine selection since the
+     * query is effectively answered already by classic.
+     */
+    bool useEofOptimization() const {
+        auto mps = peekMps();
+        return mps && mps->bestSolutionEof() &&
+            // If explain is used, go through regular engine selection to display which engine is
+            // targeted if EOF is not reached during multiplanning.
+            !_cq->getExpCtxRaw()->getExplain() &&
+            // We can't use EOF optimization if pipeline is present. Because we may need to execute
+            // the pipeline part in SBE, we have to rebuild and rerun the whole query.
+            _cq->cqPipeline().empty() &&
+            // We want more coverage for SBE in debug builds.
+            !kDebugBuild;
     }
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeSbePlanExecutor(
@@ -215,7 +253,7 @@ private:
                                                            {} /*rejectedJoinPlans*/,
                                                            std::move(remoteCursors),
                                                            std::move(remoteExplains),
-                                                           getMps()));
+                                                           extractMps()));
     }
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeClassicExecutor(
