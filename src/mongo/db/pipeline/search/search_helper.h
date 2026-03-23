@@ -99,11 +99,6 @@ void checkAndSetViewOnExpCtx(boost::intrusive_ptr<ExpressionContext> expCtx,
                              const NamespaceString& viewName);
 
 /**
- * Check if this is a stored source $search or $_internalSearchMongot pipeline.
- */
-bool isStoredSource(const Pipeline* pipeline);
-
-/**
  * Check if this is a search-related pipeline, specifically that the front of the pipeline is a
  * stage that will rely on calls to mongot.
  */

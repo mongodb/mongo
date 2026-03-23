@@ -189,16 +189,6 @@ inline bool isMongotPipeline(const std::shared_ptr<IncrementalFeatureRolloutCont
     }
 }
 
-inline bool isStoredSource(const std::vector<BSONObj> pipeline) {
-    if (pipeline.size() >= 1 && pipeline[0][DocumentSourceSearch::kStageName]) {
-        auto searchStage = pipeline[0][DocumentSourceSearch::kStageName];
-        auto storedSourceElem = searchStage[mongot_cursor::kReturnStoredSourceArg];
-        return !storedSourceElem.eoo() && storedSourceElem.Bool();
-    }
-    return false;
-}
-
-
 }  // namespace search_helper_bson_obj
 
 

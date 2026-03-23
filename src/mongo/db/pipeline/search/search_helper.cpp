@@ -266,21 +266,6 @@ void checkAndSetViewOnExpCtx(boost::intrusive_ptr<ExpressionContext> expCtx,
     }
 }
 
-bool isStoredSource(const Pipeline* pipeline) {
-    auto ds = pipeline->peekFront();
-    auto searchStage = dynamic_cast<DocumentSourceSearch*>(ds);
-    if (searchStage && searchStage->isStoredSource()) {
-        return true;
-    }
-
-    auto searchStageInternal = dynamic_cast<DocumentSourceInternalSearchMongotRemote*>(ds);
-    if (searchStageInternal && searchStageInternal->isStoredSource()) {
-        return true;
-    }
-
-    return false;
-}
-
 bool isMongotPipeline(const Pipeline* pipeline) {
     if (!pipeline || pipeline->empty()) {
         return false;
