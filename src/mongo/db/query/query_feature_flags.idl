@@ -357,6 +357,13 @@ feature_flags:
         fcv_gated: false
         incremental_rollout_phase: in_development
 
+    featureFlagSearchExtension:
+        description: "Feature flag to enable search and searchMeta extension functionality."
+        cpp_varname: gFeatureFlagSearchExtension
+        default: false
+        fcv_gated: false
+        incremental_rollout_phase: in_development
+
     featureFlagMergeStageInsertWithUpdateBackup:
         description: "Feature flag to enable $merge stage strategy that tries to insert documents and falls back to update in case of errors"
         cpp_varname: gFeatureFlagMergeStageInsertWithUpdateBackup
