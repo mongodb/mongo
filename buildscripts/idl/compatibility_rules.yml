@@ -488,3 +488,6 @@ IGNORE_REMOVED_PARAMETERS_LIST:
   # anything added below this comment is added after the initial parameter check was added.
   # Please be specic about why this parameter should be removed instead of deprecated.
   # Ideally this list should not grow and parameters are not removed.
+
+  # We no longer suppport this error path and no atlas clusters have this parameter enabled
+  - "startLsnTruncatedMaxFailovers"
