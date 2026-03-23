@@ -37,7 +37,8 @@ def plot_cost_vs_time(csv_rows: list[dict], output_dir: str):
     """Write calibration results to CSV and generate a cost-vs-time scatter plot."""
     os.makedirs(output_dir, exist_ok=True)
 
-    csv_path = os.path.join(output_dir, "cost_vs_time.csv")
+    scenario = csv_rows[0]["scenario"]
+    csv_path = os.path.join(output_dir, f"cost_vs_time_{scenario}.csv")
     with open(csv_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=csv_rows[0].keys())
         writer.writeheader()
@@ -62,11 +63,11 @@ def plot_cost_vs_time(csv_rows: list[dict], output_dir: str):
 
     ax.set_xlabel("Execution Time (ms)")
     ax.set_ylabel("Optimizer Cost Estimate")
-    ax.set_title("Execution Time vs Cost Estimate: INLJ and HJ")
+    ax.set_title(f"Execution Time vs Cost Estimate: INLJ and HJ ({scenario})")
     ax.legend()
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
-    png_path = os.path.join(output_dir, "cost_vs_time.png")
+    png_path = os.path.join(output_dir, f"cost_vs_time_{scenario}.png")
     fig.savefig(png_path, dpi=150)
     print(f"Saved {png_path}")
     plt.show()

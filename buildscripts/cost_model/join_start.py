@@ -256,12 +256,20 @@ async def calibrate_random_io(manager: MongodManager, num_lookups: int = 100):
     return fetch_mean_ms
 
 
-async def calibrate_join_algorithms(manager: MongodManager, num_runs: int = 10):
+async def calibrate_join_algorithms(
+    manager: MongodManager,
+    left_coll: str,
+    right_coll: str,
+    scenario: str,
+    cache_size_gb: float,
+    num_runs: int = 10,
+):
     """
     Compares INLJ vs HJ by running $lookup queries across join fields and selectivities.
 
-    The WT cache is set to 256 MB so neither ~300 MB "large" collection fits entirely
-    in memory, forcing relatively realistic disk I/O during joins.
+    The caller chooses which collections and WT cache size to use, enabling two
+    scenarios: one where the data exceeds the cache and one where the data is fully
+    cache-resident.
 
     For each (join_field, predicate) combination we run three rounds, each after a
     cold restart so cache conditions are comparable:
@@ -278,9 +286,14 @@ async def calibrate_join_algorithms(manager: MongodManager, num_runs: int = 10):
 
     Returns a list of dicts (one per combination) with cost and timing data.
     """
-    print(f"\n=== Join Algorithm Calibration ({num_runs} runs per config) ===")
+    print(
+        f"\n=== Join Algorithm Calibration: {scenario} "
+        f"({left_coll} ⨝ {right_coll}, "
+        f"cache {cache_size_gb} GB, "
+        f"{num_runs} runs per config) ==="
+    )
 
-    join_cache_args = ["--wiredTigerCacheSizeGB", "0.25"]
+    cache_args = ["--wiredTigerCacheSizeGB", str(cache_size_gb)]
     join_fields = [
         # (name, number of distinct values)
         ("unique", COLLECTION_CARDINALITY),
@@ -308,7 +321,7 @@ async def calibrate_join_algorithms(manager: MongodManager, num_runs: int = 10):
                 {"$match": {"random": {"$lte": pred_const}}},
                 {
                     "$lookup": {
-                        "from": "join_coll_2_large",
+                        "from": right_coll,
                         "localField": join_field[0],
                         "foreignField": join_field[0],
                         "as": "joined",
@@ -322,13 +335,11 @@ async def calibrate_join_algorithms(manager: MongodManager, num_runs: int = 10):
             verbosity = "queryPlanner" if skip_execution else "executionStats"
 
             # Using the algorithm which the optimizer picks
-            manager.restart_cold(extra_start_args=join_cache_args)
+            manager.restart_cold(extra_start_args=cache_args)
             await manager.database.set_parameter("internalJoinMethod", "any")
             algo_freqs: dict[str, int] = {}
             for _ in range(num_runs):
-                result = await run_join_explain(
-                    manager.database, "join_coll_1_large", pipeline, verbosity
-                )
+                result = await run_join_explain(manager.database, left_coll, pipeline, verbosity)
                 algo_freqs[result.algorithm] = algo_freqs.get(result.algorithm, 0) + 1
 
             optimizer_picks_str = " ".join(
@@ -341,28 +352,24 @@ async def calibrate_join_algorithms(manager: MongodManager, num_runs: int = 10):
             inlj_cost_mean, hj_cost_mean = None, None
 
             # Forcing INLJ
-            manager.restart_cold(extra_start_args=join_cache_args)
+            manager.restart_cold(extra_start_args=cache_args)
             await manager.database.set_parameter("internalJoinMethod", "INLJ")
 
             inlj_times, inlj_costs = [], []
             for _ in range(num_runs):
-                result = await run_join_explain(
-                    manager.database, "join_coll_1_large", pipeline, verbosity
-                )
+                result = await run_join_explain(manager.database, left_coll, pipeline, verbosity)
                 assert result.algorithm == "INLJ", f"Expected INLJ but got {result.algorithm}"
                 inlj_costs.append(result.cost_estimate)
                 if result.exec_time_ms is not None:
                     inlj_times.append(result.exec_time_ms)
 
             # Forcing HJ
-            manager.restart_cold(extra_start_args=join_cache_args)
+            manager.restart_cold(extra_start_args=cache_args)
             await manager.database.set_parameter("internalJoinMethod", "HJ")
 
             hj_times, hj_costs = [], []
             for _ in range(num_runs):
-                result = await run_join_explain(
-                    manager.database, "join_coll_1_large", pipeline, verbosity
-                )
+                result = await run_join_explain(manager.database, left_coll, pipeline, verbosity)
                 assert result.algorithm == "HJ", f"Expected HJ but got {result.algorithm}"
                 hj_costs.append(result.cost_estimate)
                 if result.exec_time_ms is not None:
@@ -390,6 +397,7 @@ async def calibrate_join_algorithms(manager: MongodManager, num_runs: int = 10):
 
             results.append(
                 {
+                    "scenario": scenario,
                     "join_field": join_field[0],
                     "pred_const": pred_const,
                     "skipped": skip_execution,
@@ -415,6 +423,7 @@ async def main():
 
     repo_root = os.path.abspath(os.path.join(script_directory, "..", ".."))
     mongod_bin = os.path.join(repo_root, "bazel-bin", "install-mongod", "bin", "mongod")
+    output_dir = os.path.join(script_directory, "join_output")
 
     with MongodManager(
         mongod_bin,
@@ -451,8 +460,25 @@ async def main():
             f"  ({time_rand_page_ms:.4f}ms / {cpu_tuple_ms:.6f}ms)"
         )
 
-        results = await calibrate_join_algorithms(manager)
-        plot_cost_vs_time(results, os.path.join(script_directory, "join_output"))
+        # The ~100MB collections will fit comfortably in the 5GB cache.
+        in_cache_results = await calibrate_join_algorithms(
+            manager,
+            left_coll="join_coll_1",
+            right_coll="join_coll_2",
+            scenario="in-cache",
+            cache_size_gb=5,
+        )
+        plot_cost_vs_time(in_cache_results, output_dir)
+
+        # The ~300MB collections won't fit in the 256MB cache.
+        exceeds_cache_results = await calibrate_join_algorithms(
+            manager,
+            left_coll="join_coll_1_large",
+            right_coll="join_coll_2_large",
+            scenario="exceeds-cache",
+            cache_size_gb=0.25,
+        )
+        plot_cost_vs_time(exceeds_cache_results, output_dir)
 
     print("DONE!")
 
