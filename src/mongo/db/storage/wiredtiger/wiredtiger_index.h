@@ -385,6 +385,10 @@ public:
         return false;
     }
 
+    boost::optional<RecordId> findLoc(OperationContext* opCtx,
+                                      RecoveryUnit& ru,
+                                      std::span<const char> keyString) const override;
+
     bool isDup(OperationContext* opCtx,
                RecoveryUnit& ru,
                WT_CURSOR* c,

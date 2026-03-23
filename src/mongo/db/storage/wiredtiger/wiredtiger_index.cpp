@@ -1448,6 +1448,53 @@ std::unique_ptr<SortedDataBuilderInterface> WiredTigerIdIndex::makeBulkBuilder(
     return std::make_unique<IdBulkBuilder>(this, opCtx, ru);
 }
 
+boost::optional<RecordId> WiredTigerIdIndex::findLoc(OperationContext* opCtx,
+                                                     RecoveryUnit& ru,
+                                                     std::span<const char> keyString) const {
+    invariant(KeyFormat::Long == _rsKeyFormat);
+    // Bypass WiredTigerIndexCursorBase: use a raw cursor like _unindex does.
+    // RecordId is stored in the WT value, not the key.
+    auto& wtRu = WiredTigerRecoveryUnit::get(ru);
+    auto cursorParams =
+        getWiredTigerCursorParams(wtRu, _container.tableId(), true /* allowOverwrite */);
+    WiredTigerCursor curwrap(std::move(cursorParams), _container.uri(), *wtRu.getSession());
+    wtRu.assertInActiveTxn();
+    WT_CURSOR* c = curwrap.get();
+
+    setKey(c, keyString);
+    int ret = wiredTigerPrepareConflictRetry(
+        *opCtx, StorageExecutionContext::get(opCtx)->getPrepareConflictTracker(), ru, [&] {
+            return c->search(c);
+        });
+
+    if (ret == WT_NOTFOUND) {
+        return boost::none;
+    }
+    invariantWTOK(ret, c->session);
+
+    WT_ITEM value;
+    invariantWTOK(c->get_value(c, &value), c->session);
+    BufReader br(value.data, value.size);
+    RecordId rid = key_string::decodeRecordIdLong(&br);
+    invariant(!rid.isNull());
+    key_string::TypeBits typeBits = key_string::TypeBits::fromBuffer(getKeyStringVersion(), &br);
+    if (!br.atEof()) {
+        // getLogOptionsForDataCorruption uasserts with DataCorruptionDetected when
+        // DataCorruptionDetectionMode is kThrow; otherwise logs only. Matches
+        // WiredTigerIdIndexCursor::updatePosition for the same condition.
+        auto bsonKey = key_string::toBson(keyString, _ordering, typeBits);
+
+        LOGV2_ERROR_OPTIONS(5176202,
+                            getLogOptionsForDataCorruption(ru),
+                            "findLoc seeing multiple records for key in _id index",
+                            "key"_attr = bsonKey,
+                            "index"_attr = _indexName,
+                            "uri"_attr = _container.uri(),
+                            logAttrs(_collectionUUID));
+    }
+    return rid;
+}
+
 std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIdIndex::_insert(
     OperationContext* opCtx,
     RecoveryUnit& ru,
