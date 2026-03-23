@@ -967,8 +967,11 @@ Status NetworkInterfaceTL::CommandStateBase::handleClientAcquisitionError(Status
     timeSpentWaitingBeforeConnectionTimeoutMillis.increment(
         durationCount<Milliseconds>(connTimeoutWaitTime));
 
-    auto timeoutCode = request.timeoutCode;
-    if (timeoutCode && connTimeoutWaitTime >= poolTimeout) {
+    // Honor the request's timeout error code for any connection-acquisition time limit failure.
+    // Do not require connTimeoutWaitTime >= poolTimeout: poolTimeout is the remaining deadline
+    // budget at the start of acquisition, while acquisition can fail immediately (e.g. fail
+    // points) with an ExceededTimeLimit-class error before that budget is consumed.
+    if (auto timeoutCode = request.timeoutCode) {
         status = Status(*timeoutCode, status.reason());
     }
 
