@@ -45,6 +45,7 @@ from join_calibration_settings import (
     join_data_generator,
     join_database,
 )
+from join_plotting import plot_cost_vs_time
 from join_workload_execution import run_join_explain
 from mongod_manager import MongodManager
 from scipy.stats import trim_mean
@@ -145,12 +146,12 @@ async def calibrate_cpu(manager: MongodManager, num_runs: int = 30):
 
         join_times_ms = []
         for i in range(num_runs):
-            t, algo, used_disk = await run_join_explain(manager.database, "join_coll_1", pipeline)
-            assert algo == "HJ", f"Expected HJ but got {algo}"
-            assert not used_disk, "HJ spilled to disk during CPU calibration"
+            result = await run_join_explain(manager.database, "join_coll_1", pipeline)
+            assert result.algorithm == "HJ", f"Expected HJ but got {result.algorithm}"
+            assert not result.used_disk, "HJ spilled to disk during CPU calibration"
 
-            join_times_ms.append(t)
-            print(f"  [{i + 1}/{num_runs}] in-memory HJ: {t:.3f}ms")
+            join_times_ms.append(result.exec_time_ms)
+            print(f"  [{i + 1}/{num_runs}] in-memory HJ: {result.exec_time_ms:.3f}ms")
 
     mean_join_ms = trim_mean(join_times_ms, proportiontocut=TRIMMED_MEAN_PROPORTION)
     cpu_tuple_ms = mean_join_ms / (7 * COLLECTION_CARDINALITY)
@@ -268,33 +269,38 @@ async def calibrate_join_algorithms(manager: MongodManager, num_runs: int = 10):
       2. Force INLJ
       3. Force HJ
 
-    High-cardinality join fields (uniform_256, uniform_16) produce very large result
-    sets, so we don't actually run those join queries because they would take too long.
-    We just verify that the optimizer picks HJ, which is the best algorithm for these.
+    Combinations whose estimated output cardinality exceeds the 500K threshold are too expensive
+    to execute. For those we only collect the optimizer's algorithm pick and verify that HJ was
+    chosen, which is the best algorithm for these cases.
 
     Prints a per-combination summary showing which algorithm is genuinely faster
     and whether the optimizer's majority pick is correct.
+
+    Returns a list of dicts (one per combination) with cost and timing data.
     """
     print(f"\n=== Join Algorithm Calibration ({num_runs} runs per config) ===")
 
     join_cache_args = ["--wiredTigerCacheSizeGB", "0.25"]
     join_fields = [
-        # (name, low or high cardinality)
-        ("unique", "low"),
-        ("uniform_64k", "low"),
-        ("uniform_4k", "low"),
-        ("uniform_256", "high"),
-        ("uniform_16", "high"),
+        # (name, number of distinct values)
+        ("unique", COLLECTION_CARDINALITY),
+        ("uniform_64k", 65536),
+        ("uniform_4k", 4096),
+        ("uniform_256", 256),
+        ("uniform_16", 16),
     ]
-    predicate_constants = [256, 1024, 4096, 16384, 65536]
+    predicate_constants = [4, 16, 64, 256, 1024, 4096, 16384, 65536]
 
     header = (
         f"{'join_field':<16} {'pred':<8} {'optimizer_picks':<24} "
-        f"{'INLJ_ms':>10} {'HJ_ms':>10} {'faster':>8} {'correct':>10}"
+        f"{'INLJ_ms':>10} {'HJ_ms':>10} {'faster':>8} {'correct':>10} "
+        f"{'INLJ_cost':>12} {'HJ_cost':>12}"
     )
     separator = "-" * len(header)
     print(header)
     print(separator)
+
+    results = []
 
     for join_field in join_fields:
         for pred_const in predicate_constants:
@@ -311,18 +317,19 @@ async def calibrate_join_algorithms(manager: MongodManager, num_runs: int = 10):
                 {"$unwind": "$joined"},
                 {"$count": "total"},
             ]
-            high_join_cardinality = join_field[1] == "high"
-            verbosity = "queryPlanner" if high_join_cardinality else "executionStats"
+            estimated_output = pred_const * (COLLECTION_CARDINALITY / join_field[1])
+            skip_execution = estimated_output > 500_000
+            verbosity = "queryPlanner" if skip_execution else "executionStats"
 
             # Using the algorithm which the optimizer picks
             manager.restart_cold(extra_start_args=join_cache_args)
             await manager.database.set_parameter("internalJoinMethod", "any")
             algo_freqs: dict[str, int] = {}
             for _ in range(num_runs):
-                _, algo, _ = await run_join_explain(
+                result = await run_join_explain(
                     manager.database, "join_coll_1_large", pipeline, verbosity
                 )
-                algo_freqs[algo] = algo_freqs.get(algo, 0) + 1
+                algo_freqs[result.algorithm] = algo_freqs.get(result.algorithm, 0) + 1
 
             optimizer_picks_str = " ".join(
                 f"{algo} {freq}/{num_runs}"
@@ -331,46 +338,74 @@ async def calibrate_join_algorithms(manager: MongodManager, num_runs: int = 10):
             majority_algo = max(algo_freqs, key=algo_freqs.get)
 
             inlj_mean, hj_mean = None, None
-            if not high_join_cardinality:
-                # Forcing INLJ
-                manager.restart_cold(extra_start_args=join_cache_args)
-                await manager.database.set_parameter("internalJoinMethod", "INLJ")
-                inlj_times = []
-                for _ in range(num_runs):
-                    t, algo, _ = await run_join_explain(
-                        manager.database, "join_coll_1_large", pipeline
-                    )
-                    assert algo == "INLJ", f"Expected INLJ but got {algo}"
-                    inlj_times.append(t)
+            inlj_cost_mean, hj_cost_mean = None, None
 
-                # Forcing HJ
-                manager.restart_cold(extra_start_args=join_cache_args)
-                await manager.database.set_parameter("internalJoinMethod", "HJ")
-                hj_times = []
-                for _ in range(num_runs):
-                    t, algo, _ = await run_join_explain(
-                        manager.database, "join_coll_1_large", pipeline
-                    )
-                    assert algo == "HJ", f"Expected HJ but got {algo}"
-                    hj_times.append(t)
+            # Forcing INLJ
+            manager.restart_cold(extra_start_args=join_cache_args)
+            await manager.database.set_parameter("internalJoinMethod", "INLJ")
 
+            inlj_times, inlj_costs = [], []
+            for _ in range(num_runs):
+                result = await run_join_explain(
+                    manager.database, "join_coll_1_large", pipeline, verbosity
+                )
+                assert result.algorithm == "INLJ", f"Expected INLJ but got {result.algorithm}"
+                inlj_costs.append(result.cost_estimate)
+                if result.exec_time_ms is not None:
+                    inlj_times.append(result.exec_time_ms)
+
+            # Forcing HJ
+            manager.restart_cold(extra_start_args=join_cache_args)
+            await manager.database.set_parameter("internalJoinMethod", "HJ")
+
+            hj_times, hj_costs = [], []
+            for _ in range(num_runs):
+                result = await run_join_explain(
+                    manager.database, "join_coll_1_large", pipeline, verbosity
+                )
+                assert result.algorithm == "HJ", f"Expected HJ but got {result.algorithm}"
+                hj_costs.append(result.cost_estimate)
+                if result.exec_time_ms is not None:
+                    hj_times.append(result.exec_time_ms)
+
+            inlj_cost_mean = sum(inlj_costs) / len(inlj_costs)
+            hj_cost_mean = sum(hj_costs) / len(hj_costs)
+            if inlj_times:
                 inlj_mean = trim_mean(inlj_times, proportiontocut=TRIMMED_MEAN_PROPORTION)
+            if hj_times:
                 hj_mean = trim_mean(hj_times, proportiontocut=TRIMMED_MEAN_PROPORTION)
 
             # Print whether the optimizer is making the correct decision
-            faster = "HJ" if high_join_cardinality or hj_mean < inlj_mean else "INLJ"
+            faster = "HJ" if skip_execution or hj_mean < inlj_mean else "INLJ"
             correct = "✓" if majority_algo == faster else "✗"
 
-            def fmt_mean(v):
-                return f"{v:>10.1f}" if v is not None else f"{'-':>10}"
+            def fmt(v, width=10, decimals=1):
+                return f"{v:>{width}.{decimals}f}" if v is not None else f"{'-':>{width}}"
 
             print(
                 f"{join_field[0]:<16} {pred_const:<8} {optimizer_picks_str:<24} "
-                f"{fmt_mean(inlj_mean)} {fmt_mean(hj_mean)} {faster:>8} {correct:>10}"
+                f"{fmt(inlj_mean)} {fmt(hj_mean)} {faster:>8} {correct:>10} "
+                f"{fmt(inlj_cost_mean, 12, 2)} {fmt(hj_cost_mean, 12, 2)}"
+            )
+
+            results.append(
+                {
+                    "join_field": join_field[0],
+                    "pred_const": pred_const,
+                    "skipped": skip_execution,
+                    "optimizer_majority": majority_algo,
+                    "inlj_time_ms": inlj_mean,
+                    "hj_time_ms": hj_mean,
+                    "inlj_cost": inlj_cost_mean,
+                    "hj_cost": hj_cost_mean,
+                    "faster": faster,
+                    "correct": correct,
+                }
             )
 
     await manager.database.set_parameter("internalJoinMethod", "any")
     print(separator)
+    return results
 
 
 async def main():
@@ -416,7 +451,8 @@ async def main():
             f"  ({time_rand_page_ms:.4f}ms / {cpu_tuple_ms:.6f}ms)"
         )
 
-        await calibrate_join_algorithms(manager)
+        results = await calibrate_join_algorithms(manager)
+        plot_cost_vs_time(results, os.path.join(script_directory, "join_output"))
 
     print("DONE!")
 

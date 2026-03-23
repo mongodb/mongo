@@ -3,3 +3,4 @@ cm
 *.png
 figures/
 parameters.csv
+join_output/

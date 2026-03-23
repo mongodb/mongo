@@ -29,7 +29,16 @@
 
 from __future__ import annotations
 
+from typing import NamedTuple
+
 from database_instance import DatabaseInstance
+
+
+class JoinExplainResult(NamedTuple):
+    exec_time_ms: float | None
+    used_disk: bool | None
+    algorithm: str
+    cost_estimate: float
 
 
 def abbreviate_stage(stage_name: str) -> str:
@@ -47,24 +56,21 @@ async def run_join_explain(
     collection_name: str,
     pipeline: list,
     verbosity: str = "executionStats",
-) -> tuple[float | None, str, bool | None]:
-    """
-    Run an aggregation explain and return (exec_time_ms, algorithm, used_disk).
-    If verbosity is 'queryPlanner', exec_time_ms will be None.
-    """
+) -> JoinExplainResult:
     explain = await database.explain_aggregate(collection_name, pipeline, verbosity)
     cursor = explain["stages"][0]["$cursor"]
+
+    exec_time_ms, used_disk = None, None
     if verbosity == "executionStats":
         stats = cursor["executionStats"]["executionStages"]
         exec_time_ms = stats["executionTimeNanos"] / 1e6
         used_disk = stats["inputStage"].get("usedDisk")
-    else:
-        exec_time_ms = None
-        used_disk = None
-
     query_plan = cursor["queryPlanner"]["winningPlan"]["queryPlan"]
-    algorithm = abbreviate_stage(query_plan["stage"])
 
     assert query_plan["leftEmbeddingField"] == "none", f"Expected {collection_name} as outer table"
-
-    return exec_time_ms, algorithm, used_disk
+    return JoinExplainResult(
+        exec_time_ms=exec_time_ms,
+        used_disk=used_disk,
+        algorithm=abbreviate_stage(query_plan["stage"]),
+        cost_estimate=query_plan["costEstimate"],
+    )
