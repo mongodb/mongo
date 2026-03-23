@@ -59,7 +59,8 @@ assert.eq(profileObj.command.update, {$inc: {"b.$[i]": 1}}, tojson(profileObj));
 assert.eq(profileObj.command.collation, {locale: "fr"}, tojson(profileObj));
 assert.eq(profileObj.command.arrayFilters, [{i: 0}], tojson(profileObj));
 assert.eq(profileObj.keysExamined, 0, tojson(profileObj));
-assert.eq(profileObj.docsExamined, 3, tojson(profileObj));
+// Yielding and write conflicts can cause extra reads because of write_stage_common::ensureStillMatches.
+assert.between(3, profileObj.docsExamined, 6, tojson(profileObj));
 assert.eq(profileObj.nMatched, 1, tojson(profileObj));
 assert.eq(profileObj.nModified, 1, tojson(profileObj));
 assert.eq(profileObj.keysInserted, 1, tojson(profileObj));
@@ -94,7 +95,8 @@ assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
 assert.eq(profileObj.command.query, {a: 2}, tojson(profileObj));
 assert.eq(profileObj.command.remove, true, tojson(profileObj));
 assert.eq(profileObj.keysExamined, 0, tojson(profileObj));
-assert.eq(profileObj.docsExamined, 3, tojson(profileObj));
+// Yielding and write conflicts can cause extra reads because of write_stage_common::ensureStillMatches.
+assert.between(3, profileObj.docsExamined, 6, tojson(profileObj));
 assert.eq(profileObj.ndeleted, 1, tojson(profileObj));
 assert.eq(profileObj.keysDeleted, expectedKeysDeleted, tojson(profileObj));
 assert.eq(profileObj.planSummary, "COLLSCAN", tojson(profileObj));
@@ -144,8 +146,9 @@ const expectedPlan = collectionIsClustered
 
 assert.eq({_id: 2, a: 2}, coll.findAndModify({query: {_id: 2}, update: {$inc: {b: 1}}}));
 profileObj = getLatestProfilerEntry(testDB);
-assert.eq(profileObj.keysExamined, expectedKeysExamined, tojson(profileObj));
-assert.eq(profileObj.docsExamined, 1, tojson(profileObj));
+// Yielding and write conflicts can cause extra reads because of write_stage_common::ensureStillMatches.
+assert.between(expectedKeysExamined, profileObj.keysExamined, 2 * expectedKeysExamined, tojson(profileObj));
+assert.between(1, profileObj.docsExamined, 2, tojson(profileObj));
 assert.eq(profileObj.nMatched, 1, tojson(profileObj));
 assert.eq(profileObj.nModified, 1, tojson(profileObj));
 assert.eq(profileObj.planSummary, expectedPlan, tojson(profileObj));
@@ -167,7 +170,8 @@ assert.eq(profileObj.command.query, {a: 2}, tojson(profileObj));
 assert.eq(profileObj.command.update, {$inc: {b: 1}}, tojson(profileObj));
 assert.eq(profileObj.command.fields, {_id: 0, a: 1}, tojson(profileObj));
 assert.eq(profileObj.keysExamined, 0, tojson(profileObj));
-assert.eq(profileObj.docsExamined, 3, tojson(profileObj));
+// Yielding and write conflicts can cause extra reads because of write_stage_common::ensureStillMatches.
+assert.between(3, profileObj.docsExamined, 6, tojson(profileObj));
 assert.eq(profileObj.nMatched, 1, tojson(profileObj));
 assert.eq(profileObj.nModified, 1, tojson(profileObj));
 assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));

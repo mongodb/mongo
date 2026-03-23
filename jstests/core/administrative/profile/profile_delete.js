@@ -67,8 +67,9 @@ assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
 assert.eq(profileObj.op, "remove", tojson(profileObj));
 assert.eq(profileObj.command.collation, {locale: "fr"}, tojson(profileObj));
 assert.eq(profileObj.ndeleted, 1, tojson(profileObj));
-assert.eq(profileObj.keysExamined, 1, tojson(profileObj));
-assert.eq(profileObj.docsExamined, 1, tojson(profileObj));
+// Yielding and write conflicts can cause extra reads because of write_stage_common::ensureStillMatches.
+assert.between(1, profileObj.keysExamined, 2, tojson(profileObj));
+assert.between(1, profileObj.docsExamined, 2, tojson(profileObj));
 assert.eq(profileObj.keysDeleted, expectedKeysDeleted, tojson(profileObj));
 assert(profileObj.hasOwnProperty("queryHash"), tojson(profileObj));
 assert(profileObj.hasOwnProperty("planCacheKey"), tojson(profileObj));

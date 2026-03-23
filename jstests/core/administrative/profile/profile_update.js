@@ -47,8 +47,9 @@ let profileObj = getLatestProfilerEntry(testDB);
 
 assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
 assert.eq(profileObj.op, "update", tojson(profileObj));
-assert.eq(profileObj.keysExamined, 1, tojson(profileObj));
-assert.eq(profileObj.docsExamined, 1, tojson(profileObj));
+// Yielding and write conflicts can cause extra reads because of write_stage_common::ensureStillMatches.
+assert.between(1, profileObj.keysExamined, 2, tojson(profileObj));
+assert.between(1, profileObj.docsExamined, 2, tojson(profileObj));
 assert.eq(profileObj.keysInserted, 1, tojson(profileObj));
 assert.eq(profileObj.keysDeleted, 1, tojson(profileObj));
 assert.eq(profileObj.nMatched, 1, tojson(profileObj));
@@ -89,8 +90,9 @@ assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.update({a: {$gte: 5}}, {$set: {c: 1}, $inc: {a: -10}}, {multi: true}));
 profileObj = getLatestProfilerEntry(testDB);
 
-assert.eq(profileObj.keysExamined, 5, tojson(profileObj));
-assert.eq(profileObj.docsExamined, 5, tojson(profileObj));
+// Yielding and write conflicts can cause extra reads because of write_stage_common::ensureStillMatches.
+assert.between(5, profileObj.keysExamined, 10, tojson(profileObj));
+assert.between(5, profileObj.docsExamined, 10, tojson(profileObj));
 assert.eq(profileObj.keysInserted, 5, tojson(profileObj));
 assert.eq(profileObj.keysDeleted, 5, tojson(profileObj));
 assert.eq(profileObj.nMatched, 5, tojson(profileObj));
@@ -123,7 +125,8 @@ assert.eq(
     tojson(profileObj),
 );
 assert.eq(profileObj.keysExamined, expectedKeysExamined, tojson(profileObj));
-assert.eq(profileObj.docsExamined, expectedDocsExamined, tojson(profileObj));
+// Yielding and write conflicts can cause extra reads because of write_stage_common::ensureStillMatches.
+assert.between(expectedDocsExamined, profileObj.docsExamined, 2 * expectedDocsExamined, tojson(profileObj));
 assert.eq(profileObj.keysInserted, expectedKeysInserted, tojson(profileObj));
 assert.eq(profileObj.nMatched, 0, tojson(profileObj));
 assert.eq(profileObj.nModified, 0, tojson(profileObj));

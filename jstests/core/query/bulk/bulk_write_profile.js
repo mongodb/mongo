@@ -116,8 +116,9 @@ assert.eq(profileUpdate.command.filter, {a: {$lt: 4}}, tojson(profileUpdate));
 assert.eq(profileUpdate.command.updateMods, {$push: {b: "mdb"}}, tojson(profileUpdate));
 assert.eq(profileUpdate.command.multi, true, tojson(profileUpdate));
 assert.eq(profileUpdate.command.upsert, false, tojson(profileUpdate));
-assert.eq(profileUpdate.keysExamined, 4, tojson(profileUpdate));
-assert.eq(profileUpdate.docsExamined, 4, tojson(profileUpdate));
+// Yielding and write conflicts can cause extra reads because of write_stage_common::ensureStillMatches.
+assert.between(4, profileUpdate.keysExamined, 8, tojson(profileUpdate));
+assert.between(4, profileUpdate.docsExamined, 8, tojson(profileUpdate));
 assert.eq(profileUpdate.keysInserted, 0, tojson(profileUpdate));
 assert.eq(profileUpdate.keysDeleted, 0, tojson(profileUpdate));
 assert.eq(profileUpdate.nMatched, 4, tojson(profileUpdate));
@@ -128,7 +129,7 @@ assert(profileUpdate.hasOwnProperty("millis"), tojson(profileUpdate));
 assert(profileUpdate.hasOwnProperty("numYield"), tojson(profileUpdate));
 assert(profileUpdate.hasOwnProperty("locks"), tojson(profileUpdate));
 if (isLinux()) {
-    assert(profileUpdate.hasOwnProperty("cpuNanos"), tojson(profileInsert));
+    assert(profileUpdate.hasOwnProperty("cpuNanos"), tojson(profileUpdate));
 }
 assert.eq(profileUpdate.appName, "MongoDB Shell", tojson(profileUpdate));
 
@@ -140,8 +141,9 @@ assert.eq(profileDelete.command.delete, 1, tojson(profileDelete));
 assert.eq(profileDelete.command.filter, {a: {$gte: 8}}, tojson(profileDelete));
 assert.eq(profileDelete.command.multi, true, tojson(profileDelete));
 assert.eq(profileDelete.command.hint, {a: 1}, tojson(profileDelete));
-assert.eq(profileDelete.keysExamined, 5, tojson(profileDelete));
-assert.eq(profileDelete.docsExamined, 5, tojson(profileDelete));
+// Yielding and write conflicts can cause extra reads because of write_stage_common::ensureStillMatches.
+assert.between(5, profileDelete.keysExamined, 10, tojson(profileDelete));
+assert.between(5, profileDelete.docsExamined, 10, tojson(profileDelete));
 assert.eq(profileDelete.ndeleted, 5, tojson(profileDelete));
 assert.eq(profileDelete.keysDeleted, isClustered ? 5 : 5 * 2, tojson(profileDelete));
 assert.eq(profileDelete.planSummary, "IXSCAN { a: 1 }", tojson(profileDelete));
