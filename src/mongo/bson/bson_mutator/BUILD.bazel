@@ -1,0 +1,34 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_fuzztest", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "bson_mutator",
+    srcs = [
+        "bson_mutator.cpp",
+        "bson_mutator_util.cpp",
+    ],
+    hdrs = [
+        "bson_mutator.h",
+        "bson_mutator_owned_obj.h",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:fsan_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
+        "@com_google_googletest//:gtest",
+        "@fuzztest//fuzztest",
+        "@fuzztest//fuzztest:domain",
+    ],
+)
+
+# Dissabled to not waste compute during normal runs
+mongo_cc_fuzztest(
+    name = "bson_mutator_tests",
+    srcs = ["bson_mutator_test.cpp"],
+    target_compatible_with = ["@platforms//:incompatible"],
+    deps = [":bson_mutator"],
+)
