@@ -70,10 +70,11 @@ for (const [name, data] of Object.entries(kAllClusterParameters)) {
 
     if (data.hasOwnProperty("featureFlag")) {
         if (!FeatureFlagUtil.isPresentAndEnabled(conn, data.featureFlag)) {
-            // This parameter is not supported in the current FCV.
+            // This parameter is not supported in the current FCV or binary. FCV incompatibility
+            // will throw BadValue, while binary incompatibility will throw NoSuchKey.
             assert.commandFailedWithCode(
                 conn.getDB("admin").runCommand({setClusterParameter: {[name]: data.testValues[0]}}),
-                ErrorCodes.BadValue,
+                [ErrorCodes.BadValue, ErrorCodes.NoSuchKey],
             );
 
             // Skip the rest of the checks for unsupported parameters.
@@ -86,10 +87,11 @@ for (const [name, data] of Object.entries(kAllClusterParameters)) {
         data.hasOwnProperty("minFCV") &&
         MongoRunner.compareBinVersions(data["minFCV"], currentFCVInMultiversion) > 0
     ) {
-        // This parameter is not supported in the current FCV.
+        // This parameter is not supported in the current FCV or binary. FCV incompatibility
+        // will throw BadValue, while binary incompatibility will throw NoSuchKey.
         assert.commandFailedWithCode(
             conn.getDB("admin").runCommand({setClusterParameter: {[name]: data.testValues[0]}}),
-            ErrorCodes.BadValue,
+            [ErrorCodes.BadValue, ErrorCodes.NoSuchKey],
         );
 
         // Skip the rest of the checks for unsupported parameters.
