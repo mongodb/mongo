@@ -5,7 +5,9 @@ export var MetadataConsistencyChecker = (function () {
         // The isTransientError() function is responsible for setting an error as transient and
         // abort the metadata consistency check to be retried in the future.
         const isTransientError = function (e) {
-            // TODO SERVER-105255 Remove the exception for ingress gRPC.
+            // In ingress gRPC, terminated streams are surfaced to the client as CallbackCanceled,
+            // even when the underlying cause is a network error.
+            // Treat this as transient for gRPC so metadata consistency hooks don’t fail spuriously.
             if (mongos.isGRPC() && e.code == ErrorCodes.CallbackCanceled) {
                 jsTest.log("Treating `CallbackCanceled` as transient for gRPC streams!");
                 return true;
