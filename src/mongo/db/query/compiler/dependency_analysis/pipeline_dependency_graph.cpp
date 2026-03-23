@@ -246,36 +246,67 @@ struct Scope {
 };
 
 /**
+ * Holds arrayness information or a constant value (if known).
+ *
+ * FieldMetadata is stored within every Field node in the graph. Since Field nodes are pretty
+ * numerous, we try to keep the size of this struct as small as possible.
+ *
+ * TODO(SERVER-119392): Implement constant propagation
+ */
+struct FieldMetadata {
+    bool isDefault() const {
+        return *this == FieldMetadata{};
+    }
+
+    auto operator<=>(const FieldMetadata&) const = default;
+
+    /**
+     * True if the value of this field can be type array.
+     */
+    bool canFieldBeArray{true};
+};
+
+// It's fine to change the assert and increase the size of the FieldMetadata, but there should be a
+// good reason to do so, since the knock-on effect is large (many fields in a graph). If you managed
+// to reduce it - thanks! :)
+static_assert(sizeof(FieldMetadata) == 1, "FieldMetadata size has changed");
+
+/**
  * Represents a definition of a single path component. Each redefinition of a field is represented
  * as a separate node.
+ *
+ * Since Field nodes are pretty numerous, we try to keep the size of this struct as small as
+ * possible.
  */
 struct Field {
-    /**
-     * Holds arrayness information or a constant value (if known).
-     *
-     * TODO(SERVER-119384): Implement arrayness tracking
-     * TODO(SERVER-119392): Implement constant propagation
-     */
-    struct Metadata {};
-
     Field(ScopeId declaringScope,
           ScopeId embeddedScope = ScopeId::none(),
           FieldDependencies dependencies = {},
-          Metadata metadata = {})
-        : metadata(std::move(metadata)),
-          dependencies(std::move(dependencies)),
+          FieldMetadata metadata = {})
+        : dependencies(std::move(dependencies)),
           declaringScope(declaringScope),
-          embeddedScope(embeddedScope) {}
+          embeddedScope(embeddedScope),
+          metadata(std::move(metadata)) {}
 
-    // This could also be stored as a node, and referenced here by its ID.
-    Metadata metadata{};
+    // Note: Field order is dictated by type alignment as opposed to semantics, to reduce
+    // padding and the overall size of the structure.
+
     FieldDependencies dependencies{};
     // Scope declaring this field.
     // NOTE: We might not need to track this, since we know the scope in lookupField.
     ScopeId declaringScope{ScopeId::none()};
     // Embedded scope containing nested fields (e.g. 'a.b').
     ScopeId embeddedScope{ScopeId::none()};
+    // This could also be stored as a node, and referenced here by its ID.
+    FieldMetadata metadata{};
 };
+
+// It's fine to change the assert and increase the size of a Field, but there should be a good
+// reason to do so, since the knock-on effect is large (many fields in a graph). If you managed to
+// reduce it - thanks! :)
+// The Abseil flat_hash_set seems to change size under a sanitized build. Itis easier to ignore it
+// and check the remaining overheads.
+static_assert(sizeof(Field) - sizeof(FieldDependencies) == 16, "Field size has changed");
 
 // Information extracted from DocumentSource to populate the graph.
 class DocumentSourceInfo {
@@ -308,6 +339,17 @@ private:
 };
 
 static_assert(document_transformation::DescribesDocumentTransformation<DocumentSourceInfo>);
+
+bool canExpressionEvaluateToArray(const Expression& expr) {
+    if (auto* constantExpr = dynamic_cast<const ExpressionConstant*>(&expr)) {
+        return constantExpr->getValue().isArray();
+    }
+    return true;
+}
+
+void updateMetadataFromExpression(FieldMetadata& metadata, const Expression& expr) {
+    metadata.canFieldBeArray = canExpressionEvaluateToArray(expr);
+}
 }  // namespace
 
 class DependencyGraph::Impl {
@@ -346,6 +388,7 @@ public:
 private:
     using ParsedPath = boost::container::small_vector<StringPool::Id, 8>;
     using ParsedPathView = std::span<StringPool::Id>;
+    using FieldList = boost::container::small_vector<FieldId, 8>;
 
     class Serializer;
 
@@ -380,12 +423,17 @@ private:
      * Declare a field for the given (possibly dotted) path in the scope.
      * For a path like 'a.b' declares 'a' with embedded scope holding 'b'.
      * If 'a' already exists, any fields are preserved.
+     * The 'dependencies' and 'metadata' are assigned to the declared field 'a.b'.
      * Returns the FieldId for the base component in path (for 'a.b' returns 'a').
      */
-    FieldId declareField(ScopeId scope, ParsedPathView path, FieldDependencies dependencies) {
+    FieldId declareField(ScopeId scope,
+                         ParsedPathView path,
+                         FieldDependencies dependencies,
+                         FieldMetadata metadata = {}) {
         // Declaring 'a' should create field 'a' and exit.
         if (path.size() == 1) {
-            auto field = _fields.append(Field{scope, ScopeId::none(), std::move(dependencies)});
+            auto field = _fields.append(
+                Field{scope, ScopeId::none(), std::move(dependencies), std::move(metadata)});
             _scopes[scope].fields[path.front()] = field;
             return field;
         }
@@ -429,8 +477,10 @@ private:
             _scopes[scope].fields[basePath.front()] = newBaseField;
         }
         // Finally, declare the subPath in the embeddedScope we found or created.
-        auto embeddedField =
-            declareField(_fields[newBaseField].embeddedScope, subPath, std::move(dependencies));
+        auto embeddedField = declareField(_fields[newBaseField].embeddedScope,
+                                          subPath,
+                                          std::move(dependencies),
+                                          std::move(metadata));
         _fields[newBaseField].dependencies.emplace(embeddedField);
         return newBaseField;
     }
@@ -503,8 +553,11 @@ private:
 
     /**
      * Gets the Field node that defines the given path in the given scope.
+     * The traversed base fields are appended to 'prefix' (if provided).
      */
-    FieldLookupResult lookupField(ScopeId scopeId, ParsedPathView path) const {
+    FieldLookupResult lookupField(ScopeId scopeId,
+                                  ParsedPathView path,
+                                  FieldList* prefix = nullptr) const {
         const auto& scope = _scopes[scopeId];
         auto fieldNameId = path.front();
         if (auto it = scope.fields.find(fieldNameId); it != scope.fields.end()) {
@@ -521,8 +574,11 @@ private:
                 // We found 'a', but it has no embedded scope and we are looking for 'a.b'.
                 return FieldLookupResult{fieldId, true /*shadowed*/};
             }
+            if (prefix) {
+                prefix->push_back(fieldId);
+            }
             // We're resolving a dotted path and there are known subpaths.
-            return lookupField(_fields[fieldId].embeddedScope, path.subspan(1));
+            return lookupField(_fields[fieldId].embeddedScope, path.subspan(1), prefix);
         }
 
         if (scope.exhaustiveScope) {
@@ -540,6 +596,18 @@ private:
     FieldId lookupFullPath(ScopeId scopeId, ParsedPathView path) const {
         auto [fieldId, shadowed] = lookupField(scopeId, path);
         return shadowed ? FieldId::none() : fieldId;
+    }
+
+    /**
+     * Returns true if any field in the list can contain arrays.
+     */
+    bool canPrefixContainArrays(const FieldList& prefix) const {
+        for (auto& containingField : prefix) {
+            if (_fields[containingField].metadata.canFieldBeArray) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -600,13 +668,19 @@ private:
                 [&](const ModifyPath& p) {
                     maybeDeclareInheritedScope();
                     auto parsedPath = internPath(p.getPath());
-                    declareField(scopeId, parsedPath, depsFromStage);
+                    FieldMetadata metadata{};
+                    if (auto expr = p.getExpression()) {
+                        updateMetadataFromExpression(metadata, *expr);
+                        // TODO(SERVER-121942): Extract correct field-level dependencies.
+                    }
+                    declareField(scopeId, parsedPath, depsFromStage, std::move(metadata));
                 },
                 [&](const RenamePath& p) {
                     maybeDeclareInheritedScope();
                     auto parsedOldPath = internPath(p.getOldPath());
                     auto parsedNewPath = internPath(p.getNewPath());
 
+                    FieldMetadata metadata;
                     FieldDependencies deps;
                     bool isCollectionField = false;
                     if (parentScope) {
@@ -618,9 +692,16 @@ private:
                         // 'a' depends on the $replaceWith stage's <missing> field.
                         // Example 2: [{$set: {'b': 1}}, {$set: {a: '$b.c'}}]
                         // 'a' depends on 'b'
-                        auto [oldPathField, shadowed] = lookupField(parentScope, parsedOldPath);
+                        FieldList prefix;
+                        auto [oldPathField, shadowed] =
+                            lookupField(parentScope, parsedOldPath, &prefix);
                         isCollectionField = oldPathField == FieldId::none();
                         deps.insert(oldPathField);
+                        // If we find the field, we can use its canFieldBeArray.
+                        if (oldPathField && !shadowed && !canPrefixContainArrays(prefix)) {
+                            metadata.canFieldBeArray =
+                                _fields[oldPathField].metadata.canFieldBeArray;
+                        }
                     } else {
                         isCollectionField = true;
                         deps.insert(FieldId::none());
@@ -629,12 +710,13 @@ private:
                     if (isCollectionField) {
                         // We represent all collection field references as FieldId::none(), without
                         // distinguishing between them.
-                        // TODO(119384): Query Path Arrayness API.
+                        // To get done (SERVER-119384): Query Path Arrayness API.
                     }
 
                     // Each rename modifies the new field and depends on the previous field.
-                    declareField(scopeId, parsedNewPath, std::move(deps));
-                    // TODO(SERVER-119384): Compute & store arrayness for each field along the path.
+                    declareField(scopeId, parsedNewPath, std::move(deps), std::move(metadata));
+                    // To get done (SERVER-119384): Compute & store arrayness for each field along
+                    // the path.
                 },
             },
             ds);
@@ -932,7 +1014,17 @@ private:
         if (field.embeddedScope) {
             serializeScope(field.embeddedScope, bob);
         }
+        if (!field.metadata.isDefault()) {
+            serializeMetadata(field.metadata, bob);
+        }
         serializeDependencies(field.dependencies, bob);
+    }
+
+    void serializeMetadata(const FieldMetadata& metadata, BSONObjBuilder& bob) {
+        BSONObjBuilder metaBuilder = bob.subobjStart("metadata");
+        if (!metadata.canFieldBeArray) {
+            metaBuilder.append("array", false);
+        }
     }
 
     void serializeDependencies(const FieldDependencies& deps, BSONObjBuilder& bob) {

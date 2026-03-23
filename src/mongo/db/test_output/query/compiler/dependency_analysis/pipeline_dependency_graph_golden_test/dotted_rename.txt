@@ -57,6 +57,9 @@ output: {
                                         },
                                         "c:5": {
                                             "declaringScope": "scope:2",
+                                            "metadata": {
+                                                "array": false
+                                            },
                                             "dependencies": [
                                                 "<base document>:-1"
                                             ]
@@ -84,6 +87,9 @@ output: {
                             },
                             "e:8": {
                                 "declaringScope": "scope:3",
+                                "metadata": {
+                                    "array": false
+                                },
                                 "dependencies": [
                                     "<base document>:-1"
                                 ]
