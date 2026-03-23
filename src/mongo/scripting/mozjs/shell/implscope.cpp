@@ -526,7 +526,7 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine,
             // don't have a good way of getting information about the
             // guard page on those platforms.
             //
-            // TODO: What if we are running on a platform with very
+            // What if we are running on a platform with very
             // large pages, like 4MB?
             const auto available_stack_space = available.value();
 
@@ -650,10 +650,6 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
 
 #ifdef __linux__
     if (std::getenv("OUTPUT_DEBUG_JSSCOPE_ADDRESSES")) {
-        std::cout << "Starting new scope: currentJSScope = "
-                  << static_cast<void*>(currentJSScope.load()) << " buildStackStringForGdb = "
-                  << reinterpret_cast<void*>(&buildStackStringForGdb) << std::endl;
-
         std::string filename = "./jsscope_debug_" + std::to_string(getpid()) + ".yml";
 
         std::ofstream debugFile(filename, std::ios::app);
