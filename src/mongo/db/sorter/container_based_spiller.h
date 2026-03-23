@@ -405,14 +405,22 @@ public:
 
                 while (mergeIterator->more()) {
                     auto next = mergeIterator->next();
-                    writer->addAlreadySorted(next.first, next.second);
+                    writeConflictRetry(&_opCtx,
+                                       _ru,
+                                       "ContainerBasedSpiller::mergeSpills_insert",
+                                       NamespaceString::kEmpty,
+                                       [&] { writer->addAlreadySorted(next.first, next.second); });
                     ++numSpilled;
                 }
                 invariant((opts.limit) ? numSpilled <= numSourceRows : numSpilled == numSourceRows);
 
                 // TODO(SERVER-117546): Use a truncate rather than individual deletes.
                 for (int64_t current = deleteRangeStart; current < deleteRangeEnd; ++current) {
-                    _containerBasedStorage().remove(current);
+                    writeConflictRetry(&_opCtx,
+                                       _ru,
+                                       "ContainerBasedSpiller::mergeSpills_remove",
+                                       NamespaceString::kEmpty,
+                                       [&] { _containerBasedStorage().remove(current); });
                 }
 
                 iters.push_back(writer->done());
