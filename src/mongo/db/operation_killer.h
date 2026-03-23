@@ -32,6 +32,9 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_id.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

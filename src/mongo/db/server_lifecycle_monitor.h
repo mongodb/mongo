@@ -29,11 +29,14 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
 #include "mongo/util/synchronized_value.h"
 
 #include <functional>
 
 #include <boost/optional.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

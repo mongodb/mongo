@@ -35,8 +35,11 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
@@ -51,7 +54,7 @@ class Command;
  * Any access from a client thread that does not own the `opCtx`, or after the `opCtx` is
  * released is strictly forbidden.
  */
-class RequestExecutionContext {
+class MONGO_MOD_OPEN RequestExecutionContext {
 public:
     RequestExecutionContext() = delete;
     RequestExecutionContext(const RequestExecutionContext&) = delete;

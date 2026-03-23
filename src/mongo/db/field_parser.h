@@ -37,6 +37,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
@@ -48,6 +49,8 @@
 
 #include <fmt/format.h>
 #include <fmt/ostream.h>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
@@ -240,8 +243,6 @@ public:
                                 const BSONField<BSONObj>& field,
                                 BSONObj* out,
                                 std::string* errMsg = nullptr);
-
-    // TODO: BSONElement extraction of types below
 
     /**
      * Extracts a mandatory 'field' from the object 'doc'. Writes the extracted contents to '*out'

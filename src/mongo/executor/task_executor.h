@@ -45,6 +45,7 @@
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/interruptible.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
@@ -57,12 +58,9 @@
 
 #include <boost/move/utility_core.hpp>
 
-namespace mongo {
+MONGO_MOD_PUBLIC;
 
-class BSONObjBuilder;
-class OperationContext;
-
-namespace executor {
+namespace mongo::executor {
 
 struct ConnectionPoolStats;
 
@@ -84,7 +82,8 @@ struct ConnectionPoolStats;
  * If an event is unsignaled when shutdown is called, the executor will ensure that any threads
  * blocked in waitForEvent() eventually return.
  */
-class TaskExecutor : public OutOfLineExecutor, public std::enable_shared_from_this<TaskExecutor> {
+class MONGO_MOD_OPEN TaskExecutor : public OutOfLineExecutor,
+                                    public std::enable_shared_from_this<TaskExecutor> {
     TaskExecutor(const TaskExecutor&) = delete;
     TaskExecutor& operator=(const TaskExecutor&) = delete;
 
@@ -449,7 +448,7 @@ protected:
 /**
  * Class representing a scheduled callback and providing methods for interacting with it.
  */
-class TaskExecutor::CallbackState {
+class MONGO_MOD_OPEN TaskExecutor::CallbackState {
     CallbackState(const CallbackState&) = delete;
     CallbackState& operator=(const CallbackState&) = delete;
 
@@ -607,5 +606,4 @@ struct TaskExecutor::RemoteCommandCallbackArgs {
     ResponseStatus response;
 };
 
-}  // namespace executor
-}  // namespace mongo
+}  // namespace mongo::executor

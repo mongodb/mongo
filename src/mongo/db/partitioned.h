@@ -32,6 +32,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/aligned.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -43,6 +44,8 @@
 #include <vector>
 
 #include <boost/align/aligned_allocator.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

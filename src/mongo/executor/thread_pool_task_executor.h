@@ -43,6 +43,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/interruptible.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -51,6 +52,8 @@
 #include <mutex>
 
 #include <boost/optional.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

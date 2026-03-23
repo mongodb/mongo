@@ -32,6 +32,9 @@
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/generic_argument_gen.h"
+#include "mongo/util/modules.h"
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
