@@ -16,6 +16,7 @@ mongo_cc_library(
     ],
     deps = [
         "replicated_fast_count_committer",
+        "replicated_fast_count_delta_utils",
         "//src/mongo/db:record_id_helpers",
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/shard_role",
@@ -69,6 +70,7 @@ mongo_cc_library(
         "replicated_fast_count_enabled",
         "//src/mongo/db/repl:apply_ops_command_info",
         "//src/mongo/db/repl:oplog_entry",
+        "//src/mongo/db/shard_role",
     ],
 )
 

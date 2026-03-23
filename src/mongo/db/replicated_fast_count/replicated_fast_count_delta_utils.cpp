@@ -142,6 +142,39 @@ stdx::unordered_map<UUID, CollectionSizeCount> extractSizeCountDeltasForApplyOps
     return sizeCountDeltas;
 }
 
+boost::optional<CollectionOrViewAcquisition> acquireFastCountCollectionForRead(
+    OperationContext* opCtx) {
+    CollectionOrViewAcquisition acquisition = acquireCollectionOrView(
+        opCtx,
+        CollectionOrViewAcquisitionRequest::fromOpCtx(
+            opCtx,
+            NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore),
+            AcquisitionPrerequisites::OperationType::kRead),
+        LockMode::MODE_IS);
+
+    if (acquisition.getCollectionPtr()) {
+        return acquisition;
+    }
+
+    return boost::none;
+}
+
+boost::optional<CollectionOrViewAcquisition> acquireFastCountCollectionForWrite(
+    OperationContext* opCtx) {
+    CollectionOrViewAcquisition acquisition = acquireCollectionOrView(
+        opCtx,
+        CollectionOrViewAcquisitionRequest::fromOpCtx(
+            opCtx,
+            NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore),
+            AcquisitionPrerequisites::OperationType::kWrite),
+        LockMode::MODE_IX);
+
+    if (acquisition.getCollectionPtr()) {
+        return acquisition;
+    }
+
+    return boost::none;
+}
 }  // namespace replicated_fast_count
 
 

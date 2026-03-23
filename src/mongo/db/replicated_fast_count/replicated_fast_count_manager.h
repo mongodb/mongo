@@ -223,20 +223,6 @@ private:
                             const Timestamp& validAsOfTS);
 
     /**
-     * Acquire the fastcount collection that underpins this class with write intent.
-     * Returns boost::none if it doesn't exist.
-     */
-    boost::optional<CollectionOrViewAcquisition> _acquireFastCountCollectionForWrite(
-        OperationContext* opCtx);
-
-    /**
-     * Acquire the fastcount collection that underpins this class with read intent.
-     * Returns boost::none if it doesn't exist.
-     */
-    boost::optional<CollectionOrViewAcquisition> _acquireFastCountCollectionForRead(
-        OperationContext* opCtx);
-
-    /**
      * Populates the in-memory values of _metadata with the values persisted in the internal fast
      * count collection. Returns the number of records that were scanned.
      */

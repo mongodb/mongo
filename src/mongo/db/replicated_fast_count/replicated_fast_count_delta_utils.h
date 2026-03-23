@@ -29,8 +29,12 @@
 
 #pragma once
 
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
+#include "mongo/db/shard_role/shard_role.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace replicated_fast_count {
@@ -53,6 +57,20 @@ boost::optional<CollectionSizeCount> extractSizeCountDeltaForOp(const repl::Oplo
  */
 stdx::unordered_map<UUID, CollectionSizeCount> extractSizeCountDeltasForApplyOps(
     const repl::OplogEntry& applyOpsEntry);
+
+/**
+ * Acquires the replicated fast count collection for read access.
+ * Returns boost::none if the collection does not exist.
+ */
+boost::optional<CollectionOrViewAcquisition> acquireFastCountCollectionForRead(
+    OperationContext* opCtx);
+
+/**
+ * Acquire the fastcount collection that underpins this class with write intent.
+ * Returns boost::none if it doesn't exist.
+ */
+boost::optional<CollectionOrViewAcquisition> acquireFastCountCollectionForWrite(
+    OperationContext* opCtx);
 
 }  // namespace replicated_fast_count
 
