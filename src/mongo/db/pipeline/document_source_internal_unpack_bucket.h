@@ -48,6 +48,7 @@
 #include "mongo/db/timeseries/mixed_schema_buckets_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/string_map.h"
 
 #include <memory>
 #include <set>
@@ -262,6 +263,15 @@ public:
         _sharedState->_bucketUnpacker.setIncludeMinTimeAsMetadata();
     }
 
+    // Sets the 2dsphere index version map and, if an event filter was already parsed before this
+    // map became available (e.g. deserialized from BSON on a shard receiving a router-translated
+    // pipeline), stamps the versions onto its geo predicates immediately.
+    void set2dsphereIndexVersions(boost::optional<StringMap<int>> versions);
+
+    bool has2dsphereIndexVersions() const {
+        return _geo2dsphereIndexVersions.has_value();
+    }
+
     void setIncludeMaxTimeAsMetadata() {
         _sharedState->_bucketUnpacker.setIncludeMaxTimeAsMetadata();
     }
@@ -390,6 +400,12 @@ private:
     // If buckets contained a mixed type schema along some path, we have to push down special
     // predicates in order to ensure correctness.
     bool _assumeNoMixedSchemaData = false;
+
+    // Map from user-facing field name to 2dsphereIndexVersion, built at translation time from the
+    // collection's index catalog. boost::none means the map was not computed (e.g. for sharded
+    // queries translated at the router), in which case setEventFilter falls back to a catalog
+    // lookup.
+    boost::optional<StringMap<int>> _geo2dsphereIndexVersions = boost::none;
 
     // This is true if 'bucketRoundingSeconds' and 'bucketMaxSpanSeconds' are set, equal, and
     // unchanged. Then we can push down certain $match and $group queries.

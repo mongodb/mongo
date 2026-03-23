@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document_source_internal_convert_bucket_index_stats.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
+#include "mongo/db/timeseries/timeseries_2dsphere_index_version_lookup.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 
@@ -268,6 +269,30 @@ void translateIndexHintIfRequiredImpl(const boost::intrusive_ptr<ExpressionConte
         request.setHint(rewrittenHintWithStatus.getValue());
     }
 }
+// Walks 'pipeline' looking for $_internalUnpackBucket stages that were deserialized without
+// collection-derived parameters (e.g. a pipeline received from a router that lacked index info),
+// and fills them in from the already-acquired 'collPtr'. This is the mechanism by which
+// shard-side executions obtain parameters that can only be derived from the actual collection
+// (currently: the 2dsphere index version map).
+void populateUnpackBucketStagesFromCollection(Pipeline& pipeline, const CollectionPtr& collPtr) {
+    if (!collPtr) {
+        return;
+    }
+    for (auto& source : pipeline.getSources()) {
+        auto* unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(source.get());
+        if (!unpack) {
+            continue;
+        }
+        if (unpack->has2dsphereIndexVersions()) {
+            continue;
+        }
+        boost::optional<StringMap<int>> versions =
+            timeseries::build2dsphereIndexVersionMap(*collPtr.get());
+        unpack->set2dsphereIndexVersions(versions);
+        break;
+    }
+}
+
 }  // namespace
 
 bool requiresViewlessTimeseriesTranslation(OperationContext* const opCtx,
@@ -286,6 +311,12 @@ void translateStagesIfRequired(const boost::intrusive_ptr<ExpressionContext>& ex
                                Pipeline& pipeline,
                                const CollectionOrViewAcquisition& collOrView) {
     translateStagesIfRequiredImpl<CollectionOrViewAcquisition>(expCtx, pipeline, collOrView);
+    // For pipelines that arrived pre-translated from a router (where CollectionRoutingInfo was used
+    // and no index info was available), modify the unpack stage with any collection-related
+    // metadata.
+    if (collOrView.isCollection()) {
+        populateUnpackBucketStagesFromCollection(pipeline, collOrView.getCollectionPtr());
+    }
 }
 
 void translateStagesIfRequired(const boost::intrusive_ptr<ExpressionContext>& expCtx,
