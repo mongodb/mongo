@@ -640,13 +640,8 @@ class DataConsistencyChecker {
             const sourceVersion = sourceCollInfos.binVersion;
             const syncingVersion = syncingCollInfos.binVersion;
 
-            // If both versions are before 8.2 or both are 8.2 onwards, we are good.
-            if (
-                (MongoRunner.compareBinVersions(sourceVersion, "8.2") === -1 &&
-                    MongoRunner.compareBinVersions(syncingVersion, "8.2") === -1) ||
-                (MongoRunner.compareBinVersions(sourceVersion, "8.2") >= 0 &&
-                    MongoRunner.compareBinVersions(syncingVersion, "8.2") >= 0)
-            ) {
+            // If both versions are the same, we are good.
+            if (MongoRunner.compareBinVersions(sourceVersion, syncingVersion) === 0) {
                 return false;
             }
 
