@@ -63,6 +63,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
+MONGO_FAIL_POINT_DEFINE(planCacheAlwaysReplanClassic);
 
 namespace mongo {
 
@@ -102,6 +103,12 @@ Status CachedPlanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
     // query from scratch.
     size_t maxWorksBeforeReplan =
         static_cast<size_t>(internalQueryCacheEvictionRatio.load() * _decisionWorks);
+
+    // When the failpoint is active, force the cached plan to always be replanned by setting the
+    // threshold to zero.
+    if (MONGO_unlikely(planCacheAlwaysReplanClassic.shouldFail())) {
+        maxWorksBeforeReplan = 0;
+    }
 
     // The trial period ends without replanning if the cached plan produces this many results.
     size_t numResults = trial_period::getTrialPeriodNumToReturn(*_canonicalQuery);

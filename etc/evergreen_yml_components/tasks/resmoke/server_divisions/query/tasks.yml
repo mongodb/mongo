@@ -2514,6 +2514,35 @@ tasks:
       - func: "do setup"
       - func: "run tests"
 
+  - <<: *task_template
+    name: core_repeat_queries_always_replan
+    tags:
+      [
+        "assigned_to_jira_team_server_query_optimization",
+        "default",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+        "incompatible_tsan",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
+    name: aggregation_repeat_queries_always_replan
+    tags:
+      [
+        "assigned_to_jira_team_server_query_optimization",
+        "default",
+        "aggregation",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+        "incompatible_tsan",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
   - <<: *benchmark_template
     name: benchmarks_abt_lowering
     tags:

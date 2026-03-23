@@ -42,6 +42,8 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
+MONGO_FAIL_POINT_DEFINE(planCacheAlwaysReplanSBE);
+
 namespace mongo::classic_runtime_planner_for_sbe {
 
 namespace {
@@ -219,7 +221,13 @@ std::unique_ptr<PlannerInterface> attemptToUsePlan(
                                                                   std::move(sbePlanAndData));
     }
 
-    const size_t maxReadsBeforeReplan = internalQueryCacheEvictionRatio.load() * *decisionReads;
+    size_t maxReadsBeforeReplan = internalQueryCacheEvictionRatio.load() * *decisionReads;
+
+    // When the failpoint is active, force the cached plan to always be replanned by setting the
+    // threshold to zero.
+    if (MONGO_unlikely(planCacheAlwaysReplanSBE.shouldFail())) {
+        maxReadsBeforeReplan = 0;
+    }
     auto candidate = collectExecutionStatsForCachedPlan(plannerData,
                                                         std::move(solution),
                                                         indexExistenceChecker,

@@ -37,6 +37,14 @@ filters:
   - "core_repeat_queries.yml":
     approvers:
       - 10gen/query-optimization
+  - "core_repeat_queries_always_replan.yml":
+    approvers:
+      - 10gen/query-optimization
+      - 10gen/query-execution
+  - "aggregation_repeat_queries_always_replan.yml":
+    approvers:
+      - 10gen/query-optimization
+      - 10gen/query-execution
   - "replica_sets_jscore_pqs*":
     approvers:
       - 10gen/query-execution-query-settings

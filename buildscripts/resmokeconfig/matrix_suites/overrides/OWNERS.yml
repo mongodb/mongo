@@ -24,6 +24,10 @@ filters:
   - "repeat_queries.yml":
     approvers:
       - 10gen/query-optimization
+  - "always_replan.yml":
+    approvers:
+      - 10gen/query-optimization
+      - 10gen/query-execution
   - "*legacy_timeseries.yml":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog

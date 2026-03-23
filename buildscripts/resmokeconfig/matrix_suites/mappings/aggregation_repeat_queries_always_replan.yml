@@ -1,0 +1,4 @@
+# This suite runs aggregation tests with repeated queries and forced replanning.
+base_suite: aggregation_repeat_queries_multiplan_single_solutions
+overrides:
+  - "always_replan.enable"

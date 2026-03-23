@@ -1,0 +1,16 @@
+# This override enables failpoints that force replanning to always occur when a cached plan is
+# used. This exercises the code path where the cached plan is deemed less efficient than expected,
+# triggering cache eviction and replanning from scratch.
+- name: enable
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          set_parameters:
+            failpoint.planCacheAlwaysReplanClassic: "{mode: 'alwaysOn'}"
+            failpoint.planCacheAlwaysReplanSBE: "{mode: 'alwaysOn'}"
+
+- name: excluded_files
+  value:
+    exclude_files:
+      - jstests/core/query/plan_cache/**/*.js

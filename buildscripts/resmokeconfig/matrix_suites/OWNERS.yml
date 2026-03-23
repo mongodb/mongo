@@ -42,6 +42,10 @@ filters:
   - "generated_suites/*pqs*":
     approvers:
       - 10gen/query-execution-query-settings
+  - "generated_suites/*repeat_queries*":
+    approvers:
+      - 10gen/query-optimization
+      - 10gen/query-execution
   - "generated_suites/*execution_control*":
     approvers:
       - 10gen/server-workload-resilience

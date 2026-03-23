@@ -115,7 +115,8 @@ StatusWith<std::unique_ptr<PlannerInterface>> preparePlanner(
     if (auto cs = CollectionQueryInfo::get(collections.getMainCollection())
                       .getPlanCache()
                       ->getCacheEntryIfActive(planCacheKey)) {
-        // TODO SERVER-117566 Implement plan cache lookup.
+        // TODO SERVER-117566 Implement plan cache lookup, including failpoint for forced replanning
+        // to get additional cache + replanning coverage.
         cachedPlanHash = cs->cachedPlan->solutionHash;
     }
 

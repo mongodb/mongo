@@ -1,6 +1,7 @@
 // Test the plan cache entries for a $lookup with a single query solution. It should produce a
 // single cache entry.
 // @tags: [
+//   assumes_against_mongod_not_mongos,
 //   assumes_unsharded_collection,
 //   do_not_wrap_aggregations_in_facets,
 //   assumes_read_concern_unchanged,
@@ -10,8 +11,8 @@
 const outer = db.outer;
 const inner = db.inner;
 
-outer.drop();
-inner.drop();
+assert(outer.drop());
+assert(inner.drop());
 
 assert.commandWorked(
     outer.insert([
@@ -48,7 +49,13 @@ const expectedResults = [
     const innerPlan = inner.getPlanCache().list()[0];
     assert(innerPlan.isActive);
     assert.eq(innerPlan.cachedPlan.inputStage.stage, "COLLSCAN");
-    assert.eq(innerPlan.cachedPlan.inputStage.filter, {b: {$eq: 1}});
+
+    // Depending on when the query replans, we may see these filters. We're not concerned
+    // with the specific constant we see in the predicate, just that the shape {b: {$eq: X}}
+    // appears.
+    const expectedCachedFilters = [{b: {$eq: 0}}, {b: {$eq: 1}}, {b: {$eq: 2}}];
+    const cachedFilter = innerPlan.cachedPlan.inputStage.filter;
+    assert(expectedCachedFilters.some((filter) => tojson(filter) === tojson(cachedFilter)));
 }
 
 inner.getPlanCache().clear();

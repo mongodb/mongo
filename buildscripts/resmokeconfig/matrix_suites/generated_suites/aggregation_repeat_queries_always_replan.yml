@@ -1,0 +1,41 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/aggregation_repeat_queries_always_replan.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+##########################################################
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config:
+    shell_options:
+      eval:
+        await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
+        await import("jstests/libs/override_methods/rerun_queries.js");
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        failpoint.planCacheAlwaysReplanClassic: "{mode: 'alwaysOn'}"
+        failpoint.planCacheAlwaysReplanSBE: "{mode: 'alwaysOn'}"
+        internalQueryPlannerUseMultiplannerForSingleSolutions: true
+  hooks:
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+matrix_suite: true
+selector:
+  exclude_files:
+    - jstests/aggregation/extras/*.js
+    - jstests/aggregation/data/*.js
+  exclude_with_any_tags:
+    - does_not_support_repeated_reads
+    - does_not_support_multiplanning_single_solutions
+    - requires_profiling
+  roots:
+    - jstests/aggregation/**/*.js
+test_kind: js_test

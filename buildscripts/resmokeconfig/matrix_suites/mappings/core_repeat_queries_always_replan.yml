@@ -1,0 +1,9 @@
+# This suite runs jscore tests with repeated queries and forced replanning.
+base_suite: core
+overrides:
+  - "always_replan.enable"
+eval:
+  - "repeat_queries.enable_eval"
+excludes:
+  - "repeat_queries.excluded_files"
+  - "always_replan.excluded_files"
