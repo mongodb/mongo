@@ -117,7 +117,6 @@
 
 namespace mongo {
 
-using std::map;
 using std::string;
 using std::vector;
 
@@ -1081,8 +1080,6 @@ void Balancer::_mainThread() {
         _beginRound(opCtx.get());
 
         try {
-            uassert(13258, "oids broken after resetting!", _checkOIDs(opCtx.get()));
-
             Status refreshStatus = balancerConfig->refreshAndCheck(opCtx.get());
             if (!refreshStatus.isOK()) {
                 LOGV2_WARNING(21877, "Skipping balancing round", "error"_attr = refreshStatus);
@@ -1299,77 +1296,6 @@ void Balancer::_sleepFor(OperationContext* opCtx, Milliseconds waitTimeout) {
     _condVar.wait_for(lock, waitTimeout.toSystemDuration(), [&] {
         return _threadSetState != ThreadSetState::Running;
     });
-}
-
-bool Balancer::_checkOIDs(OperationContext* opCtx) {
-    auto shardingContext = Grid::get(opCtx);
-
-    const auto all = shardingContext->shardRegistry()->getAllShardIds(opCtx);
-
-    // map of OID machine ID => shardId
-    map<int, ShardId> oids;
-
-    for (const ShardId& shardId : all) {
-        if (_terminationRequested()) {
-            return false;
-        }
-
-        auto shardStatus = shardingContext->shardRegistry()->getShard(opCtx, shardId);
-        if (!shardStatus.isOK()) {
-            continue;
-        }
-        const auto s = std::move(shardStatus.getValue());
-
-        auto result =
-            uassertStatusOK(s->runCommand(opCtx,
-                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                          DatabaseName::kAdmin,
-                                          BSON("features" << 1),
-                                          Seconds(30),
-                                          Shard::RetryPolicy::kIdempotent));
-        uassertStatusOK(result.commandStatus);
-        BSONObj f = std::move(result.response);
-
-        if (f["oidMachine"].isNumber()) {
-            int x = f["oidMachine"].numberInt();
-            if (oids.count(x) == 0) {
-                oids[x] = shardId;
-            } else {
-                LOGV2(21868,
-                      "Two machines have the same oidMachine value",
-                      "oidMachine"_attr = x,
-                      "firstShardId"_attr = shardId,
-                      "secondShardId"_attr = oids[x]);
-
-                result = uassertStatusOK(
-                    s->runCommand(opCtx,
-                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                  DatabaseName::kAdmin,
-                                  BSON("features" << 1 << "oidReset" << 1),
-                                  Seconds(30),
-                                  Shard::RetryPolicy::kIdempotent));
-                uassertStatusOK(result.commandStatus);
-
-                auto otherShardStatus = shardingContext->shardRegistry()->getShard(opCtx, oids[x]);
-                if (otherShardStatus.isOK()) {
-                    result = uassertStatusOK(otherShardStatus.getValue()->runCommand(
-                        opCtx,
-                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                        DatabaseName::kAdmin,
-                        BSON("features" << 1 << "oidReset" << 1),
-                        Seconds(30),
-                        Shard::RetryPolicy::kIdempotent));
-                    uassertStatusOK(result.commandStatus);
-                }
-
-                return false;
-            }
-        } else {
-            LOGV2(21869, "warning: oidMachine not set on shard", "shard"_attr = s->toString());
-        }
-    }
-
-    return true;
 }
 
 Status Balancer::_splitChunksIfNeeded(OperationContext* opCtx) {

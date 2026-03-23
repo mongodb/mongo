@@ -240,12 +240,6 @@ private:
     void _sleepFor(OperationContext* opCtx, Milliseconds waitTimeout);
 
     /**
-     * Returns true if all the servers listed in configdb as being shards are reachable and are
-     * distinct processes (no hostname mixup).
-     */
-    bool _checkOIDs(OperationContext* opCtx);
-
-    /**
      * Iterates through all chunks in all collections, except for the sessions collection, splitting
      * any chunks that straddle zone boundaries.
      */
