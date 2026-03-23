@@ -134,20 +134,10 @@ boost::optional<BSONObj> fetchPreOrPostImageFromSnapshot(const repl::OplogEntry&
                               << opTimestamp,
                 opTimestamp.asULL() >= 1);
 
-        if (inTxn) {
-            return opTimestamp - 1;
-        }
-        // TODO (SERVER-120623): For a retryable findAndModify executed outside a transaction,
-        // opTimestamp - 1 corresponds to to the oplog slot reserved for the forged pre/post noop
-        // oplog entry. Please refer to SERVER-120623 for why we currently should not read at this
-        // timestamp.
-        uassert(12020801,
-                str::stream()
-                    << "Failed to look up the pre-image document. Expected the to have reserved an "
-                       "additional oplog slot immediately before the findAndModify's oplog slot "
-                    << opTimestamp,
-                opTimestamp.asULL() >= 2);
-        return opTimestamp - 2;
+        // opTimestamp - 1 corresponds to the oplog slot reserved for the forged pre/post noop oplog
+        // entry. No data write occurs at this timestamp, so reading at opTimestamp - 1 correctly
+        // sees the pre-image before the data write at opTimestamp.
+        return opTimestamp - 1;
     }();
     snapshotReadConcern.setArgsAtClusterTimeForSnapshot(atClusterTime);
 

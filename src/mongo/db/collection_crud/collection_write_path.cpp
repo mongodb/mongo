@@ -42,6 +42,7 @@
 #include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string_util.h"
+#include "mongo/db/op_observer/batched_write_context.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/record_id_helpers.h"
@@ -135,6 +136,12 @@ std::vector<OplogSlot> reserveOplogSlotsForRetryableFindAndModify(OperationConte
     // For retryable findAndModify running in a multi-document transaction, we will reserve the
     // oplog entries when the transaction prepares or commits without prepare.
     if (opCtx->inMultiDocumentTransaction()) {
+        return {};
+    }
+
+    // For retryable findAndModify that are batched, we will reserve oplog entries when the batched
+    // write commits.
+    if (BatchedWriteContext::get(opCtx).writesAreBatched()) {
         return {};
     }
 

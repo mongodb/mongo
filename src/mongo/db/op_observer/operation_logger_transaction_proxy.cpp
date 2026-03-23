@@ -62,8 +62,9 @@ void OperationLoggerTransactionProxy::logOplogRecords(OperationContext* opCtx,
 }
 
 std::vector<OplogSlot> OperationLoggerTransactionProxy::getNextOpTimes(OperationContext* opCtx,
-                                                                       std::size_t count) {
-    return _targetOperationLogger->getNextOpTimes(opCtx, count);
+                                                                       std::size_t count,
+                                                                       std::size_t opTimeOffset) {
+    return _targetOperationLogger->getNextOpTimes(opCtx, count, opTimeOffset);
 }
 
 }  // namespace mongo

@@ -66,7 +66,9 @@ public:
      * are appended to the oplog.
      * If the test requires actual OpTimes to work, use OperationLoggerImpl instead.
      */
-    std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count) override {
+    std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx,
+                                          std::size_t count,
+                                          std::size_t opTimeOffset = 0) override {
         return std::vector<OplogSlot>{count, OplogSlot(Timestamp(1, 1), /*term=*/1LL)};
     }
 };

@@ -785,8 +785,10 @@ void createOplog(OperationContext* opCtx) {
     createOplog(opCtx, NamespaceString::kRsOplogNamespace, isReplSet);
 }
 
-std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count) {
-    return LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, count);
+std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx,
+                                      std::size_t count,
+                                      std::size_t opTimeOffset) {
+    return LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, count, opTimeOffset);
 }
 
 // -------------------------------------

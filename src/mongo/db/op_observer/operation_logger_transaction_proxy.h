@@ -76,7 +76,9 @@ public:
                          repl::OpTime finalOpTime,
                          Date_t wallTime) override;
 
-    std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count) override;
+    std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx,
+                                          std::size_t count,
+                                          std::size_t opTimeOffset = 0) override;
 
 private:
     std::unique_ptr<OperationLogger> _targetOperationLogger;

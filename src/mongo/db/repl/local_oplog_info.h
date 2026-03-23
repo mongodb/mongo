@@ -132,8 +132,14 @@ public:
     /**
      * Allocates optimes for new entries in the oplog. Returns the new optimes in a vector along
      * with their terms.
+     *
+     * The opTimeOffset is an increment applied to the base opTime when registering the oplog
+     * visibility point, allowing the caller to move the visible, hole-free end of the oplog forward
+     * by a configurable amount.
      */
-    std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count);
+    std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx,
+                                          std::size_t count,
+                                          std::size_t opTimeOffset = 0);
 
     /**
      * Returns a shared reference to the oplog truncate markers to allow the caller to wait

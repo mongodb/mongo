@@ -56,8 +56,9 @@ void OperationLoggerImpl::logOplogRecords(OperationContext* opCtx,
 }
 
 std::vector<OplogSlot> OperationLoggerImpl::getNextOpTimes(OperationContext* opCtx,
-                                                           std::size_t count) {
-    return repl::getNextOpTimes(opCtx, count);
+                                                           std::size_t count,
+                                                           std::size_t opTimeOffset) {
+    return repl::getNextOpTimes(opCtx, count, opTimeOffset);
 }
 
 }  // namespace mongo

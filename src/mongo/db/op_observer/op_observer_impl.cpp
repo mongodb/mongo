@@ -373,6 +373,18 @@ bool shouldTimestampIndexBuildSinglePhase(OperationContext* opCtx, const Namespa
     return true;
 }
 
+/**
+ * We reserve two oplog slots:
+ * 1. The first slot at opTime {TS-1} is reserved so resharding can forge a no-op image oplog entry.
+ * 2. The second slot at opTime {TS} is used by the retryable findAndModify operation.
+ */
+void reserveOplogSlotsForRetryableFindAndModify(OperationContext* opCtx,
+                                                OperationLogger* operationLogger,
+                                                MutableOplogEntry& oplogEntry) {
+    auto slots = operationLogger->getNextOpTimes(opCtx, /*count*/ 2, /*opTimeOffset*/ 1);
+    oplogEntry.setOpTime(slots[1]);
+}
+
 }  // namespace
 
 OpObserverImpl::OpObserverImpl(std::unique_ptr<OperationLogger> operationLogger)
@@ -2168,6 +2180,10 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
                     _operationLogger->appendOplogEntryChainInfo(
                         opCtx, &oplogEntry, &oplogLink, oplogEntry.getStatementIds());
                 }
+                if (oplogEntry.getNeedsRetryImage()) {
+                    reserveOplogSlotsForRetryableFindAndModify(
+                        opCtx, _operationLogger.get(), oplogEntry);
+                }
                 [[fallthrough]];
             }
             case repl::OpTypeEnum::kContainerDelete:
@@ -2203,10 +2219,27 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
                                     getMaxSizeOfBatchedOperationsInSingleOplogEntryBytes(),
                                     /*prepare=*/false);
 
+    std::size_t opTimeOffset = 0;
+    if (applyOpsOplogSlotAndOperationAssignment.numOperationsWithNeedsRetryImage > 0) {
+        if (const auto& applyOpsEntries = applyOpsOplogSlotAndOperationAssignment.applyOpsEntries;
+            applyOpsEntries.size() > 1) {
+            for (std::size_t entryIdx = 1; entryIdx < applyOpsEntries.size(); ++entryIdx) {
+                for (const auto& op : applyOpsEntries[entryIdx].operations) {
+                    invariant(
+                        !op.hasField(repl::OplogEntryBase::kNeedsRetryImageFieldName),
+                        "retryable findAndModify operations must be in the first applyOps entry");
+                }
+            }
+        }
+
+        // When a batch contains retryable findAndModify operations, the first opTime slot is offset
+        // so resharding may forge a noop oplog entry at the offset.
+        opTimeOffset = 1;
+    }
     // Reserve all the optimes in advance, so we only need to get the optime mutex once.  We
     // reserve enough entries for all statements in the transaction.
     auto oplogSlots = _operationLogger->getNextOpTimes(
-        opCtx, applyOpsOplogSlotAndOperationAssignment.numberOfOplogSlotsRequired);
+        opCtx, applyOpsOplogSlotAndOperationAssignment.numberOfOplogSlotsRequired, opTimeOffset);
 
     boost::optional<repl::ReplOperation::ImageBundle> noPrePostImage;
 

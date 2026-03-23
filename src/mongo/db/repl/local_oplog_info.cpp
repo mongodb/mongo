@@ -141,7 +141,9 @@ void LocalOplogInfo::setNewTimestamp(ServiceContext* service, const Timestamp& n
     VectorClockMutable::get(service)->tickClusterTimeTo(LogicalTime(newTime));
 }
 
-std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx, std::size_t count) {
+std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx,
+                                                      std::size_t count,
+                                                      std::size_t opTimeOffset) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     long long term = repl::OpTime::kUninitializedTerm;
 
@@ -180,7 +182,9 @@ std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx, s
         // We can't establish it here because that would require locking the local database, which
         // would be a lock order violation.
         invariant(_rs);
-        fassert(28560, storageEngine->oplogDiskLocRegister(opCtx, _rs, ts, orderedCommit));
+        invariant(opTimeOffset < count);
+        Timestamp registerTs(ts.asULL() + opTimeOffset);
+        fassert(28560, storageEngine->oplogDiskLocRegister(opCtx, _rs, registerTs, orderedCommit));
     }
 
     const auto prevAssertOnLockAttempt =

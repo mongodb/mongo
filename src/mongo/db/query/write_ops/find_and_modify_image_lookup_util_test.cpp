@@ -127,18 +127,15 @@ void testFetchPreOrPostImageFromSnapshot(
 }
 
 TEST(FindAndModifyImageLookupTest, FetchPreImageFromSnapshotBasic_RetryableWrite) {
-    // TODO (SERVER-120623): Once we go back to reading at opTimestamp - 1 instead, the expected
-    // atClusterTime below should be Timestamp(100, 1) instead.
-
     auto entryOpTime0 = repl::OpTime(Timestamp(100, 2), 5);
-    auto expectedAtClusterTime0 = Timestamp(100, 0);
+    auto expectedAtClusterTime0 = Timestamp(100, 1);
     testFetchPreOrPostImageFromSnapshot(RetryImageEnum::kPreImage,
                                         entryOpTime0,
                                         boost::none /* commitTimestamp */,
                                         expectedAtClusterTime0);
 
     auto entryOpTime1 = repl::OpTime(Timestamp(100, 1), 5);
-    auto expectedAtClusterTime1 = Timestamp(99, kMaxTsInc);
+    auto expectedAtClusterTime1 = Timestamp(100, 0);
     testFetchPreOrPostImageFromSnapshot(RetryImageEnum::kPreImage,
                                         entryOpTime1,
                                         boost::none /* commitTimestamp */,
@@ -186,12 +183,11 @@ TEST(FindAndModifyImageLookupTest, FetchPreImageFromSnapshotRequiresTsULLGte1_Re
 
 TEST(FindAndModifyImageLookupTest, FetchPreImageFromSnapshotRequiresTsULLGte2_RetryableWrite) {
     auto entryOpTime = repl::OpTime(Timestamp(0, 1), 5);
-    auto expectedAtClusterTime = boost::none;
+    auto expectedAtClusterTime = Timestamp(0, 0);
     testFetchPreOrPostImageFromSnapshot(RetryImageEnum::kPreImage,
                                         entryOpTime,
                                         boost::none /* commitTimestamp */,
-                                        expectedAtClusterTime,
-                                        12020801 /* expectedErrorCode */);
+                                        expectedAtClusterTime);
 }
 
 TEST(FindAndModifyImageLookupTest,
