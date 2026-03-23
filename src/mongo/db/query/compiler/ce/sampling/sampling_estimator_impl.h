@@ -221,7 +221,7 @@ public:
                 while (true) {
                     hasNext = it.hasNext();
                     if (elemSet.insert(element).second) {
-                        elementCount += matches(oil, element);
+                        elementCount += matchesInterval(oil, element);
                         if (elementCount > 0 && skipDuplicateMatches) {
                             break;
                         }
@@ -261,16 +261,6 @@ protected:
      */
     static std::unique_ptr<CanonicalQuery> makeEmptyCanonicalQuery(const NamespaceString& nss,
                                                                    OperationContext* opCtx);
-
-    /**
-     * This helper checks if an element is within the given Interval.
-     */
-    static bool matches(const Interval& interval, BSONElement val);
-
-    /**
-     * This helper checks if an element is within any of the list of Interval.
-     */
-    static bool matches(const OrderedIntervalList& oil, BSONElement val);
 
     /**
      * This helper calls the given callback for each document

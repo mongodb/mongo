@@ -98,4 +98,51 @@ size_t countNDV(const std::vector<FieldPathAndEqSemantics>& fields,
     return distinctValues.size();
 }
 
+bool matchesInterval(const Interval& interval, BSONElement val) {
+    int startCmp = val.woCompare(interval.start, 0 /*ignoreFieldNames*/);
+    int endCmp = val.woCompare(interval.end, 0 /*ignoreFieldNames*/);
+
+    if (startCmp == 0) {
+        /**
+         * The document value is equal to the starting point of the interval; the document is inside
+         * the bounds of this index interval if the starting point is included in the interval.
+         */
+        return interval.startInclusive;
+    } else if (startCmp < 0 && endCmp < 0) {
+        /**
+         * The document value is less than both the starting point and the end point and is thus
+         * not inside the bounds of this index interval. Depending on the index spec and the
+         * direction the index is traversed, endCmp can be < startCmp which is why it's necesary to
+         * check both interval end points.
+         */
+        return false;
+    }
+
+    if (endCmp == 0) {
+        /**
+         * The document value is equal to the end point of the interval; the document is inside the
+         * bounds of this index interval if the end point is included in the interval.
+         */
+        return interval.endInclusive;
+    } else if (endCmp > 0 && startCmp > 0) {
+        /**
+         * The document value is greater than both the starting point and the end point and is thus
+         * not inside the bounds of this index interval. Depending on the index spec and the
+         * direction the index is traversed, startCmp can be < endCmp which is why it's necesary to
+         * check both interval end points.
+         */
+        return false;
+    }
+    return true;
+}
+
+bool matchesInterval(const OrderedIntervalList& oil, BSONElement val) {
+    for (auto&& interval : oil.intervals) {
+        if (matchesInterval(interval, val)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 }  // namespace mongo::ce

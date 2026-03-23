@@ -115,4 +115,15 @@ struct FieldPathAndEqSemantics {
 size_t countNDV(const std::vector<FieldPathAndEqSemantics>& fields,
                 const std::vector<BSONObj>& docs);
 
+/**
+ * This helper checks if an element is within the given Interval.
+ */
+bool matchesInterval(const Interval& interval, BSONElement val);
+
+/**
+ * This helper checks if an element is within any of the list of Interval.
+ */
+bool matchesInterval(const OrderedIntervalList& oil, BSONElement val);
+
+
 }  // namespace mongo::ce
