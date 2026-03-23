@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,41 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/traffic_recorder.h"
-#include "mongo/rpc/op_msg.h"
-#include "mongo/util/modules.h"
+#include "mongo/db/traffic_recorder/stashed_request.h"
 
-#include <filesystem>
-#include <iosfwd>
-#include <string>
-
-#pragma once
+#include "mongo/transport/session.h"
 
 namespace mongo {
-static const std::string kSessionStartOpType = "sessionStart";
-static const std::string kSessionEndOpType = "sessionEnd";
 
-// Packet struct
-struct TrafficReaderPacket {
-    EventType eventType;
-    uint64_t id;
-    StringData session;
-    Microseconds offset;  // offset from the start of the recording in microseconds
-    uint64_t order;
-    MsgData::ConstView message;
-};
+const OperationContext::Decoration<StashedRequest> StashedRequest::get =
+    OperationContext::declareDecoration<StashedRequest>();
 
-// Comparator for round-trip testing that a packet read from disk is equal to the value written to
-// disk originally.
-bool operator==(const TrafficReaderPacket& read, const TrafficRecordingPacket& recorded);
+void StashedRequest::clear() {
+    _value.reset();
+}
 
-// Method for testing, takes the recorded traffic and returns a BSONArray
-MONGO_MOD_PUBLIC BSONArray trafficRecordingFileToBSONArr(const std::string& inputFile,
-                                                         bool bodyAsNestedDoc = false);
+void StashedRequest::set(const Message& message) {
+    _value = message;
+}
 
-// This is the function that traffic_reader_main.cpp calls
-void trafficRecordingFileToMongoReplayFile(int inFile, std::ostream& outFile);
-
-TrafficReaderPacket readPacket(ConstDataRangeCursor cdr);
+boost::optional<Message> StashedRequest::take() {
+    return std::move(_value);
+}
 }  // namespace mongo

@@ -365,3 +365,67 @@ function normalize(path) {
 
     removeFile(recordingDir);
 }
+
+// Ensure requests with sensitive fields are excluded from recordings
+{
+    const path = MongoRunner.toRealDir("$dataDir/traffic_recording/");
+    let recordingDir = path + "/recordings/";
+
+    removeFile(recordingDir);
+    mkdir(recordingDir);
+
+    let m = MongoRunner.runMongod({auth: "", setParameter: {trafficRecordingDirectory: path, enableTestCommands: 1}});
+
+    let db = m.getDB("admin");
+
+    db.createUser({user: "admin", pwd: "pass", roles: jsTest.adminUserRoles});
+    db.auth("admin", "pass");
+
+    assert.commandWorked(
+        db.runCommand({"startTrafficRecording": 1, "destination": "recordings", "recordingID": "foobar"}),
+    );
+
+    {
+        // Start a new connection, and authenticate.
+        let conn = new Mongo(m.host);
+        let db2 = conn.getDB("admin");
+        db2.auth("admin", "pass");
+    }
+
+    assert.commandWorked(db.runCommand({"stopTrafficRecording": 1}));
+
+    MongoRunner.stopMongod(m, null, {user: "admin", pwd: "pass"});
+
+    let ops = convertTrafficRecordingToBSON(recordingDir, true);
+
+    // Check that events were actually recorded
+    assert(ops.length > 0);
+
+    function getCmdName(op) {
+        const body = op.rawop.body;
+        if (body == undefined) {
+            // Session start/end events do not have a body.
+            return undefined;
+        }
+        return Object.entries(body)[0][0];
+    }
+
+    // Check that actual operations were recorded, not just
+    // session start/end etc.
+    // Specifically check that a hello was seen.
+    assert(ops.map(getCmdName).filter((name) => name == "hello").length > 0);
+
+    // Verify sasl related commands don't appear in the recording.
+    assert(
+        ops.every((op) => {
+            const cmdName = getCmdName(op);
+            if (cmdName == undefined) {
+                // Session start/end events do not have a body.
+                return true;
+            }
+            return !cmdName.toLowerCase().includes("sasl");
+        }),
+    );
+
+    removeFile(recordingDir);
+}

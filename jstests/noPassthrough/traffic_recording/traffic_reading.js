@@ -106,4 +106,3 @@ assert.eq(opTypes["insert"], 2);
 assert.eq(opTypes["delete"], 1);
 assert.eq(opTypes["update"], 1);
 assert.eq(opTypes["aggregate"], 1);
-assert.eq(opTypes["stopTrafficRecording"], 1);

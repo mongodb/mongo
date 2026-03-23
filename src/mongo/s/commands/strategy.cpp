@@ -77,6 +77,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/topology/mongos_topology_coordinator.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
+#include "mongo/db/traffic_recorder/stashed_request.h"
 #include "mongo/db/transaction_validation.h"
 #include "mongo/db/validate_api_parameters.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
@@ -1216,6 +1217,12 @@ void ClientCommand::_execute() {
     try {
         ParseAndRunCommand runner(_rec, &_errorBuilder);
         runner.run();
+        auto* cmd = _rec->getCommand();
+        if (cmd && !cmd->sensitiveFieldNames().empty()) {
+            // This request contains some sensitive fields.
+            // Do not include it in a traffic recording to avoid leaking information.
+            StashedRequest::get(_rec->getOpCtx()).clear();
+        }
 
         LOGV2_DEBUG(22771,
                     3,
@@ -1224,6 +1231,10 @@ void ClientCommand::_execute() {
                     "headerId"_attr = _rec->getMessage().header().getId());
     } catch (const DBException& ex) {
         auto status = ex.toStatus();
+
+        // An exception was thrown, but the request might still
+        // have sensitive data. Avoid recording it, just in case.
+        StashedRequest::get(_rec->getOpCtx()).clear();
 
         LOGV2_DEBUG(22772,
                     1,

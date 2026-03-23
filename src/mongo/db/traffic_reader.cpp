@@ -144,7 +144,9 @@ boost::optional<TrafficReaderPacket> readPacket(char* buf, int fd) {
     return readPacket(ConstDataRangeCursor(buf, buf + len));
 }
 
-void getBSONObjFromPacket(TrafficReaderPacket& packet, BSONObjBuilder* builder) {
+void getBSONObjFromPacket(TrafficReaderPacket& packet,
+                          BSONObjBuilder* builder,
+                          bool bodyAsNestedDoc = false) {
     {
         // RawOp Field
         BSONObjBuilder rawop(builder->subobjStart("rawop"));
@@ -162,8 +164,16 @@ void getBSONObjFromPacket(TrafficReaderPacket& packet, BSONObjBuilder* builder) 
                 header.append("opcode", static_cast<int32_t>(packet.message.getNetworkOp()));
             }
 
-            rawop.appendBinData(
-                "body", packet.message.getLen(), BinDataGeneral, packet.message.view2ptr());
+            if (bodyAsNestedDoc) {
+                Message message;
+                message.setData(dbMsg, packet.message.data(), packet.message.dataLen());
+                OpMsg::removeChecksum(&message);
+                auto body = rpc::opMsgRequestFromAnyProtocol(message).body;
+                rawop.append("body", body);
+            } else {
+                rawop.appendBinData(
+                    "body", packet.message.getLen(), BinDataGeneral, packet.message.view2ptr());
+            }
         }
     }
 
@@ -207,7 +217,7 @@ bool operator==(const TrafficReaderPacket& read, const TrafficRecordingPacket& r
         std::tie(recorded.id, recorded.session, recorded.offset, recorded.order, recordedData);
 }
 
-BSONArray trafficRecordingFileToBSONArr(const std::string& inputFile) {
+BSONArray trafficRecordingFileToBSONArr(const std::string& inputFile, bool bodyAsNestedDoc) {
     BSONArrayBuilder builder{};
 
     uassert(ErrorCodes::FileNotOpen,
@@ -249,7 +259,7 @@ BSONArray trafficRecordingFileToBSONArr(const std::string& inputFile) {
 
         while (auto packet = readPacket(buf.get(), inputFd)) {
             BSONObjBuilder bob(builder.subobjStart());
-            getBSONObjFromPacket(*packet, &bob);
+            getBSONObjFromPacket(*packet, &bob, bodyAsNestedDoc);
             addOpType(*packet, &bob);
         }
     }

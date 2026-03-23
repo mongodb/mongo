@@ -113,6 +113,7 @@
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
+#include "mongo/db/traffic_recorder/stashed_request.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction_validation.h"
 #include "mongo/db/validate_api_parameters.h"
@@ -2496,6 +2497,12 @@ Future<DbResponse> ServiceEntryPointShardRole::handleRequest(OperationContext* o
 
     try {
         auto response = hr.runOperation();
+        auto* cmd = hr.executionContext.getCommand();
+        if (cmd && !cmd->sensitiveFieldNames().empty()) {
+            // This request contains some sensitive fields.
+            // Do not include it in a traffic recording to avoid leaking information.
+            StashedRequest::get(opCtx).clear();
+        }
         hr.completeOperation(response);
         return response;
     } catch (const DBException& ex) {
