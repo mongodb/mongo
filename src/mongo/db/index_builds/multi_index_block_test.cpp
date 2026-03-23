@@ -46,6 +46,8 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -601,6 +603,75 @@ TEST_F(MultiIndexBlockTest, AddDocumentBetweenInitAndInsertAll) {
                                              IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
     {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(indexer->commit(operationContext(),
+                                  coll.getWritableCollection(operationContext()),
+                                  MultiIndexBlock::kNoopOnCreateEachFn,
+                                  MultiIndexBlock::kNoopOnCommitFn));
+        wuow.commit();
+    }
+}
+
+TEST_F(MultiIndexBlockTest, DrainBackgroundWritesYieldIsTracked) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    int64_t drainYieldsBefore = 0;
+    if (capturer.canReadMetrics()) {
+        drainYieldsBefore =
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDrainYields);
+    }
+
+    auto indexer = getIndexer();
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       *storageEngine);
+
+    {
+        AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+        CollectionWriter coll(operationContext(), autoColl);
+
+        {
+            WriteUnitOfWork wuow(operationContext());
+            ASSERT_OK(indexer
+                          ->init(operationContext(),
+                                 coll,
+                                 {indexBuildInfo},
+                                 MultiIndexBlock::kNoopOnInitFn,
+                                 MultiIndexBlock::InitMode::SteadyState,
+                                 boost::none,
+                                 /*generateTableWrites=*/true)
+                          .getStatus());
+            wuow.commit();
+        }
+
+        {
+            WriteUnitOfWork wuow(operationContext());
+            ASSERT_OK(Helpers::insert(operationContext(), *autoColl, BSON("_id" << 0 << "a" << 1)));
+            wuow.commit();
+        }
+
+        ASSERT_OK(indexer->insertAllDocumentsInCollection(operationContext(), getNSS()));
+    }
+
+    {
+        AutoGetCollection autoColl(operationContext(), getNSS(), MODE_IX);
+        ASSERT_OK(indexer->drainBackgroundWrites(operationContext(),
+                                                 RecoveryUnit::ReadSource::kNoTimestamp,
+                                                 IndexBuildInterceptor::DrainYieldPolicy::kYield));
+    }
+
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDrainYields),
+            drainYieldsBefore + 1);
+    }
+
+    {
+        AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+        CollectionWriter coll(operationContext(), autoColl);
         WriteUnitOfWork wuow(operationContext());
         ASSERT_OK(indexer->commit(operationContext(),
                                   coll.getWritableCollection(operationContext()),

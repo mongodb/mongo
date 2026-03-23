@@ -69,10 +69,10 @@ struct HistogramSnapshot {
 
 // TODO SERVER-121249: Replace this local helper if SERVER-121249 introduces
 // an OTel histogram test helper that supports empty histograms.
-HistogramSnapshot readSideWritesDrainDurationOrZero(otel::metrics::OtelMetricsCapturer& capturer) {
+HistogramSnapshot readHistogramOrZero(otel::metrics::OtelMetricsCapturer& capturer,
+                                      otel::metrics::MetricName metricName) {
     try {
-        const auto histogram = capturer.readInt64Histogram(
-            otel::metrics::MetricNames::kIndexBuildSideWritesDrainDuration);
+        const auto histogram = capturer.readInt64Histogram(metricName);
         return {histogram.count, histogram.sum};
     } catch (const DBException& ex) {
         if (ex.code() == ErrorCodes::KeyNotFound) {
@@ -179,7 +179,8 @@ protected:
 
     // Reusable function which executes the test and can be run under different configurations (eg.
     // feature flags).
-    void testSingleInsertIsSavedToSideWritesTable(LazyRecordStore::CreateMode createMode);
+    void testSingleOpIsSavedToSideWritesTable(IndexBuildInterceptor::Op op,
+                                              LazyRecordStore::CreateMode createMode);
 
     boost::optional<AutoGetCollection> _coll;
 
@@ -187,13 +188,17 @@ private:
     NamespaceString _nss = NamespaceString::createNamespaceString_forTest("testDB.interceptor");
 };
 
-void IndexBuilderInterceptorTest::testSingleInsertIsSavedToSideWritesTable(
-    LazyRecordStore::CreateMode createMode) {
+void IndexBuilderInterceptorTest::testSingleOpIsSavedToSideWritesTable(
+    IndexBuildInterceptor::Op op, LazyRecordStore::CreateMode createMode) {
+
     otel::metrics::OtelMetricsCapturer capturer;
-    int64_t writtenBefore = 0;
+    int64_t insertedBefore = 0;
+    int64_t deletedBefore = 0;
     if (capturer.canReadMetrics()) {
-        writtenBefore =
-            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesWritten);
+        insertedBefore =
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesInserted);
+        deletedBefore =
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted);
     }
 
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
@@ -206,14 +211,8 @@ void IndexBuilderInterceptorTest::testSingleInsertIsSavedToSideWritesTable(
 
     WriteUnitOfWork wuow(operationContext());
     int64_t numKeys = 0;
-    ASSERT_OK(interceptor->sideWrite(operationContext(),
-                                     *_coll.get(),
-                                     entry,
-                                     {keyString},
-                                     {},
-                                     {},
-                                     IndexBuildInterceptor::Op::kInsert,
-                                     &numKeys));
+    ASSERT_OK(interceptor->sideWrite(
+        operationContext(), *_coll.get(), entry, {keyString}, {}, {}, op, &numKeys));
     ASSERT_EQ(1, numKeys);
     wuow.commit();
 
@@ -223,25 +222,42 @@ void IndexBuilderInterceptorTest::testSingleInsertIsSavedToSideWritesTable(
 
     auto sideWrites = getSideWritesTableContents(indexBuildInfo);
     ASSERT_EQ(1, sideWrites.size());
-    ASSERT_BSONOBJ_EQ(BSON("op" << "i"
-                                << "key" << serializedKeyString),
+    ASSERT_BSONOBJ_EQ(BSON("op" << (op == IndexBuildInterceptor::Op::kInsert ? "i" : "d") << "key"
+                                << serializedKeyString),
                       sideWrites[0]);
 
     if (capturer.canReadMetrics()) {
         EXPECT_EQ(
-            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesWritten),
-            writtenBefore + 1);
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesInserted),
+            insertedBefore + (op == IndexBuildInterceptor::Op::kInsert ? 1 : 0));
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted),
+            deletedBefore + (op == IndexBuildInterceptor::Op::kDelete ? 1 : 0));
     }
 }
 
 TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSideWritesTable) {
-    testSingleInsertIsSavedToSideWritesTable(LazyRecordStore::CreateMode::deferred);
+    testSingleOpIsSavedToSideWritesTable(IndexBuildInterceptor::Op::kInsert,
+                                         LazyRecordStore::CreateMode::deferred);
 }
 
 TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSideWritesTablePrimaryDriven) {
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagPrimaryDrivenIndexBuilds", true);
-    testSingleInsertIsSavedToSideWritesTable(LazyRecordStore::CreateMode::immediate);
+    testSingleOpIsSavedToSideWritesTable(IndexBuildInterceptor::Op::kInsert,
+                                         LazyRecordStore::CreateMode::immediate);
+}
+
+TEST_F(IndexBuilderInterceptorTest, SingleDeleteIsSavedToSideWritesTable) {
+    testSingleOpIsSavedToSideWritesTable(IndexBuildInterceptor::Op::kDelete,
+                                         LazyRecordStore::CreateMode::deferred);
+}
+
+TEST_F(IndexBuilderInterceptorTest, SingleDeleteIsSavedToSideWritesTablePrimaryDriven) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPrimaryDrivenIndexBuilds", true);
+    testSingleOpIsSavedToSideWritesTable(IndexBuildInterceptor::Op::kDelete,
+                                         LazyRecordStore::CreateMode::immediate);
 }
 
 TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSkippedRecordsIntRidTrackerTable) {
@@ -373,10 +389,14 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsDrainedIntoIndexPrimaryDriven)
     otel::metrics::OtelMetricsCapturer capturer;
     int64_t drainedBefore = 0;
     HistogramSnapshot drainDurationBefore{0, 0};
+    HistogramSnapshot drainBytesBefore{0, 0};
     if (capturer.canReadMetrics()) {
         drainedBefore =
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDrained);
-        drainDurationBefore = readSideWritesDrainDurationOrZero(capturer);
+        drainDurationBefore = readHistogramOrZero(
+            capturer, otel::metrics::MetricNames::kIndexBuildSideWritesDrainDuration);
+        drainBytesBefore = readHistogramOrZero(
+            capturer, otel::metrics::MetricNames::kIndexBuildSideWritesDrainBytes);
     }
 
     RAIIServerParameterControllerForTest featureFlagController(
@@ -434,6 +454,10 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsDrainedIntoIndexPrimaryDriven)
             otel::metrics::MetricNames::kIndexBuildSideWritesDrainDuration);
         EXPECT_EQ(drainDurationAfter.count, drainDurationBefore.count + 1);
         EXPECT_GE(drainDurationAfter.sum, drainDurationBefore.sum);
+        const auto drainBytesAfter = capturer.readInt64Histogram(
+            otel::metrics::MetricNames::kIndexBuildSideWritesDrainBytes);
+        EXPECT_EQ(drainBytesAfter.count, drainBytesBefore.count + 1);
+        EXPECT_GE(drainBytesAfter.sum, drainBytesBefore.sum);
     }
 }
 
@@ -441,10 +465,14 @@ TEST_F(IndexBuilderInterceptorTest, SingleDeleteIsDrainedIntoIndexPrimaryDriven)
     otel::metrics::OtelMetricsCapturer capturer;
     int64_t drainedBefore = 0;
     HistogramSnapshot drainDurationBefore{0, 0};
+    HistogramSnapshot drainBytesBefore{0, 0};
     if (capturer.canReadMetrics()) {
         drainedBefore =
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDrained);
-        drainDurationBefore = readSideWritesDrainDurationOrZero(capturer);
+        drainDurationBefore = readHistogramOrZero(
+            capturer, otel::metrics::MetricNames::kIndexBuildSideWritesDrainDuration);
+        drainBytesBefore = readHistogramOrZero(
+            capturer, otel::metrics::MetricNames::kIndexBuildSideWritesDrainBytes);
     }
 
     RAIIServerParameterControllerForTest featureFlagController(
@@ -519,6 +547,10 @@ TEST_F(IndexBuilderInterceptorTest, SingleDeleteIsDrainedIntoIndexPrimaryDriven)
             otel::metrics::MetricNames::kIndexBuildSideWritesDrainDuration);
         EXPECT_EQ(drainDurationAfter.count, drainDurationBefore.count + 1);
         EXPECT_GE(drainDurationAfter.sum, drainDurationBefore.sum);
+        const auto drainBytesAfter = capturer.readInt64Histogram(
+            otel::metrics::MetricNames::kIndexBuildSideWritesDrainBytes);
+        EXPECT_EQ(drainBytesAfter.count, drainBytesBefore.count + 1);
+        EXPECT_GE(drainBytesAfter.sum, drainBytesBefore.sum);
     }
 }
 
