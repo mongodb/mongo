@@ -471,6 +471,26 @@ TEST_F(PipelineDependencyGraphTest, CanDottedRenamedPathsBeArray) {
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, CanRedefinedBaseFieldBeArray) {
+    setPipeline(
+        "[{$set: { a: 1, b: 1, 'c.c': 1 }},"
+        "{$set: { 'a.a': 1, 'a.b': 1, 'b.b.b': 1, c: 1 }},"
+        "{$set: { 'a.b.a': 1, 'b.b': 1, 'b.a': 1 }}]");
+    runTest([&] {
+        // Lookup from the end of the pipeline.
+        auto* ds = stages.back().get();
+        ASSERT_FALSE(graph->canPathBeArray(ds, "a"));
+        ASSERT_FALSE(graph->canPathBeArray(ds, "a.a"));
+        ASSERT_FALSE(graph->canPathBeArray(ds, "a.b"));
+        ASSERT_FALSE(graph->canPathBeArray(ds, "a.b.a"));
+        ASSERT_FALSE(graph->canPathBeArray(ds, "b"));
+        ASSERT_FALSE(graph->canPathBeArray(ds, "b.b"));
+        ASSERT_FALSE(graph->canPathBeArray(ds, "b.a"));
+        // TODO(SERVER-119392): This should pass.
+        // ASSERT_FALSE(graph->canPathBeArray(ds, "b.b.b"));
+    });
+}
+
 // TODO(SERVER-121932): Implement prefix rewrite and lookup full path in path arrayness.
 // TEST_F(PipelineDependencyGraphTest, CanBeArraysLooksThroughDottedRenamedPaths) {
 //     pathArrayness->addPath("x.y.z", {}, true);

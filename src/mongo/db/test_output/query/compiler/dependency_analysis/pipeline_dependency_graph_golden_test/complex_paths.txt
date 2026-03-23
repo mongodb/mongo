@@ -155,6 +155,9 @@ output: {
                             }
                         }
                     },
+                    "metadata": {
+                        "array": false
+                    },
                     "dependencies": [
                         "a:9",
                         "b:10"
@@ -195,6 +198,9 @@ output: {
                                 ]
                             }
                         }
+                    },
+                    "metadata": {
+                        "array": false
                     },
                     "dependencies": [
                         "b:13"
@@ -257,11 +263,17 @@ output: {
                                         }
                                     }
                                 },
+                                "metadata": {
+                                    "array": false
+                                },
                                 "dependencies": [
                                     "a:22"
                                 ]
                             }
                         }
+                    },
+                    "metadata": {
+                        "array": false
                     },
                     "dependencies": [
                         "a:7",
@@ -300,6 +312,9 @@ output: {
                                 ]
                             }
                         }
+                    },
+                    "metadata": {
+                        "array": false
                     },
                     "dependencies": [
                         "a:25",

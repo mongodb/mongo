@@ -506,6 +506,7 @@ private:
             }
             declareScope(_scopes[scope].stage, exhaustiveEmbeddedScope, parentEmbeddedScope);
             _scopes[scope].fields[basePath.front()] = newBaseField;
+            populateBaseFieldMetadata(newBaseField, existingBaseField);
         }
         // Finally, declare the subPath in the embeddedScope we found or created.
         auto embeddedField = declareField(_fields[newBaseField].embeddedScope,
@@ -630,6 +631,22 @@ private:
     }
 
     /**
+     * Populate metadata when a base field is redefined.
+     */
+    void populateBaseFieldMetadata(FieldId newBaseField, FieldId existingBaseField) {
+        if (existingBaseField) {
+            _fields[newBaseField].metadata.canFieldBeArray =
+                _fields[existingBaseField].metadata.canFieldBeArray;
+        } else {
+            // The included base field is a collection field.
+            // TODO(SERVER-121932): Can we use the path prefix rename code to establish the path and
+            // query the Path Arrayness API. Note that path arrayness gives arrayness for entire
+            // path, so if the final field is non-array we could assume no element is as
+            // optimisation, but this could be harder to wire-in.
+        }
+    }
+
+    /**
      * Returns true if any field in the list can contain arrays.
      */
     bool canPrefixContainArrays(const FieldList& prefix) const {
@@ -746,8 +763,6 @@ private:
 
                     // Each rename modifies the new field and depends on the previous field.
                     declareField(scopeId, parsedNewPath, std::move(deps), std::move(metadata));
-                    // To get done (SERVER-119384): Compute & store arrayness for each field along
-                    // the path.
                 },
             },
             ds);
