@@ -39,6 +39,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/create_oplog_entry_gen.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -248,6 +249,12 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* o
                         !status.isOK()) {
                         return status;
                     }
+                } else if (indexesVec[i].spec["unique"].trueValue() ||
+                           IndexDescriptor::isIdIndexPattern(
+                               indexesVec[i].spec.getObjectField("key"))) {
+                    return {ErrorCodes::BadValue,
+                            "constraintViolationsTrackerIdent is required for unique and _id "
+                            "indexes"};
                 }
                 indexesVec[i].setInternalIdents(
                     std::string{internalIdents.getSorterIdent()},

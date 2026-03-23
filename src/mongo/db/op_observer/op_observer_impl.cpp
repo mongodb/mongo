@@ -74,6 +74,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_operation_source.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/database_holder.h"
+#include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/shard_id.h"
@@ -330,6 +331,10 @@ std::vector<repl::IndexIdents> buildIndexIdentsForO2(OperationContext* opCtx,
             invariant(indexBuildInfo.sorterIdent);
             invariant(indexBuildInfo.sideWritesIdent);
             invariant(indexBuildInfo.skippedRecordsTrackerIdent);
+            invariant(
+                !(indexBuildInfo.spec["unique"].trueValue() ||
+                  IndexDescriptor::isIdIndexPattern(indexBuildInfo.spec.getObjectField("key"))) ||
+                indexBuildInfo.constraintViolationsTrackerIdent);
 
             repl::InternalIdents internalIdents;
             internalIdents.setSorterIdent(*indexBuildInfo.sorterIdent);

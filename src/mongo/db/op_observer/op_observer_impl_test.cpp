@@ -6180,6 +6180,66 @@ TEST_F(OpObserverTest, OnCommitIndexBuildNoInternalIdentsWhenPrimaryDrivenIndexB
     EXPECT_FALSE(indexElemObj.hasField("internalIdents"));
 }
 
+using OpObserverIndexBuildDeathTest = OpObserverTest;
+
+DEATH_TEST_F(OpObserverIndexBuildDeathTest,
+             OnStartIndexBuildInvariantIfUniqueIndexMissingConstraintViolationsTrackerIdent,
+             "invariant") {
+    OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
+    auto opCtx = cc().makeOperationContext();
+
+    auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+
+    // Build a unique index IndexBuildInfo but clear the constraintViolationsTrackerIdent to
+    // simulate it being missing.
+    auto uniqueSpec =
+        BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1" << "unique" << true);
+    IndexBuildInfo indexBuildInfo(uniqueSpec, "index-1", *storageEngine);
+    indexBuildInfo.setInternalIdents(*indexBuildInfo.sorterIdent,
+                                     *indexBuildInfo.sideWritesIdent,
+                                     *indexBuildInfo.skippedRecordsTrackerIdent,
+                                     boost::none);
+
+    AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
+    WriteUnitOfWork wunit(opCtx.get());
+    RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        "featureFlagPrimaryDrivenIndexBuilds", true);
+    RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
+        "featureFlagReplicateLocalCatalogIdentifiers", true);
+    opObserver.onStartIndexBuild(
+        opCtx.get(), nss, UUID::gen(), UUID::gen(), {indexBuildInfo}, false);
+}
+
+DEATH_TEST_F(OpObserverIndexBuildDeathTest,
+             OnCommitIndexBuildInvariantIfUniqueIndexMissingConstraintViolationsTrackerIdent,
+             "invariant") {
+    OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
+    auto opCtx = cc().makeOperationContext();
+
+    auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+
+    // Build a unique index IndexBuildInfo but clear the constraintViolationsTrackerIdent to
+    // simulate it being missing.
+    auto uniqueSpec =
+        BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1" << "unique" << true);
+    IndexBuildInfo indexBuildInfo(uniqueSpec, "index-1", *storageEngine);
+    indexBuildInfo.setInternalIdents(*indexBuildInfo.sorterIdent,
+                                     *indexBuildInfo.sideWritesIdent,
+                                     *indexBuildInfo.skippedRecordsTrackerIdent,
+                                     boost::none);
+
+    AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
+    WriteUnitOfWork wunit(opCtx.get());
+    RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        "featureFlagPrimaryDrivenIndexBuilds", true);
+    RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
+        "featureFlagReplicateLocalCatalogIdentifiers", true);
+    opObserver.onCommitIndexBuild(
+        opCtx.get(), nss, UUID::gen(), UUID::gen(), {indexBuildInfo}, {}, false);
+}
+
 TEST_F(OpObserverTest, OnContainerInsert) {
     auto opCtx = cc().makeOperationContext();
     Lock::GlobalLock lock{opCtx.get(), LockMode::MODE_IX};
