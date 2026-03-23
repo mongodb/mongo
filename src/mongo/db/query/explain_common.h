@@ -71,4 +71,9 @@ void generatePeakTrackedMemBytes(const OperationContext* opCtx, BSONObjBuilder* 
  */
 bool appendIfRoom(const BSONObj& toAppend, StringData fieldName, BSONObjBuilder* out);
 
+/**
+ * Conditionally appends a BSONArray to 'bob' depending on whether or not the maximum user size for
+ * a BSON object will be exceeded.
+ */
+bool appendIfRoom(const BSONArray& toAppend, StringData fieldName, BSONObjBuilder* out);
 }  // namespace mongo::explain_common

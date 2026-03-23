@@ -43,6 +43,30 @@
 #include "mongo/util/version.h"
 
 namespace mongo::explain_common {
+namespace append_if_room {
+/*
+ * This constant restricts the maximum output object size for 'appendIfRoom' functions. By setting
+ * it slightly lower than 'BSONObjMaxUserSize', we ensure the final output stays within limits even
+ * after adding mandatory small fields that are not individually size-checked.
+ *
+ * Assumption: BSONObjMaxUserSize will never be below 10KB.
+ */
+constexpr int OutputObjectMaxSize = BSONObjMaxUserSize - 10 * 1024;
+
+void appendWarningMessage(StringData fieldName, BSONObjBuilder* out) {
+    constexpr int kWarningMsgOverhead = 60;
+    // The reserved buffer size for the warning message if 'out' exceeds the max BSON user size.
+    const int warningMsgSize = fieldName.size() + kWarningMsgOverhead;
+
+    // Unless 'out' has already exceeded the max BSON user size, add a warning indicating
+    // that data has been truncated.
+    if (out->len() < OutputObjectMaxSize - warningMsgSize) {
+        out->append("warning",
+                    str::stream() << "'" << fieldName << "'"
+                                  << " has been omitted due to BSON size limit");
+    }
+}
+}  // namespace append_if_room
 
 void generateServerInfo(BSONObjBuilder* out) {
     BSONObjBuilder serverBob(out->subobjStart("serverInfo"));
@@ -84,23 +108,24 @@ void generatePeakTrackedMemBytes(const OperationContext* opCtx, BSONObjBuilder* 
 }
 
 bool appendIfRoom(const BSONObj& toAppend, StringData fieldName, BSONObjBuilder* out) {
-    if ((out->len() + toAppend.objsize()) < BSONObjMaxUserSize) {
+    if ((out->len() + toAppend.objsize()) < append_if_room::OutputObjectMaxSize) {
         out->append(fieldName, toAppend);
         return true;
     }
 
-    // The reserved buffer size for the warning message if 'out' exceeds the max BSON user size.
-    const int warningMsgSize = fieldName.size() + 60;
-
-    // Unless 'out' has already exceeded the max BSON user size, add a warning indicating
-    // that data has been truncated.
-    if (out->len() < BSONObjMaxUserSize - warningMsgSize) {
-        out->append("warning",
-                    str::stream() << "'" << fieldName << "'"
-                                  << " has been omitted due to BSON size limit");
-    }
+    append_if_room::appendWarningMessage(fieldName, out);
 
     return false;
 }
 
+bool appendIfRoom(const BSONArray& toAppend, StringData fieldName, BSONObjBuilder* out) {
+    if ((out->len() + toAppend.objsize()) < append_if_room::OutputObjectMaxSize) {
+        out->appendArray(fieldName, toAppend);
+        return true;
+    }
+
+    append_if_room::appendWarningMessage(fieldName, out);
+
+    return false;
+}
 }  // namespace mongo::explain_common

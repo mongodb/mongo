@@ -530,7 +530,7 @@ void Explain::planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* 
         // Add the 'createdFromQuery' object.
         {
             const auto& createdFromQuery = entry.debugInfo->createdFromQuery;
-            BSONObjBuilder shapeBuilder(out->subobjStart("createdFromQuery"));
+            BSONObjBuilder shapeBuilder{};
             shapeBuilder.append("query", createdFromQuery.filter);
             shapeBuilder.append("sort", createdFromQuery.sort);
             shapeBuilder.append("projection", createdFromQuery.projection);
@@ -540,22 +540,23 @@ void Explain::planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* 
             if (!createdFromQuery.distinct.isEmpty()) {
                 shapeBuilder.append("distinct", createdFromQuery.distinct);
             }
+            explain_common::appendIfRoom(shapeBuilder.obj(), "createdFromQuery", out);
         }
 
         auto plannerStats = getCachedPlanStats(debugInfo, ExplainOptions::Verbosity::kQueryPlanner);
         auto execStats = getCachedPlanStats(debugInfo, ExplainOptions::Verbosity::kExecStats);
 
         tassert(11320917, "plannerStats must not be empty", plannerStats.size() > 0);
-        out->append("cachedPlan", plannerStats[0].first);
+        explain_common::appendIfRoom(plannerStats[0].first, "cachedPlan", out);
 
-        BSONArrayBuilder creationBuilder(out->subarrayStart("creationExecStats"));
+        BSONArrayBuilder creationBuilder{};
         for (auto&& stats : execStats) {
             BSONObjBuilder planBob(creationBuilder.subobjStart());
             generateSinglePlanExecutionInfo(
                 stats, boost::none, &planBob, false /* isTrialPeriodInfo */);
             planBob.doneFast();
         }
-        creationBuilder.doneFast();
+        explain_common::appendIfRoom(creationBuilder.arr(), "creationExecStats", out);
 
         BSONArrayBuilder scoresBuilder(out->subarrayStart("candidatePlanScores"));
         for (double score : debugInfo.decision->scores) {
@@ -580,10 +581,11 @@ void Explain::planCacheEntryToBSON(const sbe::PlanCacheEntry& entry, BSONObjBuil
     appendBasicPlanCacheEntryInfoToBSON(entry, out);
 
     sbe::DebugPrintInfo debugPrintInfo{};
-    out->append(
-        "cachedPlan",
+    explain_common::appendIfRoom(
         BSON("slots" << entry.cachedPlan->planStageData.debugString() << "stages"
-                     << sbe::DebugPrinter().print(*entry.cachedPlan->root, debugPrintInfo)));
+                     << sbe::DebugPrinter().print(*entry.cachedPlan->root, debugPrintInfo)),
+        "cachedPlan",
+        out);
 
     out->append("indexFilterSet", entry.cachedPlan->indexFilterApplied);
     out->append("isPinned", entry.isPinned());
