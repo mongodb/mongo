@@ -54,9 +54,8 @@ public:
     using RandomFunc = std::function<int()>;
 
     static int threadSafeRandom() {
-        static StaticImmortal<synchronized_value<PseudoRandom>> random{
-            PseudoRandom{SecureRandom{}.nextInt64()}};
-        return (*random)->nextInt32(defaultRandomMax());
+        static thread_local PseudoRandom random{SecureRandom{}.nextInt64()};
+        return random.nextInt32(defaultRandomMax());
     }
 
     static RandomFunc defaultRandomFunc() {
