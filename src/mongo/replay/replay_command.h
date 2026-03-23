@@ -76,6 +76,8 @@ public:
 
     EventType getEventType() const;
 
+    void replaceBody(BSONObj buf);
+
 private:
     /** Extract the actual message body containing the actual bson command containing the query */
     OpMsgRequest parseBody() const;
@@ -93,6 +95,13 @@ private:
 
 
     TrafficReaderPacket _packet;
+    // During replay, it may be necessary to edit a message before executing it.
+    // In that case, a new message may be stored in this shared buffer, and _packet
+    // made to reference it.
+    SharedBuffer _ownedBody;
+
+    // Lazily initialized on first use, to avoid repeated parsing from packet data.
+    mutable boost::optional<OpMsgRequest> _parsedRequest;
 };
 
 std::pair<Microseconds, uint64_t> extractOffsetAndSessionFromCommand(const ReplayCommand& command);

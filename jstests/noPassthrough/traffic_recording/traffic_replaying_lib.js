@@ -40,7 +40,9 @@ export function recordOperations(recordingDirGlobal, customRecordingDir, opsToRe
 
     assert.commandWorked(adminDB.runCommand({startTrafficRecording: 1, destination: customRecordingDir}));
 
-    const dbContext = {adminDB, testDB, coll, serverURI: `mongodb://${mongodInstance.host}`};
+    const serverURI = `mongodb://admin:pass@${mongodInstance.host}/admin`;
+
+    const dbContext = {adminDB, testDB, coll, serverURI};
 
     opsToRecord(dbContext);
 
@@ -49,5 +51,5 @@ export function recordOperations(recordingDirGlobal, customRecordingDir, opsToRe
 
     assert.commandWorked(adminDB.runCommand({stopTrafficRecording: 1}));
 
-    return {mongodInstance, coll, recordingFilePath};
+    return {mongodInstance, coll, recordingFilePath, serverURI};
 }

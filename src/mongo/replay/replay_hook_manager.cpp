@@ -41,6 +41,11 @@ ReplayObserverManager& ReplayObserverManager::get() {
     return mgr;
 }
 
+void ReplayObserverManager::reset() {
+    _observers.clear();
+    _sessionObserverFactories.clear();
+}
+
 PerSessionObserverState ReplayObserverManager::makeSessionObservers() {
     std::vector<std::shared_ptr<ReplayObserver>> hooks;
     hooks.reserve(_sessionObserverFactories.size());

@@ -13,6 +13,7 @@ mongo_cc_library(
     name = "mongor_lib",
     srcs = [
         "config_handler.cpp",
+        "cursor_rewrite_hook.cpp",
         "performance_reporter.cpp",
         "rawop_document.cpp",
         "recording_reader.cpp",

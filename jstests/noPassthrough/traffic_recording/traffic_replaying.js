@@ -8,7 +8,7 @@ import {
 } from "jstests/noPassthrough/traffic_recording/traffic_replaying_lib.js";
 
 function parseRecordedTraffic(recordingFilePath) {
-    const recordedTraffic = convertTrafficRecordingToBSON(recordingFilePath);
+    const recordedTraffic = convertTrafficRecordingToBSON(recordingFilePath, true);
     const opTypes = {};
     recordedTraffic.forEach((obj) => {
         const opType = obj.opType;
@@ -18,12 +18,11 @@ function parseRecordedTraffic(recordingFilePath) {
 }
 
 function recordAndParseOperations(recordingDirGlobal, customRecordingDir, workflowCallback) {
-    const {mongodInstance, coll, recordingFilePath} = recordOperations(
+    const {mongodInstance, coll, recordingFilePath, serverURI} = recordOperations(
         recordingDirGlobal,
         customRecordingDir,
         workflowCallback,
     );
-    const serverURI = `mongodb://${mongodInstance.host}`;
 
     MongoRunner.stopMongod(mongodInstance, null, {user: "admin", pwd: "pass"});
 
@@ -42,12 +41,14 @@ function runInstances(baseDir, customSubDir, workflowCallback) {
 
 const defaultOperationsLambda = (dbContext) => {
     const {testDB, coll} = dbContext;
-    assert.commandWorked(coll.insert({name: "foo biz bar"}));
+    for (let i = 0; i < 200; ++i) {
+        assert.commandWorked(coll.insert({name: "foo biz bar", i}));
+    }
     assert.eq("foo biz bar", coll.findOne().name);
     assert.commandWorked(coll.insert({name: "foo bar"}));
     assert.eq("foo bar", coll.findOne({name: "foo bar"}).name);
     assert.commandWorked(coll.deleteOne({}));
-    assert.eq(1, coll.aggregate().toArray().length);
+    assert.eq(200, coll.aggregate().toArray().length);
     assert.commandWorked(coll.update({}, {}));
 };
 
@@ -95,10 +96,11 @@ removeFile(realDirectory);
 // Recording
 const initialResults = runInstances("traffic_recording_" + UUID().hex(), "recordings", defaultOperationsLambda);
 assert.eq(initialResults.opTypes["serverStatus"], 1);
-assert.eq(initialResults.opTypes["insert"], 2);
+assert.eq(initialResults.opTypes["insert"], 201);
 assert.eq(initialResults.opTypes["find"], 2);
 assert.eq(initialResults.opTypes["delete"], 1);
 assert.eq(initialResults.opTypes["aggregate"], 1);
+assert.eq(initialResults.opTypes["getMore"], 1);
 assert.eq(initialResults.opTypes["update"], 1);
 assert.eq(initialResults.opTypes["sessionStart"], 1);
 assert.eq(initialResults.opTypes["sessionEnd"], 1);
@@ -118,14 +120,29 @@ const replayResults = runInstances("replayed_recording_" + UUID().hex(), "replay
 // in order to compute the filepath, we issue a server status inside runInstances, this plus the
 // one recorded will bring total count to 2.
 assert.eq(replayResults.opTypes["serverStatus"], 2);
-assert.eq(replayResults.opTypes["insert"], 2);
+assert.eq(replayResults.opTypes["insert"], 201);
 assert.eq(replayResults.opTypes["find"], 2);
 assert.eq(replayResults.opTypes["delete"], 1);
 assert.eq(replayResults.opTypes["aggregate"], 1);
+assert.eq(initialResults.opTypes["getMore"], 1);
 assert.eq(replayResults.opTypes["update"], 1);
-assert.gte(initialResults.opTypes["sessionStart"], 1);
-assert.eq(initialResults.opTypes["sessionEnd"], 1);
+assert.gte(replayResults.opTypes["sessionStart"], 1);
+assert.gte(replayResults.opTypes["sessionEnd"], 1);
 // ======================================================================================== //
+
+function getRecordedGetMore(recordedTraffic) {
+    for (let req of recordedTraffic) {
+        if (req.opType == "getMore") {
+            jsTest.log.debug(tojson(req.rawop.body));
+            return req.rawop.body["getMore"];
+        }
+    }
+}
+
+let origCursor = getRecordedGetMore(initialResults.recordedTraffic);
+let replayCursor = getRecordedGetMore(replayResults.recordedTraffic);
+
+assert.neq(origCursor, replayCursor);
 
 cleanUpDirectory(initialResults.recordingDirGlobal);
 cleanUpDirectory(replayResults.recordingDirGlobal);

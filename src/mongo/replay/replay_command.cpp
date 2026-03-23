@@ -85,13 +85,16 @@ std::string ReplayCommand::toString() const {
 }
 
 OpMsgRequest ReplayCommand::parseBody() const {
-    Message message;
-    // TODO: SERVER-107809 setData here copies the message unnecessarily.
-    // OpMsg should be changed to allow parsing from a "view" type.
-    message.setData(dbMsg, _packet.message.data(), _packet.message.dataLen());
-    OpMsg::removeChecksum(&message);
-    // TODO: SERVER-109756 remove unused fields such as lsid.
-    return rpc::opMsgRequestFromAnyProtocol(message);
+    if (!_parsedRequest) {
+        Message message;
+        // TODO: SERVER-107809 setData here copies the message unnecessarily.
+        // OpMsg should be changed to allow parsing from a "view" type.
+        message.setData(dbMsg, _packet.message.data(), _packet.message.dataLen());
+        OpMsg::removeChecksum(&message);
+        // TODO: SERVER-109756 remove unused fields such as lsid.
+        _parsedRequest = rpc::opMsgRequestFromAnyProtocol(message);
+    }
+    return *_parsedRequest;
 }
 Microseconds ReplayCommand::parseOffset() const {
     return _packet.offset;
@@ -117,6 +120,11 @@ std::string ReplayCommand::parseOpType() const {
 
 EventType ReplayCommand::getEventType() const {
     return _packet.eventType;
+}
+
+void ReplayCommand::replaceBody(BSONObj body) {
+    parseBody();
+    _parsedRequest->body = body;
 }
 
 bool ReplayCommand::isSessionStart() const {

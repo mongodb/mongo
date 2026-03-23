@@ -336,6 +336,8 @@ TEST(SessionSimulatorTest, HooksInvoked) {
 
         sessionSimulator.run();
     }
+
+    ReplayObserverManager::get().reset();
 }
 
 }  // namespace mongo
