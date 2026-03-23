@@ -30,13 +30,16 @@ buildvariants:
       compile_variant: enterprise-amazon2023-streams
       large_distro_name: amazon2023.3-c5-24xlarge
       packager_distro: amazon2023
+      packager_arch: x86_64
     tasks:
       - name: compile_and_archive_dist_test_TG
         distros:
           - amazon2023.3-c5-24xlarge
       - name: aggregation
+      - name: streams_build_and_push
+        distros:
+          - amazon2023.3-c5-24xlarge
       - name: .streams_release_test
-      - name: streams_build_only_gen
       - name: generate_buildid_to_debug_symbols_mapping
 
   - name: enterprise-amazon2023-streams-arm64
@@ -60,13 +63,16 @@ buildvariants:
       compile_variant: enterprise-amazon2023-streams-arm64
       large_distro_name: amazon2023.3-arm64-xxxlarge
       packager_distro: amazon2023
+      packager_arch: aarch64
     tasks:
       - name: compile_and_archive_dist_test_TG
         distros:
           - amazon2023.3-arm64-xxxlarge
       - name: aggregation
+      - name: streams_build_and_push
+        distros:
+          - amazon2023.3-arm64-xxxlarge
       - name: .streams_release_test
-      - name: streams_build_only_gen
       - name: generate_buildid_to_debug_symbols_mapping
 
   # TODO(SERVER-120489): There are issues with these variants that need to be investigated/fixed
@@ -175,7 +181,10 @@ buildvariants:
       - name: run_unit_tests_TG
         distros:
           - rhel8.8-xlarge
-      - name: .streams_release_test !.requires_extra_system_deps !streams_kafka_gen !streams_kafka_benchmark !streams_kafka_gwproxy !streams_s3
+      - name: streams_sanitizer_gen
+      - name: streams_https_sanitizer
+      - name: streams_lambda_sanitizer
+      - name: streams_kinesis_sanitizer
       - name: generate_buildid_to_debug_symbols_mapping
 
   - name: enterprise-rhel8-streams-aubsan
@@ -213,7 +222,11 @@ buildvariants:
       - name: run_unit_tests_TG
         distros:
           - rhel8.8-xlarge
-      - name: .streams_release_test !.requires_extra_system_deps !streams_kafka_gen !streams_kafka_benchmark !streams_kafka_gwproxy
+      - name: streams_sanitizer_gen
+      - name: streams_https_sanitizer
+      - name: streams_lambda_sanitizer
+      - name: streams_kinesis_sanitizer
+      - name: streams_s3_sanitizer
       - name: generate_buildid_to_debug_symbols_mapping
 
   # DSI perf harness variant

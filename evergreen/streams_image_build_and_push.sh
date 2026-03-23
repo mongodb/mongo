@@ -4,7 +4,7 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 set -o errexit
 
 REGISTRY="664315256653.dkr.ecr.us-east-1.amazonaws.com"
-REPO="mongo/mongostream"
+REPO="${streams_ecr_repo:-mongo/mongostream-testing}"
 IMAGE="$REGISTRY/$REPO"
 GITSHA="$github_commit"
 ARCH="$packager_arch"
@@ -21,14 +21,14 @@ fi
 
 TAG_SUFFIX="$ARCH"
 
-# Only amazon2023 distros are supported today
-if [ "$DISTRO" != "amazon2023" ]; then
-    echo "Unsupported distro: $DISTRO" >&2
-    exit 1
-fi
-
 if [ "$DISTRO" == "amazon2023" ]; then
     TAG_SUFFIX="$ARCH-al2023"
+fi
+
+# Optional variant-specific suffix to avoid ECR tag collisions when multiple
+# variants run streams_build_and_push with the same arch/distro/patch.
+if [ -n "$streams_variant_tag" ]; then
+    TAG_SUFFIX="$TAG_SUFFIX$streams_variant_tag"
 fi
 
 if [ "$PATCH" ]; then
@@ -42,6 +42,26 @@ for arg in "$@"; do
     fi
 done
 
+MONGOD_PATH="./src/bazel-bin/src/mongo/db/mongod"
+MONGO_PATH="./src/bazel-bin/src/mongo/shell/mongo"
+echo "Current mongod path: $MONGOD_PATH"
+echo "Current mongo path: $MONGO_PATH"
+
+cd src
+
+mkdir -p ./dist-test/bin
+cp -L "../$MONGOD_PATH" ./dist-test/bin/mongod
+cp -L "../$MONGO_PATH" ./dist-test/bin/mongo
+
+if [ "$DISTRO" != "amazon2023" ]; then
+    echo "Skipping Docker build for distro: $DISTRO"
+    echo "Creating streams-binaries.tgz with binaries only..."
+    tar -czvf streams-binaries.tgz dist-test/
+    echo "Created streams-binaries.tgz containing:"
+    tar -tzvf streams-binaries.tgz
+    exit 0
+fi
+
 attempts=0
 max_attempts=4
 
@@ -53,19 +73,9 @@ if [ "$1" == "--push" ]; then
     done
 fi
 
-# Build Image
-MONGOD_PATH="$(find ./src -type f -name 'mongod')"
-MONGO_PATH="$(find ./src -type f -name 'mongo')"
-echo "Current mongod path: $MONGOD_PATH"
-echo "Current mongo path: $MONGO_PATH"
-
-mkdir -p ./src/bin
-mv "$MONGOD_PATH" ./src/bin/mongod
-mv "$MONGO_PATH" ./src/bin/mongo
-
-cd src
-activate_venv
-setup_db_contrib_tool
+mkdir -p ./bin
+cp ./dist-test/bin/mongod ./bin/mongod
+cp ./dist-test/bin/mongo ./bin/mongo
 
 # Restructure asp-js-engine directory: asp-js-engine/asp-js-engine/ -> asp-js-engine/
 if [ -d "asp-js-engine/asp-js-engine" ]; then
@@ -88,6 +98,15 @@ docker tag "$IMAGE" "$IMAGE:$GITSHA-$TAG_SUFFIX"
 
 docker images
 
+# Export image tag for downstream test tasks to pull from ECR
+FULL_IMAGE_TAG="$IMAGE:$GITSHA-$TAG_SUFFIX"
+echo "$FULL_IMAGE_TAG" >streams-image-tag.txt
+echo "Exported image tag: $FULL_IMAGE_TAG"
+
+tar -czvf streams-binaries.tgz dist-test/
+echo "Created streams-binaries.tgz containing:"
+tar -tzvf streams-binaries.tgz
+
 if [ "$1" == "--push" ]; then
-    docker push "$IMAGE:$GITSHA-$TAG_SUFFIX"
+    docker push "$FULL_IMAGE_TAG"
 fi

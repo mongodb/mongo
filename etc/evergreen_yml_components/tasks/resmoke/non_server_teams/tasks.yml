@@ -79,6 +79,30 @@ variables:
           resmoke_jobs_max: 1
           suite: benchmark_suite
 
+  - &gen_task_template_streams
+    name: gen_task_template_streams
+    depends_on:
+      - name: version_gen
+        variant: generate-tasks-for-version
+        omit_generated_tasks: true
+      - name: archive_dist_test
+      - name: streams_build_and_push
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          resmoke_args: --help
+
+  - &task_template_streams
+    name: template_streams
+    depends_on:
+      - name: streams_build_and_push
+    commands:
+      - func: "do setup for streams"
+      - func: "run tests"
+        vars:
+          resmoke_args: --help
+          resmoke_jobs_max: 0
+
 ################################################
 #                    Tasks                     #
 ################################################
@@ -245,7 +269,7 @@ tasks:
           exec_timeout_secs: 18000 # 5 hour timeout.
           resmoke_jobs_max: 1
 
-  - <<: *gen_task_template
+  - <<: *gen_task_template_streams
     name: streams_gen
     tags:
       ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
@@ -255,7 +279,18 @@ tasks:
           num_tasks: 10
           fallback_num_sub_suites: 2
 
+  # Sanitizer variant of streams_gen - uses archive_dist_test binaries instead of streams_build_and_push
   - <<: *gen_task_template
+    name: streams_sanitizer_gen
+    tags: ["assigned_to_jira_team_streams", "experimental"]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: streams
+          num_tasks: 10
+          fallback_num_sub_suites: 2
+
+  - <<: *gen_task_template_streams
     name: streams_kafka_gen
     tags:
       ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
@@ -266,7 +301,7 @@ tasks:
           fallback_num_sub_suites: 2
           resmoke_jobs_max: 1
 
-  - <<: *task_template
+  - <<: *task_template_streams
     name: streams_kafka_gwproxy
     tags:
       ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
@@ -274,52 +309,93 @@ tasks:
       - command: ec2.assume_role
         params:
           role_arn: "arn:aws:iam::664315256653:role/streams-evergreen-ecr-access-ro"
-      - func: "do setup"
+      - func: "do setup for streams"
       - func: "run tests with aws credentials"
 
-  - <<: *task_template
+  - <<: *task_template_streams
     name: streams_kafka_benchmark
     tags:
       ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
     commands:
-      - func: "do setup"
+      - func: "do setup for streams"
       - func: "run tests"
 
-  - <<: *task_template
+  - <<: *task_template_streams
     name: streams_https
     tags:
       ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
     commands:
-      - func: "do setup"
+      - func: "do setup for streams"
       - func: "run tests"
 
+  # Sanitizer variant of streams_https - uses archive_dist_test binaries instead of streams_build_and_push
   - <<: *task_template
-    name: streams_lambda
-    tags:
-      ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
-    commands:
-      - func: "do setup"
-      - func: "run tests"
-
-  - <<: *task_template
-    name: streams_s3
-    tags:
-      ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
+    name: streams_https_sanitizer
+    tags: ["assigned_to_jira_team_streams", "experimental"]
     commands:
       - func: "do setup"
       - func: "run tests"
         vars:
+          suite: streams_https
+
+  # Sanitizer variant of streams_lambda - uses archive_dist_test binaries instead of streams_build_and_push
+  - <<: *task_template
+    name: streams_lambda_sanitizer
+    tags: ["assigned_to_jira_team_streams", "experimental"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: streams_lambda
+
+  # Sanitizer variant of streams_kinesis - uses archive_dist_test binaries instead of streams_build_and_push
+  - <<: *task_template
+    name: streams_kinesis_sanitizer
+    tags: ["assigned_to_jira_team_streams", "experimental"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: streams_kinesis
+
+  # Sanitizer variant of streams_s3 - uses archive_dist_test binaries instead of streams_build_and_push
+  - <<: *task_template
+    name: streams_s3_sanitizer
+    tags: ["assigned_to_jira_team_streams", "experimental"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: streams_s3
           resmoke_jobs_max: 1
 
-  - <<: *task_template
+  - <<: *task_template_streams
+    name: streams_lambda
+    tags:
+      ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
+    commands:
+      - func: "do setup for streams"
+      - func: "run tests"
+
+  - <<: *task_template_streams
+    name: streams_s3
+    tags:
+      ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
+    commands:
+      - func: "do setup for streams"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template_streams
     name: streams_kinesis
     tags:
       ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
     commands:
-      - func: "do setup"
+      - func: "do setup for streams"
       - func: "run tests"
 
-  - <<: *task_template
+  - <<: *task_template_streams
     name: streams_aspio
     tags:
       [
@@ -329,12 +405,12 @@ tasks:
         "requires_extra_system_deps",
       ]
     commands:
-      - func: "do setup"
+      - func: "do setup for streams"
       - func: "run streams tests"
         vars:
           resmoke_jobs_max: 1
 
-  - <<: *task_template
+  - <<: *task_template_streams
     name: streams_aspio_iceberg_0
     tags:
       [
@@ -344,12 +420,12 @@ tasks:
         "requires_extra_system_deps",
       ]
     commands:
-      - func: "do setup"
+      - func: "do setup for streams"
       - func: "run streams tests"
         vars:
           resmoke_jobs_max: 1
 
-  - <<: *task_template
+  - <<: *task_template_streams
     name: streams_aspio_iceberg_1
     tags:
       [
@@ -359,12 +435,12 @@ tasks:
         "requires_extra_system_deps",
       ]
     commands:
-      - func: "do setup"
+      - func: "do setup for streams"
       - func: "run streams tests"
         vars:
           resmoke_jobs_max: 4
 
-  - <<: *task_template
+  - <<: *task_template_streams
     name: streams_aspio_iceberg_2
     tags:
       [
@@ -374,12 +450,12 @@ tasks:
         "requires_extra_system_deps",
       ]
     commands:
-      - func: "do setup"
+      - func: "do setup for streams"
       - func: "run streams tests"
         vars:
           resmoke_jobs_max: 4
 
-  - <<: *task_template
+  - <<: *task_template_streams
     name: streams_aspio_iceberg_3
     tags:
       [
@@ -389,12 +465,12 @@ tasks:
         "requires_extra_system_deps",
       ]
     commands:
-      - func: "do setup"
+      - func: "do setup for streams"
       - func: "run streams tests"
         vars:
           resmoke_jobs_max: 4
 
-  - <<: *task_template
+  - <<: *task_template_streams
     name: streams_aspio_iceberg_large
     tags:
       [
@@ -404,12 +480,12 @@ tasks:
         "requires_extra_system_deps",
       ]
     commands:
-      - func: "do setup"
+      - func: "do setup for streams"
       - func: "run streams tests"
         vars:
           resmoke_jobs_max: 1
 
-  - <<: *task_template
+  - <<: *task_template_streams
     name: streams_aspio_iceberg_5
     tags:
       [
@@ -419,12 +495,12 @@ tasks:
         "requires_extra_system_deps",
       ]
     commands:
-      - func: "do setup"
+      - func: "do setup for streams"
       - func: "run streams tests"
         vars:
           resmoke_jobs_max: 4
 
-  - <<: *task_template
+  - <<: *task_template_streams
     name: streams_aspio_utilities
     tags:
       [
@@ -434,12 +510,12 @@ tasks:
         "requires_extra_system_deps",
       ]
     commands:
-      - func: "do setup"
+      - func: "do setup for streams"
       - func: "run streams tests"
         vars:
           resmoke_jobs_max: 1
 
-  - <<: *task_template
+  - <<: *task_template_streams
     name: streams_externaljs
     tags:
       [
@@ -449,13 +525,13 @@ tasks:
         "requires_extra_system_deps",
       ]
     commands:
-      - func: "do setup"
+      - func: "do setup for streams"
       - func: "run streams tests"
         vars:
           resmoke_jobs_max: 1
           HAS_JS_ENGINE: "true"
 
-  - <<: *task_template
+  - <<: *task_template_streams
     name: streams_aspio_pubsub
     tags:
       [
@@ -465,55 +541,33 @@ tasks:
         "requires_extra_system_deps",
       ]
     commands:
-      - func: "do setup"
+      - func: "do setup for streams"
       - func: "run streams tests"
         vars:
           resmoke_jobs_max: 1
 
-  - name: streams_build_only_gen
+  - name: streams_build_and_push
     tags: ["assigned_to_jira_team_streams", "auxiliary"]
-    depends_on:
-      - name: version_gen
-        variant: generate-tasks-for-version
-        # This is added because of EVG-18211.
-        # Without this we are adding extra dependencies on evergreen and it is causing strain
-        omit_generated_tasks: true
     commands:
-      - func: "streams build"
+      - func: "streams build and push"
         vars:
-          streams_output_file: streams_build_only.json
-          streams_s3_path: streams_build_only
+          push_arg: "--push"
 
-  - name: streams_build_and_push_gen
+  - name: streams_build_and_push_break_glass
     tags: ["assigned_to_jira_team_streams", "auxiliary"]
-    depends_on:
-      - name: version_gen
-        variant: generate-tasks-for-version
-        # This is added because of EVG-18211.
-        # Without this we are adding extra dependencies on evergreen and it is causing strain
-        omit_generated_tasks: true
     commands:
-      - func: "streams build"
+      - func: "streams build and push"
         vars:
-          streams_output_file: streams_build_and_push.json
-          streams_s3_path: streams_build_and_push
-          push_arg: "--push=true"
+          push_arg: "--push"
+          break_glass_arg: "--break-glass"
 
-  - name: streams_build_and_push_break_glass_gen
+  - name: streams_build_debug
     tags: ["assigned_to_jira_team_streams", "auxiliary"]
     depends_on:
-      - name: version_gen
-        variant: generate-tasks-for-version
-        # This is added because of EVG-18211.
-        # Without this we are adding extra dependencies on evergreen and it is causing strain
-        omit_generated_tasks: true
+      - name: streams_build_and_push
     commands:
-      - func: "streams build"
-        vars:
-          streams_output_file: streams_build_and_push.json
-          streams_s3_path: streams_build_and_push
-          push_arg: "--push=true"
-          break_glass_arg: "--break-glass=true"
+      - func: "streams build debug"
+      - func: "upload streams debugsymbols"
 
   - name: bazel_result_tasks_gen
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]

@@ -168,7 +168,7 @@ rules:
       - variant_tag_name: "forbid_tasks_tagged_with_experimental"
         forbidden_task_tag: "experimental"
         ignored_tasks: [
-            # TODO: remove this exception when SERVER-94572 is resolved
+            # TODO(SERVER-94572): remove this exception when resolved
             "benchmarks_streams",
             "streams_gen",
             "streams_kafka_gen",
@@ -188,7 +188,15 @@ rules:
             "streams_aspio_utilities",
             "streams_externaljs",
             "streams_aspio_pubsub",
-            # TODO: remove these exceptions when SERVER-94573 is resolved
+            "streams_sanitizer_gen",
+            "streams_https_sanitizer",
+            "streams_lambda_sanitizer",
+            "streams_kinesis_sanitizer",
+            "streams_s3_sanitizer",
+            "streams_build_and_push",
+            "streams_build_and_push_break_glass",
+            "streams_build_debug",
+            # TODO(SERVER-94573): remove these exceptions when resolved
             "selinux_rhel9_enterprise",
             "selinux_rhel8_org",
             "selinux_rhel9_org",
