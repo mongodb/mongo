@@ -6,9 +6,6 @@
  *   assumes_balancer_off,
  *   # TODO SERVER-119779: The drop config.system.sessions in a hook might cause a hang with CMC
  *   does_not_support_transactions,
- *   # TODO SERVER-121826: This test is incompatible with random clears for some reason as it
- *   # detects inconsistencies across shards after clearing the metadata.
- *   incompatible_with_random_sharding_metadata_clears
  *  ]
  */
 

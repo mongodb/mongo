@@ -94,6 +94,3 @@ filters:
   - "cleanup.py":
     approvers:
       - 10gen/devprod-correctness
-  - "clear_collection_sharding_metadata.py":
-    approvers:
-      - 10gen/server-catalog-and-routing-shard-catalog

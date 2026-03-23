@@ -7,8 +7,6 @@
  *   # TODO SERVER-107141 re-enable this test in stepdown suites
  *   does_not_support_stepdowns,
  *   assumes_balancer_off,
- *   # TODO SERVER-121826: Re-enable this test for the random sharding metadata clears passthrough suite
- *   incompatible_with_random_sharding_metadata_clears
  * ]
  */
 

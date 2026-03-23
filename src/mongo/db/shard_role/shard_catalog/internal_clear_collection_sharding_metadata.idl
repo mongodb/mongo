@@ -49,4 +49,4 @@ commands:
                 type: bool
                 description: >-
                     Specifies whether the clear is authoritative or not
-                optional: true
+                default: true

@@ -1,5 +1,0 @@
-base_suite: sharded_collections_jscore_passthrough_base
-overrides:
-  - "collection_sharding_metadata_cleanup.hooks"
-excludes:
-  - "collection_sharding_metadata_cleanup.exclusion_tags"

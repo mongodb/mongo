@@ -72,46 +72,17 @@ public:
             const NamespaceString& nss = ns();
 
             auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-            if (scopedCsr->getCriticalSectionSignal(
-                    ShardingMigrationCriticalSection::Operation::kWrite)) {
-                LOGV2_INFO(12182601, "Not clearing metadata as critical section is taken");
-                return;
-            }
-
-            if (scopedCsr->getMetadataRefreshFuture()) {
-                LOGV2_INFO(12182600, "Not clearing metadata as a refresh is taking place");
-                return;
-            }
-
             auto previousState = scopedCsr->getAuthoritativeState();
-            if (auto isAuthoritativeSet = cmd.getIsAuthoritative()) {
-                uassert(ErrorCodes::InvalidOptions,
-                        "Cannot change the authoritativeness of the CSS until the FCV is upgraded",
-                        feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
-                            VersionContext::getDecoration(opCtx),
-                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-                if (*isAuthoritativeSet) {
-                    LOGV2_INFO(12170301,
-                               "Clearing metadata authoritatively",
-                               "previousAuthoritativeState"_attr = previousState);
-                    scopedCsr->clearFilteringMetadata_authoritative(opCtx);
-                } else {
-                    LOGV2_INFO(12170300,
-                               "Clearing metadata non-authoritatively",
-                               "previousAuthoritativeState"_attr = previousState);
-                    scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
-                }
+            if (cmd.getIsAuthoritative()) {
+                LOGV2_INFO(12170301,
+                           "Clearing metadata authoritatively",
+                           "previousAuthoritativeState"_attr = previousState);
+                scopedCsr->clearFilteringMetadata_authoritative(opCtx);
             } else {
-                LOGV2_INFO(
-                    12182602,
-                    "Clearing metadata without changing authoritativeness of the sharding state",
-                    "previousAuthoritativeState"_attr = previousState);
-                if (previousState ==
-                    CollectionShardingRuntime::AuthoritativeState::kAuthoritative) {
-                    scopedCsr->clearFilteringMetadata_authoritative(opCtx);
-                } else {
-                    scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
-                }
+                LOGV2_INFO(12170300,
+                           "Clearing metadata non-authoritatively",
+                           "previousAuthoritativeState"_attr = previousState);
+                scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
             }
         }
 
