@@ -204,6 +204,17 @@ py_binary(
 )
 
 py_binary(
+    name = "todo_linter",
+    srcs = [
+        "todo_linter.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/linter",
+    ],
+)
+
+py_binary(
     name = "errorcodes",
     srcs = ["errorcodes.py"],
     visibility = ["//visibility:public"],

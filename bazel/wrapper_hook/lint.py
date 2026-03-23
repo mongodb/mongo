@@ -444,6 +444,14 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
         lr.run_bazel("//buildscripts:quickmongolint", ["lint"])
 
     if lint_all or any(
+        file.endswith(
+            (".cpp", ".c", ".h", ".hpp", ".py", ".js", ".mjs", ".inl", ".idl", ".yml", ".bazel")
+        )
+        for file in files_to_lint
+    ):
+        lr.run_bazel("//buildscripts:todo_linter", ["lint-patch"])
+
+    if lint_all or any(
         file.endswith((".cpp", ".c", ".h", ".py", ".idl")) for file in files_to_lint
     ):
         lr.run_bazel("//buildscripts:errorcodes", ["--quiet"])

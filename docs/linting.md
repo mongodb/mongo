@@ -29,6 +29,14 @@ by running the following command: `buildscripts/quickmongolint.py --help`. You c
 
 Ex: `buildscripts/quickmongolint.py lint`
 
+### `todo_linter.py`
+
+The `buildscripts/todo_linter.py` script checks for `TODO SERVER-XXXXX` comments and fails if any
+are found. This enforces that unlinked ticket references are not left in committed code. It runs
+automatically as part of `bazel run lint` for C++, Python, JavaScript, and Bazel files.
+
+Ex: `bazel run //buildscripts:todo_linter -- lint`
+
 ## Javascript Linters
 
 The `bazel run lint` command runs the `eslint` javascript linter.

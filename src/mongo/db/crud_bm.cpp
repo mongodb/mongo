@@ -65,7 +65,8 @@
 namespace mongo {
 namespace {
 // Sets up replication services for `svcCtx`.
-// TODO SERVER-XXXXX: Make this benchmark call into some utility that is also used by `mongod_main`.
+// TODO SERVER-122243: Make this benchmark call into some utility that is also used by
+// `mongod_main`.
 void setupReplication(ServiceContext* svcCtx, ClusterRole role) {
     auto makeStorageInterface = [](auto svcCtx) {
         repl::StorageInterface::set(svcCtx, std::make_unique<repl::StorageInterfaceImpl>());
@@ -136,7 +137,7 @@ void setupShardingState(ServiceContext* svcCtx) {
 
 void setupOpObservers(ServiceContext* svcCtx) {
     auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
-    // TODO SERVER-XXXXX: Call into a helper to initialize opObservers that run on shard servers.
+    // TODO SERVER-122243: Call into a helper to initialize opObservers that run on shard servers.
     svcCtx->setOpObserver(std::move(opObserverRegistry));
 }
 
