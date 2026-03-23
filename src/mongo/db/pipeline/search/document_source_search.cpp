@@ -48,6 +48,8 @@
 
 #include <boost/optional/optional.hpp>
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 namespace mongo {
 
 using boost::intrusive_ptr;
@@ -64,16 +66,27 @@ StringData removePrefixWorkaround(StringData key, StringData pre) {
     MONGO_COMPILER_DIAGNOSTIC_POP
     return key;
 }
+
+Rarely _samplerSearchBeta;
+
+std::unique_ptr<SearchLiteParsed> parseSearchBeta(const NamespaceString& nss,
+                                                  const BSONElement& spec,
+                                                  const LiteParserOptions& options) {
+    if (_samplerSearchBeta.tick()) {
+        LOGV2_WARNING(12165200, "$searchBeta is deprecated. Use $search instead.");
+    }
+    return SearchLiteParsed::parse(nss, spec, options);
+}
 }  // namespace
 
 REGISTER_LITE_PARSED_DOCUMENT_SOURCE(search,
                                      SearchLiteParsed::parse,
                                      AllowedWithApiStrict::kNeverInVersion1);
 
-// $searchBeta is supported as an alias for $search for compatibility with applications that used
-// search during its beta period.
+// $searchBeta is supported as a deprecated alias for $search for compatibility with applications
+// that used search during its beta period.
 REGISTER_LITE_PARSED_DOCUMENT_SOURCE(searchBeta,
-                                     SearchLiteParsed::parse,
+                                     parseSearchBeta,
                                      AllowedWithApiStrict::kNeverInVersion1);
 
 // This allocates SearchStageStageParams::id, which is shared by $search, $searchBeta,

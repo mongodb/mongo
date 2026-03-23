@@ -1,6 +1,7 @@
 /**
  * Verify that `$searchBeta` works as an alias for `$search`.
  */
+import {getMatchingLoglinesCount} from "jstests/libs/log.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 
@@ -83,6 +84,11 @@ const expected = [
     {"_id": 3, "title": "vegetables"},
 ];
 assert.eq(expected, cursor.toArray());
+
+// Verify that a deprecation warning was logged for $searchBeta usage.
+const globalLog = assert.commandWorked(db.adminCommand({getLog: "global"}));
+const count = getMatchingLoglinesCount(globalLog.log, {msg: "$searchBeta is deprecated. Use $search instead."});
+assert.eq(count, 1, "Expected exactly one deprecation warning for $searchBeta");
 
 MongoRunner.stopMongod(conn);
 mongotmock.stop();
