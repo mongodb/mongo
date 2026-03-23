@@ -29,12 +29,26 @@ export function areViewlessTimeseriesEnabled(db) {
 
 // Returns true if the suite creates all timeseries collections in viewless format.
 export function isViewlessTimeseriesOnlySuite(db) {
-    return isStableFCVSuite() && FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections");
+    // If we are in a stable FCV suite, then we can just check the current value of the feature flag.
+    if (isStableFCVSuite()) {
+        return FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections");
+    }
+
+    // In FCV upgrade/downgrade suite, the suite is viewless-only if the flag has been enabled since
+    // last LTS (example: viewless timeseries released in FCV 9.0, we are in binary 9.1 running a
+    // FCV 9.0 - FCV 9.1 upgrade/downgrade suite --> all collections are viewless).
+    const flagDoc = FeatureFlagUtil.getFeatureFlagDoc(db.getMongo(), "CreateViewlessTimeseriesCollections");
+    return flagDoc.value && MongoRunner.compareBinVersions(lastLTSFCV, flagDoc.version) >= 0;
 }
 
 // Returns true if the suite creates all timeseries collections in viewful format.
 export function isViewfulTimeseriesOnlySuite(db) {
-    return isStableFCVSuite() && !FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections");
+    if (isStableFCVSuite()) {
+        return !FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections");
+    }
+
+    // Check if the viewless timeseries feature flag is disabled in the latest FCV.
+    return !FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections", true /* ignoreFCV */);
 }
 
 /**
