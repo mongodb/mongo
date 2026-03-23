@@ -31,6 +31,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -802,5 +803,99 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupDoesNotDropTables) {
         *shard_role_details::getRecoveryUnit(operationContext()), sideWritesIdent));
 }
 
+TEST_F(MultiIndexBlockTest, BasicMetrics) {
+    // Test that an index build with two specs generates proper metrics. Shou
+    auto indexer = getIndexer();
+
+    otel::metrics::OtelMetricsCapturer capturer;
+    int64_t scannedBefore = 0;
+    int64_t keysGeneratedBefore = 0;
+    int64_t keysInsertedBefore = 0;
+    if (capturer.canReadMetrics()) {
+        scannedBefore =
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildDocsScanned);
+        keysGeneratedBefore =
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysGeneratedFromScan);
+        keysInsertedBefore =
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysInsertedFromScan);
+    }
+
+    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+    CollectionWriter coll(operationContext(), autoColl);
+
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    auto spec1 =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       *storageEngine);
+    auto spec2 =
+        IndexBuildInfo(BSON("key" << BSON("b" << 1) << "name"
+                                  << "b_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-2",
+                       *storageEngine);
+    constexpr size_t numIndexSpecs = 2;
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(indexer
+                      ->init(operationContext(),
+                             coll,
+                             {spec1, spec2},
+                             MultiIndexBlock::kNoopOnInitFn,
+                             MultiIndexBlock::InitMode::SteadyState,
+                             boost::none,
+                             /*generateTableWrites=*/false)
+                      .getStatus());
+        wuow.commit();
+    }
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(Helpers::insert(operationContext(), *autoColl, BSON("_id" << 0 << "a" << 1)));
+        ASSERT_OK(Helpers::insert(operationContext(), *autoColl, BSON("_id" << 1 << "a" << 2)));
+        wuow.commit();
+    }
+    constexpr size_t numDocsInColl = 2;
+
+    ASSERT_OK(indexer->insertAllDocumentsInCollection(operationContext(), getNSS()));
+    ASSERT_OK(indexer->drainBackgroundWrites(operationContext(),
+                                             RecoveryUnit::ReadSource::kNoTimestamp,
+                                             IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildDocsScanned),
+                  scannedBefore + numDocsInColl);
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysGeneratedFromScan),
+            keysGeneratedBefore + (numDocsInColl * numIndexSpecs));
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysInsertedFromScan),
+            keysInsertedBefore + (numDocsInColl * numIndexSpecs));
+    }
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(indexer->commit(operationContext(),
+                                  coll.getWritableCollection(operationContext()),
+                                  MultiIndexBlock::kNoopOnCreateEachFn,
+                                  MultiIndexBlock::kNoopOnCommitFn));
+        wuow.commit();
+    }
+
+    // Same validation as before commit().
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildDocsScanned),
+                  scannedBefore + numDocsInColl);
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysGeneratedFromScan),
+            keysGeneratedBefore + (numDocsInColl * numIndexSpecs));
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysInsertedFromScan),
+            keysInsertedBefore + (numDocsInColl * numIndexSpecs));
+    }
+}
 }  // namespace
 }  // namespace mongo

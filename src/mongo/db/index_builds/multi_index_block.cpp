@@ -73,6 +73,9 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/metrics/metric_unit.h"
+#include "mongo/otel/metrics/metrics_counter.h"
+#include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
@@ -110,6 +113,16 @@ MONGO_FAIL_POINT_DEFINE(hangDuringIndexBuildBulkLoadYield);
 MONGO_FAIL_POINT_DEFINE(hangDuringIndexBuildBulkLoadYieldSecond);
 
 namespace {
+
+auto& bulkDocsScannedCounter = otel::metrics::MetricsService::instance().createInt64Counter(
+    otel::metrics::MetricNames::kIndexBuildDocsScanned,
+    "Total number of documents scanned during collection scan",
+    otel::metrics::MetricUnit::kOperations);
+
+auto& bulkKeysGeneratedCounter = otel::metrics::MetricsService::instance().createInt64Counter(
+    otel::metrics::MetricNames::kIndexBuildKeysGeneratedFromScan,
+    "Total number of keys generated from collection scan",
+    otel::metrics::MetricUnit::kOperations);
 
 size_t getEachIndexBuildMaxMemoryUsageBytes(boost::optional<size_t> maxMemoryUsageBytes,
                                             size_t numIndexSpecs) {
@@ -896,6 +909,8 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
             continue;
         }
 
+        bulkDocsScannedCounter.add(1);
+
         {
             stdx::unique_lock<Client> lk(*opCtx->getClient());
             progress->get(lk)->setTotalWhileRunning(
@@ -1012,6 +1027,7 @@ Status MultiIndexBlock::_insert(
                                                  _indexes[i].options,
                                                  onSuppressedError,
                                                  shouldRelaxConstraints);
+            bulkKeysGeneratedCounter.add(1);
         } catch (...) {
             return exceptionToStatus();
         }

@@ -68,6 +68,9 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/metrics/metric_unit.h"
+#include "mongo/otel/metrics/metrics_counter.h"
+#include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/fail_point.h"
@@ -200,6 +203,11 @@ public:
 
 auto& indexBulkBuilderSSS =
     *ServerStatusSectionBuilder<IndexBulkBuilderSSS>("indexBulkBuilder").forShard();
+
+auto& keysInsertedCounter = otel::metrics::MetricsService::instance().createInt64Counter(
+    otel::metrics::MetricNames::kIndexBuildKeysInsertedFromScan,
+    "Total number of keys inserted to indexes from collection scan",
+    otel::metrics::MetricUnit::kEvents);
 
 /**
  * Returns true if at least one prefix of any of the indexed fields causes the index to be
@@ -1244,6 +1252,7 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
             WriteUnitOfWork wunit(opCtx);
             for (auto&& key : batch) {
                 _addKeyForCommit(opCtx, ru, *collection, key);
+                keysInsertedCounter.add(1);
             }
             wunit.commit();
         });

@@ -108,6 +108,12 @@ public:
     static constexpr MetricName kIndexBuildSideWritesDrainYields = {
         "index_builds.side_writes.drain_yields"};
 
+    static constexpr MetricName kIndexBuildKeysInsertedFromScan = {
+        "index_builds.keys_inserted_from_scan"};
+    static constexpr MetricName kIndexBuildDocsScanned = {"index_builds.docs_scanned"};
+    static constexpr MetricName kIndexBuildKeysGeneratedFromScan = {
+        "index_builds.keys_generated_from_scan"};
+
     // Test-only
     static constexpr MetricName kTest1 = {"test_only.metric1"};
     static constexpr MetricName kTest2 = {"test_only.metric2"};
