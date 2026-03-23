@@ -350,7 +350,7 @@ def main() -> None:
         "--target",
         help="Target for generated SBOM. Commit: results from running/completed PR scan, Branch: results from latest monitoring scan, Project: results from latest monitoring scan of the 'default' branch (default: commit)",
         choices=["commit", "branch", "project"],
-        default="commit",
+        default="project",
         type=str,
     )
     endor.add_argument(
@@ -792,7 +792,7 @@ def main() -> None:
                 )
             )
             logger.warning(
-                "VERSION MISMATCH: %s: Endor version %s does not match import script version %s. 'priority_version_source' from metadata: %s",
+                "VERSION MISMATCH: %s: Endor version %s; Import script version %s. 'priority_version_source' from metadata: %s",
                 component_key,
                 versions["endor"],
                 versions["import_script"],
@@ -950,11 +950,18 @@ def main() -> None:
                     "LICENSES: %s does not have a 'licenses' field. Adding empty list to component.",
                     endor_components[component]["bom-ref"],
                 )
+            add_component_property(endor_components[component], "internal:as-is_component", "true")
             meta_bom["components"].append(endor_components[component])
-            meta_bom["dependencies"].append(
-                {"ref": endor_components[component]["bom-ref"], "dependsOn": []}
+
+            meta_bom["dependencies"].extend(
+                [
+                    d
+                    for d in endor_bom["dependencies"]
+                    if d.get("ref") == endor_components[component]["bom-ref"]
+                ]
             )
-            logger.warning("SBOM AS-IS COMPONENT: Added %s", component)
+            if component.startswith(("pkg:github/", "pkg:generic/")):
+                logger.warning("SBOM AS-IS COMPONENT: Added %s", component)
 
     # endregion Parse unmatched Endor Labs components
 

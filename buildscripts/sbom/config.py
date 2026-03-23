@@ -60,6 +60,7 @@ endor_components_rename = [
     ["pkg:c/git.openldap.org/openldap/openldap", "pkg:generic/openldap/openldap"],
     ["pkg:generic/gitlab.gnome.org/gnome/libxml2", "pkg:generic/gnome/libxml2"],
     ["pkg:generic/gitlab.com/bzip2/bzip2", "pkg:github/libarchive/bzip2"],
+    ["pkg:generic/gitlab.com/federicomenaquintero/bzip2", "pkg:github/libarchive/bzip2"],
 ]
 
 # ################ Version Transformation ################

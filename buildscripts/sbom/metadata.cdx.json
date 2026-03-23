@@ -2038,6 +2038,10 @@
         {
           "name": "import_script_path",
           "value": "src/third_party/json-c/scripts/import.sh"
+        },
+        {
+          "name": "internal:generate_sbom:priority_version_source",
+          "value": "import_script"
         }
       ]
     },
@@ -2212,6 +2216,10 @@
         {
           "name": "import_script_path",
           "value": "src/third_party/bzip2/scripts/import.sh"
+        },
+        {
+          "name": "internal:generate_sbom:priority_version_source",
+          "value": "import_script"
         }
       ]
     },

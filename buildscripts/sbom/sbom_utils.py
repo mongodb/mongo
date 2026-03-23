@@ -113,6 +113,10 @@ def convert_sbom_to_public(sbom_dict: dict):
             occurence.get("location", "").startswith("src/third_party/private")
             for occurence in c.get("evidence", {}).get("occurrences", [])
         )
+        or any(
+            property.get("name", "") == "internal:as-is_component"
+            for property in c.get("properties", [])
+        )
     ]
 
     # Remove internal components and any dependencies on them from the SBOM
