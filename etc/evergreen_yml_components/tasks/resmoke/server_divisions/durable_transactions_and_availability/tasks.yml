@@ -278,6 +278,7 @@ tasks:
         "incompatible_ppc",
         "incompatible_s390x",
         "causally_consistent",
+        "has_bazel_target",
       ]
     commands:
       - func: "do setup"
@@ -391,6 +392,7 @@ tasks:
         "common",
         "repl",
         "txn",
+        "has_bazel_target",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -695,6 +697,7 @@ tasks:
         "jscore",
         "common",
         "txns",
+        "has_bazel_target",
       ]
     commands:
       - func: "do setup"
@@ -714,6 +717,7 @@ tasks:
         "jscore",
         "txns",
         "multi_oplog",
+        "has_bazel_target",
       ]
     commands:
       - func: "do setup"
@@ -1321,6 +1325,7 @@ tasks:
         "non_maj_read",
         "san",
         "requires_large_host",
+        "has_bazel_target",
       ]
     commands:
       - func: "do setup"
@@ -1767,6 +1772,7 @@ tasks:
         "initsync",
         "uninitialized_fcv",
         "large",
+        "has_bazel_target",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1825,6 +1831,7 @@ tasks:
         "uninitialized_fcv",
         "large",
         "requires_large_host",
+        "has_bazel_target",
       ]
     commands:
       - func: "do setup"

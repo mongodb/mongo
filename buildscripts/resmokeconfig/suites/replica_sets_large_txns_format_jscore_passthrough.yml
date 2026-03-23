@@ -4,14 +4,7 @@
 test_kind: js_test
 
 selector:
-  roots:
-    - jstests/core/txns/**/*.js
-  exclude_files:
-    # These tests change the transactionLifetimeLimitSeconds server parameter which conflicts with how
-    # the CheckReplDBHashInBackground hook doesn't want transactions to be reaped while it is running.
-    - jstests/core/txns/abort_expired_transaction.js
-    - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js
-    - jstests/core/txns/kill_op_on_txn_expiry.js
+  from_target: //jstests/suites/transactions:replica_sets_large_txns_format_jscore_passthrough
 
 executor:
   archive:

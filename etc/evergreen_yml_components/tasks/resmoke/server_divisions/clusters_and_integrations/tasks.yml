@@ -1609,6 +1609,7 @@ tasks:
         "jscore",
         "causally_consistent",
         "txns",
+        "has_bazel_target",
       ]
     commands:
       - func: "do setup"
@@ -1698,6 +1699,7 @@ tasks:
         "sharding",
         "jscore",
         "txns",
+        "has_bazel_target",
       ]
     commands:
       - func: "do setup"
@@ -1713,6 +1715,7 @@ tasks:
         "sharding",
         "jscore",
         "txns",
+        "has_bazel_target",
       ]
     commands:
       - func: "do setup"
@@ -3176,6 +3179,7 @@ tasks:
         "jscore",
         "causally_consistent",
         "txns",
+        "has_bazel_target",
       ]
     commands:
       - func: "do setup"

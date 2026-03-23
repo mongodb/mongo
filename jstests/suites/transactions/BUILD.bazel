@@ -1,0 +1,545 @@
+load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
+load("//jstests/suites/query-execution:common.bzl", "CONCURRENCY_DATA")
+
+resmoke_suite_test(
+    name = "causally_consistent_jscore_txns_passthrough",
+    srcs = ["//jstests/core/txns:all_subpackage_javascript_files"],
+    config = "//buildscripts/resmokeconfig:suites/causally_consistent_jscore_txns_passthrough.yml",
+    data = ["//jstests/core/libs:raw_operation_utils.js"],
+    exclude_files = [
+        # These tests rely on reads that cannot use an afterClusterTime read concern because the read
+        # happens after a transaction is prepared, but before it is committed.
+        "//jstests/core/txns:prepare_conflict_aggregation_behavior.js",
+
+        # These tests rely on having read concerns that don't use afterClusterTime.
+        "//jstests/core/txns:timestamped_reads_wait_for_prepare_oplog_visibility.js",
+
+        # The following tests are excluded because they do not use the transactions shell helpers.
+        "//jstests/core/txns:non_transactional_operations_on_session_with_transaction.js",
+    ],
+    exclude_with_any_tags = [
+        "does_not_support_causal_consistency",
+        "requires_capped",  # Transactions are not allowed to operate on capped collections.
+    ],
+    shard_count = 4,
+    tags = [
+        "causally_consistent",
+        "ci-release-critical",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "concurrency_replication_multi_stmt_txn",
+    srcs = ["//jstests/concurrency/fsm_workloads:all_subpackage_javascript_files"],
+    config = "//buildscripts/resmokeconfig:suites/concurrency_replication_multi_stmt_txn.yml",
+    data = [
+    ] + CONCURRENCY_DATA,
+    exclude_files = [
+        # Relies on having one thread observe writes from the other threads, which won't become visible
+        # once a transaction in the thread is started because it'll keep reading from the same snapshot.
+        "//jstests/concurrency/fsm_workloads/ddl/create_index_background:create_index_background.js",
+        "//jstests/concurrency/fsm_workloads/ddl/create_index_background:create_index_background_partial_filter.js",
+        "//jstests/concurrency/fsm_workloads/ddl/create_index_background:create_index_background_wildcard.js",
+        "//jstests/concurrency/fsm_workloads/ddl/create_index_background:create_index_background_multi_doc_txn.js",
+
+        # Expects reads to die with a particular error, but other errors are possible if the read is part
+        # of a transaction (e.g. ErrorCodes.LockTimeout).
+        "//jstests/concurrency/fsm_workloads/query:drop_index_during_replan.js",
+        "//jstests/concurrency/fsm_workloads/query:drop_index_during_lookup.js",
+
+        # Extracts error code from write error, which is obscured by runInsideTransaction.
+        "//jstests/concurrency/fsm_workloads:access_collection_in_transaction_after_catalog_changes.js",
+
+        # Induces non-blindly-retriable errors (see SERVER-45767).
+        "//jstests/concurrency/fsm_workloads/ddl:create_database.js",
+
+        # Performs direct writes to system.views
+        "//jstests/concurrency/fsm_workloads/view_catalog:view_catalog_direct_system_writes.js",
+    ],
+    exclude_with_any_tags = [
+        "requires_standalone",
+        "requires_sharding",
+        "does_not_support_transactions",
+
+        # Snapshot reads in transactions are banned on capped collections.
+        "requires_capped",
+
+        # Sharing cursors between state functions will fail in this suite because it will attempt to use
+        # the same cursor in multiple transactions.
+        "state_functions_share_cursor",
+
+        # These start a transaction in one state function and use it in other state functions. This suite
+        # would instead execute each state function as its own transaction.
+        "state_functions_share_transaction",
+
+        # Tests which expect commands to fail and catch the error can cause transactions to abort and
+        # retry indefinitely.
+        "catches_command_failures",
+
+        # time-series collections do not support write transactions
+        "requires_timeseries",
+    ],
+    shard_count = 20,
+    tags = [
+        "ci-release-critical",
+        "common",
+        "concurrency",
+        "repl",
+        "txn",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharded_collections_txns_uninitialized_fcv_jscore_passthrough",
+    srcs = ["//jstests/core/txns:all_subpackage_javascript_files"],
+    config = "//buildscripts/resmokeconfig:suites/sharded_collections_txns_uninitialized_fcv_jscore_passthrough.yml",
+    data = ["//jstests/core/libs:raw_operation_utils.js"],
+    exclude_files = [
+        # Profile can only be run against the admin database on mongos.
+        "//jstests/core/txns:transactions_profiling.js",
+        "//jstests/core/txns:transactions_profiling_with_drops.js",
+
+        # transactionLifetimeLimitSeconds parameter is not available in mongos.
+        "//jstests/core/txns:abort_expired_transaction.js",
+        "//jstests/core/txns:abort_transaction_thread_does_not_block_on_locks.js",
+        "//jstests/core/txns:kill_op_on_txn_expiry.js",
+
+        # Uses hangAfterCollectionInserts failpoint not available on mongos.
+        "//jstests/core/txns:speculative_snapshot_includes_all_writes.js",
+
+        # These workloads explicitly create collections inside multi-document transactions. These are
+        # non-idempotent operations, and the implicit collection sharding logic upon collection access
+        # results in premature collection creation, causing the workloads to fail.
+        "//jstests/core/txns:create_indexes.js",
+        "//jstests/core/txns:create_collection_parallel.js",
+        "//jstests/core/txns:create_indexes_parallel.js",
+        "//jstests/core/txns:commands_in_txns_read_concern.js",
+        "//jstests/core/txns:create_collection.js",
+    ],
+    exclude_with_any_tags = [
+        "assumes_against_mongod_not_mongos",
+
+        # This passthrough implicitly shards the accessed collections. Do not run tests where collections
+        # can't be created on `getCollection` call.
+        "assumes_no_implicit_collection_creation_on_get_collection",
+
+        # Tests tagged with the following will fail because they assume collections are not sharded.
+        "assumes_no_implicit_collection_creation_after_drop",
+        "assumes_no_implicit_index_creation",
+        "assumes_unsharded_collection",
+        "cannot_create_unique_index_when_using_hashed_shard_key",
+
+        # Transactions are not allowed to operate on capped collections.
+        "requires_capped",
+
+        # Prepare is not a command on mongos.
+        "uses_prepare_transaction",
+    ],
+    shard_count = 4,
+    tags = [
+        "ci-release-critical",
+        "initsync",
+        "jscore",
+        "large",
+        "sharding",
+        "uninitialized_fcv",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "core_txns",
+    srcs = ["//jstests/core/txns:all_subpackage_javascript_files"],
+    config = "//buildscripts/resmokeconfig:suites/core_txns.yml",
+    data = ["//jstests/core/libs:raw_operation_utils.js"],
+    exclude_with_any_tags = [
+        # Transactions are not allowed to operate on capped collections.
+        "requires_capped",
+    ],
+    tags = [
+        "ci-release-critical",
+        "common",
+        "jscore",
+        "txns",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "core_txns_large_txns_format",
+    srcs = ["//jstests/core/txns:all_subpackage_javascript_files"],
+    config = "//buildscripts/resmokeconfig:suites/core_txns_large_txns_format.yml",
+    data = ["//jstests/core/libs:raw_operation_utils.js"],
+    exclude_files = [],
+    exclude_with_any_tags = [
+        # Transactions are not allowed to operate on capped collections.
+        "requires_capped",
+    ],
+    tags = [
+        "ci-release-critical",
+        "jscore",
+        "multi_oplog",
+        "txns",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "replica_sets_large_txns_format_jscore_passthrough",
+    srcs = ["//jstests/core/txns:all_subpackage_javascript_files"],
+    config = "//buildscripts/resmokeconfig:suites/replica_sets_large_txns_format_jscore_passthrough.yml",
+    data = ["//jstests/core/libs:raw_operation_utils.js"],
+    exclude_files = [
+        # These tests change the transactionLifetimeLimitSeconds server parameter which conflicts with how
+        # the CheckReplDBHashInBackground hook doesn't want transactions to be reaped while it is running.
+        "//jstests/core/txns:abort_expired_transaction.js",
+        "//jstests/core/txns:abort_transaction_thread_does_not_block_on_locks.js",
+        "//jstests/core/txns:kill_op_on_txn_expiry.js",
+    ],
+    shard_count = 8,
+    tags = [
+        "ci-release-critical",
+        "large",
+        "multi_oplog",
+        "non_maj_read",
+        "replica_sets",
+        "san",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharded_causally_consistent_jscore_txns_passthrough",
+    srcs = ["//jstests/core/txns:all_subpackage_javascript_files"],
+    config = "//buildscripts/resmokeconfig:suites/sharded_causally_consistent_jscore_txns_passthrough.yml",
+    data = ["//jstests/core/libs:raw_operation_utils.js"],
+    exclude_files = [
+        # Profile can only be run against the admin database on mongos.
+        "//jstests/core/txns:transactions_profiling_with_drops.js",
+        "//jstests/core/txns:transactions_profiling.js",
+
+        # transactionLifetimeLimitSeconds parameter is not available in mongos.
+        "//jstests/core/txns:kill_op_on_txn_expiry.js",
+        "//jstests/core/txns:abort_transaction_thread_does_not_block_on_locks.js",
+        "//jstests/core/txns:abort_expired_transaction.js",
+
+        # Uses hangAfterCollectionInserts failpoint not available on mongos.
+        "//jstests/core/txns:speculative_snapshot_includes_all_writes.js",
+
+        # Does not use the transactions shell helpers so afterClusterTime read concern is incorrectly
+        # attached to statements in a transaction beyond the first one.
+        "//jstests/core/txns:non_transactional_operations_on_session_with_transaction.js",
+    ],
+    exclude_with_any_tags = [
+        "assumes_against_mongod_not_mongos",
+        "does_not_support_causal_consistency",
+        "requires_2_or_more_shards",
+
+        # Transactions are not allowed to operate on capped collections.
+        "requires_capped",
+
+        # Prepare is not a command on mongos.
+        "uses_prepare_transaction",
+    ],
+    shard_count = 4,
+    tags = [
+        "causally_consistent",
+        "ci-release-critical",
+        "jscore",
+        "sharding",
+        "txns",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharded_collections_causally_consistent_jscore_txns_passthrough",
+    srcs = ["//jstests/core/txns:all_subpackage_javascript_files"],
+    config = "//buildscripts/resmokeconfig:suites/sharded_collections_causally_consistent_jscore_txns_passthrough.yml",
+    data = ["//jstests/core/libs:raw_operation_utils.js"],
+    exclude_files = [
+        # Profile can only be run against the admin database on mongos.
+        "//jstests/core/txns:transactions_profiling_with_drops.js",
+        "//jstests/core/txns:transactions_profiling.js",
+
+        # Set the transactionLifetimeLimitSeconds parameter, which is not on mongos.
+        "//jstests/core/txns:abort_expired_transaction.js",
+        "//jstests/core/txns:abort_transaction_thread_does_not_block_on_locks.js",
+        "//jstests/core/txns:kill_op_on_txn_expiry.js",
+
+        # Uses hangAfterCollectionInserts failpoint not available on mongos.
+        "//jstests/core/txns:speculative_snapshot_includes_all_writes.js",
+
+        # Does not use the transactions shell helpers so afterClusterTime read concern is incorrectly
+        # attached to statements in a transaction beyond the first one.
+        "//jstests/core/txns:non_transactional_operations_on_session_with_transaction.js",
+
+        # These workloads explicitly create collections inside multi-document transactions. These are
+        # non-idempotent operations, and the implicit collection sharding logic upon collection access
+        # results in premature collection creation, causing the workloads to fail.
+        "//jstests/core/txns:create_collection.js",
+        "//jstests/core/txns:create_collection_parallel.js",
+        "//jstests/core/txns:commands_in_txns_read_concern.js",
+        "//jstests/core/txns:create_indexes.js",
+        "//jstests/core/txns:create_indexes_parallel.js",
+    ],
+    exclude_with_any_tags = [
+        "assumes_against_mongod_not_mongos",
+        "cannot_create_unique_index_when_using_hashed_shard_key",
+        "does_not_support_causal_consistency",
+
+        # This passthrough implicitly shards the accessed collections. Do not run tests where collections
+        # can't be created on `getCollection` call.
+        "assumes_no_implicit_collection_creation_on_get_collection",
+
+        # Tests tagged with the following will fail because they assume collections are not sharded.
+        "assumes_no_implicit_collection_creation_after_drop",
+        "assumes_no_implicit_index_creation",
+        "assumes_unsharded_collection",
+
+        # Transactions are not allowed to operate on capped collections.
+        "requires_capped",
+
+        # Prepare is not a command on mongos
+        "uses_prepare_transaction",
+    ],
+    shard_count = 4,
+    tags = [
+        "causally_consistent",
+        "ci-release-critical",
+        "jscore",
+        "sharding",
+        "txns",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharded_jscore_txns",
+    srcs = ["//jstests/core/txns:all_subpackage_javascript_files"],
+    config = "//buildscripts/resmokeconfig:suites/sharded_jscore_txns.yml",
+    data = ["//jstests/core/libs:raw_operation_utils.js"],
+    exclude_files = [
+        # Profile can only be run against the admin database on mongos.
+        "//jstests/core/txns:transactions_profiling.js",
+        "//jstests/core/txns:transactions_profiling_with_drops.js",
+
+        # transactionLifetimeLimitSeconds parameter is not available in mongos.
+        "//jstests/core/txns:abort_expired_transaction.js",
+        "//jstests/core/txns:kill_op_on_txn_expiry.js",
+        "//jstests/core/txns:abort_transaction_thread_does_not_block_on_locks.js",
+
+        # Uses hangAfterCollectionInserts failpoint not available on mongos.
+        "//jstests/core/txns:speculative_snapshot_includes_all_writes.js",
+    ],
+    exclude_with_any_tags = [
+        "assumes_against_mongod_not_mongos",
+        "requires_2_or_more_shards",
+
+        # Transactions are not allowed to operate on capped collections.
+        "requires_capped",
+
+        # Prepare is not a command on mongos.
+        "uses_prepare_transaction",
+    ],
+    shard_count = 4,
+    tags = [
+        "ci-release-critical",
+        "jscore",
+        "sharding",
+        "txns",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharded_jscore_txns_sharded_collections",
+    srcs = ["//jstests/core/txns:all_subpackage_javascript_files"],
+    config = "//buildscripts/resmokeconfig:suites/sharded_jscore_txns_sharded_collections.yml",
+    data = ["//jstests/core/libs:raw_operation_utils.js"],
+    exclude_files = [
+        # Profile can only be run against the admin database on mongos.
+        "//jstests/core/txns:transactions_profiling.js",
+        "//jstests/core/txns:transactions_profiling_with_drops.js",
+
+        # transactionLifetimeLimitSeconds parameter is not available in mongos.
+        "//jstests/core/txns:abort_expired_transaction.js",
+        "//jstests/core/txns:kill_op_on_txn_expiry.js",
+        "//jstests/core/txns:abort_transaction_thread_does_not_block_on_locks.js",
+
+        # Uses hangAfterCollectionInserts failpoint not available on mongos.
+        "//jstests/core/txns:speculative_snapshot_includes_all_writes.js",
+
+        # These workloads explicitly create collections inside multi-document transactions. These are
+        # non-idempotent operations, and the implicit collection sharding logic upon collection access
+        # results in premature collection creation, causing the workloads to fail.
+        "//jstests/core/txns:commands_in_txns_read_concern.js",
+        "//jstests/core/txns:create_indexes_parallel.js",
+        "//jstests/core/txns:create_collection.js",
+        "//jstests/core/txns:create_collection_parallel.js",
+        "//jstests/core/txns:create_indexes.js",
+    ],
+    exclude_with_any_tags = [
+        "assumes_against_mongod_not_mongos",
+        "cannot_create_unique_index_when_using_hashed_shard_key",
+
+        # This passthrough implicitly shards the accessed collections. Do not run tests where collections
+        # can't be created on `getCollection` call.
+        "assumes_no_implicit_collection_creation_on_get_collection",
+
+        # Tests tagged with the following will fail because they assume collections are not sharded.
+        "assumes_no_implicit_collection_creation_after_drop",
+        "assumes_no_implicit_index_creation",
+        "assumes_unsharded_collection",
+
+        # Transactions are not allowed to operate on capped collections.
+        "requires_capped",
+
+        # Prepare is not a command on mongos.
+        "uses_prepare_transaction",
+    ],
+    shard_count = 4,
+    tags = [
+        "ci-release-critical",
+        "jscore",
+        "sharding",
+        "txns",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_txns_uninitialized_fcv_jscore_passthrough",
+    srcs = ["//jstests/core/txns:all_subpackage_javascript_files"],
+    config = "//buildscripts/resmokeconfig:suites/sharding_txns_uninitialized_fcv_jscore_passthrough.yml",
+    data = ["//jstests/core/libs:raw_operation_utils.js"],
+    exclude_files = [
+        # Profile can only be run against the admin database on mongos.
+        "//jstests/core/txns:transactions_profiling.js",
+        "//jstests/core/txns:transactions_profiling_with_drops.js",
+
+        # transactionLifetimeLimitSeconds parameter is not available in mongos.
+        "//jstests/core/txns:abort_expired_transaction.js",
+        "//jstests/core/txns:kill_op_on_txn_expiry.js",
+        "//jstests/core/txns:abort_transaction_thread_does_not_block_on_locks.js",
+
+        # Uses hangAfterCollectionInserts failpoint not available on mongos.
+        "//jstests/core/txns:speculative_snapshot_includes_all_writes.js",
+    ],
+    exclude_with_any_tags = [
+        "assumes_against_mongod_not_mongos",
+        "requires_2_or_more_shards",
+
+        # Transactions are not allowed to operate on capped collections.
+        "requires_capped",
+
+        # Prepare is not a command on mongos.
+        "uses_prepare_transaction",
+    ],
+    tags = [
+        "ci-release-critical",
+        "initsync",
+        "jscore",
+        "large",
+        "sharding",
+        "uninitialized_fcv",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
