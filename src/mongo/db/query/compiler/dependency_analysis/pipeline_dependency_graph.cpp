@@ -352,9 +352,15 @@ void updateMetadataFromExpression(FieldMetadata& metadata, const Expression& exp
 }
 }  // namespace
 
+bool defaultCanPathBeArray(StringData path) {
+    return true;
+}
+
 class DependencyGraph::Impl {
 public:
-    Impl(const DocumentSourceContainer& container) {
+    explicit Impl(const DocumentSourceContainer& container,
+                  CanPathBeArray canMainCollPathBeArray = defaultCanPathBeArray)
+        : _canMainCollPathBeArray(std::move(canMainCollPathBeArray)) {
         recompute(container);
     }
 
@@ -370,6 +376,31 @@ public:
         }
 
         return nullptr;
+    }
+
+    bool canPathBeArray(DocumentSource* ds, PathRef path) const {
+        auto stageId = getStageId(ds);
+        auto scopeId = _stages[stageId].scope;
+        auto parsedPath = parsePath(path);
+
+        FieldList prefix;
+        if (auto [fieldId, shadowed] = lookupField(scopeId, parsedPath, &prefix); fieldId) {
+            if (shadowed) {
+                // TODO(SERVER-119392): If our field is shadowed by another, and we know the value
+                // for that shadowing field, we can determine if the result can be array.
+                // For example, if {$set: {a: 1}}, then a.b cannot be array (it is missing).
+                return true;
+            }
+
+            if (_scopes[_fields[fieldId].declaringScope].missingField == fieldId) {
+                // If we do not know what this field is, we have to assume it can be an array.
+                return true;
+            }
+
+            return canPrefixContainArrays(prefix) || _fields[fieldId].metadata.canFieldBeArray;
+        }
+
+        return _canMainCollPathBeArray(path);
     }
 
     void recompute(const DocumentSourceContainer& container,
@@ -710,7 +741,7 @@ private:
                     if (isCollectionField) {
                         // We represent all collection field references as FieldId::none(), without
                         // distinguishing between them.
-                        // To get done (SERVER-119384): Query Path Arrayness API.
+                        metadata.canFieldBeArray = _canMainCollPathBeArray(p.getOldPath());
                     }
 
                     // Each rename modifies the new field and depends on the previous field.
@@ -869,10 +900,14 @@ private:
 
     // Mapping between DocumentSource and StageId, recomputed when the graph is recomputed.
     absl::flat_hash_map<const DocumentSource*, StageId> _dsToStageId;
+
+    // Callback to query the Path Arrayness API for the main collection.
+    const CanPathBeArray _canMainCollPathBeArray;
 };
 
-DependencyGraph::DependencyGraph(const DocumentSourceContainer& container)
-    : _impl(std::make_unique<Impl>(container)) {}
+DependencyGraph::DependencyGraph(const DocumentSourceContainer& container,
+                                 CanPathBeArray canMainCollPathBeArray)
+    : _impl(std::make_unique<Impl>(container, std::move(canMainCollPathBeArray))) {}
 
 DependencyGraph::~DependencyGraph() = default;
 DependencyGraph::DependencyGraph(DependencyGraph&&) noexcept = default;
@@ -881,6 +916,10 @@ DependencyGraph& DependencyGraph::operator=(DependencyGraph&&) noexcept = defaul
 boost::intrusive_ptr<mongo::DocumentSource> DependencyGraph::getDeclaringStage(DocumentSource* ds,
                                                                                PathRef path) const {
     return _impl->getDeclaringStage(ds, path);
+}
+
+bool DependencyGraph::canPathBeArray(DocumentSource* ds, PathRef path) const {
+    return _impl->canPathBeArray(ds, path);
 }
 
 void DependencyGraph::recompute(const DocumentSourceContainer& container,

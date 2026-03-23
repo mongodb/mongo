@@ -59,10 +59,18 @@ namespace {
 
 class PipelineDependencyGraphTest : public unittest::Test {
 protected:
+    void SetUp() override {
+        pathArrayness = std::make_shared<PathArrayness>();
+    }
+
     void setPipeline(const std::string& array) {
         pipeline = parsePipeline(array);
+        pipeline->getContext()->setPathArrayness(pathArrayness);
         stages.assign(pipeline->getSources().begin(), pipeline->getSources().end());
-        graph = std::make_unique<DependencyGraph>(pipeline->getSources());
+        canPathBeArray = [this](StringData path) -> bool {
+            return pathArrayness->canPathBeArray(FieldRef(path), pipeline->getContext().get());
+        };
+        graph = std::make_unique<DependencyGraph>(pipeline->getSources(), canPathBeArray);
     }
 
     /**
@@ -78,6 +86,8 @@ protected:
     }
 
     std::unique_ptr<Pipeline> pipeline;
+    std::shared_ptr<PathArrayness> pathArrayness;
+    CanPathBeArray canPathBeArray;
     std::vector<boost::intrusive_ptr<DocumentSource>> stages;
     std::unique_ptr<DependencyGraph> graph;
 
@@ -352,6 +362,125 @@ TEST_F(PipelineDependencyGraphTest, ComplexPathsMultiple) {
         ASSERT_EQUALS(graph->getDeclaringStage(ds, "a.b.a"), stages[2]);
     });
 }
+
+TEST_F(PipelineDependencyGraphTest, CanPathBeArrayWithoutArraynessInfo) {
+    setPipeline("[{$set: { a: '$b' }}]");
+    runTest([&] {
+        // Lookup from the end of the pipeline.
+        auto* ds = stages.back().get();
+        ASSERT_TRUE(graph->canPathBeArray(ds, "b"));
+        ASSERT_TRUE(graph->canPathBeArray(ds, "a"));
+        ASSERT_TRUE(graph->canPathBeArray(ds, "a.a"));
+        ASSERT_TRUE(graph->canPathBeArray(ds, "a.unknown"));
+        ASSERT_TRUE(graph->canPathBeArray(ds, "unknown"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanPathBeArrayWhenMissing) {
+    setPipeline("[{$replaceWith: {}}]");
+    runTest([&] {
+        // Lookup from the end of the pipeline.
+        auto* ds = stages.back().get();
+        // TODO(SERVER-119392): These should be trivially non-array with constant propagation.
+        ASSERT_TRUE(graph->canPathBeArray(ds, "a"));
+        ASSERT_TRUE(graph->canPathBeArray(ds, "a.a"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanPathBeArrayWhenKnown) {
+    setPipeline("[{$set: { 'a.b': 1, 'a.c': [], 'a.d': {$add: [2, 2]} }}]");
+    runTest([&] {
+        // Lookup from the end of the pipeline.
+        auto* ds = stages.back().get();
+        ASSERT_TRUE(graph->canPathBeArray(ds, "a"));
+        ASSERT_TRUE(graph->canPathBeArray(ds, "a.a"));
+        ASSERT_TRUE(graph->canPathBeArray(ds, "a.b"));
+        ASSERT_TRUE(graph->canPathBeArray(ds, "a.c"));
+        ASSERT_TRUE(graph->canPathBeArray(ds, "a.d"));
+        ASSERT_TRUE(graph->canPathBeArray(ds, "a.unknown"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanRenamedPathBeArray) {
+    pathArrayness->addPath("b", {}, true);
+    setPipeline("[{$set: { a: '$b' }}]");
+    runTest([&] {
+        // Lookup from the end of the pipeline.
+        auto* ds = stages.back().get();
+        ASSERT_FALSE(graph->canPathBeArray(ds, "b"));
+        ASSERT_FALSE(graph->canPathBeArray(ds, "a"));
+        ASSERT_TRUE(graph->canPathBeArray(ds, "a.a"));
+        ASSERT_TRUE(graph->canPathBeArray(ds, "a.unknown"));
+        ASSERT_TRUE(graph->canPathBeArray(ds, "unknown"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanRenamedChainBeArray) {
+    pathArrayness->addPath("a.x", {}, true);
+    setPipeline(
+        "[{$set: { b: '$a' }}, "
+        " {$set: { c: '$b' }}, "
+        " {$set: { d: '$c' }}]");
+    runTest([&] {
+        // Lookup from the end of the pipeline.
+        auto* ds = stages.back().get();
+        ASSERT_FALSE(graph->canPathBeArray(ds, "a"));
+        ASSERT_FALSE(graph->canPathBeArray(ds, "b"));
+        ASSERT_FALSE(graph->canPathBeArray(ds, "c"));
+        ASSERT_FALSE(graph->canPathBeArray(ds, "d"));
+        // TODO(SERVER-121932): This should pass
+        ASSERT_TRUE(graph->canPathBeArray(ds, "d.x"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanRenamedWithProjectBeArray) {
+    pathArrayness->addPath("a", {}, true);
+    setPipeline("[{$set: {}}, {$group: { _id: '$a' }}]");
+    runTest([&] {
+        // Lookup from the end of the pipeline.
+        auto* ds = stages.back().get();
+        ASSERT_FALSE(graph->canPathBeArray(ds, "_id"));
+        // 'a' is missing after the $group.
+        ASSERT_TRUE(graph->canPathBeArray(ds, "a"));
+        ASSERT_FALSE(graph->canPathBeArray(stages.front().get(), "a"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanDottedRenamedPathsBeArray) {
+    pathArrayness->addPath("x.y.z", {}, true);
+    setPipeline("[{$set: { a: '$x', b: '$x.y', 'c.d': '$x', 'e.f': '$x.y.z', 'g': '$x.y.z' }}]");
+    runTest([&] {
+        // Lookup from the end of the pipeline.
+        auto* ds = stages.back().get();
+        ASSERT_FALSE(graph->canPathBeArray(ds, "a"));
+        ASSERT_TRUE(graph->canPathBeArray(ds, "a.unknown"));
+        ASSERT_FALSE(graph->canPathBeArray(ds, "b"));
+        ASSERT_TRUE(graph->canPathBeArray(ds, "b.unknown"));
+        // TODO(SERVER-121932): Once we can see .y, this should pass.
+        // ASSERT_FALSE(graph->canPathBeArray(ds, "b.z"));
+        ASSERT_TRUE(graph->canPathBeArray(ds, "b.z"));
+        // TODO(SERVER-121943): Once $x.y.z is reported as rename, this should pass.
+        // ASSERT_FALSE(graph->canPathBeArray(ds, "g"));
+        ASSERT_TRUE(graph->canPathBeArray(ds, "g"));
+        ASSERT_TRUE(graph->canPathBeArray(ds, "c"));
+        ASSERT_TRUE(graph->canPathBeArray(ds, "c.d"));
+        ASSERT_TRUE(graph->canPathBeArray(ds, "c.unknown"));
+        ASSERT_TRUE(graph->canPathBeArray(ds, "e"));
+        ASSERT_TRUE(graph->canPathBeArray(ds, "e.f"));
+        ASSERT_TRUE(graph->canPathBeArray(ds, "e.unknown"));
+    });
+}
+
+// TODO(SERVER-121932): Implement prefix rewrite and lookup full path in path arrayness.
+// TEST_F(PipelineDependencyGraphTest, CanBeArraysLooksThroughDottedRenamedPaths) {
+//     pathArrayness->addPath("x.y.z", {}, true);
+//     setPipeline("[{$set: { a: '$x', b: '$x.y', 'c.d': '$x', 'e.f': '$x.y.z' }}]");
+//     runTest([&] {
+//         // Lookup from the end of the pipeline.
+//         auto* ds = stages.back().get();
+//         ASSERT_FALSE(graph->canPathBeArray(ds, "a.y.z"));
+//     });
+// }
 
 }  // namespace
 }  // namespace mongo::pipeline::dependency_graph
