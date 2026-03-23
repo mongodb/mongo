@@ -61,6 +61,7 @@ Every task could be tagged with any number of the following tags:
 - `incompatible_oscrypto` - the task should be excluded from variants unsupported by oscrypto.
 - `requires_compile_variant` - the task can (or should) only run on variants that has compile releated expansions.
 - `requires_large_host` - the task requires a large host to run.
+- `requires_large_host_aubsan` - the task requires a large host to run on {A,UB}SAN variants.
 - `requires_large_host_tsan` - the task requires a large host to run on TSAN variants.
 - `requires_large_host_debug_mode` - the task requires a large host to run on Debug Mode variants.
 - `requires_large_host_commit_queue` - the task requires a large host to run on in the commit-queue.

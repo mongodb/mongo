@@ -2386,12 +2386,14 @@ tasks:
 
   - <<: *task_template
     name: read_only_sharded
+    # TODO(SERVER-122088): Remove "requires_large_host_aubsan" tag.
     tags:
       [
         "assigned_to_jira_team_server_execution",
         "default",
         "read_only",
         "requires_replicated_fast_count_recovery",
+        "requires_large_host_aubsan",
       ]
     commands:
       - func: "do setup"
