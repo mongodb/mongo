@@ -384,7 +384,7 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                     performCausalityBarrier(opCtx, barrier);
                 }
 
-                _exitCriticalSection(opCtx, executor, token, true /* hasOperationCommitted */);
+                _exitCriticalSection(opCtx, executor, token);
             }))
         .then(_buildPhaseHandler(
             Phase::kResumeMigrations,
@@ -450,7 +450,7 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_cleanupOnAbort(
             performCausalityBarrier(opCtx, barrier);
 
             if (_doc.getPhase() >= Phase::kBlockCrud) {
-                _exitCriticalSection(opCtx, executor, token, false /* hasOperationCommitted */);
+                _exitCriticalSection(opCtx, executor, token);
             }
 
             if (_doc.getPhase() >= Phase::kRemoteIndexValidation) {
@@ -463,14 +463,10 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_cleanupOnAbort(
 void RefineCollectionShardKeyCoordinator::_exitCriticalSection(
     OperationContext* opCtx,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancellationToken& token,
-    bool hasOperationCommitted) {
+    const CancellationToken& token) {
     ShardsvrParticipantBlock unblockCRUDOperationsRequest(nss());
     unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
     unblockCRUDOperationsRequest.setReason(_critSecReason);
-
-    // TODO (SERVER-121704): Make secondary nodes also clear the filtering metadata upon releasing
-    // the critical section when aborting.
 
     // When shards are authoritative, there is no need to clear the filtering metadata upon
     // releasing the critical section; the commit phase is responsible for updating the shard
@@ -479,7 +475,7 @@ void RefineCollectionShardKeyCoordinator::_exitCriticalSection(
     bool isDDLAuthoritative = feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
         VersionContext::getDecoration(opCtx),
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-    if (isDDLAuthoritative && hasOperationCommitted) {
+    if (isDDLAuthoritative) {
         unblockCRUDOperationsRequest.setClearCollMetadata(false);
     }
 

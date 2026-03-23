@@ -86,8 +86,7 @@ private:
 
     void _exitCriticalSection(OperationContext* opCtx,
                               const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-                              const CancellationToken& token,
-                              bool hasOperationCommitted);
+                              const CancellationToken& token);
 
     const mongo::RefineCollectionShardKeyRequest _request;
 
