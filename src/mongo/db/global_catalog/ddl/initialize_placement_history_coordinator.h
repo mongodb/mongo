@@ -36,11 +36,8 @@
 namespace mongo {
 
 class InitializePlacementHistoryCoordinator final
-    : public RecoverableShardingDDLCoordinator<InitializePlacementHistoryCoordinatorDocument,
-                                               InitializePlacementHistoryPhaseEnum> {
+    : public RecoverableShardingDDLCoordinator<InitializePlacementHistoryCoordinatorDocument> {
 public:
-    using Phase = InitializePlacementHistoryPhaseEnum;
-
     InitializePlacementHistoryCoordinator(ShardingCoordinatorService* service,
                                           const BSONObj& initialState)
         : RecoverableShardingDDLCoordinator(
@@ -51,10 +48,6 @@ public:
     void checkIfOptionsConflict(const BSONObj& doc) const final {}
 
 private:
-    StringData serializePhase(const Phase& phase) const override {
-        return idl::serialize(phase);
-    }
-
     std::set<NamespaceString> _getAdditionalLocksToAcquire(OperationContext* opCtx) override;
 
     bool _mustAlwaysMakeProgress() override;

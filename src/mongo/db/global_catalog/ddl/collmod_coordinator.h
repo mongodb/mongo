@@ -61,12 +61,8 @@
 namespace mongo {
 
 class CollModCoordinator final
-    : public RecoverableShardingDDLCoordinator<CollModCoordinatorDocument,
-                                               CollModCoordinatorPhaseEnum> {
+    : public RecoverableShardingDDLCoordinator<CollModCoordinatorDocument> {
 public:
-    using StateDoc = CollModCoordinatorDocument;
-    using Phase = CollModCoordinatorPhaseEnum;
-
     CollModCoordinator(ShardingCoordinatorService* service, const BSONObj& initialState);
 
     void checkIfOptionsConflict(const BSONObj& doc) const override;
@@ -107,10 +103,6 @@ private:
         // is sharded.
         std::vector<ShardId> participantsNotOwningChunks;
     };
-
-    StringData serializePhase(const Phase& phase) const override {
-        return idl::serialize(phase);
-    }
 
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;

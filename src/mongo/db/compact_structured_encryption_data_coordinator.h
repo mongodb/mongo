@@ -59,12 +59,9 @@
 namespace mongo {
 
 class MONGO_MOD_PUB CompactStructuredEncryptionDataCoordinator final
-    : public RecoverableShardingDDLCoordinator<CompactStructuredEncryptionDataState,
-                                               CompactStructuredEncryptionDataPhaseEnum> {
+    : public RecoverableShardingDDLCoordinator<CompactStructuredEncryptionDataState> {
 public:
     static constexpr auto kStateContext = "CompactStructuredEncryptionDataState"_sd;
-    using StateDoc = CompactStructuredEncryptionDataState;
-    using Phase = CompactStructuredEncryptionDataPhaseEnum;
 
     CompactStructuredEncryptionDataCoordinator(ShardingCoordinatorService* service,
                                                const BSONObj& doc)
@@ -84,10 +81,6 @@ public:
     void checkIfOptionsConflict(const BSONObj& stateDoc) const final {}
 
 private:
-    StringData serializePhase(const Phase& phase) const override {
-        return idl::serialize(phase);
-    }
-
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept final;
 

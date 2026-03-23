@@ -30,6 +30,7 @@
 #include "mongo/db/topology/remove_shard_commit_coordinator.h"
 
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/topology/remove_shard_exception.h"

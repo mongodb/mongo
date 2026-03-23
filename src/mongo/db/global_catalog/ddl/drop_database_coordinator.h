@@ -55,13 +55,9 @@
 namespace mongo {
 
 class DropDatabaseCoordinator final
-    : public RecoverableShardingDDLCoordinator<DropDatabaseCoordinatorDocument,
-                                               DropDatabaseCoordinatorPhaseEnum> {
+    : public RecoverableShardingDDLCoordinator<DropDatabaseCoordinatorDocument> {
 
 public:
-    using StateDoc = DropDatabaseCoordinatorDocument;
-    using Phase = DropDatabaseCoordinatorPhaseEnum;
-
     DropDatabaseCoordinator(ShardingCoordinatorService* service, const BSONObj& initialState)
         : RecoverableShardingDDLCoordinator(service, "DropDatabaseCoordinator", initialState),
           _dbName(nss().dbName()),
@@ -72,10 +68,6 @@ public:
     void checkIfOptionsConflict(const BSONObj& doc) const final {}
 
 private:
-    StringData serializePhase(const Phase& phase) const override {
-        return idl::serialize(phase);
-    }
-
     bool _mustAlwaysMakeProgress() override {
         return _doc.getPhase() > Phase::kUnset;
     }

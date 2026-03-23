@@ -39,12 +39,8 @@
 namespace mongo {
 
 class DropIndexesCoordinator final
-    : public RecoverableShardingDDLCoordinator<DropIndexesCoordinatorDocument,
-                                               DropIndexesCoordinatorPhaseEnum> {
+    : public RecoverableShardingDDLCoordinator<DropIndexesCoordinatorDocument> {
 public:
-    using StateDoc = DropIndexesCoordinatorDocument;
-    using Phase = DropIndexesCoordinatorPhaseEnum;
-
     DropIndexesCoordinator(ShardingCoordinatorService* service, const BSONObj& initialState);
 
     void checkIfOptionsConflict(const BSONObj& doc) const override;
@@ -52,14 +48,10 @@ public:
     void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const override;
 
     boost::optional<BSONObj> getResult(OperationContext* opCtx) {
-        return _getDoc().getResult();
+        return _copyDoc().getResult();
     }
 
 private:
-    StringData serializePhase(const Phase& phase) const override {
-        return idl::serialize(phase);
-    }
-
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 

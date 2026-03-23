@@ -38,6 +38,41 @@
 
 namespace mongo {
 
+class CoordinatorStateDocTest : public CoordinatorStateDoc {
+public:
+    explicit CoordinatorStateDocTest(ShardingCoordinatorMetadata metadata)
+        : _metadata(std::move(metadata)) {}
+
+    const ShardingCoordinatorMetadata& getShardingCoordinatorMetadata() const override {
+        return _metadata;
+    }
+
+    void setShardingCoordinatorMetadata(ShardingCoordinatorMetadata newMetadata) override {
+        _metadata = std::move(newMetadata);
+    }
+
+    void replace(std::unique_ptr<CoordinatorStateDoc> newDoc) override {
+        _metadata = newDoc->getShardingCoordinatorMetadata();
+    }
+
+    void setGenericPhase(CoordinatorGenericPhase p) override {}
+
+    CoordinatorGenericPhase getGenericPhase() const override {
+        return CoordinatorGenericPhase{};
+    }
+
+    BSONObj toBSON() const override {
+        return _metadata.toBSON();
+    }
+
+    std::unique_ptr<CoordinatorStateDoc> clone() const override {
+        return std::make_unique<CoordinatorStateDocTest>(_metadata);
+    }
+
+private:
+    ShardingCoordinatorMetadata _metadata;
+};
+
 class ShardingCoordinatorTest : public ShardServerTestFixture {
 public:
     ShardingCoordinatorTest() : ShardServerTestFixture(makeOptions()) {}
@@ -82,12 +117,12 @@ protected:
         TestShardingCoordinator(ShardingCoordinatorService* service,
                                 ShardingCoordinatorMetadata coordinatorMetadata,
                                 std::set<NamespaceString> additionalNss)
-            : ShardingCoordinator(service, coordinatorMetadata.toBSON()),
-              _shardingCoordinatorMetadata(coordinatorMetadata),
+            : ShardingCoordinator(service, "TestShardingCoordinator", coordinatorMetadata.toBSON()),
+              _doc(std::move(coordinatorMetadata)),
               _additionalNss(additionalNss) {}
 
         ShardingCoordinatorMetadata const& metadata() const override {
-            return _shardingCoordinatorMetadata;
+            return _doc.getShardingCoordinatorMetadata();
         }
 
         void setMetadata(ShardingCoordinatorMetadata&& metadata) override {}
@@ -109,6 +144,14 @@ protected:
             return ExecutorFuture<void>(**executor);
         }
 
+        const CoordinatorStateDoc& getDoc() const override {
+            return _doc;
+        }
+
+        CoordinatorStateDoc& getDoc() override {
+            return _doc;
+        }
+
         using ShardingCoordinator::_acquireAllLocksAsync;
         using ShardingCoordinator::_locker;
 
@@ -118,7 +161,7 @@ protected:
         }
 
     protected:
-        ShardingCoordinatorMetadata _shardingCoordinatorMetadata;
+        CoordinatorStateDocTest _doc;
         std::set<NamespaceString> _additionalNss;
     };
 

@@ -58,12 +58,9 @@
 namespace MONGO_MOD_PUB mongo {
 
 class CleanupStructuredEncryptionDataCoordinator final
-    : public RecoverableShardingDDLCoordinator<CleanupStructuredEncryptionDataState,
-                                               CleanupStructuredEncryptionDataPhaseEnum> {
+    : public RecoverableShardingDDLCoordinator<CleanupStructuredEncryptionDataState> {
 public:
     static constexpr auto kStateContext = "CleanupStructuredEncryptionDataState"_sd;
-    using StateDoc = CleanupStructuredEncryptionDataState;
-    using Phase = CleanupStructuredEncryptionDataPhaseEnum;
 
     CleanupStructuredEncryptionDataCoordinator(ShardingCoordinatorService* service,
                                                const BSONObj& doc)
@@ -83,10 +80,6 @@ public:
     void checkIfOptionsConflict(const BSONObj& stateDoc) const final {}
 
 private:
-    StringData serializePhase(const Phase& phase) const override {
-        return idl::serialize(phase);
-    }
-
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept final;
 

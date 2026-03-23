@@ -50,12 +50,8 @@
 
 namespace mongo {
 class MONGO_MOD_PUBLIC ReshardCollectionCoordinator
-    : public RecoverableShardingDDLCoordinator<ReshardCollectionCoordinatorDocument,
-                                               ReshardCollectionCoordinatorPhaseEnum> {
+    : public RecoverableShardingDDLCoordinator<ReshardCollectionCoordinatorDocument> {
 public:
-    using StateDoc = ReshardCollectionCoordinatorDocument;
-    using Phase = ReshardCollectionCoordinatorPhaseEnum;
-
     ReshardCollectionCoordinator(ShardingCoordinatorService* service, const BSONObj& initialState);
 
     MONGO_MOD_PRIVATE void checkIfOptionsConflict(const BSONObj& coorDoc) const override;
@@ -68,10 +64,6 @@ protected:
                                  bool persistCoordinatorDocument);
 
 private:
-    StringData serializePhase(const Phase& phase) const override {
-        return idl::serialize(phase);
-    }
-
     BSONObj _computeFinalShardKey(const CurrentChunkManager& cmOld);
 
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,

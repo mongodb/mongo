@@ -57,12 +57,8 @@
 namespace mongo {
 
 class MONGO_MOD_NEEDS_REPLACEMENT DropCollectionCoordinator final
-    : public RecoverableShardingDDLCoordinator<DropCollectionCoordinatorDocument,
-                                               DropCollectionCoordinatorPhaseEnum> {
+    : public RecoverableShardingDDLCoordinator<DropCollectionCoordinatorDocument> {
 public:
-    using StateDoc = DropCollectionCoordinatorDocument;
-    using Phase = DropCollectionCoordinatorPhaseEnum;
-
     DropCollectionCoordinator(ShardingCoordinatorService* service, const BSONObj& initialState)
         : RecoverableShardingDDLCoordinator(service, "DropCollectionCoordinator", initialState),
           _critSecReason(BSON("command"
@@ -99,10 +95,6 @@ public:
 
 private:
     const BSONObj _critSecReason;
-
-    StringData serializePhase(const Phase& phase) const override {
-        return idl::serialize(phase);
-    }
 
     bool _mustAlwaysMakeProgress() override {
         return _doc.getPhase() > Phase::kUnset;

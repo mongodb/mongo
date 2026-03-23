@@ -104,12 +104,8 @@ struct MONGO_MOD_NEEDS_REPLACEMENT OptionsAndIndexes {
 };
 
 class MONGO_MOD_NEEDS_REPLACEMENT CreateCollectionCoordinator
-    : public RecoverableShardingDDLCoordinator<CreateCollectionCoordinatorDocument,
-                                               CreateCollectionCoordinatorPhaseEnum> {
+    : public RecoverableShardingDDLCoordinator<CreateCollectionCoordinatorDocument> {
 public:
-    using CoordDoc = CreateCollectionCoordinatorDocument;
-    using Phase = CreateCollectionCoordinatorPhaseEnum;
-
     CreateCollectionCoordinator(ShardingCoordinatorService* service, const BSONObj& initialState)
         : RecoverableShardingDDLCoordinator(service, "CreateCollectionCoordinator", initialState),
           _request(_doc.getShardsvrCreateCollectionRequest()),
@@ -136,10 +132,6 @@ protected:
     const NamespaceString& nss() const override;
 
 private:
-    StringData serializePhase(const Phase& phase) const override {
-        return idl::serialize(phase);
-    }
-
     bool _mustAlwaysMakeProgress() override;
 
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,

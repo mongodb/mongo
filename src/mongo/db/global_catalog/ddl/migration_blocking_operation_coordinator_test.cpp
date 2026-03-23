@@ -29,6 +29,7 @@
 
 #include "mongo/db/global_catalog/ddl/migration_blocking_operation_coordinator.h"
 
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_catalog/ddl/migration_blocking_operation_coordinator_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_external_state_for_test.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"

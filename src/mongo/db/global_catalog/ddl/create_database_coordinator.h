@@ -38,12 +38,8 @@
 
 namespace mongo {
 class CreateDatabaseCoordinator final
-    : public RecoverableShardingDDLCoordinator<CreateDatabaseCoordinatorDocument,
-                                               CreateDatabaseCoordinatorPhaseEnum> {
+    : public RecoverableShardingDDLCoordinator<CreateDatabaseCoordinatorDocument> {
 public:
-    using StateDoc = CreateDatabaseCoordinatorDocument;
-    using Phase = CreateDatabaseCoordinatorPhaseEnum;
-
     CreateDatabaseCoordinator(ShardingCoordinatorService* service, const BSONObj& initialState)
         : RecoverableShardingDDLCoordinator(service, "CreateDatabaseCoordinator", initialState),
           _critSecReason(BSON("createDatabase" << DatabaseNameUtil::serialize(
@@ -56,10 +52,6 @@ public:
     ConfigsvrCreateDatabaseResponse getResult(OperationContext* opCtx);
 
 private:
-    StringData serializePhase(const Phase& phase) const override {
-        return idl::serialize(phase);
-    }
-
     bool _mustAlwaysMakeProgress() override {
         return _doc.getPhase() >= Phase::kEnterCriticalSectionOnPrimary;
     }

@@ -141,6 +141,7 @@ ForwardableOperationMetadata enableVersionContextPropagation(
 }
 
 ShardingCoordinator::ShardingCoordinator(ShardingCoordinatorService* service,
+                                         std::string name,
                                          const BSONObj& coorDoc)
     : _service(service),
       _coordId(extractShardingCoordinatorMetadata(coorDoc).getId()),
@@ -150,7 +151,8 @@ ShardingCoordinator::ShardingCoordinator(ShardingCoordinatorService* service,
               enableVersionContextPropagation)),
       _databaseVersion(extractShardingCoordinatorMetadata(coorDoc).getDatabaseVersion()),
       _firstExecution(!_recoveredFromDisk),
-      _externalState(_service->createExternalState()) {}
+      _externalState(_service->createExternalState()),
+      _coordinatorName(std::move(name)) {}
 
 ShardingCoordinator::~ShardingCoordinator() {
     tassert(10644519,

@@ -37,11 +37,8 @@
 namespace mongo {
 
 class UntrackUnsplittableCollectionCoordinator final
-    : public RecoverableShardingDDLCoordinator<UntrackUnsplittableCollectionCoordinatorDocument,
-                                               UntrackUnsplittableCollectionCoordinatorPhaseEnum> {
+    : public RecoverableShardingDDLCoordinator<UntrackUnsplittableCollectionCoordinatorDocument> {
 public:
-    using CoordDoc = UntrackUnsplittableCollectionCoordinatorDocument;
-    using Phase = UntrackUnsplittableCollectionCoordinatorPhaseEnum;
     UntrackUnsplittableCollectionCoordinator(ShardingCoordinatorService* service,
                                              const BSONObj& initialState)
         : RecoverableShardingDDLCoordinator(
@@ -63,10 +60,6 @@ private:
 
     bool _mustAlwaysMakeProgress() override {
         return _doc.getPhase() > Phase::kUnset;
-    }
-
-    StringData serializePhase(const Phase& phase) const override {
-        return idl::serialize(phase);
     }
 
     void _checkPreconditions();

@@ -29,6 +29,8 @@
 
 #include "mongo/db/global_catalog/ddl/drop_indexes_coordinator.h"
 
+#include "mongo/db/generic_argument_util.h"
+#include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/timeseries/catalog_helper.h"
@@ -117,7 +119,7 @@ void DropIndexesCoordinator::_dropIndexes(OperationContext* opCtx,
 
             CommandHelpers::appendSimpleCommandStatus(result, ok, errmsg);
 
-            DropIndexesCoordinatorDocument newDoc = _getDoc();
+            DropIndexesCoordinatorDocument newDoc = _copyDoc();
             newDoc.setResult(result.obj());
             _updateStateDocument(opCtx, std::move(newDoc));
 

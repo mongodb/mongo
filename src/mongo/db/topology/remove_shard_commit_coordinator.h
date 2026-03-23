@@ -38,12 +38,8 @@
 
 namespace mongo {
 class MONGO_MOD_PARENT_PRIVATE RemoveShardCommitCoordinator final
-    : public RecoverableShardingDDLCoordinator<RemoveShardCommitCoordinatorDocument,
-                                               RemoveShardCommitCoordinatorPhaseEnum> {
+    : public RecoverableShardingDDLCoordinator<RemoveShardCommitCoordinatorDocument> {
 public:
-    using StateDoc = RemoveShardCommitCoordinatorDocument;
-    using Phase = RemoveShardCommitCoordinatorPhaseEnum;
-
     RemoveShardCommitCoordinator(ShardingCoordinatorService* service, const BSONObj& initialState)
         : RecoverableShardingDDLCoordinator(service, "RemoveShardCommitCoordinator", initialState) {
     }
@@ -55,10 +51,6 @@ public:
     RemoveShardProgress getResult(OperationContext* opCtx);
 
 private:
-    StringData serializePhase(const Phase& phase) const override {
-        return idl::serialize(phase);
-    }
-
     bool _mustAlwaysMakeProgress() override {
         return _doc.getPhase() >= Phase::kCommit;
     }

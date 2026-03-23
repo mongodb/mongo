@@ -40,12 +40,8 @@
 
 namespace mongo {
 class MONGO_MOD_PARENT_PRIVATE AddShardCoordinator final
-    : public RecoverableShardingDDLCoordinator<AddShardCoordinatorDocument,
-                                               AddShardCoordinatorPhaseEnum> {
+    : public RecoverableShardingDDLCoordinator<AddShardCoordinatorDocument> {
 public:
-    using StateDoc = AddShardCoordinatorDocument;
-    using Phase = AddShardCoordinatorPhaseEnum;
-
     AddShardCoordinator(ShardingCoordinatorService* service, const BSONObj& initialState);
 
     ~AddShardCoordinator() override = default;
@@ -66,10 +62,6 @@ protected:
     bool _mustAlwaysMakeProgress() override;
 
 private:
-    StringData serializePhase(const Phase& phase) const override {
-        return idl::serialize(phase);
-    }
-
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 

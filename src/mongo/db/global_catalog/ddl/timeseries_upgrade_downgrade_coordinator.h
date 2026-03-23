@@ -50,12 +50,8 @@
 namespace mongo {
 
 class TimeseriesUpgradeDowngradeCoordinator final
-    : public RecoverableShardingDDLCoordinator<TimeseriesUpgradeDowngradeCoordinatorDocument,
-                                               TimeseriesUpgradeDowngradeCoordinatorPhaseEnum> {
+    : public RecoverableShardingDDLCoordinator<TimeseriesUpgradeDowngradeCoordinatorDocument> {
 public:
-    using StateDoc = TimeseriesUpgradeDowngradeCoordinatorDocument;
-    using Phase = TimeseriesUpgradeDowngradeCoordinatorPhaseEnum;
-
     TimeseriesUpgradeDowngradeCoordinator(ShardingCoordinatorService* service,
                                           const BSONObj& initialState)
         : RecoverableShardingDDLCoordinator(
@@ -71,10 +67,6 @@ protected:
     logv2::DynamicAttributes getCoordinatorLogAttrs() const override;
 
 private:
-    StringData serializePhase(const Phase& phase) const override {
-        return idl::serialize(phase);
-    }
-
     bool _mustAlwaysMakeProgress() override {
         return _doc.getPhase() >= Phase::kFreezeMigrations;
     };

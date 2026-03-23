@@ -37,6 +37,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_catalog/ddl/cluster_ddl.h"
 #include "mongo/db/global_catalog/ddl/create_collection_coordinator.h"
 #include "mongo/db/global_catalog/ddl/create_collection_coordinator_document_gen.h"

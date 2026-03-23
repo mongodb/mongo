@@ -54,12 +54,8 @@
 namespace mongo {
 
 class RefineCollectionShardKeyCoordinator
-    : public RecoverableShardingDDLCoordinator<RefineCollectionShardKeyCoordinatorDocument,
-                                               RefineCollectionShardKeyCoordinatorPhaseEnum> {
+    : public RecoverableShardingDDLCoordinator<RefineCollectionShardKeyCoordinatorDocument> {
 public:
-    using StateDoc = RefineCollectionShardKeyCoordinatorDocument;
-    using Phase = RefineCollectionShardKeyCoordinatorPhaseEnum;
-
     RefineCollectionShardKeyCoordinator(ShardingCoordinatorService* service,
                                         const BSONObj& initialState);
 
@@ -68,10 +64,6 @@ public:
     void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const override;
 
 private:
-    StringData serializePhase(const Phase& phase) const override {
-        return idl::serialize(phase);
-    }
-
     bool _mustAlwaysMakeProgress() override;
 
     std::vector<ShardId> _getDataShardsAndConfigServer(OperationContext* opCtx,

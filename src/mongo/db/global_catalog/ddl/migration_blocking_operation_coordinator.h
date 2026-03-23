@@ -37,12 +37,9 @@
 namespace mongo {
 
 class MigrationBlockingOperationCoordinator
-    : public RecoverableShardingDDLCoordinator<MigrationBlockingOperationCoordinatorDocument,
-                                               MigrationBlockingOperationCoordinatorPhaseEnum> {
+    : public RecoverableShardingDDLCoordinator<MigrationBlockingOperationCoordinatorDocument> {
 public:
-    using Phase = MigrationBlockingOperationCoordinatorPhaseEnum;
     using UUIDSet = stdx::unordered_set<UUID, UUID::Hash>;
-    using StateDoc = MigrationBlockingOperationCoordinatorDocument;
     using ShardingCoordinator::getOrCreate;
 
     static std::shared_ptr<MigrationBlockingOperationCoordinator> getOrCreate(
@@ -59,7 +56,6 @@ public:
     void endOperation(OperationContext* opCtx, const UUID& operationUUID);
 
 private:
-    StringData serializePhase(const Phase& phase) const override;
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 

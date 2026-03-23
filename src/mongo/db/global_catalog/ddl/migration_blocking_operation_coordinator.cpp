@@ -101,14 +101,10 @@ MigrationBlockingOperationCoordinator::MigrationBlockingOperationCoordinator(
     ShardingCoordinatorService* service, const BSONObj& initialState)
     : RecoverableShardingDDLCoordinator(
           service, "MigrationBlockingOperationCoordinator", initialState),
-      _operations{populateOperations(_getDoc())},
+      _operations{populateOperations(_copyDoc())},
       _needsRecovery{_recoveredFromDisk} {}
 
 void MigrationBlockingOperationCoordinator::checkIfOptionsConflict(const BSONObj& stateDoc) const {}
-
-StringData MigrationBlockingOperationCoordinator::serializePhase(const Phase& phase) const {
-    return idl::serialize(phase);
-}
 
 ExecutorFuture<void> MigrationBlockingOperationCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
@@ -187,7 +183,7 @@ void MigrationBlockingOperationCoordinator::beginOperation(OperationContext* opC
     _operations.insert(operationUUID);
     ScopeGuard removeOperationGuard([&] { _operations.erase(operationUUID); });
 
-    auto newDoc = _getDoc();
+    auto newDoc = _copyDoc();
     auto isFirst = _isFirstOperation(lock);
 
     if (isFirst) {
@@ -253,7 +249,7 @@ void MigrationBlockingOperationCoordinator::endOperation(OperationContext* opCtx
     }
 
     hangBeforeUpdatingDiskState.pauseWhileSet();
-    auto newDoc = _getDoc();
+    auto newDoc = _copyDoc();
     std::erase(newDoc.getOperations().get(), operationUUID);
 
     _insertOrUpdateStateDocument(lock, opCtx, std::move(newDoc));

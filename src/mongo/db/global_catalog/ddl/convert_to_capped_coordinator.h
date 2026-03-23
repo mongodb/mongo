@@ -37,12 +37,8 @@
 namespace mongo {
 
 class ConvertToCappedCoordinator final
-    : public RecoverableShardingDDLCoordinator<ConvertToCappedCoordinatorDocument,
-                                               ConvertToCappedCoordinatorPhaseEnum> {
+    : public RecoverableShardingDDLCoordinator<ConvertToCappedCoordinatorDocument> {
 public:
-    using StateDoc = ConvertToCappedCoordinatorDocument;
-    using Phase = ConvertToCappedCoordinatorPhaseEnum;
-
     ConvertToCappedCoordinator(ShardingCoordinatorService* service, const BSONObj& initialStateDoc)
         : RecoverableShardingDDLCoordinator(service, "ConvertToCappedCoordinator", initialStateDoc),
           _request(_doc.getShardsvrConvertToCappedRequest()),
@@ -74,10 +70,6 @@ protected:
     logv2::DynamicAttributes getCoordinatorLogAttrs() const override;
 
 private:
-    StringData serializePhase(const Phase& phase) const override {
-        return idl::serialize(phase);
-    }
-
     bool _mustAlwaysMakeProgress() override;
 
     ExecutorFuture<void> _cleanupOnAbort(std::shared_ptr<executor::ScopedTaskExecutor> executor,

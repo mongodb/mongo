@@ -55,12 +55,8 @@
 namespace mongo {
 
 class RenameCollectionCoordinator final
-    : public RecoverableShardingDDLCoordinator<RenameCollectionCoordinatorDocument,
-                                               RenameCollectionCoordinatorPhaseEnum> {
+    : public RecoverableShardingDDLCoordinator<RenameCollectionCoordinatorDocument> {
 public:
-    using StateDoc = RenameCollectionCoordinatorDocument;
-    using Phase = RenameCollectionCoordinatorPhaseEnum;
-
     RenameCollectionCoordinator(ShardingCoordinatorService* service, const BSONObj& initialState);
 
     void checkIfOptionsConflict(const BSONObj& doc) const override;
@@ -80,10 +76,6 @@ protected:
     logv2::DynamicAttributes getCoordinatorLogAttrs() const override;
 
 private:
-    StringData serializePhase(const Phase& phase) const override {
-        return idl::serialize(phase);
-    }
-
     bool _mustAlwaysMakeProgress() override {
         return _doc.getPhase() >= Phase::kFreezeMigrations;
     };

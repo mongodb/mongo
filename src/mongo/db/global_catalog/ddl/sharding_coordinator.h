@@ -32,11 +32,9 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
-#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
@@ -55,7 +53,6 @@
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
-#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/task_executor.h"
@@ -85,10 +82,39 @@ namespace mongo {
 MONGO_MOD_NEEDS_REPLACEMENT ShardingCoordinatorMetadata
 extractShardingCoordinatorMetadata(const BSONObj& coorDoc);
 
+/**
+ * Generic coordinator phase enum.
+ * It may be converted to any enum used by coordinator implementations, provided that it has the
+ * same underlying type and that it has a kUnset member with the value `0`.
+ */
+enum class MONGO_MOD_PRIVATE CoordinatorGenericPhase : std::int32_t {
+    kUnset = 0,
+};
+
+/**
+ * Represents a "generic" coordinator StateDoc.
+ * This interface is implemented by the template class `CoordinatorStateDocImpl` defined below.
+ */
+class MONGO_MOD_PRIVATE CoordinatorStateDoc {
+public:
+    static constexpr auto kIdFieldName = "_id"_sd;
+
+    virtual ~CoordinatorStateDoc() = default;
+    virtual const ShardingCoordinatorMetadata& getShardingCoordinatorMetadata() const = 0;
+    virtual void setShardingCoordinatorMetadata(ShardingCoordinatorMetadata newMetadata) = 0;
+    virtual void replace(std::unique_ptr<CoordinatorStateDoc> newDoc) = 0;
+    virtual void setGenericPhase(CoordinatorGenericPhase p) = 0;
+    virtual CoordinatorGenericPhase getGenericPhase() const = 0;
+    virtual BSONObj toBSON() const = 0;
+    virtual std::unique_ptr<CoordinatorStateDoc> clone() const = 0;
+};
+
 class MONGO_MOD_NEEDS_REPLACEMENT ShardingCoordinator
     : public repl::PrimaryOnlyService::TypedInstance<ShardingCoordinator> {
 public:
-    explicit ShardingCoordinator(ShardingCoordinatorService* service, const BSONObj& coorDoc);
+    explicit ShardingCoordinator(ShardingCoordinatorService* service,
+                                 std::string name,
+                                 const BSONObj& coorDoc);
 
     ~ShardingCoordinator() override;
 
@@ -164,9 +190,6 @@ protected:
         return {};
     }
 
-    virtual ShardingCoordinatorMetadata const& metadata() const = 0;
-    virtual void setMetadata(ShardingCoordinatorMetadata&& metadata) = 0;
-
     /**
      * Returns a set of basic coordinator attributes to be used for logging.
      */
@@ -188,7 +211,7 @@ protected:
      */
     virtual bool _mustAlwaysMakeProgress() {
         return false;
-    };
+    }
 
     /*
      * Specify if the given error will be retried by the coordinator infrastructure.
@@ -206,6 +229,16 @@ protected:
         getForwardableOpMetadata().setOn(opCtxHolder.get());
         return opCtxHolder;
     }
+
+    /**
+     * Return a reference to this coordinator's CoordinatorStateDoc.
+     */
+    virtual const CoordinatorStateDoc& getDoc() const = 0;
+
+    /**
+     * Return a reference to this coordinator's CoordinatorStateDoc.
+     */
+    virtual CoordinatorStateDoc& getDoc() = 0;
 
     ShardingCoordinatorService* _service;
     const ShardingCoordinatorId _coordId;
@@ -270,42 +303,24 @@ private:
     std::shared_ptr<ShardingCoordinatorExternalState> _externalState;
 
     friend class ShardingCoordinatorTest;
-};
 
-template <class StateDoc>
-class MONGO_MOD_NEEDS_REPLACEMENT NonRecoverableShardingCoordinator : public ShardingCoordinator {
-public:
+protected:
     boost::optional<BSONObj> reportForCurrentOp(
         MongoProcessInterface::CurrentOpConnectionsMode connMode,
         MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override {
         return basicReportBuilder().obj();
     }
 
-protected:
-    NonRecoverableShardingCoordinator(ShardingCoordinatorService* service,
-                                      const std::string& name,
-                                      const BSONObj& initialStateDoc)
-        : ShardingCoordinator(service, initialStateDoc),
-          _coordinatorName(name),
-          /*
-           * Force a deserialisation + serialisation of the initialStateDoc to ensure that
-           * _initialState is a full deep copy of the received parameter.
-           */
-          _initialState(
-              StateDoc::parse(initialStateDoc, IDLParserContext("CoordinatorInitialState"))
-                  .toBSON()),
-          _doc(StateDoc::parse(_initialState, IDLParserContext("CoordinatorDocument"))) {}
-
-    ShardingCoordinatorMetadata const& metadata() const override {
-        return _doc.getShardingCoordinatorMetadata();
+    virtual ShardingCoordinatorMetadata const& metadata() const {
+        return getDoc().getShardingCoordinatorMetadata();
     }
 
-    void setMetadata(ShardingCoordinatorMetadata&& metadata) override {
+    virtual void setMetadata(ShardingCoordinatorMetadata&& metadata) {
         stdx::lock_guard lk{_docMutex};
-        _doc.setShardingCoordinatorMetadata(std::move(metadata));
+        getDoc().setShardingCoordinatorMetadata(std::move(metadata));
     }
 
-    virtual void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {};
+    virtual void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {}
 
     virtual BSONObjBuilder basicReportBuilder() const noexcept {
         BSONObjBuilder bob;
@@ -322,7 +337,7 @@ protected:
         // Append dynamic fields from the state doc
         {
             stdx::lock_guard lk{_docMutex};
-            if (const auto& bucketNss = _doc.getBucketNss()) {
+            if (const auto& bucketNss = getDoc().getShardingCoordinatorMetadata().getBucketNss()) {
                 // Bucket namespace is only present in case the collection is a sharded timeseries
                 bob.append("bucketNamespace",
                            NamespaceStringUtil::serialize(bucketNss.get(),
@@ -345,26 +360,22 @@ protected:
     }
 
     const std::string _coordinatorName;
-    const BSONObj _initialState;
     mutable stdx::mutex _docMutex;
-    StateDoc _doc;
 };
 
-template <class StateDoc, class Phase>
 class MONGO_MOD_UNFORTUNATELY_OPEN RecoverableShardingCoordinator
-    : public NonRecoverableShardingCoordinator<StateDoc>,
+    : public ShardingCoordinator,
       public OperationSessionPersistence {
 protected:
-    using NonRecoverableShardingCoordinator<StateDoc>::_doc;
-    using NonRecoverableShardingCoordinator<StateDoc>::_docMutex;
-
     RecoverableShardingCoordinator(ShardingCoordinatorService* service,
                                    const std::string& name,
                                    const BSONObj& initialStateDoc)
-        : NonRecoverableShardingCoordinator<StateDoc>(service, name, initialStateDoc),
-          _sessionTracker(this) {}
+        : ShardingCoordinator(service, name, initialStateDoc), _sessionTracker(this) {}
 
-    virtual StringData serializePhase(const Phase& phase) const = 0;
+    /**
+     * Serialize a CoordinatorGenericPhase using the implementation's Phase.
+     */
+    virtual StringData serializeGenericPhase(CoordinatorGenericPhase phase) const = 0;
 
     /**
      * Advances and persists the txnNumber to ensure causality between requests, then returns the
@@ -390,17 +401,22 @@ protected:
         _sessionTracker.performCausalityBarrier(opCtx, barrier);
     }
 
-    std::function<void()> _buildPhaseHandler(const Phase& newPhase,
-                                             std::function<void(OperationContext*)>&& handlerFn) {
-        return _buildPhaseHandler(
+    std::function<void()> _buildPhaseHandlerGeneric(
+        CoordinatorGenericPhase newPhase, std::function<void(OperationContext*)>&& handlerFn) {
+        return _buildPhaseHandlerGeneric(
             newPhase, [](OperationContext*) { return true; }, std::move(handlerFn));
     }
 
-    std::function<void()> _buildPhaseHandler(const Phase& newPhase,
-                                             std::function<bool(OperationContext*)>&& shouldExecute,
-                                             std::function<void(OperationContext*)>&& handlerFn) {
+
+    std::function<void()> _buildPhaseHandlerGeneric(
+        CoordinatorGenericPhase newPhase,
+        std::function<bool(OperationContext*)>&& shouldExecute,
+        std::function<void(OperationContext*)>&& handlerFn) {
         return [=, this] {
-            const auto currPhase = _getDoc().getPhase();
+            const auto currPhase = [this] {
+                stdx::lock_guard lk{_docMutex};
+                return getDoc().getGenericPhase();
+            }();
 
             if (currPhase > newPhase) {
                 // Do not execute this phase if we already reached a subsequent one.
@@ -417,29 +433,30 @@ protected:
 
             if (currPhase < newPhase) {
                 // Persist the new phase if this is the first time we are executing it.
-                _enterPhase(newPhase);
+                _enterPhaseGeneric(newPhase);
             }
 
             return handlerFn(opCtx);
         };
     }
 
-    auto _getDoc() const {
+    auto _cloneDoc() const {
         stdx::lock_guard lk{_docMutex};
-        return _doc;
+        return getDoc().clone();
     }
 
-    void _enterPhase(const Phase& newPhase) {
-        auto newDoc = _getDoc();
+    void _enterPhaseGeneric(CoordinatorGenericPhase newPhase) {
+        auto newDoc = _cloneDoc();
+        const auto& currentDoc = getDoc();
 
-        newDoc.setPhase(newPhase);
+        newDoc->setGenericPhase(newPhase);
 
         LOGV2_DEBUG(5390501,
                     2,
                     "sharding coordinator phase transition",
-                    "coordinatorId"_attr = _doc.getId(),
-                    "newPhase"_attr = serializePhase(newDoc.getPhase()),
-                    "oldPhase"_attr = serializePhase(_doc.getPhase()));
+                    "coordinatorId"_attr = currentDoc.getShardingCoordinatorMetadata().getId(),
+                    "newPhase"_attr = serializeGenericPhase(newDoc->getGenericPhase()),
+                    "oldPhase"_attr = serializeGenericPhase(currentDoc.getGenericPhase()));
 
         ServiceContext::UniqueOperationContext uniqueOpCtx;
         auto opCtx = cc().getOperationContext();
@@ -448,33 +465,34 @@ protected:
             opCtx = uniqueOpCtx.get();
         }
 
-        if (_doc.getPhase() == Phase::kUnset) {
-            _insertStateDocument(opCtx, std::move(newDoc));
+        if (currentDoc.getGenericPhase() == CoordinatorGenericPhase::kUnset) {
+            _insertStateDocumentGeneric(opCtx, std::move(newDoc));
         } else {
-            _updateStateDocument(opCtx, std::move(newDoc));
+            _updateStateDocumentGeneric(opCtx, std::move(newDoc));
         }
     }
-
     BSONObjBuilder basicReportBuilder() const noexcept override {
-        auto baseReportBuilder = NonRecoverableShardingCoordinator<StateDoc>::basicReportBuilder();
+        auto baseReportBuilder = ShardingCoordinator::basicReportBuilder();
 
-        const auto currPhase = [&]() {
+        const auto currPhase = [this] {
             stdx::lock_guard l{_docMutex};
-            return _doc.getPhase();
+            return getDoc().getGenericPhase();
         }();
 
-        baseReportBuilder.append("currentPhase", serializePhase(currPhase));
+        baseReportBuilder.append("currentPhase", serializeGenericPhase(currPhase));
         return baseReportBuilder;
     }
 
-    void _insertStateDocument(OperationContext* opCtx, StateDoc&& newDoc) {
-        auto copyMetadata = newDoc.getShardingCoordinatorMetadata();
+    void _insertStateDocumentGeneric(OperationContext* opCtx,
+                                     std::unique_ptr<CoordinatorStateDoc> newDoc) {
+        auto copyMetadata = newDoc->getShardingCoordinatorMetadata();
         copyMetadata.setRecoveredFromDisk(true);
-        newDoc.setShardingCoordinatorMetadata(copyMetadata);
+        newDoc->setShardingCoordinatorMetadata(copyMetadata);
 
-        PersistentTaskStore<StateDoc> store(NamespaceString::kShardingDDLCoordinatorsNamespace);
+        PersistentTaskStore<CoordinatorStateDoc> store(
+            NamespaceString::kShardingDDLCoordinatorsNamespace);
         try {
-            store.add(opCtx, newDoc, defaultMajorityWriteConcern());
+            store.add(opCtx, *newDoc, defaultMajorityWriteConcern());
         } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
             // A series of step-up and step-down events can cause a node to try and insert the
             // document when it has already been persisted locally, but we must still wait for
@@ -488,28 +506,31 @@ protected:
 
         {
             stdx::lock_guard lk{_docMutex};
-            _doc = std::move(newDoc);
+            getDoc().replace(std::move(newDoc));
         }
     }
 
-    void _updateStateDocument(OperationContext* opCtx, StateDoc&& newDoc) {
-        PersistentTaskStore<StateDoc> store(NamespaceString::kShardingDDLCoordinatorsNamespace);
+    void _updateStateDocumentGeneric(OperationContext* opCtx,
+                                     std::unique_ptr<CoordinatorStateDoc> newDoc) {
+        PersistentTaskStore<CoordinatorStateDoc> store(
+            NamespaceString::kShardingDDLCoordinatorsNamespace);
+        const auto& coorMetadata = newDoc->getShardingCoordinatorMetadata();
         tassert(10644540,
                 "Expected recoveredFromDisk to be set on the coordinator document metadata",
-                newDoc.getShardingCoordinatorMetadata().getRecoveredFromDisk());
+                coorMetadata.getRecoveredFromDisk());
         store.update(opCtx,
-                     BSON(StateDoc::kIdFieldName << newDoc.getId().toBSON()),
-                     newDoc.toBSON(),
+                     BSON(CoordinatorStateDoc::kIdFieldName << coorMetadata.getId().toBSON()),
+                     newDoc->toBSON(),
                      defaultMajorityWriteConcern());
 
         {
             stdx::lock_guard lk{_docMutex};
-            _doc = std::move(newDoc);
+            getDoc().replace(std::move(newDoc));
         }
     }
 
     boost::optional<Status> getAbortReason() const override {
-        const auto& status = _doc.getAbortReason();
+        const auto& status = getDoc().getShardingCoordinatorMetadata().getAbortReason();
         tassert(10644541, "when persisted, status must be an error", !status || !status->isOK());
         return status;
     }
@@ -521,18 +542,18 @@ protected:
     void triggerCleanup(OperationContext* opCtx, const Status& status) {
         LOGV2_INFO(7418502,
                    "Coordinator failed, persisting abort reason",
-                   "coordinatorId"_attr = _doc.getId(),
-                   "phase"_attr = serializePhase(_doc.getPhase()),
+                   "coordinatorId"_attr = getDoc().getShardingCoordinatorMetadata().getId(),
+                   "phase"_attr = serializeGenericPhase(getDoc().getGenericPhase()),
                    "reason"_attr = redact(status));
 
-        auto newDoc = _getDoc();
+        auto newDoc = _cloneDoc();
 
-        auto coordinatorMetadata = newDoc.getShardingCoordinatorMetadata();
+        auto coordinatorMetadata = newDoc->getShardingCoordinatorMetadata();
 
         coordinatorMetadata.setAbortReason(sharding_ddl_util::possiblyTruncateErrorStatus(status));
-        newDoc.setShardingCoordinatorMetadata(std::move(coordinatorMetadata));
+        newDoc->setShardingCoordinatorMetadata(std::move(coordinatorMetadata));
 
-        _updateStateDocument(opCtx, std::move(newDoc));
+        _updateStateDocumentGeneric(opCtx, std::move(newDoc));
 
         uassertStatusOK(status);
     }
@@ -545,7 +566,7 @@ private:
     boost::optional<OperationSessionInfo> readSession(OperationContext* opCtx) const override {
         auto optSession = [&] {
             stdx::lock_guard lk{_docMutex};
-            return _doc.getShardingCoordinatorMetadata().getSession();
+            return getDoc().getShardingCoordinatorMetadata().getSession();
         }();
         if (!optSession) {
             return boost::none;
@@ -564,14 +585,183 @@ private:
             // the time the DDL coordinator does this, we've already deleted our state document.
             return;
         }
-        auto newDoc = _getDoc();
-        auto newMetadata = newDoc.getShardingCoordinatorMetadata();
+        auto newDoc = _cloneDoc();
+        auto newMetadata = newDoc->getShardingCoordinatorMetadata();
         newMetadata.setSession(CoordinatorSession(*osi->getSessionId(), *osi->getTxnNumber()));
-        newDoc.setShardingCoordinatorMetadata(std::move(newMetadata));
-        _updateStateDocument(opCtx, std::move(newDoc));
+        newDoc->setShardingCoordinatorMetadata(std::move(newMetadata));
+        _updateStateDocumentGeneric(opCtx, std::move(newDoc));
     }
 
     OperationSessionTracker _sessionTracker;
+};
+
+template <typename StateDoc>
+class MONGO_MOD_PRIVATE CoordinatorStateDocImpl : public CoordinatorStateDoc {
+    constexpr static bool kDocHasPhase = requires(StateDoc doc) { doc.getPhase(); };
+
+    consteval static auto getPhaseTypeHelper() {
+        if constexpr (kDocHasPhase) {
+            return StateDoc{}.getPhase();
+        } else {
+            // For documents without getPhase (used in non-recoverable coordinators) return
+            // CoordinatorGenericPhase so that the static_assert's down below keep working.
+            return CoordinatorGenericPhase{};
+        }
+    }
+
+public:
+    using DocPhase = decltype(getPhaseTypeHelper());
+    using DocPhaseUnderlying = std::underlying_type_t<DocPhase>;
+
+    static_assert(
+        std::is_same_v<DocPhaseUnderlying, std::underlying_type_t<CoordinatorGenericPhase>>,
+        "The coordinator phase enumeration doesn't have the same underlying type as "
+        "CoordinatorGenericPhase");
+    static_assert(
+        requires(DocPhase p) { p = DocPhase::kUnset; },
+        "The coordinator phase enumeration doesn't have a member `kUnset`");
+    static_assert(static_cast<DocPhaseUnderlying>(DocPhase::kUnset) ==
+                      static_cast<DocPhaseUnderlying>(CoordinatorGenericPhase::kUnset),
+                  "The coordinator phase enumeration kUnset doesn't have the same value as "
+                  "CoordinatorGenericPhase::kUnset (it must be 0)");
+    static_assert(kDocHasPhase || std::is_same_v<DocPhase, CoordinatorGenericPhase>,
+                  "CoordinatorGenericPhase can't be the coordinator's phase enumeration");
+
+    explicit CoordinatorStateDocImpl() = default;
+    explicit CoordinatorStateDocImpl(StateDoc doc) : _doc(std::move(doc)) {}
+
+    const ShardingCoordinatorMetadata& getShardingCoordinatorMetadata() const override {
+        return _doc.getShardingCoordinatorMetadata();
+    }
+
+    void setShardingCoordinatorMetadata(ShardingCoordinatorMetadata newMetadata) override {
+        _doc.setShardingCoordinatorMetadata(std::move(newMetadata));
+    }
+
+    void setGenericPhase(CoordinatorGenericPhase p) override {
+        if constexpr (kDocHasPhase) {
+            _doc.setPhase(castToCoordinatorPhase(p));
+        } else {
+            tasserted(12096100, "Setting a phase to a non-recoverable document");
+        }
+    }
+
+    CoordinatorGenericPhase getGenericPhase() const override {
+        if constexpr (kDocHasPhase) {
+            return castToGenericPhase(_doc.getPhase());
+        } else {
+            tasserted(12096101, "Getting the phase from a non-recoverable document");
+        }
+    }
+
+    std::unique_ptr<CoordinatorStateDoc> clone() const override {
+        return std::make_unique<CoordinatorStateDocImpl<StateDoc>>(_doc);
+    }
+
+    BSONObj toBSON() const override {
+        return _doc.toBSON();
+    }
+
+    void replace(std::unique_ptr<CoordinatorStateDoc> newDoc) override {
+        auto* cast = dynamic_cast<CoordinatorStateDocImpl<StateDoc>*>(newDoc.get());
+        tassert(12096104, "newDoc dynamic_cast failed", cast);
+        _doc = std::move(cast->_doc);
+    }
+
+    static constexpr CoordinatorGenericPhase castToGenericPhase(DocPhase en) {
+        const auto i = static_cast<DocPhaseUnderlying>(en);
+        return static_cast<CoordinatorGenericPhase>(i);
+    }
+
+    static constexpr DocPhase castToCoordinatorPhase(CoordinatorGenericPhase en) {
+        const auto i = static_cast<DocPhaseUnderlying>(en);
+        return static_cast<DocPhase>(i);
+    }
+
+    StateDoc _doc;
+};
+
+/**
+ * Provide a typed StateDoc _doc for coordinator implementations.
+ */
+template <typename TStateDoc>
+class MONGO_MOD_UNFORTUNATELY_OPEN NonRecoverableTypedDocMixin {
+protected:
+    using StateDoc = TStateDoc;
+
+    explicit NonRecoverableTypedDocMixin(const BSONObj& coorDoc)
+        : _docWrapper(
+              StateDoc::parseOwned(coorDoc.getOwned(), IDLParserContext("CoordinatorDocument"))) {}
+
+    CoordinatorStateDocImpl<TStateDoc> _docWrapper{};
+    // Keep API compatibility for coordinators.
+    StateDoc& _doc = _docWrapper._doc;
+};
+
+
+/**
+ * Provide typed protected functions for recoverable coordinators.
+ */
+template <typename Base, typename TStateDoc>
+class MONGO_MOD_UNFORTUNATELY_OPEN RecoverableTypedDocMixin
+    : protected NonRecoverableTypedDocMixin<TStateDoc> {
+
+protected:
+    using StateDoc = NonRecoverableTypedDocMixin<TStateDoc>::StateDoc;
+    using Phase = CoordinatorStateDocImpl<TStateDoc>::DocPhase;
+
+    using NonRecoverableTypedDocMixin<TStateDoc>::NonRecoverableTypedDocMixin;
+
+    std::function<void()> _buildPhaseHandler(Phase newPhase,
+                                             std::function<void(OperationContext*)>&& handlerFn) {
+        return self()._buildPhaseHandlerGeneric(
+            CoordinatorStateDocImpl<TStateDoc>::castToGenericPhase(newPhase), std::move(handlerFn));
+    }
+
+    std::function<void()> _buildPhaseHandler(Phase newPhase,
+                                             std::function<bool(OperationContext*)>&& shouldExecute,
+                                             std::function<void(OperationContext*)>&& handlerFn) {
+        return self()._buildPhaseHandlerGeneric(
+            CoordinatorStateDocImpl<TStateDoc>::castToGenericPhase(newPhase),
+            std::move(shouldExecute),
+            std::move(handlerFn));
+    }
+
+    void _enterPhase(Phase newPhase) {
+        self()._enterPhaseGeneric(CoordinatorStateDocImpl<TStateDoc>::castToGenericPhase(newPhase));
+    }
+
+    void _insertStateDocument(OperationContext* opCtx, StateDoc&& newDoc) {
+        self()._insertStateDocumentGeneric(
+            opCtx, std::make_unique<CoordinatorStateDocImpl<StateDoc>>(std::move(newDoc)));
+    }
+
+    void _updateStateDocument(OperationContext* opCtx, StateDoc&& newDoc) {
+        self()._updateStateDocumentGeneric(
+            opCtx, std::make_unique<CoordinatorStateDocImpl<StateDoc>>(std::move(newDoc)));
+    }
+
+    StringData serializePhase(Phase phase) const {
+        return idl::serialize(phase);
+    }
+
+    StringData serializePhase(CoordinatorGenericPhase phase) const {
+        return serializePhase(CoordinatorStateDocImpl<StateDoc>::castToCoordinatorPhase(phase));
+    }
+
+    StateDoc _copyDoc() const {
+        stdx::lock_guard lk{self()._docMutex};
+        return this->_doc;
+    }
+
+private:
+    // CRTP self() functions.
+    Base& self() {
+        return static_cast<Base&>(*this);
+    }
+    const Base& self() const {
+        return static_cast<Base const&>(*this);
+    }
 };
 
 #undef MONGO_LOGV2_DEFAULT_COMPONENT

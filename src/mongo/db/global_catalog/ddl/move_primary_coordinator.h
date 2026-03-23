@@ -60,12 +60,8 @@
 namespace mongo {
 
 class MovePrimaryCoordinator final
-    : public RecoverableShardingDDLCoordinator<MovePrimaryCoordinatorDocument,
-                                               MovePrimaryCoordinatorPhaseEnum> {
+    : public RecoverableShardingDDLCoordinator<MovePrimaryCoordinatorDocument> {
 public:
-    using StateDoc = MovePrimaryCoordinatorDocument;
-    using Phase = MovePrimaryCoordinatorPhaseEnum;
-
     MovePrimaryCoordinator(ShardingCoordinatorService* service, const BSONObj& initialState);
     ~MovePrimaryCoordinator() override = default;
 
@@ -76,7 +72,6 @@ protected:
     logv2::DynamicAttributes getCoordinatorLogAttrs() const override;
 
 private:
-    StringData serializePhase(const Phase& phase) const override;
     void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const override;
     bool _mustAlwaysMakeProgress() override;
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,

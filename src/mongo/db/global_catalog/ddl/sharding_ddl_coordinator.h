@@ -35,20 +35,53 @@
 
 namespace mongo {
 
-template <class StateDoc>
+template <typename StateDoc>
 class MONGO_MOD_NEEDS_REPLACEMENT NonRecoverableShardingDDLCoordinator
-    : public NonRecoverableShardingCoordinator<StateDoc> {
+    : public ShardingCoordinator,
+      protected NonRecoverableTypedDocMixin<StateDoc> {
 protected:
-    using NonRecoverableShardingCoordinator<StateDoc>::NonRecoverableShardingCoordinator;
+    explicit NonRecoverableShardingDDLCoordinator(ShardingCoordinatorService* service,
+                                                  std::string name,
+                                                  const BSONObj& coorDoc)
+        : ShardingCoordinator(service, std::move(name), coorDoc),
+          NonRecoverableTypedDocMixin<StateDoc>(coorDoc) {}
+
+    const CoordinatorStateDoc& getDoc() const override {
+        return this->_docWrapper;
+    }
+
+    CoordinatorStateDoc& getDoc() override {
+        return this->_docWrapper;
+    }
 };
 
-template <class StateDoc, class Phase>
+template <typename StateDoc>
 class MONGO_MOD_UNFORTUNATELY_OPEN RecoverableShardingDDLCoordinator
-    : public RecoverableShardingCoordinator<StateDoc, Phase> {
+    : public RecoverableShardingCoordinator,
+      protected RecoverableTypedDocMixin<RecoverableShardingDDLCoordinator<StateDoc>, StateDoc> {
+
+    friend RecoverableTypedDocMixin<RecoverableShardingDDLCoordinator<StateDoc>, StateDoc>;
+
 protected:
-    using RecoverableShardingCoordinator<StateDoc, Phase>::RecoverableShardingCoordinator;
-    using RecoverableShardingCoordinator<StateDoc, Phase>::_doc;
-    using RecoverableShardingCoordinator<StateDoc, Phase>::_docMutex;
+    explicit RecoverableShardingDDLCoordinator(ShardingCoordinatorService* service,
+                                               std::string name,
+                                               const BSONObj& coorDoc)
+        : RecoverableShardingCoordinator(service, std::move(name), coorDoc),
+          RecoverableTypedDocMixin<RecoverableShardingDDLCoordinator<StateDoc>, StateDoc>(coorDoc) {
+    }
+
+    const CoordinatorStateDoc& getDoc() const override {
+        return this->_docWrapper;
+    }
+
+    CoordinatorStateDoc& getDoc() override {
+        return this->_docWrapper;
+    }
+
+private:
+    StringData serializeGenericPhase(CoordinatorGenericPhase phase) const override {
+        return this->serializePhase(phase);
+    }
 };
 
 #undef MONGO_LOGV2_DEFAULT_COMPONENT

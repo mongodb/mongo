@@ -37,12 +37,8 @@
 namespace mongo {
 
 class MONGO_MOD_NEEDS_REPLACEMENT CloneAuthoritativeMetadataCoordinator final
-    : public RecoverableShardingDDLCoordinator<CloneAuthoritativeMetadataCoordinatorDocument,
-                                               CloneAuthoritativeMetadataCoordinatorPhaseEnum> {
+    : public RecoverableShardingDDLCoordinator<CloneAuthoritativeMetadataCoordinatorDocument> {
 public:
-    using StateDoc = CloneAuthoritativeMetadataCoordinatorDocument;
-    using Phase = CloneAuthoritativeMetadataCoordinatorPhaseEnum;
-
     CloneAuthoritativeMetadataCoordinator(ShardingCoordinatorService* service,
                                           const BSONObj& initialStateDoc)
         : RecoverableShardingDDLCoordinator(
@@ -51,10 +47,6 @@ public:
     void checkIfOptionsConflict(const BSONObj& stateDoc) const final {}
 
 private:
-    StringData serializePhase(const Phase& phase) const override {
-        return idl::serialize(phase);
-    }
-
     bool _mustAlwaysMakeProgress() override {
         return _doc.getPhase() >= Phase::kGetDatabasesToClone;
     }

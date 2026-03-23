@@ -146,10 +146,6 @@ logv2::DynamicAttributes MovePrimaryCoordinator::getCoordinatorLogAttrs() const 
                                     "toShardId"_attr = _doc.getToShardId()};
 }
 
-StringData MovePrimaryCoordinator::serializePhase(const Phase& phase) const {
-    return idl::serialize(phase);
-}
-
 void MovePrimaryCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {
     stdx::lock_guard lk(_docMutex);
     cmdInfoBuilder->append(
