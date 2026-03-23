@@ -3792,7 +3792,9 @@ functions:
         region: us-east-1
         remote_file: tpc-h/tpch-${scale}-normalized.archive.gz
         local_file: tpc-h/tpch-${scale}-normalized.archive.gz
-        require_checksum_sha256: ${checksum}
+        # TODO SERVER-122114 . We can not validate checksums until s3.get
+        # is able to request a specific file version via `versionId`
+        # require_checksum_sha256: ${checksum}
 
   "fetch mongodb database tools":
     - *f_expansions_write
