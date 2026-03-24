@@ -1213,7 +1213,7 @@ PipelineResolver::MongosViewRequestResult buildResolvedViewAggregateRequest(
 
     uassert(ErrorCodes::OptionNotSupportedOnView,
             "$rankFusion and $scoreFusion are unsupported on timeseries collections",
-            !(state.resolvedView->timeseries() && state.originalRequest->getIsHybridSearch()));
+            !(state.resolvedView->isTimeseries() && state.originalRequest->getIsHybridSearch()));
     return resolved;
 }
 

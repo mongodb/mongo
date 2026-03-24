@@ -237,59 +237,39 @@ ViewInfo::~ViewInfo() = default;
 ViewInfo::ViewInfo(ViewInfo&&) noexcept = default;
 ViewInfo& ViewInfo::operator=(ViewInfo&&) noexcept = default;
 
-ViewInfo::ViewInfo(NamespaceString pViewName,
-                   NamespaceString pResolvedNss,
-                   std::vector<BSONObj> pViewPipeBson,
-                   const LiteParserOptions& pOptions)
-    : viewName(std::move(pViewName)),
-      resolvedNss(std::move(pResolvedNss)),
-      _ownedOriginalBsonPipeline(std::move(pViewPipeBson)) {
-    // Ensure all BSONObj objects in _ownedOriginalBsonPipeline are owned.
-    // This is a no-op if they're already owned, but ensures ownership if they're not.
-    for (auto& bson : _ownedOriginalBsonPipeline) {
-        bson = bson.getOwned();
-    }
+ViewInfo::ViewInfo(NamespaceString viewName_,
+                   NamespaceString resolvedNss_,
+                   std::vector<BSONObj> viewPipeBson_,
+                   const LiteParserOptions& options_)
+    : _wrappedNamespace(
+          viewName_,
+          resolvedNss_,
+          std::move(viewPipeBson_),
+          BSONObj(),
+          ResolvedNamespaceViewOptions{.options = std::make_shared<LiteParserOptions>(options_),
+                                       .shouldParseLpp = true}) {}
 
-    viewPipeline = std::make_unique<LiteParsedPipeline>(
-        resolvedNss, _ownedOriginalBsonPipeline, false, pOptions);
-
-    // Ensure all stages in the view pipeline own their backing BSON.
-    viewPipeline->makeOwned();
-}
+ViewInfo::ViewInfo(const ResolvedNamespace& resolvedNamespace)
+    : _wrappedNamespace(resolvedNamespace) {}
 
 std::vector<BSONObj> ViewInfo::getOriginalBson() const {
-    return _ownedOriginalBsonPipeline;
+    return _wrappedNamespace.getOriginalBson();
 }
 
 std::vector<BSONObj> ViewInfo::getSerializedViewPipeline() const {
-    tassert(11898700, "A ViewInfo must have a view pipeline to get desugared BSON.", viewPipeline);
-
-    std::vector<BSONObj> result;
-    result.reserve(viewPipeline->getStages().size());
-    for (const auto& stage : viewPipeline->getStages()) {
-        result.push_back(stage->getOriginalBson().wrap());
-    }
-    return result;
+    return _wrappedNamespace.getSerializedViewPipeline();
 }
 
 LiteParsedPipeline ViewInfo::getViewPipeline() const {
-    tassert(11506600, "A ViewInfo being cloned must have a view pipeline.", viewPipeline);
+    return _wrappedNamespace.getViewPipeline();
+}
 
-    // Ownership should be preserved because the original stages own their BSON, and the default
-    // copy constructor copies _ownedBson, which uses BSONObj's shared ownership. Still, we call
-    // makeOwned() defensively here. This is a no-op if the stages already own their BSON.
-    auto out = viewPipeline->clone();
-    out.makeOwned();
-    return out;
+void ViewInfo::desugarViewPipeline() {
+    _wrappedNamespace.desugarViewPipeline();
 }
 
 ViewInfo ViewInfo::clone() const {
-    ViewInfo out;
-    out.viewName = viewName;
-    out.resolvedNss = resolvedNss;
-    out._ownedOriginalBsonPipeline = _ownedOriginalBsonPipeline;
-    out.viewPipeline = std::make_unique<LiteParsedPipeline>(getViewPipeline());
-    return out;
+    return ViewInfo(_wrappedNamespace.clone());
 }
 
 }  // namespace mongo

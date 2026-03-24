@@ -492,7 +492,7 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline(
             return buildPipelineFromViewDefinition(
                 fromExpCtx,
                 e->getNamespace(),
-                isRawDataOperation(pExpCtx->getOperationContext()) && e->timeseries()
+                isRawDataOperation(pExpCtx->getOperationContext()) && e->isTimeseries()
                     ? std::vector<BSONObj>{}
                     : e->getPipeline(),
                 true /* attachCursorAfterOptimizing */,
@@ -532,7 +532,7 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline(
         pipeline = buildPipelineFromViewDefinition(
             fromExpCtx,
             e->getNamespace(),
-            isRawDataOperation(pExpCtx->getOperationContext()) && e->timeseries()
+            isRawDataOperation(pExpCtx->getOperationContext()) && e->isTimeseries()
                 ? std::vector<BSONObj>{}
                 : e->getPipeline(),
             !cacheIsServing,

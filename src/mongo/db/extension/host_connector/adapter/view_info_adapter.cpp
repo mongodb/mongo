@@ -47,7 +47,7 @@ ViewInfoAdapter::ViewInfoAdapter(std::string&& dbName,
                 _viewPipelineByteViews.empty() ? nullptr : _viewPipelineByteViews.data()}) {}
 
 ViewInfoAdapter ViewInfoAdapter::fromViewInfo(const ViewInfo& viewInfo) {
-    std::string dbStr = DatabaseNameUtil::serialize(viewInfo.viewName.dbName(),
+    std::string dbStr = DatabaseNameUtil::serialize(viewInfo.getViewName().dbName(),
                                                     SerializationContext::stateCommandRequest());
 
     std::vector<BSONObj> stages = viewInfo.getOriginalBson();
@@ -58,7 +58,7 @@ ViewInfoAdapter ViewInfoAdapter::fromViewInfo(const ViewInfo& viewInfo) {
     }
 
     return ViewInfoAdapter(std::move(dbStr),
-                           std::string{viewInfo.viewName.coll()},
+                           std::string{viewInfo.getViewName().coll()},
                            std::move(stages),
                            std::move(stageViews));
 }

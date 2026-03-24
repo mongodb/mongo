@@ -109,6 +109,9 @@ class LiteParsedDocumentSource;
 /**
  * A ViewInfo struct stores the view namespace, resolved namespace (underlying collection), and the
  * desugared view pipeline from ResolvedView.
+ *
+ * TODO SERVER-122116 Remove this class once all callers have been transitioned to the new
+ * ResolvedNamespace.
  */
 struct MONGO_MOD_PUBLIC ViewInfo {
     ViewInfo() = default;
@@ -127,10 +130,16 @@ struct MONGO_MOD_PUBLIC ViewInfo {
      *
      * Note that the ViewInfo owns the backing BSONObj for `viewPipeline`.
      */
-    ViewInfo(NamespaceString viewName,
-             NamespaceString resolvedNss,
-             std::vector<BSONObj> viewPipeBson,
-             const LiteParserOptions& options = LiteParserOptions{});
+    ViewInfo(NamespaceString viewName_,
+             NamespaceString resolvedNss_,
+             std::vector<BSONObj> viewPipeBson_,
+             const LiteParserOptions& options_ = LiteParserOptions{});
+
+    ViewInfo(const ResolvedNamespace& resolvedNamespace);
+
+    NamespaceString getViewName() const {
+        return _wrappedNamespace.getNamespace();
+    }
 
     /**
      * Returns the original BSON view pipeline. Note that this is the pre-desugared version of the
@@ -149,22 +158,15 @@ struct MONGO_MOD_PUBLIC ViewInfo {
      */
     LiteParsedPipeline getViewPipeline() const;
 
+    // Desugars the internally-parsed view pipeline in place. Must be called before handleView()
+    // so that extension stages in view definitions are expanded prior to stitching. See
+    // ResolvedNamespace::ViewPipelineDesugarer for why a callback is used instead of a direct call.
+    void desugarViewPipeline();
+
     ViewInfo clone() const;
 
-    NamespaceString viewName;     // Unresolved view namespace.
-    NamespaceString resolvedNss;  // Underlying collection that the view runs.
-
 private:
-    // Stores the original pre-desugar BSON view pipeline and owns the underlying BSON.
-    // Must be declared before viewPipeline so it is destroyed after viewPipeline (C++ destroys
-    // members in reverse declaration order, and LiteParsedDocumentSource holds BSONElement
-    // references into this data).
-    std::vector<BSONObj> _ownedOriginalBsonPipeline;
-
-public:
-    // The desugared view pipeline, represented as a LiteParsedPipeline so it can be cloned and
-    // applied repeatedly.
-    std::unique_ptr<LiteParsedPipeline> viewPipeline;
+    ResolvedNamespace _wrappedNamespace;
 };
 
 /**

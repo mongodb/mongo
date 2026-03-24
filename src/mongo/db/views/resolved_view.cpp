@@ -55,118 +55,24 @@ namespace mongo {
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(ResolvedView);
 
 ResolvedView ResolvedView::fromBSON(const BSONObj& commandResponseObj) {
-    uassert(40248,
-            "command response expected to have a 'resolvedView' field",
-            commandResponseObj.hasField("resolvedView"));
-
-    auto viewDef = commandResponseObj.getObjectField("resolvedView");
-    uassert(40249, "resolvedView must be an object", !viewDef.isEmpty());
-
-    uassert(40250,
-            "View definition must have 'ns' field of type string",
-            viewDef.hasField("ns") && viewDef.getField("ns").type() == BSONType::string);
-
-    uassert(40251,
-            "View definition must have 'pipeline' field of type array",
-            viewDef.hasField("pipeline") && viewDef.getField("pipeline").type() == BSONType::array);
-
-    std::vector<BSONObj> pipeline;
-    for (auto&& item : viewDef["pipeline"].Obj()) {
-        pipeline.push_back(item.Obj().getOwned());
-    }
-
-    BSONObj collationSpec;
-    if (auto collationElt = viewDef["collation"]) {
-        uassert(40639,
-                "View definition 'collation' field must be an object",
-                collationElt.type() == BSONType::object);
-        collationSpec = collationElt.embeddedObject().getOwned();
-    }
-
-    boost::optional<TimeseriesOptions> timeseriesOptions = boost::none;
-    if (auto tsOptionsElt = viewDef[kTimeseriesOptions]) {
-        if (tsOptionsElt.isABSONObj()) {
-            timeseriesOptions = TimeseriesOptions::parse(
-                tsOptionsElt.Obj(), IDLParserContext{"ResolvedView::fromBSON"});
-        }
-    }
-
-    boost::optional<bool> mixedSchema = boost::none;
-    if (auto mixedSchemaElem = viewDef[kTimeseriesMayContainMixedData]) {
-        uassert(6067204,
-                str::stream() << "view definition must have " << kTimeseriesMayContainMixedData
-                              << " of type bool or no such field",
-                mixedSchemaElem.type() == BSONType::boolean);
-
-        mixedSchema = boost::optional<bool>(mixedSchemaElem.boolean());
-    }
-
-    boost::optional<bool> usesExtendedRange = boost::none;
-    if (auto usesExtendedRangeElem = viewDef[kTimeseriesUsesExtendedRange]) {
-        uassert(6646910,
-                str::stream() << "view definition must have " << kTimeseriesUsesExtendedRange
-                              << " of type bool or no such field",
-                usesExtendedRangeElem.type() == BSONType::boolean);
-
-        usesExtendedRange = boost::optional<bool>(usesExtendedRangeElem.boolean());
-    }
-
-    boost::optional<bool> fixedBuckets = boost::none;
-    if (auto fixedBucketsElem = viewDef[kTimeseriesfixedBuckets]) {
-        uassert(7823304,
-                str::stream() << "view definition must have " << kTimeseriesfixedBuckets
-                              << " of type bool or no such field",
-                fixedBucketsElem.type() == BSONType::boolean);
-
-        fixedBuckets = boost::optional<bool>(fixedBucketsElem.boolean());
-    }
-
-    return {NamespaceStringUtil::deserializeForErrorMsg(viewDef["ns"].valueStringData()),
-            std::move(pipeline),
-            std::move(collationSpec),
-            std::move(timeseriesOptions),
-            std::move(mixedSchema),
-            std::move(usesExtendedRange),
-            std::move(fixedBuckets)};
+    ResolvedNamespace inner = ResolvedNamespace::fromBSON(commandResponseObj);
+    return ResolvedView(std::move(inner));
 }
 
 void ResolvedView::serialize(BSONObjBuilder* builder) const {
-    BSONObjBuilder subObj(builder->subobjStart("resolvedView"));
-    subObj.append("ns", _namespace.toStringForErrorMsg());
-    subObj.append("pipeline", _pipeline);
-    if (_timeseriesOptions) {
-        BSONObjBuilder tsObj(builder->subobjStart(kTimeseriesOptions));
-        _timeseriesOptions->serialize(&tsObj);
-    }
-    // Only serialize if it doesn't contain mixed data.
-    if ((_timeseriesMayContainMixedData && !(*_timeseriesMayContainMixedData)))
-        subObj.append(kTimeseriesMayContainMixedData, *_timeseriesMayContainMixedData);
-
-    if ((_timeseriesUsesExtendedRange && (*_timeseriesUsesExtendedRange)))
-        subObj.append(kTimeseriesUsesExtendedRange, *_timeseriesUsesExtendedRange);
-
-    if ((_timeseriesfixedBuckets && (*_timeseriesfixedBuckets)))
-        subObj.append(kTimeseriesfixedBuckets, *_timeseriesfixedBuckets);
-
-    if (!_defaultCollation.isEmpty()) {
-        subObj.append("collation", _defaultCollation);
-    }
+    _wrappedNamespace.serialize(builder);
 }
 
 std::shared_ptr<const ErrorExtraInfo> ResolvedView::parse(const BSONObj& cmdReply) {
-    return std::make_shared<ResolvedView>(fromBSON(cmdReply));
+    return std::make_shared<ResolvedView>(*ResolvedNamespace::parse(cmdReply));
 }
 
-
 ResolvedView ResolvedView::parseFromBSON(const BSONElement& elem) {
-    uassert(936370, "resolvedView must be an object", elem.type() == BSONType::object);
-    BSONObjBuilder localBuilder;
-    localBuilder.append("resolvedView", elem.Obj());
-    return fromBSON(localBuilder.done());
+    return ResolvedView(ResolvedNamespace::parseFromBSON(elem));
 }
 
 void ResolvedView::serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
-    serialize(builder);
+    _wrappedNamespace.serialize(builder);
 }
 
 void ResolvedView::applyTimeseriesRewrites(std::vector<BSONObj>* resolvedPipeline) const {
@@ -216,14 +122,19 @@ void ResolvedView::applyTimeseriesRewrites(std::vector<BSONObj>* resolvedPipelin
              unpackStage[DocumentSourceInternalUnpackBucket::kStageNameInternal].Obj()) {
             builder.append(elem);
         }
-        builder.append(DocumentSourceInternalUnpackBucket::kAssumeNoMixedSchemaData,
-                       ((_timeseriesMayContainMixedData && !(*_timeseriesMayContainMixedData))));
+        auto timeseriesMetadata = _wrappedNamespace.getTimeseriesViewMetadata();
+        if (timeseriesMetadata.has_value()) {
+            builder.append(DocumentSourceInternalUnpackBucket::kAssumeNoMixedSchemaData,
+                           (timeseriesMetadata->mayContainMixedData &&
+                            !(*timeseriesMetadata->mayContainMixedData)));
 
-        builder.append(DocumentSourceInternalUnpackBucket::kUsesExtendedRange,
-                       ((_timeseriesUsesExtendedRange && *_timeseriesUsesExtendedRange)));
+            builder.append(
+                DocumentSourceInternalUnpackBucket::kUsesExtendedRange,
+                (timeseriesMetadata->usesExtendedRange && *timeseriesMetadata->usesExtendedRange));
 
-        builder.append(DocumentSourceInternalUnpackBucket::kFixedBuckets,
-                       ((_timeseriesfixedBuckets && *_timeseriesfixedBuckets)));
+            builder.append(DocumentSourceInternalUnpackBucket::kFixedBuckets,
+                           (timeseriesMetadata->fixedBuckets && *timeseriesMetadata->fixedBuckets));
+        }
 
         (*resolvedPipeline)[0] =
             BSON(DocumentSourceInternalUnpackBucket::kStageNameInternal << builder.obj());
@@ -232,7 +143,7 @@ void ResolvedView::applyTimeseriesRewrites(std::vector<BSONObj>* resolvedPipelin
 
 boost::optional<BSONObj> ResolvedView::rewriteIndexHintForTimeseries(
     const BSONObj& originalHint) const {
-    if (!timeseries()) {
+    if (!isTimeseries()) {
         return boost::none;
     }
 
@@ -241,8 +152,8 @@ boost::optional<BSONObj> ResolvedView::rewriteIndexHintForTimeseries(
         return boost::none;
     }
 
-    auto converted = timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(*_timeseriesOptions,
-                                                                               originalHint);
+    auto converted = timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
+        _wrappedNamespace.getTimeseriesViewMetadata()->options.value(), originalHint);
     if (converted.isOK()) {
         return converted.getValue();
     }

@@ -617,6 +617,7 @@ mongo_cc_library(
     srcs = [
         "lite_parsed_document_source.cpp",
         "lite_parsed_pipeline.cpp",
+        "resolved_namespace.cpp",
     ],
     deps = [
         ":aggregation_request_helper",

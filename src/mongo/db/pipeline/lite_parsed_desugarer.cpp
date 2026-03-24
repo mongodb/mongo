@@ -29,10 +29,18 @@
 
 #include "mongo/db/pipeline/lite_parsed_desugarer.h"
 
+#include "mongo/base/init.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 // TODO SERVER-120179 Remove when the feature flag is enabled.
 #include "mongo/db/query/query_feature_flags_gen.h"
 
 namespace mongo {
+
+// Register the desugarer so that ResolvedNamespace::parseViewPipeline() can desugar extension
+// stages in view definitions without a direct dependency on the lite_parsed_desugarer target.
+MONGO_INITIALIZER(RegisterViewPipelineDesugarer)(InitializerContext*) {
+    ResolvedNamespace::setViewPipelineDesugarer(&LiteParsedDesugarer::desugar);
+}
 
 bool LiteParsedDesugarer::desugar(LiteParsedPipeline* pipeline) {
     const auto& stages = pipeline->getStages();

@@ -598,7 +598,7 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
         opts.optimize = false;
         opts.attachCursorSource = false;
         const std::vector<BSONObj>& resolvedPipe =
-            (e->timeseries() && isRawDataOperation(pExpCtx->getOperationContext()))
+            (e->isTimeseries() && isRawDataOperation(pExpCtx->getOperationContext()))
             ? std::vector<BSONObj>{}
             : e->getPipeline();
         pipeline = pipeline_factory::makePipelineFromViewDefinition(

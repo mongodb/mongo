@@ -979,7 +979,7 @@ SecondParseRequirement maybeApplyViewPipeline(const AggExState& aggExState,
     // rewrites.
     // TODO SERVER-101599 remove this code once 9.0 becomes last LTS. By then only viewless
     // timeseries collections will exist.
-    if (aggExState.getResolvedView().timeseries()) {
+    if (aggExState.getResolvedView().isTimeseries()) {
         return SecondParseRequirement::kReparseFromBson;
     }
 

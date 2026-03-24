@@ -112,13 +112,13 @@ TEST(LiteParsedPipelineTest, HandleViewDoesNotConsumeOrMutateViewInfo) {
     std::vector<BSONObj> viewStages = {BSON("$match" << BSON("x" << 1))};
     const auto viewInfo = createTestViewInfo(std::move(viewStages));
 
-    ASSERT_TRUE(viewInfo.viewPipeline);
+    ASSERT_FALSE(viewInfo.getOriginalBson().empty());
     const auto before = viewInfo.getOriginalBson();
     ASSERT_EQ(before.size(), 1U);
 
     pipeline.handleView(viewInfo, {});
 
-    ASSERT_TRUE(viewInfo.viewPipeline);
+    ASSERT_FALSE(viewInfo.getOriginalBson().empty());
     const auto after = viewInfo.getOriginalBson();
     ASSERT_EQ(after.size(), 1U);
     ASSERT_BSONOBJ_EQ(before[0], after[0]);
@@ -150,7 +150,7 @@ TEST(LiteParsedPipelineTest, ViewInfoCloneIsIndependentOfOriginalLifetime) {
         auto viewInfo = createTestViewInfo(std::move(viewStages));
         cloned = viewInfo.clone();
     }
-    ASSERT_TRUE(cloned.viewPipeline);
+    ASSERT_FALSE(cloned.getOriginalBson().empty());
     LiteParsedPipeline userPipe(kTestNss, std::vector<BSONObj>{BSON("$sort" << BSON("y" << 1))});
 
     userPipe.handleView(cloned, {});
@@ -197,18 +197,20 @@ TEST(LiteParsedPipelineTest,
     for (auto& stage : replacements) {
         stage->makeOwned();
     }
-    viewInfo.viewPipeline->replaceStageWith(0, std::move(replacements));
 
-    // getOriginalBson() should still return the original, unmodified pipeline.
+    // getViewPipeline() returns a copy. Modify the copy, not the ViewInfo's internal pipeline.
+    auto modifiedPipeline = viewInfo.getViewPipeline();
+    modifiedPipeline.replaceStageWith(0, std::move(replacements));
+
+    // getOriginalBson() and getSerializedViewPipeline() on the original ViewInfo should still
+    // return the original, unmodified pipeline since we only mutated the copy.
     auto original = viewInfo.getOriginalBson();
     ASSERT_EQ(original.size(), 1U);
     ASSERT_BSONOBJ_EQ(original[0], viewStages[0]);
 
-    // getSerializedViewPipeline() should reflect the modified (desugared) pipeline.
     auto serialized = viewInfo.getSerializedViewPipeline();
-    ASSERT_EQ(serialized.size(), 2U);
-    ASSERT_BSONOBJ_EQ(serialized[0], newStage1);
-    ASSERT_BSONOBJ_EQ(serialized[1], newStage2);
+    ASSERT_EQ(serialized.size(), 1U);
+    ASSERT_BSONOBJ_EQ(serialized[0], viewStages[0]);
 }
 
 TEST(LiteParsedPipelineTest, ClonedPipelineWithViewStagesPreservesOwnership) {

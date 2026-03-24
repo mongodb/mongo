@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/util/modules.h"
 
@@ -49,6 +50,9 @@ namespace mongo {
 /**
  * Represents a resolved definition, composed of a base collection namespace and a pipeline
  * built from one or more views.
+ *
+ * TODO SERVER-122118 Remove this class once all callers have been transitioned to the new
+ * ResolvedNamespace.
  */
 class MONGO_MOD_PUBLIC ResolvedView final : public ErrorExtraInfo {
 public:
@@ -58,28 +62,45 @@ public:
                  boost::optional<TimeseriesOptions> timeseriesOptions = boost::none,
                  boost::optional<bool> timeseriesMayContainMixedData = boost::none,
                  boost::optional<bool> timeseriesUsesExtendedRange = boost::none,
-                 boost::optional<bool> timeseriesfixedBuckets = boost::none,
+                 boost::optional<bool> timeseriesFixedBuckets = boost::none,
                  const bool isNewTimeseriesWithoutView = false)
-        : _namespace(collectionNs),
-          _pipeline(std::move(pipeline)),
-          _defaultCollation(std::move(defaultCollation)),
-          _timeseriesOptions(timeseriesOptions),
-          _timeseriesMayContainMixedData(timeseriesMayContainMixedData),
-          _timeseriesUsesExtendedRange(timeseriesUsesExtendedRange),
-          _timeseriesfixedBuckets(timeseriesfixedBuckets) {
-        // If we reach here with a timeseries query, it will be because we're working with a
-        // view-based timeseries collection. Viewless timeseries collections should be defined
-        // already and should not trigger this kickback at all.
-        //
-        // TODO(SERVER-100862): This check should be removed once the isNewTimeseriesWithoutView
-        // parameter has been removed.
-        tassert(9950300,
-                (std::stringstream{}
-                 << "Should not be performing view resolution on viewless timeseries collection: "
-                 << collectionNs.toStringForErrorMsg())
-                    .str(),
-                !isNewTimeseriesWithoutView);
-    }
+        : _wrappedNamespace(ResolvedNamespace(
+              collectionNs,
+              collectionNs,
+              std::move(pipeline),
+              std::move(defaultCollation),
+              ResolvedNamespaceViewOptions{.timeseriesMetadata =
+                                               TimeseriesViewMetadata{timeseriesOptions,
+                                                                      timeseriesMayContainMixedData,
+                                                                      timeseriesUsesExtendedRange,
+                                                                      timeseriesFixedBuckets},
+                                           .validateIsNotViewlessTimeseries = true,
+                                           .isViewlessTimeseries = isNewTimeseriesWithoutView})) {}
+
+    ResolvedView(const NamespaceString& userNss,
+                 const NamespaceString& collectionNs,
+                 std::vector<BSONObj> pipeline,
+                 BSONObj defaultCollation,
+                 boost::optional<TimeseriesOptions> timeseriesOptions = boost::none,
+                 boost::optional<bool> timeseriesMayContainMixedData = boost::none,
+                 boost::optional<bool> timeseriesUsesExtendedRange = boost::none,
+                 boost::optional<bool> timeseriesFixedBuckets = boost::none,
+                 const bool isNewTimeseriesWithoutView = false)
+        : _wrappedNamespace(ResolvedNamespace(
+              userNss,
+              collectionNs,
+              std::move(pipeline),
+              std::move(defaultCollation),
+              ResolvedNamespaceViewOptions{.timeseriesMetadata =
+                                               TimeseriesViewMetadata{timeseriesOptions,
+                                                                      timeseriesMayContainMixedData,
+                                                                      timeseriesUsesExtendedRange,
+                                                                      timeseriesFixedBuckets},
+                                           .validateIsNotViewlessTimeseries = true,
+                                           .isViewlessTimeseries = isNewTimeseriesWithoutView})) {}
+
+    ResolvedView(const ResolvedNamespace& resolvedNamespace)
+        : _wrappedNamespace(resolvedNamespace) {}
 
     static ResolvedView fromBSON(const BSONObj& commandResponseObj);
 
@@ -95,50 +116,45 @@ public:
     boost::optional<BSONObj> rewriteIndexHintForTimeseries(const BSONObj& originalHint) const;
 
     const NamespaceString& getNamespace() const {
-        return _namespace;
+        return _wrappedNamespace.getResolvedNamespace();
     }
 
     const std::vector<BSONObj>& getPipeline() const {
-        return _pipeline;
+        return _wrappedNamespace.getBsonPipeline();
     }
 
     const BSONObj& getDefaultCollation() const {
-        return _defaultCollation;
+        return _wrappedNamespace.getDefaultCollation();
     }
 
-    bool timeseries() const {
-        return _timeseriesOptions.has_value();
+    bool isTimeseries() const {
+        return _wrappedNamespace.isTimeseries();
     }
 
-    const boost::optional<TimeseriesOptions>& getTimeseriesOptions() const {
-        return _timeseriesOptions;
+    boost::optional<TimeseriesOptions> getTimeseriesOptions() const {
+        auto metadata = _wrappedNamespace.getTimeseriesViewMetadata();
+        return metadata ? metadata->options : boost::none;
     }
 
-    const boost::optional<bool>& getMayContainMixedData() const {
-        return _timeseriesMayContainMixedData;
+    boost::optional<bool> getMayContainMixedData() const {
+        auto metadata = _wrappedNamespace.getTimeseriesViewMetadata();
+        return metadata ? metadata->mayContainMixedData : boost::none;
     }
 
-    const boost::optional<bool>& getUsesExtendedRange() const {
-        return _timeseriesUsesExtendedRange;
+    boost::optional<bool> getUsesExtendedRange() const {
+        auto metadata = _wrappedNamespace.getTimeseriesViewMetadata();
+        return metadata ? metadata->usesExtendedRange : boost::none;
     }
 
-    const boost::optional<bool>& getFixedBuckets() const {
-        return _timeseriesfixedBuckets;
+    boost::optional<bool> getFixedBuckets() const {
+        auto metadata = _wrappedNamespace.getTimeseriesViewMetadata();
+        return metadata ? metadata->fixedBuckets : boost::none;
     }
 
     // ErrorExtraInfo API
     static constexpr auto code = ErrorCodes::CommandOnShardedViewNotSupportedOnMongod;
-    static constexpr StringData kTimeseriesMayContainMixedData = "timeseriesMayContainMixedData"_sd;
-    static constexpr StringData kTimeseriesOptions = "timeseriesOptions"_sd;
-    static constexpr StringData kTimeseriesUsesExtendedRange = "timeseriesUsesExtendedRange"_sd;
-    static constexpr StringData kTimeseriesfixedBuckets = "timeseriesfixedBuckets"_sd;
-
     void serialize(BSONObjBuilder* bob) const final;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
-
-    /*
-     * These methods support IDL parsing of ResolvedView.
-     */
     static ResolvedView parseFromBSON(const BSONElement& elem);
     void serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const;
 
@@ -147,25 +163,14 @@ public:
      */
     ViewInfo toViewInfo(const NamespaceString& viewNss,
                         const LiteParserOptions& options = LiteParserOptions{}) const {
-        return ViewInfo{viewNss, _namespace, _pipeline, options};
+        return ViewInfo{viewNss,
+                        _wrappedNamespace.getResolvedNamespace(),
+                        _wrappedNamespace.getBsonPipeline(),
+                        options};
     }
 
 private:
-    NamespaceString _namespace;
-    std::vector<BSONObj> _pipeline;
-
-    // The default collation associated with this view. An empty object means that the default
-    // is the simple collation.
-    //
-    // Currently all operations which run over a view must use the default collation. This means
-    // that operations on the view which do not specify a collation inherit the default.
-    // Operations on the view which specify any other collation fail with a user error.
-    BSONObj _defaultCollation;
-
-    boost::optional<TimeseriesOptions> _timeseriesOptions;
-    boost::optional<bool> _timeseriesMayContainMixedData;
-    boost::optional<bool> _timeseriesUsesExtendedRange;
-    boost::optional<bool> _timeseriesfixedBuckets;
+    ResolvedNamespace _wrappedNamespace;
 };
 
 }  // namespace mongo

@@ -158,7 +158,7 @@ void applyFinalTransformations(AggregateCommandRequest& resolvedRequest,
 
     // If we have an index hint on a time-series view, we may need to rewrite the index spec to
     // match the index on the underlying buckets collection.
-    if (originalRequest.getHint() && resolvedView.timeseries()) {
+    if (originalRequest.getHint() && resolvedView.isTimeseries()) {
         auto newHint = resolvedView.rewriteIndexHintForTimeseries(*originalRequest.getHint());
         if (newHint.has_value()) {
             resolvedRequest.setHint(*newHint);
@@ -193,9 +193,11 @@ void PipelineResolver::applyViewToLiteParsed(LiteParsedPipeline* userLPP,
                                              const NamespaceString& viewNss,
                                              const ResolvedNamespaceMap& resolvedNamespaces,
                                              const LiteParserOptions& options) {
-    // Desugar the viewPipeline and apply it to the user pipeline.
+    // Desugar extension stages in the view pipeline before stitching. This uses a callback
+    // registered by lite_parsed_desugarer.cpp to avoid a circular build dependency between
+    // ResolvedNamespace and LiteParsedDesugarer.
     auto viewInfo = resolvedView.toViewInfo(viewNss, options);
-    LiteParsedDesugarer::desugar(viewInfo.viewPipeline.get());
+    viewInfo.desugarViewPipeline();
     userLPP->handleView(viewInfo, resolvedNamespaces);
 }
 
@@ -215,7 +217,7 @@ PipelineResolver::MongosViewRequestResult PipelineResolver::buildResolvedMongosV
     std::vector<BSONObj> resolvedPipeline;
     boost::optional<LiteParsedPipeline> userLPP;
     if (search_helper_bson_obj::isMongotPipeline(ifrContext, request.getPipeline()) ||
-        resolvedView.timeseries()) {
+        resolvedView.isTimeseries()) {
         resolvedPipeline =
             buildResolvedPipelineForSimpleCase(ifrContext, resolvedView, request.getPipeline());
         userLPP = boost::none;
