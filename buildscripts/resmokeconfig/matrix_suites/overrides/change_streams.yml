@@ -71,6 +71,7 @@
       # TODO: SERVER-114511 re-enable this test.
       - jstests/change_streams/migrate_last_chunk_from_shard_event.js
 
+# Contains mongos and mongod options for secondary reads testing.
 - name: secondary_reads
   value:
     executor:
@@ -94,6 +95,19 @@
         # This suite requires w:"majority" writes to be applied on all shard secondaries.
         # By setting shards to two node replsets, the majority is all voting nodes.
         num_rs_nodes_per_shard: 2
+
+# Contains mongod-only options for secondary reads testing.
+- name: secondary_reads_mongod
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          set_parameters:
+            logComponentVerbosity:
+              verbosity: 0
+              command: 1
+              query: 1
+              replication: 3
 
 - name: secondary_reads_excludes
   value:
