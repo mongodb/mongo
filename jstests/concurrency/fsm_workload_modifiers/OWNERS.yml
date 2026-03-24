@@ -6,3 +6,6 @@ filters:
   - "random_manual_migrations.js":
     approvers:
       - 10gen/server-cluster-scalability
+  - "random_update_delete.js":
+    approvers:
+      - 10gen/server-cluster-scalability

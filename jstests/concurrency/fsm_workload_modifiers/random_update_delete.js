@@ -180,7 +180,11 @@ export function randomUpdateDelete($config, $super) {
 
     $config.data.readOwnedDocuments = function readOwnedDocuments(db, collName) {
         const shardKeyField = this.getShardKeyField(collName);
-        const documents = findFirstBatch(db, collName, {tid: this.tid}, 1000);
+        let documents;
+        assert.soonRetryOnAcceptableErrors(() => {
+            documents = findFirstBatch(db, collName, {tid: this.tid}, 1000);
+            return true;
+        }, this.getExpectedErrors());
         const map = new Map();
         for (const doc of documents) {
             map.set(doc[shardKeyField], doc);
