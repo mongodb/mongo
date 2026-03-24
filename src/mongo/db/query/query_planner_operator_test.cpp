@@ -74,7 +74,7 @@ TEST_F(QueryPlannerTest, ExprEqCanUseIndex) {
     runQuery(fromjson("{$expr: {$eq: ['$a', 1]}}"));
     ASSERT_EQUALS(getNumSolutions(), 1U);
     assertSolutionExists(
-        "{fetch: {filter: {$expr: {$eq: ['$a', {$const: 1}]}}, node: {ixscan: {pattern: {a: 1}, "
+        "{fetch: { node: {ixscan: {pattern: {a: 1}, "
         "bounds: {a: "
         "[[1,1,true,true]]}}}}}");
 }
@@ -87,9 +87,9 @@ TEST_F(QueryPlannerTest, ExprEqCannotUseMultikeyFieldOfIndex) {
     assertSolutionExists("{cscan: {dir: 1, filter: {$and: [{$expr: {$eq: ['$a.b', 1]}}]}}}");
 }
 
-// Test that when a $expr predicate is ANDed with an index-eligible predicate, an imprecise
-// $_internalExpr predicate is pushed into the IXSCAN bounds, to filter out results before fetching.
-TEST_F(QueryPlannerTest, ExprQueryOnMultiKeyIndexPushesImpreciseFilterToIxscan) {
+// Test that a $expr predicate with equality to constant is pushed into the IXSCAN bounds of a
+// compound non-multikey index. The fetch parent needs no filter.
+TEST_F(QueryPlannerTest, ExprEqQueryOnCompoundIndexPushesFilterToIxscan) {
     params.mainCollectionInfo.options = QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(BSON("a" << 1 << "b" << 1), false /* multikey */);
     runQuery(fromjson("{$and: [{a: 123}, {$expr: {$eq: ['$b', 456]}}]}"));
@@ -98,9 +98,26 @@ TEST_F(QueryPlannerTest, ExprQueryOnMultiKeyIndexPushesImpreciseFilterToIxscan) 
     assertSolutionExists(
         "{cscan: {filter: {$and: [{a: 123}, {$expr: {$eq: ['$b', 456]}}]}, dir: 1}}");
     assertSolutionExists(
-        "{fetch: {filter: {$expr: {$eq: ['$b', 456]}}, node: "
+        "{fetch: { filter: null, node: "
         "{ixscan: {pattern: {a:1,b:1}, bounds: "
         "{a: [[123,123,true,true]], b: [[456,456,true,true]]}}}}}");
+}
+
+// Test that a $expr predicate is not pushed into the IXSCAN bounds for multikey index.
+TEST_F(QueryPlannerTest, ExprQueryOnMultiKeyIndexPushesImpreciseFilterToIxscan) {
+    params.mainCollectionInfo.options = QueryPlannerParams::INCLUDE_COLLSCAN;
+    // 'b' is multikey.
+    MultikeyPaths multikeyPaths{{}, {0U}};
+    addIndex(BSON("a" << 1 << "b" << 1), multikeyPaths);
+    runQuery(fromjson("{$and: [{a: 123}, {$expr: {$eq: ['$b', 456]}}]}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{cscan: {filter: {$and: [{a: 123}, {$expr: {$eq: ['$b', 456]}}]}, dir: 1}}");
+    assertSolutionExists(
+        "{fetch: {filter: {$and: [{$expr: {$eq: ['$b', 456]}}]}, node: "
+        "{ixscan: {pattern: {a:1,b:1}, bounds: "
+        "{a: [[123,123,true,true]], b: [['MinKey', 'MaxKey', true, true]]}}}}}");
 }
 
 TEST_F(QueryPlannerTest, MustFetchWhenIndexKeyRequiredToCoverSortIsMultikey) {

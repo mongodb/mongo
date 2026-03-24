@@ -43,6 +43,7 @@
 #include "mongo/db/geo/shapes.h"
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
 #include "mongo/db/matcher/expression_internal_eq_hashed_key.h"
@@ -762,6 +763,24 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
                 default:
                     tasserted(6334920,
                               str::stream() << "unexpected MatchType " << expr->matchType());
+            }
+        }
+    } else if (MatchExpression::EXPRESSION == expr->matchType()) {
+        const auto* node = dynamic_cast<const ExprMatchExpression*>(expr);
+        auto dataElem = node->getData();
+        // To extract index bounds from $expr we need:
+        // - the expression to be an equality to a not-null constant, in which case getData()
+        // returns a BSONElement.
+        // - the index is not a multikey and not hashed. Although we could extract bounds from
+        // hashed index, in this case the plan would still require a FETCH stage.
+        if (!index.multikey && !isHashed && dataElem.has_value()) {
+            BSONObj dataObj = objFromElement(*dataElem, index.collator);
+            MONGO_verify(dataObj.isOwned());
+
+            oilOut->intervals.push_back(makePointInterval(dataObj));
+            *tightnessOut = IndexBoundsBuilder::EXACT;
+            if (ietBuilder != nullptr) {
+                ietBuilder->addConst(*oilOut);
             }
         }
     } else if (MatchExpression::LT == expr->matchType()) {

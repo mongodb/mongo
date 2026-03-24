@@ -48,6 +48,7 @@ mongo_cc_unit_test(
     srcs = [
         "index_bounds_builder_collator_test.cpp",
         "index_bounds_builder_eq_null_test.cpp",
+        "index_bounds_builder_expr_test.cpp",
         "index_bounds_builder_interval_test.cpp",
         "index_bounds_builder_regex_test.cpp",
         "index_bounds_builder_test.cpp",

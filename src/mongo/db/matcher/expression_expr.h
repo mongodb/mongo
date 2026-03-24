@@ -175,14 +175,35 @@ public:
         return hasRenameablePath;
     }
 
+    StringData path() const final {
+        if (_path) {
+            return StringData(_path.get());
+        }
+        return StringData();
+    }
+
+    /**
+     * If the expression is an equality to not-null constant, return a BSONElement of the form
+     * {<path> : <constant>}. This is a help function to build index bounds for this special kind of
+     * expression.
+     */
+    boost::optional<BSONElement> getData() const;
+
 private:
     void _doSetCollator(const CollatorInterface* collator) final;
+
+    void setPathForEquality(boost::intrusive_ptr<Expression> expression);
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 
     boost::intrusive_ptr<Expression> _expression;
 
     boost::optional<RewriteExpr::RewriteResult> _rewriteResult;
+
+    boost::optional<std::string> _path;
+
+    // Internal storage for the equivalent $eq expression.
+    boost::optional<BSONObj> _backingBSON;
 };
 
 }  // namespace mongo

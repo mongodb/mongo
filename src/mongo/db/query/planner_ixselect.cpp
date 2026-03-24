@@ -45,6 +45,7 @@
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_algo.h"
+#include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
 #include "mongo/db/query/canonical_query_encoder.h"
@@ -212,6 +213,11 @@ static bool boundsGeneratingNodeContainsComparisonToType(MatchExpression* node, 
 
     if (const auto* comparisonExpr = dynamic_cast<const ComparisonMatchExpressionBase*>(node)) {
         return comparisonExpr->getData().type() == type;
+    }
+
+    if (const auto* exprExpr = dynamic_cast<const ExprMatchExpression*>(node);
+        exprExpr && exprExpr->getData().has_value()) {
+        return exprExpr->getData().get().type() == type;
     }
 
     if (node->matchType() == MatchExpression::MATCH_IN) {
@@ -433,6 +439,10 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
     }
 
     if (exprtype == MatchExpression::INTERNAL_EQ_HASHED_KEY && index.type != INDEX_HASHED) {
+        return false;
+    }
+
+    if (exprtype == MatchExpression::EXPRESSION && (index.type != INDEX_BTREE || index.multikey)) {
         return false;
     }
 

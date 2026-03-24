@@ -313,10 +313,28 @@ function invertShards(queryPlanner, shouldFlatten = true) {
 }
 
 /**
+ * Help function to exclude fields from explain.
+ */
+function excludeFields(obj, fields) {
+    if (Array.isArray(obj)) {
+        // Process each element in the array.
+        return obj.map((item) => excludeFields(item, fields));
+    } else if (obj !== null && typeof obj === "object") {
+        const newObj = {};
+        for (const key of Object.keys(obj)) {
+            if (!fields.includes(key)) {
+                newObj[key] = excludeFields(obj[key], fields);
+            }
+        }
+        return newObj;
+    }
+    return obj;
+}
+/**
  * Returns a formatted version of the explain, excluding fields which might differ in the explain
  * across multiple executions of the same query (e.g. caching information or UUIDs).
  */
-export function formatExplainRoot(explain, shouldFlatten = true) {
+export function formatExplainRoot(explain, shouldFlatten = true, fieldsToExclude = []) {
     let res = {};
     if (!isPlainObject(explain)) {
         return res;
@@ -349,6 +367,9 @@ export function formatExplainRoot(explain, shouldFlatten = true) {
 
     addIfPresent("queryShapeHash", explain, res);
 
+    if (fieldsToExclude.length > 0) {
+        return excludeFields(res, fieldsToExclude);
+    }
     return res;
 }
 

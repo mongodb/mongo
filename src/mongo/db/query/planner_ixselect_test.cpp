@@ -203,7 +203,7 @@ TEST(QueryPlannerIXSelectTest, GetFieldsArrayNegation) {
 TEST(QueryPlannerIXSelectTest, GetFieldsInternalExpr) {
     testGetFields("{$expr: {$lt: ['$a', 'r']}}", "", "", false /* sparse supported */);
     testGetFields("{$expr: {$eq: ['$a', null]}}", "", "", false /* sparse supported */);
-    testGetFields("{$expr: {$eq: ['$a', 1]}}", "", "", false /* sparse supported */);
+    testGetFields("{$expr: {$eq: ['$a', 1]}}", "", "a", false /* sparse supported */);
 }
 
 /**
@@ -1534,6 +1534,36 @@ TEST(QueryPlannerIXSelectTest, GeoPredicateUnderNotCannotUse2dsphereIndex) {
                     expectedIndices,
                     false /* mustUseIndexedPlan */,
                     true /* shouldNormalize */);
+}
+
+TEST(QueryPlannerIXSelectTest, ExprWithEqualityToConstantCanUseIndex) {
+    auto index = buildSimpleIndexEntry(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{$expr: {$eq: ['$a', 3]}}", "", nullptr, indices, "a", expectedIndices);
+}
+
+TEST(QueryPlannerIXSelectTest, ExprWithEqualityToConstantSwappedCanUseIndex) {
+    auto index = buildSimpleIndexEntry(BSON("a" << 1));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{$expr: {$eq: [3, '$a']}}", "", nullptr, indices, "a", expectedIndices);
+}
+
+TEST(QueryPlannerIXSelectTest, ExprWithEqualityToConstantCannotUseHashedIndex) {
+    auto index = buildSimpleIndexEntry(BSON("a" << "hashed"));
+    CollatorInterfaceMock indexCollator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    index.collator = &indexCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {};
+    testRateIndices("{$expr: {$eq: ['$a', 3]}}", "", nullptr, indices, "a", expectedIndices);
 }
 
 /*

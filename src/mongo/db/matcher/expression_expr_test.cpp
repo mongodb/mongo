@@ -541,5 +541,53 @@ TEST_F(ExprMatchTest, ExprRedactsCorrectly) {
         })",
         serialize(opts));
 }
+
+TEST_F(ExprMatchTest, TestPathOnEqToConstant) {
+    auto matchExprBSON = fromjson("{$expr: {$eq: ['$a', 3]}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matchExpr = uassertStatusOK(
+        MatchExpressionParser::parse(matchExprBSON,
+                                     expCtx,
+                                     ExtensionsCallbackNoop(),
+                                     MatchExpressionParser::kAllowAllSpecialFeatures));
+
+    ASSERT_TRUE(MatchExpression::EXPRESSION == matchExpr->matchType());
+    ASSERT_TRUE(matchExpr->path() == "a");
+    auto exprExpr = dynamic_cast<ExprMatchExpression*>(matchExpr.get());
+    auto data = exprExpr->getData();
+    ASSERT_TRUE(data.has_value());
+    ASSERT_BSONOBJ_EQ(data.get().wrap(), fromjson("{a: 3}"));
+}
+
+TEST_F(ExprMatchTest, TestPathOnEqToConstantSwapped) {
+    auto matchExprBSON = fromjson("{$expr: {$eq: [3, '$a']}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matchExpr = uassertStatusOK(
+        MatchExpressionParser::parse(matchExprBSON,
+                                     expCtx,
+                                     ExtensionsCallbackNoop(),
+                                     MatchExpressionParser::kAllowAllSpecialFeatures));
+
+    ASSERT_TRUE(MatchExpression::EXPRESSION == matchExpr->matchType());
+    ASSERT_TRUE(matchExpr->path() == "a");
+    auto exprExpr = dynamic_cast<ExprMatchExpression*>(matchExpr.get());
+    auto data = exprExpr->getData();
+    ASSERT_TRUE(data.has_value());
+    ASSERT_BSONOBJ_EQ(data.get().wrap(), fromjson("{a: 3}"));
+}
+
+TEST_F(ExprMatchTest, TestPathOnEqToRoot) {
+    auto matchExprBSON = fromjson("{$expr: {$eq: ['$$ROOT', {_id: 1, a: 1}]}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matchExpr = uassertStatusOK(
+        MatchExpressionParser::parse(matchExprBSON,
+                                     expCtx,
+                                     ExtensionsCallbackNoop(),
+                                     MatchExpressionParser::kAllowAllSpecialFeatures));
+
+    ASSERT_TRUE(MatchExpression::EXPRESSION == matchExpr->matchType());
+    // We expect an empty path on equality to $$ROOT.
+    ASSERT_TRUE(matchExpr->path() == "");
+}
 }  // namespace
 }  // namespace mongo

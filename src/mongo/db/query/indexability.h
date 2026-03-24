@@ -70,6 +70,7 @@ public:
             case MatchExpression::INTERNAL_EXPR_GTE:
             case MatchExpression::INTERNAL_EXPR_LT:
             case MatchExpression::INTERNAL_EXPR_LTE:
+            case MatchExpression::EXPRESSION:
                 return false;
             default:
                 return true;
@@ -285,6 +286,7 @@ private:
             case MatchExpression::INTERNAL_EXPR_LT:
             case MatchExpression::INTERNAL_EXPR_LTE:
             case MatchExpression::INTERNAL_EQ_HASHED_KEY:
+            case MatchExpression::EXPRESSION:
                 return true;
             default:
                 return false;

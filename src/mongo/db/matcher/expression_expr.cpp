@@ -55,7 +55,9 @@ ExprMatchExpression::ExprMatchExpression(boost::intrusive_ptr<Expression> expr,
                                          clonable_ptr<ErrorAnnotation> annotation)
     : MatchExpression(MatchType::EXPRESSION, std::move(annotation)),
       _expCtx(expCtx),
-      _expression(expr) {}
+      _expression(expr) {
+    setPathForEquality(expr);
+}
 
 ExprMatchExpression::ExprMatchExpression(BSONElement elem,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -109,6 +111,15 @@ std::unique_ptr<MatchExpression> ExprMatchExpression::clone() const {
     if (_rewriteResult) {
         clone->_rewriteResult = _rewriteResult->clone();
     }
+    if (getTag()) {
+        clone->setTag(getTag()->clone());
+    }
+    if (_path) {
+        clone->_path = _path;
+    }
+    if (_backingBSON) {
+        clone->_backingBSON = _backingBSON->getOwned();
+    }
     return clone;
 }
 
@@ -121,4 +132,49 @@ bool ExprMatchExpression::isTriviallyFalse() const {
     auto exprConst = dynamic_cast<ExpressionConstant*>(_expression.get());
     return exprConst && !exprConst->getValue().coerceToBool();
 }
+
+namespace {
+/**
+ * Helper function to extract path and constant from equality comparison expression.
+ */
+std::pair<ExpressionFieldPath*, ExpressionConstant*> extractPathAndConstant(
+    boost::intrusive_ptr<ExpressionCompare> eqExpression) {
+    const auto& children = eqExpression->getChildren();
+    uassert(4125200, "$eq should have 2 children", children.size() == 2ul);
+
+    ExpressionFieldPath* ePath{nullptr};
+    ExpressionConstant* eConst{nullptr};
+    if ((ePath = dynamic_cast<ExpressionFieldPath*>(children[0].get()))) {
+        eConst = dynamic_cast<ExpressionConstant*>(children[1].get());
+    } else {
+        ePath = dynamic_cast<ExpressionFieldPath*>(children[1].get());
+        eConst = dynamic_cast<ExpressionConstant*>(children[0].get());
+    }
+    return std::make_pair(ePath, eConst);
+}
+}  // namespace
+
+void ExprMatchExpression::setPathForEquality(boost::intrusive_ptr<Expression> expression) {
+    if (auto eq = dynamic_cast<ExpressionCompare*>(expression.get());
+        eq && eq->getOp() == ExpressionCompare::EQ) {
+
+        // Extract left-hand side and right-hand side of the Expression.
+        auto [ePath, eConst] = extractPathAndConstant(eq);
+
+        if (ePath == nullptr || ePath->isROOT() || ePath->isVariableReference() ||
+            eConst == nullptr || eConst->getValue().nullish() || eConst->getValue().isArray()) {
+            return;
+        }
+        _path = ePath->getFieldPath().tail().fullPath();
+        _backingBSON = BSON(_path.get() << eConst->getValue());
+    }
+}
+
+boost::optional<BSONElement> ExprMatchExpression::getData() const {
+    if (_backingBSON) {
+        return _backingBSON.get().firstElement();
+    }
+    return boost::none;
+}
+
 }  // namespace mongo

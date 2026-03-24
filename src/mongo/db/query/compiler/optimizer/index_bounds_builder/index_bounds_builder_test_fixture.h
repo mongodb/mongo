@@ -102,7 +102,7 @@ public:
     /**
      * Make a multikey IndexEntry with the provided key pattern and multikey paths.
      */
-    IndexEntry buildMultikeyIndexEntry(const BSONObj& kp, const MultikeyPaths& mkp) {
+    static IndexEntry buildMultikeyIndexEntry(const BSONObj& kp, const MultikeyPaths& mkp) {
         return {kp,
                 IndexNames::nameToType(IndexNames::findPluginName(kp)),
                 IndexConfig::kLatestIndexVersion,

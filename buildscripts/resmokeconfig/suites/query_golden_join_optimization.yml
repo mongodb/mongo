@@ -14,6 +14,8 @@ selector:
     # TODO SERVER-114566: Re-enable these tests when
     # preserveNullAndEmptyArrays = true is handled appropriately.
     - jstests/query_golden/lookup_unwind_md.js
+    # No joins in those tests
+    - jstests/query_golden/expr_eq_optimization_md.js
 executor:
   config:
     shell_options:
