@@ -493,23 +493,23 @@ TEST_F(ReplicatedFastCountTest, InitializePopulatesMetadataFromExistingInternalC
 
         WriteUnitOfWork wuow{_opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations};
 
-        ASSERT_OK(Helpers::insert(
-            _opCtx,
-            *fastCountColl,
-            BSON("_id" << uuid1 << ReplicatedFastCountManager::kValidAsOfKey << Timestamp(1, 1)
-                       << ReplicatedFastCountManager::kMetaDataKey
-                       << BSON(ReplicatedFastCountManager::kCountKey
-                               << expectedCount1 << ReplicatedFastCountManager::kSizeKey
-                               << expectedSize1))));
+        ASSERT_OK(
+            Helpers::insert(_opCtx,
+                            *fastCountColl,
+                            BSON("_id" << uuid1 << replicated_fast_count::kValidAsOfKey
+                                       << Timestamp(1, 1) << replicated_fast_count::kMetadataKey
+                                       << BSON(replicated_fast_count::kCountKey
+                                               << expectedCount1 << replicated_fast_count::kSizeKey
+                                               << expectedSize1))));
 
-        ASSERT_OK(Helpers::insert(
-            _opCtx,
-            *fastCountColl,
-            BSON("_id" << uuid2 << ReplicatedFastCountManager::kValidAsOfKey << Timestamp(1, 1)
-                       << ReplicatedFastCountManager::kMetaDataKey
-                       << BSON(ReplicatedFastCountManager::kCountKey
-                               << expectedCount2 << ReplicatedFastCountManager::kSizeKey
-                               << expectedSize2))));
+        ASSERT_OK(
+            Helpers::insert(_opCtx,
+                            *fastCountColl,
+                            BSON("_id" << uuid2 << replicated_fast_count::kValidAsOfKey
+                                       << Timestamp(1, 1) << replicated_fast_count::kMetadataKey
+                                       << BSON(replicated_fast_count::kCountKey
+                                               << expectedCount2 << replicated_fast_count::kSizeKey
+                                               << expectedSize2))));
 
         wuow.commit();
     }

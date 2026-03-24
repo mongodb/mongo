@@ -106,11 +106,6 @@ public:
      */
     void initializeFastCountCommitFn();
 
-    inline static StringData kMetaDataKey = "meta"_sd;
-    inline static StringData kSizeKey = "sz"_sd;
-    inline static StringData kCountKey = "ct"_sd;
-    inline static StringData kValidAsOfKey = "valid-as-of"_sd;
-
     /**
      * Spawns fastcount thread.
      * Skips running thread when _isUnderTest.

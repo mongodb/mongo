@@ -215,9 +215,15 @@ int ReplicatedFastCountManager::_hydrateMetadataFromDisk(
         ++numRecordsScanned;
 
         auto& meta = _metadata[uuid];
-        meta.sizeCount.count = data.getField(kMetaDataKey).Obj().getField(kCountKey).Long();
-        meta.sizeCount.size = data.getField(kMetaDataKey).Obj().getField(kSizeKey).Long();
-        meta.validAsOf = data.getField(kValidAsOfKey).timestamp();
+        meta.sizeCount.count = data.getField(replicated_fast_count::kMetadataKey)
+                                   .Obj()
+                                   .getField(replicated_fast_count::kCountKey)
+                                   .Long();
+        meta.sizeCount.size = data.getField(replicated_fast_count::kMetadataKey)
+                                  .Obj()
+                                  .getField(replicated_fast_count::kSizeKey)
+                                  .Long();
+        meta.validAsOf = data.getField(replicated_fast_count::kValidAsOfKey).timestamp();
     }
     return numRecordsScanned;
 }
@@ -493,8 +499,11 @@ void ReplicatedFastCountManager::_insertOneMetadata(OperationContext* opCtx,
 BSONObj ReplicatedFastCountManager::_getDocForWrite(const UUID& uuid,
                                                     const CollectionSizeCount& sizeCount,
                                                     const Timestamp& validAsOfTS) const {
-    return BSON("_id" << uuid << kValidAsOfKey << validAsOfTS << kMetaDataKey
-                      << BSON(kCountKey << sizeCount.count << kSizeKey << sizeCount.size));
+    return BSON("_id" << uuid << replicated_fast_count::kValidAsOfKey << validAsOfTS
+                      << replicated_fast_count::kMetadataKey
+                      << BSON(replicated_fast_count::kCountKey << sizeCount.count
+                                                               << replicated_fast_count::kSizeKey
+                                                               << sizeCount.size));
 }
 
 RecordId ReplicatedFastCountManager::_keyForUUID(const UUID& uuid) const {

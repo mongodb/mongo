@@ -34,6 +34,7 @@
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_interface_local.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_uncommitted_changes.h"
@@ -61,19 +62,19 @@ void checkFastCountMetadataInInternalCollection(OperationContext* opCtx,
         if (!expectPersisted) {
             return;
         }
-        int64_t persistedCount = persisted.getField(ReplicatedFastCountManager::kMetaDataKey)
+        int64_t persistedCount = persisted.getField(replicated_fast_count::kMetadataKey)
                                      .Obj()
-                                     .getField(ReplicatedFastCountManager::kCountKey)
+                                     .getField(replicated_fast_count::kCountKey)
                                      .Long();
-        int64_t persistedSize = persisted.getField(ReplicatedFastCountManager::kMetaDataKey)
+        int64_t persistedSize = persisted.getField(replicated_fast_count::kMetadataKey)
                                     .Obj()
-                                    .getField(ReplicatedFastCountManager::kSizeKey)
+                                    .getField(replicated_fast_count::kSizeKey)
                                     .Long();
         EXPECT_EQ(persistedCount, expectedCount);
         EXPECT_EQ(persistedSize, expectedSize);
 
         // TODO SERVER-120540: Introduce validation for valid-as-of beyond its basic presence.
-        ASSERT_TRUE(persisted.hasField(ReplicatedFastCountManager::kValidAsOfKey));
+        ASSERT_TRUE(persisted.hasField(replicated_fast_count::kValidAsOfKey));
     }
 }
 
@@ -333,13 +334,13 @@ void assertFastCountApplyOpsMatches(const repl::OplogEntry& applyOpsEntry,
             case FastCountOpType::kInsert: {
                 const auto& obj = innerEntry.getObject();
 
-                auto metaElem = obj[ReplicatedFastCountManager::kMetaDataKey];
+                auto metaElem = obj[replicated_fast_count::kMetadataKey];
                 EXPECT_TRUE(metaElem.isABSONObj())
                     << "Meta field not numeric for UUID " << uuid << ": " << metaElem;
 
                 auto metaObj = metaElem.Obj();
-                auto countElem = metaObj[ReplicatedFastCountManager::kCountKey];
-                auto sizeElem = metaObj[ReplicatedFastCountManager::kSizeKey];
+                auto countElem = metaObj[replicated_fast_count::kCountKey];
+                auto sizeElem = metaObj[replicated_fast_count::kSizeKey];
 
                 EXPECT_TRUE(countElem.isNumber())
                     << "Count field not numeric for UUID " << uuid << ": " << countElem;
@@ -364,9 +365,8 @@ void assertFastCountApplyOpsMatches(const repl::OplogEntry& applyOpsEntry,
 
                 std::string kSubDiffSectionFieldPrefix = "s";
                 auto sizeElem =
-                    obj["diff"]
-                       [kSubDiffSectionFieldPrefix + ReplicatedFastCountManager::kMetaDataKey]["u"]
-                       [ReplicatedFastCountManager::kSizeKey];
+                    obj["diff"][kSubDiffSectionFieldPrefix + replicated_fast_count::kMetadataKey]
+                       ["u"][replicated_fast_count::kSizeKey];
                 EXPECT_TRUE(sizeElem.isNumber())
                     << "Size field not numeric for UUID " << uuid << ": " << sizeElem;
 

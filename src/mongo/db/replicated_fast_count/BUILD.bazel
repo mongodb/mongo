@@ -80,6 +80,7 @@ mongo_cc_library(
         "replicated_fast_count_test_helpers.cpp",
     ],
     deps = [
+        "replicated_fast_count_delta_utils",
         "replicated_fast_count_manager",
         "//src/mongo/db/op_observer:operation_logger_impl",
         "//src/mongo/db/repl:oplog_entry",

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
@@ -38,6 +39,12 @@
 
 namespace mongo {
 namespace replicated_fast_count {
+
+inline constexpr StringData kMetadataKey = "meta"_sd;
+inline constexpr StringData kSizeKey = "sz"_sd;
+inline constexpr StringData kCountKey = "ct"_sd;
+inline constexpr StringData kValidAsOfKey = "valid-as-of"_sd;
+
 /**
  * Returns the size and count delta extracted from the oplog entry's size metadata ('m' field), if
  * present.
