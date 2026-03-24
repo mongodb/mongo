@@ -82,6 +82,7 @@ commands:
                 description: "Whether initiate reshardCollection if the shardKey doesn't change."
                 optional: true
             reshardingUUID:
+                cpp_name: userReshardingUUID
                 type: uuid
                 description: >-
                     "A user-provided identifier used to identify this resharding operation for
@@ -152,6 +153,7 @@ commands:
                 description: "Whether initiate reshardCollection if the shardKey doesn't change."
                 optional: true
             reshardingUUID:
+                cpp_name: userReshardingUUID
                 type: uuid
                 description: >-
                     "A user-provided identifier used to identify this resharding operation for

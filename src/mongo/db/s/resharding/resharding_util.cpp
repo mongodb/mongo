@@ -590,8 +590,8 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
                                                    std::move(tempReshardingNss),
                                                    shardKeySpec);
     commonMetadata.setStartTime(opCtx->fastClockSource().now());
-    if (request.getReshardingUUID()) {
-        commonMetadata.setUserReshardingUUID(*request.getReshardingUUID());
+    if (request.getUserReshardingUUID()) {
+        commonMetadata.setUserReshardingUUID(*request.getUserReshardingUUID());
     }
     if (setProvenance && request.getProvenance()) {
         commonMetadata.setProvenance(*request.getProvenance());

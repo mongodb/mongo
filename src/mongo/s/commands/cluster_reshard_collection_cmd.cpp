@@ -101,7 +101,7 @@ public:
 
             reshardCollectionRequest.setShardDistribution(request().getShardDistribution());
             reshardCollectionRequest.setForceRedistribution(request().getForceRedistribution());
-            reshardCollectionRequest.setReshardingUUID(request().getReshardingUUID());
+            reshardCollectionRequest.setUserReshardingUUID(request().getUserReshardingUUID());
             reshardCollectionRequest.setRelaxed(request().getRelaxed());
             if (resharding::gFeatureFlagMoveCollection.isEnabled(
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||

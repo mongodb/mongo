@@ -194,7 +194,7 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
             configsvrReshardCollection.setRelaxed(_doc.getRelaxed());
             configsvrReshardCollection.setShardDistribution(_doc.getShardDistribution());
             configsvrReshardCollection.setForceRedistribution(_doc.getForceRedistribution());
-            configsvrReshardCollection.setReshardingUUID(_doc.getReshardingUUID());
+            configsvrReshardCollection.setUserReshardingUUID(_doc.getUserReshardingUUID());
 
             resharding::validatePerformVerification(VersionContext::getDecoration(opCtx),
                                                     _doc.getPerformVerification());
