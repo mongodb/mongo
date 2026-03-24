@@ -218,14 +218,6 @@ if __name__ == "__main__":
 
     resmoke_args.append(f"--archiveDirectory={os.path.join(outputs_dir, 'data_archives')}")
 
-    if (
-        os.path.isfile(os.path.join("bazel", "resmoke", "test_runtimes.json"))
-        and os.path.getsize(os.path.join("bazel", "resmoke", "test_runtimes.json")) != 0
-    ):
-        resmoke_args.append(
-            f"--historicTestRuntimes={os.path.join('bazel', 'resmoke', 'test_runtimes.json')}"
-        )
-
     with ctx:
         cli.main(resmoke_args)
 

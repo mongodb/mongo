@@ -7,12 +7,9 @@
 # Note on imports and python versions:
 #   This file is executed by Bazel prior to the build. Expect no packages to
 #   be available except those installed by wrapper_hook.py
-import json
 import os
 import pathlib
-import re
 import sys
-import urllib.request
 
 # Prepend repository root to path, to avoid shadowing from bazel runfiles.
 REPO_ROOT = str(pathlib.Path(__file__).parent.parent)
@@ -64,32 +61,6 @@ def print_feature_flag_status():
     print_stable_key("unreleased_ifr_flags", " ".join(unreleased_ifr_flags))
 
 
-def print_test_runtimes_status():
-    project = os.environ.get("project", "")
-    build_variant = os.environ.get("build_variant", "")
-    task = os.environ.get("task_name", "")
-    if not project or not build_variant or not task:
-        return
-
-    # Extracts the base task name, i.e. auth_0-linux_enterprise -> auth
-    match = re.search(r"(.+)_\d+-(linux|mac|windows)*", task)
-    if match:
-        task = match.group(1)
-
-    url = f"https://mongo-test-stats.s3.amazonaws.com/{project}/{build_variant}/{task}"
-    try:
-        with urllib.request.urlopen(url) as response:
-            content = response.read()
-            stats = json.loads(content)
-    except Exception:
-        return
-
-    for s in stats:
-        for field in ["num_pass", "num_fail", "max_duration_pass"]:
-            s.pop(field, None)
-    print_volatile_key("TEST_RUNTIMES", json.dumps(stats))
-
-
 def print_evergreen_expansions():
     for expansion in [
         "build_id",
@@ -114,7 +85,6 @@ def print_evergreen_expansions():
 def main():
     print_evergreen_expansions()
     print_feature_flag_status()
-    print_test_runtimes_status()
 
 
 if __name__ == "__main__":

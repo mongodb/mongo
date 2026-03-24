@@ -62,21 +62,6 @@ genrule(
     visibility = ["//visibility:public"],
 )
 
-genrule(
-    name = "test_runtimes",
-    srcs = [],
-    outs = ["test_runtimes.json"],
-    cmd = """
-    awk '/^TEST_RUNTIMES/ { for (i=2; i<=NF; i++) print $$i }' bazel-out/volatile-status.txt > $@
-    """,
-    stamp = True,
-    tags = [
-        "external",
-        "no-cache",
-    ],
-    visibility = ["//visibility:public"],
-)
-
 bool_flag(
     name = "in_evergreen",
     build_setting_default = False,
@@ -117,6 +102,13 @@ int_flag(
     name = "test_timeout",
     build_setting_default = 0,  # 0 results in no timeout.
     make_variable = "RESMOKE_TEST_TIMEOUT",
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "download_historic_runtimes",
+    srcs = ["download_historic_runtimes.py"],
+    main = "download_historic_runtimes.py",
     visibility = ["//visibility:public"],
 )
 

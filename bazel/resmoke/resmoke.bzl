@@ -89,6 +89,17 @@ def resmoke_suite_test(
         group_size = 0,
         group_count_multiplier = "",
         **kwargs):
+    historic_runtimes = name + "_historic_runtimes"
+    native.genrule(
+        name = historic_runtimes,
+        srcs = [],
+        outs = [historic_runtimes + ".json"],
+        cmd = "$(location //bazel/resmoke:download_historic_runtimes) --suite=//{pkg}:{name} --volatile-status=bazel-out/volatile-status.txt --output=$@".format(pkg = native.package_name(), name = name),
+        tools = ["//bazel/resmoke:download_historic_runtimes"],
+        stamp = True,
+        tags = ["no-remote", "external", "no-cache"],
+    )
+
     generated_config = name + "_config"
     resmoke_config(
         name = generated_config,
@@ -137,7 +148,7 @@ def resmoke_suite_test(
             "//bazel/resmoke:unreleased_ifr_flags",
             "//bazel/resmoke:volatile_status",
             "//bazel/resmoke:resource_monitor",
-            "//bazel/resmoke:test_runtimes",
+            ":%s" % historic_runtimes,
             "//buildscripts/resmokeconfig:common_jstest_data",
             "//buildscripts/resmokeconfig:fully_disabled_feature_flags.yml",
             "//buildscripts/resmokeconfig:resmoke_modules.yml",
@@ -167,6 +178,7 @@ def resmoke_suite_test(
             "--archiveMode=directory",
             "--archiveLimitMb=500",
             "--testTimeout=$(RESMOKE_TEST_TIMEOUT)",
+            "--historicTestRuntimes=$(location :%s)" % historic_runtimes,
         ] + extra_args + resmoke_args,
         tags = tags + ["no-cache", "resources:port_block:1", "resmoke_suite_test"],
         timeout = timeout,
