@@ -40,6 +40,9 @@ from buildscripts.util.read_config import read_config_file
 
 RESMOKE_TEST_QUERY = 'attr(tags, "resmoke_suite_test", //...)'
 RESMOKE_TESTS_TAG_FILTER = "resmoke_tests_tag_filter"
+MASTER_PROJECT_NAME = "mongodb-mongo-master"
+MASTER_PROJECT_CONFIG = "etc/evergreen.yml"
+NIGHTLY_PROJECT_CONFIG = "etc/evergreen_nightly.yml"
 
 app = typer.Typer(pretty_exceptions_show_locals=False)
 
@@ -486,14 +489,22 @@ def create_task_group_for_variant(variant_name: str, task_name: str, targets: li
     }
 
 
+def get_evergreen_config_path(project_name: str) -> str:
+    if project_name == MASTER_PROJECT_NAME:
+        return MASTER_PROJECT_CONFIG
+    return NIGHTLY_PROJECT_CONFIG
+
+
 @app.command()
 def main(outfile: Annotated[str, typer.Option()]):
     os.chdir(os.environ.get("BUILD_WORKSPACE_DIRECTORY", "."))
 
     expansions = read_config_file("../expansions.yml")
+    project_name = expansions.get("project", MASTER_PROJECT_NAME)
+    evg_config_path = get_evergreen_config_path(project_name)
 
-    print("Parsing Evergreen configuration...", file=sys.stderr)
-    evg_config = parse_evergreen_file("etc/evergreen.yml")
+    print(f"Parsing Evergreen configuration from {evg_config_path}...", file=sys.stderr)
+    evg_config = parse_evergreen_file(evg_config_path)
 
     project = {"tasks": [], "task_groups": [], "buildvariants": []}
 
