@@ -139,7 +139,8 @@ export class ReplSetTest {
         assert.soon(
             () => {
                 try {
-                    let conn = _callHello(this);
+                    const expectedDownNodes = states.includes(ReplSetTest.State.DOWN) ? [node] : [];
+                    let conn = _callHello(this, expectedDownNodes);
                     if (!conn) {
                         conn = this._liveNodes[0];
                     }
@@ -3758,7 +3759,7 @@ function _replSetGetConfig(conn) {
  * '_secondaries': all nodes other than '_primary' (note this includes arbiters)
  * '_liveNodes': all currently reachable nodes
  */
-function _callHello(rst) {
+function _callHello(rst, expectedDownNodes = []) {
     rst._liveNodes = [];
     rst._primary = null;
     rst._secondaries = [];
@@ -3769,7 +3770,14 @@ function _callHello(rst) {
     rst.nodes.forEach(function (node) {
         try {
             node.setSecondaryOk();
-            let n = node.getDB("admin")._helloOrLegacyHello();
+            let probeConn = node;
+            if (expectedDownNodes.includes(node)) {
+                // Use a short-lived connection with a bounded socket timeout to probe the node.
+                // This avoids blocking indefinitely if a node has crashed but the existing TCP
+                // connection hasn't been cleaned up yet (e.g. during fassert scenarios).
+                probeConn = new Mongo(`mongodb://${node.host}/?socketTimeoutMS=${rst.timeoutMS}`);
+            }
+            const n = probeConn.getDB("admin")._helloOrLegacyHello();
             rst._liveNodes.push(node);
             // We verify that the node has a valid config by checking if n.me exists. Then, we
             // check to see if the node is in primary state.
