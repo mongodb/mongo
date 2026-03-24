@@ -117,6 +117,42 @@ const skipFieldData = [...Array(1010).keys()].map(function (i) {
     }
 });
 
+const nestedArrayData = [
+    {
+        metadata: {sensorId: 5578, type: "temperature"},
+        timestamp: ISODate("2021-05-18T12:00:00.000Z"),
+        arrObj: [{x: 1}, {y: [2, 3]}],
+    },
+    {
+        metadata: {sensorId: 5578, type: "temperature"},
+        timestamp: ISODate("2021-05-18T16:00:00.000Z"),
+        arrObj: [{x: 5}, {y: [4, 5]}],
+    },
+    {
+        metadata: {sensorId: 5578, type: "temperature"},
+        timestamp: ISODate("2021-05-18T20:00:00.000Z"),
+        arrObj: [{x: 3}, {y: [0, 1]}],
+    },
+];
+
+const nestedObjectWithArrayData = [
+    {
+        metadata: {sensorId: 5578, type: "temperature"},
+        timestamp: ISODate("2021-05-18T12:00:00.000Z"),
+        objArr: {nested: {arr: [1, 2], marker: "a"}},
+    },
+    {
+        metadata: {sensorId: 5578, type: "temperature"},
+        timestamp: ISODate("2021-05-18T16:00:00.000Z"),
+        objArr: {nested: {arr: [5, 6], marker: "z"}},
+    },
+    {
+        metadata: {sensorId: 5578, type: "temperature"},
+        timestamp: ISODate("2021-05-18T20:00:00.000Z"),
+        objArr: {nested: {arr: [3, 4], marker: "m"}},
+    },
+];
+
 /** Drops collection and creates it again with new data, checking that collection is valid before
  * faulty data is inserted.
  * @param {DB} db
@@ -378,6 +414,154 @@ describe("Test 'control.min' and 'control.max' match the uncompressed documents 
         this.expectValidationFailure = false;
         assert.eq(res.nNonCompliantDocuments, 0);
         assert.eq(res.warnings.length, 0);
+    });
+
+    it("Passes validation when array min/max are updated consistently with the bucket data", function () {
+        setUpCollection(this.db, arrayData);
+        const coll = this.db.getCollection(collName);
+
+        // After the data update, the element-wise min/max across all 3 entries is:
+        //   data.arr.0 (unchanged): ["a", {field: 1}, 1]
+        //   data.arr.1 (updated):   ["0", {field: 2}, 100]
+        //   data.arr.2 (updated):   ["zzzzz", {field: -2}, 30]
+        // Element-wise min: pos0="0"(arr.1), pos1={field:-2}(arr.2), pos2=1(arr.0)
+        // Element-wise max: pos0="zzzzz"(arr.2), pos1={field:2}(arr.1), pos2=100(arr.1)
+        const newMin = ["0", {field: -2}, 1];
+        const newMax = ["zzzzz", {field: 2}, 100];
+
+        assert.commandWorked(
+            getTimeseriesCollForRawOps(this.db, coll).update(
+                {},
+                {
+                    $set: {
+                        "control.min.arr": newMin,
+                        "control.max.arr": newMax,
+                        "data.arr.1": ["0", {field: 2}, 100],
+                        "data.arr.2": ["zzzzz", {field: -2}, 30],
+                    },
+                },
+                getRawOperationSpec(this.db),
+            ),
+        );
+
+        const res = assert.commandWorked(coll.validate());
+        this.expectValidationFailure = false;
+        assert(res.valid, tojson(res));
+        assert.eq(res.errors.length, 0, tojson(res));
+        assert.eq(res.nNonCompliantDocuments, 0, tojson(res));
+    });
+
+    it("Fails validation when control.max for an array has an extra trailing element", function () {
+        setUpCollection(this.db, arrayData);
+        const coll = this.db.getCollection(collName);
+
+        // The actual element-wise max is ["z", {field: 2}, 100]. We add a trailing element
+        // to specifically test the extra-element detection, keeping positions 0-2 correct.
+        assert.commandWorked(
+            getTimeseriesCollForRawOps(this.db, coll).update(
+                {},
+                {$set: {"control.max.arr": ["z", {field: 2}, 100, 999]}},
+                getRawOperationSpec(this.db),
+            ),
+        );
+
+        const res = assert.commandWorked(coll.validate());
+        this.expectValidationFailure = true;
+        assert(!res.valid, tojson(res));
+        // Two errors: one for the min/max mismatch, one for the structural mismatch between
+        // control.max (4 elements) and control.min (3 elements) detected by
+        // doesMinMaxHaveMixedSchemaData ("Encountered extra field(s) in time-series bucket
+        // min/max").
+        assert.eq(res.errors.length, 2, tojson(res));
+        assert.eq(res.nNonCompliantDocuments, 1, tojson(res));
+    });
+
+    it("Fails validation when control.min for an array of objects differs in a nested object value", function () {
+        setUpCollection(this.db, nestedArrayData);
+        const coll = this.db.getCollection(collName);
+
+        // The actual element-wise min is [{x: 1}, {y: [0, 1]}]. Corrupt only the first
+        // element's nested field value while keeping the second element correct.
+        assert.commandWorked(
+            getTimeseriesCollForRawOps(this.db, coll).update(
+                {},
+                {$set: {"control.min.arrObj": [{x: -100}, {y: [0, 1]}]}},
+                getRawOperationSpec(this.db),
+            ),
+        );
+
+        const res = assert.commandWorked(coll.validate());
+        this.expectValidationFailure = true;
+        assert(!res.valid, tojson(res));
+        assert.eq(res.errors.length, 1, tojson(res));
+        assert.eq(res.nNonCompliantDocuments, 1, tojson(res));
+    });
+
+    it("Passes validation when object min/max are updated consistently with the bucket data", function () {
+        setUpCollection(this.db, objectData);
+        const coll = this.db.getCollection(collName);
+
+        const newMax = {nestedObj: {field: 20}};
+
+        assert.commandWorked(
+            getTimeseriesCollForRawOps(this.db, coll).update(
+                {},
+                {
+                    $set: {
+                        "control.max.obj": newMax,
+                        "data.obj.1": newMax,
+                    },
+                },
+                getRawOperationSpec(this.db),
+            ),
+        );
+
+        const res = assert.commandWorked(coll.validate());
+        this.expectValidationFailure = false;
+        assert(res.valid, tojson(res));
+        assert.eq(res.errors.length, 0, tojson(res));
+        assert.eq(res.nNonCompliantDocuments, 0, tojson(res));
+    });
+
+    it("Fails validation when control.max for an object has an extra nested field", function () {
+        setUpCollection(this.db, objectData);
+        const coll = this.db.getCollection(collName);
+
+        assert.commandWorked(
+            getTimeseriesCollForRawOps(this.db, coll).update(
+                {},
+                {$set: {"control.max.obj": {nestedObj: {field: 10, extra: 1}}}},
+                getRawOperationSpec(this.db),
+            ),
+        );
+
+        const res = assert.commandWorked(coll.validate());
+        this.expectValidationFailure = true;
+        assert(!res.valid, tojson(res));
+        // Two errors: one for the min/max mismatch, one for the structural mismatch between
+        // control.max.obj.nestedObj (has extra field 'extra') and control.min.obj.nestedObj
+        // detected by doesMinMaxHaveMixedSchemaData ("Encountered extra field(s)...").
+        assert.eq(res.errors.length, 2, tojson(res));
+        assert.eq(res.nNonCompliantDocuments, 1, tojson(res));
+    });
+
+    it("Fails validation when control.max for an object containing arrays differs from the bucket data", function () {
+        setUpCollection(this.db, nestedObjectWithArrayData);
+        const coll = this.db.getCollection(collName);
+
+        assert.commandWorked(
+            getTimeseriesCollForRawOps(this.db, coll).update(
+                {},
+                {$set: {"control.max.objArr": {nested: {arr: [9, 9], marker: "z"}}}},
+                getRawOperationSpec(this.db),
+            ),
+        );
+
+        const res = assert.commandWorked(coll.validate());
+        this.expectValidationFailure = true;
+        assert(!res.valid, tojson(res));
+        assert.eq(res.errors.length, 1, tojson(res));
+        assert.eq(res.nNonCompliantDocuments, 1, tojson(res));
     });
 
     afterEach(function () {
