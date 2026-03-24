@@ -21,6 +21,8 @@
 #
 last-continuous:
   all:
+    - test_file: jstests/core/administrative/filemd5.js
+      ticket: SERVER-119317
     - test_file: jstests/core/index/elemmatch_index.js
       ticket: SERVER-108945
     - test_file: jstests/concurrency/fsm_workloads/ddl/collMod/collMod_options_with_index_ops.js
@@ -164,6 +166,8 @@ last-continuous:
   suites: null
 last-lts:
   all:
+    - test_file: jstests/core/administrative/filemd5.js
+      ticket: SERVER-119317
     - test_file: jstests/core/index/elemmatch_index.js
       ticket: SERVER-108945
     - test_file: jstests/replsets/malformed_heartbeat_request.js

@@ -46,6 +46,7 @@ namespace mongo {
     "For non-cryptographic purposes, consider using a modern hash function like XXHash or "
     "CityHash.")]]
 void md5_init_state_deprecated(md5_state_t* pms) {
+    memset(pms, 0, sizeof(md5_state_t));
     md5_init(pms);
 }
 
