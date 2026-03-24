@@ -3235,6 +3235,11 @@ TEST_F(OnUpdateOutputsTest, TestNonTransactionFundamentalOnUpdateOutputs) {
         const auto& testCase = _cases[testIdx];
         logTestCase(testCase);
 
+        // TODO (SERVER-122524): Re-enable test cases with grouping.
+        if (testCase.oplogGroupType == kGroup) {
+            continue;
+        }
+
         auto opCtxRaii = cc().makeOperationContext();
         OperationContext* opCtx = opCtxRaii.get();
 

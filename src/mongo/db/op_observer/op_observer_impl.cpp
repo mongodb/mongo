@@ -2170,6 +2170,10 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
     auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
     auto* batchedOps = batchedWriteContext.getBatchedOperations(opCtx);
 
+    // Ensure that no one previously reserved any timestamps for this operation.
+    invariant(batchedOps->isEmpty() ||
+              !shard_role_details::getRecoveryUnit(opCtx)->isTimestamped());
+
     if (batchedOps->isEmpty()) {
         return;
     } else if (batchedOps->numOperations() == 1) {
