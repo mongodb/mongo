@@ -58,9 +58,9 @@ namespace mongo {
  * In both cases the class must be used as follows:
  *
  * while (true) {
- *     recoverer.start();
- *     recoverer.wait();
- *     if (auto collMetadata = recoverer.drain()) {
+ *     auto roundId = recoverer.start();
+ *     recoverer.wait(roundId);
+ *     if (auto collMetadata = recoverer.drain(roundId)) {
  *         CSR.install(collMetadata);
  *         break;
  *     }
@@ -71,19 +71,32 @@ namespace mongo {
  */
 class MONGO_MOD_PRIVATE CollectionCacheRecoverer {
 public:
+    // An opaque identifier for the round. Used in order to support concurrent access to the
+    // recoverer.
+    struct RecoveryRoundId {
+    private:
+        friend class CollectionCacheRecoverer;
+        RecoveryRoundId(repl::OpTime id) : id(id) {};
+        repl::OpTime id;
+    };
+
     CollectionCacheRecoverer(const NamespaceString& nss, CollectionMetadata existingMetadata)
-        : _collMetadata(SemiFuture<CollectionMetadata>::makeReady(std::move(existingMetadata))),
+        : _collMetadata(
+              SemiFuture<CollectionMetadata>::makeReady(std::move(existingMetadata)).share()),
           _nss(nss) {};
     CollectionCacheRecoverer(const NamespaceString& nss) : _nss(nss) {};
 
-    void start(OperationContext* opCtx, ExecutorPtr executor);
+    RecoveryRoundId start(OperationContext* opCtx, ExecutorPtr executor);
 
     /**
      * Waits until the CollectionMetadata has been recovered from disk. Note that in order to get it
      * we must first call `drainAndApply` in order to drain the potentially concurrent oplog
      * entries.
+     *
+     * Returns a failed Status with AtomicityFailure if the current round already finished to signal
+     * the caller that it has to restart the loop.
      */
-    Status waitForInitialPass(OperationContext* opCtx);
+    Status waitForInitialPass(OperationContext* opCtx, RecoveryRoundId recoveryRound);
 
     /**
      * Drain and publish the latest collection metadata state to the caller. This method can return
@@ -94,7 +107,8 @@ public:
      * currently untracked (no sharding metadata exists) or tracked (it's sharded and therefore
      * present on the global catalog).
      */
-    boost::optional<CollectionMetadata> drainAndApply(OperationContext* opCtx);
+    boost::optional<CollectionMetadata> drainAndApply(OperationContext* opCtx,
+                                                      RecoveryRoundId recoveryRound);
 
     /**
      * Apply the oplog entry to the CollectionMetadata. If disk recovery is taking place it will
@@ -113,7 +127,7 @@ private:
     // (M) denotes protection via the _mutex
     stdx::mutex _mutex;
     CancellationSource _cancellationSource;
-    SemiFuture<CollectionMetadata> _collMetadata;
+    SharedSemiFuture<CollectionMetadata> _collMetadata;
 
     using QueuedItem = std::variant<InvalidateCollectionMetadataOplogEntry,
                                     CollectionShardingStateDeltaOplogEntry>;

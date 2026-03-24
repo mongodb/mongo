@@ -148,6 +148,18 @@ public:
                 criticalSectionSignal->get(opCtx);
 
             if (Base::request().getSyncFromConfig()) {
+                {
+                    const auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, ns());
+                    if (scopedCsr->getAuthoritativeState() ==
+                        CollectionShardingRuntime::AuthoritativeState::kAuthoritative) {
+                        // This command is used as part of non-authoritative DDLs which means we're
+                        // flipping from authoritative to non-authoritative. Clear out the filtering
+                        // metadata in order to avoid doing a recovery with authoritative
+                        // information.
+                        // TODO SERVER-122394: Remove this once all DDLs are authoritative
+                        scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
+                    }
+                }
                 LOGV2_DEBUG(21982, 1, "Forcing remote routing table refresh", logAttrs(ns()));
                 uassertStatusOK(
                     FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(

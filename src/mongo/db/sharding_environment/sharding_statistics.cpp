@@ -118,5 +118,10 @@ void ShardingStatistics::report(BSONObjBuilder* builder) const {
         authoritativeShardDatabaseStatistics.report(databaseVersionUpdateCountersBuilder);
         databaseVersionUpdateCountersBuilder.doneFast();
     }
+    {
+        BSONObjBuilder subobj{builder->subobjStart("collectionShardingMetadataRecoveryStatistics")};
+        authoritativeCollectionMetadataStatistics.report(subobj);
+        subobj.doneFast();
+    }
 }
 }  // namespace mongo

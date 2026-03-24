@@ -223,6 +223,11 @@ private:
                                                const NamespaceString& nss,
                                                boost::optional<ChunkVersion> chunkVersionReceived);
 
+    void _onCollectionPlacementVersionMismatchAuthoritative(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        boost::optional<ChunkVersion> chunkVersionReceived);
+
     // TODO (SERVER-97261): remove the Grid's CatalogCache usages once 9.0 becomes last LTS.
     // If _cache is set, it will be used only for filtering; otherwise, the Grid's CatalogCache will
     // be used.

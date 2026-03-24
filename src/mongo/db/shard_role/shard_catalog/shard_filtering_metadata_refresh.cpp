@@ -64,10 +64,12 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/db/versioning_protocol/database_version.h"
+#include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
@@ -341,7 +343,29 @@ Status FilteringMetadataCache::onCollectionPlacementVersionMismatch(
     const NamespaceString& nss,
     boost::optional<ChunkVersion> chunkVersionReceived) noexcept {
     try {
-        _onCollectionPlacementVersionMismatch(opCtx, nss, chunkVersionReceived);
+        auto shouldUseAuthoritativePath = [&] {
+            if (!feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))
+                return false;
+            auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx, nss);
+            return scopedCsr->getAuthoritativeState() ==
+                CollectionShardingRuntime::AuthoritativeState::kAuthoritative;
+        }();
+        // This check can flip by the time the function returns meaning a CSR has changed from
+        // authoritative to non-authoritative and viceversa. However, it's not an issue since any of
+        // the two state transitions will lead to the correct result once the function returns:
+        // - Start non-authoritative and end up becoming authoritative: The end result is that the
+        //   collection will contain the correct shard filtering information/version so the query
+        //   will produce the correct results.
+        // - Start authoritative and end up non-authoritative: The check that occurs at the end of
+        //   the authoritative recovery will notice that the CSS is now non-authoritative and
+        //   perform an early return so that we retry the entire operation again.
+        if (shouldUseAuthoritativePath) {
+            _onCollectionPlacementVersionMismatchAuthoritative(opCtx, nss, chunkVersionReceived);
+        } else {
+            _onCollectionPlacementVersionMismatch(opCtx, nss, chunkVersionReceived);
+        }
         return Status::OK();
     } catch (const DBException& ex) {
         LOGV2(22062,
@@ -912,6 +936,214 @@ void FilteringMetadataCache::_onDbVersionMismatchAuthoritative(
                 receivedDbVersion == wantedVersion);
 
         break;
+    }
+}
+
+namespace {
+bool waitToRecoverCollection(
+    OperationContext* opCtx,
+    ExecutorPtr executor,
+    const NamespaceString& nss,
+    boost::optional<CollectionShardingRuntime::ScopedExclusiveCollectionShardingRuntime>&
+        scopedCsr) {
+    auto recoverer = (*scopedCsr)->getCollectionCacheRecoverer();
+    if (!recoverer) {
+        // Recovery just finished, no need to wait for anything.
+        return false;
+    }
+    // We need to recover, release the lock and proceed to attempt a round of recovery.
+    scopedCsr.reset();
+
+    auto roundId = recoverer->start(opCtx, executor);
+    if (auto status = recoverer->waitForInitialPass(opCtx, roundId);
+        status.code() == ErrorCodes::AtomicityFailure) {
+        // The current round failed to produce a result since it got drained and applied by another
+        // thread, restart the loop.
+        return true;
+    } else {
+        if (!status.isOK()) {
+            // A failure occurred, cleanup the state so that the next recoverer can retry it. We
+            // only cleanup if we're the first one trying to do so.
+            auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+            if (recoverer.get() == csr->getCollectionCacheRecoverer().get()) {
+                csr->setCollectionRecoverer(nullptr);
+            }
+        }
+        uassertStatusOK(status);
+    }
+
+    boost::optional<CollectionShardingRuntime::ScopedExclusiveCollectionShardingRuntime> csr =
+        CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+
+    if (waitForCriticalSectionIfNeeded(opCtx, &csr)) {
+        // We need to detect if there is a critical section in place at this point since there's
+        // potentially changes that are happening to the metadata that we just read, making it
+        // invalid. We wait and return to the caller that a new round of recovery must take place
+        // since there might be oplog entries to be applied by the time the critical section is
+        // finished.
+        return true;
+    }
+
+    ON_BLOCK_EXIT([&] {
+        ShardingStatistics::get(opCtx)
+            .authoritativeCollectionMetadataStatistics.registerDiskRecovery();
+    });
+
+    if (recoverer.get() != (*csr)->getCollectionCacheRecoverer().get()) {
+        // Recovery has already occurred or a new recovery is taking place, therefore we indicate
+        // that a new round of waits must be performed.
+        return true;
+    }
+
+    if (auto newMetadata = recoverer->drainAndApply(opCtx, roundId)) {
+        // Drain was successful, therefore we install the new filtering metadata and remove the
+        // recoverer from the CSR to signal other waiters. By virtue of the check above only one
+        // caller will succeed. If the drain fails the recoverer will be reset and so a new
+        // round of recovery must happen.
+        if ((*csr)->getAuthoritativeState() ==
+            CollectionShardingRuntime::AuthoritativeState::kAuthoritative) {
+            // Only setup the filtering metadata if the collection is still authoritative. This can
+            // flip at any time as a result of downgrade or if a non-authoritative DDL took place
+            // and made the durable state invalid.
+            //
+            // TODO SERVER-122394: Update comment once all DDLs are authoritative.
+            (*csr)->setFilteringMetadata_authoritative(opCtx, std::move(*newMetadata));
+        }
+        (*csr)->setCollectionRecoverer(nullptr);
+    }
+    return true;
+}
+}  // namespace
+
+void FilteringMetadataCache::_onCollectionPlacementVersionMismatchAuthoritative(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    boost::optional<ChunkVersion> chunkVersionReceived) {
+
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+    invariant(!opCtx->getClient()->isInDirectClient());
+    ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
+
+    Timer t;
+    ScopeGuard finishTiming([&] {
+        CurOp::get(opCtx)->debug().placementVersionRefreshMillis += Milliseconds(t.millis());
+    });
+
+    if (nss.isNamespaceAlwaysUntracked()) {
+        return;
+    }
+    // We wait until either of the following two conditions completes:
+    // 1. The shard version requested matches what the shard currently holds in memory
+    // 2. We've waited until configTime is reached, meaning the shard can recover if necessary from
+    //    disk and decide whether the router is stale.
+    // The first point can be fulfilled by either a recovery already taking place and populating the
+    // CSS or by just waiting for oplog application to apply the simple delta entries to reach the
+    // targeted version.
+    //
+    // The second point can happen if the collection has undergone an epoch change (including a full
+    // drop), meaning that recovery will have to be triggered in order to make the shard aware of
+    // its current version.
+    //
+    // TODO SERVER-119750: Investigate if this can cause any bottlenecks for example during a
+    // restart
+    const auto vectorClock = VectorClock::get(opCtx)->getTime();
+    const auto configTime = vectorClock.configTime();
+    const auto timeToWaitFor =
+        repl::OpTime{configTime.asTimestamp(), repl::OpTime::kUninitializedTerm};
+
+    LOGV2_DEBUG(11983602,
+                2,
+                "Authoritative sharding metadata recovery requested for collection",
+                logAttrs(nss),
+                "chunkVersionReceived"_attr = chunkVersionReceived,
+                "configTime"_attr = timeToWaitFor);
+
+    auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    auto result =
+        [&] {
+            auto configTimeWait = repl::ReplicationCoordinator::get(opCtx)
+                                      ->registerWaiterForMajorityReadOpTime(opCtx, timeToWaitFor)
+                                      .thenRunOn(executor);
+            auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx, nss);
+            if (!chunkVersionReceived) {
+                // This means we just want to trigger a recovery from disk. There's no version to
+                // wait for.
+                return whenAny(std::move(configTimeWait));
+            }
+
+            auto chunkVersionWait = scopedCsr
+                                        ->registerWaiterForChunkVersion(
+                                            opCtx, ShardVersionFactory::make(*chunkVersionReceived))
+                                        .thenRunOn(executor);
+            return whenAny(std::move(configTimeWait), std::move(chunkVersionWait));
+        }()
+            .get(opCtx);
+
+    if (result.index == 1) {
+        // The shard version on the shard is equal or greater than the one passed in. We can return
+        // now and let the next retry loop check if the remote side is stale. This will happen if
+        // the version received and the version we have at resolution time are for the same
+        // collection. In other words, that only a sequence of simple oplog delta entries occurred
+        // in order to transform the CSS.
+        LOGV2_DEBUG(11983601,
+                    2,
+                    "Metadata disk recovery is unnecessary since the collection sharding state now "
+                    "matches the requested version",
+                    logAttrs(nss),
+                    "chunkVersionReceived"_attr = chunkVersionReceived);
+        ShardingStatistics::get(opCtx)
+            .authoritativeCollectionMetadataStatistics.registerSuccessfulShardVersionWait();
+        return;
+    }
+    // At this point configTime was reached, this means that we're in one of the following cases:
+    // 1. The shard version is unknown and is pending recovery, in which case we recover now
+    //    and then do the comparison on the next retry loop.
+    // 2. The shard version is known and may or may not match. Therefore we can return since the
+    //    next retry loop will take care of handling the shard version check to see if the router is
+    //    stale or not.
+    while (true) {
+        LOGV2_DEBUG(11983600,
+                    2,
+                    "Metadata disk recovery is necessary since we waited for replication to "
+                    "populate the collection sharding state but it didn't",
+                    logAttrs(nss),
+                    "chunkVersionReceived"_attr = chunkVersionReceived);
+        // We could get away with using a shared lock here and then reacquiring with an exclusive
+        // lock later, but considering this is a rare case and the actual work being done here is
+        // relatively short we prefer using an exclusive lock to simplify the code.
+        auto scopedCsr =
+            boost::make_optional(CollectionShardingRuntime::acquireExclusive(opCtx, nss));
+
+        if (waitForCriticalSectionIfNeeded(opCtx, &scopedCsr))
+            continue;
+
+        if (waitToRecoverCollection(opCtx, executor, nss, scopedCsr)) {
+            continue;
+        }
+
+        if ((*scopedCsr)->getAuthoritativeState() ==
+            CollectionShardingRuntime::AuthoritativeState::kNonAuthoritative) {
+            // The collection is now non-authoritative, therefore we need to retry with the
+            // non-authoritative path. This is a degenerate case that can only happen during an FCV
+            // downgrade or if some DDLs are authoritative while others aren't and have been applied
+            // to the targeted collection.
+            // TODO SERVER-122394: Update comment once all DDLs are authoritative.
+            return;
+        }
+
+        if ((*scopedCsr)->getCurrentMetadataIfKnown()) {
+            // This is case 2. Which means the current state is up to date and the remote node
+            // may or may not be stale. We delegate to the next retry loop to decide.
+            return;
+        }
+        // We're now on case 1: the CSR state has to be recovered and no recoverer is in place. We
+        // have to setup the recoverer and start recovering from disk at the current timestamp since
+        // we know that no critical section is taking place.
+        ShardingStatistics::get(opCtx)
+            .authoritativeCollectionMetadataStatistics.registerCreationOfRecoverer();
+        auto recoverer = std::make_shared<CollectionCacheRecoverer>(nss);
+        (*scopedCsr)->setCollectionRecoverer(std::move(recoverer));
+        waitToRecoverCollection(opCtx, executor, nss, scopedCsr);
     }
 }
 

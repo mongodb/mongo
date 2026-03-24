@@ -116,9 +116,9 @@ TEST_F(RecovererFixture, CacheRecovererCanRecoverFromDisk) {
 
     CollectionCacheRecoverer recoverer{kTestNss};
 
-    recoverer.start(operationContext(), getExecutor());
-    ASSERT_OK(recoverer.waitForInitialPass(operationContext()));
-    auto collMetadata = recoverer.drainAndApply(operationContext());
+    auto roundId = recoverer.start(operationContext(), getExecutor());
+    ASSERT_OK(recoverer.waitForInitialPass(operationContext(), roundId));
+    auto collMetadata = recoverer.drainAndApply(operationContext(), roundId);
 
     ASSERT_TRUE(collMetadata);
 
@@ -148,17 +148,18 @@ TEST_F(RecovererFixture, CacheRecovererAppliesOplogChanges) {
     auto collMetadata = [&] {
         CollectionCacheRecoverer recoverer{kTestNss};
 
-        recoverer.start(operationContext(), getExecutor());
-        ASSERT_OK(recoverer.waitForInitialPass(operationContext()));
-        return recoverer.drainAndApply(operationContext());
+        auto roundId = recoverer.start(operationContext(), getExecutor());
+        ASSERT_OK(recoverer.waitForInitialPass(operationContext(), roundId));
+        return recoverer.drainAndApply(operationContext(), roundId);
     }();
 
     ASSERT_TRUE(collMetadata);
 
     CollectionCacheRecoverer recoverer{kTestNss, std::move(*collMetadata)};
+    auto roundId = recoverer.start(operationContext(), getExecutor());
     recoverer.onOplogEntry(
         operationContext(), Timestamp(Date_t::now()), CollectionShardingStateDeltaOplogEntry{});
-    collMetadata = recoverer.drainAndApply(operationContext());
+    collMetadata = recoverer.drainAndApply(operationContext(), roundId);
 
     ASSERT_TRUE(collMetadata);
 }
@@ -184,8 +185,8 @@ TEST_F(RecovererFixture, CacheRecovererCanRecoverFromDiskWithConcurrentOplogEntr
     CollectionCacheRecoverer recoverer{kTestNss};
 
     auto collMetadata = [&]() {
-        recoverer.start(operationContext(), getExecutor());
-        ASSERT_OK(recoverer.waitForInitialPass(operationContext()));
+        auto roundId = recoverer.start(operationContext(), getExecutor());
+        ASSERT_OK(recoverer.waitForInitialPass(operationContext(), roundId));
         auto recoveryTimestamp =
             repl::ReplicationCoordinator::get(operationContext())->getMyLastWrittenOpTime();
         // We now add an oplog entry that invalidates the previous recovery.
@@ -193,13 +194,13 @@ TEST_F(RecovererFixture, CacheRecovererCanRecoverFromDiskWithConcurrentOplogEntr
             operationContext(),
             recoveryTimestamp.getTimestamp() + 1,
             InvalidateCollectionMetadataOplogEntry{std::string(kTestNss.coll())});
-        auto collMetadata = recoverer.drainAndApply(operationContext());
+        auto collMetadata = recoverer.drainAndApply(operationContext(), roundId);
         // This should've encountered an invalidate entry which triggers a new round of wait +
         // drain.
         ASSERT_FALSE(collMetadata);
-        recoverer.start(operationContext(), getExecutor());
-        ASSERT_OK(recoverer.waitForInitialPass(operationContext()));
-        collMetadata = recoverer.drainAndApply(operationContext());
+        roundId = recoverer.start(operationContext(), getExecutor());
+        ASSERT_OK(recoverer.waitForInitialPass(operationContext(), roundId));
+        collMetadata = recoverer.drainAndApply(operationContext(), roundId);
         // Recovery should've happened by now and returned the final state.
         ASSERT_TRUE(collMetadata);
         return collMetadata;
@@ -232,8 +233,8 @@ TEST_F(RecovererFixture, CacheRecovererBubblesUpCachePressureErrors) {
 
     CollectionCacheRecoverer recoverer{kTestNss};
 
-    recoverer.start(operationContext(), getExecutor());
-    auto status = recoverer.waitForInitialPass(operationContext());
+    auto roundId = recoverer.start(operationContext(), getExecutor());
+    auto status = recoverer.waitForInitialPass(operationContext(), roundId);
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status.code(), ErrorCodes::WriteConflict);
 }
@@ -254,8 +255,8 @@ TEST_F(RecovererFixture, CacheRecovererBubblesUpDiskReadingFailure) {
         CollectionCacheRecoverer recoverer{kTestNss};
 
         // The CollectionType is parsed via an IDL parser. So it should throw an IDL failure.
-        recoverer.start(operationContext(), getExecutor());
-        auto status = recoverer.waitForInitialPass(operationContext());
+        auto roundId = recoverer.start(operationContext(), getExecutor());
+        auto status = recoverer.waitForInitialPass(operationContext(), roundId);
         ASSERT_NOT_OK(status);
         ASSERT_EQ(status.code(), ErrorCodes::IDLFailedToParse);
     }
@@ -279,11 +280,50 @@ TEST_F(RecovererFixture, CacheRecovererBubblesUpDiskReadingFailure) {
 
         // The ChunkType uses a custom parser that returns a different family of errors compared to
         // the CollectionType. Let's make sure that's the case.
-        recoverer.start(operationContext(), getExecutor());
-        auto status = recoverer.waitForInitialPass(operationContext());
+        auto roundId = recoverer.start(operationContext(), getExecutor());
+        auto status = recoverer.waitForInitialPass(operationContext(), roundId);
         ASSERT_NOT_OK(status);
         ASSERT_EQ(status.code(), ErrorCodes::NoSuchKey);
     }
+}
+
+TEST_F(RecovererFixture, CacheRecovererFailsDueToDifferentRoundId) {
+    OperationContext* opCtx = operationContext();
+    int numChunks = 20;
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, numChunks, ShardId("0"));
+
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
+
+    {
+        DBDirectClient client(opCtx);
+        client.insert(NamespaceString::kConfigShardCatalogCollectionsNamespace, collType.toBSON());
+    }
+
+    for (const auto& chunk : chunks) {
+        DBDirectClient client(opCtx);
+        client.insert(NamespaceString::kConfigShardCatalogChunksNamespace, chunk.toConfigBSON());
+    }
+
+    CollectionCacheRecoverer recoverer{kTestNss};
+
+    auto roundId = recoverer.start(operationContext(), getExecutor());
+    ASSERT_OK(recoverer.waitForInitialPass(operationContext(), roundId));
+    // We now add an oplog entry that invalidates the previous recovery.
+    auto recoveryTimestamp =
+        repl::ReplicationCoordinator::get(operationContext())->getMyLastWrittenOpTime();
+    recoverer.onOplogEntry(operationContext(),
+                           recoveryTimestamp.getTimestamp() + 1,
+                           InvalidateCollectionMetadataOplogEntry{std::string(kTestNss.coll())});
+    auto collMetadata = recoverer.drainAndApply(operationContext(), roundId);
+    // This should've encountered an invalidate entry which triggers a new round of wait +
+    // drain.
+    ASSERT_FALSE(collMetadata);
+
+    // If a separate thread calls with the previous round then it should fail.
+    ASSERT_EQ(recoverer.waitForInitialPass(operationContext(), roundId).code(),
+              ErrorCodes::AtomicityFailure);
+    ASSERT_FALSE(recoverer.drainAndApply(operationContext(), roundId));
 }
 
 }  // namespace mongo

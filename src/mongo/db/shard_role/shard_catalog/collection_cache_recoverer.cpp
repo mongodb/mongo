@@ -128,22 +128,37 @@ CollectionMetadata recoverCollectionFromDisk(OperationContext* opCtx,
 }
 }  // namespace
 
-Status CollectionCacheRecoverer::waitForInitialPass(OperationContext* opCtx) {
-    stdx::unique_lock lk(_mutex);
+Status CollectionCacheRecoverer::waitForInitialPass(
+    OperationContext* opCtx, CollectionCacheRecoverer::RecoveryRoundId recoveryRound) {
+    const auto [future, roundId] = [&] {
+        stdx::lock_guard lk(_mutex);
+        // We copy the future in order to avoid racing with a concurrent drainAndApply that will
+        // reset the recoverer.
+        return std::make_pair(_collMetadata, _timestampToReadAt);
+    }();
+    if (recoveryRound.id != roundId) {
+        // The wait is invalid since the previous start failed to produce a result and we had to
+        // reset everything. The future is potentially in an invalid state since disk recovery needs
+        // to be restarted.
+        return {ErrorCodes::AtomicityFailure, ""};
+    }
     tassert(12033900,
-            "Attempting to recover without a valid collection metadata setup or without setting up "
+            "Attempting to recover without a valid collection metadata setup or without "
+            "setting up "
             "async recovery",
-            _collMetadata.valid());
-    return _collMetadata.getNoThrow(opCtx).getStatus();
+            future.valid());
+    return future.getNoThrow(opCtx).getStatus();
 }
 
-void CollectionCacheRecoverer::start(OperationContext* opCtx, ExecutorPtr executor) {
+CollectionCacheRecoverer::RecoveryRoundId CollectionCacheRecoverer::start(OperationContext* opCtx,
+                                                                          ExecutorPtr executor) {
     std::lock_guard lk(_mutex);
 
     if (_collMetadata.valid()) {
-        // We got created with an already existing CollectionMetadata, there's nothing to read from
-        // disk.
-        return;
+        // If there's already a future in place it means we either got created with an existing set
+        // of CollectionMetadata or someone else has called start(). In any case, there's nothing
+        // for us to do here.
+        return {_timestampToReadAt};
     }
     // We first have to wait until the lastWritten batch of oplog entries has been
     // applied and can be used for snapshot reads. This is because not doing so exposes
@@ -197,7 +212,8 @@ void CollectionCacheRecoverer::start(OperationContext* opCtx, ExecutorPtr execut
                 }
                 return status;
             }))
-            .semi();
+            .share();
+    return {_timestampToReadAt};
 }
 
 void CollectionCacheRecoverer::onOplogEntry(OperationContext* opCtx,
@@ -247,8 +263,16 @@ boost::optional<CollectionMetadata> applyOplogEntry(
 }  // namespace
 
 boost::optional<CollectionMetadata> CollectionCacheRecoverer::drainAndApply(
-    OperationContext* opCtx) {
+    OperationContext* opCtx, CollectionCacheRecoverer::RecoveryRoundId recoveryRound) {
     stdx::lock_guard lk(_mutex);
+
+    if (recoveryRound.id != _timestampToReadAt) {
+        // The wait that preceeded this call was invalidated, we fail the drain on purpose since it
+        // would otherwise block for a potentially long time to resolve the future and the state has
+        // already been reset by the drain.
+        return boost::none;
+    }
+
     auto collMetadata = _collMetadata.get();
     while (!_entriesToApply.empty()) {
         ON_BLOCK_EXIT([&] { _entriesToApply.pop(); });
@@ -257,8 +281,10 @@ boost::optional<CollectionMetadata> CollectionCacheRecoverer::drainAndApply(
             [&](const auto& entry) { return applyOplogEntry(opCtx, entry, collMetadata); }, entry);
         if (!newCollMetadata) {
             // Draining failed, signal the caller that it must perform another round of recovery. We
-            // advance the timestamp such that it gets the new valid snapshot.
+            // advance the timestamp such that it gets the new valid snapshot and reset the state of
+            // _collMetadata so that we can restart.
             _timestampToReadAt = repl::OpTime{ts, repl::OpTime::kUninitializedTerm};
+            _collMetadata = {};
             return boost::none;
         }
         collMetadata = std::move(*newCollMetadata);

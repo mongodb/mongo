@@ -39,6 +39,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/shard_catalog/collection_cache_recoverer.h"
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/critical_section_signal.h"
@@ -321,6 +322,9 @@ public:
     };
     AuthoritativeState getAuthoritativeState() const;
 
+    void setCollectionRecoverer(std::shared_ptr<CollectionCacheRecoverer> recoverer);
+    std::shared_ptr<CollectionCacheRecoverer> getCollectionCacheRecoverer() const;
+
 private:
     friend class CollectionShardingRuntimeTest;
 
@@ -423,6 +427,10 @@ private:
     // This is mutable since we don't need to acquire the CSR in an exclusive state as it will not
     // perform any modifications to the underlying data.
     mutable WaiterList<ChunkVersion> _shardVersionWaiters;
+
+    // Tracks the fact that concurrent recovery of the collection's sharding metadata is taking
+    // place by a concurrent thread handling a shard version mismatch
+    std::shared_ptr<CollectionCacheRecoverer> _collectionRecoverer;
 };
 
 /**

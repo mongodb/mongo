@@ -757,6 +757,17 @@ void CollectionShardingRuntime::resetPlacementVersionRecoverRefreshFuture() {
     _placementVersionInRecoverOrRefresh = boost::none;
 }
 
+void CollectionShardingRuntime::setCollectionRecoverer(
+    std::shared_ptr<CollectionCacheRecoverer> recoverer) {
+    invariant(!(_collectionRecoverer && recoverer));
+    _collectionRecoverer = std::move(recoverer);
+}
+
+std::shared_ptr<CollectionCacheRecoverer> CollectionShardingRuntime::getCollectionCacheRecoverer()
+    const {
+    return _collectionRecoverer;
+}
+
 SharedSemiFuture<void> CollectionShardingRuntime::registerWaiterForChunkVersion(
     OperationContext* opCtx, const ShardVersion& expectedVersion) const {
     const auto expectedChunkVersion = expectedVersion.placementVersion();

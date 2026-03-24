@@ -906,6 +906,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/shard_role/shard_catalog:metadata_manager_test.cpp",
         "//src/mongo/db/shard_role/shard_catalog:op_observer_sharding_test.cpp",
         "//src/mongo/db/shard_role/shard_catalog:operation_sharding_state_test.cpp",
+        "//src/mongo/db/shard_role/shard_catalog:shard_filtering_metadata_refresh_test.cpp",
         "//src/mongo/db/sharding_environment:range_arithmetic_test.cpp",
         "//src/mongo/db/sharding_environment:shard_local_test.cpp",
     ],
