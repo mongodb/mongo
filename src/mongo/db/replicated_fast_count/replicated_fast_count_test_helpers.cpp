@@ -462,4 +462,11 @@ CollectionSizeCount scanForAccurateSizeCount(OperationContext* opCtx, const Name
     return sizeCount;
 }
 
+absl::flat_hash_map<UUID, CollectionSizeCount> extractSizeCountDeltasForApplyOps(
+    const repl::OplogEntry& applyOpsEntry, const boost::optional<UUID>& uuidFilter) {
+    absl::flat_hash_map<UUID, CollectionSizeCount> deltas;
+    replicated_fast_count::extractSizeCountDeltasForApplyOps(applyOpsEntry, uuidFilter, deltas);
+    return deltas;
+}
+
 }  // namespace mongo::replicated_fast_count_test_helpers

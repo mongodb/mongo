@@ -28,8 +28,14 @@
  */
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
 #include "mongo/db/rss/stub_persistence_provider.h"
+#include "mongo/util/uuid.h"
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::replicated_fast_count_test_helpers {
 /**
@@ -292,6 +298,13 @@ boost::optional<repl::OplogEntry> getMostRecentOplogEntry(OperationContext* opCt
  * collection.
  */
 CollectionSizeCount scanForAccurateSizeCount(OperationContext* opCtx, const NamespaceString& nss);
+
+/**
+ * Convenience wrapper around extractSizeCountDeltasForApplyOps that constructs and returns the
+ * result map.
+ */
+absl::flat_hash_map<UUID, CollectionSizeCount> extractSizeCountDeltasForApplyOps(
+    const repl::OplogEntry& applyOpsEntry, const boost::optional<UUID>& uuidFilter = boost::none);
 
 
 }  // namespace mongo::replicated_fast_count_test_helpers

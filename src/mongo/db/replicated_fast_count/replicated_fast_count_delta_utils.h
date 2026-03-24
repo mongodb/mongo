@@ -34,7 +34,9 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
 #include "mongo/db/shard_role/shard_role.h"
+#include "mongo/db/storage/record_store.h"
 
+#include <absl/container/flat_hash_map.h>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
@@ -56,14 +58,30 @@ inline constexpr StringData kValidAsOfKey = "valid-as-of"_sd;
 boost::optional<CollectionSizeCount> extractSizeCountDeltaForOp(const repl::OplogEntry& oplogEntry);
 
 /**
- * Returns cumulative size and count deltas for each uuid across the inner operations of the
- * 'applyOpsEntry'.
+ * Accumulates cumulative size and count deltas for each uuid across the inner operations of the
+ * 'applyOpsEntry' into 'sizeCountDeltasOut'. If 'uuidFilter' is provided, only entries for that
+ * UUID are collected.
  *
  * The OplogEntry provided must be of type 'repl::OplogEntry::CommandType::kApplyOps'; otherwise,
  * the method throws and terminates the current operation.
  */
-stdx::unordered_map<UUID, CollectionSizeCount> extractSizeCountDeltasForApplyOps(
-    const repl::OplogEntry& applyOpsEntry);
+void extractSizeCountDeltasForApplyOps(
+    const repl::OplogEntry& applyOpsEntry,
+    const boost::optional<UUID>& uuidFilter,
+    absl::flat_hash_map<UUID, CollectionSizeCount>& sizeCountDeltasOut);
+
+/**
+ * Given a cursor to the oplog, scans the oplog starting after "seekAfterTS" (exclusive bound) and
+ * aggregates the size count deltas across UUIDs. Only accumulates size count information for
+ * "uuidFilter" when provided.
+ *
+ * The map contains an entry for each 'uuid' which has replicated size count information within the
+ * scanned oplog range. May include entries where size count deltas sum to 0.
+ */
+absl::flat_hash_map<UUID, CollectionSizeCount> aggregateSizeCountDeltasInOplog(
+    SeekableRecordCursor& oplogCursor,
+    const Timestamp& seekAfterTS,
+    const boost::optional<UUID>& uuidFilter = boost::none);
 
 /**
  * Acquires the replicated fast count collection for read access.

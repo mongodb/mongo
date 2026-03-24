@@ -29,15 +29,18 @@
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
 
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 
-namespace mongo {
-namespace {
+#include <absl/container/flat_hash_map.h>
 
+namespace mongo {
+namespace replicated_fast_count {
+namespace {
 bool isSupportedOpType(repl::OpTypeEnum opType) {
     switch (opType) {
         case repl::OpTypeEnum::kInsert:
@@ -68,16 +71,16 @@ int32_t computeCountDeltaForOp(repl::OpTypeEnum opType) {
 void recordCollectionSizeCountDelta(
     const UUID& uuid,
     const CollectionSizeCount& sizeCountDelta,
-    stdx::unordered_map<UUID, CollectionSizeCount>& sizeCountDeltasOut) {
+    absl::flat_hash_map<UUID, CollectionSizeCount>& sizeCountDeltasOut) {
     auto [it, inserted] = sizeCountDeltasOut.try_emplace(uuid, sizeCountDelta);
     if (!inserted) {
         // Entry exists, so update as needed.
         it->second = it->second + sizeCountDelta;
     }
 }
+
 }  // namespace
 
-namespace replicated_fast_count {
 boost::optional<CollectionSizeCount> extractSizeCountDeltaForOp(
     const repl::OplogEntry& oplogEntry) {
     const auto& sizeMd = oplogEntry.getSizeMetadata();
@@ -101,13 +104,22 @@ boost::optional<CollectionSizeCount> extractSizeCountDeltaForOp(
                           << "' is incompatible with top level 'm' field: "
                           << redact(oplogEntry.toBSONForLogging()),
             isReplicatedFastCountEligible(oplogEntry.getNss()));
+
+    massert(12116001,
+            str::stream() << "Unexpected input: Missing 'ui' field for operation '"
+                          << redact(oplogEntry.toBSONForLogging())
+                          << "' which tracks replicated size and count",
+            oplogEntry.getUuid().has_value());
+
     const int32_t sizeDelta = sizeMd->getSz();
     const int32_t countDelta = computeCountDeltaForOp(opType);
     return CollectionSizeCount{.size = sizeDelta, .count = countDelta};
 }
 
-stdx::unordered_map<UUID, CollectionSizeCount> extractSizeCountDeltasForApplyOps(
-    const repl::OplogEntry& applyOpsEntry) {
+void extractSizeCountDeltasForApplyOps(
+    const repl::OplogEntry& applyOpsEntry,
+    const boost::optional<UUID>& uuidFilter,
+    absl::flat_hash_map<UUID, CollectionSizeCount>& sizeCountDeltasOut) {
     massert(12116000,
             str::stream() << "Unexpected input: Expected applyOps oplog entry for extracting size "
                              "metadata, instead received entry of command type '"
@@ -115,31 +127,47 @@ stdx::unordered_map<UUID, CollectionSizeCount> extractSizeCountDeltasForApplyOps
                           << "'. Received entry: " << redact(applyOpsEntry.toBSONForLogging()),
             applyOpsEntry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
 
-    // Stores the aggregate deltas for each 'uuid' with replicated size and count.
-    stdx::unordered_map<UUID, CollectionSizeCount> sizeCountDeltas;
     std::vector<repl::OplogEntry> innerEntries;
     repl::ApplyOps::extractOperationsTo(
         applyOpsEntry, applyOpsEntry.getEntry().toBSON(), &innerEntries);
+
     for (const auto& op : innerEntries) {
         if (op.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
-            const auto nestedOpRes = extractSizeCountDeltasForApplyOps(op);
-            for (const auto& [uuid, sizeCountDelta] : nestedOpRes) {
-                recordCollectionSizeCountDelta(uuid, sizeCountDelta, sizeCountDeltas);
-            }
+            extractSizeCountDeltasForApplyOps(op, uuidFilter, sizeCountDeltasOut);
+            continue;
+        }
+        const auto& opUuid = op.getUuid();
+        if (uuidFilter && opUuid != uuidFilter) {
             continue;
         }
         if (auto sizeCountDelta = extractSizeCountDeltaForOp(op); sizeCountDelta.has_value()) {
-            const auto& uuid = op.getUuid();
-            massert(12116001,
-                    str::stream()
-                        << "Unexpected input: Missing 'ui' field for inner applyOps operation '"
-                        << redact(op.toBSONForLogging())
-                        << "' which tracks replicated size and count",
-                    uuid.has_value());
-            recordCollectionSizeCountDelta(*uuid, *sizeCountDelta, sizeCountDeltas);
+            recordCollectionSizeCountDelta(*opUuid, *sizeCountDelta, sizeCountDeltasOut);
         }
     }
-    return sizeCountDeltas;
+}
+
+absl::flat_hash_map<UUID, CollectionSizeCount> aggregateSizeCountDeltasInOplog(
+    SeekableRecordCursor& oplogCursor,
+    const Timestamp& seekAfterTS,
+    const boost::optional<UUID>& uuidFilter) {
+    absl::flat_hash_map<UUID, CollectionSizeCount> aggregatedDeltas;
+    RecordId seekRid =
+        massertStatusOK(record_id_helpers::keyForOptime(seekAfterTS, KeyFormat::Long));
+    for (auto rec = oplogCursor.seek(seekRid, SeekableRecordCursor::BoundInclusion::kExclude); rec;
+         rec = oplogCursor.next()) {
+        const auto entry = massertStatusOK(repl::OplogEntry::parse(rec->data.toBson()));
+        if (entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
+            extractSizeCountDeltasForApplyOps(entry, uuidFilter, aggregatedDeltas);
+            continue;
+        }
+        if (uuidFilter && entry.getUuid() != uuidFilter) {
+            continue;
+        }
+        if (auto delta = extractSizeCountDeltaForOp(entry); delta.has_value()) {
+            recordCollectionSizeCountDelta(*entry.getUuid(), *delta, aggregatedDeltas);
+        }
+    }
+    return aggregatedDeltas;
 }
 
 boost::optional<CollectionOrViewAcquisition> acquireFastCountCollectionForRead(

@@ -474,7 +474,7 @@ TEST_F(ReplicatedFastCountTxnFixture, ApplyOpsOplogEntryContainsSizeDeltaMetadat
     // The total count and size for each collection should be equal to aggregated deltas given the
     // collection began empty before the transaction.
     const auto deltas =
-        replicated_fast_count::extractSizeCountDeltasForApplyOps(applyOpsOplogEntry);
+        replicated_fast_count_test_helpers::extractSizeCountDeltasForApplyOps(applyOpsOplogEntry);
     // 2 UUIDs had replicated size count information updated from the transaction.
     ASSERT_EQ(2u, deltas.size());
 
