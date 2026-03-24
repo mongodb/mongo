@@ -18,6 +18,7 @@ variables:
         --//bazel/config:antithesis=True
         --copt=-fsanitize-coverage=trace-pc-guard
         --linkopt=-lvoidstar
+        --allocator=system
     tasks:
       - name: compile_and_archive_dist_test_TG
       - name: .antithesis
