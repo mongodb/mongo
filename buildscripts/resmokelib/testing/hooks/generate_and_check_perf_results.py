@@ -417,8 +417,11 @@ class CheckPerfResultTestCase(interface.DynamicTestCase):
                 )
 
         if any_metric_has_failed:
-            # If this in the merge queue, check to see if an override comment was made by an authorized user.
-            if _config.EVERGREEN_REQUESTER == "github_merge_queue":
+            # Check to see if an override comment was made by an authorized user.
+            if (
+                _config.EVERGREEN_REQUESTER == "github_pr"
+                or _config.EVERGREEN_REQUESTER == "github_merge_queue"
+            ):
                 github_pr_number = int(get_expansion("github_pr_number", 0))
                 if not github_pr_number:
                     raise ServerFailure(
