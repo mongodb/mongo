@@ -44,6 +44,11 @@ void Registry::remove(UUID buildUUID) {
     _entries.erase(buildUUID);
 }
 
+void Registry::clear() {
+    std::lock_guard lock{_mutex};
+    _entries.clear();
+}
+
 std::vector<std::pair<UUID, Registry::Entry>> Registry::all() const {
     std::lock_guard lock{_mutex};
     std::vector<std::pair<UUID, Entry>> entries;

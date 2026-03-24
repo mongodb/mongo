@@ -36,7 +36,11 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
+#include "mongo/db/index_builds/primary_driven/registry.h"
+#include "mongo/db/index_builds/primary_driven/util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/service_context.h"
@@ -48,6 +52,7 @@
 #include "mongo/db/shard_role/shard_catalog/historical_catalogid_tracker.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/logv2/log.h"
@@ -227,6 +232,9 @@ PreviousCatalogState closeCatalog(OperationContext* opCtx) {
     // outside the catalog itself.
     catalog_stats::requiresTimeseriesExtendedRangeSupport.storeRelaxed(0);
 
+    // Primary-driven index builds are tracked outside of the catalog, so clear them here.
+    index_builds::primary_driven::registry(opCtx->getServiceContext()).clear();
+
     reopenOnFailure.dismiss();
     return previousCatalogState;
 }
@@ -260,12 +268,26 @@ void openCatalog(OperationContext* opCtx,
                                                           StorageEngine::LastShutdownState::kClean,
                                                           false /* forRepair */));
 
-    // Once all unfinished index builds have been dropped and the catalog has been reloaded, resume
-    // or restart any unfinished index builds. This will not resume/restart any index builds to
-    // completion, but rather start the background thread, build the index, and wait for a
-    // replicated commit or abort oplog entry.
-    IndexBuildsCoordinator::get(opCtx)->restartIndexBuildsForRecovery(
-        opCtx, reconcileResult.indexBuildsToRestart, reconcileResult.indexBuildsToResume);
+    if (feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        for (auto&& [buildUUID, entry] : reconcileResult.indexBuildsToRestart) {
+            std::vector<IndexBuildInfo> builds;
+            builds.reserve(entry.indexSpecsAndIdents.size());
+            for (auto&& [spec, ident] : entry.indexSpecsAndIdents) {
+                builds.emplace_back(spec, ident, *storageEngine);
+            }
+            index_builds::primary_driven::registry(opCtx->getServiceContext())
+                .add(buildUUID, entry.dbName, entry.collUUID, std::move(builds));
+        }
+    } else {
+        // Once all unfinished index builds have been dropped and the catalog has been reloaded,
+        // resume or restart any unfinished index builds. This will not resume/restart any index
+        // builds to completion, but rather start the background thread, build the index, and wait
+        // for a replicated commit or abort oplog entry.
+        IndexBuildsCoordinator::get(opCtx)->restartIndexBuildsForRecovery(
+            opCtx, reconcileResult.indexBuildsToRestart, reconcileResult.indexBuildsToResume);
+    }
 
     CatalogControlUtils::reopenAllDatabasesAndReloadCollectionCatalog(
         opCtx, storageEngine, previousCatalogState, stableTimestamp);

@@ -56,6 +56,8 @@ public:
 
     void remove(UUID buildUUID);
 
+    void clear();
+
     std::vector<std::pair<UUID, Entry>> all() const;
 
 private:
