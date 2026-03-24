@@ -472,11 +472,11 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
         boost::optional<AutoGetDb> dbLock;
         boost::optional<AutoGetCollection> collLock;
         if (nss.isDbOnly()) {
-            dbLock.emplace(opCtx, nss.dbName(), MODE_X);
+            dbLock.emplace(opCtx, nss.dbName(), MODE_IX);
         } else {
             collLock.emplace(opCtx,
                              nss,
-                             MODE_X,
+                             fixLockModeForSystemDotViewsChanges(nss, MODE_IX),
                              AutoGetCollection::Options{}.viewMode(
                                  auto_get_collection::ViewMode::kViewsPermitted));
         }
