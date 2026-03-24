@@ -69,7 +69,7 @@ namespace mongo {
  * We expect the first case to just be a single loop and for both start and wait to be immediate
  * no-ops.
  */
-class MONGO_MOD_PRIVATE CollectionCacheRecoverer {
+class MONGO_MOD_PARENT_PRIVATE CollectionCacheRecoverer {
 public:
     // An opaque identifier for the round. Used in order to support concurrent access to the
     // recoverer.

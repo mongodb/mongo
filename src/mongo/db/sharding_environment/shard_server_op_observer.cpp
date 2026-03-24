@@ -893,7 +893,17 @@ void ShardServerOpObserver::onInvalidateCollectionMetadata(OperationContext* opC
             op.getUuid());
 
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-    scopedCsr->clearFilteringMetadata_authoritative(opCtx, *op.getUuid());
+    // We have to consider concurrent recovery threads reading the durable state. As the drain and
+    // install is an atomic operation the presence of a recoverer means that we still haven't
+    // drained and applied the changes. The invalidate has to be communicated to the recovery
+    // threads such that a new durable read is performed as whatever was read before is now invalid.
+    //
+    // The lack of this means we're free to proceed with a clear of the metadata.
+    if (auto recoverer = scopedCsr->getCollectionCacheRecoverer()) {
+        recoverer->onOplogEntry(opCtx, op.getTimestamp(), InvalidateCollectionMetadataOplogEntry{});
+    } else {
+        scopedCsr->clearFilteringMetadata_authoritative(opCtx, *op.getUuid());
+    }
 }
 
 }  // namespace mongo
