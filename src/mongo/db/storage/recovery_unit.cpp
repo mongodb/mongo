@@ -114,19 +114,27 @@ void RecoveryUnit::beginUnitOfWork(bool readOnly) {
 }
 
 void RecoveryUnit::commitUnitOfWork() {
-    invariant(!_readOnly);
+    if (_readOnly) {
+        _readOnly = false;
+        commitRegisteredChanges(boost::none);
+        return;
+    }
+
+    runPreCommitHooks(_opCtx);
+
     doCommitUnitOfWork();
     resetSnapshot();
 }
 
 void RecoveryUnit::abortUnitOfWork() {
-    invariant(!_readOnly);
+    if (_readOnly) {
+        _readOnly = false;
+        abortRegisteredChanges();
+        return;
+    }
+
     doAbortUnitOfWork();
     resetSnapshot();
-}
-
-void RecoveryUnit::endReadOnlyUnitOfWork() {
-    _readOnly = false;
 }
 
 void RecoveryUnit::abandonSnapshot() {

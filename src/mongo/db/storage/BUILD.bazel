@@ -309,6 +309,7 @@ mongo_cc_library(
         "//src/mongo/db:service_context",
         "//src/mongo/db:shard_role_api",
         "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/transport:transport_layer_mock",
         "//src/mongo/unittest",
     ],
 )

@@ -46,7 +46,9 @@
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
@@ -265,7 +267,7 @@ TEST_F(RecoveryUnitTestHarness, AbandonSnapshotCommitMode) {
 
 TEST_F(RecoveryUnitTestHarness, FlipReadOnly) {
     ru->beginUnitOfWork(/*readOnly=*/true);
-    ru->endReadOnlyUnitOfWork();
+    ru->abortUnitOfWork();
 
     ru->beginUnitOfWork(/*readOnly=*/false);
     ru->commitUnitOfWork();
@@ -311,15 +313,6 @@ DEATH_TEST_F(RecoveryUnitTestHarness, AbandonSnapshotMustBeOutOfUnitOfWork, "inv
     shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
 }
 
-DEATH_TEST_F(RecoveryUnitTestHarness, CommitInReadOnly, "invariant") {
-    shard_role_details::getRecoveryUnit(opCtx.get())->beginUnitOfWork(/*readOnly=*/true);
-    shard_role_details::getRecoveryUnit(opCtx.get())->commitUnitOfWork();
-}
-
-DEATH_TEST_F(RecoveryUnitTestHarness, AbortInReadOnly, "invariant") {
-    shard_role_details::getRecoveryUnit(opCtx.get())->beginUnitOfWork(/*readOnly=*/true);
-    shard_role_details::getRecoveryUnit(opCtx.get())->abortUnitOfWork();
-}
 
 DEATH_TEST_REGEX_F(RecoveryUnitTestHarness,
                    LogCommitHandlerTypeWithTimestampBeforeTerminatingOnException,
@@ -365,6 +358,34 @@ DEATH_TEST_REGEX_F(RecoveryUnitTestHarness,
     ru->beginUnitOfWork(opCtx->readOnly());
     ru->registerChange(std::make_unique<ThrowsOnRollbackTestChange>());
     ru->abortUnitOfWork();
+}
+
+// Ensure that WuOW properly updates the RecoveryUnitState even when user writes are disabled (in
+// readOnly mode).
+TEST_F(RecoveryUnitTestHarness, WriteUnitOfWorkUpdatesStateInReadOnlyMode) {
+    // This test disables user writes and creates and destroys a wUOW without committing. The
+    // subsequent wUOW creation should not hit the invariant.
+
+    // Create a client from a user connection so that read only returns true
+    // as user writes are disabled.
+    auto session = transport::MockSession::create(nullptr);
+    auto userClient =
+        getGlobalServiceContext()->getService()->makeClient("userClient", std::move(session));
+
+    getGlobalServiceContext()->disallowUserWrites();
+
+    auto testOpCtx = userClient->makeOperationContext();
+
+    ASSERT_TRUE(testOpCtx->readOnly());
+
+    // Create and destroy a WriteUnitOfWork without committing. This should update _ruState.
+    { WriteUnitOfWork wuow(testOpCtx.get()); }
+
+    // We should not hit the invariant here since _ruState would now be updated.
+    {
+        WriteUnitOfWork wuow2(testOpCtx.get());
+        wuow2.commit();
+    }
 }
 
 DEATH_TEST_REGEX_F(RecoveryUnitTestHarness,

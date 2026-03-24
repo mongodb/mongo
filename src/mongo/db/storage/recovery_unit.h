@@ -200,11 +200,12 @@ public:
     void abortUnitOfWork();
 
     /**
-     * Cleans up any state set for this unit of work.
-     *
-     * Should be called through WriteUnitOfWork rather than directly.
+     * Returns whether or not this RecoveryUnit is in read only unit of work. In this state,
+     * users may assert when this RecoveryUnit is used for writing to the storage engine.
      */
-    void endReadOnlyUnitOfWork();
+    bool readOnly() const {
+        return _readOnly;
+    }
 
     /**
      * Sets whether cursors in this operation should engage in pre-fetching data from disk to
