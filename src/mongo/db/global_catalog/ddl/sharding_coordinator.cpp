@@ -36,9 +36,10 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
-#include "mongo/db/global_catalog/sharding_catalog_client.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/shard_role/lock_manager/locker.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/sharding_environment/client/shard.h"
@@ -48,7 +49,6 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -143,7 +143,8 @@ ForwardableOperationMetadata enableVersionContextPropagation(
 ShardingCoordinator::ShardingCoordinator(ShardingCoordinatorService* service,
                                          std::string name,
                                          const BSONObj& coorDoc)
-    : _service(service),
+    : _coordinatorName(std::move(name)),
+      _service(service),
       _coordId(extractShardingCoordinatorMetadata(coorDoc).getId()),
       _recoveredFromDisk(extractShardingCoordinatorMetadata(coorDoc).getRecoveredFromDisk()),
       _forwardableOpMetadata(
@@ -151,8 +152,7 @@ ShardingCoordinator::ShardingCoordinator(ShardingCoordinatorService* service,
               enableVersionContextPropagation)),
       _databaseVersion(extractShardingCoordinatorMetadata(coorDoc).getDatabaseVersion()),
       _firstExecution(!_recoveredFromDisk),
-      _externalState(_service->createExternalState()),
-      _coordinatorName(std::move(name)) {}
+      _externalState(_service->createExternalState()) {}
 
 ShardingCoordinator::~ShardingCoordinator() {
     tassert(10644519,
@@ -600,6 +600,224 @@ bool ShardingCoordinator::_isRetriableErrorForDDLCoordinator(const Status& statu
 
 ShardingCoordinatorExternalState* ShardingCoordinator::_getExternalState() {
     return _externalState.get();
+}
+
+BSONObjBuilder ShardingCoordinator::basicReportBuilder() const noexcept {
+    BSONObjBuilder bob;
+
+    // Append static info
+    bob.append("type", "op");
+    bob.append("ns",
+               NamespaceStringUtil::serialize(originalNss(), SerializationContext::stateDefault()));
+    bob.append("desc", _coordinatorName);
+    bob.append("op", "command");
+    bob.append("active", true);
+
+    // Append dynamic fields from the state doc
+    {
+        stdx::lock_guard lk{_docMutex};
+        if (const auto& bucketNss = getDoc().getShardingCoordinatorMetadata().getBucketNss()) {
+            // Bucket namespace is only present in case the collection is a sharded timeseries
+            bob.append("bucketNamespace",
+                       NamespaceStringUtil::serialize(bucketNss.get(),
+                                                      SerializationContext::stateDefault()));
+        }
+    }
+
+    // Create command description
+    BSONObjBuilder cmdInfoBuilder;
+    {
+        stdx::lock_guard lk{_docMutex};
+        if (const auto& optComment = getForwardableOpMetadata().getComment()) {
+            cmdInfoBuilder.append(optComment.get().firstElement());
+        }
+    }
+    appendCommandInfo(&cmdInfoBuilder);
+    bob.append("command", cmdInfoBuilder.obj());
+
+    return bob;
+}
+
+std::function<void()> RecoverableShardingCoordinator::_buildPhaseHandlerGeneric(
+    CoordinatorGenericPhase newPhase, std::function<void(OperationContext*)>&& handlerFn) {
+    return _buildPhaseHandlerGeneric(
+        newPhase, [](OperationContext*) { return true; }, std::move(handlerFn));
+}
+
+std::function<void()> RecoverableShardingCoordinator::_buildPhaseHandlerGeneric(
+    CoordinatorGenericPhase newPhase,
+    std::function<bool(OperationContext*)>&& shouldExecute,
+    std::function<void(OperationContext*)>&& handlerFn) {
+    return [=, this] {
+        const auto currPhase = [this] {
+            stdx::lock_guard lk{_docMutex};
+            return getDoc().getGenericPhase();
+        }();
+
+        if (currPhase > newPhase) {
+            // Do not execute this phase if we already reached a subsequent one.
+            return;
+        }
+
+        auto opCtxHolder = this->makeOperationContext();
+        auto* opCtx = opCtxHolder.get();
+
+        if (!shouldExecute(opCtx)) {
+            // Do not execute the phase if the passed in condition is not met.
+            return;
+        }
+
+        if (currPhase < newPhase) {
+            // Persist the new phase if this is the first time we are executing it.
+            _enterPhaseGeneric(newPhase);
+        }
+
+        return handlerFn(opCtx);
+    };
+}
+
+void RecoverableShardingCoordinator::_enterPhaseGeneric(CoordinatorGenericPhase newPhase) {
+    auto newDoc = _cloneDoc();
+    const auto& currentDoc = getDoc();
+
+    newDoc->setGenericPhase(newPhase);
+
+    LOGV2_DEBUG(5390501,
+                2,
+                "sharding coordinator phase transition",
+                "coordinatorId"_attr = currentDoc.getShardingCoordinatorMetadata().getId(),
+                "newPhase"_attr = serializeGenericPhase(newDoc->getGenericPhase()),
+                "oldPhase"_attr = serializeGenericPhase(currentDoc.getGenericPhase()));
+
+    ServiceContext::UniqueOperationContext uniqueOpCtx;
+    auto opCtx = cc().getOperationContext();
+    if (!opCtx) {
+        uniqueOpCtx = this->makeOperationContext();
+        opCtx = uniqueOpCtx.get();
+    }
+
+    if (currentDoc.getGenericPhase() == CoordinatorGenericPhase::kUnset) {
+        _insertStateDocumentGeneric(opCtx, std::move(newDoc));
+    } else {
+        _updateStateDocumentGeneric(opCtx, std::move(newDoc));
+    }
+}
+
+BSONObjBuilder RecoverableShardingCoordinator::basicReportBuilder() const noexcept {
+    auto baseReportBuilder = ShardingCoordinator::basicReportBuilder();
+
+    const auto currPhase = [this] {
+        stdx::lock_guard l{_docMutex};
+        return getDoc().getGenericPhase();
+    }();
+
+    baseReportBuilder.append("currentPhase", serializeGenericPhase(currPhase));
+    return baseReportBuilder;
+}
+
+void RecoverableShardingCoordinator::_insertStateDocumentGeneric(
+    OperationContext* opCtx, std::unique_ptr<CoordinatorStateDoc> newDoc) {
+    auto copyMetadata = newDoc->getShardingCoordinatorMetadata();
+    copyMetadata.setRecoveredFromDisk(true);
+    newDoc->setShardingCoordinatorMetadata(copyMetadata);
+
+    PersistentTaskStore<CoordinatorStateDoc> store(
+        NamespaceString::kShardingDDLCoordinatorsNamespace);
+    try {
+        store.add(opCtx, *newDoc, defaultMajorityWriteConcern());
+    } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
+        // A series of step-up and step-down events can cause a node to try and insert the
+        // document when it has already been persisted locally, but we must still wait for
+        // majority commit.
+        const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        const auto lastLocalOpTime = replCoord->getMyLastAppliedOpTime();
+        WaitForMajorityService::get(opCtx->getServiceContext())
+            .waitUntilMajorityForWrite(lastLocalOpTime, opCtx->getCancellationToken())
+            .get(opCtx);
+    }
+
+    {
+        stdx::lock_guard lk{_docMutex};
+        getDoc().replace(std::move(newDoc));
+    }
+}
+
+void RecoverableShardingCoordinator::_updateStateDocumentGeneric(
+    OperationContext* opCtx, std::unique_ptr<CoordinatorStateDoc> newDoc) {
+    PersistentTaskStore<CoordinatorStateDoc> store(
+        NamespaceString::kShardingDDLCoordinatorsNamespace);
+    const auto& coorMetadata = newDoc->getShardingCoordinatorMetadata();
+    tassert(10644540,
+            "Expected recoveredFromDisk to be set on the coordinator document metadata",
+            coorMetadata.getRecoveredFromDisk());
+    store.update(opCtx,
+                 BSON(CoordinatorStateDoc::kIdFieldName << coorMetadata.getId().toBSON()),
+                 newDoc->toBSON(),
+                 defaultMajorityWriteConcern());
+
+    {
+        stdx::lock_guard lk{_docMutex};
+        getDoc().replace(std::move(newDoc));
+    }
+}
+
+boost::optional<Status> RecoverableShardingCoordinator::getAbortReason() const {
+    const auto& status = getDoc().getShardingCoordinatorMetadata().getAbortReason();
+    tassert(10644541, "when persisted, status must be an error", !status || !status->isOK());
+    return status;
+}
+
+void RecoverableShardingCoordinator::triggerCleanup(OperationContext* opCtx, const Status& status) {
+    LOGV2_INFO(7418502,
+               "Coordinator failed, persisting abort reason",
+               "coordinatorId"_attr = getDoc().getShardingCoordinatorMetadata().getId(),
+               "phase"_attr = serializeGenericPhase(getDoc().getGenericPhase()),
+               "reason"_attr = redact(status));
+
+    auto newDoc = _cloneDoc();
+
+    auto coordinatorMetadata = newDoc->getShardingCoordinatorMetadata();
+
+    coordinatorMetadata.setAbortReason(sharding_ddl_util::possiblyTruncateErrorStatus(status));
+    newDoc->setShardingCoordinatorMetadata(std::move(coordinatorMetadata));
+
+    _updateStateDocumentGeneric(opCtx, std::move(newDoc));
+
+    uassertStatusOK(status);
+}
+
+void RecoverableShardingCoordinator::_onCleanup(OperationContext* opCtx) {
+    releaseSession(opCtx);
+}
+
+boost::optional<OperationSessionInfo> RecoverableShardingCoordinator::readSession(
+    OperationContext* opCtx) const {
+    auto optSession = [&] {
+        stdx::lock_guard lk{_docMutex};
+        return getDoc().getShardingCoordinatorMetadata().getSession();
+    }();
+    if (!optSession) {
+        return boost::none;
+    }
+
+    OperationSessionInfo osi;
+    osi.setSessionId(optSession->getLsid());
+    osi.setTxnNumber(optSession->getTxnNumber());
+    return osi;
+}
+
+void RecoverableShardingCoordinator::writeSession(
+    OperationContext* opCtx, const boost::optional<OperationSessionInfo>& osi) {
+    if (!osi) {
+        // The tracker will call writeSession with boost::none after calling releaseSession; by
+        // the time the DDL coordinator does this, we've already deleted our state document.
+        return;
+    }
+    auto newDoc = _cloneDoc();
+    auto newMetadata = newDoc->getShardingCoordinatorMetadata();
+    newMetadata.setSession(CoordinatorSession(*osi->getSessionId(), *osi->getTxnNumber()));
+    newDoc->setShardingCoordinatorMetadata(std::move(newMetadata));
+    _updateStateDocumentGeneric(opCtx, std::move(newDoc));
 }
 
 }  // namespace mongo

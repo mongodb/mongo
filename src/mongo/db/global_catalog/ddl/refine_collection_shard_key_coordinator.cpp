@@ -45,6 +45,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/router_role/router_role.h"
+#include "mongo/db/s/primary_only_service_helpers/all_shards_and_config_causality_barrier.h"
 #include "mongo/db/s/primary_only_service_helpers/participant_causality_barrier.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"

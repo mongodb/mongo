@@ -75,6 +75,7 @@
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
+#include "mongo/db/s/primary_only_service_helpers/all_shards_and_config_causality_barrier.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"

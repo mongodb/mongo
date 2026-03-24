@@ -57,6 +57,7 @@
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/router_role/router_role.h"
+#include "mongo/db/s/primary_only_service_helpers/all_shards_and_config_causality_barrier.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_role/ddl/list_collections_gen.h"

@@ -46,6 +46,7 @@
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
+#include "mongo/db/s/primary_only_service_helpers/all_shards_and_config_causality_barrier.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_role/ddl/coll_mod_gen.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
