@@ -1,0 +1,148 @@
+VARIATION SetTopLevelFieldThenIncludeSubfields
+input: {
+    "pipeline": [
+        {
+            "$set": {
+                "a": {
+                    "$const": 1
+                },
+                "b": {
+                    "c": {
+                        "$const": 1
+                    }
+                }
+            }
+        },
+        {
+            "$project": {
+                "_id": true,
+                "a": {
+                    "x": true
+                },
+                "b": {
+                    "x": true
+                }
+            }
+        },
+        {
+            "$match": {
+                "a": 1,
+                "a.x": 1,
+                "b.x": 1,
+                "b": 1
+            }
+        }
+    ]
+}
+output: {
+    "$set:0": {
+        "scope:0": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:0": {
+                    "declaringScope": "scope:0",
+                    "dependencies": []
+                },
+                "a:1": {
+                    "declaringScope": "scope:0",
+                    "metadata": {
+                        "array": false
+                    },
+                    "dependencies": [
+                        "<base document>:-1"
+                    ]
+                },
+                "b:2": {
+                    "declaringScope": "scope:0",
+                    "scope:1": {
+                        "exhaustiveScope": "scope:-1",
+                        "fields": {
+                            "<missing>:3": {
+                                "declaringScope": "scope:1",
+                                "dependencies": []
+                            },
+                            "c:4": {
+                                "declaringScope": "scope:1",
+                                "metadata": {
+                                    "array": false
+                                },
+                                "dependencies": [
+                                    "<base document>:-1"
+                                ]
+                            }
+                        }
+                    },
+                    "dependencies": [
+                        "c:4"
+                    ]
+                }
+            }
+        },
+        "dependencies": [
+            "<base document>:-1"
+        ]
+    },
+    "$project:1": {
+        "scope:2": {
+            "exhaustiveScope": "scope:2",
+            "fields": {
+                "<missing>:5": {
+                    "declaringScope": "scope:2",
+                    "dependencies": []
+                },
+                "_id:-1": "_id:-1",
+                "a:6": {
+                    "declaringScope": "scope:2",
+                    "scope:3": {
+                        "exhaustiveScope": "scope:2",
+                        "fields": {
+                            "<missing>:7": {
+                                "declaringScope": "scope:3",
+                                "dependencies": []
+                            },
+                            "x:8": {
+                                "declaringScope": "scope:3",
+                                "dependencies": [
+                                    "a:1"
+                                ]
+                            }
+                        }
+                    },
+                    "dependencies": [
+                        "x:8"
+                    ]
+                },
+                "b:9": {
+                    "declaringScope": "scope:2",
+                    "scope:4": {
+                        "exhaustiveScope": "scope:4",
+                        "fields": {
+                            "<missing>:10": {
+                                "declaringScope": "scope:4",
+                                "dependencies": []
+                            },
+                            "x:-1": "x:-1"
+                        }
+                    },
+                    "dependencies": [
+                        "b:2"
+                    ]
+                }
+            }
+        },
+        "dependencies": [
+            "<base document>:-1",
+            "a:1"
+        ]
+    },
+    "$match:2": {
+        "scope:2": "scope:2",
+        "dependencies": [
+            "<base document>:-1",
+            "a:6",
+            "b:9",
+            "x:8"
+        ]
+    }
+}
+

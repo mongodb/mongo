@@ -1,0 +1,85 @@
+VARIATION InclusionBaseCollectionDotted
+input: {
+    "pipeline": [
+        {
+            "$project": {
+                "_id": true,
+                "x": true,
+                "a": {
+                    "b": {
+                        "c": true,
+                        "d": true
+                    }
+                }
+            }
+        },
+        {
+            "$match": {
+                "a.b.c": 1,
+                "a.b.d": 1,
+                "a.b.e": 1,
+                "a.b": 1,
+                "x": 1
+            }
+        }
+    ]
+}
+output: {
+    "$project:0": {
+        "scope:0": {
+            "exhaustiveScope": "scope:0",
+            "fields": {
+                "<missing>:0": {
+                    "declaringScope": "scope:0",
+                    "dependencies": []
+                },
+                "_id:-1": "_id:-1",
+                "a:1": {
+                    "declaringScope": "scope:0",
+                    "scope:1": {
+                        "exhaustiveScope": "scope:1",
+                        "fields": {
+                            "<missing>:2": {
+                                "declaringScope": "scope:1",
+                                "dependencies": []
+                            },
+                            "b:3": {
+                                "declaringScope": "scope:1",
+                                "scope:2": {
+                                    "exhaustiveScope": "scope:2",
+                                    "fields": {
+                                        "<missing>:4": {
+                                            "declaringScope": "scope:2",
+                                            "dependencies": []
+                                        },
+                                        "c:-1": "c:-1",
+                                        "d:-1": "d:-1"
+                                    }
+                                },
+                                "dependencies": [
+                                    "<base document>:-1"
+                                ]
+                            }
+                        }
+                    },
+                    "dependencies": [
+                        "<base document>:-1"
+                    ]
+                },
+                "x:-1": "x:-1"
+            }
+        },
+        "dependencies": [
+            "<base document>:-1"
+        ]
+    },
+    "$match:1": {
+        "scope:0": "scope:0",
+        "dependencies": [
+            "<base document>:-1",
+            "<missing>:4",
+            "b:3"
+        ]
+    }
+}
+

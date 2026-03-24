@@ -134,7 +134,6 @@ TEST_F(PipelineDependencyGraphGoldenTest, ComplexPaths) {
 }
 
 TEST_F(PipelineDependencyGraphGoldenTest, InclusionProjection) {
-    // TODO(SERVER-119374): Double check how inclusion projection should be handled.
     runVariation({
         .name = "InclusionProjection",
         .pipeline = "[{$set: { a: 'foo' }},"
@@ -263,6 +262,71 @@ TEST_F(PipelineDependencyGraphGoldenTest, RenameSameFieldsTwice) {
         .name = "RenameSameFieldsTwice",
         .pipeline = "[{$set: { a: 1 }},"
                     " {$set: { b: '$a', c: '$a', d: '$f', e: '$f' }}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, InclusionMixedFieldOrigins) {
+    runVariation({
+        .name = "InclusionMixedFieldOrigins",
+        .pipeline = "[{$set: { a: 1 }},"
+                    "{$project: { a: 1, b: 1 }},"
+                    "{$match: { a: 1, b: 1, c: 1 }}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, InclusionAfterReplaceRoot) {
+    runVariation({
+        .name = "InclusionAfterReplaceRoot",
+        .pipeline = "[{$replaceRoot: { newRoot: '$x' }},"
+                    "{$project: { a: 1, 'b.c': 1 }},"
+                    "{$match: { a: 1, 'b.c': 1, d: 1 }}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, InclusionDottedKnownSubfields) {
+    runVariation({
+        .name = "InclusionDottedKnownSubfields",
+        .pipeline = "[{$set: { 'a.b': 1, 'a.c': 2, 'a.d': 3 }},"
+                    "{$project: { 'a.b': 1, 'a.d': 1 }},"
+                    "{$match: { 'a.b': 1, 'a.c': 1, 'a.d': 1 }}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, ChainedInclusionProjections) {
+    runVariation({
+        .name = "ChainedInclusionProjections",
+        .pipeline = "[{$set: { a: 1, b: 1, c: 1 }},"
+                    "{$project: { a: 1, b: 1 }},"
+                    "{$project: { a: 1 }},"
+                    "{$match: { a: 1, b: 1 }}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, ChainedExclusionProjections) {
+    runVariation({
+        .name = "ChainedExclusionProjections",
+        .pipeline = "[{$set: { a: 1, b: 1, c: 1 }},"
+                    "{$project: { c: 0 }},"
+                    "{$project: { b: 0, c: 0 }},"
+                    "{$match: { a: 1, b: 1 }}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, InclusionBaseCollectionDotted) {
+    runVariation({
+        .name = "InclusionBaseCollectionDotted",
+        .pipeline = "[{$project: { 'a.b.c': 1, 'a.b.d': 1, 'x': 1 }},"
+                    "{$match: { 'a.b.c': 1, 'a.b.d': 1, 'a.b.e': 1, 'a.b': 1, x: 1 }}]",
+    });
+}
+
+// TODO(SERVER-121660): Revisit this.
+TEST_F(PipelineDependencyGraphGoldenTest, SetTopLevelFieldThenIncludeSubfields) {
+    runVariation({
+        .name = "SetTopLevelFieldThenIncludeSubfields",
+        .pipeline = "[{$set: {a: 1, b: {c: 1 }}},"
+                    "{$project: {'a.x': 1, 'b.x': 1}},"
+                    "{$match: {a: 1, 'a.x': 1, 'b.x': 1, b: 1}}]",
     });
 }
 

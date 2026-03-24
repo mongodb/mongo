@@ -77,10 +77,16 @@ struct NodeContainer {
     using Id = TypedId<T>;
 
     T& operator[](Id id) {
+        if constexpr (kDebugBuild) {
+            invariant(id, str::stream() << "Invalid access, container size " << size());
+        }
         return _nodes.at(id.value);
     }
 
     const T& operator[](Id id) const {
+        if constexpr (kDebugBuild) {
+            invariant(id, str::stream() << "Invalid access, container size " << size());
+        }
         return _nodes.at(id.value);
     }
 
@@ -240,7 +246,7 @@ struct Scope {
     // to $set is considered modified by $group. If we do not have an exhaustiveScope, the field
     // can be assumed to come from the document.
     ScopeId exhaustiveScope;
-    // FieldId for field made "missing" by this stage.
+    // Sentinel FieldId for any field made "missing" by this stage.
     // This is also the minimum FieldId declared by this stage.
     FieldId missingField;
 };
@@ -520,18 +526,34 @@ private:
     /**
      * Includes the field from the parent scope into the given scope.
      * This has the semantics of an inclusion projection.
+     *
+     * If given, 'defaultFieldId' tells us the assumed origin of the field in case there is no
+     * parent scope:
+     *  - A real FieldId if some prefix of the field is defined (e.g. if "a" is defined but we don't
+     *    know if "a.b" is).
+     *  - FieldId::none() if the field originates from the base collection.
+     *  - parentScope.missingField if the field was made missing by an exhaustive stage.
      */
-    void includeField(ScopeId scope, ScopeId parentScope, ParsedPathView path) {
+    void includeField(ScopeId scope,
+                      ScopeId parentScope,
+                      ParsedPathView path,
+                      FieldId defaultFieldId = FieldId::none()) {
+        // Gets the field which defines the last component in the given path in the parent scope, or
+        // 'defaultFieldId' if there is no parent scope.
+        auto resolvePathInParent = [this, parentScope, defaultFieldId](ParsedPathView path) {
+            return parentScope ? lookupFullPath(parentScope, path) : defaultFieldId;
+        };
+
         // Including 'a' should reference field 'a' and exit.
         if (path.size() == 1) {
-            auto existingField = lookupFullPath(parentScope, path);
-            if (existingField && existingField != _scopes[parentScope].missingField) {
-                _scopes[scope].fields[path.front()] = existingField;
-                return;
-            }
-            // TODO (SERVER-119374): Deps should be either missingField or whatever we use to
-            // represent a field from the base collection.
-            declareField(scope, path, {});
+            // Note that all four possible cases are covered by resolvePathInParent():
+            // 1) Included field is defined in parentScope.
+            // 2) Included field is not defined in parentScope, but not all fields are known
+            //    (return FieldId::none()).
+            // 3) Included field is not defined in parentScope and all fields are known (return the
+            //    "missing" field id of the last exhaustive stage).
+            // 4) There is no parentScope to resolve paths in (return the given 'defaultFieldId').
+            _scopes[scope].fields[path.front()] = resolvePathInParent(path);
             return;
         }
 
@@ -542,45 +564,47 @@ private:
         auto basePath = path.subspan(0, 1);
         auto subPath = path.subspan(1);
 
-        auto previousBaseField = lookupFullPath(parentScope, basePath);
-        auto existingBaseField = lookupFullPath(scope, basePath);
+        FieldId parentBaseField = resolvePathInParent(basePath);
+        ScopeId parentEmbeddedScope =
+            parentBaseField ? _fields[parentBaseField].embeddedScope : ScopeId::none();
+        ScopeId parentDeclaringScope =
+            parentBaseField ? _fields[parentBaseField].declaringScope : ScopeId::none();
 
-        if (existingBaseField && existingBaseField != _scopes[scope].missingField) {
+        bool shadowedByParent = parentDeclaringScope && !parentEmbeddedScope &&
+            parentBaseField != _scopes[parentDeclaringScope].missingField;
+
+        // If the parent field is defined but has no embedded scope, it's a scalar or an unknown
+        // value that shadows any subpath. That is, the subfield that is being included is either
+        // not known or is known to not exist. We currently don't properly distinguish between the
+        // two, so we declare the field to avoid incorrect dependency tracking.
+        // TODO(SERVER-122273): Revisit this when we properly distinguish between unknown and
+        // missing fields.
+        if (shadowedByParent) {
+            declareField(scope, path, {parentBaseField});
+            return;
+        }
+
+        if (FieldId existingBaseField = lookupFullPath(scope, basePath);
+            existingBaseField && existingBaseField != _scopes[scope].missingField) {
             // Due to the rule that we cannot have clashing paths, we know that we cannot have just
             // "include a" and then "include a.b".
             tassert(11937306, "Clashing paths", _fields[existingBaseField].embeddedScope);
             // Since we are calling includeField, we expect that we cannot already have 'a' included
             // trivially either.
             tassert(11936307, "Already exists", _fields[existingBaseField].declaringScope == scope);
-
-            if (previousBaseField && _fields[previousBaseField].embeddedScope) {
-                // Great, we know exactly where this 'b' comes from, just re-include in 'a'.
-                includeField(_fields[existingBaseField].embeddedScope,
-                             _fields[previousBaseField].embeddedScope,
-                             subPath);
-                return;
-            }
-            // We cannot figure out where this 'b' comes from. We will re-declare it here.
-            // TODO (SERVER-119374): How to represent fields that come from the base collection?
-            declareField(_fields[existingBaseField].embeddedScope, subPath, {});
-            return;
+            // 'a' is already defined in the current scope.
+            includeField(_fields[existingBaseField].embeddedScope,
+                         parentEmbeddedScope,
+                         subPath,
+                         parentBaseField /*defaultFieldId*/);
+        } else {
+            // 'a' is not included in the current scope, so we need to declare it then include 'b'.
+            FieldId newBaseField = declareField(scope, basePath, {parentBaseField});
+            ScopeId newEmbeddedScope = _scopes.getNextId();
+            declareScope(_scopes[scope].stage, newEmbeddedScope, ScopeId::none());
+            _fields[newBaseField].embeddedScope = newEmbeddedScope;
+            includeField(newEmbeddedScope, parentEmbeddedScope, subPath, parentBaseField);
         }
-
-        // 'a' is not included in the current scope, so we need to declare it then include 'b'.
-        auto newBaseField = declareField(scope, basePath, {});
-        if (previousBaseField && _fields[previousBaseField].embeddedScope) {
-            // We know about 'a' from before, so we can include 'b'.
-            auto embeddedScope = _scopes.getNextId();
-            declareScope(_scopes[scope].stage, embeddedScope, ScopeId::none());
-            _fields[newBaseField].embeddedScope = embeddedScope;
-            includeField(embeddedScope, _fields[previousBaseField].embeddedScope, subPath);
-            return;
-        }
-
-        // We do not know about 'a', so we don't know what is being included at all.
-        // We will need to just declare 'a.b' anew.
-        // TODO (SERVER-119374): How to represent fields that come from the base collection?
-        declareField(scope, path, {});
     }
 
     /**
@@ -590,6 +614,8 @@ private:
     FieldLookupResult lookupField(ScopeId scopeId,
                                   ParsedPathView path,
                                   FieldList* prefix = nullptr) const {
+        tassert(11937401, "Missing scopeId", scopeId);
+
         const auto& scope = _scopes[scopeId];
         auto fieldNameId = path.front();
         if (auto it = scope.fields.find(fieldNameId); it != scope.fields.end()) {
@@ -614,10 +640,13 @@ private:
         }
 
         if (scope.exhaustiveScope) {
-            // Not every possible field is known; the field could be coming from the base document.
+            // The field isn't defined in this scope and every field is known. This means the base
+            // document is no longer visible, so the field was defined (made missing) by the
+            // exhaustive stage.
             return {_scopes[scope.exhaustiveScope].missingField};
         }
 
+        // Not every possible field is known; the field could be coming from the base document.
         return {FieldId::none()};
     }
 
@@ -698,7 +727,6 @@ private:
         document_transformation::describeTransformation(
             OverloadedVisitor{
                 [&](const ReplaceRoot&) {
-                    // TODO(SERVER-119374): Revisit how to handle kNotSupported and kAllPaths.
                     // All paths might be modified. This scope does not inherit the parent scope
                     // fields. It also doesn't know all fields - all lookups will fail and we should
                     // say we have no information about the field (as opposed to saying the field is
@@ -1036,32 +1064,34 @@ private:
             _visitedScopes.insert(scopeId);
             BSONObjBuilder scopeBob = bob.subobjStart(scopeName);
             scopeBob.append("exhaustiveScope", formatScope(scope.exhaustiveScope));
+            BSONObjBuilder fieldsBob = scopeBob.subobjStart("fields");
             {
-                BSONObjBuilder fieldsBob = scopeBob.subobjStart("fields");
-                {
-                    BSONObjBuilder fieldObj = fieldsBob.subobjStart(fmt::format(
-                        "<missing>:{}", _orderedFieldIds.get(scope.missingField).value));
-                    serializeField(scope.missingField, fieldObj);
-                }
+                BSONObjBuilder fieldObj = fieldsBob.subobjStart(
+                    fmt::format("<missing>:{}", _orderedFieldIds.get(scope.missingField).value));
+                serializeField(scope.missingField, fieldObj);
+            }
 
-                // FieldMap doesn't guarantee any order. We need a stable order for golden testing.
-                for (auto&& name : getSortedStringKeys(scope.fields.begin(), scope.fields.end())) {
-                    auto fieldId = scope.fields.at(name);
-                    auto scopeFieldName = formatField(_graph._strings.get(name), fieldId);
-                    if (fieldId < scope.missingField) {
-                        // Field is inherited if the field ID is lower than the <missing> field of
-                        // the scope.
-                        fieldsBob.append(scopeFieldName, scopeFieldName);
-                    } else {
-                        BSONObjBuilder fieldObj = fieldsBob.subobjStart(scopeFieldName);
-                        serializeField(fieldId, fieldObj);
-                    }
+            // FieldMap doesn't guarantee any order. We need a stable order for golden testing.
+            for (auto&& name : getSortedStringKeys(scope.fields.begin(), scope.fields.end())) {
+                auto fieldId = scope.fields.at(name);
+                auto scopeFieldName = formatField(_graph._strings.get(name), fieldId);
+                if (fieldId < scope.missingField) {
+                    // Field is inherited if the field ID is lower than the <missing> field of
+                    // the scope.
+                    fieldsBob.append(scopeFieldName, scopeFieldName);
+                } else {
+                    BSONObjBuilder fieldObj = fieldsBob.subobjStart(scopeFieldName);
+                    serializeField(fieldId, fieldObj);
                 }
             }
         }
     }
 
     void serializeField(FieldId fieldId, BSONObjBuilder& bob) {
+        if (!fieldId) {
+            bob.append("source", "<base document>");
+            return;
+        }
         const auto& field = _graph._fields[fieldId];
         auto fieldScopeName = formatScope(field.declaringScope);
         bob.append("declaringScope", fieldScopeName);

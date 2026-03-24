@@ -1,0 +1,74 @@
+VARIATION InclusionMixedFieldOrigins
+input: {
+    "pipeline": [
+        {
+            "$set": {
+                "a": {
+                    "$const": 1
+                }
+            }
+        },
+        {
+            "$project": {
+                "_id": true,
+                "a": true,
+                "b": true
+            }
+        },
+        {
+            "$match": {
+                "a": 1,
+                "b": 1,
+                "c": 1
+            }
+        }
+    ]
+}
+output: {
+    "$set:0": {
+        "scope:0": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:0": {
+                    "declaringScope": "scope:0",
+                    "dependencies": []
+                },
+                "a:1": {
+                    "declaringScope": "scope:0",
+                    "metadata": {
+                        "array": false
+                    },
+                    "dependencies": []
+                }
+            }
+        },
+        "dependencies": []
+    },
+    "$project:1": {
+        "scope:1": {
+            "exhaustiveScope": "scope:1",
+            "fields": {
+                "<missing>:2": {
+                    "declaringScope": "scope:1",
+                    "dependencies": []
+                },
+                "_id:-1": "_id:-1",
+                "a:1": "a:1",
+                "b:-1": "b:-1"
+            }
+        },
+        "dependencies": [
+            "<base document>:-1",
+            "a:1"
+        ]
+    },
+    "$match:2": {
+        "scope:1": "scope:1",
+        "dependencies": [
+            "<base document>:-1",
+            "<missing>:2",
+            "a:1"
+        ]
+    }
+}
+

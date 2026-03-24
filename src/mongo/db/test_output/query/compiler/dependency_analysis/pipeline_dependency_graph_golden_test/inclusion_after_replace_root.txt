@@ -1,0 +1,82 @@
+VARIATION InclusionAfterReplaceRoot
+input: {
+    "pipeline": [
+        {
+            "$replaceRoot": {
+                "newRoot": "$x"
+            }
+        },
+        {
+            "$project": {
+                "_id": true,
+                "a": true,
+                "b": {
+                    "c": true
+                }
+            }
+        },
+        {
+            "$match": {
+                "a": 1,
+                "b.c": 1,
+                "d": 1
+            }
+        }
+    ]
+}
+output: {
+    "$replaceRoot:0": {
+        "scope:0": {
+            "exhaustiveScope": "scope:0",
+            "fields": {
+                "<missing>:0": {
+                    "declaringScope": "scope:0",
+                    "dependencies": []
+                }
+            }
+        },
+        "dependencies": [
+            "<base document>:-1"
+        ]
+    },
+    "$project:1": {
+        "scope:1": {
+            "exhaustiveScope": "scope:1",
+            "fields": {
+                "<missing>:1": {
+                    "declaringScope": "scope:1",
+                    "dependencies": []
+                },
+                "_id:0": "_id:0",
+                "a:0": "a:0",
+                "b:2": {
+                    "declaringScope": "scope:1",
+                    "scope:2": {
+                        "exhaustiveScope": "scope:2",
+                        "fields": {
+                            "<missing>:3": {
+                                "declaringScope": "scope:2",
+                                "dependencies": []
+                            },
+                            "c:0": "c:0"
+                        }
+                    },
+                    "dependencies": [
+                        "<missing>:0"
+                    ]
+                }
+            }
+        },
+        "dependencies": [
+            "<missing>:0"
+        ]
+    },
+    "$match:2": {
+        "scope:1": "scope:1",
+        "dependencies": [
+            "<missing>:0",
+            "<missing>:1"
+        ]
+    }
+}
+

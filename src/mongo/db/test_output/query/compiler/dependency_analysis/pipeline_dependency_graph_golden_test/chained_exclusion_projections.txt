@@ -1,38 +1,36 @@
-VARIATION InclusionProjection
+VARIATION ChainedExclusionProjections
 input: {
     "pipeline": [
         {
             "$set": {
                 "a": {
-                    "$const": "foo"
-                }
-            }
-        },
-        {
-            "$set": {
+                    "$const": 1
+                },
                 "b": {
-                    "$const": "bar"
-                }
-            }
-        },
-        {
-            "$set": {
+                    "$const": 1
+                },
                 "c": {
-                    "$const": "baz"
+                    "$const": 1
                 }
             }
         },
         {
             "$project": {
-                "_id": true,
-                "b": true,
-                "c": true
+                "c": false,
+                "_id": true
+            }
+        },
+        {
+            "$project": {
+                "b": false,
+                "c": false,
+                "_id": true
             }
         },
         {
             "$match": {
-                "a": "foo",
-                "b": "bar"
+                "a": 1,
+                "b": 1
             }
         }
     ]
@@ -52,76 +50,69 @@ output: {
                         "array": false
                     },
                     "dependencies": []
+                },
+                "b:2": {
+                    "declaringScope": "scope:0",
+                    "metadata": {
+                        "array": false
+                    },
+                    "dependencies": []
+                },
+                "c:3": {
+                    "declaringScope": "scope:0",
+                    "metadata": {
+                        "array": false
+                    },
+                    "dependencies": []
                 }
             }
         },
         "dependencies": []
     },
-    "$set:1": {
+    "$project:1": {
         "scope:1": {
             "exhaustiveScope": "scope:-1",
             "fields": {
-                "<missing>:2": {
+                "<missing>:4": {
                     "declaringScope": "scope:1",
                     "dependencies": []
                 },
                 "a:1": "a:1",
-                "b:3": {
+                "b:2": "b:2",
+                "c:5": {
                     "declaringScope": "scope:1",
-                    "metadata": {
-                        "array": false
-                    },
                     "dependencies": []
                 }
             }
         },
         "dependencies": []
     },
-    "$set:2": {
+    "$project:2": {
         "scope:2": {
             "exhaustiveScope": "scope:-1",
             "fields": {
-                "<missing>:4": {
+                "<missing>:6": {
                     "declaringScope": "scope:2",
                     "dependencies": []
                 },
                 "a:1": "a:1",
-                "b:3": "b:3",
-                "c:5": {
+                "b:7": {
                     "declaringScope": "scope:2",
-                    "metadata": {
-                        "array": false
-                    },
+                    "dependencies": []
+                },
+                "c:8": {
+                    "declaringScope": "scope:2",
                     "dependencies": []
                 }
             }
         },
         "dependencies": []
     },
-    "$project:3": {
-        "scope:3": {
-            "exhaustiveScope": "scope:3",
-            "fields": {
-                "<missing>:6": {
-                    "declaringScope": "scope:3",
-                    "dependencies": []
-                },
-                "_id:-1": "_id:-1",
-                "b:3": "b:3",
-                "c:5": "c:5"
-            }
-        },
+    "$match:3": {
+        "scope:2": "scope:2",
         "dependencies": [
-            "<base document>:-1",
-            "b:3",
-            "c:5"
-        ]
-    },
-    "$match:4": {
-        "scope:3": "scope:3",
-        "dependencies": [
-            "<missing>:6",
-            "b:3"
+            "a:1",
+            "b:7"
         ]
     }
 }
