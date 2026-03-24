@@ -10,6 +10,7 @@
  * ]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {getTimeseriesBucketsColl} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
@@ -97,7 +98,40 @@ function testUpgradeErrors() {
             }),
             ErrorCodes.IllegalOperation,
         );
-        assert(db.getCollection(regularCollName).drop());
+    }
+
+    {
+        jsTest.log.info(
+            "Upgrade: Non-timeseries collection while system.buckets exists should fail with TimeseriesBucketMetadataInconsistent",
+        );
+        const regularCollBucketsName = "system.buckets." + regularCollName;
+        const createBucketsOp = {
+            op: "c",
+            ns: dbName + ".$cmd",
+            o: {
+                create: regularCollBucketsName,
+                clusteredIndex: true,
+                timeseries: {
+                    timeField: "t",
+                    granularity: "seconds",
+                    bucketMaxSpanSeconds: 3600,
+                },
+            },
+        };
+        const primaryShard = st.rs0.getPrimary();
+        const shardDB = primaryShard.getDB(dbName);
+        const fp = configureFailPoint(primaryShard, "skipCheckConflictingTimeseriesNamespace", {
+            namespace: dbName + "." + regularCollBucketsName,
+        });
+        assert.commandWorked(shardDB.runCommand({applyOps: [createBucketsOp]}));
+        fp.off();
+        assert.commandFailedWithCode(
+            db.runCommand({
+                upgradeDowngradeViewlessTimeseries: regularCollName,
+                mode: "upgradeToViewless",
+            }),
+            ErrorCodes.TimeseriesBucketMetadataInconsistent,
+        );
     }
 
     {
@@ -110,8 +144,9 @@ function testUpgradeErrors() {
             }),
             ErrorCodes.CommandNotSupportedOnLegacyTimeseriesBucketsNamespace,
         );
-        assert(db.getCollection(tsCollName).drop());
     }
+
+    assert.commandWorked(db.dropDatabase());
 }
 
 // Run the tests

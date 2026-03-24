@@ -115,6 +115,8 @@ MONGO_FAIL_POINT_DEFINE(failTimeseriesViewCreation);
 MONGO_FAIL_POINT_DEFINE(clusterAllCollectionsByDefault);
 MONGO_FAIL_POINT_DEFINE(skipIdIndex);
 MONGO_FAIL_POINT_DEFINE(hangCreateCollectionBeforeLockAcquisition);
+// TODO SERVER-122511 Remove this failpoint once 9.0 becomes last LTS.
+MONGO_FAIL_POINT_DEFINE(skipCheckConflictingTimeseriesNamespace);
 
 using IndexVersion = IndexDescriptor::IndexVersion;
 
@@ -389,13 +391,21 @@ Status _checkNamespaceOrTimeseriesBucketsAlreadyExists(OperationContext* opCtx,
     const auto checkOtherTimeseriesNss = opCtx->isEnforcingConstraints() &&
         gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledAndIgnoreFCVUnsafe();
 
-    if (checkOtherTimeseriesNss) {
+    bool skipConflictingTimeseriesNamespaceCheck = false;
+    skipCheckConflictingTimeseriesNamespace.executeIf(
+        [&](const BSONObj&) { skipConflictingTimeseriesNamespaceCheck = true; },
+        [&](const BSONObj& data) {
+            const auto namespaceFromFailpoint = data.getStringField("namespace");
+            return !namespaceFromFailpoint.empty() && namespaceFromFailpoint == nss.ns_forTest();
+        });
+
+    if (checkOtherTimeseriesNss && !MONGO_unlikely(skipConflictingTimeseriesNamespaceCheck)) {
         auto otherTimeseriesNss = nss.isTimeseriesBucketsCollection()
             ? nss.getTimeseriesViewNamespace()
             : nss.makeTimeseriesBucketsNamespace();
         auto statusOtherNss = catalog::checkIfNamespaceExists(opCtx, otherTimeseriesNss);
         if (!statusOtherNss.isOK()) {
-            return statusOtherNss.addContext("Conflicitng namespace already exists");
+            return statusOtherNss.addContext("Conflicting namespace already exists");
         }
     }
     return Status::OK();

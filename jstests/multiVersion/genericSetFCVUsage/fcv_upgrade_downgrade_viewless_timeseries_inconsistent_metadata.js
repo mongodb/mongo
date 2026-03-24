@@ -26,79 +26,80 @@ const adminDB = st.s.getDB("admin");
 assert(FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections"));
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
-// Checks if system.buckets.<collName> exists, indicating legacy (viewful) format.
-function isLegacyTimeseriesFormat(collName) {
-    return (
+// Checks if collection is in viewless format.
+function isViewlessTimeseriesFormat(collName) {
+    const collInfo = db.getCollectionInfos({name: collName})[0];
+    const bucketsExists =
         adminDB
             .getSiblingDB(dbName)
             .getCollection("system.buckets." + collName)
-            .exists() !== null
-    );
+            .exists() !== null;
+    return collInfo && collInfo.options && collInfo.options.timeseries && !bucketsExists;
 }
 
-// Checks if collection is in viewless format (main namespace exists with timeseries options).
-function isViewlessTimeseriesFormat(collName) {
-    const collInfo = db.getCollectionInfos({name: collName})[0];
-    return collInfo && collInfo.options && collInfo.options.timeseries && !isLegacyTimeseriesFormat(collName);
-}
+const validTsCollName = "validTs";
+const regularCollName = "regularColl";
+const inconsistentCollName = "system.buckets." + regularCollName;
+const primaryShard = st.rs0.getPrimary();
+const shardDB = primaryShard.getDB(dbName);
 
-jsTest.log.info("Creating two viewless timeseries collections at latest FCV");
-const validCollName = "validTs";
-const inconsistentCollName = "inconsistentTs";
-const validColl = db[validCollName];
-const inconsistentColl = db[inconsistentCollName];
+jsTest.log.info("Downgrading FCV to lastLTS to create legacy timeseries collections");
+assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
+jsTest.log.info("Creating valid timeseries collection in legacy format");
 assert.commandWorked(
-    db.createCollection(validCollName, {
+    db.createCollection(validTsCollName, {
         timeseries: {timeField: "t", metaField: "m"},
     }),
 );
-assert.commandWorked(validColl.insertOne({t: ISODate(), m: 1, value: "valid"}));
+assert.commandWorked(db[validTsCollName].insertOne({t: ISODate(), m: 1, value: "valid"}));
 
-assert.commandWorked(
-    db.createCollection(inconsistentCollName, {
-        timeseries: {timeField: "t", metaField: "m"},
-    }),
-);
-assert.commandWorked(inconsistentColl.insertOne({t: ISODate(), m: 2, value: "inconsistent"}));
+// Create a regular collection.
+assert.commandWorked(db.createCollection(regularCollName));
 
-jsTest.log.info("Downgrading FCV to last LTS to get legacy format collections");
-assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
-
-jsTest.log.info("Verifying both collections are now in legacy format");
-assert.eq(true, isLegacyTimeseriesFormat(validCollName));
-assert.eq(true, isLegacyTimeseriesFormat(inconsistentCollName));
-
-jsTest.log.info("Enabling failpoint on CONFIG SERVER to simulate TimeseriesBucketMetadataInconsistent");
-const configPrimary = st.configRS.getPrimary();
-const failpoint = configureFailPoint(configPrimary, "FailViewlessTimeseriesUpgradeWithBucketMetadataInconsistent", {
-    namespace: inconsistentColl.getFullName(),
+// Create the orphan system.buckets collection.
+const createBucketsOp = {
+    op: "c",
+    ns: dbName + ".$cmd",
+    o: {
+        create: inconsistentCollName,
+        clusteredIndex: true,
+        timeseries: {
+            timeField: "t",
+            granularity: "seconds",
+            bucketMaxSpanSeconds: 3600,
+        },
+    },
+};
+const fp = configureFailPoint(primaryShard, "skipCheckConflictingTimeseriesNamespace", {
+    namespace: dbName + "." + inconsistentCollName,
 });
+assert.commandWorked(shardDB.runCommand({applyOps: [createBucketsOp]}));
+fp.off();
 
-jsTest.log.info("Attempting FCV upgrade, this should succeed despite one collection having issues");
-assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+jsTest.log.info("Attempting FCV upgrade, this should succeed despite the metadata inconsistency");
+assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
 jsTest.log.info("Verifying valid collection was converted to viewless format");
-assert.eq(true, isViewlessTimeseriesFormat(validCollName));
+assert.eq(true, isViewlessTimeseriesFormat(validTsCollName));
 
-jsTest.log.info("Verifying inconsistent collection was skipped (still in legacy format)");
-assert.eq(true, isLegacyTimeseriesFormat(inconsistentCollName));
+jsTest.log.info("Verifying regular collection remains non-timeseries and orphan buckets are kept");
+const regularCollInfo = db.getCollectionInfos({name: regularCollName})[0];
+assert(regularCollInfo);
+assert(!regularCollInfo.options?.timeseries);
+assert.neq(null, adminDB.getSiblingDB(dbName).getCollection(inconsistentCollName).exists());
 
 jsTest.log.info("Verifying bypass parameter allowDirectSystemBucketsAccess works");
-const bucketCollName = "system.buckets." + inconsistentCollName;
-const shardPrimary = st.rs0.getPrimary();
-
 assert.commandFailedWithCode(
-    db.runCommand({count: bucketCollName}),
+    db.runCommand({count: inconsistentCollName}),
     ErrorCodes.CommandNotSupportedOnLegacyTimeseriesBucketsNamespace,
 );
 
-assert.commandWorked(shardPrimary.adminCommand({setParameter: 1, allowDirectSystemBucketsAccess: true}));
-assert.commandWorked(db.runCommand({count: bucketCollName}));
+assert.commandWorked(primaryShard.adminCommand({setParameter: 1, allowDirectSystemBucketsAccess: true}));
+assert.commandWorked(db.runCommand({count: inconsistentCollName}));
 
 // cleanup
-assert.commandWorked(shardPrimary.adminCommand({setParameter: 1, allowDirectSystemBucketsAccess: false}));
-failpoint.off();
+assert.commandWorked(primaryShard.adminCommand({setParameter: 1, allowDirectSystemBucketsAccess: false}));
 assert.commandWorked(db.dropDatabase());
 
 st.stop();

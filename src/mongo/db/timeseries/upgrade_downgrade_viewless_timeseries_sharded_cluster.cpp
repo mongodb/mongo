@@ -63,7 +63,6 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangAfterEnumeratingTimeseriesCollectionsForFCV);
 MONGO_FAIL_POINT_DEFINE(alwaysReportTimeseriesCollectionsNeedConversion);
-MONGO_FAIL_POINT_DEFINE(FailViewlessTimeseriesUpgradeWithBucketMetadataInconsistent);
 
 /**
  * Returns all timeseries collection namespaces across the cluster that need to be converted
@@ -232,18 +231,6 @@ void upgradeDowngradeViewlessTimeseriesInShardedCluster(OperationContext* opCtx,
             }
 
             try {
-                // Failpoint to simulate TimeseriesBucketMetadataInconsistent for a namespace.
-                FailViewlessTimeseriesUpgradeWithBucketMetadataInconsistent.executeIf(
-                    [&nss](const BSONObj&) {
-                        uasserted(ErrorCodes::TimeseriesBucketMetadataInconsistent,
-                                  str::stream()
-                                      << "Simulated metadata inconsistency for namespace: "
-                                      << nss.toStringForErrorMsg());
-                    },
-                    [&nss](const BSONObj& data) {
-                        return nss.ns_forTest() == data.getStringField("namespace");
-                    });
-
                 ShardsvrUpgradeDowngradeViewlessTimeseries shardsvrReq(nss);
                 shardsvrReq.setMode(isUpgrade ? TimeseriesUpgradeDowngradeModeEnum::kToViewless
                                               : TimeseriesUpgradeDowngradeModeEnum::kToLegacy);
