@@ -1104,7 +1104,11 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           }
 
           const auto& entry = *op;
-          auto swOplogEntry = IndexBuildOplogEntry::parse(opCtx, entry);
+          auto swOplogEntry = IndexBuildOplogEntry::parse(
+              opCtx,
+              entry,
+              shouldReplicateLocalCatalogIdentifiers(
+                  rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider()));
           if (!swOplogEntry.isOK()) {
               return swOplogEntry.getStatus().withContext(
                   "Error parsing 'commitIndexBuild' oplog entry");

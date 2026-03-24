@@ -1273,6 +1273,46 @@ TEST_F(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
     }
 }
 
+void assertIndexBuildSkipsO2WhenParseO2False(OperationContext* opCtx,
+                                             const OpTime& opTime,
+                                             StringData commandName,
+                                             OplogEntry::CommandType expectedCommandType) {
+    const std::string ns = "test.coll";
+    const auto nss = NamespaceString::createNamespaceString_forTest(ns);
+    const UUID indexBuildUUID = UUID::gen();
+    const std::vector<BSONObj> indexSpecs = {
+        BSON("v" << 2 << "key" << BSON("x" << 1) << "name"
+                 << "x_1"),
+        BSON("v" << 2 << "key" << BSON("y" << 1) << "name"
+                 << "y_1"),
+    };
+    const auto uuid = UUID::gen();
+
+    const auto o =
+        BSON(commandName << ns << "indexBuildUUID" << indexBuildUUID << "indexes" << indexSpecs);
+    const auto o2 = BSON("indexes" << BSON_ARRAY(BSON("indexIdent" << "index-0")
+                                                 << BSON("indexIdent" << "index-1")));
+    const auto entry = makeCommandOplogEntry(opTime, nss, o, o2, uuid);
+
+    auto parsed = unittest::assertGet(IndexBuildOplogEntry::parse(opCtx, entry, /*parseO2=*/false));
+    ASSERT_EQ(parsed.commandType, expectedCommandType);
+    ASSERT_EQ(parsed.indexes.size(), 2);
+    // o2 was skipped, so idents should be empty.
+    ASSERT(parsed.indexes[0].indexIdent.empty());
+    ASSERT(parsed.indexes[1].indexIdent.empty());
+    ASSERT_FALSE(parsed.cause);
+}
+
+TEST_F(OplogEntryTest, ParseStartIndexBuildSkipsO2WhenParseO2False) {
+    assertIndexBuildSkipsO2WhenParseO2False(
+        _opCtx.get(), entryOpTime, "startIndexBuild", OplogEntry::CommandType::kStartIndexBuild);
+}
+
+TEST_F(OplogEntryTest, ParseCommitIndexBuildSkipsO2WhenParseO2False) {
+    assertIndexBuildSkipsO2WhenParseO2False(
+        _opCtx.get(), entryOpTime, "commitIndexBuild", OplogEntry::CommandType::kCommitIndexBuild);
+}
+
 TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
     auto parse = [&](BSONObj o, boost::optional<BSONObj> o2 = boost::none) {
         auto entry = makeCommandOplogEntry(entryOpTime, nss, o, o2, UUID::gen());
