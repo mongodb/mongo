@@ -157,6 +157,7 @@ namespace {
 Rarely _samplerAccumulatorJs, _samplerFunctionJs;
 
 MONGO_FAIL_POINT_DEFINE(hangAfterCreatingAggregationPlan);
+MONGO_FAIL_POINT_DEFINE(hangBeforeCreatingAggCatalogState);
 
 bool checkRetryableWriteAlreadyApplied(const AggExState& aggExState,
                                        rpc::ReplyBuilderInterface* result) {
@@ -1369,6 +1370,15 @@ Status _runAggregate(std::unique_ptr<AggExState> aggExState, rpc::ReplyBuilderIn
     // global MODE_X lock, after having sent interrupt signals to read operations. This operation
     // must never hold open storage cursors while ignoring interrupt.
     InterruptibleLockGuard interruptibleLockAcquisition(aggExState->getOpCtx());
+
+    hangBeforeCreatingAggCatalogState.executeIf(
+        [&](const auto&) {
+            hangBeforeCreatingAggCatalogState.pauseWhileSet(aggExState->getOpCtx());
+        },
+        [&](const BSONObj& data) {
+            auto nsElem = data["ns"];
+            return !nsElem || nsElem.str() == aggExState->getOriginalNss().toStringForErrorMsg();
+        });
 
     // Acquire any catalog locks needed by the pipeline, and create catalog-dependent state.
     std::unique_ptr<AggCatalogState> aggCatalogState = aggExState->createAggCatalogState();
