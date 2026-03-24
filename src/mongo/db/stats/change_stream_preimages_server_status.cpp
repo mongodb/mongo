@@ -38,8 +38,6 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/version_context.h"
 
-#include <memory>
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 
 namespace mongo {
@@ -59,6 +57,8 @@ void appendPreImagesCollectionStats(OperationContext* opCtx, BSONObjBuilder* res
         result->append("expireAfterSeconds", expireAfterSeconds->count());
     }
 
+    // Note: on disaggregated storage, the values returned for 'numRecords' and 'dataSize' may
+    // always be 0.
     int64_t numRecords = preImagesColl->numRecords(opCtx);
     int64_t dataSize = preImagesColl->dataSize(opCtx);
     result->append("numDocs", numRecords);
@@ -113,9 +113,6 @@ public:
                             const BSONElement& configElement) const override {
         BSONObjBuilder builder;
 
-        // Purging metrics are reported regardless of whether it is a single or multi-tenant
-        // environment. In the case of a multi tenant environment, the metrics are cumulative across
-        // tenants.
         const auto& jobStats =
             ChangeStreamPreImagesCollectionManager::get(opCtx).getPurgingJobStats();
         builder.append("purgingJob", jobStats.toBSON());

@@ -225,14 +225,16 @@ void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImages
                     "Periodic change stream expired pre-images removal job starting",
                     "useReplicatedTruncates"_attr = useReplicatedTruncates);
 
-        // The number of removals here can be an estimate based on collection size information,
-        // which can be inaccurate.
+        // The number of removals here can be an estimate based on collection size and count
+        // information, which can be inaccurate.
         if (size_t estimatedNumberOfRemovals =
                 _deleteExpiredPreImagesWithTruncate(opCtx.get(), useReplicatedTruncates);
             estimatedNumberOfRemovals > 0) {
             LOGV2_DEBUG(5869104,
                         1,
-                        "Periodic change stream expired pre-images removal job finished executing",
+                        "Periodic change stream expired pre-images removal job finished executing. "
+                        "The number of removed pre-images reported is only an estimate and its "
+                        "accuracy can vary.",
                         "estimatedNumberOfRemovals"_attr = estimatedNumberOfRemovals,
                         "jobDuration"_attr = (Date_t::now() - startTime).toString());
         }

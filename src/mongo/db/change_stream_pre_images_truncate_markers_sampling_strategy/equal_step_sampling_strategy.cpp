@@ -264,9 +264,14 @@ bool EqualStepSamplingStrategy::performSampling(OperationContext* opCtx,
             "Expecting number of sample keys to equal number of last records keys",
             samples.size() == nsUUIDLastRecords.size());
 
-    // We don't rely on the 'SizeStorer' here. That means the "estimates" used for 'numRecords'
-    // and 'dataSize' here are hard-coded and can be very inaccurate. 'numRecords' must be at
-    // least 1 to prevent division by zero below.
+    // We cannot rely on the 'SizeStorer' here, as it may return 0 for both 'numRecords' and
+    // 'dataSize' with disaggregated storage. Specifically, replicated fastcount information is not
+    // available for implicitly replicated collections such as 'config.system.preimages'. That means
+    // we need to make up estimates for 'numRecords' and 'dataSize' here:
+    // - 'numRecords' is set to the number of pre-images found during the sampling.
+    //   This is guaranteed to be at least 1.
+    // - 'dataSize' is set to the value of 'numRecords' * 1024.
+    // These estimates can be very inaccurate.
     int64_t numRecords = std::max<int64_t>(1, countTotalSamples(samples));
 
     // Multiply the number of records by an arbitrarily-chosen average record size here to get
@@ -278,18 +283,20 @@ bool EqualStepSamplingStrategy::performSampling(OperationContext* opCtx,
     const double estimatedRecordsPerMarker = std::ceil(minBytesPerMarker / avgRecordSize);
     const double estimatedBytesPerMarker = estimatedRecordsPerMarker * avgRecordSize;
 
-    LOGV2_DEBUG(11423705,
-                3,
-                "Statistics after equal step pre-images collection sampling",
-                "nsUUIDs"_attr = nsUUIDLastRecords.size(),
-                "numSamplesPerMarker"_attr = _numSamplesPerMarker,
-                "dataSizeSampled"_attr = dataSize,
-                "numRecordsSampled"_attr = numRecords,
-                "avgRecordSizeSampled"_attr = avgRecordSize,
-                "estimatedRecordsPerMarker"_attr = estimatedRecordsPerMarker,
-                "estimatedBytesPerMarker"_attr = estimatedBytesPerMarker,
-                "minBytesPerMarker"_attr = minBytesPerMarker,
-                "preImagesCollectionUUID"_attr = preImagesCollection.uuid());
+    LOGV2_DEBUG(
+        11423705,
+        3,
+        "Statistics after equal step pre-images collection sampling. These are partially based on "
+        "estimates and heuristics, so they can be inaccurate.",
+        "nsUUIDs"_attr = nsUUIDLastRecords.size(),
+        "numSamplesPerMarker"_attr = _numSamplesPerMarker,
+        "dataSizeSampled"_attr = dataSize,
+        "numRecordsSampled"_attr = numRecords,
+        "avgRecordSizeSampled"_attr = avgRecordSize,
+        "estimatedRecordsPerMarker"_attr = estimatedRecordsPerMarker,
+        "estimatedBytesPerMarker"_attr = estimatedBytesPerMarker,
+        "minBytesPerMarker"_attr = minBytesPerMarker,
+        "preImagesCollectionUUID"_attr = preImagesCollection.uuid());
 
     // Use the samples to generate and install in 'markersMap' the initial sets of whole markers
     // for each distinct 'nsUUID' value. And then fix the install entries in 'markersMap' so the
