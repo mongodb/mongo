@@ -152,6 +152,16 @@ public:
     bool isCWWCSet(OperationContext* opCtx);
 
     /**
+     * Returns true if a cluster-wide read concern default may have been set.
+     * This is a cheap atomic check suitable for fast-path decisions.
+     * It may briefly return true after a CWRC is unset (until the cache refreshes),
+     * but will never return false when a CWRC is actually set.
+     */
+    bool isCWRCSetFast() const {
+        return _customDefaultReadConcernSet.loadRelaxed();
+    }
+
+    /**
      * Invalidates the cached RWC defaults, causing them to be refreshed.
      *
      * After this call returns, the read methods below (getDefault, getDefaultReadConcern,
@@ -220,6 +230,8 @@ private:
 
     // Indicate whether implicit default write concern should be majority or not.
     AtomicWord<bool> _implicitDefaultWriteConcernMajority;
+
+    AtomicWord<bool> _customDefaultReadConcernSet{false};
 };
 
 }  // namespace MONGO_MOD_PUB mongo

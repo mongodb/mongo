@@ -1350,7 +1350,7 @@ void RunCommandAndWaitForWriteConcern::_setup() {
             } else if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
                        serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
                 if (!genericArgs.getWriteConcern()) {
-                    // TODO: Disabled until after SERVER-44539, to avoid log spam.
+                    // TODO(SERVER-44539): Disabled to avoid log spam.
                     // LOGV2(21959, "Missing writeConcern on {command}", "Missing "
                     // "writeConcern on command", "command"_attr = command->getName());
                 }
@@ -1433,6 +1433,17 @@ void RunCommandAndWaitForWriteConcern::_checkWriteConcern() {
  */
 StatusWith<repl::ReadConcernArgs> ExecCommandDatabase::_extractReadConcern(
     OperationContext* opCtx, bool startTransaction, bool startOrContinueTransaction) {
+    // Fast path for the common case of a simple external query with no custom cluster-wide
+    // default: skip the cache lookup and return the implicit default directly.
+    if (!startTransaction && !startOrContinueTransaction &&
+        !_invocation->getGenericArguments().getReadConcern() &&
+        !opCtx->inMultiDocumentTransaction() && !_isInternalClient() &&
+        !ReadWriteConcernDefaults::get(opCtx).isCWRCSetFast()) {
+        repl::ReadConcernArgs fastDefault;
+        fastDefault.getProvenance().setSource(ReadWriteConcernProvenance::Source::implicitDefault);
+        return fastDefault;
+    }
+
     repl::ReadConcernArgs readConcernArgs;
 
     if (auto& rc = _invocation->getGenericArguments().getReadConcern()) {
@@ -1473,7 +1484,7 @@ StatusWith<repl::ReadConcernArgs> ExecCommandDatabase::_extractReadConcern(
             if ((serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
                  serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) &&
                 !readConcernArgs.isSpecified()) {
-                // TODO: Disabled until after SERVER-44539, to avoid log spam.
+                // TODO(SERVER-44539): Disabled to avoid log spam.
                 // LOGV2(21954,
                 //       "Missing readConcern for command",
                 //       "command"_attr = _invocation->definition()->getName());

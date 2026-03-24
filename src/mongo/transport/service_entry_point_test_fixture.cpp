@@ -367,18 +367,18 @@ void ServiceEntryPointTestFixture::testOpCtxInterrupt(bool deferHandling) {
     }
 }
 
-void ServiceEntryPointTestFixture::testReadConcernClientUnspecifiedNoDefault() {
-    // We don't supply any read concern here, so the implicit default read concern is chosen by
-    // the ServiceEntryPoint.
+void ServiceEntryPointTestFixture::testReadConcernClientUnspecifiedNoDefault(
+    int expectedApplyDefaultLogCount) {
     unittest::LogCaptureGuard logs;
     const auto cmdBSON = BSON(TestCmdSucceeds::kCommandName << 1);
     auto opCtx = makeOperationContext();
-    auto dbResponse = runCommandTestWithResponse(cmdBSON, opCtx.get());
+    runCommandTestWithResponse(cmdBSON, opCtx.get());
+    logs.stop();
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx.get());
     ASSERT(readConcernArgs.isImplicitDefault());
     ASSERT_EQ(readConcernArgs.getLevel(), repl::ReadConcernLevel::kLocalReadConcern);
-    logs.stop();
-    ASSERT_EQ(logs.countTextContaining("Applying default readConcern on command"), 1);
+    ASSERT_EQ(logs.countTextContaining("Applying default readConcern on command"),
+              expectedApplyDefaultLogCount);
 }
 
 void ServiceEntryPointTestFixture::testReadConcernClientUnspecifiedWithDefault() {

@@ -118,7 +118,7 @@ TEST_F(ServiceEntryPointRouterRoleTest, TestOpCtxInterrupt) {
 }
 
 TEST_F(ServiceEntryPointRouterRoleTest, TestReadConcernClientUnspecifiedNoDefault) {
-    testReadConcernClientUnspecifiedNoDefault();
+    testReadConcernClientUnspecifiedNoDefault(1);
 }
 
 TEST_F(ServiceEntryPointRouterRoleTest, TestReadConcernClientUnspecifiedWithDefault) {
