@@ -1067,8 +1067,7 @@ Status runAggregateImpl(OperationContext* opCtx,
     return status;
 }
 
-boost::optional<ResolvedView> chainViews(boost::optional<ResolvedView> currentView,
-                                         ResolvedView newView) {
+ResolvedView chainViews(boost::optional<ResolvedView> currentView, const ResolvedView& newView) {
     // Multiple view kickbacks can occur if the collection changes after the first view
     // kickback. If we already have a resolved view, we must compose the two resolved
     // pipelines to avoid losing the pipeline accumulated from the first kickback.
@@ -1076,19 +1075,23 @@ boost::optional<ResolvedView> chainViews(boost::optional<ResolvedView> currentVi
         return newView;
     }
 
+    // Compose the two pipelines.
     std::vector<BSONObj> composedPipeline = newView.getPipeline();
     const std::vector<BSONObj>& toPrepend = currentView->getPipeline();
     composedPipeline.insert(composedPipeline.end(), toPrepend.begin(), toPrepend.end());
 
     // All views seen during the resolution will have the same collation, so we can just use the
     // current view's collation.
+    // We will only ever have 1 timeseries view per aggregation and it is guaranteed to be the last
+    // view resolved, since it is internally created.
+    // TODO SERVER-111172: Remove this timeseries specific handling after 9.0 is LTS.
     return ResolvedView(newView.getNamespace(),
                         std::move(composedPipeline),
                         currentView->getDefaultCollation(),
                         newView.getTimeseriesOptions(),
-                        newView.getMayContainMixedData() || currentView->getMayContainMixedData(),
-                        newView.getUsesExtendedRange() || currentView->getUsesExtendedRange(),
-                        newView.getFixedBuckets() || currentView->getFixedBuckets());
+                        newView.getMayContainMixedData(),
+                        newView.getUsesExtendedRange(),
+                        newView.getFixedBuckets());
 }
 
 
@@ -1491,7 +1494,7 @@ Status ClusterAggregate::runAggregate(
 
             // Save the resolved view in the state.
             state.resolvedView =
-                chainViews(std::move(state.resolvedView), std::move(*ex.extraInfo<ResolvedView>()));
+                chainViews(std::move(state.resolvedView), *ex.extraInfo<ResolvedView>());
 
             // Pre-disable vector search extension for views. This is an optimization,
             // because we know that the vector search extension is not eligible to run on
