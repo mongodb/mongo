@@ -8,11 +8,29 @@
  * @tags: [
  *   requires_timeseries,
  *   multiversion_incompatible,
- *   does_not_support_stepdowns,
+ *   # On slower variants, inserting the very large document creates an interruptible window long
+ *   # enough that operations like taking the critical section during upgrades/downgrades or running
+ *   # the balancer can consistently interrupt the operation enough for the test to not make progress.
+ *   tsan_incompatible,
+ *   incompatible_aubsan,
  * ]
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+
+// Retries the insert if it fails with InterruptedDueToReplStateChange (e.g. due to a stepdown),
+// then asserts that the final result fails with the expected error code.
+function assertInsertFailedWithCode(insertFn, expectedCode) {
+    assert.soon(() => {
+        const res = insertFn();
+        if (res.code == ErrorCodes.InterruptedDueToReplStateChange) {
+            jsTest.log.info("Retrying insert after transient command error: " + tojson(res));
+            return false;
+        }
+        assert.commandFailedWithCode(res, expectedCode);
+        return true;
+    }, "insert did not fail with expected error code " + expectedCode);
+}
 
 let counter = 0;
 TimeseriesTest.run((insert) => {
@@ -44,8 +62,8 @@ TimeseriesTest.run((insert) => {
     // Insert Measurements
 
     // This measurement is always too big due to meta.
-    assert.commandFailedWithCode(insert(coll, measurement1), ErrorCodes.BSONObjectTooLarge);
+    assertInsertFailedWithCode(() => insert(coll, measurement1), ErrorCodes.BSONObjectTooLarge);
 
     // This measurement is always too big due to total metric size being copied into control block.
-    assert.commandFailedWithCode(insert(coll, measurement2), ErrorCodes.BSONObjectTooLarge);
+    assertInsertFailedWithCode(() => insert(coll, measurement2), ErrorCodes.BSONObjectTooLarge);
 });
