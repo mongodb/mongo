@@ -98,9 +98,9 @@ void resetTermScopedPromise(WithLock,
     promise = boost::none;
 }
 
-void ensureSet(WithLock, SharedPromise<void>& promise) {
-    if (!promise.getFuture().isReady()) {
-        promise.emplaceValue();
+void ensureSet(WithLock, boost::optional<SharedPromise<void>>& promise) {
+    if (promise.has_value() && !promise->getFuture().isReady()) {
+        promise->emplaceValue();
     }
 }
 
@@ -167,14 +167,12 @@ void RangeDeleterService::onStepUpComplete(OperationContext* opCtx, long long te
                 _state = kUp;
                 LOGV2_INFO(11079600, "Range deleter service is now up", "term"_attr = term);
                 _readyRangeDeletionsProcessorPtr->beginProcessing();
-                if (_serviceUpPromise.has_value()) {
-                    ensureSet(lock, *_serviceUpPromise);
-                }
+                ensureSet(lock, _serviceUpPromise);
             }
         })
         .getAsync([](auto) {});
 
-    ensureSet(lock, *_termInitializationPromise);
+    ensureSet(lock, _termInitializationPromise);
 
     _launchRangeDeletionRecoveryTask(opCtx, term);
 }
