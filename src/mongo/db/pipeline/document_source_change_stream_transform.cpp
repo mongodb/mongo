@@ -115,6 +115,7 @@ StageConstraints DocumentSourceChangeStreamTransform::constraints(
     // database or cluster, mark as independent of any collection if so.
     constraints.isIndependentOfAnyCollection = _isIndependentOfAnyCollection;
     constraints.consumesLogicalCollectionData = false;
+    constraints.outputDependsOnSingleInput = true;
     return constraints;
 }
 

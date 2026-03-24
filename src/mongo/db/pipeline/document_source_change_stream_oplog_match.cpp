@@ -183,6 +183,7 @@ StageConstraints DocumentSourceChangeStreamOplogMatch::constraints(
     constraints.isIndependentOfAnyCollection =
         getExpCtx()->getNamespaceString().isCollectionlessAggregateNS() ? true : false;
     constraints.consumesLogicalCollectionData = false;
+    constraints.outputDependsOnSingleInput = true;
     return constraints;
 }
 

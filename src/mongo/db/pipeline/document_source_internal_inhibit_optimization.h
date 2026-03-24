@@ -88,6 +88,7 @@ public:
         // Given that InternalInhibit stage despite being a passthrough stage, should not take part
         // in any optimization, we explicitely set that it doesn't preserve cardinality.
         constraints.preservesCardinality = false;
+        constraints.outputDependsOnSingleInput = false;
         return constraints;
     }
 

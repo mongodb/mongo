@@ -113,8 +113,8 @@ StageConstraints DocumentSourceFindAndModifyImageLookup::constraints(
                                  LookupRequirement::kNotAllowed,
                                  UnionRequirement::kNotAllowed,
                                  ChangeStreamRequirement::kDenylist);
-
     constraints.consumesLogicalCollectionData = false;
+    constraints.outputDependsOnSingleInput = true;
     return constraints;
 }
 

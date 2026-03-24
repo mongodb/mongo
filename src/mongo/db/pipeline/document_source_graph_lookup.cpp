@@ -191,6 +191,7 @@ StageConstraints DocumentSourceGraphLookUp::constraints(PipelineSplitState pipeS
 
     constraints.canSwapWithMatch = true;
     constraints.canSwapWithSkippingOrLimitingStage = !_unwind;
+    constraints.outputDependsOnSingleInput = true;
 
     // If this $graphLookup is on the merging half of the pipeline and the inner collection
     // isn't sharded (that is, it is either unsplittable or untracked), then we should merge

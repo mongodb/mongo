@@ -102,6 +102,7 @@ public:
                                          : LookupRequirement::kAllowed,
                                      UnionRequirement::kAllowed};
         constraints.preservesCardinality = true;
+        constraints.outputDependsOnSingleInput = true;
         if (_mergeShardId) {
             constraints.mergeShardId = _mergeShardId;
         }

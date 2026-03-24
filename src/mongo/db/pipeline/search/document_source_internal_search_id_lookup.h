@@ -85,6 +85,7 @@ public:
         constraints.preservesOrderAndMetadata = true;
         // All search stages are unsupported on timeseries collections.
         constraints.canRunOnTimeseries = false;
+        constraints.outputDependsOnSingleInput = true;
 
         return constraints;
     }

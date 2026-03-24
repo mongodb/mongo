@@ -92,7 +92,7 @@ public:
     }
 
     StageConstraints constraints(PipelineSplitState pipeState) const override {
-        StageConstraints result = {
+        StageConstraints constraints = {
             StreamType::kStreaming,
             PositionRequirement::kNone,
             HostTypeRequirement::kNone,
@@ -102,9 +102,10 @@ public:
             LookupRequirement::kAllowed,
             UnionRequirement::kAllowed,
         };
-        result.preservesCardinality = true;
-        result.canSwapWithMatch = true;
-        return result;
+        constraints.preservesCardinality = true;
+        constraints.canSwapWithMatch = true;
+        constraints.outputDependsOnSingleInput = true;
+        return constraints;
     }
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final {

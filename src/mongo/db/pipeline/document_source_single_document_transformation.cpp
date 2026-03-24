@@ -81,6 +81,7 @@ StageConstraints DocumentSourceSingleDocumentTransformation::constraints(
     constraints.canSwapWithMatch = true;
     constraints.canSwapWithSkippingOrLimitingStage = true;
     constraints.isAllowedWithinUpdatePipeline = true;
+    constraints.outputDependsOnSingleInput = true;
     // This transformation could be part of a 'collectionless' change stream on an entire
     // database or cluster, mark as independent of any collection if so.
     constraints.isIndependentOfAnyCollection = _isIndependentOfAnyCollection;

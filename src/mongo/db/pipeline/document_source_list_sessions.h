@@ -151,6 +151,7 @@ public:
                                      UnionRequirement::kAllowed);
 
         constraints.consumesLogicalCollectionData = false;
+        constraints.outputDependsOnSingleInput = true;
         return constraints;
     }
 

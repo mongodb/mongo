@@ -160,6 +160,7 @@ public:
         constraints.canAppearOnlyOnceInPipeline = true;
         // This stage only reads raw timeseries bucket documents.
         constraints.consumesLogicalCollectionData = false;
+        constraints.outputDependsOnSingleInput = true;
         return constraints;
     }
 

@@ -93,6 +93,7 @@ public:
         constraints.checkExistenceForDiffInsertOperations = true;
         constraints.isIndependentOfAnyCollection = false;
         constraints.consumesLogicalCollectionData = false;
+        constraints.outputDependsOnSingleInput = true;
         return constraints;
     }
 

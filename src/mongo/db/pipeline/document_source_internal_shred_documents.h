@@ -73,6 +73,7 @@ public:
                                      ChangeStreamRequirement::kAllowlist);
         constraints.preservesCardinality = true;
         constraints.isAllowedWithinUpdatePipeline = true;
+        constraints.outputDependsOnSingleInput = true;
         return constraints;
     }
 

@@ -90,8 +90,8 @@ public:
                                      TransactionRequirement::kAllowed,
                                      LookupRequirement::kAllowed,
                                      UnionRequirement::kAllowed);
-
         constraints.canSwapWithMatch = true;
+        constraints.outputDependsOnSingleInput = true;
         return constraints;
     }
 

@@ -80,6 +80,7 @@ StageConstraints DocumentSourceChangeStreamHandleTopologyChangeV2::constraints(
     constraints.canSwapWithMatch = true;
     constraints.canSwapWithSingleDocTransformOrRedact = true;
     constraints.consumesLogicalCollectionData = false;
+    constraints.outputDependsOnSingleInput = true;
 
     return constraints;
 }

@@ -172,6 +172,7 @@ StageConstraints DocumentSourceChangeStreamUnwindTransaction::constraints(
                                  UnionRequirement::kNotAllowed,
                                  ChangeStreamRequirement::kChangeStreamStage);
     constraints.consumesLogicalCollectionData = false;
+    constraints.outputDependsOnSingleInput = true;
     return constraints;
 }
 

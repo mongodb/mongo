@@ -111,6 +111,7 @@ public:
         constraints.preservesCardinality = true;
         constraints.canSwapWithMatch = true;
         constraints.consumesLogicalCollectionData = false;
+        constraints.outputDependsOnSingleInput = true;
         return constraints;
     }
 

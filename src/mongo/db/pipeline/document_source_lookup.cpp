@@ -581,6 +581,7 @@ StageConstraints DocumentSourceLookUp::constraints(PipelineSplitState pipeState)
 
     constraints.canSwapWithMatch = true;
     constraints.canSwapWithSkippingOrLimitingStage = !_unwindSrc;
+    constraints.outputDependsOnSingleInput = true;
 
     return constraints;
 }

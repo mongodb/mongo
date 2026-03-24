@@ -73,9 +73,9 @@ public:
                                      TransactionRequirement::kAllowed,
                                      LookupRequirement::kAllowed,
                                      UnionRequirement::kAllowed);
-
         constraints.canSwapWithMatch = true;
         constraints.canSwapWithSkippingOrLimitingStage = true;
+        constraints.outputDependsOnSingleInput = true;
         return constraints;
     }
 

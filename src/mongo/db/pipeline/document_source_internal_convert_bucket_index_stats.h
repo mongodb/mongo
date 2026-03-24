@@ -85,6 +85,7 @@ public:
                                      UnionRequirement::kAllowed,
                                      ChangeStreamRequirement::kDenylist);
         constraints.consumesLogicalCollectionData = false;
+        constraints.outputDependsOnSingleInput = true;
         return constraints;
     }
 

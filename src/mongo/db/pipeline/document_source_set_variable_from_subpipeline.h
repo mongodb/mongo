@@ -115,6 +115,7 @@ public:
         setVariableConstraints.preservesCardinality = true;
         setVariableConstraints.preservesOrderAndMetadata = true;
         setVariableConstraints.canSwapWithSkippingOrLimitingStage = true;
+        setVariableConstraints.outputDependsOnSingleInput = true;
         return setVariableConstraints;
     }
 

@@ -66,8 +66,8 @@ public:
                                      TransactionRequirement::kAllowed,
                                      LookupRequirement::kAllowed,
                                      UnionRequirement::kAllowed);
-
         constraints.canSwapWithSkippingOrLimitingStage = true;
+        constraints.outputDependsOnSingleInput = true;
         return constraints;
     }
 

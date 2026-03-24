@@ -76,6 +76,7 @@ public:
         // Given that the exchange stage accumulates results from all workers, the overall logical
         // number of documents remains the same.
         constraints.preservesCardinality = true;
+        constraints.outputDependsOnSingleInput = true;
         return constraints;
     }
 
