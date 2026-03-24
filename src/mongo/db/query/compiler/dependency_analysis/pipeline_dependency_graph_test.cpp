@@ -607,9 +607,7 @@ TEST_F(PipelineDependencyGraphTest, CanDottedRenamedPathsBeArray) {
         // TODO(SERVER-121932): Once we can see .y, this should pass.
         // ASSERT_FALSE(graph->canPathBeArray(ds, "b.z"));
         ASSERT_TRUE(graph->canPathBeArray(ds, "b.z"));
-        // TODO(SERVER-121943): Once $x.y.z is reported as rename, this should pass.
-        // ASSERT_FALSE(graph->canPathBeArray(ds, "g"));
-        ASSERT_TRUE(graph->canPathBeArray(ds, "g"));
+        ASSERT_FALSE(graph->canPathBeArray(ds, "g"));
         ASSERT_TRUE(graph->canPathBeArray(ds, "c"));
         ASSERT_TRUE(graph->canPathBeArray(ds, "c.d"));
         ASSERT_TRUE(graph->canPathBeArray(ds, "c.unknown"));

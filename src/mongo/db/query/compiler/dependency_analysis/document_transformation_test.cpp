@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/compiler/dependency_analysis/document_transformation.h"
 
+#include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -125,12 +126,17 @@ public:
     }
     void operator()(const RenamePath& op) override {
         renamed.emplace_back(op.getNewPath(), op.getOldPath());
+        maxArrayTraversals.emplace(
+            op.getNewPath(),
+            std::make_pair(op.getNewPathMaxArrayTraversals(), op.getOldPathMaxArrayTraversals()));
     }
 
     bool replacedRoot{false};
     std::vector<std::string> preserved;
     std::vector<std::string> modified;
     std::vector<std::pair<std::string, std::string>> renamed;
+    // Array traversal information from renames as (newPath, oldPath).
+    mongo::StringMap<std::pair<int, int>> maxArrayTraversals;
 };
 
 GetModPathsReturn roundtrip(const GetModPathsReturn& modPaths) {
@@ -423,6 +429,186 @@ TEST(DocumentTransformationTest, DescribeComputedPathsRenames) {
     EXPECT_THAT(visitor.preserved, IsEmpty());
     EXPECT_THAT(visitor.modified, IsEmpty());
     EXPECT_THAT(visitor.renamed, UnorderedElementsAre(Pair("a"s, "x.y"s), Pair("b.c"s, "x.y"s)));
+}
+
+TEST(DocumentTransformationTest, DescribeComputedPathsSimpleRenames) {
+    auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
+    auto expr = ExpressionFieldPath::parse(expCtx.get(), "$x", expCtx->variablesParseState);
+    StringMap<boost::intrusive_ptr<Expression>> paths{
+        {"a"s, expr}, {"b.c"s, expr}, {"d.e.f"s, expr}};
+
+    TestVisitor visitor;
+    document_transformation::describeComputedPaths(visitor, paths.begin(), paths.end(), {});
+
+    EXPECT_THAT(visitor.preserved, IsEmpty());
+    EXPECT_THAT(visitor.modified, IsEmpty());
+    EXPECT_THAT(visitor.renamed,
+                UnorderedElementsAre(Pair("a"s, "x"s), Pair("b.c"s, "x"s), Pair("d.e.f"s, "x"s)));
+
+    // Check that the maxArrayTraversals is consistent with getComputedPaths.
+
+    auto renamesForA = expr->getComputedPaths("a", Variables::kRootId).renames;
+    EXPECT_TRUE(renamesForA.contains("a"));
+    EXPECT_EQ(visitor.maxArrayTraversals.at("a"s), std::make_pair(0, 0));
+
+    auto renamesForBC = expr->getComputedPaths("b.c", Variables::kRootId).renames;
+    EXPECT_TRUE(renamesForBC.contains("b.c"));
+    EXPECT_EQ(visitor.maxArrayTraversals.at("b.c"s), std::make_pair(0, 0));
+
+    auto renamesForDEF = expr->getComputedPaths("d.e.f", Variables::kRootId).renames;
+    EXPECT_TRUE(renamesForDEF.contains("d.e.f"));
+    EXPECT_EQ(visitor.maxArrayTraversals.at("d.e.f"s), std::make_pair(0, 0));
+}
+
+TEST(DocumentTransformationTest, DescribeComputedPathsOtherRenames) {
+    auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
+    auto expr = ExpressionFieldPath::parse(expCtx.get(), "$x.y.z", expCtx->variablesParseState);
+    StringMap<boost::intrusive_ptr<Expression>> paths{
+        {"a"s, expr}, {"b.c"s, expr}, {"d.e.f"s, expr}};
+
+    TestVisitor visitor;
+    document_transformation::describeComputedPaths(visitor, paths.begin(), paths.end(), {});
+
+    EXPECT_THAT(visitor.preserved, IsEmpty());
+    EXPECT_THAT(visitor.modified, IsEmpty());
+    EXPECT_THAT(visitor.renamed,
+                UnorderedElementsAre(
+                    Pair("a"s, "x.y.z"s), Pair("b.c"s, "x.y.z"s), Pair("d.e.f"s, "x.y.z"s)));
+
+    // Since we have three elements x.y.z, these renames are currently not reported as renames by
+    // getComputedPaths.
+
+    auto modifiedPathsForA = expr->getComputedPaths("a", Variables::kRootId).paths;
+    EXPECT_TRUE(modifiedPathsForA.contains("a"));
+    EXPECT_EQ(visitor.maxArrayTraversals.at("a"s), std::make_pair(0, 2));
+
+    auto modifiedPathsForBC = expr->getComputedPaths("b.c", Variables::kRootId).paths;
+    EXPECT_TRUE(modifiedPathsForBC.contains("b.c"));
+    EXPECT_EQ(visitor.maxArrayTraversals.at("b.c"s), std::make_pair(0, 2));
+
+    auto modifiedPathsForDEF = expr->getComputedPaths("d.e.f", Variables::kRootId).paths;
+    EXPECT_TRUE(modifiedPathsForDEF.contains("d.e.f"));
+    EXPECT_EQ(visitor.maxArrayTraversals.at("d.e.f"s), std::make_pair(0, 2));
+}
+
+TEST(DocumentTransformationTest, DescribeComputedPathsObjectEmpty) {
+    auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
+    auto expr = ExpressionObject::parse(expCtx.get(), fromjson("{}"), expCtx->variablesParseState);
+    StringMap<boost::intrusive_ptr<Expression>> paths{{"_id"s, expr}};
+
+    TestVisitor visitor;
+    document_transformation::describeComputedPaths(visitor, paths.begin(), paths.end(), {});
+
+    EXPECT_THAT(visitor.preserved, IsEmpty());
+    EXPECT_THAT(visitor.modified, IsEmpty());
+    EXPECT_THAT(visitor.renamed, IsEmpty());
+}
+
+TEST(DocumentTransformationTest, DescribeComputedPathsObjectModifications) {
+    auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
+    auto expr = ExpressionObject::parse(
+        expCtx.get(), fromjson("{a: 1, b: {c: 1}}"), expCtx->variablesParseState);
+    StringMap<boost::intrusive_ptr<Expression>> paths{{"_id"s, expr}};
+
+    TestVisitor visitor;
+    document_transformation::describeComputedPaths(visitor, paths.begin(), paths.end(), {});
+
+    EXPECT_THAT(visitor.preserved, IsEmpty());
+    EXPECT_THAT(visitor.modified, UnorderedElementsAre("_id.a"_sd, "_id.b.c"_sd));
+    EXPECT_THAT(visitor.renamed, IsEmpty());
+}
+
+TEST(DocumentTransformationTest, DescribeComputedPathsObjectSimpleRenames) {
+    auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
+    auto expr = ExpressionObject::parse(
+        expCtx.get(), fromjson("{a: {b: '$x'}}"), expCtx->variablesParseState);
+    StringMap<boost::intrusive_ptr<Expression>> paths{{"_id"s, expr}};
+
+    TestVisitor visitor;
+    document_transformation::describeComputedPaths(visitor, paths.begin(), paths.end(), {});
+
+    EXPECT_THAT(visitor.preserved, IsEmpty());
+    EXPECT_THAT(visitor.modified, IsEmpty());
+    EXPECT_THAT(visitor.renamed, UnorderedElementsAre(Pair("_id.a.b"s, "x"s)));
+    // _id.a and _id.a.b cannot contain arrays.
+    EXPECT_EQ(visitor.maxArrayTraversals.at("_id.a.b"s), std::make_pair(0, 0));
+
+    // The maxArrayTraversals indicating no arrays should be consistent with 'renames',
+    // since $x also does not require array traversal.
+    auto renames = expr->getComputedPaths("_id", Variables::kRootId).renames;
+    EXPECT_TRUE(renames.contains("_id.a.b"));
+}
+
+TEST(DocumentTransformationTest, DescribeComputedPathsObjectComplexRenames) {
+    auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
+    auto expr = ExpressionObject::parse(
+        expCtx.get(), fromjson("{a: {b: '$x.y'}}"), expCtx->variablesParseState);
+    StringMap<boost::intrusive_ptr<Expression>> paths{{"_id"s, expr}};
+
+    TestVisitor visitor;
+    document_transformation::describeComputedPaths(visitor, paths.begin(), paths.end(), {});
+
+    EXPECT_THAT(visitor.preserved, IsEmpty());
+    EXPECT_THAT(visitor.modified, IsEmpty());
+    EXPECT_THAT(visitor.renamed, UnorderedElementsAre(Pair("_id.a.b"s, "x.y"s)));
+    // _id.a and _id.a.b cannot contain arrays, x.y may contain 1.
+    EXPECT_EQ(visitor.maxArrayTraversals.at("_id.a.b"s), std::make_pair(0, 1));
+
+    // The maxArrayTraversals indicating no arrays and x.y on the right should be
+    // consistent with complex renames normally, however ExpressionObject does not support these
+    // in getComputedPaths so it reports them as modified.
+    auto modifiedPaths = expr->getComputedPaths("_id", Variables::kRootId).paths;
+    EXPECT_TRUE(modifiedPaths.contains("_id.a.b"));
+}
+
+TEST(DocumentTransformationTest, DescribeComputedPathsObjectOtherRenames) {
+    auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
+    auto expr = ExpressionObject::parse(expCtx.get(),
+                                        fromjson("{a: {b: {c: '$x.y.z'}}, c: '$x.y.z'}"),
+                                        expCtx->variablesParseState);
+    StringMap<boost::intrusive_ptr<Expression>> paths{{"_id"s, expr}};
+
+    TestVisitor visitor;
+    document_transformation::describeComputedPaths(visitor, paths.begin(), paths.end(), {});
+
+    EXPECT_THAT(visitor.preserved, IsEmpty());
+    EXPECT_THAT(visitor.renamed,
+                UnorderedElementsAre(Pair("_id.a.b.c"s, "x.y.z"s), Pair("_id.c"s, "x.y.z"s)));
+    // _id.a, _id.a.b, _id.a.b.c cannot contain arrays (nested objects).
+    EXPECT_EQ(visitor.maxArrayTraversals.at("_id.a.b.c"s), std::make_pair(0, 2));
+    // _id.c cannot contain arrays.
+    EXPECT_EQ(visitor.maxArrayTraversals.at("_id.c"s), std::make_pair(0, 2));
+
+    // Renames with more than 1 component were not reported anywhere and were treated as modified
+    // paths.
+    auto modifiedPaths = expr->getComputedPaths("_id", Variables::kRootId).paths;
+    EXPECT_TRUE(modifiedPaths.contains("_id.a.b.c"));
+    EXPECT_TRUE(modifiedPaths.contains("_id.c"));
+}
+
+TEST(DocumentTransformationTest, DescribeComputedPathsObjectMixed) {
+    auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
+    auto expr = ExpressionObject::parse(expCtx.get(),
+                                        fromjson("{a: {b: '$x.y.z', c: 1}, d: {$toInt: '1'}}"),
+                                        expCtx->variablesParseState);
+    StringMap<boost::intrusive_ptr<Expression>> paths{{"_id"s, expr}};
+
+    TestVisitor visitor;
+    document_transformation::describeComputedPaths(visitor, paths.begin(), paths.end(), {});
+
+    EXPECT_THAT(visitor.preserved, IsEmpty());
+    EXPECT_THAT(visitor.modified, UnorderedElementsAre("_id.a.c"_sd, "_id.d"_sd));
+    EXPECT_THAT(visitor.renamed, UnorderedElementsAre(Pair("_id.a.b"s, "x.y.z"s)));
+    // _id.a and _id.a.b cannot contain arrays.
+    EXPECT_EQ(visitor.maxArrayTraversals.at("_id.a.b"s), std::make_pair(0, 2));
 }
 
 }  // namespace

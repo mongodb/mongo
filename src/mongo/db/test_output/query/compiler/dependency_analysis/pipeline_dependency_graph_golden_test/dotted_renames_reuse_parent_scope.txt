@@ -209,7 +209,6 @@ output: {
                                                                             "f2:24": {
                                                                                 "declaringScope": "scope:11",
                                                                                 "dependencies": [
-                                                                                    "<base document>:-1",
                                                                                     "f1:11"
                                                                                 ]
                                                                             }

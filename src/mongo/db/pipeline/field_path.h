@@ -160,6 +160,17 @@ public:
     }
 
     /**
+     * Returns the path past the first element.
+     * Use instead of tail().fullPath() to avoid a copy.
+     * Precondition getPathLength() > 1.
+     */
+    StringData tailPath() const {
+        tassert(
+            12194301, "FieldPath::tailPath() called on single element path", getPathLength() > 1);
+        return StringData(_fieldPath).substr(_fieldPathDotPosition[1] + 1);
+    }
+
+    /**
      * A FieldPath like this but missing the first element (useful for recursion).
      * Precondition getPathLength() > 1.
      */

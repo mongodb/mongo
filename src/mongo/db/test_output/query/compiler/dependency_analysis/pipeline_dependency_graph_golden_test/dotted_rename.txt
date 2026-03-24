@@ -119,18 +119,12 @@ output: {
                 "f:10": {
                     "declaringScope": "scope:4",
                     "dependencies": [
-                        "<base document>:-1",
-                        "a:1",
-                        "c:5",
-                        "e:8"
+                        "c:5"
                     ]
                 },
                 "g:11": {
                     "declaringScope": "scope:4",
                     "dependencies": [
-                        "<base document>:-1",
-                        "a:1",
-                        "c:5",
                         "e:8"
                     ]
                 },

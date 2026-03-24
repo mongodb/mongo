@@ -105,10 +105,75 @@ void describeProjectedPath(DocumentOperationVisitor& visitor, StringData path, b
     }
 }
 
+/**
+ * Visitor for Expressions which reports paths to a DocumentOperationVisitor for supported
+ * expressions. This fills in information which Expression::getComputedPaths does not report, but
+ * which the DocumentOperationVisitor can interpret, such as "other" renames like 'a.b': '$c.d.e'.
+ * If the Expression type is not supported, isOK() returns false, and the DocumentOperationVisitor
+ * is not called.
+ */
+class SpecializedExpressionOperationVisitor : public SelectiveConstExpressionVisitorBase {
+public:
+    using SelectiveConstExpressionVisitorBase::visit;
+
+    explicit SpecializedExpressionOperationVisitor(DocumentOperationVisitor& visitor,
+                                                   StringData path,
+                                                   BSONDepthIndex depth)
+        : _visitor(visitor), _path(path), _depth(depth) {}
+
+    /**
+     * Returns true if DocumentOperationVisitor was called during the visit.
+     */
+    bool isOK() const {
+        return _handled;
+    }
+
+    void visit(const ExpressionFieldPath* expr) final {
+        if (expr->isVariableReference()) {
+            return;
+        }
+        _handled = true;
+        const FieldPath& oldFieldPath = expr->getFieldPath();
+        StringData oldPath = oldFieldPath.tailPath();
+        BSONDepthIndex oldPathMaxArrayTraversals = std::count(oldPath.begin(), oldPath.end(), '.');
+        _visitor(RenamePathWithFixedArrayness{_path, oldPath, _depth, oldPathMaxArrayTraversals});
+    }
+
+    void visit(const ExpressionObject* expr) final {
+        _handled = true;
+        const std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>&>>& children =
+            expr->getChildExpressions();
+        for (auto&& [childField, childExpr] : children) {
+            auto childPath = FieldPath::getFullyQualifiedPath(_path, childField);
+            // The depth is used to report the maximum levels of array traversals on the left side.
+            // Since object expressions evaluate to objects, we know they will not require
+            // additional array traversal.
+            describeComputedPath(_visitor, childPath, childExpr, _depth);
+        }
+    }
+
+private:
+    DocumentOperationVisitor& _visitor;
+    const StringData _path;
+    const BSONDepthIndex _depth;
+    bool _handled{false};
+};
+
+/**
+ * Reports the computed paths of 'expr' into the 'visitor'.
+ * For some expression types, this may report more detailed information than
+ * Expression::getComputedPaths (since that does not report some rename cases).
+ */
 void describeComputedPath(DocumentOperationVisitor& visitor,
                           const std::string& path,
                           const boost::intrusive_ptr<Expression>& expr,
                           BSONDepthIndex depth) {
+    SpecializedExpressionOperationVisitor exprVisitor{visitor, path, depth};
+    expr->acceptVisitor(&exprVisitor);
+    if (exprVisitor.isOK()) {
+        return;
+    }
+
     auto exprComputedPaths = expr->getComputedPaths(path);
     for (auto&& exprComputedPath : exprComputedPaths.paths) {
         if (!exprComputedPaths.complexRenames.contains(exprComputedPath)) {
