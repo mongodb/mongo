@@ -1322,6 +1322,15 @@ class MultipleAccumulatorsForAField : public ParseErrorBase {
     }
 };
 
+/** An accumulator field with an empty field name. */
+class EmptyAccumulatorFieldName : public Base {
+public:
+    void TestBody() final {
+        ASSERT_THROWS_CODE(
+            createGroup(BSON("_id" << 1 << "" << BSON("$sum" << 1))), AssertionException, 12116300);
+    }
+};
+
 /** Aggregation using duplicate field names is allowed currently. */
 class DuplicateAggregateFieldNames : public ExpressionBase {
     BSONObj doc() override {
@@ -1954,6 +1963,7 @@ public:
         add<BadAccumulator>();
         add<SumArray>();
         add<MultipleAccumulatorsForAField>();
+        add<EmptyAccumulatorFieldName>();
         add<DuplicateAggregateFieldNames>();
         add<AggregateObjectExpression>();
         add<AggregateOperatorExpression>();

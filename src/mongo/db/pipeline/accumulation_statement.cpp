@@ -78,6 +78,8 @@ boost::intrusive_ptr<AccumulatorState> AccumulationStatement::makeAccumulator() 
 AccumulationStatement AccumulationStatement::parseAccumulationStatement(
     ExpressionContext* const expCtx, const BSONElement& elem, const VariablesParseState& vps) {
     auto fieldName = elem.fieldNameStringData();
+    uassert(12116300, "The field name '' cannot be an empty string", !fieldName.empty());
+
     uassert(40234,
             str::stream() << "The field '" << fieldName << "' must be an accumulator object",
             elem.type() == BSONType::object &&
