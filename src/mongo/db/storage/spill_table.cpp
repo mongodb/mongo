@@ -157,7 +157,7 @@ int64_t SpillTable::storageSize(RecoveryUnit& ru) const {
         return _rs->storageSize(ru);
     }
 
-    _ru->setIsolation(RecoveryUnit::Isolation::readUncommitted);
+    _ru->setIsolation(RecoveryUnit::Isolation::readCommitted);
     return _rs->storageSize(*_ru);
 }
 
@@ -239,7 +239,7 @@ bool SpillTable::findRecord(OperationContext* opCtx, const RecordId& rid, Record
     }
 
     _ru->setOperationContext(opCtx);
-    _ru->setIsolation(RecoveryUnit::Isolation::readUncommitted);
+    _ru->setIsolation(RecoveryUnit::Isolation::readCommitted);
     ON_BLOCK_EXIT([this] { _ru->setOperationContext(nullptr); });
 
     return _rs->findRecord(opCtx, *_ru, rid, out);
@@ -310,7 +310,7 @@ std::unique_ptr<SpillTable::Cursor> SpillTable::getCursor(OperationContext* opCt
     }
 
     _ru->setOperationContext(opCtx);
-    _ru->setIsolation(RecoveryUnit::Isolation::readUncommitted);
+    _ru->setIsolation(RecoveryUnit::Isolation::readCommitted);
 
     return std::make_unique<SpillTable::Cursor>(_ru.get(), _rs->getCursor(opCtx, *_ru, forward));
 }
