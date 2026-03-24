@@ -1,0 +1,111 @@
+VARIATION ChainedReplaceRoots
+input: {
+    "pipeline": [
+        {
+            "$set": {
+                "a": {
+                    "$const": 1
+                }
+            }
+        },
+        {
+            "$replaceRoot": {
+                "newRoot": "$a"
+            }
+        },
+        {
+            "$replaceRoot": {
+                "newRoot": "$b"
+            }
+        },
+        {
+            "$set": {
+                "c": {
+                    "$const": 1
+                }
+            }
+        },
+        {
+            "$match": {
+                "a": 1,
+                "c": 1
+            }
+        }
+    ]
+}
+output: {
+    "$set:0": {
+        "scope:0": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:0": {
+                    "declaringScope": "scope:0",
+                    "dependencies": []
+                },
+                "a:1": {
+                    "declaringScope": "scope:0",
+                    "metadata": {
+                        "array": false
+                    },
+                    "dependencies": []
+                }
+            }
+        },
+        "dependencies": []
+    },
+    "$replaceRoot:1": {
+        "scope:1": {
+            "exhaustiveScope": "scope:1",
+            "fields": {
+                "<missing>:2": {
+                    "declaringScope": "scope:1",
+                    "dependencies": []
+                }
+            }
+        },
+        "dependencies": [
+            "a:1"
+        ]
+    },
+    "$replaceRoot:2": {
+        "scope:2": {
+            "exhaustiveScope": "scope:2",
+            "fields": {
+                "<missing>:3": {
+                    "declaringScope": "scope:2",
+                    "dependencies": []
+                }
+            }
+        },
+        "dependencies": [
+            "<missing>:2"
+        ]
+    },
+    "$set:3": {
+        "scope:3": {
+            "exhaustiveScope": "scope:2",
+            "fields": {
+                "<missing>:4": {
+                    "declaringScope": "scope:3",
+                    "dependencies": []
+                },
+                "c:5": {
+                    "declaringScope": "scope:3",
+                    "metadata": {
+                        "array": false
+                    },
+                    "dependencies": []
+                }
+            }
+        },
+        "dependencies": []
+    },
+    "$match:4": {
+        "scope:3": "scope:3",
+        "dependencies": [
+            "<missing>:3",
+            "c:5"
+        ]
+    }
+}
+

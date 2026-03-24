@@ -650,5 +650,66 @@ TEST_F(PipelineDependencyGraphTest, CanRedefinedBaseFieldBeArray) {
 //     });
 // }
 
+TEST_F(PipelineDependencyGraphTest, ReplaceRootAttributesAllFields) {
+    setPipeline(
+        "[{$set: { a: 1 }},"
+        "{$replaceRoot: { newRoot: '$a' }},"
+        "{$set: { c: 1 }}]");
+
+    runTest([&] {
+        auto* last = stages.back().get();
+        // All pre-existing fields are attributed to $replaceRoot.
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "a"), stages[1]);
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "b"), stages[1]);
+        // 'c' set after $replaceRoot.
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "c"), stages[2]);
+    });
+}
+
+
+TEST_F(PipelineDependencyGraphTest, ReplaceRootShadowsPriorDefinitions) {
+    setPipeline(
+        "[{$set: { a: 1, b: 1 }},"
+        "{$replaceRoot: { newRoot: {} }},"
+        "{$match: { a: 1, b: 1 }}]");
+
+    runTest([&] {
+        auto* last = stages.back().get();
+        // Both fields are attributed to $replaceRoot, not the $set.
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "a"), stages[1]);
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "b"), stages[1]);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ReplaceRootThenSetThenLookup) {
+    setPipeline(
+        "[{$replaceRoot: { newRoot: '$x' }},"
+        "{$set: { a: 1 }},"
+        "{$match: { a: 1, b: 1 }}]");
+
+    runTest([&] {
+        auto* last = stages.back().get();
+        // 'a' redefined after $replaceRoot.
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "a"), stages[1]);
+        // 'b' not redefined — still attributed to $replaceRoot.
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "b"), stages[0]);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ChainedReplaceRoots) {
+    setPipeline(
+        "[{$set: { a: 1 }},"
+        "{$replaceRoot: { newRoot: '$a' }},"
+        "{$replaceRoot: { newRoot: '$b' }},"
+        "{$match: { a: 1 }}]");
+
+    runTest([&] {
+        auto* last = stages.back().get();
+        // Second $replaceRoot is the last exhaustive stage.
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "a"), stages[2]);
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "b"), stages[2]);
+    });
+}
+
 }  // namespace
 }  // namespace mongo::pipeline::dependency_graph

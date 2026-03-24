@@ -1,0 +1,103 @@
+VARIATION ReplaceRootThenSet
+input: {
+    "pipeline": [
+        {
+            "$set": {
+                "a": {
+                    "$const": 1
+                },
+                "b": {
+                    "$const": 1
+                }
+            }
+        },
+        {
+            "$replaceRoot": {
+                "newRoot": "$a"
+            }
+        },
+        {
+            "$set": {
+                "c": {
+                    "$const": 1
+                }
+            }
+        },
+        {
+            "$match": {
+                "a": 1,
+                "b": 1,
+                "c": 1
+            }
+        }
+    ]
+}
+output: {
+    "$set:0": {
+        "scope:0": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:0": {
+                    "declaringScope": "scope:0",
+                    "dependencies": []
+                },
+                "a:1": {
+                    "declaringScope": "scope:0",
+                    "metadata": {
+                        "array": false
+                    },
+                    "dependencies": []
+                },
+                "b:2": {
+                    "declaringScope": "scope:0",
+                    "metadata": {
+                        "array": false
+                    },
+                    "dependencies": []
+                }
+            }
+        },
+        "dependencies": []
+    },
+    "$replaceRoot:1": {
+        "scope:1": {
+            "exhaustiveScope": "scope:1",
+            "fields": {
+                "<missing>:3": {
+                    "declaringScope": "scope:1",
+                    "dependencies": []
+                }
+            }
+        },
+        "dependencies": [
+            "a:1"
+        ]
+    },
+    "$set:2": {
+        "scope:2": {
+            "exhaustiveScope": "scope:1",
+            "fields": {
+                "<missing>:4": {
+                    "declaringScope": "scope:2",
+                    "dependencies": []
+                },
+                "c:5": {
+                    "declaringScope": "scope:2",
+                    "metadata": {
+                        "array": false
+                    },
+                    "dependencies": []
+                }
+            }
+        },
+        "dependencies": []
+    },
+    "$match:3": {
+        "scope:2": "scope:2",
+        "dependencies": [
+            "<missing>:3",
+            "c:5"
+        ]
+    }
+}
+

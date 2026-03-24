@@ -1,0 +1,88 @@
+VARIATION ReplaceRootSetAndDottedLookup
+input: {
+    "pipeline": [
+        {
+            "$replaceRoot": {
+                "newRoot": "$x"
+            }
+        },
+        {
+            "$set": {
+                "a": {
+                    "b": {
+                        "$const": 1
+                    }
+                }
+            }
+        },
+        {
+            "$match": {
+                "a.b": 1,
+                "a.c": 1,
+                "d": 1
+            }
+        }
+    ]
+}
+output: {
+    "$replaceRoot:0": {
+        "scope:0": {
+            "exhaustiveScope": "scope:0",
+            "fields": {
+                "<missing>:0": {
+                    "declaringScope": "scope:0",
+                    "dependencies": []
+                }
+            }
+        },
+        "dependencies": [
+            "<base document>:-1"
+        ]
+    },
+    "$set:1": {
+        "scope:1": {
+            "exhaustiveScope": "scope:0",
+            "fields": {
+                "<missing>:1": {
+                    "declaringScope": "scope:1",
+                    "dependencies": []
+                },
+                "a:2": {
+                    "declaringScope": "scope:1",
+                    "scope:2": {
+                        "exhaustiveScope": "scope:0",
+                        "fields": {
+                            "<missing>:3": {
+                                "declaringScope": "scope:2",
+                                "dependencies": []
+                            },
+                            "b:4": {
+                                "declaringScope": "scope:2",
+                                "metadata": {
+                                    "array": false
+                                },
+                                "dependencies": [
+                                    "<missing>:0"
+                                ]
+                            }
+                        }
+                    },
+                    "dependencies": [
+                        "b:4"
+                    ]
+                }
+            }
+        },
+        "dependencies": [
+            "<missing>:0"
+        ]
+    },
+    "$match:2": {
+        "scope:1": "scope:1",
+        "dependencies": [
+            "<missing>:0",
+            "b:4"
+        ]
+    }
+}
+

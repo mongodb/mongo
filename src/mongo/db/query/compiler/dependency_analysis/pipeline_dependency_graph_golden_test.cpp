@@ -330,5 +330,44 @@ TEST_F(PipelineDependencyGraphGoldenTest, SetTopLevelFieldThenIncludeSubfields) 
     });
 }
 
+TEST_F(PipelineDependencyGraphGoldenTest, ReplaceRootThenSet) {
+    runVariation({
+        .name = "ReplaceRootThenSet",
+        .pipeline = "[{$set: { a: 1, b: 1 }},"
+                    "{$replaceRoot: { newRoot: '$a' }},"
+                    "{$set: { c: 1 }},"
+                    "{$match: { a: 1, b: 1, c: 1 }}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, ReplaceRootThenInclusion) {
+    runVariation({
+        .name = "ReplaceRootThenInclusion",
+        .pipeline = "[{$replaceRoot: { newRoot: '$x' }},"
+                    "{$project: { a: 1, b: 1 }},"
+                    "{$match: { a: 1, b: 1, c: 1 }}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, ChainedReplaceRoots) {
+    runVariation({
+        .name = "ChainedReplaceRoots",
+        .pipeline = "[{$set: { a: 1 }},"
+                    "{$replaceRoot: { newRoot: '$a' }},"
+                    "{$replaceRoot: { newRoot: '$b' }},"
+                    "{$set: { c: 1 }},"
+                    "{$match: { a: 1, c: 1 }}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, ReplaceRootSetAndDottedLookup) {
+    runVariation({
+        .name = "ReplaceRootSetAndDottedLookup",
+        .pipeline = "[{$replaceRoot: { newRoot: '$x' }},"
+                    "{$set: { 'a.b': 1 }},"
+                    "{$match: { 'a.b': 1, 'a.c': 1, d: 1 }}]",
+    });
+}
+
 }  // namespace
 }  // namespace mongo::pipeline::dependency_graph
