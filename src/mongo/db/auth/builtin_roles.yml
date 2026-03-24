@@ -99,7 +99,7 @@ roles:
           - createCollection # readWrite gets this also
           - dbStats # clusterMonitor gets this also
           - dropCollection
-          - dropDatabase # clusterAdmin gets this also TODO(spencer): shold readWriteAnyDatabase?
+          - dropDatabase # clusterAdmin gets this also
           - dropIndex
           - dropSearchIndex
           - createIndex
@@ -658,7 +658,7 @@ roles:
   # PREVIEW role for performing internal search operations in 8.1 .
   # The privileges defined for this role may be further restricted
   #  without warning in future releases.
-  # TODO: SPM-4133
+  # TODO: SERVER-122489
   searchCoordinator:
     adminOnly: true
     roles:
