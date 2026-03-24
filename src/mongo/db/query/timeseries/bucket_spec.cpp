@@ -133,7 +133,8 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
     bool includeMetaField,
     bool assumeNoMixedSchemaData,
     IneligiblePredicatePolicy policy,
-    bool fixedBuckets) {
+    bool fixedBuckets,
+    Get2dsphereIndexVersionFn get2dsphereIndexVersion) {
 
     tassert(5916304, "BucketSpec::createPredicatesOnBucketLevelField nullptr", matchExpr);
 
@@ -184,7 +185,8 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
                                                             includeMetaField,
                                                             assumeNoMixedSchemaData,
                                                             policy,
-                                                            fixedBuckets);
+                                                            fixedBuckets,
+                                                            get2dsphereIndexVersion);
             if (child.loosePredicate) {
                 looseAndExpression->add(std::move(child.loosePredicate));
             }
@@ -242,7 +244,8 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
                                                             includeMetaField,
                                                             assumeNoMixedSchemaData,
                                                             policy,
-                                                            fixedBuckets);
+                                                            fixedBuckets,
+                                                            get2dsphereIndexVersion);
             if (looseOrExpression && child.loosePredicate) {
                 looseOrExpression->add(std::move(child.loosePredicate));
             } else {
@@ -308,8 +311,13 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
         auto& geoExpr = static_cast<const GeoMatchExpression*>(matchExpr)->getGeoExpression();
         if (geoExpr.getPred() == GeoExpression::WITHIN ||
             geoExpr.getPred() == GeoExpression::INTERSECT) {
+            boost::optional<S2IndexVersion> indexVersion = get2dsphereIndexVersion
+                ? get2dsphereIndexVersion(pExpCtx->getOperationContext(),
+                                          pExpCtx->getNamespaceString(),
+                                          geoExpr.getField())
+                : boost::none;
             return {std::make_unique<InternalBucketGeoWithinMatchExpression>(
-                        geoExpr.getGeometryPtr(), geoExpr.getField()),
+                        geoExpr.getGeometryPtr(), geoExpr.getField(), nullptr, indexVersion),
                     nullptr};
         }
     } else if (matchExpr->matchType() == MatchExpression::EXISTS) {
@@ -394,7 +402,8 @@ std::pair<bool, BSONObj> BucketSpec::pushdownPredicate(
     bool includeMetaField,
     bool assumeNoMixedSchemaData,
     IneligiblePredicatePolicy policy,
-    bool fixedBuckets) {
+    bool fixedBuckets,
+    Get2dsphereIndexVersionFn get2dsphereIndexVersion) {
     auto [metaOnlyPred, bucketMetricPred, residualPred] =
         getPushdownPredicates(expCtx,
                               tsOptions,
@@ -403,7 +412,8 @@ std::pair<bool, BSONObj> BucketSpec::pushdownPredicate(
                               includeMetaField,
                               assumeNoMixedSchemaData,
                               policy,
-                              fixedBuckets);
+                              fixedBuckets,
+                              get2dsphereIndexVersion);
     BSONObjBuilder result;
     if (metaOnlyPred)
         metaOnlyPred->serialize(&result, {});
@@ -437,7 +447,8 @@ BucketSpec::SplitPredicates BucketSpec::getPushdownPredicates(
     bool includeMetaField,
     bool assumeNoMixedSchemaData,
     IneligiblePredicatePolicy policy,
-    bool fixedBuckets) {
+    bool fixedBuckets,
+    Get2dsphereIndexVersionFn get2dsphereIndexVersion) {
 
     auto allowedFeatures = MatchExpressionParser::kDefaultSpecialFeatures;
     auto matchExpr = uassertStatusOK(
@@ -465,7 +476,8 @@ BucketSpec::SplitPredicates BucketSpec::getPushdownPredicates(
                                                includeMetaField,
                                                assumeNoMixedSchemaData,
                                                policy,
-                                               fixedBuckets);
+                                               fixedBuckets,
+                                               get2dsphereIndexVersion);
         bucketMetricPred = std::move(bucketPredicate.loosePredicate);
         if (!expCtx->getRequiresTimeseriesExtendedRangeSupport()) {
             // It may be possible to generate _id predicates or even '$alwaysTrue' or '$alwaysFalse'

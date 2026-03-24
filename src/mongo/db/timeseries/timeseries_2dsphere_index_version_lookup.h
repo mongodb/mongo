@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2025-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,27 +29,20 @@
 
 #pragma once
 
-#include "mongo/db/exec/matcher/match_details.h"
-#include "mongo/db/geo/geometry_container.h"
-#include "mongo/db/index/s2_common.h"
-#include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
-namespace exec::matcher {
+namespace timeseries {
 
-bool geoContains(const GeometryContainer& queryGeom,
-                 const GeoExpression::Predicate& queryPredicate,
-                 bool skipValidation,
-                 const BSONElement& e,
-                 boost::optional<S2IndexVersion> indexVersion = boost::none);
+/**
+ * Scans all ready indexes on 'coll' and returns a map from user-facing field name to
+ * 2dsphereIndexVersion for every 2dsphere_bucket index found. When multiple indexes cover the
+ * same field, the version from the first index encountered is kept.
+ */
+MONGO_MOD_PUBLIC StringMap<int> build2dsphereIndexVersionMap(const Collection& coll);
 
-bool geoContains(const GeometryContainer& queryGeom,
-                 const GeoExpression::Predicate& queryPredicate,
-                 GeometryContainer& otherContainer);
-
-bool matchesGeoContainer(const GeoMatchExpression* expr, const GeometryContainer& input);
-
-}  // namespace exec::matcher
+}  // namespace timeseries
 }  // namespace mongo

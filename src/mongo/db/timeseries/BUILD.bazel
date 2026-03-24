@@ -47,6 +47,26 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "timeseries_constants",
+    hdrs = ["timeseries_constants.h"],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/commands:create_command",
+    ],
+)
+
+mongo_cc_library(
+    name = "timeseries_2dsphere_index_version_lookup",
+    srcs = ["timeseries_2dsphere_index_version_lookup.cpp"],
+    deps = [
+        ":timeseries_constants",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/shard_role/shard_catalog:collection_catalog",
+        "//src/mongo/db/shard_role/shard_catalog:index_catalog",
+    ],
+)
+
+mongo_cc_library(
     name = "timeseries_metadata",
     srcs = [
         "metadata.cpp",
@@ -258,6 +278,7 @@ mongo_cc_unit_test(
         "bucket_compression_test.cpp",
         "catalog_helper_test.cpp",
         "collection_pre_conditions_util_test.cpp",
+        "timeseries_2dsphere_index_version_lookup_test.cpp",
         "timeseries_collmod_test.cpp",
         "timeseries_dotted_path_support_test.cpp",
         "timeseries_extended_range_test.cpp",
@@ -275,6 +296,7 @@ mongo_cc_unit_test(
     deps = [
         ":bucket_compression",
         ":collection_pre_conditions_util",
+        ":timeseries_2dsphere_index_version_lookup",
         ":timeseries_conversion_util",
         ":timeseries_extended_range",
         ":timeseries_options",

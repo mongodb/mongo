@@ -81,6 +81,7 @@
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
@@ -1203,8 +1204,27 @@ StatusWithMatchExpression parseInternalBucketGeoWithinMatchExpression(
     // Parse the field.
     std::string field = subobj["field"].String();
 
+    boost::optional<S2IndexVersion> indexVersion = boost::none;
+    if (subobj.hasField(IndexDescriptor::k2dsphereVersionFieldName)) {
+        BSONElement versionElem = subobj[IndexDescriptor::k2dsphereVersionFieldName];
+        if (!versionElem.isNumber()) {
+            return {ErrorCodes::TypeMismatch,
+                    str::stream() << InternalBucketGeoWithinMatchExpression::kName
+                                  << "'s '2dsphereIndexVersion' field must be a number"};
+        }
+        long long versionVal = versionElem.safeNumberLong();
+        if (versionVal != 1 && versionVal != 2 && versionVal != 3 && versionVal != 4) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << InternalBucketGeoWithinMatchExpression::kName
+                                  << "'s '2dsphereIndexVersion' must be 1, 2, 3, or 4, got: "
+                                  << versionVal};
+        }
+        indexVersion = static_cast<S2IndexVersion>(versionVal);
+    }
+
     expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
-    return {std::make_unique<InternalBucketGeoWithinMatchExpression>(geoContainer, field)};
+    return {std::make_unique<InternalBucketGeoWithinMatchExpression>(
+        geoContainer, field, nullptr, indexVersion)};
 }
 
 StatusWithMatchExpression parseInternalSchemaAllowedProperties(
@@ -1859,7 +1879,7 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
             return parseMOD(name, e, expCtx);
 
         case PathAcceptingKeyword::OPTIONS: {
-            // TODO: try to optimize this
+            // TODO SERVER-122402 try to optimize this
             // we have to do this since $options can be before or after a $regex
             // but we validate here
             for (auto temp : context) {

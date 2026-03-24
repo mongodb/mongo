@@ -3,6 +3,9 @@ filters:
   - "*":
     approvers:
       - 10gen/server-collection-write-path
+  - "timeseries_2dsphere_index_version_lookup*":
+    approvers:
+      - 10gen/query-integration-timeseries
   - "*catalog_helper*":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
