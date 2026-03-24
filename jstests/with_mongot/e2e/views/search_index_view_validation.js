@@ -4,6 +4,8 @@
  *
  * @tags: [ featureFlagExtensionsAPI ]
  */
+import {isPlatformCompatibleWithExtensions} from "jstests/noPassthrough/libs/extension_helpers.js";
+
 const invalidStageErrorCode = 10623000;
 const matchErrorCode = 10623001;
 const addFieldsErrorCode = 10623002;
@@ -58,23 +60,25 @@ testSearchIndexOnInvalidView({
     errorCode: invalidStageErrorCode,
 });
 
-testSearchIndexOnInvalidView({
-    // Test with an extension that desugars into $addFields and $match (allowed stages).
-    // This should fail as we do not desugar before making CRUD operations on search indexes,
-    // meaning that the search index validator will see `$addFieldsMatch` (not supported)
-    // rather than the desugared form of `$addFields` + `$match` (supported).
-    name: "search_index_addFields_match_extension",
-    pipeline: [
-        {
-            $addFieldsMatch: {
-                field: "apple",
-                value: "banana",
-                filter: "grape",
+if (isPlatformCompatibleWithExtensions()) {
+    testSearchIndexOnInvalidView({
+        // Test with an extension that desugars into $addFields and $match (allowed stages).
+        // This should fail as we do not desugar before making CRUD operations on search indexes,
+        // meaning that the search index validator will see `$addFieldsMatch` (not supported)
+        // rather than the desugared form of `$addFields` + `$match` (supported).
+        name: "search_index_addFields_match_extension",
+        pipeline: [
+            {
+                $addFieldsMatch: {
+                    field: "apple",
+                    value: "banana",
+                    filter: "grape",
+                },
             },
-        },
-    ],
-    errorCode: invalidStageErrorCode,
-});
+        ],
+        errorCode: invalidStageErrorCode,
+    });
+}
 
 // ===============================================================================
 // Stage-specific constraints.
