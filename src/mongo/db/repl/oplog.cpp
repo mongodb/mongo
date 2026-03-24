@@ -2264,11 +2264,14 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         invariant(op.getTerm());
                         insertStmt.oplogSlot = OpTime(op.getTimestamp(), op.getTerm().value());
                     } else if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(
-                                   opCtx, collection->ns())) {
+                                   opCtx, collection->ns()) &&
+                               !wuow.isGroupingOplogEntries()) {
                         // Primaries processing inserts always pre-allocate timestamps. For parity,
                         // we also pre-allocate timestamps for an `applyOps` of insert oplog
                         // entries. This parity is meaningful for capped collections where the
-                        // insert may result in a delete that becomes replicated.
+                        // insert may result in a delete that becomes replicated. However, we can
+                        // skip this if oplog entries are being grouped because the timestamp will
+                        // be allocated at commit time.
                         auto oplogInfo = LocalOplogInfo::get(opCtx);
                         auto oplogSlots = oplogInfo->getNextOpTimes(opCtx, /*batchSize=*/1);
                         insertStmt.oplogSlot = oplogSlots.front();
