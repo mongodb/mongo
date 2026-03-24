@@ -1,0 +1,117 @@
+VARIATION GroupCompoundKey
+input: {
+    "pipeline": [
+        {
+            "$set": {
+                "x": {
+                    "$const": 1
+                },
+                "y": {
+                    "$const": 1
+                }
+            }
+        },
+        {
+            "$group": {
+                "_id": {
+                    "a": "$x",
+                    "b": "$y"
+                },
+                "$willBeMerged": false
+            }
+        },
+        {
+            "$match": {
+                "_id.a": 1,
+                "_id.b": 1,
+                "_id.c": 1
+            }
+        }
+    ]
+}
+output: {
+    "$set:0": {
+        "scope:0": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:0": {
+                    "declaringScope": "scope:0",
+                    "dependencies": []
+                },
+                "x:1": {
+                    "declaringScope": "scope:0",
+                    "metadata": {
+                        "array": false
+                    },
+                    "dependencies": []
+                },
+                "y:2": {
+                    "declaringScope": "scope:0",
+                    "metadata": {
+                        "array": false
+                    },
+                    "dependencies": []
+                }
+            }
+        },
+        "dependencies": []
+    },
+    "$group:1": {
+        "scope:1": {
+            "exhaustiveScope": "scope:1",
+            "fields": {
+                "<missing>:3": {
+                    "declaringScope": "scope:1",
+                    "dependencies": []
+                },
+                "_id:4": {
+                    "declaringScope": "scope:1",
+                    "scope:2": {
+                        "exhaustiveScope": "scope:1",
+                        "fields": {
+                            "<missing>:5": {
+                                "declaringScope": "scope:2",
+                                "dependencies": []
+                            },
+                            "a:6": {
+                                "declaringScope": "scope:2",
+                                "metadata": {
+                                    "array": false
+                                },
+                                "dependencies": [
+                                    "x:1"
+                                ]
+                            },
+                            "b:7": {
+                                "declaringScope": "scope:2",
+                                "metadata": {
+                                    "array": false
+                                },
+                                "dependencies": [
+                                    "y:2"
+                                ]
+                            }
+                        }
+                    },
+                    "dependencies": [
+                        "a:6",
+                        "b:7"
+                    ]
+                }
+            }
+        },
+        "dependencies": [
+            "x:1",
+            "y:2"
+        ]
+    },
+    "$match:2": {
+        "scope:1": "scope:1",
+        "dependencies": [
+            "<missing>:3",
+            "a:6",
+            "b:7"
+        ]
+    }
+}
+

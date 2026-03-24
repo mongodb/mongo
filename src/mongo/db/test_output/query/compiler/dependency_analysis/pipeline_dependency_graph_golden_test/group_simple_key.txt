@@ -1,0 +1,82 @@
+VARIATION GroupSimpleKey
+input: {
+    "pipeline": [
+        {
+            "$set": {
+                "x": {
+                    "$const": 1
+                }
+            }
+        },
+        {
+            "$group": {
+                "_id": "$x",
+                "count": {
+                    "$sum": {
+                        "$const": 1
+                    }
+                },
+                "$willBeMerged": false
+            }
+        },
+        {
+            "$match": {
+                "_id": 1,
+                "count": 1,
+                "a": 1
+            }
+        }
+    ]
+}
+output: {
+    "$set:0": {
+        "scope:0": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:0": {
+                    "declaringScope": "scope:0",
+                    "dependencies": []
+                },
+                "x:1": {
+                    "declaringScope": "scope:0",
+                    "metadata": {
+                        "array": false
+                    },
+                    "dependencies": []
+                }
+            }
+        },
+        "dependencies": []
+    },
+    "$group:1": {
+        "scope:1": {
+            "exhaustiveScope": "scope:1",
+            "fields": {
+                "<missing>:2": {
+                    "declaringScope": "scope:1",
+                    "dependencies": []
+                },
+                "_id:3": {
+                    "declaringScope": "scope:1",
+                    "metadata": {
+                        "array": false
+                    },
+                    "dependencies": [
+                        "x:1"
+                    ]
+                }
+            }
+        },
+        "dependencies": [
+            "x:1"
+        ]
+    },
+    "$match:2": {
+        "scope:1": "scope:1",
+        "dependencies": [
+            "<missing>:2",
+            "_id:3"
+        ]
+    }
+}
+

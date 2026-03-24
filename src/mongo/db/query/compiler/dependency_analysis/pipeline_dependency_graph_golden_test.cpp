@@ -369,5 +369,51 @@ TEST_F(PipelineDependencyGraphGoldenTest, ReplaceRootSetAndDottedLookup) {
     });
 }
 
+TEST_F(PipelineDependencyGraphGoldenTest, GroupSimpleKey) {
+    runVariation({
+        .name = "GroupSimpleKey",
+        .pipeline = "[{$set: { x: 1 }},"
+                    "{$group: { _id: '$x', count: { $sum: 1 } }},"
+                    "{$match: { _id: 1, count: 1, a: 1 }}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, GroupCompoundKey) {
+    runVariation({
+        .name = "GroupCompoundKey",
+        .pipeline = "[{$set: { x: 1, y: 1 }},"
+                    "{$group: { _id: { a: '$x', b: '$y' } }},"
+                    "{$match: { '_id.a': 1, '_id.b': 1, '_id.c': 1 }}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, GroupNullKeyThenSet) {
+    runVariation({
+        .name = "GroupNullKeyThenSet",
+        .pipeline = "[{$group: { _id: null, total: { $sum: 1 } }},"
+                    "{$set: { a: 1 }},"
+                    "{$match: { _id: 1, total: 1, a: 1, b: 1 }}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, SetGroupSet) {
+    runVariation({
+        .name = "SetGroupSet",
+        .pipeline = "[{$set: { x: 1, y: 1 }},"
+                    "{$group: { _id: '$x' }},"
+                    "{$set: { a: 1 }},"
+                    "{$match: { _id: 1, a: 1, b: 1, x: 1 }}]",
+    });
+}
+
+// TODO(SERVER-121639): Enable.
+// TEST_F(PipelineDependencyGraphGoldenTest, GroupKeyFromBaseDocument) {
+//     runVariation({
+//         .name = "GroupKeyFromBaseDocument",
+//         .pipeline = "[{$group: { _id: '$x' }},"
+//                     "{$match: { _id: 1, x: 1 }}]",
+//     });
+// }
+
 }  // namespace
 }  // namespace mongo::pipeline::dependency_graph

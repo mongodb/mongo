@@ -1,0 +1,74 @@
+VARIATION GroupNullKeyThenSet
+input: {
+    "pipeline": [
+        {
+            "$group": {
+                "_id": {
+                    "$const": null
+                },
+                "total": {
+                    "$sum": {
+                        "$const": 1
+                    }
+                },
+                "$willBeMerged": false
+            }
+        },
+        {
+            "$set": {
+                "a": {
+                    "$const": 1
+                }
+            }
+        },
+        {
+            "$match": {
+                "_id": 1,
+                "total": 1,
+                "a": 1,
+                "b": 1
+            }
+        }
+    ]
+}
+output: {
+    "$group:0": {
+        "scope:0": {
+            "exhaustiveScope": "scope:0",
+            "fields": {
+                "<missing>:0": {
+                    "declaringScope": "scope:0",
+                    "dependencies": []
+                }
+            }
+        },
+        "dependencies": []
+    },
+    "$set:1": {
+        "scope:1": {
+            "exhaustiveScope": "scope:0",
+            "fields": {
+                "<missing>:1": {
+                    "declaringScope": "scope:1",
+                    "dependencies": []
+                },
+                "a:2": {
+                    "declaringScope": "scope:1",
+                    "metadata": {
+                        "array": false
+                    },
+                    "dependencies": []
+                }
+            }
+        },
+        "dependencies": []
+    },
+    "$match:2": {
+        "scope:1": "scope:1",
+        "dependencies": [
+            "<missing>:0",
+            "a:2"
+        ]
+    }
+}
+
