@@ -3,7 +3,8 @@
  *   # This test is incompatible with 'config shard' as it creates a cluster with 0 shards in order
  *   # to be able to add shard with data on it (which is only allowed on the first shard).
  *   config_shard_incompatible,
- *   requires_fcv_83,
+ *   featureFlagShardAuthoritativeDbMetadataDDL,
+ *   featureFlagShardAuthoritativeDbMetadataCRUD,
  *   requires_replicated_fast_count_recovery,
  *   # This test restarts the server and requires that data persists across restarts.
  *   requires_persistence,
