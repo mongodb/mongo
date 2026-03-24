@@ -314,7 +314,20 @@ TEST_F(ServerSelectorTestFixture, ShouldSelectRandomlyWhenMultipleOptionsAreAvai
     ASSERT_FALSE(frequencyInfo[HostAndPort("s3")]);
 }
 
-TEST_F(ServerSelectorTestFixture, ShouldNotSelectDeprioritizedHostsNearest) {
+class OverloadAwareServerSelectionTest : public ServerSelectorTestFixture {
+public:
+    void setUp() override {
+        ServerSelectorTestFixture::setUp();
+        gOverloadAwareServerSelectionEnabled.store(true);
+    }
+
+    void tearDown() override {
+        ServerSelectorTestFixture::tearDown();
+        gOverloadAwareServerSelectionEnabled.store(false);
+    }
+};
+
+TEST_F(OverloadAwareServerSelectionTest, ShouldNotSelectDeprioritizedHostsNearest) {
     TopologyStateMachine stateMachine(sdamConfiguration);
     auto topologyDescription = std::make_shared<TopologyDescription>(sdamConfiguration);
 
@@ -421,7 +434,7 @@ TEST_F(ServerSelectorTestFixture, ShouldNotSelectDeprioritizedHostsNearest) {
     ASSERT_EQ(md.stats->numTargetingAvoidedDeprioritized.load(), 0);
 }
 
-TEST_F(ServerSelectorTestFixture, ShouldNotSelectDeprioritizedPrimaryWhenPrimaryPreferred) {
+TEST_F(OverloadAwareServerSelectionTest, ShouldNotSelectDeprioritizedPrimaryWhenPrimaryPreferred) {
     TopologyStateMachine stateMachine(sdamConfiguration);
     auto topologyDescription = std::make_shared<TopologyDescription>(sdamConfiguration);
 
@@ -492,7 +505,8 @@ TEST_F(ServerSelectorTestFixture, ShouldNotSelectDeprioritizedPrimaryWhenPrimary
     ASSERT_EQ(md.stats->numTargetingAvoidedDeprioritized.load(), 0);
 }
 
-TEST_F(ServerSelectorTestFixture, ShouldNotSelectDeprioritizedSecondaryWhenSecondaryPreferred) {
+TEST_F(OverloadAwareServerSelectionTest,
+       ShouldNotSelectDeprioritizedSecondaryWhenSecondaryPreferred) {
     TopologyStateMachine stateMachine(sdamConfiguration);
     auto topologyDescription = std::make_shared<TopologyDescription>(sdamConfiguration);
 
