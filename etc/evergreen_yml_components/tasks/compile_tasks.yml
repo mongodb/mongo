@@ -1279,6 +1279,47 @@ tasks:
           version: ${release_version}
           filenames:
             - "src/mongo_crypt_shared_v1-${push_name}-${push_arch}*"
+  - name: compile_mongor
+    tags:
+      [
+        "requires_compile_variant",
+        "assigned_to_jira_team_server_query_optimization",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "blocked_in_query_alias",
+        "release_critical",
+      ]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "do bazel setup"
+      - func: "f_expansions_write"
+      - func: "bazel compile"
+        vars:
+          targets: archive-mongor-debug archive-mongor-stripped
+          bazel_args: >-
+            --config=evg
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: "src/bazel-bin/mongor-stripped.${ext|tgz}"
+          remote_file: "${project}/mongor/${build_variant}/${revision}/mongor_dev-${version}.${ext|tgz}"
+          bucket: mciuploads
+          permissions: public-read
+          content_type: ${content_type|application/tar}
+          display_name: "MongoR dev"
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: "src/bazel-bin/mongor-debug.${ext|tgz}"
+          remote_file: "${project}/mongor/${build_variant}/${revision}/mongor_debug-${version}.${ext|tgz}"
+          bucket: mciuploads
+          permissions: public-read
+          content_type: ${content_type|application/tar}
+          display_name: "MongoR debug"
 
   # Sys-perf relies on this task for uploading pgo data please reach out before changing it.
   - name: upload_pgo_bolt_data
