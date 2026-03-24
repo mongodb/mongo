@@ -33,6 +33,7 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/namespace_string.h"
+        - "mongo/db/query/find_command_idl_utils.h"
     mod_visibility: pub
 
 imports:
@@ -52,8 +53,8 @@ types:
         bson_serialization_type: any
         description: "Bool data type field which doesn't produce any data when serialized."
         cpp_type: "bool"
-        deserializer: "::mongo::parseBoolean"
-        serializer: "::mongo::noOpSerializer"
+        deserializer: "::mongo::find_command_idl_utils::parseBoolean"
+        serializer: "::mongo::find_command_idl_utils::noOpSerializer"
         is_view: false
     object_owned_nonempty_serialize:
         bson_serialization_type: any
@@ -61,8 +62,8 @@ types:
             An owned BSONObj, which gets serialized only when the BSON is not empty.
             The object is ignored if empty, null or missing.
         cpp_type: "mongo::BSONObj"
-        serializer: "::mongo::serializeBSONWhenNotEmpty"
-        deserializer: "::mongo::parseOwnedBSON"
+        serializer: "::mongo::find_command_idl_utils::serializeBSONWhenNotEmpty"
+        deserializer: "::mongo::find_command_idl_utils::parseOwnedBSON"
         default: mongo::BSONObj()
         is_view: false
 

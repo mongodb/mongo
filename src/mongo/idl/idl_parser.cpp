@@ -27,11 +27,9 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
-#include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/idl/idl_parser.h"
+
+#include "mongo/base/error_codes.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
@@ -41,6 +39,8 @@
 #include <span>
 #include <stack>
 #include <string>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -324,46 +324,6 @@ std::vector<std::vector<std::uint8_t>> transformVector(const std::vector<ConstDa
     });
 
     return output;
-}
-
-/**
- * IMPORTANT: The method should not be modified, as API version input/output guarantees could
- * break because of it.
- */
-void noOpSerializer(bool, StringData fieldName, BSONObjBuilder* bob) {}
-
-/**
- * IMPORTANT: The method should not be modified, as API version input/output guarantees could
- * break because of it.
- */
-void serializeBSONWhenNotEmpty(BSONObj obj, StringData fieldName, BSONObjBuilder* bob) {
-    if (!obj.isEmpty()) {
-        bob->append(fieldName, obj);
-    }
-}
-
-/**
- * IMPORTANT: The method should not be modified, as API version input/output guarantees could
- * break because of it.
- */
-BSONObj parseOwnedBSON(BSONElement element) {
-    uassert(ErrorCodes::TypeMismatch,
-            str::stream() << "Expected field " << element.fieldNameStringData()
-                          << "to be of type object",
-            element.type() == BSONType::object);
-    return element.Obj().getOwned();
-}
-
-/**
- * IMPORTANT: The method should not be modified, as API version input/output guarantees could
- * break because of it.
- */
-bool parseBoolean(BSONElement element) {
-    uassert(ErrorCodes::TypeMismatch,
-            str::stream() << "Expected field " << element.fieldNameStringData()
-                          << "to be of type object",
-            element.type() == BSONType::boolean);
-    return element.boolean();
 }
 
 }  // namespace mongo

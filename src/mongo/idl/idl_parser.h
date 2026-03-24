@@ -68,9 +68,9 @@
 // A handful of things in this file are used externally in non-generated code. The ones that should
 // be are explicitly marked PUBLIC. The ones that shouldn't are marked NEEDS_REPLACEMENT.
 //
-// TODO: Clean up this file and put everything that isn't intended to be public in a namespace like
-// idl_parser_helpers to make that clear. And probably put it in a different header then the stuff
-// that is intended to be public.
+// TODO(SERVER-122446): Clean up this file and put everything that isn't intended to be public in a
+// namespace like idl_parser_helpers to make that clear. And probably put it in a different header
+// then the stuff that is intended to be public.
 //
 // You can use the following command to see everything used outside of generated idl parsers:
 // clang-format off
@@ -348,8 +348,8 @@ struct BasicOrderOps<boost::optional<T>> {
  * This class is responsible for throwing all error messages the IDL generated parsers throw,
  * and provide utility methods like checking a BSON type or set of BSON types.
  *
- * TODO: Split this class into the parts that should be public and the parts that are only for
- * internal use by generated code.
+ * TODO(SERVER-122446): Split this class into the parts that should be public and the parts that are
+ * only for internal use by generated code.
  */
 class MONGO_MOD_NEEDS_REPLACEMENT IDLParserContext {
     IDLParserContext(const IDLParserContext&) = delete;
@@ -624,30 +624,6 @@ std::vector<StringData> transformVector(const std::vector<std::string>& input);
 std::vector<std::string> transformVector(const std::vector<StringData>& input);
 std::vector<ConstDataRange> transformVector(const std::vector<std::vector<std::uint8_t>>& input);
 std::vector<std::vector<std::uint8_t>> transformVector(const std::vector<ConstDataRange>& input);
-
-/**
- * IMPORTANT: The method should not be modified, as API version input/output guarantees could
- * break because of it.
- */
-void noOpSerializer(bool, StringData fieldName, BSONObjBuilder* bob);
-
-/**
- * IMPORTANT: The method should not be modified, as API version input/output guarantees could
- * break because of it.
- */
-void serializeBSONWhenNotEmpty(BSONObj obj, StringData fieldName, BSONObjBuilder* bob);
-
-/**
- * IMPORTANT: The method should not be modified, as API version input/output guarantees could
- * break because of it.
- */
-BSONObj parseOwnedBSON(BSONElement element);
-
-/**
- * IMPORTANT: The method should not be modified, as API version input/output guarantees could
- * break because of it.
- */
-bool parseBoolean(BSONElement element);
 
 /**
  * Generated enums specialize this with their element count.

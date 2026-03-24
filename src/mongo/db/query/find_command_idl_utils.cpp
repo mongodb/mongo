@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,47 +27,42 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/query/find_command_idl_utils.h"
-#include "mongo/idl/idl_parser.h"
-#include "mongo/util/modules.h"
 
-namespace mongo {
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/util/assert_util.h"
 
-class MONGO_MOD_PUB FindCommandRequest : public FindCommandRequestBase {
-public:
-    explicit FindCommandRequest(
-        NamespaceStringOrUUID nssOrUUID,
-        boost::optional<SerializationContext> serializationContext = boost::none)
-        : FindCommandRequestBase(std::move(nssOrUUID), std::move(serializationContext)) {}
+#include <fmt/format.h>
 
-    const NamespaceStringOrUUID& getNamespaceOrUUID() const {
-        if (_overrideNssOrUUID) {
-            return _overrideNssOrUUID.value();
-        }
+namespace mongo::find_command_idl_utils {
 
-        return FindCommandRequestBase::getNamespaceOrUUID();
+namespace {
+void assertType(BSONElement element, BSONType type) {
+    uassert(ErrorCodes::TypeMismatch,
+            fmt::format("Expected field {} to be of type {}",
+                        element.fieldNameStringData(),
+                        typeName(type)),
+            element.type() == type);
+}
+}  // namespace
+
+void noOpSerializer(bool, StringData fieldName, BSONObjBuilder* bob) {}
+
+void serializeBSONWhenNotEmpty(BSONObj obj, StringData fieldName, BSONObjBuilder* bob) {
+    if (!obj.isEmpty()) {
+        bob->append(fieldName, obj);
     }
+}
 
-    void setNss(const NamespaceString& nss) {
-        _overrideNssOrUUID = NamespaceStringOrUUID{nss};
-    }
+BSONObj parseOwnedBSON(BSONElement element) {
+    assertType(element, BSONType::object);
+    return element.Obj().getOwned();
+}
 
-    static FindCommandRequest parse(const BSONObj& bsonObject,
-                                    const IDLParserContext& ctxt,
-                                    DeserializationContext* dctx = nullptr) {
-        NamespaceString localNS;
-        FindCommandRequest object(localNS);
-        object.parseProtected(bsonObject, ctxt, dctx);
-        return object;
-    }
+bool parseBoolean(BSONElement element) {
+    assertType(element, BSONType::boolean);
+    return element.boolean();
+}
 
-private:
-    // This value is never serialized, instead we will serialize out the NamespaceStringOrUUID we
-    // parsed when building the FindCommandRequest.
-    boost::optional<NamespaceStringOrUUID> _overrideNssOrUUID;
-};
-
-}  // namespace mongo
+}  // namespace mongo::find_command_idl_utils

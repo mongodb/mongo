@@ -138,6 +138,19 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "find_command_idl_utils",
+    srcs = [
+        "find_command_idl_utils.cpp",
+    ],
+    hdrs = [
+        "find_command_idl_utils.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
 idl_generator(
     name = "hint_gen",
     src = "hint.idl",
@@ -457,6 +470,7 @@ mongo_cc_library(
         "tailable_mode_gen",
     ],
     deps = [
+        ":find_command_idl_utils",
         ":hint_parser",
         "//src/mongo/crypto:fle_fields",
         "//src/mongo/db/auth:authprivilege",
