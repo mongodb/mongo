@@ -134,8 +134,8 @@ TEST(FindAndModifyImageLookupTest, FetchPreImageFromSnapshotBasic_RetryableWrite
                                         boost::none /* commitTimestamp */,
                                         expectedAtClusterTime0);
 
-    auto entryOpTime1 = repl::OpTime(Timestamp(100, 1), 5);
-    auto expectedAtClusterTime1 = Timestamp(100, 0);
+    auto entryOpTime1 = repl::OpTime(Timestamp(100, 0), 5);
+    auto expectedAtClusterTime1 = Timestamp(99, kMaxTsInc);
     testFetchPreOrPostImageFromSnapshot(RetryImageEnum::kPreImage,
                                         entryOpTime1,
                                         boost::none /* commitTimestamp */,
@@ -181,7 +181,8 @@ TEST(FindAndModifyImageLookupTest, FetchPreImageFromSnapshotRequiresTsULLGte1_Re
                                         12020800 /* expectedErrorCode */);
 }
 
-TEST(FindAndModifyImageLookupTest, FetchPreImageFromSnapshotRequiresTsULLGte2_RetryableWrite) {
+TEST(FindAndModifyImageLookupTest,
+     FetchPreImageFromSnapshotDoesNotRequireTsULLGte2_RetryableWrite) {
     auto entryOpTime = repl::OpTime(Timestamp(0, 1), 5);
     auto expectedAtClusterTime = Timestamp(0, 0);
     testFetchPreOrPostImageFromSnapshot(RetryImageEnum::kPreImage,
