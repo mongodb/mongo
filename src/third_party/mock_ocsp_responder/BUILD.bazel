@@ -1,0 +1,22 @@
+load("@poetry//:dependencies.bzl", "dependency")
+
+package(default_visibility = ["//visibility:public"])
+
+py_library(
+    name = "mock_ocsp_responder",
+    srcs = ["mock_ocsp_responder.py"],
+    deps = [
+        dependency(
+            "asn1crypto",
+            group = "testing",
+        ),
+        dependency(
+            "oscrypto",
+            group = "testing",
+        ),
+        dependency(
+            "flask",
+            group = "testing",
+        ),
+    ],
+)

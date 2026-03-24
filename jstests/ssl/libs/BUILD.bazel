@@ -3,6 +3,14 @@ load("//bazel:mongo_js_rules.bzl", "all_subpackage_javascript_files", "mongo_js_
 package(default_visibility = ["//visibility:public"])
 
 mongo_js_library(
+    name = "libs",
+    srcs = glob([
+        "*.js",
+    ]),
+    deps = ["//jstests/multiVersion/libs:all_javascript_files"],
+)
+
+mongo_js_library(
     name = "all_javascript_files",
     srcs = glob([
         "*.js",

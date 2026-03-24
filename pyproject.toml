@@ -158,6 +158,7 @@ asn1crypto = "^1.5.1"
 toml = ">=0.10.2,<0.11.0"
 filelock = "^3.18.0"
 numpy = { version = "2.2.6", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
+oscrypto = { version = "^1.3.0", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
 
 # Werkzeug is needed for ocsp tests in ocsp_mock.py
 # version 3+ fails with "ImportError: cannot import name 'url_quote' from 'werkzeug.urls'"
@@ -209,6 +210,7 @@ libdeps = [
 resmoke = "buildscripts.resmoke:entrypoint"
 
 [tool.ruff]
+force-exclude = true
 extend-exclude = [
     "src/third_party",
 ]

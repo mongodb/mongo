@@ -3,9 +3,12 @@ load("//bazel:mongo_js_rules.bzl", "all_subpackage_javascript_files", "mongo_js_
 package(default_visibility = ["//visibility:public"])
 
 exports_files([
+    "8k-prime.dhparam",
     "key1",
+    "key2",
     "testconfig",
     "authTestsKey",
+    "keyForRollover",
 ])
 
 mongo_js_library(

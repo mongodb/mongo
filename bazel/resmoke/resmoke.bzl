@@ -1,6 +1,37 @@
 load("//bazel:test_exec_properties.bzl", "test_exec_properties")
 load("@rules_python//python:defs.bzl", "py_test")
 
+def _collect_python_imports_impl(ctx):
+    """Collects Python imports from data dependencies to build PYTHONPATH."""
+    python_imports = []
+
+    # Collect PyInfo from data dependencies
+    for dep in ctx.attr.data:
+        if PyInfo in dep:
+            for import_path in dep[PyInfo].imports.to_list():
+                if import_path not in python_imports:
+                    python_imports.append(import_path)
+
+    # Write imports to a file, one per line
+    imports_file = ctx.actions.declare_file(ctx.label.name + ".python_imports")
+    ctx.actions.write(
+        output = imports_file,
+        content = "\n".join(python_imports) + "\n" if python_imports else "",
+    )
+
+    return [DefaultInfo(files = depset([imports_file]))]
+
+_collect_python_imports = rule(
+    implementation = _collect_python_imports_impl,
+    attrs = {
+        "data": attr.label_list(
+            allow_files = True,
+            doc = "Data dependencies to extract Python imports from",
+        ),
+    },
+    doc = "Helper rule to collect Python imports from data dependencies",
+)
+
 def resmoke_config_impl(ctx):
     base_name = ctx.label.name.removesuffix("_config")
     test_list_file = ctx.actions.declare_file(base_name + ".txt")
@@ -113,6 +144,14 @@ def resmoke_suite_test(
         tags = ["resmoke_config"],
     )
 
+    # Collect Python imports from data dependencies
+    python_imports_target = name + "_python_imports"
+    _collect_python_imports(
+        name = python_imports_target,
+        data = data,
+        tags = ["manual"],
+    )
+
     resmoke_shim = Label("//bazel/resmoke:resmoke_shim.py")
     resmoke = Label("//buildscripts:resmoke")
     extra_args = select({
@@ -143,6 +182,7 @@ def resmoke_suite_test(
         data = data + srcs + [
             config,
             generated_config,
+            python_imports_target,
             "//bazel/resmoke:on_feature_flags",
             "//bazel/resmoke:off_feature_flags",
             "//bazel/resmoke:unreleased_ifr_flags",
@@ -186,6 +226,7 @@ def resmoke_suite_test(
         env = {
             "LOCAL_RESOURCES": "$(LOCAL_RESOURCES)",
             "GIT_PYTHON_REFRESH": "quiet",  # Ignore "Bad git executable" error when importing git python. Git commands will still error if run.
+            "PYTHON_IMPORTS_FILE": "$(location %s)" % native.package_relative_label(python_imports_target),
         } | select({
             "//bazel/resmoke:installed_dist_test_enabled": {},
             "//bazel/resmoke:skip_deps_for_cquery_enabled": {},

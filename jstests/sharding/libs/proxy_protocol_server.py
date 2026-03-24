@@ -19,7 +19,7 @@ This wrapper adds two patches:
 import ssl
 import sys
 from asyncio.base_events import BaseEventLoop
-from typing import Dict, Optional, Tuple, List
+from typing import Optional
 
 import proxyprotocol.server.main
 from proxyprotocol.server.main import main
@@ -39,7 +39,7 @@ _sni_store = {}  # type: Dict[int, str]
 _MONGO_ROLES_OID_DOTTED = "1.3.6.1.4.1.34601.2.1.1"
 
 
-def _extract_cert_info(der_cert_bytes: bytes) -> Tuple[Optional[str], Optional[bytes]]:
+def _extract_cert_info(der_cert_bytes: bytes) -> tuple[Optional[str], Optional[bytes]]:
     """Extract subject DN (RFC 4514 string) and roles (raw DER) from a DER certificate.
 
     Returns (dn_string, roles_der). Either may be None if not present.
@@ -64,7 +64,7 @@ def _extract_cert_info(der_cert_bytes: bytes) -> Tuple[Optional[str], Optional[b
 
 
 # See setTLVs docstring in jstests/sharding/libs/proxy_protocol.js for format.
-def _parse_pp2_tlv_structs_json(raw_json_tlv: str) -> Dict[int, bytes]:
+def _parse_pp2_tlv_structs_json(raw_json_tlv: str) -> dict[int, bytes]:
     import json
 
     def is_valid_type(type_num: int) -> bool:
@@ -75,7 +75,7 @@ def _parse_pp2_tlv_structs_json(raw_json_tlv: str) -> Dict[int, bytes]:
             or (0xE0 <= type_num <= 0xEF)
         )
 
-    def parse_one_struct(obj: dict) -> Tuple[int, bytes]:
+    def parse_one_struct(obj: dict) -> tuple[int, bytes]:
         if "type" not in obj:
             raise ValueError("TLV object missing required field 'type'")
         type_num = obj["type"]
@@ -87,8 +87,8 @@ def _parse_pp2_tlv_structs_json(raw_json_tlv: str) -> Dict[int, bytes]:
             raise ValueError("TLV object missing required field 'value'")
         return type_num, str(obj["value"]).encode("utf-8")
 
-    def parse_ssl_tlv(obj: dict) -> Dict[int, bytes]:
-        ret: Dict[int, bytes] = {}
+    def parse_ssl_tlv(obj: dict) -> dict[int, bytes]:
+        ret: dict[int, bytes] = {}
         if "ssl" in obj:
             ssl_obj = obj["ssl"]
             if not isinstance(ssl_obj, list):
@@ -102,15 +102,15 @@ def _parse_pp2_tlv_structs_json(raw_json_tlv: str) -> Dict[int, bytes]:
         maybe_ssl_obj = parse_ssl_tlv(entry)
         if maybe_ssl_obj:
             if ssl_tlvs:
-                raise ValueError(f"Expected one ssl entry but received multiple")
+                raise ValueError("Expected one ssl entry but received multiple")
             ssl_tlvs.update(maybe_ssl_obj)
             return
 
         type_num, val = parse_one_struct(entry)
         tlvs[type_num] = val
 
-    tlvs: Dict[int, bytes] = {}
-    ssl_tlvs: Dict[int, bytes] = {}
+    tlvs: dict[int, bytes] = {}
+    ssl_tlvs: dict[int, bytes] = {}
     parsed = json.loads(raw_json_tlv)
     if isinstance(parsed, dict):
         parse_common(parsed, tlvs, ssl_tlvs)
@@ -174,16 +174,18 @@ async def _patched_run(args):
 
     from proxyprotocol.build import build_transport_result
     from proxyprotocol.dnsbl import Dnsbl
-    from proxyprotocol.server import Address
-    from proxyprotocol.server.protocol import DownstreamProtocol, UpstreamProtocol
-    from proxyprotocol.result import is_ipv4, is_ipv6, is_unix
     from proxyprotocol.result import (
         ProxyResult,
         ProxyResultIPv4,
         ProxyResultIPv6,
         ProxyResultUnix,
+        is_ipv4,
+        is_ipv6,
+        is_unix,
     )
-    from proxyprotocol.tlv import ProxyProtocolTLV, ProxyProtocolSSLTLV
+    from proxyprotocol.server import Address
+    from proxyprotocol.server.protocol import DownstreamProtocol, UpstreamProtocol
+    from proxyprotocol.tlv import ProxyProtocolSSLTLV, ProxyProtocolTLV
 
     # --- BEGIN: Code copied from library's run() function ---
     loop = asyncio.get_running_loop()
@@ -411,8 +413,8 @@ proxyprotocol.server.main.run = _patched_run
 
 
 def _parse_wrapper_flags_from_argv(
-    argv: List[str],
-) -> Tuple[List[str], Optional[str], Optional[str]]:
+    argv: list[str],
+) -> tuple[list[str], Optional[str], Optional[str]]:
     """
     Strip wrapper-specific flags from argv.
 
@@ -420,7 +422,7 @@ def _parse_wrapper_flags_from_argv(
       - --pp2-tlv-file PATH
       - --unix-egress PATH   (connect egress to a Unix domain socket instead of TCP)
     """
-    filtered: List[str] = []
+    filtered: list[str] = []
     tlv_file: Optional[str] = None
     unix_egress: Optional[str] = None
 

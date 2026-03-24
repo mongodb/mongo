@@ -1,0 +1,227 @@
+load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
+load("//jstests/suites/query-execution:common.bzl", "CORE_DATA")
+
+resmoke_suite_test(
+    name = "auth",
+    srcs = ["//jstests/auth:all_javascript_files"],
+    config = "//buildscripts/resmokeconfig:suites/auth.yml",
+    data = [
+        "//jstests/auth/lib:all_subpackage_javascript_files",
+        "//jstests/disk/libs:all_subpackage_javascript_files",
+        "//jstests/fle2/libs:all_subpackage_javascript_files",
+        "//jstests/libs:key1",
+        "//jstests/libs:key2",
+        "//jstests/libs:keyForRollover",
+        "//jstests/libs/config_files:disable_auth.ini",
+        "//jstests/libs/config_files:disable_noauth.ini",
+        "//jstests/libs/config_files:enable_auth.json",
+        "//jstests/sharding/libs:all_subpackage_javascript_files",
+        "//jstests/sharding/libs:proxy_protocol_server",
+        "//jstests/ssl/libs",
+        "//jstests/with_mongot/mongotmock/lib",
+    ],
+    exclude_files = [
+        "//jstests/auth:repl.js",  # Skip until SERVER-25618 is resolved.
+    ],
+    shard_count = 20,
+    tags = [
+        "auth",
+        "ci-release-critical",
+        "incompatible_with_bazel_remote_test",  # jstests/auth/buildinfo_auth_cmd.js fails related to the remote executor's hostname when determining if localhostAuthBypass should apply.
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db/query/search/mongotmock",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "client_encrypt",
+    srcs = ["//jstests/client_encrypt:all_javascript_files"],
+    config = "//buildscripts/resmokeconfig:suites/client_encrypt.yml",
+    data = [
+        "//jstests/ssl/libs",
+        "//x509:generate_main_certificates",
+    ],
+    tags = [
+        "ci-release-critical",
+        "encrypt",
+        "patch_build",
+        "ssl",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "ssl",
+    srcs = [
+        "//jstests/ssl:all_javascript_files",
+        "//src/mongo/db/modules/enterprise/jstests/fips:all_javascript_files",
+    ],
+    config = "//buildscripts/resmokeconfig:suites/ssl.yml",
+    data = [
+        "//jstests/libs:8k-prime.dhparam",
+        "//jstests/libs:key1",
+        "//jstests/libs:test_pem_files",
+        "//jstests/sharding/libs:all_subpackage_javascript_files",
+        "//jstests/ssl:tls_enumerator",
+        "//jstests/ssl/libs",
+        "//src/mongo/db/modules/enterprise/jstests/external_auth/lib:all_subpackage_javascript_files",
+        "//x509:generate_main_certificates",
+    ],
+    shard_count = 4,
+    tags = [
+        "ci-release-critical",
+        "encrypt",
+        "incompatible_with_bazel_remote_test",  # jstests/ssl/ssl_x509_SAN.js requires IPv6, which is disabled on remote executors.
+        "patch_build",
+        "ssl",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "ssl_special",
+    srcs = ["//jstests/sslSpecial:all_javascript_files"],
+    config = "//buildscripts/resmokeconfig:suites/ssl_special.yml",
+    data = [
+        "//jstests/libs:key1",
+        "//jstests/ssl/libs",
+        "//x509:generate_main_certificates",
+    ],
+    shard_count = 4,
+    tags = [
+        "ci-release-critical",
+        "encrypt",
+        "patch_build",
+        "ssl",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "core_auth",
+    srcs = ["//jstests/core:all_subpackage_javascript_files"],
+    config = "//buildscripts/resmokeconfig:suites/core_auth.yml",
+    data = CORE_DATA + [
+        "//jstests/libs:authTestsKey",
+    ],
+    exclude_files = [
+        # Transactions are not supported on MongoDB standalone nodes.
+        "//jstests/core/txns:all_subpackage_javascript_files",
+        # Queryable encryption is not supported on standalone.
+        "//jstests/core/query/queryable_encryption:all_subpackage_javascript_files",
+
+        # Commands using UUIDs are not compatible with name-based auth
+        "//jstests/core/query:commands_with_uuid.js",
+
+        # Query settings are not supported on standalone.
+        "//jstests/core/query/query_settings:all_subpackage_javascript_files",
+
+        # Skip any tests that run with auth explicitly.
+        "//jstests/core/query/bulk:bulk_write_non_auth.js",
+        "//jstests/core/administrative:auth1.js",
+        "//jstests/core/administrative:auth2.js",
+    ],
+    exclude_with_any_tags = [
+        # Multiple users cannot be authenticated on one connection within a session.
+        "creates_and_authenticates_user",
+    ],
+    shard_count = 4,
+    tags = [
+        "auth",
+        "ci-release-critical",
+        "common",
+        "jscore",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "ocsp",
+    srcs = ["//jstests/ocsp:all_javascript_files"],
+    config = "//buildscripts/resmokeconfig:suites/ocsp.yml",
+    data = [
+        "//jstests/ocsp/lib:all_javascript_files",
+        "//jstests/ocsp/lib:ocsp_mock",
+        "//jstests/ssl/libs",
+        "//x509:generate_main_certificates",
+    ],
+    tags = [
+        "ci-release-critical",
+        "encrypt",
+        "ocsp",
+        "patch_build",
+        "ssl",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "ssl_linear",
+    srcs = ["//jstests/ssl_linear:all_javascript_files"],
+    config = "//buildscripts/resmokeconfig:suites/ssl_linear.yml",
+    data = [
+        "//jstests/libs:key1",
+        "//jstests/ssl/libs",
+        "//x509:generate_main_certificates",
+    ],
+    tags = [
+        "ci-release-critical",
+        "encrypt",
+        "incompatible_with_bazel_remote_test",  # jstests/ssl_linear/ssl_with_system_ca.js requires `openssl` to be installed and on the path.
+        "patch_build",
+        "ssl",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "ssl_x509",
+    srcs = ["//jstests/ssl_x509:all_javascript_files"],
+    config = "//buildscripts/resmokeconfig:suites/ssl_x509.yml",
+    data = [
+        "//jstests/libs:key1",
+        "//jstests/ssl/libs",
+        "//x509:generate_main_certificates",
+    ],
+    tags = [
+        "ci-release-critical",
+        "encrypt",
+        "patch_build",
+        "ssl",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)

@@ -3,8 +3,7 @@ test_kind: js_test
 # Similar to the `ssl` suite, but configured by evergreen to run sequentially, so that the
 # contents of the Windows system certificate store are only affected by one test at a time.
 selector:
-  roots:
-    - jstests/ssl_linear/*.js
+  from_target: //jstests/suites/security:ssl_linear
 
 # ssl tests start their own mongod's.
 executor:

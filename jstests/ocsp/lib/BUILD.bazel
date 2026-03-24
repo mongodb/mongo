@@ -10,3 +10,11 @@ mongo_js_library(
 )
 
 all_subpackage_javascript_files()
+
+py_binary(
+    name = "ocsp_mock",
+    srcs = ["ocsp_mock.py"],
+    deps = [
+        "//src/third_party/mock_ocsp_responder",
+    ],
+)

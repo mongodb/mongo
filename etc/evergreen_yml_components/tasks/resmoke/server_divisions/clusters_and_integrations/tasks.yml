@@ -701,6 +701,7 @@ tasks:
         "ssl",
         "encrypt",
         "patch_build",
+        "has_bazel_target",
       ]
     commands:
       - func: "do setup"
@@ -917,6 +918,7 @@ tasks:
         "jscore",
         "auth",
         "common",
+        "has_bazel_target",
       ]
     commands:
       - func: "do setup"
@@ -1018,6 +1020,7 @@ tasks:
         "encrypt",
         "ocsp",
         "patch_build",
+        "has_bazel_target",
       ]
     commands:
       - func: "do setup"
@@ -1099,6 +1102,7 @@ tasks:
         "encrypt",
         "ssl",
         "patch_build",
+        "has_bazel_target",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1159,6 +1163,7 @@ tasks:
         "ssl",
         "patch_build",
         "requires_replicated_fast_count_recovery",
+        "has_bazel_target",
       ]
     commands:
       - func: "do setup"

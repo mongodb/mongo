@@ -54,6 +54,35 @@ def add_evergreen_build_info(args):
     add_volatile_arg(args, "--versionId=", "version_id")
 
 
+def setup_pythonpath():
+    """Setup PYTHONPATH and executable location for jstests that call python"""
+
+    os.environ["RESMOKE_PYTHON"] = sys.executable
+
+    python_imports_file = os.environ.get("PYTHON_IMPORTS_FILE")
+    if not python_imports_file or not os.path.exists(python_imports_file):
+        return
+
+    with open(python_imports_file, "r") as f:
+        imports = [line.strip() for line in f if line.strip()]
+
+    if not imports:
+        return
+
+    # Convert runfiles-relative paths to absolute paths
+    test_srcdir = os.environ.get("TEST_SRCDIR")
+    if not test_srcdir:
+        return
+    import_paths = [os.path.join(test_srcdir, imp) for imp in imports]
+
+    existing_pythonpath = os.environ.get("PYTHONPATH", "")
+    new_pythonpath = os.pathsep.join(import_paths)
+    if existing_pythonpath:
+        new_pythonpath = new_pythonpath + os.pathsep + existing_pythonpath
+
+    os.environ["PYTHONPATH"] = new_pythonpath
+
+
 class ResmokeShimContext:
     def __init__(self):
         self.links = []
@@ -138,6 +167,8 @@ class ResmokeShimContext:
 
 
 if __name__ == "__main__":
+    setup_pythonpath()
+
     sys.argv[0] = os.path.join(
         "buildscripts", "resmoke.py"
     )  # Ensure resmoke's local invocation is printed using resmoke.py directly

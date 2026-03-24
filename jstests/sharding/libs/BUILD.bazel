@@ -1,4 +1,5 @@
 load("//bazel:mongo_js_rules.bzl", "all_subpackage_javascript_files", "mongo_js_library")
+load("@poetry//:dependencies.bzl", "dependency")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -15,3 +16,14 @@ mongo_js_library(
 )
 
 all_subpackage_javascript_files()
+
+py_binary(
+    name = "proxy_protocol_server",
+    srcs = ["proxy_protocol_server.py"],
+    deps = [
+        dependency(
+            "proxy-protocol",
+            group = "testing",
+        ),
+    ],
+)

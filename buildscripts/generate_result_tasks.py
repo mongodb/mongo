@@ -338,17 +338,18 @@ def query_targets(
 
     # Query for tests with tags that match the variant. Only py_test rules are considered,
     # since resmoke_suite_test is a macro for a py_test.
+    excluded = f"attr(tags, '\\bincompatible_with_bazel_remote_test(?![a-zA-Z0-9_-])', kind('py_test', {target_pattern}))"
     if len(tags) == 1:
         # Single tag - simple query
         tag = tags[0]
-        query = f"attr(tags, '\\b{tag}(?![a-zA-Z0-9_-])', kind('py_test', {target_pattern}))"
+        query = f"attr(tags, '\\b{tag}(?![a-zA-Z0-9_-])', kind('py_test', {target_pattern})) - {excluded}"
     else:
         # Multiple tags - use + operator to combine them in a single query
         tag_queries = [
             f"attr(tags, '\\b{tag}(?![a-zA-Z0-9_-])', kind('py_test', {target_pattern}))"
             for tag in tags
         ]
-        query = " + ".join(tag_queries)
+        query = f"({' + '.join(tag_queries)}) - {excluded}"
 
     cmd = (
         ["bazel", "cquery"]

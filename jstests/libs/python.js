@@ -1,6 +1,13 @@
 // Helper for finding the local python binary.
 
 export function getPython3Binary() {
+    // Use RESMOKE_PYTHON if set, pointing to the python that should be used.
+    const resmokePython = _getEnv("RESMOKE_PYTHON");
+    if (resmokePython) {
+        jsTest.log.info("Using Python from RESMOKE_PYTHON: " + resmokePython);
+        return resmokePython;
+    }
+
     // On windows it is important to use python vs python3
     // or else we will pick up a python that is not in our venv
     clearRawMongoProgramOutput();

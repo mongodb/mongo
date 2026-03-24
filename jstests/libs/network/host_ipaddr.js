@@ -14,7 +14,9 @@ export function get_ipaddr() {
 
     let ipFile = path + "ipaddr-" + Random.srand() + ".log";
     let windowsCmd = "ipconfig > " + ipFile;
-    let unixCmd = "(/sbin/ifconfig || /usr/sbin/ip addr) | grep 'inet ' | grep -v '127.0.0.1' > " + ipFile;
+    let unixCmd =
+        "(/sbin/ifconfig || /usr/sbin/ip addr || hostname -I | tr ' ' '\\n' | grep -v '^$' | sed 's/^/inet /') | grep 'inet ' | grep -v '127.0.0.1' > " +
+        ipFile;
     let ipAddr = null;
     let hostType = null;
 
