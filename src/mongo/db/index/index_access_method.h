@@ -66,6 +66,14 @@ struct BtreeExternalSortComparison {
         return l.compare(r);
     }
 };
+
+/**
+ * Specifies whether container write oplog entries need to be generated.
+ *
+ * This is used for primary-driven index builds which require replicating container writes.
+ */
+enum class ContainerWriteBehavior { kDoNotReplicate, kReplicate };
+
 /**
  * An IndexAccessMethod is the interface through which all the mutation, lookup, and
  * traversal of index entries is done. The class is designed so that the underlying index
@@ -318,7 +326,7 @@ public:
         size_t maxMemoryUsageBytes,
         const boost::optional<IndexStateInfo>& stateInfo,
         const DatabaseName& dbName,
-        const IndexBuildMethodEnum& method) = 0;
+        ContainerWriteBehavior containerWriteBehavior) = 0;
 
     virtual SorterFileStats& getSorterFileStats() = 0;
 
@@ -449,11 +457,6 @@ public:
                  const ShouldRelaxConstraintsFn& shouldRelaxConstraints = nullptr) const;
 
     /**
-     * Specifies whether container write oplog entries need to be generated.
-     */
-    enum class ContainerWriteBehavior { kReplicate, kUnreplicated };
-
-    /**
      * Inserts the specified keys into the index. Does not attempt to determine whether the
      * insertion of these keys should cause the index to become multikey. The 'numInserted' output
      * parameter, if non-nullptr, will be reset to the number of keys inserted by this function
@@ -469,7 +472,7 @@ public:
         KeyHandlerFn&& onDuplicateKey,
         int64_t* numInserted,
         IncludeDuplicateRecordId includeDuplicateRecordId = IncludeDuplicateRecordId::kOff,
-        ContainerWriteBehavior containerWriteBehavior = ContainerWriteBehavior::kUnreplicated);
+        ContainerWriteBehavior containerWriteBehavior = ContainerWriteBehavior::kDoNotReplicate);
 
     /**
      * Inserts the specified keys into the index. and determines whether these keys should cause the
@@ -488,7 +491,7 @@ public:
         KeyHandlerFn&& onDuplicateKey,
         int64_t* numInserted,
         IncludeDuplicateRecordId includeDuplicateRecordId = IncludeDuplicateRecordId::kOff,
-        ContainerWriteBehavior containerWriteBehavior = ContainerWriteBehavior::kUnreplicated);
+        ContainerWriteBehavior containerWriteBehavior = ContainerWriteBehavior::kDoNotReplicate);
 
     /**
      * Analogous to insertKeys above, but remove the keys instead of inserting them.
@@ -502,7 +505,7 @@ public:
                       const InsertDeleteOptions& options,
                       int64_t* numDeleted,
                       ContainerWriteBehavior containerWriteBehavior =
-                          ContainerWriteBehavior::kUnreplicated) const;
+                          ContainerWriteBehavior::kDoNotReplicate) const;
 
     /**
      * Gets the keys of the documents 'from' and 'to' and prepares them for the update.
@@ -689,7 +692,7 @@ public:
         size_t maxMemoryUsageBytes,
         const boost::optional<IndexStateInfo>& stateInfo,
         const DatabaseName& dbName,
-        const IndexBuildMethodEnum& method) final;
+        ContainerWriteBehavior containerWriteBehavior) final;
 
     SorterFileStats& getSorterFileStats() final;
 

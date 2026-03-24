@@ -198,8 +198,8 @@ makeSpiller(OperationContext* opCtx,
             SorterFileStats& fileStats,
             SorterContainerStats& containerStats,
             const DatabaseName& dbName,
-            IndexBuildMethodEnum method) {
-    if (method == IndexBuildMethodEnum::kPrimaryDriven) {
+            ContainerWriteBehavior containerWriteBehavior) {
+    if (containerWriteBehavior == ContainerWriteBehavior::kReplicate) {
         invariant(!stateInfo);
         return std::make_shared<sorter::ContainerBasedSpiller<key_string::Value,
                                                               mongo::NullValue,
@@ -505,7 +505,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
 
             // TODO SERVER-117551 Make initiateBulk happen for primary-driven and non-primary-driven
             // at the same call site.
-            if (_method != IndexBuildMethodEnum::kPrimaryDriven) {
+            if (_containerWriteBehavior == ContainerWriteBehavior::kDoNotReplicate) {
                 index.bulk =
                     index.real->initiateBulk(opCtx,
                                              collection.get(),
@@ -517,11 +517,11 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                                                          index.real->getSorterFileStats(),
                                                          index.real->getSorterContainerStats(),
                                                          collection->ns().dbName(),
-                                                         _method),
+                                                         _containerWriteBehavior),
                                              eachIndexBuildMaxMemoryUsageBytes,
                                              stateInfo,
                                              collection->ns().dbName(),
-                                             _method);
+                                             _containerWriteBehavior);
             }
 
             const IndexDescriptor* descriptor = indexCatalogEntry->descriptor();
@@ -588,7 +588,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
     const boost::optional<RecordId>& resumeAfterRecordId) {
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
     // Primary-driven index builds need to replicate container writes.
-    auto operationType = _method == IndexBuildMethodEnum::kPrimaryDriven
+    auto operationType = _containerWriteBehavior == ContainerWriteBehavior::kReplicate
         ? AcquisitionPrerequisites::kWrite
         : AcquisitionPrerequisites::kUnreplicatedWrite;
     // TODO SERVER-109542: Use regular ShardRole acquisitions for read.
@@ -674,7 +674,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
     shard_role_details::getRecoveryUnit(opCtx)->setReadOnce(readOnce);
 
     // TODO (SERVER-119515): Move this to a higher level.
-    if (_method == IndexBuildMethodEnum::kPrimaryDriven &&
+    if (_containerWriteBehavior == ContainerWriteBehavior::kReplicate &&
         !opCtx->getServiceContext()->getStorageEngine()->isEphemeral()) {
         shard_role_details::getRecoveryUnit(opCtx)->setPrefetching(
             primaryDrivenIndexBuildPrefetching.load());
@@ -739,11 +739,11 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
                             index.real->getSorterFileStats(),
                             index.real->getSorterContainerStats(),
                             collection->nss().dbName(),
-                            _method),
+                            _containerWriteBehavior),
                 getEachIndexBuildMaxMemoryUsageBytes(boost::none, _indexes.size()),
                 /*stateInfo=*/boost::none,
                 collection->nss().dbName(),
-                _method);
+                _containerWriteBehavior);
         }
     };
 
@@ -759,7 +759,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
         try {
             // TODO SERVER-117551 Make initiateBulk happen for primary-driven and non-primary-driven
             // at the same call site.
-            if (_method == IndexBuildMethodEnum::kPrimaryDriven) {
+            if (_containerWriteBehavior == ContainerWriteBehavior::kReplicate) {
                 for (auto& index : _indexes) {
                     auto indexCatalogEntry =
                         index.block->getEntry(opCtx, collection->getCollectionPtr());
@@ -774,11 +774,11 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
                                     index.real->getSorterFileStats(),
                                     index.real->getSorterContainerStats(),
                                     collection->nss().dbName(),
-                                    _method),
+                                    _containerWriteBehavior),
                         getEachIndexBuildMaxMemoryUsageBytes(boost::none, _indexes.size()),
                         /*stateInfo=*/boost::none,
                         collection->nss().dbName(),
-                        _method);
+                        _containerWriteBehavior);
                 }
             }
             // Resumable index builds can only be resumed prior to the oplog recovery phase of
@@ -1164,10 +1164,10 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
                 },
                 onDuplicateRecord,
                 yieldFn,
-                (this->_method == IndexBuildMethodEnum::kPrimaryDriven)
+                (this->_containerWriteBehavior == ContainerWriteBehavior::kReplicate)
                     ? primaryDrivenIndexBuildIndexInsertionBatchSize.load()
                     : 1,
-                (this->_method == IndexBuildMethodEnum::kPrimaryDriven)
+                (this->_containerWriteBehavior == ContainerWriteBehavior::kReplicate)
                     ? primaryDrivenIndexBuildIndexInsertionBatchBytes.load()
                     : std::numeric_limits<size_t>::max());
 
@@ -1408,6 +1408,10 @@ bool MultiIndexBlock::isBackgroundBuilding() const {
 
 void MultiIndexBlock::setIndexBuildMethod(IndexBuildMethodEnum indexBuildMethod) {
     _method = indexBuildMethod;
+}
+
+void MultiIndexBlock::setContainerWriteBehavior(ContainerWriteBehavior containerWriteBehavior) {
+    _containerWriteBehavior = containerWriteBehavior;
 }
 
 void MultiIndexBlock::appendBuildInfo(BSONObjBuilder* builder) const {

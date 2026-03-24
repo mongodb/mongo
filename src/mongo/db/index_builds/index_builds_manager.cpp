@@ -34,6 +34,7 @@
 #include "mongo/bson/bson_validate.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/multi_index_block.h"
 #include "mongo/db/index_repair.h"
@@ -128,6 +129,9 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
     }
 
     builder->setIndexBuildMethod(options.method);
+    builder->setContainerWriteBehavior(options.method == IndexBuildMethodEnum::kPrimaryDriven
+                                           ? ContainerWriteBehavior::kReplicate
+                                           : ContainerWriteBehavior::kDoNotReplicate);
 
     try {
         writeConflictRetry(opCtx, "IndexBuildsManager::setUpIndexBuild", nss, [&]() {

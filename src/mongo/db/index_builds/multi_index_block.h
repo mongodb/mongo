@@ -335,6 +335,8 @@ public:
 
     void setIndexBuildMethod(IndexBuildMethodEnum indexBuildMethod);
 
+    void setContainerWriteBehavior(ContainerWriteBehavior containerWriteBehavior);
+
     /**
      * Appends the current state information of the index build to the builder.
      */
@@ -390,6 +392,8 @@ private:
     std::vector<IndexToBuild> _indexes;
 
     IndexBuildMethodEnum _method = IndexBuildMethodEnum::kHybrid;
+
+    ContainerWriteBehavior _containerWriteBehavior = ContainerWriteBehavior::kDoNotReplicate;
 
     bool _ignoreUnique = false;
 
