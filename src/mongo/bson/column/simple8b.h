@@ -385,7 +385,7 @@ MONGO_COMPILER_ALWAYS_INLINE_GCC14 inline size_t visitAll(const char* buffer,
 /**
  * Returns the total number of values over multiple Simple8b blocks including missing values.
  */
-inline size_t count(const char* buffer, size_t size);
+MONGO_MOD_PUBLIC inline size_t count(const char* buffer, size_t size);
 
 /**
  * Returns the last value (can be missing) over multiple Simple8b blocks. If called with unsigned T

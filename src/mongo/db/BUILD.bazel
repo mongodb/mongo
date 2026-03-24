@@ -44,6 +44,7 @@ mongo_cc_library(
         ":startup_warnings_common",
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/repl:repl_settings",
+        "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/util:processinfo",
     ],
 )

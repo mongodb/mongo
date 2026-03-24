@@ -30,6 +30,7 @@
 #include "mongo/db/timeseries/timeseries_options.h"
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
@@ -330,6 +331,13 @@ TEST(TimeseriesOptionsTest, AreTimeseriesBucketsFixed) {
             << "BucketMaxSpanSeconds=value1, BucketRoundingSeconds=value2, "
             << "BucketingParametersChanged=true implies buckets should not be fixed.";
     }
+}
+
+TEST(TimeseriesOptionsTest, BSONColumnMemEstimationCalculations) {
+    // The calculations for BSONColumn memory estimation in bson_validate.cpp rely on the defaults
+    // for some server parameters. If these change, we also need to recalculate and potentially
+    // adjust the memory threshold of the 'bsonMaxExpandedMemUsage' parameter.
+    ASSERT_EQ(gTimeseriesBucketMinCount, 10);
 }
 
 }  // namespace mongo

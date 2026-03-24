@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/column/simple8b.h"
 #include "mongo/platform/int128.h"
@@ -83,6 +84,12 @@ inline uint32_t numElemsForControlByte(const char* control) {
     }
     return num;
 }
+
+/*
+ * Calculate number of interleaved streams for a reference object and interleaved control byte. Will
+ * throw if no scalar streams are found as that is an invalid reference object for the control byte.
+ */
+uint32_t numInterleavedStreams(const BSONObj& refObj, uint8_t control);
 
 inline uint8_t scaleIndexForControlByte(uint8_t control) {
     static constexpr std::array<uint8_t, 16> kControlToScaleIndex = {kInvalidScaleIndex,

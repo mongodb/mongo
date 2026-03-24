@@ -60,3 +60,13 @@ server_parameters:
             lte: 2
         default: 2
         redact: false
+
+    bsonMaxExpandedMemUsage:
+        description: "The maximum amount of memory usage to expand a BSON object in bytes, taking BSONColumn into account."
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<long long>
+        cpp_varname: bsonMaxExpandedMemUsage
+        validator:
+            gte: 0
+        default: 209715200 # 200Mb
+        redact: false
