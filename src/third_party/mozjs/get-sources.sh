@@ -10,7 +10,7 @@ NAME=spidermonkey
 
 VERSION="140.7.0esr"
 LIB_GIT_BRANCH=spidermonkey-esr140.7-cpp-only
-LIB_GIT_REVISION=43ad77e05411b90dd589ec466494ece49cbf6044
+LIB_GIT_REVISION=692674d55f1c4acfae4316efab0f79cd67250341
 LIB_GIT_REPO=git@github.com:mongodb-forks/spidermonkey.git
 # If a local spidermonkey repo exists, this is much faster than fetching from git:
 # LIB_GIT_REPO=/home/ubuntu/spidermonkey/.git
