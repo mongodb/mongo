@@ -13,6 +13,7 @@ from buildscripts.resmokelib import config, errors
 from buildscripts.resmokelib.generate_fuzz_config.mongo_fuzzer_configs import (
     generate_normal_mongo_parameters,
     generate_special_runtime_parameters,
+    is_enterprise_param_available,
 )
 from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 from buildscripts.resmokelib.testing.fixtures import replicaset, shardedcluster, standalone
@@ -123,21 +124,19 @@ class FuzzRuntimeParameters(interface.Hook):
         runtime_mongod_params = {
             param: val
             for param, val in config_fuzzer_params["mongod"].items()
-            if "runtime" in val.get("fuzz_at", [])
-            and not (val.get("enterprise_only", False) and "enterprise" not in config.MODULES)
+            if "runtime" in val.get("fuzz_at", []) and is_enterprise_param_available(val)
         }
         runtime_mongos_params = {
             param: val
             for param, val in config_fuzzer_params["mongos"].items()
-            if "runtime" in val.get("fuzz_at", [])
-            and not (val.get("enterprise_only", False) and "enterprise" not in config.MODULES)
+            if "runtime" in val.get("fuzz_at", []) and is_enterprise_param_available(val)
         }
 
         # Get cluster parameters
         cluster_params = {
             param: val
             for param, val in config_fuzzer_params["cluster"].items()
-            if not (val.get("enterprise_only", False) and "enterprise" not in config.MODULES)
+            if is_enterprise_param_available(val)
         }
 
         # Flow control-related parameters should only be fuzzed when enableFlowControl is set to True at startup.

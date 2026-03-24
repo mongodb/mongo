@@ -7,6 +7,18 @@ import stat
 
 from buildscripts.resmokelib import config, utils
 
+
+def is_enterprise_param_available(param_config: dict) -> bool:
+    """
+    Check if a parameter is available for fuzzing.
+
+    Returns True if the parameter is available (either not enterprise-only, or the
+    enterprise module is loaded). This handles the case where config.MODULES is empty
+    (e.g., when generate-fuzz-config is run standalone without module initialization).
+    """
+    return not param_config.get("enterprise_only", False) or "enterprise" in (config.MODULES or [])
+
+
 # Parameter sets with different behaviors.
 flow_control_params = [
     "flowControlTicketAdderConstant",
@@ -218,7 +230,7 @@ def generate_encryption_config(rng: random.Random):
     # encryption also required an enterprise binary.
     if (
         config.STORAGE_ENGINE != "wiredTiger"
-        or "enterprise" not in config.MODULES
+        or "enterprise" not in (config.MODULES or [])
         or config.DISABLE_ENCRYPTION_FUZZING
     ):
         return ret
@@ -375,8 +387,7 @@ def generate_mongod_parameters(rng):
     params = {
         param: val
         for param, val in config_fuzzer_params["mongod"].items()
-        if "startup" in val.get("fuzz_at", [])
-        and not (val.get("enterprise_only", False) and "enterprise" not in config.MODULES)
+        if "startup" in val.get("fuzz_at", []) and is_enterprise_param_available(val)
     }
 
     # TODO (SERVER-75632): Remove/comment out the below line to enable passthrough testing.
@@ -412,7 +423,7 @@ def generate_mongod_extra_configs(rng):
     generated_config = {
         key: generate_normal_mongo_parameters(rng, value, key)
         for key, value in config_fuzzer_extra_configs["mongod"].items()
-        if not (value.get("enterprise_only", False) and "enterprise" not in config.MODULES)
+        if is_enterprise_param_available(value)
     }
 
     # This is needed for our antithesis setup
@@ -434,8 +445,7 @@ def generate_mongos_parameters(rng):
     params = {
         param: val
         for param, val in config_fuzzer_params["mongos"].items()
-        if "startup" in val.get("fuzz_at", [])
-        and not (val.get("enterprise_only", False) and "enterprise" not in config.MODULES)
+        if "startup" in val.get("fuzz_at", []) and is_enterprise_param_available(val)
     }
 
     return {key: generate_normal_mongo_parameters(rng, value, key) for key, value in params.items()}
