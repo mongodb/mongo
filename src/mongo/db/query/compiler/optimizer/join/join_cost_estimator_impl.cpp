@@ -46,9 +46,9 @@ JoinCostEstimate JoinCostEstimatorImpl::costCollScanFragment(NodeId nodeId) {
     // CollScan performs roughly sequential reads from disk as it is stored in a WT b-tree. We
     // estimate the number of disk read by estimating the number of pages the collscan will read.
     // This is done by dividing the data size by the page size.
-    CardinalityEstimate numSeqIOs = CardinalityEstimate{
-        CardinalityType{collStats.logicalDataSizeBytes / collStats.pageSizeBytes},
-        EstimationSource::Metadata};
+    CardinalityEstimate numSeqIOs =
+        CardinalityEstimate{CardinalityType{collStats.onDiskSizeBytes / collStats.pageSizeBytes},
+                            EstimationSource::Metadata};
     // CollScan does no random read from disk.
     CardinalityEstimate numRandIOs = zeroCE;
 
@@ -69,7 +69,7 @@ JoinCostEstimate JoinCostEstimatorImpl::costIndexScanFragment(NodeId nodeId) {
     // documents this plan fragment returns. In the multikey case, we just ignore the cost of
     // deduplicating RIDs as part of the index scan.
     auto& collStats = _jCtx.catStats.collStats.at(_jCtx.joinGraph.getNode(nodeId).collectionName);
-    double numPagesColl = collStats.logicalDataSizeBytes / collStats.pageSizeBytes;
+    double numPagesColl = collStats.onDiskSizeBytes / collStats.pageSizeBytes;
     CardinalityEstimate numRandIOs = CardinalityEstimate{
         CardinalityType{estimateMackertLohmanRandIO(
             numPagesColl, _jCtx.catStats.numPagesInStorageEngineCache, numDocsOutput.toDouble())},
@@ -175,7 +175,7 @@ JoinCostEstimate JoinCostEstimatorImpl::costINLJFragment(const JoinPlanNode& lef
     // TODO SERVER-117523: Integrate the height of the B-tree into the formula.
     auto& rightCollStats =
         _jCtx.catStats.collStats.at(_jCtx.joinGraph.getNode(right).collectionName);
-    double numPagesColl = rightCollStats.logicalDataSizeBytes / rightCollStats.pageSizeBytes;
+    double numPagesColl = rightCollStats.onDiskSizeBytes / rightCollStats.pageSizeBytes;
 
     // The cardinality of the outer side is the number of probes we will perform.
     double numProbes = leftDocs.toDouble();

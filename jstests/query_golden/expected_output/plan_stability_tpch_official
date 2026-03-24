@@ -244,19 +244,18 @@
 "  -> [customer] COLLSCAN: plan_stability_tpch_official.customer ",
 "  -> [none] HJ o_orderkey = lineitem.l_orderkey",
 "      -> [orders] COLLSCAN: plan_stability_tpch_official.orders ",
-"      -> [none] INLJ s_suppkey = l_suppkey",
+"      -> [none] HJ s_suppkey = l_suppkey",
 "          -> [none] HJ n_nationkey = s_nationkey",
 "              -> [n1] COLLSCAN: plan_stability_tpch_official.nation ",
 "              -> [none] PROJECTION_SIMPLE",
 "                  -> COLLSCAN: plan_stability_tpch_official.supplier ",
-"          -> [lineitem] FETCH: plan_stability_tpch_official.lineitem {'$and':[{'$expr':{'$gte':['$l_shipdate',{'$const':'1995-01-01T00:00:00.000Z'}]}},{'$expr':{'$lte':['$l_shipdate',{'$const':'1996-12-31T00:00:00.000Z'}]}},{'l_shipdate':{'$_internalExprGte':'1995-01-01T00:00:00.000Z'}},{'l_shipdate':{'$_internalExprLte':'1996-12-31T00:00:00.000Z'}}]} ",
-"              -> INDEX_PROBE_NODE: plan_stability_tpch_official.lineitem l_suppkey_1",
+"          -> [lineitem] COLLSCAN: plan_stability_tpch_official.lineitem {'$and':[{'$expr':{'$gte':['$l_shipdate',{'$const':'1995-01-01T00:00:00.000Z'}]}},{'$expr':{'$lte':['$l_shipdate',{'$const':'1996-12-31T00:00:00.000Z'}]}}]} ",
 "$lookup nation n_nationkey_1",
 "$project",
 "$group",
 "$project",
 "$sort"],
-    "keys" :    616203,
+    "keys" :     15631,
     "docs" :    782228,
     "result" :
 [
@@ -1279,19 +1278,19 @@
 {"$sort":{"revenue":-1}},
 {"$limit":20}]},
     "winningPlan": [
-"HJ orders.o_orderkey = l_orderkey",
-"  -> [none] HJ o_custkey = c_custkey",
-"      -> [orders] FETCH: plan_stability_tpch_official.orders {'$and':[{'$expr':{'$gte':['$o_orderdate',{'$const':'1993-10-01T00:00:00.000Z'}]}},{'$expr':{'$lt':['$o_orderdate',{'$const':'1994-01-01T00:00:00.000Z'}]}}]} ",
-"          -> IXSCAN: plan_stability_tpch_official.orders o_orderdate_1 {'o_orderdate':['[new Date(749433600000), new Date(757382400000))']}",
-"      -> [none] INLJ n_nationkey = c_nationkey",
-"          -> [nation] COLLSCAN: plan_stability_tpch_official.nation ",
-"          -> [none] FETCH: plan_stability_tpch_official.customer ",
-"              -> INDEX_PROBE_NODE: plan_stability_tpch_official.customer c_nationkey_1",
-"  -> [lineitem] COLLSCAN: plan_stability_tpch_official.lineitem {'$and':[{'$expr':{'$eq':['$l_returnflag',{'$const':'R'}]}}]} ",
+"HJ n_nationkey = c_nationkey",
+"  -> [nation] COLLSCAN: plan_stability_tpch_official.nation ",
+"  -> [none] HJ orders.o_custkey = c_custkey",
+"      -> [none] HJ o_orderkey = l_orderkey",
+"          -> [orders] FETCH: plan_stability_tpch_official.orders {'$and':[{'$expr':{'$gte':['$o_orderdate',{'$const':'1993-10-01T00:00:00.000Z'}]}},{'$expr':{'$lt':['$o_orderdate',{'$const':'1994-01-01T00:00:00.000Z'}]}}]} ",
+"              -> IXSCAN: plan_stability_tpch_official.orders o_orderdate_1 {'o_orderdate':['[new Date(749433600000), new Date(757382400000))']}",
+"          -> [lineitem] COLLSCAN: plan_stability_tpch_official.lineitem {'$and':[{'$expr':{'$eq':['$l_returnflag',{'$const':'R'}]}}]} ",
+"      -> [none] PROJECTION_SIMPLE",
+"          -> COLLSCAN: plan_stability_tpch_official.customer ",
 "$group",
 "$project",
 "$sort"],
-    "keys" :     20677,
+    "keys" :      5677,
     "docs" :    621274,
     "result" :
 [
@@ -1499,7 +1498,7 @@
 }
 
 ],
-">>>totals": {"commands": 7, "keys":   1422713, "docs":   3408017, "rows":       220}
+">>>totals": {"commands": 7, "keys":    807141, "docs":   3408017, "rows":       220}
 }
 
 

@@ -88,13 +88,17 @@ public:
         jCtx->catStats = {
             .collStats = {
                 {smallNss,
-                 CollectionStats{.logicalDataSizeBytes =
-                                     collCards[smallNodeId].toDouble() * docSizeBytes}},
+                 CollectionStats{
+                     .logicalDataSizeBytes = collCards[smallNodeId].toDouble() * docSizeBytes,
+                     .onDiskSizeBytes = collCards[smallNodeId].toDouble() * docSizeBytes}},
                 {largeNss,
-                 CollectionStats{.logicalDataSizeBytes =
-                                     collCards[largeNodeId].toDouble() * docSizeBytes}},
+                 CollectionStats{
+                     .logicalDataSizeBytes = collCards[largeNodeId].toDouble() * docSizeBytes,
+                     .onDiskSizeBytes = collCards[largeNodeId].toDouble() * docSizeBytes}},
                 {extremelySmallNss,
                  CollectionStats{.logicalDataSizeBytes =
+                                     collCards[extremelySmallNodeId].toDouble() * docSizeBytes,
+                                 .onDiskSizeBytes =
                                      collCards[extremelySmallNodeId].toDouble() * docSizeBytes}},
             }};
 

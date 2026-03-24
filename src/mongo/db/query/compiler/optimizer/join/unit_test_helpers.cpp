@@ -171,8 +171,11 @@ void JoinOrderingTestFixture::initGraph(size_t numNodes, bool withIndexes) {
         // Pick some cardinalities.
         collCards.push_back(makeCard(i * 1000.0 + 10.0));
         subsetCards.emplace(makeNodeSet((NodeId)i), collCards[i]);
-        catStats.collStats[nss] =
-            CollectionStats{.logicalDataSizeBytes = collCards[i].toDouble() * 420.0};
+        const double dataSize = collCards[i].toDouble() * 420.0;
+        catStats.collStats[nss] = CollectionStats{
+            .logicalDataSizeBytes = dataSize,
+            .onDiskSizeBytes = dataSize / 4,
+        };
 
         auto cq = makeCanonicalQuery(nss, filterBSON);
         cbrCqQsns.emplace(cq.get(),

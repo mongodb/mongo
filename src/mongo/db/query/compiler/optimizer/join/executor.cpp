@@ -218,6 +218,8 @@ CatalogStats createCatalogStats(OperationContext* opCtx, const MultipleCollectio
         collStats.emplace(coll->ns(),
                           CollectionStats{
                               .logicalDataSizeBytes = static_cast<double>(recordStore->dataSize()),
+                              .onDiskSizeBytes = static_cast<double>(
+                                  recordStore->storageSize(ru) - recordStore->freeStorageSize(ru)),
                           });
     });
     auto engine = opCtx->getServiceContext()->getStorageEngine();
