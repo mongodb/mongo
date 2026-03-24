@@ -3485,11 +3485,11 @@ TEST_F(PipelineOptimizationTest, MatchOnCondShouldNotSwapSinceCategoryIsOther) {
         "[{$project: {redacted: false}}, "
         "{$match: {$_internalSchemaCond: [{a: 1}, {b: 1}, {c: 1}]}}]";
     outputPipe =
-        "[{$project: {redacted: false, _id: true}}, "
-        "{$match: {$_internalSchemaCond: [{a: {$eq : 1}}, {b: {$eq: 1}}, {c: {$eq: 1}}]}}]";
+        "[{$match: {$_internalSchemaCond: [{a: {$eq : 1}}, {b: {$eq: 1}}, {c: {$eq: 1}}]}}, "
+        "{$project: {redacted: false, _id: true}}]";
     serializedPipe =
-        "[{$project: {redacted: false, _id: true}}, "
-        "{$match: {$_internalSchemaCond: [{a: 1}, {b: 1}, {c: 1}]}}]";
+        "[{$match: {$_internalSchemaCond: [{a: 1}, {b: 1}, {c: 1}]}}, "
+        "{$project: {redacted: false, _id: true}}]";
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 
     inputPipe =

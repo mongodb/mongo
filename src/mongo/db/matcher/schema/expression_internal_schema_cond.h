@@ -32,6 +32,7 @@
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_arity.h"
 #include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/util/modules.h"
@@ -82,6 +83,37 @@ public:
 
     void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
         visitor->visit(this);
+    }
+
+    void applyRename(const StringMap<std::string>& renameList) {
+        if (renameList.empty()) {
+            return;
+        }
+
+        expression::Renameables renameables;
+        for (size_t i = 0; i < numChildren(); ++i) {
+            auto* child = getChild(i);
+            const bool canRename = expression::hasOnlyRenameableMatchExpressionChildren(
+                *child, renameList, renameables);
+            invariant(canRename);
+        }
+        expression::applyRenamesToExpression(renameList, &renameables);
+    }
+
+    bool hasRenameablePath(const StringMap<std::string>& renameList) const {
+        if (renameList.empty()) {
+            return true;
+        }
+
+        for (size_t i = 0; i < numChildren(); ++i) {
+            auto* child = getChild(i);
+            const bool canRename =
+                expression::hasOnlyRenameableMatchExpressionChildren(*child, renameList);
+            if (!canRename) {
+                return false;
+            }
+        }
+        return true;
     }
 };
 

@@ -66,7 +66,8 @@ bool hasPredicateOnPaths(const MatchExpression& expr,
                          mongo::MatchExpression::MatchType searchType,
                          const OrderedPathSet& paths);
 
-using PathOrExprMatchExpression = std::variant<PathMatchExpression*, ExprMatchExpression*>;
+using PathOrExprMatchExpression =
+    std::variant<PathMatchExpression*, ExprMatchExpression*, InternalSchemaCondMatchExpression*>;
 
 /**
  * A 'Renameables' is a list of match expression nodes which require renaming in order to push these

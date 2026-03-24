@@ -54,6 +54,7 @@
 #include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
 #include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/overloaded_visitor.h"
 
 #include <cmath>
 #include <compare>
@@ -1108,6 +1109,45 @@ bool hasOnlyRenameableMatchExpressionChildrenImpl(E&& expr,
                 case MatchExpression::MatchType::ALWAYS_FALSE: {
                     return true;
                 }
+                case MatchExpression::INTERNAL_SCHEMA_COND: {
+                    auto condExpr =
+                        checked_cast<MaybeMutablePtr<mutating, InternalSchemaCondMatchExpression>>(
+                            &expr);
+                    bool hasOnlyRenameableMatchExpressions = condExpr->hasRenameablePath(renames);
+                    if constexpr (mutating) {
+                        if (renames.size() > 0 && hasOnlyRenameableMatchExpressions) {
+                            // The second element is ignored for $internalSchemaCond.
+                            (renameables.emplace_back(condExpr, ""_sd), ...);
+                        }
+                    }
+                    return hasOnlyRenameableMatchExpressions;
+                }
+                case MatchExpression::INTERNAL_SCHEMA_BIN_DATA_ENCRYPTED_TYPE:
+                case MatchExpression::INTERNAL_SCHEMA_BIN_DATA_FLE2_ENCRYPTED_TYPE: {
+                    // InternalSchemaBinDataEncryptedTypeExpression and
+                    // InternalSchemaBinDataFLE2EncryptedTypeExpression are PathMatchExpression
+                    auto pathExpr =
+                        checked_cast<MaybeMutablePtr<mutating, PathMatchExpression>>(&expr);
+                    if (renames.size() == 0 || !pathExpr->optPath()) {
+                        return true;
+                    }
+                    auto&& [wouldSucceed, optNewPath] = pathExpr->wouldRenameSucceed(renames);
+                    if (!wouldSucceed) {
+                        if constexpr (mutating) {
+                            (renameables.clear(), ...);
+                        }
+                        return false;
+                    }
+                    if constexpr (mutating) {
+                        if (optNewPath) {
+                            (renameables.emplace_back(pathExpr, *optNewPath), ...);
+                        }
+                    }
+                    return true;
+                }
+                case MatchExpression::INTERNAL_SCHEMA_ROOT_DOC_EQ: {
+                    return false;
+                }
                 default: {
                     if constexpr (mutating) {
                         (renameables.clear(), ...);
@@ -1500,13 +1540,13 @@ void applyRenamesToExpression(const StringMap<std::string>& renames,
                               const Renameables* renameables) {
     tassert(7585301, "Invalid argument", renameables);
     for (auto&& [matchExpr, newPath] : *renameables) {
-        if (holds_alternative<PathMatchExpression*>(matchExpr)) {
-            // PathMatchExpression.
-            get<PathMatchExpression*>(matchExpr)->setPath(newPath);
-        } else {
-            // ExprMatchExpression
-            get<ExprMatchExpression*>(matchExpr)->applyRename(renames);
-        }
+        visit(
+            OverloadedVisitor{[&newPath](PathMatchExpression* expr) { expr->setPath(newPath); },
+                              [&renames](ExprMatchExpression* expr) { expr->applyRename(renames); },
+                              [&renames](InternalSchemaCondMatchExpression* expr) {
+                                  expr->applyRename(renames);
+                              }},
+            matchExpr);
     }
 }
 
