@@ -156,12 +156,8 @@ Status commit(OperationContext* opCtx,
             opCtx, index.getIndexName(), IndexCatalog::InclusionPolicy::kUnfinished);
 
         {
-            // TODO (SERVER-121123): Use idents provided in index.
-            auto mutableIndex = index;
-            mutableIndex.indexIdent = entry->getIdent();
-            mutableIndex.setInternalIdents(*opCtx->getServiceContext()->getStorageEngine());
             IndexBuildInterceptor interceptor{opCtx,
-                                              mutableIndex,
+                                              index,
                                               LazyRecordStore::CreateMode::openExisting,
                                               entry->descriptor()->unique(),
                                               false};
