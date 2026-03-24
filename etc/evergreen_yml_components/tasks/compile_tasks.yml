@@ -1081,7 +1081,7 @@ tasks:
             PROMOTE_BUILD_VARIANT: ${promote_build_variant}
             PROMOTE_MONGO_VERSION: ${version}
             PROMOTE_REVISION: ${promote_revision}
-            PROMOTE_CDN_ADDRESS: ${promote_cdn_address}
+            PROMOTE_CDN_ADDRESS: https://downloads.cloud.10gen.cc/sys-perf-builds/${promote_project_identifier}/${promote_version_id}/${promote_build_variant}/${promote_build_id}/mongo-binaries.${promote_extension}
             CLOUD_ENV_API_PUBLIC_KEY: ${cloud_dev_api_public_key}
             CLOUD_ENV_API_PRIVATE_KEY: ${cloud_dev_api_private_key}
           args:
@@ -1095,7 +1095,7 @@ tasks:
             PROMOTE_BUILD_VARIANT: ${promote_build_variant}
             PROMOTE_MONGO_VERSION: ${version}
             PROMOTE_REVISION: ${promote_revision}
-            PROMOTE_CDN_ADDRESS: ${promote_cdn_address}
+            PROMOTE_CDN_ADDRESS: https://downloads.cloud.10gen.cc/sys-perf-builds/${promote_project_identifier}/${promote_version_id}/${promote_build_variant}/${promote_build_id}/mongo-binaries.${promote_extension}
             CLOUD_ENV_API_PUBLIC_KEY: ${cloud_qa_api_public_key}
             CLOUD_ENV_API_PRIVATE_KEY: ${cloud_qa_api_private_key}
           args:
