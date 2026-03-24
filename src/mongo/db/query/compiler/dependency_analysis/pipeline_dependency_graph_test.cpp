@@ -711,5 +711,126 @@ TEST_F(PipelineDependencyGraphTest, ChainedReplaceRoots) {
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, GroupSimpleKey) {
+    setPipeline(
+        "[{$set: { x: 1 }},"
+        "{$group: { _id: '$x', count: { $sum: 1 } }},"
+        "{$match: { _id: 1, count: 1, a: 1 }}]");
+
+    runTest([&] {
+        auto* last = stages.back().get();
+        // _id declared by $group.
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "_id"), stages[1]);
+        // 'count' is also declared by $group.
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "count"), stages[1]);
+        // 'a' from the base document is made missing by $group.
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "a"), stages[1]);
+        // 'x' is also made missing by $group.
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "x"), stages[1]);
+    });
+}
+
+// TODO(SERVER-121639): Enable.
+// TEST_F(PipelineDependencyGraphTest, GroupKeyFromBaseDocument) {
+//     setPipeline(
+//         "[{$group: { _id: '$x' }},"
+//         "{$match: { _id: 1 }}]");
+//
+//     runTest([&] {
+//         auto* last = stages.back().get();
+//         // _id declared by $group.
+//         ASSERT_EQUALS(graph->getDeclaringStage(last, "_id"), stages[0]);
+//     });
+// }
+
+TEST_F(PipelineDependencyGraphTest, GroupCompoundKey) {
+    setPipeline(
+        "[{$set: { x: 1, y: 1 }},"
+        "{$group: { _id: { a: '$x', b: '$y' } }},"
+        "{$match: { '_id.a': 1, '_id.b': 1, '_id.c': 1 }}]");
+
+    runTest([&] {
+        auto* last = stages.back().get();
+        // _id.a declared by $group.
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "_id.a"), stages[1]);
+        // _id.b declared by $group.
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "_id.b"), stages[1]);
+        // _id declared by group.
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "_id"), stages[1]);
+        // _id.c is not a group key field — attributed to $group via missing sentinel.
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "_id.c"), stages[1]);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GroupDottedKeyNoRename) {
+    setPipeline(
+        "[{$set: { x: 1 }},"
+        "{$group: { _id: '$x.y' }},"
+        "{$match: { _id: 1 }}]");
+
+    runTest([&] {
+        auto* last = stages.back().get();
+        // _id declared by $group.
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "_id"), stages[1]);
+        // Everything else is made missing by $group.
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "x"), stages[1]);
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "x.y"), stages[1]);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GroupNullKey) {
+    setPipeline(
+        "[{$group: { _id: null, total: { $sum: 1 } }},"
+        "{$set: { a: 1 }},"
+        "{$match: { _id: 1, total: 1, a: 1, b: 1 }}]");
+
+    runTest([&] {
+        auto* last = stages.back().get();
+        // _id is declared by $group.
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "_id"), stages[0]);
+        // 'total' is declared by $group.
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "total"), stages[0]);
+        // 'a' set after $group.
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "a"), stages[1]);
+        // 'b' is made missing by $group.
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "b"), stages[0]);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GroupThenInclusion) {
+    setPipeline(
+        "[{$group: { _id: {foo: {bar: 1}}, count: { $sum: 1 } }},"
+        "{$project: { _id: 1 }},"
+        "{$match: { _id: 1, count: 1 }}]");
+
+    runTest([&] {
+        auto* last = stages.back().get();
+        // _id preserved through inclusion, most recently declared by $group.
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "_id"), stages[0]);
+        // 'count' excluded by inclusion projection.
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "count"), stages[1]);
+        // Any arbitrary field last excluded by the inclusion projection.
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "foo"), stages[1]);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SetThenGroupThenSetThenMatch) {
+    setPipeline(
+        "[{$set: { x: 1 }},"
+        "{$group: { _id: '$x' }},"
+        "{$set: { a: 1 }},"
+        "{$match: { _id: 1, a: 1, b: 1 }}]");
+
+    runTest([&] {
+        auto* last = stages.back().get();
+        // _id declared by $group.
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "_id"), stages[1]);
+        // 'a' set after $group.
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "a"), stages[2]);
+        // 'b' made missing by $group.
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "b"), stages[1]);
+    });
+}
+
 }  // namespace
 }  // namespace mongo::pipeline::dependency_graph
