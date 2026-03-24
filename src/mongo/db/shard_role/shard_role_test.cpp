@@ -1993,7 +1993,7 @@ void ShardRoleTest::testRestoreFailsOnTimeseriesCollectionUpgradeThroughMainNss(
         dbNameTestDb, "TimeseriesCollectionThatWillBeUpgraded"));
 
     RAIIServerParameterControllerForTest throwsTimeseriesUpgradeDowngradeEnable(
-        "featureFlagViewlessTimeseriesUpgradeDowngradeRetriableError", true);
+        "featureFlagCreateViewlessTimeseriesCollections", true);
 
     {
         // Create legacy (viewful) timeseries collection.
@@ -2042,7 +2042,7 @@ void ShardRoleTest::testRestoreFailsOnTimeseriesCollectionUpgradeThroughBucketsN
         dbNameTestDb, "TimeseriesCollectionThatWillBeUpgraded"));
 
     RAIIServerParameterControllerForTest throwsTimeseriesUpgradeDowngradeEnable(
-        "featureFlagViewlessTimeseriesUpgradeDowngradeRetriableError", true);
+        "featureFlagCreateViewlessTimeseriesCollections", true);
 
     {
         // Create legacy (viewful) timeseries collection.
@@ -2095,7 +2095,7 @@ void ShardRoleTest::testRestoreFailsOnTimeseriesCollectionDowngradeThroughMainNs
         dbNameTestDb, "TimeseriesCollectionThatWillBeDowngraded"));
 
     RAIIServerParameterControllerForTest throwsTimeseriesUpgradeDowngradeEnable(
-        "featureFlagViewlessTimeseriesUpgradeDowngradeRetriableError", true);
+        "featureFlagCreateViewlessTimeseriesCollections", true);
 
     {
         // Create viewless timeseries collection.
@@ -2146,7 +2146,7 @@ void ShardRoleTest::testRestoreFailsOnTimeseriesCollectionDowngradeThroughBucket
         dbNameTestDb, "TimeseriesCollectionThatWillBeDowngraded"));
 
     RAIIServerParameterControllerForTest throwsTimeseriesUpgradeDowngradeEnable(
-        "featureFlagViewlessTimeseriesUpgradeDowngradeRetriableError", true);
+        "featureFlagCreateViewlessTimeseriesCollections", true);
 
     {
         // Create viewless timeseries collection.

@@ -384,11 +384,12 @@ std::variant<CollectionPtr, std::shared_ptr<const ViewDefinition>> acquireLocalC
 
     auto coll = getCollection(nss);
 
-    // We are temporarly guarding this code under the ViewlessTimeseries feature flag
+    // We are temporarily guarding this code under the ViewlessTimeseries feature flag
     // to make sure it will be only executed in the binary version where
     // viewless timeseries are enabled.
     // (Ignore FCV check): This code is backward compatible.
-    if (forRestore && gFeatureFlagViewlessTimeseriesUpgradeDowngradeRetriableError.isEnabled() &&
+    if (forRestore &&
+        gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledAndIgnoreFCVUnsafe() &&
         prerequisites.uuid && !coll) {
         // Between yielding and restoring the acquisition, the target collection disappeared.
         // If this has been caused by a timeseries upgrade/downgrade that renamed the timeseries
@@ -486,7 +487,8 @@ SnapshotedServices acquireServicesSnapshot(OperationContext* opCtx,
         return boost::none;
     }();
 
-    // TODO: This will be removed when we no longer snapshot sharding state on CollectionPtr.
+    // TODO SERVER-122491: This will be removed when we no longer snapshot sharding state on
+    // CollectionPtr.
     if (holds_alternative<CollectionPtr>(collOrView) && collectionDescription.isSharded()) {
         get<CollectionPtr>(collOrView).setShardKeyPattern(collectionDescription.getKeyPattern());
     }
@@ -2024,7 +2026,8 @@ void restoreTransactionResourcesToOperationContext(
             direct_connection_util::checkDirectShardOperationAllowed(
                 opCtx, transactionResources.acquiredCollections.front().prerequisites.nss);
 
-            // TODO: This will be removed when we no longer snapshot sharding state on CollectionPtr
+            // TODO SERVER-122491: This will be removed when we no longer snapshot sharding state on
+            // CollectionPtr
             invariant(acquiredCollection.collectionDescription);
             if (acquiredCollection.collectionDescription->isSharded()) {
                 acquiredCollection.collectionPtr.setShardKeyPattern(
