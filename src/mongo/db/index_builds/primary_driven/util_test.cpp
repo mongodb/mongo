@@ -169,6 +169,7 @@ protected:
     UUID collUUID = UUID::gen();
 
 private:
+    // TODO (SERVER-116165): Remove.
     RAIIServerParameterControllerForTest _featureFlag{"featureFlagPrimaryDrivenIndexBuilds", true};
 };
 

@@ -358,7 +358,11 @@ DEATH_TEST(ContainerIteratorChecksumDeathTest, IncorrectChecksumV2Fails, "116059
     iterator.next();
 }
 
-class ContainerIteratorTest : public testing::TestWithParam<SorterChecksumVersion> {};
+class ContainerIteratorTest : public testing::TestWithParam<SorterChecksumVersion> {
+public:
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+};
 
 INSTANTIATE_TEST_SUITE_P(ContainerIteratorTestSuite,
                          ContainerIteratorTest,
@@ -380,6 +384,8 @@ TEST_P(ContainerIteratorTest, EmptyIteratorHasZeroChecksum) {
 class SortedContainerWriterTest : public ServiceContextMongoDTest {
 public:
     SorterTracker sorterTracker;
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
 
     /**
      * Creates and exhausts iterators created from the writer to ensure that the final checksum
@@ -546,7 +552,11 @@ TEST_F(SortedContainerWriterTest, ContainerWriterAllowsNullValueWithNonNullKey) 
 }
 
 class ContainerBasedSpillerTest : public ServiceContextMongoDTest,
-                                  public testing::WithParamInterface<int64_t> {};
+                                  public testing::WithParamInterface<int64_t> {
+public:
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+};
 
 INSTANTIATE_TEST_SUITE_P(ContainerBasedSpillerTest,
                          ContainerBasedSpillerTest,

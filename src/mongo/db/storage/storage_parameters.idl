@@ -295,3 +295,8 @@ feature_flags:
         cpp_varname: feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds
         default: false
         fcv_gated: true
+    featureFlagContainerWrites:
+        description: "Enable support for container write oplog entries."
+        cpp_varname: feature_flags::gContainerWrites
+        default: false
+        fcv_gated: true

@@ -42,6 +42,7 @@ executor:
       set_parameters:
         enableElectionHandoff: 0
         enableTestCommands: 1
+        featureFlagContainerWrites: 1
         featureFlagPrimaryDrivenIndexBuilds: 1
         featureFlagRecordIdsReplicated: 1
     num_nodes: 3

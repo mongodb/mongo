@@ -4,6 +4,7 @@
       fixture:
         mongod_options:
           set_parameters:
+            featureFlagContainerWrites: 1
             featureFlagPrimaryDrivenIndexBuilds: 1
             featureFlagRecordIdsReplicated: 1
 - name: enable_primary_driven_index_builds_feature_flag_mongos
@@ -12,6 +13,7 @@
       fixture:
         mongos_options:
           set_parameters:
+            featureFlagContainerWrites: 1
             featureFlagPrimaryDrivenIndexBuilds: 1
             featureFlagRecordIdsReplicated: 1
 - name: enable_primary_driven_index_builds_feature_flag_testdata_parameter_mongod
@@ -22,6 +24,7 @@
           global_vars:
             TestData:
               setParameters:
+                featureFlagContainerWrites: true
                 featureFlagPrimaryDrivenIndexBuilds: true
                 featureFlagRecordIdsReplicated: true
 - name: enable_primary_driven_index_builds_feature_flag_testdata_parameter_mongos
@@ -32,6 +35,7 @@
           global_vars:
             TestData:
               setParametersMongos:
+                featureFlagContainerWrites: true
                 featureFlagPrimaryDrivenIndexBuilds: true
                 featureFlagRecordIdsReplicated: true
 - name: exclude_primary_driven_index_builds_incompatible_tag

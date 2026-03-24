@@ -242,8 +242,9 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSideWritesTable) {
 }
 
 TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSideWritesTablePrimaryDriven) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagPrimaryDrivenIndexBuilds", true);
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
     testSingleOpIsSavedToSideWritesTable(IndexBuildInterceptor::Op::kInsert,
                                          LazyRecordStore::CreateMode::immediate);
 }
@@ -254,8 +255,9 @@ TEST_F(IndexBuilderInterceptorTest, SingleDeleteIsSavedToSideWritesTable) {
 }
 
 TEST_F(IndexBuilderInterceptorTest, SingleDeleteIsSavedToSideWritesTablePrimaryDriven) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagPrimaryDrivenIndexBuilds", true);
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
     testSingleOpIsSavedToSideWritesTable(IndexBuildInterceptor::Op::kDelete,
                                          LazyRecordStore::CreateMode::immediate);
 }
@@ -279,8 +281,9 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSkippedRecordsIntRidTra
 
 TEST_F(IndexBuilderInterceptorTest,
        SingleInsertIsSavedToSkippedRecordsTrackerTableIntRidPrimaryDriven) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagPrimaryDrivenIndexBuilds", true);
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
 
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
     auto interceptor =
@@ -318,8 +321,9 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSkippedRecordsTrackerTa
 
 TEST_F(IndexBuilderInterceptorTest,
        SingleInsertIsSavedToSkippedRecordsTrackerTableStringRidPrimaryDriven) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagPrimaryDrivenIndexBuilds", true);
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
 
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
     auto interceptor =
@@ -361,8 +365,9 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToDuplicateKeyTable) {
 }
 
 TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToDuplicateKeyTablePrimaryDriven) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagPrimaryDrivenIndexBuilds", true);
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
     auto indexBuildInfo =
         buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}, unique: true}"));
     auto interceptor =
@@ -399,8 +404,9 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsDrainedIntoIndexPrimaryDriven)
             capturer, otel::metrics::MetricNames::kIndexBuildSideWritesDrainBytes);
     }
 
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagPrimaryDrivenIndexBuilds", true);
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
 
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
     auto interceptor =
@@ -475,8 +481,9 @@ TEST_F(IndexBuilderInterceptorTest, SingleDeleteIsDrainedIntoIndexPrimaryDriven)
             capturer, otel::metrics::MetricNames::kIndexBuildSideWritesDrainBytes);
     }
 
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagPrimaryDrivenIndexBuilds", true);
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
 
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
     auto interceptor =

@@ -23,8 +23,16 @@ const coll = db.getCollection(collName);
 const indexName = "x_1";
 const indexSpec = {x: 1};
 
+// TODO(SERVER-109578): Remove this check when the feature flag is removed.
 if (!FeatureFlagUtil.isPresentAndEnabled(db, "PrimaryDrivenIndexBuilds")) {
     jsTest.log.info("Skipping test because featureFlagPrimaryDrivenIndexBuilds is disabled");
+    rst.stopSet();
+    quit();
+}
+
+// TODO(SERVER-109578): Remove this check when the feature flag is removed.
+if (!FeatureFlagUtil.isPresentAndEnabled(primary.getDB(dbName), "ContainerWrites")) {
+    jsTestLog("Skipping test because featureFlagContainerWrites is disabled");
     rst.stopSet();
     quit();
 }

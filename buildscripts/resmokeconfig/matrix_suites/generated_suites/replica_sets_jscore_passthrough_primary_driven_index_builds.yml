@@ -23,6 +23,7 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        featureFlagContainerWrites: 1
         featureFlagPrimaryDrivenIndexBuilds: 1
         featureFlagRecordIdsReplicated: 1
     num_nodes: 2

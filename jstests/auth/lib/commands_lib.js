@@ -367,8 +367,7 @@ export const authCommandsLib = {
         {
             testname: "applyOps_container_insert",
             skipSharded: true,
-            skipTest: (conn) =>
-                !isFeatureEnabled(conn, "featureFlagPrimaryDrivenIndexBuilds") || !storageEngineIsWiredTiger(),
+            skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagContainerWrites") || !storageEngineIsWiredTiger(),
             setup: function (db) {
                 const coll = "containerOpsColl";
                 db[coll].drop();
@@ -409,8 +408,7 @@ export const authCommandsLib = {
         {
             testname: "applyOps_container_delete",
             skipSharded: true,
-            skipTest: (conn) =>
-                !isFeatureEnabled(conn, "featureFlagPrimaryDrivenIndexBuilds") || !storageEngineIsWiredTiger(),
+            skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagContainerWrites") || !storageEngineIsWiredTiger(),
             setup: function (db) {
                 const coll = "containerOpsColl";
                 db[coll].drop();

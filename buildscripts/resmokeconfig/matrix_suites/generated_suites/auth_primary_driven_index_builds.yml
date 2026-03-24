@@ -13,9 +13,11 @@ executor:
         TestData:
           roleGraphInvalidationIsFatal: true
           setParameters:
+            featureFlagContainerWrites: true
             featureFlagPrimaryDrivenIndexBuilds: true
             featureFlagRecordIdsReplicated: true
           setParametersMongos:
+            featureFlagContainerWrites: true
             featureFlagPrimaryDrivenIndexBuilds: true
             featureFlagRecordIdsReplicated: true
       nodb: ""

@@ -15,9 +15,11 @@ executor:
       global_vars:
         TestData:
           setParameters:
+            featureFlagContainerWrites: true
             featureFlagPrimaryDrivenIndexBuilds: true
             featureFlagRecordIdsReplicated: true
           setParametersMongos:
+            featureFlagContainerWrites: true
             featureFlagPrimaryDrivenIndexBuilds: true
             featureFlagRecordIdsReplicated: true
       nodb: ""

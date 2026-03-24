@@ -2235,8 +2235,8 @@ TEST_F(OplogApplierImplTest, ApplyApplyOpsSessionDeleteAfterLaterRetryableUpdate
 // TODO (SERVER-109556): Adjustments to suites coming from this ticket might result in a better
 // candidate for this test's fixture.
 TEST_F(OplogApplierImplTest, ApplyApplyOpsContainerOperations) {
-    // TODO (SERVER-103670): Remove.
-    RAIIServerParameterControllerForTest ff("featureFlagPrimaryDrivenIndexBuilds", true);
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
 
@@ -2294,8 +2294,8 @@ TEST_F(OplogApplierImplTest, ApplyApplyOpsContainerOperations) {
 // TODO (SERVER-109556): Adjustments to suites coming from this ticket might result in a better
 // candidate for this test's fixture.
 TEST_F(OplogApplierImplTest, ApplyContainerOperations) {
-    // TODO (SERVER-103670): Remove.
-    RAIIServerParameterControllerForTest ff("featureFlagPrimaryDrivenIndexBuilds", true);
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
 
     auto nss = NamespaceString::createNamespaceString_forTest("test.t");
 

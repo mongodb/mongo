@@ -23,6 +23,7 @@
 - featureFlagSessionsCollectionCoordinatorOnConfigServer
 # TODO (SERVER-108818): test primary-driven index builds in allFeatureFlag variant.
 - featureFlagPrimaryDrivenIndexBuilds
+- featureFlagContainerWrites
 # TODO SERVER-117454: Enable the feature flag in the all-feature-flags variant.
 - featureFlagReplicatedFastCount
 # TODO (SERVER-117324): Remove featureFlagDisallowFindAndModifyImageCollection

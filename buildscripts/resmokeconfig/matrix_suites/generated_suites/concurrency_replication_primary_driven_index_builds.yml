@@ -22,6 +22,7 @@ executor:
       oplogSize: 1024
       set_parameters:
         enableTestCommands: 1
+        featureFlagContainerWrites: 1
         featureFlagPrimaryDrivenIndexBuilds: 1
         featureFlagRecordIdsReplicated: 1
         queryAnalysisSamplerConfigurationRefreshSecs: 1

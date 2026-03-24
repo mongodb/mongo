@@ -136,7 +136,7 @@ Status _applyOps(OperationContext* opCtx,
                             if (oplogApplicationMode == OplogApplication::Mode::kApplyOpsCmd) {
                                 uassert(ErrorCodes::InvalidOptions,
                                         "Container ops are not enabled",
-                                        ::mongo::feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds
+                                        ::mongo::feature_flags::gContainerWrites
                                                 .isEnabledUseLatestFCVWhenUninitialized(
                                                     VersionContext::getDecoration(opCtx),
                                                     serverGlobalParams.featureCompatibility

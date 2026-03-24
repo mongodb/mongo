@@ -530,8 +530,9 @@ TEST_F(IndexBuildsCoordinatorTest, StartIndexBuildOnNonEmptyCollectionReplicates
 // Creates a single and two-phase index build and checks that 'abortAllTwoPhaseIndexBuildsForStepUp'
 // aborts only the two phase index build.
 TEST_F(IndexBuildsCoordinatorTest, StepUpPrimaryDrivenAbortsOnlyTwoPhaseBuilds) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagPrimaryDrivenIndexBuilds", true);
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
 
     auto opCtx = operationContext();
     auto* indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);

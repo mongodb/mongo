@@ -676,8 +676,8 @@ TEST_F(ApplyOpsTest, ContainerOpsRequireFeatureFlagAndTestCommands) {
 
     auto testContainerOps =
         [&](bool featureFlagEnabled, bool testCommandsEnabled, bool commandSucceeds) {
-            RAIIServerParameterControllerForTest featureFlagController{
-                "featureFlagPrimaryDrivenIndexBuilds", featureFlagEnabled};
+            RAIIServerParameterControllerForTest featureFlagController{"featureFlagContainerWrites",
+                                                                       featureFlagEnabled};
             setTestCommandsEnabled(testCommandsEnabled);
 
             BSONObjBuilder resultBuilder;

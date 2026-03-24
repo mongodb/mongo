@@ -225,7 +225,11 @@ template <typename Traits>
 class FileBasedMakeFromExistingRangesTest : public MakeFromExistingRangesTypedTestBase<Traits> {};
 
 template <typename Traits>
-class MakeFromExistingRangesTest : public MakeFromExistingRangesTypedTestBase<Traits> {};
+class MakeFromExistingRangesTest : public MakeFromExistingRangesTypedTestBase<Traits> {
+public:
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+};
 
 using MakeFromExistingRangesTypes = ::testing::Types<FileTraits, ContainerTraits>;
 TYPED_TEST_SUITE(MakeFromExistingRangesTest, MakeFromExistingRangesTypes);
@@ -1523,7 +1527,10 @@ TEST_F(BoundedSorterTest, LargeSpill) {
     ASSERT_GTE(sorter->stats().spilledRanges(), 1);
 }
 template <typename Traits>
-class SpillerMergeDiskSpaceTest : public MakeFromExistingRangesTypedTestBase<Traits> {};
+class SpillerMergeDiskSpaceTest : public MakeFromExistingRangesTypedTestBase<Traits> {
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+};
 
 TYPED_TEST_SUITE(SpillerMergeDiskSpaceTest, MakeFromExistingRangesTypes);
 
