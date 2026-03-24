@@ -1126,7 +1126,8 @@ TEST_F(CollectionClonerTestResumable, RecordIdsReplicatedFindProjects) {
         // that can parse documents of the form {r: <long recordId>, d: <original document>}.
         auto testDoc = BSON("r" << 10LL << "d" << BSON("_id" << 42));
         const auto& [rid, doc] = fn(testDoc);
-        ASSERT_EQUALS(rid, RecordId(10));
+        ASSERT_TRUE(rid.isLong());
+        ASSERT_EQ(rid.getLong(), 10LL);
         ASSERT_EQUALS(doc.woCompare(BSON("_id" << 42)), 0);
 
         return Status::OK();
