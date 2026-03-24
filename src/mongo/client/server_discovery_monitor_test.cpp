@@ -56,9 +56,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 
-#include <list>
 #include <memory>
-#include <ratio>
 #include <utility>
 #include <vector>
 
@@ -75,6 +73,12 @@ namespace {
 using executor::NetworkInterfaceMock;
 using executor::RemoteCommandResponse;
 using InNetworkGuard = NetworkInterfaceMock::InNetworkGuard;
+
+BSONObj makeHelloResponseWithTopologyVersion() {
+    return BSON("ok" << 1.0 << "isWritablePrimary" << false << "secondary" << true
+                     << "topologyVersion"
+                     << BSON("processId" << OID::gen() << "counter" << static_cast<long long>(0)));
+}
 
 class ServerDiscoveryMonitorTestFixture : public unittest::Test {
 protected:
@@ -241,9 +245,8 @@ protected:
     void validateHelloResponse(const HostAndPort& hostAndPort, Milliseconds deadline) {
         ASSERT_TRUE(_topologyListener->hasHelloResponse(hostAndPort));
         ASSERT_LT(elapsed(), deadline);
-        auto helloResponse = _topologyListener->getHelloResponse(hostAndPort);
+        const auto helloResponse = _topologyListener->getHelloResponse(hostAndPort);
 
-        // There should only be one "hello" response queued up.
         ASSERT_EQ(helloResponse.size(), 1);
         ASSERT(helloResponse[0].isOK());
     }
@@ -271,7 +274,7 @@ protected:
      * time.
      */
     void waitForNextHello(Milliseconds timeoutMS) {
-        auto deadline = elapsed() + timeoutMS;
+        const auto deadline = elapsed() + timeoutMS;
         while (!hasReadyRequests() && elapsed() < deadline) {
             advanceTime(Milliseconds(1));
         }
@@ -293,13 +296,77 @@ private:
 };
 
 /**
+ * Parameterized test fixture that runs tests with both kSdam and kStreamable protocols. For
+ * kStreamable, tests exercise the ServerDiscoveryMonitor::_scheduleStreamableHello code path by
+ * first sending a successful hello with topologyVersion to prime the monitor.
+ */
+class SingleServerDiscoveryMonitorProtocolTestFixture
+    : public ServerDiscoveryMonitorTestFixture,
+      public testing::WithParamInterface<ReplicaSetMonitorProtocol> {
+protected:
+    void setUp() override {
+        ServerDiscoveryMonitorTestFixture::setUp();
+        ReplicaSetMonitorProtocolTestUtil::setRSMProtocol(GetParam());
+    }
+
+    bool isStreamableProtocol() const {
+        return GetParam() == ReplicaSetMonitorProtocol::kStreamable;
+    }
+
+    /**
+     * For kStreamable protocol, sends an initial hello that returns a topologyVersion,
+     * which primes the monitor to use _scheduleStreamableHello for subsequent requests.
+     * For kSdam, this is a no-op.
+     */
+    void primeForStreamableIfNeeded(MockReplicaSet* replSet,
+                                    const HostAndPort& hostAndPort,
+                                    const SdamConfiguration& config) {
+        if (!isStreamableProtocol()) {
+            return;
+        }
+
+        // Process the first hello to establish topologyVersion
+        processHelloRequest(replSet, hostAndPort);
+        auto* const topologyListener = getTopologyListener();
+        const Milliseconds timeout = config.getConnectionTimeout();
+        while (elapsed() < timeout && !topologyListener->hasHelloResponse(hostAndPort)) {
+            advanceTime(Milliseconds(1));
+        }
+
+        ASSERT_TRUE(topologyListener->hasHelloResponse(hostAndPort));
+        const auto responses = topologyListener->getHelloResponse(hostAndPort);
+        ASSERT_EQ(responses.size(), 1);
+        ASSERT_OK(responses[0]);
+
+        waitForNextHello(timeout);
+    }
+};
+
+INSTANTIATE_TEST_SUITE_P(SingleServerDiscoveryMonitorProtocol,
+                         SingleServerDiscoveryMonitorProtocolTestFixture,
+                         testing::Values(ReplicaSetMonitorProtocol::kSdam,
+                                         ReplicaSetMonitorProtocol::kStreamable),
+                         [](const testing::TestParamInfo<ReplicaSetMonitorProtocol>& info) {
+                             // The returned string will be added as a suffix to the name of the
+                             // generated tests, e.g. "foo.bar/Sdam" and "foo.bar/Streamable".
+                             switch (info.param) {
+                                 case ReplicaSetMonitorProtocol::kSdam:
+                                     return "Sdam";
+                                 case ReplicaSetMonitorProtocol::kStreamable:
+                                     return "Streamable";
+                                 default:
+                                     MONGO_UNREACHABLE;
+                             }
+                         });
+
+/**
  * Checks that a SingleServerDiscoveryMonitor sends "hello" requests at least heartbeatFrequency
  * apart.
  */
 TEST_F(ServerDiscoveryMonitorTestFixture, heartbeatFrequencyCheck) {
     auto replSet = std::make_unique<MockReplicaSet>(
         "test", 1, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
-    auto hostAndPort = HostAndPort(replSet->getSecondaries()[0]);
+    const HostAndPort hostAndPort{replSet->getSecondaries()[0]};
 
     const auto config = SdamConfiguration(std::vector<HostAndPort>{hostAndPort});
     auto ssHelloMonitor = initSingleServerDiscoveryMonitor(config, hostAndPort, replSet.get());
@@ -324,34 +391,193 @@ TEST_F(ServerDiscoveryMonitorTestFixture, heartbeatFrequencyCheck) {
 
 /**
  * Confirms that a SingleServerDiscoveryMonitor reports to the TopologyListener when a "hello"
- * command generates an error.
+ * command succeeds.
  */
-TEST_F(ServerDiscoveryMonitorTestFixture, singleServerDiscoveryMonitorReportsFailure) {
+TEST_P(SingleServerDiscoveryMonitorProtocolTestFixture,
+       singleServerDiscoveryMonitorReportsSuccess) {
     auto replSet = std::make_unique<MockReplicaSet>(
         "test", 1, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
 
-    // Kill the server before starting up the SingleServerDiscoveryMonitor.
-    auto hostAndPort = HostAndPort(replSet->getSecondaries()[0]);
-    {
-        NetworkInterfaceMock::InNetworkGuard ing(getNet());
-        replSet->kill(hostAndPort.toString());
+    const HostAndPort hostAndPort{replSet->getSecondaries()[0]};
+
+    // For streamable protocol, configure responses to include topologyVersion.
+    if (isStreamableProtocol()) {
+        auto node = replSet->getNode(hostAndPort.toString());
+        node->setCommandReply("hello", makeHelloResponseWithTopologyVersion());
+    }
+
+    const SdamConfiguration config{std::vector<HostAndPort>{hostAndPort}};
+    auto ssHelloMonitor = initSingleServerDiscoveryMonitor(config, hostAndPort, replSet.get());
+    ssHelloMonitor->disableExpeditedChecking();
+
+    // For streamable protocol, prime with first hello to establish topologyVersion.
+    primeForStreamableIfNeeded(replSet.get(), hostAndPort, config);
+
+    auto* const topologyListener = getTopologyListener();
+    const auto [successesBefore, failuresBefore] = topologyListener->serverHeartbeatCounts();
+    processHelloRequest(replSet.get(), hostAndPort);
+    const Milliseconds timeout = config.getConnectionTimeout();
+    while (elapsed() < timeout && !topologyListener->hasHelloResponse(hostAndPort)) {
+        advanceTime(Milliseconds(1));
+    }
+    ASSERT_TRUE(topologyListener->hasHelloResponse(hostAndPort));
+    const auto responses = topologyListener->getHelloResponse(hostAndPort);
+    ASSERT_EQ(responses.size(), 1);
+    ASSERT_OK(responses[0]);
+    const auto [successes, failures] = topologyListener->serverHeartbeatCounts();
+    ASSERT_EQ(successes - successesBefore, 1);
+    ASSERT_EQ(failures - failuresBefore, 0);
+}
+
+/**
+ * Confirms that a SingleServerDiscoveryMonitor reports to the TopologyListener when a "hello"
+ * command returns a response with ok:0 indicating the remote server is shutting down.
+ */
+TEST_P(SingleServerDiscoveryMonitorProtocolTestFixture,
+       singleServerDiscoveryMonitorReportsRemoteShutdownInProgress) {
+    auto replSet = std::make_unique<MockReplicaSet>(
+        "test", 1, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
+
+    const HostAndPort hostAndPort{replSet->getSecondaries()[0]};
+    auto node = replSet->getNode(hostAndPort.toString());
+
+    // Configure the mock server to return a ShutdownInProgress error response.
+    auto shutdownErrorResponse = BSON("ok" << 0.0 << "errmsg"
+                                           << "The server is in quiesce mode and will shut down"
+                                           << "code" << ErrorCodes::ShutdownInProgress << "codeName"
+                                           << "ShutdownInProgress");
+
+    if (isStreamableProtocol()) {
+        // For streamable: first response establishes topologyVersion, second is the error.
+        node->setCommandReply("hello",
+                              {makeHelloResponseWithTopologyVersion(), shutdownErrorResponse});
+    } else {
+        node->setCommandReply("hello", shutdownErrorResponse);
     }
 
     const auto config = SdamConfiguration(std::vector<HostAndPort>{hostAndPort});
     auto ssHelloMonitor = initSingleServerDiscoveryMonitor(config, hostAndPort, replSet.get());
     ssHelloMonitor->disableExpeditedChecking();
 
+    // For streamable protocol, prime with first hello to establish topologyVersion.
+    primeForStreamableIfNeeded(replSet.get(), hostAndPort, config);
+
+    auto* const topologyListener = getTopologyListener();
+    const auto [successesBefore, failuresBefore] = topologyListener->serverHeartbeatCounts();
     processHelloRequest(replSet.get(), hostAndPort);
-    auto topologyListener = getTopologyListener();
-    auto timeoutMS = config.getConnectionTimeout();
-    while (elapsed() < timeoutMS && !topologyListener->hasHelloResponse(hostAndPort)) {
-        // Advance time in small increments to ensure we stop before another "hello" is sent.
+    const Milliseconds timeout = config.getConnectionTimeout();
+    while (elapsed() < timeout && !topologyListener->hasHelloResponse(hostAndPort)) {
         advanceTime(Milliseconds(1));
     }
     ASSERT_TRUE(topologyListener->hasHelloResponse(hostAndPort));
-    auto response = topologyListener->getHelloResponse(hostAndPort);
-    ASSERT_EQ(response.size(), 1);
-    ASSERT_EQ(response[0], ErrorCodes::HostUnreachable);
+    const auto responses = topologyListener->getHelloResponse(hostAndPort);
+    ASSERT_EQ(responses.size(), 1);
+    ASSERT_EQ(responses[0], ErrorCodes::ShutdownInProgress);
+    const auto [successes, failures] = topologyListener->serverHeartbeatCounts();
+    ASSERT_EQ(successes - successesBefore, 0);
+    ASSERT_EQ(failures - failuresBefore, 1);
+}
+
+/**
+ * Confirms that a SingleServerDiscoveryMonitor reports an IDL parsing error to the TopologyListener
+ * when a "hello" command returns ok:0 but is missing required error fields (code, codeName,
+ * errmsg).
+ */
+TEST_P(SingleServerDiscoveryMonitorProtocolTestFixture,
+       singleServerDiscoveryMonitorReportsIDLParseErrorForMalformedErrorReply) {
+    const auto replSet = std::make_unique<MockReplicaSet>(
+        "test", 1, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
+
+    const HostAndPort hostAndPort{replSet->getSecondaries()[0]};
+    auto* const node = replSet->getNode(hostAndPort.toString());
+
+    // Configure the mock server to return an error response missing required fields.
+    // A valid error response requires "code" and "errmsg" fields per the ErrorReply IDL.
+    const auto malformedErrorResponse = BSON("ok" << 0.0);
+
+    if (isStreamableProtocol()) {
+        // For streamable: first response establishes topologyVersion, second is the error.
+        node->setCommandReply("hello",
+                              {makeHelloResponseWithTopologyVersion(), malformedErrorResponse});
+    } else {
+        node->setCommandReply("hello", malformedErrorResponse);
+    }
+
+    const SdamConfiguration config{std::vector<HostAndPort>{hostAndPort}};
+    const auto ssHelloMonitor =
+        initSingleServerDiscoveryMonitor(config, hostAndPort, replSet.get());
+    ssHelloMonitor->disableExpeditedChecking();
+
+    // For streamable protocol, prime with first hello to establish topologyVersion.
+    primeForStreamableIfNeeded(replSet.get(), hostAndPort, config);
+
+    auto* const topologyListener = getTopologyListener();
+    const auto [successesBefore, failuresBefore] = topologyListener->serverHeartbeatCounts();
+    processHelloRequest(replSet.get(), hostAndPort);
+    const Milliseconds timeout = config.getConnectionTimeout();
+    while (elapsed() < timeout && !topologyListener->hasHelloResponse(hostAndPort)) {
+        advanceTime(Milliseconds(1));
+    }
+    ASSERT_TRUE(topologyListener->hasHelloResponse(hostAndPort));
+    const auto responses = topologyListener->getHelloResponse(hostAndPort);
+    ASSERT_EQ(responses.size(), 1);
+    ASSERT_EQ(responses[0], ErrorCodes::IDLFailedToParse);
+    const auto [successes, failures] = topologyListener->serverHeartbeatCounts();
+    ASSERT_EQ(successes - successesBefore, 0);
+    ASSERT_EQ(failures - failuresBefore, 1);
+}
+
+/**
+ * Confirms that a SingleServerDiscoveryMonitor reports to the TopologyListener when a "hello"
+ * command generates a network error.
+ */
+TEST_P(SingleServerDiscoveryMonitorProtocolTestFixture,
+       singleServerDiscoveryMonitorReportsFailure) {
+    const auto replSet = std::make_unique<MockReplicaSet>(
+        "test", 1, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
+
+    const HostAndPort hostAndPort{replSet->getSecondaries()[0]};
+    const auto config = SdamConfiguration(std::vector<HostAndPort>{hostAndPort});
+
+    if (isStreamableProtocol()) {
+        // For streamable: first response establishes topologyVersion, then server dies.
+        auto* const node = replSet->getNode(hostAndPort.toString());
+        node->setCommandReply("hello", makeHelloResponseWithTopologyVersion());
+    }
+
+    const auto ssHelloMonitor =
+        initSingleServerDiscoveryMonitor(config, hostAndPort, replSet.get());
+    ssHelloMonitor->disableExpeditedChecking();
+
+    if (isStreamableProtocol()) {
+        // Prime with first hello to establish topologyVersion, then kill the server.
+        primeForStreamableIfNeeded(replSet.get(), hostAndPort, config);
+        {
+            NetworkInterfaceMock::InNetworkGuard ing(getNet());
+            replSet->kill(hostAndPort.toString());
+        }
+    } else {
+        // Kill the server before starting.
+        {
+            NetworkInterfaceMock::InNetworkGuard ing(getNet());
+            replSet->kill(hostAndPort.toString());
+        }
+    }
+
+    auto* const topologyListener = getTopologyListener();
+    const auto [successesBefore, failuresBefore] = topologyListener->serverHeartbeatCounts();
+    processHelloRequest(replSet.get(), hostAndPort);
+    const Milliseconds timeout = config.getConnectionTimeout();
+    while (elapsed() < timeout && !topologyListener->hasHelloResponse(hostAndPort)) {
+        advanceTime(Milliseconds(1));
+    }
+    ASSERT_TRUE(topologyListener->hasHelloResponse(hostAndPort));
+    const auto responses = topologyListener->getHelloResponse(hostAndPort);
+    ASSERT_EQ(responses.size(), 1);
+    ASSERT_EQ(responses[0], ErrorCodes::HostUnreachable);
+    const auto [successes, failures] = topologyListener->serverHeartbeatCounts();
+    ASSERT_EQ(successes - successesBefore, 0);
+    ASSERT_EQ(failures - failuresBefore, 1);
 }
 
 TEST_F(ServerDiscoveryMonitorTestFixture, ServerHelloMonitorOnTopologyDescriptionChangeAddHost) {
@@ -471,8 +697,8 @@ TEST_F(ServerDiscoveryMonitorTestFixture, ServerHelloMonitorShutdownStopsHelloRe
             processHelloRequest(replSet.get(), hostVec[0]);
         }
         if (topologyListener->hasHelloResponse(hostVec[0])) {
-            auto helloResponses = topologyListener->getHelloResponse(hostVec[0]);
-            for (auto& response : helloResponses) {
+            const auto helloResponses = topologyListener->getHelloResponse(hostVec[0]);
+            for (const Status& response : helloResponses) {
                 ASSERT_FALSE(response.isOK());
             }
         }

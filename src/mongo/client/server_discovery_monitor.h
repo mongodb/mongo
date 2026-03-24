@@ -87,8 +87,10 @@ public:
         const Milliseconds& expeditedRefreshPeriod,
         const Milliseconds& previousRefreshPeriod);
 
-    // Sent in the initial hello request when using the streamable exhaust protocol. The max
-    // duration a server should wait for a significant topology change before sending a response.
+    /**
+     * Sent in the initial hello request when using the streamable exhaust protocol. The max
+     * duration a server should wait for a significant topology change before sending a response.
+     */
     static constexpr Milliseconds kMaxAwaitTime = Milliseconds(10000);
 
 private:
@@ -96,14 +98,23 @@ private:
     void _rescheduleNextHello(WithLock, Milliseconds delay);
     void _doRemoteCommand();
 
-    // Use the awaitable hello protocol with the exhaust bit set. Attach _topologyVersion and
-    // kMaxAwaitTimeMS to the request.
+    /**
+     * Uses the awaitable hello protocol with the exhaust bit set. Attaches _topologyVersion and
+     * kMaxAwaitTimeMS to the request.
+     */
     StatusWith<executor::TaskExecutor::CallbackHandle> _scheduleStreamableHello();
 
-    // Use the old hello protocol. Do not attach _topologyVersion or kMaxAwaitTimeMS to the
-    // request.
+    /**
+     * Uses the old hello protocol. Does not attach _topologyVersion or kMaxAwaitTimeMS to the
+     * request.
+     */
     StatusWith<executor::TaskExecutor::CallbackHandle> _scheduleSingleHello();
 
+    /**
+     * Dispatches to one of `_onHelloSuccess` or `_onHelloFailure` depending on the remote command
+     * response.
+     */
+    void _onHello(const executor::RemoteCommandResponse&);
     void _onHelloSuccess(BSONObj bson);
     void _onHelloFailure(const Status& status, BSONObj bson);
 
@@ -150,14 +161,10 @@ public:
 
     void shutdown();
 
-    /**
-     * Request an immediate check of each member in the replica set.
-     */
+    /** Requests an immediate check of each member in the replica set. */
     void requestImmediateCheck();
 
-    /**
-     * Add/Remove Single Monitors based on the current topology membership.
-     */
+    /** Adds/Removes Single Monitors based on the current topology membership. */
     void onTopologyDescriptionChangedEvent(TopologyDescriptionPtr previousDescription,
                                            TopologyDescriptionPtr newDescription) override;
 
@@ -165,7 +172,7 @@ public:
 
 private:
     /**
-     * If the provided executor exists, use that one (for testing). Otherwise create a new one.
+     * If the provided executor exists, uses that one (for testing). Otherwise creates a new one.
      */
     std::shared_ptr<executor::TaskExecutor> _setupExecutor(
         const std::shared_ptr<executor::TaskExecutor>& executor);

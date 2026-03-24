@@ -55,6 +55,13 @@ public:
                                        const HostAndPort& hostAndPort,
                                        BSONObj reply) override;
 
+    struct Counts {
+        unsigned successes = 0;
+        unsigned failures = 0;
+    };
+
+    Counts serverHeartbeatCounts() const;
+
     /**
      * Returns true if _serverHelloReplies contains an element corresponding to hostAndPort.
      */
@@ -85,6 +92,7 @@ private:
     stdx::mutex _mutex;
     stdx::unordered_map<HostAndPort, std::vector<Status>> _serverHelloReplies;
     stdx::unordered_map<HostAndPort, std::vector<StatusWith<HelloRTT>>> _serverPingRTTs;
+    Counts _serverHeartbeatCounts;
 };
 
 }  // namespace mongo::sdam

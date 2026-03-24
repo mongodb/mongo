@@ -45,6 +45,7 @@ void TopologyListenerMock::onServerHeartbeatSucceededEvent(const HostAndPort& ho
     } else {
         _serverHelloReplies.emplace(hostAndPort, std::vector<Status>{Status::OK()});
     }
+    ++_serverHeartbeatCounts.successes;
 }
 
 void TopologyListenerMock::onServerHeartbeatFailureEvent(Status errorStatus,
@@ -59,6 +60,11 @@ void TopologyListenerMock::onServerHeartbeatFailureEvent(Status errorStatus,
     } else {
         _serverHelloReplies.emplace(hostAndPort, std::vector<Status>{errorStatus});
     }
+    ++_serverHeartbeatCounts.failures;
+}
+
+TopologyListenerMock::Counts TopologyListenerMock::serverHeartbeatCounts() const {
+    return _serverHeartbeatCounts;
 }
 
 bool TopologyListenerMock::hasHelloResponse(const HostAndPort& hostAndPort) {

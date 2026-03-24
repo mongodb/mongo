@@ -85,6 +85,26 @@ bool exhaustEnabled(boost::optional<TopologyVersion> topologyVersion) {
             gReplicaSetMonitorProtocol == ReplicaSetMonitorProtocol::kStreamable);
 }
 
+/**
+ * Returns whether the "ok" field of the specified hello response body indicates success, for a
+ * permissive but not-too-permissive interpretation of success.
+ *
+ * Servers will respond with an "ok" value of `double(1.0)` or `double(0.0)`. Some response handlers
+ * accept the more permissive `BSONElement::trueValue() `, or `BSONElement::numberInt()`, or
+ * `BSONElement::coerce(long long*)`.
+ *
+ * The policy in this function is that `looksOK(...)` is `true` if: the "ok" field is present, and
+ * its value is either a number equal to one or is the boolean `true`.
+ *
+ * Note that this function is called in a context where returning `false` delegates to
+ * `ErrorReply::parse`.
+ */
+bool looksOK(const BSONObj& helloResponseBody) {
+    const BSONElement ok = helloResponseBody["ok"];
+    double value;
+    return (ok.coerce(&value) && value == 1.0) || (ok.isBoolean() && ok.boolean());
+}
+
 }  // namespace
 
 SingleServerDiscoveryMonitor::SingleServerDiscoveryMonitor(
@@ -307,11 +327,7 @@ StatusWith<TaskExecutor::CallbackHandle> SingleServerDiscoveryMonitor::_schedule
                 }
             }
 
-            if (result.response.isOK()) {
-                self->_onHelloSuccess(result.response.data);
-            } else {
-                self->_onHelloFailure(result.response.status, result.response.data);
-            }
+            self->_onHello(result.response);
         });
 
     return swCbHandle;
@@ -366,11 +382,7 @@ StatusWith<TaskExecutor::CallbackHandle> SingleServerDiscoveryMonitor::_schedule
                 }
             }
 
-            if (result.response.isOK()) {
-                self->_onHelloSuccess(result.response.data);
-            } else {
-                self->_onHelloFailure(result.response.status, result.response.data);
-            }
+            self->_onHello(result.response);
         });
 
     return swCbHandle;
@@ -407,6 +419,40 @@ void SingleServerDiscoveryMonitor::_cancelOutstandingRequest(WithLock) {
     }
 
     _helloOutstanding = false;
+}
+
+void SingleServerDiscoveryMonitor::_onHello(const executor::RemoteCommandResponse& response) {
+    // There are four success/failure cases to consider:
+    //
+    // 1. If `!response.isOK()` (i.e. not ok) then something failed in the sending of the hello
+    //    command or the receiving of the response. In this case, invoke `_onHelloFailure` with the
+    //    `response.status`.
+    // 2. Otherwise, if `response.isOK()` and `response.data` has `ok: 1.0`, then the command
+    //    request/response was transmitted successfully and the resulting hello response was a
+    //    success. In this case, invoke `_onHelloSuccess` with the `response.data`.
+    // 3. Otherwise, if we're able to parse an `ErrorReply` from `response.data`, then the server
+    //    delivered a "not OK" hello response from which we can construct an error `Status`. In this
+    //    case, invoke `_onHelloFailure` with the error status derived from the response body.
+    // 4. Otherwise, if we're unable to parse an `ErrorReply` from `response.data`, then the server
+    //    delivered a "not OK" hello response that did not contain the required error response
+    //    fields. In this case, invoke `_onHelloFailure` with an IDL parse failure status.
+    if (!response.isOK()) {  // (1)
+        _onHelloFailure(response.status, response.data);
+        return;
+    }
+    if (looksOK(response.data)) {  // (2)
+        _onHelloSuccess(response.data);
+        return;
+    }
+    try {  // (3)
+        const auto reply = ErrorReply::parse(response.data);
+        _onHelloFailure(Status(ErrorCodes::Error{reply.getCode()}, reply.getErrmsg()),
+                        response.data);
+    } catch (const DBException& error) {  // (4)
+        _onHelloFailure(error.toStatus("unable to parse ErrorReply from non-OK hello "
+                                       "response in SingleServerDiscoveryMonitor"),
+                        response.data);
+    }
 }
 
 void SingleServerDiscoveryMonitor::_onHelloSuccess(const BSONObj bson) {

@@ -91,10 +91,16 @@ struct RemoteCommandResponse {
                                                                Microseconds elapsed,
                                                                bool moreToCome = false);
 
-    BSONObj data;  // Always owned. May point into message.
+    BSONObj data;  ///< Always owned. May point into message.
     boost::optional<Microseconds> elapsed;
+    /**
+     * `status` is the `Status` of sending the request and receiving the response. It is _not_ a
+     * status associated with the response payload, e.g. it does not indicate whether the response
+     * payload has an `ok: 1.0` field.
+     */
     Status status = Status::OK();
-    bool moreToCome = false;  // Whether or not the moreToCome bit is set on an exhaust message.
+    /** `moreToCome` indicates whether the moreToCome bit is set on an exhaust message. */
+    bool moreToCome = false;
     HostAndPort target;
 
     friend std::ostream& operator<<(std::ostream& os, const RemoteCommandResponse& request);
