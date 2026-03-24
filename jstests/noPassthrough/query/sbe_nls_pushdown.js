@@ -5,6 +5,7 @@
  *
  */
 import {aggPlanHasStage, getEngine} from "jstests/libs/query/analyze_plan.js";
+import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const conn = MongoRunner.runMongod({
@@ -67,6 +68,8 @@ const assertPlan = (label, explainResult, expected, ctx) => {
 };
 
 function runAllExamples() {
+    const sbeFull = checkSbeFullFeatureFlagEnabled(db);
+
     for (const flags of [
         {
             featureFlagSbeNonLeadingMatch: false,
@@ -81,6 +84,7 @@ function runAllExamples() {
     ]) {
         const params = {internalQueryFrameworkControl: "trySbeRestricted", ...flags};
         const allOn = flags.featureFlagSbeNonLeadingMatch;
+        const useSbe = sbeFull || allOn;
         const ctx = tojson(params);
 
         runWithParamsAllNonConfigNodes(db, params, () => {
@@ -113,8 +117,8 @@ function runAllExamples() {
                     "ex2",
                     plan,
                     {
-                        engine: allOn ? "sbe" : "classic",
-                        inClassic: {"$group": !allOn},
+                        engine: useSbe ? "sbe" : "classic",
+                        inClassic: {"$group": !useSbe},
                     },
                     ctx,
                 );
@@ -127,8 +131,8 @@ function runAllExamples() {
                     "ex3",
                     plan,
                     {
-                        engine: allOn ? "sbe" : "classic",
-                        inClassic: {"$group": !allOn, "$lookup": !allOn},
+                        engine: useSbe ? "sbe" : "classic",
+                        inClassic: {"$group": !useSbe, "$lookup": !useSbe},
                     },
                     ctx,
                 );
@@ -149,8 +153,13 @@ function runAllExamples() {
                     "ex4",
                     plan,
                     {
-                        engine: "classic",
-                        inClassic: {"$group": true, "$lookup": true, "$addFields": true, "$sort": true},
+                        engine: sbeFull ? "sbe" : "classic",
+                        inClassic: {
+                            "$group": !sbeFull,
+                            "$lookup": !sbeFull,
+                            "$addFields": !sbeFull,
+                            "$sort": !sbeFull,
+                        },
                     },
                     ctx,
                 );
@@ -163,12 +172,12 @@ function runAllExamples() {
                     "ex5",
                     plan,
                     {
-                        engine: allOn ? "sbe" : "classic",
+                        engine: useSbe ? "sbe" : "classic",
                         inClassic: {
-                            "$group": !allOn,
-                            "$lookup": !allOn,
-                            "$addFields": !allOn,
-                            "$match": !allOn,
+                            "$group": !useSbe,
+                            "$lookup": !useSbe,
+                            "$addFields": !useSbe,
+                            "$match": !useSbe,
                         },
                     },
                     ctx,
@@ -182,8 +191,13 @@ function runAllExamples() {
                     "ex6",
                     plan,
                     {
-                        engine: "classic",
-                        inClassic: {"$group": true, "$lookup": true, "$sort": true, "$match": true},
+                        engine: sbeFull ? "sbe" : "classic",
+                        inClassic: {
+                            "$group": !sbeFull,
+                            "$lookup": !sbeFull,
+                            "$sort": !sbeFull,
+                            "$match": !sbeFull,
+                        },
                     },
                     ctx,
                 );
