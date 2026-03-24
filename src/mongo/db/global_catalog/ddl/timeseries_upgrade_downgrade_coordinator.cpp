@@ -164,7 +164,7 @@ void TimeseriesUpgradeDowngradeCoordinator::_checkPreconditions(OperationContext
                                          repl::ReadConcernArgs::kLocal,
                                          AcquisitionPrerequisites::kRead));
         if (bucketsAcq.exists()) {
-            uasserted(ErrorCodes::UserDataInconsistent,
+            uasserted(ErrorCodes::TimeseriesBucketMetadataInconsistent,
                       str::stream() << "Collection " << originalNss().toStringForErrorMsg()
                                     << " is a regular (non-timeseries) collection but an orphan "
                                        "bucket collection "

@@ -63,7 +63,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangAfterEnumeratingTimeseriesCollectionsForFCV);
 MONGO_FAIL_POINT_DEFINE(alwaysReportTimeseriesCollectionsNeedConversion);
-MONGO_FAIL_POINT_DEFINE(FailViewlessTimeseriesUpgradeWithUserDataInconsistent);
+MONGO_FAIL_POINT_DEFINE(FailViewlessTimeseriesUpgradeWithBucketMetadataInconsistent);
 
 /**
  * Returns all timeseries collection namespaces across the cluster that need to be converted
@@ -232,10 +232,10 @@ void upgradeDowngradeViewlessTimeseriesInShardedCluster(OperationContext* opCtx,
             }
 
             try {
-                // Failpoint to simulate UserDataInconsistent for a specific namespace.
-                FailViewlessTimeseriesUpgradeWithUserDataInconsistent.executeIf(
+                // Failpoint to simulate TimeseriesBucketMetadataInconsistent for a namespace.
+                FailViewlessTimeseriesUpgradeWithBucketMetadataInconsistent.executeIf(
                     [&nss](const BSONObj&) {
-                        uasserted(ErrorCodes::UserDataInconsistent,
+                        uasserted(ErrorCodes::TimeseriesBucketMetadataInconsistent,
                                   str::stream()
                                       << "Simulated metadata inconsistency for namespace: "
                                       << nss.toStringForErrorMsg());
@@ -283,7 +283,7 @@ void upgradeDowngradeViewlessTimeseriesInShardedCluster(OperationContext* opCtx,
                             "timeseries collection",
                             "isUpgrade"_attr = isUpgrade,
                             logAttrs(nss));
-            } catch (const ExceptionFor<ErrorCodes::UserDataInconsistent>&) {
+            } catch (const ExceptionFor<ErrorCodes::TimeseriesBucketMetadataInconsistent>&) {
                 // Collection has metadata inconsistencies, permanently skip it across all
                 // retry iterations since this condition won't resolve with retries.
                 namespacesWithInconsistentMetadata.insert(nss);

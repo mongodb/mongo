@@ -391,7 +391,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanUpgradeFailsOnConflictingColle
         "featureFlagCreateViewlessTimeseriesCollections", true);
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
     ASSERT_EQ(canUpgradeToViewlessTimeseries(operationContext(), nss1).code(),
-              ErrorCodes::UserDataInconsistent);
+              ErrorCodes::TimeseriesBucketMetadataInconsistent);
 }
 
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanUpgradeFailsOnConflictingView) {
@@ -407,7 +407,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanUpgradeFailsOnConflictingView)
         "featureFlagCreateViewlessTimeseriesCollections", true);
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
     ASSERT_EQ(canUpgradeToViewlessTimeseries(operationContext(), nss1).code(),
-              ErrorCodes::UserDataInconsistent);
+              ErrorCodes::TimeseriesBucketMetadataInconsistent);
 }
 
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanUpgradeSucceedsWithoutView) {

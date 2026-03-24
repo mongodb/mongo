@@ -69,9 +69,9 @@ jsTest.log.info("Verifying both collections are now in legacy format");
 assert.eq(true, isLegacyTimeseriesFormat(validCollName));
 assert.eq(true, isLegacyTimeseriesFormat(inconsistentCollName));
 
-jsTest.log.info("Enabling failpoint on CONFIG SERVER to simulate UserDataInconsistent");
+jsTest.log.info("Enabling failpoint on CONFIG SERVER to simulate TimeseriesBucketMetadataInconsistent");
 const configPrimary = st.configRS.getPrimary();
-const failpoint = configureFailPoint(configPrimary, "FailViewlessTimeseriesUpgradeWithUserDataInconsistent", {
+const failpoint = configureFailPoint(configPrimary, "FailViewlessTimeseriesUpgradeWithBucketMetadataInconsistent", {
     namespace: inconsistentColl.getFullName(),
 });
 

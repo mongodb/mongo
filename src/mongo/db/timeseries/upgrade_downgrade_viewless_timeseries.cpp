@@ -168,7 +168,7 @@ Status canUpgradeToViewlessTimeseries(OperationContext* opCtx,
                   "issue"_attr = inconsistency.issue,
                   "options"_attr = inconsistency.options);
         }
-        return Status(ErrorCodes::UserDataInconsistent,
+        return Status(ErrorCodes::TimeseriesBucketMetadataInconsistent,
                       str::stream()
                           << "Cannot upgrade to viewless timeseries: metadata inconsistency found "
                              "for collection "
@@ -300,7 +300,7 @@ void upgradeToViewlessTimeseries(OperationContext* opCtx,
 
         // Validate upgrade preconditions (including idempotency check)
         auto canUpgradeStatus = canUpgradeToViewlessTimeseries(opCtx, locks);
-        if (canUpgradeStatus.code() == ErrorCodes::UserDataInconsistent) {
+        if (canUpgradeStatus.code() == ErrorCodes::TimeseriesBucketMetadataInconsistent) {
             // Metadata inconsistency found - skip upgrade (already logged by canUpgrade)
             return;
         }

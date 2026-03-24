@@ -1206,5 +1206,7 @@ error_codes:
       categories: [StreamProcessorUserError, StreamProcessorRetryableError],
     }
 
+  - {code: 495, name: TimeseriesBucketMetadataInconsistent}
+
   # ^^^^
   # Add new codes, sequentially numbered, above.
