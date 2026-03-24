@@ -426,9 +426,6 @@ ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
         auto uniqueOpCtx = tc->makeOperationContext();
         auto opCtx = uniqueOpCtx.get();
 
-        const auto recipientShard =
-            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, recipientShardId));
-
         BSONObjBuilder builder;
         builder.append("_recvChunkReleaseCritSec",
                        NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
@@ -442,6 +439,9 @@ ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
             "release migration critical section on recipient",
             [&](OperationContext* newOpCtx) {
                 try {
+                    const auto recipientShard = uassertStatusOK(
+                        Grid::get(opCtx)->shardRegistry()->getShard(opCtx, recipientShardId));
+
                     const auto response = recipientShard->runCommand(
                         newOpCtx,
                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
