@@ -52,9 +52,31 @@ LiteParsedPipeline makeLiteParsedPipeline(const boost::intrusive_ptr<ExpressionC
                               LiteParserOptions{.ifrContext = expCtx->getIfrContext()});
 }
 
-std::unique_ptr<Pipeline> finalizePipeline(std::unique_ptr<Pipeline> pipeline,
-                                           const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                           const MakePipelineOptions& opts) {
+void desugarIfNecessary(LiteParsedPipeline& liteParsedPipeline, const MakePipelineOptions& opts) {
+    if (opts.desugar) {
+        LiteParsedDesugarer::desugar(&liteParsedPipeline);
+    }
+}
+
+std::unique_ptr<Pipeline> parseAndDesugarPipeline(
+    const std::vector<BSONObj>& rawPipeline,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const MakePipelineOptions& opts) {
+
+    LiteParsedPipeline liteParsedPipeline = makeLiteParsedPipeline(expCtx, rawPipeline);
+
+    desugarIfNecessary(liteParsedPipeline, opts);
+
+    return Pipeline::parseFromLiteParsed(liteParsedPipeline, expCtx, opts.validator);
+}
+
+std::unique_ptr<Pipeline> finalizePipeline(
+    std::unique_ptr<Pipeline> pipeline,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const MakePipelineOptions& opts,
+    AggregateCommandRequest& aggRequest,
+    boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
+    boost::optional<BSONObj> readConcernOverride = boost::none) {
     expCtx->initializeReferencedSystemVariables();
 
     bool alreadyOptimized = opts.alreadyOptimized;
@@ -67,22 +89,26 @@ std::unique_ptr<Pipeline> finalizePipeline(std::unique_ptr<Pipeline> pipeline,
     pipeline->validateCommon(alreadyOptimized);
 
     if (opts.attachCursorSource) {
-        // Creating AggregateCommandRequest in order to pass all necessary 'opts' to the
-        // preparePipelineForExecution().
-        AggregateCommandRequest aggRequest(expCtx->getNamespaceString(),
-                                           pipeline->serializeToBson());
+        tassert(11779300,
+                "If preparing pipeline for execution, opts.desugar should be set so that the "
+                "AggregateCommandRequest contains the correct serialization of the pipeline.",
+                opts.desugar);
+
+        aggRequest.setPipeline(pipeline->serializeToBson());
+
         pipeline = expCtx->getMongoProcessInterface()->preparePipelineForExecution(
             expCtx,
             aggRequest,
             std::move(pipeline),
-            boost::none,
+            shardCursorsSortSpec,
             opts.shardTargetingPolicy,
-            std::move(opts.readConcern),
+            readConcernOverride ? std::move(readConcernOverride) : std::move(opts.readConcern),
             opts.useCollectionDefaultCollator);
     }
 
     return pipeline;
 }
+
 }  // namespace
 
 std::unique_ptr<Pipeline> makePipeline(BSONElement rawPipelineElement,
@@ -111,15 +137,9 @@ std::unique_ptr<Pipeline> makePipeline(BSONElement rawPipelineElement,
 std::unique_ptr<Pipeline> makePipeline(const std::vector<BSONObj>& rawPipeline,
                                        const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        MakePipelineOptions opts) {
-    LiteParsedPipeline liteParsedPipeline = makeLiteParsedPipeline(expCtx, rawPipeline);
-
-    if (opts.desugar) {
-        LiteParsedDesugarer::desugar(&liteParsedPipeline);
-    }
-
-    auto pipeline = Pipeline::parseFromLiteParsed(liteParsedPipeline, expCtx, opts.validator);
-
-    return finalizePipeline(std::move(pipeline), expCtx, opts);
+    auto aggRequest = AggregateCommandRequest(expCtx->getNamespaceString(), std::vector<BSONObj>{});
+    return finalizePipeline(
+        parseAndDesugarPipeline(rawPipeline, expCtx, opts), expCtx, opts, aggRequest);
 }
 
 std::unique_ptr<Pipeline> makePipeline(AggregateCommandRequest& aggRequest,
@@ -142,34 +162,11 @@ std::unique_ptr<Pipeline> makePipeline(AggregateCommandRequest& aggRequest,
                                                   : opts.readConcern;
     }
 
-    LiteParsedPipeline liteParsedPipeline =
-        makeLiteParsedPipeline(expCtx, aggRequest.getPipeline());
-
-    if (opts.desugar) {
-        LiteParsedDesugarer::desugar(&liteParsedPipeline);
-    }
-
-    auto pipeline = Pipeline::parseFromLiteParsed(liteParsedPipeline, expCtx, opts.validator);
-    if (opts.optimize) {
-        pipeline_optimization::optimizePipeline(*pipeline);
-    }
-
-    constexpr bool alreadyOptimized = true;
-    pipeline->validateCommon(alreadyOptimized);
-    aggRequest.setPipeline(pipeline->serializeToBson());
-
-    if (opts.attachCursorSource) {
-        pipeline = expCtx->getMongoProcessInterface()->preparePipelineForExecution(
-            expCtx,
-            aggRequest,
-            std::move(pipeline),
-            shardCursorsSortSpec,
-            opts.shardTargetingPolicy,
-            std::move(readConcern),
-            opts.useCollectionDefaultCollator);
-    }
-
-    return pipeline;
+    auto pipeline = parseAndDesugarPipeline(aggRequest.getPipeline(), expCtx, opts);
+    auto copiedOpts = opts;
+    copiedOpts.alreadyOptimized = true;
+    return finalizePipeline(
+        std::move(pipeline), expCtx, copiedOpts, aggRequest, shardCursorsSortSpec, readConcern);
 }
 
 namespace {
@@ -230,9 +227,7 @@ std::unique_ptr<Pipeline> makePipelineFromViewDefinition(
     // Create a LiteParsedPipeline for the user pipeline and apply view handling via bindViewInfo().
     LiteParsedPipeline userLiteParsedPipeline(
         makeLiteParsedPipeline(subPipelineExpCtx, currentPipeline));
-    if (opts.desugar) {
-        LiteParsedDesugarer::desugar(&userLiteParsedPipeline);
-    }
+    desugarIfNecessary(userLiteParsedPipeline, opts);
 
     // Apply the view to the user pipeline.
     const ResolvedView resolvedView{resolvedNs.ns, std::move(resolvedNs.pipeline), BSONObj()};
@@ -248,8 +243,9 @@ std::unique_ptr<Pipeline> makePipelineFromViewDefinition(
     optsWithoutDesugar.desugar = false;
     auto pipeline =
         Pipeline::parseFromLiteParsed(userLiteParsedPipeline, subPipelineExpCtx, opts.validator);
-
-    return finalizePipeline(std::move(pipeline), subPipelineExpCtx, opts);
+    auto aggRequest =
+        AggregateCommandRequest(subPipelineExpCtx->getNamespaceString(), std::vector<BSONObj>{});
+    return finalizePipeline(std::move(pipeline), subPipelineExpCtx, opts, aggRequest);
 }
 
 std::unique_ptr<Pipeline> makeFacetPipeline(const std::vector<BSONObj>& rawPipeline,
