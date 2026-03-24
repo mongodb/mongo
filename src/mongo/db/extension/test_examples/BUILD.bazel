@@ -66,6 +66,7 @@ extensions_with_config(
         ":duplicate_stage_descriptor_bad_extension_signed_lib",
         ":foo_extension_v2_signed_lib",
         ":vector_search_extension_signed_lib",
+        ":search_extension_signed_lib",
         ":assert_deadline_increased_after_batch_extension_signed_lib",
     ],
 )
@@ -287,6 +288,14 @@ signed_mongo_cc_extension_shared_library(
 signed_mongo_cc_extension_shared_library(
     name = "vector_search_extension",
     srcs = ["vector_search.cpp"],
+)
+
+# "search" is used to test that we can override the existing $search and $searchMeta
+# implementations. It must not have the _mongo_extension suffix so that it doesn't get loaded in
+# the Extensions-enabled variant since that would break real $search/$searchMeta tests.
+signed_mongo_cc_extension_shared_library(
+    name = "search_extension",
+    srcs = ["search.cpp"],
 )
 
 # "assert_deadline_increased_after_batch" is used to test that the operation deadline
