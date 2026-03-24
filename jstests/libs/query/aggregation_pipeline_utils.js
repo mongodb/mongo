@@ -75,3 +75,11 @@ export function isSlowBuild(db) {
     }
     return isSlowBuildInfo(db.getServerBuildInfo());
 }
+
+/**
+ * Returns true if resmoke.py was called with --runAllFeatureFlagTests.
+ */
+
+export function isRunAllFeatureFlagTests() {
+    return TestData.hasOwnProperty("runAllFeatureFlagTests") && TestData.runAllFeatureFlagTests;
+}

@@ -411,12 +411,21 @@ class GoldenTestApp(object):
         else:
             raise AppError(f"Platform not supported by this setup utility: {platform.platform()}")
 
-    @cli.command("clean-run-accept", help="Runs the test in all suites and accepts the results.")
-    @click.argument("test_name", required=True)
+    @cli.command(
+        "clean-run-accept",
+        help="Runs tests in all suites they participate in and accepts all the results.",
+    )
+    @click.argument("tests", required=True, nargs=-1)
     @click.pass_obj
-    def command_clean_run_accept(self, test_name):
-        """Runs a given jstest with all its passthrough suites and accepts the results."""
+    def command_clean_run_accept(self, tests):
         self.init_config()
+
+        for test_name in tests:
+            self.clean_run_accept_test(test_name)
+
+    def clean_run_accept_test(self, test_name):
+        """Runs a jstest through all of its passthroughs and accepts the results."""
+
         self.clean()
 
         self.vprint(
@@ -433,7 +442,14 @@ class GoldenTestApp(object):
         resmoke_invocations = []
 
         for suite in suites:
-            resmoke_invocations.append(["--suite", suite])
+            resmoke_args = ["--suite", suite]
+            if suite == "query_golden_join_optimization_plan_stability":
+                # This suite runs with --runAllFeatureFlagTests in evergreen, so should be run that way locally.
+                # There is currently no known way to detect this without calling `evergreen evaluate` and fishing
+                # in the output, so we are forced to match on the suite name here.
+                resmoke_args.append("--runAllFeatureFlagTests")
+
+            resmoke_invocations.append(resmoke_args)
 
         if "query_golden_classic" in suites:
             # The test belongs to the query_golden_classic passthrough, which means that its various expected files
