@@ -41,13 +41,16 @@ protected:
 
     void setUp() override;
 
+    void insertDocuments(const std::vector<BSONObj>& docs);
+
     void insertNDocuments(int count);
 
     void tearDown() override;
 
     void createIndexOnEmptyCollection(OperationContext* opCtx,
                                       BSONObj index,
-                                      std::string indexName);
+                                      std::string indexName,
+                                      BSONObj options = BSONObj());
 
     std::pair<std::unique_ptr<CanonicalQuery>, PlannerData> createCQAndPlannerData(
         const MultipleCollectionAccessor& collections,

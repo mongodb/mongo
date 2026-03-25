@@ -128,9 +128,9 @@ public:
     size_t numCandidatePlans() const;
 
     /**
-     * Runs the trial period by working all candidate plans in round-robin fashion up to a total of
-     * 'maxNumWorksPerPlan' works per plan or until one plan hits EOF or returns 'targetNumResults'
-     * results.
+     * Runs the trial period by working all non-rejected candidate plans in round-robin fashion up
+     * to a total of 'maxNumWorksPerPlan' works per plan or until one plan hits EOF or returns
+     * 'targetNumResults' results.
      *
      * If Multiplan rate limiting is enabled, the function attempts to obtain a token per candidate
      * plan to proceed with multiplanning. If not enough tokens are available, the function waits
@@ -151,7 +151,7 @@ public:
 
     /**
      * Picks a best plan based on the statistics collected during trials. All further calls to
-     * doWork() will return results from the best plan.
+     * doWork() will return results from the best plan. Ignores rejected plans.
      */
     Status pickBestPlan();
 
@@ -211,11 +211,13 @@ public:
     [[nodiscard]] PlanExplainerData extractPlanExplainerData();
 
     /**
-     * Rejects all candidate plans except those with the given hash without picking a best plan.
+     * Rejects all candidate plans except those with the given hashes without picking a best plan.
+     * Rejecting a plan keeps it from being run in further calls to runTrials() and being considered
+     * by pickBestPlan().
      * Needed before extracting rejected plans for explain when no best plan was chosen via MP.
      * Cannot be used if a best plan was already chosen.
      */
-    void abandonTrialsExceptHash(size_t hash);
+    void abandonTrialsExceptHashes(const boost::container::flat_set<size_t>& hashes);
 
     bool isStateSaved() {
         return _isStateSaved;
