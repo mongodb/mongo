@@ -15,3 +15,6 @@ filters:
   - "getlog*":
     approvers:
       - 10gen/server-networking-and-observability
+  - "filemd5.js":
+    approvers:
+      - 10gen/query-execution

@@ -12,7 +12,15 @@ assert.commandWorked(db.fs.chunks.insert({files_id: 1, n: 0, data: new BinData(0
 assert.commandFailedWithCode(db.runCommand({filemd5: 1, root: "fs"}), ErrorCodes.NoQueryExecutionPlans);
 
 db.fs.chunks.createIndex({files_id: 1, n: 1});
-assert.commandWorked(db.runCommand({filemd5: 1, root: "fs"}));
+assert.soon(() => {
+    const res = db.runCommand({filemd5: 1, root: "fs"});
+    if (res.ok) {
+        return true;
+    }
+
+    assert.commandFailedWithCode(res, ErrorCodes.NoQueryExecutionPlans);
+    return false;
+}, "filemd5 should succeed after index is created");
 
 assert.commandFailedWithCode(db.runCommand({filemd5: 1, root: "fs", partialOk: 1, md5state: 5}), 50847);
 assert.commandWorked(db.fs.chunks.insert({files_id: 2, n: 0}));
