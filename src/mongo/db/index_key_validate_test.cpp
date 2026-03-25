@@ -336,6 +336,24 @@ TEST(IndexKeyValidateTest, ValidateAfterSecondsAcceptsFloatingPointNumber) {
     ASSERT_EQUALS(spec["expireAfterSeconds"].safeNumberLong(), 123LL);
 }
 
+// TODO (SERVER-120350): Remove this test case.
+TEST(IndexKeyValidateTest, UpgradeRepairRejectsNonIntegerExpireAfterSeconds) {
+    // Non-integer expireAfterSeconds is accepted during normal validation.
+    ASSERT_OK(index_key_validate::validateIndexSpec(
+                  nullptr, fromjson("{key: {a: 1}, name: 'index', expireAfterSeconds: 123.456}"))
+                  .getStatus());
+
+    // During upgrade repair, a non-integer expireAfterSeconds must return TypeMismatch so that
+    // repairIndexSpec() can convert the on-disk value to an integer.
+    auto status = index_key_validate::validateIndexSpec(nullptr,
+                                                        fromjson("{key: {a: 1}, name: 'index', "
+                                                                 "expireAfterSeconds: 123.456}"),
+                                                        index_key_validate::kAllowedFieldNames,
+                                                        /*isUpgradeRepair=*/true)
+                      .getStatus();
+    ASSERT_EQ(status.code(), ErrorCodes::TypeMismatch);
+}
+
 TEST(IndexKeyValidateTest, RepairIndexSpecs) {
     ASSERT(fromjson("{key: {a: 1}, name: 'index'}")
                .binaryEqual(index_key_validate::repairIndexSpec(
@@ -412,6 +430,14 @@ TEST(IndexKeyValidateTest, RepairIndexSpecs) {
                .binaryEqual(index_key_validate::repairIndexSpec(
                    NamespaceString::createNamespaceString_forTest("coll"),
                    fromjson("{key: {a: 1}, name: 'index', background: true, background: true}"))));
+
+    // A valid but non-integer 'expireAfterSeconds' (float) is truncated to its integer value.
+    ASSERT(BSON("key" << BSON("a" << 1) << "name"
+                      << "index"
+                      << "expireAfterSeconds" << 123)
+               .binaryEqual(index_key_validate::repairIndexSpec(
+                   NamespaceString::createNamespaceString_forTest("coll"),
+                   fromjson("{key: {a: 1}, name: 'index', expireAfterSeconds: 123.456}"))));
 }
 
 TEST(IndexKeyValidateTest, GeoIndexSpecs) {

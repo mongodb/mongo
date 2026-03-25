@@ -354,17 +354,28 @@ BSONObj repairIndexSpec(const NamespaceString& ns,
                           "fieldName"_attr = redact(fieldName),
                           "indexSpec"_attr = redact(indexSpec));
             builder->appendBool(fieldName, true);
-        } else if (IndexDescriptor::kExpireAfterSecondsFieldName == fieldName &&
-                   !validateExpireAfterSeconds(indexSpecElem,
-                                               ValidateExpireAfterSecondsMode::kSecondaryTTLIndex)
-                        .isOK()) {
-            LOGV2_WARNING(6835900,
-                          "Fixing expire field from TTL index spec",
-                          "namespace"_attr = redact(toStringForLogging(ns)),
-                          "fieldName"_attr = redact(fieldName),
-                          "indexSpec"_attr = redact(indexSpec));
-            builder->appendNumber(fieldName,
-                                  durationCount<Seconds>(kExpireAfterSecondsForInactiveTTLIndex));
+        } else if (IndexDescriptor::kExpireAfterSecondsFieldName == fieldName) {
+            auto swType = validateExpireAfterSeconds(
+                indexSpecElem, ValidateExpireAfterSecondsMode::kSecondaryTTLIndex);
+            if (!swType.isOK()) {
+                LOGV2_WARNING(6835900,
+                              "Fixing expire field from TTL index spec",
+                              "namespace"_attr = redact(toStringForLogging(ns)),
+                              "fieldName"_attr = redact(fieldName),
+                              "indexSpec"_attr = redact(indexSpec));
+                builder->appendNumber(
+                    fieldName, durationCount<Seconds>(kExpireAfterSecondsForInactiveTTLIndex));
+            } else if (extractExpireAfterSecondsType(swType) ==
+                       TTLCollectionCache::Info::ExpireAfterSecondsType::kNonInt) {
+                LOGV2_WARNING(12025301,
+                              "Converting non-integer expireAfterSeconds to integer in index spec",
+                              "namespace"_attr = redact(toStringForLogging(ns)),
+                              "fieldName"_attr = redact(fieldName),
+                              "indexSpec"_attr = redact(indexSpec));
+                builder->appendNumber(fieldName, indexSpecElem.safeNumberInt());
+            } else {
+                builder->append(indexSpecElem);
+            }
         } else if (IndexDescriptor::k2dIndexBitsFieldName == fieldName) {
             // The bits index option might've been stored as a double in the catalog which is
             // incorrect considering this field represent the number of precision bits of a 2d
@@ -658,6 +669,7 @@ StatusWith<BSONObj> validateIndexSpec(
             // Prior to SERVER-120174, non-integer values could be stored for this parameter. During
             // FCV upgrade, signal the repair path by returning an error here so that
             // repairIndexSpec() will convert any such on-disk values to integers.
+            // TODO (SERVER-120350): Remove once v9.0 branches out
             if (isUpgradeRepair && is2dIndexWithNonIntBits) {
                 return {ErrorCodes::TypeMismatch,
                         str::stream()
@@ -672,6 +684,17 @@ StatusWith<BSONObj> validateIndexSpec(
             } else if (extractExpireAfterSecondsType(swType) ==
                        TTLCollectionCache::Info::ExpireAfterSecondsType::kNonInt) {
                 isTTLIndexWithNonIntExpireAfterSeconds = true;
+
+                // Prior to SERVER-77828, non-integer values could be stored for this parameter.
+                // During FCV upgrade, signal the repair path by returning an error here so that
+                // repairIndexSpec() will convert any such on-disk values to integers.
+                // TODO (SERVER-120350): Remove once v9.0 branches out
+                if (isUpgradeRepair) {
+                    return {ErrorCodes::TypeMismatch,
+                            str::stream() << "The field '" << indexSpecElemFieldName
+                                          << "' must be an integer, but got "
+                                          << typeName(indexSpecElem.type())};
+                }
             }
         } else {
             // We can assume field name is valid at this point. Validation of fieldname is handled
