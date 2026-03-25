@@ -18,7 +18,6 @@
 #include "mozilla/Utf8.h"
 
 #include <algorithm>
-#include <charconv>
 #include <iterator>
 #include <limits>
 #ifdef HAVE_LOCALECONV
@@ -46,6 +45,7 @@
 #include "util/DoubleToString.h"
 #include "util/Memory.h"
 #include "util/StringBuilder.h"
+#include "util/ToCharsCompat.h"  // MONGODB MODIFICATION: MONGO_MOZJS_TO_CHARS
 #include "vm/BigIntType.h"
 #include "vm/GlobalObject.h"
 #include "vm/JSAtomUtils.h"  // Atomize, AtomizeString
@@ -791,8 +791,8 @@ JSLinearString* js::Int32ToStringWithHeap(JSContext* cx, int32_t si,
 
   char buffer[JSFatInlineString::MAX_LENGTH_LATIN1];
 
-  auto result = std::to_chars(buffer, std::end(buffer), si, 10);
-  MOZ_ASSERT(result.ec == std::errc());
+  // MONGODB MODIFICATION: use MONGO_MOZJS_TO_CHARS for macOS < 10.15 compatibility.
+  auto result = MONGO_MOZJS_TO_CHARS(buffer, std::end(buffer), si, 10);
 
   size_t length = result.ptr - buffer;
   const auto& latin1Chars =
@@ -826,8 +826,8 @@ JSAtom* js::Int32ToAtom(JSContext* cx, int32_t si) {
   }
 
   Int32ToCStringBuf cbuf;
-  auto result = std::to_chars(cbuf.sbuf, std::end(cbuf.sbuf), si, 10);
-  MOZ_ASSERT(result.ec == std::errc());
+  // MONGODB MODIFICATION: use MONGO_MOZJS_TO_CHARS for macOS < 10.15 compatibility.
+  auto result = MONGO_MOZJS_TO_CHARS(cbuf.sbuf, std::end(cbuf.sbuf), si, 10);
 
   Maybe<uint32_t> indexValue;
   if (si >= 0) {
@@ -847,8 +847,8 @@ JSAtom* js::Int32ToAtom(JSContext* cx, int32_t si) {
 frontend::TaggedParserAtomIndex js::Int32ToParserAtom(
     FrontendContext* fc, frontend::ParserAtomsTable& parserAtoms, int32_t si) {
   Int32ToCStringBuf cbuf;
-  auto result = std::to_chars(cbuf.sbuf, std::end(cbuf.sbuf), si, 10);
-  MOZ_ASSERT(result.ec == std::errc());
+  // MONGODB MODIFICATION: use MONGO_MOZJS_TO_CHARS for macOS < 10.15 compatibility.
+  auto result = MONGO_MOZJS_TO_CHARS(cbuf.sbuf, std::end(cbuf.sbuf), si, 10);
 
   size_t length = result.ptr - cbuf.sbuf;
   return parserAtoms.internAscii(fc, cbuf.sbuf, length);
@@ -873,8 +873,8 @@ static size_t Int32ToCString(char (&out)[Length], T i) {
   }
 
   // -1 to leave space for the terminating null-character.
-  auto result = std::to_chars(out, std::end(out) - 1, i, Base);
-  MOZ_ASSERT(result.ec == std::errc());
+  // MONGODB MODIFICATION: use MONGO_MOZJS_TO_CHARS for macOS < 10.15 compatibility.
+  auto result = MONGO_MOZJS_TO_CHARS(out, std::end(out) - 1, i, Base);
 
   // Null-terminate the result.
   *result.ptr = '\0';
@@ -1642,25 +1642,9 @@ static JSLinearString* Int32ToStringWithBase(JSContext* cx, int32_t i,
 
   char buf[MaximumLength] = {};
 
-  // Use explicit cases for base 10 and base 16 to make it more likely the
-  // compiler will generate optimized code for these two common bases.
-  std::to_chars_result result;
-  switch (base) {
-    case 10: {
-      result = std::to_chars(buf, std::end(buf), i, 10);
-      break;
-    }
-    case 16: {
-      result = std::to_chars(buf, std::end(buf), i, 16);
-      break;
-    }
-    default: {
-      MOZ_ASSERT(base >= 2 && base <= 36);
-      result = std::to_chars(buf, std::end(buf), i, base);
-      break;
-    }
-  }
-  MOZ_ASSERT(result.ec == std::errc());
+  // MONGODB MODIFICATION: use MONGO_MOZJS_TO_CHARS for macOS < 10.15 compatibility.
+  MOZ_ASSERT(base >= 2 && base <= 36);
+  auto result = MONGO_MOZJS_TO_CHARS(buf, std::end(buf), i, base);
 
   size_t length = result.ptr - buf;
   MOZ_ASSERT(i < 0 || length > 2, "small static strings are handled above");
@@ -1790,8 +1774,8 @@ JSLinearString* js::IndexToString(JSContext* cx, uint32_t index) {
 
   char buffer[JSFatInlineString::MAX_LENGTH_LATIN1];
 
-  auto result = std::to_chars(buffer, std::end(buffer), index, 10);
-  MOZ_ASSERT(result.ec == std::errc());
+  // MONGODB MODIFICATION: use MONGO_MOZJS_TO_CHARS for macOS < 10.15 compatibility.
+  auto result = MONGO_MOZJS_TO_CHARS(buffer, std::end(buffer), index, 10);
 
   size_t length = result.ptr - buffer;
   const auto& latin1Chars =
