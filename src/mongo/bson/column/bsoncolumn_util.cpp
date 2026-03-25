@@ -34,12 +34,14 @@
 namespace mongo::bsoncolumn {
 
 uint32_t numInterleavedStreams(const BSONObj& refObj, uint8_t control) {
-    BSONType rootType = control == bsoncolumn::kInterleavedStartArrayRootControlByte
+    BSONType rootType =
+        static_cast<char>(control) == bsoncolumn::kInterleavedStartArrayRootControlByte
         ? BSONType::array
         : BSONType::object;
 
-    bool traverseIntoArrays = control == bsoncolumn::kInterleavedStartControlByte ||
-        control == bsoncolumn::kInterleavedStartArrayRootControlByte;
+    bool traverseIntoArrays =
+        static_cast<char>(control) == bsoncolumn::kInterleavedStartControlByte ||
+        static_cast<char>(control) == bsoncolumn::kInterleavedStartArrayRootControlByte;
 
     uint32_t num = 0;
     BSONObjTraversal t(
