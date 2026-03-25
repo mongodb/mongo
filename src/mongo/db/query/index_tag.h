@@ -108,8 +108,8 @@ public:
 
     // We don't know the full path from a node unless we keep notes as we traverse from the
     // root.  We do this once and store it.
-    // TODO: Do a FieldRef / StringData pass.
-    // TODO: We might want this inside of the MatchExpression.
+    // TODO SERVER-122505: Do a FieldRef / StringData pass.
+    // TODO SERVER-122506: We might want this inside of the MatchExpression.
     std::string path;
 
     // Points to the innermost containing $elemMatch. If this tag is
@@ -278,6 +278,39 @@ private:
 
     // The index tag the predicate should receive at its current position in the tree.
     std::unique_ptr<MatchExpression::TagData> _indexTag;
+};
+
+/**
+ * A tag to signal whether or not a predicate should be pruned from the MatchExpression tree.
+ */
+class PruneTag : public MatchExpression::TagData {
+public:
+    PruneTag(bool shouldBePruned) : _shouldBePruned(shouldBePruned) {}
+
+    void debugString(StringBuilder* builder) const override {
+        *builder << " prune: " << _shouldBePruned;
+    }
+
+    TagData* clone() const override {
+        return new PruneTag(_shouldBePruned);
+    }
+
+    Type getType() const override {
+        return Type::PruneTag;
+    }
+
+    void hash(absl::HashState& state, const MatchExpression::HashParam& param) const override {
+        // Pruning tags are not relevant for the plan cache. They should actually never be left in
+        // there.
+        MONGO_UNREACHABLE_TASSERT(10360105);
+    }
+
+    bool shouldBePruned() const {
+        return _shouldBePruned;
+    }
+
+private:
+    bool _shouldBePruned;
 };
 
 /*

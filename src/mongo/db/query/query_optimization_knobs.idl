@@ -936,6 +936,16 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: true
         redact: false
+
+    internalQueryPlannerPushdownFilterToIxscanForSort:
+        description: >-
+            Enables the query planner to push predicates down to the IXSCAN stage whenever
+            possible in those queries where an index is leveraged to provide sorting.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryPlannerPushdownFilterToIxscanForSort"
+        cpp_vartype: AtomicWord<bool>
+        default: true
+        redact: false
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'

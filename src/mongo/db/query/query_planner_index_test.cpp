@@ -28,26 +28,21 @@
  */
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/index/wildcard_key_generator.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
-#include "mongo/db/query/query_execution_knobs_gen.h"
-#include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
-#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
-#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstddef>
-#include <memory>
-#include <vector>
 
 namespace mongo {
 namespace {
@@ -1696,6 +1691,1094 @@ TEST_F(QueryPlannerTest, PlansForWholeIndexScanWithSortAreGenerated) {
     assertSolutionExists(
         "{proj: {spec: {'b': 1, _id: 0}, node: {fetch: {node: {ixscan: {pattern: {a: 1}}}}}}}");
 }
+
+TEST_F(QueryPlannerTest, PlansForWholeIndexScanWithSortAreGeneratedOverIdIndex) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+
+    runQueryAsCommand(fromjson("{find: 'testns', filter: {}, projection: {}, sort: {'_id': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {"
+        "   node: {ixscan: {"
+        "       pattern: {_id: 1}"
+        "   }}"
+        "}}");
+}
+
+// Tests for predicates management for whole index plans generated to satisfy sorting.
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortPushesDownFilterOnSecondIndexKeyAndAvoidsFetch) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: 1}, projection: {'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {ixscan: {"
+        "           filter: {b: 1}, "
+        "           pattern: {a: 1, b: 1}"
+        "    }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest,
+       WholeIndexScanForSortPushesDownFilterOnSecondIndexKeyAndFetchesForProjection) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    runQueryAsCommand(fromjson("{find: 'testns', filter: {b: 1}, projection: {}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {"
+        "   node: {ixscan: {"
+        "       filter: {b: 1}, "
+        "       pattern: {a: 1, b: 1}"
+        "    }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortFiltersOnFetchIfNotIndexed) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {q: 1}, projection: {'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {fetch: {"
+        "       filter: {q: 1}, "
+        "       node: {ixscan: {"
+        "           pattern: {a: 1, b: 1}"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+// $and combined predicates
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortPushesDownAllIndexedANDPredicates) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1));
+
+    runQueryAsCommand(fromjson(
+        "{find: 'testns', filter: {b: 1, c: 2}, projection: {'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {ixscan: {"
+        "       filter: {$and: [{b: 1}, {c: 2}]}, "
+        "       pattern: {a: 1, b: 1, c: 1}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortKeepsAllUnindexedANDPredicatesInFetch) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    runQueryAsCommand(fromjson(
+        "{find: 'testns', filter: {j: 1, k: 2}, projection: {'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {fetch: {"
+        "       filter: {$and: [{j: 1}, {k: 2}]}, "
+        "       node: {ixscan: {"
+        "           pattern: {a: 1, b: 1}"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortSpreadsANDQueryPredicatesAmongFetchAndIxscan) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    runQueryAsCommand(fromjson(
+        "{find: 'testns', filter: {b: 1, q: 1}, projection: {'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {fetch: {"
+        "       filter: {q: 1}, "
+        "       node: {ixscan: {"
+        "           filter: {b: 1}, "
+        "           pattern: {a: 1, b: 1}"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortSplitsMultipleIndexedAndMultipleUnindexed) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1));
+
+    // b and c are indexed, j and k are not.
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: 1, c: 2, j: 3, k: 4}, projection: {'b': 1, _id: "
+                 "0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {fetch: {"
+        "       filter: {$and: [{j: 3}, {k: 4}]}, "
+        "       node: {ixscan: {"
+        "           filter: {$and: [{b: 1}, {c: 2}]}, "
+        "           pattern: {a: 1, b: 1, c: 1}"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+// $or combined predicates tests.
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortDoesNotOptimizeRootLevelOR) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {$or: [{b: 1}, {j: 1}]}, projection: {'b': 1, _id: 0}, "
+                 "sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {fetch: {"
+        "       filter: {$or: [{b: 1}, {j: 1}]}, "
+        "       node: {ixscan: {"
+        "           pattern: {a: 1, b: 1}"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+// Nested combined predicates tests.
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortKeepsORInsideANDInFetchWhenNotAllChildrenIndexed) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1));
+
+    // The OR has one indexed and one unindexed child, so the whole OR stays in FETCH.
+    // b:1 is indexed and pushed to IXSCAN.
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: 1, $or: [{c: 2}, {j: 1}]}, projection: {'b': 1, "
+                 "_id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {fetch: {"
+        "       filter: {$or: [{c: 2}, {j: 1}]}, "
+        "       node: {ixscan: {"
+        "           filter: {b: 1}, "
+        "           pattern: {a: 1, b: 1, c: 1}"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortKeepsORWithAllUnindexedChildrenInFetch) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1));
+
+    // The OR has all unindexed children (j and k are not in the index).
+    // The whole OR stays in FETCH. b:1 is indexed and pushed to IXSCAN.
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: 1, $or: [{j: 2}, {k: 3}]}, projection: {'b': 1, "
+                 "_id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {fetch: {"
+        "       filter: {$or: [{j: 2}, {k: 3}]}, "
+        "       node: {ixscan: {"
+        "           filter: {b: 1}, "
+        "           pattern: {a: 1, b: 1, c: 1}"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortFullyPushesORWithAllIndexedChildrenIntoIxscan) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1 << "d" << 1));
+
+    // The OR has all indexed children (b and c are in the index).
+    // The whole OR is pushed down to IXSCAN. No FETCH needed.
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: 1, $or: [{c: 2}, {d: 3}]}, projection: {'b': 1, "
+                 "_id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {ixscan: {"
+        "       filter: {b: 1, $or: [{c: 2}, {d: 3}]}, "
+        "       pattern: {a: 1, b: 1, c: 1, d: 1}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest,
+       WholeIndexScanForSortDoesSpreadNestedANDQueryPredicatesAmongFetchAndIxscan) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1));
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: 1, $and: [{c: 2}, {j: 1}]}, projection: {'b': 1, "
+                 "_id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {fetch: {"
+        "       filter: {j: 1}, "
+        "       node: {ixscan: {"
+        "           filter: {$and: [{c: 2}, {b: 1}]},"
+        "           pattern: {a: 1, b: 1, c: 1}"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest,
+       WholeIndexScanForSortDoesNotSpreadNestedNORQueryPredicatesAmongFetchAndIxscan) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1));
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: 1, $nor: [{c: 2}, {j: 1}]}, projection: {'b': 1, "
+                 "_id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {fetch: {"
+        "       filter: {j: {$ne: 1}}, "
+        "       node: {ixscan: {"
+        "           filter: {b: 1, c: {$ne: 2}}, "
+        "           pattern: {a: 1, b: 1, c: 1}"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+// Negative predicates tests.
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortPushesDownNegativeFilterIfFullyIndexed) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: {$ne: 1}}, projection: {'b': 1, "
+                 "_id: 0}, sort: {'a': 1, 'b': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj:{ "
+        "   spec: {'b': 1, _id: 0},"
+        "   node: {ixscan: {"
+        "       filter: {b: {$ne: 1}}, "
+        "       pattern: {a: 1, b: 1}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortKeepsNOTOfUnindexedFieldInFetch) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    // NOT on an unindexed field → stays in FETCH.
+    runQueryAsCommand(fromjson(
+        "{find: 'testns', filter: {j: {$ne: 5}}, projection: {'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {fetch: {"
+        "       filter: {j: {$ne: 5}}, "
+        "       node: {ixscan: {"
+        "           pattern: {a: 1, b: 1}"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortPushesDownNOTOnIndexedAndKeepsNOTOnUnindexed) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    // NOT(indexed) is pushed, NOT(unindexed) stays in FETCH.
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: {$ne: 1}, j: {$ne: 2}}, projection: {'b': 1, _id: "
+                 "0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {fetch: {"
+        "       filter: {j: {$ne: 2}}, "
+        "       node: {ixscan: {"
+        "           filter: {b: {$ne: 1}}, "
+        "           pattern: {a: 1, b: 1}"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortNORAtRootLevelWithAllIndexedStaysInFetch) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1));
+
+    // Rooted $nor is not normalized to AND(NOT, NOT) at root level, and index tagging does
+    // not descend into the NOR children. The entire NOR is treated as unindexed and stays in
+    // FETCH.
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {$nor: [{b: 1}, {c: 2}]}, projection: {'b': 1, _id: "
+                 "0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {fetch: {"
+        "       filter: {$nor: [{b: 1}, {c: 2}]}, "
+        "       node: {ixscan: {"
+        "           pattern: {a: 1, b: 1, c: 1}"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortPushesDownNinOnIndexedField) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    // $nin on an indexed field is equivalent to NOT($in), which is safe to pushdown.
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: {$nin: [1, 2, 3]}}, projection: {'b': 1, _id: 0}, "
+                 "sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {ixscan: {"
+        "       filter: {b: {$nin: [1, 2, 3]}}, "
+        "       pattern: {a: 1, b: 1}"
+        "   }}"
+        "}}");
+}
+
+// Unsupported scenarios: Special index types, timeseries and non matching collations.
+
+TEST_F(QueryPlannerTest,
+       WholeIndexScanForSortIsNotUsedWithPartialIndexesThatDoNotSupersetTheFilter) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    auto filter = fromjson("{a: {$gt: 0}}");
+    auto expr = parseMatchExpression(filter);
+    addIndex(BSON("a" << 1 << "b" << 1), expr.get());
+
+    ASSERT_EQ(2, params.mainCollectionInfo.indexes.size());
+    ASSERT_TRUE(params.mainCollectionInfo.indexes[1].filterExpr != nullptr);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: 1}, projection: {'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj:{ "
+        "   spec: {'b': 1, _id: 0},"
+        "   node: {sort: {"
+        "       limit: 0,"
+        "       pattern: {a: 1},"
+        "       node: {cscan: {"
+        "           dir: 1"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(
+    QueryPlannerTest,
+    WholeIndexScanForSortPushesFilterDownAndAvoidsFetchWithPartialIndexThatSupersetsTheGivenFilter) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    auto filter = fromjson("{b: {$gt: 0}}");
+    auto expr = parseMatchExpression(filter);
+    addIndex(BSON("a" << 1 << "b" << 1), expr.get());
+
+    ASSERT_EQ(2, params.mainCollectionInfo.indexes.size());
+    ASSERT_TRUE(params.mainCollectionInfo.indexes[1].filterExpr != nullptr);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: 1}, projection: {'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {ixscan: {"
+        "       filter: {b: 1}, "
+        "       pattern: {a: 1, b: 1}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortIsNotUsedWithSparseIndexes) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1), false, true);
+
+    ASSERT_EQ(2, params.mainCollectionInfo.indexes.size());
+    ASSERT_TRUE(params.mainCollectionInfo.indexes[1].sparse);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: 1}, projection: {'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj:{ "
+        "   spec: {'b': 1, _id: 0},"
+        "   node: {sort: {"
+        "       limit: 0,"
+        "       pattern: {a: 1},"
+        "       node: {cscan: {"
+        "           dir: 1"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortDoesNotPushPredicatesDownWithMultikeyIndexes) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1), true);
+
+    ASSERT_EQ(2, params.mainCollectionInfo.indexes.size());
+    ASSERT_TRUE(params.mainCollectionInfo.indexes[1].multikey);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: 1}, projection: {'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {sort: {"
+        "           pattern: {a: 1},"
+        "           limit: 0, "
+        "           node: {fetch: {"
+        "               filter: {b: 1}, "
+        "               node: {ixscan: {"
+        "                   pattern: {a: 1, b: 1}"
+        "               }}"
+        "           }}"
+        "    }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WildcardIndexIsNotUsedToProvideSort) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    BSONObj keyPattern = BSON("a" << 1 << "$**" << 1);
+    auto wildcardProjection = WildcardKeyGenerator::createProjectionExecutor(keyPattern, {});
+    IndexEntry entry{
+        keyPattern,
+        IndexType::INDEX_WILDCARD,
+        IndexConfig::kLatestIndexVersion,
+        false,
+        {},
+        {},
+        true,   // sparse. Wildcard indexes are always sparse.
+        false,  // unique
+        // Add the position to the name so we have a unique set of index names.
+        IndexEntry::Identifier{"hari_king_of_the_stove" +
+                               std::to_string(params.mainCollectionInfo.indexes.size())},
+        BSONObj(),
+        &wildcardProjection};
+    addIndex(entry);
+
+    ASSERT_EQ(2, params.mainCollectionInfo.indexes.size());
+    ASSERT_EQ(IndexType::INDEX_WILDCARD, params.mainCollectionInfo.indexes[1].type);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: 1}, projection: {'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj:{ "
+        "   spec: {'b': 1, _id: 0},"
+        "   node: {sort: {"
+        "       limit: 0,"
+        "       pattern: {a: 1},"
+        "       node: {cscan: {"
+        "           dir: 1"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, ColumnarIndexIsNotUsedToProvideSort) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << IndexNames::COLUMN));
+
+    ASSERT_EQ(2, params.mainCollectionInfo.indexes.size());
+    ASSERT_EQ(IndexType::INDEX_COLUMN, params.mainCollectionInfo.indexes[1].type);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: 1}, projection: {'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj:{ "
+        "   spec: {'b': 1, _id: 0},"
+        "   node: {sort: {"
+        "       limit: 0,"
+        "       pattern: {a: 1},"
+        "       node: {cscan: {"
+        "           dir: 1"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortIsNotUsedWith2DIndexes) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << IndexNames::GEO_2D));
+
+    ASSERT_EQ(2, params.mainCollectionInfo.indexes.size());
+    ASSERT_EQ(IndexType::INDEX_2D, params.mainCollectionInfo.indexes[1].type);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: 1}, projection: {'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj:{ "
+        "   spec: {'b': 1, _id: 0},"
+        "   node: {sort: {"
+        "       limit: 0,"
+        "       pattern: {a: 1},"
+        "       node: {cscan: {"
+        "           dir: 1"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortIsNotUsedWithEncryptedRangeIndexes) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << IndexNames::ENCRYPTED_RANGE));
+
+    ASSERT_EQ(2, params.mainCollectionInfo.indexes.size());
+    ASSERT_EQ(IndexType::INDEX_ENCRYPTED_RANGE, params.mainCollectionInfo.indexes[1].type);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: 1}, projection: {'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj:{ "
+        "   spec: {'b': 1, _id: 0},"
+        "   node: {sort: {"
+        "       limit: 0,"
+        "       pattern: {a: 1},"
+        "       node: {cscan: {"
+        "           dir: 1"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortIsNotUsedWithHaystackIndexes) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << IndexNames::GEO_HAYSTACK));
+
+    ASSERT_EQ(2, params.mainCollectionInfo.indexes.size());
+    ASSERT_EQ(IndexType::INDEX_HAYSTACK, params.mainCollectionInfo.indexes[1].type);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: 1}, projection: {'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj:{ "
+        "   spec: {'b': 1, _id: 0},"
+        "   node: {sort: {"
+        "       limit: 0,"
+        "       pattern: {a: 1},"
+        "       node: {cscan: {"
+        "           dir: 1"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortIsNotUsedWith2DSphereIndexes) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << IndexNames::GEO_2DSPHERE));
+
+    ASSERT_EQ(2, params.mainCollectionInfo.indexes.size());
+    ASSERT_EQ(IndexType::INDEX_2DSPHERE, params.mainCollectionInfo.indexes[1].type);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: 1}, projection: {'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj:{ "
+        "   spec: {'b': 1, _id: 0},"
+        "   node: {sort: {"
+        "       limit: 0,"
+        "       pattern: {a: 1},"
+        "       node: {cscan: {"
+        "           dir: 1"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortIsNotUsedWith2DSphereBucketIndexes) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << IndexNames::GEO_2DSPHERE_BUCKET));
+
+    ASSERT_EQ(2, params.mainCollectionInfo.indexes.size());
+    ASSERT_EQ(IndexType::INDEX_2DSPHERE_BUCKET, params.mainCollectionInfo.indexes[1].type);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: 1}, projection: {'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj:{ "
+        "   spec: {'b': 1, _id: 0},"
+        "   node: {sort: {"
+        "       limit: 0,"
+        "       pattern: {a: 1},"
+        "       node: {cscan: {"
+        "           dir: 1"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortIsNotUsedWithTextIndexes) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << IndexNames::TEXT));
+
+    ASSERT_EQ(2, params.mainCollectionInfo.indexes.size());
+    ASSERT_EQ(IndexType::INDEX_TEXT, params.mainCollectionInfo.indexes[1].type);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: 1}, projection: {'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj:{ "
+        "   spec: {'b': 1, _id: 0},"
+        "   node: {sort: {"
+        "       limit: 0,"
+        "       pattern: {a: 1},"
+        "       node: {cscan: {"
+        "           dir: 1"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortIsNotUsedWithHashedIndexes) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << IndexNames::HASHED));
+
+    ASSERT_EQ(2, params.mainCollectionInfo.indexes.size());
+    ASSERT_EQ(IndexType::INDEX_HASHED, params.mainCollectionInfo.indexes[1].type);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: 1}, projection: {'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj:{ "
+        "   spec: {'b': 1, _id: 0},"
+        "   node: {sort: {"
+        "       limit: 0,"
+        "       pattern: {a: 1},"
+        "       node: {cscan: {"
+        "           dir: 1"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortDoesNotPushfilterDownWithTimeseriesCollection) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    params.mainCollectionInfo.stats.isTimeseries = true;
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: 1}, projection: {'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {fetch: {"
+        "       filter: {b: 1}, "
+        "       node: {ixscan: {"
+        "           pattern: {a: 1, b: 1}"
+        "       }}"
+        "    }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest,
+       WholeIndexScanForSortDoesNotPushFilterDownWithNonMatchingIndexAndQueryCollations) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    addIndex(BSON("a" << 1 << "b" << 1), &collator);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: 1}, projection: {'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj:{ "
+        "   spec: {'b': 1, _id: 0},"
+        "   node: {sort: {"
+        "       limit: 0,"
+        "       pattern: {a: 1},"
+        "       node: {cscan: {"
+        "           dir: 1"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+// Existence checking predicates need fetching since indexes cannot distinguish between null and non
+// existing.
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortDoesNotPushDownExistsFilter) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: {$exists: true}}, projection: {'b': 1, _id: 0}, "
+                 "sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {fetch: {"
+        "       filter: {b: {$exists: true}}, "
+        "       node: {ixscan: {"
+        "           pattern: {a: 1, b: 1}"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortDoesNotPushDownNegatedExistsFilter) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    runQueryAsCommand(fromjson(
+        "{find: 'testns', filter: {b: {$not: {$exists: true}}}, projection: {'b': 1, _id: 0}, "
+        "sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {fetch: {"
+        "       filter: {b: {$not: {$exists: true}}}, "
+        "       node: {ixscan: {"
+        "           pattern: {a: 1, b: 1}"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortKeepsNegativeFilterForFetchIfNotIndexed) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    runQueryAsCommand(fromjson(
+        "{find: 'testns', filter: {q: {$not: {$exists: false}}}, projection: {'b': 1, _id: 0}, "
+        "sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj:{ spec: {'b': 1, _id: 0},"
+        "   node: {fetch: {"
+        "       filter: {q: {$not: {$exists: false}}},"
+        "       node: {ixscan: {"
+        "           pattern: {a: 1, b: 1}"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortDoesNotPushDownTypeNullFilter) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    // type 10 is null type. Not safe to be pushed down to IXSCAN stage.
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: {$type: 10}}, projection: {'b': 1, _id: 0}, sort: "
+                 "{'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {fetch: {"
+        "       filter: {b: {$type: 10}}, "
+        "       node: {ixscan: {"
+        "           pattern: {a: 1, b: 1}"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortDoesNotPushDownTypeNullFilterNegated) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    // type null is index unsafe. Wrapping NOT inherits it hence staying in fetch.
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: {$not: {$type: 10}}}, projection: {'b': 1, _id: "
+                 "0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {fetch: {"
+        "       filter: {b: {$not: {$type: 10}}}, "
+        "       node: {ixscan: {"
+        "           pattern: {a: 1, b: 1}"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortDoesPushDownTypeStringFilter) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    // Type 2 is string. Safe to be pushed down.
+    runQueryAsCommand(fromjson(
+        "{find: 'testns', filter: {b: {$type: 2}}, projection: {'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {ixscan: {"
+        "       filter: {b: {$type: 2}}, "
+        "       pattern: {a: 1, b: 1}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortSplitsExistsFromIndexedInAND) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1));
+
+    // $exists is index-unsafe. b:1 is pushed down, $exists stays in FETCH.
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: 1, c: {$exists: true}}, projection: {'b': 1, _id: "
+                 "0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {fetch: {"
+        "       filter: {c: {$exists: true}}, "
+        "       node: {ixscan: {"
+        "           filter: {b: 1}, "
+        "           pattern: {a: 1, b: 1, c: 1}"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortSplitsTypeNullFromIndexedInAND) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1));
+
+    // $type: 10 (null) is index-unsafe. b:1 is pushed down, $type stays in FETCH.
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: 1, c: {$type: 10}}, projection: {'b': 1, _id: 0}, "
+                 "sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {fetch: {"
+        "       filter: {c: {$type: 10}}, "
+        "       node: {ixscan: {"
+        "           filter: {b: 1}, "
+        "           pattern: {a: 1, b: 1, c: 1}"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortSplitsNOTExistsFromIndexedInAND) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1));
+
+    // NOT($exists) wraps an index-unsafe predicate. b:1 is pushed, NOT($exists) stays.
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: 1, c: {$not: {$exists: true}}}, projection: {'b': "
+                 "1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {fetch: {"
+        "       filter: {c: {$not: {$exists: true}}}, "
+        "       node: {ixscan: {"
+        "           filter: {b: 1}, "
+        "           pattern: {a: 1, b: 1, c: 1}"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortSplitsNOTIndexedSafeAndNOTExists) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1));
+
+    // NOT(b:1) is indexed+safe -> pushed to IXSCAN. NOT($exists) is unsafe -> stays in FETCH.
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: {$ne: 1}, c: {$not: {$exists: true}}}, projection: "
+                 "{'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {fetch: {"
+        "       filter: {c: {$not: {$exists: true}}}, "
+        "       node: {ixscan: {"
+        "           filter: {b: {$ne: 1}}, "
+        "           pattern: {a: 1, b: 1, c: 1}"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortKeepsBothExistsAndTypeNullInFetch) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1));
+
+    // Both $exists and $type:null are index-unsafe so both stay in FETCH, nothing pushed.
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: {$exists: true}, c: {$type: 10}}, projection: "
+                 "{'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {fetch: {"
+        "       filter: {$and: [{b: {$exists: true}}, {c: {$type: 10}}]}, "
+        "       node: {ixscan: {"
+        "           pattern: {a: 1, b: 1, c: 1}"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortPushesNullEqualityToIxscan) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: null}, projection: "
+                 "{'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {ixscan: {"
+        "       filter: {b: null}, "
+        "       pattern: {a: 1, b: 1}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortPushesNullIneEqualityToIxscan) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: {$ne: null}}, projection: "
+                 "{'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {ixscan: {"
+        "       filter: {b: {$ne: null}}, "
+        "       pattern: {a: 1, b: 1}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortPushesNullInToIxscan) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: {$in: [1, null]}}, projection: "
+                 "{'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {ixscan: {"
+        "       filter: {b: {$in: [1, null] }}, "
+        "       pattern: {a: 1, b: 1}"
+        "   }}"
+        "}}");
+}
+
+// $elemMatch tests.
+
+// TODO. This one can be pushed down to the index.
+TEST_F(QueryPlannerTest, WholeIndexScanForSortElemMatchValueOnIndexedFieldIsKeptInFetch) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: {$elemMatch: {$gt: 5}}}, projection: "
+                 "{'b': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b': 1, _id: 0}, "
+        "   node: {fetch: {"
+        "       filter: {b: {$elemMatch: {$gt: 5}}}, "
+        "       node: {ixscan: {"
+        "           filter: null, "
+        "           pattern: {a: 1, b: 1}"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortElemMatchObjectOnIndexedFieldIsKeptInFetch) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b.x" << 1));
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {b: {$elemMatch: {x: 5}}}, projection: "
+                 "{'b.x': 1, _id: 0}, sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {'b.x': 1, _id: 0}, "
+        "   node: {fetch: {"
+        "       filter: {b: {$elemMatch: {x: 5}}}, "
+        "       node: {ixscan: {"
+        "           filter: null, "
+        "           pattern: {a: 1, 'b.x': 1}"
+        "       }}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortElemMatchOnUnindexedField) {
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {c: {$elemMatch: {$gt: 5}}}, "
+                 "sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {"
+        "   filter: {c: {$elemMatch: {$gt: 5}}}, "
+        "   node: {ixscan: {"
+        "       filter: null, "
+        "       pattern: {a: 1, b: 1}"
+        "   }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, WholeIndexScanForSortElemMatchObjectWithIndexedChildrenNotPushedToIxscan) {
+    // Regression test for the index13.js failure (Location17409): $elemMatch on 'a.b' with
+    // index {a: 1, "a.b.x": 1, "a.b.y": 1}. Even though the $elemMatch's children reference
+    // indexed fields (a.b.x, a.b.y), field 'a.b' itself is not in the index, so the
+    // $elemMatch cannot be evaluated on the IXSCAN.
+    params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1 << "a.b.x" << 1 << "a.b.y" << 1));
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {'a.b': {$elemMatch: {x: 1, y: 1}}}, "
+                 "sort: {'a': 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {"
+        "   filter: {'a.b': {$elemMatch: {x: 1, y: 1}}},"
+        "   node: {ixscan: {"
+        "       filter: null,"
+        "       pattern: {a: 1, 'a.b.x': 1, 'a.b.y': 1}"
+        "   }}"
+        "}}");
+}
+
 
 }  // namespace
 }  // namespace mongo

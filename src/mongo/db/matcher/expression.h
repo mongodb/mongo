@@ -390,7 +390,7 @@ public:
 
     class TagData {
     public:
-        enum class Type { IndexTag, RelevantTag, OrPushdownTag };
+        enum class Type { IndexTag, RelevantTag, OrPushdownTag, PruneTag };
         virtual ~TagData() = default;
         virtual void debugString(StringBuilder* builder) const = 0;
         virtual TagData* clone() const = 0;

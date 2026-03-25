@@ -27,7 +27,9 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/planner_access.h"
 
+#include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/assert_util.h"
@@ -58,6 +60,7 @@
 #include "mongo/db/matcher/expression_text_base.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
@@ -68,10 +71,11 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/indexability.h"
-#include "mongo/db/query/planner_access.h"
+#include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/record_id_range.h"
 #include "mongo/db/record_id.h"
@@ -82,14 +86,21 @@
 #include "mongo/db/storage/key_format.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
+#include <memory>
 #include <set>
 #include <string>
 #include <tuple>
 #include <utility>
 #include <vector>
+
+#include <s2cellid.h>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -755,7 +766,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
         isn->queryCollator = query.getCollator();
 
         // Get the ixtag->pos-th element of the index key pattern.
-        // TODO: cache this instead/with ixtag->pos?
+        // TODO SERVER-122502: cache this instead/with ixtag->pos?
         BSONObjIterator it(index.keyPattern);
         BSONElement keyElt = it.next();
         for (size_t i = 0; i < pos; ++i) {
@@ -936,7 +947,7 @@ void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr, ScanBuildingSt
     }
 
     // Get the ixtag->pos-th element of the index key pattern.
-    // TODO: cache this instead/with ixtag->pos?
+    // TODO SERVER-122502: cache this instead/with ixtag->pos?
     BSONObjIterator it(index.keyPattern);
     BSONElement keyElt = it.next();
     for (size_t i = 0; i < pos; ++i) {
@@ -1242,7 +1253,7 @@ void QueryPlannerAccess::finishLeafNode(
     }
 
     // Find the first field in the scan's bounds that was not filled out.
-    // TODO: could cache this.
+    // TODO SERVER-122503: could cache this.
     size_t firstEmptyField = 0;
     for (firstEmptyField = 0; firstEmptyField < bounds->fields.size(); ++firstEmptyField) {
         if (bounds->fields[firstEmptyField].name.empty()) {
@@ -2114,9 +2125,281 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
     return nullptr;
 }
 
-std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::scanWholeIndex(const IndexEntry& index,
-                                                                      const CanonicalQuery& query,
-                                                                      int direction) {
+/**
+ * Recursively traverses the tree and prunes nodes tagged with a PruneTag with prunable=true.
+ * Prunning happens by returning nullptr from this function, which signals to the caller that the
+ * node should be pruned from the tree.
+ *
+ * @param node The current node being traversed.
+ * @return The pruned node, or nullptr if the node itself is pruned.
+ */
+std::unique_ptr<MatchExpression> pruneNodesTaggedForPruning(std::unique_ptr<MatchExpression> node) {
+    tassert(10360116,
+            "Expected PruneTag or nullptr as tag on node",
+            !node->getTag() ||
+                node->getTag()->getType() == MatchExpression::TagData::Type::PruneTag);
+    auto tag = static_cast<PruneTag*>(node->getTag());
+    if (tag && tag->shouldBePruned()) {
+        // Returning nullptr here is effectively pruning this node from the tree.
+        return nullptr;
+    }
+
+    // Only AND nodes can be partially pruned, so we only need to check the children of AND nodes
+    // for pruning tags.
+    if (MatchExpression::AND == node->matchType()) {
+        auto childVector = node->getChildVector();
+        std::vector<std::unique_ptr<MatchExpression>> children;
+        for (auto& child : *childVector) {
+            if (auto keptChild = pruneNodesTaggedForPruning(std::move(child))) {
+                children.push_back(std::move(keptChild));
+            }
+        }
+        // Note: we are replacing the entire child vector of the node here, which is fine since we
+        // are working on a clone of the original tree.
+        *childVector = std::move(children);
+    }
+    // Returning the node here means we are keeping it in the tree.
+    return node;
+}
+
+/**
+ * Describes how much of an expression subtree was tagged for pruning.
+ * Values are ordered so that higher means more pruning, enabling comparisons like
+ * `result >= TagForPruningResult::kPartiallyTagged`.
+ */
+enum class TagForPruningResult {
+    /** Nothing in the subtree needs pruning. */
+    kNothingTagged,
+    /** Some children were tagged for pruning. */
+    kPartiallyTagged,
+    /** The entire subtree (including the root) must be pruned. */
+    kWhollyTagged,
+};
+
+/**
+ * Combines two TagForPruningResult values. If both are the same, the result is that value;
+ * otherwise the result is kPartiallyTagged (i.e. a mix of pruned and unpruned nodes).
+ */
+TagForPruningResult operator|(TagForPruningResult lhs, TagForPruningResult rhs) {
+    if (lhs == rhs) {
+        return lhs;
+    }
+    return TagForPruningResult::kPartiallyTagged;
+}
+
+/**
+ * Traverses the tree and tags nodes with a PruneTag whose value will be true (indicating they
+ * should be pruned) in the cases where the node is either unindexed or index-unsafe.
+ *
+ * @param node Pointer to the current node being traversed.
+ * @return A TagForPruningResult indicating whether the whole tree, parts of it, or nothing was
+ * tagged for pruning.
+ */
+TagForPruningResult tagUnindexedOrIndexUnsafeNodesForPruning(MatchExpression* node) {
+    // Accumulates the combined pruning status across all children using the '|' operator.
+    // Starts at kWhollyTagged since if the container is empty it'd mean it can be pruned.
+    // Subsequent children are folded in using the  '|' operator (same|same -> same, different ->
+    // kPartiallyTagged). For leaf nodes (no children) this value is unused.
+    TagForPruningResult combinedChildResult = TagForPruningResult::kWhollyTagged;
+    bool noChildrenProcessed = true;
+
+    auto nodeDebugStr = node->debugString();
+    ON_BLOCK_EXIT([&] {
+        tassert(10360113,
+                "Expected PruneTag or nullptr as tag on node",
+                !node->getTag() ||
+                    node->getTag()->getType() == MatchExpression::TagData::Type::PruneTag);
+        LOGV2_DEBUG(10360106,
+                    5,
+                    "Finished processing node for pruning",
+                    "before"_attr = nodeDebugStr,
+                    "pruneTag"_attr = static_cast<PruneTag*>(node->getTag())->shouldBePruned(),
+                    "after"_attr = node->debugString());
+    });
+
+    // ElemMatchObject requires iterating sub-documents at its own path. An IXSCAN only has
+    // flat key values and cannot perform this evaluation, even if the elemMatch's children
+    // reference indexed fields (e.g. $elemMatch on 'a.b' with index {a.b.x: 1, a.b.y: 1}).
+    // Always mark as prunable so it is pruned off from the IXSCAN filter and will therefore be
+    // processed by the FETCH filter.
+    // TODO SERVER-120791. Add support for elem match objects.
+    if (node->matchType() == MatchExpression::ELEM_MATCH_OBJECT) {
+        node->setTag(new PruneTag(true));
+        return TagForPruningResult::kWhollyTagged;
+    }
+
+    // Check children first
+    if (auto childVector = node->getChildVector()) {
+        for (auto& child : *childVector) {
+            auto childResult = tagUnindexedOrIndexUnsafeNodesForPruning(child.get());
+            if (noChildrenProcessed) {
+                combinedChildResult = childResult;
+                noChildrenProcessed = false;
+            } else {
+                combinedChildResult = combinedChildResult | childResult;
+            }
+        }
+    } else if (node->numChildren() == 1) {
+        // Expressions such as NOT or ElemMatch have only one child accessible via getChild(0).
+        // TODO SERVER-120792. For elemMatchValues, leverage the RelevantTag since children is never
+        // tagged.
+        combinedChildResult = tagUnindexedOrIndexUnsafeNodesForPruning(node->getChild(0));
+    } else {
+        tassert(10360111, "Unexpected child count!", node->numChildren() == 0);
+    }
+
+    if (node->numChildren() > 0) {
+        if (node->matchType() == MatchExpression::AND) {
+            // Only prune the AND itself if all children are wholly tagged; otherwise keep the AND
+            // and let individual children be pruned. The combined result already encodes the
+            // nothing/partial/wholly distinction.
+            node->setTag(new PruneTag(combinedChildResult == TagForPruningResult::kWhollyTagged));
+            return combinedChildResult;
+        } else {
+            // For OR/NOT, any pruning in children forces the whole subtree to be pruned to
+            // preserve correctness.
+            bool mustPrune = combinedChildResult != TagForPruningResult::kNothingTagged;
+            node->setTag(new PruneTag(mustPrune));
+            return mustPrune ? TagForPruningResult::kWhollyTagged
+                             : TagForPruningResult::kNothingTagged;
+        }
+    }
+
+    // Only leaf nodes beyond this point.
+
+    auto rt = static_cast<RelevantTag*>(node->getTag());
+    bool isIndexed = rt && !(rt->notFirst.empty() && rt->first.empty());
+
+    // Unindexed -> Prune
+    if (!isIndexed) {
+        node->setTag(new PruneTag(true));
+        return TagForPruningResult::kWhollyTagged;
+    }
+
+    // TODO SERVER-12869. Remove this exception once indexes can be trusted to distinguish between
+    // not existing and null values.
+    bool unsafe = false;
+    if (node->matchType() == MatchExpression::EXISTS) {
+        unsafe = true;
+    } else if (node->matchType() == MatchExpression::TYPE_OPERATOR) {
+        auto typeExpr = static_cast<const TypeMatchExpression*>(node);
+        if (typeExpr->typeSet().hasType(BSONType::null)) {
+            unsafe = true;
+        }
+    }
+
+    node->setTag(new PruneTag(unsafe));
+    return unsafe ? TagForPruningResult::kWhollyTagged : TagForPruningResult::kNothingTagged;
+}
+
+/**
+ * Negates the PruneTag on every leaf node and recomputes container (AND/OR/NOT) tags
+ * bottom-up from the flipped leaf values. This converts tags produced by
+ * tagUnindexedOrIndexUnsafeNodesForPruning (which marks unindexed/unsafe nodes for pruning away
+ * from the IXSCAN) into the complementary tags needed for the FETCH filter (which marks
+ * indexed-safe nodes for pruning).
+ *
+ * The key benefit is that all index-safety and indexedness logic lives in a single tagging
+ * function (tagUnindexedOrIndexUnsafeNodesForPruning). This function only flips and recomputes.
+ *
+ * OR semantics: all-or-nothing. We can only prune an entire OR subtree if ALL children are
+ * prunable after negation. If not, we force all children to not-prunable to preserve
+ * correctness.
+ *
+ * @param node Pointer to the current node being traversed. Must already have PruneTags set.
+ * @return true if the current node is tagged for pruning after negation.
+ */
+bool negatePruneTagsAndRecomputeContainersTag(MatchExpression* node) {
+    bool prunable = true;
+    LOGV2_DEBUG(10360110, 5, "Negating prune tag for node: {}", "node"_attr = node->debugString());
+
+    // ElemMatchObject is treated as an atomic leaf for pruning (see
+    // tagUnindexedOrIndexUnsafeNodesForPruning). Just flip its tag.
+    if (node->matchType() == MatchExpression::ELEM_MATCH_OBJECT) {
+        tassert(10360115,
+                "Expected PruneTag as tag on node",
+                node->getTag() &&
+                    node->getTag()->getType() == MatchExpression::TagData::Type::PruneTag);
+        auto tag = static_cast<PruneTag*>(node->getTag());
+        bool flipped = !tag->shouldBePruned();
+        node->setTag(new PruneTag(flipped));
+        return flipped;
+    }
+
+    if (auto childVector = node->getChildVector()) {
+        for (auto& child : *childVector) {
+            if (!negatePruneTagsAndRecomputeContainersTag(child.get())) {
+                prunable = false;
+            }
+        }
+    } else if (node->numChildren() == 1) {
+        // Some expressions such as NOT or ElemMatch have only one child accessible via
+        // getChild(0).
+        prunable = negatePruneTagsAndRecomputeContainersTag(node->getChild(0));
+    } else {
+        // Leaf node: flip the existing PruneTag.
+        tassert(10360114,
+                "Expected PruneTag as tag on node",
+                node->getTag() &&
+                    node->getTag()->getType() == MatchExpression::TagData::Type::PruneTag);
+        auto tag = static_cast<PruneTag*>(node->getTag());
+        prunable = !tag->shouldBePruned();
+    }
+
+    node->setTag(new PruneTag(prunable));
+    return prunable;
+}
+
+/**
+ * Removes children from AND expressions that have already been indexed, as indicated by their
+ * RelevantTag. This function modifies the expression tree in-place by removing nodes that have
+ * either first or notFirst fields set in their RelevantTag, indicating they were already
+ * considered for index usage.
+ *
+ * @param tree Pointer to the root of the match expression tree to be pruned.
+ *
+ * Example 1:
+ * Input:  AND
+ *        /  \
+ *  {unindexed} {indexed}
+ * Output: AND
+ *         |
+ *    {unindexed}
+ *
+ * Example 2:
+ * Input:         AND
+ *            /    |      \
+ * {unindexed} {indexed} {unindexed}
+ * Output:   AND
+ *        /      \
+ * {unindexed} {unindexed}
+ *
+ * Example 3:
+ * Input:      OR
+ *            /  \
+ *         AND   {unindexed}
+ *        /  \
+ * {unindexed} {indexed}
+ * Output:     Same (OR node remains unchanged since function only processes AND nodes).
+ */
+std::unique_ptr<MatchExpression> pruneIndexSafeChildren(std::unique_ptr<MatchExpression> tree) {
+    // Negate leaf tags and recompute containers to get the complementary tags
+    // needed for the FETCH filter (marks indexed-safe nodes for pruning instead).
+    negatePruneTagsAndRecomputeContainersTag(tree.get());
+    LOGV2_DEBUG(10360101,
+                1,
+                "Negated prune tags and recomputed container tags",
+                "tree"_attr = tree->debugString());
+    return pruneNodesTaggedForPruning(std::move(tree));
+}
+
+std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::scanWholeIndex(
+    const IndexEntry& index,
+    const CanonicalQuery& query,
+    const QueryPlannerIXSelect::QueryContext& queryContext,
+    const QueryPlannerParams& params,
+    int direction) {
+
     std::unique_ptr<QuerySolutionNode> solnRoot;
 
     // Build an ixscan over the id index, use it, and return it.
@@ -2137,12 +2420,150 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::scanWholeIndex(const Inde
     if (MatchExpression::AND == filter->matchType() && (0 == filter->numChildren())) {
         solnRoot = std::move(isn);
     } else {
-        // TODO: We may not need to do the fetch if the predicates in root are covered.  But
-        // for now it's safe (though *maybe* slower).
-        unique_ptr<FetchNode> fetch = std::make_unique<FetchNode>(query.nss());
+        if (internalQueryPlannerPushdownFilterToIxscanForSort.load()) {
+            solnRoot = pushdownFilterToFullIxscan(
+                std::move(filter), std::move(isn), index, queryContext, params, query.nss());
+        } else {
+            LOGV2_INFO(10360100,
+                       "Not optimizing full IXSCAN as disabled by query knob",
+                       "query"_attr = redact(filter->debugString()),
+                       "index"_attr = index.toString());
+            unique_ptr<FetchNode> fetch = std::make_unique<FetchNode>(query.nss());
+            fetch->filter = std::move(filter);
+            fetch->children.push_back(std::move(isn));
+            solnRoot = std::move(fetch);
+        }
+    }
+
+    return solnRoot;
+}
+
+/**
+ * Attempts to optimize query execution by pushing down parts of the filter predicate into a
+ * full index scan (IXSCAN) when possible. This can reduce the number of documents that need to
+ * be fetched from the collection by applying filter predicates at the index scan stage rather
+ * than at the fetch stage. It could potentially turn the query into a covered one.
+ *
+ * The function analyzes the provided filter and determines which predicates can be evaluated
+ * using the index. These predicates are pushed down to the IXSCAN node. Any remaining
+ * predicates that cannot be evaluated by the index are attached to a FETCH node above the
+ * IXSCAN.
+ *
+ * The optimization is currently skipped for timeseries collections, hashed indexes, and
+ * multikey indexes. Only certain filter types (leaf, AND, NOT) are considered for optimization.
+ * Future work (see TODOs) will expand support to OR and NOR expressions.
+ *
+ * @param filter
+ *      The root of the filter expression tree to be analyzed and potentially pushed down.
+ *      Ownership is transferred to this function.
+ * @param isn
+ *      The IndexScanNode representing the full index scan. Ownership is transferred to this
+ * function.
+ * @param index
+ *      The IndexEntry describing the index being scanned.
+ * @param queryContext
+ *      Contextual information about the query for index selection.
+ * @param params
+ *      Query planner parameters, including collection statistics and other planning options.
+ *
+ * @return
+ *      A unique_ptr to the root QuerySolutionNode of the optimized query plan. This will be
+ * either:
+ *          - A FetchNode (with any remaining filter) above the IndexScanNode (with pushed-down
+ * filter), or
+ *          - The IndexScanNode itself if all predicates were pushed down.
+ */
+std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::pushdownFilterToFullIxscan(
+    std::unique_ptr<MatchExpression> filter,
+    std::unique_ptr<IndexScanNode> isn,
+    const IndexEntry& index,
+    const QueryPlannerIXSelect::QueryContext& queryContext,
+    const QueryPlannerParams& params,
+    const NamespaceString& nss) {
+    std::unique_ptr<QuerySolutionNode> solnRoot;
+    // Sparse or partial indexes could skip documents that match the filter making the resulting
+    // plan incorrect but that's something we do not need to take care here since it has already
+    // been taken care at QueryPlanner::plan time.
+    // TODO SERVER-103594. Do not skip the optimization for timeseries.
+    // TODO SERVER-103595. Do not skip the optimization for hashed indexes.
+    // TODO SERVER-103596. Do not skip the optimization for multikey indexes.
+    // TODO SERVER-103592 optimize also OR expressions.
+    if (index.type == IndexType::INDEX_BTREE && !index.multikey &&
+        !params.mainCollectionInfo.stats.isTimeseries &&
+        filter->matchType() != MatchExpression::OR) {
+        QueryPlannerIXSelect::rateIndices(filter.get(), "" /* prefix */, {index}, queryContext);
+        QueryPlannerIXSelect::stripInvalidAssignments(filter.get(), {index});
+        LOGV2_DEBUG(10360112,
+                    5,
+                    "Checking if full IXSCAN can be optimized",
+                    "query"_attr = redact(filter->debugString()),
+                    "index"_attr = redact(index.toString()));
+
+        auto originalQuery = filter->debugString();
+        // TODO SERVER-120976: early return if root is to be pruned.
+        tagUnindexedOrIndexUnsafeNodesForPruning(filter.get());
+        LOGV2_DEBUG(10360107,
+                    5,
+                    "Tagged unindexed or index unsafe nodes for pruning",
+                    "filter"_attr = filter->debugString());
+        std::unique_ptr<MatchExpression> filterforIXScanStage = filter->clone();
+        std::unique_ptr<MatchExpression> filterForFetchStage = filter->clone();
+        filterforIXScanStage = pruneNodesTaggedForPruning(std::move(filterforIXScanStage));
+        LOGV2_DEBUG(10360108,
+                    5,
+                    "Pruned unindexed or index unsafe nodes for IXSCAN stage",
+                    "filter"_attr =
+                        filterforIXScanStage ? filterforIXScanStage->debugString() : "nullptr");
+        if (filterforIXScanStage) {
+            filterforIXScanStage = optimizeMatchExpression(std::move(filterforIXScanStage));
+        } else {
+            // Everything was pruned meaning no filter at IXSCAN stage
+            filterforIXScanStage = std::make_unique<AndMatchExpression>();
+        }
+        filterforIXScanStage->resetTag();
+        LOGV2_DEBUG(
+            10360102,
+            5,
+            "IXSCAN filter after pruning and reoptimization not indexed or index unsafe nodes",
+            "filter"_attr = filterforIXScanStage->debugString());
+
+        filterForFetchStage = pruneIndexSafeChildren(std::move(filterForFetchStage));
+        LOGV2_DEBUG(10360109,
+                    5,
+                    "Pruned index safe nodes for FETCH stage",
+                    "filter"_attr =
+                        filterForFetchStage ? filterForFetchStage->debugString() : "nullptr");
+        if (filterForFetchStage) {
+            filter = optimizeMatchExpression(std::move(filterForFetchStage));
+        } else {
+            // Everything was pruned, meaning the index covers the query.
+            filter = std::make_unique<AndMatchExpression>();
+        }
+        filter->resetTag();
+        LOGV2_DEBUG(10360103,
+                    5,
+                    "FETCH filter after pruning and reoptimization of index safe nodes",
+                    "filter"_attr = filter->debugString());
+
+        if (!filterforIXScanStage->isTriviallyTrue()) {
+            LOGV2_DEBUG(10360104,
+                        5,
+                        "Adding filter to full IXSCAN stage",
+                        "query"_attr = redact(originalQuery),
+                        "index"_attr = redact(index.toString()),
+                        "IXScanfilter"_attr = redact(filterforIXScanStage->debugString()),
+                        "fetchFilter"_attr = redact(filter->debugString()));
+            isn->filter = std::move(filterforIXScanStage);
+        }
+    }
+
+    if (!filter->isTriviallyTrue()) {
+        unique_ptr<FetchNode> fetch = std::make_unique<FetchNode>(nss);
         fetch->filter = std::move(filter);
         fetch->children.push_back(std::move(isn));
         solnRoot = std::move(fetch);
+    } else {
+        solnRoot = std::move(isn);
     }
 
     return solnRoot;
@@ -2217,8 +2638,9 @@ void QueryPlannerAccess::handleFilterAnd(ScanBuildingState* scanState) {
         // for affixing later.
         ++scanState->curChild;
     } else if (scanState->tightness == IndexBoundsBuilder::EXACT) {
-        // The tightness of the bounds is exact. We want to remove this child so that when control
-        // returns to handleIndexedAnd we know that we don't need it to create a FETCH stage.
+        // The tightness of the bounds is exact. We want to remove this child so that when
+        // control returns to handleIndexedAnd we know that we don't need it to create a FETCH
+        // stage.
         root->getChildVector()->erase(root->getChildVector()->begin() + scanState->curChild);
     } else if (scanState->tightness == IndexBoundsBuilder::INEXACT_COVERED &&
                (INDEX_TEXT == index.type || !index.multikey)) {
@@ -2267,8 +2689,8 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeIndexScan(
     if (MatchExpression::AND == filter->matchType() && (0 == filter->numChildren())) {
         solnRoot = std::move(isn);
     } else {
-        // TODO: We may not need to do the fetch if the predicates in root are covered.  But
-        // for now it's safe (though *maybe* slower).
+        // TODO SERVER-122504: We may not need to do the fetch if the predicates in root are
+        // covered.  But for now it's safe (though *maybe* slower).
         unique_ptr<FetchNode> fetch = std::make_unique<FetchNode>(query.nss());
         fetch->filter = std::move(filter);
         fetch->children.push_back(std::move(isn));

@@ -53,6 +53,7 @@ selector:
     - jstests/core/query/and/and3.js
     - jstests/core/query/not/not2.js
     - jstests/core/query/type/type_operator_on_missing_values.js
+    - jstests/core/index/index_for_sort.js
 
     # TODO SERVER-100610: Test directly or indirectly asserts on specific plan chosen
     - jstests/core/query/sort/sort_array.js

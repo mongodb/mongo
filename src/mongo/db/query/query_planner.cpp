@@ -563,13 +563,14 @@ std::unique_ptr<QuerySolution> buildVirtScanSoln(const std::vector<BSONArray>& d
 std::unique_ptr<QuerySolution> buildWholeIXSoln(
     const IndexEntry& index,
     const CanonicalQuery& query,
+    const QueryPlannerIXSelect::QueryContext& queryContext,
     const QueryPlannerParams& params,
     const boost::optional<int>& direction = boost::none) {
     tassert(6499400,
             "Cannot pass both an explicit direction and a traversal preference",
             !(direction.has_value() && params.traversalPreference));
-    std::unique_ptr<QuerySolutionNode> solnRoot(
-        QueryPlannerAccess::scanWholeIndex(index, query, direction.value_or(1)));
+    std::unique_ptr<QuerySolutionNode> solnRoot(QueryPlannerAccess::scanWholeIndex(
+        index, query, queryContext, params, direction.value_or(1)));
     return QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot));
 }
 
@@ -596,7 +597,7 @@ StatusWith<std::unique_ptr<PlanCacheIndexTree>> QueryPlanner::cacheDataFromTagge
         // check that the index is OK with the predicate. The only thing we have to do
         // this for is 2d.  For now it's easier to move ahead if we don't cache 2d.
         //
-        // TODO: revisit with a post-cached-index-assignment compatibility check
+        // TODO SERVER-122499: revisit with a post-cached-index-assignment compatibility check
         if (is2DIndex(relevantIndices[itag->index].keyPattern)) {
             return Status(ErrorCodes::BadValue, "can't cache '2d' index");
         }
@@ -735,8 +736,11 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
 
     if (SolutionCacheData::WHOLE_IXSCAN_SOLN == solnCacheData.solnType) {
         // The solution can be constructed by a scan over the entire index.
-        auto soln = buildWholeIXSoln(
-            *solnCacheData.tree->entry, query, params, solnCacheData.wholeIXSolnDir);
+        auto soln = buildWholeIXSoln(*solnCacheData.tree->entry,
+                                     query,
+                                     {.collator = query.getCollator()},
+                                     params,
+                                     solnCacheData.wholeIXSolnDir);
         if (!soln) {
             return Status(ErrorCodes::NoQueryExecutionPlans,
                           "plan cache error: soln that uses index to provide sort");
@@ -976,6 +980,7 @@ void extendCandidatePlans(const CanonicalQuery& query,
                           const std::vector<IndexEntry>& fullIndexList,
                           const std::vector<IndexEntry>& relevantIndices,
                           bool hasHint,
+                          QueryPlannerIXSelect::QueryContext queryContext,
                           boost::optional<StringSet&> relevantIndexOutput,
                           boost::optional<bool&> hasRelevantMultikeyIndex,
                           std::vector<std::unique_ptr<QuerySolution>>& out) {
@@ -1010,9 +1015,9 @@ void extendCandidatePlans(const CanonicalQuery& query,
                 // be used to provide a sort. In addition, the index needs to be a non-sparse
                 // index.
                 //
-                // TODO: Sparse indexes can't normally provide a sort, because non-indexed
-                // documents could potentially be missing from the result set.  However, if the
-                // query predicate can be used to guarantee that all documents to be returned
+                // TODO SERVER-122500: Sparse indexes can't normally provide a sort, because
+                // non-indexed documents could potentially be missing from the result set.  However,
+                // if the query predicate can be used to guarantee that all documents to be returned
                 // are indexed, then the index should be able to provide the sort.
                 //
                 // For example:
@@ -1053,7 +1058,7 @@ void extendCandidatePlans(const CanonicalQuery& query,
                     LOGV2_DEBUG(
                         20981, 5, "Planner: outputting soln that uses index to provide sort");
                     auto index = fullIndexList[i];
-                    auto soln = buildWholeIXSoln(index, query, params, direction);
+                    auto soln = buildWholeIXSoln(index, query, queryContext, params, direction);
                     // If the solution was created to satisfy a sort requirement for distinct scan,
                     // ensure we have a distinct scan plan.
                     if (soln && (providesSort || soln->hasNode(STAGE_DISTINCT_SCAN))) {
@@ -1104,6 +1109,7 @@ void extendCandidatePlans(const CanonicalQuery& query,
             auto soln = buildWholeIXSoln(
                 index,
                 query,
+                queryContext,
                 // TODO SERVER-87683 Investigate why empty parameters are used instead of 'params'.
                 QueryPlannerParams{
                     QueryPlannerParams::ArgsForTest{},
@@ -1571,7 +1577,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     LOGV2_DEBUG(20979, 5, "Planner: outputted indexed solutions", "numSolutions"_attr = out.size());
 
     // Produce legible error message for failed OR planning with a TEXT child.
-    // TODO: support collection scan for non-TEXT children of OR.
+    // TODO SERVER-122501: support collection scan for non-TEXT children of OR.
     if (out.size() == 0 && textNode != nullptr &&
         MatchExpression::OR == query.getPrimaryMatchExpression()->matchType()) {
         MatchExpression* root = query.getPrimaryMatchExpression();
@@ -1626,7 +1632,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
             "hint"_attr = redact(hintedIndexBson->toString()));
 
         // Return hinted index solution if found.
-        if (auto soln = buildWholeIXSoln(relevantIndices.front(), query, params)) {
+        if (auto soln = buildWholeIXSoln(relevantIndices.front(), query, queryContext, params)) {
             LOGV2_DEBUG(20980, 5, "Planner: outputting soln that uses hinted index as scan");
             return singleSolution(std::move(soln));
         }
@@ -1639,6 +1645,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                          fullIndexList,
                          relevantIndices,
                          hintedIndexBson.has_value(),
+                         queryContext,
                          relevantIndexOutput,
                          hasRelevantMultikeyIndex,
                          out);

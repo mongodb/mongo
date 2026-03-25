@@ -112,7 +112,11 @@ public:
     }
 
     std::unique_ptr<MatchExpression> clone() const final {
-        return std::make_unique<AlwaysFalseMatchExpression>(_errorAnnotation);
+        auto clone = std::make_unique<AlwaysFalseMatchExpression>(_errorAnnotation);
+        if (getTag()) {
+            clone->setTag(getTag()->clone());
+        }
+        return clone;
     }
 
     bool isTriviallyFalse() const final {
@@ -141,7 +145,11 @@ public:
     }
 
     std::unique_ptr<MatchExpression> clone() const final {
-        return std::make_unique<AlwaysTrueMatchExpression>(_errorAnnotation);
+        auto clone = std::make_unique<AlwaysTrueMatchExpression>(_errorAnnotation);
+        if (getTag()) {
+            clone->setTag(getTag()->clone());
+        }
+        return clone;
     }
 
     bool isTriviallyTrue() const final {

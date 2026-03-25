@@ -104,9 +104,12 @@ Status filterMatches(const BSONObj& testFilter,
             "match expression provided by the test did not parse successfully");
     }
     std::unique_ptr<MatchExpression> root = std::move(statusWithMatcher.getValue());
-    if (root->matchType() == mongo::MatchExpression::NOT) {
-        // Ideally we would optimize() everything, but some of the tests depend on structural
+    if (root->matchType() == mongo::MatchExpression::NOT ||
+        root->matchType() == mongo::MatchExpression::NOR) {
+        // 1. Ideally we would optimize() everything, but some of the tests depend on structural
         // equivalence of single-arg $or expressions.
+        // 2. NOR with a single child is optimized to NOT during canonicalization, so we need to
+        // optimize here for the comparison to match.
         root = optimizeMatchExpression(std::move(root));
     }
     sortMatchExpressionTree(root.get());

@@ -2476,7 +2476,7 @@
     "rows" :      1},
 
 {">>>pipeline": [{"$match":{"field6_mixed_idx":{"$in":[false]},"field10_datetime_idx":{"$type":"date"},"$nor":[{"field4_list_idx":{"$nin":[91,5,46,163]},"field40_list":["m"],"field31_list_idx":{"$all":[]}},{"field28_datetime_idx":{"$ne":"2024-01-11T00:00:00.000Z"},"field19_datetime_idx":{"$lte":"2024-02-19T00:00:00.000Z"}}],"field12_Decimal128_idx":{"$lt":{"$numberDecimal":"1.7"}},"field32_dict_idx":{"$lte":{"k":1}},"field31_list_idx":{"$lte":149}}},{"$sort":{"field35_int_idx":-1}},{"$skip":230},{"$project":{"field1_datetime_idx":1,"field32_dict_idx":1,"_id":0}}],
-    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"SKIP","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field35_int_idx_-1_field10_datetime_idx_1","indexBounds":{"field35_int_idx":["[MaxKey, MinKey]"],"field10_datetime_idx":["[MinKey, MaxKey]"]}}}}},
+    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"SKIP","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","filter":true,"indexName":"field35_int_idx_-1_field10_datetime_idx_1","indexBounds":{"field35_int_idx":["[MaxKey, MinKey]"],"field10_datetime_idx":["[MinKey, MaxKey]"]}}}}},
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
