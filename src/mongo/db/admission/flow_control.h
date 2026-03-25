@@ -106,6 +106,17 @@ public:
          * optime.
          */
         virtual void update() = 0;
+
+        /**
+         * Returns the number of ops the sustainer applied in the last period, bypassing
+         * _approximateOpsBetween(). Returns -1 by default to indicate that the caller should
+         * fall back to _approximateOpsBetween() for the count. Overridden by providers whose
+         * sustainer timestamps live in a different domain than the oplog samples (e.g. phylog
+         * LSNs in disaggregated storage).
+         */
+        virtual std::int64_t getSustainerAppliedCount() const {
+            return -1;
+        }
     };
 
     static constexpr int kMaxTickets = 1000 * 1000 * 1000;

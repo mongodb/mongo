@@ -333,8 +333,10 @@ int FlowControl::_calculateNewTicketsForLag(const Timestamp& prevSustainerTimest
                           currSustainerTimestamp.toString()));
     invariant(lagMillis >= thresholdLagMillis);
 
-    const std::int64_t sustainerAppliedCount =
-        _approximateOpsBetween(prevSustainerTimestamp, currSustainerTimestamp);
+    const std::int64_t providerCount = _timestampProvider->getSustainerAppliedCount();
+    const std::int64_t sustainerAppliedCount = providerCount >= 0
+        ? providerCount
+        : _approximateOpsBetween(prevSustainerTimestamp, currSustainerTimestamp);
     LOGV2_DEBUG(22218,
                 DEBUG_LOG_LEVEL,
                 " PrevApplied: {prevSustainerTimestamp} CurrApplied: {currSustainerTimestamp} "
