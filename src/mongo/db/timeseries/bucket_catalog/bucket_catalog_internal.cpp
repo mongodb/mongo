@@ -1010,9 +1010,15 @@ std::pair<OID, Date_t> generateBucketOID(const Date_t& time, const TimeseriesOpt
     // time. The second, and more important reason, is so that we reliably group measurements
     // together into predictable chunks for sharding. This way we know from a measurement timestamp
     // what the bucket timestamp will be, so we can route measurements to the right shard chunk.
-    auto roundedTime = roundTimestampToGranularity(time, options);
-    int64_t const roundedSeconds = durationCount<Seconds>(roundedTime.toDurationSinceEpoch());
+    const auto roundedTime = roundTimestampToGranularity(time, options);
+    const int64_t roundedSeconds = durationCount<Seconds>(roundedTime.toDurationSinceEpoch());
     oid.setTimestamp(roundedSeconds);
+
+    // Check if the OID has overflowed, in this case, the high bit must be set to ensure proper
+    // catalog operations.
+    if (roundedSeconds & 0xFFFF'FFFF'0000'0000) {
+        oid.setTimestamp(oid.getTimestamp() | static_cast<OID::Timestamp>(0x8000'0000UL));
+    }
 
     // Now, if we used the standard OID generation method for the remaining bytes we could end up
     // with lots of bucket OID collisions. Consider the case where we have the granularity set to

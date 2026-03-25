@@ -168,8 +168,7 @@ describe("Validation against snapshot using Replset", function () {
         assert(res.valid, res);
         assert.eq(res.nrecords, 1, {reason: "Expected at least 1 record from the time the snapshot was made", res});
 
-        // TODO: SERVER-119972 expect this to pass with no warnings
-        // assert.eq(res.warnings.length, 0, res);
+        assert.eq(res.warnings.length, 0, res);
         assert.eq(res.errors.length, 0, res);
     });
 
@@ -184,8 +183,8 @@ describe("Validation against snapshot using Replset", function () {
         const res = this.db[this.collName].validate({atClusterTime: clusterTime});
         assert(res.valid, res);
         assert.eq(res.nrecords, 1, {reason: "Expected at least 1 record from the time the snapshot was made", res});
-        // TODO: SERVER-119972 expect this to pass with no warnings
-        // assert.eq(res.warnings.length, 0, res);
+
+        assert.eq(res.warnings.length, 0, res);
         assert.eq(res.errors.length, 0, res);
     });
 

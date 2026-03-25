@@ -290,9 +290,9 @@ TimeseriesValidationStatus _validateTimeSeriesIdTimestamp(
     const StringData timeField = timeseriesOptions.getTimeField();
 
     // Compares both timestamps as Dates.
-    auto minTimestamp = recordBson[timeseries::kBucketControlFieldName]
-                                  [timeseries::kBucketControlMinFieldName][timeField]
-                                      .Date();
+    const auto minTimestamp = recordBson[timeseries::kBucketControlFieldName]
+                                        [timeseries::kBucketControlMinFieldName][timeField]
+                                            .Date();
 
     auto oidEmbeddedTimestamp = recordBson[timeseries::kBucketIdFieldName].OID().asDateT();
 
@@ -1287,7 +1287,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                             // logged above.
 
                             // The following result cases are logged as warnings
-                            // TODO: SERVER-119972 change this to signal an error instead
+                            // TODO: SERVER-122124 change this to signal an error instead
                             case TimeseriesValidationResult::kExtendedRangeMismatch:
                                 LOGV2_WARNING_OPTIONS(
                                     11461400,

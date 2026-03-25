@@ -389,8 +389,9 @@ presets or vice versa, as long as the associated seconds parameters do not decre
 
 Though the time component of the bucket's ObjectID should be equal to the `control.min.<time>` field,
 the ObjectID type stores timestamps as 4-byte unix timestamps with precision of seconds from 1970 to
-2038 that can overflow. The control block stores an 8-byte timestamp with precision of milliseconds
-that can exceed 2038.
+2038 that can overflow. The control block stores an 8-byte timestamp with precision of milliseconds.
+
+This timestamp will overflow for positive timestamps greater than 2038-01-17T03:14:07.000Z, or negative timestamps represented by dates before 1970-01-01T00:00:00.000Z. In the event of an overflow, the most significant bit of the timeseries bucket `_id` field will be set to `1`. This allows a collection to quickly determine that a collection contains extended-range timestamps.
 
 The bucket's ObjectID has no inherent relation to the time component of the `_id` of a measurement.
 The `_id` of a measurement (not the bucket) will have a time component that is indicative of

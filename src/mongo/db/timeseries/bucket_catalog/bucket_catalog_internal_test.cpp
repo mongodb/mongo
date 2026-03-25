@@ -31,12 +31,14 @@
 
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/rollover.h"
+#include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
 #include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
+
 
 namespace mongo::timeseries::bucket_catalog {
 namespace {
@@ -153,5 +155,80 @@ TEST_F(BucketCatalogInternalTest, RolloverUpdatesRolloverStats) {
         _testRolloverWithRolloverReasonUpdatesStats(reason, metric);
     }
 }
+
+
+struct GenerateBucketOIDExtendedRangeParam {
+    static GenerateBucketOIDExtendedRangeParam create(int64_t millisSinceEpoch, bool setsFlag) {
+        return {.date = Date_t::fromMillisSinceEpoch(millisSinceEpoch), .setsFlag = setsFlag};
+    }
+
+    Date_t date;
+    bool setsFlag{false};
+};
+
+std::ostream& operator<<(std::ostream& os, const GenerateBucketOIDExtendedRangeParam& param) {
+    os << std::format("date: {}, setsFlag: {}", param.date.toString(), param.setsFlag);
+    return os;
+}
+
+class GenerateBucketOIDExtendedRangeTest
+    : public testing::TestWithParam<GenerateBucketOIDExtendedRangeParam> {};
+
+TEST_P(GenerateBucketOIDExtendedRangeTest, ExtendedRangeFlagIsSetCorrectly) {
+    const auto [date, expectExtendedRange] = GetParam();
+    const auto options = std::invoke([] {
+        TimeseriesOptions opts("time");
+        opts.setGranularity(BucketGranularityEnum::Seconds);
+        return opts;
+    });
+
+    const auto [oid, roundedTime] = internal::generateBucketOID(date, options);
+    EXPECT_EQ(expectExtendedRange, timeseries::oidHasExtendedRangeTime(oid)) << fmt::format(
+        "Input timestamp: {0:d}.{1:d}s ({2:#018x}), OID timestamp: {3:d} ({3:#010x})",
+        date.toMillisSinceEpoch() / 1000,
+        date.toMillisSinceEpoch() % 1000,
+        date.toMillisSinceEpoch(),
+        oid.getTimestamp());
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    GenerateBucketOIDExtendedRange,
+    GenerateBucketOIDExtendedRangeTest,
+    testing::Values(
+        // Standard range: epoch
+        GenerateBucketOIDExtendedRangeParam::create(0x0000'0000'0000'0000LL * 1000, false),
+        // Standard range: 2021-01-01T00:00:00Z
+        GenerateBucketOIDExtendedRangeParam::create(0x0000'0000'5FEE'6600LL * 1000, false),
+
+        // Standard range: just under INT32_MAX (2038-01-19T03:13:00Z, multiple of 60)
+        GenerateBucketOIDExtendedRangeParam::create(0x0000'0000'7FFF'FFCBLL * 1000, false),
+
+        // Extended: 1 minute before epoch (negative timestamp)
+        GenerateBucketOIDExtendedRangeParam::create(-0x3CLL * 1000, true),
+
+        // Extended: well before epoch (~1958)
+        GenerateBucketOIDExtendedRangeParam::create(-0x0000'0000'167F'0934LL * 1000, true),
+
+        // Extended: just past INT32_MAX (0x8000'0044), truncation naturally has high bit
+        GenerateBucketOIDExtendedRangeParam::create(0x0000'0000'8000'0044LL * 1000, true),
+
+        // Extended: ~2106, truncation wraps to 0x2C — flag required to distinguish from epoch
+        GenerateBucketOIDExtendedRangeParam::create(0x0000'0001'0000'002CLL * 1000, true),
+
+        // Extended: ~2174, truncation wraps to 0x8000'0004 — high bit naturally present
+        GenerateBucketOIDExtendedRangeParam::create(0x0000'0001'8000'0024LL * 1000, true),
+
+        // Extended: ~2242, double wrap to 0x2C — flag required again
+        GenerateBucketOIDExtendedRangeParam::create(0x0000'0002'0000'001CLL * 1000, true),
+
+        // Extended: ~2242, double wrap to 0x2C — no flag
+        GenerateBucketOIDExtendedRangeParam::create(0x0000'0000'7FFF'FFFFLL * 1000, false),
+
+        // Extended: ~just past INT32_MAX, using milliseconds
+        // This is floored to integer seconds based on timeseries options and the min cannot be
+        // higher resolution than seconds, the flag should not be set as the control.min[timeField]
+        // on the bucket will be within the standard range.
+        GenerateBucketOIDExtendedRangeParam::create(0x0000'0000'7FFF'FFFFLL * 1000 + 1LL, false)));
+
 }  // namespace
 }  // namespace mongo::timeseries::bucket_catalog

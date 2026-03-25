@@ -878,6 +878,63 @@ public:
         })BSON");
     }
 
+    static BSONObj getJustPastEpochMaxDoc() {
+        // Note that this simulates "seconds" granularity for a bucket just past the epoch time max.
+        // The server will round this document down to the date in "control.min.date"
+        // In mongosh, the document can be reproduced by:
+        // > db.createCollection("ts", {timeseries: {timeField: "date"}})
+        // > db.ts.insertOne({date: ISODate("2038-01-17T03:14:08Z"), data: 42})
+        // > EJSON.stringify(db.system.buckets.ts.findOne(), null, 4) // requires mongosh
+        return ::mongo::fromjson(R"BSON(
+            {
+                "_id": {
+                    "$oid": "7ffd5cf829fd87c86e0fda70"
+                },
+                "control": {
+                    "version": 2,
+                    "min": {
+                        "date": {
+                            "$date": "2038-01-17T03:14:00Z"
+                        },
+                        "data": 42,
+                        "_id": {
+                            "$oid": "69b86f31cf1a6157b5542e76"
+                        }
+                    },
+                    "max": {
+                        "date": {
+                            "$date": "2038-01-17T03:14:08Z"
+                        },
+                        "data": 42,
+                        "_id": {
+                            "$oid": "69b86f31cf1a6157b5542e76"
+                        }
+                    },
+                    "count": 1
+                },
+                "data": {
+                    "data": {
+                        "$binary": {
+                            "base64": "EAAqAAAAAA==",
+                            "subType": "07"
+                        }
+                    },
+                    "date": {
+                        "$binary": {
+                            "base64": "CQAASLP18wEAAAA=",
+                            "subType": "07"
+                        }
+                    },
+                    "_id": {
+                        "$binary": {
+                            "base64": "BwBpuG8xzxphV7VULnYA",
+                            "subType": "07"
+                        }
+                    }
+                }
+            })BSON");
+    }
+
     static std::vector<BSONObj> getAllSampleDocs() {
         return {getSampleDoc(), getVersion3ControlSampleDoc(), getExtendedTimeRangeSampleDoc()};
     };
@@ -1342,8 +1399,21 @@ TEST_F(TimeseriesCollectionValidationTest, ReportErrorsInExtendedRangeBookkeepin
         const AutoGetCollection coll(_opCtx, _nss, MODE_IS);
         EXPECT_FALSE(coll->getRequiresTimeseriesExtendedRangeSupport());
     }
+    // TODO: SERVER-122124 This validation should become an error.
     foregroundValidate(
         _nss, _opCtx, {.valid = true, .numRecords = 1, .numErrors = 0, .numWarnings = 1});
+}
+
+TEST_F(TimeseriesCollectionValidationTest, ValidationOfDocumentJustPastEpochMax) {
+    const auto doc = getJustPastEpochMaxDoc();
+    insertDoc(doc);
+    {
+        const AutoGetCollection coll(_opCtx, _nss, MODE_IS);
+        EXPECT_FALSE(coll->getRequiresTimeseriesExtendedRangeSupport())
+            << "Do not set the flag for this test";
+    }
+    foregroundValidate(
+        _nss, _opCtx, {.valid = true, .numRecords = 1, .numErrors = 0, .numWarnings = 0});
 }
 
 }  // namespace
