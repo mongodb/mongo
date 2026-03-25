@@ -33,6 +33,8 @@
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
+#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
+#include "mongo/db/storage/snapshot.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 
@@ -202,6 +204,26 @@ boost::optional<CollectionOrViewAcquisition> acquireFastCountCollectionForWrite(
     }
 
     return boost::none;
+}
+
+void readAndIncrementSizeCounts(OperationContext* opCtx,
+                                absl::flat_hash_map<UUID, CollectionSizeCount>& deltas) {
+    const auto acquisition = acquireFastCountCollectionForRead(opCtx).value();
+    const CollectionPtr& coll = acquisition.getCollectionPtr();
+
+    for (auto& [uuid, delta] : deltas) {
+        const RecordId rid = record_id_helpers::keyForDoc(
+                                 BSON("_id" << uuid),
+                                 clustered_util::makeDefaultClusteredIdIndex().getIndexSpec(),
+                                 /*collator=*/nullptr)
+                                 .getValue();
+        Snapshotted<BSONObj> doc;
+        if (coll->findDoc(opCtx, rid, &doc)) {
+            const BSONObj& data = doc.value();
+            delta.count += data.getField(kMetadataKey).Obj().getField(kCountKey).Long();
+            delta.size += data.getField(kMetadataKey).Obj().getField(kSizeKey).Long();
+        }
+    }
 }
 }  // namespace replicated_fast_count
 

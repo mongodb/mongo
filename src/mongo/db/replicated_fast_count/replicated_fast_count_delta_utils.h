@@ -35,6 +35,7 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/util/uuid.h"
 
 #include <absl/container/flat_hash_map.h>
 #include <boost/optional/optional.hpp>
@@ -97,6 +98,13 @@ boost::optional<CollectionOrViewAcquisition> acquireFastCountCollectionForRead(
 boost::optional<CollectionOrViewAcquisition> acquireFastCountCollectionForWrite(
     OperationContext* opCtx);
 
+/**
+ * For each entry in 'deltas', looks up the persisted size and count for that UUID in the
+ * on-disk fast count collection and adds the persisted values to the entry's size and count
+ * in place. If a UUID has no on-disk entry, its delta is left unchanged.
+ */
+void readAndIncrementSizeCounts(OperationContext* opCtx,
+                                absl::flat_hash_map<UUID, CollectionSizeCount>& deltas);
 }  // namespace replicated_fast_count
 
 

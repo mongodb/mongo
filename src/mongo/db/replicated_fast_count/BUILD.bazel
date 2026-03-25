@@ -82,9 +82,11 @@ mongo_cc_library(
     ],
     deps = [
         "replicated_fast_count_enabled",
+        "//src/mongo/db:record_id_helpers",
         "//src/mongo/db/repl:apply_ops_command_info",
         "//src/mongo/db/repl:oplog_entry",
         "//src/mongo/db/shard_role",
+        "//src/mongo/db/shard_role/shard_catalog:collection_options",
     ],
 )
 
@@ -122,6 +124,23 @@ mongo_cc_unit_test(
         "//src/mongo/db/op_observer:operation_logger_impl",
         "//src/mongo/db/repl:mock_repl_coord_server_fixture",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "replicated_fast_count_delta_utils_test",
+    srcs = [
+        "replicated_fast_count_delta_utils_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_eighth_group",
+        "server-collection-write-path",
+    ],
+    deps = [
+        "replicated_fast_count_delta_utils",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/db/shard_role/shard_catalog:collection_options",
     ],
 )
 
