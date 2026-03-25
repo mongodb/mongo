@@ -363,6 +363,12 @@ IGNORE_STABLE_TO_UNSTABLE_LIST:
   - "hello-reply-majorityOpTime"
   - "find-param-$_startAt"
 
+  # Not user-facing. serializer function has simply been renamed
+  - "find-param-collation"
+  - "find-param-filter"
+  - "find-param-projection"
+  - "find-param-sort"
+
 RENAMED_COMPLEX_ACCESS_CHECKS:
   # Changed during 6.1 as part of removing multi-auth support.
   get_single_user: "get_authenticated_user"
