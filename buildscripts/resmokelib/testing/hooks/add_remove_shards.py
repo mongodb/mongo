@@ -151,6 +151,7 @@ class _AddRemoveShardThread(threading.Thread):
     _LOCK_BUSY = 46
     _FAILED_TO_SATISFY_READ_PREFERENCE = 133
     _OPLOG_OPERATION_UNSUPPORTED = 62
+    _RANGE_NOT_IN_SINGLE_CHUNK = 11089203
 
     _CONFIG_DATABASE_NAME = "config"
     _LOGICAL_SESSIONS_COLLECTION_NAME = "system.sessions"
@@ -364,14 +365,27 @@ class _AddRemoveShardThread(threading.Thread):
             self.logger.error(msg)
             raise errors.ServerFailure(msg)
 
-    def _is_expected_move_collection_error(self, err, namespace):
-        if err.code == self._NAMESPACE_NOT_FOUND:
-            # A concurrent dropDatabase or dropCollection could have removed the database before we
-            # run moveCollection.
+    def _is_common_expected_move_error_code(self, code):
+        """Errors common to moveCollection, moveRange, and movePrimary during shard draining."""
+        if code == self._NAMESPACE_NOT_FOUND:
+            # A concurrent dropDatabase or dropCollection could have removed the namespace.
             return True
-
-        if err.code == self._DATABASE_DROP_PENDING:
+        if code == self._DATABASE_DROP_PENDING:
             # A concurrent dropDatabase can prevent migrations.
+            return True
+        if code == self._LOCK_BUSY:
+            # The concurrent CheckMetadataConsistencyInBackground hook or another DDL operation
+            # may hold the DDL lock, preventing the move operation from acquiring it.
+            return True
+        return False
+
+    def _is_expected_move_collection_error(self, err, namespace):
+        """
+        Checks both errors common to all move operations during shard draining (e.g.
+        NamespaceNotFound, DatabaseDropPending) and errors specific to moveCollection
+        (e.g. BackgroundOperationInProgressForNamespace, ReshardCollectionAborted).
+        """
+        if self._is_common_expected_move_error_code(err.code):
             return True
 
         if err.code == self._BACKGROUND_OPERATION_IN_PROGRESS_FOR_NAMESPACE:
@@ -410,12 +424,12 @@ class _AddRemoveShardThread(threading.Thread):
         return False
 
     def _is_expected_move_range_error(self, err):
-        if err.code == self._NAMESPACE_NOT_FOUND:
-            # A concurrent dropDatabase or dropCollection could have removed the database before we
-            # run moveRange.
-            return True
-        if err.code == self._DATABASE_DROP_PENDING:
-            # A concurrent dropDatabase can prevent migrations.
+        """
+        Checks both errors common to all move operations during shard draining (e.g.
+        NamespaceNotFound, DatabaseDropPending) and errors specific to moveRange (e.g.
+        ReshardCollectionInProgress, ConflictingOperationInProgress, RangeNotInSingleChunk).
+        """
+        if self._is_common_expected_move_error_code(err.code):
             return True
         if err.code == self._RESHARD_COLLECTION_IN_PROGRESS:
             # A concurrent reshardCollection or unshardCollection could have started before we
@@ -424,25 +438,25 @@ class _AddRemoveShardThread(threading.Thread):
         if err.code == self._CONFLICTING_OPERATION_IN_PROGRESS:
             # This error is expected when balancing is blocked, e.g. via 'setAllowMigrations'.
             return True
+        if err.code == self._RANGE_NOT_IN_SINGLE_CHUNK:
+            # The chunk boundaries read from config.chunks may have been split by the balancer
+            # or a concurrent operation before the moveRange command executes, so the original
+            # [min, max) range no longer fits inside a single chunk.
+            return True
         return False
 
     def _is_expected_move_primary_error_code(self, code):
-        if code == self._NAMESPACE_NOT_FOUND:
-            # A concurrent dropDatabase could have removed the database before we run movePrimary.
-            return True
-
-        if code == self._DATABASE_DROP_PENDING:
-            # A concurrent dropDatabase can prevent migrations.
+        """
+        Checks both error codes common to all move operations during shard draining (e.g.
+        NamespaceNotFound, DatabaseDropPending) and codes specific to movePrimary (e.g.
+        ConflictingOperationInProgress, non-idempotent cloning phase errors).
+        """
+        if self._is_common_expected_move_error_code(code):
             return True
 
         if code == self._CONFLICTING_OPERATION_IN_PROGRESS:
             # Tests with interruptions may interrupt the add/remove shard thread while running
             # movePrimary, leading the thread to retry and hit ConflictingOperationInProgress.
-            return True
-
-        if code == self._LOCK_BUSY:
-            # If there is an in-progress moveCollection operation, movePrimary would fail to acquire
-            # the DDL lock.
             return True
 
         if code == 7120202:
@@ -1120,10 +1134,11 @@ class _AddRemoveShardThread(threading.Thread):
                 # error message as well.
                 if err.code in [self._OPERATION_FAILED] and (
                     "Connection refused" in str(err)
+                    or "does not belong to replica set" in str(err)
                     or any(err_name in str(err) for err_name in retryable_network_err_names)
                 ):
                     self.logger.info(
-                        "Connection refused when " + msg + ", will retry. err: " + str(err)
+                        "Transient error when " + msg + ", will retry. err: " + str(err)
                     )
                     time.sleep(1)
                     continue
