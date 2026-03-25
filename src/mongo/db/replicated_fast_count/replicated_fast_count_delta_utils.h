@@ -88,14 +88,28 @@ absl::flat_hash_map<UUID, CollectionSizeCount> aggregateSizeCountDeltasInOplog(
  * Acquires the replicated fast count collection for read access.
  * Returns boost::none if the collection does not exist.
  */
-boost::optional<CollectionOrViewAcquisition> acquireFastCountCollectionForRead(
+boost::optional<CollectionOrViewAcquisition> acquireSizeCountCollectionForRead(
     OperationContext* opCtx);
 
 /**
  * Acquire the fastcount collection that underpins this class with write intent.
  * Returns boost::none if it doesn't exist.
  */
-boost::optional<CollectionOrViewAcquisition> acquireFastCountCollectionForWrite(
+boost::optional<CollectionOrViewAcquisition> acquireSizeCountCollectionForWrite(
+    OperationContext* opCtx);
+
+/**
+ * Acquires the timestamp collection for read access. Returns boost::none if the collection does not
+ * exist.
+ */
+boost::optional<CollectionOrViewAcquisition> acquireTimestampCollectionForRead(
+    OperationContext* opCtx);
+
+/**
+ * Acquire the timestamps collection that underpins this class with write intent. Returns
+ * boost::none if it doesn't exist.
+ */
+boost::optional<CollectionOrViewAcquisition> acquireTimestampCollectionForWrite(
     OperationContext* opCtx);
 
 /**

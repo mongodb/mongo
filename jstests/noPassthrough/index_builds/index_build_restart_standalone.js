@@ -3,6 +3,8 @@
  * index build.
  *
  * @tags: [
+ *   # TODO SERVER-122441: Enable on replicated fast count variant
+ *   requires_replicated_fast_count_recovery,
  *   requires_persistence,
  *   requires_replication,
  * ]
