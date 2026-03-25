@@ -60,6 +60,10 @@ buildvariants:
       - name: streams_build_and_push_break_glass
         distros:
           - amazon2023.3-c5-24xlarge
+      # TODO(SERVER-120347): Move back to arm64 variant once we are ready to switch to using arm64.
+      - name: streams_publish_manifest_al2023_gen
+      - name: streams_publish_manifest_al2023_break_glass_gen
+        activate: false # Only run on manual patches
 
   - name: enterprise-amazon2023-streams-arm64
     display_name: "Amazon Linux 2023 enterprise build with streams arm64"

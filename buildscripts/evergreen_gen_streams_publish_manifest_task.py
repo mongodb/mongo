@@ -17,37 +17,18 @@ from buildscripts.util.read_config import read_config_file
 # The docker manifest is used in order for the different architecture images to be pulled correctly without needing the particular architecture tag.
 
 
-def make_testing_gate_task(compile_variant: str) -> Task:
-    dependencies = {
-        TaskDependency("aggregation", compile_variant),
-        TaskDependency(".streams_release_test", compile_variant),
-        # TODO(SERVER-120347): Re-add arm64 dependencies once we are ready to switch to using arm64.
-        # TaskDependency("aggregation", f"{compile_variant}-arm64"),
-        # TaskDependency(".streams_release_test", f"{compile_variant}-arm64"),
-    }
-
-    return Task(f"streams_testing_gate_{compile_variant}", [], dependencies)
-
-
 def make_task(compile_variant: str, break_glass: str) -> Task:
     task_name = "streams_publish_manifest_"
-    dep_task_prefix = "streams_build_and_push_"
+    dep_task_name = "streams_build_and_push"
     script_args = ["./src/evergreen/streams_docker_manifest.sh"]
 
     dependencies = set()
 
     if break_glass == "true":
         task_name += "break_glass_"
-        dep_task_prefix += "break_glass_"
+        dep_task_name += "_break_glass"
         script_args.append("--break-glass")
-    else:
-        dependencies.add(TaskDependency("aggregation", compile_variant))
-        # TODO(SERVER-120347): Re-add arm64 dependency once we are ready to switch to using arm64.
-        # dependencies.add(TaskDependency("aggregation", f"{compile_variant}-arm64"))
-        dependencies.add(TaskDependency(".streams_release_test"))
-    dependencies.add(TaskDependency(f"{dep_task_prefix}{compile_variant}"))
-    # TODO(SERVER-120347): Re-add arm64 dependency once we are ready to switch to using arm64.
-    # dependencies.add(TaskDependency(f"{dep_task_prefix}{compile_variant}-arm64"))
+    dependencies.add(TaskDependency(dep_task_name, compile_variant))
 
     commands = [
         BuiltInCommand("manifest.load", {}),
@@ -92,10 +73,7 @@ def main(
     build_variant = BuildVariant(name=build_variant_name)
     build_variant.display_task(
         current_task_name.replace("_gen", ""),
-        [
-            make_task(compile_variant_name, break_glass=break_glass),
-            make_testing_gate_task(compile_variant_name),
-        ],
+        [make_task(compile_variant_name, break_glass=break_glass)],
         distros=[distro],
     )
     shrub_project = ShrubProject.empty()
