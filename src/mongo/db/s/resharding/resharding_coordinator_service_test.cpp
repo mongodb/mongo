@@ -182,7 +182,6 @@ public:
             opCtx, sourceNss, donorShardIds, executor, token);
     }
 
-
     void establishAllRecipientsAsParticipants(
         OperationContext* opCtx,
         const NamespaceString& tempNss,
@@ -2485,6 +2484,21 @@ TEST_F(ReshardingCoordinatorServiceTest, AbortDuringCommitDoesNotCauseInfiniteRe
     makeRecipientsProceedToDoneWithAssert(opCtx);
 
     ASSERT_OK(coordinator->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(ReshardingCoordinatorServiceTest, FeatureFlagReshardingInitNoRefreshSendsInitCmd) {
+    const std::vector<CoordinatorStateEnum> states = {
+        CoordinatorStateEnum::kPreparingToDonate,
+    };
+
+    RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
+        "featureFlagReshardingInitNoRefresh", true);
+    // If establishAllDonorsAsParticipants is called during kPreparingToDonate, it throws
+    // InternalError and resharding fails.
+    externalState()->throwUnrecoverableErrorIn(CoordinatorStateEnum::kPreparingToDonate,
+                                               kEstablishAllDonorsAsParticipants);
+
+    runReshardingToCompletion();
 }
 
 }  // namespace

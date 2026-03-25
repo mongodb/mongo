@@ -288,7 +288,6 @@ void ReshardingCoordinatorExternalStateImpl::establishAllDonorsAsParticipants(
         opCtx, sourceNss, donorShardIds, executor, token);
 }
 
-
 void ReshardingCoordinatorExternalStateImpl::establishAllRecipientsAsParticipants(
     OperationContext* opCtx,
     const NamespaceString& tempNss,

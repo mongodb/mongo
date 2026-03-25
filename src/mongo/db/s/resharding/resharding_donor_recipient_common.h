@@ -99,6 +99,17 @@ boost::optional<std::shared_ptr<StateMachine>> tryGetReshardingStateMachineAndTh
 }
 
 /**
+ * Creates a ReshardingStateMachine if this node is primary and the ReshardingStateMachine doesn't
+ * already exist. Persists the state document and initializes the in-memory state machine.
+ *
+ * It is safe to call this function when this node is actually a secondary.
+ */
+template <class Service, class StateMachine, class ReshardingDocument>
+void createReshardingStateMachine(OperationContext* opCtx,
+                                  const ReshardingDocument& doc,
+                                  bool throwOnNotPrimaryError = false);
+
+/**
  * The following functions construct a ReshardingDocument from the given 'reshardingFields'.
  */
 ReshardingDonorDocument constructDonorDocumentFromReshardingFields(

@@ -30,6 +30,7 @@
 #include "mongo/db/s/resharding/resharding_coordinator_command_util.h"
 
 #include "mongo/db/generic_argument_util.h"
+#include "mongo/db/s/resharding/shardsvr_resharding_commands_gen.h"
 #include "mongo/s/request_types/abort_reshard_collection_gen.h"
 #include "mongo/s/request_types/commit_reshard_collection_gen.h"
 
@@ -82,6 +83,23 @@ void tellAllParticipantsToAbort(OperationContext* opCtx,
     ShardsvrAbortReshardCollection abortCmd(doc.getReshardingUUID(), isUserAborted);
 
     sendReshardingCommand(opCtx, abortCmd, stepdownToken, executor, getAllParticipantShardIds(doc));
+}
+
+void tellAllDonorsToInitialize(OperationContext* opCtx,
+                               const ReshardingCoordinatorDocument& doc,
+                               CancellationToken stepdownToken,
+                               const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    ShardsvrReshardDonorInitialize cmd(doc.getReshardingUUID());
+    cmd.setCommonReshardingMetadata(doc.getCommonReshardingMetadata());
+    cmd.setRecipientShards(
+        resharding::extractShardIdsFromParticipantEntries(doc.getRecipientShards()));
+    cmd.setTelemetryContext(doc.getTelemetryContext());
+
+    sendReshardingCommand(opCtx,
+                          cmd,
+                          stepdownToken,
+                          executor,
+                          resharding::extractShardIdsFromParticipantEntries(doc.getDonorShards()));
 }
 
 void tellAllDonorsToStartChangeStreamsMonitor(

@@ -50,6 +50,7 @@
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/otel/traces/telemetry_context_serialization.h"
 #include "mongo/s/request_types/reshard_collection_gen.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/testing_proctor.h"
 
@@ -283,7 +284,7 @@ ExecutorFuture<void> ReshardingCoordinator::_tellAllParticipantsReshardingStarte
                    })
                    .then([this, executor]() {
                        pauseBeforeTellDonorToRefresh.pauseWhileSet();
-                       _establishAllDonorsAsParticipants(executor);
+                       _initializeAllDonors(executor);
                    })
                    .then([this, executor] { _establishAllRecipientsAsParticipants(executor); })
                    .onCompletion([this](Status status) {
@@ -1885,17 +1886,23 @@ void ReshardingCoordinator::_removeOrQuiesceCoordinatorDocAndRemoveReshardingFie
 #endif  // RESHARDING_COORDINATOR_PART_3
 #ifdef RESHARDING_COORDINATOR_PART_4
 
-void ReshardingCoordinator::_establishAllDonorsAsParticipants(
+void ReshardingCoordinator::_initializeAllDonors(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     invariant(_coordinatorDoc.getState() == CoordinatorStateEnum::kPreparingToDonate);
     auto opCtx = _makeOperationContext();
-
-    _reshardingCoordinatorExternalState->establishAllDonorsAsParticipants(
-        opCtx.get(),
-        _coordinatorDoc.getSourceNss(),
-        _coordinatorDoc.getDonorShards(),
-        **executor,
-        _ctHolder->getStepdownToken());
+    if (resharding::gFeatureFlagReshardingInitNoRefresh.isEnabled(
+            VersionContext::getDecoration(opCtx.get()),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        resharding::tellAllDonorsToInitialize(
+            opCtx.get(), _coordinatorDoc, _ctHolder->getStepdownToken(), executor);
+    } else {
+        _reshardingCoordinatorExternalState->establishAllDonorsAsParticipants(
+            opCtx.get(),
+            _coordinatorDoc.getSourceNss(),
+            _coordinatorDoc.getDonorShards(),
+            **executor,
+            _ctHolder->getStepdownToken());
+    }
 }
 
 void ReshardingCoordinator::_establishAllRecipientsAsParticipants(

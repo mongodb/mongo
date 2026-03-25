@@ -476,9 +476,11 @@ private:
     /**
      * Sends '_flushRoutingTableCacheUpdatesWithWriteConcern' to ensure donor state machine creation
      * by the time the refresh completes.
+     *
+     * If featureFlagReshardingInitNoRefresh feature flag is enabled, this function sends
+     * _shardsvrReshardDonorInitialize command to all donor shards.
      */
-    void _establishAllDonorsAsParticipants(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+    void _initializeAllDonors(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
      * Sends '_flushRoutingTableCacheUpdatesWithWriteConcern' to ensure recipient state machine

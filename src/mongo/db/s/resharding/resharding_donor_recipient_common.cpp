@@ -117,14 +117,12 @@ void ensureStateDocumentInserted(OperationContext* opCtx, const ReshardingDocume
     }
 }
 
-/*
- * Creates a ReshardingStateMachine if this node is primary and the ReshardingStateMachine doesn't
- * already exist.
- *
- * It is safe to call this function when this node is actually a secondary.
- */
+}  // namespace
+
 template <class Service, class StateMachine, class ReshardingDocument>
-void createReshardingStateMachine(OperationContext* opCtx, const ReshardingDocument& doc) {
+void createReshardingStateMachine(OperationContext* opCtx,
+                                  const ReshardingDocument& doc,
+                                  bool throwOnNotPrimaryError) {
     try {
         // Inserting the resharding state document must happen synchronously with the shard version
         // refresh for the w:majority wait from the resharding coordinator to mean that this replica
@@ -138,6 +136,9 @@ void createReshardingStateMachine(OperationContext* opCtx, const ReshardingDocum
         auto service = registry->lookupServiceByName(Service::kServiceName);
         StateMachine::getOrCreate(opCtx, service, doc.toBSON());
     } catch (const ExceptionFor<ErrorCategory::NotPrimaryError>&) {
+        if (throwOnNotPrimaryError) {
+            throw;
+        }
         // resharding::processReshardingFieldsForCollection() is called on both primary and
         // secondary nodes as part of the shard version being refreshed. Due to the RSTL lock not
         // being held throughout the shard version refresh, it is also possible for the node to
@@ -150,6 +151,15 @@ void createReshardingStateMachine(OperationContext* opCtx, const ReshardingDocum
     }
 }
 
+template void
+createReshardingStateMachine<ReshardingDonorService, DonorStateMachine, ReshardingDonorDocument>(
+    OperationContext*, const ReshardingDonorDocument&, bool);
+template void createReshardingStateMachine<ReshardingRecipientService,
+                                           RecipientStateMachine,
+                                           ReshardingRecipientDocument>(
+    OperationContext*, const ReshardingRecipientDocument&, bool);
+
+namespace {
 /*
  * Either constructs a new ReshardingDonorStateMachine with 'reshardingFields' or passes
  * 'reshardingFields' to an already-existing ReshardingDonorStateMachine.

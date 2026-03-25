@@ -760,6 +760,9 @@ const internalCommandsMap = {
             },
             recipientShards: [],
         },
+        postcommand: (db) => {
+            db.getSiblingDB("config").localReshardingOperations.donor.drop();
+        },
     },
     _shardsvrReshardRecipientInitialize: {
         testname: "_shardsvrReshardRecipientInitialize",

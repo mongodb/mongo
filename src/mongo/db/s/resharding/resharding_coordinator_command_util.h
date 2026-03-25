@@ -51,6 +51,11 @@ void tellAllParticipantsToAbort(OperationContext* opCtx,
                                 const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
                                 bool isUserAborted);
 
+void tellAllDonorsToInitialize(OperationContext* opCtx,
+                               const ReshardingCoordinatorDocument& doc,
+                               CancellationToken stepdownToken,
+                               const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
 void tellAllDonorsToStartChangeStreamsMonitor(
     OperationContext* opCtx,
     const ReshardingCoordinatorDocument& doc,
