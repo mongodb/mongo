@@ -417,10 +417,6 @@ BSONObj makeTimeseriesInsertCompressedBucketDocument(
 mongo::write_ops::WriteCommandRequestBase makeTimeseriesWriteOpBase(std::vector<StmtId>&& stmtIds) {
     mongo::write_ops::WriteCommandRequestBase base;
 
-    // The schema validation configured in the bucket collection is intended for direct
-    // operations by end users and is not applicable here.
-    base.setBypassDocumentValidation(true);
-
     if (!stmtIds.empty()) {
         base.setStmtIds(std::move(stmtIds));
     }
@@ -660,9 +656,6 @@ mongo::write_ops::UpdateCommandRequest makeTimeseriesTransformationOp(
         {makeTimeseriesTransformationOpEntry(opCtx, bucketId, std::move(transformationFunc))});
 
     mongo::write_ops::WriteCommandRequestBase base;
-    // The schema validation configured in the bucket collection is intended for direct
-    // operations by end users and is not applicable here.
-    base.setBypassDocumentValidation(true);
 
     base.setBypassEmptyTsReplacement(request.getBypassEmptyTsReplacement());
 
@@ -671,6 +664,9 @@ mongo::write_ops::UpdateCommandRequest makeTimeseriesTransformationOp(
     base.setStmtIds(std::vector<StmtId>{kUninitializedStmtId});
 
     op.setWriteCommandRequestBase(std::move(base));
+
+    // TODO SERVER-122404: Remove this unreachable code path.
+    MONGO_UNREACHABLE;
     return op;
 }
 

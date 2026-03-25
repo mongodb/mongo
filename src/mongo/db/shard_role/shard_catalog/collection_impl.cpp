@@ -575,9 +575,13 @@ std::pair<Collection::SchemaValidationResult, Status> CollectionImpl::checkValid
             return {SchemaValidationResult::kError,
                     Status(ErrorCodes::BadValue,
                            "bypassDocumentValidation is not permitted on 'validated' collections")};
-        } else {
-            return {SchemaValidationResult::kPass, Status::OK()};
         }
+        if (isTimeseriesCollection()) {
+            return {SchemaValidationResult::kError,
+                    Status(ErrorCodes::BadValue,
+                           "bypassDocumentValidation is not permitted on timeseries collections")};
+        }
+        return {SchemaValidationResult::kPass, Status::OK()};
     }
 
     if (ns().isTemporaryReshardingCollection()) {
