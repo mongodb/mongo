@@ -2037,7 +2037,7 @@ Status ReplicationCoordinatorImpl::_waitUntilClusterTimeForRead(OperationContext
     }
 }
 
-// TODO: remove when SERVER-29729 is done
+// TODO (SERVER-29729): Remove code duplication.
 Status ReplicationCoordinatorImpl::_waitUntilOpTimeForReadDeprecated(
     OperationContext* opCtx, const ReadConcernArgs& readConcern) {
     const auto targetOpTime = readConcern.getTargetOpTime();
@@ -4446,6 +4446,9 @@ void ReplicationCoordinatorImpl::_errorOnPromisesIfHorizonChanged(WithLock lk,
     }
 
     if (oldIndex >= 0) {
+        // The _sniToValidConfigPromiseMap is only utilized when the config is uninitialized or we
+        // were removed in the old config. If we were a member of the old config, the sni-to-promise
+        // map must be empty.
         invariant(_sniToValidConfigPromiseMap.empty());
 
         const auto oldHorizonMappings = oldConfig.getMemberAt(oldIndex).getHorizonMappings();
@@ -4459,7 +4462,8 @@ void ReplicationCoordinatorImpl::_errorOnPromisesIfHorizonChanged(WithLock lk,
             // increment the topology version until the end.
             _topCoord->incrementTopologyVersion();
             _lastHorizonTopologyChange = _topCoord->getTopologyVersion().getCounter();
-            _createHorizonTopologyChangePromiseMapping(lk);
+            // Clear the horizons-to-promise map since the horizons have changed.
+            _horizonToTopologyChangePromiseMap.clear();
             HelloMetrics::get(opCtx)->resetNumAwaitingTopologyChangesForAllSessionManagers(
                 opCtx->getServiceContext());
         }
@@ -4679,7 +4683,8 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
                               "offendingConfigs"_attr = offendingConfigs);
     }
 
-    // If the SplitHorizon has changed, reply to all waiting hellos with an error.
+    // If the SplitHorizon has changed, reply to all waiting hellos with an error. This will clear
+    // the horizons map if horizons have changed.
     _errorOnPromisesIfHorizonChanged(lk, opCtx, oldConfig, newConfig, _selfIndex, myIndex);
 
     LOGV2(21392, "New replica set config in use", "config"_attr = _rsConfig.unsafePeek().toBSON());
@@ -4716,14 +4721,16 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
         action = PostMemberStateUpdateAction::kActionStartSingleNodeElection;
     }
 
+    // Check if we are in the current config.
     if (_selfIndex >= 0) {
         // Don't send heartbeats if we're not in the config, if we get re-added one of the
         // nodes in the set will contact us.
         _startHeartbeats(lk);
 
         if (_horizonToTopologyChangePromiseMap.empty()) {
-            // We should only create a new horizon-to-promise mapping for nodes that are members of
-            // the config.
+            // This indicates that we either have just joined the set, or horizon
+            // mappings have changed as part of this reconfig.
+            // In this case, regenerate the mappings using the new config.
             _createHorizonTopologyChangePromiseMapping(lk);
         }
     } else {

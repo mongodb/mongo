@@ -1396,7 +1396,10 @@ private:
     static std::string getConfigStateString(ConfigState state);
 
     /**
-     * Returns true if the horizon mappings between the oldConfig and newConfig are different.
+     * Issues an error on all promises due to changing horizons. If the current node does not have a
+     * valid config or has been removed, this returns an error to promises in the
+     * _sniToValidConfigPromiseMap. Otherwise, if the horizon mappings have changed, this returns an
+     * error to promises in the _horizonToTopologyChangePromiseMap.
      */
     void _errorOnPromisesIfHorizonChanged(WithLock lk,
                                           OperationContext* opCtx,
@@ -1694,7 +1697,7 @@ private:
      * Waits until the optime of the current node is at least the opTime specified in 'readConcern'.
      * Supports local and majority readConcern.
      */
-    // TODO: remove when SERVER-29729 is done
+    // TODO (SERVER-29729): Remove code duplication.
     Status _waitUntilOpTimeForReadDeprecated(OperationContext* opCtx,
                                              const ReadConcernArgs& readConcern);
 
@@ -1869,7 +1872,7 @@ private:
         _horizonToTopologyChangePromiseMap;  // (M)
 
     // Maps a requested SNI to the promise waited on by awaitable hello requests when the node
-    // has an unitialized replica set config or is removed. An empty SNI will map to a promise on
+    // has an uninitialized replica set config or is removed. An empty SNI will map to a promise on
     // the default horizon.
     StringMap<std::shared_ptr<SharedPromiseOfHelloResponse>> _sniToValidConfigPromiseMap;  // (M)
 

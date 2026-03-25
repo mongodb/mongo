@@ -77,6 +77,7 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/ensure_fcv.h"
 #include "mongo/unittest/log_test.h"
+#include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -4686,6 +4687,88 @@ TEST_F(ReplCoordTest, HelloOnRemovedNode) {
     getHelloThread.join();
     ASSERT_TRUE(helloReturned.load());
     net->exitNetwork();
+}
+
+TEST_F(ReplCoordTest, AwaitHelloResponseCorrectWhenNodeSelfIndexChangesAndHorizonMappingsChange) {
+    // Regression test: when a reconfig both changes _selfIndex (by removing a preceding node) and
+    // changes the horizon mappings, the horizon-to-promise map must be rebuilt using the NEW
+    // _selfIndex. Previously, _createHorizonTopologyChangePromiseMapping was called before
+    // _selfIndex was updated, so it built the map from the wrong member's horizons.
+    init();
+    const auto host0 = "node0:12345";
+    const auto host1Self = "node1:12345";
+    const auto initialHorizonSni = "initialhorizon.com";
+    const auto initialHorizonHost = "initialhorizon.com:100";
+    const auto newHorizonSni = "newhorizon.com";
+    const auto newHorizonHost = "newhorizon.com:200";
+
+    // Start a 2-node set where self (node1) is at index 1 (not 0) with an initial horizon.
+    // All members must share the same horizon names, so give each node its own address under
+    // the same horizon label.
+    assertStartSuccess(
+        BSON("_id" << "mySet"
+                   << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("host" << host0 << "_id" << 0 << "horizons"
+                                             << BSON(initialHorizonSni << "initialhorizon.com:99"))
+                                 << BSON("host" << host1Self << "_id" << 1 << "horizons"
+                                                << BSON(initialHorizonSni << initialHorizonHost)))),
+        HostAndPort(host1Self));
+
+    // Become primary.
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(OpTimeWithTermOne(100, 1),
+                                                        Date_t() + Seconds(100));
+    simulateSuccessfulV1Election();
+    ASSERT(getReplCoord()->getMemberState().primary());
+
+    auto maxAwaitTime = Milliseconds(5000);
+    auto deadline = getNet()->now() + maxAwaitTime;
+    auto opCtx = makeOperationContext();
+
+    auto waitForHelloFailPoint = globalFailPointRegistry().find("waitForHelloResponse");
+    auto timesEnteredFailPoint = waitForHelloFailPoint->setMode(FailPoint::alwaysOn, 0);
+    ON_BLOCK_EXIT([&] { waitForHelloFailPoint->setMode(FailPoint::off, 0); });
+
+    // A waiting hello should receive SplitHorizonChange when the horizons change.
+    unittest::ThreadAssertionMonitor monitor;
+    stdx::thread getHelloThread = monitor.spawn([&] {
+        const auto topologyVersion = getTopoCoord().getTopologyVersion();
+        ASSERT_THROWS_CODE(awaitHelloWithNewOpCtx(getReplCoord(), topologyVersion, {}, deadline),
+                           AssertionException,
+                           ErrorCodes::SplitHorizonChange);
+        monitor.notifyDone();
+    });
+    waitForHelloFailPoint->waitForTimesEntered(timesEnteredFailPoint + 1);
+
+    BSONObjBuilder garbage;
+    ReplSetReconfigArgs args;
+    args.force = true;
+    // Remove preSelfNode (shifting self from index 1 -> 0) and change self's horizon.
+    args.newConfigObj =
+        BSON("_id" << "mySet"
+                   << "version" << 2 << "protocolVersion" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 1 << "host" << host1Self << "horizons"
+                                            << BSON(newHorizonSni << newHorizonHost))));
+    stdx::thread reconfigThread = monitor.spawn([&] {
+        Status status(ErrorCodes::InternalError, "Not Set");
+        status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &garbage);
+        ASSERT_OK(status);
+        monitor.notifyDone();
+    });
+    reconfigThread.join();
+    getHelloThread.join();
+
+    // After the reconfig, a hello with the new horizon should return the correct host for self
+    // (now at index 0). This verifies the horizon map was rebuilt with the updated _selfIndex.
+    const auto newHorizon = SplitHorizon::Parameters(std::string(newHorizonSni));
+    const auto response =
+        getReplCoord()->awaitHelloResponse(opCtx.get(), newHorizon, boost::none, boost::none);
+    ASSERT_TRUE(response->isWritablePrimary());
+    // The primary's address in the new horizon should reflect self's new config entry (index 0).
+    ASSERT_EQUALS(HostAndPort(newHorizonHost), response->getPrimary());
+    const auto hosts = response->getHosts();
+    ASSERT_EQUALS(1u, hosts.size());
+    ASSERT_EQUALS(HostAndPort(newHorizonHost), hosts[0]);
 }
 
 TEST_F(ReplCoordTest, AwaitHelloRespondsCorrectlyWhenNodeRemovedAndReadded) {
