@@ -62,7 +62,6 @@
 #include "mongo/util/net/http_client.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/processinfo.h"
-#include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/version.h"
 
@@ -128,6 +127,13 @@ public:
         const auto clock = service->getFastClockSource();
         const auto runStart = clock->now();
         BSONObjBuilder timeBuilder(256);
+        Date_t phaseStart = runStart;
+        auto recordPhase = [&](StringData name) {
+            const Date_t t = clock->now();
+            timeBuilder.appendNumber(fmt::format("after {}", name),
+                                     durationCount<Milliseconds>(t - phaseStart));
+            phaseStart = t;
+        };
 
         ScopedAdmissionPriority<ExecutionAdmissionContext> admissionPriority(
             opCtx, AdmissionContext::Priority::kExempt);
@@ -144,8 +150,8 @@ public:
         result.append("uptimeEstimate", durationCount<Seconds>(uptime));
         result.appendDate("localTime", Date_t::now());
 
-        timeBuilder.appendNumber("after basic",
-                                 durationCount<Milliseconds>(clock->now() - runStart));
+        // Milliseconds spent building the fixed header fields above (not cumulative since start).
+        recordPhase("basic"_sd);
 
         // Individual section 'includeByDefault()' settings will be bypassed if the caller specified
         // {all: 1}.
@@ -197,9 +203,7 @@ public:
                 }
                 throw;
             }
-            timeBuilder.appendNumber(
-                static_cast<std::string>(str::stream() << "after " << section->getSectionName()),
-                durationCount<Milliseconds>(clock->now() - runStart));
+            recordPhase(section->getSectionName());
         }
 
         // --- counters
@@ -216,11 +220,14 @@ public:
             if (metricsEl.type() == BSONType::object)
                 excludePaths = BSON("metrics" << metricsEl.embeddedObject());
             appendMergedTrees(metricTrees, result, excludePaths);
+            recordPhase("metrics"_sd);
         }
 
         // --- some hard coded global things hard to pull out
 
-        auto runElapsed = clock->now() - runStart;
+        const Date_t endTime = clock->now();
+        timeBuilder.appendNumber("other", durationCount<Milliseconds>(endTime - phaseStart));
+        const auto runElapsed = endTime - runStart;
         timeBuilder.appendNumber("at end", durationCount<Milliseconds>(runElapsed));
         if (runElapsed > Milliseconds(1000)) {
             BSONObj t = timeBuilder.obj();
