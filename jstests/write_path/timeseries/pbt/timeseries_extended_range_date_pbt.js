@@ -94,6 +94,7 @@ describe("Basic comparative PBT for timeseries inserts", () => {
 
         ctrlColl = db.getCollection(ctrlCollName);
         tsColl = db.getCollection(tsCollName);
+        bucketColl = getTimeseriesCollForRawOps(tsColl.getDB(), tsColl);
     };
 
     // Zero out the arbitrary generation stats before exercising a range.
@@ -206,7 +207,7 @@ describe("Basic comparative PBT for timeseries inserts", () => {
             fc.assert(
                 fc
                     .property(programArb, (cmds) => {
-                        const model = makeEmptyModel(ctrlColl);
+                        const model = makeEmptyModel(ctrlColl, bucketColl);
                         fc.modelRun(() => ({model: model, real: {tsColl, ctrlColl}}), cmds);
                         assertCollectionsMatch(tsColl, ctrlColl);
                         stats = cmds.commands.reduce(commandMeasurementStatsReducer, stats);

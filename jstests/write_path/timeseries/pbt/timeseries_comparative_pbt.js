@@ -18,6 +18,7 @@ import {fc} from "jstests/third_party/fast_check/fc-4.6.0.js";
 import {makeEmptyModel} from "jstests/write_path/timeseries/pbt/lib/command_grammar.js";
 import {makeTimeseriesCommandSequenceArb} from "jstests/write_path/timeseries/pbt/lib/command_arbitraries.js";
 import {assertCollectionsMatch} from "jstests/write_path/timeseries/pbt/lib/assertions.js";
+import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 const ctrlCollName = jsTestName() + "_control";
 const tsCollName = jsTestName() + "_timeseries";
@@ -38,6 +39,7 @@ describe("Basic comparative PBT for timeseries inserts", () => {
 
         ctrlColl = db.getCollection(ctrlCollName);
         tsColl = db.getCollection(tsCollName);
+        bucketColl = getTimeseriesCollForRawOps(tsColl.getDB(), tsColl);
     };
 
     it("keeps tsColl and ctrlColl in sync under insert/batch-insert/delete", () => {
@@ -61,7 +63,7 @@ describe("Basic comparative PBT for timeseries inserts", () => {
         fc.assert(
             fc
                 .property(programArb, (cmds) => {
-                    const model = makeEmptyModel(ctrlColl);
+                    const model = makeEmptyModel(ctrlColl, bucketColl);
                     fc.modelRun(() => ({model: model, real: {tsColl, ctrlColl}}), cmds);
                     assertCollectionsMatch(tsColl, ctrlColl);
                 })

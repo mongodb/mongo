@@ -14,6 +14,7 @@ import {
     DeleteByFilterCommand,
     DeleteByRandomIdCommand,
     Filter,
+    InsertOldBucketCommand,
     UpdateByFilterCommand,
 } from "jstests/write_path/timeseries/pbt/lib/command_grammar.js";
 
@@ -171,6 +172,28 @@ export function makeFilterArb(timeFieldname, metaFieldname, opts = {}) {
                 .map(([op, children]) => (op === "and" ? Filter.and(children) : Filter.or(children))),
         ),
     })).filter;
+}
+
+/**
+ * Arbitrary for InsertOldBucketCommand.
+ *
+ * Generates:
+ *   new InsertOldBucketCommand(pick, timeSeed, timeFieldname, metaFieldname)
+ *
+ * The actual bucket and timestamp are chosen at run-time from the model;
+ * this arb only controls which bucket is targeted and where in its range the
+ * new measurement lands.
+ *
+ * @param {string} timeFieldname
+ * @param {string} metaFieldname
+ * @returns {fc.Arbitrary<InsertOldBucketCommand>}
+ */
+export function makeInsertOldBucketCommandArb(timeFieldname, metaFieldname) {
+    const pickArb = fc.integer({min: -0x7fffffff, max: 0x7fffffff});
+    const timeSeedArb = fc.integer({min: -0x7fffffff, max: 0x7fffffff});
+    return fc
+        .tuple(pickArb, timeSeedArb)
+        .map(([pick, timeSeed]) => new InsertOldBucketCommand(pick, timeSeed, timeFieldname, metaFieldname));
 }
 
 /**

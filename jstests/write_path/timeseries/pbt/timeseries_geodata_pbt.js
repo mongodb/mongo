@@ -22,6 +22,7 @@ import {
     makeGeospatialQueryArb,
 } from "jstests/write_path/timeseries/pbt/lib/geodata_arbitraries.js";
 import {assertCollectionsMatch} from "jstests/write_path/timeseries/pbt/lib/assertions.js";
+import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 const ctrlCollName = jsTestName() + "_control";
 const tsCollName = jsTestName() + "_timeseries";
@@ -32,6 +33,7 @@ const metaValue = "geospatial";
 describe("Geospatial Query Comparative Test for Timeseries", () => {
     let tsColl;
     let ctrlColl;
+    let bucketColl;
 
     const beforeHook = () => {
         db[ctrlCollName].drop();
@@ -42,6 +44,7 @@ describe("Geospatial Query Comparative Test for Timeseries", () => {
 
         ctrlColl = db.getCollection(ctrlCollName);
         tsColl = db.getCollection(tsCollName);
+        bucketColl = getTimeseriesCollForRawOps(tsColl.getDB(), tsColl);
 
         // This test needs to create 2dsphere indexes to properly exercise the timeseries write path.
         ctrlColl.createIndex({[geoField]: "2dsphere"});
@@ -69,7 +72,7 @@ describe("Geospatial Query Comparative Test for Timeseries", () => {
         fc.assert(
             fc
                 .property(programArb, (cmds) => {
-                    const model = makeEmptyModel(ctrlColl);
+                    const model = makeEmptyModel(ctrlColl, bucketColl);
                     fc.modelRun(() => ({model: model, real: {tsColl, ctrlColl}}), cmds);
                     assertCollectionsMatch(tsColl, ctrlColl);
                 })
@@ -102,7 +105,7 @@ describe("Geospatial Query Comparative Test for Timeseries", () => {
                     programArb,
                     fc.array(makeGeospatialQueryArb(geoField, 10000), {minLength: 1, maxLength: 40}),
                     (cmds, queries) => {
-                        const model = makeEmptyModel(ctrlColl);
+                        const model = makeEmptyModel(ctrlColl, bucketColl);
                         fc.modelRun(() => ({model: model, real: {tsColl, ctrlColl}}), cmds);
                         for (const query of queries) {
                             assertCollectionsMatch(tsColl, ctrlColl, query);

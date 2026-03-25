@@ -15,10 +15,10 @@ import {makeMetricArb} from "jstests/write_path/timeseries/pbt/lib/metric_arbitr
  * we will simply defer this to the control collection, making the model a simple holder for the ref.
  *
  * Model shape:
- *   { docs: Map<string, doc> }
+ *   { ctrlColl, bucketColl }
  */
-export function makeEmptyModel(ctrlColl) {
-    return {ctrlColl};
+export function makeEmptyModel(ctrlColl, bucketColl) {
+    return {ctrlColl, bucketColl};
 }
 
 export function modelHasDoc(model, id) {
@@ -328,6 +328,79 @@ export class Filter {
     }
     static or(filters) {
         return new Filter("or", 0, {filters});
+    }
+}
+
+/**
+ * InsertOldBucketCommand: insert a measurement that targets an existing bucket.
+ *
+ * Selects a bucket from model.bucketColl and crafts a measurement whose time
+ * falls within that bucket's [control.min, control.max] time range and whose
+ * meta field matches the bucket's meta. This exercises the code path for
+ * inserting into an existing (potentially old or closed) bucket.
+ */
+export class InsertOldBucketCommand {
+    /**
+     * @param {number} pick      - selects which bucket to target (by index mod count)
+     * @param {number} timeSeed  - derives the timestamp within the bucket's time range
+     * @param {string} timeFieldname
+     * @param {string} metaFieldname
+     */
+    constructor(pick, timeSeed, timeFieldname, metaFieldname) {
+        this._pick = pick | 0;
+        this._timeSeed = timeSeed | 0;
+        this._timeFieldname = timeFieldname;
+        this._metaFieldname = metaFieldname;
+        this._doc = null; // populated during run() for logging
+    }
+
+    toString() {
+        const docStr = this._doc !== null ? tojsononeline(this._doc) : "<unpopulated>";
+        return `InsertOldBucketCommand(pick=${this._pick}, timeSeed=${this._timeSeed}, doc=${docStr})`;
+    }
+
+    /**
+     * Precondition: at least one bucket must exist in bucketColl.
+     */
+    check(model) {
+        return model?.bucketColl != null && model.bucketColl.find({}).rawData().hasNext();
+    }
+
+    /**
+     * Pick a bucket, craft a measurement whose time falls within it, and insert
+     * into both tsColl and ctrlColl.
+     */
+    run(model, {tsColl, ctrlColl}) {
+        const buckets = model.bucketColl.find({}).rawData().sort({_id: 1}).toArray();
+        if (buckets.length === 0) {
+            throw new Error("InsertOldBucketCommand.run called with no buckets");
+        }
+
+        const bucket = buckets[Math.abs(this._pick) % buckets.length];
+
+        const minTime = bucket.control.min[this._timeFieldname];
+        const maxTime = bucket.control.max[this._timeFieldname];
+
+        if (!(minTime instanceof Date) || !(maxTime instanceof Date)) {
+            // Bucket has no valid time bounds for this timeField; skip.
+            return;
+        }
+
+        const minMs = minTime.getTime();
+        const maxMs = maxTime.getTime();
+        const span = Math.max(0, maxMs - minMs);
+        const pickedMs = minMs + (span > 0 ? Math.abs(this._timeSeed) % (span + 1) : 0);
+
+        const doc = {
+            _id: new ObjectId(),
+            [this._timeFieldname]: new Date(pickedMs),
+            [this._metaFieldname]: bucket.meta,
+        };
+        this._doc = doc;
+
+        const resTs = tsColl.insertOne(doc);
+        const resCtrl = ctrlColl.insertOne(doc);
+        assert.docEq(resTs, resCtrl);
     }
 }
 
