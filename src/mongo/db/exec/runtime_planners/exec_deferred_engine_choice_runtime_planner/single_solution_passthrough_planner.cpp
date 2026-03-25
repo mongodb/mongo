@@ -32,9 +32,12 @@
 namespace mongo::exec_deferred_engine_choice {
 
 SingleSolutionPassthroughPlanner::SingleSolutionPassthroughPlanner(
-    PlannerData plannerData, std::unique_ptr<QuerySolution> querySolution)
+    PlannerData plannerData,
+    std::unique_ptr<QuerySolution> querySolution,
+    boost::optional<PlanExplainerData> maybeExplainData)
     : DeferredEngineChoicePlannerInterface(std::move(plannerData)),
-      _querySolution(std::move(querySolution)) {}
+      _querySolution(std::move(querySolution)),
+      _maybeExplainData(std::move(maybeExplainData)) {}
 
 PlanRankingResult SingleSolutionPassthroughPlanner::extractPlanRankingResult() {
     tassert(11974302,
@@ -42,6 +45,7 @@ PlanRankingResult SingleSolutionPassthroughPlanner::extractPlanRankingResult() {
             "feature flag enabled.",
             feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.isEnabled());
     return PlanRankingResult{.solutions = makeQsnResult(std::move(_querySolution)),
+                             .maybeExplainData = std::move(_maybeExplainData),
                              .plannerParams = extractPlannerParams(),
                              .cachedPlanHash = cachedPlanHash()};
 }

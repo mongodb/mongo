@@ -132,13 +132,6 @@
 
 namespace mongo {
 
-namespace {
-/**
- * Aggregation of the total number of times query planning occurred.
- */
-auto& plannerInvocationCount = *MetricBuilder<Counter64>{"query.planning.invocationCount"};
-}  // namespace
-
 boost::intrusive_ptr<ExpressionContext> makeExpressionContextForGetExecutor(
     OperationContext* opCtx,
     const BSONObj& requestCollation,
@@ -399,7 +392,7 @@ public:
     }
 
     StatusWith<std::unique_ptr<ResultType>> finishPrepare() {
-        plannerInvocationCount.increment();
+        incrementPlannerInvocationCount();
 
         // TODO SERVER-120492: Investigate if we can remove the replanning restriction on
         // subplanning. If not, add a descriptive comment here about why.
@@ -430,6 +423,7 @@ public:
             !rankerResult.getValue().solutions.empty()) {
             // The plan ranker will place the best plan at index 0.
             captureCardinalityEstimationMethodForQueryStats(
+                _opCtx,
                 rankerResult.getValue().maybeExplainData,
                 rankerResult.getValue().solutions[0].get());
         }
@@ -476,35 +470,6 @@ public:
 
     const QueryPlannerParams& getPlannerParams() {
         return *_plannerParams.get();
-    }
-
-    bool shouldMultiPlanForSingleSolution(const PlanRankingResult& rankerResult,
-                                          const CanonicalQuery* cq) {
-        auto expCtx = _cq->getExpCtxRaw();
-
-        // Force multiplanning (and therefore caching) if forcePlanCache is set. We could
-        // manually update the plan cache instead without multiplanning but this is simpler.
-        bool forceMultiPlanForSingleSolution = expCtx->getForcePlanCache() ||
-            expCtx->getQueryKnobConfiguration().getUseMultiplannerForSingleSolutions();
-
-        // If there is rejected plans in the  result from 'rankPlans()' and the
-        // 'needsWorksMeasuredForPlanCache' flag is set, we run the single CBR picked solution
-        // through multiplanner to measure its number of works and add the plan to the plan cache.
-        // If 'internalQueryDisablePlanCache' disables the plan cache, we will ignore
-        // 'needsWorksMeasuredForPlanCache' and the number of rejected plans and instead only check
-        // whether we should force running the single solution plan through the multiplanner.
-        auto shouldMultiplanForCBRChosenPlan =
-            !internalQueryDisablePlanCache.load() && rankerResult.needsWorksMeasuredForPlanCache;
-
-        // We will not cache for an explain command.
-        if (!expCtx->getExplain().has_value() && shouldMultiplanForCBRChosenPlan) {
-            LOGV2_DEBUG(11918000,
-                        2,
-                        "CBR picked the best plan and it will be cached via multiplanning",
-                        "query"_attr = cq->toString());
-        }
-
-        return shouldMultiplanForCBRChosenPlan || forceMultiPlanForSingleSolution;
     }
 
 protected:
@@ -598,44 +563,6 @@ protected:
             return cs->cachedPlan->solutionHash;
         }
         return boost::none;
-    }
-
-    /**
-     * Captures the cardinality estimation method (if it exists) from the winning plan's root node
-     * and stores it in CurOp for query stats collection.
-     */
-    void captureCardinalityEstimationMethodForQueryStats(
-        const boost::optional<PlanExplainerData>& maybeExplainData, const QuerySolution* solution) {
-        if (maybeExplainData && !maybeExplainData->estimates.empty() && solution) {
-            auto it = maybeExplainData->estimates.find(solution->root());
-            if (it != maybeExplainData->estimates.end()) {
-                auto& ceMethods =
-                    CurOp::get(_opCtx)->debug().getAdditiveMetrics().cardinalityEstimationMethods;
-                switch (it->second.outCE.source()) {
-                    case cost_based_ranker::EstimationSource::Histogram:
-                        ceMethods.setHistogram(ceMethods.getHistogram().value_or(0) + 1);
-                        break;
-                    case cost_based_ranker::EstimationSource::Sampling:
-                        ceMethods.setSampling(ceMethods.getSampling().value_or(0) + 1);
-                        break;
-                    case cost_based_ranker::EstimationSource::Heuristics:
-                        ceMethods.setHeuristics(ceMethods.getHeuristics().value_or(0) + 1);
-                        break;
-                    case cost_based_ranker::EstimationSource::Mixed:
-                        ceMethods.setMixed(ceMethods.getMixed().value_or(0) + 1);
-                        break;
-                    case cost_based_ranker::EstimationSource::Metadata:
-                        ceMethods.setMetadata(ceMethods.getMetadata().value_or(0) + 1);
-                        break;
-                    case cost_based_ranker::EstimationSource::Code:
-                        ceMethods.setCode(ceMethods.getCode().value_or(0) + 1);
-                        break;
-                    default:
-                        MONGO_UNREACHABLE_TASSERT(11560600);
-                        break;
-                }
-            }
-        }
     }
 
     OperationContext* _opCtx;

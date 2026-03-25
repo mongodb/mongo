@@ -49,10 +49,13 @@
 #include "mongo/db/pipeline/sbe_pushdown.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/planner_analysis.h"
+#include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/wildcard_multikey_paths.h"
@@ -74,6 +77,11 @@
 namespace mongo {
 
 namespace {
+/**
+ * Aggregation of the total number of times query planning occurred.
+ */
+auto& plannerInvocationCount = *MetricBuilder<Counter64>{"query.planning.invocationCount"};
+
 void inspectPlannerResult(
     const std::unique_ptr<PlannerInterface>& result,
     const boost::optional<QueryPlannerParams::ReplanningData>& replanningData) {
@@ -136,6 +144,10 @@ void setOpDebugPlanCacheInfo(OperationContext* opCtx, const PlanCacheInfo& cache
     if (!opDebug.planCacheKey && cacheInfo.planCacheKey) {
         opDebug.planCacheKey = *cacheInfo.planCacheKey;
     }
+}
+
+void incrementPlannerInvocationCount() {
+    plannerInvocationCount.increment();
 }
 
 std::unique_ptr<PlannerInterface> retryMakePlanner(
@@ -205,6 +217,71 @@ std::unique_ptr<PlannerInterface> retryMakePlanner(
         }
     }
     tasserted(8712800, "Exceeded retry iterations for making a planner");
+}
+
+bool shouldMultiPlanForSingleSolution(const PlanRankingResult& rankerResult,
+                                      const CanonicalQuery* cq) {
+    auto expCtx = cq->getExpCtxRaw();
+
+    // Force multiplanning (and therefore caching) if forcePlanCache is set. We could
+    // manually update the plan cache instead without multiplanning but this is simpler.
+    bool forceMultiPlanForSingleSolution = expCtx->getForcePlanCache() ||
+        expCtx->getQueryKnobConfiguration().getUseMultiplannerForSingleSolutions();
+
+    // If there is rejected plans in the  result from 'rankPlans()' and the
+    // 'needsWorksMeasuredForPlanCache' flag is set, we run the single CBR picked solution
+    // through multiplanner to measure its number of works and add the plan to the plan cache.
+    // If 'internalQueryDisablePlanCache' disables the plan cache, we will ignore
+    // 'needsWorksMeasuredForPlanCache' and the number of rejected plans and instead only check
+    // whether we should force running the single solution plan through the multiplanner.
+    auto shouldMultiplanForCBRChosenPlan =
+        !internalQueryDisablePlanCache.load() && rankerResult.needsWorksMeasuredForPlanCache;
+
+    // We will not cache for an explain command.
+    if (!expCtx->getExplain().has_value() && shouldMultiplanForCBRChosenPlan) {
+        LOGV2_DEBUG(11918000,
+                    2,
+                    "CBR picked the best plan and it will be cached via multiplanning",
+                    "query"_attr = cq->toString());
+    }
+
+    return shouldMultiplanForCBRChosenPlan || forceMultiPlanForSingleSolution;
+}
+
+void captureCardinalityEstimationMethodForQueryStats(
+    OperationContext* opCtx,
+    const boost::optional<PlanExplainerData>& maybeExplainData,
+    const QuerySolution* solution) {
+    if (maybeExplainData && !maybeExplainData->estimates.empty() && solution) {
+        auto it = maybeExplainData->estimates.find(solution->root());
+        if (it != maybeExplainData->estimates.end()) {
+            auto& ceMethods =
+                CurOp::get(opCtx)->debug().getAdditiveMetrics().cardinalityEstimationMethods;
+            switch (it->second.outCE.source()) {
+                case cost_based_ranker::EstimationSource::Histogram:
+                    ceMethods.setHistogram(ceMethods.getHistogram().value_or(0) + 1);
+                    break;
+                case cost_based_ranker::EstimationSource::Sampling:
+                    ceMethods.setSampling(ceMethods.getSampling().value_or(0) + 1);
+                    break;
+                case cost_based_ranker::EstimationSource::Heuristics:
+                    ceMethods.setHeuristics(ceMethods.getHeuristics().value_or(0) + 1);
+                    break;
+                case cost_based_ranker::EstimationSource::Mixed:
+                    ceMethods.setMixed(ceMethods.getMixed().value_or(0) + 1);
+                    break;
+                case cost_based_ranker::EstimationSource::Metadata:
+                    ceMethods.setMetadata(ceMethods.getMetadata().value_or(0) + 1);
+                    break;
+                case cost_based_ranker::EstimationSource::Code:
+                    ceMethods.setCode(ceMethods.getCode().value_or(0) + 1);
+                    break;
+                default:
+                    MONGO_UNREACHABLE_TASSERT(11560601);
+                    break;
+            }
+        }
+    }
 }
 
 }  // namespace mongo

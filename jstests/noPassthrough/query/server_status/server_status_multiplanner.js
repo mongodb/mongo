@@ -17,8 +17,9 @@ import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
 const collName = jsTestName();
 const dbName = jsTestName();
 
-// Use an isolated server instance to obtain predictible serverStatus planning metrics.
-const conn = MongoRunner.runMongod({});
+// Use an isolated server instance to obtain predictible serverStatus planning metrics. Disable CBR, because it changes multi planner metrics.
+// TODO SERVER-122264 Enable CBR for this test.
+const conn = MongoRunner.runMongod({setParameter: {featureFlagCostBasedRanker: false}});
 assert.neq(conn, null, "mongod failed to start");
 const db = conn.getDB(dbName);
 let coll = db.getCollection(collName);

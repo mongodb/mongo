@@ -107,12 +107,28 @@ protected:
 class SingleSolutionPassthroughPlanner final : public DeferredEngineChoicePlannerInterface {
 public:
     SingleSolutionPassthroughPlanner(PlannerData plannerData,
-                                     std::unique_ptr<QuerySolution> querySolution);
+                                     std::unique_ptr<QuerySolution> querySolution,
+                                     boost::optional<PlanExplainerData> maybeExplainData = {});
 
     PlanRankingResult extractPlanRankingResult() override;
 
 private:
     std::unique_ptr<QuerySolution> _querySolution;
+    boost::optional<PlanExplainerData> _maybeExplainData;
+};
+
+/**
+ * A planner that holds already known PlanRankingResult. Used when we get PlanRankingResult from
+ * CBR.
+ */
+class PreComputedRankingResultPlanner final : public DeferredEngineChoicePlannerInterface {
+public:
+    PreComputedRankingResultPlanner(PlannerData plannerData, PlanRankingResult result);
+
+    PlanRankingResult extractPlanRankingResult() override;
+
+private:
+    PlanRankingResult _result;
 };
 
 /**
@@ -121,7 +137,10 @@ private:
  */
 class MultiPlanner final : public DeferredEngineChoicePlannerInterface {
 public:
-    MultiPlanner(PlannerData plannerData, std::vector<std::unique_ptr<QuerySolution>> solutions);
+    MultiPlanner(PlannerData plannerData,
+                 std::vector<std::unique_ptr<QuerySolution>> solutions,
+                 bool addingCBRChosenPlanToPlanCache = false,
+                 boost::optional<PlanExplainerData> maybeExplainData = boost::none);
 
     /**
      * Returns the specific stats from the multi-planner stage.
@@ -137,6 +156,7 @@ private:
                                std::vector<plan_ranker::CandidatePlan>&);
 
     std::unique_ptr<MultiPlanStage> _multiplanStage;
+    boost::optional<PlanExplainerData> _maybeExplainData;
 };
 
 /**

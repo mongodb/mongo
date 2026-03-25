@@ -34,6 +34,7 @@
 #include "mongo/db/exec/classic/delete_stage.h"
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/exec/runtime_planners/planner_interface.h"
+#include "mongo/db/exec/runtime_planners/planner_types.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/sbe_pushdown.h"
 #include "mongo/db/query/canonical_distinct.h"
@@ -91,6 +92,10 @@ private:
  */
 void setOpDebugPlanCacheInfo(OperationContext* opCtx, const PlanCacheInfo& cacheInfo);
 
+/**
+ * Increments the query.planning.invocationCount server status metric.
+ */
+void incrementPlannerInvocationCount();
 
 using MakePlannerParamsFn = std::function<std::unique_ptr<QueryPlannerParams>(
     const CanonicalQuery&, size_t, boost::optional<QueryPlannerParams::ReplanningData>)>;
@@ -107,5 +112,22 @@ std::unique_ptr<PlannerInterface> retryMakePlanner(
     CanonicalQuery* canonicalQuery,
     std::size_t plannerOptions,
     Pipeline* pipeline);
+
+/**
+ * Returns true if the single solution from the ranker should be run through multiplanning.
+ * This can happen when CBR picked a winner that needs works measured for plan cache insertion,
+ * or when force plan cache or force multiplanner is enabled.
+ */
+bool shouldMultiPlanForSingleSolution(const PlanRankingResult& rankerResult,
+                                      const CanonicalQuery* cq);
+
+/**
+ * Captures the cardinality estimation method (if it exists) from the winning plan's root node
+ * and stores it in CurOp for query stats collection.
+ */
+void captureCardinalityEstimationMethodForQueryStats(
+    OperationContext* opCtx,
+    const boost::optional<PlanExplainerData>& maybeExplainData,
+    const QuerySolution* solution);
 
 }  // namespace mongo

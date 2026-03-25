@@ -35,15 +35,19 @@
 namespace mongo::exec_deferred_engine_choice {
 
 MultiPlanner::MultiPlanner(PlannerData plannerData,
-                           std::vector<std::unique_ptr<QuerySolution>> solutions)
-    : DeferredEngineChoicePlannerInterface(std::move(plannerData)) {
+                           std::vector<std::unique_ptr<QuerySolution>> solutions,
+                           bool addingCBRChosenPlanToPlanCache,
+                           boost::optional<PlanExplainerData> maybeExplainData)
+    : DeferredEngineChoicePlannerInterface(std::move(plannerData)),
+      _maybeExplainData(std::move(maybeExplainData)) {
     _multiplanStage = std::make_unique<MultiPlanStage>(
         cq()->getExpCtxRaw(),
         collections().getMainCollectionPtrOrAcquisition(),
         cq(),
         plan_cache_util::ClassicPlanCacheWriter{opCtx(),
                                                 collections().getMainCollectionPtrOrAcquisition()},
-        boost::none /*replanReason*/);
+        boost::none /*replanReason TODO SERVER-119037*/,
+        addingCBRChosenPlanToPlanCache);
     for (auto&& solution : solutions) {
         solution->indexFilterApplied = plannerParams()->indexFiltersApplied;
         auto executableTree = buildExecutableTree(*solution);
@@ -67,8 +71,15 @@ PlanRankingResult MultiPlanner::extractPlanRankingResult() {
     uassertStatusOK(_multiplanStage->pickBestPlan());
     auto querySolution = _multiplanStage->extractBestSolution();
 
+    if (!_maybeExplainData.has_value()) {
+        _maybeExplainData.emplace();
+    }
+    _maybeExplainData->planStageQsnMap.insert(std::make_move_iterator(_planStageQsnMap.begin()),
+                                              std::make_move_iterator(_planStageQsnMap.end()));
+
     return PlanRankingResult{
         .solutions = makeQsnResult(std::move(querySolution)),
+        .maybeExplainData = std::move(_maybeExplainData),
         .execState = SavedExecState{.workingSet = extractWs(), .root = std::move(_multiplanStage)},
         .plannerParams = extractPlannerParams(),
         .cachedPlanHash = cachedPlanHash()};

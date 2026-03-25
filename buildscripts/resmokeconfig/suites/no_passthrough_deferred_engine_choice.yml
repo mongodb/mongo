@@ -21,19 +21,14 @@ selector:
     # TODO SERVER-121809 Add scoped debug info for query planner params in new get executor
     - jstests/noPassthrough/query/query_planner_params_diagnostics.js
 
-    # TODO SERVER-119606 call CBR in new get_executor
-    - jstests/noPassthrough/query/cbr/**/*.js
-    - jstests/noPassthrough/query/queryStats/query_stats_cbr_metrics.js
-    - jstests/noPassthrough/query/plan_evaluation_coll_fraction.js
-    - jstests/noPassthrough/query/server_status/server_status_automaticCE.js
-    - jstests/noPassthrough/query/server_status/server_status_cbr.js
-
     # TODO SERVER-117566 implement plan cache in new get executor
     - jstests/noPassthrough/query/plan_cache/**/*.js
     - jstests/noPassthrough/query/queryStats/query_stats_disk_usage_plan_cache.js
     - jstests/noPassthrough/query/command_diagnostics_plan_cache.js
     - jstests/noPassthrough/query/sbe_subplanning.js
     - jstests/noPassthrough/timeseries/query/timeseries_in_sbe_uses_plan_cache.js
+    - jstests/noPassthrough/query/queryStats/query_stats_cbr_metrics.js
+    - jstests/noPassthrough/query/server_status/server_status_cbr.js
 
     # TODO SERVER-122039 Investigate unknown failures
     - jstests/noPassthrough/query/multiplanner/tie_breaking_index_prefix.js

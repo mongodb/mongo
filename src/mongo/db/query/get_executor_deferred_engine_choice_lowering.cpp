@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/get_executor_deferred_engine_choice_lowering.h"
 
+#include "mongo/db/exec/classic/count.h"
 #include "mongo/db/exec/runtime_planners/planner_types.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/sbe_pushdown.h"
@@ -234,26 +235,31 @@ private:
                                                       isFromPlanCache,
                                                       remoteCursors.get());
 
+        // Count queries are not supported in SBE
+        buildRejectedExecutableTreesForExplain(solution.get(), false /*isCountQuery*/);
+
         auto nss = _cq->nss();
         tassert(11742306,
                 "Solution must be present if cachedPlanHash is present: ",
                 solution != nullptr || !_rankingResult.cachedPlanHash.has_value());
-        return uassertStatusOK(plan_executor_factory::make(_opCtx,
-                                                           std::move(_cq),
-                                                           std::move(solution),
-                                                           std::move(sbePlanAndData),
-                                                           _collections,
-                                                           plannerParams()->providedOptions,
-                                                           std::move(nss),
-                                                           std::move(sbeYieldPolicy),
-                                                           isFromPlanCache,
-                                                           _rankingResult.cachedPlanHash,
-                                                           false /*usedJoinOpt*/,
-                                                           {} /*estimates*/,
-                                                           {} /*rejectedJoinPlans*/,
-                                                           std::move(remoteCursors),
-                                                           std::move(remoteExplains),
-                                                           extractMps()));
+        return uassertStatusOK(
+            plan_executor_factory::make(_opCtx,
+                                        std::move(_cq),
+                                        std::move(solution),
+                                        std::move(sbePlanAndData),
+                                        _collections,
+                                        plannerParams()->providedOptions,
+                                        std::move(nss),
+                                        std::move(sbeYieldPolicy),
+                                        isFromPlanCache,
+                                        _rankingResult.cachedPlanHash,
+                                        false /*usedJoinOpt*/,
+                                        {} /*estimates*/,
+                                        {} /*rejectedJoinPlans*/,
+                                        std::move(remoteCursors),
+                                        std::move(remoteExplains),
+                                        extractMps(),
+                                        std::move(_rankingResult.maybeExplainData)));
     }
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeClassicExecutor(
@@ -276,15 +282,25 @@ private:
             planStage = std::move(_rankingResult.execState->root);
         } else {
             workingSet = std::make_unique<WorkingSet>();
-            stage_builder::PlanStageToQsnMap planStageToQsnMap;
+            if (!_rankingResult.maybeExplainData.has_value()) {
+                _rankingResult.maybeExplainData.emplace();
+            }
             planStage = stage_builder::buildClassicExecutableTree(
                 _opCtx,
                 _collections.getMainCollectionPtrOrAcquisition(),
                 *_cq,
                 *solution,
                 workingSet.get(),
-                &planStageToQsnMap);
+                &_rankingResult.maybeExplainData->planStageQsnMap);
         }
+
+        if (const auto* countStage = dynamic_cast<const CountStage*>(planStage.get())) {
+            buildRejectedExecutableTreesForExplain(
+                solution.get(), true, countStage->getLimit(), countStage->getSkip());
+        } else {
+            buildRejectedExecutableTreesForExplain(solution.get(), false /*isCountQuery*/);
+        }
+
         return uassertStatusOK(plan_executor_factory::make(
             _opCtx,
             std::move(workingSet),
@@ -309,6 +325,51 @@ private:
                                                        std::move(solution),
                                                        plannerParams()->secondaryCollectionsInfo,
                                                        true /* keepSentinel */);
+    }
+
+    void buildRejectedExecutableTreesForExplain(const QuerySolution* solution,
+                                                const bool isCountQuery,
+                                                const long long countLimit = 0,
+                                                const long long countSkip = 0) {
+        if (!_rankingResult.maybeExplainData || !_cq->getExplain()) {
+            return;
+        }
+
+        _rankingResult.maybeExplainData->workingSetForRejectedPlansExplain =
+            std::make_unique<WorkingSet>();
+        stage_builder::PlanStageToQsnMap planStageToQsnMap;
+        for (auto&& solutionWithPlanStage :
+             _rankingResult.maybeExplainData->rejectedPlansWithStages) {
+            if (!solutionWithPlanStage.planStage) {
+                // If planStage is not already built, build it. This will be the case for CBR
+                // rejected plans that are not multi-planned.
+                auto execTree = stage_builder::buildClassicExecutableTree(
+                    _opCtx,
+                    _collections.getMainCollectionPtrOrAcquisition(),
+                    *_cq,
+                    *solutionWithPlanStage.solution,
+                    _rankingResult.maybeExplainData->workingSetForRejectedPlansExplain.get(),
+                    &planStageToQsnMap);
+                solutionWithPlanStage.planStage = std::move(execTree);
+            }
+            if (isCountQuery) {
+                tassert(11960602,
+                        "Expected rejected plan to not have CountStage as root",
+                        solutionWithPlanStage.planStage->stageType() != STAGE_COUNT);
+
+                // Wrap the rejected plan's root stage in a CountStage to reflect the actual
+                // execution.
+                solutionWithPlanStage.planStage = std::make_unique<CountStage>(
+                    _cq->getExpCtxRaw(),
+                    countLimit,
+                    countSkip,
+                    _rankingResult.maybeExplainData->workingSetForRejectedPlansExplain.get(),
+                    solutionWithPlanStage.planStage.release());
+            }
+        }
+        for (auto& mapping : planStageToQsnMap) {
+            _rankingResult.maybeExplainData->planStageQsnMap.emplace(std::move(mapping));
+        }
     }
 
     std::unique_ptr<CanonicalQuery> _cq;

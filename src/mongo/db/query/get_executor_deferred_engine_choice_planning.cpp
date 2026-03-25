@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/get_executor_deferred_engine_choice_planning.h"
 
+#include "mongo/db/exec/classic/multi_plan.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/runtime_planners/exec_deferred_engine_choice_runtime_planner/planner_interface.h"
@@ -38,6 +39,7 @@
 #include "mongo/db/query/get_executor_fast_paths.h"
 #include "mongo/db/query/get_executor_helpers.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
+#include "mongo/db/query/plan_ranking/plan_ranker.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/stats/counters.h"
@@ -47,6 +49,78 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::exec_deferred_engine_choice {
+
+namespace {
+StatusWith<std::unique_ptr<PlannerInterface>> planWithCBR(
+    OperationContext* opCtx,
+    CanonicalQuery* cq,
+    const std::shared_ptr<QueryPlannerParams>& plannerParams,
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
+    const MultipleCollectionAccessor& collections,
+    boost::optional<size_t> cachedPlanHash) {
+    auto makePlannerData = [&]() {
+        return PlannerData{opCtx,
+                           cq,
+                           std::make_unique<WorkingSet>(),
+                           collections,
+                           plannerParams,
+                           yieldPolicy,
+                           cachedPlanHash};
+    };
+
+    plan_ranking::PlanRanker planRanker;
+    // Pass isClassic=true because CBR internally uses classic multiplanning; the actual engine
+    // choice (classic vs SBE) is deferred to the lowering phase.
+    auto rankerResultSW = planRanker.rankPlans(opCtx,
+                                               *cq,
+                                               *plannerParams,
+                                               yieldPolicy,
+                                               collections,
+                                               makePlannerData(),
+                                               true /* isClassic */);
+    if (!rankerResultSW.isOK()) {
+        return rankerResultSW.getStatus();
+    }
+    auto rankerResult = std::move(rankerResultSW.getValue());
+
+    if (!rankerResult.solutions.empty()) {
+        captureCardinalityEstimationMethodForQueryStats(
+            opCtx, rankerResult.maybeExplainData, rankerResult.solutions[0].get());
+    }
+
+    if (rankerResult.execState) {
+        // Some CBR strategies use MultiPlanner internally and they keep QuerySolution owned by
+        // MultiPlanStage. Extract the actual winning solution from the MultiPlanStage so downstream
+        // code can use it.
+        if (!rankerResult.solutions.empty() && rankerResult.solutions[0] == nullptr) {
+            auto* mps = dynamic_cast<MultiPlanStage*>(rankerResult.execState->root.get());
+            tassert(11960601, "Expected MultiPlanStage in execState when solution is null", mps);
+            rankerResult.solutions[0] = mps->extractBestSolution();
+        }
+        rankerResult.plannerParams = plannerParams;
+        rankerResult.cachedPlanHash = cachedPlanHash;
+        return std::make_unique<PreComputedRankingResultPlanner>(makePlannerData(),
+                                                                 std::move(rankerResult));
+    }
+
+    tassert(11960600,
+            "Expected at least one solution from plan ranking",
+            !rankerResult.solutions.empty());
+
+    if (rankerResult.solutions.size() == 1 && !shouldMultiPlanForSingleSolution(rankerResult, cq)) {
+        rankerResult.solutions[0]->indexFilterApplied = plannerParams->indexFiltersApplied;
+        return std::make_unique<SingleSolutionPassthroughPlanner>(
+            makePlannerData(),
+            std::move(rankerResult.solutions[0]),
+            std::move(rankerResult.maybeExplainData));
+    }
+
+    return std::make_unique<MultiPlanner>(makePlannerData(),
+                                          std::move(rankerResult.solutions),
+                                          rankerResult.needsWorksMeasuredForPlanCache,
+                                          std::move(rankerResult.maybeExplainData));
+}
+}  // namespace
 
 StatusWith<std::unique_ptr<PlannerInterface>> preparePlanner(
     OperationContext* opCtx,
@@ -124,6 +198,10 @@ StatusWith<std::unique_ptr<PlannerInterface>> preparePlanner(
         return std::make_unique<SubPlanner>(makePlannerData(cachedPlanHash));
     }
 
+    if (plannerParams->cbrEnabled) {
+        return planWithCBR(opCtx, cq, plannerParams, yieldPolicy, collections, cachedPlanHash);
+    }
+
     auto solutions = uassertStatusOK(QueryPlanner::plan(*cq, *plannerParams));
     // The planner should have returned an error status if there are no solutions.
     tassert(11742305, "Expected at least one solution to answer query", !solutions.empty());
@@ -155,6 +233,7 @@ PlanRankingResult planRanking(OperationContext* opCtx,
     // If no express executor was returned, we can reuse the planner params created by `tryExpress`
     // for other planning logic.
     tassert(11974306, "Expected planner params to be initialized.", expressResult.plannerParams);
+    incrementPlannerInvocationCount();
     auto paramsForSingleCollectionQuery = std::move(expressResult.plannerParams);
 
     auto makePlannerHelper = [&](std::unique_ptr<QueryPlannerParams> plannerParams,

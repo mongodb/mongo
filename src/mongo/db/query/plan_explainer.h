@@ -53,6 +53,7 @@ struct SolutionWithPlanStage {
 };
 
 struct PlanExplainerData {
+    std::unique_ptr<WorkingSet> workingSetForRejectedPlansExplain;
     std::vector<SolutionWithPlanStage> rejectedPlansWithStages;
     std::unique_ptr<mongo::PlanStageStats> multiPlannerWinningPlanTrialStats;
     boost::optional<double> multiPlannerWinningPlanScore;

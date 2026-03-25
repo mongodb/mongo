@@ -14,14 +14,17 @@ selector:
     - jstests/noPassthroughWithMongod/query/plan_selection_no_results.js
     - jstests/noPassthroughWithMongod/query/now_variable.js
 
-    # TODO SERVER-119606 call CBR in new get_executor
-    - jstests/noPassthroughWithMongod/query/plan_ranking/**/*.js
-    - jstests/noPassthroughWithMongod/query/cbr/**/*.js
-
     # TODO SERVER-117566 implement plan cache in new get executor
     - jstests/noPassthroughWithMongod/query/plan_cache_replanned_plan_is_cached_plan.js
     - jstests/noPassthroughWithMongod/query/plan_cache_replanning.js
+    - jstests/noPassthroughWithMongod/query/plan_ranking/cbr_plan_cache.js
     - jstests/noPassthroughWithMongod/query/sbe/sbe_index_count_scan_cache.js
+
+    # TODO SERVER-117707 fully support SBE in CBR
+    - jstests/noPassthroughWithMongod/query/plan_ranking/cbr_with_sbe_eligible_query.js
+
+    # TODO SERVER-122213 fix cbr_sampling.js
+    - jstests/noPassthroughWithMongod/query/cbr/cbr_sampling.js
 
 executor:
   archive:

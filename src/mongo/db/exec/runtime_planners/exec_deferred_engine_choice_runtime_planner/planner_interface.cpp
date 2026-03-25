@@ -54,4 +54,12 @@ std::vector<std::unique_ptr<QuerySolution>> makeQsnResult(std::unique_ptr<QueryS
     return v;
 }
 
+PreComputedRankingResultPlanner::PreComputedRankingResultPlanner(PlannerData plannerData,
+                                                                 PlanRankingResult result)
+    : DeferredEngineChoicePlannerInterface(std::move(plannerData)), _result(std::move(result)) {}
+
+PlanRankingResult PreComputedRankingResultPlanner::extractPlanRankingResult() {
+    return std::move(_result);
+}
+
 }  // namespace mongo::exec_deferred_engine_choice
