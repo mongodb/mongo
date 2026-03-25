@@ -98,7 +98,7 @@ public:
     void testCommandServiceCounters(ClusterRole serviceRole);
     void testCommandMaxTimeMS();
     void testOpCtxInterrupt(bool deferHandling);
-    void testReadConcernClientUnspecifiedNoDefault(int expectedApplyDefaultLogCount = 0);
+    void testReadConcernClientUnspecifiedNoDefault();
     void testReadConcernClientUnspecifiedWithDefault();
     void testReadConcernClientSuppliedLevelNotAllowed(bool exceptionLogged);
     void testReadConcernClientSuppliedAllowed();
