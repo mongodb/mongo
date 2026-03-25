@@ -5,7 +5,8 @@
  * TODO (SERVER-98118): Remove this test.
  *
  * @tags: [
- *   requires_fcv_83,
+ *   featureFlagShardAuthoritativeDbMetadataCRUD,
+ *   featureFlagShardAuthoritativeDbMetadataDDL,
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
