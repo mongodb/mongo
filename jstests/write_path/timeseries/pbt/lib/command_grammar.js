@@ -83,8 +83,6 @@ export class InsertCommand {
             }
         });
 
-        // TODO SERVER-120457 remove model updates when ctrlColl replaces model
-        // Deletes may attempt to delete missing documents
         assert.docEq(resTs, resCtrl);
     }
 }
