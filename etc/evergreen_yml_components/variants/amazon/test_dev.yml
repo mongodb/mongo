@@ -291,6 +291,7 @@ buildvariants:
       clang_tidy_toolchain: v5
       compile_variant: *commit-queue
       resmoke_tests_tag_filter: ci-development-critical-single-variant
+      resmoke_tests_build_timeout_seconds: 1800
     depends_on: []
     tasks:
       - name: compile_test_parallel_core_stream_and_pretty_printer_tests_TG
@@ -306,6 +307,7 @@ buildvariants:
         distros:
           - amazon2023-arm64-latest-m8g-12xlarge-commitqueue
       - name: resmoke_tests_TG
+        exec_timeout_secs: 3600
         distros:
           - amazon2023-arm64-latest-m8g-12xlarge-commitqueue
       - name: .commit_check
