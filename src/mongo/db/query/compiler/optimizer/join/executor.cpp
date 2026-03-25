@@ -224,9 +224,10 @@ CatalogStats createCatalogStats(OperationContext* opCtx, const MultipleCollectio
     });
     auto engine = opCtx->getServiceContext()->getStorageEngine();
     double cacheSizeBytes = engine->getCacheSizeMB() * 1024 * 1024;
-    return {.collStats = std::move(collStats),
-            // This calculation assumes that all pages in WT cache are 32KiB.
-            .numPagesInStorageEngineCache = cacheSizeBytes / (32 * 1024)};
+    return {
+        .collStats = std::move(collStats),
+        .bytesInStorageEngineCache = cacheSizeBytes,
+    };
 }
 
 // Initialize unique field information for all namespaces in the join graph.

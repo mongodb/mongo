@@ -71,4 +71,64 @@ TEST_F(CatalogStatsTest, FieldsAreUnique) {
     ASSERT_FALSE(fieldsAreUnique({"foo.subfield"}, uniqueFields));
     ASSERT_FALSE(fieldsAreUnique({"baz", "qux.subfield"}, uniqueFields));
 }
+
+TEST_F(CatalogStatsTest, NumPagesInStorageEngineCache) {
+    const auto nss = makeNSS("coll");
+
+    auto numPages = [&](CollectionStats collStats, double cacheBytes = 2.0 * 1024 * 1024 * 1024) {
+        return CatalogStats{.collStats = {{nss, collStats}},
+                            .bytesInStorageEngineCache = cacheBytes}
+            .numPagesInStorageEngineCache(nss);
+    };
+
+    // Edge cases: when either size is 0, the function should not crash and return a positive
+    // value (falls back to the default 32 KiB in-memory page size).
+    ASSERT_GT(numPages({.logicalDataSizeBytes = 0, .onDiskSizeBytes = 0}), 0);
+    ASSERT_GT(numPages({.logicalDataSizeBytes = 0, .onDiskSizeBytes = 1000}), 0);
+    ASSERT_GT(numPages({.logicalDataSizeBytes = 1000, .onDiskSizeBytes = 0}), 0);
+
+    // A larger cache should fit more pages.
+    ASSERT_GT(numPages({.logicalDataSizeBytes = 1000, .onDiskSizeBytes = 500, .pageSizeBytes = 100},
+                       /*cacheBytes*/ 2000),
+              numPages({.logicalDataSizeBytes = 1000, .onDiskSizeBytes = 500, .pageSizeBytes = 100},
+                       /*cacheBytes*/ 1000));
+
+    // Smaller on-disk page size → more pages on disk → smaller average in-memory page size →
+    // more pages fit in the cache.
+    ASSERT_GT(
+        numPages({.logicalDataSizeBytes = 1000, .onDiskSizeBytes = 500, .pageSizeBytes = 50}),
+        numPages({.logicalDataSizeBytes = 1000, .onDiskSizeBytes = 500, .pageSizeBytes = 100}));
+
+    // Higher compression (smaller on-disk size for same logical size) → fewer on-disk pages →
+    // larger average in-memory page → fewer pages fit in cache.
+    ASSERT_GT(
+        numPages({.logicalDataSizeBytes = 1000, .onDiskSizeBytes = 500, .pageSizeBytes = 100}),
+        numPages({.logicalDataSizeBytes = 1000, .onDiskSizeBytes = 250, .pageSizeBytes = 100}));
+
+    // When the collection is smaller than a single on-disk page, pagesInColl < 1 so the average
+    // in-memory page size exceeds the logical data size. The result should still be positive.
+    ASSERT_GT(numPages({.logicalDataSizeBytes = 10, .onDiskSizeBytes = 10, .pageSizeBytes = 100}),
+              0);
+
+    // When the cache is smaller than the average in-memory page size, fewer than 1 page fits.
+    // The result should again be a positive fraction.
+    const double tinyCachePages =
+        numPages({.logicalDataSizeBytes = 1000, .onDiskSizeBytes = 500, .pageSizeBytes = 100},
+                 /*cacheBytes*/ 50);
+    ASSERT_GT(tinyCachePages, 0);
+    ASSERT_LT(tinyCachePages, 1);
+
+    // Quantization: differences in onDiskSizeBytes within a 2^(1/4) bucket should produce the
+    // same result. onDisk 500 vs 515 with pageSize 100 → raw pagesInColl 5.0 vs 5.15 (~3% diff),
+    // both round to the same 2^(1/4) bucket.
+    ASSERT_EQ(
+        numPages({.logicalDataSizeBytes = 1000, .onDiskSizeBytes = 500, .pageSizeBytes = 100}),
+        numPages({.logicalDataSizeBytes = 1000, .onDiskSizeBytes = 515, .pageSizeBytes = 100}));
+
+    // Differences large enough to cross a bucket boundary should produce different results.
+    // onDisk 500 vs 520 with pageSize 100 → raw pagesInColl 5.0 vs 5.2, different buckets.
+    ASSERT_NE(
+        numPages({.logicalDataSizeBytes = 1000, .onDiskSizeBytes = 500, .pageSizeBytes = 100}),
+        numPages({.logicalDataSizeBytes = 1000, .onDiskSizeBytes = 520, .pageSizeBytes = 100}));
+}
 }  // namespace mongo::join_ordering

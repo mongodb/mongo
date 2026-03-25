@@ -31,6 +31,28 @@
 
 namespace mongo::join_ordering {
 
+double CatalogStats::numPagesInStorageEngineCache(const NamespaceString& nss) const {
+    const auto& coll = collStats.at(nss);
+    // Estimate the average in memory page size by first estimating the number of leaf pages in
+    // the collection. Take care to avoid division by 0 in cases of empty collection.
+    double avgInMemoryPageSize = 32 * 1024;
+    if (coll.onDiskSizeBytes > 0 && coll.logicalDataSizeBytes > 0) {
+        tassert(12259201, "pageSizeBytes must be > 0", coll.pageSizeBytes > 0);
+        double pagesInCollRaw = coll.onDiskSizeBytes / coll.pageSizeBytes;
+        // Quantize to the nearest power of 2^(1/4) to absorb small platform-dependent
+        // differences in onDiskSizeBytes (~3% observed between Ubuntu and Amazon Linux 2023 for
+        // TPC-H SF 0.1 orders table). This gives ~9.5% max quantization error, which is acceptable
+        // given the Mackert-Lohman formula is already approximate.
+        constexpr double kQuantizationGranularity = 4.0;
+        double pagesInColl =
+            std::pow(2.0,
+                     std::round(kQuantizationGranularity * std::log2(pagesInCollRaw)) /
+                         kQuantizationGranularity);
+        avgInMemoryPageSize = coll.logicalDataSizeBytes / pagesInColl;
+    }
+    return bytesInStorageEngineCache / avgInMemoryPageSize;
+}
+
 boost::optional<UniqueFieldSet> buildUniqueFieldSetForIndex(const BSONObj& keyPattern,
                                                             FieldToBit& fieldToBit) {
     UniqueFieldSet uniqueFields;

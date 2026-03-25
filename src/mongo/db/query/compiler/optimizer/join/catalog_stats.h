@@ -56,10 +56,18 @@ struct CollectionStats {
  * Statistics extracted from the catalog useful for cost estimation.
  */
 struct CatalogStats {
+
+    /**
+     * Estimate the number of pages from the given collection that would fit in the WT cache. This
+     * function is parameterized by collection as we've found that different collections can have
+     * very different average page sizes in memory.
+     */
+    double numPagesInStorageEngineCache(const NamespaceString& nss) const;
+
     stdx::unordered_map<NamespaceString, CollectionStats> collStats;
 
-    // Default to 2GiB / 32KiB as a start
-    double numPagesInStorageEngineCache{65536};
+    // Default to 2GiB.
+    double bytesInStorageEngineCache{2.0 * 1024 * 1024 * 1024};
 };
 
 // For a single collection, the maximum number of distinct fields that are part of unique indexes

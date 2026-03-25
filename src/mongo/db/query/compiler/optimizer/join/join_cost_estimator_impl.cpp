@@ -68,12 +68,15 @@ JoinCostEstimate JoinCostEstimatorImpl::costIndexScanFragment(NodeId nodeId) {
     // multikey and non-multikey indexes. In both cases, 'numDocsOutput' represents the number of
     // documents this plan fragment returns. In the multikey case, we just ignore the cost of
     // deduplicating RIDs as part of the index scan.
-    auto& collStats = _jCtx.catStats.collStats.at(_jCtx.joinGraph.getNode(nodeId).collectionName);
+    const auto& nss = _jCtx.joinGraph.getNode(nodeId).collectionName;
+    auto& collStats = _jCtx.catStats.collStats.at(nss);
     double numPagesColl = collStats.onDiskSizeBytes / collStats.pageSizeBytes;
-    CardinalityEstimate numRandIOs = CardinalityEstimate{
-        CardinalityType{estimateMackertLohmanRandIO(
-            numPagesColl, _jCtx.catStats.numPagesInStorageEngineCache, numDocsOutput.toDouble())},
-        EstimationSource::Sampling};
+    CardinalityEstimate numRandIOs =
+        CardinalityEstimate{CardinalityType{estimateMackertLohmanRandIO(
+                                numPagesColl,
+                                _jCtx.catStats.numPagesInStorageEngineCache(nss),
+                                numDocsOutput.toDouble())},
+                            EstimationSource::Sampling};
     return JoinCostEstimate(numDocsProcessed, numDocsOutput, numSeqIOs, numRandIOs);
 }
 
@@ -173,8 +176,8 @@ JoinCostEstimate JoinCostEstimatorImpl::costINLJFragment(const JoinPlanNode& lef
 
     // Model the random IO performed by doing the index probe and fetch.
     // TODO SERVER-117523: Integrate the height of the B-tree into the formula.
-    auto& rightCollStats =
-        _jCtx.catStats.collStats.at(_jCtx.joinGraph.getNode(right).collectionName);
+    const auto& nss = _jCtx.joinGraph.getNode(right).collectionName;
+    auto& rightCollStats = _jCtx.catStats.collStats.at(nss);
     double numPagesColl = rightCollStats.onDiskSizeBytes / rightCollStats.pageSizeBytes;
 
     // The cardinality of the outer side is the number of probes we will perform.
@@ -190,7 +193,7 @@ JoinCostEstimate JoinCostEstimatorImpl::costINLJFragment(const JoinPlanNode& lef
     CardinalityEstimate numRandIOsCollection = CardinalityEstimate{
         CardinalityType{estimateMackertLohmanRandIO(
             numPagesAccessedColl,
-            _jCtx.catStats.numPagesInStorageEngineCache,
+            _jCtx.catStats.numPagesInStorageEngineCache(nss),
             // In a MongoDB index, we append the RecordId (RID) to the index key. This means that a
             // single index probe will read index keys for the same join key in RID order. Because
             // MongoDB collections are clustered on RID, each fetch is not performing a truely
