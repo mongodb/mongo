@@ -28,7 +28,7 @@ notifications:
           grace_period_days: 2
     slack:
       overall_scope_tags:
-        - "<!here>"
+        - "<!subteam^S0ANBEJA4TH>" # database-leads+
         - "<@U0WM3PSMV>" # mira.carey@mongodb.com - SVP
         - "<@U03J9P66LRW>" # tyler.brock@mongodb.com - VP
         - "<@U032DKCUWQ4>" # mick.graham@mongodb.com - VP
