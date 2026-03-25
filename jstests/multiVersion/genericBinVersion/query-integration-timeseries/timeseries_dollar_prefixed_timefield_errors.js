@@ -136,14 +136,16 @@ function assertCollectionsQueryable(db) {
 }
 
 testPerformReplSetRollingRestart({
-    // support for $-prefixed timeField/metaField was removed in 8.3
+    // Support for $-prefixed timeField/metaField was removed in v8.3.
     startingVersion: {binVersion: "last-lts"},
     setupFn: setUp,
     beforeRestart: () => {},
-    afterSecondariesHaveRestarted: (primaryConnection, originalPrimary) => {
-        // Create on the node that wasn't restarted (still on last-lts).
-        assertCreateDollarCollectionsWorks(getDB(originalPrimary));
-        assertCollectionsQueryable(getDB(primaryConnection));
+    afterSecondariesHaveRestarted: (primaryConnection) => {
+        // Check that collections can be created and queried while secondaries are on the new
+        // version and primaries are on the old version.
+        const db = getDB(primaryConnection);
+        assertCreateDollarCollectionsWorks(db);
+        assertCollectionsQueryable(db);
     },
     afterPrimariesHaveRestarted: (primaryConnection) => {
         const db = getDB(primaryConnection);
