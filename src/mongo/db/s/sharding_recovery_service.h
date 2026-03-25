@@ -103,11 +103,17 @@ public:
      * Do nothing if the critical section is taken for that namespace and reason, and will invariant
      * otherwise since it is the responsibility of the caller to ensure that only one thread is
      * taking the critical section.
+     *
+     * The 'lockAcquisitionTimeout' parameter, when set, limits how much time this method will wait
+     * for db/collection lock acquisition. If unable to acquire the locks within the specified time
+     * limit, then a LockTimeout exception is thrown.
      */
-    void acquireRecoverableCriticalSectionBlockWrites(OperationContext* opCtx,
-                                                      const NamespaceString& nss,
-                                                      const BSONObj& reason,
-                                                      const WriteConcernOptions& writeConcern);
+    void acquireRecoverableCriticalSectionBlockWrites(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const BSONObj& reason,
+        const WriteConcernOptions& writeConcern,
+        boost::optional<Milliseconds> lockAcquisitionTimeout = boost::none);
 
     /**
      * Advances the recoverable critical section from the catch-up phase (i.e. blocking writes) to
@@ -118,11 +124,17 @@ public:
      * It updates a doc from `config.collectionCriticalSections` with `writeConcern` write concern.
      *
      * Do nothing if the critical section is already taken in commit phase.
+     *
+     * The 'lockAcquisitionTimeout' parameter, when set, limits how much time this method will wait
+     * for db/collection lock acquisition. If unable to acquire the locks within the specified time
+     * limit, then a LockTimeout exception is thrown.
      */
-    void promoteRecoverableCriticalSectionToBlockAlsoReads(OperationContext* opCtx,
-                                                           const NamespaceString& nss,
-                                                           const BSONObj& reason,
-                                                           const WriteConcernOptions& writeConcern);
+    void promoteRecoverableCriticalSectionToBlockAlsoReads(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const BSONObj& reason,
+        const WriteConcernOptions& writeConcern,
+        boost::optional<Milliseconds> lockAcquisitionTimeout = boost::none);
 
     /**
      * Releases the recoverable critical section for the given namespace and reason.
