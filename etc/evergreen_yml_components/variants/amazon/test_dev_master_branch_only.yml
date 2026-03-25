@@ -343,7 +343,7 @@ buildvariants:
       - name: .query_fuzzer
       - name: .updatefuzzer
       - name: .jstestfuzz
-      - name: .query_shape_hash_stability_fuzzer
+      - name: .query_shape_hash_stability_fuzzer !.exclude_from_sbe_variants
 
   - <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
     name: enterprise-amazon-linux2023-arm64-all-non-rollback-feature-flags-fuzzers
@@ -555,8 +555,8 @@ buildvariants:
         --excludeWithAnyTags=resource_intensive
     # This set of tasks is duplicated from amazon_linux2023_arm64_static-classic-engine-query-patch-only.
     tasks:
-      - name: .assigned_to_jira_team_server_query_execution !.requires_extra_system_deps !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias !.uwe
-      - name: .assigned_to_jira_team_server_query_execution !.requires_extra_system_deps .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias !.uwe
+      - name: .assigned_to_jira_team_server_query_execution !.requires_extra_system_deps !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias !.query_shape_hash_stability_fuzzer !.uwe
+      - name: .assigned_to_jira_team_server_query_execution !.requires_extra_system_deps .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias !.query_shape_hash_stability_fuzzer !.uwe
         distros:
           - amazon2023-arm64-atlas-latest-m8g-4xlarge
       - name: .assigned_to_jira_team_server_query_optimization !.requires_extra_system_deps !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.change_stream_fuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias

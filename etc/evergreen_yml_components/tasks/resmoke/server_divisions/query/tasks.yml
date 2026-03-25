@@ -2018,6 +2018,7 @@ tasks:
         "incompatible_tsan",
         "incompatible_aubsan",
         "incompatible_debug_mode",
+        "exclude_from_sbe_variants",
       ]
     commands:
       - func: "initialize multiversion tasks"
@@ -2049,6 +2050,7 @@ tasks:
         "incompatible_tsan",
         "incompatible_aubsan",
         "incompatible_debug_mode",
+        "exclude_from_sbe_variants",
       ]
     commands:
       - func: "initialize multiversion tasks"
@@ -2080,6 +2082,7 @@ tasks:
         "incompatible_tsan",
         "incompatible_aubsan",
         "incompatible_debug_mode",
+        "exclude_from_sbe_variants",
       ]
     commands:
       - func: "initialize multiversion tasks"
@@ -2111,6 +2114,7 @@ tasks:
         "incompatible_tsan",
         "incompatible_aubsan",
         "incompatible_debug_mode",
+        "exclude_from_sbe_variants",
       ]
     commands:
       - func: "initialize multiversion tasks"
