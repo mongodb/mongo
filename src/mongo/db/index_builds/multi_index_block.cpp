@@ -206,7 +206,6 @@ makeSpiller(OperationContext* opCtx,
                                                               BtreeExternalSortComparison>>(
             *opCtx,
             *shard_role_details::getRecoveryUnit(opCtx),
-            collection,
             entry->indexBuildInterceptor()->getSorterContainer(),
             containerStats,
             dbName,

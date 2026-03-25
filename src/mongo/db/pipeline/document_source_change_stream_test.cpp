@@ -3152,7 +3152,6 @@ TEST_F(ChangeStreamStageTest, MatchFiltersNoOp) {
 // `ci` ops should always be filtered out by the change stream.
 TEST_F(ChangeStreamStageTest, MatchFiltersContainerInsert) {
     auto ci = repl::makeContainerInsertOplogEntry(repl::OpTime(Timestamp(10, 10), 1 /* term */),
-                                                  nss,
                                                   "containerIdent"_sd,
                                                   1LL,
                                                   BSONBinData("V", 1, BinDataGeneral));
@@ -3164,7 +3163,7 @@ TEST_F(ChangeStreamStageTest, MatchFiltersContainerInsert) {
 // `cd` ops should always be filtered out by the change stream.
 TEST_F(ChangeStreamStageTest, MatchFiltersContainerDelete) {
     auto cd = repl::makeContainerDeleteOplogEntry(
-        repl::OpTime(Timestamp(10, 10), 1 /* term */), nss, "containerIdent"_sd, 1LL);
+        repl::OpTime(Timestamp(10, 10), 1 /* term */), "containerIdent"_sd, 1LL);
 
     checkTransformation(cd, boost::none);
 }

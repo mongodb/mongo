@@ -57,11 +57,12 @@ awaitIndex();
 // Inspect the oplog.rs for applyOps generated from the concurrent write during index build.
 const oplog = primary.getDB("local").getCollection("oplog.rs");
 const nss = coll.getFullName();
+const containerNss = "admin.$container";
 const applyOps = oplog
     .find({
         op: "c",
         "o.applyOps": {$exists: true},
-        "o.applyOps.ns": nss,
+        "o.applyOps.ns": {$in: [nss, containerNss]},
     })
     .sort({ts: 1})
     .toArray();

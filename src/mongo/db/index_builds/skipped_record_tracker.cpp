@@ -116,7 +116,6 @@ void SkippedRecordTracker::record(OperationContext* opCtx,
                 uassertStatusOK(container_write::insert(
                     opCtx,
                     *shard_role_details::getRecoveryUnit(opCtx),
-                    coll,
                     container,
                     reservedRidBlock[0].getLong(),
                     std::span<const char>(toInsert.objdata(), toInsert.objsize()),

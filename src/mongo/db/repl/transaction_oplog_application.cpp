@@ -208,15 +208,18 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
                 scopedVersionContext.emplace(opCtx, *op.getVersionContext());
             }
 
-            auto coll =
-                acquireCollection(opCtx,
-                                  CollectionAcquisitionRequest(op.getNss(),
-                                                               PlacementConcern::kPretendUnsharded,
-                                                               repl::ReadConcernArgs::get(opCtx),
-                                                               AcquisitionPrerequisites::kWrite),
-                                  MODE_IX);
-            const bool isDataConsistent = true;
             auto status = [&] {
+                if (op.isContainerOpType()) {
+                    return applyContainerOperation(
+                        opCtx, ApplierOperation{&op}, oplogApplicationMode);
+                }
+                auto coll = acquireCollection(
+                    opCtx,
+                    CollectionAcquisitionRequest(op.getNss(),
+                                                 PlacementConcern::kPretendUnsharded,
+                                                 repl::ReadConcernArgs::get(opCtx),
+                                                 AcquisitionPrerequisites::kWrite),
+                    MODE_IX);
                 if (op.isCommand()) {
                     invariant(op.getCommandType() == OplogEntry::CommandType::kCreate ||
                                   op.getCommandType() == OplogEntry::CommandType::kCreateIndexes,
@@ -224,16 +227,13 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
                               "'createIndexes' command");
                     return repl::applyCommand_inlock(
                         opCtx, ApplierOperation{&op}, oplogApplicationMode);
-                } else if (op.isContainerOpType()) {
-                    return applyContainerOperation_inlock(
-                        opCtx, ApplierOperation{&op}, oplogApplicationMode);
                 }
                 return repl::applyOperation_inlock(opCtx,
                                                    coll,
                                                    ApplierOperation{&op},
                                                    false /*alwaysUpsert*/,
                                                    oplogApplicationMode,
-                                                   isDataConsistent);
+                                                   true /*isDataConsistent*/);
             }();
             if (!status.isOK()) {
                 return status;
@@ -636,15 +636,16 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
         }
         auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
         auto ns = op.getNss();
-        auto uuid = *op.getUuid();
-        if (indexBuildsCoord->inProgForCollection(uuid, IndexBuildProtocol::kSinglePhase)) {
+        auto uuid = op.getUuid();
+        if (uuid.has_value() &&
+            indexBuildsCoord->inProgForCollection(*uuid, IndexBuildProtocol::kSinglePhase)) {
             LOGV2_WARNING(21849,
                           "Blocking replication until single-phase index builds are finished on "
                           "collection, due to prepared transaction",
                           "namespace"_attr = redact(toStringForLogging(ns)),
                           "uuid"_attr = uuid);
             indexBuildsCoord->awaitNoIndexBuildInProgressForCollection(
-                opCtx, uuid, IndexBuildProtocol::kSinglePhase);
+                opCtx, *uuid, IndexBuildProtocol::kSinglePhase);
         }
     }
 

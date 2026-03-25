@@ -41,7 +41,6 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/op_observer",
-        "//src/mongo/db/shard_role:shard_role_api_stor_ex",
         "//src/mongo/db/storage:container",
     ],
 )

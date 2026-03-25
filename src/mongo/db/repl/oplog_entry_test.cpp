@@ -392,7 +392,7 @@ TEST_F(OplogEntryTest, ContainerInsert) {
     StringData containerIdent = "container_ident";
     auto key = BSONBinData("k", 1, BinDataType::BinDataGeneral);
     auto value = BSONBinData("v", 1, BinDataType::BinDataGeneral);
-    auto entry = makeContainerInsertOplogEntry(entryOpTime, nss, containerIdent, key, value);
+    auto entry = makeContainerInsertOplogEntry(entryOpTime, containerIdent, key, value);
 
     ASSERT_FALSE(entry.isCommand());
     ASSERT_FALSE(entry.isPartialTransaction());
@@ -410,7 +410,7 @@ TEST_F(OplogEntryTest, ContainerInsert) {
 TEST_F(OplogEntryTest, ContainerDelete) {
     StringData containerIdent = "container_ident";
     auto key = BSONBinData("k", 1, BinDataType::BinDataGeneral);
-    auto entry = makeContainerDeleteOplogEntry(entryOpTime, nss, containerIdent, key);
+    auto entry = makeContainerDeleteOplogEntry(entryOpTime, containerIdent, key);
 
     ASSERT_FALSE(entry.isCommand());
     ASSERT_FALSE(entry.isPartialTransaction());

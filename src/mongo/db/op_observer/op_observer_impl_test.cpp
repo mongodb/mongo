@@ -4636,7 +4636,7 @@ TEST_F(BatchedWriteOutputsTest, TestSingleContainerInsertIsNotInApplyOps) {
             int64_t key = 100;
             std::string value = "things";
             opCtx->getServiceContext()->getOpObserver()->onContainerInsert(
-                opCtx, _nss, uuid, ident, key, value);
+                opCtx, ident, key, value);
         },
         false /*isRetryable*/);
 }
@@ -4647,8 +4647,7 @@ TEST_F(BatchedWriteOutputsTest, TestSingleContainerDeleteIsNotInApplyOps) {
             auto ident = "ident";
             int64_t key = 100;
 
-            opCtx->getServiceContext()->getOpObserver()->onContainerDelete(
-                opCtx, _nss, uuid, ident, key);
+            opCtx->getServiceContext()->getOpObserver()->onContainerDelete(opCtx, ident, key);
         },
         false /*isRetryable*/);
 }
@@ -6252,8 +6251,8 @@ TEST_F(OpObserverTest, OnContainerInsert) {
     std::string value2 = "other things";
 
     OpObserverImpl opObserver{std::make_unique<OperationLoggerImpl>()};
-    opObserver.onContainerInsert(opCtx.get(), nss, uuid, ident, key1, value1);
-    opObserver.onContainerInsert(opCtx.get(), nss, uuid, ident, key2, value2);
+    opObserver.onContainerInsert(opCtx.get(), ident, key1, value1);
+    opObserver.onContainerInsert(opCtx.get(), ident, key2, value2);
 
     auto entries = getNOplogEntries(opCtx.get(), 2);
     auto entry1 = assertGet(OplogEntry::parse(entries[0]));
@@ -6300,8 +6299,8 @@ TEST_F(OpObserverTest, OnContainerDelete) {
     std::string key2 = "stuff";
 
     OpObserverImpl opObserver{std::make_unique<OperationLoggerImpl>()};
-    opObserver.onContainerDelete(opCtx.get(), nss, uuid, ident, key1);
-    opObserver.onContainerDelete(opCtx.get(), nss, uuid, ident, key2);
+    opObserver.onContainerDelete(opCtx.get(), ident, key1);
+    opObserver.onContainerDelete(opCtx.get(), ident, key2);
 
     auto entries = getNOplogEntries(opCtx.get(), 2);
     auto entry1 = assertGet(OplogEntry::parse(entries[0]));
@@ -6365,9 +6364,9 @@ TEST_F(BatchedWriteOutputsTest, OnContainerInsertBatched) {
     std::string value2 = "other things";
 
     opCtx->getServiceContext()->getOpObserver()->onContainerInsert(
-        opCtx.get(), _nss, uuid, ident, key1, value1);
+        opCtx.get(), ident, key1, value1);
     opCtx->getServiceContext()->getOpObserver()->onContainerInsert(
-        opCtx.get(), _nss, uuid, ident, key2, value2);
+        opCtx.get(), ident, key2, value2);
 
     wuow.commit();
 
@@ -6420,10 +6419,8 @@ TEST_F(BatchedWriteOutputsTest, OnContainerDeleteBatched) {
     int64_t key1 = 100;
     std::string key2 = "stuff";
 
-    opCtx->getServiceContext()->getOpObserver()->onContainerDelete(
-        opCtx.get(), _nss, uuid, ident, key1);
-    opCtx->getServiceContext()->getOpObserver()->onContainerDelete(
-        opCtx.get(), _nss, uuid, ident, key2);
+    opCtx->getServiceContext()->getOpObserver()->onContainerDelete(opCtx.get(), ident, key1);
+    opCtx->getServiceContext()->getOpObserver()->onContainerDelete(opCtx.get(), ident, key2);
 
     wuow.commit();
 
@@ -6469,9 +6466,8 @@ TEST_F(BatchedWriteOutputsTest, OnContainerInsertDeleteBatchedWithInsertDeleteUp
     std::string value2 = "other things";
 
     opCtx->getServiceContext()->getOpObserver()->onContainerInsert(
-        opCtx.get(), _nss, uuid, ident, key1, value1);
-    opCtx->getServiceContext()->getOpObserver()->onContainerDelete(
-        opCtx.get(), _nss, uuid, ident, key2);
+        opCtx.get(), ident, key1, value1);
+    opCtx->getServiceContext()->getOpObserver()->onContainerDelete(opCtx.get(), ident, key2);
     {
         std::vector<InsertStatement> insert;
         insert.emplace_back(BSON("_id" << 0));
@@ -6554,8 +6550,8 @@ TEST_F(OpObserverTransactionTest, OnContainerInsert) {
     std::string value1 = "things";
     std::string value2 = "other things";
 
-    opObserver().onContainerInsert(opCtx(), nss, uuid, ident, key1, value1);
-    opObserver().onContainerInsert(opCtx(), nss, uuid, ident, key2, value2);
+    opObserver().onContainerInsert(opCtx(), ident, key1, value1);
+    opObserver().onContainerInsert(opCtx(), ident, key2, value2);
 
     commitUnpreparedTransaction<OpObserverImpl>(opCtx(), opObserver());
 
@@ -6609,8 +6605,8 @@ TEST_F(OpObserverTransactionTest, OnContainerDelete) {
     int64_t key1 = 100;
     std::string key2 = "stuff";
 
-    opObserver().onContainerDelete(opCtx(), nss, uuid, ident, key1);
-    opObserver().onContainerDelete(opCtx(), nss, uuid, ident, key2);
+    opObserver().onContainerDelete(opCtx(), ident, key1);
+    opObserver().onContainerDelete(opCtx(), ident, key2);
 
     commitUnpreparedTransaction<OpObserverImpl>(opCtx(), opObserver());
 
@@ -6655,8 +6651,8 @@ TEST_F(OpObserverTransactionTest, OnContainerInsertDeleteWithInsertDeleteUpdate)
     std::string value1 = "things";
     std::string value2 = "other things";
 
-    opObserver().onContainerInsert(opCtx(), nss, uuid, ident, key1, value1);
-    opObserver().onContainerDelete(opCtx(), nss, uuid, ident, key2);
+    opObserver().onContainerInsert(opCtx(), ident, key1, value1);
+    opObserver().onContainerDelete(opCtx(), ident, key2);
     {
         std::vector<InsertStatement> insert;
         insert.emplace_back(BSON("_id" << 0));

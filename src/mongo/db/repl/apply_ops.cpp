@@ -143,13 +143,7 @@ Status _applyOps(OperationContext* opCtx,
                                                         .acquireFCVSnapshot()) &&
                                             getTestCommandsEnabled());
                             }
-                            auto coll = acquireCollection(opCtx,
-                                                          {nss,
-                                                           PlacementConcern::kPretendUnsharded,
-                                                           ReadConcernArgs::get(opCtx),
-                                                           AcquisitionPrerequisites::kWrite},
-                                                          MODE_IX);
-                            uassertStatusOK(applyContainerOperation_inlock(
+                            uassertStatusOK(applyContainerOperation(
                                 opCtx, ApplierOperation{&entry}, oplogApplicationMode));
                             return Status::OK();
                         }

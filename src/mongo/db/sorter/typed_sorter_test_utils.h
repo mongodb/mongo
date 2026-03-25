@@ -32,7 +32,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/shard_role/shard_catalog/collection_mock.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sorter/container_based_spiller.h"
 #include "mongo/db/sorter/file_based_spiller.h"
@@ -196,11 +195,7 @@ struct ContainerTraits {
     static constexpr int kCorruptedStorageErrorCode = 0;
 
     explicit ContainerTraits(ServiceContext::UniqueOperationContext opCtx)
-        : _opCtx(std::move(opCtx)),
-          _containerStats(&_tracker),
-          _coll(std::make_shared<CollectionMock>(
-              NamespaceString::createNamespaceString_forTest("test", "coll"))),
-          _collPtr(_coll.get()) {
+        : _opCtx(std::move(opCtx)), _containerStats(&_tracker) {
         auto* replCoord = repl::ReplicationCoordinator::get(_opCtx.get());
         auto* replCoordMock = dynamic_cast<repl::ReplicationCoordinatorMock*>(replCoord);
         ASSERT(replCoordMock);
@@ -229,10 +224,9 @@ struct ContainerTraits {
             .table = std::move(table),
             .spiller = Spiller(*_opCtx,
                                ru,
-                               _collPtr,
                                container,
                                _containerStats,
-                               _collPtr->ns().dbName(),
+                               boost::none,
                                checksumVersion,
                                insertionBatchSize,
                                testSpillingMinAvailableDiskSpaceBytes),
@@ -259,7 +253,6 @@ struct ContainerTraits {
         return std::make_unique<SortedContainerWriter<IntWrapper, IntWrapper>>(
             *_opCtx,
             ru,
-            _collPtr,
             container,
             _containerStats,
             opts,
@@ -305,8 +298,6 @@ private:
     SorterTracker _tracker;
     SorterContainerStats _containerStats;
     std::shared_ptr<TemporaryRecordStore> _writerTable;
-    std::shared_ptr<CollectionMock> _coll;
-    CollectionPtr _collPtr;
     int64_t _nextKey = 1;
 };
 

@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/storage/container.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/modules.h"
@@ -47,7 +46,6 @@ namespace mongo::container_write {
  */
 Status insert(OperationContext* opCtx,
               RecoveryUnit& ru,
-              const CollectionPtr& coll,
               IntegerKeyedContainer& container,
               int64_t key,
               std::span<const char> value,
@@ -58,7 +56,6 @@ Status insert(OperationContext* opCtx,
  */
 Status insert(OperationContext* opCtx,
               RecoveryUnit& ru,
-              const CollectionPtr& coll,
               StringKeyedContainer& container,
               std::span<const char> key,
               std::span<const char> value,
@@ -69,7 +66,6 @@ Status insert(OperationContext* opCtx,
  */
 Status remove(OperationContext* opCtx,
               RecoveryUnit& ru,
-              const CollectionPtr& coll,
               IntegerKeyedContainer& container,
               int64_t key);
 
@@ -78,7 +74,6 @@ Status remove(OperationContext* opCtx,
  */
 Status remove(OperationContext* opCtx,
               RecoveryUnit& ru,
-              const CollectionPtr& coll,
               StringKeyedContainer& container,
               std::span<const char> key);
 

@@ -137,28 +137,18 @@ public:
                   OpStateAccumulator* opAccumulator = nullptr) final;
 
     void onContainerInsert(OperationContext* opCtx,
-                           const NamespaceString& ns,
-                           const UUID& collUUID,
                            StringData ident,
                            int64_t key,
                            std::span<const char> value) final;
 
     void onContainerInsert(OperationContext* opCtx,
-                           const NamespaceString& ns,
-                           const UUID& collUUID,
                            StringData ident,
                            std::span<const char> key,
                            std::span<const char> value) final;
 
-    void onContainerDelete(OperationContext* opCtx,
-                           const NamespaceString& ns,
-                           const UUID& collUUID,
-                           StringData ident,
-                           int64_t key) final;
+    void onContainerDelete(OperationContext* opCtx, StringData ident, int64_t key) final;
 
     void onContainerDelete(OperationContext* opCtx,
-                           const NamespaceString& ns,
-                           const UUID& collUUID,
                            StringData ident,
                            std::span<const char> key) final;
 

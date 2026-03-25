@@ -2308,8 +2308,8 @@ TEST_F(OplogApplierImplTest, ApplyContainerOperations) {
 
     auto k = BSONBinData("K", 1, BinDataGeneral);
     auto v = BSONBinData("V", 1, BinDataGeneral);
-    auto insertEntry = makeContainerInsertOplogEntry(nextOpTime(), nss, ident, k, v);
-    auto deleteEntry = makeContainerDeleteOplogEntry(nextOpTime(), nss, ident, k);
+    auto insertEntry = makeContainerInsertOplogEntry(nextOpTime(), ident, k, v);
+    auto deleteEntry = makeContainerDeleteOplogEntry(nextOpTime(), ident, k);
 
     ASSERT_OK(_applyOplogEntryOrGroupedInsertsWrapper(
         _opCtx.get(), ApplierOperation{&insertEntry}, OplogApplication::Mode::kSecondary));
@@ -2326,10 +2326,10 @@ TEST_F(OplogApplierImplTest, ContainerOplogEntryHashesOnKey) {
     auto k2 = BSONBinData("K", 2, BinDataGeneral);
     auto v = BSONBinData("V", 1, BinDataGeneral);
 
-    auto insertEntry1 = makeContainerInsertOplogEntry(nextOpTime(), nss, ident1, k1, v);
-    auto insertEntry2 = makeContainerInsertOplogEntry(nextOpTime(), nss, ident2, k1, v);
-    auto deleteEntry1 = makeContainerDeleteOplogEntry(nextOpTime(), nss, ident1, k1);
-    auto deleteEntry2 = makeContainerDeleteOplogEntry(nextOpTime(), nss, ident1, k2);
+    auto insertEntry1 = makeContainerInsertOplogEntry(nextOpTime(), ident1, k1, v);
+    auto insertEntry2 = makeContainerInsertOplogEntry(nextOpTime(), ident2, k1, v);
+    auto deleteEntry1 = makeContainerDeleteOplogEntry(nextOpTime(), ident1, k1);
+    auto deleteEntry2 = makeContainerDeleteOplogEntry(nextOpTime(), ident1, k2);
 
     CachedCollectionProperties collPropertiesCache;
     uint32_t id1 =

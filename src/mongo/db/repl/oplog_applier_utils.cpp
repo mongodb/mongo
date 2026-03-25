@@ -597,13 +597,7 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
         return status;
     } else if (DurableOplogEntry::isContainerOpType(opType)) {
         return writeConflictRetry(opCtx, "applyOplogEntryOrGroupedInserts_container", nss, [&] {
-            auto coll = acquireCollection(opCtx,
-                                          {nss,
-                                           PlacementConcern::kPretendUnsharded,
-                                           ReadConcernArgs::get(opCtx),
-                                           AcquisitionPrerequisites::kWrite},
-                                          MODE_IX);
-            Status status = applyContainerOperation_inlock(opCtx, op, oplogApplicationMode);
+            Status status = applyContainerOperation(opCtx, op, oplogApplicationMode);
             incrementOpsAppliedStats();
             return status;
         });

@@ -109,28 +109,18 @@ public:
                   OpStateAccumulator* opAccumulator = nullptr) override {}
 
     void onContainerInsert(OperationContext* opCtx,
-                           const NamespaceString& ns,
-                           const UUID& collUUID,
                            StringData ident,
                            int64_t key,
                            std::span<const char> value) override {}
 
     void onContainerInsert(OperationContext* opCtx,
-                           const NamespaceString& ns,
-                           const UUID& collUUID,
                            StringData ident,
                            std::span<const char> key,
                            std::span<const char> value) override {}
 
-    void onContainerDelete(OperationContext* opCtx,
-                           const NamespaceString& ns,
-                           const UUID& collUUID,
-                           StringData ident,
-                           int64_t key) override {}
+    void onContainerDelete(OperationContext* opCtx, StringData ident, int64_t key) override {}
 
     void onContainerDelete(OperationContext* opCtx,
-                           const NamespaceString& ns,
-                           const UUID& collUUID,
                            StringData ident,
                            std::span<const char> key) override {}
 

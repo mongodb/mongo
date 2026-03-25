@@ -199,7 +199,6 @@ public:
 
     SortedContainerWriter(OperationContext& opCtx,
                           RecoveryUnit& ru,
-                          const CollectionPtr& collection,
                           IntegerKeyedContainer& container,
                           SorterContainerStats& containerStats,
                           const SortOptions& opts,
@@ -209,7 +208,6 @@ public:
         : SortedStorageWriter<Key, Value>(opts, settings, checksumVersion),
           _opCtx(opCtx),
           _ru(ru),
-          _collection(collection),
           _container(container),
           _containerStats(containerStats),
           _nextKey(nextKey),
@@ -230,13 +228,8 @@ public:
             size == 0 ? std::span<const char>{} : std::span<const char>(buffer.buf(), size);
 
         WriteUnitOfWork wuow(&_opCtx);
-        uassertStatusOK(container_write::insert(&_opCtx,
-                                                _ru,
-                                                _collection,
-                                                _container,
-                                                currentKey,
-                                                value,
-                                                container::ExistingKeyPolicy::overwrite));
+        uassertStatusOK(container_write::insert(
+            &_opCtx, _ru, _container, currentKey, value, container::ExistingKeyPolicy::overwrite));
         wuow.commit();
 
         if (size > 0) {
@@ -267,7 +260,6 @@ public:
 private:
     OperationContext& _opCtx;
     RecoveryUnit& _ru;
-    const CollectionPtr& _collection;
     IntegerKeyedContainer& _container;
     SorterContainerStats& _containerStats;
     int64_t _nextKey;
@@ -281,7 +273,6 @@ public:
 
     ContainerBasedSorterStorage(OperationContext& opCtx,
                                 RecoveryUnit& ru,
-                                const CollectionPtr& collection,
                                 IntegerKeyedContainer& container,
                                 SorterContainerStats& stats,
                                 int64_t currKey,
@@ -290,7 +281,6 @@ public:
         : SorterStorageBase<Key, Value>(std::move(dbName), checksumVersion),
           _opCtx(opCtx),
           _ru(ru),
-          _collection(collection),
           _container(container),
           _stats(stats),
           _currKey(currKey) {}
@@ -298,15 +288,7 @@ public:
     std::unique_ptr<SortedStorageWriter<Key, Value>> makeWriter(const SortOptions& opts,
                                                                 const Settings& settings) override {
         return std::make_unique<sorter::SortedContainerWriter<Key, Value>>(
-            _opCtx,
-            _ru,
-            _collection,
-            _container,
-            _stats,
-            opts,
-            _currKey,
-            this->getChecksumVersion(),
-            settings);
+            _opCtx, _ru, _container, _stats, opts, _currKey, this->getChecksumVersion(), settings);
     };
 
     size_t getIteratorSize() override {
@@ -340,14 +322,13 @@ public:
 
     void remove(int64_t key) {
         WriteUnitOfWork wuow{&_opCtx};
-        uassertStatusOK(container_write::remove(&_opCtx, _ru, _collection, _container, key));
+        uassertStatusOK(container_write::remove(&_opCtx, _ru, _container, key));
         wuow.commit();
     }
 
 private:
     OperationContext& _opCtx;
     RecoveryUnit& _ru;
-    const CollectionPtr& _collection;
     IntegerKeyedContainer& _container;
     SorterContainerStats& _stats;
     int64_t _currKey;
@@ -358,7 +339,6 @@ class ContainerBasedSpiller : public SorterSpillerBase<Key, Value, Comparator> {
 public:
     ContainerBasedSpiller(OperationContext& opCtx,
                           RecoveryUnit& ru,
-                          const CollectionPtr& collection,
                           IntegerKeyedContainer& container,
                           SorterContainerStats& stats,
                           boost::optional<DatabaseName> dbName,
@@ -367,7 +347,7 @@ public:
                           int64_t minAvailableDiskBytesToSpill)
         : SorterSpillerBase<Key, Value, Comparator>(
               std::make_unique<ContainerBasedSorterStorage<Key, Value>>(
-                  opCtx, ru, collection, container, stats, 1, std::move(dbName), checksumVersion),
+                  opCtx, ru, container, stats, 1, std::move(dbName), checksumVersion),
               minAvailableDiskBytesToSpill),
           _opCtx(opCtx),
           _ru(ru),

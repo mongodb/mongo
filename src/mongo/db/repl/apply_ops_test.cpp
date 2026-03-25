@@ -666,7 +666,6 @@ TEST_F(ApplyOpsTest, ContainerOpsRequireFeatureFlagAndTestCommands) {
 
     auto makeApplyOpsCmd = [&](OpTime opTime) {
         auto entry = makeContainerInsertOplogEntry(opTime,
-                                                   nss,
                                                    containerIdent,
                                                    BSONBinData("K", 1, BinDataGeneral),
                                                    BSONBinData("V", 1, BinDataGeneral));

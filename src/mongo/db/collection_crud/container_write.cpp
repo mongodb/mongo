@@ -29,12 +29,13 @@
 
 #include "mongo/db/collection_crud/container_write.h"
 
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 
 namespace mongo::container_write {
 namespace {
-void assertCanAcceptContainerWrites(OperationContext* opCtx, const NamespaceString& ns) {
+void assertCanAcceptContainerWrites(OperationContext* opCtx) {
     const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     uassert(ErrorCodes::InvalidOptions,
             "Container write support is not enabled",
@@ -43,80 +44,76 @@ void assertCanAcceptContainerWrites(OperationContext* opCtx, const NamespaceStri
                     VersionContext::getDecoration(opCtx), fcv));
 
     uassert(ErrorCodes::NotWritablePrimary,
-            str::stream() << "Not primary while inserting to container for "
-                          << ns.toStringForErrorMsg(),
-            repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns));
+            str::stream() << "Not primary while inserting to container",
+            repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(
+                opCtx, NamespaceString::kContainerNamespace));
 }
 }  // namespace
 
 Status insert(OperationContext* opCtx,
               RecoveryUnit& ru,
-              const CollectionPtr& coll,
               IntegerKeyedContainer& container,
               int64_t key,
               std::span<const char> value,
               container::ExistingKeyPolicy policy) {
-    assertCanAcceptContainerWrites(opCtx, coll->ns());
+    assertCanAcceptContainerWrites(opCtx);
     auto status = container.insert(ru, key, value, policy);
     if (!status.isOK()) {
         return status;
     }
 
     opCtx->getServiceContext()->getOpObserver()->onContainerInsert(
-        opCtx, coll->ns(), coll->uuid(), container.ident()->getIdent(), key, value);
+        opCtx, container.ident()->getIdent(), key, value);
 
     return Status::OK();
 }
 
 Status insert(OperationContext* opCtx,
               RecoveryUnit& ru,
-              const CollectionPtr& coll,
               StringKeyedContainer& container,
               std::span<const char> key,
               std::span<const char> value,
               container::ExistingKeyPolicy policy) {
-    assertCanAcceptContainerWrites(opCtx, coll->ns());
+    assertCanAcceptContainerWrites(opCtx);
     auto status = container.insert(ru, key, value, policy);
     if (!status.isOK()) {
         return status;
     }
 
     opCtx->getServiceContext()->getOpObserver()->onContainerInsert(
-        opCtx, coll->ns(), coll->uuid(), container.ident()->getIdent(), key, value);
+        opCtx, container.ident()->getIdent(), key, value);
 
     return Status::OK();
 }
 
 Status remove(OperationContext* opCtx,
               RecoveryUnit& ru,
-              const CollectionPtr& coll,
               IntegerKeyedContainer& container,
               int64_t key) {
-    assertCanAcceptContainerWrites(opCtx, coll->ns());
+    assertCanAcceptContainerWrites(opCtx);
     auto status = container.remove(ru, key);
     if (!status.isOK()) {
         return status;
     }
 
     opCtx->getServiceContext()->getOpObserver()->onContainerDelete(
-        opCtx, coll->ns(), coll->uuid(), container.ident()->getIdent(), key);
+        opCtx, container.ident()->getIdent(), key);
 
     return Status::OK();
 }
 
 Status remove(OperationContext* opCtx,
               RecoveryUnit& ru,
-              const CollectionPtr& coll,
               StringKeyedContainer& container,
               std::span<const char> key) {
-    assertCanAcceptContainerWrites(opCtx, coll->ns());
+    assertCanAcceptContainerWrites(opCtx);
     auto status = container.remove(ru, key);
     if (!status.isOK()) {
         return status;
     }
 
     opCtx->getServiceContext()->getOpObserver()->onContainerDelete(
-        opCtx, coll->ns(), coll->uuid(), container.ident()->getIdent(), key);
+        opCtx, container.ident()->getIdent(), key);
 
     return Status::OK();
 }

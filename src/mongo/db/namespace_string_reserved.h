@@ -307,4 +307,7 @@
                                                                                                    \
     /*  Namespace for storing feature compatibility version changes block documents */             \
     X(kBlockFCVChangesNamespace, DatabaseName::kConfig, "system.block_fcv_changes"_sd)             \
+                                                                                                   \
+    /*  Namespace used for container oplog entries. */                                             \
+    X(kContainerNamespace, DatabaseName::kAdmin, "$container"_sd)                                  \
     /**/

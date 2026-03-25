@@ -63,18 +63,10 @@ StatusWith<UniqueBuffer> _get(OperationContext* opCtx, StringData ident, int64_t
 }
 
 /**
- * Helper for applyContainerOperation_inlock that satisfies its preconditions.
+ * Helper for applyContainerOperation that satisfies its preconditions.
  */
-Status applyContainerOpHelper(OperationContext* opCtx,
-                              const OplogEntry& e,
-                              LockMode collMode = MODE_IX) {
-    const auto nss = e.getNss();
-
-    boost::optional<AutoGetCollection> coll;
-    if (collMode != MODE_NONE) {
-        coll.emplace(opCtx, nss, collMode);
-    }
-    return applyContainerOperation_inlock(opCtx, {&e}, OplogApplication::Mode::kSecondary);
+Status applyContainerOpHelper(OperationContext* opCtx, const OplogEntry& e) {
+    return applyContainerOperation(opCtx, {&e}, OplogApplication::Mode::kSecondary);
 }
 
 DurableOplogEntryParams makeBaseParams(const NamespaceString& nss,
@@ -111,7 +103,7 @@ protected:
         _trsBytes = se->getEngine()->makeTemporaryRecordStore(*ru, _bytesIdent, KeyFormat::String);
         _trsInt = se->getEngine()->makeTemporaryRecordStore(*ru, _intIdent, KeyFormat::Long);
         swt.commit();
-        _nss = NamespaceString::createNamespaceString_forTest("test.t");
+        _nss = NamespaceString::kContainerNamespace;
     }
 
     ServiceContext::UniqueOperationContext _opCtx;
@@ -130,11 +122,11 @@ TEST_F(ApplyContainerOpsTest, ContainerOpApplyByteKey) {
     auto v4 = BSONBinData("D", 1, BinDataGeneral);
 
     auto makeInsert = [&](BSONBinData k, BSONBinData v) {
-        return makeContainerInsertOplogEntry(OpTime(), _nss, _bytesIdent, k, v);
+        return makeContainerInsertOplogEntry(OpTime(), _bytesIdent, k, v);
     };
 
     auto makeDelete = [&](BSONBinData k) {
-        return makeContainerDeleteOplogEntry(OpTime(), _nss, _bytesIdent, k);
+        return makeContainerDeleteOplogEntry(OpTime(), _bytesIdent, k);
     };
 
     auto makeGet = [&](auto k) {
@@ -184,10 +176,10 @@ TEST_F(ApplyContainerOpsTest, ContainerOpApplyIntKey) {
     auto v4 = BSONBinData("D", 1, BinDataGeneral);
 
     auto makeInsert = [&](int64_t k, BSONBinData v) {
-        return makeContainerInsertOplogEntry(OpTime(), _nss, _intIdent, k, v);
+        return makeContainerInsertOplogEntry(OpTime(), _intIdent, k, v);
     };
     auto makeDelete = [&](int64_t k) {
-        return makeContainerDeleteOplogEntry(OpTime(), _nss, _intIdent, k);
+        return makeContainerDeleteOplogEntry(OpTime(), _intIdent, k);
     };
     auto makeGet = [&](int64_t k) {
         return _get(_opCtx.get(), _intIdent, k);
@@ -234,7 +226,7 @@ TEST_F(ApplyContainerOpsTest, ContainerOpsApplyOpsTimestampVisibility) {
 
     const int64_t k = 1;
     const auto v = BSONBinData("A", 1, BinDataGeneral);
-    auto entry = makeContainerInsertOplogEntry(OpTime(), _nss, _intIdent, k, v);
+    auto entry = makeContainerInsertOplogEntry(OpTime(), _intIdent, k, v);
 
     // Having an applyOps timestamp and non-replicated writes matches the conditions of secondary
     // application of container ops in a wrapping apply ops
@@ -269,7 +261,7 @@ TEST_F(ApplyContainerOpsTest, ContainerOpsSingleOpTimestampVisibility) {
 
     const int64_t k = 1;
     const auto v = BSONBinData("A", 1, BinDataGeneral);
-    auto entry = makeContainerInsertOplogEntry(OpTime(commitTs, 0), _nss, _intIdent, k, v);
+    auto entry = makeContainerInsertOplogEntry(OpTime(commitTs, 0), _intIdent, k, v);
 
     // Non-replicated writes with a timestamp on the oplog entry matches the conditions of
     // secondary application of a single container op.
@@ -308,24 +300,13 @@ TEST_F(ApplyContainerOpsTest, ApplyContainerOpInvalidOpType) {
     ASSERT_THROWS_CODE(applyContainerOpHelper(_opCtx.get(), {op}), DBException, 10704705);
 }
 
-using ApplyContainerOpsTestDeathTest = ApplyContainerOpsTest;
-DEATH_TEST_F(ApplyContainerOpsTestDeathTest, ApplyContainerOpRequiresIXLock, "invariant") {
-    int64_t k = 1;
-    auto v = BSONBinData("V", 1, BinDataGeneral);
-
-    OplogEntry op = {DurableOplogEntry{
-        makeBaseParams(_nss, _intIdent, OpTypeEnum::kContainerInsert, BSON("k" << k << "v" << v))}};
-
-    auto status = applyContainerOpHelper(_opCtx.get(), op, MODE_NONE);
-}
-
 TEST_F(ApplyContainerOpsTest, ContainerOpsRequiresTimestamp) {
     int64_t k = 1;
     auto v = BSONBinData("V", 1, BinDataGeneral);
     auto nullOpTime = OpTime();
 
-    auto insertEntry = makeContainerInsertOplogEntry(nullOpTime, _nss, _bytesIdent, k, v);
-    auto deleteEntry = makeContainerDeleteOplogEntry(nullOpTime, _nss, _bytesIdent, k);
+    auto insertEntry = makeContainerInsertOplogEntry(nullOpTime, _bytesIdent, k, v);
+    auto deleteEntry = makeContainerDeleteOplogEntry(nullOpTime, _bytesIdent, k);
 
     repl::UnreplicatedWritesBlock uwb(_opCtx.get());
 
@@ -338,8 +319,8 @@ TEST_F(ApplyContainerOpsTest, ContainerOpsRejectMismatchedExistingCommitTimestam
     const Timestamp existingTs(10, 1);
     int64_t k = 1;
     auto v = BSONBinData("V", 1, BinDataGeneral);
-    auto insertEntry = makeContainerInsertOplogEntry(OpTime(commitTs, 0), _nss, _bytesIdent, k, v);
-    auto deleteEntry = makeContainerDeleteOplogEntry(OpTime(commitTs, 0), _nss, _bytesIdent, k);
+    auto insertEntry = makeContainerInsertOplogEntry(OpTime(commitTs, 0), _bytesIdent, k, v);
+    auto deleteEntry = makeContainerDeleteOplogEntry(OpTime(commitTs, 0), _bytesIdent, k);
 
     repl::UnreplicatedWritesBlock uwb(_opCtx.get());
     auto* ru = shard_role_details::getRecoveryUnit(_opCtx.get());

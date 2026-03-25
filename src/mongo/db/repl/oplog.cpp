@@ -529,9 +529,11 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
     });
     // All collections should have UUIDs now, so all insert, update, and delete oplog entries should
     // also have uuids. Some no-op (n) and command (c) entries may still elide the uuid field.
+    // Container operations (ci/cd) are not collection-scoped and do not carry a UUID.
     invariant(oplogEntry->getUuid() || oplogEntry->getOpType() == OpTypeEnum::kNoop ||
                   oplogEntry->getOpType() == OpTypeEnum::kCommand ||
-                  oplogEntry->getOpType() == OpTypeEnum::kKeyMaterial,
+                  oplogEntry->getOpType() == OpTypeEnum::kKeyMaterial ||
+                  DurableOplogEntry::isContainerOpType(oplogEntry->getOpType()),
               str::stream() << "Expected uuid for logOp with oplog entry: "
                             << redact(oplogEntry->toBSON()));
 
@@ -2885,11 +2887,9 @@ Status applyOperation_inlock(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status applyContainerOperation_inlock(OperationContext* opCtx,
-                                      const ApplierOperation& op,
-                                      OplogApplication::Mode mode) {
-    const auto& nss = op->getNss();
-    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IX));
+Status applyContainerOperation(OperationContext* opCtx,
+                               const ApplierOperation& op,
+                               OplogApplication::Mode mode) {
 
     auto ident = op->getContainer();
     auto* engine = opCtx->getServiceContext()->getStorageEngine();

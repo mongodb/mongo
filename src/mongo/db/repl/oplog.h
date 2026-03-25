@@ -280,9 +280,9 @@ Status applyOperation_inlock(OperationContext* opCtx,
  *
  * Returns OK on success, or the the failure status reported by the storage engine.
  */
-Status applyContainerOperation_inlock(OperationContext* opCtx,
-                                      const ApplierOperation& op,
-                                      OplogApplication::Mode oplogApplicationMode);
+Status applyContainerOperation(OperationContext* opCtx,
+                               const ApplierOperation& op,
+                               OplogApplication::Mode oplogApplicationMode);
 
 /**
  * Take a command op and apply it locally

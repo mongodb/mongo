@@ -468,7 +468,6 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
 
             result = container_write::insert(opCtx,
                                              ru,
-                                             coll,
                                              _newInterface->getContainer(),
                                              keyString.getView(),
                                              keyString.getTypeBitsView(),
@@ -532,7 +531,7 @@ void SortedDataIndexAccessMethod::removeOneKey(
     try {
         if (containerWriteBehavior == ContainerWriteBehavior::kReplicate) {
             auto status = container_write::remove(
-                opCtx, ru, coll, _newInterface->getContainer(), keyString.getView());
+                opCtx, ru, _newInterface->getContainer(), keyString.getView());
             // Ignore NoSuchKey errors as they are effectively noops
             if (status.code() != ErrorCodes::NoSuchKey) {
                 uassertStatusOK(status);
@@ -1387,7 +1386,6 @@ void BulkBuilderImpl::_addKeyForCommit(OperationContext* opCtx,
     if (_containerWriteBehavior == ContainerWriteBehavior::kReplicate) {
         uassertStatusOK(container_write::insert(opCtx,
                                                 ru,
-                                                coll,
                                                 _iam->getSortedDataInterface()->getContainer(),
                                                 key.getKeyAndRecordIdView(),
                                                 key.getTypeBitsView(),

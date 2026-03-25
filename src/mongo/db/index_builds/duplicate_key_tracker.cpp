@@ -114,7 +114,6 @@ Status DuplicateKeyTracker::recordKey(OperationContext* opCtx,
         invariant(reservedRidBlock.size() == 1);
         auto status = container_write::insert(opCtx,
                                               *shard_role_details::getRecoveryUnit(opCtx),
-                                              coll,
                                               container,
                                               reservedRidBlock[0].getLong(),
                                               std::span<const char>(builder.buf(), builder.len()),
@@ -188,7 +187,6 @@ boost::optional<SortedDataInterface::DuplicateKey> DuplicateKeyTracker::checkCon
             uassertStatusOK(container_write::remove(
                 opCtx,
                 *shard_role_details::getRecoveryUnit(opCtx),
-                coll,
                 std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs->getContainer()).get(),
                 record->id.getLong()));
         } else {

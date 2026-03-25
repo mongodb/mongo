@@ -137,7 +137,6 @@ Status SideWritesTracker::bufferSideWrite(OperationContext* opCtx,
             auto status =
                 container_write::insert(opCtx,
                                         *shard_role_details::getRecoveryUnit(opCtx),
-                                        coll,
                                         container,
                                         rid.getLong(),
                                         std::span<const char>(doc.objdata(), doc.objsize()),
@@ -372,7 +371,6 @@ Status SideWritesTracker::drainWritesIntoIndex(
                         .get();
                 auto status = container_write::remove(opCtx,
                                                       *shard_role_details::getRecoveryUnit(opCtx),
-                                                      coll,
                                                       container,
                                                       recordId.getLong());
                 if (!status.isOK()) {
