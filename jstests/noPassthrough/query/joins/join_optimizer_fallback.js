@@ -74,68 +74,6 @@ function runTestCaseEligiblePipeline({pipeline, expectedCount}) {
     assert(joinOptUsed(explain), "Expected join optimizer and actual usage differ: " + tojson(explain));
 }
 
-// Cross-db $lookup (eg join collections on different databases) is ineligible for optimization.
-runTestCaseIneligiblePipeline({
-    pipeline: [
-        {
-            $lookup: {
-                from: {
-                    db: db2,
-                    coll: coll2.getName(),
-                },
-                localField: "a",
-                foreignField: "a",
-                as: "coll2",
-            },
-        },
-        {$unwind: "$coll2"},
-        {
-            $lookup: {
-                from: {
-                    db: db3,
-                    coll: coll3.getName(),
-                },
-                localField: "a",
-                foreignField: "a",
-                as: "coll3",
-            },
-        },
-        {$unwind: "$coll3"},
-    ],
-    expectedCount: 1,
-});
-
-// Prefix is eligible but suffix is cross-DB $lookup and therefore ineligible.
-runTestCaseIneligiblePipeline({
-    pipeline: [
-        {
-            $lookup: {
-                from: {
-                    db: db1,
-                    coll: coll12.getName(),
-                },
-                localField: "a",
-                foreignField: "a",
-                as: "coll2",
-            },
-        },
-        {$unwind: "$coll2"},
-        {
-            $lookup: {
-                from: {
-                    db: db3,
-                    coll: coll3.getName(),
-                },
-                localField: "a",
-                foreignField: "a",
-                as: "coll3",
-            },
-        },
-        {$unwind: "$coll3"},
-    ],
-    expectedCount: 1,
-});
-
 // Query involving only a cross-product is not accepted by the join optimizer.
 runTestCaseIneligiblePipeline({
     pipeline: [
