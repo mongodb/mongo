@@ -95,7 +95,7 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
         }();
 
         if (collectionUUID && expectedUUID && *collectionUUID != *expectedUUID) {
-            // Ignore the drop collection if the collections exists locally and there is a mismatch
+            // Ignore the drop collection if the collection exists locally and there is a mismatch
             // between the current uuid and the expected one.
             LOGV2_DEBUG(8363400,
                         1,
@@ -120,7 +120,7 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
             }();
             if (!isEmpty) {
                 // Ignore the drop collection if the collection has records locally and it's
-                // explicitely required to skip non-empty collections.
+                // explicitly required to skip non-empty collections.
                 LOGV2_DEBUG(9525700,
                             1,
                             "Skipping dropping the collection because it is not empty",
@@ -131,10 +131,10 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
     }
 
     // Remove all range deletion task documents present on disk for the collection to drop. This is
-    // a best-effort tentative considering that migrations are not blocked, hence some new document
+    // a best-effort attempt considering that migrations are not blocked, hence some new document
     // may be inserted before actually dropping the collection.
     if (collectionUUID) {
-        // The multi-document remove command cannot be run in  transactions, so run it using
+        // The multi-document remove command cannot be run in transactions, so run it using
         // an alternative client.
         auto newClient =
             opCtx->getService()->makeClient("removeRangeDeletions-" + collectionUUID->toString());
@@ -300,7 +300,7 @@ void DropCollectionCoordinator::_commitDropCollection(
 
     // Define the identity of the shard that will be in charge of notifying change streams.
     // The value needs to be persisted once retrieved: tracked collections require a data-bearing
-    // shard (prior to the DDL commit) as the notifier and this information may not be longer
+    // shard (prior to the DDL commit) as the notifier and this information may no longer be
     // available in the routing table in case of stepdown and retry of this coordinator.
     const auto changeStreamsNotifierShardId = [&]() {
         auto primaryShardId = ShardingState::get(opCtx)->shardId();
@@ -322,7 +322,7 @@ void DropCollectionCoordinator::_commitDropCollection(
         if (!dataBearingShard) {
             LOGV2_WARNING(10361100,
                           "Unable to retrieve the identity of a data bearing shard for the "
-                          "collection beng dropped (possibly due to a metadata inconsistency)",
+                          "collection being dropped (possibly due to a metadata inconsistency)",
                           "nss"_attr = nss());
             dataBearingShard = primaryShardId;
         }
@@ -374,7 +374,7 @@ void DropCollectionCoordinator::_commitDropCollection(
     }
 
     // Checkpoint the configTime to ensure that, in the case of a stepdown, the new primary will
-    // start-up from a configTime that is inclusive of the metadata removable that was committed
+    // start-up from a configTime that is inclusive of the metadata removal that was committed
     // during the critical section.
     VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
 
