@@ -2325,12 +2325,7 @@ tasks:
   - <<: *gen_task_template
     name: noPassthroughWithMongod_gen
     tags:
-      [
-        "assigned_to_jira_team_server_execution",
-        "release_critical",
-        "misc_js",
-        "requires_replicated_fast_count_recovery",
-      ]
+      ["assigned_to_jira_team_server_execution", "release_critical", "misc_js"]
     commands:
       - func: "generate resmoke tasks"
         vars:
