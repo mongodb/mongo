@@ -122,20 +122,19 @@ validate({coll: coll1.getName(), apiStrict: true});
 const viewName = jsTestName() + "view1";
 const view = testDB.createView(viewName, coll2.getName(), [{$project: {v: {$_testApiVersion: {unstable: true}}}}]);
 
-validate({coll: viewName, apiStrict: true, error: true});
-validate({dbName: dbName, apiStrict: true, error: true});
+assertValidateError(() => validate({coll: viewName, apiStrict: true, error: true}));
+assertValidateError(() => validate({dbName: dbName, apiStrict: true, error: true}));
 
 validate({dbName: "otherDB", apiStrict: true});
 validate({dbName: dbName, coll: coll1.getName(), apiStrict: true});
 
 // With view name in the input.
-validate({coll: viewName, apiStrict: true, error: {code: ErrorCodes.APIStrictError}});
-validate({dbName: dbName, coll: viewName, apiStrict: true, error: {code: ErrorCodes.APIStrictError}});
+assertValidateError(() => validate({coll: viewName, apiStrict: true, error: {code: ErrorCodes.APIStrictError}}));
+assertValidateError(() =>
+    validate({dbName: dbName, coll: viewName, apiStrict: true, error: {code: ErrorCodes.APIStrictError}}),
+);
 
 validate({dbName: "new", coll: viewName, apiStrict: true});
-
-// Collection named same as the view name in another db.
-validate({coll: viewName, apiStrict: true, error: {code: ErrorCodes.APIStrictError}});
 
 //
 // Tests for validator.
