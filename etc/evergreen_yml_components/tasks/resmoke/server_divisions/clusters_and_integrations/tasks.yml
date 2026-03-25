@@ -1915,17 +1915,21 @@ tasks:
 
   - <<: *gen_task_template
     name: sharded_collections_jscore_passthrough_with_balancer_drop_config_cache_collections_gen
-    tags:
-      [
+    tags: [
         "assigned_to_jira_team_server_catalog_and_routing",
         "default",
         "incompatible_mac",
         "sharding",
         "jscore",
         "common",
+        # TODO(SERVER-122088): remove requires_large_host_* tags
+        "requires_large_host_aubsan",
+        "requires_large_host_tsan",
       ]
     commands:
       - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
 
   - <<: *gen_task_template
     name: sharding_jscore_passthrough_priority_ports_gen

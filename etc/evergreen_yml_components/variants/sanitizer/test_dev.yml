@@ -492,20 +492,20 @@ buildvariants:
         --excludeWithAnyTags=requires_increased_memlock_limits,incompatible_aubsan
         --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"
     tasks:
-      - name: .development_critical !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
-      - name: .development_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .development_critical !.requires_extra_system_deps !.requires_large_host !.requires_large_host_aubsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .development_critical !.requires_extra_system_deps .requires_large_host .requires_large_host_aubsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
           - rhel8.8-xlarge
-      - name: .release_critical !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
-      - name: .release_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .release_critical !.requires_extra_system_deps !.requires_large_host !.requires_large_host_aubsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .release_critical !.requires_extra_system_deps .requires_large_host .requires_large_host_aubsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
           - rhel8.8-xlarge
-      - name: .default !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
-      - name: .default !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .default !.requires_extra_system_deps !.requires_large_host !.requires_large_host_aubsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .default !.requires_extra_system_deps .requires_large_host .requires_large_host_aubsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
           - rhel8.8-xlarge
-      - name: .non_deterministic !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
-      - name: .non_deterministic !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .non_deterministic !.requires_extra_system_deps !.requires_large_host !.requires_large_host_aubsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
+      - name: .non_deterministic !.requires_extra_system_deps .requires_large_host .requires_large_host_aubsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
           - rhel8.8-xlarge
 
