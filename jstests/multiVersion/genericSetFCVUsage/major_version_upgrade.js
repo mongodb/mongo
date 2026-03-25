@@ -30,7 +30,6 @@ const defaultOptions = {
 // dropped.
 // TODO SERVER-76166: Programmatically generate list of LTS versions.
 const versions = [
-    {binVersion: '6.0', featureCompatibilityVersion: '6.0', testCollection: 'six_zero'},
     {binVersion: 'last-lts', featureCompatibilityVersion: lastLTSFCV, testCollection: 'last_lts'},
     {
         binVersion: 'last-continuous',
