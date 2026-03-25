@@ -34,8 +34,8 @@ buildvariants:
   # Build variant that uses cross compilation to prove out that compilation succeeds on MacOS without having to
   # run on more expensive MacOS infrastructure.
   - name: &enterprise-macos-arm64-cross-compile enterprise-macos-arm64-cross-compile
-    display_name: "Enterprise MacOS ARM64 Cross Compile"
-    tags: ["bazel_check"]
+    display_name: "! Enterprise MacOS ARM64 Cross Compile"
+    tags: ["required", "bazel_check"]
     cron: "0 1 * * *" # From the ${project_nightly_cron} parameter, upgrade to required after stability is proven out.
     run_on:
       - ubuntu2204-arm64-m8g-4xlarge
