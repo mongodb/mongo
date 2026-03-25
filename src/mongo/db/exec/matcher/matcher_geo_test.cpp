@@ -31,7 +31,6 @@
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_geo_parser.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
@@ -80,7 +79,7 @@ public:
     }
 
     std::unique_ptr<MatchExpression> getDummyBucketGeoExpr() {
-        _ownedGeoNoVersion = fromjson(R"(
+        auto bucketGeoExpr = fromjson(R"(
             {$_internalBucketGeoWithin: {
                 withinRegion: {
                     $geometry: {
@@ -90,14 +89,14 @@ public:
                 },
                 field: "loc"
             }})");
-        auto expr = MatchExpressionParser::parse(_ownedGeoNoVersion, _expCtx);
+        auto expr = MatchExpressionParser::parse(bucketGeoExpr, _expCtx);
         ASSERT_OK(expr.getStatus());
 
         return std::move(expr.getValue());
     }
 
     std::unique_ptr<MatchExpression> getDummyBucketGeoExprLegacy() {
-        _ownedGeoLegacy = fromjson(R"(
+        auto bucketGeoExpr = fromjson(R"(
             {$_internalBucketGeoWithin: {
                 withinRegion: {
                     $box: [
@@ -107,40 +106,11 @@ public:
                 },
                 field: "loc"
             }})");
-        auto expr = MatchExpressionParser::parse(_ownedGeoLegacy, _expCtx);
+        auto expr = MatchExpressionParser::parse(bucketGeoExpr, _expCtx);
         ASSERT_OK(expr.getStatus());
 
         return std::move(expr.getValue());
     }
-
-    std::unique_ptr<MatchExpression> getDummyBucketGeoExprWithIndexVersion(int indexVersion) {
-        _ownedGeoWithVersion =
-            BSON("$_internalBucketGeoWithin"
-                 << BSON("withinRegion"
-                         << BSON("$geometry" << BSON(
-                                     "type" << "Polygon"
-                                            << "coordinates"
-                                            << BSON_ARRAY(BSON_ARRAY(
-                                                   BSON_ARRAY(0 << 0)
-                                                   << BSON_ARRAY(0 << 5) << BSON_ARRAY(5 << 5)
-                                                   << BSON_ARRAY(5 << 0) << BSON_ARRAY(0 << 0)))))
-                         << "field"
-                         << "loc"
-                         << "2dsphereIndexVersion" << indexVersion));
-
-        auto expr = MatchExpressionParser::parse(_ownedGeoWithVersion,
-                                                 _expCtx,
-                                                 ExtensionsCallbackNoop(),
-                                                 MatchExpressionParser::kAllowAllSpecialFeatures);
-        ASSERT_OK(expr.getStatus());
-
-        return std::move(expr.getValue());
-    }
-
-protected:
-    BSONObj _ownedGeoWithVersion;
-    BSONObj _ownedGeoNoVersion;
-    BSONObj _ownedGeoLegacy;
 
 private:
     boost::intrusive_ptr<ExpressionContextForTest> _expCtx = new ExpressionContextForTest();
@@ -287,48 +257,6 @@ TEST_F(InternalBucketGeoWithinExpression, BucketContainsNonPointTypeLegacy) {
         BSON("loc" << BSON_ARRAY(10 << 10)).firstElement());
 
     ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), obj));
-}
-
-TEST_F(InternalBucketGeoWithinExpression, With2dsphereIndexVersion4GeoJSONPoints) {
-    auto expr = getDummyBucketGeoExprWithIndexVersion(4);
-
-    auto obj = createBucketObj(BSON("loc" << BSON("type" << "Point"
-                                                         << "coordinates" << BSON_ARRAY(1 << 1)))
-                                   .firstElement(),
-                               BSON("loc" << BSON("type" << "Point"
-                                                         << "coordinates" << BSON_ARRAY(3 << 3)))
-                                   .firstElement());
-
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), obj));
-}
-
-TEST_F(InternalBucketGeoWithinExpression, With2dsphereIndexVersion3LegacyPoints) {
-    auto expr = getDummyBucketGeoExprWithIndexVersion(3);
-
-    auto obj = createBucketObj(BSON("loc" << BSON_ARRAY(1 << 1)).firstElement(),
-                               BSON("loc" << BSON_ARRAY(3 << 3)).firstElement());
-
-    ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), obj));
-}
-
-TEST_F(InternalBucketGeoWithinExpression, EquivalentAndClonePreserveIndexVersion) {
-    auto exprWithVersion = getDummyBucketGeoExprWithIndexVersion(4);
-    auto exprWithoutVersion = getDummyBucketGeoExpr();
-
-    // Expressions with and without index version should not be equivalent.
-    ASSERT_FALSE(exprWithVersion->equivalent(exprWithoutVersion.get()));
-    ASSERT_FALSE(exprWithoutVersion->equivalent(exprWithVersion.get()));
-
-    // Clone should preserve index version and be equivalent to original.
-    auto clone = exprWithVersion->clone();
-    ASSERT_TRUE(exprWithVersion->equivalent(clone.get()));
-
-    auto* ibgwWithVersion =
-        static_cast<InternalBucketGeoWithinMatchExpression*>(exprWithVersion.get());
-    auto* ibgwClone = static_cast<InternalBucketGeoWithinMatchExpression*>(clone.get());
-    ASSERT_TRUE(ibgwWithVersion->getIndexVersion());
-    ASSERT_TRUE(ibgwClone->getIndexVersion());
-    ASSERT_EQUALS(*ibgwWithVersion->getIndexVersion(), *ibgwClone->getIndexVersion());
 }
 
 TEST(ExpressionGeoTest, Geo1) {

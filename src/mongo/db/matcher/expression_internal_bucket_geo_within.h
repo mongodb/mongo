@@ -37,7 +37,6 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/geo/geometry_container.h"
-#include "mongo/db/index/s2_common.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
@@ -81,17 +80,14 @@ public:
     static constexpr StringData kWithinRegion = "withinRegion"_sd;
     static constexpr StringData kField = "field"_sd;
 
-    InternalBucketGeoWithinMatchExpression(
-        std::shared_ptr<GeometryContainer> container,
-        std::string field,
-        clonable_ptr<ErrorAnnotation> annotation = nullptr,
-        boost::optional<S2IndexVersion> indexVersion = boost::none)
+    InternalBucketGeoWithinMatchExpression(std::shared_ptr<GeometryContainer> container,
+                                           std::string field,
+                                           clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : MatchExpression(MatchExpression::INTERNAL_BUCKET_GEO_WITHIN, std::move(annotation)),
           _geoContainer(container),
           _indexField("data." + field),
           _fieldRef(_indexField),
-          _field(std::move(field)),
-          _indexVersion(indexVersion) {}
+          _field(std::move(field)) {}
 
     void debugString(StringBuilder& debug, int indentationLevel) const final;
 
@@ -131,10 +127,6 @@ public:
         return *_geoContainer;
     }
 
-    boost::optional<S2IndexVersion> getIndexVersion() const {
-        return _indexVersion;
-    }
-
     StringData path() const final {
         return _indexField;
     }
@@ -156,7 +148,6 @@ private:
     std::string _indexField;
     FieldRef _fieldRef;
     std::string _field;
-    boost::optional<S2IndexVersion> _indexVersion;
 };
 
 }  // namespace mongo

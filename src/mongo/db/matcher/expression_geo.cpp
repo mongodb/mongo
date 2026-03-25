@@ -99,8 +99,7 @@ GeoMatchExpression::GeoMatchExpression(boost::optional<StringData> path,
     : LeafMatchExpression(GEO, path, std::move(annotation)),
       _rawObj(rawObj),
       _query(query),
-      _canSkipValidation(false),
-      _2dsphereIndexVersion(boost::none) {}
+      _canSkipValidation(false) {}
 
 /**
  * Takes shared ownership of the passed-in GeoExpression.
@@ -112,8 +111,7 @@ GeoMatchExpression::GeoMatchExpression(boost::optional<StringData> path,
     : LeafMatchExpression(GEO, path, std::move(annotation)),
       _rawObj(rawObj),
       _query(query),
-      _canSkipValidation(false),
-      _2dsphereIndexVersion(boost::none) {}
+      _canSkipValidation(false) {}
 
 void GeoMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
@@ -143,15 +141,13 @@ bool GeoMatchExpression::equivalent(const MatchExpression* other) const {
     if (path() != realOther->path())
         return false;
 
-    return SimpleBSONObjComparator::kInstance.evaluate(_rawObj == realOther->_rawObj) &&
-        _2dsphereIndexVersion == realOther->_2dsphereIndexVersion;
+    return SimpleBSONObjComparator::kInstance.evaluate(_rawObj == realOther->_rawObj);
 }
 
 std::unique_ptr<MatchExpression> GeoMatchExpression::clone() const {
     std::unique_ptr<GeoMatchExpression> next =
         std::make_unique<GeoMatchExpression>(path(), _query, _rawObj, _errorAnnotation);
     next->_canSkipValidation = _canSkipValidation;
-    next->_2dsphereIndexVersion = _2dsphereIndexVersion;
     if (getTag()) {
         next->setTag(getTag()->clone());
     }

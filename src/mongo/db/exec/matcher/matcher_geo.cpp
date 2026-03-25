@@ -57,14 +57,13 @@ bool geoContains(const GeometryContainer& queryGeom,
 bool geoContains(const GeometryContainer& queryGeom,
                  const GeoExpression::Predicate& queryPredicate,
                  bool skipValidation,
-                 const BSONElement& e,
-                 boost::optional<S2IndexVersion> indexVersion) {
+                 const BSONElement& e) {
     if (!e.isABSONObj()) {
         return false;
     }
 
     GeometryContainer geometry;
-    if (!geometry.parseFromStorage(e, skipValidation, indexVersion).isOK()) {
+    if (!geometry.parseFromStorage(e, skipValidation).isOK()) {
         return false;
     }
 
@@ -111,11 +110,8 @@ bool matchesGeoContainer(const GeoMatchExpression* expr, const GeometryContainer
 
 void MatchesSingleElementEvaluator::visit(const GeoMatchExpression* expr) {
     const auto& query = expr->getGeoExpression();
-    _result = geoContains(query.getGeometry(),
-                          query.getPred(),
-                          expr->getCanSkipValidation(),
-                          _elem,
-                          expr->get2dsphereIndexVersion());
+    _result =
+        geoContains(query.getGeometry(), query.getPred(), expr->getCanSkipValidation(), _elem);
 }
 
 void MatchesSingleElementEvaluator::visit(const TwoDPtInAnnulusExpression* expr) {
@@ -217,29 +213,26 @@ bool matchesBSONObj(const InternalBucketGeoWithinMatchExpression* expr, const BS
     }
     // Returns true if the bucket should be unpacked and all the data within the bucket should be
     // checked later.
-    auto parseMinMaxPoint = [indexVersion = expr->getIndexVersion()](const BSONElement& elem,
-                                                                     PointWithCRS* out) -> bool {
-        if (!indexVersion && elem.type() == BSONType::object &&
-            elem.Obj().firstElement().isNumber()) {
-            // Without an index version (e.g., on a mongos without catalog access), we cannot
-            // resolve the V3 vs V4+ parsing ambiguity for objects whose first field is numeric:
-            // V3 tries legacy-point first; V4+ tries GeoJSON first. Conservatively unpack the
-            // bucket to avoid discarding data that the index correctly returned.
-            return true;
-        }
+    auto parseMinMaxPoint = [](const BSONElement& elem, PointWithCRS* out) -> bool {
         auto geoObj = elem.embeddedObject();
-        GeometryContainer geometry;
-        Status status = geometry.parseFromStorage(elem, false, indexVersion);
-        if (!status.isOK()) {
-            return true;  // Parsing from storage failed, we should unpack the bucket to be safe.
+        if (BSONType::array == elem.type() || geoObj.firstElement().isNumber()) {
+            // Legacy Point.
+            if (!GeoParser::parseLegacyPoint(elem, out, true).isOK()) {
+                return true;
+            }
+        } else {
+            // If the bucket contains GeoJSON objects of types other than 'Points' we cannot be sure
+            // whether this bucket contains data is within the provided region.
+            if (!geoObj.hasField(GEOJSON_TYPE) ||
+                geoObj[GEOJSON_TYPE].String() != GEOJSON_TYPE_POINT) {
+                return true;
+            }
+            // GeoJSON Point.
+            if (!GeoParser::parseGeoJSONPoint(geoObj, out).isOK()) {
+                return true;
+            }
         }
-        if (!geometry.isPoint()) {
-            // The stored value didn't parse as a point, so we can't do a
-            // bounding-box comparison on the control min/max; unpack the bucket.
-            return true;
-        }
-        *out = geometry.getPoint();
-        return false;  // No need to unpack.
+        return false;
     };
 
     PointWithCRS minPoint;
