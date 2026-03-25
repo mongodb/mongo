@@ -341,9 +341,9 @@ TEST_F(OplogEntryTest, IndexBuildO2RoundTrip) {
                                    << BSON("sorterIdent" << "internal-sorter-a"
                                                          << "sideWritesIdent"
                                                          << "internal-sideWrites-a"
-                                                         << "skippedRecordsTrackerIdent"
-                                                         << "internal-skippedRecordsTracker-a"
-                                                         << "constraintViolationsTrackerIdent"
+                                                         << "skippedRecordsIdent"
+                                                         << "internal-skippedRecords-a"
+                                                         << "constraintViolationsIdent"
                                                          << "internal-constraintViolations-a"))));
     const auto parsedO2WithInternalIdents = IndexBuildOplogEntryO2::parse(
         rawO2WithInternalIdents, IDLParserContext("indexBuildOplogEntryO2"));
@@ -356,38 +356,36 @@ TEST_F(OplogEntryTest, IndexBuildO2RoundTrip) {
               "internal-sorter-a");
     EXPECT_EQ(parsedIndexesWithInternalIdents[0]
                   .getInternalIdents()
-                  ->getConstraintViolationsTrackerIdent()
+                  ->getConstraintViolationsIdent()
                   .value_or(""),
               "internal-constraintViolations-a");
 
     const auto serializedO2WithInternalIdents = parsedO2WithInternalIdents.toBSON();
     ASSERT_BSONOBJ_EQ(rawO2WithInternalIdents, serializedO2WithInternalIdents);
 
-    const auto rawO2WithoutConstraintViolationsTracker =
-        BSON("indexes" << BSON_ARRAY(
-                 BSON("indexIdent" << indexIdentUniqueTag << "internalIdents"
-                                   << BSON("sorterIdent" << "internal-sorter-b"
-                                                         << "sideWritesIdent"
-                                                         << "internal-sideWrites-b"
-                                                         << "skippedRecordsTrackerIdent"
-                                                         << "internal-skippedRecordsTracker-b"))));
-    const auto parsedO2WithoutConstraintViolationsTracker = IndexBuildOplogEntryO2::parse(
-        rawO2WithoutConstraintViolationsTracker, IDLParserContext("indexBuildOplogEntryO2"));
-    const auto& parsedIndexesWithoutConstraintViolationsTracker =
-        parsedO2WithoutConstraintViolationsTracker.getIndexes();
+    const auto rawO2WithoutConstraintViolations =
+        BSON("indexes" << BSON_ARRAY(BSON("indexIdent"
+                                          << indexIdentUniqueTag << "internalIdents"
+                                          << BSON("sorterIdent" << "internal-sorter-b"
+                                                                << "sideWritesIdent"
+                                                                << "internal-sideWrites-b"
+                                                                << "skippedRecordsIdent"
+                                                                << "internal-skippedRecords-b"))));
+    const auto parsedO2WithoutConstraintViolations = IndexBuildOplogEntryO2::parse(
+        rawO2WithoutConstraintViolations, IDLParserContext("indexBuildOplogEntryO2"));
+    const auto& parsedIndexesWithoutConstraintViolations =
+        parsedO2WithoutConstraintViolations.getIndexes();
 
-    ASSERT_EQ(parsedIndexesWithoutConstraintViolationsTracker.size(), 1);
-    EXPECT_EQ(parsedIndexesWithoutConstraintViolationsTracker[0].getIndexIdent(),
-              indexIdentUniqueTag);
-    ASSERT(parsedIndexesWithoutConstraintViolationsTracker[0].getInternalIdents());
-    EXPECT_FALSE(parsedIndexesWithoutConstraintViolationsTracker[0]
+    ASSERT_EQ(parsedIndexesWithoutConstraintViolations.size(), 1);
+    EXPECT_EQ(parsedIndexesWithoutConstraintViolations[0].getIndexIdent(), indexIdentUniqueTag);
+    ASSERT(parsedIndexesWithoutConstraintViolations[0].getInternalIdents());
+    EXPECT_FALSE(parsedIndexesWithoutConstraintViolations[0]
                      .getInternalIdents()
-                     ->getConstraintViolationsTrackerIdent());
+                     ->getConstraintViolationsIdent());
 
-    const auto serializedO2WithoutConstraintViolationsTracker =
-        parsedO2WithoutConstraintViolationsTracker.toBSON();
-    ASSERT_BSONOBJ_EQ(rawO2WithoutConstraintViolationsTracker,
-                      serializedO2WithoutConstraintViolationsTracker);
+    const auto serializedO2WithoutConstraintViolations =
+        parsedO2WithoutConstraintViolations.toBSON();
+    ASSERT_BSONOBJ_EQ(rawO2WithoutConstraintViolations, serializedO2WithoutConstraintViolations);
 }
 
 TEST_F(OplogEntryTest, ContainerInsert) {
@@ -1061,17 +1059,17 @@ TEST_F(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
                                   << BSON("sorterIdent" << "internal-sorter-0"
                                                         << "sideWritesIdent"
                                                         << "internal-sideWrites-0"
-                                                        << "skippedRecordsTrackerIdent"
-                                                        << "internal-skippedRecordsTracker-0"
-                                                        << "constraintViolationsTrackerIdent"
+                                                        << "skippedRecordsIdent"
+                                                        << "internal-skippedRecords-0"
+                                                        << "constraintViolationsIdent"
                                                         << "internal-constraintViolations-0"))
                 << BSON("indexIdent" << "index-1" << "internalIdents"
                                      << BSON("sorterIdent" << "internal-sorter-1"
                                                            << "sideWritesIdent"
                                                            << "internal-sideWrites-1"
-                                                           << "skippedRecordsTrackerIdent"
-                                                           << "internal-skippedRecordsTracker-1"
-                                                           << "constraintViolationsTrackerIdent"
+                                                           << "skippedRecordsIdent"
+                                                           << "internal-skippedRecords-1"
+                                                           << "constraintViolationsIdent"
                                                            << "internal-constraintViolations-1"))));
 
         const auto entry = makeCommandOplogEntry(entryOpTime, nss, o, o2, uuid);
@@ -1082,15 +1080,13 @@ TEST_F(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
         ASSERT_EQ(parsed.indexes.size(), 2);
         ASSERT_TRUE(parsed.indexes[0].sorterIdent);
         ASSERT_TRUE(parsed.indexes[0].sideWritesIdent);
-        ASSERT_TRUE(parsed.indexes[0].skippedRecordsTrackerIdent);
-        ASSERT_TRUE(parsed.indexes[0].constraintViolationsTrackerIdent);
+        ASSERT_TRUE(parsed.indexes[0].skippedRecordsIdent);
+        ASSERT_TRUE(parsed.indexes[0].constraintViolationsIdent);
         ASSERT_TRUE(parsed.indexes[1].sorterIdent);
         EXPECT_EQ(*parsed.indexes[0].sorterIdent, "internal-sorter-0");
         EXPECT_EQ(*parsed.indexes[0].sideWritesIdent, "internal-sideWrites-0");
-        EXPECT_EQ(*parsed.indexes[0].skippedRecordsTrackerIdent,
-                  "internal-skippedRecordsTracker-0");
-        EXPECT_EQ(*parsed.indexes[0].constraintViolationsTrackerIdent,
-                  "internal-constraintViolations-0");
+        EXPECT_EQ(*parsed.indexes[0].skippedRecordsIdent, "internal-skippedRecords-0");
+        EXPECT_EQ(*parsed.indexes[0].constraintViolationsIdent, "internal-constraintViolations-0");
         EXPECT_EQ(*parsed.indexes[1].sorterIdent, "internal-sorter-1");
     }
 
@@ -1100,13 +1096,13 @@ TEST_F(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
         const auto o = BSON("startIndexBuild" << ns << "indexBuildUUID" << indexBuildUUID
                                               << "indexes" << singleIndexSpecs);
         const auto o2 =
-            BSON("indexes" << BSON_ARRAY(BSON(
-                     "indexIdent" << "index-0" << "internalIdents"
-                                  << BSON("sorterIdent" << "internal-sorter-0"
-                                                        << "sideWritesIdent"
-                                                        << "internal-sideWrites-0"
-                                                        << "skippedRecordsTrackerIdent"
-                                                        << "internal-skippedRecordsTracker-0"))));
+            BSON("indexes" << BSON_ARRAY(
+                     BSON("indexIdent" << "index-0" << "internalIdents"
+                                       << BSON("sorterIdent" << "internal-sorter-0"
+                                                             << "sideWritesIdent"
+                                                             << "internal-sideWrites-0"
+                                                             << "skippedRecordsIdent"
+                                                             << "internal-skippedRecords-0"))));
 
         const auto entry = makeCommandOplogEntry(entryOpTime, nss, o, o2, uuid);
         RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
@@ -1116,12 +1112,11 @@ TEST_F(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
         ASSERT_EQ(parsed.indexes.size(), 1);
         ASSERT_TRUE(parsed.indexes[0].sorterIdent);
         ASSERT_TRUE(parsed.indexes[0].sideWritesIdent);
-        ASSERT_TRUE(parsed.indexes[0].skippedRecordsTrackerIdent);
+        ASSERT_TRUE(parsed.indexes[0].skippedRecordsIdent);
         EXPECT_EQ(*parsed.indexes[0].sorterIdent, "internal-sorter-0");
         EXPECT_EQ(*parsed.indexes[0].sideWritesIdent, "internal-sideWrites-0");
-        EXPECT_EQ(*parsed.indexes[0].skippedRecordsTrackerIdent,
-                  "internal-skippedRecordsTracker-0");
-        EXPECT_FALSE(parsed.indexes[0].constraintViolationsTrackerIdent);
+        EXPECT_EQ(*parsed.indexes[0].skippedRecordsIdent, "internal-skippedRecords-0");
+        EXPECT_FALSE(parsed.indexes[0].constraintViolationsIdent);
     }
 
     {
@@ -1168,7 +1163,7 @@ TEST_F(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
         ASSERT_EQ(indexIdentUniqueTag1, o2Indexes[1].getField("indexIdent").str());
         ASSERT_FALSE(parsed.indexes[0].sorterIdent);
         ASSERT_FALSE(parsed.indexes[0].sideWritesIdent);
-        ASSERT_FALSE(parsed.indexes[0].constraintViolationsTrackerIdent);
+        ASSERT_FALSE(parsed.indexes[0].constraintViolationsIdent);
         ASSERT_EQ(parsed.indexBuildMethod, IndexBuildMethodEnum::kHybrid);
     }
 
@@ -1182,15 +1177,14 @@ TEST_F(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
                                        << BSON("sorterIdent" << "internal-sorter-0"
                                                              << "sideWritesIdent"
                                                              << "internal-sideWrites-0"
-                                                             << "skippedRecordsTrackerIdent"
-                                                             << "internal-skippedRecordsTracker-0"))
-                     << BSON("indexIdent"
-                             << "index-1" << "internalIdents"
-                             << BSON("sorterIdent" << "internal-sorter-1"
-                                                   << "sideWritesIdent"
-                                                   << "internal-sideWrites-1"
-                                                   << "skippedRecordsTrackerIdent"
-                                                   << "internal-skippedRecordsTracker-1"))));
+                                                             << "skippedRecordsIdent"
+                                                             << "internal-skippedRecords-0"))
+                     << BSON("indexIdent" << "index-1" << "internalIdents"
+                                          << BSON("sorterIdent" << "internal-sorter-1"
+                                                                << "sideWritesIdent"
+                                                                << "internal-sideWrites-1"
+                                                                << "skippedRecordsIdent"
+                                                                << "internal-skippedRecords-1"))));
         const auto entry = makeCommandOplogEntry(entryOpTime, nss, o, o2, uuid);
         RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
@@ -1200,12 +1194,11 @@ TEST_F(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
         ASSERT_EQ(parsed.indexes.size(), 2);
         ASSERT_TRUE(parsed.indexes[0].sorterIdent);
         ASSERT_TRUE(parsed.indexes[0].sideWritesIdent);
-        ASSERT_TRUE(parsed.indexes[0].skippedRecordsTrackerIdent);
-        ASSERT_FALSE(parsed.indexes[0].constraintViolationsTrackerIdent);
+        ASSERT_TRUE(parsed.indexes[0].skippedRecordsIdent);
+        ASSERT_FALSE(parsed.indexes[0].constraintViolationsIdent);
         EXPECT_EQ(*parsed.indexes[0].sorterIdent, "internal-sorter-0");
         EXPECT_EQ(*parsed.indexes[0].sideWritesIdent, "internal-sideWrites-0");
-        EXPECT_EQ(*parsed.indexes[0].skippedRecordsTrackerIdent,
-                  "internal-skippedRecordsTracker-0");
+        EXPECT_EQ(*parsed.indexes[0].skippedRecordsIdent, "internal-skippedRecords-0");
         EXPECT_EQ(*parsed.indexes[1].sorterIdent, "internal-sorter-1");
     }
 
@@ -1219,15 +1212,14 @@ TEST_F(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
                                        << BSON("sorterIdent" << "internal-sorter-0"
                                                              << "sideWritesIdent"
                                                              << "internal-sideWrites-0"
-                                                             << "skippedRecordsTrackerIdent"
-                                                             << "internal-skippedRecordsTracker-0"))
-                     << BSON("indexIdent"
-                             << "index-1" << "internalIdents"
-                             << BSON("sorterIdent" << "internal-sorter-1"
-                                                   << "sideWritesIdent"
-                                                   << "internal-sideWrites-1"
-                                                   << "skippedRecordsTrackerIdent"
-                                                   << "internal-skippedRecordsTracker-1"))));
+                                                             << "skippedRecordsIdent"
+                                                             << "internal-skippedRecords-0"))
+                     << BSON("indexIdent" << "index-1" << "internalIdents"
+                                          << BSON("sorterIdent" << "internal-sorter-1"
+                                                                << "sideWritesIdent"
+                                                                << "internal-sideWrites-1"
+                                                                << "skippedRecordsIdent"
+                                                                << "internal-skippedRecords-1"))));
         const auto entry = makeCommandOplogEntry(entryOpTime, nss, o, o2, uuid);
         // featureFlagPrimaryDrivenIndexBuilds intentionally NOT enabled
         auto result = IndexBuildOplogEntry::parse(_opCtx.get(), entry);
@@ -1368,13 +1360,13 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
                                     << BSON("sorterIdent" << "internal-sorter-a"
                                                           << "sideWritesIdent"
                                                           << "internal-sideWrites-a"
-                                                          << "skippedRecordsTrackerIdent"
-                                                          << "internal-skippedRecordsTracker-a"
-                                                          << "constraintViolationsTrackerIdent"
+                                                          << "skippedRecordsIdent"
+                                                          << "internal-skippedRecords-a"
+                                                          << "constraintViolationsIdent"
                                                           << "internal-constraintViolations-a"))))),
         ErrorCodes::BadValue);
 
-    // Non-unique indexes always omit constraintViolationsTrackerIdent.
+    // Non-unique indexes always omit constraintViolationsIdent.
     {
         RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
@@ -1385,15 +1377,14 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
                 nss,
                 baseObj,
                 BSON("indexes" << BSON_ARRAY(
-                         BSON("indexIdent"
-                              << "index-0" << "internalIdents"
-                              << BSON("sorterIdent" << "internal-sorter-a"
-                                                    << "sideWritesIdent"
-                                                    << "internal-sideWrites-a"
-                                                    << "skippedRecordsTrackerIdent"
-                                                    << "internal-skippedRecordsTracker-a")))),
+                         BSON("indexIdent" << "index-0" << "internalIdents"
+                                           << BSON("sorterIdent" << "internal-sorter-a"
+                                                                 << "sideWritesIdent"
+                                                                 << "internal-sideWrites-a"
+                                                                 << "skippedRecordsIdent"
+                                                                 << "internal-skippedRecords-a")))),
                 UUID::gen())));
-        EXPECT_FALSE(parsed.indexes[0].constraintViolationsTrackerIdent);
+        EXPECT_FALSE(parsed.indexes[0].constraintViolationsIdent);
     }
 
     // Reject an internalIdents object that omits one of its required non-optional fields.
@@ -1402,12 +1393,11 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
             "featureFlagPrimaryDrivenIndexBuilds", true);
         ASSERT_THROWS_CODE(
             parse(baseObj,
-                  BSON("indexes" << BSON_ARRAY(
-                           BSON("indexIdent"
-                                << "index-0" << "internalIdents"
-                                << BSON("sorterIdent" << "internal-sorter-a"
-                                                      << "skippedRecordsTrackerIdent"
-                                                      << "internal-skippedRecordsTracker-a"))))),
+                  BSON("indexes" << BSON_ARRAY(BSON(
+                           "indexIdent" << "index-0" << "internalIdents"
+                                        << BSON("sorterIdent" << "internal-sorter-a"
+                                                              << "skippedRecordsIdent"
+                                                              << "internal-skippedRecords-a"))))),
             AssertionException,
             ErrorCodes::IDLFailedToParse);
     }
@@ -1429,15 +1419,15 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
                                       << BSON("sorterIdent" << "internal-sorter-0"
                                                             << "sideWritesIdent"
                                                             << "internal-sideWrites-0"
-                                                            << "skippedRecordsTrackerIdent"
-                                                            << "internal-skippedRecordsTracker-0"
-                                                            << "constraintViolationsTrackerIdent"
+                                                            << "skippedRecordsIdent"
+                                                            << "internal-skippedRecords-0"
+                                                            << "constraintViolationsIdent"
                                                             << "internal-constraintViolations-0"))
                                  << BSON("indexIdent" << "index-1")))),
                   ErrorCodes::BadValue);
     }
 
-    // Unique indexes require constraintViolationsTrackerIdent in primary-driven index builds.
+    // Unique indexes require constraintViolationsIdent in primary-driven index builds.
     {
         RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
@@ -1446,19 +1436,19 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
                                    << BSON_ARRAY(BSON("v" << 2 << "key" << BSON("x" << 1) << "name"
                                                           << "x_1"
                                                           << "unique" << true)));
-        ASSERT_EQ(parse(uniqueBaseObj,
-                        BSON("indexes" << BSON_ARRAY(BSON(
-                                 "indexIdent"
-                                 << "index-0" << "internalIdents"
-                                 << BSON("sorterIdent" << "internal-sorter-a"
-                                                       << "sideWritesIdent"
-                                                       << "internal-sideWrites-a"
-                                                       << "skippedRecordsTrackerIdent"
-                                                       << "internal-skippedRecordsTracker-a"))))),
-                  ErrorCodes::BadValue);
+        ASSERT_EQ(
+            parse(uniqueBaseObj,
+                  BSON("indexes" << BSON_ARRAY(BSON(
+                           "indexIdent" << "index-0" << "internalIdents"
+                                        << BSON("sorterIdent" << "internal-sorter-a"
+                                                              << "sideWritesIdent"
+                                                              << "internal-sideWrites-a"
+                                                              << "skippedRecordsIdent"
+                                                              << "internal-skippedRecords-a"))))),
+            ErrorCodes::BadValue);
     }
 
-    // _id indexes require constraintViolationsTrackerIdent in primary-driven index builds.
+    // _id indexes require constraintViolationsIdent in primary-driven index builds.
     {
         RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
@@ -1466,16 +1456,16 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
             "startIndexBuild" << "test.coll" << "indexBuildUUID" << UUID::gen() << "indexes"
                               << BSON_ARRAY(BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
                                                      << "_id_")));
-        ASSERT_EQ(parse(idBaseObj,
-                        BSON("indexes" << BSON_ARRAY(BSON(
-                                 "indexIdent"
-                                 << "index-0" << "internalIdents"
-                                 << BSON("sorterIdent" << "internal-sorter-a"
-                                                       << "sideWritesIdent"
-                                                       << "internal-sideWrites-a"
-                                                       << "skippedRecordsTrackerIdent"
-                                                       << "internal-skippedRecordsTracker-a"))))),
-                  ErrorCodes::BadValue);
+        ASSERT_EQ(
+            parse(idBaseObj,
+                  BSON("indexes" << BSON_ARRAY(BSON(
+                           "indexIdent" << "index-0" << "internalIdents"
+                                        << BSON("sorterIdent" << "internal-sorter-a"
+                                                              << "sideWritesIdent"
+                                                              << "internal-sideWrites-a"
+                                                              << "skippedRecordsIdent"
+                                                              << "internal-skippedRecords-a"))))),
+            ErrorCodes::BadValue);
     }
 
     baseObj =
@@ -1515,12 +1505,12 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
               BSON("indexes" << BSON_ARRAY(
                        BSON("indexIdent" << "index-0" << "internalIdents"
                                          << BSON("sorterIdent" << "s0" << "sideWritesIdent" << "sw0"
-                                                               << "skippedRecordsTrackerIdent"
+                                                               << "skippedRecordsIdent"
                                                                << "srt0"))
                        << BSON("indexIdent" << "index-1" << "internalIdents"
                                             << BSON("sorterIdent" << "s1" << "sideWritesIdent"
                                                                   << "sw1"
-                                                                  << "skippedRecordsTrackerIdent"
+                                                                  << "skippedRecordsIdent"
                                                                   << "srt1"))))),
         ErrorCodes::BadValue);
     // Reject a commitIndexBuild batch where only some indexes specify internalIdents.
@@ -1533,7 +1523,7 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
                            BSON("indexIdent" << "index-0" << "internalIdents"
                                              << BSON("sorterIdent" << "s0" << "sideWritesIdent"
                                                                    << "sw0"
-                                                                   << "skippedRecordsTrackerIdent"
+                                                                   << "skippedRecordsIdent"
                                                                    << "srt0"))
                            << BSON("indexIdent" << "index-1")))),
             ErrorCodes::BadValue);
@@ -1544,16 +1534,15 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
         RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
         ASSERT_THROWS_CODE(
-            parse(baseObj,
-                  BSON("indexes" << BSON_ARRAY(
-                           BSON("indexIdent"
-                                << "index-0" << "internalIdents"
-                                << BSON("sorterIdent" << "s0" << "skippedRecordsTrackerIdent"
-                                                      << "srt0"))
-                           << BSON("indexIdent"
-                                   << "index-1" << "internalIdents"
-                                   << BSON("sorterIdent" << "s1" << "skippedRecordsTrackerIdent"
-                                                         << "srt1"))))),
+            parse(
+                baseObj,
+                BSON("indexes" << BSON_ARRAY(
+                         BSON("indexIdent" << "index-0" << "internalIdents"
+                                           << BSON("sorterIdent" << "s0" << "skippedRecordsIdent"
+                                                                 << "srt0"))
+                         << BSON("indexIdent" << "index-1" << "internalIdents"
+                                              << BSON("sorterIdent" << "s1" << "skippedRecordsIdent"
+                                                                    << "srt1"))))),
             AssertionException,
             ErrorCodes::IDLFailedToParse);
     }
@@ -1567,18 +1556,17 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
                   BSON("indexes" << BSON_ARRAY(
                            BSON("indexIdent"
                                 << "index-0" << "internalIdents"
-                                << BSON("sideWritesIdent" << "sw0" << "skippedRecordsTrackerIdent"
+                                << BSON("sideWritesIdent" << "sw0" << "skippedRecordsIdent"
                                                           << "srt0"))
-                           << BSON("indexIdent"
-                                   << "index-1" << "internalIdents"
-                                   << BSON("sideWritesIdent" << "sw1"
-                                                             << "skippedRecordsTrackerIdent"
-                                                             << "srt1"))))),
+                           << BSON("indexIdent" << "index-1" << "internalIdents"
+                                                << BSON("sideWritesIdent" << "sw1"
+                                                                          << "skippedRecordsIdent"
+                                                                          << "srt1"))))),
             AssertionException,
             ErrorCodes::IDLFailedToParse);
     }
 
-    // Reject commitIndexBuild internalIdents missing required skippedRecordsTrackerIdent.
+    // Reject commitIndexBuild internalIdents missing required skippedRecordsIdent.
     {
         RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
@@ -1618,12 +1606,12 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
               BSON("indexes" << BSON_ARRAY(
                        BSON("indexIdent" << "index-0" << "internalIdents"
                                          << BSON("sorterIdent" << "s0" << "sideWritesIdent" << "sw0"
-                                                               << "skippedRecordsTrackerIdent"
+                                                               << "skippedRecordsIdent"
                                                                << "srt0"))
                        << BSON("indexIdent" << "index-1" << "internalIdents"
                                             << BSON("sorterIdent" << "s1" << "sideWritesIdent"
                                                                   << "sw1"
-                                                                  << "skippedRecordsTrackerIdent"
+                                                                  << "skippedRecordsIdent"
                                                                   << "srt1"))))),
         ErrorCodes::BadValue);
     // Reject a commitIndexBuild batch where only some indexes specify internalIdents.
@@ -1636,7 +1624,7 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
                            BSON("indexIdent" << "index-0" << "internalIdents"
                                              << BSON("sorterIdent" << "s0" << "sideWritesIdent"
                                                                    << "sw0"
-                                                                   << "skippedRecordsTrackerIdent"
+                                                                   << "skippedRecordsIdent"
                                                                    << "srt0"))
                            << BSON("indexIdent" << "index-1")))),
             ErrorCodes::BadValue);
@@ -1647,16 +1635,15 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
         RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
         ASSERT_THROWS_CODE(
-            parse(baseObj,
-                  BSON("indexes" << BSON_ARRAY(
-                           BSON("indexIdent"
-                                << "index-0" << "internalIdents"
-                                << BSON("sorterIdent" << "s0" << "skippedRecordsTrackerIdent"
-                                                      << "srt0"))
-                           << BSON("indexIdent"
-                                   << "index-1" << "internalIdents"
-                                   << BSON("sorterIdent" << "s1" << "skippedRecordsTrackerIdent"
-                                                         << "srt1"))))),
+            parse(
+                baseObj,
+                BSON("indexes" << BSON_ARRAY(
+                         BSON("indexIdent" << "index-0" << "internalIdents"
+                                           << BSON("sorterIdent" << "s0" << "skippedRecordsIdent"
+                                                                 << "srt0"))
+                         << BSON("indexIdent" << "index-1" << "internalIdents"
+                                              << BSON("sorterIdent" << "s1" << "skippedRecordsIdent"
+                                                                    << "srt1"))))),
             AssertionException,
             ErrorCodes::IDLFailedToParse);
     }
@@ -1670,18 +1657,17 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
                   BSON("indexes" << BSON_ARRAY(
                            BSON("indexIdent"
                                 << "index-0" << "internalIdents"
-                                << BSON("sideWritesIdent" << "sw0" << "skippedRecordsTrackerIdent"
+                                << BSON("sideWritesIdent" << "sw0" << "skippedRecordsIdent"
                                                           << "srt0"))
-                           << BSON("indexIdent"
-                                   << "index-1" << "internalIdents"
-                                   << BSON("sideWritesIdent" << "sw1"
-                                                             << "skippedRecordsTrackerIdent"
-                                                             << "srt1"))))),
+                           << BSON("indexIdent" << "index-1" << "internalIdents"
+                                                << BSON("sideWritesIdent" << "sw1"
+                                                                          << "skippedRecordsIdent"
+                                                                          << "srt1"))))),
             AssertionException,
             ErrorCodes::IDLFailedToParse);
     }
 
-    // Reject commitIndexBuild internalIdents missing required skippedRecordsTrackerIdent.
+    // Reject commitIndexBuild internalIdents missing required skippedRecordsIdent.
     {
         RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
             "featureFlagPrimaryDrivenIndexBuilds", true);
@@ -1698,7 +1684,7 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
             ErrorCodes::IDLFailedToParse);
     }
 
-    // Unique indexes require constraintViolationsTrackerIdent in primary-driven index builds.
+    // Unique indexes require constraintViolationsIdent in primary-driven index builds.
     {
         const auto uniqueIndexSpecs =
             BSON_ARRAY(BSON("v" << 2 << "key" << BSON("x" << 1) << "name"
@@ -1719,14 +1705,14 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
                                 << "index-0" << "internalIdents"
                                 << BSON("sorterIdent" << "internal-sorter-0" << "sideWritesIdent"
                                                       << "internal-sideWrites-0"
-                                                      << "skippedRecordsTrackerIdent"
-                                                      << "internal-skippedRecordsTracker-0"))
+                                                      << "skippedRecordsIdent"
+                                                      << "internal-skippedRecords-0"))
                            << BSON("indexIdent"
                                    << "index-1" << "internalIdents"
                                    << BSON("sorterIdent" << "internal-sorter-1" << "sideWritesIdent"
                                                          << "internal-sideWrites-1"
-                                                         << "skippedRecordsTrackerIdent"
-                                                         << "internal-skippedRecordsTracker-1"))))),
+                                                         << "skippedRecordsIdent"
+                                                         << "internal-skippedRecords-1"))))),
             ErrorCodes::BadValue);
     }
 

@@ -75,8 +75,8 @@ struct IndexBuildInfo {
      */
     void setInternalIdents(boost::optional<std::string> sorterIdent,
                            boost::optional<std::string> sideWritesIdent,
-                           boost::optional<std::string> skippedRecordsTrackerIdent,
-                           boost::optional<std::string> constraintViolationsTrackerIdent);
+                           boost::optional<std::string> skippedRecordsIdent,
+                           boost::optional<std::string> constraintViolationsIdent);
 
     BSONObj toBSON() const;
 
@@ -87,8 +87,8 @@ struct IndexBuildInfo {
     // depending on the index type and the index build method being used.
     boost::optional<std::string> sorterIdent;
     boost::optional<std::string> sideWritesIdent;
-    boost::optional<std::string> skippedRecordsTrackerIdent;
-    boost::optional<std::string> constraintViolationsTrackerIdent;
+    boost::optional<std::string> skippedRecordsIdent;
+    boost::optional<std::string> constraintViolationsIdent;
 };
 
 /**

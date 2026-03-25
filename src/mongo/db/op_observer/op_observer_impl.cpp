@@ -330,20 +330,19 @@ std::vector<repl::IndexIdents> buildIndexIdentsForO2(OperationContext* opCtx,
         if (isPrimaryDrivenIndexBuildEnabled(VersionContext::getDecoration(opCtx))) {
             invariant(indexBuildInfo.sorterIdent);
             invariant(indexBuildInfo.sideWritesIdent);
-            invariant(indexBuildInfo.skippedRecordsTrackerIdent);
+            invariant(indexBuildInfo.skippedRecordsIdent);
             invariant(
                 !(indexBuildInfo.spec["unique"].trueValue() ||
                   IndexDescriptor::isIdIndexPattern(indexBuildInfo.spec.getObjectField("key"))) ||
-                indexBuildInfo.constraintViolationsTrackerIdent);
+                indexBuildInfo.constraintViolationsIdent);
 
             repl::InternalIdents internalIdents;
             internalIdents.setSorterIdent(*indexBuildInfo.sorterIdent);
             internalIdents.setSideWritesIdent(*indexBuildInfo.sideWritesIdent);
-            internalIdents.setSkippedRecordsTrackerIdent(
-                *indexBuildInfo.skippedRecordsTrackerIdent);
-            if (indexBuildInfo.constraintViolationsTrackerIdent) {
-                internalIdents.setConstraintViolationsTrackerIdent(
-                    *indexBuildInfo.constraintViolationsTrackerIdent);
+            internalIdents.setSkippedRecordsIdent(*indexBuildInfo.skippedRecordsIdent);
+            if (indexBuildInfo.constraintViolationsIdent) {
+                internalIdents.setConstraintViolationsIdent(
+                    *indexBuildInfo.constraintViolationsIdent);
             }
             indexIdents.setInternalIdents(std::move(internalIdents));
         }

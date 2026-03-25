@@ -1552,12 +1552,12 @@ BSONObj MultiIndexBlock::_constructStateObject(OperationContext* opCtx,
 
         auto& indexBuildInfo = index.block->getIndexBuildInfo();
         indexStateInfo.setSideWritesTable(*indexBuildInfo.sideWritesIdent);
-        indexStateInfo.setSkippedRecordTrackerTable(*indexBuildInfo.skippedRecordsTrackerIdent);
-        // For compatibility with v8.0, the constraintViolationsTrackerIdent is not persisted in the
+        indexStateInfo.setSkippedRecordTrackerTable(*indexBuildInfo.skippedRecordsIdent);
+        // For compatibility with v8.0, the constraintViolationsIdent is not persisted in the
         // resume state if the index is not unique given that version used to check explicitly for
         // this case and fail otherwise.
         if (index.block->getSpec()["unique"].trueValue()) {
-            if (auto& duplicateKeyTrackerIdent = indexBuildInfo.constraintViolationsTrackerIdent) {
+            if (auto& duplicateKeyTrackerIdent = indexBuildInfo.constraintViolationsIdent) {
                 indexStateInfo.setDuplicateKeyTrackerTable(*duplicateKeyTrackerIdent);
             }
         }

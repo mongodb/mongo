@@ -159,7 +159,7 @@ protected:
                                  fmt::format("index-{}", i));
             indexes.back().setInternalIdents(fmt::format("internal-sorter-{}", i),
                                              fmt::format("internal-sideWrites-{}", i),
-                                             fmt::format("internal-skippedRecordsTracker-{}", i),
+                                             fmt::format("internal-skippedRecords-{}", i),
                                              fmt::format("internal-constraintViolations-{}", i));
         }
         return indexes;
@@ -196,8 +196,8 @@ TEST_F(UtilTest, Start) {
         EXPECT_TRUE(engine.hasIdent(ru, index.indexIdent));
         EXPECT_TRUE(engine.hasIdent(ru, *index.sorterIdent));
         EXPECT_TRUE(engine.hasIdent(ru, *index.sideWritesIdent));
-        EXPECT_TRUE(engine.hasIdent(ru, *index.skippedRecordsTrackerIdent));
-        EXPECT_TRUE(engine.hasIdent(ru, *index.constraintViolationsTrackerIdent));
+        EXPECT_TRUE(engine.hasIdent(ru, *index.skippedRecordsIdent));
+        EXPECT_TRUE(engine.hasIdent(ru, *index.constraintViolationsIdent));
     }
 
     ASSERT_TRUE(opObserver().lastStartArgs);
@@ -211,10 +211,8 @@ TEST_F(UtilTest, Start) {
         EXPECT_EQ(args.indexes[i].indexIdent, indexes[i].indexIdent);
         EXPECT_EQ(args.indexes[i].sorterIdent, indexes[i].sorterIdent);
         EXPECT_EQ(args.indexes[i].sideWritesIdent, indexes[i].sideWritesIdent);
-        EXPECT_EQ(args.indexes[i].skippedRecordsTrackerIdent,
-                  indexes[i].skippedRecordsTrackerIdent);
-        EXPECT_EQ(args.indexes[i].constraintViolationsTrackerIdent,
-                  indexes[i].constraintViolationsTrackerIdent);
+        EXPECT_EQ(args.indexes[i].skippedRecordsIdent, indexes[i].skippedRecordsIdent);
+        EXPECT_EQ(args.indexes[i].constraintViolationsIdent, indexes[i].constraintViolationsIdent);
     }
     EXPECT_FALSE(args.fromMigrate);
     EXPECT_FALSE(args.isTimeseries);
@@ -238,10 +236,10 @@ TEST_F(UtilTest, Commit) {
         ASSERT_OK(engine.immediatelyCompletePendingDrop(operationContext(), *index.sorterIdent));
         ASSERT_OK(
             engine.immediatelyCompletePendingDrop(operationContext(), *index.sideWritesIdent));
+        ASSERT_OK(
+            engine.immediatelyCompletePendingDrop(operationContext(), *index.skippedRecordsIdent));
         ASSERT_OK(engine.immediatelyCompletePendingDrop(operationContext(),
-                                                        *index.skippedRecordsTrackerIdent));
-        ASSERT_OK(engine.immediatelyCompletePendingDrop(operationContext(),
-                                                        *index.constraintViolationsTrackerIdent));
+                                                        *index.constraintViolationsIdent));
     }
 
     auto coll = acquireCollectionMaybeLockFree(
@@ -266,8 +264,8 @@ TEST_F(UtilTest, Commit) {
         EXPECT_TRUE(engine.hasIdent(ru, indexes[i].indexIdent));
         EXPECT_FALSE(engine.hasIdent(ru, *indexes[i].sorterIdent));
         EXPECT_FALSE(engine.hasIdent(ru, *indexes[i].sideWritesIdent));
-        EXPECT_FALSE(engine.hasIdent(ru, *indexes[i].skippedRecordsTrackerIdent));
-        EXPECT_FALSE(engine.hasIdent(ru, *indexes[i].constraintViolationsTrackerIdent));
+        EXPECT_FALSE(engine.hasIdent(ru, *indexes[i].skippedRecordsIdent));
+        EXPECT_FALSE(engine.hasIdent(ru, *indexes[i].constraintViolationsIdent));
     }
 
     ASSERT_TRUE(opObserver().lastCommitArgs);
@@ -303,10 +301,10 @@ TEST_F(UtilTest, Abort) {
         ASSERT_OK(engine.immediatelyCompletePendingDrop(operationContext(), *index.sorterIdent));
         ASSERT_OK(
             engine.immediatelyCompletePendingDrop(operationContext(), *index.sideWritesIdent));
+        ASSERT_OK(
+            engine.immediatelyCompletePendingDrop(operationContext(), *index.skippedRecordsIdent));
         ASSERT_OK(engine.immediatelyCompletePendingDrop(operationContext(),
-                                                        *index.skippedRecordsTrackerIdent));
-        ASSERT_OK(engine.immediatelyCompletePendingDrop(operationContext(),
-                                                        *index.constraintViolationsTrackerIdent));
+                                                        *index.constraintViolationsIdent));
     }
 
     auto coll = acquireCollectionMaybeLockFree(
@@ -324,8 +322,8 @@ TEST_F(UtilTest, Abort) {
         EXPECT_FALSE(engine.hasIdent(ru, indexes[i].indexIdent));
         EXPECT_FALSE(engine.hasIdent(ru, *indexes[i].sorterIdent));
         EXPECT_FALSE(engine.hasIdent(ru, *indexes[i].sideWritesIdent));
-        EXPECT_FALSE(engine.hasIdent(ru, *indexes[i].skippedRecordsTrackerIdent));
-        EXPECT_FALSE(engine.hasIdent(ru, *indexes[i].constraintViolationsTrackerIdent));
+        EXPECT_FALSE(engine.hasIdent(ru, *indexes[i].skippedRecordsIdent));
+        EXPECT_FALSE(engine.hasIdent(ru, *indexes[i].constraintViolationsIdent));
     }
 
     ASSERT_TRUE(opObserver().lastAbortArgs);

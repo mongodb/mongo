@@ -70,22 +70,21 @@ void IndexBuildInfo::setInternalIdents(StorageEngine& storageEngine) {
     setInternalIdents(
         storageEngine.generateNewInternalIndexBuildIdent("sorter", indexIdent),
         storageEngine.generateNewInternalIndexBuildIdent("sideWrites", indexIdent),
-        storageEngine.generateNewInternalIndexBuildIdent("skippedRecordsTracker", indexIdent),
+        storageEngine.generateNewInternalIndexBuildIdent("skippedRecords", indexIdent),
         usesConstraintViolationsTracker(spec)
             ? boost::make_optional(storageEngine.generateNewInternalIndexBuildIdent(
                   "constraintViolations", indexIdent))
             : boost::none);
 }
 
-void IndexBuildInfo::setInternalIdents(
-    boost::optional<std::string> sorterIdent,
-    boost::optional<std::string> sideWritesIdent,
-    boost::optional<std::string> skippedRecordsTrackerIdent,
-    boost::optional<std::string> constraintViolationsTrackerIdent) {
+void IndexBuildInfo::setInternalIdents(boost::optional<std::string> sorterIdent,
+                                       boost::optional<std::string> sideWritesIdent,
+                                       boost::optional<std::string> skippedRecordsIdent,
+                                       boost::optional<std::string> constraintViolationsIdent) {
     this->sorterIdent = std::move(sorterIdent);
     this->sideWritesIdent = std::move(sideWritesIdent);
-    this->skippedRecordsTrackerIdent = std::move(skippedRecordsTrackerIdent);
-    this->constraintViolationsTrackerIdent = std::move(constraintViolationsTrackerIdent);
+    this->skippedRecordsIdent = std::move(skippedRecordsIdent);
+    this->constraintViolationsIdent = std::move(constraintViolationsIdent);
 }
 
 BSONObj IndexBuildInfo::toBSON() const {
@@ -100,12 +99,11 @@ BSONObj IndexBuildInfo::toBSON() const {
     if (sideWritesIdent) {
         bsonObjBuilder.append("sideWritesIdent", *sideWritesIdent);
     }
-    if (skippedRecordsTrackerIdent) {
-        bsonObjBuilder.append("skippedRecordsTrackerIdent", *skippedRecordsTrackerIdent);
+    if (skippedRecordsIdent) {
+        bsonObjBuilder.append("skippedRecordsIdent", *skippedRecordsIdent);
     }
-    if (constraintViolationsTrackerIdent) {
-        bsonObjBuilder.append("constraintViolationsTrackerIdent",
-                              *constraintViolationsTrackerIdent);
+    if (constraintViolationsIdent) {
+        bsonObjBuilder.append("constraintViolationsIdent", *constraintViolationsIdent);
     }
     return bsonObjBuilder.obj();
 }

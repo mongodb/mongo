@@ -91,19 +91,17 @@ IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
           return SideWritesTracker{opCtx, *indexBuildInfo.sideWritesIdent, createMode};
       }()),
       _skippedRecordTracker([&]() {
-          uassert(10709202,
-                  "skippedRecordsTrackerIdent is not provided",
-                  indexBuildInfo.skippedRecordsTrackerIdent);
-          return SkippedRecordTracker(
-              opCtx, *indexBuildInfo.skippedRecordsTrackerIdent, createMode);
+          uassert(
+              10709202, "skippedRecordsIdent is not provided", indexBuildInfo.skippedRecordsIdent);
+          return SkippedRecordTracker(opCtx, *indexBuildInfo.skippedRecordsIdent, createMode);
       }()),
       _skipNumAppliedCheck(createMode == LazyRecordStore::CreateMode::openExisting) {
     if (unique) {
         uassert(10709203,
-                "constraintViolationsTrackerIdent is not provided",
-                indexBuildInfo.constraintViolationsTrackerIdent);
+                "constraintViolationsIdent is not provided",
+                indexBuildInfo.constraintViolationsIdent);
         _duplicateKeyTracker = std::make_unique<DuplicateKeyTracker>(
-            opCtx, *indexBuildInfo.constraintViolationsTrackerIdent, createMode);
+            opCtx, *indexBuildInfo.constraintViolationsIdent, createMode);
     }
     // TODO(SERVER-110289): Use utility function instead of checking fcvSnapshot.
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();

@@ -65,10 +65,10 @@ structs:
             sideWritesIdent:
                 description: "The ident used for the side writes temp table."
                 type: string
-            skippedRecordsTrackerIdent:
+            skippedRecordsIdent:
                 description: "The ident used for the skipped records tracker temp table."
                 type: string
-            constraintViolationsTrackerIdent:
+            constraintViolationsIdent:
                 description: "The ident used for the duplicate key tracker temp table, when one is created."
                 type: string
                 optional: true

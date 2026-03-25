@@ -362,13 +362,12 @@ TEST_F(IdentGenerationTest, ValidInternalIndexBuildIdent) {
             << "ident: " << sideWritesIdent;
         ASSERT_TRUE(ident::isValidIdent(sideWritesIdent)) << "ident: " << sideWritesIdent;
 
-        auto skippedRecordsTrackerStem = "skippedRecordsTracker";
-        auto skippedRecordsTrackerIdent =
-            ident::generateNewInternalIndexBuildIdent(skippedRecordsTrackerStem, indexIdent);
-        ASSERT_TRUE(ident::isInternalIdent(skippedRecordsTrackerIdent, skippedRecordsTrackerStem))
-            << "ident: " << skippedRecordsTrackerIdent;
-        ASSERT_TRUE(ident::isValidIdent(skippedRecordsTrackerIdent))
-            << "ident: " << skippedRecordsTrackerIdent;
+        auto skippedRecordsStem = "skippedRecords";
+        auto skippedRecordsIdent =
+            ident::generateNewInternalIndexBuildIdent(skippedRecordsStem, indexIdent);
+        ASSERT_TRUE(ident::isInternalIdent(skippedRecordsIdent, skippedRecordsStem))
+            << "ident: " << skippedRecordsIdent;
+        ASSERT_TRUE(ident::isValidIdent(skippedRecordsIdent)) << "ident: " << skippedRecordsIdent;
 
         auto constraintViolationsStem = "constraintViolations";
         auto constraintViolationsIdent =

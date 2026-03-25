@@ -5958,12 +5958,11 @@ TEST_F(OpObserverTest, OnStartIndexBuildIncludesInternalIdents) {
 
     ASSERT_BSONOBJ_EQ(indexElemObj.getObjectField("internalIdents"),
                       BSON("sorterIdent" << *indexes[0].sorterIdent << "sideWritesIdent"
-                                         << *indexes[0].sideWritesIdent
-                                         << "skippedRecordsTrackerIdent"
-                                         << *indexes[0].skippedRecordsTrackerIdent));
+                                         << *indexes[0].sideWritesIdent << "skippedRecordsIdent"
+                                         << *indexes[0].skippedRecordsIdent));
 }
 
-TEST_F(OpObserverTest, OnStartIndexBuildIncludesConstraintViolationsTrackerIdentForUniqueIndexes) {
+TEST_F(OpObserverTest, OnStartIndexBuildIncludesconstraintViolationsIdentForUniqueIndexes) {
     OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
     auto opCtx = cc().makeOperationContext();
 
@@ -5992,11 +5991,10 @@ TEST_F(OpObserverTest, OnStartIndexBuildIncludesConstraintViolationsTrackerIdent
     auto indexElemObj = indexesElemVec[0].Obj();
     ASSERT_BSONOBJ_EQ(indexElemObj.getObjectField("internalIdents"),
                       BSON("sorterIdent" << *indexes[0].sorterIdent << "sideWritesIdent"
-                                         << *indexes[0].sideWritesIdent
-                                         << "skippedRecordsTrackerIdent"
-                                         << *indexes[0].skippedRecordsTrackerIdent
-                                         << "constraintViolationsTrackerIdent"
-                                         << *indexes[0].constraintViolationsTrackerIdent));
+                                         << *indexes[0].sideWritesIdent << "skippedRecordsIdent"
+                                         << *indexes[0].skippedRecordsIdent
+                                         << "constraintViolationsIdent"
+                                         << *indexes[0].constraintViolationsIdent));
 }
 
 TEST_F(OpObserverTest, OnCommitIndexBuildIncludesIndexIdent) {
@@ -6079,12 +6077,11 @@ TEST_F(OpObserverTest, OnCommitIndexBuildIncludesInternalIdentsWithPrimaryDriven
 
     ASSERT_BSONOBJ_EQ(indexElemObj.getObjectField("internalIdents"),
                       BSON("sorterIdent" << *indexes[0].sorterIdent << "sideWritesIdent"
-                                         << *indexes[0].sideWritesIdent
-                                         << "skippedRecordsTrackerIdent"
-                                         << *indexes[0].skippedRecordsTrackerIdent));
+                                         << *indexes[0].sideWritesIdent << "skippedRecordsIdent"
+                                         << *indexes[0].skippedRecordsIdent));
 }
 
-TEST_F(OpObserverTest, OnCommitIndexBuildIncludesConstraintViolationsTrackerIdentForUniqueIndexes) {
+TEST_F(OpObserverTest, OnCommitIndexBuildIncludesconstraintViolationsIdentForUniqueIndexes) {
     OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
     auto opCtx = cc().makeOperationContext();
 
@@ -6114,11 +6111,10 @@ TEST_F(OpObserverTest, OnCommitIndexBuildIncludesConstraintViolationsTrackerIden
     auto indexElemObj = indexesElemVec[0].Obj();
     ASSERT_BSONOBJ_EQ(indexElemObj.getObjectField("internalIdents"),
                       BSON("sorterIdent" << *indexes[0].sorterIdent << "sideWritesIdent"
-                                         << *indexes[0].sideWritesIdent
-                                         << "skippedRecordsTrackerIdent"
-                                         << *indexes[0].skippedRecordsTrackerIdent
-                                         << "constraintViolationsTrackerIdent"
-                                         << *indexes[0].constraintViolationsTrackerIdent));
+                                         << *indexes[0].sideWritesIdent << "skippedRecordsIdent"
+                                         << *indexes[0].skippedRecordsIdent
+                                         << "constraintViolationsIdent"
+                                         << *indexes[0].constraintViolationsIdent));
 }
 
 TEST_F(OpObserverTest, OnCommitIndexBuildMultipleIndexesIncludesAllIdents) {
@@ -6151,8 +6147,8 @@ TEST_F(OpObserverTest, OnCommitIndexBuildMultipleIndexesIncludesAllIdents) {
         auto internalIdents = indexElemObj.getObjectField("internalIdents");
         EXPECT_EQ(internalIdents.getStringField("sorterIdent"), *indexes[i].sorterIdent);
         EXPECT_EQ(internalIdents.getStringField("sideWritesIdent"), *indexes[i].sideWritesIdent);
-        EXPECT_EQ(internalIdents.getStringField("skippedRecordsTrackerIdent"),
-                  *indexes[i].skippedRecordsTrackerIdent);
+        EXPECT_EQ(internalIdents.getStringField("skippedRecordsIdent"),
+                  *indexes[i].skippedRecordsIdent);
     }
 }
 
@@ -6188,7 +6184,7 @@ TEST_F(OpObserverTest, OnCommitIndexBuildNoInternalIdentsWhenPrimaryDrivenIndexB
 using OpObserverIndexBuildDeathTest = OpObserverTest;
 
 DEATH_TEST_F(OpObserverIndexBuildDeathTest,
-             OnStartIndexBuildInvariantIfUniqueIndexMissingConstraintViolationsTrackerIdent,
+             OnStartIndexBuildInvariantIfUniqueIndexMissingconstraintViolationsIdent,
              "invariant") {
     OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
     auto opCtx = cc().makeOperationContext();
@@ -6196,14 +6192,14 @@ DEATH_TEST_F(OpObserverIndexBuildDeathTest,
     auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
 
-    // Build a unique index IndexBuildInfo but clear the constraintViolationsTrackerIdent to
+    // Build a unique index IndexBuildInfo but clear the constraintViolationsIdent to
     // simulate it being missing.
     auto uniqueSpec =
         BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1" << "unique" << true);
     IndexBuildInfo indexBuildInfo(uniqueSpec, "index-1", *storageEngine);
     indexBuildInfo.setInternalIdents(*indexBuildInfo.sorterIdent,
                                      *indexBuildInfo.sideWritesIdent,
-                                     *indexBuildInfo.skippedRecordsTrackerIdent,
+                                     *indexBuildInfo.skippedRecordsIdent,
                                      boost::none);
 
     AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
@@ -6217,7 +6213,7 @@ DEATH_TEST_F(OpObserverIndexBuildDeathTest,
 }
 
 DEATH_TEST_F(OpObserverIndexBuildDeathTest,
-             OnCommitIndexBuildInvariantIfUniqueIndexMissingConstraintViolationsTrackerIdent,
+             OnCommitIndexBuildInvariantIfUniqueIndexMissingconstraintViolationsIdent,
              "invariant") {
     OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
     auto opCtx = cc().makeOperationContext();
@@ -6225,14 +6221,14 @@ DEATH_TEST_F(OpObserverIndexBuildDeathTest,
     auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
 
-    // Build a unique index IndexBuildInfo but clear the constraintViolationsTrackerIdent to
+    // Build a unique index IndexBuildInfo but clear the constraintViolationsIdent to
     // simulate it being missing.
     auto uniqueSpec =
         BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1" << "unique" << true);
     IndexBuildInfo indexBuildInfo(uniqueSpec, "index-1", *storageEngine);
     indexBuildInfo.setInternalIdents(*indexBuildInfo.sorterIdent,
                                      *indexBuildInfo.sideWritesIdent,
-                                     *indexBuildInfo.skippedRecordsTrackerIdent,
+                                     *indexBuildInfo.skippedRecordsIdent,
                                      boost::none);
 
     AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);

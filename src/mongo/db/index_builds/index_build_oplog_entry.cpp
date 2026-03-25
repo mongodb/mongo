@@ -238,14 +238,14 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* o
                 const auto& internalIdents = *indexes[i].getInternalIdents();
                 for (const auto ident : {internalIdents.getSorterIdent(),
                                          internalIdents.getSideWritesIdent(),
-                                         internalIdents.getSkippedRecordsTrackerIdent()}) {
+                                         internalIdents.getSkippedRecordsIdent()}) {
                     if (auto status = validateInternalIdent(ident); !status.isOK()) {
                         return status;
                     }
                 }
-                if (const auto& constraintViolationsTrackerIdent =
-                        internalIdents.getConstraintViolationsTrackerIdent()) {
-                    if (auto status = validateInternalIdent(*constraintViolationsTrackerIdent);
+                if (const auto& constraintViolationsIdent =
+                        internalIdents.getConstraintViolationsIdent()) {
+                    if (auto status = validateInternalIdent(*constraintViolationsIdent);
                         !status.isOK()) {
                         return status;
                     }
@@ -253,16 +253,16 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* o
                            IndexDescriptor::isIdIndexPattern(
                                indexesVec[i].spec.getObjectField("key"))) {
                     return {ErrorCodes::BadValue,
-                            "constraintViolationsTrackerIdent is required for unique and _id "
+                            "constraintViolationsIdent is required for unique and _id "
                             "indexes"};
                 }
                 indexesVec[i].setInternalIdents(
                     std::string{internalIdents.getSorterIdent()},
                     std::string{internalIdents.getSideWritesIdent()},
-                    std::string{internalIdents.getSkippedRecordsTrackerIdent()},
-                    internalIdents.getConstraintViolationsTrackerIdent()
+                    std::string{internalIdents.getSkippedRecordsIdent()},
+                    internalIdents.getConstraintViolationsIdent()
                         ? boost::make_optional(
-                              std::string{*internalIdents.getConstraintViolationsTrackerIdent()})
+                              std::string{*internalIdents.getConstraintViolationsIdent()})
                         : boost::none);
             }
 

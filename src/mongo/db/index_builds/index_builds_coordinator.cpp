@@ -2237,21 +2237,21 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
             IndexBuildInfo indexBuildInfo(indexStateInfo.getSpec(), boost::none);
             indexBuildInfo.sideWritesIdent.emplace(indexStateInfo.getSideWritesTable());
             if (auto ident = indexStateInfo.getSkippedRecordTrackerTable()) {
-                indexBuildInfo.skippedRecordsTrackerIdent.emplace(*ident);
+                indexBuildInfo.skippedRecordsIdent.emplace(*ident);
             } else {
                 // Older versions only persisted the skipped record tracker table ident if there
                 // were skipped records, so it may be missing. If it is, we can safely generate a
                 // new one as there's no existing table we need to reuse and we can't be in a
                 // primary-driven index build.
-                auto skippedRecordsTrackerIdent = storageEngine->generateNewInternalIdent();
+                auto skippedRecordsIdent = storageEngine->generateNewInternalIdent();
                 auto lazyRecordStore = LazyRecordStore(
-                    opCtx, skippedRecordsTrackerIdent, LazyRecordStore::CreateMode::immediate);
+                    opCtx, skippedRecordsIdent, LazyRecordStore::CreateMode::immediate);
                 lazyRecordStore.keepTemporaryTable(opCtx);
                 // Immediate creation ensures the table is created.
-                indexBuildInfo.skippedRecordsTrackerIdent.emplace(skippedRecordsTrackerIdent);
+                indexBuildInfo.skippedRecordsIdent.emplace(skippedRecordsIdent);
             }
             if (auto ident = indexStateInfo.getDuplicateKeyTrackerTable()) {
-                indexBuildInfo.constraintViolationsTrackerIdent.emplace(*ident);
+                indexBuildInfo.constraintViolationsIdent.emplace(*ident);
             } else {
                 // Nothing to do here, unlike in the skipped records tracker case, because the only
                 // reason for the constraint violations table to be missing is if the index being

@@ -62,7 +62,7 @@ public:
     };
 
     SkippedRecordTracker(OperationContext* opCtx,
-                         StringData skippedRecordsTrackerIdent,
+                         StringData skippedRecordsIdent,
                          LazyRecordStore::CreateMode createMode);
 
     /**
