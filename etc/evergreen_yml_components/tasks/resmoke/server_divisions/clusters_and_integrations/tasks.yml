@@ -1961,10 +1961,10 @@ tasks:
 
   - <<: *gen_task_template
     name: sharding_stepdown_fcv_upgrade_downgrade_jscore_passthrough_gen
-    tags:
-      [
+    tags: [
         "assigned_to_jira_team_server_catalog_and_routing",
         "incompatible_mac",
+        "incompatible_ppc", # TODO SERVER-122597: Remove once the underlying election timeout issue is fixed.
         "release_critical",
         "sharding",
         "jscore",
