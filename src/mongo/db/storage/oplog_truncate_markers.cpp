@@ -271,14 +271,13 @@ bool OplogTruncateMarkers::awaitHasExpiredOplogOrDead(OperationContext* opCtx, R
     // the retention time into the wait period and not just the configured thread wake interval.
     // Note that oplogMinRetentionHours can be fractional, so don't use Interval to calculate this.
     double minRetentionSeconds = storageGlobalParams.oplogMinRetentionHours.load() * 60 * 60;
-    int checkPeriodSeconds = (minRetentionSeconds != 0.0)
-        ? std::min<int>(gOplogTruncationCheckPeriodSeconds, minRetentionSeconds)
-        : gOplogTruncationCheckPeriodSeconds;
+    // When truncating by time, use a smaller wake time to prevent too much oplog from accumulating.
+    Seconds checkPeriod((minRetentionSeconds != 0.0) ? std::min<int>(30, minRetentionSeconds) : 30);
     // Wait until kill() is called or oplog can be truncated.
     stdx::unique_lock<stdx::mutex> lock(_reclaimMutex);
     MONGO_IDLE_THREAD_BLOCK;
     auto isWaitConditionSatisfied =
-        opCtx->waitForConditionOrInterruptFor(_reclaimCv, lock, Seconds(checkPeriodSeconds), [&] {
+        opCtx->waitForConditionOrInterruptFor(_reclaimCv, lock, checkPeriod, [&] {
             if (_isDead) {
                 return true;
             }
