@@ -1608,7 +1608,8 @@ private:
 // Global variable indicating if this is a server or a client instance
 bool isSSLServer = false;
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("SetupOpenSSL", "EndStartupOptionHandling"))
+MONGO_INITIALIZER_WITH_PREREQUISITES(
+    SSLManager, ("SetupOpenSSL", "EndStartupOptionHandling", "OpenSSLHashCheck"))
 (InitializerContext*) {
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
         theSSLManagerCoordinator = new SSLManagerCoordinator();
@@ -3365,7 +3366,7 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
         ocspFuture = ocspClientVerification(conn, reactor);
     }
 
-    // TODO: check optional cipher restriction, using cert.
+    // We need to check optional cipher restriction, using cert.
     auto peerSubject = getCertificateSubjectX509Name(peerCert.get());
     const auto cipher = SSL_get_current_cipher(conn);
     if (!serverGlobalParams.quiet.load() && gEnableDetailedConnectionHealthMetricLogLines.load()) {
@@ -3641,7 +3642,7 @@ void SSLManagerOpenSSL::_handleSSLError(SSLConnectionOpenSSL* conn, int ret) {
             break;
 
         case SSL_ERROR_ZERO_RETURN:
-            // TODO: Check if we can avoid throwing an exception for this condition
+            // We need to check if we can avoid throwing an exception for this condition
             // If so, change error() back to LOG(3)
             LOGV2_ERROR(23259, "SSL network connection closed");
             break;

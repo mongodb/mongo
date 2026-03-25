@@ -28,7 +28,8 @@
  */
 
 #include "mongo/base/data_range.h"
-#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/config.h"     // IWYU pragma: keep
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/crypto/sha512_block.h"
@@ -45,6 +46,7 @@
 #include <cstdint>
 #include <cstring>
 
+#include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 #include <openssl/opensslv.h>
@@ -90,6 +92,12 @@ namespace mongo {
 
 namespace {
 
+std::string getOpenSSLErrorString() {
+    constexpr size_t kMsgLen = 256;
+    char msg[kMsgLen];
+    ERR_error_string_n(ERR_get_error(), msg, kMsgLen);
+    return msg;
+}
 
 /**
  * Class to load singleton instances of each SHA algorithm.
@@ -101,6 +109,20 @@ public:
         _algoSHA1 = EVP_MD_fetch(NULL, "SHA1", NULL);
         _algoSHA256 = EVP_MD_fetch(NULL, "SHA2-256", NULL);
         _algoSHA512 = EVP_MD_fetch(NULL, "SHA2-512", NULL);
+        // Use SHA-256 as the litmus test for a functional OpenSSL environment. SHA-1 may
+        // legitimately be unavailable under FIPS 140-3 where it is not approved for general
+        // hashing. If SHA-256 fails to load, it likely indicates a missing FIPS provider.
+        fassert(11319400,
+                Status(_algoSHA256 ? ErrorCodes::OK : ErrorCodes::InternalError,
+                       _algoSHA256 ? ""
+                                   : "Failed to fetch OpenSSL SHA2-256 hash algorithm: " +
+                               getOpenSSLErrorString() +
+                               ". This may be caused by running in an environment where "
+                               "FIPS mode is enforced (e.g. via system crypto policy or "
+                               "kernel FIPS flag) but the OpenSSL library in use does not "
+                               "have a FIPS provider installed. Ensure OpenSSL is built "
+                               "with FIPS support and the FIPS provider module is "
+                               "available."));
     }
 
     ~OpenSSLHashLoader() {
@@ -149,6 +171,14 @@ static OpenSSLHashLoader& getOpenSSLHashLoader() {
     return *loader;
 }
 
+// Eagerly initialize the OpenSSLHashLoader during startup, before SSLManager loads TLS
+// certificates. This ensures that if SHA2-256 is unavailable (e.g. a FIPS-only OpenSSL
+// config without the FIPS module installed), fassert 11319400 fires with a clear diagnostic
+// message rather than a confusing "decode error" from PEM certificate loading.
+MONGO_INITIALIZER_GENERAL(OpenSSLHashCheck, ("default"), ())
+(InitializerContext*) {
+    getOpenSSLHashLoader();
+}
 
 /*
  * Computes a SHA hash of 'input'.
