@@ -2,9 +2,7 @@
 pypiwin32>=223; sys_platform == "win32" and python_version > "3"
 pywin32>=225; sys_platform == "win32" and python_version > "3"
 
-cryptography == 2.3; (platform_machine == "s390x" and platform_release < "5.14.0-362.8.1.el9_3.s390x") or (platform_machine == "ppc64le" and platform_release < "5.14.0-362.13.1.el9_3.ppc64le")
-cryptography == 36.0.2; (platform_machine == "s390x" and platform_release >= "5.14.0-362.8.1.el9_3.s390x") or (platform_machine == "ppc64le" and platform_release >= "5.14.0-362.13.1.el9_3.ppc64le")
-cryptography == 36.0.2; platform_machine != "s390x" and platform_machine != "ppc64le"
+cryptography == 36.0.2
 
 mongo-ninja-python == 1.11.1.5; (platform_machine == "x86_64" or platform_machine == "aarch64") and sys_platform == "linux"
 ninja >= 1.10.0; (platform_machine != "x86_64" and platform_machine != "aarch64") or sys_platform != "linux"
