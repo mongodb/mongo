@@ -238,6 +238,58 @@ TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithForeignDBAndPipeline) {
     ASSERT(unionWith->getSourceName() == DocumentSourceUnionWith::kStageName);
 }
 
+TEST_F(DocumentSourceUnionWithTest, QueryStatsSerializeWithForeignDBIncludesDbField) {
+    auto expCtx = getExpCtx();
+    NamespaceString nsToUnionWith =
+        NamespaceString::createNamespaceString_forTest(boost::none, "crossDB", "coll");
+    expCtx->setResolvedNamespaces(
+        ResolvedNamespaceMap{{nsToUnionWith, {nsToUnionWith, std::vector<BSONObj>()}}});
+    auto bson =
+        BSON("$unionWith" << BSON("db" << "crossDB"
+                                       << "coll" << nsToUnionWith.coll() << "pipeline"
+                                       << BSON_ARRAY(BSON("$addFields" << BSON("a" << 3)))));
+    auto unionWith = DocumentSourceUnionWith::createFromBson(bson.firstElement(), expCtx);
+
+    // Serialize with query stats options that transform identifiers.
+    auto opts = SerializationOptions::kMarkIdentifiers_FOR_TEST;
+    std::vector<Value> serializedArray;
+    unionWith->serializeToArray(serializedArray, opts);
+    auto serializedBson = serializedArray[0].getDocument().toBson();
+
+    // The serialized output must include the "db" field for cross-database $unionWith.
+    auto unionWithSpec = serializedBson["$unionWith"].Obj();
+    ASSERT_TRUE(unionWithSpec.hasField("db")) << "Expected 'db' field in query stats "
+                                                 "serialization for cross-database $unionWith: "
+                                              << serializedBson;
+    ASSERT_EQ(unionWithSpec["db"].String(), "HASH<crossDB>");
+    ASSERT_EQ(unionWithSpec["coll"].String(), "HASH<coll>");
+}
+
+TEST_F(DocumentSourceUnionWithTest, QueryStatsSerializeWithSameDBOmitsDbField) {
+    auto expCtx = getExpCtx();
+    NamespaceString nsToUnionWith = NamespaceString::createNamespaceString_forTest(
+        expCtx->getNamespaceString().dbName(), "coll");
+    expCtx->setResolvedNamespaces(
+        ResolvedNamespaceMap{{nsToUnionWith, {nsToUnionWith, std::vector<BSONObj>()}}});
+    auto bson =
+        BSON("$unionWith" << BSON("coll" << nsToUnionWith.coll() << "pipeline"
+                                         << BSON_ARRAY(BSON("$addFields" << BSON("a" << 3)))));
+    auto unionWith = DocumentSourceUnionWith::createFromBson(bson.firstElement(), expCtx);
+
+    // Serialize with query stats options that transform identifiers.
+    auto opts = SerializationOptions::kMarkIdentifiers_FOR_TEST;
+    std::vector<Value> serializedArray;
+    unionWith->serializeToArray(serializedArray, opts);
+    auto serializedBson = serializedArray[0].getDocument().toBson();
+
+    // Same-database $unionWith should NOT include the "db" field.
+    auto unionWithSpec = serializedBson["$unionWith"].Obj();
+    ASSERT_FALSE(unionWithSpec.hasField("db")) << "Unexpected 'db' field in query stats "
+                                                  "serialization for same-database $unionWith: "
+                                               << serializedBson;
+    ASSERT_EQ(unionWithSpec["coll"].String(), "HASH<coll>");
+}
+
 TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithoutPipeline) {
     auto expCtx = getExpCtx();
     NamespaceString nsToUnionWith = NamespaceString::createNamespaceString_forTest(
@@ -713,6 +765,30 @@ TEST_F(DocumentSourceUnionWithTest, RedactsCorrectlyBasic) {
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "$unionWith": {
+                "coll": "HASH<coll>",
+                "pipeline": []
+            }
+        })",
+        redact(*docSource));
+}
+
+TEST_F(DocumentSourceUnionWithTest, RedactsCorrectlyCrossDB) {
+    auto expCtx = getExpCtx();
+    auto nsToUnionWith =
+        NamespaceString::createNamespaceString_forTest(boost::none, "crossDB", "coll");
+    expCtx->setResolvedNamespaces(
+        ResolvedNamespaceMap{{nsToUnionWith, {nsToUnionWith, std::vector<BSONObj>()}}});
+
+    auto docSource = DocumentSourceUnionWith::createFromBson(
+        BSON("$unionWith" << BSON("db" << "crossDB"
+                                       << "coll" << nsToUnionWith.coll()))
+            .firstElement(),
+        expCtx);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$unionWith": {
+                "db": "HASH<crossDB>",
                 "coll": "HASH<coll>",
                 "pipeline": []
             }

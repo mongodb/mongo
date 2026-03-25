@@ -557,9 +557,14 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
                                            _sharedState->_pipeline->getContext(),
                                            pipeline_factory::kOptionsMinimal)
                 ->serializeToBson(opts);
-        auto spec = collectionless ? DOC("pipeline" << serializedPipeline)
-                                   : DOC("coll" << opts.serializeIdentifier(_userNss.coll())
-                                                << "pipeline" << serializedPipeline);
+        auto spec = collectionless
+            ? DOC("pipeline" << serializedPipeline)
+            : (_hasForeignDB
+                   ? DOC("db" << opts.serializeIdentifier(_userNss.dbName().db(OmitTenant{}))
+                              << "coll" << opts.serializeIdentifier(_userNss.coll()) << "pipeline"
+                              << serializedPipeline)
+                   : DOC("coll" << opts.serializeIdentifier(_userNss.coll()) << "pipeline"
+                                << serializedPipeline));
         return Value(DOC(getSourceName() << spec));
     } else {
         MutableDocument spec;
