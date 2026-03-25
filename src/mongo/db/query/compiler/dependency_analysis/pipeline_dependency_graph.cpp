@@ -419,7 +419,6 @@ public:
         }
     }
 
-    size_t numStages() const;
     BSONObj toBSON() const;
 
 private:

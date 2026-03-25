@@ -86,7 +86,6 @@ public:
     void recompute(const DocumentSourceContainer& container,
                    boost::optional<DocumentSourceContainer::const_iterator> stageIt = {});
 
-    size_t numStages() const;
     std::string toDebugString() const;
     BSONObj toBSON() const;
 
