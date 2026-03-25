@@ -372,7 +372,7 @@ private:
  *
  * T is the type of an iterator pointing to the (key, value) pair of interest.
  */
-template <typename T>
+template <typename T, bool CanMove = true>
 class MaterializedRowValueAccessor final : public AssignableSlotAccessor {
 public:
     using AssignableSlotAccessor::reset;
@@ -383,7 +383,12 @@ public:
         return _it->second.getViewOfValue(_slot);
     }
     TagValueOwned copyOrMoveValue() override {
-        return _it->second.copyOrMoveValue(_slot);
+        if constexpr (CanMove) {
+            return _it->second.copyOrMoveValue(_slot);
+        } else {
+            auto [tag, val] = getViewOfValue();
+            return copyValue(tag, val);
+        }
     }
 
     void reset(bool owned, TypeTags tag, Value val) override {

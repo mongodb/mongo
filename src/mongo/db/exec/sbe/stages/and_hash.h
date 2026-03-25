@@ -107,7 +107,7 @@ private:
                                               value::MaterializedRowEq>;
 
     using HashKeyAccessor = value::MaterializedRowKeyAccessor<TableType::iterator>;
-    using HashProjectAccessor = value::MaterializedRowValueAccessor<TableType::iterator>;
+    using HashProjectAccessor = value::MaterializedRowValueAccessor<TableType::iterator, false>;
 
     const value::SlotVector _outerCond;
     const value::SlotVector _outerProjects;

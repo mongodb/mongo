@@ -152,4 +152,64 @@ TEST_F(AndHashStageTest, AndHashCollationTest) {
     }
 }
 
+TEST_F(AndHashStageTest, TestHashValueIsCopied) {
+    // Outer side: one row with key="a" and projected value "projectedValue".
+    // The string is >7 bytes to ensure heap allocation (StringBig), exercising
+    // the ownership transfer in copyOrMoveValue().
+    auto [outerTag, outerVal] =
+        stage_builder::makeValue(BSON_ARRAY(BSON_ARRAY("a" << "projectedValue")));
+    value::ValueGuard outerGuard{outerTag, outerVal};
+
+    // Inner side: two rows both with key="a". Both match the single outer row,
+    // so AndHash produces two results from the same hash table entry.
+    auto [innerTag, innerVal] = stage_builder::makeValue(BSON_ARRAY("a" << "a"));
+    value::ValueGuard innerGuard{innerTag, innerVal};
+
+    auto ctx = makeCompileCtx();
+
+    outerGuard.reset();
+    auto [outerSlots, outerStage] = generateVirtualScanMulti(2, outerTag, outerVal);
+    auto outerKeySlot = outerSlots[0];
+    auto outerProjectSlot = outerSlots[1];
+
+    innerGuard.reset();
+    auto [innerKeySlot, innerStage] = generateVirtualScan(innerTag, innerVal);
+
+    auto andHashStage = makeS<AndHashStage>(std::move(outerStage),
+                                            std::move(innerStage),
+                                            makeSV(outerKeySlot),
+                                            makeSV(outerProjectSlot),
+                                            makeSV(innerKeySlot),
+                                            makeSV(),
+                                            boost::none,
+                                            nullptr /* yieldPolicy */,
+                                            kEmptyPlanNodeId);
+
+    auto resultAccessors = prepareTree(ctx.get(), andHashStage.get(), makeSV(outerProjectSlot));
+    auto* projectAccessor = resultAccessors[0];
+
+    // First getNext(): inner "a" matches outer "a".
+    ASSERT_EQ(andHashStage->getNext(), PlanState::ADVANCED);
+
+    auto [tag1, val1] = projectAccessor->copyOrMoveValue().releaseToRaw();
+
+    ASSERT_EQ(tag1, value::TypeTags::StringBig);
+
+    // Releasing the old value before processing the next row.
+    value::releaseValue(tag1, val1);
+
+    // Second getNext(): another inner "a" matches the same outer hash table entry.
+    ASSERT_EQ(andHashStage->getNext(), PlanState::ADVANCED);
+
+    auto [tag2, val2] = projectAccessor->getViewOfValue();
+
+    auto [expectedTag, expectedVal] = value::makeNewString("projectedValue");
+    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+    ASSERT_TRUE(valueEquals(tag2, val2, expectedTag, expectedVal));
+
+    ASSERT_EQ(andHashStage->getNext(), PlanState::IS_EOF);
+
+    andHashStage->close();
+}
+
 }  // namespace mongo::sbe
