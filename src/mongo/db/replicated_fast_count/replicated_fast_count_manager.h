@@ -35,6 +35,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_committer.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_role.h"
@@ -155,6 +156,10 @@ public:
      */
     void flushSync(OperationContext* opCtx);
 
+    ReplicatedFastCountMetrics& getReplicatedFastCountMetrics() {
+        return _metrics;
+    }
+
     /**
      * Disables periodic background writes of metadata for testing purposes. Must be called before
      * startup().
@@ -237,6 +242,12 @@ private:
      */
     RecordId _keyForUUID(const UUID& uuid) const;
     UUID _UUIDForKey(RecordId key) const;
+
+    // Metrics for the ReplicatedFastCountManager reported via both serverStatus and OTel.
+    //
+    // Metrics are shared between ReplicatedFastCountManager instances. We assume there is exactly
+    // one ReplicatedFastCountManager per mongod process.
+    static inline ReplicatedFastCountMetrics _metrics;
 
     StringData _threadName = "replicatedSizeCount"_sd;
     stdx::thread _backgroundThread;

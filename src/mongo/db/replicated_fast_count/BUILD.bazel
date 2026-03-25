@@ -10,6 +10,19 @@ exports_files(
 )
 
 mongo_cc_library(
+    name = "replicated_fast_count_metrics",
+    srcs = [
+        "replicated_fast_count_metrics.cpp",
+    ],
+    hdrs = [
+        "replicated_fast_count_metrics.h",
+    ],
+    deps = [
+        "//src/mongo/otel/metrics:otel_metrics_service",
+    ],
+)
+
+mongo_cc_library(
     name = "replicated_fast_count_manager",
     srcs = [
         "replicated_fast_count_manager.cpp",
@@ -17,6 +30,7 @@ mongo_cc_library(
     deps = [
         "replicated_fast_count_committer",
         "replicated_fast_count_delta_utils",
+        "replicated_fast_count_metrics",
         "//src/mongo/db:record_id_helpers",
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/shard_role",
@@ -146,10 +160,16 @@ mongo_cc_unit_test(
     target_compatible_with = select({
         "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
         "//conditions:default": [],
+    }) + select({
+        "//bazel/config:build_otel_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [
         "replicated_fast_count_init",
+        "replicated_fast_count_metrics",
         "replicated_fast_count_test_helpers",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/otel/metrics:metrics_test_util",
+        "//src/mongo/util:fail_point",
     ],
 )

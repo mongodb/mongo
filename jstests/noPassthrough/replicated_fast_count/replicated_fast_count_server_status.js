@@ -1,6 +1,8 @@
 /**
  * This test checks that ReplicatedFastCountManager server status metrics are reported correctly.
  *
+ * All metrics are reported via the OTel server status integration.
+ *
  * @tags: [
  *   featureFlagReplicatedFastCount,
  *   requires_replication,
@@ -13,7 +15,22 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Maximum amount of time that can elapse in an assert.soon() in this test before timeout. The
 // default value is 10 minutes, but server status updates should never take that long.
-const serverStatusAssertTimeoutMs = 10_000; // 10 sec
+const kServerStatusAssertTimeoutMs = 10_000; // 10 sec
+
+// OTel server status keys use the format "<metric_name>_<unit>"
+const kIsRunning = "replicated_fast_count.is_running_events";
+const kFlushSuccessCount = "replicated_fast_count.flush.success_count_events";
+const kFlushFailureCount = "replicated_fast_count.flush.failure_count_events";
+const kFlushTimeMsMin = "replicated_fast_count.flush_time.min_milliseconds";
+const kFlushTimeMsMax = "replicated_fast_count.flush_time.max_milliseconds";
+const kFlushTimeMsTotal = "replicated_fast_count.flush_time.total_milliseconds";
+const kFlushedDocsMin = "replicated_fast_count.flushed_docs.min_events";
+const kFlushedDocsMax = "replicated_fast_count.flushed_docs.max_events";
+const kFlushedDocsTotal = "replicated_fast_count.flushed_docs.total_events";
+const kEmptyUpdateCount = "replicated_fast_count.empty_update_count_events";
+const kInsertCount = "replicated_fast_count.insert_count_operations";
+const kUpdateCount = "replicated_fast_count.update_count_operations";
+const kWriteTimeMsTotal = "replicated_fast_count.write_time.total_milliseconds";
 
 /**
  * Returns a function that triggers a flush of ReplicatedFastCountManager and waits for it to
@@ -32,25 +49,10 @@ function makeForceFlush(db, delay = 0) {
 }
 
 /**
- * Asserts the the provided array of field names exist in the replicated fast count server status
- * section.
- *
- * This is useful for detecting if a field name does not exist before asserting its value in
- * assert.soon() since assert.soon() does not print the difference between expected and actual
- * values.
- */
-function checkMetricsExist(db, fieldNames) {
-    const metrics = db.serverStatus().replicatedFastCount;
-    for (const fieldName of fieldNames) {
-        assert.neq(metrics[fieldName], undefined, metrics);
-    }
-}
-
-/**
- * Returns the replicated fast count collection server status metrics.
+ * Returns the OTel server status metrics.
  */
 function getMetrics(db) {
-    return db.serverStatus().replicatedFastCount;
+    return db.serverStatus().otelMetrics;
 }
 
 describe("fast count server status metric", function () {
@@ -63,14 +65,6 @@ describe("fast count server status metric", function () {
     });
 
     it("flush time", function () {
-        checkMetricsExist(this.db, [
-            "flushSuccessCount",
-            "flushTimeMsMin",
-            "flushTimeMsMax",
-            "flushTimeMsTotal",
-            "writeTimeMsTotal",
-        ]);
-
         {
             // First flush with 500ms delay.
             const forceFlush = makeForceFlush(this.db, 500);
@@ -80,15 +74,15 @@ describe("fast count server status metric", function () {
                 () => {
                     const metrics = getMetrics(this.db);
                     return (
-                        metrics.flushSuccessCount >= 1 &&
-                        metrics.flushTimeMsMin >= 0 &&
-                        metrics.flushTimeMsMax >= 500 &&
-                        metrics.flushTimeMsTotal >= 500 &&
-                        metrics.writeTimeMsTotal >= 0
+                        metrics[kFlushSuccessCount] >= 1 &&
+                        metrics[kFlushTimeMsMin] >= 0 &&
+                        metrics[kFlushTimeMsMax] >= 500 &&
+                        metrics[kFlushTimeMsTotal] >= 500 &&
+                        metrics[kWriteTimeMsTotal] >= 0
                     );
                 },
                 () => `Expected flush time metrics after 500ms delay, got ${tojson(getMetrics(this.db))}`,
-                serverStatusAssertTimeoutMs,
+                kServerStatusAssertTimeoutMs,
             );
         }
         {
@@ -100,21 +94,19 @@ describe("fast count server status metric", function () {
                 () => {
                     const metrics = getMetrics(this.db);
                     return (
-                        metrics.flushSuccessCount >= 2 &&
-                        metrics.flushTimeMsMin < 500 &&
-                        metrics.flushTimeMsMax >= 500 &&
-                        metrics.flushTimeMsTotal >= 600
+                        metrics[kFlushSuccessCount] >= 2 &&
+                        metrics[kFlushTimeMsMin] < 500 &&
+                        metrics[kFlushTimeMsMax] >= 500 &&
+                        metrics[kFlushTimeMsTotal] >= 600
                     );
                 },
                 () => `Expected flush time metrics after second flush, got ${tojson(getMetrics(this.db))}`,
-                serverStatusAssertTimeoutMs,
+                kServerStatusAssertTimeoutMs,
             );
         }
     });
 
     it("flush failure", function () {
-        checkMetricsExist(this.db, ["flushFailureCount"]);
-
         const failpoint = configureFailPoint(this.db, "failDuringFlush");
         assert.commandWorked(this.db.adminCommand({fsync: 1}));
         failpoint.wait();
@@ -122,27 +114,19 @@ describe("fast count server status metric", function () {
         assert.soon(
             () => {
                 const metrics = getMetrics(this.db);
-                return metrics.flushFailureCount == 1;
+                return metrics[kFlushFailureCount] == 1;
             },
             () => `Expected flushFailureCount to be incremented, got ${tojson(getMetrics(this.db))}}`,
-            serverStatusAssertTimeoutMs,
+            kServerStatusAssertTimeoutMs,
         );
     });
 
     it("empty update", function () {
         const metrics = getMetrics(this.db);
-        assert.eq(metrics.emptyUpdateCount, 0, metrics);
+        assert.eq(metrics[kEmptyUpdateCount], 0, metrics);
     });
 
     it("collection write and flush size", function () {
-        checkMetricsExist(this.db, [
-            "insertCount",
-            "updateCount",
-            "flushedDocsMin",
-            "flushedDocsMax",
-            "flushedDocsAvg",
-        ]);
-
         for (let i = 1; i <= 5; i++) {
             assert.commandWorked(this.db.createCollection("coll" + i));
         }
@@ -164,15 +148,15 @@ describe("fast count server status metric", function () {
             () => {
                 const metrics = getMetrics(this.db);
                 return (
-                    metrics.insertCount >= 1 &&
-                    metrics.updateCount >= 1 &&
-                    metrics.flushedDocsMin >= 1 &&
-                    metrics.flushedDocsMax >= 5 &&
-                    metrics.flushedDocsAvg > 0
+                    metrics[kInsertCount] >= 1 &&
+                    metrics[kUpdateCount] >= 1 &&
+                    metrics[kFlushedDocsMin] >= 1 &&
+                    metrics[kFlushedDocsMax] >= 5 &&
+                    metrics[kFlushedDocsTotal] >= 6
                 );
             },
             () => `Expected write and flushed docs metrics, got ${tojson(getMetrics(this.db))}`,
-            serverStatusAssertTimeoutMs,
+            kServerStatusAssertTimeoutMs,
         );
     });
 
@@ -189,14 +173,16 @@ describe("is running", function () {
     });
 
     it("before step up", function () {
+        // isRunning is not yet set (startup() has not been called), so the OTel gauge has not
+        // been written and the key may be absent. Either absent or 0 is correct here.
         const metrics = getMetrics(this.db);
-        assert.eq(metrics.isRunning, false, metrics);
+        assert.neq(metrics[kIsRunning], 1, metrics);
     });
 
     it("after step up", function () {
         this.rst.initiate();
         const metrics = getMetrics(this.db);
-        assert.eq(metrics.isRunning, true, metrics);
+        assert.eq(metrics[kIsRunning], 1, metrics);
     });
 
     it("after step down", function () {
@@ -206,9 +192,9 @@ describe("is running", function () {
         this.db.adminCommand({replSetStepDown: 60, force: true});
 
         assert.soon(
-            () => getMetrics(this.db).isRunning === false,
-            () => `Expected isRunning to be false after stepdown, got ${tojson(getMetrics(this.db))}`,
-            serverStatusAssertTimeoutMs,
+            () => getMetrics(this.db)[kIsRunning] != 1,
+            () => `Expected isRunning to not be 1 after stepdown, got ${tojson(getMetrics(this.db))}`,
+            kServerStatusAssertTimeoutMs,
         );
     });
 

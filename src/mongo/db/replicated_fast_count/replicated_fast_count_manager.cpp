@@ -30,8 +30,8 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 
 #include "mongo/db/collection_crud/collection_write_path.h"
-#include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
@@ -47,96 +47,6 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(sleepAfterFlush);
 MONGO_FAIL_POINT_DEFINE(failDuringFlush);
-
-/**
- * Aggregate metrics for the replicated fast count collection reported by server status.
- */
-class ReplicatedFastCountSSS : public ServerStatusSection {
-public:
-    using ServerStatusSection::ServerStatusSection;
-
-    bool includeByDefault() const final {
-        return true;
-    }
-
-    BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const final {
-        BSONObjBuilder replicatedFastCount;
-
-        replicatedFastCount.append("isRunning", isRunning.loadRelaxed());
-
-        replicatedFastCount.append("flushSuccessCount", flushSuccessCount.loadRelaxed());
-        replicatedFastCount.append("flushFailureCount", flushFailureCount.loadRelaxed());
-        replicatedFastCount.append(
-            "flushTimeMsMin", flushTimeMsMax.loadRelaxed() > 0 ? flushTimeMsMin.loadRelaxed() : 0);
-        replicatedFastCount.append("flushTimeMsMax", flushTimeMsMax.loadRelaxed());
-        replicatedFastCount.append("flushTimeMsTotal", flushTimeMsTotal.loadRelaxed());
-        replicatedFastCount.append(
-            "flushedDocsMin", flushedDocsMax.loadRelaxed() > 0 ? flushedDocsMin.loadRelaxed() : 0);
-        replicatedFastCount.append("flushedDocsMax", flushedDocsMax.loadRelaxed());
-        const auto successCount = flushSuccessCount.loadRelaxed();
-        replicatedFastCount.append(
-            "flushedDocsAvg",
-            successCount > 0 ? static_cast<double>(flushedDocsTotal.loadRelaxed()) / successCount
-                             : 0);
-
-        replicatedFastCount.append("emptyUpdateCount", emptyUpdateCount.loadRelaxed());
-
-        replicatedFastCount.append("insertCount", insertCount.loadRelaxed());
-        replicatedFastCount.append("updateCount", updateCount.loadRelaxed());
-        replicatedFastCount.append("writeTimeMsTotal", writeTimeMsTotal.loadRelaxed());
-
-        return replicatedFastCount.obj();
-    }
-
-    /**
-     * Records metrics for a successful flush.
-     */
-    void recordFlush(Date_t startTime, size_t batchSize) {
-        const int64_t elapsedTime = (Date_t::now() - startTime).count();
-        flushSuccessCount.addAndFetch(1);
-        flushTimeMsMin.storeRelaxed(std::min(flushTimeMsMin.loadRelaxed(), elapsedTime));
-        flushTimeMsMax.storeRelaxed(std::max(flushTimeMsMax.loadRelaxed(), elapsedTime));
-        flushTimeMsTotal.addAndFetch(elapsedTime);
-        flushedDocsMin.storeRelaxed(
-            std::min(flushedDocsMin.loadRelaxed(), static_cast<int64_t>(batchSize)));
-        flushedDocsMax.storeRelaxed(
-            std::max(flushedDocsMax.loadRelaxed(), static_cast<int64_t>(batchSize)));
-        flushedDocsTotal.addAndFetch(batchSize);
-    }
-
-    // Boolean flag indicating whether or not the fast count background thread is currently running.
-    Atomic<bool> isRunning{false};
-
-    // Flushes persist fast count information to the oplog and occur during checkpointing,
-    // shutdown, step down, etc. The total number of flush attempts = flushSuccessCount +
-    // flushFailureCount.
-    Atomic<int64_t> flushSuccessCount{0};
-    Atomic<int64_t> flushFailureCount{0};
-    Atomic<int64_t> flushTimeMsMin{std::numeric_limits<int64_t>::max()};
-    Atomic<int64_t> flushTimeMsMax{0};
-    Atomic<int64_t> flushTimeMsTotal{0};
-    // Aggregate metrics for the min/max number of documents inserted or updated during one flush.
-    Atomic<int64_t> flushedDocsMin{std::numeric_limits<int>::max()};
-    Atomic<int64_t> flushedDocsMax{0};
-    // The total number of documents written during flushes. Used to compute the average flush size.
-    Atomic<int64_t> flushedDocsTotal{0};
-
-    // The number of times an empty diff is found when writing an update to the replicated fast
-    // count collection.
-    Atomic<int64_t> emptyUpdateCount{0};
-
-    // The number of inserts into a new record for storing size and count data.
-    Atomic<int64_t> insertCount{0};
-    // The number of update to an existing record storing size and count data.
-    Atomic<int64_t> updateCount{0};
-    // The total time spent writing metadata to the replicated fast count collection.
-    // writeTimeMsTotal / flushTimeMsTotal = the proportion of iteration time writing dirty
-    // metadata.
-    Atomic<int64_t> writeTimeMsTotal{0};
-};
-
-ReplicatedFastCountSSS& replicatedFastCountSSS =
-    *ServerStatusSectionBuilder<ReplicatedFastCountSSS>("replicatedFastCount").forShard();
 
 }  // namespace
 
@@ -176,7 +86,7 @@ void ReplicatedFastCountManager::startup(OperationContext* opCtx) {
             &ReplicatedFastCountManager::_startBackgroundThread, this, opCtx->getServiceContext());
     }
 
-    replicatedFastCountSSS.isRunning.store(true);
+    _metrics.setIsRunning(true);
 }
 
 void ReplicatedFastCountManager::shutdown(OperationContext* opCtx) {
@@ -199,7 +109,7 @@ void ReplicatedFastCountManager::shutdown(OperationContext* opCtx) {
 
     LOGV2(11751501, "ReplicatedFastCountManager stopped");
 
-    replicatedFastCountSSS.isRunning.store(false);
+    _metrics.setIsRunning(false);
 }
 
 int ReplicatedFastCountManager::_hydrateMetadataFromDisk(
@@ -330,7 +240,7 @@ void ReplicatedFastCountManager::_acquireAndFlush(OperationContext* opCtx,
     try {
         _doFlush(opCtx, fastCountColl, dirtyMetadata);
     } catch (const DBException& ex) {
-        replicatedFastCountSSS.flushFailureCount.addAndFetch(1);
+        _metrics.incrementFlushFailureCount();
         LOGV2_WARNING(7397500,
                       "Failed to persist collection sizeCount metadata",
                       "error"_attr = ex.toStatus());
@@ -369,7 +279,7 @@ void ReplicatedFastCountManager::_doFlush(OperationContext* opCtx,
                           _keyForUUID(metadataKey));
     }
     wuow.commit();
-    replicatedFastCountSSS.writeTimeMsTotal.addAndFetch((Date_t::now() - startTime).count());
+    _metrics.addWriteTimeMsTotal((Date_t::now() - startTime).count());
 }
 
 void ReplicatedFastCountManager::_startBackgroundThread(ServiceContext* svcCtx) {
@@ -429,7 +339,7 @@ void ReplicatedFastCountManager::_flushPeriodicallyOnSignal() {
             }
         });
 
-        replicatedFastCountSSS.recordFlush(flushStartTime, dirtyMetadata.size());
+        _metrics.recordFlush(flushStartTime, dirtyMetadata.size());
     }
 }
 
@@ -443,10 +353,10 @@ void ReplicatedFastCountManager::_writeOneMetadata(OperationContext* opCtx,
     bool exists = fastCountColl->findDoc(opCtx, recordId, &doc);
 
     if (exists) {
-        replicatedFastCountSSS.updateCount.addAndFetch(1);
+        _metrics.incrementUpdateCount();
         _updateOneMetadata(opCtx, fastCountColl, doc, uuid, sizeCount, validAsOfTS, recordId);
     } else {
-        replicatedFastCountSSS.insertCount.addAndFetch(1);
+        _metrics.incrementInsertCount();
         _insertOneMetadata(opCtx, fastCountColl, uuid, sizeCount, validAsOfTS);
     }
 }
@@ -478,7 +388,8 @@ void ReplicatedFastCountManager::_updateOneMetadata(OperationContext* opCtx,
         collection_internal::updateDocument(
             opCtx, fastCountColl, recordId, doc, newDoc, &args.update, nullptr, nullptr, &args);
     } else {
-        replicatedFastCountSSS.emptyUpdateCount.addAndFetch(1);
+        // TODO(SERVER-122569): Delete this metric and the associated tests.
+        _metrics.incrementEmptyUpdateCount();
         LOGV2(11648805, "ReplicatedFastCountManager empty update", "uuid"_attr = uuid);
     }
 }

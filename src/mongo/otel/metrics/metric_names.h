@@ -107,6 +107,32 @@ public:
         "index_builds.side_writes.drain_bytes"};
     static constexpr MetricName kIndexBuildSideWritesDrainYields = {
         "index_builds.side_writes.drain_yields"};
+    static constexpr MetricName kReplicatedFastCountIsRunning = {
+        "replicated_fast_count.is_running"};
+    static constexpr MetricName kReplicatedFastCountFlushSuccessCount = {
+        "replicated_fast_count.flush.success_count"};
+    static constexpr MetricName kReplicatedFastCountFlushFailureCount = {
+        "replicated_fast_count.flush.failure_count"};
+    static constexpr MetricName kReplicatedFastCountFlushTimeMsMin = {
+        "replicated_fast_count.flush_time.min"};
+    static constexpr MetricName kReplicatedFastCountFlushTimeMsMax = {
+        "replicated_fast_count.flush_time.max"};
+    static constexpr MetricName kReplicatedFastCountFlushTimeMsTotal = {
+        "replicated_fast_count.flush_time.total"};
+    static constexpr MetricName kReplicatedFastCountFlushedDocsMin = {
+        "replicated_fast_count.flushed_docs.min"};
+    static constexpr MetricName kReplicatedFastCountFlushedDocsMax = {
+        "replicated_fast_count.flushed_docs.max"};
+    static constexpr MetricName kReplicatedFastCountFlushedDocsTotal = {
+        "replicated_fast_count.flushed_docs.total"};
+    static constexpr MetricName kReplicatedFastCountEmptyUpdateCount = {
+        "replicated_fast_count.empty_update_count"};
+    static constexpr MetricName kReplicatedFastCountInsertCount = {
+        "replicated_fast_count.insert_count"};
+    static constexpr MetricName kReplicatedFastCountUpdateCount = {
+        "replicated_fast_count.update_count"};
+    static constexpr MetricName kReplicatedFastCountWriteTimeMsTotal = {
+        "replicated_fast_count.write_time.total"};
 
     static constexpr MetricName kIndexBuildKeysInsertedFromScan = {
         "index_builds.keys_inserted_from_scan"};
