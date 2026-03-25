@@ -256,7 +256,7 @@ void AutoMergerPolicy::_checkInternalUpdatesWithLock(OperationContext* opCtx, Wi
     }
 
     // Trigger Automerger every `autoMergerIntervalSecs` seconds
-    if (_intervalTimer.seconds() > autoMergerIntervalSecs) {
+    if (_intervalTimer.seconds() > autoMergerIntervalSecs.load()) {
         _init(opCtx, lk);
     }
 }
