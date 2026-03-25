@@ -263,14 +263,9 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
             readConcern.setWaitLastStableRecoveryTimestamp(true);
             request.setReadConcern(readConcern);
 
-            // TODO SERVER-120915: Remove the PrimaryOnly readPref once SERVER-120915 is unblokced.
-            auto& rss = rss::ReplicatedStorageService::get(opCtx->getServiceContext());
-            auto mustUsePrimaryDrivenIndexBuilds =
-                rss.getPersistenceProvider().mustUsePrimaryDrivenIndexBuilds();
-            auto rp = mustUsePrimaryDrivenIndexBuilds ? ReadPreference::PrimaryOnly
-                                                      : ReadPreference::Nearest;
             auto readPref = ReadPreferenceSetting{
-                rp, Seconds(resharding::gReshardingCollectionClonerMaxStalenessSeconds.load())};
+                ReadPreference::Nearest,
+                Seconds(resharding::gReshardingCollectionClonerMaxStalenessSeconds.load())};
             // The read preference on the request is merely informational (e.g. for profiler
             // entries) -- the pipeline's opCtx setting is actually used when sending the request.
             request.setUnwrappedReadPref(readPref.toContainingBSON());
