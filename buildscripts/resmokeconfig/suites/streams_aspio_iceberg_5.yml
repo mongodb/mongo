@@ -7,6 +7,8 @@ selector:
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_partitioning_2.js
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_metadata_validation.js
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_catalog_test.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_combine_files_conflict.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_delete_conflict_test.js
 
 executor:
   fixture:
