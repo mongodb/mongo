@@ -311,6 +311,7 @@ class DockerComposeImageBuilder:
         self._clone_qa_repo_to_build_context(self.WORKLOAD_BUILD_CONTEXT)
         self._clone_jstestfuzz_to_build_context(self.WORKLOAD_BUILD_CONTEXT)
         self._add_libvoidstar_to_build_context(self.WORKLOAD_BUILD_CONTEXT)
+        self._copy_retry_script_to_build_context(self.WORKLOAD_BUILD_CONTEXT)
         self._copy_config_files_to_build_context(self.WORKLOAD_BUILD_CONTEXT)
 
         # Build docker image
@@ -332,6 +333,7 @@ class DockerComposeImageBuilder:
         self._copy_mongodb_binaries_to_build_context(self.MONGO_BINARIES_BUILD_CONTEXT)
         self._clone_mongo_repo_to_build_context(self.MONGO_BINARIES_BUILD_CONTEXT)
         self._add_libvoidstar_to_build_context(self.MONGO_BINARIES_BUILD_CONTEXT)
+        self._copy_retry_script_to_build_context(self.MONGO_BINARIES_BUILD_CONTEXT)
         self._copy_config_files_to_build_context(self.MONGO_BINARIES_BUILD_CONTEXT)
 
         # Build docker image
@@ -521,6 +523,18 @@ class DockerComposeImageBuilder:
                 get_expansion("github_token_jstestfuzz"),
             )
             print("Done cloning jstestfuzz repo to build context.")
+
+    def _copy_retry_script_to_build_context(self, dir_path):
+        """
+        Copy retry_apt.sh script to the build context.
+
+        :param dir_path: Directory path to add retry script to.
+        """
+        retry_script_source = "buildscripts/antithesis/base_images/retry_apt.sh"
+        retry_script_dest = os.path.join(dir_path, "retry_apt.sh")
+        print("Copy retry_apt.sh to build context...")
+        shutil.copy(retry_script_source, retry_script_dest)
+        print("Done copying retry_apt.sh to build context.")
 
     def _copy_config_files_to_build_context(self, dir_path):
         """

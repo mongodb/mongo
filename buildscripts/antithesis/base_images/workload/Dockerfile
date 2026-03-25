@@ -7,31 +7,42 @@ EXPOSE 27019
 RUN mkdir -p /scripts
 RUN mkdir -p /var/log/mongodb
 
-RUN apt-get update
+# Copy retry script for handling transient apt failures
+COPY retry_apt.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/retry_apt.sh
 
-# Install mongo dependencies
-RUN apt-get install -y curl
-
-# Install git
-RUN apt-get install -y git
+# Install dependencies with retries (including llvm and libc6-dbg)
+# Retry up to 6 times with exponential backoff if mirrors are syncing
+ARG LLVM_VERSION=12
+RUN retry_apt.sh "APT package installation" sh -c "\
+    apt-get clean && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        curl \
+        git \
+        software-properties-common \
+        llvm-${LLVM_VERSION} \
+        libc6-dbg"
 
 # Set up Python 3.13 via deadsnakes PPA (project requires >=3.13)
-RUN apt-get install -y software-properties-common \
-    && add-apt-repository ppa:deadsnakes/ppa \
-    && apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y python3.13 python3.13-venv python3.13-dev build-essential \
-    && python3.13 -m ensurepip --upgrade
+# Retry entire setup (PPA addition with GPG key import + package install)
+RUN retry_apt.sh "Python 3.13 installation" sh -c "\
+    add-apt-repository ppa:deadsnakes/ppa && \
+    apt-get clean && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        python3.13 \
+        python3.13-venv \
+        python3.13-dev \
+        build-essential" && \
+    python3.13 -m ensurepip --upgrade
 RUN ln -f $(which python3.13) /usr/bin/python
 RUN ln -f $(which python3.13) /usr/bin/python3
 
 RUN python -m pip install --upgrade pip wheel
 
-# Ensure the symbolizer is present (llvm)
-ARG LLVM_VERSION=12
-RUN apt-get install -y llvm-${LLVM_VERSION}
-
-# Ensure that libc debugsymbols are on the machine
-RUN apt-get install -y libc6-dbg
+# Clean up retry script after use
+RUN rm /usr/local/bin/retry_apt.sh
 
 # Copy TSAN suppressions
 COPY tsan.suppressions /etc/tsan.suppressions

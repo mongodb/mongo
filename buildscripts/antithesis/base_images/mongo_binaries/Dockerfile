@@ -8,27 +8,26 @@ EXPOSE 20000-20100
 
 # Prep the environment
 RUN mkdir -p /data/db /data/configdb /var/log/mongodb /scripts
-ARG LLVM_VERSION=12
+
+# Copy retry script for handling transient apt failures
+COPY retry_apt.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/retry_apt.sh
+
 # Install dependencies of MongoDB Server with retries
 # Retry up to 6 times with exponential backoff if mirrors are syncing
-RUN set -eux; \
-    export DEBIAN_FRONTEND=noninteractive; \
-    rm -rf /var/lib/apt/lists/*; \
-    delay=5; \
-    for i in $(seq 1 6); do \
-        if apt-get clean && apt-get update && apt-get install -y --no-install-recommends \
-            curl \
-            python3 \
-            llvm-${LLVM_VERSION} \
-            libc6-dbg \
-            gdb; then \
-            break; \
-        fi; \
-        echo "APT failed on attempt $i... retrying in ${delay}s"; \
-        sleep ${delay}; \
-        delay=$((delay * 2)); \
-    done; \
-    rm -rf /var/lib/apt/lists/*
+ARG LLVM_VERSION=12
+RUN retry_apt.sh "APT package installation" sh -c "\
+    apt-get clean && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        curl \
+        python3 \
+        llvm-${LLVM_VERSION} \
+        libc6-dbg \
+        gdb"
+
+# Clean up retry script after use
+RUN rm /usr/local/bin/retry_apt.sh
 
 # Copy TSAN suppressions
 COPY tsan.suppressions /etc/tsan.suppressions
