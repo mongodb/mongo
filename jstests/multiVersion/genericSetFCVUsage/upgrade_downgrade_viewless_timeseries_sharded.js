@@ -11,6 +11,7 @@
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {getTimeseriesBucketsColl} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 if (lastLTSFCV != "8.0") {
     jsTest.log.info("Skipping test because last LTS FCV is no longer 8.0");
@@ -20,12 +21,7 @@ if (lastLTSFCV != "8.0") {
 // Checks if system.buckets.<collName> exists, indicating legacy (viewful) format.
 // Returns true if legacy format (buckets collection exists), false if viewless format.
 function isLegacyTimeseriesFormat(adminDB, dbName, collName) {
-    return (
-        adminDB
-            .getSiblingDB(dbName)
-            .getCollection("system.buckets." + collName)
-            .exists() !== null
-    );
+    return getTimeseriesBucketsColl(adminDB.getSiblingDB(dbName).getCollection(collName)).exists() !== null;
 }
 
 // Asserts all timeseries collections are in the expected format.
@@ -41,6 +37,15 @@ function assertTimeseriesFormat(adminDB, dbName, collectionsToCheck, expectLegac
             `${name} collection should be in ${formatName} format ` +
                 `(system.buckets.${collName} ${actuallyLegacy ? "exists" : "does not exist"})`,
         );
+
+        const collDB = adminDB.getSiblingDB(dbName);
+        if (expectLegacyFormat) {
+            const metadata = getTimeseriesBucketsColl(collDB.getCollection(collName)).getMetadata();
+            assert(metadata.options.validator);
+        } else {
+            const metadata = collDB.getCollection(collName).getMetadata();
+            assert(!metadata.options.validator);
+        }
     }
 }
 

@@ -36,9 +36,9 @@ const expectedIndexes = coll.getIndexes();
 function assertValidTimeseriesCollection(nodeColl, {expectViewlessFormat}) {
     // The collection exists
     assert(nodeColl.exists());
-
     if (expectViewlessFormat) {
         assert(!getTimeseriesBucketsColl(nodeColl).exists());
+        assert(!nodeColl.getMetadata().options.validator);
     } else {
         assert(getTimeseriesBucketsColl(nodeColl).exists());
         assert(getTimeseriesBucketsColl(nodeColl).getMetadata().options.validator);
