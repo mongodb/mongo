@@ -74,6 +74,31 @@ std::vector<std::string> extractIndexNames(const std::vector<BSONObj>& specs) {
 
 }  // namespace
 
+StringData indexBuildProtocolToString(IndexBuildProtocol protocol) {
+    switch (protocol) {
+        case IndexBuildProtocol::kSinglePhase:
+            return "single phase"_sd;
+        case IndexBuildProtocol::kTwoPhase:
+            return "two phase"_sd;
+        case IndexBuildProtocol::kPrimaryDriven:
+            return "primary driven"_sd;
+    }
+    MONGO_UNREACHABLE;
+}
+
+IndexBuildProtocol parseIndexBuildProtocol(StringData str) {
+    if (str == "single phase"_sd) {
+        return IndexBuildProtocol::kSinglePhase;
+    } else if (str == "two phase"_sd) {
+        return IndexBuildProtocol::kTwoPhase;
+    } else if (str == "primary driven"_sd) {
+        return IndexBuildProtocol::kPrimaryDriven;
+    }
+    uasserted(ErrorCodes::BadValue,
+              str::stream() << "Enumeration value '" << str
+                            << "' for type IndexBuildProtocol is not a valid value.");
+}
+
 std::string indexBuildActionToString(IndexBuildAction action) {
     switch (action) {
         case IndexBuildAction::kNoAction:
@@ -298,7 +323,7 @@ void ReplIndexBuildState::commit(OperationContext* opCtx) {
 }
 
 void ReplIndexBuildState::requestAbortFromPrimary() {
-    invariant(protocol == IndexBuildProtocol::kTwoPhase);
+    invariant(mustReplicateCompletion(protocol));
     stdx::lock_guard lk(_mutex);
     _indexBuildState.setState(IndexBuildState::kAwaitPrimaryAbort, false /* skipCheck */);
 }
@@ -708,6 +733,8 @@ Status ReplIndexBuildState::onConflictWithNewIndexBuild(const ReplIndexBuildStat
 
 bool ReplIndexBuildState::isResumable() const {
     stdx::lock_guard lk(_mutex);
+    // It's implied that the IndexBuildProtocol is resumable if _lastOpTimeBeforeInterceptors is
+    // set.
     return !_lastOpTimeBeforeInterceptors.isNull();
 }
 

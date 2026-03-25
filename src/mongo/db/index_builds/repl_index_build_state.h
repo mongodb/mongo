@@ -70,8 +70,101 @@ enum class IndexBuildProtocol {
      * Refers to the two-phase index build protocol for building indexes in replica sets. Indexes
      * are built simultaneously on all nodes.
      */
-    kTwoPhase
+    kTwoPhase,
+    /**
+     * The overall index build process is similar to kHybrid. However, instead of building
+     * the index independently on each replica, only the primary runs the logic to build the
+     * index. Replicas simply apply the oplog entries generated during the build.
+     *
+     * This is the default for all index builds in a disaggregated storage cluster and is
+     * currently not supported in an attached storage cluster.
+     */
+    kPrimaryDriven
 };
+
+/**
+ * Is it required to register an index build in the index_builds collection?
+ */
+inline bool mustRegister(IndexBuildProtocol protocol) {
+    switch (protocol) {
+        case IndexBuildProtocol::kTwoPhase:
+            return true;
+        case IndexBuildProtocol::kPrimaryDriven:
+        case IndexBuildProtocol::kSinglePhase:
+            return false;
+    }
+    MONGO_UNREACHABLE;
+}
+
+/**
+ * Is it required to replicate completion of the index build?
+ */
+inline bool mustReplicateCompletion(IndexBuildProtocol protocol) {
+    switch (protocol) {
+        case IndexBuildProtocol::kTwoPhase:
+        case IndexBuildProtocol::kPrimaryDriven:
+            return true;
+        case IndexBuildProtocol::kSinglePhase:
+            return false;
+    }
+    MONGO_UNREACHABLE;
+}
+
+/**
+ * Is the index build resumable?
+ */
+inline bool isProtocolResumable(IndexBuildProtocol protocol) {
+    return protocol == IndexBuildProtocol::kTwoPhase;
+}
+
+/**
+ * Is it required to replicate container ops?
+ */
+inline bool mustReplicateContainerOps(IndexBuildProtocol protocol) {
+    return protocol == IndexBuildProtocol::kPrimaryDriven;
+}
+
+/**
+ * Is it required to replicate multikey metadata with createIndexes?
+ */
+inline bool mustReplicateMultikeyMetadata(IndexBuildProtocol protocol) {
+    return protocol == IndexBuildProtocol::kPrimaryDriven;
+}
+
+/**
+ * Should the RSTL be skipped when aborting?
+ */
+inline bool mustSkipRSTLOnAbort(IndexBuildProtocol protocol) {
+    return protocol == IndexBuildProtocol::kSinglePhase;
+}
+
+/**
+ * Is it required to reach a commit quorum to complete the index build?
+ */
+inline bool requiresCommitQuorum(IndexBuildProtocol protocol) {
+    return protocol == IndexBuildProtocol::kTwoPhase;
+}
+
+/**
+ * Is it required to abort index builds during step-up?
+ */
+inline bool mustAbortAtStepUp(IndexBuildProtocol protocol) {
+    return protocol == IndexBuildProtocol::kPrimaryDriven;
+}
+
+/**
+ * Is it required to abort index builds during shutdown?
+ */
+inline bool mustAbortAtShutdown(IndexBuildProtocol protocol) {
+    return protocol == IndexBuildProtocol::kPrimaryDriven;
+}
+
+/**
+ * Returns a string representation of IndexBuildProtocol.
+ */
+StringData indexBuildProtocolToString(IndexBuildProtocol protocol);
+
+IndexBuildProtocol parseIndexBuildProtocol(StringData);
 
 // Indicates the type of abort or commit signal that will be received by primary and secondaries.
 enum class IndexBuildAction {
@@ -324,8 +417,6 @@ struct IndexBuildMetrics {
  * Tracks the cross replica set progress of a particular index build identified by a build UUID.
  *
  * This is intended to only be used by the IndexBuildsCoordinator class.
- *
- * TODO: pass in commit quorum setting.
  */
 class ReplIndexBuildState {
     ReplIndexBuildState(const ReplIndexBuildState&) = delete;
