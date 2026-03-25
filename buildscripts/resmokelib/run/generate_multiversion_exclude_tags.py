@@ -22,20 +22,20 @@ BACKPORTS_REQUIRED_FILE = "backports_required_for_multiversion_tests.yml"
 BACKPORTS_REQUIRED_BASE_URL = "https://raw.githubusercontent.com/10gen/mongo"
 
 
-def get_backports_required_hash_for_shell_version(mongo_shell_path: str | None = None):
-    """Parse the old shell binary to get the commit hash."""
+def get_backports_required_hash(mongod_path: str | None = None):
+    """Parse the old binary to get the commit hash."""
     env_vars = os.environ.copy()
     paths = get_path_env_var(env_vars=env_vars)
     env_vars["PATH"] = os.pathsep.join(paths)
 
-    mongo_shell = mongo_shell_path
+    mongod = mongod_path
     if is_windows():
-        mongo_shell = mongo_shell_path + ".exe"
+        mongod = mongod_path + ".exe"
 
-    shell_version = check_output(
-        f"{mongo_shell} --version", shell=True, env=env_vars
-    ).decode("utf-8")
-    for line in shell_version.splitlines():
+    version = check_output(f"{mongod} --version", shell=True, env=env_vars).decode(
+        "utf-8"
+    )
+    for line in version.splitlines():
         if "gitVersion" in line:
             version_line = line.split(":")[1]
             # We identify the commit hash as the string enclosed by double quotation marks.
@@ -51,7 +51,7 @@ def get_backports_required_hash_for_shell_version(mongo_shell_path: str | None =
             else:
                 break
     raise ValueError(
-        f"Could not find a valid commit hash from the {mongo_shell_path} mongo binary."
+        f"Could not find a valid commit hash from the {mongod_path} mongo binary."
     )
 
 
@@ -120,14 +120,12 @@ def generate_exclude_yaml(
     # mongo shell executable.
     from buildscripts.resmokelib import multiversionconstants
 
-    shell_version = {
-        MultiversionOptions.LAST_LTS: multiversionconstants.LAST_LTS_MONGO_BINARY,
-        MultiversionOptions.LAST_CONTINUOUS: multiversionconstants.LAST_CONTINUOUS_MONGO_BINARY,
+    old_mongod = {
+        MultiversionOptions.LAST_LTS: multiversionconstants.LAST_LTS_MONGOD_BINARY,
+        MultiversionOptions.LAST_CONTINUOUS: multiversionconstants.LAST_CONTINUOUS_MONGOD_BINARY,
     }[old_bin_version]
 
-    old_version_commit_hash = get_backports_required_hash_for_shell_version(
-        mongo_shell_path=shell_version
-    )
+    old_version_commit_hash = get_backports_required_hash(old_mongod)
 
     # Get the yaml contents from the old commit.
     logger.info(
