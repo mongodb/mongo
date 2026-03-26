@@ -222,14 +222,14 @@ public:
         key.serializeForSorter(buffer);
         val.serializeForSorter(buffer);
 
-        const auto currentKey = _nextKey++;
         const auto size = static_cast<size_t>(buffer.len());
         const std::span<const char> value =
             size == 0 ? std::span<const char>{} : std::span<const char>(buffer.buf(), size);
 
         WriteUnitOfWork wuow(&_opCtx);
+        _ru.onRollback([this](OperationContext*) { --_nextKey; });
         uassertStatusOK(container_write::insert(
-            &_opCtx, _ru, _container, currentKey, value, container::ExistingKeyPolicy::overwrite));
+            &_opCtx, _ru, _container, _nextKey++, value, container::ExistingKeyPolicy::overwrite));
         wuow.commit();
 
         if (size > 0) {
