@@ -29,6 +29,9 @@
 
 #include "mongo/db/pipeline/search/search_helper.h"
 
+#include "mongo/base/counter.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/ifr_flag_retry_info.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
@@ -317,6 +320,16 @@ bool isExtensionVectorSearchPipeline(const Pipeline* pipeline) {
     return std::any_of(stages.begin(), stages.end(), [](const auto& stage) {
         return isExtensionVectorSearchStage(stage->getSourceName());
     });
+}
+
+void throwIfrKickbackIfNecessary(bool kickbackCondition,
+                                 const IncrementalRolloutFeatureFlag& flag,
+                                 Counter64& metric,
+                                 StringData errorMsg) {
+    if (kickbackCondition) {
+        metric.increment();
+        uassertStatusOK(Status(IFRFlagRetryInfo(flag.getName()), errorMsg));
+    }
 }
 
 bool shouldPreValidateMetaDependencies(const Pipeline* pipeline) {

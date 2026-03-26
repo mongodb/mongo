@@ -35,7 +35,6 @@
 #include "mongo/db/extension/host_connector/adapter/view_info_adapter.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
-#include "mongo/db/ifr_flag_retry_info.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
 #include "mongo/db/pipeline/search/search_helper.h"
@@ -222,11 +221,13 @@ void DocumentSourceExtensionOptimizable::LiteParsedExpanded::bindViewInfo(
                 hasExtensionVectorSearchStage());
 
         // If this is a $vectorSearch stage, we perform the IFR flag retry kickback to use legacy
-        // $vectorSearch instead.
-        vector_search_metrics::onViewKickbackRetryCount.increment();
-        uassertStatusOK(
-            Status(IFRFlagRetryInfo(feature_flags::gFeatureFlagVectorSearchExtension.getName()),
-                   "$vectorSearch-as-an-extension is not allowed against views."));
+        // $vectorSearch instead. We pass 'true' here because the uassert above already guarantees
+        // we only reach this point when hasExtensionVectorSearchStage() is true.
+        search_helpers::throwIfrKickbackIfNecessary(
+            true /*kickbackCondition*/,
+            feature_flags::gFeatureFlagVectorSearchExtension,
+            vector_search_metrics::onViewKickbackRetryCount,
+            "$vectorSearch-as-an-extension is not allowed against views.");
     }
 
     auto viewInfoAdapter = host_connector::ViewInfoAdapter::fromViewInfo(viewInfo);

@@ -39,7 +39,6 @@
 #include "mongo/db/extension/shared/handle/aggregation_stage/logical.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
-#include "mongo/db/ifr_flag_retry_info.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/lite_parsed_desugarer.h"
 #include "mongo/db/pipeline/search/search_helper.h"
@@ -350,14 +349,14 @@ public:
     static boost::intrusive_ptr<DocumentSourceExtensionOptimizable> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, AggStageAstNodeHandle astNode) {
         if (expCtx->getInUnionWith() &&
-            search_helpers::isExtensionVectorSearchStage(std::string(astNode->getName())) &&
             !feature_flags::gFeatureFlagExtensionViewsAndUnionWith.isEnabled()) {
             // Throw the IFR retry error for extension $vectorSearch in $unionWith if the feature
             // flag is not enabled.
-            vector_search_metrics::inUnionWithKickbackRetryCount.increment(1);
-            uassertStatusOK(
-                Status(IFRFlagRetryInfo(feature_flags::gFeatureFlagVectorSearchExtension.getName()),
-                       "The $vectorSearch extension stage is not supported in a $unionWith"));
+            search_helpers::throwIfrKickbackIfNecessary(
+                search_helpers::isExtensionVectorSearchStage(std::string(astNode->getName())),
+                feature_flags::gFeatureFlagVectorSearchExtension,
+                vector_search_metrics::inUnionWithKickbackRetryCount,
+                "The $vectorSearch extension stage is not supported in a $unionWith");
         }
 
         return boost::intrusive_ptr<DocumentSourceExtensionOptimizable>(

@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/extension/host/extension_vector_search_server_status.h"
-#include "mongo/db/ifr_flag_retry_info.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
 #include "mongo/db/pipeline/document_source_score_fusion_gen.h"
@@ -42,6 +41,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/score_fusion_pipeline_builder.h"
+#include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/allowed_contexts.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -138,17 +138,15 @@ std::map<std::string, std::unique_ptr<Pipeline>> parseAndValidateScoredSelection
                                false,
                                LiteParserOptions{.ifrContext = pExpCtx->getIfrContext()});
 
-        if (liteParsedPipeline.hasExtensionVectorSearchStage()) {
-            // If any input pipeline has an extension $vectorSearch stage, we perform the IFR flag
-            // retry kickback to use legacy $vectorSearch instead.
-            // TODO SERVER-117661: Implement support for extension $vectorSearch stages in
-            // scoreFusion pipelines.
-            vector_search_metrics::inHybridSearchKickbackRetryCount.increment();
-            uassertStatusOK(
-                Status(IFRFlagRetryInfo(feature_flags::gFeatureFlagVectorSearchExtension.getName()),
-                       "$vectorSearch-as-an-extension is not allowed against in a $scoreFusion "
-                       "pipeline."));
-        }
+        // If any input pipeline has an extension $vectorSearch stage, we perform the IFR flag
+        // retry kickback to use legacy $vectorSearch instead.
+        // TODO SERVER-117661: Implement support for extension $vectorSearch stages in
+        // scoreFusion pipelines.
+        search_helpers::throwIfrKickbackIfNecessary(
+            liteParsedPipeline.hasExtensionVectorSearchStage(),
+            feature_flags::gFeatureFlagVectorSearchExtension,
+            vector_search_metrics::inHybridSearchKickbackRetryCount,
+            "$vectorSearch-as-an-extension is not allowed in a $scoreFusion pipeline.");
 
         auto pipeline = Pipeline::parseFromLiteParsed(liteParsedPipeline, pExpCtx);
 
