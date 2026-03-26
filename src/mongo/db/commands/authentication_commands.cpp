@@ -157,10 +157,10 @@ MONGO_REGISTER_COMMAND(CmdLogout).forRouter().forShard();
 #ifdef MONGO_CONFIG_SSL
 
 std::unique_ptr<UserRequest> getX509UserRequest(OperationContext* opCtx, const UserName& username) {
-    std::shared_ptr<transport::Session> session;
-    if (opCtx && opCtx->getClient()) {
-        session = opCtx->getClient()->session();
-    }
+    uassert(ErrorCodes::AuthenticationFailed,
+            "Must have opCtx and client in getX509UserRequest",
+            opCtx && opCtx->getClient());
+    auto session = opCtx->getClient()->session();
 
     bool insertAuthenticatedMechanism =
         gFeatureFlagUseInternalAuthzInsteadOfLDAP.isEnabledUseLastLTSFCVWhenUninitialized(

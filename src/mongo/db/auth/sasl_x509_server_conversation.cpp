@@ -102,10 +102,10 @@ std::string getUserName(Client* client,
 StatusWith<std::unique_ptr<UserRequest>> SaslX509ServerMechanism::makeUserRequest(
     OperationContext* opCtx) const {
     std::unique_ptr<UserRequest> request;
+    auto versionCtx = opCtx ? VersionContext::getDecoration(opCtx) : kNoVersionContext;
     bool shouldInsertAuthenticatedMechanism =
         gFeatureFlagUseInternalAuthzInsteadOfLDAP.isEnabledUseLastLTSFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+            versionCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     if (shouldInsertAuthenticatedMechanism) {
         request = std::make_unique<UserRequestGeneral>(
             UserName(getPrincipalName(), getAuthenticationDatabase()),
