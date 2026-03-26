@@ -65,6 +65,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(failPreimagesCollectionCreation);
 MONGO_FAIL_POINT_DEFINE(disableChangeStreamPreImagesRemover);
+MONGO_FAIL_POINT_DEFINE(preImagesRemovalFailsWithNotWritablePrimary);
 
 const auto getPreImagesCollectionManager =
     ServiceContext::declareDecoration<ChangeStreamPreImagesCollectionManager>();
@@ -203,6 +204,11 @@ void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImages
         //     brings back possible inconsistencies anyway. This is an unavoidable side effect of
         //     using local removals.
         VersionContext::FixedOperationFCVRegion fixedFcvRegion(opCtx.get());
+
+        // Simulate "NotWritablePrimary" error for usage in tests.
+        if (MONGO_unlikely(preImagesRemovalFailsWithNotWritablePrimary.shouldFail())) {
+            uasserted(ErrorCodes::NotWritablePrimary, "not primary");
+        }
 
         // Don't execute the removal if the feature flag value has changed compared to when the job
         // was originally started.

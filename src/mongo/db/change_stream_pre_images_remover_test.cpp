@@ -428,6 +428,51 @@ protected:
     }
 };
 
+TEST_F(PreImagesRemoverTest, TruncateThrowsExceptionWhenNotPrimaryWithReplicatedTruncates) {
+    RAIIServerParameterControllerForTest featureFlagScope{
+        "featureFlagUseReplicatedTruncatesForDeletions", true};
+
+    auto uuid = CollectionCatalog::get(operationContext())
+                    ->lookupCollectionByNamespace(operationContext(), kPreImageEnabledCollection)
+                    ->uuid();
+
+    auto clock = clockSource();
+    auto startOperationTime = clock->now();
+    auto numRecords = 1000;
+    prePopulatePreImagesCollection(kPreImageEnabledCollection, numRecords, startOperationTime);
+
+    ASSERT_EQ(numRecords, countPreImagesForNsUUID(operationContext(), uuid));
+
+    // Advance the clock to align with the most recent pre-image inserted.
+    clock->advance(Milliseconds{numRecords});
+
+    // Move the clock further ahead to simulate startup with a collection of expired pre-images.
+    clock->advance(Seconds{10});
+
+    setExpirationTime(Seconds{1});
+
+    // Enable fail point that makes preImagesRemoval fail with "NotWritablePrimary" error.
+    {
+        FailPointEnableBlock failPoint("preImagesRemovalFailsWithNotWritablePrimary");
+
+        auto passStats = performPass(Milliseconds{0}, true /* useReplicatedTruncates */);
+        ASSERT_EQ(passStats["totalPass"].numberLong(), 1);
+
+        // The removal pass should have done nothing.
+        ASSERT_EQ(passStats["docsDeleted"].numberLong(), 0);
+        ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 0);
+
+        ASSERT_EQ(numRecords, countPreImagesForNsUUID(operationContext(), uuid));
+    }
+
+    // After removing the fail point, the removal should actually remove the pre-images.
+    auto passStats = performPass(Milliseconds{0}, true /* useReplicatedTruncates */);
+
+    ASSERT_EQ(passStats["totalPass"].numberLong(), 2);
+    ASSERT_EQ(passStats["docsDeleted"].numberLong(), 360448);
+    ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 1);
+}
+
 TEST_F(PreImagesRemoverTest, RecordIdToPreImageTimestampRetrieval) {
     // Basic case.
     {
