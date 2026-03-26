@@ -54,7 +54,7 @@ bool InternalBucketGeoWithinMatchExpression::equivalent(const MatchExpression* e
     return SimpleBSONObjComparator::kInstance.evaluate(
                _geoContainer->getGeoElement().Obj() ==
                other->getGeoContainer().getGeoElement().Obj()) &&
-        _field == other->getField();
+        _field == other->getField() && _indexVersion == other->_indexVersion;
 }
 
 void InternalBucketGeoWithinMatchExpression::serialize(BSONObjBuilder* builder,
@@ -73,12 +73,16 @@ void InternalBucketGeoWithinMatchExpression::serialize(BSONObjBuilder* builder,
     // Serialize the field which is being searched over.
     bob.append(InternalBucketGeoWithinMatchExpression::kField,
                opts.serializeFieldPathFromString(_field));
+    if (_indexVersion) {
+        bob.append("2dsphereIndexVersion", static_cast<int>(*_indexVersion));
+    }
     bob.doneFast();
 }
 
 std::unique_ptr<MatchExpression> InternalBucketGeoWithinMatchExpression::clone() const {
     std::unique_ptr<InternalBucketGeoWithinMatchExpression> next =
-        std::make_unique<InternalBucketGeoWithinMatchExpression>(_geoContainer, _field);
+        std::make_unique<InternalBucketGeoWithinMatchExpression>(
+            _geoContainer, _field, nullptr, _indexVersion);
     if (getTag()) {
         next->setTag(getTag()->clone());
     }

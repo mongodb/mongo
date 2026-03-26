@@ -45,7 +45,9 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/index/s2_common.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
@@ -635,6 +637,30 @@ boost::intrusive_ptr<Expression> rewriteGroupByField(
     return ExpressionObject::create(pExpCtx.get(), std::move(fieldsAndExprs));
 }
 
+// Walks the match expression tree and sets the 2dsphere index version on any
+// GeoMatchExpression nodes whose field appears in versionMap. This is needed
+// because setEventFilter re-parses the filter from BSON, producing a fresh
+// expression tree with no index version; the version must be re-applied from
+// the catalog snapshot stored in _geo2dsphereIndexVersions.
+void set2dsphereIndexVersionOnGeoPredicates(MatchExpression* expr,
+                                            const boost::optional<StringMap<int>>& versionMap) {
+    if (!versionMap) {
+        return;
+    }
+    if (expr->matchType() == MatchExpression::GEO) {
+        auto* geoExpr = static_cast<GeoMatchExpression*>(expr);
+        auto field = std::string(geoExpr->getGeoExpression().getField());
+        auto it = versionMap->find(field);
+        if (it != versionMap->end()) {
+            geoExpr->set2dsphereIndexVersion(static_cast<S2IndexVersion>(it->second));
+        }
+        return;
+    }
+    for (size_t i = 0; i < expr->numChildren(); ++i) {
+        set2dsphereIndexVersionOnGeoPredicates(expr->getChild(i), versionMap);
+    }
+}
+
 }  // namespace
 
 DocumentSourceInternalUnpackBucket::DocumentSourceInternalUnpackBucket(
@@ -1117,6 +1143,25 @@ void DocumentSourceInternalUnpackBucket::setEventFilter(BSONObj eventFilterBson,
 
     _eventFilterDeps = DepsTracker();
     dependency_analysis::addDependencies(_sharedState->_eventFilter.get(), &_eventFilterDeps);
+    // The event filter was just re-parsed from raw BSON, which does not carry
+    // 2dsphere index version information. _geo2dsphereIndexVersions was populated
+    // from the index catalog at translation time (on mongod) and stored separately
+    // in the stage spec. Stamp the version onto any geo predicates now so that
+    // bucket-level geo optimization can use the correct V3 vs V4+ parsing semantics.
+    set2dsphereIndexVersionOnGeoPredicates(_sharedState->_eventFilter.get(),
+                                           _geo2dsphereIndexVersions);
+}
+
+void DocumentSourceInternalUnpackBucket::set2dsphereIndexVersions(
+    boost::optional<StringMap<int>> versions) {
+    _geo2dsphereIndexVersions = std::move(versions);
+    // If an event filter was already parsed before the version map became available
+    // (e.g. from BSON deserialization on a shard receiving a router-translated pipeline
+    // where the router lacked index info), stamp the versions onto its geo predicates now.
+    if (_sharedState->_eventFilter && _geo2dsphereIndexVersions) {
+        set2dsphereIndexVersionOnGeoPredicates(_sharedState->_eventFilter.get(),
+                                               _geo2dsphereIndexVersions);
+    }
 }
 
 void DocumentSourceInternalUnpackBucket::internalizeProject(const BSONObj& project,
@@ -1181,6 +1226,16 @@ std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractOrBuildProje
 
 BucketSpec::BucketPredicate DocumentSourceInternalUnpackBucket::createPredicatesOnBucketLevelField(
     const MatchExpression* matchExpr) const {
+    timeseries::Get2dsphereIndexVersionFn get2dsphereIndexVersion;
+    if (_geo2dsphereIndexVersions) {
+        get2dsphereIndexVersion = [&versionMap = *_geo2dsphereIndexVersions](
+                                      OperationContext*, const NamespaceString&, StringData field) {
+            auto it = versionMap.find(std::string(field));
+            return it != versionMap.end()
+                ? boost::make_optional(static_cast<S2IndexVersion>(it->second))
+                : boost::optional<S2IndexVersion>();
+        };
+    }
     return BucketSpec::createPredicatesOnBucketLevelField(
         matchExpr,
         _sharedState->_bucketUnpacker.bucketSpec(),
@@ -1190,7 +1245,8 @@ BucketSpec::BucketPredicate DocumentSourceInternalUnpackBucket::createPredicates
         _sharedState->_bucketUnpacker.includeMetaField(),
         _assumeNoMixedSchemaData,
         BucketSpec::IneligiblePredicatePolicy::kIgnore,
-        _fixedBuckets);
+        _fixedBuckets,
+        get2dsphereIndexVersion);
 }
 
 bool DocumentSourceInternalUnpackBucket::generateBucketLevelIdPredicates(

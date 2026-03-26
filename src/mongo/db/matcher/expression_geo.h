@@ -40,6 +40,7 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/geo/shapes.h"
+#include "mongo/db/index/s2_common.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_visitor.h"
@@ -136,6 +137,13 @@ public:
         return *_query;
     }
 
+    boost::optional<S2IndexVersion> get2dsphereIndexVersion() const {
+        return _2dsphereIndexVersion;
+    }
+    void set2dsphereIndexVersion(boost::optional<S2IndexVersion> v) {
+        _2dsphereIndexVersion = v;
+    }
+
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);
     }
@@ -155,10 +163,11 @@ private:
     // Share ownership of our query with all of our clones
     std::shared_ptr<const GeoExpression> _query;
     bool _canSkipValidation;
+    boost::optional<S2IndexVersion> _2dsphereIndexVersion;
 };
 
 
-// TODO: Make a struct, turn parse stuff into something like
+// TODO SERVER-122401: Make a struct, turn parse stuff into something like
 // static Status parseNearQuery(const BSONObj& obj, NearQuery** out);
 class GeoNearExpression {
     GeoNearExpression(const GeoNearExpression&) = delete;
@@ -243,7 +252,7 @@ private:
 /**
  * Expression which checks whether a legacy 2D index point is contained within our near
  * search annulus.  See nextInterval() below for more discussion.
- * TODO: Make this a standard type of GEO match expression
+ * TODO SERVER-122399: Make this a standard type of GEO match expression
  */
 class TwoDPtInAnnulusExpression : public LeafMatchExpression {
 public:

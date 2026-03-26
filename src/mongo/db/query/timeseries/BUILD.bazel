@@ -16,8 +16,10 @@ mongo_cc_unit_test(
     ],
     tags = ["mongo_unittest_third_group"],
     deps = [
+        "//src/mongo/db/index:expression_params",
         "//src/mongo/db/pipeline",
         "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
         "//src/mongo/db/timeseries:timeseries_test_fixture",
     ],
 )

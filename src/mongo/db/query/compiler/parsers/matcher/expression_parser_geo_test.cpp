@@ -32,6 +32,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -1097,6 +1098,130 @@ TEST(ExpressionGeoTest, RoundTripSerializeInternalBucketGeoWithin) {
             },
             field: "loc"
         }})"));
+}
+
+TEST(ExpressionGeoTest, ParseInternalBucketGeoWithin2dsphereIndexVersionValid) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+
+    for (int version : {1, 2, 3, 4}) {
+        BSONObj query =
+            BSON("$_internalBucketGeoWithin"
+                 << BSON("withinRegion"
+                         << BSON("$geometry" << BSON(
+                                     "type" << "Polygon"
+                                            << "coordinates"
+                                            << BSON_ARRAY(BSON_ARRAY(
+                                                   BSON_ARRAY(0 << 0)
+                                                   << BSON_ARRAY(5 << 0) << BSON_ARRAY(5 << 5)
+                                                   << BSON_ARRAY(0 << 5) << BSON_ARRAY(0 << 0)))))
+                         << "field"
+                         << "loc"
+                         << "2dsphereIndexVersion" << version));
+
+        auto result = MatchExpressionParser::parse(query,
+                                                   expCtx,
+                                                   ExtensionsCallbackNoop(),
+                                                   MatchExpressionParser::kAllowAllSpecialFeatures);
+        ASSERT_OK(result.getStatus()) << "Failed for version " << version;
+
+        auto* ibgw = static_cast<InternalBucketGeoWithinMatchExpression*>(result.getValue().get());
+        ASSERT_TRUE(ibgw->getIndexVersion()) << "Expected index version for version " << version;
+        ASSERT_EQUALS(static_cast<int>(*ibgw->getIndexVersion()), version)
+            << "Wrong index version for version " << version;
+    }
+}
+
+TEST(ExpressionGeoTest, ParseInternalBucketGeoWithin2dsphereIndexVersionInvalid) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+
+    for (long long version : {0, 5}) {
+        BSONObj query =
+            BSON("$_internalBucketGeoWithin"
+                 << BSON("withinRegion"
+                         << BSON("$geometry" << BSON(
+                                     "type" << "Polygon"
+                                            << "coordinates"
+                                            << BSON_ARRAY(BSON_ARRAY(
+                                                   BSON_ARRAY(0 << 0)
+                                                   << BSON_ARRAY(5 << 0) << BSON_ARRAY(5 << 5)
+                                                   << BSON_ARRAY(0 << 5) << BSON_ARRAY(0 << 0)))))
+                         << "field"
+                         << "loc"
+                         << "2dsphereIndexVersion" << version));
+
+        auto result = MatchExpressionParser::parse(query,
+                                                   expCtx,
+                                                   ExtensionsCallbackNoop(),
+                                                   MatchExpressionParser::kAllowAllSpecialFeatures);
+        ASSERT_NOT_OK(result.getStatus()) << "Should fail for version " << version;
+        ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::BadValue);
+    }
+}
+
+TEST(ExpressionGeoTest, ParseInternalBucketGeoWithin2dsphereIndexVersionTypeMismatch) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+
+    // Use BSON() because JSON does not allow field names starting with a digit
+    // (2dsphereIndexVersion).
+    BSONObj query =
+        BSON("$_internalBucketGeoWithin"
+             << BSON("withinRegion"
+                     << BSON("$geometry"
+                             << BSON("type" << "Polygon"
+                                            << "coordinates"
+                                            << BSON_ARRAY(BSON_ARRAY(
+                                                   BSON_ARRAY(0 << 0)
+                                                   << BSON_ARRAY(5 << 0) << BSON_ARRAY(5 << 5)
+                                                   << BSON_ARRAY(0 << 5) << BSON_ARRAY(0 << 0)))))
+                     << "field"
+                     << "loc"
+                     << "2dsphereIndexVersion"
+                     << "not_a_number"));
+
+    auto result = MatchExpressionParser::parse(
+        query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::kAllowAllSpecialFeatures);
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::TypeMismatch);
+}
+
+TEST(ExpressionGeoTest, RoundTripSerializeInternalBucketGeoWithinWith2dsphereIndexVersion) {
+    auto opts = SerializationOptions{LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+
+    // Use BSON() because JSON does not allow field names starting with a digit
+    // (2dsphereIndexVersion).
+    BSONObj inputExpr =
+        BSON("$_internalBucketGeoWithin"
+             << BSON("withinRegion"
+                     << BSON("$geometry"
+                             << BSON("type" << "Polygon"
+                                            << "coordinates"
+                                            << BSON_ARRAY(BSON_ARRAY(
+                                                   BSON_ARRAY(0 << 0)
+                                                   << BSON_ARRAY(0 << 5) << BSON_ARRAY(5 << 5)
+                                                   << BSON_ARRAY(5 << 0) << BSON_ARRAY(0 << 0)))))
+                     << "field"
+                     << "loc"
+                     << "2dsphereIndexVersion" << 4));
+
+    auto result = MatchExpressionParser::parse(inputExpr, expCtx);
+    ASSERT_OK(result.getStatus());
+
+    BSONObjBuilder bob;
+    result.getValue()->serialize(&bob, opts);
+    auto serialized = bob.obj();
+    ASSERT_TRUE(serialized.hasField("$_internalBucketGeoWithin"));
+    ASSERT_TRUE(serialized["$_internalBucketGeoWithin"].Obj().hasField("2dsphereIndexVersion"));
+    ASSERT_EQUALS(serialized["$_internalBucketGeoWithin"].Obj()["2dsphereIndexVersion"].Int(), 4);
+
+    // Round-trip: parse the serialized expression and verify index version is preserved.
+    auto roundTripped = MatchExpressionParser::parse(serialized, expCtx);
+    ASSERT_OK(roundTripped.getStatus());
+
+    auto* ibgw =
+        static_cast<InternalBucketGeoWithinMatchExpression*>(roundTripped.getValue().get());
+    ASSERT_TRUE(ibgw->getIndexVersion());
+    ASSERT_EQUALS(static_cast<int>(*ibgw->getIndexVersion()), 4);
 }
 
 }  // namespace mongo

@@ -30,12 +30,18 @@
 #include "mongo/db/query/timeseries/timeseries_translation.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/db/index/s2_common.h"
+#include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
+#include "mongo/db/query/util/make_data_structure.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_role.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
@@ -374,5 +380,79 @@ TEST_F(TimeseriesRewritesTest, BucketsFixedTest) {
     }
 }
 
+/**
+ * Fixture that sets up a timeseries buckets collection with a 2dsphere_bucket index to verify
+ * the bucket spec uses the index's 2dsphereIndexVersion when creating
+ * InternalBucketGeoWithinMatchExpression.
+ */
+class GeoIndexVersionWithCatalogTest : public CatalogTestFixture {
+public:
+    void setUp() override {
+        CatalogTestFixture::setUp();
+        auto opCtx = operationContext();
+
+        CreateCommand createCmd(_measurementsNss);
+        createCmd.getCreateCollectionRequest().setTimeseries(TimeseriesOptions("time"));
+        ASSERT_OK(createCollection(opCtx, createCmd));
+
+        // Add a 2dsphere_bucket index on data.loc with 2dsphereIndexVersion 3.
+        const BSONObj indexSpec =
+            BSON("v" << 2 << "key" << BSON("data.loc" << "2dsphere_bucket") << "name"
+                     << "loc_2dsphere"
+                     << "2dsphereIndexVersion" << 3);
+        ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
+            opCtx, _measurementsNss.makeTimeseriesBucketsNamespace(), {indexSpec}));
+    }
+
+    boost::intrusive_ptr<ExpressionContextForTest> getExpCtx() {
+        return make_intrusive<ExpressionContextForTest>(operationContext(), _measurementsNss);
+    }
+
+    CollectionOrViewAcquisition getCollAcquisition() {
+        return acquireCollectionOrView(operationContext(),
+                                       CollectionOrViewAcquisitionRequest(
+                                           _measurementsNss.makeTimeseriesBucketsNamespace(),
+                                           PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
+                                           repl::ReadConcernArgs::get(operationContext()),
+                                           AcquisitionPrerequisites::kRead),
+                                       MODE_IS);
+    }
+
+    const NamespaceString _measurementsNss =
+        NamespaceString::createNamespaceString_forTest("test", "pipeline_test");
+};
+
+TEST_F(GeoIndexVersionWithCatalogTest, GeoWithinUses2dsphereBucketIndexVersionFromCatalog) {
+    // Simulate a pipeline arriving from the router: it has a pre-translated unpack stage but no
+    // 2dsphere index version info (the router lacks index catalog access).
+    auto expCtx = getExpCtx();
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: "
+                            "'time', bucketMaxSpanSeconds: 3600}}"),
+                   fromjson("{$match: {loc: {$geoWithin: {$geometry: {type: \"Polygon\", "
+                            "coordinates: [ [ [ 0, 0 ], [ 3, 6 ], [ 6, 1 ], [ 0, 0 ] ] ]}}}}}")),
+        expCtx,
+        pipeline_factory::kOptionsMinimal);
+
+    auto collAcquisition = getCollAcquisition();
+    timeseries::translateStagesIfRequired(expCtx, *pipeline, collAcquisition);
+
+    auto& container = pipeline->getSources();
+    ASSERT_EQ(container.size(), 2U);
+
+    auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
+    auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
+                         ->createPredicatesOnBucketLevelField(original->getMatchExpression());
+
+    ASSERT_TRUE(predicate.loosePredicate);
+    auto* ibgw =
+        dynamic_cast<InternalBucketGeoWithinMatchExpression*>(predicate.loosePredicate.get());
+    ASSERT_NE(ibgw, nullptr)
+        << "Expected InternalBucketGeoWithinMatchExpression when $geoWithin is pushed down";
+    ASSERT_TRUE(ibgw->getIndexVersion())
+        << "Expected index version from catalog when 2dsphere_bucket index exists";
+    ASSERT_EQ(*ibgw->getIndexVersion(), S2_INDEX_VERSION_3)
+        << "Expected 2dsphereIndexVersion 3 from the index we created";
+}
 }  // namespace
 }  // namespace mongo
