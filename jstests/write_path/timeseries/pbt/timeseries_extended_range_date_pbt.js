@@ -19,6 +19,9 @@ import {makeEmptyModel} from "jstests/write_path/timeseries/pbt/lib/command_gram
 import {makeTimeseriesCommandSequenceArb} from "jstests/write_path/timeseries/pbt/lib/command_arbitraries.js";
 import {assertCollectionsMatch} from "jstests/write_path/timeseries/pbt/lib/assertions.js";
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
+import {getFcParams, getFcAssertArgs} from "jstests/write_path/timeseries/pbt/lib/fast_check_params.js";
+const fcParams = getFcParams();
+const fcAssertArgs = getFcAssertArgs();
 
 const ctrlCollName = jsTestName() + "_control";
 const tsCollName = jsTestName() + "_timeseries";
@@ -186,12 +189,10 @@ describe("Basic comparative PBT for timeseries inserts", () => {
         return accumulatedStats;
     };
 
-    // Test each range against the the property that a Timeseries and Standard
-    // collection remain the same for a given set of commands.
     for (const [label, dateRange] of Object.entries(extendedDateRanges)) {
         const programArb = makeTimeseriesCommandSequenceArb(
-            /* minCommands   */ 1,
-            /* maxCommands   */ 30,
+            /* minCommands   */ fcParams.minCommands || 1,
+            /* maxCommands   */ fcParams.maxCommands || 30,
             /* timeField     */ timeField,
             /* metaField     */ metaField,
             /* metaValue     */ metaValue,
@@ -201,7 +202,7 @@ describe("Basic comparative PBT for timeseries inserts", () => {
             /* maxDocs       */ 10,
             /* options       */ {ranges: {dateRange}}, // {intRange, dateRange} if you want to override
             /* fieldNameArb  */ undefined, // use default short-string field names
-            /* replayPath    */ undefined, // replace this value with the replay path to replicate a failure
+            /* replayPath    */ fcParams.replayPath,
         );
         it(`keeps tsColl and ctrlColl in sync under insert/batch-insert/delete: ${label}`, () => {
             fc.assert(
@@ -219,7 +220,7 @@ describe("Basic comparative PBT for timeseries inserts", () => {
                             .reduce(bucketCollectionQueryStatsReducer, stats);
                     })
                     .beforeEach(beforeHook),
-                {numRuns: 50},
+                fcAssertArgs,
             );
         });
     }

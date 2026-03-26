@@ -237,6 +237,8 @@ DEFAULTS = {
     "skip_extensions_signature_verification": False,
     # Enable shell JS debugging
     "jsdbg": False,
+    # Parameters for fast-check property-based tests
+    "fast_check_parameters": None,
 }
 
 _SuiteOptions = collections.namedtuple(
@@ -773,6 +775,9 @@ HISTORIC_TEST_RUNTIMES = None
 
 # Shell debug options
 JSDBG = None
+
+# Parameters for fast-check property-based tests (dict parsed from JSON)
+FAST_CHECK_PARAMETERS = None
 
 ##
 # Internally used configuration options that aren't exposed to the user

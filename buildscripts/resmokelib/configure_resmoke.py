@@ -919,6 +919,8 @@ flags in common: {common_set}
 
     _config.JSDBG = config.pop("jsdbg")
 
+    _config.FAST_CHECK_PARAMETERS = config.pop("fast_check_parameters")
+
     # Internal testing options.
     _config.INTERNAL_PARAMS = config.pop("internal_params")
 

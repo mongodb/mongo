@@ -4,6 +4,14 @@ selector:
     - jstests/write_path/timeseries/pbt/*.js
 
 executor:
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          fastCheckParameters:
+            numRuns: 75
+            minCommands: 1
+            maxCommands: 250
   hooks:
     - class: ValidateCollections
     - class: CleanEveryN

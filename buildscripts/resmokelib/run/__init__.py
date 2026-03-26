@@ -2,6 +2,7 @@
 
 import argparse
 import collections
+import json
 import os
 import os.path
 import platform
@@ -1522,7 +1523,7 @@ class RunPlugin(PluginInterface):
             help="Outputs the tests that would be run.",
         )
 
-        # TODO: add support for --dryRun=commands
+        # TODO(SERVER-122699): add support for --dryRun=commands
         parser.add_argument(
             "--dryRun",
             action="store",
@@ -2277,6 +2278,27 @@ class RunPlugin(PluginInterface):
             type=str,
             help=(
                 "Sets the path to the resmoke modules config to allow testing different configurations."
+            ),
+        )
+
+        def fast_check_params_parser(params: str | None) -> dict | None:
+            if not params:
+                return None
+            try:
+                result = json.loads(params)
+                if not isinstance(result, dict):
+                    raise argparse.ArgumentTypeError("--fastCheckParameters must be a JSON object")
+                return result
+            except json.JSONDecodeError as e:
+                raise argparse.ArgumentTypeError(f"Invalid JSON for --fastCheckParameters: {e}")
+
+        internal_options.add_argument(
+            "--fastCheckParameters",
+            dest="fast_check_parameters",
+            type=fast_check_params_parser,
+            help=(
+                "JSON string of parameters for fast-check property-based tests. "
+                "Supported keys: numRuns, seed, replayPath, path, endOnFailure, minCommands, maxCommands"
             ),
         )
 

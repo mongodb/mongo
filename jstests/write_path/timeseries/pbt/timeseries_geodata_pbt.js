@@ -22,12 +22,17 @@ import {
     makeGeospatialQueryArb,
 } from "jstests/write_path/timeseries/pbt/lib/geodata_arbitraries.js";
 import {assertCollectionsMatch} from "jstests/write_path/timeseries/pbt/lib/assertions.js";
+import {getFcParams, getFcAssertArgs} from "jstests/write_path/timeseries/pbt/lib/fast_check_params.js";
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
+const fcParams = getFcParams();
+const fcAssertArgs = getFcAssertArgs();
 const ctrlCollName = jsTestName() + "_control";
 const tsCollName = jsTestName() + "_timeseries";
 
 const geoField = "loc";
+const timeField = "ts";
+const metaField = "meta";
 const metaValue = "geospatial";
 
 describe("Geospatial Query Comparative Test for Timeseries", () => {
@@ -53,10 +58,10 @@ describe("Geospatial Query Comparative Test for Timeseries", () => {
 
     it("keeps tsColl and ctrlColl in sync under insert/batch-insert/delete of GeoPoint data", () => {
         const programArb = makeTimeseriesCommandSequenceArb(
-            /* minCommands   */ 1,
-            /* maxCommands   */ 30,
-            /* timeField     */ "ts",
-            /* metaField     */ "meta",
+            /* minCommands   */ fcParams.minCommands || 1,
+            /* maxCommands   */ fcParams.maxCommands || 30,
+            /* timeField     */ timeField,
+            /* metaField     */ metaField,
             /* metaValue     */ metaValue,
             /* minFields     */ 1,
             /* maxFields     */ 1,
@@ -66,7 +71,7 @@ describe("Geospatial Query Comparative Test for Timeseries", () => {
                 explicitArbitraries: {[geoField]: makeGeoArbFactory(makeGeoPointArb)},
             },
             /* fieldNameArb  */ undefined, // use default short-string field names
-            /* replayPath    */ undefined, // replace this value with the replay path to replicate a failure
+            /* replayPath    */ fcParams.replayPath,
         );
 
         fc.assert(
@@ -77,16 +82,16 @@ describe("Geospatial Query Comparative Test for Timeseries", () => {
                     assertCollectionsMatch(tsColl, ctrlColl);
                 })
                 .beforeEach(beforeHook),
-            {numRuns: 50},
+            fcAssertArgs,
         );
     });
 
     it("produces equal geonear queries", () => {
         const programArb = makeTimeseriesCommandSequenceArb(
-            /* minCommands   */ 1,
-            /* maxCommands   */ 30,
-            /* timeField     */ "ts",
-            /* metaField     */ "meta",
+            /* minCommands   */ fcParams.minCommands || 1,
+            /* maxCommands   */ fcParams.maxCommands || 30,
+            /* timeField     */ timeField,
+            /* metaField     */ metaField,
             /* metaValue     */ metaValue,
             /* minFields     */ 1,
             /* maxFields     */ 1,
@@ -96,7 +101,7 @@ describe("Geospatial Query Comparative Test for Timeseries", () => {
                 explicitArbitraries: {[geoField]: makeGeoArbFactory(makeGeoPointArb)},
             },
             /* fieldNameArb  */ undefined, // use default short-string field names
-            /* replayPath    */ undefined, // replace this value with the replay path to replicate a failure
+            /* replayPath    */ fcParams.replayPath,
         );
 
         fc.assert(
@@ -113,7 +118,7 @@ describe("Geospatial Query Comparative Test for Timeseries", () => {
                     },
                 )
                 .beforeEach(beforeHook),
-            {numRuns: 50},
+            fcAssertArgs,
         );
     });
 });

@@ -18,12 +18,16 @@ import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 import {makeEmptyModel} from "jstests/write_path/timeseries/pbt/lib/command_grammar.js";
 import {makeTimeseriesCommandSequenceArb} from "jstests/write_path/timeseries/pbt/lib/command_arbitraries.js";
 import {assertCollectionsMatch} from "jstests/write_path/timeseries/pbt/lib/assertions.js";
+import {getFcParams, getFcAssertArgs} from "jstests/write_path/timeseries/pbt/lib/fast_check_params.js";
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
+const fcParams = getFcParams();
+const fcAssertArgs = getFcAssertArgs();
 const ctrlCollName = jsTestName() + "_control";
 const tsCollName = jsTestName() + "_timeseries";
 const timeField = "ts";
 const metaField = "meta";
+const metaValue = "metavalue";
 
 describe("PBT for timeseries inserts biasing towards generating long runs of matching or monotonically in/decreasing values", () => {
     let tsColl;
@@ -43,13 +47,11 @@ describe("PBT for timeseries inserts biasing towards generating long runs of mat
     };
 
     it("keeps tsColl and ctrlColl in sync under insert/batch-insert/delete", () => {
-        const metaValue = "metavalu";
-
         const programArb = makeTimeseriesCommandSequenceArb(
-            /* minCommands   */ 1,
-            /* maxCommands   */ 30,
-            /* timeField     */ "ts",
-            /* metaField     */ "meta",
+            /* minCommands   */ fcParams.minCommands || 1,
+            /* maxCommands   */ fcParams.maxCommands || 30,
+            /* timeField     */ timeField,
+            /* metaField     */ metaField,
             /* metaValue     */ metaValue,
             /* minFields     */ 1,
             /* maxFields     */ 3,
@@ -57,7 +59,7 @@ describe("PBT for timeseries inserts biasing towards generating long runs of mat
             /* maxDocs       */ 10,
             /* options       */ {runFrequency: 0.5}, // {intRange, dateRange} if you want to override
             /* fieldNameArb  */ undefined, // use default short-string field names
-            /* replayPath    */ undefined, // replace this value with the replay path to replicate a failure
+            /* replayPath    */ fcParams.replayPath,
         );
 
         fc.assert(
@@ -68,7 +70,7 @@ describe("PBT for timeseries inserts biasing towards generating long runs of mat
                     assertCollectionsMatch(tsColl, ctrlColl);
                 })
                 .beforeEach(beforeHook),
-            {numRuns: 50},
+            fcAssertArgs,
         );
     });
 });

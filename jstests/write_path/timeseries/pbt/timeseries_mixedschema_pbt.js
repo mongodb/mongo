@@ -16,7 +16,11 @@ import {fc} from "jstests/third_party/fast_check/fc-4.6.0.js";
 import {makeEmptyModel} from "jstests/write_path/timeseries/pbt/lib/command_grammar.js";
 import {makeTimeseriesCommandSequenceArb} from "jstests/write_path/timeseries/pbt/lib/command_arbitraries.js";
 import {assertCollectionsMatch} from "jstests/write_path/timeseries/pbt/lib/assertions.js";
+import {getFcParams, getFcAssertArgs} from "jstests/write_path/timeseries/pbt/lib/fast_check_params.js";
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
+
+const fcParams = getFcParams();
+const fcAssertArgs = getFcAssertArgs();
 
 const ctrlCollName = jsTestName() + "_control";
 const tsCollName = jsTestName() + "_timeseries";
@@ -188,8 +192,8 @@ describe("Comparative PBT for mixed-schema timeseries field streams", () => {
 
     it("keeps tsColl and ctrlColl in sync under mixed-schema field streams", () => {
         const programArb = makeTimeseriesCommandSequenceArb(
-            1, // minCommands
-            30, // maxCommands
+            fcParams.minCommands || 1, // minCommands
+            fcParams.maxCommands || 30, // maxCommands
             timeField,
             metaField,
             metaValue,
@@ -198,8 +202,11 @@ describe("Comparative PBT for mixed-schema timeseries field streams", () => {
             0, // minDocs
             50, // maxDocs
             {
+                // options
                 mixedSchemaChance: 0.5,
             },
+            undefined, //fieldNameArb
+            fcParams.replayPath,
         );
 
         fc.assert(
@@ -214,7 +221,7 @@ describe("Comparative PBT for mixed-schema timeseries field streams", () => {
                     stats = updateFinalCollectionFieldTypeStats(stats, tsColl.find().toArray());
                 })
                 .beforeEach(beforeHook),
-            {numRuns: 50},
+            fcAssertArgs,
         );
     });
 });

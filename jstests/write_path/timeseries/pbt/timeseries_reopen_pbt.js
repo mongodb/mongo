@@ -24,7 +24,11 @@ import {
     makeInsertOldBucketCommandArb,
 } from "jstests/write_path/timeseries/pbt/lib/command_arbitraries.js";
 import {assertCollectionsMatch} from "jstests/write_path/timeseries/pbt/lib/assertions.js";
+import {getFcParams, getFcAssertArgs} from "jstests/write_path/timeseries/pbt/lib/fast_check_params.js";
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
+
+const fcParams = getFcParams();
+const fcAssertArgs = getFcAssertArgs();
 
 const ctrlCollName = jsTestName() + "_control";
 const tsCollName = jsTestName() + "_timeseries";
@@ -78,7 +82,7 @@ describe("PBT exercising bucket reopening via InsertOldBucketCommand", () => {
         const programArb = fc.commands(
             [batchInsertArb, batchInsertArb, batchInsertArb, batchInsertArb, batchInsertArb, insertOldBucketArb],
             {
-                maxCommands: 150,
+                maxCommands: fcParams.maxCommands || 100, // maxCommands
             },
         );
 
@@ -102,7 +106,7 @@ describe("PBT exercising bucket reopening via InsertOldBucketCommand", () => {
                     }
                 })
                 .beforeEach(beforeHook),
-            {numRuns: 50},
+            fcAssertArgs,
         );
     });
 });

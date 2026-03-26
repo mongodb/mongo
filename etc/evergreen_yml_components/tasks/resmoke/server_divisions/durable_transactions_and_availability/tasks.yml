@@ -2463,6 +2463,7 @@ tasks:
       - func: "run tests"
         vars:
           suite: timeseries_write_pbt
+          resmoke_args: "--fastCheckParameters=${fastCheckParameters|}"
 
   ################################################
   #           Disagg Storage tasks               #
