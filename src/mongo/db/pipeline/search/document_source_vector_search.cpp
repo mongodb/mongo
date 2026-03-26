@@ -42,7 +42,6 @@
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/query/search/search_index_view_validation.h"
 #include "mongo/db/query/search/search_task_executors.h"
-#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/views/resolved_view.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -59,13 +58,12 @@ REGISTER_LITE_PARSED_DOCUMENT_SOURCE_FALLBACK(
     [](const NamespaceString& nss,
        const BSONElement& spec,
        const LiteParserOptions& options) -> std::unique_ptr<LiteParsedDocumentSource> {
-        tassert(11632200,
-                "Router sent featureFlagVectorSearchExtension=true but the extension is not loaded "
-                "on this shard.",
-                !(options.opCtx && OperationShardingState::isShardingAware(options.opCtx) &&
-                  options.ifrContext &&
-                  options.ifrContext->getSavedFlagValue(
-                      feature_flags::gFeatureFlagVectorSearchExtension)));
+        tassert(
+            11632200,
+            "Cannot invoke fallback $vectorSearch parser: featureFlagVectorSearchExtension=true "
+            "requires extension to be loaded",
+            !search_helpers::isExtensionFlagEnabledByRouter(
+                options, feature_flags::gFeatureFlagVectorSearchExtension));
         return VectorSearchLiteParsed::parse(nss, spec, options);
     },
     AllowedWithApiStrict::kNeverInVersion1,

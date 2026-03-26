@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
@@ -48,6 +49,7 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/query/search/search_task_executors.h"
+#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
 #include "mongo/util/assert_util.h"
@@ -769,6 +771,12 @@ std::unique_ptr<SearchNode> getSearchNode(NamespaceString nss, DocumentSource* s
     } else {
         tasserted(7855801, str::stream() << "Unknown stage type" << stage->getSourceName());
     }
+}
+
+bool isExtensionFlagEnabledByRouter(const LiteParserOptions& options,
+                                    IncrementalRolloutFeatureFlag& flag) {
+    return options.opCtx && OperationShardingState::isShardingAware(options.opCtx) &&
+        options.ifrContext && options.ifrContext->getSavedFlagValue(flag);
 }
 
 }  // namespace search_helpers

@@ -33,9 +33,12 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 #include "mongo/db/query/search/mongot_options.h"
+#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -99,6 +102,56 @@ TEST_F(SearchTest, ShouldFailToParseIfSpecIsNotObject) {
     ASSERT_THROWS_CODE(DocumentSourceSearch::createFromBson(specObj.firstElement(), getExpCtx()),
                        AssertionException,
                        ErrorCodes::FailedToParse);
+}
+
+using SearchDeathTest = SearchTest;
+
+DEATH_TEST_F(SearchDeathTest,
+             TassertsWhenRouterSendsExtensionFlagButExtensionNotLoaded,
+             "12230700") {
+    auto opCtx = getExpCtx()->getOperationContext();
+
+    // Set shard role to simulate request coming from mongos.
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    ScopedSetShardRole scopedSetShardRole{
+        opCtx, nss, ShardVersion::UNTRACKED(), boost::none /* databaseVersion */};
+
+    // Simulate router sending featureFlagSearchExtension=true.
+    auto& flag = feature_flags::gFeatureFlagSearchExtension;
+    std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << true)};
+    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+
+    auto spec = fromjson(R"({
+        $search: {
+            term: "asdf"
+        }
+    })");
+
+    // Parse the $search stage. Since the extension is not loaded (only the fallback parser
+    // is registered), this should trigger the tassert when the router sent the flag as true.
+    LiteParsedDocumentSource::parse(
+        nss, spec, LiteParserOptions{.ifrContext = ifrContext, .opCtx = opCtx});
+}
+
+TEST_F(SearchTest, UsesFallbackLegacyParserWhenSearchExtensionFlagIsFalse) {
+    auto opCtx = getExpCtx()->getOperationContext();
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
+
+    // Simulate router sending featureFlagSearchExtension=false.
+    auto& flag = feature_flags::gFeatureFlagSearchExtension;
+    std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << false)};
+    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+
+    auto spec = fromjson(R"({
+        $search: {
+            term: "asdf"
+        }
+    })");
+
+    // Should successfully parse using the fallback legacy implementation.
+    ASSERT_DOES_NOT_THROW(LiteParsedDocumentSource::parse(
+        nss, spec, LiteParserOptions{.ifrContext = ifrContext, .opCtx = opCtx}));
 }
 
 }  // namespace

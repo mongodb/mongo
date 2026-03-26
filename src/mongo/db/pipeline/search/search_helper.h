@@ -54,6 +54,7 @@ namespace mongo {
 
 class Counter64;
 class IncrementalRolloutFeatureFlag;
+struct LiteParserOptions;
 
 using RemoteCursorMap = absl::flat_hash_map<size_t, std::unique_ptr<executor::TaskExecutorCursor>>;
 using RemoteExplainVector = std::vector<BSONObj>;
@@ -254,5 +255,12 @@ void promoteStoredSourceOrAddIdLookup(
  * isSearchMetaStage(stage) return 'true'. Else, an error is thrown.
  */
 std::unique_ptr<SearchNode> getSearchNode(NamespaceString nss, DocumentSource* stage);
+
+/**
+ * Returns true if the router indicated an extension feature flag is enabled but the extension is
+ * not loaded on this shard.
+ */
+bool isExtensionFlagEnabledByRouter(const LiteParserOptions& options,
+                                    IncrementalRolloutFeatureFlag& flag);
 }  // namespace search_helpers
 }  // namespace mongo

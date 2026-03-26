@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/search/lite_parsed_search.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/skip_and_limit.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/search/manage_search_index_request_gen.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/query/search/search_index_view_validation.h"
@@ -79,9 +80,23 @@ std::unique_ptr<SearchLiteParsed> parseSearchBeta(const NamespaceString& nss,
 }
 }  // namespace
 
-REGISTER_LITE_PARSED_DOCUMENT_SOURCE(search,
-                                     SearchLiteParsed::parse,
-                                     AllowedWithApiStrict::kNeverInVersion1);
+// Register the legacy parser as a fallback. This parser will be used when
+// featureFlagSearchExtension is disabled or when the search extension has not been
+// loaded. Errors if the router sent the flag as true but the extension is not loaded.
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE_FALLBACK(
+    search,
+    [](const NamespaceString& nss,
+       const BSONElement& spec,
+       const LiteParserOptions& options) -> std::unique_ptr<LiteParsedDocumentSource> {
+        tassert(12230700,
+                "Cannot invoke fallback $search parser: featureFlagSearchExtension=true "
+                "requires extension to be loaded",
+                !search_helpers::isExtensionFlagEnabledByRouter(
+                    options, feature_flags::gFeatureFlagSearchExtension));
+        return SearchLiteParsed::parse(nss, spec, options);
+    },
+    AllowedWithApiStrict::kNeverInVersion1,
+    &feature_flags::gFeatureFlagSearchExtension);
 
 // $searchBeta is supported as a deprecated alias for $search for compatibility with applications
 // that used search during its beta period.

@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/search/lite_parsed_search.h"
 #include "mongo/db/pipeline/search/search_helper.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/query/search/search_index_view_validation.h"
 #include "mongo/db/query/search/search_task_executors.h"
@@ -61,9 +62,23 @@ auto cloneEachOne(std::list<boost::intrusive_ptr<DocumentSource>> stages, const 
 }
 }  // namespace
 
-REGISTER_LITE_PARSED_DOCUMENT_SOURCE(searchMeta,
-                                     SearchMetaLiteParsed::parse,
-                                     AllowedWithApiStrict::kNeverInVersion1);
+// Register the legacy parser as a fallback. This parser will be used when
+// featureFlagSearchExtension is disabled or when the search extension has not been
+// loaded. Errors if the router sent the flag as true but the extension is not loaded.
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE_FALLBACK(
+    searchMeta,
+    [](const NamespaceString& nss,
+       const BSONElement& spec,
+       const LiteParserOptions& options) -> std::unique_ptr<LiteParsedDocumentSource> {
+        tassert(12230701,
+                "Cannot invoke fallback $searchMeta parser: featureFlagSearchExtension=true "
+                "requires extension to be loaded",
+                !search_helpers::isExtensionFlagEnabledByRouter(
+                    options, feature_flags::gFeatureFlagSearchExtension));
+        return SearchMetaLiteParsed::parse(nss, spec, options);
+    },
+    AllowedWithApiStrict::kNeverInVersion1,
+    &feature_flags::gFeatureFlagSearchExtension);
 
 REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(searchMeta,
                                                    DocumentSourceSearchMeta,
