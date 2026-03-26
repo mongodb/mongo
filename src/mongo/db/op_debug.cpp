@@ -212,7 +212,7 @@ void OpDebug::report(OperationContext* opCtx,
                     client && client->session() && client->session()->isConnectedToPriorityPort());
     }
     pAttrs->addDeepCopy("ns", toStringForLogging(curop.getNSS()));
-    pAttrs->addDeepCopy("collectionType", getCollectionType(opCtx, curop.getNSS()));
+    pAttrs->addDeepCopy("collectionType", getCollectionTypeFromNamespaceString(curop.getNSS()));
 
     if (client) {
         if (auto clientMetadata = ClientMetadata::get(client)) {
@@ -1449,7 +1449,7 @@ void OpDebug::appendResolvedViewsInfo(BSONObjBuilder& builder) const {
     resolvedViewsArr.doneFast();
 }
 
-std::string OpDebug::getCollectionType(OperationContext* opCtx, const NamespaceString& nss) const {
+std::string OpDebug::getCollectionTypeFromNamespaceString(const NamespaceString& nss) const {
     if (nss.isEmpty()) {
         return "none";
     }
@@ -1476,17 +1476,6 @@ std::string OpDebug::getCollectionType(OperationContext* opCtx, const NamespaceS
                 return "timeseries";
             }
             return "view";
-        }
-    }
-
-    if (!knownTimeseriesNamespaces.empty()) {
-        auto itr = knownTimeseriesNamespaces.find(nss);
-        if (itr != knownTimeseriesNamespaces.end()) {
-            if (isRawDataOperation(opCtx)) {
-                return "timeseriesBuckets";
-            } else {
-                return "timeseries";
-            }
         }
     }
 

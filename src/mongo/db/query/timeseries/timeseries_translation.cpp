@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/timeseries/timeseries_translation.h"
 
-#include "mongo/db/curop.h"
 #include "mongo/db/pipeline/document_source_index_stats.h"
 #include "mongo/db/pipeline/document_source_internal_convert_bucket_index_stats.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
@@ -159,21 +158,12 @@ void translatePipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
 }
 
 boost::optional<TimeseriesTranslationParams> getTimeseriesTranslationParamsIfRequired(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, const CollectionRoutingInfo& cri) {
+    OperationContext* opCtx, const CollectionRoutingInfo& cri) {
 
     const bool isViewlessTimeseriesColl =
         cri.hasRoutingTable() && isViewlessTimeseriesCollection(cri.getChunkManager());
 
-    // Regardless if we perform the timeseries translation, if the namespace is a viewless
-    // timeseries, we need to add it into the CurOp::knownTimeseriesNamespace map so $currentOp can
-    // return the correct coll type.
-    if (isViewlessTimeseriesColl) {
-        CurOp::get(expCtx->getOperationContext())
-            ->debug()
-            .knownTimeseriesNamespaces.insert(expCtx->getUserNss());
-    }
-
-    if (isRawDataOperation(expCtx->getOperationContext()) || !isViewlessTimeseriesColl) {
+    if (isRawDataOperation(opCtx) || !isViewlessTimeseriesColl) {
         // No translation necessary in these cases.
         return boost::none;
     }
@@ -193,26 +183,15 @@ boost::optional<TimeseriesTranslationParams> getTimeseriesTranslationParamsIfReq
 }
 
 boost::optional<TimeseriesTranslationParams> getTimeseriesTranslationParamsIfRequired(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const CollectionOrViewAcquisition& collOrView) {
+    OperationContext* opCtx, const CollectionOrViewAcquisition& collOrView) {
     if (!collOrView.isCollection()) {
         return boost::none;
     }
 
     const CollectionPtr& collPtr = collOrView.getCollectionPtr();
-
     const bool isViewlessTimeseriesColl = collPtr && isViewlessTimeseriesCollection(*collPtr.get());
 
-    // Regardless if we perform the timeseries translation, if the namespace is a viewless
-    // timeseries, we need to add it into the CurOp::knownTimeseriesNamespace map so $currentOp can
-    // return the correct coll type.
-    if (isViewlessTimeseriesColl) {
-        CurOp::get(expCtx->getOperationContext())
-            ->debug()
-            .knownTimeseriesNamespaces.insert(expCtx->getUserNss());
-    }
-
-    if (isRawDataOperation(expCtx->getOperationContext()) || !isViewlessTimeseriesColl) {
+    if (isRawDataOperation(opCtx) || !isViewlessTimeseriesColl) {
         // No translation necessary in these cases.
         return boost::none;
     }
@@ -236,7 +215,7 @@ void translateStagesIfRequiredImpl(const boost::intrusive_ptr<ExpressionContext>
     }
 
     const boost::optional<TimeseriesTranslationParams> params =
-        getTimeseriesTranslationParamsIfRequired(expCtx, catalogData);
+        getTimeseriesTranslationParamsIfRequired(expCtx->getOperationContext(), catalogData);
     if (!params) {
         return;
     }
@@ -258,7 +237,7 @@ void translateIndexHintIfRequiredImpl(const boost::intrusive_ptr<ExpressionConte
     }
 
     const boost::optional<TimeseriesTranslationParams> params =
-        getTimeseriesTranslationParamsIfRequired(expCtx, catalogData);
+        getTimeseriesTranslationParamsIfRequired(expCtx->getOperationContext(), catalogData);
     if (!params) {
         return;
     }

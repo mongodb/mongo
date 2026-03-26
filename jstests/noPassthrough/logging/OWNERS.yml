@@ -3,3 +3,6 @@ filters:
   - "*":
     approvers:
       - 10gen/server-networking-and-observability
+  - "log_collectionType.js":
+    approvers:
+      - 10gen/query-integration-observability

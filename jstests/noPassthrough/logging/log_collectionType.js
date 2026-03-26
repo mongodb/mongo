@@ -1,12 +1,9 @@
 /**
  * This test verifies the correctness of the "collectionType" value in the slow query logs.
- * @tags: [
- * ]
  */
 
 import {
     areViewlessTimeseriesEnabled,
-    getTimeseriesBucketsColl,
     getTimeseriesCollForDDLOps,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {findMatchingLogLine} from "jstests/libs/log.js";
@@ -17,6 +14,9 @@ import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_
 
     // Asserts slow query log contains expectedCollType.
     function checkLogForCollectionType(ns, expectedCollType, command = "aggregate") {
+        if (expectedCollType == "timeseries" && areViewlessTimeseriesEnabled(db)) {
+            expectedCollType = "normal";
+        }
         const globalLog = assert.commandWorked(db.adminCommand({getLog: "global"}));
         const line = findMatchingLogLine(globalLog.log, {
             msg: "Slow query",
@@ -76,7 +76,7 @@ import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_
 
     getTimeseriesCollForRawOps(db, db.test.timeseries_coll_rawops).aggregate(pipeline, getRawOperationSpec(db));
     let tsCollNs = "test." + getTimeseriesCollForDDLOps(db, "timeseries_coll_rawops");
-    checkLogForCollectionType(tsCollNs, "timeseriesBuckets");
+    checkLogForCollectionType(tsCollNs, areViewlessTimeseriesEnabled(db) ? "normal" : "timeseriesBuckets");
 
     // Check for view defined on a timeseries collection.
     assert.commandWorked(db.createView("viewOnTsColl", "timeseries_coll", [{$match: {a: 1}}]));
