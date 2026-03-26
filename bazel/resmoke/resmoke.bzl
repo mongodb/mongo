@@ -174,30 +174,43 @@ def resmoke_suite_test(
 
     deps_path = ":".join(["$(location %s)" % dep for dep in deps])
 
+    default_data = [
+        config,
+        generated_config,
+        python_imports_target,
+        "//bazel/resmoke:on_feature_flags",
+        "//bazel/resmoke:off_feature_flags",
+        "//bazel/resmoke:unreleased_ifr_flags",
+        "//bazel/resmoke:volatile_status",
+        "//bazel/resmoke:resource_monitor",
+        ":%s" % historic_runtimes,
+        "//buildscripts/resmokeconfig:common_jstest_data",
+        "//buildscripts/resmokeconfig:required_jstest_data",
+        "//buildscripts/resmokeconfig:fully_disabled_feature_flags.yml",
+        "//buildscripts/resmokeconfig:resmoke_modules.yml",
+        "//buildscripts/resmokeconfig/evg_task_doc:all_files",
+        "//buildscripts/resmokeconfig/loggers:all_files",
+        "//src/mongo/util/version:releases.yml",
+        "//:generated_resmoke_config",
+        "//:jsconfig.json",
+
+        # The below dependencies are used by many suites. To ease authoring new suites, they
+        # are included in all suites for now.
+        # TODO(SERVER-122756), prune this, ideally removing it entirely.
+        "//jstests/libs:authTestsKey",
+        "//jstests/libs:key1",
+        "//jstests/libs:key2",
+        "//src/third_party/schemastore.org:schemas",
+        "//x509:generate_main_certificates",
+    ]
+    merged_data = data + srcs + [d for d in default_data if d not in data]
+
     py_test(
         name = name,
         # To a user of resmoke_suite_test, the `srcs` is the list of tests to select. However, to the py_test rule,
         # the `srcs` are expected to be Python files only.
         srcs = [resmoke_shim],
-        data = data + srcs + [
-            config,
-            generated_config,
-            python_imports_target,
-            "//bazel/resmoke:on_feature_flags",
-            "//bazel/resmoke:off_feature_flags",
-            "//bazel/resmoke:unreleased_ifr_flags",
-            "//bazel/resmoke:volatile_status",
-            "//bazel/resmoke:resource_monitor",
-            ":%s" % historic_runtimes,
-            "//buildscripts/resmokeconfig:common_jstest_data",
-            "//buildscripts/resmokeconfig:fully_disabled_feature_flags.yml",
-            "//buildscripts/resmokeconfig:resmoke_modules.yml",
-            "//buildscripts/resmokeconfig/evg_task_doc:all_files",
-            "//buildscripts/resmokeconfig/loggers:all_files",
-            "//src/mongo/util/version:releases.yml",
-            "//:generated_resmoke_config",
-            "//:jsconfig.json",
-        ] + select({
+        data = merged_data + select({
             "//bazel/resmoke:installed_dist_test_enabled": ["//:installed-dist-test", "//:.resmoke_mongo_version.yml"],
             "//conditions:default": ["//bazel/resmoke:resmoke_mongo_version"],
         }),

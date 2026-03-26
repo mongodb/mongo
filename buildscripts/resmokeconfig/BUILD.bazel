@@ -13,7 +13,7 @@ filegroup(
 # imports added unconditionally by resmoke when starting the mongo shell or used by
 # resmoke hooks.
 mongo_js_library(
-    name = "common_jstest_data",
+    name = "required_jstest_data",
     deps = [
         "//jstests/aggregation/extras:utils",
         "//jstests/concurrency/fsm_workload_helpers:auto_retry_transaction",
@@ -26,6 +26,28 @@ mongo_js_library(
         "//jstests/replsets/libs:all_javascript_files",
         "//jstests/sharding/libs:sharded_index_util",
         "//jstests/third_party/fast_check:all_javascript_files",
+    ],
+)
+
+# Javascript imports that are using a at least several jstest suties. This list is a tradeoff
+# to spend less effort finding the exact javascript dependencies and data files each suite needs.
+# TODO(SERVER-122756), prune this, ideally removing it entirely.
+mongo_js_library(
+    name = "common_jstest_data",
+    deps = [
+        "//jstests/aggregation/extras:all_subpackage_javascript_files",
+        "//jstests/concurrency/fsm_libs:all_subpackage_javascript_files",
+        "//jstests/concurrency/fsm_utils:all_subpackage_javascript_files",
+        "//jstests/concurrency/fsm_workload_helpers",
+        "//jstests/concurrency/fsm_workload_modifiers:all_subpackage_javascript_files",
+        "//jstests/core/libs:all_subpackage_javascript_files",
+        "//jstests/multiVersion/libs:all_subpackage_javascript_files",
+        "//jstests/noPassthrough/libs:all_subpackage_javascript_files",
+        "//jstests/sharding/analyze_shard_key/libs:all_subpackage_javascript_files",
+        "//jstests/sharding/libs:all_subpackage_javascript_files",
+        "//jstests/ssl/libs",
+        "//jstests/with_mongot/e2e_lib",
+        "//jstests/with_mongot/mongotmock/lib",
     ],
 )
 
