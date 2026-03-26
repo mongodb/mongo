@@ -54,11 +54,9 @@ SUITE_HIERARCHY = {
         }
     },
     "concurrency_replication_causal_consistency": {},
-    "concurrency_replication_causal_consistency_with_replica_set_endpoint": {},
     "concurrency_replication_for_backup_restore": {},
     "concurrency_replication_for_export_import": {},
     "concurrency_replication_multi_stmt_txn": {},
-    "concurrency_replication_multi_stmt_txn_with_replica_set_endpoint": {},
     "concurrency_replication": {},
     "concurrency_sharded_initial_sync": {"concurrency_sharded_causal_consistency": {}},
     # JScore passthrough suites
