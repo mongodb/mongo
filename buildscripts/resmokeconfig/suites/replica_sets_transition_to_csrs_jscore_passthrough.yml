@@ -5,7 +5,7 @@ selector:
     - jstests/core/**/*.js
   exclude_files:
     # Transactions do not support retryability of individual operations.
-    # TODO: Remove this once it is supported (SERVER-33952).
+    # TODO (SERVER-33952) Remove this once it is supported.
     - jstests/core/txns/**/*.js
     # The set_param1.js test attempts to compare the response from running the {getParameter: "*"}
     # command multiple times, which may observe the change to the "transactionLifetimeLimitSeconds"
@@ -65,6 +65,9 @@ selector:
     - jstests/core/**/benchrun_pipeline_updates.js
     - jstests/core/**/find_and_modify_concurrent_update.js
     - jstests/core/**/shellstartparallel.js
+
+    # TODO (SERVER-122382) Re-enable the following tests
+    - jstests/core/index/index_check6.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod

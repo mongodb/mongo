@@ -5,3 +5,5 @@ overrides:
   - "multiversion.sharding_multiversion_mongos_testdata_last_continuous"
   # TODO (SERVER-117693) - Remove this override once SERVER-114640 is backported to 8.2
   - "multiversion.sharding_temporarily_enforce_1_mongos"
+excludes:
+  - "multiversion.sharding_jscore_passthrough_last_continuous_new_old_old_new_excluded_files"

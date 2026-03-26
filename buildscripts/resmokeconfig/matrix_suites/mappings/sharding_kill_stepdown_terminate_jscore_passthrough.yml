@@ -11,3 +11,4 @@ extends:
 
 excludes:
   - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_files_fle"
+  - "replica_sets_stepdown_selector.kill_stepdown_terminate_jscore_passthrough_extra_files"

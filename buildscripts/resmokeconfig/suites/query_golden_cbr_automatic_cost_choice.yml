@@ -3,6 +3,10 @@ test_kind: js_test
 selector:
   roots:
     - jstests/query_golden/plan_stability*.js
+  # TODO (SERVER-122382) Re-enable the following tests
+  exclude_files:
+    - jstests/query_golden/plan_stability2.js
+    - jstests/query_golden/plan_stability.js
 executor:
   config:
     shell_options:

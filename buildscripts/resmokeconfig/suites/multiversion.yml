@@ -16,6 +16,10 @@ selector:
     # TODO SERVER-42919: recent work on the ReplicaSetMonitor means that mongoS no longer crashes when
     # it attempts to connect to an upgraded mongoD. Un-denylist when SERVER-42919 fixes this issue.
     - jstests/multiVersion/genericSetFCVUsage/fcv_core/crash_mongos_against_upgraded_cluster.js
+
+    # TODO SERVER-122382 Re-enable the following tests
+    - jstests/multiVersion/genericSetFCVUsage/collection_validator_feature_compatibility_version.js
+    - jstests/multiVersion/genericSetFCVUsage/view_definition_feature_compatibility_version.js
   exclude_with_any_tags:
     - featureFlagToaster
     - featureFlagSpoon

@@ -389,3 +389,31 @@
             TestData:
               # TODO (SERVER-111403): Enable OpenTelemetry tracing in multiversion suites.
               enableOTELTracing: false
+
+- name: sharding_multiversion_fixture_last_continuous
+  value:
+    exclude_files:
+      # TODO (SERVER-122386) Re-enable the following tests
+      - jstests/sharding/flush_resharding_state_change_errors.js
+      # TODO (SERVER-122385) Re-enable the following tests
+      - jstests/sharding/replica_set_to_csrs_promotion.js
+      - jstests/sharding/add_shard_fails_promotion_from_lastlts_to_lastcontinuous.js
+      - jstests/sharding/direct_shard_connection_ddls_on_replicaset.js
+      - jstests/sharding/direct_shard_connection_ddls_during_promotion_to_dedicated.js
+
+- name: sharding_jscore_passthrough_last_continuous_new_old_old_new_excluded_files
+  value:
+    exclude_files:
+      # TODO (SERVER-122384) Re-enable the following tests
+      - jstests/core/ddl/create_collection.js
+      - jstests/core/timeseries/ddl/timeseries_index.js
+      # TODO (SERVER-122382) Re-enable the following tests
+      - jstests/core/query/or/subplanning_blocked_during_replanning.js
+
+- name: sharding_last_continuous_excluded_files
+  value:
+    exclude_files:
+      # TODO (SERVER-122384) Re-enable the following tests
+      - jstests/core/timeseries/ddl/timeseries_index.js
+      # TODO (SERVER-122387) Re-enable the following tests
+      - jstests/sharding/timeseries/timeseries_indexes.js

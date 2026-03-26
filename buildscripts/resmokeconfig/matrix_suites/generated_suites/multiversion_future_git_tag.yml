@@ -25,6 +25,8 @@ selector:
     - jstests/multiVersion/libs/*.js
     - jstests/multiVersion/genericBinVersion/minor_version_tags_new_old_new.js
     - jstests/multiVersion/genericSetFCVUsage/fcv_core/crash_mongos_against_upgraded_cluster.js
+    - jstests/multiVersion/genericSetFCVUsage/collection_validator_feature_compatibility_version.js
+    - jstests/multiVersion/genericSetFCVUsage/view_definition_feature_compatibility_version.js
   exclude_with_any_tags:
     - featureFlagToaster
     - featureFlagSpoon

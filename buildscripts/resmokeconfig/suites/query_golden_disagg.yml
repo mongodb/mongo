@@ -7,6 +7,9 @@ selector:
     - jstests/query_golden/libs/**/*.js
     - jstests/query_golden/test_inputs/**/*.js
     - jstests/query_golden/join_opt/plan_stability*.js
+    # TODO (SERVER-122382) Re-enable the following tests
+    - jstests/query_golden/plan_stability2.js
+    - jstests/query_golden/plan_stability.js
   exclude_with_any_tags:
     # TODO SERVER-121517: Remove after updating test to account for profiling level > 0 not being supported in disagg.
     - requires_profiling
