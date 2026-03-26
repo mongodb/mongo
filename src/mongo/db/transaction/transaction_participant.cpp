@@ -2559,6 +2559,12 @@ void TransactionParticipant::Participant::shutdown(OperationContext* opCtx) {
     stdx::lock_guard<Client> lock(*opCtx->getClient());
 
     p().inShutdown = true;
+    // The stashed RecoveryUnit may hold a dangling pointer to an OperationContext. Make sure we
+    // have a valid OperationContext set in the RecoveryUnit when it is destroyed as it is passed
+    // to registered rollback handlers.
+    if (o(lock).txnResourceStash) {
+        o(lock).txnResourceStash->recoveryUnit()->setOperationContext(opCtx);
+    }
     o(lock).txnResourceStash = boost::none;
 }
 

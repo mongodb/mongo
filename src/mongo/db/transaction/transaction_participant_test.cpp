@@ -1118,6 +1118,47 @@ TEST_F(TxnParticipantTest, StashedRollbackDoesntHoldClientLock) {
     future.get();
 }
 
+TEST_F(TxnParticipantTest, ShutdownCallsRollbackHandlerWithShutdownOpCtx) {
+    // Start a transaction and register a rollback handler from a temporary opCtx.
+    OperationContext* rollbackCalledWithOpCtx = nullptr;
+
+    runFunctionFromDifferentOpCtx([&](OperationContext* newOpCtx) {
+        newOpCtx->setLogicalSessionId(_sessionId);
+        newOpCtx->setTxnNumber(_txnNumber);
+        newOpCtx->setInMultiDocumentTransaction();
+
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx);
+        auto sessionCheckout = mongoDSessionCatalog->checkOutSession(newOpCtx);
+        auto txnParticipant = TransactionParticipant::get(newOpCtx);
+        txnParticipant.beginOrContinue(newOpCtx,
+                                       {*newOpCtx->getTxnNumber()},
+                                       false /* autocommit */,
+                                       TransactionParticipant::TransactionActions::kStart);
+        txnParticipant.unstashTransactionResources(newOpCtx, "insert");
+
+        // Acquire a lock so the locker is non-empty, required for stashing.
+        {
+            Lock::GlobalLock lk(newOpCtx, MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
+        }
+
+        // Register a rollback handler that records which opCtx it receives.
+        shard_role_details::getRecoveryUnit(newOpCtx)->onRollback(
+            [&](OperationContext* callbackOpCtx) { rollbackCalledWithOpCtx = callbackOpCtx; });
+
+        txnParticipant.stashTransactionResources(newOpCtx);
+        sessionCheckout->checkIn(newOpCtx, OperationContextSession::CheckInReason::kDone);
+    });
+
+    // Check out the same session from a live shutdown.
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
+    auto sessionCheckout = mongoDSessionCatalog->checkOutSession(opCtx());
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant.shutdown(opCtx());
+
+    // The rollback handler must have been called with the live shutdown opCtx.
+    ASSERT_EQ(rollbackCalledWithOpCtx, opCtx());
+}
+
 TEST_F(TxnParticipantTest, ThrowDuringOnTransactionPrepareAbortsTransaction) {
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
