@@ -17,6 +17,11 @@
  *      - 'skipMultiversion': If you set this field to true, the test case will skip running in
  *      multiversion suites. This is useful if you have a command that existed behind a feature flag
  *      in the previous version and is now enabled.
+ *
+ * Each 'run' (or 'explain') test case object can additionally specify:
+ *      - 'checkResponse': An optional function(res, context) called after a successful command to
+ *      validate the response content. 'context' is an object with 'afterDropRecreate' (boolean)
+ *      indicating which test scenario is running.
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
@@ -116,6 +121,10 @@ function validateCommandTestCase(testCase, validateSendsDbVersion) {
         testCase.cleanUp ? typeof testCase.cleanUp === "function" : true,
         "cleanUp must be a function: " + tojson(testCase),
     );
+    assert(
+        testCase.checkResponse ? typeof testCase.checkResponse === "function" : true,
+        "checkResponse must be a function: " + tojson(testCase),
+    );
 }
 
 function testCommandAfterMovePrimary(testCase, connection, st, dbName, collName) {
@@ -192,6 +201,9 @@ function testCommandAfterMovePrimary(testCase, connection, st, dbName, collName)
         assert.commandFailedWithCode(res, testCase.expectedFailureCode);
     } else {
         assert.commandWorked(res);
+        if (testCase.checkResponse) {
+            testCase.checkResponse(res, {afterDropRecreate: false});
+        }
     }
 
     // If this command does not go through the router then there is no need to check if they are
@@ -297,6 +309,9 @@ function testCommandAfterDropRecreateDatabase(testCase, connection, st) {
         assert.commandFailedWithCode(res, testCase.expectedFailureCode);
     } else {
         assert.commandWorked(res);
+        if (testCase.checkResponse) {
+            testCase.checkResponse(res, {afterDropRecreate: true});
+        }
     }
 
     // If this command does not go through the router then there is no need to check if they are
@@ -366,6 +381,9 @@ const allTestCases = {
                         pipeline: [{$match: {x: 1}}],
                         cursor: {batchSize: 10},
                     };
+                },
+                checkResponse: function (res) {
+                    assert.eq(res.cursor.firstBatch.length, 0, "aggregate should return empty results");
                 },
             },
             explain: {
@@ -481,6 +499,9 @@ const allTestCases = {
                 command: function (dbName, collName) {
                     return {count: collName, query: {x: 1}};
                 },
+                checkResponse: function (res) {
+                    assert.eq(res.n, 0, "count should return 0");
+                },
             },
             explain: {
                 sendsDbVersion: true,
@@ -552,6 +573,9 @@ const allTestCases = {
                 command: function (dbName, collName) {
                     return {distinct: collName, key: "x"};
                 },
+                checkResponse: function (res) {
+                    assert.eq(res.values.length, 0, "distinct should return empty values");
+                },
             },
             explain: {
                 sendsDbVersion: true,
@@ -596,6 +620,9 @@ const allTestCases = {
                 sendsDbVersion: true,
                 command: function (dbName, collName) {
                     return {find: collName, filter: {x: 1}};
+                },
+                checkResponse: function (res) {
+                    assert.eq(res.cursor.firstBatch.length, 0, "find should return empty results");
                 },
             },
             explain: {
@@ -686,6 +713,21 @@ const allTestCases = {
                 command: function (dbName, collName) {
                     return {listCollections: 1};
                 },
+                checkResponse: function (res, context) {
+                    if (context.afterDropRecreate) {
+                        assert.eq(
+                            res.cursor.firstBatch.length,
+                            0,
+                            "listCollections should return 0 collections after drop/recreate",
+                        );
+                    } else {
+                        assert.gte(
+                            res.cursor.firstBatch.length,
+                            1,
+                            "listCollections should return at least 1 collection after movePrimary",
+                        );
+                    }
+                },
             },
         },
         listCommands: {skip: "executes locally on mongos (not sent to any remote node)"},
@@ -696,6 +738,9 @@ const allTestCases = {
                 explicitlyCreateCollection: true,
                 command: function (dbName, collName) {
                     return {listIndexes: collName};
+                },
+                checkResponse: function (res) {
+                    assert.gte(res.cursor.firstBatch.length, 1, "listIndexes should return at least the _id index");
                 },
             },
         },
