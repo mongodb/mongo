@@ -9,6 +9,8 @@ selector:
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_catalog_test.js
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_combine_files_conflict.js
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_delete_conflict_test.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_rewrite_files.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_rewrite_files_conflict.js
 
 executor:
   fixture:
