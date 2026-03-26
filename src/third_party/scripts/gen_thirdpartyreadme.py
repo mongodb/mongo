@@ -2,6 +2,7 @@ import bisect
 import json
 import logging
 import os
+import re
 import sys
 import warnings
 
@@ -26,9 +27,14 @@ def main():
 
     component_links_string = sbom_to_component_links_string(sbom)
 
+    wiredtiger_chart = folders_to_wiredtiger_chart()
+    right_pad_chart_values(wiredtiger_chart)
+    wiredtiger_chart_string = chart_to_string(wiredtiger_chart)
+
     template_data = {
         "component_chart": component_chart_string,
         "component_links": component_links_string,
+        "wiredtiger_chart": wiredtiger_chart_string,
     }
     create_markdown_with_template(template_data)
 
@@ -56,6 +62,8 @@ def sbom_to_component_chart(sbom: dict) -> list[list[str]]:
     component_chart = []
 
     for component in components:
+        if is_first_party(component):
+            continue
         check_component_validity(component)
         name = component["name"]
         license_string = []
@@ -109,11 +117,41 @@ def sbom_to_component_links_string(sbom: dict) -> list[list[str]]:
     link_list = []
 
     for component in components:
+        if is_first_party(component):
+            continue
         check_component_validity(component)
         info_link = get_component_info_link(component)
         bisect.insort(link_list, f"[{component['name'].replace('|', '')}]: {info_link}")
 
     return "\n".join(link_list)
+
+
+WIREDTIGER_3RDPARTY_PATH = "src/third_party/wiredtiger/test/3rdparty"
+_WIREDTIGER_FOLDER_RE = re.compile(r"(.*-\d+\.\d+(\.\d+)?).*")
+
+
+def folders_to_wiredtiger_chart() -> list[list[str]]:
+    wiredtiger_chart = [["Name"]]
+
+    try:
+        folder_names = os.listdir(WIREDTIGER_3RDPARTY_PATH)
+    except FileNotFoundError:
+        logging.warning("Warning: %s does not exist. Skipping wiredtiger chart.", WIREDTIGER_3RDPARTY_PATH)
+        return wiredtiger_chart
+
+    for folder in folder_names:
+        m = _WIREDTIGER_FOLDER_RE.fullmatch(folder)
+        if m:
+            name, version = m.group(1).rsplit("-", 1)
+            bisect.insort(wiredtiger_chart, [f"pkg:pypi/{name}@{version}"])
+
+    return wiredtiger_chart
+
+def is_first_party(component: dict) -> bool:
+    for prop in component.get("properties", []):
+        if prop.get("name") == "mdb_first_party" and prop.get("value") == "true":
+            return True
+    return False
 
 
 def check_component_validity(component) -> None:

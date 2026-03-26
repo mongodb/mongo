@@ -2416,6 +2416,10 @@
         {
           "name": "import_script_path",
           "value": "src/third_party/libmongocrypt/import.sh"
+        },
+        {
+          "name": "mdb_first_party",
+          "value": "true"
         }
       ]
     },
@@ -2465,6 +2469,10 @@
         {
           "name": "import_script_path",
           "value": "src/third_party/libbson/import.sh"
+        },
+        {
+          "name": "mdb_first_party",
+          "value": "true"
         }
       ]
     },
@@ -2510,6 +2518,10 @@
         {
           "name": "emits_persisted_data",
           "value": "false"
+        },
+        {
+          "name": "mdb_first_party",
+          "value": "true"
         }
       ]
     },
@@ -3216,6 +3228,10 @@
       "properties": [
         {
           "name": "emits_persisted_data",
+          "value": "true"
+        },
+        {
+          "name": "mdb_first_party",
           "value": "true"
         }
       ]
