@@ -8,12 +8,17 @@
 #   bazel run \
 #       //bazel/remote_execution_container:repin_dockerfiles \
 #       --config=local
+#
+# To update the docker images, follow the instructions in the
+# confluence page: go/devprod-build-update-rbe-containers.
 
 FROM ubuntu:18.04@sha256:152dc042452c496007f07ca9127571cb9c29697f42acbfad72324b2bb2e43c98
 
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         build-essential=12.4ubuntu1 \
+        hostname=3.20 \
+        iproute2=4.15.0-2ubuntu1.3 \
         libcurl4-openssl-dev=7.58.0-2ubuntu3.24 \
         libgssapi-krb5-2=1.16-2ubuntu0.4 \
         libkrb5-dev=1.16-2ubuntu0.4 \
@@ -21,7 +26,9 @@ RUN apt-get update && \
         libsasl2-dev=2.1.27~101-g0780600+dfsg-3ubuntu2.4 \
         libssl-dev=1.1.1-1ubuntu2.1~18.04.23 \
         libxml2-dev=2.9.4+dfsg1-6.1ubuntu1.9 \
+        openssl=1.1.1-1ubuntu2.1~18.04.23 \
         systemtap-sdt-dev=3.1-3ubuntu0.1 \
+        zip=3.0-11build1 \
     && rm -rf /var/lib/apt/lists/*
 
 CMD ["/bin/bash"]

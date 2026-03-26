@@ -12,20 +12,24 @@
 # To update the docker images, follow the instructions in the
 # confluence page: go/devprod-build-update-rbe-containers.
 
-FROM amazonlinux:2023@sha256:4f02d5d4500105878af64950f9c46cde3392b907907cb0d23a885c721a26f67d
+FROM amazonlinux:2023@sha256:162fc5b69e11e81023f83a1ab618b184927ff3002d0852432af3b6ae4a1b5304
 
 RUN yum check-update || true && \
     yum install -y \
         cyrus-sasl-devel-2.1.27-18.amzn2023.0.3 \
         cyrus-sasl-gssapi-2.1.27-18.amzn2023.0.3 \
-        glibc-devel-2.34-196.amzn2023.0.1 \
+        glibc-devel-2.34-231.amzn2023.0.3 \
+        hostname-3.23-4.amzn2023.0.3 \
+        iproute-6.10.0-319.amzn2023.0.1 \
         krb5-devel-1.21.3-6.amzn2023.0.1 \
-        libcurl-devel-8.11.1-4.amzn2023.0.1 \
+        libcurl-devel-8.17.0-1.amzn2023.0.1 \
         libzstd-1.5.5-1.amzn2023.0.1 \
         openldap-devel-2.4.57-6.amzn2023.0.7 \
-        openssl-devel-3.2.2-1.amzn2023.0.1 \
+        openssl-3.2.2-1.amzn2023.0.5 \
+        openssl-devel-3.2.2-1.amzn2023.0.5 \
         procps-ng-3.3.17-1.amzn2023.0.2 \
-        systemtap-sdt-devel-5.2-1.amzn2023.0.5 \
+        systemtap-sdt-devel-5.4-1.amzn2023.0.1 \
+        zip-3.0-28.amzn2023.0.2 \
     && yum clean all && rm -rf /var/cache/yum/*
 
 CMD ["/bin/bash"]

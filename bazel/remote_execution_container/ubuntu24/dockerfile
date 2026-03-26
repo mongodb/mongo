@@ -12,20 +12,24 @@
 # To update the docker images, follow the instructions in the
 # confluence page: go/devprod-build-update-rbe-containers.
 
-FROM ubuntu:24.04@sha256:9cbed754112939e914291337b5e554b07ad7c392491dba6daf25eef1332a22e8
+FROM ubuntu:24.04@sha256:186072bba1b2f436cbb91ef2567abca677337cfc786c86e107d25b7072feef0c
 
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         build-essential=12.10ubuntu1 \
-        libcurl4-openssl-dev=8.5.0-2ubuntu10.6 \
+        hostname=3.23+nmu2ubuntu2 \
+        iproute2=6.1.0-1ubuntu6.2 \
+        libcurl4-openssl-dev=8.5.0-2ubuntu10.8 \
         libgssapi-krb5-2=1.20.1-6ubuntu2.6 \
         libkrb5-dev=1.20.1-6ubuntu2.6 \
-        libldap2-dev=2.6.7+dfsg-1~exp1ubuntu8.2 \
+        libldap2-dev=2.6.10+dfsg-0ubuntu0.24.04.1 \
         libncurses-dev=6.4+20240113-1ubuntu2 \
         libsasl2-dev=2.1.28+dfsg1-5ubuntu3.1 \
-        libssl-dev=3.0.13-0ubuntu3.5 \
-        libxml2-dev=2.9.14+dfsg-1.3ubuntu3.5 \
+        libssl-dev=3.0.13-0ubuntu3.7 \
+        libxml2-dev=2.9.14+dfsg-1.3ubuntu3.7 \
+        openssl=3.0.13-0ubuntu3.7 \
         systemtap-sdt-dev=5.0-2ubuntu1 \
+        zip=3.0-13ubuntu0.2 \
     && rm -rf /var/lib/apt/lists/*
 
 CMD ["/bin/bash"]

@@ -8,20 +8,27 @@
 #   bazel run \
 #       //bazel/remote_execution_container:repin_dockerfiles \
 #       --config=local
+#
+# To update the docker images, follow the instructions in the
+# confluence page: go/devprod-build-update-rbe-containers.
 
-FROM ubuntu:22.04@sha256:340d9b015b194dc6e2a13938944e0d016e57b9679963fdeb9ce021daac430221
+FROM ubuntu:22.04@sha256:ce4a593b4e323dcc3dd728e397e0a866a1bf516a1b7c31d6aa06991baec4f2e0
 
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         build-essential=12.9ubuntu3 \
-        libcurl4-openssl-dev=7.81.0-1ubuntu1.17 \
-        libgssapi-krb5-2=1.19.2-2ubuntu0.4 \
-        libkrb5-dev=1.19.2-2ubuntu0.4 \
-        libldap2-dev=2.5.18+dfsg-0ubuntu0.22.04.2 \
+        hostname=3.23ubuntu2 \
+        iproute2=5.15.0-1ubuntu2 \
+        libcurl4-openssl-dev=7.81.0-1ubuntu1.23 \
+        libgssapi-krb5-2=1.19.2-2ubuntu0.7 \
+        libkrb5-dev=1.19.2-2ubuntu0.7 \
+        libldap2-dev=2.5.20+dfsg-0ubuntu0.22.04.1 \
         libsasl2-dev=2.1.27+dfsg2-3ubuntu1.2 \
-        libssl-dev=3.0.2-0ubuntu1.17 \
-        libxml2-dev=2.9.13+dfsg-1ubuntu0.4 \
+        libssl-dev=3.0.2-0ubuntu1.21 \
+        libxml2-dev=2.9.13+dfsg-1ubuntu0.11 \
+        openssl=3.0.2-0ubuntu1.21 \
         systemtap-sdt-dev=4.6-2 \
+        zip=3.0-12build2 \
     && rm -rf /var/lib/apt/lists/*
 
 CMD ["/bin/bash"]

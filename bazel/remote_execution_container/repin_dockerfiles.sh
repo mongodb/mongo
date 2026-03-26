@@ -33,10 +33,13 @@ openldap-devel
 openssl-devel
 procps-ng
 systemtap-sdt-devel
+zip
 "
 
 COMMON_PACKAGES["debian"]="
 build-essential
+hostname
+iproute2
 libcurl4-openssl-dev
 libgssapi-krb5-2
 libldap2-dev
@@ -44,6 +47,8 @@ libsasl2-dev
 libssl-dev
 libxml2-dev
 libkrb5-dev
+openssl
+zip
 "
 
 COMMON_PACKAGES["suse"]="
@@ -54,6 +59,7 @@ krb5-devel
 libcurl-devel
 libopenssl-devel
 openldap2-devel
+zip
 "
 
 # Distribution-specific additional packages. If you have a package that
@@ -65,7 +71,10 @@ libzstd
 "
 
 ADDITIONAL_PACKAGES["amazonlinux:2023"]="
+hostname
+iproute
 libzstd
+openssl
 "
 
 ADDITIONAL_PACKAGES["redhat/ubi8:8.9"]="

@@ -8,6 +8,9 @@
 #   bazel run \
 #       //bazel/remote_execution_container:repin_dockerfiles \
 #       --config=local
+#
+# To update the docker images, follow the instructions in the
+# confluence page: go/devprod-build-update-rbe-containers.
 
 FROM opensuse/leap:15.2@sha256:dfa464ed7bc25fb77ad652d4e722cb0e78fc230425846be10e51dda1f43aa5c9
 
@@ -21,6 +24,7 @@ RUN zypper refresh && \
         libfl2 \
         libopenssl-devel \
         openldap2-devel \
+        zip \
     && zypper clean --all
 
 CMD ["/bin/bash"]
