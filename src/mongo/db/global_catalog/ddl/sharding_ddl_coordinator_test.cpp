@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/global_catalog/ddl/sharding_coordinator.h"
+#include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
 
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_external_state_for_test.h"
 #include "mongo/db/shard_role/lock_manager/locker.h"
@@ -38,44 +38,36 @@
 
 namespace mongo {
 
-class CoordinatorStateDocTest : public CoordinatorStateDoc {
+class CoordinatorStateDocTest {
 public:
     explicit CoordinatorStateDocTest(ShardingCoordinatorMetadata metadata)
         : _metadata(std::move(metadata)) {}
 
-    const ShardingCoordinatorMetadata& getShardingCoordinatorMetadata() const override {
+    const ShardingCoordinatorMetadata& getShardingCoordinatorMetadata() const {
         return _metadata;
     }
 
-    void setShardingCoordinatorMetadata(ShardingCoordinatorMetadata newMetadata) override {
+    void setShardingCoordinatorMetadata(ShardingCoordinatorMetadata newMetadata) {
         _metadata = std::move(newMetadata);
     }
 
-    void replace(std::unique_ptr<CoordinatorStateDoc> newDoc) override {
-        _metadata = newDoc->getShardingCoordinatorMetadata();
-    }
-
-    void setGenericPhase(CoordinatorGenericPhase p) override {}
-
-    CoordinatorGenericPhase getGenericPhase() const override {
-        return CoordinatorGenericPhase{};
-    }
-
-    BSONObj toBSON() const override {
+    BSONObj toBSON() const {
         return _metadata.toBSON();
     }
 
-    std::unique_ptr<CoordinatorStateDoc> clone() const override {
-        return std::make_unique<CoordinatorStateDocTest>(_metadata);
+    static inline CoordinatorStateDocTest parseOwned(BSONObj&& bsonObject,
+                                                     const IDLParserContext& ctxt) {
+        return CoordinatorStateDocTest{
+            ShardingCoordinatorMetadata::parseOwned(std::move(bsonObject))};
     }
 
 private:
     ShardingCoordinatorMetadata _metadata;
 };
 
-class ShardingCoordinatorTest : public ShardServerTestFixture {
+class ShardingDDLCoordinatorTest : public ShardServerTestFixture {
 public:
-    ShardingCoordinatorTest() : ShardServerTestFixture(makeOptions()) {}
+    ShardingDDLCoordinatorTest() : ShardServerTestFixture(makeOptions()) {}
 
     void setUp() override {
         ShardServerTestFixture::setUp();
@@ -84,7 +76,8 @@ public:
         _network = network.get();
         executor::ThreadPoolMock::Options thread_pool_options;
         thread_pool_options.onCreateThread = [] {
-            Client::initThread("ShardingCoordinatorTest", getGlobalServiceContext()->getService());
+            Client::initThread("ShardingDDLCoordinatorTest",
+                               getGlobalServiceContext()->getService());
         };
 
         _executor = makeThreadPoolTestExecutor(std::move(network), thread_pool_options);
@@ -112,13 +105,14 @@ protected:
     std::shared_ptr<executor::ScopedTaskExecutor> _scopedExecutor;
     std::unique_ptr<ShardingCoordinatorService> _service;
 
-    class TestShardingCoordinator : public ShardingCoordinator {
+    class TestShardingDDLCoordinator
+        : public NonRecoverableShardingDDLCoordinator<CoordinatorStateDocTest> {
     public:
-        TestShardingCoordinator(ShardingCoordinatorService* service,
-                                ShardingCoordinatorMetadata coordinatorMetadata,
-                                std::set<NamespaceString> additionalNss)
-            : ShardingCoordinator(service, "TestShardingCoordinator", coordinatorMetadata.toBSON()),
-              _doc(std::move(coordinatorMetadata)),
+        TestShardingDDLCoordinator(ShardingCoordinatorService* service,
+                                   ShardingCoordinatorMetadata coordinatorMetadata,
+                                   std::set<NamespaceString> additionalNss)
+            : NonRecoverableShardingDDLCoordinator<CoordinatorStateDocTest>(
+                  service, "TestShardingDDLCoordinator", coordinatorMetadata.toBSON()),
               _additionalNss(additionalNss) {}
 
         ShardingCoordinatorMetadata const& metadata() const override {
@@ -144,24 +138,15 @@ protected:
             return ExecutorFuture<void>(**executor);
         }
 
-        const CoordinatorStateDoc& getDoc() const override {
-            return _doc;
-        }
-
-        CoordinatorStateDoc& getDoc() override {
-            return _doc;
-        }
-
-        using ShardingCoordinator::_acquireAllLocksAsync;
-        using ShardingCoordinator::_locker;
-
         void fulfillPromises() {
             _constructionCompletionPromise.emplaceValue();
             _completionPromise.emplaceValue();
         }
 
+        using ShardingCoordinator::_acquireLocksAsync;
+        using NonRecoverableShardingDDLCoordinator<CoordinatorStateDocTest>::_locker;
+
     protected:
-        CoordinatorStateDocTest _doc;
         std::set<NamespaceString> _additionalNss;
     };
 
@@ -183,7 +168,7 @@ protected:
     }
 };
 
-TEST_F(ShardingCoordinatorTest, AcquiresDDLLocks) {
+TEST_F(ShardingDDLCoordinatorTest, AcquiresDDLLocks) {
     auto testDDLLocksAcquired = [&](NamespaceString mainNss,
                                     std::set<NamespaceString> additionalNss,
                                     std::set<DatabaseName> expectedDbLocks,
@@ -193,7 +178,7 @@ TEST_F(ShardingCoordinatorTest, AcquiresDDLLocks) {
             ShardingCoordinatorId(mainNss, CoordinatorTypeEnum::kDropCollection));
         coordinatorMetadata.setForwardableOpMetadata(ForwardableOperationMetadata{});
 
-        auto coordinator = std::make_shared<TestShardingCoordinator>(
+        auto coordinator = std::make_shared<TestShardingDDLCoordinator>(
             _service.get(), coordinatorMetadata, std::set<NamespaceString>({additionalNss}));
         coordinator->fulfillPromises();
         CancellationSource cancellationSource;
@@ -207,7 +192,7 @@ TEST_F(ShardingCoordinatorTest, AcquiresDDLLocks) {
                    cancellationToken = cancellationSource.token()] {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
-                return coordinator->_acquireAllLocksAsync(opCtx, scopedExecutor, cancellationToken);
+                return coordinator->_acquireLocksAsync(opCtx, scopedExecutor, cancellationToken);
             })
             .get();
 

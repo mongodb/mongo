@@ -78,50 +78,6 @@ namespace mongo {
 MONGO_FAIL_POINT_DEFINE(hangBeforeRunningCoordinatorInstance);
 MONGO_FAIL_POINT_DEFINE(hangBeforeRemovingCoordinatorDocument);
 
-namespace {
-
-const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
-
-}  // namespace
-
-template <typename T>
-ExecutorFuture<void> ShardingCoordinator::_acquireLockAsync(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    const CancellationToken& token,
-    const T& resource,
-    LockMode lockMode) {
-    return AsyncTry([this, resource, lockMode] {
-               auto opCtxHolder = makeOperationContext();
-               auto* opCtx = opCtxHolder.get();
-
-               const auto coorName = idl::serialize(_coordId.getOperationType());
-
-               _scopedLocks.emplace(DDLLockManager::ScopedBaseDDLLock{opCtx,
-                                                                      _locker.get(),
-                                                                      resource,
-                                                                      coorName,
-                                                                      lockMode,
-                                                                      false /* waitForRecovery */});
-           })
-        .until([this, resource, lockMode](Status status) {
-            if (!status.isOK()) {
-                LOGV2_WARNING(
-                    6819300,
-                    "DDL lock acquisition attempt failed",
-                    logv2::DynamicAttributes{getCoordinatorLogAttrs(),
-                                             "resource"_attr = toStringForLogging(resource),
-                                             "mode"_attr = modeName(lockMode),
-                                             "error"_attr = redact(status)});
-            }
-            // Coordinators can't generally be rolled back so in case we recovered a coordinator
-            // from disk we need to ensure eventual completion of the operation, so we must retry
-            // until we manage to acquire the lock.
-            return (!_recoveredFromDisk) || status.isOK();
-        })
-        .withBackoffBetweenIterations(kExponentialBackoff)
-        .on(**executor, token);
-}
-
 ShardingCoordinatorMetadata extractShardingCoordinatorMetadata(const BSONObj& coorDoc) {
     return ShardingCoordinatorMetadata::parse(coorDoc,
                                               IDLParserContext("ShardingCoordinatorMetadata"));
@@ -253,70 +209,6 @@ ExecutorFuture<void> ShardingCoordinator::_translateTimeseriesNss(
         .on(**executor, token);
 }
 
-ExecutorFuture<void> ShardingCoordinator::_acquireAllLocksAsync(
-    OperationContext* opCtx,
-    std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    const CancellationToken& token) {
-    // Fetching all the locks that need to be acquired. Sort them by nss to avoid deadlocks.
-    // If the requested nss represents a timeseries buckets namespace, translate it to its view nss.
-    std::set<NamespaceString> locksToAcquire;
-    locksToAcquire.insert(originalNss().isTimeseriesBucketsCollection()
-                              ? originalNss().getTimeseriesViewNamespace()
-                              : originalNss());
-
-    for (const auto& additionalLock : _getAdditionalLocksToAcquire(opCtx)) {
-        locksToAcquire.insert(additionalLock.isTimeseriesBucketsCollection()
-                                  ? additionalLock.getTimeseriesViewNamespace()
-                                  : additionalLock);
-    }
-
-    // Acquiring all DDL locks in sorted order to avoid deadlocks
-    // Note that the sorted order is provided by default through the std::set container
-    auto futureChain = ExecutorFuture<void>(**executor);
-    boost::optional<DatabaseName> lastDb;
-    for (const auto& lockNss : locksToAcquire) {
-        const bool isDbOnly = lockNss.coll().empty();
-
-        // Acquiring the database DDL lock
-        const auto normalizedDbName = [&] {
-            if (_coordId.getOperationType() != CoordinatorTypeEnum::kCreateDatabase) {
-                // Already existing databases are not allowed to have their names differ just on
-                // case. Uses the requested database name directly.
-                return lockNss.dbName();
-            }
-            const auto dbNameStr =
-                DatabaseNameUtil::serialize(lockNss.dbName(), SerializationContext::stateDefault());
-            return DatabaseNameUtil::deserialize(
-                boost::none, str::toLower(dbNameStr), SerializationContext::stateDefault());
-        }();
-        if (lastDb != normalizedDbName) {
-            const auto lockMode = (isDbOnly ? MODE_X : MODE_IX);
-            futureChain = std::move(futureChain)
-                              .then([this,
-                                     executor,
-                                     token,
-                                     normalizedDbName,
-                                     lockMode,
-                                     anchor = shared_from_this()] {
-                                  return _acquireLockAsync<DatabaseName>(
-                                      executor, token, normalizedDbName, lockMode);
-                              });
-            lastDb = normalizedDbName;
-        }
-
-        // Acquiring the collection DDL lock
-        if (!isDbOnly) {
-            futureChain =
-                std::move(futureChain)
-                    .then([this, executor, token, nss = lockNss, anchor = shared_from_this()] {
-                        return _acquireLockAsync<NamespaceString>(executor, token, nss, MODE_X);
-                    });
-        }
-    }
-    return futureChain;
-}
-
-
 ExecutorFuture<void> ShardingCoordinator::_cleanupOnAbort(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token,
@@ -356,27 +248,12 @@ SemiFuture<void> ShardingCoordinator::run(std::shared_ptr<executor::ScopedTaskEx
         .then([this, executor, token, anchor = shared_from_this()] {
             auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
-
-            tassert(10644521, "Expected _locker to be unset", !_locker);
-            _locker = std::make_unique<Locker>(opCtx->getServiceContext());
-            _locker->unsetThreadId();
-            _locker->setDebugInfo(str::stream() << _coordId.toBSON());
-
-            // Check if this coordinator is allowed to start according to the user-writes blocking
-            // critical section. If it is not the first execution, it means it had started already
-            // and we are recovering this coordinator. In this case, let it be completed even though
-            // new DDL operations may be prohibited now.
-            // Coordinators that do not affect user data are allowed to start even when user writes
-            // are blocked.
-            if (_firstExecution && !canAlwaysStartWhenUserWritesAreDisabled()) {
-                _getExternalState()->checkShardedDDLAllowedToStart(opCtx, originalNss());
-            }
+            _initialize(opCtx);
         })
         .then([this, executor, token, anchor = shared_from_this()] {
             auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
-
-            return _acquireAllLocksAsync(opCtx, executor, token);
+            return _acquireLocksAsync(opCtx, executor, token);
         })
         .then([this, executor, token, anchor = shared_from_this()] {
             if (!originalNss().isConfigDB() && !originalNss().isAdminDB() && !_recoveredFromDisk &&
@@ -572,10 +449,7 @@ SemiFuture<void> ShardingCoordinator::run(std::shared_ptr<executor::ScopedTaskEx
                 }
             }
 
-            // Release all DDL locks
-            while (!_scopedLocks.empty()) {
-                _scopedLocks.pop();
-            }
+            _releaseLocks(opCtx);
 
             stdx::lock_guard<stdx::mutex> lg(_mutex);
             if (!_completionPromise.getFuture().isReady()) {
