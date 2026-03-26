@@ -1,0 +1,57 @@
+load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
+
+resmoke_suite_test(
+    name = "backup_restore",
+    srcs = [
+        "//src/mongo/db/modules/enterprise/jstests/hot_backups:all_subpackage_javascript_files",
+    ],
+    config = "//buildscripts/resmokeconfig:suites/backup_restore.yml",
+    data = [
+        "//buildscripts/resmokeconfig:suites/concurrency_replication_for_backup_restore.yml",
+        "//jstests/concurrency/fsm_workloads:all_subpackage_javascript_files",
+        "//jstests/disk/libs:all_javascript_files",
+        "//jstests/sharding/libs:all_javascript_files",
+        "//jstests/ssl/libs:all_javascript_files",
+        "//src/mongo/db/modules/enterprise/jstests/encryptdb/libs:all_javascript_files",
+        "//src/mongo/db/modules/enterprise/jstests/encryptdb/libs:ekf",
+        "//src/mongo/db/modules/enterprise/jstests/encryptdb/libs:ekf2",
+        "//src/mongo/db/modules/enterprise/jstests/external_auth/lib:all_files",
+        "//src/mongo/db/modules/enterprise/jstests/external_auth/lib:ldapmockserver",
+        "//src/mongo/db/modules/enterprise/jstests/live_restore/libs:all_javascript_files",
+        "//x509:generate_main_certificates",
+    ],
+    tags = [
+        "ci-release-critical",
+        "ci-requires-execution-on-windows-patch-build",
+        "misc_js",
+        "resources:cpu:2",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+        "//src/mongo/tools/mongobridge_tool:mongobridge",
+    ],
+)
+
+resmoke_suite_test(
+    name = "queryable_wt",
+    srcs = [
+        "//src/mongo/db/modules/enterprise/jstests/queryable_wt:all_javascript_files",
+    ],
+    config = "//buildscripts/resmokeconfig:suites/queryable_wt.yml",
+    data = [
+        "//src/mongo/db/modules/enterprise/jstests/hot_backups/libs:all_javascript_files",
+    ],
+    tags = ["ci-release-critical"],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)

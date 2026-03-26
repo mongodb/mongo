@@ -4,8 +4,7 @@ description: |
   Hence, they require their own suite.
 
 selector:
-  roots:
-    - src/mongo/db/modules/*/jstests/hot_backups/**/*.js
+  from_target: //jstests/suites/backup-restore:backup_restore
 
 # backupRestore tests start their own mongod's.
 executor:

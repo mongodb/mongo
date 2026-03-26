@@ -991,6 +991,7 @@ tasks:
         "requires_execution_on_windows_patch_build",
         "requires_large_host",
         "requires_replicated_fast_count_recovery",
+        "has_bazel_target",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1006,6 +1007,7 @@ tasks:
         "assigned_to_jira_team_server_integration",
         "release_critical",
         "requires_large_host",
+        "has_bazel_target",
       ]
     commands:
       - func: "do setup"

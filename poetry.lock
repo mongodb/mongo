@@ -1615,20 +1615,19 @@ type = ["pytest-mypy"]
 
 [[package]]
 name = "incremental"
-version = "22.10.0"
-description = "\"A small library that versions your Python projects.\""
+version = "24.11.0"
+description = "A CalVer version manager that supports the future."
 optional = false
-python-versions = "*"
+python-versions = ">=3.8"
 groups = ["external-auth"]
 markers = "platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\""
 files = [
-    {file = "incremental-22.10.0-py2.py3-none-any.whl", hash = "sha256:b864a1f30885ee72c5ac2835a761b8fe8aa9c28b9395cacf27286602688d3e51"},
-    {file = "incremental-22.10.0.tar.gz", hash = "sha256:912feeb5e0f7e0188e6f42241d2f450002e11bbc0937c65865045854c24c0bd0"},
+    {file = "incremental-24.11.0-py3-none-any.whl", hash = "sha256:a34450716b1c4341fe6676a0598e88a39e04189f4dce5dc96f656e040baa10b3"},
+    {file = "incremental-24.11.0.tar.gz", hash = "sha256:87d3480dbb083c1d736222511a8cf380012a8176c2456d01ef483242abbbcf8c"},
 ]
 
-[package.extras]
-mypy = ["click (>=6.0)", "mypy (==0.812)", "twisted (>=16.4.0)"]
-scripts = ["click (>=6.0)", "twisted (>=16.4.0)"]
+[package.dependencies]
+packaging = ">=17.0"
 
 [[package]]
 name = "inject"
@@ -2778,7 +2777,7 @@ version = "25.0"
 description = "Core utilities for Python packages"
 optional = false
 python-versions = ">=3.8"
-groups = ["compile", "export", "idl", "jira-client", "powercycle-incompatible", "testing"]
+groups = ["compile", "export", "external-auth", "idl", "jira-client", "powercycle-incompatible", "testing"]
 markers = "platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\""
 files = [
     {file = "packaging-25.0-py3-none-any.whl", hash = "sha256:29572ef2b1f17581046b3a2227d5c611fb25ec70ca1ba8554b24b0e69331a484"},
@@ -5204,41 +5203,40 @@ files = [
 
 [[package]]
 name = "twisted"
-version = "24.3.0"
+version = "24.11.0"
 description = "An asynchronous networking framework written in Python"
 optional = false
 python-versions = ">=3.8.0"
 groups = ["external-auth"]
 markers = "platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\""
 files = [
-    {file = "twisted-24.3.0-py3-none-any.whl", hash = "sha256:039f2e6a49ab5108abd94de187fa92377abe5985c7a72d68d0ad266ba19eae63"},
-    {file = "twisted-24.3.0.tar.gz", hash = "sha256:6b38b6ece7296b5e122c9eb17da2eeab3d98a198f50ca9efd00fb03e5b4fd4ae"},
+    {file = "twisted-24.11.0-py3-none-any.whl", hash = "sha256:fe403076c71f04d5d2d789a755b687c5637ec3bcd3b2b8252d76f2ba65f54261"},
+    {file = "twisted-24.11.0.tar.gz", hash = "sha256:695d0556d5ec579dcc464d2856b634880ed1319f45b10d19043f2b57eb0115b5"},
 ]
 
 [package.dependencies]
-attrs = ">=21.3.0"
-automat = ">=0.8.0"
+attrs = ">=22.2.0"
+automat = ">=24.8.0"
 constantly = ">=15.1"
 hyperlink = ">=17.1.1"
-incremental = ">=22.10.0"
-twisted-iocpsupport = {version = ">=1.0.2,<2", markers = "platform_system == \"Windows\""}
+incremental = ">=24.7.0"
 typing-extensions = ">=4.2.0"
 zope-interface = ">=5"
 
 [package.extras]
-all-non-platform = ["twisted[conch,http2,serial,test,tls]", "twisted[conch,http2,serial,test,tls]"]
+all-non-platform = ["appdirs (>=1.4.0)", "appdirs (>=1.4.0)", "bcrypt (>=3.1.3)", "bcrypt (>=3.1.3)", "cryptography (>=3.3)", "cryptography (>=3.3)", "cython-test-exception-raiser (>=1.0.2,<2)", "cython-test-exception-raiser (>=1.0.2,<2)", "h2 (>=3.2,<5.0)", "h2 (>=3.2,<5.0)", "httpx[http2] (>=0.27)", "httpx[http2] (>=0.27)", "hypothesis (>=6.56)", "hypothesis (>=6.56)", "idna (>=2.4)", "idna (>=2.4)", "priority (>=1.1.0,<2.0)", "priority (>=1.1.0,<2.0)", "pyhamcrest (>=2)", "pyhamcrest (>=2)", "pyopenssl (>=21.0.0)", "pyopenssl (>=21.0.0)", "pyserial (>=3.0)", "pyserial (>=3.0)", "pywin32 (!=226)", "pywin32 (!=226)", "service-identity (>=18.1.0)", "service-identity (>=18.1.0)"]
 conch = ["appdirs (>=1.4.0)", "bcrypt (>=3.1.3)", "cryptography (>=3.3)"]
-dev = ["coverage (>=6b1,<7)", "pyflakes (>=2.2,<3.0)", "python-subunit (>=1.4,<2.0)", "twisted[dev-release]", "twistedchecker (>=0.7,<1.0)"]
+dev = ["coverage (>=7.5,<8.0)", "cython-test-exception-raiser (>=1.0.2,<2)", "httpx[http2] (>=0.27)", "hypothesis (>=6.56)", "pydoctor (>=23.9.0,<23.10.0)", "pyflakes (>=2.2,<3.0)", "pyhamcrest (>=2)", "python-subunit (>=1.4,<2.0)", "sphinx (>=6,<7)", "sphinx-rtd-theme (>=1.3,<2.0)", "towncrier (>=23.6,<24.0)", "twistedchecker (>=0.7,<1.0)"]
 dev-release = ["pydoctor (>=23.9.0,<23.10.0)", "pydoctor (>=23.9.0,<23.10.0)", "sphinx (>=6,<7)", "sphinx (>=6,<7)", "sphinx-rtd-theme (>=1.3,<2.0)", "sphinx-rtd-theme (>=1.3,<2.0)", "towncrier (>=23.6,<24.0)", "towncrier (>=23.6,<24.0)"]
-gtk-platform = ["pygobject", "pygobject", "twisted[all-non-platform]", "twisted[all-non-platform]"]
-http2 = ["h2 (>=3.0,<5.0)", "priority (>=1.1.0,<2.0)"]
-macos-platform = ["pyobjc-core", "pyobjc-core", "pyobjc-framework-cfnetwork", "pyobjc-framework-cfnetwork", "pyobjc-framework-cocoa", "pyobjc-framework-cocoa", "twisted[all-non-platform]", "twisted[all-non-platform]"]
-mypy = ["mypy (>=1.8,<2.0)", "mypy-zope (>=1.0.3,<1.1.0)", "twisted[all-non-platform,dev]", "types-pyopenssl", "types-setuptools"]
-osx-platform = ["twisted[macos-platform]", "twisted[macos-platform]"]
+gtk-platform = ["appdirs (>=1.4.0)", "appdirs (>=1.4.0)", "bcrypt (>=3.1.3)", "bcrypt (>=3.1.3)", "cryptography (>=3.3)", "cryptography (>=3.3)", "cython-test-exception-raiser (>=1.0.2,<2)", "cython-test-exception-raiser (>=1.0.2,<2)", "h2 (>=3.2,<5.0)", "h2 (>=3.2,<5.0)", "httpx[http2] (>=0.27)", "httpx[http2] (>=0.27)", "hypothesis (>=6.56)", "hypothesis (>=6.56)", "idna (>=2.4)", "idna (>=2.4)", "priority (>=1.1.0,<2.0)", "priority (>=1.1.0,<2.0)", "pygobject", "pygobject", "pyhamcrest (>=2)", "pyhamcrest (>=2)", "pyopenssl (>=21.0.0)", "pyopenssl (>=21.0.0)", "pyserial (>=3.0)", "pyserial (>=3.0)", "pywin32 (!=226)", "pywin32 (!=226)", "service-identity (>=18.1.0)", "service-identity (>=18.1.0)"]
+http2 = ["h2 (>=3.2,<5.0)", "priority (>=1.1.0,<2.0)"]
+macos-platform = ["appdirs (>=1.4.0)", "appdirs (>=1.4.0)", "bcrypt (>=3.1.3)", "bcrypt (>=3.1.3)", "cryptography (>=3.3)", "cryptography (>=3.3)", "cython-test-exception-raiser (>=1.0.2,<2)", "cython-test-exception-raiser (>=1.0.2,<2)", "h2 (>=3.2,<5.0)", "h2 (>=3.2,<5.0)", "httpx[http2] (>=0.27)", "httpx[http2] (>=0.27)", "hypothesis (>=6.56)", "hypothesis (>=6.56)", "idna (>=2.4)", "idna (>=2.4)", "priority (>=1.1.0,<2.0)", "priority (>=1.1.0,<2.0)", "pyhamcrest (>=2)", "pyhamcrest (>=2)", "pyobjc-core", "pyobjc-core", "pyobjc-framework-cfnetwork", "pyobjc-framework-cfnetwork", "pyobjc-framework-cocoa", "pyobjc-framework-cocoa", "pyopenssl (>=21.0.0)", "pyopenssl (>=21.0.0)", "pyserial (>=3.0)", "pyserial (>=3.0)", "pywin32 (!=226)", "pywin32 (!=226)", "service-identity (>=18.1.0)", "service-identity (>=18.1.0)"]
+mypy = ["appdirs (>=1.4.0)", "bcrypt (>=3.1.3)", "coverage (>=7.5,<8.0)", "cryptography (>=3.3)", "cython-test-exception-raiser (>=1.0.2,<2)", "h2 (>=3.2,<5.0)", "httpx[http2] (>=0.27)", "hypothesis (>=6.56)", "idna (>=2.4)", "mypy (==1.10.1)", "mypy-zope (==1.0.6)", "priority (>=1.1.0,<2.0)", "pydoctor (>=23.9.0,<23.10.0)", "pyflakes (>=2.2,<3.0)", "pyhamcrest (>=2)", "pyopenssl (>=21.0.0)", "pyserial (>=3.0)", "python-subunit (>=1.4,<2.0)", "pywin32 (!=226)", "service-identity (>=18.1.0)", "sphinx (>=6,<7)", "sphinx-rtd-theme (>=1.3,<2.0)", "towncrier (>=23.6,<24.0)", "twistedchecker (>=0.7,<1.0)", "types-pyopenssl", "types-setuptools"]
+osx-platform = ["appdirs (>=1.4.0)", "appdirs (>=1.4.0)", "bcrypt (>=3.1.3)", "bcrypt (>=3.1.3)", "cryptography (>=3.3)", "cryptography (>=3.3)", "cython-test-exception-raiser (>=1.0.2,<2)", "cython-test-exception-raiser (>=1.0.2,<2)", "h2 (>=3.2,<5.0)", "h2 (>=3.2,<5.0)", "httpx[http2] (>=0.27)", "httpx[http2] (>=0.27)", "hypothesis (>=6.56)", "hypothesis (>=6.56)", "idna (>=2.4)", "idna (>=2.4)", "priority (>=1.1.0,<2.0)", "priority (>=1.1.0,<2.0)", "pyhamcrest (>=2)", "pyhamcrest (>=2)", "pyobjc-core", "pyobjc-core", "pyobjc-framework-cfnetwork", "pyobjc-framework-cfnetwork", "pyobjc-framework-cocoa", "pyobjc-framework-cocoa", "pyopenssl (>=21.0.0)", "pyopenssl (>=21.0.0)", "pyserial (>=3.0)", "pyserial (>=3.0)", "pywin32 (!=226)", "pywin32 (!=226)", "service-identity (>=18.1.0)", "service-identity (>=18.1.0)"]
 serial = ["pyserial (>=3.0)", "pywin32 (!=226)"]
-test = ["cython-test-exception-raiser (>=1.0.2,<2)", "hypothesis (>=6.56)", "pyhamcrest (>=2)"]
+test = ["cython-test-exception-raiser (>=1.0.2,<2)", "httpx[http2] (>=0.27)", "hypothesis (>=6.56)", "pyhamcrest (>=2)"]
 tls = ["idna (>=2.4)", "pyopenssl (>=21.0.0)", "service-identity (>=18.1.0)"]
-windows-platform = ["pywin32 (!=226)", "pywin32 (!=226)", "twisted[all-non-platform]", "twisted[all-non-platform]"]
+windows-platform = ["appdirs (>=1.4.0)", "appdirs (>=1.4.0)", "bcrypt (>=3.1.3)", "bcrypt (>=3.1.3)", "cryptography (>=3.3)", "cryptography (>=3.3)", "cython-test-exception-raiser (>=1.0.2,<2)", "cython-test-exception-raiser (>=1.0.2,<2)", "h2 (>=3.2,<5.0)", "h2 (>=3.2,<5.0)", "httpx[http2] (>=0.27)", "httpx[http2] (>=0.27)", "hypothesis (>=6.56)", "hypothesis (>=6.56)", "idna (>=2.4)", "idna (>=2.4)", "priority (>=1.1.0,<2.0)", "priority (>=1.1.0,<2.0)", "pyhamcrest (>=2)", "pyhamcrest (>=2)", "pyopenssl (>=21.0.0)", "pyopenssl (>=21.0.0)", "pyserial (>=3.0)", "pyserial (>=3.0)", "pywin32 (!=226)", "pywin32 (!=226)", "pywin32 (!=226)", "pywin32 (!=226)", "service-identity (>=18.1.0)", "service-identity (>=18.1.0)", "twisted-iocpsupport (>=1.0.2)", "twisted-iocpsupport (>=1.0.2)"]
 
 [[package]]
 name = "twisted-iocpsupport"
@@ -5247,7 +5245,7 @@ description = "An extension for use in the twisted I/O Completion Ports reactor.
 optional = false
 python-versions = "*"
 groups = ["external-auth"]
-markers = "(platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\") and platform_system == \"Windows\""
+markers = "(platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\") and sys_platform == \"win32\""
 files = [
     {file = "twisted-iocpsupport-1.0.4.tar.gz", hash = "sha256:858096c0d15e33f15ac157f455d8f86f2f2cdd223963e58c0f682a3af8362d89"},
     {file = "twisted_iocpsupport-1.0.4-cp310-cp310-win32.whl", hash = "sha256:afa2b630797f9ed2f27f3d9f55e3f72b4244911e45a8c82756f44babbf0b243e"},
@@ -5822,4 +5820,4 @@ libdeps = ["cxxfilt", "eventlet", "flask", "flask-cors", "gevent", "lxml", "prog
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13,<4.0"
-content-hash = "952bf17da9a9813a7f7e97e66d2f3febc4376654a2792df6f42eed4b30cb7654"
+content-hash = "9bbe30cd9b6800652ce9fc61a7af198d335ea9ef1f8d44cd6dcadd8f2ebcffcf"

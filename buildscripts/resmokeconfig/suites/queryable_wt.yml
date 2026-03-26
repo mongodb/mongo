@@ -4,8 +4,7 @@ description: |
   restored using queryable WT."
 
 selector:
-  roots:
-    - src/mongo/db/modules/*/jstests/queryable_wt/*.js
+  from_target: //jstests/suites/backup-restore:queryable_wt
 
 # Tests start their own mongod's.
 executor:
