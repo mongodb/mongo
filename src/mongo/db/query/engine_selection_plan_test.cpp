@@ -110,6 +110,32 @@ TEST_F(EngineSelectionPlanFixture, HashedIndexIxScanEligibility) {
     }
 }
 
+// Test eligibility of AND_HASH plans.
+TEST_F(EngineSelectionPlanFixture, AndHashEligibility) {
+    auto andHash = std::make_unique<AndHashNode>();
+    andHash->children.emplace_back(
+        std::make_unique<IndexScanNode>(nss, buildSimpleIndexEntry(fromjson("{a: 1}"))));
+    andHash->children.emplace_back(
+        std::make_unique<IndexScanNode>(nss, buildSimpleIndexEntry(fromjson("{b: 1}"))));
+
+    auto solution = std::make_unique<QuerySolution>();
+    solution->setRoot(std::move(andHash));
+    ASSERT_FALSE(isPlanSbeEligible(solution.get()));
+}
+
+// Test eligibility of AND_SORTED plans.
+TEST_F(EngineSelectionPlanFixture, AndSortedEligibility) {
+    auto andSorted = std::make_unique<AndSortedNode>();
+    andSorted->children.emplace_back(
+        std::make_unique<IndexScanNode>(nss, buildSimpleIndexEntry(fromjson("{a: 1}"))));
+    andSorted->children.emplace_back(
+        std::make_unique<IndexScanNode>(nss, buildSimpleIndexEntry(fromjson("{b: 1}"))));
+
+    auto solution = std::make_unique<QuerySolution>();
+    solution->setRoot(std::move(andSorted));
+    ASSERT_FALSE(isPlanSbeEligible(solution.get()));
+}
+
 // Test selection of FETCH + IXSCAN plans.
 TEST_F(EngineSelectionPlanFixture, FetchIxScanSelection) {
     BSONObj indexFields = fromjson("{a: 1}");

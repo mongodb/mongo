@@ -11,7 +11,6 @@ selector:
     - jstests/noPassthroughWithMongod/query/explain/explain_with_backup_plans.js
 
     # TODO SERVER-122039 Investigate unknown failures
-    - jstests/noPassthroughWithMongod/query/plan_selection_no_results.js
     - jstests/noPassthroughWithMongod/query/now_variable.js
 
     # TODO SERVER-117566 implement plan cache in new get executor

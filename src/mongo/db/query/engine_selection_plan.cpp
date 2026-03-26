@@ -99,6 +99,12 @@ void visit(F&& f, const QuerySolutionNode& node) {
         case STAGE_DISTINCT_SCAN:
             f(static_cast<const DistinctNode&>(node));
             break;
+        case STAGE_AND_HASH:
+            f(static_cast<const AndHashNode&>(node));
+            break;
+        case STAGE_AND_SORTED:
+            f(static_cast<const AndSortedNode&>(node));
+            break;
         default:
             f(node);
             break;
@@ -223,10 +229,27 @@ public:
 };
 static_assert(HasPreVisit<HashedIndexScanPatternRule, IndexScanNode>);
 
+/**
+ * This rule matches:
+ * 1. A query solution that has at least one AND_HASH or AND_SORTED node. (SERVER-90818).
+ */
+class AndHashOrSortedRule {
+public:
+    void preVisit(RuleEngine& engine, const AndSortedNode& node) {
+        engine.match();
+    }
+    void preVisit(RuleEngine& engine, const AndHashNode& node) {
+        engine.match();
+    }
+};
+static_assert(HasPreVisit<AndHashOrSortedRule, AndSortedNode>);
+static_assert(HasPreVisit<AndHashOrSortedRule, AndHashNode>);
+
 }  // namespace
 
 bool isPlanSbeEligible(const QuerySolution* solution) {
-    return !treeMatchesAny(solution, DistinctScanRule(), HashedIndexScanPatternRule());
+    return !treeMatchesAny(
+        solution, DistinctScanRule(), HashedIndexScanPatternRule(), AndHashOrSortedRule());
 }
 
 EngineChoice engineSelectionForPlan(const QuerySolution* solution) {
