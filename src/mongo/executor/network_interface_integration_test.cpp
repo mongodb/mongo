@@ -120,16 +120,9 @@ std::ostream& operator<<(std::ostream& out, const NetworkInterface::Counters& co
 
 namespace {
 
-bool pingCommandMissing(const RemoteCommandResponse& result) {
-    if (result.isOK()) {
-        // On mongos, there is no sleep command, so just check that the command failed with
-        // a "Command not found" error code
-        ASSERT_EQ(result.data["ok"].Double(), 0.0);
-        ASSERT_EQ(result.data["code"].Int(), 59);
-        return true;
-    }
-
-    return false;
+BSONObj makeEchoCmdObj() {
+    return BSON("echo" << 1 << "foo"
+                       << "bar");
 }
 
 TEST_F(NetworkInterfaceIntegrationFixture, Ping) {
@@ -257,20 +250,9 @@ public:
         return request;
     }
 
-    BSONObj makeEchoCmdObj() {
-        return BSON("echo" << 1 << "foo"
-                           << "bar");
-    }
-
     BSONObj makeFindCmdObj() {
         return BSON("find" << "test"
                            << "filter" << BSONObj());
-    }
-
-    BSONObj makeSleepCmdObj() {
-        return BSON("sleep" << 1 << "lock"
-                            << "none"
-                            << "secs" << 1000000000);
     }
 
     RemoteCommandResponse runCurrentOpForCommand(HostAndPort target, const std::string command) {
@@ -811,7 +793,22 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
     opCtx->setDeadlineByDate(serviceContext->getPreciseClockSource()->now() + opCtxDeadline,
                              ErrorCodes::ExceededTimeLimit);
 
-    auto request = makeTestCommand(requestTimeout, makeSleepCmdObj(), opCtx.get());
+    assertCommandOK(DatabaseName::kAdmin,
+                    BSON("configureFailPoint" << "failCommand"
+                                              << "mode"
+                                              << "alwaysOn"
+                                              << "data"
+                                              << BSON("blockConnection" << true << "failCommands"
+                                                                        << BSON_ARRAY("echo"))));
+
+    ON_BLOCK_EXIT([&] {
+        assertCommandOK(DatabaseName::kAdmin,
+                        BSON("configureFailPoint" << "failCommand"
+                                                  << "mode"
+                                                  << "off"));
+    });
+
+    auto request = makeTestCommand(requestTimeout, makeEchoCmdObj(), opCtx.get());
 
     auto deferred = runCommand(cb, request);
     // The time returned in result.elapsed is measured from when the command started, which happens
@@ -820,12 +817,6 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
     auto networkStartCommandDelay = stopWatch.elapsed();
 
     auto result = deferred.get(interruptible());
-
-    // mongos doesn't implement the ping command, so ignore the response there, otherwise
-    // check that we've timed out.
-    if (pingCommandMissing(result)) {
-        return;
-    }
 
     ASSERT_EQ(ErrorCodes::ExceededTimeLimit, result.status);
     ASSERT(result.elapsed);
@@ -836,9 +827,9 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
     ASSERT_LT(result.elapsed.value(), requestTimeout);
     ASSERT_EQ(result.target, fixture().getServers().front());
 
-    // Sleep has timed out but _killOperations may still be running. We can't use
-    // waitForCommandToStop since there is no guarantee when _killOperations starts.
-    assertNumOps({.canceled = 0u, .timedOut = 1u, .failed = 0u, .succeeded = 0u});
+    // The number of timed-out operations is 1 because of the echo command. The number of succeeded
+    // operations is 1 because of the 'configureFailPoint' command.
+    assertNumOps({.canceled = 0u, .timedOut = 1u, .failed = 0u, .succeeded = 1u});
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineLater) {
@@ -860,8 +851,23 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
     opCtx->setDeadlineByDate(serviceContext->getPreciseClockSource()->now() + opCtxDeadline,
                              ErrorCodes::ExceededTimeLimit);
 
+    assertCommandOK(DatabaseName::kAdmin,
+                    BSON("configureFailPoint" << "failCommand"
+                                              << "mode"
+                                              << "alwaysOn"
+                                              << "data"
+                                              << BSON("blockConnection" << true << "failCommands"
+                                                                        << BSON_ARRAY("echo"))));
+
+    ON_BLOCK_EXIT([&] {
+        assertCommandOK(DatabaseName::kAdmin,
+                        BSON("configureFailPoint" << "failCommand"
+                                                  << "mode"
+                                                  << "off"));
+    });
+
     auto request = makeTestCommand(
-        requestTimeout, makeSleepCmdObj(), opCtx.get(), false, ErrorCodes::MaxTimeMSExpired);
+        requestTimeout, makeEchoCmdObj(), opCtx.get(), false, ErrorCodes::MaxTimeMSExpired);
     auto createRequestDelay = timer.elapsed();
 
     auto deferred = runCommand(cb, request);
@@ -871,12 +877,6 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
     auto networkStartCommandDelay = timer.elapsed();
 
     auto result = deferred.get(interruptible());
-
-    // mongos doesn't implement the ping command, so ignore the response there, otherwise
-    // check that we've timed out.
-    if (pingCommandMissing(result)) {
-        return;
-    }
 
     ASSERT_EQ(ErrorCodes::MaxTimeMSExpired, result.status);
     ASSERT(result.elapsed);
@@ -889,9 +889,9 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
     ASSERT_GTE(result.elapsed.value() + createRequestDelay + Milliseconds(1), requestTimeout);
     ASSERT_LT(result.elapsed.value() + networkStartCommandDelay, opCtxDeadline);
 
-    // Sleep has timed out but _killOperations may still be running. We can't use
-    // waitForCommandToStop since there is no guarantee when _killOperations starts.
-    assertNumOps({.canceled = 0u, .timedOut = 1u, .failed = 0u, .succeeded = 0u});
+    // The number of timed-out operations is 1 because of the echo command. The number of succeeded
+    // operations is 1 because of the 'configureFailPoint' command.
+    assertNumOps({.canceled = 0u, .timedOut = 1u, .failed = 0u, .succeeded = 1u});
 }
 
 // Test that the local timeout buffer (maxTimeMsLocalBufferTimeMillis) causes the local timer
@@ -1602,10 +1602,29 @@ public:
     void setUp() override {
         setConnectHook(std::make_unique<HangingHook>());
         NetworkInterfaceTestWithConnectHook::setUp();
+
+        // Set up failpoint to block the "echo" command in the HangingHook below.
+        runSetupCommandSync(
+            DatabaseName::kAdmin,
+            BSON("configureFailPoint"
+                 << "failCommand"
+                 << "mode"
+                 << "alwaysOn"
+                 << "data"
+                 << BSON("blockConnection" << true << "failCommands" << BSON_ARRAY("echo"))));
+    }
+
+    void tearDown() override {
+        runSetupCommandSync(DatabaseName::kAdmin,
+                            BSON("configureFailPoint" << "failCommand"
+                                                      << "mode"
+                                                      << "off"));
+        NetworkInterfaceTest::tearDown();
     }
 
 private:
-    // Hook that intentionally never finishes
+    // Hook that intentionally never finishes so TLConnection::setup for the request in the test
+    // below cannot complete while the failpoint stays on.
     class HangingHook : public executor::NetworkConnectionHook {
         Status validateHost(const HostAndPort&,
                             const BSONObj& request,
@@ -1615,22 +1634,12 @@ private:
 
         StatusWith<boost::optional<RemoteCommandRequest>> makeRequest(
             const HostAndPort& remoteHost) final {
-            return {boost::make_optional(RemoteCommandRequest(remoteHost,
-                                                              DatabaseName::kAdmin,
-                                                              BSON("sleep" << 1 << "lock"
-                                                                           << "none"
-                                                                           << "secs" << 100000000),
-                                                              BSONObj(),
-                                                              nullptr))};
+            return {boost::make_optional(RemoteCommandRequest(
+                remoteHost, DatabaseName::kAdmin, makeEchoCmdObj(), BSONObj(), nullptr))};
         }
 
         Status handleReply(const HostAndPort& remoteHost, RemoteCommandResponse&& response) final {
-            if (!pingCommandMissing(response)) {
-                ASSERT_EQ(ErrorCodes::CallbackCanceled, response.status);
-                return response.status;
-            }
-
-            return {ErrorCodes::ExceededTimeLimit, "No ping command. Returning pseudo-timeout."};
+            return response.status;
         }
     };
 };
@@ -1638,8 +1647,6 @@ private:
 // Test that we time out a command if the connection hook hangs.
 TEST_F(NetworkInterfaceTestWithHangingHook, HookHangs) {
     /**
-     *  Since mongos's have no ping command, we effectively skip this test by returning
-     *  ExceededTimeLimit above. (That ErrorCode is used heavily in repl and sharding code.)
      *  If we return NetworkInterfaceExceededTimeLimit, it will make the ConnectionPool
      *  attempt to reform the connection, which can lead to an accepted but unfortunate
      *  race between TLConnection::setup and TLTypeFactory::shutdown.
@@ -1648,7 +1655,7 @@ TEST_F(NetworkInterfaceTestWithHangingHook, HookHangs) {
      */
     RemoteCommandRequest request{fixture().getServers()[0],
                                  DatabaseName::kAdmin,
-                                 BSON("ping" << 1),
+                                 BSON("hello" << 1),
                                  BSONObj(),
                                  nullptr,
                                  Seconds(1)};
