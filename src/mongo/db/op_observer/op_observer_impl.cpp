@@ -352,6 +352,19 @@ std::vector<repl::IndexIdents> buildIndexIdentsForO2(OperationContext* opCtx,
     return o2Indexes;
 }
 
+/**
+ * Populates the o2 field of oplogEntry with index idents (plus internal idents when
+ * primary-driven builds are active).
+ */
+void setIndexBuildO2(OperationContext* opCtx,
+                     MutableOplogEntry& oplogEntry,
+                     const std::vector<IndexBuildInfo>& indexes,
+                     const NamespaceString& nss) {
+    repl::IndexBuildOplogEntryO2 o2;
+    o2.setIndexes(buildIndexIdentsForO2(opCtx, indexes, nss));
+    oplogEntry.setObject2(o2.toBSON());
+}
+
 bool shouldTimestampIndexBuildSinglePhase(OperationContext* opCtx, const NamespaceString& nss) {
     // This function returns whether a timestamp for a catalog write when beginning an index build,
     // or aborting an index build is necessary. There are four scenarios:
@@ -490,9 +503,7 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
     oplogEntry.setObject(oplogEntryBuilder.done());
     if (shouldReplicateLocalCatalogIdentifiers(
             rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider())) {
-        repl::IndexBuildOplogEntryO2 o2;
-        o2.setIndexes(buildIndexIdentsForO2(opCtx, indexes, nss));
-        oplogEntry.setObject2(o2.toBSON());
+        setIndexBuildO2(opCtx, oplogEntry, indexes, nss);
     }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
     logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
@@ -571,9 +582,7 @@ void OpObserverImpl::onCommitIndexBuild(OperationContext* opCtx,
     oplogEntry.setObject(oplogEntryBuilder.done());
     if (shouldReplicateLocalCatalogIdentifiers(
             rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider())) {
-        repl::IndexBuildOplogEntryO2 o2;
-        o2.setIndexes(buildIndexIdentsForO2(opCtx, indexes, nss));
-        oplogEntry.setObject2(o2.toBSON());
+        setIndexBuildO2(opCtx, oplogEntry, indexes, nss);
     }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
     logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
@@ -583,7 +592,7 @@ void OpObserverImpl::onAbortIndexBuild(OperationContext* opCtx,
                                        const NamespaceString& nss,
                                        const UUID& collUUID,
                                        const UUID& indexBuildUUID,
-                                       const std::vector<BSONObj>& indexes,
+                                       const std::vector<IndexBuildInfo>& indexes,
                                        const Status& cause,
                                        bool fromMigrate,
                                        bool isTimeseries) {
@@ -597,8 +606,8 @@ void OpObserverImpl::onAbortIndexBuild(OperationContext* opCtx,
     indexBuildUUID.appendToBuilder(&oplogEntryBuilder, "indexBuildUUID");
 
     BSONArrayBuilder indexesArr(oplogEntryBuilder.subarrayStart("indexes"));
-    for (const auto& indexDoc : indexes) {
-        indexesArr.append(indexDoc);
+    for (const auto& indexBuildInfo : indexes) {
+        indexesArr.append(indexBuildInfo.spec);
     }
     indexesArr.done();
 
@@ -622,6 +631,10 @@ void OpObserverImpl::onAbortIndexBuild(OperationContext* opCtx,
     oplogEntry.setNss(nss.getCommandNS());
     oplogEntry.setUuid(collUUID);
     oplogEntry.setObject(oplogEntryBuilder.done());
+    if (shouldReplicateLocalCatalogIdentifiers(
+            rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider())) {
+        setIndexBuildO2(opCtx, oplogEntry, indexes, nss);
+    }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
     logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
 }

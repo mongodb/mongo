@@ -417,7 +417,7 @@ void onAbortIndexBuild(OperationContext* opCtx,
                                   nss,
                                   collUUID,
                                   replState.buildUUID,
-                                  toIndexSpecs(replState.getIndexes()),
+                                  replState.getIndexes(),
                                   replState.getAbortStatus(),
                                   fromMigrate,
                                   isTimeseries);

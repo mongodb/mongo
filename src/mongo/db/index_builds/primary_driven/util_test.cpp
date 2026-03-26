@@ -73,7 +73,7 @@ public:
         NamespaceString ns;
         UUID collUUID;
         UUID buildUUID;
-        std::vector<BSONObj> indexes;
+        std::vector<IndexBuildInfo> indexes;
         Status cause;
         bool fromMigrate;
         bool isTimeseries;
@@ -115,7 +115,7 @@ public:
                            const NamespaceString& ns,
                            const UUID& collUUID,
                            const UUID& buildUUID,
-                           const std::vector<BSONObj>& indexes,
+                           const std::vector<IndexBuildInfo>& indexes,
                            const Status& cause,
                            bool fromMigrate,
                            bool isTimeseries) override {
@@ -332,8 +332,8 @@ TEST_F(UtilTest, Abort) {
     EXPECT_EQ(args.collUUID, collUUID);
     EXPECT_EQ(args.buildUUID, buildUUID);
     EXPECT_EQ(args.indexes.size(), 2);
-    ASSERT_BSONOBJ_EQ(args.indexes[0], indexes[0].spec);
-    ASSERT_BSONOBJ_EQ(args.indexes[1], indexes[1].spec);
+    ASSERT_BSONOBJ_EQ(args.indexes[0].spec, indexes[0].spec);
+    ASSERT_BSONOBJ_EQ(args.indexes[1].spec, indexes[1].spec);
     ASSERT_EQ(args.cause, cause);
     EXPECT_FALSE(args.fromMigrate);
     EXPECT_FALSE(args.isTimeseries);

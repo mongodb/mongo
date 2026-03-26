@@ -1145,7 +1145,11 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                       "The abortIndexBuild operation is not supported in applyOps mode"};
           }
 
-          auto swOplogEntry = IndexBuildOplogEntry::parse(opCtx, *op);
+          auto swOplogEntry = IndexBuildOplogEntry::parse(
+              opCtx,
+              *op,
+              shouldReplicateLocalCatalogIdentifiers(
+                  rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider()));
           if (!swOplogEntry.isOK()) {
               return swOplogEntry.getStatus().withContext(
                   "Error parsing 'abortIndexBuild' oplog entry");

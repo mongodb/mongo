@@ -1263,6 +1263,104 @@ TEST_F(OplogEntryTest, ParseValidIndexBuildOplogEntry) {
         ASSERT(parsed.indexes[1].indexIdent.empty());
         ASSERT_EQ(parsed.cause, cause);
     }
+
+    // abortIndexBuild with o2 containing indexIdents (no internalIdents).
+    {
+        BSONObjBuilder causeBuilder;
+        causeBuilder.append("ok", false);
+        const auto cause = Status(ErrorCodes::IndexBuildAborted, "aborted");
+        cause.serializeErrorToBSON(&causeBuilder);
+        const auto o =
+            BSON("abortIndexBuild" << ns << "indexBuildUUID" << indexBuildUUID << "indexes"
+                                   << indexSpecs << "cause" << causeBuilder.obj());
+        const auto o2 = BSON("indexes" << o2Indexes);
+        const auto entry = makeCommandOplogEntry(entryOpTime, nss, o, o2, uuid);
+        auto parsed = unittest::assertGet(IndexBuildOplogEntry::parse(_opCtx.get(), entry));
+        EXPECT_EQ(parsed.commandType, OplogEntry::CommandType::kAbortIndexBuild);
+        ASSERT_EQ(parsed.indexes.size(), 2);
+        auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
+        const auto& indexIdentUniqueTag0 =
+            storageEngine->getIndexIdentUniqueTag(parsed.indexes[0].indexIdent, nss.dbName());
+        const auto& indexIdentUniqueTag1 =
+            storageEngine->getIndexIdentUniqueTag(parsed.indexes[1].indexIdent, nss.dbName());
+        EXPECT_EQ(indexIdentUniqueTag0, o2Indexes[0].getField("indexIdent").str());
+        EXPECT_EQ(indexIdentUniqueTag1, o2Indexes[1].getField("indexIdent").str());
+        EXPECT_FALSE(parsed.indexes[0].sorterIdent);
+        EXPECT_FALSE(parsed.indexes[0].sideWritesIdent);
+        EXPECT_FALSE(parsed.indexes[0].constraintViolationsIdent);
+        EXPECT_EQ(parsed.indexBuildMethod, IndexBuildMethodEnum::kHybrid);
+    }
+
+    // abortIndexBuild with o2 containing internalIdents (primaryDriven mode).
+    {
+        BSONObjBuilder causeBuilder;
+        causeBuilder.append("ok", false);
+        const auto cause = Status(ErrorCodes::IndexBuildAborted, "aborted");
+        cause.serializeErrorToBSON(&causeBuilder);
+        const auto o =
+            BSON("abortIndexBuild" << ns << "indexBuildUUID" << indexBuildUUID << "indexes"
+                                   << indexSpecs << "cause" << causeBuilder.obj());
+        const auto o2 =
+            BSON("indexes" << BSON_ARRAY(
+                     BSON("indexIdent" << "index-0" << "internalIdents"
+                                       << BSON("sorterIdent" << "internal-sorter-0"
+                                                             << "sideWritesIdent"
+                                                             << "internal-sideWrites-0"
+                                                             << "skippedRecordsIdent"
+                                                             << "internal-skippedRecordsTracker-0"))
+                     << BSON("indexIdent"
+                             << "index-1" << "internalIdents"
+                             << BSON("sorterIdent" << "internal-sorter-1"
+                                                   << "sideWritesIdent"
+                                                   << "internal-sideWrites-1"
+                                                   << "skippedRecordsIdent"
+                                                   << "internal-skippedRecordsTracker-1"))));
+        const auto entry = makeCommandOplogEntry(entryOpTime, nss, o, o2, uuid);
+        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+            "featureFlagPrimaryDrivenIndexBuilds", true);
+        auto parsed = unittest::assertGet(IndexBuildOplogEntry::parse(_opCtx.get(), entry));
+        EXPECT_EQ(parsed.commandType, OplogEntry::CommandType::kAbortIndexBuild);
+        EXPECT_EQ(parsed.indexBuildMethod, IndexBuildMethodEnum::kPrimaryDriven);
+        ASSERT_EQ(parsed.indexes.size(), 2);
+        ASSERT_TRUE(parsed.indexes[0].sorterIdent);
+        ASSERT_TRUE(parsed.indexes[0].sideWritesIdent);
+        ASSERT_TRUE(parsed.indexes[0].skippedRecordsIdent);
+        EXPECT_FALSE(parsed.indexes[0].constraintViolationsIdent);
+        EXPECT_EQ(*parsed.indexes[0].sorterIdent, "internal-sorter-0");
+        EXPECT_EQ(*parsed.indexes[0].sideWritesIdent, "internal-sideWrites-0");
+        EXPECT_EQ(*parsed.indexes[0].skippedRecordsIdent, "internal-skippedRecordsTracker-0");
+        EXPECT_EQ(*parsed.indexes[1].sorterIdent, "internal-sorter-1");
+    }
+
+    // abortIndexBuild with o2 containing internalIdents is rejected when primaryDriven disabled.
+    {
+        BSONObjBuilder causeBuilder;
+        causeBuilder.append("ok", false);
+        const auto cause = Status(ErrorCodes::IndexBuildAborted, "aborted");
+        cause.serializeErrorToBSON(&causeBuilder);
+        const auto o =
+            BSON("abortIndexBuild" << ns << "indexBuildUUID" << indexBuildUUID << "indexes"
+                                   << indexSpecs << "cause" << causeBuilder.obj());
+        const auto o2 =
+            BSON("indexes" << BSON_ARRAY(
+                     BSON("indexIdent" << "index-0" << "internalIdents"
+                                       << BSON("sorterIdent" << "internal-sorter-0"
+                                                             << "sideWritesIdent"
+                                                             << "internal-sideWrites-0"
+                                                             << "skippedRecordsIdent"
+                                                             << "internal-skippedRecordsTracker-0"))
+                     << BSON("indexIdent"
+                             << "index-1" << "internalIdents"
+                             << BSON("sorterIdent" << "internal-sorter-1"
+                                                   << "sideWritesIdent"
+                                                   << "internal-sideWrites-1"
+                                                   << "skippedRecordsIdent"
+                                                   << "internal-skippedRecordsTracker-1"))));
+        const auto entry = makeCommandOplogEntry(entryOpTime, nss, o, o2, uuid);
+        // featureFlagPrimaryDrivenIndexBuilds intentionally NOT enabled
+        auto result = IndexBuildOplogEntry::parse(_opCtx.get(), entry);
+        EXPECT_EQ(result.getStatus(), ErrorCodes::BadValue);
+    }
 }
 
 void assertIndexBuildSkipsO2WhenParseO2False(OperationContext* opCtx,
@@ -1280,8 +1378,15 @@ void assertIndexBuildSkipsO2WhenParseO2False(OperationContext* opCtx,
     };
     const auto uuid = UUID::gen();
 
-    const auto o =
-        BSON(commandName << ns << "indexBuildUUID" << indexBuildUUID << "indexes" << indexSpecs);
+    BSONObjBuilder oBuilder;
+    oBuilder << commandName << ns << "indexBuildUUID" << indexBuildUUID << "indexes" << indexSpecs;
+    if (commandName == "abortIndexBuild") {
+        BSONObjBuilder causeBuilder;
+        causeBuilder.append("ok", false);
+        Status(ErrorCodes::IndexBuildAborted, "aborted").serializeErrorToBSON(&causeBuilder);
+        oBuilder << "cause" << causeBuilder.obj();
+    }
+    const auto o = oBuilder.obj();
     const auto o2 = BSON("indexes" << BSON_ARRAY(BSON("indexIdent" << "index-0")
                                                  << BSON("indexIdent" << "index-1")));
     const auto entry = makeCommandOplogEntry(opTime, nss, o, o2, uuid);
@@ -1292,7 +1397,6 @@ void assertIndexBuildSkipsO2WhenParseO2False(OperationContext* opCtx,
     // o2 was skipped, so idents should be empty.
     ASSERT(parsed.indexes[0].indexIdent.empty());
     ASSERT(parsed.indexes[1].indexIdent.empty());
-    ASSERT_FALSE(parsed.cause);
 }
 
 TEST_F(OplogEntryTest, ParseStartIndexBuildSkipsO2WhenParseO2False) {
@@ -1303,6 +1407,11 @@ TEST_F(OplogEntryTest, ParseStartIndexBuildSkipsO2WhenParseO2False) {
 TEST_F(OplogEntryTest, ParseCommitIndexBuildSkipsO2WhenParseO2False) {
     assertIndexBuildSkipsO2WhenParseO2False(
         _opCtx.get(), entryOpTime, "commitIndexBuild", OplogEntry::CommandType::kCommitIndexBuild);
+}
+
+TEST_F(OplogEntryTest, ParseAbortIndexBuildSkipsO2WhenParseO2False) {
+    assertIndexBuildSkipsO2WhenParseO2False(
+        _opCtx.get(), entryOpTime, "abortIndexBuild", OplogEntry::CommandType::kAbortIndexBuild);
 }
 
 TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
@@ -1733,6 +1842,122 @@ TEST_F(OplogEntryTest, ParseInvalidIndexBuildOplogEntry) {
         auto parsed = IndexBuildOplogEntry::parse(_opCtx.get(), entry);
         ASSERT_OK(parsed);
         ASSERT_NOT_OK(parsed.getValue().cause);
+    }
+
+    // Switch to a 2-index abortIndexBuild with a valid cause for o2 validation tests.
+    {
+        BSONObjBuilder causeBuilder;
+        causeBuilder.append("ok", false);
+        Status(ErrorCodes::IndexBuildAborted, "aborted").serializeErrorToBSON(&causeBuilder);
+        baseObj = BSON("abortIndexBuild"
+                       << "test.coll"
+                       << "indexBuildUUID" << UUID::gen() << "indexes"
+                       << BSON_ARRAY(BSON("v" << 2 << "key" << BSON("x" << 1) << "name"
+                                              << "x_1")
+                                     << BSON("v" << 2 << "key" << BSON("y" << 1) << "name"
+                                                 << "y_1"))
+                       << "cause" << causeBuilder.obj());
+    }
+
+    // Invalid o2 for abortIndexBuild: malformed BSON.
+    ASSERT_THROWS_CODE(parse(baseObj, BSONObj()), AssertionException, ErrorCodes::IDLFailedToParse);
+    // Invalid o2 for abortIndexBuild: indexes field is not an array.
+    ASSERT_THROWS_CODE(
+        parse(baseObj, BSON("indexes" << 1)), AssertionException, ErrorCodes::TypeMismatch);
+    // Invalid o2 for abortIndexBuild: element in indexes array is not an object.
+    ASSERT_THROWS_CODE(parse(baseObj, BSON("indexes" << BSON_ARRAY(1))),
+                       AssertionException,
+                       ErrorCodes::TypeMismatch);
+    // Invalid o2 for abortIndexBuild: missing indexIdent field.
+    ASSERT_THROWS_CODE(
+        parse(baseObj, BSON("indexes" << BSON_ARRAY(BSON("invalid-ident" << "ident")))),
+        AssertionException,
+        ErrorCodes::IDLFailedToParse);
+    // Invalid o2 for abortIndexBuild: o.indexes count != o2.indexes count.
+    ASSERT_EQ(parse(baseObj, BSON("indexes" << BSON_ARRAY(BSON("indexIdent" << "index-0")))),
+              ErrorCodes::BadValue);
+    // Reject internalIdents on abortIndexBuild when featureFlagPrimaryDrivenIndexBuilds disabled.
+    ASSERT_EQ(
+        parse(baseObj,
+              BSON("indexes" << BSON_ARRAY(
+                       BSON("indexIdent" << "index-0" << "internalIdents"
+                                         << BSON("sorterIdent" << "s0" << "sideWritesIdent" << "sw0"
+                                                               << "skippedRecordsIdent"
+                                                               << "srt0"))
+                       << BSON("indexIdent" << "index-1" << "internalIdents"
+                                            << BSON("sorterIdent" << "s1" << "sideWritesIdent"
+                                                                  << "sw1"
+                                                                  << "skippedRecordsIdent"
+                                                                  << "srt1"))))),
+        ErrorCodes::BadValue);
+    // Reject an abortIndexBuild batch where only some indexes specify internalIdents.
+    {
+        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+            "featureFlagPrimaryDrivenIndexBuilds", true);
+        ASSERT_EQ(
+            parse(baseObj,
+                  BSON("indexes" << BSON_ARRAY(
+                           BSON("indexIdent" << "index-0" << "internalIdents"
+                                             << BSON("sorterIdent" << "s0" << "sideWritesIdent"
+                                                                   << "sw0"
+                                                                   << "skippedRecordsIdent"
+                                                                   << "srt0"))
+                           << BSON("indexIdent" << "index-1")))),
+            ErrorCodes::BadValue);
+    }
+
+    // Reject abortIndexBuild internalIdents missing required sideWritesIdent.
+    {
+        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+            "featureFlagPrimaryDrivenIndexBuilds", true);
+        ASSERT_THROWS_CODE(
+            parse(
+                baseObj,
+                BSON("indexes" << BSON_ARRAY(
+                         BSON("indexIdent" << "index-0" << "internalIdents"
+                                           << BSON("sorterIdent" << "s0" << "skippedRecordsIdent"
+                                                                 << "srt0"))
+                         << BSON("indexIdent" << "index-1" << "internalIdents"
+                                              << BSON("sorterIdent" << "s1" << "skippedRecordsIdent"
+                                                                    << "srt1"))))),
+            AssertionException,
+            ErrorCodes::IDLFailedToParse);
+    }
+
+    // Reject abortIndexBuild internalIdents missing required sorterIdent.
+    {
+        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+            "featureFlagPrimaryDrivenIndexBuilds", true);
+        ASSERT_THROWS_CODE(
+            parse(baseObj,
+                  BSON("indexes" << BSON_ARRAY(
+                           BSON("indexIdent"
+                                << "index-0" << "internalIdents"
+                                << BSON("sideWritesIdent" << "sw0" << "skippedRecordsIdent"
+                                                          << "srt0"))
+                           << BSON("indexIdent" << "index-1" << "internalIdents"
+                                                << BSON("sideWritesIdent" << "sw1"
+                                                                          << "skippedRecordsIdent"
+                                                                          << "srt1"))))),
+            AssertionException,
+            ErrorCodes::IDLFailedToParse);
+    }
+
+    // Reject abortIndexBuild internalIdents missing required skippedRecordsIdent.
+    {
+        RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+            "featureFlagPrimaryDrivenIndexBuilds", true);
+        ASSERT_THROWS_CODE(
+            parse(baseObj,
+                  BSON("indexes" << BSON_ARRAY(
+                           BSON("indexIdent" << "index-0" << "internalIdents"
+                                             << BSON("sorterIdent" << "s0" << "sideWritesIdent"
+                                                                   << "sw0"))
+                           << BSON("indexIdent" << "index-1" << "internalIdents"
+                                                << BSON("sorterIdent" << "s1" << "sideWritesIdent"
+                                                                      << "sw1"))))),
+            AssertionException,
+            ErrorCodes::IDLFailedToParse);
     }
 }
 

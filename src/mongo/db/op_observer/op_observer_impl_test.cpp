@@ -114,6 +114,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <ostream>
 #include <utility>
@@ -847,13 +848,7 @@ TEST_F(OpObserverTest, AbortIndexBuildExpectedOplogEntry) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(boost::none, "test.coll");
     UUID indexBuildUUID = UUID::gen();
 
-    BSONObj specX = BSON("key" << BSON("x" << 1) << "name"
-                               << "x_1"
-                               << "v" << 2);
-    BSONObj specA = BSON("key" << BSON("a" << 1) << "name"
-                               << "a_1"
-                               << "v" << 2);
-    std::vector<BSONObj> specs = {specX, specA};
+    auto specs = makeSpecs(opCtx.get(), {"x", "a"});
 
     // Write to the oplog.
     Status cause(ErrorCodes::OperationFailed, "index build failed");
@@ -871,8 +866,8 @@ TEST_F(OpObserverTest, AbortIndexBuildExpectedOplogEntry) {
     abortIndexBuildBuilder.append("abortIndexBuild", nss.coll());
     indexBuildUUID.appendToBuilder(&abortIndexBuildBuilder, "indexBuildUUID");
     BSONArrayBuilder indexesArr(abortIndexBuildBuilder.subarrayStart("indexes"));
-    indexesArr.append(specX);
-    indexesArr.append(specA);
+    indexesArr.append(specs[0].spec);
+    indexesArr.append(specs[1].spec);
     indexesArr.done();
     BSONObjBuilder causeBuilder(abortIndexBuildBuilder.subobjStart("cause"));
     causeBuilder.appendBool("ok", 0);
@@ -5880,10 +5875,33 @@ TEST_F(OpObserverTest, OnCreateIndexIncludesIndexIdent) {
     ASSERT_BSONOBJ_EQ(*entry2.getObject2(), BSON("indexIdent" << indexIdentUniqueTag1));
 }
 
-TEST_F(OpObserverTest, OnStartIndexBuildIncludesIndexIdent) {
-    RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
-        "featureFlagReplicateLocalCatalogIdentifiers", true);
 
+/**
+ * IndexBuildOpParam is a uniform adapter type used for parameterized o2 ident tests for
+ * on(Start/Commit/Abort)IndexBuild.
+ */
+struct IndexBuildOpParam {
+    std::function<void(OperationContext*,
+                       OpObserverImpl&,
+                       const NamespaceString&,
+                       const std::vector<IndexBuildInfo>&)>
+        invoke;
+};
+
+class IndexBuildOplogO2Test : public OpObserverTest,
+                              public testing::WithParamInterface<IndexBuildOpParam> {
+protected:
+    void invokeOp(OperationContext* opCtx,
+                  OpObserverImpl& observer,
+                  const NamespaceString& nss,
+                  const std::vector<IndexBuildInfo>& indexes) {
+        GetParam().invoke(opCtx, observer, nss, indexes);
+    }
+};
+
+// o2 contains indexIdent when featureFlagReplicateLocalCatalogIdentifiers is enabled;
+// o2 is absent when the flag is disabled.
+TEST_P(IndexBuildOplogO2Test, IncludesIndexIdentWithReplicateLocalCatalogIdentifiersEnabled) {
     OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
     auto opCtx = cc().makeOperationContext();
 
@@ -5894,16 +5912,16 @@ TEST_F(OpObserverTest, OnStartIndexBuildIncludesIndexIdent) {
         AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
         {
-            RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
+            // With the flag enabled, o2 with indexIdent expected.
+            RAIIServerParameterControllerForTest flagEnabled(
                 "featureFlagReplicateLocalCatalogIdentifiers", true);
-            opObserver.onStartIndexBuild(
-                opCtx.get(), nss, UUID::gen(), UUID::gen(), {indexes[0]}, false);
+            invokeOp(opCtx.get(), opObserver, nss, {indexes[0]});
         }
         {
-            RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
+            // With the flag disabled, no o2 entry is expected.
+            RAIIServerParameterControllerForTest flagDisabled(
                 "featureFlagReplicateLocalCatalogIdentifiers", false);
-            opObserver.onStartIndexBuild(
-                opCtx.get(), nss, UUID::gen(), UUID::gen(), {indexes[1]}, false);
+            invokeOp(opCtx.get(), opObserver, nss, {indexes[1]});
         }
         wunit.commit();
     }
@@ -5913,137 +5931,19 @@ TEST_F(OpObserverTest, OnStartIndexBuildIncludesIndexIdent) {
     auto entry2 = assertGet(OplogEntry::parse(oplogEntries[1]));
 
     ASSERT_TRUE(entry1.getObject2());
-    auto o2 = entry1.getObject2();
-    auto indexesElem = o2->getField("indexes");
-    auto indexesElemVec = indexesElem.Array();
+    auto indexesElemVec = entry1.getObject2()->getField("indexes").Array();
     ASSERT_EQ(indexesElemVec.size(), 1);
     auto indexElemObj = indexesElemVec[0].Obj();
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     auto indexIdentUniqueTag =
         storageEngine->getIndexIdentUniqueTag(indexes[0].indexIdent, nss.dbName());
     EXPECT_EQ(indexElemObj.getField("indexIdent").str(), indexIdentUniqueTag);
-    ASSERT_FALSE(entry2.getObject2());
-}
-
-TEST_F(OpObserverTest, OnStartIndexBuildIncludesInternalIdents) {
-    OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
-    auto opCtx = cc().makeOperationContext();
-
-    auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
-    auto indexes = makeSpecs(opCtx.get(), {"a"});
-    AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
-    WriteUnitOfWork wunit(opCtx.get());
-    // Wait until after the WUOW is constructed to enable the feature flag. Otherwise,
-    // this top-level WUOW will be created in grouped-oplog mode, but onStartIndexBuild logs a
-    // direct command oplog entry first, so onBatchedWriteCommit starts with non-empty
-    // reservedOpTimes and trips the ReservedTimes invariant.
-    RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
-        "featureFlagPrimaryDrivenIndexBuilds", true);
-    RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
-        "featureFlagReplicateLocalCatalogIdentifiers", true);
-    opObserver.onStartIndexBuild(opCtx.get(), nss, UUID::gen(), UUID::gen(), {indexes[0]}, false);
-    wunit.commit();
-
-    auto entry = assertGet(OplogEntry::parse(getNOplogEntries(opCtx.get(), 1)[0]));
-    ASSERT_TRUE(entry.getObject2());
-    auto indexesElemVec = entry.getObject2()->getField("indexes").Array();
-    ASSERT_EQ(indexesElemVec.size(), 1);
-
-    auto indexElemObj = indexesElemVec[0].Obj();
-    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    auto indexIdentUniqueTag =
-        storageEngine->getIndexIdentUniqueTag(indexes[0].indexIdent, nss.dbName());
-    ASSERT_EQ(indexElemObj.getField("indexIdent").str(), indexIdentUniqueTag);
-
-    ASSERT_BSONOBJ_EQ(indexElemObj.getObjectField("internalIdents"),
-                      BSON("sorterIdent" << *indexes[0].sorterIdent << "sideWritesIdent"
-                                         << *indexes[0].sideWritesIdent << "skippedRecordsIdent"
-                                         << *indexes[0].skippedRecordsIdent));
-}
-
-TEST_F(OpObserverTest, OnStartIndexBuildIncludesconstraintViolationsIdentForUniqueIndexes) {
-    OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
-    auto opCtx = cc().makeOperationContext();
-
-    auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
-    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    std::vector<IndexBuildInfo> indexes;
-    indexes.emplace_back(BSON("v" << 2 << "key" << BSON("a" << 1) << "name"
-                                  << "a_1"
-                                  << "unique" << true),
-                         "index-1",
-                         *storageEngine);
-    AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
-    WriteUnitOfWork wunit(opCtx.get());
-    RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
-        "featureFlagPrimaryDrivenIndexBuilds", true);
-    RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
-        "featureFlagReplicateLocalCatalogIdentifiers", true);
-    opObserver.onStartIndexBuild(opCtx.get(), nss, UUID::gen(), UUID::gen(), {indexes[0]}, false);
-    wunit.commit();
-
-    auto entry = assertGet(OplogEntry::parse(getNOplogEntries(opCtx.get(), 1)[0]));
-    ASSERT_TRUE(entry.getObject2());
-    auto indexesElemVec = entry.getObject2()->getField("indexes").Array();
-    ASSERT_EQ(indexesElemVec.size(), 1);
-
-    auto indexElemObj = indexesElemVec[0].Obj();
-    ASSERT_BSONOBJ_EQ(indexElemObj.getObjectField("internalIdents"),
-                      BSON("sorterIdent" << *indexes[0].sorterIdent << "sideWritesIdent"
-                                         << *indexes[0].sideWritesIdent << "skippedRecordsIdent"
-                                         << *indexes[0].skippedRecordsIdent
-                                         << "constraintViolationsIdent"
-                                         << *indexes[0].constraintViolationsIdent));
-}
-
-TEST_F(OpObserverTest, OnCommitIndexBuildIncludesIndexIdent) {
-    RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
-        "featureFlagReplicateLocalCatalogIdentifiers", true);
-
-    OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
-    auto opCtx = cc().makeOperationContext();
-
-    auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
-    auto indexes = makeSpecs(opCtx.get(), {"a", "a"});
-
-    {
-        AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
-        WriteUnitOfWork wunit(opCtx.get());
-        {
-            RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiersEnabled(
-                "featureFlagReplicateLocalCatalogIdentifiers", true);
-            opObserver.onCommitIndexBuild(
-                opCtx.get(), nss, UUID::gen(), UUID::gen(), {indexes[0]}, {}, false);
-        }
-        {
-            RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiersDisabled(
-                "featureFlagReplicateLocalCatalogIdentifiers", false);
-            opObserver.onCommitIndexBuild(
-                opCtx.get(), nss, UUID::gen(), UUID::gen(), {indexes[1]}, {}, false);
-        }
-        wunit.commit();
-    }
-
-    auto oplogEntries = getNOplogEntries(opCtx.get(), 2);
-    auto entry1 = assertGet(OplogEntry::parse(oplogEntries[0]));
-    auto entry2 = assertGet(OplogEntry::parse(oplogEntries[1]));
-
-    // When replicated catalog identifiers are enabled, o2 should contain the index ident.
-    ASSERT_TRUE(entry1.getObject2());
-    auto o2 = entry1.getObject2();
-    auto indexesElemVec = o2->getField("indexes").Array();
-    ASSERT_EQ(indexesElemVec.size(), 1);
-    auto indexElemObj = indexesElemVec[0].Obj();
-    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    auto indexIdentUniqueTag =
-        storageEngine->getIndexIdentUniqueTag(indexes[0].indexIdent, nss.dbName());
-    EXPECT_EQ(indexElemObj.getField("indexIdent").str(), indexIdentUniqueTag);
-
-    // When replicated catalog identifiers are disabled, no o2 field.
     EXPECT_FALSE(entry2.getObject2());
 }
 
-TEST_F(OpObserverTest, OnCommitIndexBuildIncludesInternalIdentsWithPrimaryDrivenIndexBuilds) {
+// With featureFlagPrimaryDrivenIndexBuilds enabled, o2 includes an internalIdents sub-object
+// containing sorterIdent, sideWritesIdent, and skippedRecordsIdent.
+TEST_P(IndexBuildOplogO2Test, IncludesInternalIdentsWhenPrimaryDrivenEnabled) {
     OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
     auto opCtx = cc().makeOperationContext();
 
@@ -6051,16 +5951,15 @@ TEST_F(OpObserverTest, OnCommitIndexBuildIncludesInternalIdentsWithPrimaryDriven
     auto indexes = makeSpecs(opCtx.get(), {"a"});
     AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
     WriteUnitOfWork wunit(opCtx.get());
-    // Wait until after the WUOW is constructed to enable the feature flag. Otherwise,
-    // this top-level WUOW will be created in grouped-oplog mode, but onCommitIndexBuild logs a
-    // direct command oplog entry first, so onBatchedWriteCommit starts with non-empty
-    // reservedOpTimes and trips the ReservedTimes invariant.
-    RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
-        "featureFlagPrimaryDrivenIndexBuilds", true);
-    RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
+    // Enable flags *after* constructing the WUOW. Enabling featureFlagPrimaryDrivenIndexBuilds
+    // before WUOW construction puts it in grouped-oplog mode; the operation then writes a direct
+    // command oplog entry first, and onBatchedWriteCommit starts with non-empty reservedOpTimes
+    // which trips the ReservedTimes invariant.
+    RAIIServerParameterControllerForTest primaryDrivenEnabled("featureFlagPrimaryDrivenIndexBuilds",
+                                                              true);
+    RAIIServerParameterControllerForTest replicatedCatalogIdents(
         "featureFlagReplicateLocalCatalogIdentifiers", true);
-    opObserver.onCommitIndexBuild(
-        opCtx.get(), nss, UUID::gen(), UUID::gen(), {indexes[0]}, {}, false);
+    invokeOp(opCtx.get(), opObserver, nss, {indexes[0]});
     wunit.commit();
 
     auto entry = assertGet(OplogEntry::parse(getNOplogEntries(opCtx.get(), 1)[0]));
@@ -6080,26 +5979,27 @@ TEST_F(OpObserverTest, OnCommitIndexBuildIncludesInternalIdentsWithPrimaryDriven
                                          << *indexes[0].skippedRecordsIdent));
 }
 
-TEST_F(OpObserverTest, OnCommitIndexBuildIncludesconstraintViolationsIdentForUniqueIndexes) {
+// Unique indexes additionally include constraintViolationsIdent in internalIdents.
+TEST_P(IndexBuildOplogO2Test, IncludesConstraintViolationsIdentForUniqueIndexes) {
     OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
     auto opCtx = cc().makeOperationContext();
 
     auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    std::vector<IndexBuildInfo> indexes;
-    indexes.emplace_back(BSON("v" << 2 << "key" << BSON("a" << 1) << "name"
-                                  << "a_1"
-                                  << "unique" << true),
-                         "index-1",
-                         *storageEngine);
+
+    // Build a unique index — the constructor will automatically populate
+    // constraintViolationsIdent because the spec has "unique: true".
+    auto uniqueSpec =
+        BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1" << "unique" << true);
+    IndexBuildInfo indexBuildInfo(uniqueSpec, "index-1", *storageEngine);
+
     AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
     WriteUnitOfWork wunit(opCtx.get());
-    RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
-        "featureFlagPrimaryDrivenIndexBuilds", true);
-    RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
+    RAIIServerParameterControllerForTest primaryDrivenEnabled("featureFlagPrimaryDrivenIndexBuilds",
+                                                              true);
+    RAIIServerParameterControllerForTest replicatedCatalogIdents(
         "featureFlagReplicateLocalCatalogIdentifiers", true);
-    opObserver.onCommitIndexBuild(
-        opCtx.get(), nss, UUID::gen(), UUID::gen(), {indexes[0]}, {}, false);
+    invokeOp(opCtx.get(), opObserver, nss, {indexBuildInfo});
     wunit.commit();
 
     auto entry = assertGet(OplogEntry::parse(getNOplogEntries(opCtx.get(), 1)[0]));
@@ -6109,14 +6009,15 @@ TEST_F(OpObserverTest, OnCommitIndexBuildIncludesconstraintViolationsIdentForUni
 
     auto indexElemObj = indexesElemVec[0].Obj();
     ASSERT_BSONOBJ_EQ(indexElemObj.getObjectField("internalIdents"),
-                      BSON("sorterIdent" << *indexes[0].sorterIdent << "sideWritesIdent"
-                                         << *indexes[0].sideWritesIdent << "skippedRecordsIdent"
-                                         << *indexes[0].skippedRecordsIdent
+                      BSON("sorterIdent" << *indexBuildInfo.sorterIdent << "sideWritesIdent"
+                                         << *indexBuildInfo.sideWritesIdent << "skippedRecordsIdent"
+                                         << *indexBuildInfo.skippedRecordsIdent
                                          << "constraintViolationsIdent"
-                                         << *indexes[0].constraintViolationsIdent));
+                                         << *indexBuildInfo.constraintViolationsIdent));
 }
 
-TEST_F(OpObserverTest, OnCommitIndexBuildMultipleIndexesIncludesAllIdents) {
+// Multiple indexes in one oplog entry each carry their own ident data.
+TEST_P(IndexBuildOplogO2Test, MultipleIndexesIncludesAllIdents) {
     OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
     auto opCtx = cc().makeOperationContext();
 
@@ -6124,11 +6025,11 @@ TEST_F(OpObserverTest, OnCommitIndexBuildMultipleIndexesIncludesAllIdents) {
     auto indexes = makeSpecs(opCtx.get(), {"x", "y"});
     AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
     WriteUnitOfWork wunit(opCtx.get());
-    RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
-        "featureFlagPrimaryDrivenIndexBuilds", true);
-    RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
+    RAIIServerParameterControllerForTest primaryDrivenEnabled("featureFlagPrimaryDrivenIndexBuilds",
+                                                              true);
+    RAIIServerParameterControllerForTest replicatedCatalogIdents(
         "featureFlagReplicateLocalCatalogIdentifiers", true);
-    opObserver.onCommitIndexBuild(opCtx.get(), nss, UUID::gen(), UUID::gen(), indexes, {}, false);
+    invokeOp(opCtx.get(), opObserver, nss, indexes);
     wunit.commit();
 
     auto entry = assertGet(OplogEntry::parse(getNOplogEntries(opCtx.get(), 1)[0]));
@@ -6151,7 +6052,9 @@ TEST_F(OpObserverTest, OnCommitIndexBuildMultipleIndexesIncludesAllIdents) {
     }
 }
 
-TEST_F(OpObserverTest, OnCommitIndexBuildNoInternalIdentsWhenPrimaryDrivenIndexBuildsDisabled) {
+// When featureFlagPrimaryDrivenIndexBuilds is disabled, o2 carries indexIdent but no
+// internalIdents (sorterIdent, sideWritesIdent, etc.).
+TEST_P(IndexBuildOplogO2Test, NoInternalIdentsWhenPrimaryDrivenDisabled) {
     OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
     auto opCtx = cc().makeOperationContext();
 
@@ -6159,11 +6062,10 @@ TEST_F(OpObserverTest, OnCommitIndexBuildNoInternalIdentsWhenPrimaryDrivenIndexB
     auto indexes = makeSpecs(opCtx.get(), {"a"});
     AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
     WriteUnitOfWork wunit(opCtx.get());
-    RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
+    RAIIServerParameterControllerForTest replicatedCatalogIdents(
         "featureFlagReplicateLocalCatalogIdentifiers", true);
     // featureFlagPrimaryDrivenIndexBuilds intentionally NOT enabled
-    opObserver.onCommitIndexBuild(
-        opCtx.get(), nss, UUID::gen(), UUID::gen(), {indexes[0]}, {}, false);
+    invokeOp(opCtx.get(), opObserver, nss, {indexes[0]});
     wunit.commit();
 
     auto entry = assertGet(OplogEntry::parse(getNOplogEntries(opCtx.get(), 1)[0]));
@@ -6176,69 +6078,111 @@ TEST_F(OpObserverTest, OnCommitIndexBuildNoInternalIdentsWhenPrimaryDrivenIndexB
     auto indexIdentUniqueTag =
         storageEngine->getIndexIdentUniqueTag(indexes[0].indexIdent, nss.dbName());
     EXPECT_EQ(indexElemObj.getField("indexIdent").str(), indexIdentUniqueTag);
-    // internalIdents must be absent when primary-driven index builds are not enabled
+    // internalIdents must be absent when primary-driven index builds are not enabled.
     EXPECT_FALSE(indexElemObj.hasField("internalIdents"));
+}
+
+// Helper for the invariant death tests below. Builds a unique IndexBuildInfo and then clears
+// constraintViolationsIdent to simulate a missing ident, then calls invoke().
+// setIndexBuildO2 (shared by start/commit/abort) invariants that unique indexes always carry
+// constraintViolationsIdent when primary-driven builds are active.
+void runMissingConstraintViolationsIdentDeathTest(
+    std::function<void(OperationContext*,
+                       OpObserverImpl&,
+                       const NamespaceString&,
+                       const std::vector<IndexBuildInfo>&)> invoke) {
+    OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
+    auto opCtx = cc().makeOperationContext();
+
+    auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+
+    auto uniqueSpec =
+        BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1" << "unique" << true);
+    IndexBuildInfo indexBuildInfo(uniqueSpec, "index-1", *storageEngine);
+    // Clear constraintViolationsIdent to simulate it being absent.
+    indexBuildInfo.setInternalIdents(*indexBuildInfo.sorterIdent,
+                                     *indexBuildInfo.sideWritesIdent,
+                                     *indexBuildInfo.skippedRecordsIdent,
+                                     boost::none);
+
+    AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
+    WriteUnitOfWork wunit(opCtx.get());
+    RAIIServerParameterControllerForTest primaryDrivenEnabled("featureFlagPrimaryDrivenIndexBuilds",
+                                                              true);
+    RAIIServerParameterControllerForTest replicatedCatalogIdents(
+        "featureFlagReplicateLocalCatalogIdentifiers", true);
+    invoke(opCtx.get(), opObserver, nss, {indexBuildInfo});
 }
 
 using OpObserverIndexBuildDeathTest = OpObserverTest;
 
 DEATH_TEST_F(OpObserverIndexBuildDeathTest,
-             OnStartIndexBuildInvariantIfUniqueIndexMissingconstraintViolationsIdent,
+             OnStartIndexBuildInvariantIfUniqueIndexMissingConstraintViolationsIdent,
              "invariant") {
-    OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
-    auto opCtx = cc().makeOperationContext();
+    runMissingConstraintViolationsIdentDeathTest([](OperationContext* opCtx,
+                                                    OpObserverImpl& observer,
+                                                    const NamespaceString& nss,
+                                                    const std::vector<IndexBuildInfo>& indexes) {
+        observer.onStartIndexBuild(opCtx, nss, UUID::gen(), UUID::gen(), indexes, false);
+    });
+}
 
-    auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
-    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+using OpObserverIndexBuildDeathTest = OpObserverTest;
 
-    // Build a unique index IndexBuildInfo but clear the constraintViolationsIdent to
-    // simulate it being missing.
-    auto uniqueSpec =
-        BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1" << "unique" << true);
-    IndexBuildInfo indexBuildInfo(uniqueSpec, "index-1", *storageEngine);
-    indexBuildInfo.setInternalIdents(*indexBuildInfo.sorterIdent,
-                                     *indexBuildInfo.sideWritesIdent,
-                                     *indexBuildInfo.skippedRecordsIdent,
-                                     boost::none);
-
-    AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
-    WriteUnitOfWork wunit(opCtx.get());
-    RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
-        "featureFlagPrimaryDrivenIndexBuilds", true);
-    RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
-        "featureFlagReplicateLocalCatalogIdentifiers", true);
-    opObserver.onStartIndexBuild(
-        opCtx.get(), nss, UUID::gen(), UUID::gen(), {indexBuildInfo}, false);
+DEATH_TEST_F(OpObserverIndexBuildDeathTest,
+             OnCommitIndexBuildInvariantIfUniqueIndexMissingConstraintViolationsIdent,
+             "invariant") {
+    runMissingConstraintViolationsIdentDeathTest([](OperationContext* opCtx,
+                                                    OpObserverImpl& observer,
+                                                    const NamespaceString& nss,
+                                                    const std::vector<IndexBuildInfo>& indexes) {
+        observer.onCommitIndexBuild(opCtx, nss, UUID::gen(), UUID::gen(), indexes, {}, false);
+    });
 }
 
 DEATH_TEST_F(OpObserverIndexBuildDeathTest,
-             OnCommitIndexBuildInvariantIfUniqueIndexMissingconstraintViolationsIdent,
+             OnAbortIndexBuildInvariantIfUniqueIndexMissingConstraintViolationsIdent,
              "invariant") {
-    OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
-    auto opCtx = cc().makeOperationContext();
-
-    auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
-    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-
-    // Build a unique index IndexBuildInfo but clear the constraintViolationsIdent to
-    // simulate it being missing.
-    auto uniqueSpec =
-        BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1" << "unique" << true);
-    IndexBuildInfo indexBuildInfo(uniqueSpec, "index-1", *storageEngine);
-    indexBuildInfo.setInternalIdents(*indexBuildInfo.sorterIdent,
-                                     *indexBuildInfo.sideWritesIdent,
-                                     *indexBuildInfo.skippedRecordsIdent,
-                                     boost::none);
-
-    AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
-    WriteUnitOfWork wunit(opCtx.get());
-    RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
-        "featureFlagPrimaryDrivenIndexBuilds", true);
-    RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
-        "featureFlagReplicateLocalCatalogIdentifiers", true);
-    opObserver.onCommitIndexBuild(
-        opCtx.get(), nss, UUID::gen(), UUID::gen(), {indexBuildInfo}, {}, false);
+    runMissingConstraintViolationsIdentDeathTest([](OperationContext* opCtx,
+                                                    OpObserverImpl& observer,
+                                                    const NamespaceString& nss,
+                                                    const std::vector<IndexBuildInfo>& indexes) {
+        Status cause(ErrorCodes::OperationFailed, "index build failed");
+        observer.onAbortIndexBuild(opCtx, nss, UUID::gen(), UUID::gen(), indexes, cause, false);
+    });
 }
+
+INSTANTIATE_TEST_SUITE_P(
+    OnStartIndexBuild,
+    IndexBuildOplogO2Test,
+    testing::Values(IndexBuildOpParam{[](OperationContext* opCtx,
+                                         OpObserverImpl& observer,
+                                         const NamespaceString& nss,
+                                         const std::vector<IndexBuildInfo>& indexes) {
+        observer.onStartIndexBuild(opCtx, nss, UUID::gen(), UUID::gen(), indexes, false);
+    }}));
+
+INSTANTIATE_TEST_SUITE_P(
+    OnCommitIndexBuild,
+    IndexBuildOplogO2Test,
+    testing::Values(IndexBuildOpParam{[](OperationContext* opCtx,
+                                         OpObserverImpl& observer,
+                                         const NamespaceString& nss,
+                                         const std::vector<IndexBuildInfo>& indexes) {
+        observer.onCommitIndexBuild(opCtx, nss, UUID::gen(), UUID::gen(), indexes, {}, false);
+    }}));
+
+INSTANTIATE_TEST_SUITE_P(
+    OnAbortIndexBuild,
+    IndexBuildOplogO2Test,
+    testing::Values(IndexBuildOpParam{[](OperationContext* opCtx,
+                                         OpObserverImpl& observer,
+                                         const NamespaceString& nss,
+                                         const std::vector<IndexBuildInfo>& indexes) {
+        Status cause(ErrorCodes::OperationFailed, "index build failed");
+        observer.onAbortIndexBuild(opCtx, nss, UUID::gen(), UUID::gen(), indexes, cause, false);
+    }}));
 
 TEST_F(OpObserverTest, OnContainerInsert) {
     auto opCtx = cc().makeOperationContext();

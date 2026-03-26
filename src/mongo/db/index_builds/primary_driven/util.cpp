@@ -236,12 +236,8 @@ Status abort(OperationContext* opCtx,
             opCtx, index.getIndexName(), IndexCatalog::InclusionPolicy::kUnfinished);
 
         {
-            // TODO (SERVER-121124): Use idents provided in index.
-            auto mutableIndex = index;
-            mutableIndex.indexIdent = entry->getIdent();
-            mutableIndex.setInternalIdents(*opCtx->getServiceContext()->getStorageEngine());
             IndexBuildInterceptor interceptor{opCtx,
-                                              mutableIndex,
+                                              index,
                                               LazyRecordStore::CreateMode::openExisting,
                                               entry->descriptor()->unique(),
                                               false};
@@ -264,7 +260,7 @@ Status abort(OperationContext* opCtx,
                                                                    coll.nss(),
                                                                    collectionUUID,
                                                                    buildUUID,
-                                                                   toIndexSpecs(indexes),
+                                                                   indexes,
                                                                    cause,
                                                                    /*fromMigrate=*/false);
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(

@@ -187,7 +187,7 @@ public:
                            const NamespaceString& nss,
                            const UUID& collUUID,
                            const UUID& indexBuildUUID,
-                           const std::vector<BSONObj>& indexes,
+                           const std::vector<IndexBuildInfo>& indexes,
                            const Status& cause,
                            bool fromMigrate,
                            bool isTimeseries) override {
