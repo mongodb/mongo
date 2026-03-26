@@ -113,7 +113,6 @@ export const runRewritesTest = (
     const optPipeline = [...intermediaryStages, {$sort: sortSpec}, ...posteriorStages];
     const optResults = testColl.aggregate(optPipeline, options).toArray();
     const optExplainFull = testColl.explain().aggregate(optPipeline, options);
-    printjson({optExplainFull});
 
     const ogPipeline = [
         ...intermediaryStages,
@@ -135,7 +134,11 @@ export const runRewritesTest = (
         hint: hint,
         postPlanningResults: true,
     });
-    assert(hasInternalBoundedSort(optExplain), optExplainFull);
+    if (!hasInternalBoundedSort(optExplain)) {
+        printjson({optExplainFull});
+        printjson({optExplain});
+        assert(false, "Expected to see a $_internalBoundedSort stage in the optimized explain");
+    }
 
     // Check doesn't contain stage
     const ogExplain = getExplainedPipelineFromAggregation(db, testColl, ogPipeline, {
@@ -143,7 +146,11 @@ export const runRewritesTest = (
         hint: hint,
         postPlanningResults: true,
     });
-    assert(!hasInternalBoundedSort(ogExplain), ogExplainFull);
+    if (hasInternalBoundedSort(ogExplain)) {
+        printjson({ogExplainFull});
+        printjson({ogExplain});
+        assert(false, "Did not expect to see a $_internalBoundedSort stage in the original explain");
+    }
 
     // For some queries we expect to see an extra predicate, to defend against bucketMaxSpanSeconds
     // changing out from under us.
@@ -190,5 +197,9 @@ export const runDoesntRewriteTest = (sortSpec, createIndex, hint, testColl, inte
     });
     const optExplainFull = testColl.explain().aggregate(optPipeline, {hint});
     const containsOptimization = hasInternalBoundedSort(optExplain);
-    assert(!containsOptimization, optExplainFull);
+    if (containsOptimization) {
+        printjson({optExplainFull});
+        printjson({optExplain});
+        assert(false, "Did not expect to see a $_internalBoundedSort stage in the optimized explain");
+    }
 };
