@@ -359,6 +359,28 @@ TEST_F(MetricsServiceTest, CreateCounterBeforeInitialization) {
     }
 }
 
+TEST_F(MetricsServiceTest, CreateUpDownCounterBeforeInitialization) {
+    auto& int64UpDown = metricsService->createInt64UpDownCounter(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    auto& doubleUpDown = metricsService->createDoubleUpDownCounter(
+        MetricNames::kTest2, "description", MetricUnit::kSeconds);
+
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1), 0);
+        EXPECT_EQ(metricsCapturer.readDoubleCounter(MetricNames::kTest2), 0.0);
+    }
+
+    int64UpDown.add(5);
+    doubleUpDown.add(5.0);
+
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1), 5);
+        EXPECT_DOUBLE_EQ(metricsCapturer.readDoubleCounter(MetricNames::kTest2), 5.0);
+    }
+}
+
 TEST_F(MetricsServiceTest, CreateGaugeBeforeInitialization) {
     auto& int64Gauge =
         metricsService->createInt64Gauge(MetricNames::kTest1, "description", MetricUnit::kSeconds);
@@ -540,10 +562,18 @@ TEST_F(CreateDoubleCounterTest, RecordsValues) {
 using CreateInt64UpDownCounterTest = MetricsServiceTest;
 
 TEST_F(CreateInt64UpDownCounterTest, RecordsValues) {
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+
     UpDownCounter<int64_t>& u1 = metricsService->createInt64UpDownCounter(
         MetricNames::kTest1, "description1", MetricUnit::kSeconds);
+
     UpDownCounter<int64_t>& u2 = metricsService->createInt64UpDownCounter(
         MetricNames::kTest2, "description2", MetricUnit::kBytes);
+
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1), 0);
+        EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest2), 0);
+    }
 
     u1.add(10);
     u2.add(3);
@@ -552,20 +582,32 @@ TEST_F(CreateInt64UpDownCounterTest, RecordsValues) {
     u1.add(-4);
     u2.add(2);
 
-    EXPECT_EQ(u1.value(), 11);
-    EXPECT_EQ(u2.value(), 4);
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1), 11);
+        EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest2), 4);
+    }
 
     u1.add(-1);
-    EXPECT_EQ(u1.value(), 10);
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1), 10);
+    }
 }
 
 using CreateDoubleUpDownCounterTest = MetricsServiceTest;
 
 TEST_F(CreateDoubleUpDownCounterTest, RecordsValues) {
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+
     UpDownCounter<double>& u1 = metricsService->createDoubleUpDownCounter(
         MetricNames::kTest1, "description1", MetricUnit::kSeconds);
+
     UpDownCounter<double>& u2 = metricsService->createDoubleUpDownCounter(
         MetricNames::kTest2, "description2", MetricUnit::kBytes);
+
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_EQ(metricsCapturer.readDoubleCounter(MetricNames::kTest1), 0.0);
+        EXPECT_EQ(metricsCapturer.readDoubleCounter(MetricNames::kTest2), 0.0);
+    }
 
     u1.add(10.5);
     u2.add(1.25);
@@ -573,11 +615,15 @@ TEST_F(CreateDoubleUpDownCounterTest, RecordsValues) {
     u2.add(-0.5);
     u2.add(1.25);
 
-    EXPECT_DOUBLE_EQ(u1.value(), 16.0);
-    EXPECT_DOUBLE_EQ(u2.value(), 2.0);
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_DOUBLE_EQ(metricsCapturer.readDoubleCounter(MetricNames::kTest1), 16.0);
+        EXPECT_DOUBLE_EQ(metricsCapturer.readDoubleCounter(MetricNames::kTest2), 2.0);
+    }
 
     u1.add(-0.5);
-    EXPECT_DOUBLE_EQ(u1.value(), 15.5);
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_DOUBLE_EQ(metricsCapturer.readDoubleCounter(MetricNames::kTest1), 15.5);
+    }
 }
 
 using CreateInt64GaugeTest = MetricsServiceTest;

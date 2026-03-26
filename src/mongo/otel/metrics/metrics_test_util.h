@@ -174,12 +174,14 @@ public:
     }
 #endif  // MONGO_CONFIG_OTEL
     /**
-     * Gets the value of an int64_t counter and throws an exception if it is not found.
+     * Gets the value of an int64_t counter and throws an exception if it is not found. Works with
+     * both Counter and UpdownCounter.
      */
     int64_t readInt64Counter(MetricName name);
 
     /**
-     * Gets the value of a double counter and throws an exception if it is not found.
+     * Gets the value of a double counter and throws an exception if it is not found. Works with
+     * both Counter and UpdownCounter.
      */
     double readDoubleCounter(MetricName name);
 

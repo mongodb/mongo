@@ -53,6 +53,9 @@ TEST_F(OtelMetricsCapturerTest, ReadThrowsExceptionIfMetricNotFound) {
     ASSERT_THROWS_CODE(metricsCapturer.readInt64Counter(MetricNames::kTest1),
                        DBException,
                        ErrorCodes::KeyNotFound);
+    ASSERT_THROWS_CODE(metricsCapturer.readDoubleCounter(MetricNames::kTest1),
+                       DBException,
+                       ErrorCodes::KeyNotFound);
     ASSERT_THROWS_CODE(metricsCapturer.readInt64Histogram(MetricNames::kTest1),
                        DBException,
                        ErrorCodes::KeyNotFound);
@@ -90,6 +93,21 @@ TEST_F(OtelMetricsCapturerTest, CounterWrongValueTypeThrowsException) {
                        DBException,
                        ErrorCodes::TypeMismatch);
     // Reading a double counter as an int64 counter should throw TypeMismatch.
+    ASSERT_THROWS_CODE(metricsCapturer.readInt64Counter(MetricNames::kTest2),
+                       DBException,
+                       ErrorCodes::TypeMismatch);
+}
+
+TEST_F(OtelMetricsCapturerTest, UpDownCounterWrongValueTypeThrowsException) {
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+    metricsService->createInt64UpDownCounter(
+        MetricNames::kTest1, "description1", MetricUnit::kSeconds);
+    metricsService->createDoubleUpDownCounter(
+        MetricNames::kTest2, "description2", MetricUnit::kSeconds);
+
+    ASSERT_THROWS_CODE(metricsCapturer.readDoubleCounter(MetricNames::kTest1),
+                       DBException,
+                       ErrorCodes::TypeMismatch);
     ASSERT_THROWS_CODE(metricsCapturer.readInt64Counter(MetricNames::kTest2),
                        DBException,
                        ErrorCodes::TypeMismatch);
@@ -135,6 +153,26 @@ DEATH_TEST_F(OtelMetricsCapturerDeathTest, DiesReadingDoubleCounter, "doesn't ha
         MetricNames::kTest1, "description1", MetricUnit::kSeconds);
     doubleCounter.add(3);
     metricsCapturer.readInt64Counter(MetricNames::kTest1);
+}
+
+DEATH_TEST_F(OtelMetricsCapturerDeathTest,
+             DiesReadingInt64UpDownCounter,
+             "doesn't have otel enabled") {
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+    UpDownCounter<int64_t>& u = metricsService->createInt64UpDownCounter(
+        MetricNames::kTest1, "description1", MetricUnit::kSeconds);
+    u.add(3);
+    metricsCapturer.readInt64Counter(MetricNames::kTest1);
+}
+
+DEATH_TEST_F(OtelMetricsCapturerDeathTest,
+             DiesReadingDoubleUpDownCounter,
+             "doesn't have otel enabled") {
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+    UpDownCounter<double>& u = metricsService->createDoubleUpDownCounter(
+        MetricNames::kTest1, "description1", MetricUnit::kSeconds);
+    u.add(3);
+    metricsCapturer.readDoubleCounter(MetricNames::kTest1);
 }
 
 DEATH_TEST_F(OtelMetricsCapturerDeathTest, DiesReadingInt64Gauge, "doesn't have otel enabled") {
@@ -196,6 +234,44 @@ TEST_F(OtelMetricsCapturerTest, CreateInt64CounterWithTwoCapturers) {
 
 TEST_F(OtelMetricsCapturerTest, CreateDoubleCounterWithTwoCapturers) {
     auto& metric = metricsService->createDoubleCounter(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    {
+        OtelMetricsCapturer capturer(*metricsService);
+        metric.add(1.5);
+        if (capturer.canReadMetrics()) {
+            EXPECT_DOUBLE_EQ(capturer.readDoubleCounter(MetricNames::kTest1), 1.5);
+        }
+    }
+    {
+        OtelMetricsCapturer capturer(*metricsService);
+        metric.add(10.5);
+        if (capturer.canReadMetrics()) {
+            EXPECT_DOUBLE_EQ(capturer.readDoubleCounter(MetricNames::kTest1), 10.5);
+        }
+    }
+}
+
+TEST_F(OtelMetricsCapturerTest, CreateInt64UpDownCounterWithTwoCapturers) {
+    auto& metric = metricsService->createInt64UpDownCounter(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    {
+        OtelMetricsCapturer capturer(*metricsService);
+        metric.add(1);
+        if (capturer.canReadMetrics()) {
+            EXPECT_EQ(capturer.readInt64Counter(MetricNames::kTest1), 1);
+        }
+    }
+    {
+        OtelMetricsCapturer capturer(*metricsService);
+        metric.add(10);
+        if (capturer.canReadMetrics()) {
+            EXPECT_EQ(capturer.readInt64Counter(MetricNames::kTest1), 10);
+        }
+    }
+}
+
+TEST_F(OtelMetricsCapturerTest, CreateDoubleUpDownCounterWithTwoCapturers) {
+    auto& metric = metricsService->createDoubleUpDownCounter(
         MetricNames::kTest1, "description", MetricUnit::kSeconds);
     {
         OtelMetricsCapturer capturer(*metricsService);
