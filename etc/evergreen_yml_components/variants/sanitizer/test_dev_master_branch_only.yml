@@ -524,7 +524,6 @@ buildvariants:
       - name: streams_lambda_sanitizer
       - name: streams_kinesis_sanitizer
       - name: streams_s3_sanitizer
-      - name: streams_azure_blob_sanitizer
 
   - <<: *rhel8_debug_aubsan_compile_variant_dependency
     name: rhel8-debug-aubsan-experimental-all-feature-flags
