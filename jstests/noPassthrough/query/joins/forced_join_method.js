@@ -9,8 +9,7 @@
  * ]
  */
 
-import {getWinningPlanFromExplain, getAllPlanStages} from "jstests/libs/query/analyze_plan.js";
-import {joinOptUsed, joinStageAbbreviation, plannerStageIsJoinOptNode} from "jstests/libs/query/join_utils.js";
+import {assertAllJoinsUseMethod} from "jstests/libs/query/join_utils.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB(jsTestName());
@@ -71,24 +70,6 @@ const enumerators = [
     },
     {name: "random", params: {internalJoinReorderMode: "random", internalRandomJoinOrderSeed: 42}},
 ];
-
-/**
- * Asserts that the join optimizer was used and every join node uses the expected method.
- */
-function assertAllJoinsUseMethod(explain, expectedMethod) {
-    assert(joinOptUsed(explain), "Expected join optimization to be used: " + tojson(explain));
-
-    const joinStages = getAllPlanStages(getWinningPlanFromExplain(explain)).filter(plannerStageIsJoinOptNode);
-    assert.gt(joinStages.length, 0, "Expected at least one join stage: " + tojson(explain));
-
-    for (const stage of joinStages) {
-        assert.eq(
-            joinStageAbbreviation(stage.stage),
-            expectedMethod,
-            `Expected all joins to be ${expectedMethod}, but found ${stage.stage}`,
-        );
-    }
-}
 
 /**
  * Runs a forced join method test with both the bottom-up and random enumerators. Asserts that every

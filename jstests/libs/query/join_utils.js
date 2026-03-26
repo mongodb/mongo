@@ -103,3 +103,21 @@ export function joinOptUsed(explain) {
             usedNestedLoopJoinEmbedding(explain))
     );
 }
+
+/**
+ * Asserts that the join optimizer was used and every join node uses the expected method.
+ */
+export function assertAllJoinsUseMethod(explain, expectedMethod) {
+    assert(joinOptUsed(explain), "Expected join optimization to be used: " + tojson(explain));
+
+    const joinStages = getAllPlanStages(getWinningPlanFromExplain(explain)).filter(plannerStageIsJoinOptNode);
+    assert.gt(joinStages.length, 0, "Expected at least one join stage: " + tojson(explain));
+
+    for (const stage of joinStages) {
+        assert.eq(
+            joinStageAbbreviation(stage.stage),
+            expectedMethod,
+            `Expected all joins to be ${expectedMethod}, but found ${stage.stage}`,
+        );
+    }
+}
