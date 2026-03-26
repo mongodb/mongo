@@ -677,22 +677,43 @@ void TicketingSystem::finalizeOperationStats(OperationContext* opCtx,
     // Increment ticket holder (normal and low priority) statistics counters.
     auto priority =
         wasDeprioritized ? AdmissionContext::Priority::kLow : AdmissionContext::Priority::kNormal;
-    _getHolder(priority, OperationType::kRead)
-        ->incrementDelinquencyStats(finalizedStats.readDelinquency);
-    _getHolder(priority, OperationType::kWrite)
-        ->incrementDelinquencyStats(finalizedStats.writeDelinquency);
+    if (finalizedStats.readDelinquency.totalDelinquentAcquisitions.loadRelaxed() > 0) {
+        _getHolder(priority, OperationType::kRead)
+            ->incrementDelinquencyStats(finalizedStats.readDelinquency);
+    }
+    if (finalizedStats.writeDelinquency.totalDelinquentAcquisitions.loadRelaxed() > 0) {
+        _getHolder(priority, OperationType::kWrite)
+            ->incrementDelinquencyStats(finalizedStats.writeDelinquency);
+    }
+    auto addIfNonZero = [](auto& dst, const auto& src, auto guard) {
+        if ((src.*guard).loadRelaxed() > 0) {
+            dst += src;
+        }
+    };
 
     // Increment finalized stats (CPU, elapsed, load shed) - depend on deprioritizable
     // classification.
-    _operationStats.nonDeprioritizable += finalizedStats.nonDeprioritizable;
-    _operationStats.deprioritizable += finalizedStats.deprioritizable;
+    addIfNonZero(_operationStats.nonDeprioritizable,
+                 finalizedStats.nonDeprioritizable,
+                 &OperationFinalizedStats::totalOpsFinished);
+    addIfNonZero(_operationStats.deprioritizable,
+                 finalizedStats.deprioritizable,
+                 &OperationFinalizedStats::totalOpsFinished);
 
     // Increment per-acquisition execution stats (deprioritizable/non-deprioritizable) by read/write
     // type.
-    _operationStats.readNonDeprioritizable += finalizedStats.readNonDeprioritizable;
-    _operationStats.readDeprioritizable += finalizedStats.readDeprioritizable;
-    _operationStats.writeNonDeprioritizable += finalizedStats.writeNonDeprioritizable;
-    _operationStats.writeDeprioritizable += finalizedStats.writeDeprioritizable;
+    addIfNonZero(_operationStats.readNonDeprioritizable,
+                 finalizedStats.readNonDeprioritizable,
+                 &OperationExecutionStats::totalAdmissions);
+    addIfNonZero(_operationStats.readDeprioritizable,
+                 finalizedStats.readDeprioritizable,
+                 &OperationExecutionStats::totalAdmissions);
+    addIfNonZero(_operationStats.writeNonDeprioritizable,
+                 finalizedStats.writeNonDeprioritizable,
+                 &OperationExecutionStats::totalAdmissions);
+    addIfNonZero(_operationStats.writeDeprioritizable,
+                 finalizedStats.writeDeprioritizable,
+                 &OperationExecutionStats::totalAdmissions);
 
     // Increment other global statistics counters.
     if (wasDeprioritized) {
@@ -702,7 +723,10 @@ void TicketingSystem::finalizeOperationStats(OperationContext* opCtx,
         _opsMarkedNonDeprioritizable.fetchAndAddRelaxed(1);
     }
 
-    _admissionsHistogram.record(ExecutionAdmissionContext::get(opCtx).getAdmissions());
+    auto admissions = ExecutionAdmissionContext::get(opCtx).getAdmissions();
+    if (admissions > 0) {
+        _admissionsHistogram.record(admissions);
+    }
 }
 
 boost::optional<Ticket> TicketingSystem::waitForTicketUntil(OperationContext* opCtx,
