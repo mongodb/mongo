@@ -120,7 +120,7 @@ public:
     static bool isVersioned(OperationContext* opCtx, const NamespaceString& nss);
 
     /**
-     * Returns true if the the current operation was sent from an upstream router, rather than it
+     * Returns true if the current operation was sent from an upstream router, rather than it
      * being a direct connection against the shard. The way this decision is made is based on
      * whether there is shard version declared for any namespace.
      */

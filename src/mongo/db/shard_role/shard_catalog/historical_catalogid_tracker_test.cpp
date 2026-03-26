@@ -1003,7 +1003,7 @@ TEST(HistoricalCatalogIdTrackerTest, NoTimestampRenameDropTarget) {
     ASSERT_EQ(bResultAfter, HistoricalCatalogIdTracker::LookupResult::Existence::kExists);
     ASSERT_EQ(bResultAfter, tracker.lookup(uuidA, boost::none).result);
     ASSERT_EQ(bIdAfter, tracker.lookup(uuidA, boost::none).id);
-    // Verify that the the recordId on b is now what was on a. We performed a rename with
+    // Verify that the recordId on b is now what was on a. We performed a rename with
     // dropTarget=true.
     ASSERT_EQ(aId, bIdAfter);
 

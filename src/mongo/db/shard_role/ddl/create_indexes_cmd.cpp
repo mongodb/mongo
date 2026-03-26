@@ -828,7 +828,7 @@ CreateIndexesReply runCreateIndexesWithCoordinator(
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
         // If the collection is dropped after the initial checks in this function (before the
         // AutoStatsTracker is created), the IndexBuildsCoordinator (either startIndexBuild() or
-        // the the task running the index build) may return NamespaceNotFound. This is not
+        // the task running the index build) may return NamespaceNotFound. This is not
         // considered an error and the command should return success.
         LOGV2(20448,
               "Index build: failed because collection dropped",

@@ -2165,7 +2165,7 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
                                                   kNoWaitWriteConcern));
     if (didUpdate) {
         LOGV2(23887,
-              "ensureChunkVersionIsGreaterThan bumped the the chunk version",
+              "ensureChunkVersionIsGreaterThan bumped the chunk version",
               "minKey"_attr = minKey,
               "maxKey"_attr = maxKey,
               "epoch"_attr = version.epoch(),

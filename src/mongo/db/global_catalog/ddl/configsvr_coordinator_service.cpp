@@ -122,7 +122,7 @@ bool ConfigsvrCoordinatorService::areAllCoordinatorsOfTypeFinished(
     }
 
     // If the POS has just been rebuilt on a newly-elected primary, there is a chance that the
-    // the coordinator instance does not exist yet. Query the state document namespace for any
+    // coordinator instance does not exist yet. Query the state document namespace for any
     // documents that will be built into instances.
     DBDirectClient client(opCtx);
     FindCommandRequest findStateDocs{NamespaceString::kConfigsvrCoordinatorsNamespace};

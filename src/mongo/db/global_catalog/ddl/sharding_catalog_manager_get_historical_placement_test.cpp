@@ -4483,7 +4483,7 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Clea
 
     setupConfigShard(opCtx, 5 /*nShards*/);
 
-    // Define the the earliest cluster time that needs to be preserved, then run the cleanup.
+    // Define the earliest cluster time that needs to be preserved, then run the cleanup.
     const auto earliestClusterTime = Timestamp(20, 0);
     ShardingCatalogManager::get(opCtx)->cleanUpPlacementHistory(opCtx, earliestClusterTime);
 

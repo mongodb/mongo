@@ -81,7 +81,7 @@ commands:
                 optional: true
             phase:
                 description:
-                    "An enum that indicates whether the the command is requesting the shard
+                    "An enum that indicates whether the command is requesting the shard
                     to enter phase-1 (kStart) or phase-2 (kComplete) of the 2-phase setFCV
                     protocol. Only valid to be specified for shards. If not specified on a
                     shard, it will run the full setFCV sequence (both phases)."

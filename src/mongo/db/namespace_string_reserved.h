@@ -84,7 +84,7 @@
     /*  Namespace for storing keys for validating cluster times created by other clusters. */      \
     X(kExternalKeysCollectionNamespace, DatabaseName::kConfig, "external_validation_keys"_sd)      \
                                                                                                    \
-    /*  Namespace of the the oplog collection. */                                                  \
+    /*  Namespace of the oplog collection. */                                                      \
     X(kRsOplogNamespace, DatabaseName::kLocal, "oplog.rs"_sd)                                      \
                                                                                                    \
     /*  Namespace for storing the persisted state of transaction coordinators. */                  \

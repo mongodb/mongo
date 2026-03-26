@@ -269,7 +269,7 @@ void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
 
     for (int attempt = 1;; attempt++) {
         // Since we can't differenciate if a shutdown exception is coming from a remote node or
-        // locally we need to directly inspect the the global shutdown state to correctly
+        // locally we need to directly inspect the global shutdown state to correctly
         // interrupt this task in case this node is shutting down.
         if (globalInShutdownDeprecated()) {
             uasserted(ErrorCodes::ShutdownInProgress, "Shutdown in progress");

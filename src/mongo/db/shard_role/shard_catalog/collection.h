@@ -528,7 +528,7 @@ public:
     virtual void updateHiddenSetting(OperationContext* opCtx, StringData idxName, bool hidden) = 0;
 
     /*
-     * Converts the the given index to be unique or non-unique.
+     * Converts the given index to be unique or non-unique.
      */
     virtual void updateUniqueSetting(OperationContext* opCtx, StringData idxName, bool unique) = 0;
 

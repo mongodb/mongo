@@ -319,7 +319,7 @@ TEST_F(ShardRegistryTest, GetDataDoesNoLookupAfterReloadWithShards) {
 
 TEST_F(ShardRegistryTest, GetDataDoesLookupWithNewTopologyTime) {
     addShard({"0"}, kAdvanceTopologyTime);
-    // The registry should reach out the the CSRS, cache was empty.
+    // The registry should reach out the CSRS, cache was empty.
     {
         auto future =
             launchAsync([this] { assertShardIdsFromRegistry(getData()->getAllShardIds()); });
@@ -330,7 +330,7 @@ TEST_F(ShardRegistryTest, GetDataDoesLookupWithNewTopologyTime) {
     // A shard has been added, and the topologyTime gossiped.
     addShard({"1"}, kAdvanceTopologyTime);
 
-    // The registry should reach out the the CSRS, cache was not empty.
+    // The registry should reach out the CSRS, cache was not empty.
     auto future = launchAsync([this] { assertShardIdsFromRegistry(getData()->getAllShardIds()); });
     expectCSRSLookup();
     future.default_timed_get();
@@ -340,7 +340,7 @@ TEST_F(ShardRegistryTest, GetDataDoesNoLookupWithoutNewTopologyTime) {
     // A shard has been added, and the topologyTime gossiped.
     addShard({"0"}, kAdvanceTopologyTime);
 
-    // The registry should reach out the the CSRS.
+    // The registry should reach out the CSRS.
     {
         auto future =
             launchAsync([this] { assertShardIdsFromRegistry(getData()->getAllShardIds()); });

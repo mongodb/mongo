@@ -120,7 +120,7 @@ public:
 
     /**
      * Non-blocking call, which returns the most recent db version for the given dbName from the
-     * the persistent metadata store.
+     * persistent metadata store.
      *
      * If for some reason the asynchronous fetch operation cannot be dispatched (for example on
      * shutdown), throws a DBException.

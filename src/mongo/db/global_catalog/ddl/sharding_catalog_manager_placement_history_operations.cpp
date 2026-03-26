@@ -201,7 +201,7 @@ AggregateCommandRequest createInitPlacementHistoryAggregationRequest(
     using Group = DocumentSourceGroup;
     using Project = DocumentSourceProject;
 
-    // Aliases for the field names of the the final projections
+    // Aliases for the field names of the final projections
     const auto kNss = std::string{NamespacePlacementType::kNssFieldName};
     const auto kUuid = std::string{NamespacePlacementType::kUuidFieldName};
     const auto kShards = std::string{NamespacePlacementType::kShardsFieldName};
