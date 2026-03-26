@@ -291,6 +291,11 @@ feature_flags:
         cpp_varname: gFeatureFlagUseInternalAuthzInsteadOfLDAP
         default: false
         fcv_gated: true
+    featureFlagQEPrefixSuffixSearch:
+        description: "Queryable Encryption encrypted prefix & suffix search support"
+        cpp_varname: gFeatureFlagQEPrefixSuffixSearch
+        default: false
+        fcv_gated: true
 
 server_parameters:
     allowDirectSystemBucketsAccess:
