@@ -61,17 +61,17 @@ export function runMoveChunkMakeDonorStepDownAfterFailpoint(
     const awaitResult = startParallelShell(
         funWithArgs(
             function (ns, toShardName, expectAbortDecisionWithCode) {
-                if (expectAbortDecisionWithCode) {
-                    assert.commandFailedWithCode(
-                        db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}),
-                        expectAbortDecisionWithCode,
-                    );
-                } else {
-                    assert.soonRetryOnAcceptableErrors(() => {
+                assert.soonRetryOnAcceptableErrors(() => {
+                    if (expectAbortDecisionWithCode) {
+                        assert.commandFailedWithCode(
+                            db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}),
+                            expectAbortDecisionWithCode,
+                        );
+                    } else {
                         assert.commandWorked(db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}));
-                        return true;
-                    }, ErrorCodes.FailedToSatisfyReadPreference);
-                }
+                    }
+                    return true;
+                }, ErrorCodes.FailedToSatisfyReadPreference);
             },
             ns,
             st.shard1.shardName,
