@@ -64,6 +64,10 @@ namespace {
 static constexpr auto kReadConcernLevelsDisallowedAsDefault = {
     repl::ReadConcernLevel::kSnapshotReadConcern, repl::ReadConcernLevel::kLinearizableReadConcern};
 
+bool hasCustomDefaultReadConcern(const boost::optional<repl::ReadConcernArgs>& rc) {
+    return rc && !rc->isEmpty();
+}
+
 const auto getReadWriteConcernDefaults =
     Service::declareDecoration<boost::optional<ReadWriteConcernDefaults>>();
 
@@ -214,6 +218,9 @@ void ReadWriteConcernDefaults::invalidate() {
 }
 
 void ReadWriteConcernDefaults::setDefault(OperationContext* opCtx, RWConcernDefault&& rwc) {
+    // Sync the fast-path flag whenever defaults are written.
+    _customDefaultReadConcernSet.store(hasCustomDefaultReadConcern(rwc.getDefaultReadConcern()));
+
     _defaults.insertOrAssignAndGet(
         Type::kReadWriteConcernEntry, std::move(rwc), opCtx->fastClockSource().now());
 }
@@ -261,8 +268,15 @@ ReadWriteConcernDefaults::_getDefaultCWRWCFromDisk(OperationContext* opCtx) {
         // defaultsValue.isValid() here, and we don't need to return the Handle, since callers don't
         // need to check defaultsValue.isValid() later, either.  Just dereference it to get the
         // underlying contents.
+        //
+        // Sync the fast-path flag from the authoritative cache value. This covers startup paths
+        // where setDefault() is not called (e.g. shardsvr nodes, which skip the startup
+        // refreshIfNecessary()), ensuring isCWRCSetFast() reflects what is actually on disk.
+        _customDefaultReadConcernSet.store(
+            hasCustomDefaultReadConcern(defaultsHandle->getDefaultReadConcern()));
         return RWConcernDefaultAndTime(*defaultsHandle, defaultsHandle.updateWallClockTime());
     }
+    _customDefaultReadConcernSet.store(false);
     return boost::none;
 }
 
