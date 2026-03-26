@@ -47,6 +47,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
+#include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/task_executor.h"
@@ -61,6 +62,8 @@
 #include "mongo/util/version/releases.h"
 
 #include <memory>
+#include <set>
+#include <stack>
 #include <string>
 #include <utility>
 
@@ -164,10 +167,6 @@ public:
             : boost::none;
     }
 
-    const boost::optional<mongo::DatabaseVersion>& getDatabaseVersion() const {
-        return _databaseVersion;
-    }
-
 protected:
     const NamespaceString& originalNss() const {
         return _coordId.getNss();
@@ -241,6 +240,9 @@ protected:
 
     virtual void _initialize(OperationContext* opCtx) = 0;
 
+    virtual void _checkCoordinatorPreconditions(OperationContext* opCtx,
+                                                bool afterAcquiringLocks) = 0;
+
     virtual ExecutorFuture<void> _acquireLocksAsync(
         OperationContext* opCtx,
         std::shared_ptr<executor::ScopedTaskExecutor> executor,
@@ -260,7 +262,6 @@ protected:
 
     const bool _recoveredFromDisk;
     const boost::optional<mongo::ForwardableOperationMetadata> _forwardableOpMetadata;
-    const boost::optional<mongo::DatabaseVersion> _databaseVersion;
     boost::optional<NamespaceString> _bucketNss;
 
     bool _firstExecution{

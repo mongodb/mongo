@@ -34,7 +34,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/cleanup_structured_encryption_data_coordinator.h"
 #include "mongo/db/client.h"
@@ -61,7 +60,6 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/resharding/reshard_collection_coordinator.h"
-#include "mongo/db/shard_role/shard_catalog/database_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/topology/add_shard_coordinator.h"
@@ -394,23 +392,6 @@ ShardingCoordinatorService::getOrCreateInstance(OperationContext* opCtx,
     // Wait for all coordinators to be recovered before to allow the creation of new ones.
     waitForRecovery(opCtx);
 
-    auto coorMetadata = extractShardingCoordinatorMetadata(coorDoc);
-    const auto& nss = coorMetadata.getId().getNss();
-
-    if (!nss.isConfigDB() && !nss.isAdminDB() &&
-        coorMetadata.getId().getOperationType() != CoordinatorTypeEnum::kCreateDatabase) {
-        // Check that the operation context has a database version for this namespace
-        const auto clientDbVersion = OperationShardingState::get(opCtx).getDbVersion(nss.dbName());
-        uassert(ErrorCodes::IllegalOperation,
-                "Request sent without attaching database version",
-                clientDbVersion);
-        {
-            const auto scopedDss = DatabaseShardingState::acquire(opCtx, nss.dbName());
-            scopedDss->assertIsPrimaryShardForDb(opCtx);
-        }
-        coorMetadata.setDatabaseVersion(clientDbVersion);
-    }
-
     const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     ForwardableOperationMetadata forwardableOpMetadata(opCtx);
     // We currently only propagate the Operation FCV for DDL operations.
@@ -421,6 +402,9 @@ ShardingCoordinatorService::getOrCreateInstance(OperationContext* opCtx,
                                                                fcv)) {
         forwardableOpMetadata.setVersionContext(VersionContext{fcv});
     }
+    auto coorMetadata = extractShardingCoordinatorMetadata(coorDoc);
+    coorMetadata.setDatabaseVersion(
+        OperationShardingState::get(opCtx).getDbVersion(coorMetadata.getId().getNss().dbName()));
     coorMetadata.setForwardableOpMetadata(forwardableOpMetadata);
     const auto patchedCoorDoc = coorDoc.addFields(coorMetadata.toBSON());
 

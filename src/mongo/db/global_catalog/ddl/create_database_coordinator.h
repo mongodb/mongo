@@ -63,6 +63,10 @@ private:
                                          const CancellationToken& token,
                                          const Status& status) noexcept override;
 
+    void checkDBVersion(OperationContext* opCtx, bool afterAcquiringLocks) override {
+        // CreateDatabaseCoordinator runs on the config server, so don't check the DB version.
+    }
+
     // Check the command arguments passed and if a database can be returned right away.
     void _checkPreconditions();
 

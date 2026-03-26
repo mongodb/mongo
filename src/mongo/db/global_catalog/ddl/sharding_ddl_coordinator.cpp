@@ -30,11 +30,20 @@
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
 
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
+#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/util/future_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+
+ShardingDDLCoordinatorMixin::ShardingDDLCoordinatorMixin(const BSONObj& coorDoc)
+    : _databaseVersion(extractShardingCoordinatorMetadata(coorDoc).getDatabaseVersion()) {}
+
+const boost::optional<mongo::DatabaseVersion>& ShardingDDLCoordinatorMixin::getDatabaseVersion()
+    const {
+    return _databaseVersion;
+}
 
 void ShardingDDLCoordinatorMixin::_initializeLockerAndCheckAllowedToStart(ShardingCoordinator& self,
                                                                           OperationContext* opCtx) {
@@ -52,6 +61,29 @@ void ShardingDDLCoordinatorMixin::_initializeLockerAndCheckAllowedToStart(Shardi
     if (self._firstExecution && !self.canAlwaysStartWhenUserWritesAreDisabled()) {
         self._getExternalState()->checkShardedDDLAllowedToStart(opCtx, self.originalNss());
     }
+}
+
+void ShardingDDLCoordinatorMixin::_checkDBVersion(ShardingCoordinator& self,
+                                                  OperationContext* opCtx,
+                                                  bool afterAcquiringLocks) {
+    const auto& originalNss = self.originalNss();
+
+    if (!originalNss.isConfigDB() && !originalNss.isAdminDB() && !self._recoveredFromDisk) {
+        if (afterAcquiringLocks) {
+            tassert(10644522,
+                    "Expected databaseVersion to be set on the coordinator document metadata",
+                    _databaseVersion);
+        } else {
+            uassert(ErrorCodes::IllegalOperation,
+                    "Request sent without attaching database version",
+                    _databaseVersion);
+        }
+
+        ScopedSetShardRole scopedSetShardRole(
+            opCtx, originalNss, boost::none /* shardVersion */, _databaseVersion);
+
+        self._getExternalState()->assertIsPrimaryShardForDb(opCtx, originalNss.dbName());
+    };
 }
 
 std::set<NamespaceString> ShardingDDLCoordinatorMixin::_getAdditionalLocksToAcquire(

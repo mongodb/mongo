@@ -37,8 +37,17 @@ namespace mongo {
 
 class MONGO_MOD_PRIVATE ShardingDDLCoordinatorMixin {
 protected:
+    explicit ShardingDDLCoordinatorMixin(const BSONObj& coorDoc);
+    virtual ~ShardingDDLCoordinatorMixin() = default;
+
     void _initializeLockerAndCheckAllowedToStart(ShardingCoordinator& self,
                                                  OperationContext* opCtx);
+
+    const boost::optional<mongo::DatabaseVersion>& getDatabaseVersion() const;
+
+    void _checkDBVersion(ShardingCoordinator& self,
+                         OperationContext* opCtx,
+                         bool afterAcquiringLocks);
 
     virtual std::set<NamespaceString> _getAdditionalLocksToAcquire(OperationContext* opCtx);
 
@@ -59,6 +68,7 @@ private:
         const T& resource,
         LockMode lockMode);
 
+    const boost::optional<mongo::DatabaseVersion> _databaseVersion;
     // A Locker object works attached to an opCtx and it's destroyed once the opCtx gets out of
     // scope. However, we must keep alive a unique Locker object during the whole
     // ShardingCoordinator life to preserve the lock state among all the executor tasks.
@@ -72,14 +82,17 @@ template <typename StateDoc>
 class MONGO_MOD_NEEDS_REPLACEMENT NonRecoverableShardingDDLCoordinator
     : public ShardingCoordinator,
       protected NonRecoverableTypedDocMixin<StateDoc>,
-      public ShardingDDLCoordinatorMixin {
+      protected ShardingDDLCoordinatorMixin {
+public:
+    using ShardingDDLCoordinatorMixin::getDatabaseVersion;
+
 protected:
     explicit NonRecoverableShardingDDLCoordinator(ShardingCoordinatorService* service,
                                                   std::string name,
                                                   const BSONObj& coorDoc)
         : ShardingCoordinator(service, std::move(name), coorDoc),
           NonRecoverableTypedDocMixin<StateDoc>(coorDoc),
-          ShardingDDLCoordinatorMixin() {}
+          ShardingDDLCoordinatorMixin(coorDoc) {}
 
     const CoordinatorStateDoc& getDoc() const override {
         return this->_docWrapper;
@@ -92,6 +105,10 @@ protected:
 private:
     void _initialize(OperationContext* opCtx) override {
         this->_initializeLockerAndCheckAllowedToStart(*this, opCtx);
+    }
+
+    void _checkCoordinatorPreconditions(OperationContext* opCtx, bool afterAcquiringLocks) final {
+        this->_checkDBVersion(*this, opCtx, afterAcquiringLocks);
     }
 
     ExecutorFuture<void> _acquireLocksAsync(OperationContext* opCtx,
@@ -111,9 +128,12 @@ template <typename StateDoc>
 class MONGO_MOD_UNFORTUNATELY_OPEN RecoverableShardingDDLCoordinator
     : public RecoverableShardingCoordinator,
       protected RecoverableTypedDocMixin<RecoverableShardingDDLCoordinator<StateDoc>, StateDoc>,
-      public ShardingDDLCoordinatorMixin {
+      protected ShardingDDLCoordinatorMixin {
 
     friend RecoverableTypedDocMixin<RecoverableShardingDDLCoordinator<StateDoc>, StateDoc>;
+
+public:
+    using ShardingDDLCoordinatorMixin::getDatabaseVersion;
 
 protected:
     explicit RecoverableShardingDDLCoordinator(ShardingCoordinatorService* service,
@@ -121,7 +141,7 @@ protected:
                                                const BSONObj& coorDoc)
         : RecoverableShardingCoordinator(service, std::move(name), coorDoc),
           RecoverableTypedDocMixin<RecoverableShardingDDLCoordinator<StateDoc>, StateDoc>(coorDoc),
-          ShardingDDLCoordinatorMixin() {}
+          ShardingDDLCoordinatorMixin(coorDoc) {}
 
     const CoordinatorStateDoc& getDoc() const override {
         return this->_docWrapper;
@@ -134,6 +154,14 @@ protected:
 private:
     void _initialize(OperationContext* opCtx) override {
         this->_initializeLockerAndCheckAllowedToStart(*this, opCtx);
+    }
+
+    virtual void checkDBVersion(OperationContext* opCtx, bool afterAcquiringLocks) {
+        this->_checkDBVersion(*this, opCtx, afterAcquiringLocks);
+    }
+
+    void _checkCoordinatorPreconditions(OperationContext* opCtx, bool afterAcquiringLocks) final {
+        checkDBVersion(opCtx, afterAcquiringLocks);
     }
 
     ExecutorFuture<void> _acquireLocksAsync(OperationContext* opCtx,
