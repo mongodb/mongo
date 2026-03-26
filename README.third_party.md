@@ -34,8 +34,6 @@ a notice will be included in
 | [fmt]                                                | MIT                                            | 11.2.0                                   |                      | ✗                               |
 | [folly]                                              | Apache-2.0                                     | 2023.12.25.00                            |                      | ✗                               |
 | [fuzztest]                                           | BSD-3-Clause, Apache-2.0, HPND                 | 2025-07-28                               |                      |                                 |
-| [github.com/apache/arrow-nanoarrow]                  | Apache-2.0                                     | apache-arrow-nanoarrow-0.7.0             |                      |                                 |
-| [github.com/apache/iceberg-cpp]                      | Apache-2.0                                     | v0.2.0-rc1                               |                      |                                 |
 | [googletest]                                         | BSD-3-Clause                                   | 1.17.0                                   |                      |                                 |
 | [gperftools]                                         | BSD-3-Clause                                   | 2.9.1                                    |                      | ✗                               |
 | [gRPC (C++)]                                         | Apache-2.0                                     | 1.74.1                                   |                      | ✗                               |
@@ -45,11 +43,9 @@ a notice will be included in
 | [JSON Schema Store]                                  | Apache-2.0                                     | 6847cfc3a17a04a7664474212db50c627e1e3408 |                      |                                 |
 | [JSON-Schema-Test-Suite]                             | MIT                                            | 728066f9c5c258ba3b1804a22a5b998f2ec77ec0 |                      |                                 |
 | [libdwarf]                                           | LGPL-2.1-or-later, BSD-3-Clause, Public Domain | 2.1.0                                    |                      |                                 |
-| [libmongocrypt]                                      | Apache-2.0                                     | 1.15.0                                   | ✗                    | ✗                               |
 | [LibTomCrypt]                                        | Unlicense                                      | 1.18.2                                   | ✗                    | ✗                               |
 | [libunwind]                                          | MIT                                            | 1.8.1                                    |                      | ✗                               |
 | [linenoise]                                          | BSD-2-Clause                                   | 6cdc775807e57b2c3fd64bd207814f8ee1fe35f3 |                      | ✗                               |
-| [MongoDB C Driver]                                   | Apache-2.0                                     | 1.28.1                                   | ✗                    | ✗                               |
 | [Mozilla Firefox ESR]                                | MPL-2.0                                        | 140.7.0esr                               |                      | ✗                               |
 | [MurmurHash3]                                        | Public Domain                                  | a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb |                      | ✗                               |
 | [nlohmann/json]                                      | MIT                                            | 3.11.3                                   | ✗                    |                                 |
@@ -71,9 +67,8 @@ a notice will be included in
 | [timelib]                                            | MIT                                            | 2022.13                                  |                      | ✗                               |
 | [Unicode Character Database]                         | Unicode-DFS-2016                               | 8.0.0                                    | ✗                    | ✗                               |
 | [valgrind.h]                                         | BSD-4-Clause                                   | 093bef43d69236287ccc748591c9560a71181b0a |                      | ✗                               |
-| [WiredTiger]                                         | GPL-2.0-only OR GPL-3.0-only                   | 12.0.0                                   | ✗                    | ✗                               |
 | [yaml-cpp]                                           | MIT                                            | 0.6.3                                    |                      | ✗                               |
-| [zlib]                                               | Zlib                                           | 1.3                                      | ✗                    | ✗                               |
+| [zlib]                                               | Zlib                                           | 1.3.2                                    | ✗                    | ✗                               |
 | [Zstandard (zstd)]                                   | BSD-3-Clause OR GPL-2.0-only                   | 1.5.5                                    | ✗                    | ✗                               |
 
 [Abseil Common Libraries (C++)]: https://github.com/abseil/abseil-cpp.git
@@ -86,7 +81,6 @@ a notice will be included in
 [JSON Schema Store]: https://github.com/schemastore/schemastore.git
 [JSON-Schema-Test-Suite]: https://github.com/json-schema-org/JSON-Schema-Test-Suite.git
 [LibTomCrypt]: https://github.com/libtom/libtomcrypt.git
-[MongoDB C Driver]: https://github.com/mongodb/mongo-c-driver.git
 [Mozilla Firefox ESR]: https://github.com/mozilla-firefox/firefox.git
 [MurmurHash3]: https://github.com/aappleby/smhasher/blob/a6bd3ce/
 [PCRE2 - Perl-Compatible Regular Expressions]: https://github.com/pcre2project/pcre2.git
@@ -96,7 +90,6 @@ a notice will be included in
 [SafeInt]: https://github.com/dcleblanc/safeint.git
 [Snowball Stemming Algorithms (libstemmer)]: http://github.com/snowballstem/snowball.git
 [Unicode Character Database]: https://www.unicode.org/Public/8.0.0/
-[WiredTiger]: https://github.com/wiredtiger/wiredtiger.git
 [Zstandard (zstd)]: https://github.com/facebook/zstd.git
 [benchmark]: https://github.com/google/benchmark.git
 [c-ares]: https://github.com/c-ares/c-ares.git
@@ -105,13 +98,10 @@ a notice will be included in
 [folly]: https://github.com/facebook/folly.git
 [fuzztest]: https://github.com/google/fuzztest.git
 [gRPC (C++)]: https://github.com/grpc/grpc.git
-[github.com/apache/arrow-nanoarrow]: pkg:github/apache/arrow-nanoarrow@apache-arrow-nanoarrow-0.7.0
-[github.com/apache/iceberg-cpp]: pkg:github/apache/iceberg-cpp@v0.2.0-rc1
 [googletest]: https://github.com/google/googletest.git
 [gperftools]: https://github.com/gperftools/gperftools.git
 [immer]: https://github.com/arximboldi/immer.git
 [libdwarf]: https://github.com/davea42/libdwarf-code.git
-[libmongocrypt]: https://github.com/mongodb/libmongocrypt.git
 [libunwind]: https://github.com/libunwind/libunwind.git
 [linenoise]: https://github.com/antirez/linenoise
 [nlohmann/json]: https://github.com/nlohmann/json.git
@@ -128,6 +118,22 @@ a notice will be included in
 [valgrind.h]: https://sourceware.org/git/valgrind.git
 [yaml-cpp]: https://github.com/jbeder/yaml-cpp.git
 [zlib]: https://zlib.net/fossils/
+
+## WiredTiger Vendored Test Libraries
+
+The following libraries are transitively included by WiredTiger,
+and are used by that component for testing. They don't appear in
+released binary artifacts.
+
+| Name                           |
+| ------------------------------ |
+| pkg:pypi/concurrencytest@0.1.2 |
+| pkg:pypi/discover@0.4.0        |
+| pkg:pypi/extras@0.0.3          |
+| pkg:pypi/iso8601@2.1.0         |
+| pkg:pypi/python-subunit@1.4.4  |
+| pkg:pypi/testscenarios@0.4     |
+| pkg:pypi/testtools@2.7.1       |
 
 ## Dynamically Linked Libraries
 
