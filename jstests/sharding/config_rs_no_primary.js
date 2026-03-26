@@ -35,9 +35,20 @@ assert.eq(st.config0, st.configRS.getPrimary());
 // Create the "test" database while the cluster metadata is still writeable.
 st.s.getDB("test").foo.insert({a: 1});
 
-// Take down two of the config servers so the remaining one goes into SECONDARY state.
+// Take down two of the config server nodes; the remaining secondary will keep its replication state.
 st.configRS.stop(1);
-st.configRS.stop(2);
+if (TestData.configShard) {
+    // Ensure that the surviving node has up-to-date filtering metadata to keep serving reads on the tested namespace.
+    assert.eq(
+        1,
+        st.s
+            .getDB("test")
+            .runCommand({find: "foo", $readPreference: {mode: "secondary"}, readConcern: {"level": "local"}}).cursor
+            .firstBatch.length,
+    );
+}
+
+st.configRS.stop(0);
 st.configRS.awaitNoPrimary();
 
 jsTestLog("Starting a new mongos when the config servers have no primary which should work");
@@ -54,7 +65,6 @@ let testOps = function (mongos) {
         mongos.setSecondaryOk(false);
     } else {
         let initialCount = mongos.getDB("test").foo.count();
-        // In config shard mode there's no primary.
         assert.commandWorked(mongos.getDB("test").foo.insert({a: 1}));
         assert.eq(initialCount + 1, mongos.getDB("test").foo.count());
     }

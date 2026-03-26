@@ -21,12 +21,19 @@ TestData.skipCheckRoutingTableConsistency = true;
 let st = new ShardingTest({
     shards: 2,
     config: 3,
+    other: {
+        c0: {}, // Make sure 1st config server is primary
+        c1: {rsConfig: {priority: 0}},
+        c2: {rsConfig: {priority: 0}},
+    },
     // By default, our test infrastructure sets the election timeout to a very high value (24
     // hours). For this test, we need a shorter election timeout because it relies on nodes running
     // an election when they do not detect an active primary. Therefore, we are setting the
     // electionTimeoutMillis to its default value.
     initiateWithDefaultElectionTimeout: true,
 });
+
+assert.eq(st.config0, st.configRS.getPrimary());
 
 jsTest.log("Starting sharding batch write tests...");
 
@@ -188,12 +195,13 @@ assert.eq(0, st.config0.getCollection(configColl + "").count());
 assert.eq(0, st.config1.getCollection(configColl + "").count());
 assert.eq(0, st.config2.getCollection(configColl + "").count());
 
+// Bring the config server to a state where a single secondary node is available,
+// then repeat the insert/update/delete tests to ensure that they fail due to non-satisfiable read preference.
+// (The fact that the query statements do not target any existing document shouldn't influence the test outcome).
+st.stopConfigServer(0);
 st.stopConfigServer(1);
-st.stopConfigServer(2);
 st.configRS.awaitNoPrimary();
 
-// Config server insert with no config PRIMARY
-configColl.remove({});
 printjson(
     (request = {
         insert: configColl.getName(),
@@ -203,9 +211,6 @@ printjson(
 printjson((result = configColl.runCommand(request)));
 assert.commandFailedWithCode(result, ErrorCodes.FailedToSatisfyReadPreference);
 
-// Config server insert with no config PRIMARY
-configColl.remove({});
-configColl.insert({a: 1});
 printjson(
     (request = {
         update: configColl.getName(),
@@ -215,9 +220,6 @@ printjson(
 printjson((result = configColl.runCommand(request)));
 assert.commandFailedWithCode(result, ErrorCodes.FailedToSatisfyReadPreference);
 
-// Config server insert with no config PRIMARY
-configColl.remove({});
-configColl.insert({a: 1});
 printjson(
     (request = {
         delete: configColl.getName(),
