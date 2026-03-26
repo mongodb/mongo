@@ -211,6 +211,32 @@ std::unique_ptr<sbe::PlanStage> makeScanStage(const CollectionPtr& collection,
 }
 
 /**
+ * Tries to evaluate 'expr' against 'doc'. Returns true/false for match/no-match, or boost::none if
+ * evaluation threw a DBException.
+ */
+boost::optional<bool> tryMatchesBSON(const MatchExpression* expr, const BSONObj& doc) {
+    try {
+        return exec::matcher::matchesBSON(expr, doc, nullptr);
+    } catch (const DBException&) {
+        return boost::none;
+    }
+}
+
+/**
+ * Computes a scaled cardinality estimate from the given match count and error count. The
+ * selectivity is computed over only the successfully evaluated documents (i.e., the effective
+ * sample size is 'sampleSize - errorCount').
+ */
+CardinalityEstimate makeScaledEstimate(double matchCount,
+                                       size_t errorCount,
+                                       size_t sampleSize,
+                                       double collCard) {
+    size_t effectiveSampleSize = sampleSize - errorCount;
+    double estimate = effectiveSampleSize > 0 ? (matchCount * collCard) / effectiveSampleSize : 0.0;
+    return CardinalityEstimate{CardinalityType{estimate}, EstimationSource::Sampling};
+}
+
+/**
  * This helper creates a sbe::ProjectStage which is used to apply an inclusion projection on the
  * documents when generating the sample. 'stage' is the child SBE plan stage that we use as input to
  * create the current stage. 'inputSlot' is the SBE slot where the document that we want to apply
@@ -566,22 +592,18 @@ CardinalityEstimate SamplingEstimatorImpl::estimateCardinality(const MatchExpres
     }
 
     size_t cnt = 0;
-    try {
-        for (const auto& doc : _sample) {
-            if (exec::matcher::matchesBSON(expr, doc, nullptr)) {
-                cnt++;
-            }
+    size_t errorCount = 0;
+    for (const auto& doc : _sample) {
+        auto result = tryMatchesBSON(expr, doc);
+        if (!result) {
+            errorCount++;
+            continue;
         }
-    } catch (const DBException&) {
-        // The evaluation of this expression failed. This estimation stops here and returns a
-        // CardinalityEstimate calculated based on whatever we have counted at this point with a
-        // erroneous status.
-        CardinalityEstimate ce{CardinalityType{(cnt * getCollCard()) / _sampleSize},
-                               EstimationSource::Sampling};
-        return ce;
+        if (*result) {
+            cnt++;
+        }
     }
-    CardinalityEstimate estimate{CardinalityType{(cnt * getCollCard()) / _sampleSize},
-                                 EstimationSource::Sampling};
+    CardinalityEstimate estimate = makeScaledEstimate(cnt, errorCount, _sampleSize, getCollCard());
     LOGV2_DEBUG(9756604,
                 5,
                 "SamplingCE cardinality (# docs) for MatchExpression",
@@ -598,34 +620,30 @@ std::vector<CardinalityEstimate> SamplingEstimatorImpl::estimateCardinality(
     if (!_topLevelSampleFieldNames.empty()) {
         checkSampleContainsMatchExpressionFields(_topLevelSampleFieldNames, expressions);
     }
-    // The bool value indicates whether the estimation of the corresponding expression was aborted
-    // or not. The estimation would be stopped if any error occurred during the estimation.
-    std::vector<std::pair<double, bool>> estimates(expressions.size(), {0, true});
+    std::vector<double> counts(expressions.size(), 0);
+    std::vector<size_t> errorCounts(expressions.size(), 0);
     // Experiment showed that this batch process performs better than calling
     // 'estimateCardinality(const MatchExpression* expr)' over and over.
     for (const auto& doc : _sample) {
         for (size_t i = 0; i < expressions.size(); i++) {
-            if (estimates[i].second) {
-                try {
-                    if (exec::matcher::matchesBSON(expressions[i], doc, nullptr)) {
-                        estimates[i].first += 1;
-                    }
-                } catch (const DBException&) {
-                    // The expression failed to evaluate. Abort the estimation of this expression.
-                    estimates[i].second = false;
-                }
+            auto result = tryMatchesBSON(expressions[i], doc);
+            if (!result) {
+                errorCounts[i]++;
+                continue;
+            }
+            if (*result) {
+                counts[i] += 1;
             }
         }
     }
 
-    std::vector<CardinalityEstimate> estimatesCard;
-    for (auto card : estimates) {
-        double estimate = (card.first * getCollCard()) / _sampleSize;
-        estimatesCard.push_back(
-            CardinalityEstimate{CardinalityType{estimate}, EstimationSource::Sampling});
+    std::vector<CardinalityEstimate> estimates;
+    for (size_t i = 0; i < counts.size(); i++) {
+        estimates.push_back(
+            makeScaledEstimate(counts[i], errorCounts[i], _sampleSize, getCollCard()));
     }
 
-    return estimatesCard;
+    return estimates;
 }
 
 CardinalityEstimate SamplingEstimatorImpl::estimateKeysScanned(const IndexBounds& bounds) const {
@@ -690,14 +708,25 @@ CardinalityEstimate SamplingEstimatorImpl::estimateRIDs(const IndexBounds& bound
         checkSampleContainsIndexBoundsFields(_topLevelSampleFieldNames, bounds);
     }
     size_t count = 0;
+    size_t errorCount = 0;
     forDocumentsMatchingBounds(bounds, _sample, [&](const BSONObj& document) {
         // If 'expr' is null, we are simply estimating the cardinality by IndexBounds.
-        if (expr == nullptr || exec::matcher::matchesBSON(expr, document, nullptr)) {
+        if (expr == nullptr) {
+            count++;
+            return true;
+        }
+        auto result = tryMatchesBSON(expr, document);
+        if (!result) {
+            errorCount++;
+            return true;
+        }
+        if (*result) {
             count++;
         }
+        return true;
     });
-    CardinalityEstimate estimate{CardinalityType{(count * getCollCard()) / _sampleSize},
-                                 EstimationSource::Sampling};
+    CardinalityEstimate estimate =
+        makeScaledEstimate(count, errorCount, _sampleSize, getCollCard());
     LOGV2_DEBUG(9756606,
                 5,
                 "SamplingCE cardinality (# docs) for index bounds and MatchExpression",

@@ -265,20 +265,22 @@ protected:
     /**
      * This helper calls the given callback for each document
      * in a given vector that matches the given bounds.
+     * The callback should return true to continue iterating, or false to stop.
      */
     template <typename T>
     static void forDocumentsMatchingBounds(const IndexBounds& bounds,
                                            const std::vector<BSONObj>& docs,
                                            const T& callback)
-    requires std::invocable<T, const BSONObj&>
+    requires std::is_invocable_r_v<bool, T, const BSONObj&>
     {
         size_t idx = 0;
+        bool stopped = false;
         forNumberKeysMatch(
             bounds,
             docs,
             [&](size_t matchCnt) {
-                if (matchCnt > 0) {
-                    callback(docs[idx]);
+                if (!stopped && matchCnt > 0) {
+                    stopped = !callback(docs[idx]);
                 }
                 idx++;
             },
