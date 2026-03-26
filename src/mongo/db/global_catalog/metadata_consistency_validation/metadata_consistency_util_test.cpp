@@ -1801,5 +1801,77 @@ TEST_F(MetadataConsistencyShardCatalogTest,
     ASSERT_EQ(1, countInconsistenciesWithDetailField(inconsistencies, "ownedChunks"_sd));
 }
 
+// Tests for the `severity` field on `MetadataInconsistencyItem`.
+
+class MakeInconsistencySeverityTest : public unittest::Test {
+protected:
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
+    const UUID _uuid = UUID::gen();
+
+    MissingRoutingTableDetails makeDetails() {
+        MissingRoutingTableDetails details;
+        details.setNss(_nss);
+        details.setCollectionUUID(_uuid);
+        return details;
+    }
+};
+
+TEST_F(MakeInconsistencySeverityTest, NoSeverityByDefault) {
+    const auto item = metadata_consistency_util::makeInconsistency(
+        MetadataInconsistencyTypeEnum::kMissingRoutingTable, makeDetails());
+    ASSERT_FALSE(item.getSeverity().has_value());
+}
+
+TEST_F(MakeInconsistencySeverityTest, SeverityHighIsPreserved) {
+    const auto item = metadata_consistency_util::makeInconsistency(
+        MetadataInconsistencyTypeEnum::kMissingRoutingTable,
+        makeDetails(),
+        MetadataInconsistencySeverityEnum::kHigh);
+    ASSERT_TRUE(item.getSeverity().has_value());
+    ASSERT_EQ(MetadataInconsistencySeverityEnum::kHigh, item.getSeverity().value());
+}
+
+TEST_F(MakeInconsistencySeverityTest, SeverityMediumIsPreserved) {
+    const auto item = metadata_consistency_util::makeInconsistency(
+        MetadataInconsistencyTypeEnum::kMissingRoutingTable,
+        makeDetails(),
+        MetadataInconsistencySeverityEnum::kMedium);
+    ASSERT_TRUE(item.getSeverity().has_value());
+    ASSERT_EQ(MetadataInconsistencySeverityEnum::kMedium, item.getSeverity().value());
+}
+
+TEST_F(MakeInconsistencySeverityTest, SeverityLowIsPreserved) {
+    const auto item = metadata_consistency_util::makeInconsistency(
+        MetadataInconsistencyTypeEnum::kMissingRoutingTable,
+        makeDetails(),
+        MetadataInconsistencySeverityEnum::kLow);
+    ASSERT_TRUE(item.getSeverity().has_value());
+    ASSERT_EQ(MetadataInconsistencySeverityEnum::kLow, item.getSeverity().value());
+}
+
+TEST_F(MakeInconsistencySeverityTest, ExplicitNoneSeverityIsAbsent) {
+    const auto item = metadata_consistency_util::makeInconsistency(
+        MetadataInconsistencyTypeEnum::kMissingRoutingTable, makeDetails(), boost::none);
+    ASSERT_FALSE(item.getSeverity().has_value());
+}
+
+TEST_F(MakeInconsistencySeverityTest, AbsentSeverityRoundTripsViaBSON) {
+    const auto original = metadata_consistency_util::makeInconsistency(
+        MetadataInconsistencyTypeEnum::kMissingRoutingTable, makeDetails());
+    const auto roundTripped = MetadataInconsistencyItem::parse(original.toBSON());
+    ASSERT_FALSE(roundTripped.getSeverity().has_value());
+}
+
+TEST_F(MakeInconsistencySeverityTest, SeverityRoundTripsViaBSON) {
+    const auto original = metadata_consistency_util::makeInconsistency(
+        MetadataInconsistencyTypeEnum::kMissingRoutingTable,
+        makeDetails(),
+        MetadataInconsistencySeverityEnum::kHigh);
+    const auto roundTripped = MetadataInconsistencyItem::parse(original.toBSON());
+    ASSERT_TRUE(roundTripped.getSeverity().has_value());
+    ASSERT_EQ(MetadataInconsistencySeverityEnum::kHigh, roundTripped.getSeverity().value());
+}
+
 }  // namespace
 }  // namespace mongo

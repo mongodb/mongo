@@ -101,6 +101,14 @@ enums:
             kInconsistentShardCatalogCollectionMetadata: "Found inconsistencies between collection metadata in the global catalog and the shard catalog"
             kIncompatibleUniqueIndexOnShardedCollection: "Found incompatible index options with uniqueness in a sharded collection"
 
+    MetadataInconsistencySeverity:
+        description: "Severity level of a metadata inconsistency."
+        type: string
+        values:
+            kHigh: "high"
+            kMedium: "medium"
+            kLow: "low"
+
     MetadataConsistencyCommandLevel:
         description: "Level mode of the metadata consistency command."
         type: string
@@ -571,6 +579,10 @@ structs:
             details:
                 type: object
                 description: "Details about the inconsistency."
+            severity:
+                type: MetadataInconsistencySeverity
+                description: "Severity level of the inconsistency."
+                optional: true
 
     CommonCheckMetadataRequestFields:
         description: "Common fields for all checkMetdataConsistency commands"
