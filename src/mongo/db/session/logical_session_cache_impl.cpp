@@ -275,6 +275,14 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
 }
 
 Status LogicalSessionCacheImpl::_refresh(Client* client) {
+    // As we swap out _activeSessions during this process, without this protection, _refresh may
+    // return without all active sessions being present in the collection. There is no correctness
+    // issue without this as the backswapper is a merge operation, however, the
+    // refreshLogicalSessionCacheNow function is used in testing to ensure that sessions are present
+    // before continuing. To ensure correctness of this function, make sure that it is not running
+    // concurrently with the periodic refresh. As these are the only two usages, we do not expect
+    // any performance issues from this mutex.
+    stdx::lock_guard<stdx::mutex> refreshLock(_refreshMutex);
     Status refreshStatus = Status::OK();
     // get or make an opCtx
     boost::optional<ServiceContext::UniqueOperationContext> uniqueCtx;
@@ -365,7 +373,6 @@ Status LogicalSessionCacheImpl::_refresh(Client* client) {
     for (const auto& it : activeSessions) {
         activeSessionRecords.insert(it.second);
     }
-
 
     // Refresh the active sessions in the sessions collection.
     auto refreshRes = _sessionsColl->refreshSessions(opCtx, activeSessionRecords);

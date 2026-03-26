@@ -123,7 +123,10 @@ private:
     const std::shared_ptr<SessionsCollection> _sessionsColl;
     const ReapSessionsOlderThanFn _reapSessionsOlderThanFn;
 
+    // Mutex to protect the stats object and _activeSessions swap operations.
     mutable stdx::mutex _mutex;
+    // Mutex to ensure that only one _refresh operation runs at a time.
+    mutable stdx::mutex _refreshMutex;
 
     LogicalSessionIdMap<LogicalSessionRecord> _activeSessions;
 
