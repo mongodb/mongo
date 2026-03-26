@@ -366,6 +366,7 @@ public:
             for (size_t i = 0; i < oldIters.size(); i += numParallelSpills) {
                 auto count = std::min(numParallelSpills, oldIters.size() - i);
                 auto spillsToMerge = std::span(oldIters).subspan(i, count);
+                validateMergeSpillRanges<Key, Value>(spillsToMerge);
 
                 // For container-based spilling we append merged data back into the same container
                 // range, so we rely on _minAvailableDiskBytesToSpill as a lower bound instead of
@@ -378,7 +379,7 @@ public:
                 auto writer = this->_storage->makeWriter(opts, settings);
 
                 int64_t deleteRangeStart = spillsToMerge.front()->getRange().getStart();
-                int64_t deleteRangeEnd = validateMergeSpillRanges<Key, Value>(spillsToMerge);
+                int64_t deleteRangeEnd = spillsToMerge.back()->getRange().getEnd();
                 const int64_t numSourceRows = deleteRangeEnd - deleteRangeStart;
 
                 int64_t numSpilled = 0;

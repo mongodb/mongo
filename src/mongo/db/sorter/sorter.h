@@ -532,10 +532,10 @@ struct MONGO_MOD_PRIVATE Greater {
 
 /**
  * Validates that all ranges in a merge batch have non-decreasing offsets and form a contiguous
- * sequence. Returns the end offset immediately after the final range in the batch.
+ * sequence.
  */
 template <typename Key, typename Value>
-inline int64_t validateMergeSpillRanges(
+void validateMergeSpillRanges(
     std::span<std::shared_ptr<sorter::Iterator<Key, Value>>> spillsToMerge) {
     invariant(!spillsToMerge.empty());
     int64_t expectedRangeStart = spillsToMerge.front()->getRange().getStart();
@@ -549,7 +549,6 @@ inline int64_t validateMergeSpillRanges(
                 range.getStart() == expectedRangeStart);
         expectedRangeStart = range.getEnd();
     }
-    return expectedRangeStart;
 }
 
 /**
