@@ -668,6 +668,128 @@ TEST_P(TicketSemaphoreTest, ConcurrentAcquireDoesNotOverbookOrLeak) {
     ASSERT_EQ(concurrentHolders.load(), 0);
 }
 
+/**
+ * Verifies that resize(+N) with M > N waiters unblocks exactly N waiters and leaves the remaining
+ * M-N blocked.
+ */
+TEST_P(TicketSemaphoreTest, ResizeWakesExactlyNOfMWaiters) {
+    auto sem = makeSemaphore(0);
+    auto* rawSem = sem.get();
+
+    constexpr int numWaiters = 5;
+    std::vector<Future<bool>> futures;
+    for (int i = 0; i < numWaiters; ++i) {
+        futures.push_back(spawn([&, i, rawSem, svcCtx = getServiceContext()]() {
+            auto client = svcCtx->getService()->makeClient("waiter" + std::to_string(i));
+            auto waiterOpCtx = client->makeOperationContext();
+            MockAdmissionContext admCtx;
+            return rawSem->acquire(waiterOpCtx.get(), &admCtx, getDeadline(), true);
+        }));
+    }
+
+    waitUntilBlocked(rawSem, numWaiters);
+
+    rawSem->resize(3);
+
+    _opCtx->runWithDeadline(getDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
+        while (rawSem->waiters() > 2)
+            stdx::this_thread::yield();
+    });
+    ASSERT_EQ(rawSem->waiters(), 2);
+    ASSERT_EQ(rawSem->available(), 0);
+
+    rawSem->resize(2);
+
+    for (auto& f : futures) {
+        bool result = false;
+        _opCtx->runWithDeadline(getDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
+            result = std::move(f).get(_opCtx.get());
+        });
+        ASSERT_TRUE(result);
+    }
+    ASSERT_EQ(rawSem->available(), 0);
+}
+
+/**
+ * Verifies that resize(+N) with N > number of waiters wakes all waiters and leaves N - waiters
+ * permits available afterwards. Detects if the wakeup path grant more permits than waiters,
+ * preventing permits from returning to the pool.
+ */
+TEST_P(TicketSemaphoreTest, ResizeExcessPermitsRemainAvailable) {
+    auto sem = makeSemaphore(0);
+    auto* rawSem = sem.get();
+
+    constexpr int numWaiters = 2;
+    std::vector<Future<bool>> futures;
+    for (int i = 0; i < numWaiters; ++i) {
+        futures.push_back(spawn([&, i, rawSem, svcCtx = getServiceContext()]() {
+            auto client = svcCtx->getService()->makeClient("waiter" + std::to_string(i));
+            auto waiterOpCtx = client->makeOperationContext();
+            MockAdmissionContext admCtx;
+            return rawSem->acquire(waiterOpCtx.get(), &admCtx, getDeadline(), true);
+        }));
+    }
+
+    waitUntilBlocked(rawSem, numWaiters);
+
+    // Add 5 permits: both waiters unblock and consume 2 permits, leaving 3 available.
+    rawSem->resize(5);
+
+    for (auto& f : futures) {
+        bool result = false;
+        _opCtx->runWithDeadline(getDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
+            result = std::move(f).get(_opCtx.get());
+        });
+        ASSERT_TRUE(result);
+    }
+    ASSERT_EQ(rawSem->available(), 3);
+    ASSERT_EQ(rawSem->waiters(), 0);
+}
+
+/**
+ * Verifies that a positive resize that does not push available above zero does not inadvertently
+ * wake blocked waiters.
+ */
+TEST_P(TicketSemaphoreTest, ResizePositiveButRemainsNegativeKeepsWaitersBlocked) {
+    auto sem = makeSemaphore(0);
+    auto* rawSem = sem.get();
+
+    constexpr int numWaiters = 2;
+    std::vector<Future<bool>> futures;
+    for (int i = 0; i < numWaiters; ++i) {
+        futures.push_back(spawn([&, i, rawSem, svcCtx = getServiceContext()]() {
+            auto client = svcCtx->getService()->makeClient("waiter" + std::to_string(i));
+            auto waiterOpCtx = client->makeOperationContext();
+            MockAdmissionContext admCtx;
+            return rawSem->acquire(waiterOpCtx.get(), &admCtx, getDeadline(), true);
+        }));
+    }
+
+    waitUntilBlocked(rawSem, numWaiters);
+
+    rawSem->resize(-5);
+    ASSERT_EQ(rawSem->available(), -5);
+
+    // A positive resize that stays negative must not wake any waiter.
+    rawSem->resize(3);
+    ASSERT_EQ(rawSem->available(), -2);
+    ASSERT_EQ(rawSem->waiters(), numWaiters);
+    ASSERT_FALSE(futures[0].isReady());
+    ASSERT_FALSE(futures[1].isReady());
+
+    // Cross zero — both waiters should finally unblock.
+    rawSem->resize(4);
+
+    for (auto& f : futures) {
+        bool result = false;
+        _opCtx->runWithDeadline(getDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
+            result = std::move(f).get(_opCtx.get());
+        });
+        ASSERT_TRUE(result);
+    }
+    ASSERT_EQ(rawSem->available(), 0);
+}
+
 INSTANTIATE_TEST_SUITE_P(UnorderedTicketSemaphore,
                          TicketSemaphoreTest,
                          testing::Values([](int numPermits) -> std::unique_ptr<TicketSemaphore> {

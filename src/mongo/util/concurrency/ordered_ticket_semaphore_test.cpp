@@ -454,4 +454,108 @@ TEST_F(OrderedTicketSemaphoreTest, LoadShedExemptOperationsBypassesMaxWaitersLim
     future1.get();
     future3.get();
 }
+
+/**
+ * Verifies that when the highest-priority blocked waiter is killed after being woken, the
+ * permit passes to the next-highest priority waiter rather than to the lowest-priority one.  With
+ * only two alternatives this property cannot be distinguished from a simple "permit is not lost"
+ * check, so this test uses three waiters.
+ */
+TEST_F(OrderedTicketSemaphoreTest, PassTheBatonRoutesPermitToNextPriorityWaiter) {
+    auto sem = makeSemaphore(0, 10);
+
+    auto kHighPriorityAdmissions = 1;
+    auto kMidPriorityAdmissions = 5;
+    auto kLowPriorityAdmissions = 10;
+    MockAdmissionContext highAdmCtx, midAdmCtx, lowAdmCtx;
+    highAdmCtx.setAdmission_forTest(kHighPriorityAdmissions);  // highest priority (lowest count)
+    midAdmCtx.setAdmission_forTest(kMidPriorityAdmissions);
+    lowAdmCtx.setAdmission_forTest(kLowPriorityAdmissions);  // lowest priority
+
+    auto [clientHigh, opCtxHigh] = makeOpCtx();
+    auto [clientMid, opCtxMid] = makeOpCtx();
+    auto [clientLow, opCtxLow] = makeOpCtx();
+
+    // Track which admission count was served first and second.
+    std::atomic<int> acquireOrder{0};
+    std::vector<int32_t> acquiredByAdmission(2, -1);
+
+    auto highFuture = launchAsync([&]() {
+        ASSERT_THROWS_CODE(sem->acquire(opCtxHigh.get(), &highAdmCtx, Date_t::max(), true),
+                           DBException,
+                           ErrorCodes::Interrupted);
+    });
+    auto midFuture = launchAsync([&]() {
+        ASSERT_TRUE(sem->acquire(opCtxMid.get(), &midAdmCtx, Date_t::max(), false));
+        acquiredByAdmission[acquireOrder.fetch_add(1)] = kMidPriorityAdmissions;
+        sem->release();
+    });
+    auto lowFuture = launchAsync([&]() {
+        ASSERT_TRUE(sem->acquire(opCtxLow.get(), &lowAdmCtx, Date_t::max(), false));
+        acquiredByAdmission[acquireOrder.fetch_add(1)] = kLowPriorityAdmissions;
+        sem->release();
+    });
+
+    waitForQueuedThreads(sem, 3);
+
+    // Kill the highest-priority waiter, then release one permit.
+    // Whether the kill races ahead of or behind the wakeup, the ON_BLOCK_EXIT guard
+    // ensures the permit reaches admissions=5 rather than admissions=10.
+    opCtxHigh->markKilled(ErrorCodes::Interrupted);
+    sem->release();
+
+    highFuture.get();
+    midFuture.get();
+
+    ASSERT_EQ(acquiredByAdmission[0], kMidPriorityAdmissions)
+        << "admissions=5 should receive the permit before admissions=10";
+
+    // midFuture already released its permit, which wakes lowFuture.
+    lowFuture.get();
+    ASSERT_EQ(acquiredByAdmission[1], kLowPriorityAdmissions);
+    ASSERT_EQ(sem->waiters(), 0);
+}
+
+/**
+ * Verifies that N waiters sharing the same admission count are all eventually served with no
+ * permits leaked. All-equal priorities stress the _waitQueue's handling of duplicate keys and the
+ * numToWake = std::min(waitQueue.size(), available) path.
+ */
+TEST_F(OrderedTicketSemaphoreTest, EqualAdmissionCountsAllServed) {
+    constexpr int n = 5;
+    auto sem = makeSemaphore(0, n + 1);
+
+    std::vector<MockAdmissionContext> admCtxs(n);
+    for (auto& ctx : admCtxs)
+        ctx.setAdmission_forTest(42);
+
+    std::atomic<int> servedCount{0};
+    std::vector<Future<void>> futures;
+    futures.reserve(n);
+
+    for (int i = 0; i < n; ++i) {
+        futures.push_back(launchAsync([&, i]() {
+            auto [client, opCtx] = makeOpCtx();
+            ASSERT_TRUE(sem->acquire(opCtx.get(), &admCtxs[i], Date_t::max(), false));
+            servedCount.fetch_add(1);
+            // Do not release — permits are verified via available() below.
+        }));
+    }
+
+    waitForQueuedThreads(sem, n);
+
+    // Add exactly n permits: all n waiters should unblock and each consume one.
+    sem->resize(n);
+
+    for (auto& f : futures)
+        f.get();
+
+    ASSERT_EQ(servedCount.load(), n);
+    ASSERT_EQ(sem->available(), 0);  // All n permits consumed.
+    ASSERT_EQ(sem->waiters(), 0);
+
+    // Release the n permits still held so the semaphore destructs cleanly.
+    for (int i = 0; i < n; ++i)
+        sem->release();
+}
 }  // namespace mongo
