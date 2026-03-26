@@ -35,6 +35,7 @@
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/change_stream_pre_image_util.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
@@ -53,6 +54,7 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/timer.h"
 
@@ -64,8 +66,20 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(failPreimagesCollectionCreation);
+
+// Failpoint for disabling pre-images removal temporarily during testing. This failpoint is used by
+// the replica set data consistency checks to keep the contents of the pre-images collection stable
+// for the duration of the check.
 MONGO_FAIL_POINT_DEFINE(disableChangeStreamPreImagesRemover);
 MONGO_FAIL_POINT_DEFINE(preImagesRemovalFailsWithNotWritablePrimary);
+
+// Failpoint that is misused as a counter. In testing mode, the failpoint is always enabled.
+// When entering the pre-images removal code in testing mode, the failpoint is always triggered,
+// which increases its "timesEntered" counter. The counter is also increased every time the
+// pre-images removal code is exited. This way callers can check if the pre-images removal is
+// currently executing (timesEntered % 2 == 1) or not (timesEntered % 2 == 0).
+// Note: this failpoint is always enabled during testing!
+MONGO_FAIL_POINT_DEFINE(changeStreamPreImagesRemoverInvocationCounter);
 
 const auto getPreImagesCollectionManager =
     ServiceContext::declareDecoration<ChangeStreamPreImagesCollectionManager>();
@@ -92,6 +106,15 @@ ChangeStreamPreImagesCollectionManager& ChangeStreamPreImagesCollectionManager::
 ChangeStreamPreImagesCollectionManager& ChangeStreamPreImagesCollectionManager::get(
     OperationContext* opCtx) {
     return getPreImagesCollectionManager(opCtx->getServiceContext());
+}
+
+ChangeStreamPreImagesCollectionManager::ChangeStreamPreImagesCollectionManager() {
+    // During testing, always enable the 'changeStreamPreImagesRemoverInvocationCounter' failpoint.
+    // This failpoint serves as a counter with which tests can observe from the outside if the
+    // pre-images removal thread is currently executing or not.
+    if (getTestCommandsEnabled()) {
+        changeStreamPreImagesRemoverInvocationCounter.setMode(FailPoint::Mode::alwaysOn);
+    }
 }
 
 void ChangeStreamPreImagesCollectionManager::createPreImagesCollection(OperationContext* opCtx) {
@@ -166,6 +189,18 @@ void ChangeStreamPreImagesCollectionManager::insertPreImage(OperationContext* op
 
 void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImagesRemovalPass(
     Client* client, bool useReplicatedTruncates) {
+    // Increase failpoint's "timesEntered" value when entering this function. This creates an uneven
+    // "timesEntered" value.
+    {
+        changeStreamPreImagesRemoverInvocationCounter.scoped();
+    }
+
+    ON_BLOCK_EXIT([&]() {
+        // Increase failpoint's "timesEntered" value leaving this function. This creates an even
+        // "timesEntered" value.
+        changeStreamPreImagesRemoverInvocationCounter.scoped();
+    });
+
     // Failpoint to temporarily disable pre-images removal job for testing.
     if (MONGO_unlikely(disableChangeStreamPreImagesRemover.shouldFail())) {
         return;

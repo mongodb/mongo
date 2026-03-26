@@ -17,8 +17,11 @@ export var PersistenceProviderUtil = (function () {
      * Any disagreement between nodes on whether the 'persistenceProviderProperties' command is
      * supported (i.e. some nodes return ok: 1 and some return ok: 0) will also cause the function
      * to return false.
+     *
+     * The set of nodes to query can optionally be provided via the 'nodes' parameter. If it is not
+     * set, all nodes of the current fixture will be queried.
      */
-    function allNodesHavePropertyWithValue(dbOrMongo, propertyName, propertyValue) {
+    function allNodesHavePropertyWithValue(dbOrMongo, propertyName, propertyValue, nodes) {
         let db = dbOrMongo;
         if (dbOrMongo instanceof Mongo) {
             db = dbOrMongo.getDB("admin");
@@ -26,8 +29,9 @@ export var PersistenceProviderUtil = (function () {
             throw new Error("Expected argument to be either a DB or a Mongo instance");
         }
 
-        // Get list of all nodes in the cluster.
-        const nodes = FixtureHelpers.getAllNodes(db);
+        // If no nodes are provided, get list of all nodes in the fixture.
+        nodes = nodes || FixtureHelpers.getAllNodes(db);
+
         let firstResult = undefined;
 
         // Helper to access nested properties via dot notation strings.

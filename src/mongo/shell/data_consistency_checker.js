@@ -435,6 +435,7 @@ class DataConsistencyChecker {
         ignoreUUIDs,
         syncingHasIndexes,
         collectionPrinted,
+        systemUsesReplicatedTruncates,
     ) {
         let success = true;
 
@@ -475,46 +476,6 @@ class DataConsistencyChecker {
             success = false;
         }
 
-        // There are two modes for deleting change streams pre-images from the "system.preimages"
-        // collection:
-        // 1. They can be deleted independently and locally on each node. This can cause different
-        //    nodes in the replica set to have a different view of the pre-images collection state.
-        // 2. They can be deleted via replicated truncates. In this case, only the primary executes
-        //    the deletions via "truncateRange()" calls, and the deletions are replicated via the
-        //    oplog. In this case, all nodes in the replica set are expected to have same view of
-        //    the pre-images collection.
-        let usesReplicatedTruncates = undefined;
-        const systemUsesReplicatedTruncates = () => {
-            // Fetch persistence provider properties.
-            const fetchProviderProperty = () => {
-                const doc = sourceCollInfos.conn.adminCommand({persistenceProviderProperties: 1});
-                if (!doc.ok) {
-                    return false;
-                }
-                return doc["shouldUseReplicatedTruncates"];
-            };
-
-            // Fetch feature flag status.
-            const fetchFeatureFlagValue = () => {
-                const kFlag = "featureFlagUseReplicatedTruncatesForDeletions";
-                const doc = sourceCollInfos.conn.adminCommand({getParameter: 1, [kFlag]: 1});
-                if (!doc.ok || !doc.hasOwnProperty(kFlag)) {
-                    return false;
-                }
-                return doc[kFlag].hasOwnProperty("currentlyEnabled") ? doc[kFlag].currentlyEnabled : false;
-            };
-
-            // Determine the usage only once and cache the result, as checking the feature flag
-            // every time is expensive.
-            if (usesReplicatedTruncates === undefined) {
-                // First check the persistence provider property. If this has replicated truncates
-                // enabled, we go with it. If the persistence provider does not have replicated
-                // truncates enabled, we check the current value of the feature flag.
-                usesReplicatedTruncates = fetchProviderProperty() || fetchFeatureFlagValue();
-            }
-            return usesReplicatedTruncates;
-        };
-
         let didIgnoreFailure = false;
         sourceCollInfos.collInfosRes.forEach((coll) => {
             if (sourceDBHash.collections[coll.name] !== syncingDBHash.collections[coll.name]) {
@@ -533,7 +494,7 @@ class DataConsistencyChecker {
                     sourceCollInfos,
                     syncingCollInfos,
                     coll.name,
-                    systemUsesReplicatedTruncates(),
+                    systemUsesReplicatedTruncates,
                 );
                 if (shouldIgnoreFailure) {
                     prettyPrint(

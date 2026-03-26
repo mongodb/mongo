@@ -24,16 +24,15 @@
  */
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     getPreImages,
     getPreImagesCollection,
     kPreImagesCollectionDatabase,
     kPreImagesCollectionName,
 } from "jstests/libs/query/change_stream_util.js";
+import {systemUsesReplicatedTruncates} from "jstests/libs/query/replicated_truncates_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {getFirstOplogEntry, getLatestOp} from "jstests/replsets/rslib.js";
-import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 
 export class PreImageTruncateAfterShutdownTest {
     constructor(testName) {
@@ -596,16 +595,6 @@ export class PreImageTruncateAfterShutdownTest {
     }
 
     isRunningReplicatedPreImageTruncation() {
-        // DSC only supports replicated truncates.
-        if (
-            PersistenceProviderUtil.allNodesHavePropertyWithValue(
-                this._rst.getPrimary(),
-                "shouldUseReplicatedTruncates",
-                true,
-            )
-        ) {
-            return true;
-        }
-        return FeatureFlagUtil.isPresentAndEnabled(this._rst.getPrimary(), "UseReplicatedTruncatesForDeletions");
+        return systemUsesReplicatedTruncates(this._rst.getPrimary());
     }
 }

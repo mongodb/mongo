@@ -14,8 +14,7 @@
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
+import {systemUsesReplicatedTruncates} from "jstests/libs/query/replicated_truncates_utils.js";
 import {describe, it, beforeEach, afterEach} from "jstests/libs/mochalite.js";
 
 describe("change streams preimages consistency checks", function () {
@@ -34,13 +33,6 @@ describe("change streams preimages consistency checks", function () {
             operationTime: farOffDate,
         };
     };
-
-    // Whether or not the system uses replicated truncates for removing change streams preimages.
-    // Replicated truncates are used in disaggregated storage clusters (DSC) or when the feature flag
-    // "featureFlagUseReplicatedTruncatesForDeletions" is enabled.
-    const systemUsesReplicatedTruncates = (conn) =>
-        PersistenceProviderUtil.allNodesHavePropertyWithValue(conn, "shouldUseReplicatedTruncates", true) ||
-        FeatureFlagUtil.isPresentAndEnabled(conn, "featureFlagUseReplicatedTruncatesForDeletions");
 
     // Verifies that the replica set can be shut down without running into consistency check errors.
     const assertShutdownSucceedsWithoutHashMismatch = () => {

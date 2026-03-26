@@ -108,7 +108,7 @@ public:
         BSONObj toBSON() const;
     };
 
-    explicit ChangeStreamPreImagesCollectionManager() {}
+    ChangeStreamPreImagesCollectionManager();
 
     ~ChangeStreamPreImagesCollectionManager() = default;
 
