@@ -78,6 +78,9 @@ public:
     }
 
     static UString fromUTF8(StringData str) {
+        if (str.empty()) {
+            return UString(0);
+        }
         UErrorCode error = U_ZERO_ERROR;
         int32_t len = 0;
         u_strFromUTF8(nullptr, 0, &len, str.data(), str.size(), &error);
@@ -96,7 +99,32 @@ public:
         return ret;
     }
 
+    UString foldCase() const {
+        if (_str.empty()) {
+            return UString(0);
+        }
+        UErrorCode error = U_ZERO_ERROR;
+        int32_t len =
+            u_strFoldCase(nullptr, 0, _str.data(), _str.size(), U_FOLD_CASE_DEFAULT, &error);
+        uassert(9553000,
+                str::stream() << "Error preflighting Unicode case fold: " << u_errorName(error),
+                error == U_BUFFER_OVERFLOW_ERROR);
+
+        error = U_ZERO_ERROR;
+        UString ret(len);
+        u_strFoldCase(
+            ret.data(), ret.capacity(), _str.data(), _str.size(), U_FOLD_CASE_DEFAULT, &error);
+        uassert(9553001,
+                str::stream() << "Error applying Unicode case fold: " << u_errorName(error),
+                U_SUCCESS(error));
+        ret.resize(len);
+        return ret;
+    }
+
     std::string toUTF8() const {
+        if (_str.empty()) {
+            return {};
+        }
         UErrorCode error = U_ZERO_ERROR;
         int32_t len = 0;
         u_strToUTF8(nullptr, 0, &len, _str.data(), _str.size(), &error);
@@ -196,6 +224,10 @@ MONGO_INITIALIZER_GENERAL(LoadIcuPrep, ("LoadICUData"), ("default"))(Initializer
     // Force ICU to load its caches by calling each function.
     invariant(icuSaslPrep("a"_sd).getStatus());
     invariant(icuX509DNPrep("a"_sd).getStatus());
+}
+
+std::string icuCaseFold(StringData str) {
+    return UString::fromUTF8(str).foldCase().toUTF8();
 }
 
 }  // namespace mongo

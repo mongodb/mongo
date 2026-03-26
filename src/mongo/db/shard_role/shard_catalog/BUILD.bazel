@@ -361,6 +361,7 @@ mongo_cc_library(
         "//src/mongo/db/validate:validate_idl",
         "//src/mongo/db/validate:validate_state",
         "//src/mongo/db/views:view_catalog_helpers",
+        "//src/mongo/util:icu",
         "//src/mongo/util:log_and_backoff",
         "//src/mongo/util:progress_meter",
     ],

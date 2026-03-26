@@ -55,6 +55,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/icu.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
@@ -65,7 +66,6 @@
 
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
-#include <boost/algorithm/string.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -156,19 +156,28 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx,
         }
     });
 
-    // Check casing in lock to avoid transient duplicates.
-    auto duplicate = _getNameWithConflictingCasing_inlock(dbName);
-    uassert(ErrorCodes::DatabaseDifferCase,
-            str::stream() << "db already exists with different case already have: ["
-                          << duplicate->toStringForErrorMsg() << "] trying to create ["
-                          << dbName.toStringForErrorMsg() << "]",
-            !duplicate);
-
     // Do the catalog lookup and database creation outside of the scoped lock, because these may
     // block.
     lk.unlock();
 
-    if (CollectionCatalog::get(opCtx)->getAllCollectionUUIDsFromDb(dbName).empty()) {
+    bool isNew = CollectionCatalog::get(opCtx)->getAllCollectionUUIDsFromDb(dbName).empty();
+
+    if (isNew && opCtx->isEnforcingConstraints()) {
+        // Only enforce the conflicting-casing check when creating a new database on a primary.
+        // Pre-existing databases with conflicting names (created before this check was in place)
+        // are allowed through to preserve data accessibility after an upgrade.
+        lk.lock();
+        auto duplicate = _getNameWithConflictingCasing_inlock(dbName);
+        uassert(ErrorCodes::DatabaseDifferCase,
+                str::stream() << "db name conflicts case-insensitively (Unicode case folding) with "
+                                 "existing database: ["
+                              << duplicate->toStringForErrorMsg() << "] trying to create ["
+                              << dbName.toStringForErrorMsg() << "]",
+                !duplicate);
+        lk.unlock();
+    }
+
+    if (isNew) {
         audit::logCreateDatabase(opCtx->getClient(), dbName);
         if (justCreated)
             *justCreated = true;
@@ -304,9 +313,9 @@ void DatabaseHolderImpl::closeAll(OperationContext* opCtx) {
 
 DatabaseHolderImpl::DBsIndex::NormalizedDatabaseName DatabaseHolderImpl::DBsIndex::normalize(
     const DatabaseName& dbName) {
-    std::string str = dbName.toStringForResourceId();
-    boost::algorithm::to_lower(str);
-    return str;
+    // Case-fold the UTF-8 string using Unicode rules so that names differing only in case
+    // (including non-ASCII characters) map to the same key.
+    return icuCaseFold(dbName.toStringForResourceId());
 }
 
 const DatabaseHolderImpl::DBsIndex::DBs& DatabaseHolderImpl::DBsIndex::viewAll() const {
@@ -352,14 +361,15 @@ void DatabaseHolderImpl::DBsIndex::erase(const DatabaseName& dbName) {
     _dbs.erase(dbName);
 }
 
-// Check if there is any opened database with a name with the same name with a case
-// insensitive search
+// Check if there is any opened database with a name that differs only in case.
+// Since normalize() produces a Unicode-aware lowercased key, entries sharing a normalized key
+// are guaranteed to be case-insensitive duplicates.
 boost::optional<DatabaseName> DatabaseHolderImpl::DBsIndex::getAnyConflictingName(
     const DatabaseName& dbName) const {
     NormalizedDatabaseName normalizedName = normalize(dbName);
     auto [begin, end] = _normalizedDBs.equal_range(normalizedName);
     for (auto dbsIt = begin; dbsIt != end; ++dbsIt) {
-        if (dbName.equalCaseInsensitive(dbsIt->second) && dbName != dbsIt->second) {
+        if (dbName != dbsIt->second) {
             return dbsIt->second;
         }
     }

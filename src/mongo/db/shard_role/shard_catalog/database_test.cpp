@@ -677,5 +677,125 @@ TEST_F(DatabaseTest, DatabaseHolderImplTest) {
     ASSERT_EQUALS(dbIndex.viewAll().size(), 1);
 }
 
+// Creating a new database whose name conflicts case-insensitively with an existing database must be
+// rejected. Re-opening the same database must succeed (no self-conflict). Test both ASCII and
+// non-ASCII case pairs.
+TEST_F(DatabaseTest, OpenDbRejectsCaseConflict) {
+    auto opCtx = _opCtx.get();
+    auto holder = DatabaseHolder::get(opCtx);
+
+    auto testConflict = [&](StringData lowerStr, StringData upperStr) {
+        DatabaseName lower = DatabaseName::createDatabaseName_forTest(boost::none, lowerStr);
+        DatabaseName upper = DatabaseName::createDatabaseName_forTest(boost::none, upperStr);
+
+        // Create with lowercase.
+        {
+            Lock::DBLock dbLock(opCtx, lower, MODE_X);
+            ASSERT_TRUE(holder->openDb(opCtx, lower, nullptr));
+        }
+
+        // Re-opening must succeed (no self-conflict).
+        {
+            Lock::DBLock dbLock(opCtx, lower, MODE_X);
+            ASSERT_TRUE(holder->openDb(opCtx, lower, nullptr));
+        }
+
+        // Attempting to create with different case must fail.
+        ASSERT_THROWS_CODE(
+            [&] {
+                Lock::DBLock dbLock(opCtx, upper, MODE_X);
+                holder->openDb(opCtx, upper, nullptr);
+            }(),
+            AssertionException,
+            ErrorCodes::DatabaseDifferCase);
+    };
+
+    testConflict("test", "Test");
+    testConflict("æbler", "Æbler");
+}
+
+// Pre-existing databases whose names conflict case-insensitively (e.g. created before the
+// non-ASCII DatabaseDifferCase check existed) must remain accessible after an upgrade. openDb skips
+// the conflict check when isNew==false, i.e. the database already has collections in the catalog.
+TEST_F(DatabaseTest, OpenDbAllowsPreExistingNonAsciiCaseConflict) {
+    auto opCtx = _opCtx.get();
+
+    DatabaseName lower = DatabaseName::createDatabaseName_forTest(boost::none, "æbler");
+    DatabaseName upper = DatabaseName::createDatabaseName_forTest(boost::none, "Æbler");
+
+    // Creates a collection in dbName then closes the database from the holder. Closing removes
+    // it from the holder's conflict index but does NOT evict collections from the
+    // CollectionCatalog (onCloseDatabase only removes views/resource entries), so
+    // getAllCollectionUUIDsFromDb still returns non-empty and the next openDb will see
+    // isNew==false, skipping the conflict check.
+    auto createAndClose = [&](const DatabaseName& dbName) {
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest(dbName, "c");
+        writeConflictRetry(opCtx, "createAndClose", nss, [&] {
+            WriteUnitOfWork wuow(opCtx);
+            AutoGetDb autoDb(opCtx, dbName, MODE_X);
+            auto db = autoDb.ensureDbExists(opCtx);
+            ASSERT_TRUE(db->createCollection(opCtx, nss));
+            wuow.commit();
+        });
+        {
+            AutoGetDb autoDb(opCtx, dbName, MODE_X);
+            DatabaseHolder::get(opCtx)->close(opCtx, dbName);
+        }
+        ASSERT_FALSE(CollectionCatalog::get(opCtx)->getAllCollectionUUIDsFromDb(dbName).empty());
+    };
+
+    // Each DB must be seeded while the other is absent from the holder's conflict index.
+    createAndClose(lower);
+    createAndClose(upper);
+
+    // Simulate startup reopening pre-existing conflicting databases: both openDb calls must
+    // succeed without throwing DatabaseDifferCase.
+    auto holder = DatabaseHolder::get(opCtx);
+    for (const auto& dbName : {lower, upper}) {
+        Lock::DBLock dbLock(opCtx, dbName, MODE_X);
+        ASSERT_TRUE(holder->openDb(opCtx, dbName, nullptr));
+    }
+
+    // Both databases are now accessible via the holder.
+    for (const auto& dbName : {lower, upper}) {
+        Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
+        ASSERT_TRUE(holder->getDb(opCtx, dbName));
+    }
+}
+
+// When !isEnforcingConstraints() (e.g. secondary applying oplog entries), openDb must skip the
+// conflict check so that a new-binary secondary can replicate two databases created by an
+// old-binary primary whose names conflict under Unicode case-folding.
+TEST_F(DatabaseTest, OpenDbSkipsConflictCheckWhenNotEnforcingConstraints) {
+    auto opCtx = _opCtx.get();
+
+    DatabaseName lower = DatabaseName::createDatabaseName_forTest(boost::none, "æbler");
+    DatabaseName upper = DatabaseName::createDatabaseName_forTest(boost::none, "Æbler");
+
+    // Create "æbler" normally (replicated write, i.e. primary path).
+    {
+        Lock::DBLock dbLock(opCtx, lower, MODE_X);
+        bool justCreated = false;
+        auto* db = DatabaseHolder::get(opCtx)->openDb(opCtx, lower, &justCreated);
+        ASSERT_TRUE(db);
+        ASSERT_TRUE(justCreated);
+    }
+
+    // Simulate a secondary applying an oplog entry for "Æbler" while "æbler" already exists.
+    // The conflict check must be skipped, so openDb must not throw DatabaseDifferCase.
+    // Also verify that justCreated is still set even when !isEnforcingConstraints().
+    {
+        opCtx->setEnforceConstraints(false);
+        ON_BLOCK_EXIT([&] { opCtx->setEnforceConstraints(true); });
+        ASSERT_FALSE(opCtx->isEnforcingConstraints());
+
+        Lock::DBLock dbLock(opCtx, upper, MODE_X);
+        bool justCreated = false;
+        auto* db = DatabaseHolder::get(opCtx)->openDb(opCtx, upper, &justCreated);
+        ASSERT_TRUE(db);
+        ASSERT_TRUE(justCreated);
+    }
+}
+
 }  // namespace
 }  // namespace mongo

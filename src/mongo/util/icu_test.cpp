@@ -75,5 +75,22 @@ TEST(ICUTest, icuSaslPrep) {
     }
 }
 
+TEST(ICUTest, icuCaseFold) {
+    // ASCII
+    ASSERT_EQ(icuCaseFold("Hello"), "hello");
+    ASSERT_EQ(icuCaseFold("hello"), "hello");
+
+    // Non-ASCII
+    ASSERT_EQ(icuCaseFold("Æbler"), "æbler");
+    ASSERT_EQ(icuCaseFold("æbler"), "æbler");
+    ASSERT_EQ(icuCaseFold("Ω"), "ω");
+    ASSERT_EQ(icuCaseFold("Straße"), "strasse");
+    ASSERT_EQ(icuCaseFold("Strasse"), "strasse");
+    ASSERT_EQ(icuCaseFold("STRAẞE"), "strasse");
+
+    // Empty string
+    ASSERT_EQ(icuCaseFold(""), "");
+}
+
 }  // namespace
 }  // namespace mongo
