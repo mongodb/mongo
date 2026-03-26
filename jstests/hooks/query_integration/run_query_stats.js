@@ -74,7 +74,9 @@ function takeAction(conn, operation) {
 
 let topology;
 try {
-    topology = DiscoverTopology.findConnectedNodes(conn);
+    topology = DiscoverTopology.findConnectedNodes(conn, {
+        connectFn: (host) => newMongoWithRetry(host, undefined, {gRPC: false}),
+    });
 } catch (e) {
     let errorWithCode = "Code: " + e.code + ", Message: " + e;
     jsTest.log.info("Error during topology discovery: " + errorWithCode);
