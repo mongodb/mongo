@@ -74,7 +74,33 @@
 
 namespace mongo {
 
-DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Sort);
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Sort);
+class SortLiteParsed final : public LiteParsedDocumentSourceDefault<SortLiteParsed> {
+public:
+    SortLiteParsed(const BSONElement& originalBson)
+        : LiteParsedDocumentSourceDefault<SortLiteParsed>(originalBson) {}
+
+    static std::unique_ptr<SortLiteParsed> parse(const NamespaceString& nss,
+                                                 const BSONElement& spec,
+                                                 const LiteParserOptions& options) {
+        return std::make_unique<SortLiteParsed>(spec);
+    }
+
+    std::unique_ptr<StageParams> getStageParams() const final {
+        return std::make_unique<SortStageParams>(_originalBson);
+    }
+
+    // $sort is treated as a ranked stage for hybrid search validation purposes: a pipeline
+    // containing $sort satisfies the "ranked pipeline" requirement of $rankFusion.
+    bool isRankedStage() const final {
+        return true;
+    }
+
+    // $sort only reorders documents without modifying them.
+    bool isSelectionStage() const final {
+        return true;
+    }
+};
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalBoundedSort);
 
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceSort final : public DocumentSource {

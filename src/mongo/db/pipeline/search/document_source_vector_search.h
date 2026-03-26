@@ -45,7 +45,38 @@
 
 namespace mongo {
 
-DEFINE_LITE_PARSED_SEARCH_STAGE_DERIVED(VectorSearch);
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(VectorSearch);
+class VectorSearchLiteParsed final : public LiteParsedSearchStage<VectorSearchLiteParsed> {
+public:
+    VectorSearchLiteParsed(const BSONElement& originalBson, NamespaceString nss)
+        : LiteParsedSearchStage(originalBson, std::move(nss)) {}
+
+    static std::unique_ptr<VectorSearchLiteParsed> parse(const NamespaceString& nss,
+                                                         const BSONElement& spec,
+                                                         const LiteParserOptions& options) {
+        return std::make_unique<VectorSearchLiteParsed>(spec, nss);
+    }
+
+    std::unique_ptr<StageParams> getStageParams() const final {
+        return std::make_unique<VectorSearchStageParams>(_originalBson);
+    }
+
+    // $vectorSearch produces $sortKey metadata.
+    bool isRankedStage() const final {
+        return true;
+    }
+
+    // $vectorSearch produces $vectorSearchScore metadata.
+    bool isScoredStage() const final {
+        return true;
+    }
+
+    // $vectorSearch is not a selection stage when returnStoredSource is true since it might have an
+    // implicit projection applied.
+    bool isSelectionStage() const final {
+        return !hasReturnStoredSource();
+    }
+};
 
 /**
  * Interface used to retrieve the execution stats of explain().

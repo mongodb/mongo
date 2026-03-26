@@ -495,7 +495,8 @@ public:
     }
 
     /**
-     * Returns true if this stage produces output sort key metadata ($sortKey).
+     * Returns true if this stage produces output sort key metadata ($sortKey) or is an explicit
+     * $sort stage.
      * TODO SERVER-101722 This can be removed once LPDS has StageConstraints.
      */
     virtual bool isRankedStage() const {

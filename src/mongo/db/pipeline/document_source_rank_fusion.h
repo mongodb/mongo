@@ -105,6 +105,21 @@ public:
             return true;
         }
 
+        // $rankFusion desugars into a pipeline that includes $sort.
+        bool isRankedStage() const final {
+            return true;
+        }
+
+        // $rankFusion computes a reciprocal rank fusion score for each document.
+        bool isScoredStage() const final {
+            return true;
+        }
+
+        // $rankFusion does not modify documents, only combines and reorders them.
+        bool isSelectionStage() const final {
+            return true;
+        }
+
         bool hasExtensionVectorSearchStage() const override {
             return std::any_of(_pipelines.begin(), _pipelines.end(), [](const auto& pipeline) {
                 return pipeline.hasExtensionVectorSearchStage();

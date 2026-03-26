@@ -51,7 +51,27 @@
 
 namespace mongo {
 
-DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Skip);
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Skip);
+class SkipLiteParsed final : public LiteParsedDocumentSourceDefault<SkipLiteParsed> {
+public:
+    SkipLiteParsed(const BSONElement& originalBson)
+        : LiteParsedDocumentSourceDefault<SkipLiteParsed>(originalBson) {}
+
+    static std::unique_ptr<SkipLiteParsed> parse(const NamespaceString& nss,
+                                                 const BSONElement& spec,
+                                                 const LiteParserOptions& options) {
+        return std::make_unique<SkipLiteParsed>(spec);
+    }
+
+    std::unique_ptr<StageParams> getStageParams() const final {
+        return std::make_unique<SkipStageParams>(_originalBson);
+    }
+
+    // $skip only skips documents without modifying them.
+    bool isSelectionStage() const final {
+        return true;
+    }
+};
 
 class DocumentSourceSkip final : public DocumentSource {
 public:

@@ -48,7 +48,32 @@
 
 namespace mongo {
 
-DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Score);
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Score);
+class ScoreLiteParsed final : public LiteParsedDocumentSourceDefault<ScoreLiteParsed> {
+public:
+    ScoreLiteParsed(const BSONElement& originalBson)
+        : LiteParsedDocumentSourceDefault<ScoreLiteParsed>(originalBson) {}
+
+    static std::unique_ptr<ScoreLiteParsed> parse(const NamespaceString& nss,
+                                                  const BSONElement& spec,
+                                                  const LiteParserOptions& options) {
+        return std::make_unique<ScoreLiteParsed>(spec);
+    }
+
+    std::unique_ptr<StageParams> getStageParams() const final {
+        return std::make_unique<ScoreStageParams>(_originalBson);
+    }
+
+    // $score computes score metadata for each document.
+    bool isScoredStage() const final {
+        return true;
+    }
+
+    // $score only sets metadata, it does not modify document fields.
+    bool isSelectionStage() const final {
+        return true;
+    }
+};
 
 /**
  * $score computes the "score" metadata field based on some input Expression, without making any

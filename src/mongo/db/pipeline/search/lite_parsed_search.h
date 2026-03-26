@@ -34,6 +34,8 @@
 
 namespace mongo {
 
+static constexpr StringData kReturnStoredSourceFieldName = "returnStoredSource"_sd;
+
 /**
  * A 'LiteParsed' representation of a search stage. This is the parent class for the
  * $listSearchIndexes stage.
@@ -76,13 +78,27 @@ public:
         return true;
     }
 
+protected:
+    // Returns true if the stage spec has returnStoredSource: true, which applies an implicit
+    // projection that modifies output fields.
+    bool hasReturnStoredSource() const {
+        if (this->_originalBson.type() == BSONType::object) {
+            auto specObj = this->_originalBson.Obj();
+            if (specObj.hasField(kReturnStoredSourceFieldName)) {
+                auto rss = specObj[kReturnStoredSourceFieldName];
+                return rss.isBoolean() && rss.boolean();
+            }
+        }
+        return false;
+    }
+
 private:
     const NamespaceString _nss;
 };
 
 #define DEFINE_LITE_PARSED_SEARCH_STAGE_DERIVED(stageName)                                        \
     DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(stageName);                                              \
-    class stageName##LiteParsed : public LiteParsedSearchStage<stageName##LiteParsed> {           \
+    class stageName##LiteParsed final : public LiteParsedSearchStage<stageName##LiteParsed> {     \
     public:                                                                                       \
         stageName##LiteParsed(const mongo::BSONElement& originalBson, mongo::NamespaceString nss) \
             : LiteParsedSearchStage(originalBson, nss) {}                                         \

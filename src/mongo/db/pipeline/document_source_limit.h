@@ -51,7 +51,27 @@
 
 namespace mongo {
 
-DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Limit);
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Limit);
+class LimitLiteParsed final : public LiteParsedDocumentSourceDefault<LimitLiteParsed> {
+public:
+    LimitLiteParsed(const BSONElement& originalBson)
+        : LiteParsedDocumentSourceDefault<LimitLiteParsed>(originalBson) {}
+
+    static std::unique_ptr<LimitLiteParsed> parse(const NamespaceString& nss,
+                                                  const BSONElement& spec,
+                                                  const LiteParserOptions& options) {
+        return std::make_unique<LimitLiteParsed>(spec);
+    }
+
+    std::unique_ptr<StageParams> getStageParams() const final {
+        return std::make_unique<LimitStageParams>(_originalBson);
+    }
+
+    // $limit only reduces the number of documents without modifying them.
+    bool isSelectionStage() const final {
+        return true;
+    }
+};
 
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceLimit final : public DocumentSource {
 public:

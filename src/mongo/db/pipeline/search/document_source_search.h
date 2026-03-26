@@ -42,7 +42,38 @@
 
 namespace mongo {
 
-DEFINE_LITE_PARSED_SEARCH_STAGE_DERIVED(Search);
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Search);
+class SearchLiteParsed final : public LiteParsedSearchStage<SearchLiteParsed> {
+public:
+    SearchLiteParsed(const BSONElement& originalBson, NamespaceString nss)
+        : LiteParsedSearchStage(originalBson, std::move(nss)) {}
+
+    static std::unique_ptr<SearchLiteParsed> parse(const NamespaceString& nss,
+                                                   const BSONElement& spec,
+                                                   const LiteParserOptions& options) {
+        return std::make_unique<SearchLiteParsed>(spec, nss);
+    }
+
+    std::unique_ptr<StageParams> getStageParams() const final {
+        return std::make_unique<SearchStageParams>(_originalBson);
+    }
+
+    // $search produces $sortKey metadata.
+    bool isRankedStage() const final {
+        return true;
+    }
+
+    // $search produces $searchScore metadata.
+    bool isScoredStage() const final {
+        return true;
+    }
+
+    // $search is not a selection stage when returnStoredSource is true since it might have an
+    // implicit projection applied.
+    bool isSelectionStage() const final {
+        return !hasReturnStoredSource();
+    }
+};
 
 /**
  * The $search stage expands to multiple internal stages when parsed, namely

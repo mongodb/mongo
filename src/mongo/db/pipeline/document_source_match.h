@@ -59,7 +59,27 @@
 
 namespace mongo {
 
-DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Match);
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Match);
+class MatchLiteParsed final : public LiteParsedDocumentSourceDefault<MatchLiteParsed> {
+public:
+    MatchLiteParsed(const BSONElement& originalBson)
+        : LiteParsedDocumentSourceDefault<MatchLiteParsed>(originalBson) {}
+
+    static std::unique_ptr<MatchLiteParsed> parse(const NamespaceString& nss,
+                                                  const BSONElement& spec,
+                                                  const LiteParserOptions& options) {
+        return std::make_unique<MatchLiteParsed>(spec);
+    }
+
+    std::unique_ptr<StageParams> getStageParams() const final {
+        return std::make_unique<MatchStageParams>(_originalBson);
+    }
+
+    // $match only filters documents without modifying them.
+    bool isSelectionStage() const final {
+        return true;
+    }
+};
 
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceMatch : public DocumentSource {
 public:

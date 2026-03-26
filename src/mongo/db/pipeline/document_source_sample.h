@@ -50,7 +50,27 @@
 
 namespace mongo {
 
-DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Sample);
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Sample);
+class SampleLiteParsed final : public LiteParsedDocumentSourceDefault<SampleLiteParsed> {
+public:
+    SampleLiteParsed(const BSONElement& originalBson)
+        : LiteParsedDocumentSourceDefault<SampleLiteParsed>(originalBson) {}
+
+    static std::unique_ptr<SampleLiteParsed> parse(const NamespaceString& nss,
+                                                   const BSONElement& spec,
+                                                   const LiteParserOptions& options) {
+        return std::make_unique<SampleLiteParsed>(spec);
+    }
+
+    std::unique_ptr<StageParams> getStageParams() const final {
+        return std::make_unique<SampleStageParams>(_originalBson);
+    }
+
+    // $sample only selects a random subset of documents without modifying them.
+    bool isSelectionStage() const final {
+        return true;
+    }
+};
 
 class DocumentSourceSample final : public DocumentSource {
 public:

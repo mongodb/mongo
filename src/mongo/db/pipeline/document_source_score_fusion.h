@@ -101,6 +101,21 @@ public:
             return true;
         }
 
+        // $scoreFusion desugars into a pipeline that includes $sort.
+        bool isRankedStage() const final {
+            return true;
+        }
+
+        // $scoreFusion computes a combined score for each document from its subpipelines.
+        bool isScoredStage() const final {
+            return true;
+        }
+
+        // $scoreFusion does not modify documents, only combines and reorders them.
+        bool isSelectionStage() const final {
+            return true;
+        }
+
         bool hasExtensionVectorSearchStage() const override {
             return std::any_of(_pipelines.begin(), _pipelines.end(), [](const auto& pipeline) {
                 return pipeline.hasExtensionVectorSearchStage();

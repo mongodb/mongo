@@ -47,7 +47,27 @@
 
 namespace mongo {
 
-DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalInhibitOptimization);
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(InternalInhibitOptimization);
+class InternalInhibitOptimizationLiteParsed final
+    : public LiteParsedDocumentSourceDefault<InternalInhibitOptimizationLiteParsed> {
+public:
+    InternalInhibitOptimizationLiteParsed(const BSONElement& originalBson)
+        : LiteParsedDocumentSourceDefault<InternalInhibitOptimizationLiteParsed>(originalBson) {}
+
+    static std::unique_ptr<InternalInhibitOptimizationLiteParsed> parse(
+        const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
+        return std::make_unique<InternalInhibitOptimizationLiteParsed>(spec);
+    }
+
+    std::unique_ptr<StageParams> getStageParams() const final {
+        return std::make_unique<InternalInhibitOptimizationStageParams>(_originalBson);
+    }
+
+    // $_internalInhibitOptimization is a passthrough that does not modify documents.
+    bool isSelectionStage() const final {
+        return true;
+    }
+};
 
 /**
  * An internal stage available for testing. Acts as a simple passthrough of intermediate results

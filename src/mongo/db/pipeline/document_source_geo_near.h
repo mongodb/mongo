@@ -56,7 +56,39 @@
 
 namespace mongo {
 
-DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(GeoNear);
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(GeoNear);
+class GeoNearLiteParsed final : public LiteParsedDocumentSourceDefault<GeoNearLiteParsed> {
+public:
+    GeoNearLiteParsed(const BSONElement& originalBson)
+        : LiteParsedDocumentSourceDefault<GeoNearLiteParsed>(originalBson) {}
+
+    static std::unique_ptr<GeoNearLiteParsed> parse(const NamespaceString& nss,
+                                                    const BSONElement& spec,
+                                                    const LiteParserOptions& options) {
+        return std::make_unique<GeoNearLiteParsed>(spec);
+    }
+
+    std::unique_ptr<StageParams> getStageParams() const final {
+        return std::make_unique<GeoNearStageParams>(_originalBson);
+    }
+
+    // $geoNear produces sorted output by distance, so it is a ranked stage.
+    bool isRankedStage() const final {
+        return true;
+    }
+
+    // $geoNear is a selection stage unless distanceField or includeLocs is specified,
+    // which add new fields to output documents.
+    bool isSelectionStage() const final {
+        if (_originalBson.type() == BSONType::object) {
+            auto specObj = _originalBson.Obj();
+            if (specObj.hasField("distanceField"_sd) || specObj.hasField("includeLocs"_sd)) {
+                return false;
+            }
+        }
+        return true;
+    }
+};
 
 class DocumentSourceGeoNear : public DocumentSource {
 public:
