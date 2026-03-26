@@ -32,6 +32,7 @@ core:
   meta:
     slack: server-programmability
     jira: Server Programmability
+    fully_marked: true
   files:
     - src/mongo/base/
     - src/mongo/platform/
