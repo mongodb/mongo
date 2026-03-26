@@ -31,6 +31,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/column/bson_element_storage.h"
 #include "mongo/bson/column/bsoncolumn.h"
+#include "mongo/bson/column/bsoncolumn_expressions.h"
 #include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/util/base64.h"
 
@@ -110,6 +111,10 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
                                 << ". The block-based API returned: " << elem.toString()
                                 << ". The iterator API returned: " << (*it).toString());
         ++it;
+    }
+
+    if (iteratorError.empty()) {
+        invariant(bsoncolumn::count(Data, Size) == iteratorElems.size());
     }
     return 0;
 }

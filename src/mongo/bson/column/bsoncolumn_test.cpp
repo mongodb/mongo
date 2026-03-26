@@ -523,9 +523,13 @@ public:
         BSONColumn column(buffer, size);
 
         BSONColumnBuilder reference;
+        size_t cnt = 0;
         for (auto&& elem : column) {
             reference.append(elem);
+            ++cnt;
         }
+
+        ASSERT_EQ(bsoncolumn::count(buffer, size), cnt);
 
         BSONColumnBuilder<> reopen(buffer, size);
         [[maybe_unused]] auto diff = reference.intermediate();
@@ -909,6 +913,7 @@ public:
             ASSERT_EQ(col.size(), expected.size());
             ASSERT_EQ(std::distance(col.begin(), col.end()), expected.size());
             ASSERT_EQ(col.size(), expected.size());
+            ASSERT_EQ(bsoncolumn::count(columnBinary), expected.size());
 
             auto it = col.begin();
             for (auto elem : expected) {

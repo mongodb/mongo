@@ -17,6 +17,7 @@ mongo_cc_library(
     name = "column",
     srcs = [
         "bsoncolumn.cpp",
+        "bsoncolumn_expressions.cpp",
         "bsoncolumn_interleaved.cpp",
         "bsoncolumn_util.cpp",
         "bsoncolumnbuilder.cpp",

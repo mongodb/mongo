@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/column/bsoncolumn.h"
+#include "mongo/bson/column/bsoncolumn_expressions.h"
 #include "mongo/bson/column/bsoncolumnbuilder.h"
 
 namespace mongo::bsoncolumn {
@@ -41,11 +42,14 @@ void fuzzer(const char* binary, size_t size) {
 
     // Decompress all and append data into a reference builder.
     BSONColumnBuilder reference;
+    size_t cnt = 0;
     try {
         BSONColumn column(binary, size);
         for (auto&& val : column) {
             reference.append(val);
+            ++cnt;
         }
+
     } catch (const DBException& ex) {
         iteratorDecompressorResult = ex.toStatus();
     }
@@ -65,6 +69,11 @@ void fuzzer(const char* binary, size_t size) {
         std::string err = "decompression: " + iteratorDecompressorResult.toString() +
             ", reopen: " + binaryReopenResult.toString();
         invariant(false, err);
+    }
+
+    // Verify bsoncolumn::count
+    if (iteratorDecompressorResult.isOK()) {
+        invariant(bsoncolumn::count(binary, size) == cnt);
     }
 
     auto diff = reference.intermediate();

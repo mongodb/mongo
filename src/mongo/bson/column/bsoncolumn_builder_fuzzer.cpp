@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/column/bsoncolumn.h"
+#include "mongo/bson/column/bsoncolumn_expressions.h"
 #include "mongo/bson/column/bsoncolumn_fuzzer_util.h"
 #include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/bson/column/simple8b_helpers.h"
@@ -100,6 +101,9 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     invariant(!it.more(),
               str::stream() << "There were more decoded elements than original. Column: "
                             << base64::encode(diff.data(), diff.size()));
+
+    // Verify bsoncolumn::count
+    invariant(bsoncolumn::count(diff.data(), diff.size()) == generatedElements.size());
 
     // Verify binary reopen gives identical state as intermediate
     BSONColumnBuilder reopen(diff.data(), diff.size());
