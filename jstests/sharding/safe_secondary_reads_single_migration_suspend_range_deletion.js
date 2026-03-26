@@ -24,6 +24,7 @@
  * "versioned". Determines what system profiler checks are performed.
  * @tags: [
  *    requires_scripting,
+ *    requires_profiling,
  * ]
  */
 import {
