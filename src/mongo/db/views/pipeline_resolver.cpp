@@ -72,7 +72,7 @@ std::vector<BSONObj> buildResolvedPipelineForSimpleCase(
     // For this reason, we do not expand the aggregation request to include the view pipeline.
     // Caller is expected to use LiteParsedPipeline::handleView() for such cases.
     if (search_helper_bson_obj::isMongotPipeline(ifrContext, userPipeline) ||
-        search_helper_bson_obj::isExtensionVectorSearchPipeline(ifrContext, userPipeline)) {
+        search_helper_bson_obj::isExtensionMongotPipeline(ifrContext, userPipeline)) {
         return userPipeline;
     }
 

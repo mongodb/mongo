@@ -230,6 +230,15 @@ public:
     }
 
     /**
+     * Returns true if the pipeline has a $search or $searchMeta extension stage.
+     */
+    bool hasExtensionSearchStage() const {
+        return std::any_of(_stageSpecs.begin(), _stageSpecs.end(), [](auto&& spec) {
+            return spec->hasExtensionSearchStage();
+        });
+    }
+
+    /**
      * Returns true iff the pipeline has a $rankFusion or $scoreFusion stage.
      */
     bool hasHybridSearchStage() const {

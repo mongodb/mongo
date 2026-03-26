@@ -151,6 +151,10 @@ public:
             return false;
         }
 
+        bool hasExtensionSearchStage() const override {
+            return !_pipelines.empty() && _pipelines[0].hasExtensionSearchStage();
+        }
+
         std::unique_ptr<StageParams> getStageParams() const override {
             return std::make_unique<LookUpStageParams>(_originalBson);
         }

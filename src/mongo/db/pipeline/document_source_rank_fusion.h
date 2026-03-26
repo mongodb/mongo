@@ -126,6 +126,12 @@ public:
             });
         }
 
+        bool hasExtensionSearchStage() const override {
+            return std::any_of(_pipelines.begin(), _pipelines.end(), [](const auto& pipeline) {
+                return pipeline.hasExtensionSearchStage();
+            });
+        }
+
         std::unique_ptr<StageParams> getStageParams() const override {
             return std::make_unique<RankFusionStageParams>(_originalBson);
         }

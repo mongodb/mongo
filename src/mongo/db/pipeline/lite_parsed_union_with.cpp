@@ -168,6 +168,10 @@ bool LiteParsedUnionWith::hasExtensionVectorSearchStage() const {
     return !_pipelines.empty() && _pipelines[0].hasExtensionVectorSearchStage();
 }
 
+bool LiteParsedUnionWith::hasExtensionSearchStage() const {
+    return !_pipelines.empty() && _pipelines[0].hasExtensionSearchStage();
+}
+
 void LiteParsedUnionWith::validateUnionWithCollectionlessPipeline(
     const boost::optional<std::vector<mongo::BSONObj>>& pipeline) {
     const auto errMsg =

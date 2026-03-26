@@ -113,6 +113,8 @@ public:
 
     bool hasExtensionVectorSearchStage() const override;
 
+    bool hasExtensionSearchStage() const override;
+
     static void validateUnionWithCollectionlessPipeline(
         const boost::optional<std::vector<mongo::BSONObj>>& pipeline);
 

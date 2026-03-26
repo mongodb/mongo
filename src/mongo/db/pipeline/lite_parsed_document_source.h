@@ -488,7 +488,16 @@ public:
     }
 
     /**
-     * Returns true if this is a $rankFusion pipeline
+     * Returns true if this is a $search or $searchMeta extension stage, or has a nested one.
+     * TODO SERVER-116021 Remove this override when extensions can handle views through
+     * bindViewInfo().
+     */
+    virtual bool hasExtensionSearchStage() const {
+        return false;
+    }
+
+    /**
+     * Returns true if this is a $rankFusion pipeline.
      */
     virtual bool isHybridSearchStage() const {
         return false;

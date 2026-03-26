@@ -84,12 +84,12 @@ inline bool isVectorSearchReturnStoredSource(const BSONObj& stageBson) {
 }  // namespace detail
 
 /**
- * Checks that the pipeline isn't empty and if the first stage in the pipeline is the $vectorSearch
- * extension stage. The legacy stage returns false.
+ * Checks that the pipeline isn't empty and if the first stage is an extension-implemented mongot
+ * stage ($vectorSearch, $search, or $searchMeta). Returns false for legacy implementations.
  *
  * TODO SERVER-117168 Remove this function.
  */
-inline bool isExtensionVectorSearchPipeline(
+inline bool isExtensionMongotPipeline(
     const std::shared_ptr<IncrementalFeatureRolloutContext>& ifrContext,
     const std::vector<BSONObj>& pipeline) {
     if (pipeline.empty()) {
@@ -97,29 +97,32 @@ inline bool isExtensionVectorSearchPipeline(
     }
     const auto& firstStageBson = pipeline[0];
     using detail::is;
+    // Note we don't need to worry about/consult 'featureFlagExtensionViewsAndUnionWith' because the
+    // extension will enforce this behavior by toggling its IFR flag and retrying, so thankfully
+    // this is enough, and we don't need to understand what context this BSON appears in (w.r.t.
+    // views or sub-pipelines).
     if (is<DocumentSourceVectorSearch>(firstStageBson)) {
-        // Note we don't need to worry about/consult 'featureFlagExtensionViewsAndUnionWith'
-        // because the extension will enforce this behavior by toggling
-        // 'gFeatureFlagVectorSearchExtension' and retrying, so thankfully this is enough, and
-        // we don't need to understand what context this BSON appears in (w.r.t. views or
-        // sub-pipelines).
         // TODO SERVER-121764: Remove the returnStoredSource check when the extension supports it.
         // Fall back to legacy execution when returnStoredSource is true, as the extension does
         // not support this option.
         return ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagVectorSearchExtension) &&
             detail::hasMongotExtension(serverGlobalParams.extensions) &&
             !detail::isVectorSearchReturnStoredSource(firstStageBson);
+    } else if (is<DocumentSourceSearch>(firstStageBson) ||
+               is<DocumentSourceSearchMeta>(firstStageBson)) {
+        return ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagSearchExtension) &&
+            detail::hasMongotExtension(serverGlobalParams.extensions);
     }
     return false;
 }
 
 /**
  * Checks that the pipeline isn't empty and if the first stage in the pipeline is a mongot stage
- * Namely, that includes:
- * - $search
+ * using the legacy implementation. Namely, that includes:
  * - $vectorSearch (legacy implementation only, extensions intentionally need to avoid this kind of
  * special casing)
- * - $searchMeta
+ * - $search (legacy implementation only)
+ * - $searchMeta (legacy implementation only)
  * - $listSearchIndexes
  * - $rankFusion (starting with a search stage)
  * - $scoreFusion (starting with a search stage).
@@ -144,6 +147,13 @@ inline bool isMongotPipeline(const std::shared_ptr<IncrementalFeatureRolloutCont
         return !detail::hasMongotExtension(serverGlobalParams.extensions) ||
             !ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagVectorSearchExtension) ||
             detail::isVectorSearchReturnStoredSource(firstStageBson);
+    } else if (is<DocumentSourceSearch>(firstStageBson) ||
+               is<DocumentSourceSearchMeta>(firstStageBson)) {
+        // Return true if the $search/$searchMeta implementation would be the legacy
+        // implementation. The extension enforces context restrictions by toggling
+        // 'gFeatureFlagSearchExtension' and retrying, so this is enough.
+        return !detail::hasMongotExtension(serverGlobalParams.extensions) ||
+            !ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagSearchExtension);
     } else if (is<DocumentSourceRankFusion>(firstStageBson)) {
         // Note that the $rankFusion/$scoreFusion firstStageBsons are syntactic sugar. When
         // desugared, the first firstStageBson in its first pipeline in the $rankFusion/$scoreFusion
@@ -183,9 +193,7 @@ inline bool isMongotPipeline(const std::shared_ptr<IncrementalFeatureRolloutCont
         return isMongotPipeline(ifrContext,
                                 std::vector<BSONObj>{scoreFusionFirstPipeline[0].Obj()});
     } else {
-        return is<DocumentSourceSearch>(firstStageBson) ||
-            is<DocumentSourceSearchMeta>(firstStageBson) ||
-            is<DocumentSourceListSearchIndexes>(firstStageBson);
+        return is<DocumentSourceListSearchIndexes>(firstStageBson);
     }
 }
 

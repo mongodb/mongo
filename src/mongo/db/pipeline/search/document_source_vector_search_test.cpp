@@ -41,6 +41,7 @@
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/util/scopeguard.h"
 
 
 namespace mongo {
@@ -358,13 +359,14 @@ TEST_F(DocumentSourceVectorSearchTest, DoesNotTassertWhenReturnStoredSourceTrueW
 }
 
 TEST_F(DocumentSourceVectorSearchTest,
-       IsExtensionVectorSearchPipelineReturnsFalseForReturnStoredSource) {
+       IsExtensionMongotPipelineReturnsFalseForVectorSearchWithReturnStoredSource) {
     auto& flag = feature_flags::gFeatureFlagVectorSearchExtension;
     std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << true)};
     auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
 
     // Simulate that the mongot extension is loaded.
     auto origExtensions = serverGlobalParams.extensions;
+    ScopeGuard restoreExtensions([&] { serverGlobalParams.extensions = origExtensions; });
     serverGlobalParams.extensions.push_back("mongot-extension");
 
     auto pipeline = std::vector<BSONObj>{fromjson(R"({
@@ -378,21 +380,20 @@ TEST_F(DocumentSourceVectorSearchTest,
     })")};
 
     // With returnStoredSource: true, should NOT be treated as an extension pipeline.
-    ASSERT_FALSE(search_helper_bson_obj::isExtensionVectorSearchPipeline(ifrContext, pipeline));
+    ASSERT_FALSE(search_helper_bson_obj::isExtensionMongotPipeline(ifrContext, pipeline));
     // Should be treated as a legacy mongot pipeline instead.
     ASSERT_TRUE(search_helper_bson_obj::isMongotPipeline(ifrContext, pipeline));
-
-    serverGlobalParams.extensions = origExtensions;
 }
 
 TEST_F(DocumentSourceVectorSearchTest,
-       IsExtensionVectorSearchPipelineReturnsTrueWithoutReturnStoredSource) {
+       IsExtensionMongotPipelineReturnsTrueForVectorSearchWithoutReturnStoredSource) {
     auto& flag = feature_flags::gFeatureFlagVectorSearchExtension;
     std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << true)};
     auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
 
     // Simulate that the mongot extension is loaded.
     auto origExtensions = serverGlobalParams.extensions;
+    ScopeGuard restoreExtensions([&] { serverGlobalParams.extensions = origExtensions; });
     serverGlobalParams.extensions.push_back("mongot-extension");
 
     auto pipeline = std::vector<BSONObj>{fromjson(R"({
@@ -405,21 +406,20 @@ TEST_F(DocumentSourceVectorSearchTest,
     })")};
 
     // Without returnStoredSource, should be treated as an extension pipeline.
-    ASSERT_TRUE(search_helper_bson_obj::isExtensionVectorSearchPipeline(ifrContext, pipeline));
+    ASSERT_TRUE(search_helper_bson_obj::isExtensionMongotPipeline(ifrContext, pipeline));
     // Should NOT be a legacy mongot pipeline.
     ASSERT_FALSE(search_helper_bson_obj::isMongotPipeline(ifrContext, pipeline));
-
-    serverGlobalParams.extensions = origExtensions;
 }
 
 TEST_F(DocumentSourceVectorSearchTest,
-       IsExtensionVectorSearchPipelineReturnsTrueWhenReturnStoredSourceIsFalse) {
+       IsExtensionMongotPipelineReturnsTrueForVectorSearchWithReturnStoredSourceFalse) {
     auto& flag = feature_flags::gFeatureFlagVectorSearchExtension;
     std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << true)};
     auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
 
     // Simulate that the mongot extension is loaded.
     auto origExtensions = serverGlobalParams.extensions;
+    ScopeGuard restoreExtensions([&] { serverGlobalParams.extensions = origExtensions; });
     serverGlobalParams.extensions.push_back("mongot-extension");
 
     auto pipeline = std::vector<BSONObj>{fromjson(R"({
@@ -433,10 +433,8 @@ TEST_F(DocumentSourceVectorSearchTest,
     })")};
 
     // With returnStoredSource: false, should still use extension.
-    ASSERT_TRUE(search_helper_bson_obj::isExtensionVectorSearchPipeline(ifrContext, pipeline));
+    ASSERT_TRUE(search_helper_bson_obj::isExtensionMongotPipeline(ifrContext, pipeline));
     ASSERT_FALSE(search_helper_bson_obj::isMongotPipeline(ifrContext, pipeline));
-
-    serverGlobalParams.extensions = origExtensions;
 }
 
 }  // namespace

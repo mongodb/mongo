@@ -193,6 +193,10 @@ public:
         // bindViewInfo().
         bool hasExtensionVectorSearchStage() const override;
 
+        // TODO SERVER-116021 Remove this override when extensions can handle views through
+        // bindViewInfo().
+        bool hasExtensionSearchStage() const override;
+
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
                                                      bool isImplicitDefault) const override {
             return this->onlyReadConcernLocalSupported(
@@ -315,6 +319,8 @@ public:
         }
 
         bool hasExtensionVectorSearchStage() const override;
+
+        bool hasExtensionSearchStage() const override;
 
         FirstStageViewApplicationPolicy getFirstStageViewApplicationPolicy() const override;
 

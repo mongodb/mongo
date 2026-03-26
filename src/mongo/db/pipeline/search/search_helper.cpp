@@ -314,13 +314,22 @@ bool isExtensionVectorSearchStage(std::string stageName) {
         stageName == DocumentSourceVectorSearch::kStageName;
 }
 
-bool isExtensionVectorSearchPipeline(const Pipeline* pipeline) {
+// TODO SERVER-116021 Remove this function when the extension can do this through bindViewInfo().
+bool isExtensionSearchStage(std::string stageName) {
+    return stageName == kExtensionSearchStageName ||
+        stageName == DocumentSourceSearch::kStageName ||
+        stageName == kExtensionSearchMetaStageName ||
+        stageName == DocumentSourceSearchMeta::kStageName;
+}
+
+bool isExtensionMongotPipeline(const Pipeline* pipeline) {
     if (!pipeline || pipeline->empty()) {
         return false;
     }
     const auto& stages = pipeline->getSources();
     return std::any_of(stages.begin(), stages.end(), [](const auto& stage) {
-        return isExtensionVectorSearchStage(stage->getSourceName());
+        return isExtensionVectorSearchStage(stage->getSourceName()) ||
+            isExtensionSearchStage(stage->getSourceName());
     });
 }
 
@@ -335,7 +344,7 @@ void throwIfrKickbackIfNecessary(bool kickbackCondition,
 }
 
 bool shouldPreValidateMetaDependencies(const Pipeline* pipeline) {
-    return isExtensionVectorSearchPipeline(pipeline) || isMongotPipeline(pipeline);
+    return isExtensionMongotPipeline(pipeline) || isMongotPipeline(pipeline);
 }
 
 void assertSearchMetaAccessValid(const DocumentSourceContainer& pipeline,

@@ -202,8 +202,18 @@ bool DocumentSourceExtensionOptimizable::LiteParsedExpandable::hasExtensionVecto
 }
 
 // TODO SERVER-116021 Remove this check when the extension can do this through bindViewInfo().
+bool DocumentSourceExtensionOptimizable::LiteParsedExpandable::hasExtensionSearchStage() const {
+    return search_helpers::isExtensionSearchStage(getParseTimeName());
+}
+
+// TODO SERVER-116021 Remove this check when the extension can do this through bindViewInfo().
 bool DocumentSourceExtensionOptimizable::LiteParsedExpanded::hasExtensionVectorSearchStage() const {
     return search_helpers::isExtensionVectorSearchStage(getParseTimeName());
+}
+
+// TODO SERVER-116021 Remove this check when the extension can do this through bindViewInfo().
+bool DocumentSourceExtensionOptimizable::LiteParsedExpanded::hasExtensionSearchStage() const {
+    return search_helpers::isExtensionSearchStage(getParseTimeName());
 }
 
 FirstStageViewApplicationPolicy
