@@ -447,9 +447,9 @@ A new truncate marker is created when either:
    - The record inserted serves as the 'last record' of the newly created marker.
 2. Partial marker expiration is supported, and an explicit call is made to transform the "partial
    marker" into a complete truncate marker.
-   - Partial marker expiration is supported for change stream collections and ensures that expired
-     documents in a partial marker will eventually be truncated - even if writes to the namespace
-     cease and the partial marker never meets the minimum bytes requirement.
+   - Partial marker expiration is supported for the change stream pre-images collection and ensures
+     that expired documents in a partial marker will eventually be truncated - even if writes to the
+     namespace cease and the partial marker never meets the minimum bytes requirement.
 
 ### Requirements & Properties
 
@@ -490,62 +490,100 @@ metrics will converge closer to the correct values.
 ### Collections that use CollectionTruncateMarkers
 
 - The oplog - `OplogTruncateMarkers`.
-- [Change stream pre images collections](#pre-images-collection-truncation) -
+- [Change stream pre-images collection](#pre-images-collection-truncation) -
   `PreImagesTruncateMarkersPerNsUUID`
 
 Read about the WiredTiger implementation of Oplog Truncation Markers [here](wiredtiger/README.md#oplog-truncation).
 
 ### Change Stream Collection Truncation
 
-Change stream collection that uses CollectionTruncateMarkers
+The change stream pre-images collection that uses CollectionTruncateMarkers is named
+`config.system.preimages`.
 
-- pre-images: `<tenantId>_config.system.preimages` in serverless, `config.system.preimages` in
-  dedicated environments.
-
-The change stream pre-images collections has a periodic remover thread
+Expired change stream pre-images are removed by a periodic remover thread
 ([ChangeStreamExpiredPreImagesRemover](https://github.com/mongodb/mongo/blob/r8.0.15/src/mongo/db/pipeline/change_stream_expired_pre_image_remover.cpp#L65-L70).
 The remover thread:
 
-1. Creates the tenant's initial CollectionTruncateMarkers for the tenant if they do not yet exist
+1. Creates the initial CollectionTruncateMarkers if they do not yet exist
    - Lazy initialization of the initial truncate markers is imperative so writes aren't blocked on
      startup
 2. Iterates through each truncate marker. If a marker is expired, issues a truncate of all records
    older than the marker's last record, and removes the marker from the set.
 
-#### Cleanup After Unclean Shutdown
+#### Pre-Images Collection Truncation
 
-After an unclean shutdown, all expired pre-images are truncated at startup. WiredTiger truncate
-cannot guarantee a consistent view of previously truncated data on unreplicated, untimestamped
-ranges after a crash. Unlike the oplog, the change stream collections aren't logged, don't persist
-any special timestamps, and it's possible that previously truncated documents can resurface after
-shutdown.
-
-#### Pre Images Collection Truncation
-
-Each tenant has 1 pre-images collection. Each pre-images collection contains pre-images across all
-the tenant's pre-image enabled collections.
-
-A pre-images collection is clustered by
+The change streams pre-images collection is clustered by
 [ChangeStreamPreImageId](https://github.com/mongodb/mongo/blob/r8.2.1/src/mongo/db/pipeline/change_stream_preimage.idl#L72),
 which implicitly orders pre-images first by their `'nsUUID'` (the UUID of the collection the
 pre-image is from), their `'ts'` (the timestamp associated with the pre-images oplog entry), and
 then by their `'applyOpsIndex'` (the index into the applyOps oplog entry which generated the
 pre-image, 0 if the pre-image isn't from an applyOps oplog entry).
 
-There is a set of CollectionTruncateMarkers for each 'nsUUID' within a tenant's pre-images
-collection, `PreImagesTruncateMarkersPerNsUUID`.
+There is a set of CollectionTruncateMarkers for each 'nsUUID' within the pre-images collection,
+`PreImagesTruncateMarkersPerNsUUID`.
 
-In a serverless environment, each tenant has a set 'expireAfterSeconds' parameter. An entry is
-expired if the 'wall time' associated with the pre-image is more than 'expireAfterSeconds' older
-than the node's current wall time.
+A pre-image is expired if either (1) 'expireAfterSeconds' is set and the pre-image is expired by it
+or (2) its 'ts' is less than or equal to the oldest oplog entry timestamp.
 
-In a dedicated environment, a pre-image is expired if either (1) 'expireAfterSeconds' is set and the
-pre-image is expired by it or (2) its 'ts' is less than or equal to the oldest oplog entry
-timestamp.
+`ChangeStreamExpiredPreImagesRemover` iterates over each set of `PreImagesTruncateMarkersPerNsUUID`,
+and issues a ranged truncate from the truncate marker's last record to the minimum RecordId for
+the nsUUID when there is an expired truncate marker.
 
-For each tenant, `ChangeStreamExpiredPreImagesRemover` iterates over each set of
-`PreImagesTruncateMarkersPerNsUUID`, and issues a ranged truncate from the truncate marker's last
-record to the the minimum RecordId for the nsUUID when there is an expired truncate marker.
+#### Replication of Pre-Images Collection Truncation
+
+There are two modes for truncating expired change streams pre-images:
+
+- unreplicated truncates: in this mode, all nodes in a replica set perform local, unreplicated
+  truncates on the `config.system.preimages` collection. All nodes have their own
+  `ChangeStreamExpiredPreImagesRemover` thread working. No oplog entries are written for the
+  truncates.
+- replicated truncates: in this mode, the `ChangeStreamExpiredPreImagesRemover` thread only runs on
+  the current primary of the replica set. The primary writes the truncates to the oplog using
+  `truncateRange` oplog entries. These are replicated and picked up by the secondaries' oplog
+  applier.
+
+When using unreplicated truncates, every node in a replica set has its own view of the data in the
+`config.system.preimages` collection, i.e. there can be inconsistencies between the primary and the
+secondaries w.r.t. this collection. The data consistency check (`checkDBHash`) that is performed at
+replica set shutdown in testing permits these differences.
+
+When replicated truncates are used, the primary and the secondaries should always have a consistent
+view of the data in the `config.system.preimages` collection, and `checkDBHash` does not permit any
+differences between the primary and the secondaries for this collection.
+
+Which of the two modes (unreplicated or replicated truncates) is used depends on two factors:
+
+- Disaggregated storage clusters (DSC) will always use replicated truncates, as all write operations
+  need to be timestamped and shipped to the secondaries via the oplog. Unreplicated truncates will
+  not be used in this configuration.
+- On aggregated storage clusters (ASC), feature flag `featureFlagUseReplicatedTruncatesForDeletions`
+  controls if replicated truncates are used, i.e. both unreplicated and replicated truncates can be
+  used.
+
+#### Responsibility for Pre-Images Truncation
+
+When using unreplicated truncates, the pre-image truncation (`ChangeStreamExpiredPreImagesRemover`)
+is installed on every node as part of the `onConsistentDataAvailable` callback of the
+`ReplicaSetAwareInterface`. Sampling of the pre-images in `config.system.preimages` is only done
+once when the job is installed and runs for the first time.
+
+In replicated truncates mode, only the current primary executes the pre-image removal. On every
+step-up as a primary, the node installs the pre-images removal job, as part of the
+`onStepUpComplete` callback of the `ReplicaSetAwareInterface`. When a node steps down, the pre-image
+truncation job is stopped as part of the `onStepDown` callback.
+If a step-up or step-down happens while the pre-images removal job is currently executing, the
+current removal job iteration can fail with a `NotWritablePrimary` error. This is expected and does
+not cause problems, as the new primary will take over the deletions afterwards.
+In replicated truncates mode, sampling of the documents in the pre-images collection is performed on
+every step-up as a primary.
+
+#### Cleanup After Unclean Shutdown
+
+When using unreplicated truncates, all expired pre-images are truncated at startup after an unclean
+shutdown. WiredTiger truncate cannot guarantee a consistent view of previously truncated data on
+unreplicated, untimestamped ranges after a crash.
+Unlike the oplog, the change stream pre-image collection is not logged, does not persist any special
+timestamps, and it's possible that previously truncated documents can resurface after shutdown.
 
 ### Code spelunking starting points:
 
@@ -560,7 +598,7 @@ record to the the minimum RecordId for the nsUUID when there is an expired trunc
   - Truncate markers for a given nsUUID captured within a pre-images collection.
 - [The PreImagesTruncateManager
   class](https://github.com/mongodb/mongo/blob/r8.0.15/src/mongo/db/change_stream_pre_images_truncate_manager.h#L71)
-  - Manages pre image truncate markers for each tenant.
+  - Manages pre-image truncate markers.
 
 # Oplog Collection
 
