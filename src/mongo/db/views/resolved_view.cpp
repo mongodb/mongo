@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/document_source_index_stats.h"
 #include "mongo/db/pipeline/document_source_internal_convert_bucket_index_stats.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
+#include "mongo/db/pipeline/document_source_plan_cache_stats.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/idl/idl_parser.h"
@@ -81,7 +82,8 @@ void ResolvedView::applyTimeseriesRewrites(std::vector<BSONObj>* resolvedPipelin
     if (resolvedPipeline->size() >= 2 &&
         (*resolvedPipeline)[0][DocumentSourceInternalUnpackBucket::kStageNameInternal] &&
         ((*resolvedPipeline)[1][DocumentSourceIndexStats::kStageName] ||
-         (*resolvedPipeline)[1][DocumentSourceCollStats::kStageName])) {
+         (*resolvedPipeline)[1][DocumentSourceCollStats::kStageName] ||
+         (*resolvedPipeline)[1][DocumentSourcePlanCacheStats::kStageName])) {
         //  Normally for a regular read, $_internalUnpackBucket unpacks the buckets entries into
         //  time-series document format and then passes the time-series documents on through the
         //  pipeline. Instead, for $indexStats, we need to read the buckets collection's index
@@ -102,6 +104,10 @@ void ResolvedView::applyTimeseriesRewrites(std::vector<BSONObj>* resolvedPipelin
             }
             (*resolvedPipeline)[1] =
                 BSON(DocumentSourceInternalConvertBucketIndexStats::kStageName << builder.obj());
+        } else if ((*resolvedPipeline)[1][DocumentSourcePlanCacheStats::kStageName]) {
+            // For $planCacheStats, we directly read the collection stats from the buckets
+            // collection, and skip $_internalUnpackBucket.
+            resolvedPipeline->erase(resolvedPipeline->begin());
         } else {
             auto collStatsStage = (*resolvedPipeline)[1];
             BSONObjBuilder builder;
