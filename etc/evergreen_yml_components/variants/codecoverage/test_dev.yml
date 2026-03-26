@@ -59,6 +59,7 @@ buildvariants:
       - name: streams_lambda_sanitizer
       - name: streams_kinesis_sanitizer
       - name: streams_s3_sanitizer
+      - name: streams_azure_blob_sanitizer
 
   # Variant to support Code Coverage on amd64/x86_64
   - name: &rhel-93-64-bit-coverage rhel-93-64-bit-coverage

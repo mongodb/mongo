@@ -369,6 +369,17 @@ tasks:
           suite: streams_s3
           resmoke_jobs_max: 1
 
+  # Sanitizer variant of streams_azure_blob - uses archive_dist_test binaries instead of streams_build_and_push
+  - <<: *task_template
+    name: streams_azure_blob_sanitizer
+    tags: ["assigned_to_jira_team_streams", "experimental"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: streams_azure_blob
+          resmoke_jobs_max: 1
+
   - <<: *task_template_streams
     name: streams_lambda
     tags:
@@ -379,6 +390,16 @@ tasks:
 
   - <<: *task_template_streams
     name: streams_s3
+    tags:
+      ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
+    commands:
+      - func: "do setup for streams"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template_streams
+    name: streams_azure_blob
     tags:
       ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
     commands:
