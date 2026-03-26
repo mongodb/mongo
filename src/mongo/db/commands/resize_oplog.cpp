@@ -120,6 +120,7 @@ public:
 
             if (auto minRetentionHoursOpt = params.getMinRetentionHours()) {
                 storageGlobalParams.oplogMinRetentionHours.store(*minRetentionHoursOpt);
+                storageGlobalParams.oplogMinRetentionInitializedUsingDefault = false;
             }
             wunit.commit();
 

@@ -70,6 +70,7 @@ void StorageGlobalParams::_reset() {
     queryableBackupMode = false;
     groupCollections = false;
     oplogMinRetentionHours.store(0.0);
+    oplogMinRetentionInitializedUsingDefault = true;
     allowOplogTruncation = true;
     forceDisableTableLogging = false;
 }

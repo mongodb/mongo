@@ -136,7 +136,11 @@ struct StorageGlobalParams {
     // Controls what size the oplog should be in addition to oplogSize. If set, the oplog will only
     // be truncated if it is over the capped size, and if the bucket of oldest oplog entries fall
     // outside of the retention window which is set by this option.
-    AtomicWord<double> oplogMinRetentionHours;
+    //
+    // If the value isn't explicitly set during configuration, a default value of 0 is used. This
+    // default may be overridden depending on architecture.
+    AtomicWord<double> oplogMinRetentionHours{0.0};
+    bool oplogMinRetentionInitializedUsingDefault{true};
 
     // Controls whether we allow the OplogTruncateMarkers mechanism to delete oplog history on WT.
     bool allowOplogTruncation;
