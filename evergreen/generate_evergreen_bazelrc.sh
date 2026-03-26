@@ -9,21 +9,22 @@ set -o verbose
 # Use the Evergreen temp directory to avoid filling up the disk.
 mkdir -p $TMPDIR
 if [[ "$OSTYPE" == "cygwin" ]] || [[ "$OSTYPE" == "win32" ]]; then
-    mkdir -p Z:/bazel_tmp
-    touch Z:/bazel_tmp/mci_path
+    mkdir -p Z:/b
+    touch Z:/b/mci_path
     # TODO(SERVER-94605): remove when Windows temp directory is cleared between task runs
-    if [[ "$PWD" != "$(cat Z:/bazel_tmp/mci_path)" ]]; then
-        echo "Clearing bazel output root from previous task mci '$(cat Z:/bazel_tmp/mci_path)'"
-        rm -rf Z:/bazel_tmp/* || true
-        echo $PWD >Z:/bazel_tmp/mci_path
+    if [[ "$PWD" != "$(cat Z:/b/mci_path)" ]]; then
+        echo "Clearing bazel output root from previous task mci '$(cat Z:/b/mci_path)'"
+        rm -rf Z:/b/* || true
+        echo $PWD >Z:/b/mci_path
     fi
 
     # Z:/ path is necessary to avoid running into MSVC's file length limit,
     # see https://jira.mongodb.org/browse/DEVPROD-11126
     abs_path=$(cygpath -w "$TMPDIR" | tr '\\' '/')
-    echo "startup --output_user_root=Z:/bazel_tmp" >.bazelrc.evergreen
-    echo "common --action_env=TMP=Z:/bazel_tmp" >>.bazelrc.evergreen
-    echo "common --action_env=TEMP=Z:/bazel_tmp" >>.bazelrc.evergreen
+    echo "startup --output_user_root=Z:/b" >.bazelrc.evergreen
+    echo "startup --output_base=Z:/b/b" >.bazelrc.evergreen
+    echo "common --action_env=TMP=Z:/b" >>.bazelrc.evergreen
+    echo "common --action_env=TEMP=Z:/b" >>.bazelrc.evergreen
     echo "BAZELISK_HOME=${abs_path}/bazelisk_home" >>.bazeliskrc
     echo "common --define GIT_COMMIT_HASH=$(git rev-parse HEAD)" >>.bazelrc.git
 else

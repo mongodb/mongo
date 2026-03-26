@@ -47,6 +47,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/scripting/mozjs/wasm/embedded_wasm_resource.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstdint>
@@ -54,13 +55,6 @@
 #include <set>
 #include <string>
 #include <vector>
-
-// Symbols produced by objcopy from the AOT-compiled mozjs_wasm_api.cwasm.
-// See the embed_mozjs_wasm_obj genrule in BUILD.bazel.
-extern "C" {
-extern const uint8_t _binary_mozjs_wasm_api_cwasm_start[];
-extern const uint8_t _binary_mozjs_wasm_api_cwasm_end[];
-}
 
 namespace mongo {
 namespace mozjs {
@@ -72,10 +66,8 @@ namespace {
 class WasmMozJSBridgeTest : public unittest::Test {
 public:
     static void SetUpTestSuite() {
-        size_t size = static_cast<size_t>(_binary_mozjs_wasm_api_cwasm_end -
-                                          _binary_mozjs_wasm_api_cwasm_start);
-        _s_engineCtx =
-            WasmEngineContext::createFromPrecompiled(_binary_mozjs_wasm_api_cwasm_start, size);
+        auto [wasmData, wasmSize] = getEmbeddedWasmResource();
+        _s_engineCtx = WasmEngineContext::createFromPrecompiled(wasmData, wasmSize);
     }
 
 protected:

@@ -1,0 +1,17 @@
+load("@rules_rust//rust:defs.bzl", "rust_library")
+
+package(default_visibility = ["//visibility:public"])
+
+# Allocator shim for linking Rust rlibs into a C++ binary on Windows.
+# On Linux, rules_rust provides this automatically. On Windows, MSVC doesn't
+# support weak linkage so rules_rust's allocator library is empty. We provide
+# strong symbol definitions here since we only link into C++ binaries.
+rust_library(
+    name = "win_allocator_shim",
+    srcs = ["win_allocator_shim.rs"],
+    # Use empty allocator libraries to avoid circular dependency - this IS
+    # the allocator library.
+    allocator_libraries = "@rules_rust//ffi/rs:empty_allocator_libraries",
+    edition = "2024",
+    target_compatible_with = ["@platforms//os:windows"],
+)

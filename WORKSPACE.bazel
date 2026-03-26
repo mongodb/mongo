@@ -1,4 +1,4 @@
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain.bzl", "setup_mongo_toolchains")
 load("//bazel/toolchains/cc/mongo_linux:mongo_gdb.bzl", "setup_gdb_toolchains")
 
@@ -12,6 +12,17 @@ http_archive(
 setup_mongo_toolchains()
 
 setup_gdb_toolchains()
+
+http_file(
+    name = "windows_libclang",
+    downloaded_file_path = "libclang.dll",
+    sha256 = "fd77bdb8098cd82ab918bf50e9b12743e1fc8e524fa64cb90e729fbe9cee9c15",
+    urls = [
+        # Implements retry by relisting each url multiple times to be used as a failover.
+        # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
+        "https://mdb-build-public.s3.us-east-1.amazonaws.com/windows_libclang/libclang.dll",
+    ] * 5,
+)
 
 http_archive(
     name = "windows_sasl",

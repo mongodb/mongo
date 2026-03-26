@@ -35,6 +35,19 @@ expand_template(
 cc_library(
     name = "wasmtime_c",
     hdrs = glob(["include/**"]) + [":gen_conf"],
+    defines = select({                                                                                                                                                                                                                         
+        "@platforms//os:windows": [                                                                                                                                                                                                     
+            "WASM_API_EXTERN=",                                                                                                                                                                                                         
+            "WASI_API_EXTERN=",                                                                                                                                                                                                         
+        ],                                                                                                                                                                                                                              
+        "//conditions:default": [],                                                                                                                                                                                                     
+    }),
+    linkopts = select({                                                                                                                                                                                                                 
+        "@platforms//os:windows": [                                                                                                                                                                                                     
+            "ntdll.lib",                                                                                                                                                                                                                
+        ],                                                                                                                                                                                                                              
+        "//conditions:default": [],                                                                                                                                                                                                     
+    }),  
     strip_include_prefix = "include",
     deps = [":wasmtime_c_api"],
 )

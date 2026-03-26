@@ -116,3 +116,85 @@ embed_binary_obj = rule(
     toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
     fragments = ["cpp"],
 )
+
+"""Rule to embed a binary file as a Windows resource using rc.exe.
+
+Generates an .rc file referencing the binary, compiles it to a .res with rc.exe,
+and provides CcInfo so dependents can link it via deps.
+
+At runtime, use FindResource/LoadResource/LockResource/SizeofResource to access
+the data, or use the helper in embedded_resource.h.
+"""
+
+def _embed_binary_rc_impl(ctx):
+    input_file = ctx.file.src
+    rc_file = ctx.actions.declare_file(ctx.attr.name + ".rc")
+    res_file = ctx.outputs.out
+
+    # The resource type and name used to look up the data at runtime.
+    resource_name = ctx.attr.resource_name
+
+    # Generate an .rc file that references the binary as RCDATA.
+    ctx.actions.write(
+        output = rc_file,
+        content = '{resource_name} RCDATA "{input_path}"\n'.format(
+            resource_name = resource_name,
+            input_path = input_file.path.replace("/", "\\\\"),
+        ),
+    )
+
+    args = ctx.actions.args()
+    args.add("/nologo")
+    args.add("/fo" + res_file.path)
+    args.add(rc_file.path)
+
+    ctx.actions.run(
+        executable = ctx.executable.rc,
+        arguments = [args],
+        inputs = [rc_file, input_file],
+        outputs = [res_file],
+        mnemonic = "EmbedBinaryRC",
+        progress_message = "Embedding %s as Windows resource" % input_file.short_path,
+    )
+
+    linker_input = cc_common.create_linker_input(
+        owner = ctx.label,
+        user_link_flags = [res_file.path],
+        additional_inputs = depset([res_file]),
+    )
+    linking_context = cc_common.create_linking_context(
+        linker_inputs = depset(direct = [linker_input]),
+    )
+
+    return [
+        DefaultInfo(files = depset([res_file])),
+        CcInfo(linking_context = linking_context),
+    ]
+
+embed_binary_rc = rule(
+    implementation = _embed_binary_rc_impl,
+    attrs = {
+        "src": attr.label(
+            allow_single_file = True,
+            mandatory = True,
+            doc = "Binary file to embed (e.g. .wasm or .cwasm).",
+        ),
+        "out": attr.output(
+            mandatory = True,
+            doc = "Output .res file.",
+        ),
+        "resource_name": attr.string(
+            mandatory = True,
+            doc = "Resource name used in the .rc file and at runtime with FindResource.",
+        ),
+        "rc": attr.label(
+            executable = True,
+            cfg = "exec",
+            allow_files = True,
+            default = "@mongo_windows_toolchain//:rc",
+            doc = "The rc.exe compiler.",
+        ),
+    },
+    provides = [CcInfo],
+    doc = "Embeds a binary file as a Windows resource (.res) using rc.exe.",
+)

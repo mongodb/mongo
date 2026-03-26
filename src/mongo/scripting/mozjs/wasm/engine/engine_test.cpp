@@ -45,6 +45,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/scripting/mozjs/wasm/embedded_wasm_resource.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstdint>
@@ -57,13 +58,6 @@
 
 #include <wasmtime/component.hh>
 #include <wasmtime/component/val.h>
-
-// Symbols produced by objcopy from the AOT-compiled mozjs_wasm_api.cwasm.
-// See the embed_mozjs_wasm_obj genrule in BUILD.bazel.
-extern "C" {
-extern const uint8_t _binary_mozjs_wasm_api_cwasm_start[];
-extern const uint8_t _binary_mozjs_wasm_api_cwasm_end[];
-}
 
 namespace wt = wasmtime;
 namespace wc = wasmtime::component;
@@ -213,8 +207,8 @@ class WasmMozJSTest : public unittest::Test {
 public:
     // One-time setup: deserialize the AOT pre-compiled component (near-instant).
     static void SetUpTestSuite() {
-        std::vector<uint8_t> cwasmBytes(_binary_mozjs_wasm_api_cwasm_start,
-                                        _binary_mozjs_wasm_api_cwasm_end);
+        auto [wasmData, wasmSize] = getEmbeddedWasmResource();
+        std::vector<uint8_t> cwasmBytes(wasmData, wasmData + wasmSize);
 
         wt::Config config;
         config.wasm_component_model(true);

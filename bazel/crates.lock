@@ -1,5 +1,5 @@
 {
-  "checksum": "59bd5324dcb85329b52e12815cc120ff55b623de1b940882715454c12c7c5a01",
+  "checksum": "95bde56a98991ddcd851234754f0f75d9e29aa5f163ceb6d1f44c9765b56c0c1",
   "crates": {
     "addr2line 0.25.1": {
       "name": "addr2line",
@@ -11009,7 +11009,7 @@
         "deps": {
           "common": [
             {
-              "id": "zerocopy 0.8.42",
+              "id": "zerocopy 0.8.47",
               "target": "zerocopy"
             }
           ],
@@ -15626,11 +15626,11 @@
               "target": "toml_datetime"
             },
             {
-              "id": "toml_parser 1.0.9+spec-1.1.0",
+              "id": "toml_parser 1.0.10+spec-1.1.0",
               "target": "toml_parser"
             },
             {
-              "id": "toml_writer 1.0.6+spec-1.1.0",
+              "id": "toml_writer 1.0.7+spec-1.1.0",
               "target": "toml_writer"
             },
             {
@@ -15706,14 +15706,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "toml_parser 1.0.9+spec-1.1.0": {
+    "toml_parser 1.0.10+spec-1.1.0": {
       "name": "toml_parser",
-      "version": "1.0.9+spec-1.1.0",
+      "version": "1.0.10+spec-1.1.0",
       "package_url": "https://github.com/toml-rs/toml",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/toml_parser/1.0.9+spec-1.1.0/download",
-          "sha256": "702d4415e08923e7e1ef96cd5727c0dfed80b4d2fa25db9647fe5eb6f7c5a4c4"
+          "url": "https://static.crates.io/crates/toml_parser/1.0.10+spec-1.1.0/download",
+          "sha256": "7df25b4befd31c4816df190124375d5a20c6b6921e2cad937316de3fccd63420"
         }
       },
       "targets": [
@@ -15745,14 +15745,14 @@
         "deps": {
           "common": [
             {
-              "id": "winnow 0.7.15",
+              "id": "winnow 1.0.0",
               "target": "winnow"
             }
           ],
           "selects": {}
         },
         "edition": "2021",
-        "version": "1.0.9+spec-1.1.0"
+        "version": "1.0.10+spec-1.1.0"
       },
       "license": "MIT OR Apache-2.0",
       "license_ids": [
@@ -15761,14 +15761,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "toml_writer 1.0.6+spec-1.1.0": {
+    "toml_writer 1.0.7+spec-1.1.0": {
       "name": "toml_writer",
-      "version": "1.0.6+spec-1.1.0",
+      "version": "1.0.7+spec-1.1.0",
       "package_url": "https://github.com/toml-rs/toml",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/toml_writer/1.0.6+spec-1.1.0/download",
-          "sha256": "ab16f14aed21ee8bfd8ec22513f7287cd4a91aa92e44edfe2c17ddd004e92607"
+          "url": "https://static.crates.io/crates/toml_writer/1.0.7+spec-1.1.0/download",
+          "sha256": "f17aaa1c6e3dc22b1da4b6bba97d066e354c7945cac2f7852d4e4e7ca7a6b56d"
         }
       },
       "targets": [
@@ -15798,7 +15798,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "1.0.6+spec-1.1.0"
+        "version": "1.0.7+spec-1.1.0"
       },
       "license": "MIT OR Apache-2.0",
       "license_ids": [
@@ -18671,7 +18671,7 @@
         "Apache-2.0"
       ],
       "license_file": null,
-      "additive_build_file_content": "# This file is injected into the crate BUILD file - to reference build with @crates//:wasmtime_c\nload(\"@bazel_skylib//rules:expand_template.bzl\", \"expand_template\")\nload(\"@rules_cc//cc:cc_library.bzl\", \"cc_library\")\n\nexpand_template(\n    name = \"gen_conf\",\n    out = \"include/wasmtime/conf.h\",\n    substitutions = {\n        \"#cmakedefine WASMTIME_FEATURE_PROFILING\": \"#define WASMTIME_FEATURE_PROFILING\",\n        \"#cmakedefine WASMTIME_FEATURE_WAT\": \"#define WASMTIME_FEATURE_WAT\",\n        \"#cmakedefine WASMTIME_FEATURE_CACHE\": \"#define WASMTIME_FEATURE_CACHE\",\n        \"#cmakedefine WASMTIME_FEATURE_PARALLEL_COMPILATION\": \"#define WASMTIME_FEATURE_PARALLEL_COMPILATION\",\n        \"#cmakedefine WASMTIME_FEATURE_WASI\": \"#define WASMTIME_FEATURE_WASI\",\n        \"#cmakedefine WASMTIME_FEATURE_LOGGING\": \"#define WASMTIME_FEATURE_LOGGING\",\n        \"#cmakedefine WASMTIME_FEATURE_DISABLE_LOGGING\": \"/* #undef WASMTIME_FEATURE_DISABLE_LOGGING */\",\n        \"#cmakedefine WASMTIME_FEATURE_COREDUMP\": \"#define WASMTIME_FEATURE_COREDUMP\",\n        \"#cmakedefine WASMTIME_FEATURE_ADDR2LINE\": \"#define WASMTIME_FEATURE_ADDR2LINE\",\n        \"#cmakedefine WASMTIME_FEATURE_DEMANGLE\": \"#define WASMTIME_FEATURE_DEMANGLE\",\n        \"#cmakedefine WASMTIME_FEATURE_THREADS\": \"#define WASMTIME_FEATURE_THREADS\",\n        \"#cmakedefine WASMTIME_FEATURE_GC\": \"#define WASMTIME_FEATURE_GC\",\n        \"#cmakedefine WASMTIME_FEATURE_GC_DRC\": \"#define WASMTIME_FEATURE_GC_DRC\",\n        \"#cmakedefine WASMTIME_FEATURE_GC_NULL\": \"#define WASMTIME_FEATURE_GC_NULL\",\n        \"#cmakedefine WASMTIME_FEATURE_ASYNC\": \"#define WASMTIME_FEATURE_ASYNC\",\n        \"#cmakedefine WASMTIME_FEATURE_CRANELIFT\": \"#define WASMTIME_FEATURE_CRANELIFT\",\n        \"#cmakedefine WASMTIME_FEATURE_WINCH\": \"#define WASMTIME_FEATURE_WINCH\",\n        \"#cmakedefine WASMTIME_FEATURE_DEBUG_BUILTINS\": \"#define WASMTIME_FEATURE_DEBUG_BUILTINS\",\n        \"#cmakedefine WASMTIME_FEATURE_POOLING_ALLOCATOR\": \"#define WASMTIME_FEATURE_POOLING_ALLOCATOR\",\n        \"#cmakedefine WASMTIME_FEATURE_COMPONENT_MODEL\": \"#define WASMTIME_FEATURE_COMPONENT_MODEL\",\n        \"#cmakedefine WASMTIME_FEATURE_PULLEY\": \"#define WASMTIME_FEATURE_PULLEY\",\n        \"#cmakedefine WASMTIME_FEATURE_ALL_ARCH\": \"/* #undef WASMTIME_FEATURE_ALL_ARCH */\",\n    },\n    template = \"include/wasmtime/conf.h.in\",\n)\n\ncc_library(\n    name = \"wasmtime_c\",\n    hdrs = glob([\"include/**\"]) + [\":gen_conf\"],\n    strip_include_prefix = \"include\",\n    deps = [\":wasmtime_c_api\"],\n)\n",
+      "additive_build_file_content": "# This file is injected into the crate BUILD file - to reference build with @crates//:wasmtime_c\nload(\"@bazel_skylib//rules:expand_template.bzl\", \"expand_template\")\nload(\"@rules_cc//cc:cc_library.bzl\", \"cc_library\")\n\nexpand_template(\n    name = \"gen_conf\",\n    out = \"include/wasmtime/conf.h\",\n    substitutions = {\n        \"#cmakedefine WASMTIME_FEATURE_PROFILING\": \"#define WASMTIME_FEATURE_PROFILING\",\n        \"#cmakedefine WASMTIME_FEATURE_WAT\": \"#define WASMTIME_FEATURE_WAT\",\n        \"#cmakedefine WASMTIME_FEATURE_CACHE\": \"#define WASMTIME_FEATURE_CACHE\",\n        \"#cmakedefine WASMTIME_FEATURE_PARALLEL_COMPILATION\": \"#define WASMTIME_FEATURE_PARALLEL_COMPILATION\",\n        \"#cmakedefine WASMTIME_FEATURE_WASI\": \"#define WASMTIME_FEATURE_WASI\",\n        \"#cmakedefine WASMTIME_FEATURE_LOGGING\": \"#define WASMTIME_FEATURE_LOGGING\",\n        \"#cmakedefine WASMTIME_FEATURE_DISABLE_LOGGING\": \"/* #undef WASMTIME_FEATURE_DISABLE_LOGGING */\",\n        \"#cmakedefine WASMTIME_FEATURE_COREDUMP\": \"#define WASMTIME_FEATURE_COREDUMP\",\n        \"#cmakedefine WASMTIME_FEATURE_ADDR2LINE\": \"#define WASMTIME_FEATURE_ADDR2LINE\",\n        \"#cmakedefine WASMTIME_FEATURE_DEMANGLE\": \"#define WASMTIME_FEATURE_DEMANGLE\",\n        \"#cmakedefine WASMTIME_FEATURE_THREADS\": \"#define WASMTIME_FEATURE_THREADS\",\n        \"#cmakedefine WASMTIME_FEATURE_GC\": \"#define WASMTIME_FEATURE_GC\",\n        \"#cmakedefine WASMTIME_FEATURE_GC_DRC\": \"#define WASMTIME_FEATURE_GC_DRC\",\n        \"#cmakedefine WASMTIME_FEATURE_GC_NULL\": \"#define WASMTIME_FEATURE_GC_NULL\",\n        \"#cmakedefine WASMTIME_FEATURE_ASYNC\": \"#define WASMTIME_FEATURE_ASYNC\",\n        \"#cmakedefine WASMTIME_FEATURE_CRANELIFT\": \"#define WASMTIME_FEATURE_CRANELIFT\",\n        \"#cmakedefine WASMTIME_FEATURE_WINCH\": \"#define WASMTIME_FEATURE_WINCH\",\n        \"#cmakedefine WASMTIME_FEATURE_DEBUG_BUILTINS\": \"#define WASMTIME_FEATURE_DEBUG_BUILTINS\",\n        \"#cmakedefine WASMTIME_FEATURE_POOLING_ALLOCATOR\": \"#define WASMTIME_FEATURE_POOLING_ALLOCATOR\",\n        \"#cmakedefine WASMTIME_FEATURE_COMPONENT_MODEL\": \"#define WASMTIME_FEATURE_COMPONENT_MODEL\",\n        \"#cmakedefine WASMTIME_FEATURE_PULLEY\": \"#define WASMTIME_FEATURE_PULLEY\",\n        \"#cmakedefine WASMTIME_FEATURE_ALL_ARCH\": \"/* #undef WASMTIME_FEATURE_ALL_ARCH */\",\n    },\n    template = \"include/wasmtime/conf.h.in\",\n)\n\ncc_library(\n    name = \"wasmtime_c\",\n    hdrs = glob([\"include/**\"]) + [\":gen_conf\"],\n    defines = select({                                                                                                                                                                                                                         \n        \"@platforms//os:windows\": [                                                                                                                                                                                                     \n            \"WASM_API_EXTERN=\",                                                                                                                                                                                                         \n            \"WASI_API_EXTERN=\",                                                                                                                                                                                                         \n        ],                                                                                                                                                                                                                              \n        \"//conditions:default\": [],                                                                                                                                                                                                     \n    }),\n    linkopts = select({                                                                                                                                                                                                                 \n        \"@platforms//os:windows\": [                                                                                                                                                                                                     \n            \"ntdll.lib\",                                                                                                                                                                                                                \n        ],                                                                                                                                                                                                                              \n        \"//conditions:default\": [],                                                                                                                                                                                                     \n    }),  \n    strip_include_prefix = \"include\",\n    deps = [\":wasmtime_c_api\"],\n)\n",
       "extra_aliased_targets": {
         "wasmtime_c": "wasmtime_c"
       }
@@ -23788,6 +23788,44 @@
       ],
       "license_file": "LICENSE-MIT"
     },
+    "winnow 1.0.0": {
+      "name": "winnow",
+      "version": "1.0.0",
+      "package_url": "https://github.com/winnow-rs/winnow",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/winnow/1.0.0/download",
+          "sha256": "a90e88e4667264a994d34e6d1ab2d26d398dcdca8b7f52bec8668957517fc7d8"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "winnow",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "winnow",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "edition": "2021",
+        "version": "1.0.0"
+      },
+      "license": "MIT",
+      "license_ids": [
+        "MIT"
+      ],
+      "license_file": "LICENSE-MIT"
+    },
     "winx 0.36.4": {
       "name": "winx",
       "version": "0.36.4",
@@ -24701,14 +24739,14 @@
       ],
       "license_file": "LICENSE"
     },
-    "zerocopy 0.8.42": {
+    "zerocopy 0.8.47": {
       "name": "zerocopy",
-      "version": "0.8.42",
+      "version": "0.8.47",
       "package_url": "https://github.com/google/zerocopy",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/zerocopy/0.8.42/download",
-          "sha256": "f2578b716f8a7a858b7f02d5bd870c14bf4ddbbcf3a4c05414ba6503640505e3"
+          "url": "https://static.crates.io/crates/zerocopy/0.8.47/download",
+          "sha256": "efbb2a062be311f2ba113ce66f697a4dc589f85e78a4aea276200804cea0ed87"
         }
       },
       "targets": [
@@ -24751,7 +24789,7 @@
         "deps": {
           "common": [
             {
-              "id": "zerocopy 0.8.42",
+              "id": "zerocopy 0.8.47",
               "target": "build_script_build"
             }
           ],
@@ -24763,13 +24801,13 @@
           "selects": {
             "cfg(any())": [
               {
-                "id": "zerocopy-derive 0.8.42",
+                "id": "zerocopy-derive 0.8.47",
                 "target": "zerocopy_derive"
               }
             ]
           }
         },
-        "version": "0.8.42"
+        "version": "0.8.47"
       },
       "build_script_attrs": {
         "compile_data_glob": [
@@ -24790,14 +24828,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "zerocopy-derive 0.8.42": {
+    "zerocopy-derive 0.8.47": {
       "name": "zerocopy-derive",
-      "version": "0.8.42",
+      "version": "0.8.47",
       "package_url": "https://github.com/google/zerocopy",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/zerocopy-derive/0.8.42/download",
-          "sha256": "7e6cc098ea4d3bd6246687de65af3f920c430e236bee1e3bf2e441463f08a02f"
+          "url": "https://static.crates.io/crates/zerocopy-derive/0.8.47/download",
+          "sha256": "0e8bc7269b54418e7aeeef514aa68f8690b8c0489a06b0136e5f57c4c5ccab89"
         }
       },
       "targets": [
@@ -24837,7 +24875,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "0.8.42"
+        "version": "0.8.47"
       },
       "license": "BSD-2-Clause OR Apache-2.0 OR MIT",
       "license_ids": [
@@ -25483,6 +25521,9 @@
             "s390x-unknown-linux-gnu": [
               "@@mongo_toolchain_v5//:libclang"
             ],
+            "x86_64-pc-windows-msvc": [
+              "@@windows_libclang//file:file"
+            ],
             "x86_64-unknown-linux-gnu": [
               "@@mongo_toolchain_v5//:libclang"
             ]
@@ -25522,6 +25563,9 @@
             "s390x-unknown-linux-gnu": {
               "BINDGEN_EXTRA_CLANG_ARGS": "-isystem$${pwd}/external/mongo_toolchain_v5/stow/llvm-v5/lib/clang/19/include",
               "LIBCLANG_PATH": "$(execpath @@mongo_toolchain_v5//:libclang)"
+            },
+            "x86_64-pc-windows-msvc": {
+              "LIBCLANG_PATH": "$(execpath @@windows_libclang//file)"
             },
             "x86_64-unknown-linux-gnu": {
               "BINDGEN_EXTRA_CLANG_ARGS": "-isystem$${pwd}/external/mongo_toolchain_v5/stow/llvm-v5/lib/clang/19/include",

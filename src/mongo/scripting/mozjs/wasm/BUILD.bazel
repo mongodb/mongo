@@ -1,9 +1,9 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary")
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")  # @unused mongo_cc_binary mongo_cc_library
 load("//bazel/toolchains/cc/mongo_wasm/toolchain:with_wasi_config.bzl", "with_wasi_config")
-load("//src/mongo/scripting/mozjs/wasm/engine:linkset.bzl", "cc_linkset")
-load("@rules_cc//cc:defs.bzl", "cc_binary")
+load("//bazel/wasm_rules:embed_binary.bzl", "embed_binary_obj", "embed_binary_rc")
 load("//bazel/wasm_rules:wasm_aot_compile.bzl", "aot_compile_wasm")
-load("//bazel/wasm_rules:embed_binary_obj.bzl", "embed_binary_obj")
+load("//src/mongo/scripting/mozjs/wasm/engine:linkset.bzl", "cc_linkset")
 
 # Gate WASM module compilation behind --define=build_mozjs_wasm=true.
 # Without this flag the test compiles and runs but skips (no .wasm module found).
@@ -13,6 +13,7 @@ config_setting(
 )
 
 exports_files([
+    "embedded_wasm_resource.h",
     "status.cpp",
 ])
 
@@ -186,10 +187,18 @@ mongo_cc_library(
         "//src/mongo/scripting/mozjs/wasm/bridge:bridge.h",
         "//src/mongo/scripting/mozjs/wasm/bridge:wasm_helpers.h",
     ],
+    target_compatible_with = select({
+        "@platforms//cpu:x86_64": [],
+        "@platforms//cpu:aarch64": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     deps = [
         "//src/mongo:base",
         "@crates//:wasmtime_c",
-    ],
+    ] + select({
+        "@platforms//os:linux": [],
+        "@platforms//os:windows": ["//bazel/rules_rust:win_allocator_shim"],
+    }),
 )
 
 mongo_cc_unit_test(
@@ -201,17 +210,24 @@ mongo_cc_unit_test(
         "//src/mongo/scripting/mozjs/wasm/engine:engine_test.cpp",
     ],
     auto_header = False,
+    private_hdrs = [":embedded_wasm_resource.h"],
     tags = [
         "mongo_unittest_eighth_group",
         "mozjs_wasm_tests",
     ],
-    target_compatible_with = ["@platforms//os:linux"],
+    target_compatible_with = select({
+        "@platforms//cpu:x86_64": [],
+        "@platforms//cpu:aarch64": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     deps = [
         ":bridge",
-        ":embed_mozjs_wasm_obj",
         "//src/mongo:base",
         "@crates//:wasmtime_c",
-    ],
+    ] + select({
+        "@platforms//os:linux": [":embed_mozjs_wasm_obj"],
+        "@platforms//os:windows": [":embed_mozjs_wasm_rc"],
+    }),
 )
 
 # ---------------------------------------------------------------------------
@@ -231,7 +247,7 @@ aot_compile_wasm(
     name = "aot_compile_mozjs_wasm",
     src = ":mozjs_wasm_api_data",
     out = "mozjs_wasm_api.cwasm",
-    target_compatible_with = ["@platforms//os:linux"] + select({
+    target_compatible_with = select({
         "@platforms//cpu:x86_64": [],
         "@platforms//cpu:aarch64": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -243,5 +259,13 @@ embed_binary_obj(
     src = ":aot_compile_mozjs_wasm",
     out = "embedded_mozjs_wasm.o",
     symbol_prefix = "binary_mozjs_wasm_api_cwasm",
-    target_compatible_with = ["@platforms//os:linux"],
+    target_compatible_with = ["//bazel/config:not_windows"],
+)
+
+embed_binary_rc(
+    name = "embed_mozjs_wasm_rc",
+    src = ":aot_compile_mozjs_wasm",
+    out = "embedded_mozjs_wasm.res",
+    resource_name = "MOZJS_WASM_CWASM",
+    target_compatible_with = ["@platforms//os:windows"],
 )

@@ -1,0 +1,18 @@
+diff --git rust/private/rust.bzl rust/private/rust.bzl
+index d06f5fa71..3eadb42d1 100644
+--- rust/private/rust.bzl
++++ rust/private/rust.bzl
+@@ -173,6 +173,13 @@ def _rust_library_common(ctx, crate_type):
+     toolchain = find_toolchain(ctx)
+ 
+     crate_name = compute_crate_name(ctx.workspace_name, ctx.label, toolchain, ctx.attr.crate_name)
++    # These are here for windows long path issues
++    if crate_name == "wasmtime_internal_versioned_export_macros":
++        crate_name = "wivem"
++    if crate_name == "wasmtime_internal_component_macro":
++        crate_name = "wicm"
++    if crate_name == "wasmtime_internal_c_api_macros":
++        crate_name = "wicam"
+ 
+     crate_root = getattr(ctx.file, "crate_root", None)
+     if not crate_root:

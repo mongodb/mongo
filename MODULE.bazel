@@ -328,6 +328,11 @@ register_toolchains("@mongo_windows_toolchain//...")
 
 ###################### RUST DEPS ######################
 bazel_dep(name = "rules_rust", version = "0.68.1")
+single_version_override(
+    module_name = "rules_rust",
+    patches = ["//bazel/rules_rust:windows_long_path.patch"],
+    version = "0.68.1",
+)
 
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 rust.toolchain(
@@ -426,6 +431,19 @@ crate.annotation_select(
         "x86_64-unknown-linux-gnu",
         "powerpc-unknown-linux-gnu",
         "s390x-unknown-linux-gnu",
+    ],
+)
+crate.annotation_select(
+    build_script_data = [
+        "@@windows_libclang//file",
+    ],
+    build_script_env = {
+        "LIBCLANG_PATH": "$(execpath @@windows_libclang//file)",
+    },
+    crate = "zstd-sys",
+    repositories = ["crates"],
+    triples = [
+        "x86_64-pc-windows-msvc",
     ],
 )
 
