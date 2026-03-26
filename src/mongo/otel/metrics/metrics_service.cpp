@@ -60,6 +60,20 @@ void observableCounterCallback(opentelemetry::metrics::ObserverResult observer_r
     (*observer)->Observe(value);
 }
 
+// Static callback function for observable up-down counters.
+template <typename T>
+void observableUpDownCounterCallback(opentelemetry::metrics::ObserverResult observer_result,
+                                     void* state) {
+    invariant(state != nullptr);
+    auto* const upDownCounter = static_cast<UpDownCounter<T>*>(state);
+    T value = upDownCounter->value();
+
+    auto observer =
+        std::get_if<std::shared_ptr<opentelemetry::metrics::ObserverResultT<T>>>(&observer_result);
+    invariant(observer != nullptr && *observer != nullptr);
+    (*observer)->Observe(value);
+}
+
 // Static callback function for observable gauges.
 template <typename T>
 void observableGaugeCallback(opentelemetry::metrics::ObserverResult observer_result, void* state) {
@@ -149,6 +163,30 @@ makeObservableInstrument<Counter<double>>(opentelemetry::metrics::MeterProvider&
 
 template <>
 std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+makeObservableInstrument<UpDownCounter<int64_t>>(opentelemetry::metrics::MeterProvider& provider,
+                                                 std::string name,
+                                                 std::string description,
+                                                 MetricUnit unit) {
+    return provider.GetMeter(std::string{MetricsService::kMeterName})
+        ->CreateInt64ObservableUpDownCounter(toStdStringViewForInterop(name),
+                                             description,
+                                             toStdStringViewForInterop(toString(unit)));
+}
+
+template <>
+std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+makeObservableInstrument<UpDownCounter<double>>(opentelemetry::metrics::MeterProvider& provider,
+                                                std::string name,
+                                                std::string description,
+                                                MetricUnit unit) {
+    return provider.GetMeter(std::string{MetricsService::kMeterName})
+        ->CreateDoubleObservableUpDownCounter(toStdStringViewForInterop(name),
+                                              description,
+                                              toStdStringViewForInterop(toString(unit)));
+}
+
+template <>
+std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
 makeObservableInstrument<Gauge<int64_t>>(opentelemetry::metrics::MeterProvider& provider,
                                          std::string name,
                                          std::string description,
@@ -203,6 +241,24 @@ void MetricsService::OwnedMetricVisitor::operator()(std::unique_ptr<Counter<doub
     auto observable =
         makeObservableInstrument<Counter<double>>(provider, name, id.description, id.unit);
     observable->AddCallback(observableCounterCallback<double>, counter.get());
+    newObservableInstruments.push_back(observable);
+}
+
+void MetricsService::OwnedMetricVisitor::operator()(
+    std::unique_ptr<UpDownCounter<int64_t>>& upDownCounter) {
+    upDownCounter->reset();
+    auto observable =
+        makeObservableInstrument<UpDownCounter<int64_t>>(provider, name, id.description, id.unit);
+    observable->AddCallback(observableUpDownCounterCallback<int64_t>, upDownCounter.get());
+    newObservableInstruments.push_back(observable);
+}
+
+void MetricsService::OwnedMetricVisitor::operator()(
+    std::unique_ptr<UpDownCounter<double>>& upDownCounter) {
+    upDownCounter->reset();
+    auto observable =
+        makeObservableInstrument<UpDownCounter<double>>(provider, name, id.description, id.unit);
+    observable->AddCallback(observableUpDownCounterCallback<double>, upDownCounter.get());
     newObservableInstruments.push_back(observable);
 }
 
@@ -337,6 +393,54 @@ Counter<double>& MetricsService::createDoubleCounter(MetricName name,
                                                      MetricUnit unit,
                                                      const CounterOptions& options) {
     return createCounter<double>(name, description, unit, options);
+}
+
+template <typename T>
+UpDownCounter<T>& MetricsService::createUpDownCounter(MetricName name,
+                                                      std::string description,
+                                                      MetricUnit unit,
+                                                      const UpDownCounterOptions& options) {
+    const std::string nameStr(name.getName());
+    MetricIdentifier identifier{
+        .description = description, .unit = unit, .inServerStatus = options.inServerStatus};
+    stdx::lock_guard lock(_mutex);
+    auto duplicate = getDuplicateMetric<UpDownCounter<T>>(lock, nameStr, identifier);
+    if (duplicate) {
+        return *duplicate;
+    }
+
+    auto upDownCounter = std::make_unique<UpDownCounterImpl<T>>();
+    UpDownCounter<T>* const upDownCounter_ptr = upDownCounter.get();
+    _metrics[nameStr] = {.identifier = std::move(identifier), .metric = std::move(upDownCounter)};
+
+#ifdef MONGO_CONFIG_OTEL
+    auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
+    std::shared_ptr<opentelemetry::metrics::ObservableInstrument> observableUpDownCounter =
+        makeObservableInstrument<UpDownCounter<T>>(*provider, nameStr, description, unit);
+    tassert(ErrorCodes::InternalError,
+            fmt::format("Could not create observable up-down counter for metric: {}", nameStr),
+            observableUpDownCounter != nullptr);
+    observableUpDownCounter->AddCallback(observableUpDownCounterCallback<T>, upDownCounter_ptr);
+    _observableInstruments.push_back(std::move(observableUpDownCounter));
+#endif  // MONGO_CONFIG_OTEL
+
+    return *upDownCounter_ptr;
+}
+
+UpDownCounter<int64_t>& MetricsService::createInt64UpDownCounter(
+    MetricName name,
+    std::string description,
+    MetricUnit unit,
+    const UpDownCounterOptions& options) {
+    return createUpDownCounter<int64_t>(name, description, unit, options);
+}
+
+UpDownCounter<double>& MetricsService::createDoubleUpDownCounter(
+    MetricName name,
+    std::string description,
+    MetricUnit unit,
+    const UpDownCounterOptions& options) {
+    return createUpDownCounter<double>(name, description, unit, options);
 }
 
 template <typename T>

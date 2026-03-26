@@ -36,6 +36,7 @@
 #include "mongo/otel/metrics/metrics_counter.h"
 #include "mongo/otel/metrics/metrics_gauge.h"
 #include "mongo/otel/metrics/metrics_histogram.h"
+#include "mongo/otel/metrics/metrics_updown_counter.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
 
@@ -54,6 +55,7 @@ struct ScalarMetricOptions {
     bool inServerStatus = false;
 };
 using CounterOptions = ScalarMetricOptions;
+using UpDownCounterOptions = ScalarMetricOptions;
 using GaugeOptions = ScalarMetricOptions;
 
 struct HistogramOptions {
@@ -120,6 +122,32 @@ public:
                                          std::string description,
                                          MetricUnit unit,
                                          const CounterOptions& = {});
+
+    /**
+     * Creates an int64_t up-down counter with the provided parameters. The function will throw an
+     * exception if the instrument would collide with an existing metric (i.e., same name but
+     * different type or other parameters). Metrics should be stashed once they are created to avoid
+     * taking a lock on the global list of metrics in performance-sensitive codepaths.
+     *
+     * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
+     */
+    UpDownCounter<int64_t>& createInt64UpDownCounter(MetricName name,
+                                                     std::string description,
+                                                     MetricUnit unit,
+                                                     const UpDownCounterOptions& = {});
+
+    /**
+     * Creates a double up-down counter with the provided parameters. The function will throw an
+     * exception if the instrument would collide with an existing metric (i.e., same name but
+     * different type or other parameters). Metrics should be stashed once they are created to avoid
+     * taking a lock on the global list of metrics in performance-sensitive codepaths.
+     *
+     * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
+     */
+    UpDownCounter<double>& createDoubleUpDownCounter(MetricName name,
+                                                     std::string description,
+                                                     MetricUnit unit,
+                                                     const UpDownCounterOptions& = {});
 
     /**
      * Creates or returns an existing gauge with the provided parameters. The function will throw an
@@ -220,6 +248,12 @@ private:
                               const CounterOptions& options);
 
     template <typename T>
+    UpDownCounter<T>& createUpDownCounter(MetricName name,
+                                          std::string description,
+                                          MetricUnit unit,
+                                          const UpDownCounterOptions& options);
+
+    template <typename T>
     Gauge<T>& createGauge(MetricName name,
                           std::string description,
                           MetricUnit unit,
@@ -227,6 +261,8 @@ private:
 
     using OwnedMetric = std::variant<std::unique_ptr<Counter<int64_t>>,
                                      std::unique_ptr<Counter<double>>,
+                                     std::unique_ptr<UpDownCounter<int64_t>>,
+                                     std::unique_ptr<UpDownCounter<double>>,
                                      std::unique_ptr<Gauge<int64_t>>,
                                      std::unique_ptr<Gauge<double>>,
                                      std::unique_ptr<Histogram<int64_t>>,
@@ -248,6 +284,8 @@ private:
 
         void operator()(std::unique_ptr<Counter<int64_t>>& counter);
         void operator()(std::unique_ptr<Counter<double>>& counter);
+        void operator()(std::unique_ptr<UpDownCounter<int64_t>>& upDownCounter);
+        void operator()(std::unique_ptr<UpDownCounter<double>>& upDownCounter);
         void operator()(std::unique_ptr<Gauge<int64_t>>& gauge);
         void operator()(std::unique_ptr<Gauge<double>>& gauge);
         void operator()(std::unique_ptr<Histogram<double>>& histogram);

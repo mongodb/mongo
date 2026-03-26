@@ -145,6 +145,8 @@ public:
     static constexpr MetricName kTest2 = {"test_only.metric2"};
     static constexpr MetricName kTest3 = {"test_only.metric3"};
     static constexpr MetricName kTest4 = {"test_only.metric4"};
+    static constexpr MetricName kTest5 = {"test_only.metric5"};
+    static constexpr MetricName kTest6 = {"test_only.metric6"};
 };
 
 }  // namespace otel::metrics
