@@ -2,10 +2,12 @@ test_kind: js_test
 
 selector:
   roots:
-    - src/mongo/db/modules/enterprise/jstests/streams/aspio/iceberg/iceberg_benchmark_tpcc_onedimension.js
     - src/mongo/db/modules/enterprise/jstests/streams/aspio/iceberg/iceberg_benchmark_tpcc_tinyrows.js
     - src/mongo/db/modules/enterprise/jstests/streams/aspio/iceberg/iceberg_benchmark_tpcc_smallrows.js
     - src/mongo/db/modules/enterprise/jstests/streams/aspio/iceberg/iceberg_benchmark_tpcc_mediumrows.js
+    - src/mongo/db/modules/enterprise/jstests/streams/aspio/iceberg/iceberg_benchmark_tpcc_official.js
+    # TODO(SERVER-122755): Move this elsewhere
+    - src/mongo/db/modules/enterprise/jstests/streams/aspio/iceberg/s3_emit_benchmark_tpcc.js
 
 executor:
   fixture:
