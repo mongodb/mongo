@@ -161,6 +161,23 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_unit_test(
+    name = "metrics_updown_counter_test",
+    srcs = [
+        "metrics_updown_counter_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+    ] + select(
+        {
+            "@//bazel/config:build_otel_enabled": [
+                "//src/third_party/opentelemetry-cpp/api",
+            ],
+            "//conditions:default": [],
+        },
+    ),
+)
+
+mongo_cc_unit_test(
     name = "metrics_gauge_test",
     srcs = [
         "metrics_gauge_test.cpp",
@@ -299,5 +316,6 @@ test_suite(
         ":metrics_prometheus_file_exporter_test",
         ":metrics_service_test",
         ":metrics_test_util_test",
+        ":metrics_updown_counter_test",
     ],
 )
