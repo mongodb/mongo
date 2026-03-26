@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 from collections import defaultdict
 from subprocess import check_output
+from typing import Optional
 
 from buildscripts.resmokelib.testing import tags as _tags
 from buildscripts.resmokelib.config import MultiversionOptions
@@ -21,7 +22,7 @@ BACKPORTS_REQUIRED_FILE = "backports_required_for_multiversion_tests.yml"
 BACKPORTS_REQUIRED_BASE_URL = "https://raw.githubusercontent.com/10gen/mongo"
 
 
-def get_backports_required_hash_for_shell_version(mongo_shell_path: str | None = None):
+def get_backports_required_hash_for_shell_version(mongo_shell_path: Optional[str] = None):
     """Parse the old shell binary to get the commit hash."""
     env_vars = os.environ.copy()
     paths = get_path_env_var(env_vars=env_vars)
