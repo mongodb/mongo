@@ -39,6 +39,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 
 #include <string>
@@ -180,5 +181,87 @@ TEST_F(BatchedWriteContextTest, TestAcceptedBatchOperationsSucceeds) {
     bwc.clearBatchedOperations(opCtx);
     ASSERT(ops->isEmpty());
 }
+TEST_F(BatchedWriteContextTest, TestDDLSucceedsWithEmptyBatch) {
+    auto opCtxRaii = makeOperationContext();
+    auto opCtx = opCtxRaii.get();
+
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    auto& bwc = BatchedWriteContext::get(opCtx);
+    bwc.setWritesAreBatched(true);
+
+    // DDL assertion should succeed when no CRUD ops are in the batch.
+    bwc.assertNoMixedBatchedOps(/*isDDL=*/true);
+}
+
+TEST_F(BatchedWriteContextTest, TestCRUDSucceedsWithNoPriorDDL) {
+    auto opCtxRaii = makeOperationContext();
+    auto opCtx = opCtxRaii.get();
+
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    auto& bwc = BatchedWriteContext::get(opCtx);
+    bwc.setWritesAreBatched(true);
+
+    // CRUD assertion should succeed when no DDL has occurred.
+    bwc.assertNoMixedBatchedOps(/*isDDL=*/false);
+}
+
+TEST_F(BatchedWriteContextTest, TestDDLFailsWithCRUDOpsInBatch) {
+    auto opCtxRaii = makeOperationContext();
+    auto opCtx = opCtxRaii.get();
+
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    auto& bwc = BatchedWriteContext::get(opCtx);
+    bwc.setWritesAreBatched(true);
+
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
+    auto op = repl::MutableOplogEntry::makeDeleteOperation(nss, UUID::gen(), BSON("_id" << 0));
+    bwc.addBatchedOperation(opCtx, op);
+
+    // DDL assertion should fail because CRUD ops are already in the batch.
+    ASSERT_THROWS_WITH_CHECK(
+        bwc.assertNoMixedBatchedOps(/*isDDL=*/true), DBException, [](const DBException& ex) {
+            ASSERT_EQUALS(ex.code(), 12073500);
+            assertionCount.tripwire.subtractAndFetch(1);
+        });
+}
+
+TEST_F(BatchedWriteContextTest, TestCRUDFailsAfterDDL) {
+    auto opCtxRaii = makeOperationContext();
+    auto opCtx = opCtxRaii.get();
+
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    auto& bwc = BatchedWriteContext::get(opCtx);
+    bwc.setWritesAreBatched(true);
+
+    // Mark that a DDL operation occurred.
+    bwc.assertNoMixedBatchedOps(/*isDDL=*/true);
+
+    // CRUD assertion should fail because DDL has occurred.
+    ASSERT_THROWS_WITH_CHECK(
+        bwc.assertNoMixedBatchedOps(/*isDDL=*/false), DBException, [](const DBException& ex) {
+            ASSERT_EQUALS(ex.code(), 12073501);
+            assertionCount.tripwire.subtractAndFetch(1);
+        });
+}
+
+TEST_F(BatchedWriteContextTest, TestClearResetsDDLFlag) {
+    auto opCtxRaii = makeOperationContext();
+    auto opCtx = opCtxRaii.get();
+
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+    auto& bwc = BatchedWriteContext::get(opCtx);
+    bwc.setWritesAreBatched(true);
+
+    // Mark DDL occurred.
+    bwc.assertNoMixedBatchedOps(/*isDDL=*/true);
+
+    // Clear should reset the DDL flag.
+    bwc.clearBatchedOperations(opCtx);
+
+    // CRUD should now succeed.
+    bwc.assertNoMixedBatchedOps(/*isDDL=*/false);
+}
+
 }  // namespace
 }  // namespace mongo

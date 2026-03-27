@@ -63,6 +63,12 @@ public:
     void setWritesAreBatched(bool batched);
 
     /**
+     * Asserts that DDL and CRUD operations are not mixed in the same batched write group.
+     * Must only be called when writesAreBatched() is true.
+     */
+    void assertNoMixedBatchedOps(bool isDDL);
+
+    /**
      * Adds a stored operation to the list of stored operations for the current WUOW.
      * It is illegal to add operations outside of a WUOW.
      * The stored operations must generate an applyOps entry that's within the max BSON size.
@@ -79,6 +85,8 @@ public:
 private:
     // Whether batching writes is enabled.
     bool _batchWrites = false;
+    // Whether a DDL operation has occurred in the current batched write group.
+    bool _ddlOperationOccurred = false;
 
     /**
      * Holds oplog data for operations which have been applied in the current batched

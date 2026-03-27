@@ -402,6 +402,13 @@ void reserveOplogSlotsForRetryableFindAndModify(OperationContext* opCtx,
     oplogEntry.setOpTime(slots[1]);
 }
 
+void assertBatchedDDLNotMixedWithCRUD(OperationContext* opCtx) {
+    auto& bwc = BatchedWriteContext::get(opCtx);
+    if (bwc.writesAreBatched()) {
+        bwc.assertNoMixedBatchedOps(/*isDDL=*/true);
+    }
+}
+
 }  // namespace
 
 OpObserverImpl::OpObserverImpl(std::unique_ptr<OperationLogger> operationLogger)
@@ -413,6 +420,7 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                                    const IndexBuildInfo& indexBuildInfo,
                                    bool fromMigrate,
                                    bool isTimeseries) {
+    assertBatchedDDLNotMixedWithCRUD(opCtx);
     if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
         return;
     }
@@ -474,6 +482,7 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
                                        const std::vector<IndexBuildInfo>& indexes,
                                        bool fromMigrate,
                                        bool isTimeseries) {
+    assertBatchedDDLNotMixedWithCRUD(opCtx);
     if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
         return;
     }
@@ -537,6 +546,7 @@ void OpObserverImpl::onCommitIndexBuild(OperationContext* opCtx,
                                         const std::vector<boost::optional<BSONObj>>& multikey,
                                         bool fromMigrate,
                                         bool isTimeseries) {
+    assertBatchedDDLNotMixedWithCRUD(opCtx);
     if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
         return;
     }
@@ -596,6 +606,7 @@ void OpObserverImpl::onAbortIndexBuild(OperationContext* opCtx,
                                        const Status& cause,
                                        bool fromMigrate,
                                        bool isTimeseries) {
+    assertBatchedDDLNotMixedWithCRUD(opCtx);
     if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
         return;
     }
@@ -1511,6 +1522,7 @@ void OpObserverImpl::onCreateCollection(
     bool fromMigrate,
     bool isTimeseries,
     bool recordIdsReplicated) {
+    assertBatchedDDLNotMixedWithCRUD(opCtx);
     tassert(11145000,
             "All collection creation paths are expected to acquire an Operation FCV",
             VersionContext::getDecoration(opCtx).hasOperationFCV());
@@ -1591,6 +1603,7 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
                                const CollectionOptions& oldCollOptions,
                                boost::optional<IndexCollModInfo> indexInfo,
                                bool isTimeseries) {
+    assertBatchedDDLNotMixedWithCRUD(opCtx);
     const auto [collModOplogCmd, additionalO2Field] =
         backwards_compatible_collection_options::getCollModCmdAndAdditionalO2Field(collModCmd);
 
@@ -1664,6 +1677,7 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
 void OpObserverImpl::onDropDatabase(OperationContext* opCtx,
                                     const DatabaseName& dbName,
                                     bool markFromMigrate) {
+    assertBatchedDDLNotMixedWithCRUD(opCtx);
     const auto nss = NamespaceString::makeCommandNamespace(dbName);
     if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
         return;
@@ -1695,6 +1709,7 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
                                               std::uint64_t numRecords,
                                               bool markFromMigrate,
                                               bool isTimeseries) {
+    assertBatchedDDLNotMixedWithCRUD(opCtx);
     uassert(50715,
             "dropping the server configuration collection (admin.system.version) is not allowed.",
             collectionName != NamespaceString::kServerConfigurationNamespace);
@@ -1738,6 +1753,7 @@ void OpObserverImpl::onDropIndex(OperationContext* opCtx,
                                  const std::string& indexName,
                                  const BSONObj& indexInfo,
                                  bool isTimeseries) {
+    assertBatchedDDLNotMixedWithCRUD(opCtx);
     if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
         return;
     }
@@ -1777,6 +1793,7 @@ repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
                                                  bool stayTemp,
                                                  bool markFromMigrate,
                                                  bool isTimeseries) {
+    assertBatchedDDLNotMixedWithCRUD(opCtx);
     if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, fromCollection)) {
         return {};
     }
@@ -1863,6 +1880,7 @@ void OpObserverImpl::onImportCollection(OperationContext* opCtx,
                                         const BSONObj& storageMetadata,
                                         bool isDryRun,
                                         bool isTimeseries) {
+    assertBatchedDDLNotMixedWithCRUD(opCtx);
     if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
         return;
     }

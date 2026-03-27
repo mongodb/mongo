@@ -43,9 +43,25 @@ const OperationContext::Decoration<BatchedWriteContext> BatchedWriteContext::get
 
 BatchedWriteContext::BatchedWriteContext() {}
 
+void BatchedWriteContext::assertNoMixedBatchedOps(bool isDDL) {
+    if (isDDL) {
+        tassert(12073500,
+                "DDL operation should not be in a batched write group "
+                "that already contains CRUD operations",
+                _batchedOperations.numOperations() == 0);
+        _ddlOperationOccurred = true;
+    } else {
+        tassert(12073501,
+                "CRUD operation should not be added to a batched write group "
+                "that already contains a DDL operation",
+                !_ddlOperationOccurred);
+    }
+}
+
 void BatchedWriteContext::addBatchedOperation(OperationContext* opCtx,
                                               const BatchedOperation& operation) {
     invariant(_batchWrites);
+    assertNoMixedBatchedOps(/*isDDL=*/false);
 
     // Current support is limited to only insert, update, delete, container insert, and container
     // delete operations. No multi-doc transactions.
@@ -67,6 +83,7 @@ TransactionOperations* BatchedWriteContext::getBatchedOperations(OperationContex
 
 void BatchedWriteContext::clearBatchedOperations(OperationContext* opCtx) {
     _batchedOperations.clear();
+    _ddlOperationOccurred = false;
 }
 
 bool BatchedWriteContext::writesAreBatched() const {
