@@ -1,6 +1,6 @@
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 import {checkSbeStatus, kSbeDisabled} from "jstests/libs/query/sbe_util.js";
-import {getCBRConfig, restoreCBRConfig} from "jstests/libs/query/cbr_utils.js";
+import {getCBRConfig, setCBRConfig} from "jstests/libs/query/cbr_utils.js";
 
 const collName = jsTestName();
 const coll = db[collName];
@@ -102,5 +102,5 @@ try {
     db.adminCommand({setParameter: 1, internalQueryCBRCEMode: "samplingCE"});
     runTests();
 } finally {
-    restoreCBRConfig(db, prevCBRConfig);
+    setCBRConfig(db, prevCBRConfig);
 }

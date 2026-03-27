@@ -32,6 +32,8 @@ selector:
     - jstests/core/administrative/fsync/fsync.js
     - jstests/core/txns/prepare_conflict.js
     - jstests/core/txns/prepare_conflict_aggregation_behavior.js
+    # CBR does not run on v:1 indexes and falls back to multiplanning.
+    - jstests/core/query/cbr_plan_in_cache_cbr_disabled.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - requires_profiling

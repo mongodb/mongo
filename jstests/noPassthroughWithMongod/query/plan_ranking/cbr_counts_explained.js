@@ -8,7 +8,7 @@ import {
     isIxscan,
     isCountScan,
 } from "jstests/libs/query/analyze_plan.js";
-import {getCBRConfig, restoreCBRConfig} from "jstests/libs/query/cbr_utils.js";
+import {getCBRConfig, setCBRConfig} from "jstests/libs/query/cbr_utils.js";
 
 const collName = jsTestName();
 const coll = db[collName];
@@ -69,5 +69,5 @@ try {
         runTestFastScan();
     }
 } finally {
-    restoreCBRConfig(db, prevCBRConfig);
+    setCBRConfig(db, prevCBRConfig);
 }

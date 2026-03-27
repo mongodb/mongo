@@ -249,3 +249,6 @@ filters:
   - "sharding_csrs_continuous_config_stepdown.yml":
     approvers:
       - 10gen/server-cluster-scalability
+  - "v1index_jscore_passthrough.yml":
+    approvers:
+      - 10gen/query

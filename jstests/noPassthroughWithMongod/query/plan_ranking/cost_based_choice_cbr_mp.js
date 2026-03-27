@@ -4,7 +4,7 @@ import {
     assertPlanNotCosted,
     getCBRConfig,
     getMultiplanningBatchSize,
-    restoreCBRConfig,
+    setCBRConfig,
 } from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {LcgRandom} from "jstests/libs/lcg_random.js";
@@ -298,5 +298,5 @@ try {
     //     ranker: rankerStrategies.kCBR,
     // });
 } finally {
-    restoreCBRConfig(db, prevCBRConfig);
+    setCBRConfig(db, prevCBRConfig);
 }

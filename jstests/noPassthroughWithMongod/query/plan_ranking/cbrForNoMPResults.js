@@ -7,7 +7,7 @@ import {
     getEngine,
     getRejectedPlans,
 } from "jstests/libs/query/analyze_plan.js";
-import {assertPlanCosted, assertPlanNotCosted, getCBRConfig, restoreCBRConfig} from "jstests/libs/query/cbr_utils.js";
+import {assertPlanCosted, assertPlanNotCosted, getCBRConfig, setCBRConfig} from "jstests/libs/query/cbr_utils.js";
 
 const collName = jsTestName();
 const coll = db[collName];
@@ -190,7 +190,7 @@ try {
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
     testReturnKeyIsPlannedWithMultiPlanner();
 } finally {
-    restoreCBRConfig(db, prevCBRConfig);
+    setCBRConfig(db, prevCBRConfig);
 
     assert.commandWorked(
         db.adminCommand({

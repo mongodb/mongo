@@ -1,4 +1,4 @@
-import {getCBRConfig, restoreCBRConfig} from "jstests/libs/query/cbr_utils.js";
+import {getCBRConfig, setCBRConfig} from "jstests/libs/query/cbr_utils.js";
 
 const coll = db[jsTestName()];
 
@@ -71,5 +71,5 @@ try {
         multiKey();
     }
 } finally {
-    restoreCBRConfig(db, oldCBRConfig);
+    setCBRConfig(db, oldCBRConfig);
 }

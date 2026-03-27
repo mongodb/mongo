@@ -14,3 +14,4 @@
   value:
     exclude_files:
       - jstests/core/query/plan_cache/**/*.js
+      - jstests/core/query/cbr_plan_in_cache_cbr_disabled.js

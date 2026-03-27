@@ -9,7 +9,7 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
-import {getCBRConfig, restoreCBRConfig} from "jstests/libs/query/cbr_utils.js";
+import {getCBRConfig, setCBRConfig} from "jstests/libs/query/cbr_utils.js";
 import {getQueryPlannerMetrics, getQueryStats, resetQueryStatsStore} from "jstests/libs/query/query_stats_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -257,7 +257,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                 FixtureHelpers.mapOnEachShardNode({
                     db: testDB.getSiblingDB("admin"),
                     func: (db) => {
-                        restoreCBRConfig(db, prevCBRConfig);
+                        setCBRConfig(db, prevCBRConfig);
                     },
                     primaryNodeOnly: true,
                 });
@@ -334,7 +334,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                 FixtureHelpers.mapOnEachShardNode({
                     db: testDB.getSiblingDB("admin"),
                     func: (db) => {
-                        restoreCBRConfig(db, previousCBRConfig);
+                        setCBRConfig(db, previousCBRConfig);
                         assert.commandWorked(
                             db.adminCommand({
                                 setParameter: 1,
@@ -410,7 +410,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                 FixtureHelpers.mapOnEachShardNode({
                     db: testDB.getSiblingDB("admin"),
                     func: (db) => {
-                        restoreCBRConfig(db, prevCBRConfig);
+                        setCBRConfig(db, prevCBRConfig);
                     },
                     primaryNodeOnly: true,
                 });
@@ -483,7 +483,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                 FixtureHelpers.mapOnEachShardNode({
                     db: testDB.getSiblingDB("admin"),
                     func: (db) => {
-                        restoreCBRConfig(db, prevCBRConfig);
+                        setCBRConfig(db, prevCBRConfig);
                     },
                     primaryNodeOnly: true,
                 });
@@ -544,7 +544,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                 FixtureHelpers.mapOnEachShardNode({
                     db: testDB.getSiblingDB("admin"),
                     func: (db) => {
-                        restoreCBRConfig(db, prevCBRConfig);
+                        setCBRConfig(db, prevCBRConfig);
                     },
                     primaryNodeOnly: true,
                 });
@@ -615,7 +615,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                 FixtureHelpers.mapOnEachShardNode({
                     db: testDB.getSiblingDB("admin"),
                     func: (db) => {
-                        restoreCBRConfig(db, prevCBRConfig);
+                        setCBRConfig(db, prevCBRConfig);
                     },
                     primaryNodeOnly: true,
                 });
@@ -700,7 +700,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                 FixtureHelpers.mapOnEachShardNode({
                     db: testDB.getSiblingDB("admin"),
                     func: (db) => {
-                        restoreCBRConfig(db, prevCBRConfig);
+                        setCBRConfig(db, prevCBRConfig);
                     },
                     primaryNodeOnly: true,
                 });
@@ -797,7 +797,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                 FixtureHelpers.mapOnEachShardNode({
                     db: testDB.getSiblingDB("admin"),
                     func: (db) => {
-                        restoreCBRConfig(db, prevCBRConfig);
+                        setCBRConfig(db, prevCBRConfig);
                     },
                     primaryNodeOnly: true,
                 });

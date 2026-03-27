@@ -8,7 +8,7 @@
  */
 import {section, subSection} from "jstests/libs/query/pretty_md.js";
 import {outputDistinctPlanAndResults} from "jstests/libs/query/golden_test_utils.js";
-import {getCBRConfig, restoreCBRConfig} from "jstests/libs/query/cbr_utils.js";
+import {getCBRConfig, setCBRConfig} from "jstests/libs/query/cbr_utils.js";
 
 const coll = db[jsTestName()];
 
@@ -125,5 +125,5 @@ try {
     coll.createIndex({y: 1, z: 1});
     outputDistinctPlanAndResults(coll, "x", {x: {$gt: -1}, y: {$lt: 105}}, {hint: {x: 1, y: 1}});
 } finally {
-    restoreCBRConfig(db, prevCBRConfig);
+    setCBRConfig(db, prevCBRConfig);
 }

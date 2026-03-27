@@ -9,7 +9,7 @@ import {
     getCachedPlanForQuery,
     assertPlanHasIxScanStage,
 } from "jstests/libs/query/analyze_plan.js";
-import {getCBRConfig, restoreCBRConfig} from "jstests/libs/query/cbr_utils.js";
+import {getCBRConfig, setCBRConfig} from "jstests/libs/query/cbr_utils.js";
 
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -234,7 +234,7 @@ try {
 
     // TODO SERVER-116989: Run tests under the non-release CBR configurations (e.g. sampling).
 } finally {
-    restoreCBRConfig(db, prevCBRConfig);
+    setCBRConfig(db, prevCBRConfig);
 
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: prevSequentialSamplingScan}),

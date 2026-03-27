@@ -2,6 +2,8 @@
  * Utilities for writing tests for the cost-based ranker (CBR).
  */
 
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+
 // Round the given number to the nearest 0.1
 function round(num) {
     return Math.round(num * 10) / 10;
@@ -106,13 +108,26 @@ export function getCBRConfig(db) {
     };
 }
 
-export function restoreCBRConfig(db, config) {
+export function setCBRConfig(
+    db,
+    {
+        featureFlagCostBasedRanker = true,
+        internalQueryCBRCEMode = "automaticCE",
+        automaticCEPlanRankingStrategy = "CBRForNoMultiplanningResults",
+    } = {},
+) {
     assert.commandWorked(
         db.adminCommand({
             setParameter: 1,
-            featureFlagCostBasedRanker: config.featureFlagCostBasedRanker,
-            internalQueryCBRCEMode: config.internalQueryCBRCEMode,
-            automaticCEPlanRankingStrategy: config.automaticCEPlanRankingStrategy,
+            featureFlagCostBasedRanker,
+            internalQueryCBRCEMode,
+            automaticCEPlanRankingStrategy,
         }),
     );
+}
+
+export function setCBRConfigOnAllNonConfigNodes(conn, config) {
+    for (const host of DiscoverTopology.findNonConfigNodes(conn)) {
+        setCBRConfig(new Mongo(host).getDB("admin"), config);
+    }
 }

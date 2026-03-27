@@ -39,6 +39,7 @@ selector:
     - jstests/core/query/query_settings/**/*.js
     - jstests/core/txns/**/*.js
     - jstests/core/query/plan_cache/**/*.js
+    - jstests/core/query/cbr_plan_in_cache_cbr_disabled.js
   exclude_with_any_tags:
     - does_not_support_repeated_reads
     - requires_profiling
