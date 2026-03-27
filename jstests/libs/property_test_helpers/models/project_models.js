@@ -1,13 +1,17 @@
 /*
  * Fast-check models for $project.
  */
-import {assignableFieldArb, dollarFieldArb, fieldArb} from "jstests/libs/property_test_helpers/models/basic_models.js";
+import {
+    nonEmptyAssignableFieldArb,
+    dollarFieldArb,
+    nonEmptyFieldArb,
+} from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {oneof} from "jstests/libs/property_test_helpers/models/model_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 // Inclusion/Exclusion projections. {$project: {_id: 1, a: 0}}
 export function getSingleFieldProjectArb(isInclusion, {simpleFieldsOnly = false} = {}) {
-    const projectedFieldArb = simpleFieldsOnly ? assignableFieldArb : fieldArb;
+    const projectedFieldArb = simpleFieldsOnly ? nonEmptyAssignableFieldArb : nonEmptyFieldArb;
     return fc.record({field: projectedFieldArb, includeId: fc.boolean()}).map(function ({field, includeId}) {
         const includeIdVal = includeId ? 1 : 0;
         const includeFieldVal = isInclusion ? 1 : 0;
@@ -22,7 +26,7 @@ export const simpleProjectArb = oneof(
 export function getMultipleFieldProjectArb(isInclusion = true, {simpleFieldsOnly = false} = {}) {
     // Choosing only from assignable fields to avoid projecting both m and m.1.
     const fieldVal = isInclusion ? 1 : 0;
-    const projectedFieldArb = simpleFieldsOnly ? assignableFieldArb : fieldArb;
+    const projectedFieldArb = simpleFieldsOnly ? nonEmptyAssignableFieldArb : nonEmptyFieldArb;
     // We cannot have both a field and its subfield in the same $project.
     function hasPathCollision(fields) {
         return fields.some((f) => fields.some((g) => g !== f && g.startsWith(f + ".")));
@@ -45,6 +49,6 @@ export const multipleFieldProjectArb = oneof(
 );
 
 // Project from one field to another. {$project {a: '$b'}}
-export const computedProjectArb = fc.tuple(fieldArb, dollarFieldArb).map(function ([destField, srcField]) {
+export const computedProjectArb = fc.tuple(nonEmptyFieldArb, dollarFieldArb).map(function ([destField, srcField]) {
     return {$project: {[destField]: srcField}};
 });
