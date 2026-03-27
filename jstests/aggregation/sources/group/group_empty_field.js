@@ -1,7 +1,7 @@
 /**
  * Validates that empty fields are banned in $group.
  * @tags: [
- *   requires_fcv_83,
+ *   requires_fcv_90,
  * ]
  */
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
