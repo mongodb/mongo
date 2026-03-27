@@ -323,10 +323,12 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
                 return ex.toStatus();
             }
         } else if (fieldName == "recordIdsReplicated") {
-            if (e.type() != BSONType::boolean) {
-                return {ErrorCodes::TypeMismatch, "'recordIdsReplicated' must be a boolean."};
-            }
-            collectionOptions.recordIdsReplicated = e.Bool();
+            // We are ignoring `recorIdsReplicated` field here since it used to be part of
+            // this object and DSC beta clusters contains this field. No other cluster contain
+            // this parameter as it was only persisted when it was true and the feature was only
+            // enabled for DSC. If we ever rebuild DSC clusters from scratch we can safely remove
+            // this parameter.
+            // TODO SERVER-120943 remove handling of recordIdsReplicated in collectionOptions
         } else if (!createdOn24OrEarlier && !mongo::isGenericArgument(fieldName)) {
             return Status(ErrorCodes::InvalidOptions,
                           str::stream()
@@ -412,10 +414,6 @@ CollectionOptions CollectionOptions::fromCreateCommand(OperationContext* opCtx,
         options.encryptedFieldConfig = std::move(*encryptedFieldConfig);
         setEncryptedDefaultEncryptedCollectionNames(cmd.getNamespace(),
                                                     options.encryptedFieldConfig.get_ptr());
-    }
-
-    if (auto recordIdsReplicated = cmd.getRecordIdsReplicated()) {
-        options.recordIdsReplicated = *recordIdsReplicated;
     }
 
     if (auto storageTier = cmd.getStorageTier()) {
@@ -537,10 +535,6 @@ void CollectionOptions::appendBSON(BSONObjBuilder* builder,
 
     if (encryptedFieldConfig && shouldAppend(CreateCommand::kEncryptedFieldsFieldName)) {
         builder->append(CreateCommand::kEncryptedFieldsFieldName, encryptedFieldConfig->toBSON());
-    }
-
-    if (recordIdsReplicated && shouldAppend(CreateCommand::kRecordIdsReplicatedFieldName)) {
-        builder->appendBool(CreateCommand::kRecordIdsReplicatedFieldName, true);
     }
 }
 

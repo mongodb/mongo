@@ -674,7 +674,8 @@ void ShardServerOpObserver::onCreateCollection(
     const OplogSlot& createOpTime,
     const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
     bool fromMigrate,
-    bool isTimeseries) {
+    bool isTimeseries,
+    bool recordIdsReplicated) {
     // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
     if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
         return;

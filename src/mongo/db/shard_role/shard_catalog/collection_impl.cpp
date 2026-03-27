@@ -1038,7 +1038,7 @@ Status CollectionImpl::updateCappedSize(OperationContext* opCtx,
 }
 
 void CollectionImpl::unsetRecordIdsReplicated(OperationContext* opCtx) {
-    if (!_metadata->options.recordIdsReplicated || !_metadata->recordIdsReplicated) {
+    if (!_metadata->recordIdsReplicated) {
         return;
     }
 
@@ -1048,10 +1048,8 @@ void CollectionImpl::unsetRecordIdsReplicated(OperationContext* opCtx) {
                 logAttrs(ns()),
                 logAttrs(uuid()));
 
-    _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
-        md.options.recordIdsReplicated = false;
-        md.recordIdsReplicated = false;
-    });
+    _writeMetadata(
+        opCtx, [&](durable_catalog::CatalogEntryMetaData& md) { md.recordIdsReplicated = false; });
 }
 
 bool CollectionImpl::isChangeStreamPreAndPostImagesEnabled() const {
@@ -1070,8 +1068,6 @@ void CollectionImpl::setChangeStreamPreAndPostImages(OperationContext* opCtx,
 }
 
 bool CollectionImpl::areRecordIdsReplicated() const {
-    // TODO (SERVER-119864) remove invariant.
-    invariant(_metadata->recordIdsReplicated == _metadata->options.recordIdsReplicated);
     return _metadata->recordIdsReplicated;
 }
 

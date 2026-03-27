@@ -13,13 +13,6 @@ const collName = "replRecIdCollForCreate";
 const coll = db.getCollection(collName);
 coll.drop();
 
-// Validate that it's not possible to create a clustered collection with
-// {recordIdsReplicated: true}.
-assert.commandFailedWithCode(
-    db.createCollection(collName, {clusteredIndex: {key: {_id: 1}, unique: true}, recordIdsReplicated: true}),
-    ErrorCodes.InvalidOptions,
-);
-
 // Validate that a clustered collection will never have the 'recordIdsReplicated' option set
 // implicitly.
 const clusteredCollName = collName + "_clustered";

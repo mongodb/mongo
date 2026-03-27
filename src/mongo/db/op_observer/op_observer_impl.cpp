@@ -1514,7 +1514,8 @@ void OpObserverImpl::onCreateCollection(
     const OplogSlot& createOpTime,
     const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
     bool fromMigrate,
-    bool isTimeseries) {
+    bool isTimeseries,
+    bool recordIdsReplicated) {
     tassert(11145000,
             "All collection creation paths are expected to acquire an Operation FCV",
             VersionContext::getDecoration(opCtx).hasOperationFCV());
@@ -1528,13 +1529,9 @@ void OpObserverImpl::onCreateCollection(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
-    boost::optional<bool> recordIdsReplicated = boost::none;
-    // TODO SERVER-119864 We need to manually write recordIdsReplicated when it is false
-    // because collection options does not write it in that case. We do this so the replicas
-    // can use the same state as the primary, other wise the replicas would take their own decision
-    // that could create a divergence.
-    if (replicatedRidsFeatureIsEnabled && !options.recordIdsReplicated) {
-        recordIdsReplicated = options.recordIdsReplicated;
+    boost::optional<bool> useRecordIdsReplicated = boost::none;
+    if (replicatedRidsFeatureIsEnabled) {
+        useRecordIdsReplicated = recordIdsReplicated;
     }
 
     MutableOplogEntry oplogEntry;
@@ -1549,7 +1546,7 @@ void OpObserverImpl::onCreateCollection(
     oplogEntry.setNss(collectionName.getCommandNS());
     oplogEntry.setUuid(options.uuid);
     oplogEntry.setObject(MutableOplogEntry::makeCreateCollObject(
-        collectionName, options, idIndex, recordIdsReplicated));
+        collectionName, options, idIndex, useRecordIdsReplicated));
 
     if (shouldReplicateLocalCatalogIdentifiers(
             rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider())) {

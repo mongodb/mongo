@@ -165,13 +165,6 @@ structs:
                     variant: [safeBool, ClusteredIndexSpec]
                 optional: true
                 stability: stable
-            recordIdsReplicated:
-                description:
-                    "Specifies whether this collection should utilize the same recordId for a given document
-                    across all nodes in a replica set."
-                type: safeBool
-                optional: true
-                stability: unstable
             expireAfterSeconds:
                 description: "The number of seconds after which old data should be deleted."
                 type: safeInt64

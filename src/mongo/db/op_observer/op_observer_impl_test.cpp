@@ -581,6 +581,48 @@ protected:
         ASSERT_EQ(viewless && viewlessParam, isTimeseries);
     }
 
+    void testOnCreateCollRecordIdsReplicated(bool recordIdsReplicated) {
+        RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
+            "featureFlagReplicateLocalCatalogIdentifiers", true);
+        RAIIServerParameterControllerForTest recordIdsReplicatedController(
+            "featureFlagRecordIdsReplicated", true);
+
+        auto opCtxWrapper = cc().makeOperationContext();
+        auto opCtx = opCtxWrapper.get();
+
+        // Simulate catalog information for a normal collection with a standard '_id_' index.
+        ASSERT_TRUE(nss.isReplicated());
+        auto catalogIdentifier =
+            newCatalogIdentifier(opCtx, nss.dbName(), true /* includeIdIndexIdent */);
+        CollectionOptions options{.uuid = uuid};
+
+        OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
+        {
+            // Generate the create oplog entry.
+            VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx);
+            AutoGetCollection autoColl(opCtx, nss, MODE_X);
+            WriteUnitOfWork wuow(opCtx);
+            opObserver.onCreateCollection(opCtx,
+                                          nss,
+                                          options,
+                                          BSON("v" << 2 << "key" << BSON("_id_" << 1) << "name"
+                                                   << "_id_") /* idIndex */,
+                                          repl::getNextOpTime(opCtx),
+                                          catalogIdentifier,
+                                          false /* fromMigrate*/,
+                                          false,
+                                          recordIdsReplicated);
+            wuow.commit();
+        }
+
+        const auto oplogEntryBSON = getSingleOplogEntry(opCtx);
+        const auto oplogEntry = assertGet(OplogEntry::parse(oplogEntryBSON));
+        validateReplicatedCatalogIdentifier(
+            opCtx, oplogEntry, catalogIdentifier, /*catalogReplicationEnabled=*/true);
+        ASSERT_TRUE(oplogEntry.getObject().hasField("recordIdsReplicated"));
+        ASSERT_EQ(recordIdsReplicated, oplogEntry.getObject().getBoolField("recordIdsReplicated"));
+    }
+
     void testOnCreateCollClustered(bool catalogReplicationEnabled) {
         RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
             "featureFlagReplicateLocalCatalogIdentifiers", catalogReplicationEnabled);
@@ -695,6 +737,15 @@ TEST_F(OpObserverOnCreateCollectionTest,
     testOnCreateCollBasic(
         false /* catalogReplicationEnabled */, true /* viewless */, true /* viewlessParam */);
 }
+
+TEST_F(OpObserverOnCreateCollectionTest, createCollectionRecordIdsReplicatedFalse) {
+    testOnCreateCollRecordIdsReplicated(/*recordIdsReplicated=*/false);
+}
+
+TEST_F(OpObserverOnCreateCollectionTest, createCollectionRecordIdsReplicatedTrue) {
+    testOnCreateCollRecordIdsReplicated(/*recordIdsReplicated=*/true);
+}
+
 
 TEST_F(OpObserverOnCreateCollectionTest, ClusteredReplicatedCatalogIdentifiersEnabled) {
     testOnCreateCollClustered(true /* catalogReplicationEnabled */);

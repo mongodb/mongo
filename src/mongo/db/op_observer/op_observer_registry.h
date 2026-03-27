@@ -353,7 +353,8 @@ public:
         const OplogSlot& createOpTime,
         const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
         bool fromMigrate,
-        bool isTimeseries) override {
+        bool isTimeseries,
+        bool recordIdsReplicated) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
             o->onCreateCollection(opCtx,
@@ -363,7 +364,8 @@ public:
                                   createOpTime,
                                   createCollCatalogIdentifier,
                                   fromMigrate,
-                                  isTimeseries);
+                                  isTimeseries,
+                                  recordIdsReplicated);
     }
 
     void onCollMod(OperationContext* const opCtx,

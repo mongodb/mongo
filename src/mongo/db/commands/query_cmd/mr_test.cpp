@@ -317,7 +317,8 @@ public:
         const OplogSlot& createOpTime,
         const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
         bool fromMigrate,
-        bool isViewlessTimeseries) override;
+        bool isViewlessTimeseries,
+        bool recordIdsReplicated) override;
 
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
@@ -380,7 +381,8 @@ void MapReduceOpObserver::onCreateCollection(
     const OplogSlot&,
     const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
     bool fromMigrate,
-    bool isViewlessTimeseries) {
+    bool isViewlessTimeseries,
+    bool recordIdsReplicated) {
     if (!options.temp) {
         return;
     }

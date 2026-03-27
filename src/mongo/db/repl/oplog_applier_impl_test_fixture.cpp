@@ -133,11 +133,13 @@ void OplogApplierImplOpObserver::onCreateCollection(
     const OplogSlot& createOpTime,
     const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
     bool fromMigrate,
-    bool isViewlessTimeseries) {
+    bool isViewlessTimeseries,
+    bool recordIdsReplicated) {
     if (!onCreateCollectionFn) {
         return;
     }
-    onCreateCollectionFn(opCtx, collectionName, options, idIndex, createCollCatalogIdentifier);
+    onCreateCollectionFn(
+        opCtx, collectionName, options, idIndex, createCollCatalogIdentifier, recordIdsReplicated);
 }
 
 void OplogApplierImplOpObserver::onRenameCollection(OperationContext* opCtx,
@@ -556,7 +558,8 @@ OplogEntry makeCreateCollectionOplogEntry(
     const NamespaceString& nss,
     const CollectionOptions& collectionOptions,
     const BSONObj& idIndex,
-    boost::optional<CreateCollCatalogIdentifier> createCollCatalogIdentifier) {
+    boost::optional<CreateCollCatalogIdentifier> createCollCatalogIdentifier,
+    bool recordIdsReplicated) {
     const auto object = MutableOplogEntry::makeCreateCollObject(nss, collectionOptions, idIndex);
 
     boost::optional<BSONObj> o2;

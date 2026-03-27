@@ -418,7 +418,7 @@ TEST_F(CollModTimestampedTest, CollModTimeseriesMixedSchemaFlagPointInTimeLookup
     }
 }
 
-CollectionOptions getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) {
+bool areRecordIdsReplicated(OperationContext* opCtx, const NamespaceString& nss) {
     const auto coll = acquireCollection(
         opCtx,
         CollectionAcquisitionRequest(nss,
@@ -431,7 +431,7 @@ CollectionOptions getCollectionOptions(OperationContext* opCtx, const NamespaceS
                                << nss.toStringForErrorMsg()
                                << " because collection does not exist.";
 
-    return coll.getCollectionPtr()->getCollectionOptions();
+    return coll.getCollectionPtr()->areRecordIdsReplicated();
 }
 
 TEST_F(CollModTest, CollModSetting_ReplicatedRecordIds_ToFalse_Succeeds) {
@@ -447,7 +447,7 @@ TEST_F(CollModTest, CollModSetting_ReplicatedRecordIds_ToFalse_Succeeds) {
     uassertStatusOK(createCollection(opCtx.get(), cmd));
 
     // Confirm it has replicated record Ids
-    ASSERT_TRUE(getCollectionOptions(opCtx.get(), nss).recordIdsReplicated);
+    ASSERT_TRUE(areRecordIdsReplicated(opCtx.get(), nss));
 
     // Modify it disabling replicated record Ids
     CollMod collModCmd(nss);
@@ -456,7 +456,7 @@ TEST_F(CollModTest, CollModSetting_ReplicatedRecordIds_ToFalse_Succeeds) {
     uassertStatusOK(processCollModCommand(opCtx.get(), nss, collModCmd, nullptr, &result));
 
     // Confirm replicated record Ids have been disabled
-    ASSERT_FALSE(getCollectionOptions(opCtx.get(), nss).recordIdsReplicated);
+    ASSERT_FALSE(areRecordIdsReplicated(opCtx.get(), nss));
 }
 
 TEST_F(CollModTest, CollModSetting_ReplicatedRecordIds_ToTrue_Fails) {
@@ -469,7 +469,7 @@ TEST_F(CollModTest, CollModSetting_ReplicatedRecordIds_ToTrue_Fails) {
     uassertStatusOK(createCollection(opCtx.get(), cmd));
 
     // Confirm it doesn't have replicated record Ids
-    ASSERT_FALSE(getCollectionOptions(opCtx.get(), nss).recordIdsReplicated);
+    ASSERT_FALSE(areRecordIdsReplicated(opCtx.get(), nss));
 
     // Attempt to modify it disabling replicated record Ids
     CollMod collModCmd(nss);
@@ -480,7 +480,7 @@ TEST_F(CollModTest, CollModSetting_ReplicatedRecordIds_ToTrue_Fails) {
               processCollModCommand(opCtx.get(), nss, collModCmd, nullptr, &result).code());
 
     // Confirm it still doesn't have replicated record Ids
-    ASSERT_FALSE(getCollectionOptions(opCtx.get(), nss).recordIdsReplicated);
+    ASSERT_FALSE(areRecordIdsReplicated(opCtx.get(), nss));
 }
 
 class StubPersistenceProviderRequiringReplicatedRecordIds : public rss::StubPersistenceProvider {
@@ -535,7 +535,7 @@ TEST_F(CollModTest, CollModSetting_ReplicatedRecordIds_ToFalse_WhenProviderRequi
     uassertStatusOK(createCollection(opCtx.get(), cmd));
 
     // Confirm it has replicated record Ids
-    ASSERT_TRUE(getCollectionOptions(opCtx.get(), nss).recordIdsReplicated);
+    ASSERT_TRUE(areRecordIdsReplicated(opCtx.get(), nss));
 
     // Attempt to modify it disabling replicated record Ids
     CollMod collModCmd(nss);
@@ -546,7 +546,7 @@ TEST_F(CollModTest, CollModSetting_ReplicatedRecordIds_ToFalse_WhenProviderRequi
               processCollModCommand(opCtx.get(), nss, collModCmd, nullptr, &result).code());
 
     // Confirm it still have replicated record Ids
-    ASSERT_TRUE(getCollectionOptions(opCtx.get(), nss).recordIdsReplicated);
+    ASSERT_TRUE(areRecordIdsReplicated(opCtx.get(), nss));
 }
 
 }  // namespace

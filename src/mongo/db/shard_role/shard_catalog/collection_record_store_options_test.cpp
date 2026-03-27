@@ -100,7 +100,6 @@ TEST_F(CollectionRecordStoreOptionsTest, DefaultRecordStoreOptions) {
 
 TEST_F(CollectionRecordStoreOptionsTest, DefaultRecordStoreOptionsWithRecordIdsReplicated) {
     CollectionOptions collOptions;
-    collOptions.recordIdsReplicated = true;
     const auto actualRSOptions =
         getRecordStoreOptions(kBasicNss, collOptions, /*recordIdsReplicated=*/true);
 
@@ -130,7 +129,6 @@ TEST_F(CollectionRecordStoreOptionsTest, CappedRecordStoreOptionsBasic) {
 TEST_F(CollectionRecordStoreOptionsTest, CappedRecordStoreOptionsBasicWithRecordIdsReplicated) {
     CollectionOptions collOptions;
     collOptions.capped = true;
-    collOptions.recordIdsReplicated = true;
     const auto actualRSOptions =
         getRecordStoreOptions(kBasicNss, collOptions, /*recordIdsReplicated=*/true);
 
@@ -160,7 +158,6 @@ TEST_F(CollectionRecordStoreOptionsTest, CappedRecordStoreOptionsWithRecordIdsRe
     collOptions.capped = true;
     collOptions.cappedMaxDocs = 100 /* arbitrary */;
     collOptions.cappedSize = 100 /* arbitrary */;
-    collOptions.recordIdsReplicated = true;
     const auto actualRSOptions =
         getRecordStoreOptions(kBasicNss, collOptions, /*recordIdsReplicated=*/true);
     RecordStore::Options expectedRSOptions{.isCapped = true, .allowOverwrite = false};
@@ -182,7 +179,6 @@ TEST_F(CollectionRecordStoreOptionsTest, CappedClusteredRecordStoreOptionsWithRe
     CollectionOptions collOptions;
     collOptions.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
     collOptions.capped = true;
-    collOptions.recordIdsReplicated = true;
     const auto actualRSOptions =
         getRecordStoreOptions(kBasicNss, collOptions, /*recordIdsReplicated=*/true);
     RecordStore::Options expectedRSOptions{
@@ -240,7 +236,6 @@ TEST_F(CollectionRecordStoreOptionsTest, TimeseriesRecordStoreOptionsWithRecordI
     CollectionOptions collOptions;
     collOptions.timeseries = TimeseriesOptions(/*timeField=*/"t");
     collOptions.clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
-    collOptions.recordIdsReplicated = true;
     NamespaceString timeseriesNss =
         NamespaceString::createNamespaceString_forTest("test.system.buckets.ts");
     const auto actualRSOptions =
@@ -269,7 +264,6 @@ TEST_F(CollectionRecordStoreOptionsTest, RecordStoreOptionsWithStorageEngineColl
 TEST_F(CollectionRecordStoreOptionsTest,
        RecordStoreOptionsWithStorageEngineCollectionOptionsWithRecordIdsReplicated) {
     CollectionOptions collOptions;
-    collOptions.recordIdsReplicated = true;
     collOptions.storageEngine =
         BSON("create" << kBasicNss.coll() << "storageEngine"
                       << BSON("wiredTiger" << BSON("configString" << "prefix_compression=true")));

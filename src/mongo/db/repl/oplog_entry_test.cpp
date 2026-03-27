@@ -203,14 +203,9 @@ TEST_F(OplogEntryTest, CreateWithRecordIdsReplicatedTrue) {
     opts.cappedSize = 15;
     opts.uuid = UUID::gen();
 
-    // TODO SERVER-119864 makeCreateCollObject is getting the value for recordIdsReplicated
-    // from the collection option when it is true. It will be always from the optional after
-    // the field is removed from collection options.
-    opts.recordIdsReplicated = true;
-
     // The 'object' document shouldn't contain the 'uuid' as it is specified at the top level.
-    const auto oplogEntryObjectDoc =
-        MutableOplogEntry::makeCreateCollObject(nss, opts, BSONObj() /* idIndex */);
+    const auto oplogEntryObjectDoc = MutableOplogEntry::makeCreateCollObject(
+        nss, opts, BSONObj() /* idIndex */, /*recordIdsReplicated=*/true);
     ASSERT_BSONOBJ_EQ(oplogEntryObjectDoc,
                       BSON("create" << nss.coll() << "capped" << true << "size" << 15
                                     << "recordIdsReplicated" << true));

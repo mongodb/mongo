@@ -173,7 +173,8 @@ public:
         const OplogSlot& createOpTime,
         const boost::optional<CreateCollCatalogIdentifier>& collCatalogIdentifier,
         bool fromMigrate,
-        bool isViewlessTimeseries) override {
+        bool isViewlessTimeseries,
+        bool recordIdsReplicated) override {
         const auto catalogEntry = getLocalCatalogEntry(opCtx, collectionName);
 
         // First, validate the test correctly configured whether collections are persisted in

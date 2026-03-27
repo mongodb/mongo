@@ -592,7 +592,8 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommand) {
                                             const NamespaceString& collNss,
                                             const CollectionOptions&,
                                             const BSONObj&,
-                                            const boost::optional<CreateCollCatalogIdentifier>&) {
+                                            const boost::optional<CreateCollCatalogIdentifier>&,
+                                            bool recordIdsReplicated) {
         applyCmdCalled = true;
         ASSERT_TRUE(opCtx);
         ASSERT_TRUE(shard_role_details::getLocker(opCtx)->isDbLockedForMode(nss.dbName(), MODE_IX));
@@ -618,7 +619,8 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommandMultitenant) {
                                             const NamespaceString& collNss,
                                             const CollectionOptions&,
                                             const BSONObj&,
-                                            const boost::optional<CreateCollCatalogIdentifier>&) {
+                                            const boost::optional<CreateCollCatalogIdentifier>&,
+                                            bool recordIdsReplicated) {
         applyCmdCalled = true;
         ASSERT_TRUE(opCtx);
         ASSERT_TRUE(shard_role_details::getLocker(opCtx)->isDbLockedForMode(nss.dbName(), MODE_IX));
@@ -651,7 +653,8 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommandMultitenantRequireTenantIDFa
                                             const NamespaceString& collNss,
                                             const CollectionOptions&,
                                             const BSONObj&,
-                                            const boost::optional<CreateCollCatalogIdentifier>&) {
+                                            const boost::optional<CreateCollCatalogIdentifier>&,
+                                            bool recordIdsReplicated) {
         applyCmdCalled = true;
         ASSERT_TRUE(opCtx);
         ASSERT_TRUE(shard_role_details::getLocker(opCtx)->isDbLockedForMode(nss.dbName(), MODE_IX));
@@ -691,7 +694,8 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommandMultitenantAlreadyExists) {
                                             const NamespaceString& collNss,
                                             const CollectionOptions&,
                                             const BSONObj&,
-                                            const boost::optional<CreateCollCatalogIdentifier>&) {
+                                            const boost::optional<CreateCollCatalogIdentifier>&,
+                                            bool recordIdsReplicated) {
         applyCmdCalled = true;
         ASSERT_TRUE(opCtx);
         ASSERT_TRUE(
@@ -2919,22 +2923,21 @@ protected:
         _uuid = UUID::gen();
         _lsid = makeLogicalSessionId(_opCtx.get());
 
-        _opObserver->onCreateCollectionFn =
-            [&](OperationContext* opCtx,
-                const NamespaceString& collNss,
-                const CollectionOptions&,
-                const BSONObj&,
-                const boost::optional<CreateCollCatalogIdentifier>&) {
-                stdx::lock_guard<stdx::mutex> lock(_mutex);
-                if (collNss == _nss ||
-                    collNss == NamespaceString::kSessionTransactionsTableNamespace) {
-                    // Storing the documents in a sorted data structure to make checking for valid
-                    // results easier. The inserts will be performed by different threads and
-                    // there's no guarantee of the order.
-                    (_docs[collNss]).push_back(BSON("create" << collNss.coll()));
-                } else
-                    FAIL("Unexpected create") << " on " << collNss.toStringForErrorMsg();
-            };
+        _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
+                                                const NamespaceString& collNss,
+                                                const CollectionOptions&,
+                                                const BSONObj&,
+                                                const boost::optional<CreateCollCatalogIdentifier>&,
+                                                bool recordIdsReplicated) {
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            if (collNss == _nss || collNss == NamespaceString::kSessionTransactionsTableNamespace) {
+                // Storing the documents in a sorted data structure to make checking for valid
+                // results easier. The inserts will be performed by different threads and
+                // there's no guarantee of the order.
+                (_docs[collNss]).push_back(BSON("create" << collNss.coll()));
+            } else
+                FAIL("Unexpected create") << " on " << collNss.toStringForErrorMsg();
+        };
 
         _opObserver->onInsertsFn =
             [&](OperationContext*, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
@@ -4006,7 +4009,8 @@ TEST_F(OplogApplierImplTest,
                                             const NamespaceString& collNss,
                                             const CollectionOptions&,
                                             const BSONObj&,
-                                            const boost::optional<CreateCollCatalogIdentifier>&) {
+                                            const boost::optional<CreateCollCatalogIdentifier>&,
+                                            bool recordIdsReplicated) {
         applyCmdCalled = true;
         ASSERT_EQUALS(vCtx, VersionContext::getDecoration(opCtx));
     };

@@ -116,11 +116,12 @@ void AuthOpObserver::onCreateCollection(
     const OplogSlot& createOpTime,
     const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
     bool fromMigrate,
-    bool isTimeseries) {
+    bool isTimeseries,
+    bool recordIdsReplicated) {
     const auto cmdNss = collectionName.getCommandNS();
 
-    const auto cmdObj =
-        repl::MutableOplogEntry::makeCreateCollObject(collectionName, options, idIndex);
+    const auto cmdObj = repl::MutableOplogEntry::makeCreateCollObject(
+        collectionName, options, idIndex, recordIdsReplicated);
 
     BSONObj o2;
     if (createCollCatalogIdentifier.has_value() &&

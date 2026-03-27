@@ -377,16 +377,12 @@ function validateListCatalogToListCollectionsConsistency(
     }
 
     // TODO (SERVER-91702): Remove the exclusion once the race with downgrade is fixed.
-    // TODO (SERVER-119864): Stop removing `e.options.recordIdsReplicated` once 'recordIdsReplicated'
-    // gets removed from collection options.
     if (ignoreRecordIdsReplicatedOption) {
         listCatalogMap.forEach((e) => {
             delete e.info.recordIdsReplicated;
-            delete e.options.recordIdsReplicated;
         });
         listCollections.forEach((e) => {
             delete e.info.recordIdsReplicated;
-            delete e.options.recordIdsReplicated;
         });
     }
 

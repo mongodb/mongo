@@ -368,7 +368,8 @@ public:
         const OplogSlot& createOpTime,
         const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
         bool fromMigrate,
-        bool isTimeseries = false) = 0;
+        bool isTimeseries = false,
+        bool recordIdsReplicated = false) = 0;
 
     /**
      * This function logs an oplog entry when a 'collMod' command on a collection is executed.

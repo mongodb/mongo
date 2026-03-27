@@ -36,9 +36,6 @@ namespace mongo {
 RecordStore::Options getRecordStoreOptions(const NamespaceString& nss,
                                            const CollectionOptions& collectionOptions,
                                            bool recordIdsReplicated) {
-    // TODO (SERVER-119864) remove when recordIdsReplicated is be removed from collection options
-    invariant(collectionOptions.recordIdsReplicated == recordIdsReplicated);
-
     RecordStore::Options recordStoreOptions;
 
     bool isClustered = collectionOptions.clusteredIndex.has_value();

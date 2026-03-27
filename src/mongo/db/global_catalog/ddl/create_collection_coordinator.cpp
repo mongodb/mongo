@@ -245,7 +245,6 @@ CreateCommand makeCreateCommand(OperationContext* opCtx,
     createRequest.setIdIndex(request.getIdIndex());
     createRequest.setViewOn(request.getViewOn());
     createRequest.setIndexOptionDefaults(request.getIndexOptionDefaults());
-    createRequest.setRecordIdsReplicated(request.getRecordIdsReplicated());
     createRequest.setExpireAfterSeconds(request.getExpireAfterSeconds());
     createRequest.setValidationAction(request.getValidationAction());
     createRequest.setValidationLevel(request.getValidationLevel());

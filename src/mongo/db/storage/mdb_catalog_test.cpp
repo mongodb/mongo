@@ -196,7 +196,6 @@ TEST_F(MDBCatalogTest, ParseRecordStoreOptionsEquivalence) {
             \"options\" : { \
                 \"size\" : 1024, \
                 \"capped\" : false, \
-                \"recordIdsReplicated\" : true, \
                 \"storageEngine\" : { \"doc1\" : {\"a\" : 0}} \
             } \
         } \

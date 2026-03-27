@@ -642,7 +642,6 @@ TEST_F(CreateCollectionTest,
 
     CollectionOptions options;
     CreateCommand cmd = CreateCommand(nss);
-    cmd.getCreateCollectionRequest().setRecordIdsReplicated(false);
 
     Lock::GlobalLock lk(opCtx.get(), MODE_X);
 
@@ -670,9 +669,7 @@ TEST_F(CreateCollectionTest,
     ASSERT_FALSE(collectionExists(opCtx.get(), nss));
 
     CollectionOptions options;
-    options.recordIdsReplicated = true;
     CreateCommand cmd = CreateCommand(nss);
-    cmd.getCreateCollectionRequest().setRecordIdsReplicated(true);
 
     Lock::GlobalLock lk(opCtx.get(), MODE_X);
 
@@ -869,16 +866,6 @@ TEST_F(CreateCollectionTest, TestCollectionCreationChecks) {
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
 
-    // CollectionOptions cannot have recordIdsReplicated set to true without the feature flag
-    // enabled.
-    {
-        RAIIServerParameterControllerForTest featureFlagController("featureFlagRecordIdsReplicated",
-                                                                   false);
-        auto opCtx = makeOpCtx();
-        CollectionOptions options;
-        options.recordIdsReplicated = true;
-        createCollectionTestCase(opCtx.get(), nss, options, ErrorCodes::CommandNotSupported);
-    };
     // CollectionOptions cannot have validator set when creating a viewless timeseries collection.
     {
         RAIIServerParameterControllerForTest featureFlagController(

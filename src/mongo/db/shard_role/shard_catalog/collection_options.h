@@ -175,12 +175,6 @@ struct MONGO_MOD_PUBLIC CollectionOptions {
 
     // The options for collections with encrypted fields
     boost::optional<EncryptedFieldConfig> encryptedFieldConfig;
-
-    // TODO (SERVER-119864) remove.
-    // When 'true', will use the same recordIds across all nodes in the replica set.
-    // When using disaggregated storage, will be enabled implicitly when the collection
-    // is created.
-    bool recordIdsReplicated = false;
 };
 
 MONGO_MOD_PRIVATE

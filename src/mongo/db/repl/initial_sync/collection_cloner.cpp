@@ -445,7 +445,7 @@ void CollectionCloner::runQuery() {
     ExhaustMode exhaustMode =
         collectionClonerUsesExhaust.load() ? ExhaustMode::kOn : ExhaustMode::kOff;
 
-    if (_collectionOptions.recordIdsReplicated) {
+    if (_recordIdsReplicated) {
         // The below projection returns a stream of documents in the format
         // {r: <recordId>, d: <original document>}.
         auto projection = BSON("_id" << 0 << "r" << BSON("$meta" << "recordId") << "d"
@@ -549,7 +549,7 @@ void CollectionCloner::insertDocumentsCallback(const executor::TaskExecutor::Cal
         _progressMeter.hit(int(docs.size()));
         invariant(_collLoader);
 
-        CollectionBulkLoader::ParseRecordIdAndDocFunc fn = (_collectionOptions.recordIdsReplicated)
+        CollectionBulkLoader::ParseRecordIdAndDocFunc fn = (_recordIdsReplicated)
             ? ([](const BSONObj& doc) {
                   return std::make_pair(RecordId(doc["r"].Long()), doc["d"].Obj());
               })

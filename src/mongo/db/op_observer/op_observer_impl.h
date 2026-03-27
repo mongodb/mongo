@@ -173,7 +173,8 @@ public:
         const OplogSlot& createOpTime,
         const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
         bool fromMigrate,
-        bool isTimeseries = false) final;
+        bool isTimeseries = false,
+        bool recordIdsReplicated = false) final;
     void onCollMod(OperationContext* opCtx,
                    const NamespaceString& nss,
                    const UUID& uuid,

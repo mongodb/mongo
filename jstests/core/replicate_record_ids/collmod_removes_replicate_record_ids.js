@@ -22,7 +22,7 @@ coll.drop();
 
 // Create a collection with the param set.
 jsTestLog("Creating collection " + coll.getFullName());
-assert.commandWorked(db.runCommand({create: collName, recordIdsReplicated: true}));
+assert.commandWorked(db.runCommand({create: collName}));
 jsTestLog("Created collection " + coll.getFullName());
 
 let collInfo = coll.exists();

@@ -1084,7 +1084,6 @@ TEST_F(CollectionClonerTestResumable, RecordIdsReplicatedFindProjects) {
 
     // Create a cloner that tries to replicate recordIds.
     CollectionOptions options;
-    options.recordIdsReplicated = true;
     auto cloner = makeCollectionCloner(options, /*recordIdsReplicated=*/true);
     // Get multiple batches.
     cloner->setBatchSize_forTest(1);

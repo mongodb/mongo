@@ -358,7 +358,7 @@ public:
                                          AcquisitionPrerequisites::kRead},
             MODE_IS);
         ASSERT(coll.exists());
-        ASSERT_TRUE(coll.getCollectionPtr()->getCollectionOptions().recordIdsReplicated);
+        ASSERT_TRUE(coll.getCollectionPtr()->areRecordIdsReplicated());
     }
 
     void create(NamespaceString nss) {

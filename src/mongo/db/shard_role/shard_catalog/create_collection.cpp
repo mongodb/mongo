@@ -213,12 +213,6 @@ Status validateCollectionOptions(OperationContext* opCtx,
                           "The 'clusteredIndex' option does not support {autoIndexId: false}");
         }
 
-        if (collectionOptions.recordIdsReplicated) {
-            return Status(ErrorCodes::InvalidOptions,
-                          "The 'clusteredIndex' option is not supported with the "
-                          "'recordIdsReplicated' option");
-        }
-
         auto clusteredIndexStatus = validateClusteredIndexSpec(
             opCtx, nss, clusteredIndex->getIndexSpec(), collectionOptions.expireAfterSeconds);
         if (!clusteredIndexStatus.isOK()) {
@@ -418,14 +412,6 @@ Status _performCollectionCreationChecks(OperationContext* opCtx,
     if (!status.isOK()) {
         return status;
     }
-
-    uassert(ErrorCodes::CommandNotSupported,
-            "'recordIdsReplicated' option may not be run without featureFlagRecordIdsReplicated "
-            "enabled",
-            !options.recordIdsReplicated ||
-                gFeatureFlagRecordIdsReplicated.isEnabled(
-                    VersionContext::getDecoration(opCtx),
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     const auto createViewlessTimeseriesColl =
         gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledUseLatestFCVWhenUninitialized(

@@ -148,7 +148,8 @@ public:
         const OplogSlot& createOpTime,
         const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
         bool fromMigrate,
-        bool isViewlessTimeseries) override;
+        bool isViewlessTimeseries,
+        bool recordIdsReplicated) override;
 
     /**
      * Called when OplogApplierImpl renames a collection.
@@ -213,7 +214,8 @@ public:
         const NamespaceString&,
         const CollectionOptions&,
         const BSONObj&,
-        const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier)>
+        const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
+        bool recordIdsReplicated)>
         onCreateCollectionFn;
 
     std::function<void(OperationContext*,
@@ -375,7 +377,8 @@ OplogEntry makeCreateCollectionOplogEntry(
     const NamespaceString& nss,
     const CollectionOptions& collectionOptions,
     const BSONObj& idIndex = BSONObj(),
-    boost::optional<CreateCollCatalogIdentifier> createCollCatalogIdentifier = boost::none);
+    boost::optional<CreateCollCatalogIdentifier> createCollCatalogIdentifier = boost::none,
+    bool recordIdsReplicated = false);
 OplogEntry makeCreateCollectionOplogEntry(OperationContext* opCtx,
                                           const OpTime& opTime,
                                           const NamespaceString& nss,

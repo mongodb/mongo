@@ -183,8 +183,15 @@ protected:
                     opCtx, nss, uuid, IndexBuildInfo{BSONObj(), boost::none}, false, false);
                 opObserver.onStartIndexBuild(opCtx, nss, uuid, uuid, {}, false, false);
                 opObserver.onStartIndexBuildSinglePhase(opCtx, nss);
-                opObserver.onCreateCollection(
-                    opCtx, nss, {}, BSONObj(), OplogSlot(), boost::none, false, false);
+                opObserver.onCreateCollection(opCtx,
+                                              nss,
+                                              {},
+                                              BSONObj(),
+                                              OplogSlot(),
+                                              boost::none,
+                                              false,
+                                              false,
+                                              /*recordIdsReplicated=*/false);
                 opObserver.onCollMod(opCtx, nss, uuid, BSONObj(), {}, boost::none, false);
                 opObserver.onDropDatabase(opCtx, nss.dbName(), false /*fromMigrate*/);
                 opObserver.onDropCollection(opCtx,
@@ -245,8 +252,15 @@ protected:
             ASSERT_THROWS(opObserver.onStartIndexBuild(opCtx, nss, uuid, uuid, {}, false, false),
                           AssertionException);
             ASSERT_THROWS(opObserver.onStartIndexBuildSinglePhase(opCtx, nss), AssertionException);
-            ASSERT_THROWS(opObserver.onCreateCollection(
-                              opCtx, nss, {}, BSONObj(), OplogSlot(), boost::none, false, false),
+            ASSERT_THROWS(opObserver.onCreateCollection(opCtx,
+                                                        nss,
+                                                        {},
+                                                        BSONObj(),
+                                                        OplogSlot(),
+                                                        boost::none,
+                                                        false,
+                                                        false,
+                                                        /*recordIdsReplicated=*/false),
                           AssertionException);
             ASSERT_THROWS(opObserver.onCollMod(opCtx, nss, uuid, BSONObj(), {}, boost::none, false),
                           AssertionException);

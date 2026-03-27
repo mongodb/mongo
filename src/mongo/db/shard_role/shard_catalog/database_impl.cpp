@@ -190,7 +190,6 @@ bool shouldSetRecordIdsReplicated(OperationContext* opCtx,
                     2,
                     "Collection will use recordIdsReplicated:true",
                     "provider"_attr = provider.name(),
-                    "oldValue"_attr = collectionOptions.recordIdsReplicated,
                     logAttrs(nss));
         return true;
     }
@@ -202,11 +201,7 @@ bool shouldSetRecordIdsReplicated(OperationContext* opCtx,
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     if (replicatedRidsFeatureIsEnabled) {
-        LOGV2_DEBUG(8700501,
-                    0,
-                    "Collection will use recordIdsReplicated:true.",
-                    "oldValue"_attr = collectionOptions.recordIdsReplicated,
-                    logAttrs(nss));
+        LOGV2_DEBUG(8700501, 0, "Collection will use recordIdsReplicated:true.", logAttrs(nss));
         return true;
     }
     return false;
@@ -824,12 +819,8 @@ Collection* DatabaseImpl::_createCollection(
     bool useRecordIdsReplicated = false;
     if (recordIdsReplicated.has_value()) {
         useRecordIdsReplicated = recordIdsReplicated.value();
-        // TODO (SERVER-119864) remove when recordIdsReplicated is be removed from collection
-        // options
-        invariant(optionsWithUUID.recordIdsReplicated == useRecordIdsReplicated);
     } else {
         useRecordIdsReplicated = shouldSetRecordIdsReplicated(opCtx, nss, optionsWithUUID);
-        optionsWithUUID.recordIdsReplicated = useRecordIdsReplicated;
     }
 
     hangAndFailAfterCreateCollectionReservesOpTime.executeIf(
@@ -925,7 +916,8 @@ Collection* DatabaseImpl::_createCollection(
         createOplogSlot,
         catalogIdentifierForColl,
         fromMigrate,
-        collection->isTimeseriesCollection());
+        collection->isTimeseriesCollection(),
+        useRecordIdsReplicated);
 
     // It is necessary to create the system index *after* running the onCreateCollection so that
     // the storage timestamp for the index creation is after the storage timestamp for the

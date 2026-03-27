@@ -192,7 +192,8 @@ void UserWriteBlockModeOpObserver::onCreateCollection(
     const OplogSlot& createOpTime,
     const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
     bool fromMigrate,
-    bool isTimeseries) {
+    bool isTimeseries,
+    bool recordIdsReplicated) {
     _checkWriteAllowed(opCtx, collectionName);
 }
 
