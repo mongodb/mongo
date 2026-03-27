@@ -44,11 +44,11 @@
 
 namespace mongo::replicated_fast_count_test_helpers {
 
-void checkFastCountMetadataInFastCountStoreCollection(OperationContext* opCtx,
-                                                      const UUID& uuid,
-                                                      bool expectPersisted,
-                                                      int64_t expectedCount,
-                                                      int64_t expectedSize) {
+void checkFastCountMetadataInInternalCollection(OperationContext* opCtx,
+                                                const UUID& uuid,
+                                                bool expectPersisted,
+                                                int64_t expectedCount,
+                                                int64_t expectedSize) {
     {
         AutoGetCollection fastCountColl(
             opCtx,
@@ -73,30 +73,9 @@ void checkFastCountMetadataInFastCountStoreCollection(OperationContext* opCtx,
         EXPECT_EQ(persistedCount, expectedCount);
         EXPECT_EQ(persistedSize, expectedSize);
 
-        // TODO SERVER-121625: Introduce validation for valid-as-of beyond its basic presence.
+        // TODO SERVER-120540: Introduce validation for valid-as-of beyond its basic presence.
         ASSERT_TRUE(persisted.hasField(replicated_fast_count::kValidAsOfKey));
     }
-}
-
-void checkFastCountMetadataInTimestampsCollection(OperationContext* opCtx,
-                                                  int32_t stripe,
-                                                  bool expectedPersisted,
-                                                  const Timestamp& expectedTimestamp) {
-    AutoGetCollection timestampsColl(opCtx,
-                                     NamespaceString::makeGlobalConfigCollection(
-                                         NamespaceString::kReplicatedFastCountStoreTimestamps),
-                                     LockMode::MODE_IS);
-
-    BSONObj persisted;
-    bool found = Helpers::findById(opCtx, timestampsColl->ns(), BSON("_id" << stripe), persisted);
-
-    EXPECT_EQ(found, expectedPersisted);
-    if (!expectedPersisted) {
-        return;
-    }
-    Timestamp persistedTimestamp =
-        persisted.getField(replicated_fast_count::kValidAsOfKey).timestamp();
-    EXPECT_EQ(persistedTimestamp, expectedTimestamp);
 }
 
 void checkUncommittedFastCountChanges(OperationContext* opCtx,
@@ -290,34 +269,13 @@ repl::OplogEntry getLatestApplyOpsForNss(OperationContext* opCtx, const Namespac
     return entries.back();
 }
 
-bool isApplyOpsEntryStructureValid(const repl::OplogEntry& applyOpsEntry) {
-    if (applyOpsEntry.getOpType() != repl::OpTypeEnum::kCommand) {
-        return false;
-    }
-    if (applyOpsEntry.getCommandType() != repl::OplogEntry::CommandType::kApplyOps) {
-        return false;
-    }
-    if (applyOpsEntry.getNss().ns_forTest() != "admin.$cmd"_sd) {
-        return false;
-    }
-
-    std::vector<repl::OplogEntry> innerOperations;
-    repl::ApplyOps::extractOperationsTo(
-        applyOpsEntry, applyOpsEntry.getEntry().toBSON(), &innerOperations);
-
-    for (const auto& innerEntry : innerOperations) {
-        if (innerEntry.getCommandType() != repl::OplogEntry::CommandType::kNotCommand) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 void assertFastCountApplyOpsMatches(const repl::OplogEntry& applyOpsEntry,
+                                    const NamespaceString& internalNss,
                                     const std::vector<ExpectedFastCountOp>& expectedOps) {
 
-    EXPECT_EQ(isApplyOpsEntryStructureValid(applyOpsEntry), true);
+    EXPECT_EQ(repl::OpTypeEnum::kCommand, applyOpsEntry.getOpType());
+    EXPECT_EQ(repl::OplogEntry::CommandType::kApplyOps, applyOpsEntry.getCommandType());
+    EXPECT_EQ("admin.$cmd"_sd, applyOpsEntry.getNss().ns_forTest());
 
     // Index expectations by UUID so we can match each inner op to one expected op.
     std::map<UUID, ExpectedFastCountOp> expectedByUuid;
@@ -332,14 +290,10 @@ void assertFastCountApplyOpsMatches(const repl::OplogEntry& applyOpsEntry,
     int seenFastCountOps = 0;
 
     for (const auto& innerEntry : innerOperations) {
-        if (innerEntry.getNss() != replicatedFastCountStoreNss &&
-            innerEntry.getNss() != replicatedFastCountStoreTimestampsNss) {
-            FAIL("Found unexpected non-fast-count operation in applyOps payload");
-        }
+        EXPECT_EQ(internalNss, innerEntry.getNss())
+            << "Found unexpected non-fast-count operation in applyOps payload";
 
-        if (innerEntry.getNss() == replicatedFastCountStoreTimestampsNss) {
-            continue;
-        }
+        EXPECT_EQ(repl::OplogEntry::CommandType::kNotCommand, innerEntry.getCommandType());
 
         FastCountOpType observedType = FastCountOpType::kInsert;
         UUID uuid = UUID::gen();
@@ -442,38 +396,6 @@ void assertFastCountApplyOpsMatches(const repl::OplogEntry& applyOpsEntry,
         << "Expected " << expectedByUuid.size() << " fast-count ops in applyOps, saw "
         << seenFastCountOps;
 }
-
-void assertFastCountTimestampsApplyOpsMatches(const repl::OplogEntry& applyOpsEntry,
-                                              const ExpectedFastCountTimestampsOp& expectedOp) {
-
-    EXPECT_EQ(isApplyOpsEntryStructureValid(applyOpsEntry), true);
-
-    std::vector<repl::OplogEntry> innerOperations;
-    repl::ApplyOps::extractOperationsTo(
-        applyOpsEntry, applyOpsEntry.getEntry().toBSON(), &innerOperations);
-
-    for (const auto& innerEntry : innerOperations) {
-        if (innerEntry.getNss() != replicatedFastCountStoreNss &&
-            innerEntry.getNss() != replicatedFastCountStoreTimestampsNss) {
-            FAIL("Found unexpected non-fast-count operation in applyOps payload");
-        }
-
-        if (innerEntry.getNss() == replicatedFastCountStoreNss) {
-            continue;
-        }
-
-        const BSONObj& obj = innerEntry.getObject();
-        BSONElement idElem = obj["_id"];
-        EXPECT_TRUE(idElem.isNumber());
-
-        int32_t stripeNum = idElem.safeNumberInt();
-        EXPECT_EQ(stripeNum, expectedOp.stripe) << "Mismatched stripe number for timestamp update";
-
-        Timestamp actualTimestamp = obj[replicated_fast_count::kValidAsOfKey].timestamp();
-        EXPECT_EQ(expectedOp.expectedTimestamp, actualTimestamp)
-            << "Mismatched timestamp for stripe " << stripeNum;
-    }
-};
 
 void assertReplicatedSizeCountMeta(const repl::OplogEntry& oplogEntry, int32_t expectedSizeDelta) {
     const auto entrySizeMeta = oplogEntry.getSizeMetadata();

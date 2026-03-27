@@ -172,9 +172,7 @@ public:
     bool isRunning_ForTest();
 
 private:
-    void _acquireAndFlush(OperationContext* opCtx,
-                          const FastSizeCountMap& dirtyMetadata,
-                          Timestamp validAsOfTs);
+    void _acquireAndFlush(OperationContext* opCtx, const FastSizeCountMap& dirtyMetadata);
 
     /**
      * Return a copy of a subset of _metadata, only including the dirty entries. Clears the dirty
@@ -186,10 +184,8 @@ private:
      * Write out dirtyMetadata to fastCountColl.
      */
     void _doFlush(OperationContext* opCtx,
-                  const CollectionPtr& metadataStoreColl,
-                  const CollectionPtr& metadataTimestampsColl,
-                  const FastSizeCountMap& dirtyMetadata,
-                  const Timestamp& validAsOfTs);
+                  const CollectionPtr& fastCountColl,
+                  const FastSizeCountMap& dirtyMetadata);
 
     /**
      * Runs background thread, performing final flush.
@@ -206,28 +202,25 @@ private:
     /**
      * Write one collection's sizeCount to disk.
      */
-    void _writeSizeCountEntry(OperationContext* opCtx,
-                              const CollectionPtr& fastCountColl,
-                              const UUID& uuid,
-                              const CollectionSizeCount& sizeCount,
-                              const Timestamp& validAsOfTS,
-                              const RecordId& recordId);
+    void _writeOneMetadata(OperationContext* opCtx,
+                           const CollectionPtr& fastCountColl,
+                           const UUID& uuid,
+                           const CollectionSizeCount& sizeCount,
+                           const Timestamp& validAsOfTS,
+                           const RecordId& recordId);
 
-    void _writeTimestampEntry(OperationContext* opCtx,
-                              const CollectionPtr& timestampColl,
-                              int32_t stripe,
-                              const Timestamp& validAsOfTs);
-
-    void _updateMetadata(OperationContext* opCtx,
-                         const CollectionPtr& fastCountColl,
-                         const Snapshotted<BSONObj>& doc,
-                         const BSONObj& newDoc,
-                         const BSONObj& criteria,
-                         const RecordId& recordId);
-
-    void _insertMetadata(OperationContext* opCtx,
-                         const CollectionPtr& fastCountColl,
-                         const BSONObj& newDoc);
+    void _updateOneMetadata(OperationContext* opCtx,
+                            const CollectionPtr& fastCountColl,
+                            const Snapshotted<BSONObj>& doc,
+                            const UUID& uuid,
+                            const CollectionSizeCount& sizeCount,
+                            const Timestamp& validAsOfTS,
+                            const RecordId& recordId);
+    void _insertOneMetadata(OperationContext* opCtx,
+                            const CollectionPtr& fastCountColl,
+                            const UUID& uuid,
+                            const CollectionSizeCount& sizeCount,
+                            const Timestamp& validAsOfTS);
 
     /**
      * Populates the in-memory values of _metadata with the values persisted in the internal fast
@@ -237,37 +230,18 @@ private:
                                  const CollectionOrViewAcquisition& acquisition);
 
     /**
-     * Formats and returns the document to write to the fastcount store collection.
+     * Formats and returns the document to write to the fastcount collection.
      */
     BSONObj _getDocForWrite(const UUID& uuid,
                             const CollectionSizeCount& sizeCount,
                             const Timestamp& validAsOfTS) const;
 
     /**
-     * Formats and returns the document to write to the fastcount store timestamps collection.
-     */
-    BSONObj _getTimestampDocForWrite(int32_t stripe, const Timestamp& validAsOfTs) const;
-
-    /**
-     * Generates a key (RecordId) into the fastcount store collection given a user
+     * Generates a key (RecordId) into the fastcount collection given a user
      * collection uuid.
      */
     RecordId _keyForUUID(const UUID& uuid) const;
     UUID _UUIDForKey(RecordId key) const;
-
-    /**
-     * Generates a key (RecordId) into the fast count store timestamps collection given a stripe
-     * number.
-     */
-    RecordId _keyForStripe(int32_t stripe) const;
-
-    /**
-     * Returns the stripe number into the fast count store timestamps collection for a given
-     * collection.
-     * TODO SERVER-121386: Perform actual striping. Currently this returns the same key for all
-     * entries.
-     */
-    int32_t _getStripe() const;
 
     // Metrics for the ReplicatedFastCountManager reported via both serverStatus and OTel.
     //

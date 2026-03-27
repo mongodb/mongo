@@ -1280,7 +1280,8 @@ tasks:
   - <<: *gen_task_template
     name: replica_sets_kill_secondaries_jscore_passthrough_gen
     # TODO(SERVER-69951) remove "incompatible_debug_mode" tag
-    tags: [
+    tags:
+      [
         "assigned_to_jira_team_server_repl",
         "default",
         "incompatible_debug_mode",
@@ -1289,8 +1290,6 @@ tasks:
         "large",
         "non_live_record",
         "ignore_on_code_coverage",
-        # TODO SERVER-122625: remove tag
-        "requires_replicated_fast_count_recovery",
       ]
     commands:
       - func: "generate resmoke tasks"

@@ -172,7 +172,7 @@ absl::flat_hash_map<UUID, CollectionSizeCount> aggregateSizeCountDeltasInOplog(
     return aggregatedDeltas;
 }
 
-boost::optional<CollectionOrViewAcquisition> acquireSizeCountCollectionForRead(
+boost::optional<CollectionOrViewAcquisition> acquireFastCountCollectionForRead(
     OperationContext* opCtx) {
     CollectionOrViewAcquisition acquisition = acquireCollectionOrView(
         opCtx,
@@ -189,7 +189,7 @@ boost::optional<CollectionOrViewAcquisition> acquireSizeCountCollectionForRead(
     return boost::none;
 }
 
-boost::optional<CollectionOrViewAcquisition> acquireSizeCountCollectionForWrite(
+boost::optional<CollectionOrViewAcquisition> acquireFastCountCollectionForWrite(
     OperationContext* opCtx) {
     CollectionOrViewAcquisition acquisition = acquireCollectionOrView(
         opCtx,
@@ -206,45 +206,9 @@ boost::optional<CollectionOrViewAcquisition> acquireSizeCountCollectionForWrite(
     return boost::none;
 }
 
-boost::optional<CollectionOrViewAcquisition> acquireTimestampCollectionForRead(
-    OperationContext* opCtx) {
-    CollectionOrViewAcquisition acquisition =
-        acquireCollectionOrView(opCtx,
-                                CollectionOrViewAcquisitionRequest::fromOpCtx(
-                                    opCtx,
-                                    NamespaceString::makeGlobalConfigCollection(
-                                        NamespaceString::kReplicatedFastCountStoreTimestamps),
-                                    AcquisitionPrerequisites::OperationType::kRead),
-                                LockMode::MODE_IS);
-
-    if (acquisition.getCollectionPtr()) {
-        return acquisition;
-    }
-
-    return boost::none;
-}
-
-boost::optional<CollectionOrViewAcquisition> acquireTimestampCollectionForWrite(
-    OperationContext* opCtx) {
-    CollectionOrViewAcquisition acquisition =
-        acquireCollectionOrView(opCtx,
-                                CollectionOrViewAcquisitionRequest::fromOpCtx(
-                                    opCtx,
-                                    NamespaceString::makeGlobalConfigCollection(
-                                        NamespaceString::kReplicatedFastCountStoreTimestamps),
-                                    AcquisitionPrerequisites::OperationType::kWrite),
-                                LockMode::MODE_IX);
-
-    if (acquisition.getCollectionPtr()) {
-        return acquisition;
-    }
-
-    return boost::none;
-}
-
 void readAndIncrementSizeCounts(OperationContext* opCtx,
                                 absl::flat_hash_map<UUID, CollectionSizeCount>& deltas) {
-    const auto acquisition = acquireSizeCountCollectionForRead(opCtx).value();
+    const auto acquisition = acquireFastCountCollectionForRead(opCtx).value();
     const CollectionPtr& coll = acquisition.getCollectionPtr();
 
     for (auto& [uuid, delta] : deltas) {
