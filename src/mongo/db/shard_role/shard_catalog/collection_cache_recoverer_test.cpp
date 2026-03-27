@@ -127,6 +127,25 @@ TEST_F(RecovererFixture, CacheRecovererCanRecoverFromDisk) {
     ASSERT_EQ(collMetadata->getCollPlacementVersion(), shardVersionExpected);
 }
 
+TEST_F(RecovererFixture, CacheRecovererCanRecoverFromDiskAnUntrackedCollection) {
+    OperationContext* opCtx = operationContext();
+    int numChunks = 20;
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, numChunks, ShardId("0"));
+
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
+
+    CollectionCacheRecoverer recoverer{kTestNss};
+
+    auto roundId = recoverer.start(operationContext(), getExecutor());
+    ASSERT_OK(recoverer.waitForInitialPass(operationContext(), roundId));
+    auto collMetadata = recoverer.drainAndApply(operationContext(), roundId);
+
+    ASSERT_TRUE(collMetadata);
+
+    ASSERT_FALSE(collMetadata->isSharded());
+}
+
 TEST_F(RecovererFixture, CacheRecovererAppliesOplogChanges) {
     OperationContext* opCtx = operationContext();
     int numChunks = 20;

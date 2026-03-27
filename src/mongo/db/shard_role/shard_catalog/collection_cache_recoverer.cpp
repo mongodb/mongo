@@ -70,9 +70,11 @@ CollectionMetadata recoverCollectionFromDisk(OperationContext* opCtx,
                           return false;
                       });
 
-    // TODO SERVER-121201: Handle the case where there is no entry present for the collection
-    // meaning the collection is not owned by the shard at the current time.
-    tassert(12033905, "Expected to have a collection entry present but there is none", coll);
+    // No collection entry means the collection is untracked as having an entry present implies that
+    // the collection is tracked on the sharding catalog.
+    if (!coll) {
+        return CollectionMetadata::UNTRACKED();
+    }
 
     // TODO SERVER-119940: Review whether we need to parse only a subset of the information present
     // on the chunk. Right now we're parsing it fully as if we're the CSRS even if never accessing
@@ -89,8 +91,8 @@ CollectionMetadata recoverCollectionFromDisk(OperationContext* opCtx,
             return true;
         });
 
-    // TODO SERVER-121201: Handle the case where there is a collection entry but no chunks present
-    // for it.
+    // If the collection is tracked we must at least have a single chunk entry present for the
+    // collection.
     tassert(12033904,
             "Expected to have at least one chunk entry for the collection but there are none",
             !chunks.empty());
