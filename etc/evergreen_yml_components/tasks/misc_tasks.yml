@@ -928,16 +928,10 @@ tasks:
       - func: "get engflow creds"
       - func: "bazel coverage"
         vars:
-          # Running something like "bazel test //src/..." has to do a lot of preprocessing on *all*
-          # targets before it actually runs the much smaller fraction of test targets, unless we're
-          # certain that a full build has already been cached.
-          # It might be optimized by doing a query upfront, which uses minimal analysis:
-          #   targets=$(bazel query 'kind(".*_test", //src/...)')
-          #   bazel test $targets
           target: >-
             //src/mongo/...
           args: >-
-            --test_tag_filters=mongo_unittest_debug,-code_coverage_quarantine_debug
+            --test_tag_filters=mongo_unittest,-intermediate_debug,-code_coverage_quarantine
             --test_timeout=1800
             --verbose_failures
             --instrumentation_filter=^//src/mongo[/:],-^//src/mongo/util:boost_assert_shim,-^//src/mongo/util:icu,-^//src/mongo/db/modules/enterprise/src/streams/third_party[/:]

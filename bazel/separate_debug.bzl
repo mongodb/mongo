@@ -649,6 +649,16 @@ def extract_debuginfo_impl(ctx):
     elif ctx.target_platform_has_constraint(wasi_constraint):
         return_info = wasi_extraction(ctx, cc_toolchain, inputs)
 
+    # Forward InstrumentedFilesInfo so that `bazel coverage` can collect coverage
+    # data from binaries produced by this rule. This is equivalent to running against
+    # targets with the _with_debug suffix directly, but more natural for users.
+    return_info.append(
+        coverage_common.instrumented_files_info(
+            ctx,
+            dependency_attributes = ["binary_with_debug"],
+        ),
+    )
+
     tag_provider = TagInfo(tags = ctx.attr.tags)
     return_info.append(tag_provider)
     return return_info
@@ -749,10 +759,23 @@ extract_debuginfo_test = rule(
         "_macos_constraint": attr.label(default = "@platforms//os:macos"),
         "_windows_constraint": attr.label(default = "@platforms//os:windows"),
         "_wasi_constraint": attr.label(default = "@platforms//cpu:wasm32"),
+        # Required for `bazel coverage` to invoke the C++ coverage collection
+        # script (collect_cc_coverage.sh) and merge profraw -> _cc_coverage.dat,
+        # matching the behavior of native cc_test.
+        "_lcov_merger": attr.label(
+            default = configuration_field(fragment = "coverage", name = "output_generator"),
+            executable = True,
+            cfg = config.exec(exec_group = "test"),
+        ),
+        "_collect_cc_coverage": attr.label(
+            default = "@bazel_tools//tools/test:collect_cc_coverage",
+            executable = True,
+            cfg = config.exec(exec_group = "test"),
+        ),
     },
     doc = "Extract debuginfo into a separate file",
     toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
-    fragments = ["cpp"],
+    fragments = ["cpp", "coverage"],
     executable = True,
     test = True,
 )
