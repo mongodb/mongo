@@ -528,6 +528,8 @@ last-continuous:
       ticket: SERVER-112273
     - test_file: jstests/replsets/election_term_over_int_max.js
       ticket: SERVER-119413
+    - test_file: jstests/replsets/oplog_fetch_lag_metric.js
+      ticket: SERVER-116300
   suites: null
 last-lts:
   all:
@@ -1113,4 +1115,6 @@ last-lts:
       ticket: SERVER-112273
     - test_file: jstests/replsets/election_term_over_int_max.js
       ticket: SERVER-119413
+    - test_file: jstests/replsets/oplog_fetch_lag_metric.js
+      ticket: SERVER-116300
   suites: null
