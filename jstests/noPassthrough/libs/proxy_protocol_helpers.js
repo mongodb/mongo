@@ -93,6 +93,30 @@ export const testProxyProtocolReplicaSet = (ingressPort, egressPort, version, te
     rs.stopSet();
 };
 
+export const testProxyProtocolReplicaSetWithProxyUnixSocket = (ingressPort, testFn) => {
+    const prefix = `${MongoRunner.dataPath}${jsTestName()}`;
+    mkdir(prefix);
+
+    const rs = new ReplSetTest({nodes: 1});
+    rs.startSet({proxyUnixSocketPrefix: prefix, unixSocketPrefix: prefix});
+    rs.initiate();
+
+    const unixSockPath = `${prefix}/proxy-mongodb-${rs.getPrimary().port}.sock`;
+    const proxy_server = new ProxyProtocolServer(
+        ingressPort,
+        "" /* egressPort (ignored) */,
+        2 /* proxy protocol version */,
+        {egressUnixSocket: unixSockPath},
+    );
+    proxy_server.setTLVs([{"type": 0x02, "value": "authority.example.com"}]);
+    proxy_server.start();
+
+    testFn(ingressPort, prefix, rs.getPrimary(), false);
+
+    proxy_server.stop();
+    rs.stopSet();
+};
+
 export const testProxyProtocolShardedCluster = (ingressPort, egressPort, version, testFn) => {
     const proxy_server = new ProxyProtocolServer(ingressPort, egressPort, version);
     proxy_server.start();
@@ -107,4 +131,50 @@ export const testProxyProtocolShardedCluster = (ingressPort, egressPort, version
 
     proxy_server.stop();
     st.stop();
+};
+
+export const testProxyProtocolShardedClusterWithProxyUnixSocket = (ingressPort, testFn) => {
+    const prefix = `${MongoRunner.dataPath}${jsTestName()}`;
+    mkdir(prefix);
+
+    const st = new ShardingTest({
+        shards: 1,
+        mongos: 1,
+        mongosOptions: {proxyUnixSocketPrefix: prefix, unixSocketPrefix: prefix},
+    });
+
+    const unixSockPath = `${prefix}/proxy-mongodb-${st.s0.port}.sock`;
+    const proxy_server = new ProxyProtocolServer(
+        ingressPort,
+        "" /* egressPort (ignored) */,
+        2 /* proxy protocol version */,
+        {egressUnixSocket: unixSockPath},
+    );
+    proxy_server.setTLVs([{"type": 0x02, "value": "authority.example.com"}]);
+    proxy_server.start();
+
+    testFn(ingressPort, prefix, st.s, true);
+
+    proxy_server.stop();
+    st.stop();
+};
+
+// Verify that the "client metadata" log (id 51800) emits the remote attribute properly.
+export const testClientMetadataLogOverUnixSocket = (ingressPort, unixSockPrefix, node, isRouter) => {
+    const kClientMetadataLogId = 51800;
+    const unixSockPath = `${unixSockPrefix}/mongodb-${node.port}.sock`;
+    const proxyUnixSockPath = `${unixSockPrefix}/proxy-mongodb-${node.port}.sock`;
+
+    // Connections via a unix domain socket should log "anonymous unix socket:27017" as remote attr.
+    const directConn = new Mongo(unixSockPath);
+    assert.neq(null, directConn, "Failed to connect directly to node");
+    assert.commandWorked(directConn.getDB("admin").runCommand({hello: 1}));
+    checkLog.containsJson(node, kClientMetadataLogId, {remote: "anonymous unix socket:27017"});
+
+    // Connections via the proxy unix domain socket should log the originating address reported in the proxy protocol header.
+    const lbParam = isRouter ? "/?loadBalanced=true" : "";
+    const proxiedConn = new Mongo(`mongodb://127.0.0.1:${ingressPort}${lbParam}`);
+    assert.neq(null, proxiedConn, "Failed to connect through proxy");
+    assert.commandWorked(proxiedConn.getDB("admin").runCommand({hello: 1}));
+    checkLog.containsJson(node, kClientMetadataLogId, {remote: /^127\.0\.0\.1:\d{1,5}$/});
 };

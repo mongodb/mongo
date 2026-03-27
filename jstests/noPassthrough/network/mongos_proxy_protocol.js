@@ -13,6 +13,8 @@ import {
     emptyMessageTest,
     fuzzingTest,
     testProxyProtocolShardedCluster,
+    testProxyProtocolShardedClusterWithProxyUnixSocket,
+    testClientMetadataLogOverUnixSocket,
 } from "jstests/noPassthrough/libs/proxy_protocol_helpers.js";
 
 const ingressPort = allocatePort();
@@ -23,3 +25,5 @@ testProxyProtocolShardedCluster(ingressPort, egressPort, 2, emptyMessageTest);
 
 testProxyProtocolShardedCluster(ingressPort, egressPort, 1, fuzzingTest);
 testProxyProtocolShardedCluster(ingressPort, egressPort, 2, fuzzingTest);
+
+testProxyProtocolShardedClusterWithProxyUnixSocket(ingressPort, testClientMetadataLogOverUnixSocket);

@@ -163,7 +163,8 @@ public:
 
     HostAndPort getRemote() const {
         MONGO_verify(_session);
-        return _session->remote();
+        return _session->isConnectedToProxyUnixSocket() ? _session->getSourceRemoteEndpoint()
+                                                        : _session->remote();
     }
 
     /**
