@@ -2,6 +2,7 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
 set -o errexit
+set -o pipefail
 
 REGISTRY="664315256653.dkr.ecr.us-east-1.amazonaws.com"
 REPO="${streams_ecr_repo:-mongo/mongostream-testing}"
@@ -42,25 +43,80 @@ for arg in "$@"; do
     fi
 done
 
-MONGOD_PATH="./src/bazel-bin/src/mongo/db/mongod"
-MONGO_PATH="./src/bazel-bin/src/mongo/shell/mongo"
-echo "Current mongod path: $MONGOD_PATH"
-echo "Current mongo path: $MONGO_PATH"
-
 cd src
-
-mkdir -p ./dist-test/bin
-cp -L "../$MONGOD_PATH" ./dist-test/bin/mongod
-cp -L "../$MONGO_PATH" ./dist-test/bin/mongo
 
 if [ "$DISTRO" != "amazon2023" ]; then
     echo "Skipping Docker build for distro: $DISTRO"
-    echo "Creating streams-binaries.tgz with binaries only..."
+    bash "$DIR/bazel_compile.sh"
+    mkdir -p ./dist-test/bin
+    cp -L ./bazel-bin/src/mongo/db/mongod ./dist-test/bin/mongod
+    cp -L ./bazel-bin/src/mongo/shell/mongo ./dist-test/bin/mongo
     tar -czvf streams-binaries.tgz dist-test/
-    echo "Created streams-binaries.tgz containing:"
-    tar -tzvf streams-binaries.tgz
     exit 0
 fi
+
+SRC_DIR="$(pwd)"
+LOGS_DIR="${workdir}/parallel_build_logs"
+mkdir -p "$LOGS_DIR"
+
+wait_for_job() {
+    local pid=$1
+    local name=$2
+    local log_file=$3
+
+    if ! wait "$pid"; then
+        echo "=== $name FAILED ==="
+        cat "$log_file"
+        exit 1
+    fi
+    echo "=== $name completed ==="
+}
+
+# Start bazel and venv first — they don't need the system deps.
+if [ ! -f "$SRC_DIR/bazel-bin/src/mongo/db/mongod" ]; then
+    cd "$workdir"
+    bash "$DIR/bazel_compile.sh" >"$LOGS_DIR/bazel.log" 2>&1 &
+    BAZEL_PID=$!
+    cd "$SRC_DIR"
+fi
+
+cd "$workdir"
+FORCE_CREATE=true bash "$DIR/functions/venv_setup.sh" >"$LOGS_DIR/venv.log" 2>&1 &
+VENV_PID=$!
+cd "$SRC_DIR"
+
+# Install system deps for maven/js engine (runs in parallel with bazel/venv).
+if ! command -v javac >/dev/null 2>&1; then
+    sudo dnf -y install java-17-amazon-corretto-devel wget unzip
+fi
+
+# Ensure externaljs dir exists for Docker COPY even if JS engine build hasn't finished.
+mkdir -p "$SRC_DIR/externaljs"
+
+bash "$DIR/streams_build_aspio.sh" \
+    --aspio-dir "$SRC_DIR/src/mongo/db/modules/enterprise/src/streams/aspio" \
+    --tools-dir "$SRC_DIR/streams_build_tools" \
+    --output-dir "$SRC_DIR" \
+    >"$LOGS_DIR/maven.log" 2>&1 &
+MAVEN_PID=$!
+
+sudo bash "$DIR/streams_build_js_engine.sh" \
+    --node-version 24 \
+    --build-dir "$SRC_DIR/asp-js-engine" \
+    --target-dir "$SRC_DIR/externaljs" \
+    >"$LOGS_DIR/jsengine.log" 2>&1 &
+JSENGINE_PID=$!
+
+if [ -n "${BAZEL_PID:-}" ]; then
+    wait_for_job $BAZEL_PID "Bazel compile" "$LOGS_DIR/bazel.log"
+fi
+wait_for_job $MAVEN_PID "Maven build" "$LOGS_DIR/maven.log"
+wait_for_job $JSENGINE_PID "JS engine build" "$LOGS_DIR/jsengine.log"
+wait_for_job $VENV_PID "Full venv setup" "$LOGS_DIR/venv.log"
+
+mkdir -p ./dist-test/bin
+cp -L ./bazel-bin/src/mongo/db/mongod ./dist-test/bin/mongod
+cp -L ./bazel-bin/src/mongo/shell/mongo ./dist-test/bin/mongo
 
 attempts=0
 max_attempts=4
@@ -77,20 +133,10 @@ mkdir -p ./bin
 cp ./dist-test/bin/mongod ./bin/mongod
 cp ./dist-test/bin/mongo ./bin/mongo
 
-# Restructure asp-js-engine directory: asp-js-engine/asp-js-engine/ -> asp-js-engine/
-if [ -d "asp-js-engine/asp-js-engine" ]; then
-    echo "Restructuring asp-js-engine directory..."
-    mv asp-js-engine/asp-js-engine asp-js-engine-temp
-    rm -rf asp-js-engine
-    mv asp-js-engine-temp asp-js-engine
-    echo "asp-js-engine restructured successfully"
-fi
-
 # Build docker build args array
 BUILD_ARGS=(--build-arg "BUILD_VERSION=$GITSHA-$TAG_SUFFIX")
-
-# Add externalJs
-BUILD_ARGS+=(--build-arg "HAS_JS_ENGINE=true")
+BUILD_ARGS+=(--build-arg "ASPIO_JAR_PATH=aspio.jar")
+BUILD_ARGS+=(--build-arg "EXTERNALJS_PATH=externaljs")
 
 docker build "${BUILD_ARGS[@]}" -t "$IMAGE" -f ./src/mongo/db/modules/enterprise/src/streams/build/Dockerfile.al2023 .
 

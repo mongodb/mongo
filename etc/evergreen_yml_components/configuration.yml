@@ -100,7 +100,7 @@ modules:
     owner: 10gen
     # repo: git@github.com:10gen/asp-js-engine.git
     repo: asp-js-engine
-    prefix: asp-js-engine
+    prefix: ${workdir}/src
     branch: master
     ref: v0.1.3
     auto_update: true

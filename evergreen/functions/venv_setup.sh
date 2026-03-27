@@ -9,7 +9,7 @@ python_loc=$(which ${python})
 echo "python_loc set to $python_loc"
 
 venv_dir="${workdir}/venv"
-if [ -d "$venv_dir" ]; then
+if [ -d "$venv_dir" ] && [ -z "${FORCE_CREATE:-}" ]; then
     exit 0
 fi
 

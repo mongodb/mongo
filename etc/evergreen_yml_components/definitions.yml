@@ -881,6 +881,14 @@ functions:
       args:
         - "src/evergreen/functions/venv_setup.sh"
 
+  "set up venv streams initial": &set_up_venv_streams_initial
+    command: subprocess.exec
+    display_name: "set up venv (streams initial)"
+    params:
+      binary: bash
+      args:
+        - "src/evergreen/functions/venv_setup_streams_initial.sh"
+
   "upload pip requirements": &upload_pip_requirements
     command: s3.put
     display_name: "upload pip requirements"
@@ -1319,7 +1327,7 @@ functions:
         OTEL_PARENT_ID: ${otel_parent_id}
         OTEL_COLLECTOR_DIR: "../build/OTelTraces/"
         # Path to the asp-js-engine module cloned via Evergreen modules
-        ASP_JS_ENGINE_PATH: ${workdir}/asp-js-engine
+        ASP_JS_ENGINE_PATH: ${workdir}/src/asp-js-engine
         HAS_JS_ENGINE: ${HAS_JS_ENGINE|}
         MONGOSTREAM_IMAGE: ${mongostream_image|}
 
@@ -1788,22 +1796,10 @@ functions:
   # Run streams tests that require access to the private asp-js-engine repo
   # Clone the asp-js-engine module and restore git history/tags so resmoke's git describe works
   # Re-fetch and extract binaries after git clone because the clone overwrites src/ (including tarballs and dist-test/)
-  # Copy asp-js-engine from src/ to workdir where resmoke expects it (ASP_JS_ENGINE_PATH=${workdir}/asp-js-engine)
   "run streams tests":
     - *f_expansions_write
     - *git_get_shallow_streams_project
     - *restore_git_history_and_tags
-    - command: subprocess.exec
-      display_name: "copy asp-js-engine to workdir"
-      params:
-        binary: bash
-        args:
-          - "-c"
-          - |
-            set -o errexit
-            set -o verbose
-            rm -rf asp-js-engine
-            cp -r src/asp-js-engine/asp-js-engine asp-js-engine
     - *fetch_streams_binaries
     - *extract_streams_binaries
     - *fetch_streams_image_tag
@@ -3777,12 +3773,18 @@ functions:
   "streams build and push":
     - command: manifest.load
     - *f_expansions_write
+    - command: subprocess.exec
+      display_name: "install streams build deps"
+      params:
+        binary: bash
+        args:
+          - "-c"
+          - "sudo dnf -y install java-17-amazon-corretto-devel wget unzip"
     - *git_get_shallow_streams_project
     - *add_git_tag
     - *kill_processes
     - *cleanup_environment
-    - *set_up_venv
-    - *upload_pip_requirements
+    - *set_up_venv_streams_initial
     - *get_engflow_key
     - *get_engflow_cert
     - *get_engflow_release_key
@@ -3800,7 +3802,6 @@ functions:
           - key: bazel_args
             value: "--config=evg --config=opt_profiled --features=strip_debug --separate_debug=False --simple_build_id=True --streams_release_build=True"
     - *f_expansions_write
-    - *bazel_compile_sh
     - *set_up_remote_credentials
     - command: ec2.assume_role
       params:
@@ -3813,6 +3814,7 @@ functions:
           - "./src/evergreen/streams_image_build_and_push.sh"
           - ${push_arg|}
           - ${break_glass_arg|}
+    - *upload_pip_requirements
     - command: s3.put
       params:
         aws_key: ${aws_key}
