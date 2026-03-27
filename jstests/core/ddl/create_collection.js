@@ -9,6 +9,9 @@ import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+
 // "create" command rejects invalid options.
 assert.commandWorked(db.runCommand({drop: "create_collection"}));
 assert.commandFailedWithCode(db.createCollection("create_collection", {unknown: 1}), ErrorCodes.IDLUnknownField);
@@ -308,7 +311,8 @@ if (
     assert.commandFailed(
         db.createCollection(getCollectionName(), {storageTier: {collection: "hot", indexes: {defaultTier: "lol"}}}),
     );
-} else if (!TestData.isRunningFCVUpgradeDowngradeSuite) {
+} else if (!TestData.isRunningFCVUpgradeDowngradeSuite && !isMultiversion) {
+    // TODO (SERVER-122853): Enable this test case on multiversion suites once SERVER-122853 gets merged.
     assert.commandFailedWithCode(db.createCollection(getCollectionName(), {storageTier: {collection: "cold"}}), [
         // We expect InvalidOptions when the we storageTier options is known but the feature flag is disabled
         ErrorCodes.InvalidOptions,
