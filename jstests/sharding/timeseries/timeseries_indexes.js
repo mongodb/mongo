@@ -135,10 +135,10 @@ function generateDoc(time, metaValue) {
             ...getRawOperationSpec(mongosDB),
         }),
     );
-    // The rawData listIndexes cursor.ns fix was introduced in 8.3 (SERVER-120476).
+    // The rawData listIndexes cursor.ns fix was introduced in 9.0 (SERVER-120476).
     const buildInfo = mongosDB.adminCommand({buildInfo: 1});
-    const isMongos83OrNewer = MongoRunner.compareBinVersions(buildInfo.version, "8.3") >= 0;
-    if (isMongos83OrNewer) {
+    const isMongos90OrNewer = MongoRunner.compareBinVersions(buildInfo.version, "9.0") >= 0;
+    if (isMongos90OrNewer) {
         assert.eq(
             getTimeseriesCollForRawOps(mongosDB, coll).getFullName(),
             outputOnRawBuckets.cursor.ns,

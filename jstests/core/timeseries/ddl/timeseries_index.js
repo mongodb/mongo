@@ -181,10 +181,10 @@ TimeseriesTest.run((insert) => {
         cursorDoc = assert.commandWorked(
             db.runCommand(Object.extend({listIndexes: getTimeseriesCollForRawOps(coll).getName()}, kRawOperationSpec)),
         ).cursor;
-        // The rawData listIndexes cursor.ns fix was introduced in 8.3 (SERVER-120476).
+        // The rawData listIndexes cursor.ns fix was introduced in 9.0 (SERVER-120476).
         const buildInfo = db.adminCommand({buildInfo: 1});
-        const isBinary83OrNewer = MongoRunner.compareBinVersions(buildInfo.version, "8.3") >= 0;
-        if (isBinary83OrNewer) {
+        const isBinary90OrNewer = MongoRunner.compareBinVersions(buildInfo.version, "9.0") >= 0;
+        if (isBinary90OrNewer) {
             assert.eq(getTimeseriesCollForRawOps(coll).getFullName(), cursorDoc.ns, tojson(cursorDoc));
         }
         assert.eq(numIndexesToCheck, cursorDoc.firstBatch.length, tojson(cursorDoc));
