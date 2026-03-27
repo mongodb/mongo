@@ -10,6 +10,9 @@ selector:
     # different result with missing documents in ignoreRemovedShards mode.
     - jstests/sharding/query/change_streams/change_streams_with_config_transitions.js
 
+    # Test assumes strict mode.
+    - jstests/sharding/query/change_streams/change_stream_collection_v2_strict_whitebox.js
+
 executor:
   archive:
     tests:

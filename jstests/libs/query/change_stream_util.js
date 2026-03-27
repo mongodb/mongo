@@ -986,3 +986,177 @@ export function addShardToCluster(st, shardName, numNodes, rsNodeOptions) {
     assert.commandWorked(st.s.adminCommand({addShard: replTest.getURL(), name: shardName}));
     return replTest;
 }
+
+/**
+ * Build a $currentOp filter that selects cursors originating from a command with the given comment.
+ */
+export function cursorCommentFilter(comment) {
+    return {"cursor.originatingCommand.comment": comment};
+}
+
+/**
+ * Lists idle cursors via $currentOp. Works with both mongos adminDB (for data shard cursors)
+ * and a direct config server connection (for config cursors not visible through mongos).
+ *
+ * When called against mongos, uses idleConnections:true to see data shard cursors.
+ * When called against a config server with localOps:true, sees config-local cursors.
+ *
+ * @param {DB} adminDB - The admin database to query (mongos or direct config server)
+ * @param {Object} filter - Additional $match filter for selecting specific cursors
+ * @param {Object} opts - $currentOp options override (default: {idleConnections: true})
+ */
+function listIdleCursors(adminDB, filter = {}, opts = {idleConnections: true}) {
+    return adminDB
+        .aggregate([
+            {$currentOp: Object.assign({idleCursors: true, allUsers: true}, opts)},
+            {$match: {type: "idleCursor"}},
+            {$match: filter},
+        ])
+        .toArray();
+}
+
+/**
+ * Assert that open idle cursors exist on exactly the expected data shards and optionally on the
+ * config server.
+ * @param {ShardingTest} st - The sharding test fixture
+ * @param {Array<string>} expectedDataShards - Expected shard names (data shards only)
+ * @param {boolean} expectedConfigCursor - Whether a config server cursor is expected
+ * @param {Object} filter - Filter to select specific cursors (e.g., by comment)
+ */
+export function assertOpenCursors(st, expectedDataShards, expectedConfigCursor, filter = {}) {
+    const adminDB = st.s.getDB("admin");
+    const configAdminDB = st.configRS.getPrimary().getDB("admin");
+
+    assert.soonNoExcept(
+        () => {
+            // Query all open cursors matching the filter via mongos.
+            const shardsWithOpenCursors = listIdleCursors(adminDB, filter).map((cursor) => cursor.shard);
+
+            // In config shard mode, the config server is also a data shard (named "config").
+            // Cursors on it are reported as regular data shard cursors via mongos, so we
+            // include "config" in the data shard comparison and skip the separate config
+            // cursor check below.
+            const dataShardsWithOpenCursors = jsTestOptions().configShard
+                ? shardsWithOpenCursors
+                : shardsWithOpenCursors.filter((shard) => shard !== "config");
+            assert.sameMembers(
+                expectedDataShards,
+                dataShardsWithOpenCursors,
+                `Expected ${expectedDataShards} but got ${dataShardsWithOpenCursors}`,
+            );
+
+            // With a dedicated config server, check for config cursors directly via
+            // localOps since they don't appear in the mongos $currentOp results.
+            if (!jsTestOptions().configShard) {
+                const configCursors = listIdleCursors(configAdminDB, filter, {localOps: true});
+                const configMatch = expectedConfigCursor ? configCursors.length > 0 : configCursors.length == 0;
+                return configMatch;
+            }
+            return true;
+        },
+        () => {
+            const dataCursors = listIdleCursors(adminDB, filter);
+            const configCursorCount = listIdleCursors(configAdminDB, filter, {localOps: true}).length;
+            return (
+                `Expected data cursors on ${tojsononeline(expectedDataShards)}, ` +
+                `Actual data shards: ${tojsononeline(dataCursors.map((c) => c.shard))}, ` +
+                `Expected config cursor: ${expectedConfigCursor}. ` +
+                `Actual config cursors: ${configCursorCount}`
+            );
+        },
+    );
+}
+
+/**
+ * Capture logs from `conn` while repeatedly calling `fn`, polling until all `expectedCodes`
+ * appear in order. When `expectedCodes` is empty, `fn` is called once with no polling.
+ *
+ * After all codes are found, optional per-code assertion callbacks in `codeAssertionFnMap`
+ * are invoked with the matching entry's `attr`. Not every code needs a callback.
+ *
+ * @param {Mongo} conn - The connection whose logs to capture
+ * @param {Array<number>} expectedCodes - LOGV2 IDs expected in order (empty = call fn once)
+ * @param {Function} fn - The function to execute (called once or polled repeatedly)
+ * @param {Object} [codeAssertionFnMap] - Optional map of {code: (attr) => {...}} callbacks
+ */
+export function awaitLogMessageCodes(conn, expectedCodes, fn, codeAssertionFnMap = {}) {
+    const tryParseJson = (line) => {
+        try {
+            return JSON.parse(line);
+        } catch (e) {
+            return null;
+        }
+    };
+
+    const offsetBefore = checkLog.getGlobalLog(conn).length;
+    let logs = [];
+
+    assert.soon(
+        () => {
+            fn();
+            logs = checkLog
+                .getGlobalLog(conn)
+                .slice(offsetBefore)
+                .map(tryParseJson)
+                .filter((e) => e !== null);
+
+            let matchIdx = 0;
+            for (const entry of logs) {
+                if (matchIdx < expectedCodes.length && entry.id === expectedCodes[matchIdx]) {
+                    matchIdx++;
+                }
+            }
+            return matchIdx === expectedCodes.length;
+        },
+        () => {
+            let matchIdx = 0;
+            for (const entry of logs) {
+                if (matchIdx < expectedCodes.length && entry.id === expectedCodes[matchIdx]) {
+                    matchIdx++;
+                }
+            }
+            const missing = expectedCodes.slice(matchIdx);
+            return `Timed out waiting for log codes ${tojsononeline(missing)} in ${logs.length} entries`;
+        },
+    );
+
+    const matchedLogAttrs = {};
+    for (const log of logs) {
+        if (expectedCodes.includes(log.id) && !(log.id in matchedLogAttrs)) {
+            matchedLogAttrs[log.id] = log.attr || {};
+        }
+    }
+
+    for (const [code, assertFn] of Object.entries(codeAssertionFnMap)) {
+        const numCode = Number(code);
+        assert(numCode in matchedLogAttrs, `Code ${code} not found in captured logs`);
+        assertFn(matchedLogAttrs[numCode]);
+    }
+}
+
+/**
+ * Assert that data in the shards is distributed according to the given expected counts.
+ * @param {DB} db - The database
+ * @param {Collection} coll - The collection
+ * @param {Array<[Mongo, number]>} expectedCounts - Array of [shardConn, expectedDocCount] pairs
+ */
+export function assertCollDataDistribution(db, coll, expectedCounts) {
+    for (const [shardConn, expectedCount] of expectedCounts) {
+        assert.soon(
+            () => {
+                const docs = shardConn.getDB(db.getName())[coll.getName()].find().toArray();
+                return expectedCount == docs.length;
+            },
+            "Expected " + expectedCount + " documents on " + shardConn,
+        );
+    }
+}
+
+/**
+ * Distributes the given collection according to the given configuration and checks the expected
+ * number of documents per shard match the ones given in distributionConfig.expectedCounts.
+ */
+export function ensureShardDistribution(db, coll, distributionConfig) {
+    distributeCollectionDataOverShards(db, coll, distributionConfig);
+    assertCollDataDistribution(db, coll, distributionConfig.expectedCounts);
+}
