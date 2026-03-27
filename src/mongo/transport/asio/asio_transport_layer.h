@@ -301,11 +301,15 @@ private:
     stdx::mutex _mutex;
     void stopAcceptingSessionsWithLock(stdx::unique_lock<stdx::mutex> lk);
 
-    // There are two reactors that are used by AsioTransportLayer. The _ingressReactor contains
-    // all the accepted sockets and all ingress networking activity. The _egressReactor contains
-    // egress connections.
+    // AsioTransportLayer uses three reactor roles:
+    //  - Ingress reactor (`_ingressReactor`): provides the I/O context used to create accepted
+    //    client sockets. It is intentionally not run (see reason in below paragraph) and we instead
+    //    perform read/write work synchronously on session threads.
+    //  - Acceptor reactor(s): owned by each `ListenerInterface` (`_acceptorReactor`) and used only
+    //    for listening sockets and async_accept processing on the listener thread(s).
+    //  - Egress reactor (`_egressReactor`): owns outbound client sockets for egress connections.
     //
-    // AsioTransportLayer should never call run() on the _ingressReactor.
+    // AsioTransportLayer should never call run() on `_ingressReactor`.
     // In synchronous mode, this will cause a massive performance degradation due to
     // unnecessary wakeups on the asio thread for sockets we don't intend to interact
     // with asynchronously. The additional IO context avoids registering those sockets
