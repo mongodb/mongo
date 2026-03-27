@@ -3102,8 +3102,11 @@ protected:
                 update->retryableFindAndModifyLocation =
                     RetryableFindAndModifyLocation::kSideCollection;
                 update->updateArgs->stmtIds = {1};
-                if (testCase.retryableOptions == kRecordInSideCollection) {
+                if (testCase.retryableOptions == kRecordInSideCollection &&
+                    testCase.oplogGroupType != kGroup) {
                     // 'getNextOpTimes' requires us to be inside a WUOW when reserving oplog slots.
+                    // Skip for grouped (batched) writes -- onBatchedWriteCommit handles its own
+                    // oplog slot reservation.
                     WriteUnitOfWork wuow(opCtx);
                     auto reservedSlots = repl::getNextOpTimes(opCtx, 3);
                     update->updateArgs->oplogSlots = reservedSlots;
@@ -3229,11 +3232,6 @@ TEST_F(OnUpdateOutputsTest, TestNonTransactionFundamentalOnUpdateOutputs) {
     for (std::size_t testIdx = 0; testIdx < _cases.size(); ++testIdx) {
         const auto& testCase = _cases[testIdx];
         logTestCase(testCase);
-
-        // TODO (SERVER-122524): Re-enable test cases with grouping.
-        if (testCase.oplogGroupType == kGroup) {
-            continue;
-        }
 
         auto opCtxRaii = cc().makeOperationContext();
         OperationContext* opCtx = opCtxRaii.get();
