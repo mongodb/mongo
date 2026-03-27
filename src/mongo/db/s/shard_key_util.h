@@ -242,5 +242,20 @@ void validateTimeseriesShardKey(StringData timeFieldName,
                                 boost::optional<StringData> metaFieldName,
                                 const BSONObj& shardKeyPattern);
 
+/**
+ * Validates that 'tsShardKey' uses the user-facing time-series field names (timeField and
+ * metaField), then translates it to the internal buckets collection format.
+ * Throws if the shard key contains fields other than the defined timeField or metaField.
+ */
+BSONObj validateAndTranslateTimeseriesShardKey(const TimeseriesOptions& tsOptions,
+                                               const BSONObj& tsShardKey);
+
+/**
+ * Returns true if the given shard key is a valid key already in the internal buckets collection
+ * raw key format. Returns false if the key uses user-facing field names (requiring translation)
+ * or if the key is not a recognized timeseries shard key.
+ */
+bool isRawTimeseriesShardKey(const TimeseriesOptions& tsOptions, const BSONObj& tsShardKey);
+
 }  // namespace shardkeyutil
 }  // namespace mongo

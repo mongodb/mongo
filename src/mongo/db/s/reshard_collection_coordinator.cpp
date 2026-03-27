@@ -139,12 +139,24 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                                   << "' not found in cluster catalog",
                     cmOld.hasRoutingTable());
 
+            auto provenance = _doc.getProvenance();
+            auto currentShardKey = cmOld.getShardKeyPattern().getKeyPattern().toBSON();
+
+            BSONObj translatedKey;
+            if (cmOld.isTimeseriesCollection() &&
+                resharding::isOrdinaryReshardCollection(provenance)) {
+                auto tsOptions = cmOld.getTimeseriesFields().get().getTimeseriesOptions();
+                translatedKey =
+                    shardkeyutil::validateAndTranslateTimeseriesShardKey(tsOptions, _doc.getKey());
+            }
+
             StateDoc newDoc(_doc);
             newDoc.setOldShardKey(cmOld.getShardKeyPattern().getKeyPattern().toBSON());
             newDoc.setOldCollectionUUID(cmOld.getUUID());
             _updateStateDocument(opCtx, std::move(newDoc));
 
-            ConfigsvrReshardCollection configsvrReshardCollection(nss(), _doc.getKey());
+            auto finalShardKey = translatedKey.isEmpty() ? _doc.getKey() : translatedKey;
+            ConfigsvrReshardCollection configsvrReshardCollection(nss(), finalShardKey);
             configsvrReshardCollection.setDbName(nss().dbName());
             configsvrReshardCollection.setUnique(_doc.getUnique());
             configsvrReshardCollection.setCollation(_doc.getCollation());
@@ -184,7 +196,6 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                                                     _doc.getPerformVerification());
             configsvrReshardCollection.setPerformVerification(_doc.getPerformVerification());
 
-            auto provenance = _doc.getProvenance();
             if (resharding::isMoveCollection(provenance)) {
                 uassert(ErrorCodes::NamespaceNotFound,
                         str::stream()
@@ -230,7 +241,7 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                                    "when using the forceRedistribution option. The "
                                    "forceRedistribution option is meant for redistributing the "
                                    "collection to a different set of shards.",
-                            cmOld.getShardKeyPattern().isShardKey(_doc.getKey()));
+                            cmOld.getShardKeyPattern().isShardKey(finalShardKey));
                 }
             }
 

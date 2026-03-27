@@ -1685,6 +1685,7 @@ mongo_cc_unit_test(
         "session_catalog_migration_destination_test.cpp",
         "session_catalog_migration_source_test.cpp",
         "shard_key_index_util_test.cpp",
+        "shard_key_util_test.cpp",
         "shard_local_test.cpp",
         "shard_metadata_util_test.cpp",
         "shard_server_catalog_cache_loader_test.cpp",

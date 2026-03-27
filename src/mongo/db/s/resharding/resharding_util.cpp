@@ -514,6 +514,10 @@ bool isUnshardCollection(const boost::optional<ReshardingProvenanceEnum>& proven
     return provenance && provenance.get() == ReshardingProvenanceEnum::kUnshardCollection;
 }
 
+bool isOrdinaryReshardCollection(const boost::optional<ReshardingProvenanceEnum>& provenance) {
+    return provenance && provenance.get() == ReshardingProvenanceEnum::kReshardCollection;
+}
+
 std::shared_ptr<ThreadPool> makeThreadPoolForMarkKilledExecutor(const std::string& poolName) {
     return std::make_shared<ThreadPool>([&] {
         ThreadPool::Options options;
@@ -561,17 +565,18 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     auto existingUUID = collEntry.getUuid();
     auto shardKeySpec = request.getKey();
 
-    // moveCollection/unshardCollection are called with _id as the new shard key since
-    // that's an acceptable value for tracked unsharded collections so we can skip this.
+    // TODO: SERVER-119524 Remove this after 8.3 becomes last LTS.
+    // We need to perform translation of shard key for timeseries collections if the shard key is
+    // not already translated to raw key format to provide backwards compatibility.
     if (collEntry.getTimeseriesFields() &&
         (!setProvenance ||
          (*request.getProvenance() == ReshardingProvenanceEnum::kReshardCollection))) {
         auto tsOptions = collEntry.getTimeseriesFields().get().getTimeseriesOptions();
-        shardkeyutil::validateTimeseriesShardKey(
-            tsOptions.getTimeField(), tsOptions.getMetaField(), request.getKey());
-        shardKeySpec =
-            uassertStatusOK(timeseries::createBucketsShardKeySpecFromTimeseriesShardKeySpec(
-                tsOptions, request.getKey()));
+        auto isTranslated = shardkeyutil::isRawTimeseriesShardKey(tsOptions, request.getKey());
+        if (!isTranslated) {
+            shardKeySpec =
+                shardkeyutil::validateAndTranslateTimeseriesShardKey(tsOptions, request.getKey());
+        }
     }
 
     auto tempReshardingNss = resharding::constructTemporaryReshardingNss(nss, collEntry.getUuid());
