@@ -19,6 +19,7 @@ output: {
                 },
                 "a:1": {
                     "declaringScope": "scope:0",
+                    "collectionAlias": "b",
                     "dependencies": [
                         "<base document>:-1"
                     ]

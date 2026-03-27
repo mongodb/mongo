@@ -357,6 +357,21 @@ void updateMetadataFromExpression(FieldMetadata& metadata, const Expression& exp
     metadata.canFieldBeArray = canExpressionEvaluateToArray(expr);
 }
 
+/**
+ * Extracts the remaining suffix from a dotted path string after skipping 'count' path components.
+ */
+StringData skipPathComponents(StringData path, size_t count) {
+    size_t pos = 0;
+    for (size_t i = 0; i < count && pos < path.size(); i++) {
+        auto dot = path.find('.', pos);
+        if (dot == std::string::npos) {
+            return {};
+        }
+        pos = dot + 1;
+    }
+    return path.substr(pos);
+}
+
 /// Result type used when looking up a field.
 enum class FieldMatchType : uint8_t {
     /**
@@ -459,17 +474,29 @@ public:
         switch (type) {
             case FieldMatchType::kExact:
                 return canPrefixContainArrays(prefix) || _fields[fieldId].metadata.canFieldBeArray;
-            case FieldMatchType::kShadowed:
+            case FieldMatchType::kShadowed: {
+                // Check if the shadowing field has an alias to a collection path. If so, resolve
+                // the full path and query the PathArrayness API with it.
+                if (auto* alias = getAlias(fieldId)) {
+                    if (canPrefixContainArrays(prefix) ||
+                        _fields[fieldId].metadata.canFieldBeArray) {
+                        return true;
+                    }
+                    auto suffix = skipPathComponents(path, prefix.size() + 1);
+                    return _canMainCollPathBeArray(buildDottedPath(*alias, suffix));
+                }
                 // TODO(SERVER-119392): If our field is shadowed by another, and we know the value
-                // for that shadowing field, we can determine if the result can be array.
-                // For example, if {$set: {a: 1}}, then a.b cannot be array (it is missing).
+                // for that shadowing field, we can determine if the result can be array. For
+                // example, if {$set: {a: 1}}, then a.b cannot be array (it is missing).
                 return true;
+            }
             case FieldMatchType::kMissing:
                 // If we do not know what this field is, we have to assume it can be an array.
                 return true;
             case FieldMatchType::kBaseDocument:
                 return _canMainCollPathBeArray(path);
         }
+
         MONGO_UNREACHABLE_TASSERT(12266805);
     }
 
@@ -520,7 +547,8 @@ private:
     FieldId declareField(ScopeId scope,
                          ParsedPathView path,
                          FieldDependencies dependencies,
-                         FieldMetadata metadata = {}) {
+                         FieldMetadata metadata = {},
+                         ParsedPathView collectionPathPrefix = {}) {
         // Declaring 'a' should create field 'a' and exit.
         if (path.size() == 1) {
             auto field = _fields.append(
@@ -577,13 +605,17 @@ private:
             }
             declareScope(_scopes[scope].stage, exhaustiveEmbeddedScope, parentEmbeddedScope);
             _scopes[scope].fields[basePath.front()] = newBaseField;
-            populateBaseFieldMetadata(newBaseField, existingBaseField);
+            populateBaseFieldMetadata(
+                newBaseField, existingBaseField, collectionPathPrefix, basePath.front());
         }
         // Finally, declare the subPath in the embeddedScope we found or created.
+        ParsedPath nestedPrefix(collectionPathPrefix.begin(), collectionPathPrefix.end());
+        nestedPrefix.push_back(basePath.front());
         auto embeddedField = declareField(_fields[newBaseField].embeddedScope,
                                           subPath,
                                           std::move(dependencies),
-                                          std::move(metadata));
+                                          std::move(metadata),
+                                          nestedPrefix);
         _fields[newBaseField].dependencies.emplace(embeddedField);
         return newBaseField;
     }
@@ -735,18 +767,30 @@ private:
     }
 
     /**
+     * Returns the collection path alias for the given field, or nullptr if none.
+     */
+    const ParsedPath* getAlias(FieldId fieldId) const {
+        auto it = _aliases.find(fieldId);
+        return it != _aliases.end() ? &it->second : nullptr;
+    }
+
+    /**
      * Populate metadata when a base field is redefined.
      */
-    void populateBaseFieldMetadata(FieldId newBaseField, FieldId existingBaseField) {
+    void populateBaseFieldMetadata(FieldId newBaseField,
+                                   FieldId existingBaseField,
+                                   ParsedPathView collectionPathPrefix,
+                                   StringPool::Id fieldNameId) {
         if (existingBaseField) {
             _fields[newBaseField].metadata.canFieldBeArray =
                 _fields[existingBaseField].metadata.canFieldBeArray;
         } else {
-            // The included base field is a collection field.
-            // TODO(SERVER-121932): Can we use the path prefix rename code to establish the path and
-            // query the Path Arrayness API. Note that path arrayness gives arrayness for entire
-            // path, so if the final field is non-array we could assume no element is as
-            // optimisation, but this could be harder to wire-in.
+            // The included base field is a collection field. Query the PathArrayness API to
+            // determine if the field can be an array, using the full collection path.
+            ParsedPath fullCollectionPath(collectionPathPrefix.begin(), collectionPathPrefix.end());
+            fullCollectionPath.push_back(fieldNameId);
+            _fields[newBaseField].metadata.canFieldBeArray =
+                _canMainCollPathBeArray(buildDottedPath(fullCollectionPath));
         }
     }
 
@@ -760,6 +804,26 @@ private:
             }
         }
         return false;
+    }
+
+    /**
+     * Joins the given parsed path and the given suffix by '.'.
+     */
+    std::string buildDottedPath(const ParsedPath& path, StringData suffix = {}) const {
+        str::stream ss;
+        for (size_t i = 0; i < path.size(); i++) {
+            if (i > 0) {
+                ss << '.';
+            }
+            ss << _strings.get(path[i]);
+        }
+        if (!suffix.empty()) {
+            if (!path.empty()) {
+                ss << '.';
+            }
+            ss << suffix;
+        }
+        return ss;
     }
 
     /**
@@ -834,6 +898,8 @@ private:
                     FieldMetadata metadata;
                     FieldDependencies deps;
                     bool isBaseDocumentField = false;
+                    ParsedPath aliasCollectionPath;
+
                     if (parentScope) {
                         // The found field could be either:
                         // - exact field from parent scope
@@ -847,13 +913,50 @@ private:
                         auto [oldPathField, oldPathFieldType] =
                             lookupField(parentScope, parsedOldPath, &prefix);
 
-                        isBaseDocumentField = oldPathFieldType == FieldMatchType::kBaseDocument;
                         deps.insert(oldPathField);
-                        // If we find the field, we can use its canFieldBeArray.
-                        if (oldPathFieldType == FieldMatchType::kExact &&
-                            !canPrefixContainArrays(prefix)) {
-                            metadata.canFieldBeArray =
-                                _fields[oldPathField].metadata.canFieldBeArray;
+
+                        switch (oldPathFieldType) {
+                            case FieldMatchType::kExact: {
+                                if (canPrefixContainArrays(prefix)) {
+                                    break;
+                                }
+                                metadata.canFieldBeArray =
+                                    _fields[oldPathField].metadata.canFieldBeArray;
+                                // Track transitive alias. If the prefix contains arrays
+                                // we skip this: canFieldBeArray is already true and any
+                                // downstream alias resolution would also yield true.
+                                if (auto* alias = getAlias(oldPathField)) {
+                                    aliasCollectionPath = *alias;
+                                }
+                                break;
+                            }
+                            case FieldMatchType::kMissing: {
+                                // We don't know anything about the arrayness of missing/unknown
+                                // fields.
+                                break;
+                            }
+                            case FieldMatchType::kShadowed: {
+                                // The old path is shadowed: e.g., b.z where b has no
+                                // embedded scope. Check if the shadowing field has an alias
+                                // so we can resolve through it.
+                                if (auto* alias = getAlias(oldPathField)) {
+                                    aliasCollectionPath = *alias;
+                                    size_t consumed = prefix.size() + 1;
+                                    for (size_t i = consumed; i < parsedOldPath.size(); ++i) {
+                                        aliasCollectionPath.push_back(parsedOldPath[i]);
+                                    }
+                                    if (!canPrefixContainArrays(prefix) &&
+                                        !_fields[oldPathField].metadata.canFieldBeArray) {
+                                        metadata.canFieldBeArray = _canMainCollPathBeArray(
+                                            buildDottedPath(aliasCollectionPath));
+                                    }
+                                }
+                                break;
+                            }
+                            case FieldMatchType::kBaseDocument: {
+                                isBaseDocumentField = true;
+                                break;
+                            }
                         }
                     } else {
                         isBaseDocumentField = true;
@@ -864,10 +967,18 @@ private:
                         // We represent all collection field references as FieldId::none(), without
                         // distinguishing between them.
                         metadata.canFieldBeArray = _canMainCollPathBeArray(p.getOldPath());
+                        aliasCollectionPath.assign(parsedOldPath.begin(), parsedOldPath.end());
                     }
 
                     // Each rename modifies the new field and depends on the previous field.
                     declareField(scopeId, parsedNewPath, std::move(deps), std::move(metadata));
+
+                    // Store alias for the leaf field of the new path.
+                    if (!aliasCollectionPath.empty()) {
+                        auto [leafFieldId, _] = lookupField(scopeId, parsedNewPath);
+                        tassert(12193201, "Missing leafFieldId", leafFieldId);
+                        _aliases[leafFieldId] = std::move(aliasCollectionPath);
+                    }
                 },
             },
             ds);
@@ -964,6 +1075,11 @@ private:
 
         // Invalidate all nodes originating from the given stage.
         auto [invalidScope, invalidField] = earliestDescendants(invalidStage);
+
+        // Clean up aliases for invalidated fields.
+        absl::erase_if(_aliases,
+                       [invalidField](const auto& entry) { return entry.first >= invalidField; });
+
         _stages.eraseFrom(invalidStage);
         _scopes.eraseFrom(invalidScope);
         _fields.eraseFrom(invalidField);
@@ -1020,6 +1136,11 @@ private:
 
     // Mapping between DocumentSource and StageId, recomputed when the graph is recomputed.
     absl::flat_hash_map<const DocumentSource*, StageId> _dsToStageId;
+
+    // Maps a FieldId to the collection path it aliases (as interned StringPool IDs).
+    // Only populated for fields created via RenamePath that reference collection fields
+    // (directly or transitively through other aliases).
+    absl::flat_hash_map<FieldId, ParsedPath> _aliases;
 
     // Callback to query the Path Arrayness API for the main collection.
     const CanPathBeArray _canMainCollPathBeArray;
@@ -1177,6 +1298,9 @@ private:
         }
         if (!field.metadata.isDefault()) {
             serializeMetadata(field.metadata, bob);
+        }
+        if (auto* alias = _graph.getAlias(fieldId)) {
+            bob.append("collectionAlias", _graph.buildDottedPath(*alias));
         }
         serializeDependencies(field.dependencies, bob);
     }

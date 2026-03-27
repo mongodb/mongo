@@ -23,12 +23,14 @@ output: {
                 },
                 "a:1": {
                     "declaringScope": "scope:0",
+                    "collectionAlias": "b.c",
                     "dependencies": [
                         "<base document>:-1"
                     ]
                 },
                 "d:2": {
                     "declaringScope": "scope:0",
+                    "collectionAlias": "e.f.g",
                     "dependencies": [
                         "<base document>:-1"
                     ]
@@ -44,6 +46,7 @@ output: {
                             },
                             "i:5": {
                                 "declaringScope": "scope:1",
+                                "collectionAlias": "j.k",
                                 "dependencies": [
                                     "<base document>:-1"
                                 ]

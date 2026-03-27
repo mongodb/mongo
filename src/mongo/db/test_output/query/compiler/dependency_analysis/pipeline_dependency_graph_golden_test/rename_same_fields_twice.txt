@@ -67,12 +67,14 @@ output: {
                 },
                 "d:5": {
                     "declaringScope": "scope:1",
+                    "collectionAlias": "f",
                     "dependencies": [
                         "<base document>:-1"
                     ]
                 },
                 "e:6": {
                     "declaringScope": "scope:1",
+                    "collectionAlias": "f",
                     "dependencies": [
                         "<base document>:-1"
                     ]

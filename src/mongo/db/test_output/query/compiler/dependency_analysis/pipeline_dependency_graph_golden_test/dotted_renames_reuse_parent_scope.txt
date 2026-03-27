@@ -106,6 +106,7 @@ output: {
                                                                             },
                                                                             "f1:11": {
                                                                                 "declaringScope": "scope:5",
+                                                                                "collectionAlias": "a.b.c.d.e.f",
                                                                                 "dependencies": [
                                                                                     "<base document>:-1"
                                                                                 ]
@@ -142,6 +143,7 @@ output: {
                 },
                 "b:12": {
                     "declaringScope": "scope:0",
+                    "collectionAlias": "foo1.bar1.baz1",
                     "dependencies": [
                         "<base document>:-1"
                     ]
