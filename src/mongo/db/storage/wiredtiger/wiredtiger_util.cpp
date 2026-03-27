@@ -815,7 +815,6 @@ int WiredTigerUtil::verifyTable(WiredTigerSession& session,
     // Try to close as much as possible to avoid EBUSY errors.
     session.closeAllCursors(uri);
     WiredTigerConnection& connection = session.getConnection();
-    connection.closePooledCursorsForUri(uri);
 
     // Open a new session with custom error handlers.
     const char* sessionConfig = connection.isEphemeral() ? nullptr : "prefetch=(enabled=true)";

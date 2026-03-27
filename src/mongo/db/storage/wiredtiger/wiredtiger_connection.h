@@ -106,14 +106,6 @@ public:
                                                        bool isInternal = true);
 
     /**
-     * Closes all cursors for the given URI in every session currently idle in the pool.
-     * Must be called before any exclusive DDL operation (drop, verify, salvage) to ensure
-     * parked cursors release their session_ref counts on the target data-handle, allowing
-     * WiredTiger's exclusive-lock protocol to proceed without blocking.
-     */
-    void closePooledCursorsForUri(const std::string& uri);
-
-    /**
      * Get the maximum number of sessions allowed in the cache.
      */
     int32_t getSessionCacheMax() const;

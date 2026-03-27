@@ -125,7 +125,7 @@ TEST(WiredTigerSessionTest, StaleCursorNotReturnedToCacheAfterRollbackToStable) 
 
     // Populate cache before epoch bump
     {
-        session->closeAllCursors("");
+        session->closeAllCursors(uri);
         ASSERT_EQ(session->cachedCursors(), 0);
 
         WT_CURSOR* cursor = session->getNewCursor(uri, "");
@@ -157,7 +157,7 @@ TEST(WiredTigerSessionTest, CursorNotCachedAfterCleanShutdown) {
 
     std::unique_ptr<RecoveryUnit> ru = helper.newRecoveryUnit();
     auto* session = static_cast<WiredTigerRecoveryUnit*>(ru.get())->getSession();
-    session->closeAllCursors("");
+    session->closeAllCursors(uri);
     ASSERT_EQ(session->cachedCursors(), 0);
 
     WT_CURSOR* cursor = session->getNewCursor(uri, "");
@@ -176,33 +176,6 @@ TEST(WiredTigerSessionTest, CursorNotCachedAfterCleanShutdown) {
     WT_CURSOR* checkCursor = session->getCachedCursor(555555, "");
     ASSERT_FALSE(checkCursor)
         << "Cursor should not be cached after clean-shutdown engine epoch bump";
-}
-
-TEST(WiredTigerSessionTest, PooledCursorDoesNotBlockDrop) {
-    WiredTigerHarnessHelper helper;
-    std::unique_ptr<RecordStore> rs = helper.newRecordStore();
-    auto uri = std::string{static_cast<WiredTigerRecordStore*>(rs.get())->getURI()};
-    // Strip the "table:" prefix to get the ident.
-    auto ident = uri.substr(std::string("table:").size());
-
-    // Park a cursor in the session pool by cycling a RecoveryUnit. Under SERVER-122455,
-    // the session is returned to the pool with its cursor cache intact, which means it
-    // holds a session_ref on the dhandle for this URI.
-    {
-        std::unique_ptr<RecoveryUnit> ru = helper.newRecoveryUnit();
-        auto* session = static_cast<WiredTigerRecoveryUnit*>(ru.get())->getSession();
-        WT_CURSOR* cursor = session->getNewCursor(uri, "");
-        ASSERT(cursor);
-        session->releaseCursor(999999999, cursor, "");
-        ASSERT_GT(session->cachedCursors(), 0);
-        // ru destroyed here — session returns to pool with cursor cached.
-    }
-
-    // Drop the ident. dropIdent() must call closePooledCursorsForUri() to release
-    // session_ref counts before issuing the WT drop; without it, drop returns EBUSY.
-    std::unique_ptr<RecoveryUnit> dropRu = helper.newRecoveryUnit();
-    rs.reset();
-    ASSERT_OK(helper.getEngine()->dropIdent(*dropRu, ident, false));
 }
 
 }  // namespace mongo
