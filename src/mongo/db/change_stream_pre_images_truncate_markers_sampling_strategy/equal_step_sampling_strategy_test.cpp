@@ -29,6 +29,7 @@
 #include "mongo/db/change_stream_pre_images_truncate_markers_sampling_strategy/equal_step_sampling_strategy.h"
 
 #include "mongo/db/change_stream_pre_image_test_helpers.h"
+#include "mongo/db/change_stream_pre_images_truncate_markers.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/logv2/log.h"
@@ -90,7 +91,7 @@ public:
 using EqualStepSamplingStrategyDeathTest = EqualStepSamplingStrategyTest;
 
 /**
- * Tests for scanning / sampling.
+ * Test for sampling an empty collection.
  */
 TEST_F(EqualStepSamplingStrategyTest, PopulateMapWithEmptyCollection) {
     auto opCtx = operationContext();
@@ -107,7 +108,7 @@ TEST_F(EqualStepSamplingStrategyTest, PopulateMapWithEmptyCollection) {
 }
 
 /**
- * Tests for 'sampleNSUUIDRangeEqually.
+ * Tests for 'sampleNSUUIDRangeEqually'.
  */
 DEATH_TEST_REGEX_F(EqualStepSamplingStrategyDeathTest,
                    SampleNSUUIDRangeEquallySampleSize0,
@@ -375,6 +376,78 @@ TEST_F(EqualStepSamplingStrategyTest, SampleNSUUIDRangeEquallySameTimestampDiffe
 
     constexpr uint64_t kNumSamples = 10;
     assertEqualRangeSampleForNsUUIDContainsExactPreimages(kNumSamples, expectedPreImages);
+}
+
+/**
+ * Tests for overriding server parameter 'changeStreamPreImagesSamplePointsPerUUID'.
+ */
+TEST_F(EqualStepSamplingStrategyTest, SampleSizeOneDefinedByServerParameter) {
+    auto opCtx = operationContext();
+    createPreImagesCollection(opCtx);
+
+    insertDirectlyToPreImagesCollection(opCtx, kPreImage1);
+
+    // Set the number of samples per nsUUID via server parameter, and sample with the "official"
+    // process that selects the sampling strategy. This will select the "equal step" sampling
+    // strategy.
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagUseReplicatedTruncatesForDeletions", true);
+    RAIIServerParameterControllerForTest sampleSizeController{
+        "changeStreamPreImagesSamplePointsPerUUID", 1};
+
+    auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx);
+
+    PreImagesTruncateMarkers truncateMarkers(opCtx, preImagesCollection);
+    const auto markersSnapshot = truncateMarkers.getMarkersMap_forTest().getUnderlyingSnapshot();
+
+    ASSERT_TRUE(markersSnapshot->contains(kNsUUID));
+
+    const auto& truncateMarkersForNsUUID = markersSnapshot->at(kNsUUID);
+    const auto& markers = truncateMarkersForNsUUID->getMarkers_forTest();
+    ASSERT_EQ(1, markers.size());
+    ASSERT_EQ(32768, markers[0].records);
+}
+
+TEST_F(EqualStepSamplingStrategyTest, SampleSizeTwentyDefinedByServerParameter) {
+    auto opCtx = operationContext();
+    createPreImagesCollection(opCtx);
+
+    const long long baseTime =
+        dateFromISOString("2024-01-01T00:00:01.000Z").getValue().toMillisSinceEpoch() / 1'000;
+
+    auto buildPreImage = [](UUID uuid,
+                            Timestamp ts,
+                            int64_t applyOpsIndex,
+                            const BSONObj& data) -> ChangeStreamPreImage {
+        return {ChangeStreamPreImageId{uuid, ts, applyOpsIndex}, Date_t{}, data};
+    };
+
+    // Insert 100 documents with increasing timestamp values.
+    for (int i = 0; i < 100; ++i) {
+        auto preImage =
+            buildPreImage(kNsUUID, Timestamp(Seconds(baseTime + i), 0), 0, BSON("x" << i));
+        insertDirectlyToPreImagesCollection(opCtx, preImage);
+    }
+
+    // Set the number of samples per nsUUID via server parameter, and sample with the "official"
+    // process that selects the sampling strategy. This will select the "equal step" sampling
+    // strategy.
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagUseReplicatedTruncatesForDeletions", true);
+    RAIIServerParameterControllerForTest sampleSizeController{
+        "changeStreamPreImagesSamplePointsPerUUID", 20};
+
+    auto preImagesCollection = acquirePreImagesCollectionForRead(opCtx);
+
+    PreImagesTruncateMarkers truncateMarkers(opCtx, preImagesCollection);
+    const auto markersSnapshot = truncateMarkers.getMarkersMap_forTest().getUnderlyingSnapshot();
+
+    ASSERT_TRUE(markersSnapshot->contains(kNsUUID));
+
+    const auto& truncateMarkersForNsUUID = markersSnapshot->at(kNsUUID);
+    const auto& markers = truncateMarkersForNsUUID->getMarkers_forTest();
+    ASSERT_EQ(18, markers.size());
+    ASSERT_EQ(32768, markers[0].records);
 }
 
 }  // namespace

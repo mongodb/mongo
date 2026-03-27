@@ -46,6 +46,8 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/util/time_support.h"
 
+#include <cstdint>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
@@ -180,7 +182,8 @@ std::unique_ptr<pre_image_marker_initialization_internal::SamplingStrategy> make
     OperationContext* opCtx) {
     using namespace pre_image_marker_initialization_internal;
 
-    auto numSamplesPerMarker = CollectionTruncateMarkers::kRandomSamplesPerMarker;
+    auto numSamplesPerMarker =
+        static_cast<uint64_t>(gChangeStreamPreImagesSamplePointsPerUUID.loadRelaxed());
     const auto minBytesPerMarker = gPreImagesCollectionTruncateMarkersMinBytes;
 
     // On DSC, the 'SizeStorer' that provides the number of records and the size of the data is not
@@ -189,8 +192,6 @@ std::unique_ptr<pre_image_marker_initialization_internal::SamplingStrategy> make
     // prohibitive cost for large collections. To avoid this, branch to a different approach for
     // sampling the preimages collection if needed. We may want to remove this branch once the
     // 'SizeStorer' becomes available on DSC as well.
-    // TODO SERVER-117454: Consider using the regular sampling mechanism on DSC once the
-    // 'SizeStorer' information can be fully replicated.
     if (change_stream_pre_image_util::shouldUseReplicatedTruncatesForPreImages(opCtx)) {
         return std::make_unique<EqualStepSamplingStrategy>(numSamplesPerMarker, minBytesPerMarker);
     }

@@ -81,6 +81,11 @@ public:
         const RecordIdAndWallTime& lastRidAndWall,
         uint64_t numSamples);
 
+    /**
+     * Estimated/assumed size for every pre-image sampled.
+     */
+    static constexpr int kRecordSizeEstimate = 1024;
+
 private:
     uint64_t _numSamplesPerMarker;
     int32_t _minBytesPerMarker;

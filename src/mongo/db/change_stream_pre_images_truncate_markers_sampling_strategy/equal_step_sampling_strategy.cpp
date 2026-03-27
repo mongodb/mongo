@@ -276,7 +276,7 @@ bool EqualStepSamplingStrategy::performSampling(OperationContext* opCtx,
 
     // Multiply the number of records by an arbitrarily-chosen average record size here to get
     // to a data size estimate.
-    int64_t dataSize = numRecords * 1024;
+    int64_t dataSize = numRecords * kRecordSizeEstimate;
     invariant(dataSize > 0);
     const auto minBytesPerMarker = _minBytesPerMarker;
     const double avgRecordSize = static_cast<double>(dataSize) / static_cast<double>(numRecords);

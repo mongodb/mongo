@@ -68,6 +68,27 @@ server_parameters:
             gt: 0
         redact: false
 
+    changeStreamPreImagesSamplePointsPerUUID:
+        # Sampling of the pre-images collection happens in two scenarios:
+        # - On ASC, the sampling happens on all replica set nodes as part of the node's
+        #   onConsistentDataAvailable callback. Sampling should be very infrequent.
+        # - On DSC, the sampling happens every time a node steps up as a primary. Only the
+        #   current primary will perform the sampling, but it can occur multiple times
+        #   during the lifetime of a node.
+        description: >-
+            Defines the maximum number of sample points to draw from each user collection that
+            has change stream pre- and post-images enabled. The value of this parameter can affect
+            the accuracy of the sampling and how frequent pre-image removal occurs. It can also
+            affect number of I/O operations needed for pre-images sampling.
+        set_at: [startup, runtime]
+        cpp_varname: "gChangeStreamPreImagesSamplePointsPerUUID"
+        cpp_vartype: AtomicWord<int>
+        default: 10
+        validator:
+            gte: 1
+            lte: 100
+        redact: false
+
 structs:
     ChangeStreamPreImageId:
         description: Uniquely identifies a pre-image for a given node or replica set.
