@@ -54,6 +54,11 @@ fi
 
 export VIRTUAL_ENV_DISABLE_PROMPT=yes
 
+# Keep pip new enough to better handle incomplete downloads that older pip
+# versions could surface as hash mismatches on macOS.
+pip_version="26.0.1"
+wheel_version="0.46.3"
+
 # Not all git get project calls clone into ${workdir}/src so we allow
 # callers to tell us where the pip requirements files are.
 pip_dir="${pip_dir}"
@@ -71,10 +76,10 @@ toolchain_txt="$pip_dir/toolchain-requirements.txt"
 . "$evergreen_dir/prelude_venv.sh"
 
 activate_venv
-echo "Upgrading pip to 21.0.1"
+echo "Upgrading pip to ${pip_version}"
 
-python -m pip --disable-pip-version-check install "pip==21.0.1" "wheel==0.37.0" || exit 1
-if ! python -m pip --disable-pip-version-check install -r "$toolchain_txt" -q --log install.log; then
+python -m pip --disable-pip-version-check install "pip==${pip_version}" "wheel==${wheel_version}" || exit 1
+if ! python -m pip --disable-pip-version-check install --resume-retries 5 -r "$toolchain_txt" -q --log install.log; then
   echo "Pip install error"
   cat install.log || true
   exit 1
