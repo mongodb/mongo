@@ -196,8 +196,8 @@ mongo_cc_library(
         "//src/mongo:base",
         "@crates//:wasmtime_c",
     ] + select({
-        "@platforms//os:linux": [],
         "@platforms//os:windows": ["//bazel/rules_rust:win_allocator_shim"],
+        "//conditions:default": [],
     }),
 )
 
@@ -225,8 +225,8 @@ mongo_cc_unit_test(
         "//src/mongo:base",
         "@crates//:wasmtime_c",
     ] + select({
-        "@platforms//os:linux": [":embed_mozjs_wasm_obj"],
         "@platforms//os:windows": [":embed_mozjs_wasm_rc"],
+        "//conditions:default": [":embed_mozjs_wasm_obj"],
     }),
 )
 

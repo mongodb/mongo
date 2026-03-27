@@ -1,7 +1,8 @@
-"""Rule to embed a binary file as a linkable ELF object (.o) in .rodata using objcopy.
+"""Rule to embed a binary file as a linkable object (.o) in .rodata using .incbin.
 
-Uses the Cc toolchain's objcopy and target architecture so the output object
-matches the current build's ABI and can be linked into a native binary.
+Generates a small assembly file that uses the .incbin directive to include the
+binary data, then compiles it with the CC toolchain's assembler. This works with
+both GCC and Clang on all platforms (Linux, macOS, Windows cross-compile).
 
 Provides CcInfo so dependents can link the .o via deps (recommended) in addition
 to using the output in linkopts/additional_linker_inputs.
@@ -9,72 +10,78 @@ to using the output in linkopts/additional_linker_inputs.
 
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
 
-def _obj_fmt_and_bfd_arch(ctx):
-    """Maps platform CPU constraints to objcopy -O (BFD format) and -B (BFD arch)."""
-    x86_64 = ctx.attr._x86_64[platform_common.ConstraintValueInfo]
-    aarch64 = ctx.attr._aarch64[platform_common.ConstraintValueInfo]
-    arm64 = ctx.attr._arm64[platform_common.ConstraintValueInfo]
+_ASM_TEMPLATE_LINUX = """\
+    .section .rodata,"a"
+    .global {start_sym}
+    .global {end_sym}
+    .global {size_sym}
+    .balign 16
+{start_sym}:
+    .incbin "{input_path}"
+{end_sym}:
+{size_sym} = {end_sym} - {start_sym}
+"""
 
-    if ctx.target_platform_has_constraint(x86_64):
-        return ("elf64-x86-64", "i386:x86-64")
-    if ctx.target_platform_has_constraint(aarch64) or ctx.target_platform_has_constraint(arm64):
-        return ("elf64-littleaarch64", "aarch64")
-    fail("embed_binary_obj is only supported on x86_64 and aarch64/arm64")
-
-def _binary_symbol_prefix(path):
-    """Computes the symbol prefix objcopy uses for -I binary (path with non-alnum -> _)."""
-    result = "_binary_"
-    for i in range(len(path)):
-        c = path[i]
-        if (c.isalnum() or c == "_"):
-            result += c
-        else:
-            result += "_"
-    return result
+# macOS uses Mach-O which prefixes C symbols with an underscore, so assembly
+# symbols need the extra leading underscore. The .const section is Mach-O's
+# equivalent of .rodata.
+_ASM_TEMPLATE_MACOS = """\
+    .section __TEXT,__const
+    .global _{start_sym}
+    .global _{end_sym}
+    .global _{size_sym}
+    .balign 16
+_{start_sym}:
+    .incbin "{input_path}"
+_{end_sym}:
+_{size_sym} = _{end_sym} - _{start_sym}
+"""
 
 def _embed_binary_obj_impl(ctx):
     cc_toolchain = find_cpp_toolchain(ctx)
     input_file = ctx.file.src
     output_file = ctx.outputs.out
+    prefix = "_" + ctx.attr.symbol_prefix
 
-    obj_fmt, bfd_arch = _obj_fmt_and_bfd_arch(ctx)
-    prefix = _binary_symbol_prefix(input_file.path)
-    new_prefix = "_" + ctx.attr.symbol_prefix
+    macos = ctx.attr._macos[platform_common.ConstraintValueInfo]
+    is_macos = ctx.target_platform_has_constraint(macos)
+    template = _ASM_TEMPLATE_MACOS if is_macos else _ASM_TEMPLATE_LINUX
 
-    # .data is renamed to .rodata just for semantic purposes, data using this rule should be read only
-    # --redefine symbol is used or else the symbol name is based on the path to the obj
-    # this will expose the symbols _binary_+<chosen symbol name>+_start and
-    # this will expose the symbols _binary_+<chosen symbol name>+_end which can be used to read the data
-    args = [
-        "-I",
-        "binary",
-        "-O",
-        obj_fmt,
-        "-B",
-        bfd_arch,
-        "--rename-section",
-        ".data=.rodata",
-        "--redefine-sym",
-        prefix + "_start=" + new_prefix + "_start",
-        "--redefine-sym",
-        prefix + "_end=" + new_prefix + "_end",
-        "--redefine-sym",
-        prefix + "_size=" + new_prefix + "_size",
-        input_file.path,
-        output_file.path,
-    ]
-
-    ctx.actions.run(
-        executable = cc_toolchain.objcopy_executable,
-        inputs = depset([input_file], transitive = [cc_toolchain.all_files]),
-        outputs = [output_file],
-        arguments = args,
-        mnemonic = "EmbedBinaryObj",
-        progress_message = "Embedding %s as ELF object" % input_file.short_path,
+    asm_file = ctx.actions.declare_file(ctx.attr.name + "_embed.S")
+    ctx.actions.write(
+        output = asm_file,
+        content = template.format(
+            start_sym = prefix + "_start",
+            end_sym = prefix + "_end",
+            size_sym = prefix + "_size",
+            input_path = input_file.path,
+        ),
     )
 
-    # Provide CcInfo so dependents can link this .o via deps (ensures the object
-    # is on the link line through the normal C++ dependency path).
+    feature_configuration = cc_common.configure_features(
+        ctx = ctx,
+        cc_toolchain = cc_toolchain,
+    )
+
+    # Use cc_common.compile to assemble the .S file. This properly sets up
+    # the toolchain environment (e.g. GCC's libexec path for cc1) unlike
+    # a raw ctx.actions.run with the compiler path.
+    (_compilation_context, compilation_outputs) = cc_common.compile(
+        actions = ctx.actions,
+        feature_configuration = feature_configuration,
+        cc_toolchain = cc_toolchain,
+        name = ctx.label.name,
+        srcs = [asm_file],
+        additional_inputs = [input_file],
+    )
+
+    # cc_common.compile produces objects in its own location; copy to the
+    # expected output path.
+    objs = compilation_outputs.objects
+    if not objs:
+        objs = compilation_outputs.pic_objects
+    ctx.actions.symlink(output = output_file, target_file = objs[0])
+
     linker_input = cc_common.create_linker_input(
         owner = ctx.label,
         user_link_flags = [output_file.path],
@@ -99,7 +106,7 @@ embed_binary_obj = rule(
         ),
         "out": attr.output(
             mandatory = True,
-            doc = "Output linkable ELF object (.o) with content in .rodata.",
+            doc = "Output linkable object (.o) with content in .rodata.",
         ),
         "symbol_prefix": attr.string(
             mandatory = True,
@@ -108,11 +115,9 @@ embed_binary_obj = rule(
         "_cc_toolchain": attr.label(
             default = "@bazel_tools//tools/cpp:current_cc_toolchain",
         ),
-        "_x86_64": attr.label(default = "@platforms//cpu:x86_64"),
-        "_aarch64": attr.label(default = "@platforms//cpu:aarch64"),
-        "_arm64": attr.label(default = "@platforms//cpu:arm64"),
+        "_macos": attr.label(default = "@platforms//os:macos"),
     },
-    doc = "Embeds a binary file as a linkable ELF object using the CC toolchain's objcopy.",
+    doc = "Embeds a binary file as a linkable object using .incbin via the CC toolchain.",
     toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
     fragments = ["cpp"],
 )
