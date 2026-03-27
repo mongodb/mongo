@@ -217,7 +217,8 @@ TEST(BatchedCommandResponseTest, ParseQueryStatsMetrics) {
                     << "nInserted" << 0LL << "totalTimeQueuedMicros" << 0LL << "totalAdmissions"
                     << 0LL << "totalNormalPriorityAdmissions" << 0LL << "totalLowPriorityAdmissions"
                     << 0LL << "wasLoadShed" << false << "wasDeprioritized" << false
-                    << "wasMarkedNonDeprioritizable" << false);
+                    << "wasMarkedNonDeprioritizable" << false << "clusterPeakTrackedMemBytes"
+                    << 0LL);
     };
 
     BSONObj origResponseObj = BSON(

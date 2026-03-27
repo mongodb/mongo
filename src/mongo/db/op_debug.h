@@ -254,6 +254,12 @@ public:
         // Number of documents sampled by cost-based ranker (CBR) when using sampling method to pick
         // the best plan.
         boost::optional<long long> nDocsSampled;
+
+        // Local peak tracked memory usage in bytes (max across getMore batches).
+        boost::optional<uint64_t> peakTrackedMemBytes;
+
+        // Sum of local peak and any remote per-shard peaks.
+        boost::optional<uint64_t> clusterPeakTrackedMemBytes;
     };
 
     MONGO_MOD_PRIVATE OpDebug() = default;

@@ -81,6 +81,8 @@ struct MONGO_MOD_PUB DataBearingNodeMetrics {
     CardinalityEstimationMethods cardinalityEstimationMethods;
     uint64_t nDocsSampled{0};
 
+    uint64_t clusterPeakTrackedMemBytes{0};
+
     /**
      * Adds the fields from the given object into the fields of this object using addition (in the
      * case of numeric metrics) or conjunction/disjunction (in the case of boolean metrics).
@@ -136,6 +138,7 @@ struct MONGO_MOD_PUB DataBearingNodeMetrics {
             cardinalityEstimationMethods.getCode().value_or(0) +
             other.cardinalityEstimationMethods.getCode().value_or(0));
         nDocsSampled += other.nDocsSampled;
+        clusterPeakTrackedMemBytes += other.clusterPeakTrackedMemBytes;
     }
 
     void add(const boost::optional<DataBearingNodeMetrics>& other) {
@@ -196,6 +199,7 @@ struct MONGO_MOD_PUB DataBearingNodeMetrics {
         cardinalityEstimationMethods.setCode(cardinalityEstimationMethods.getCode().value_or(0) +
                                              ce.getCode().value_or(0));
         nDocsSampled += metrics.getNDocsSampled();
+        clusterPeakTrackedMemBytes += metrics.getClusterPeakTrackedMemBytes();
     }
 };
 

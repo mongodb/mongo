@@ -1422,6 +1422,13 @@ CursorMetrics OpDebug::getCursorMetrics(size_t opIndex) const {
     metrics.setCardinalityEstimationMethods(ceMethods);
 
     metrics.setNDocsSampled(additiveMetrics.nDocsSampled.value_or(0));
+    // Only report clusterPeakTrackedMemBytes on the final response so the router won't double count
+    // remote shard peaks.
+    bool isFinalResponse = cursorExhausted || cursorid == -1;
+    metrics.setClusterPeakTrackedMemBytes(isFinalResponse
+                                              ? additiveMetrics.clusterPeakTrackedMemBytes.value_or(
+                                                    additiveMetrics.peakTrackedMemBytes.value_or(0))
+                                              : 0);
     return metrics;
 }
 
@@ -1509,6 +1516,19 @@ boost::optional<T> addOptionals(const boost::optional<T>& lhs, const boost::opti
     }
     return lhs ? (*lhs + *rhs) : rhs;
 }
+
+/**
+ * Takes the maximum of two optionals, treating uninitialized values as absent (not zero). Returns
+ * boost::none if both are uninitialized. Returns 'lhs' if only 'rhs' is uninitialized and
+ * vice-versa.
+ */
+template <typename T>
+boost::optional<T> maxOptionals(const boost::optional<T>& lhs, const boost::optional<T>& rhs) {
+    if (!rhs) {
+        return lhs;
+    }
+    return lhs ? boost::optional<T>(std::max(*lhs, *rhs)) : rhs;
+}
 }  // namespace
 
 void OpDebug::AdditiveMetrics::add(const AdditiveMetrics& otherMetrics) {
@@ -1587,6 +1607,9 @@ void OpDebug::AdditiveMetrics::add(const AdditiveMetrics& otherMetrics) {
         cardinalityEstimationMethods.getCode().value_or(0) +
         otherMetrics.cardinalityEstimationMethods.getCode().value_or(0));
     nDocsSampled = addOptionals(nDocsSampled, otherMetrics.nDocsSampled);
+    peakTrackedMemBytes = maxOptionals(peakTrackedMemBytes, otherMetrics.peakTrackedMemBytes);
+    clusterPeakTrackedMemBytes =
+        maxOptionals(clusterPeakTrackedMemBytes, otherMetrics.clusterPeakTrackedMemBytes);
 }
 
 void OpDebug::AdditiveMetrics::aggregateDataBearingNodeMetrics(
@@ -1657,6 +1680,8 @@ void OpDebug::AdditiveMetrics::aggregateDataBearingNodeMetrics(
         cardinalityEstimationMethods.getCode().value_or(0) +
         metrics.cardinalityEstimationMethods.getCode().value_or(0));
     nDocsSampled = nDocsSampled.value_or(0) + metrics.nDocsSampled;
+    clusterPeakTrackedMemBytes =
+        clusterPeakTrackedMemBytes.value_or(0) + metrics.clusterPeakTrackedMemBytes;
 }
 
 void OpDebug::AdditiveMetrics::aggregateDataBearingNodeMetrics(
@@ -1697,7 +1722,8 @@ void OpDebug::AdditiveMetrics::aggregateCursorMetrics(const CursorMetrics& metri
         metrics.getWasMarkedNonDeprioritizable(),
         Microseconds(metrics.getPlanningTimeMicros()),
         metrics.getCardinalityEstimationMethods(),
-        static_cast<uint64_t>(metrics.getNDocsSampled())});
+        static_cast<uint64_t>(metrics.getNDocsSampled()),
+        static_cast<uint64_t>(metrics.getClusterPeakTrackedMemBytes())});
 }
 
 void OpDebug::AdditiveMetrics::aggregateStorageStats(const StorageStats& stats) {
@@ -1719,6 +1745,8 @@ void OpDebug::AdditiveMetrics::reset() {
     keysDeleted = boost::none;
     executionTime = boost::none;
     nUpdateOps = boost::none;
+    peakTrackedMemBytes = boost::none;
+    clusterPeakTrackedMemBytes = boost::none;
 }
 
 bool OpDebug::AdditiveMetrics::equals(const AdditiveMetrics& otherMetrics) const {

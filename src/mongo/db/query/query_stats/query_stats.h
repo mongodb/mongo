@@ -274,6 +274,9 @@ struct QueryStatsSnapshot {
     bool wasLoadShed;
     bool wasDeprioritized;
     bool wasMarkedNonDeprioritizable;
+
+    uint64_t peakTrackedMemBytes;
+    uint64_t clusterPeakTrackedMemBytes;
 };
 
 /**

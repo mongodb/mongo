@@ -132,6 +132,10 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     additiveMetricsToAdd.planningTime = Microseconds{50};
     currentAdditiveMetrics.nDocsSampled = 10;
     additiveMetricsToAdd.nDocsSampled = 15;
+    currentAdditiveMetrics.peakTrackedMemBytes = 2048;
+    additiveMetricsToAdd.peakTrackedMemBytes = 3000;
+    currentAdditiveMetrics.clusterPeakTrackedMemBytes = 2048;
+    additiveMetricsToAdd.clusterPeakTrackedMemBytes = 2000;
 
     // Save the current AdditiveMetrics object before adding.
     OpDebug::AdditiveMetrics additiveMetricsBeforeAdd;
@@ -201,6 +205,12 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
               *additiveMetricsBeforeAdd.planningTime + *additiveMetricsToAdd.planningTime);
     ASSERT_EQ(*currentAdditiveMetrics.nDocsSampled,
               *additiveMetricsBeforeAdd.nDocsSampled + *additiveMetricsToAdd.nDocsSampled);
+    ASSERT_EQ(*currentAdditiveMetrics.peakTrackedMemBytes,
+              std::max(*additiveMetricsBeforeAdd.peakTrackedMemBytes,
+                       *additiveMetricsToAdd.peakTrackedMemBytes));
+    ASSERT_EQ(*currentAdditiveMetrics.clusterPeakTrackedMemBytes,
+              std::max(*additiveMetricsBeforeAdd.clusterPeakTrackedMemBytes,
+                       *additiveMetricsToAdd.clusterPeakTrackedMemBytes));
 }
 
 TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
@@ -517,6 +527,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     additiveMetrics.planningTime = Microseconds(100);
     additiveMetrics.cardinalityEstimationMethods.setHeuristics(2);
     additiveMetrics.nDocsSampled = 10;
+    additiveMetrics.clusterPeakTrackedMemBytes = 1000;
 
     query_stats::DataBearingNodeMetrics remoteMetrics;
     remoteMetrics.keysExamined = 3;
@@ -540,6 +551,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     remoteMetrics.cardinalityEstimationMethods.setHistogram(1);
     remoteMetrics.cardinalityEstimationMethods.setSampling(1);
     remoteMetrics.nDocsSampled = 15;
+    remoteMetrics.clusterPeakTrackedMemBytes = 2048;
 
     additiveMetrics.aggregateDataBearingNodeMetrics(remoteMetrics);
 
@@ -567,6 +579,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getMetadata().value_or(0), 0);
     ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getCode().value_or(0), 0);
     ASSERT_EQ(*additiveMetrics.nDocsSampled, 25);
+    ASSERT_EQ(*additiveMetrics.clusterPeakTrackedMemBytes, 3048);
 }
 
 TEST(CurOpTest, AdditiveMetricsAggregateDataBearingNodeMetricsTreatsNoneAsZero) {

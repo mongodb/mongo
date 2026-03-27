@@ -3684,6 +3684,7 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         metrics.setWasDeprioritized(false);
         metrics.setWasMarkedNonDeprioritizable(false);
         metrics.setOverdueInterruptApproxMaxMillis(100);
+        metrics.setClusterPeakTrackedMemBytes(100);
         scheduleResponse(id, {fromjson("{_id: 1}")}, std::move(metrics));
     }
 
@@ -3729,6 +3730,7 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         ASSERT_EQ(remoteMetrics.cardinalityEstimationMethods.getMetadata().value_or(0), 0);
         ASSERT_EQ(remoteMetrics.cardinalityEstimationMethods.getCode().value_or(0), 0);
         ASSERT_EQ(remoteMetrics.nDocsSampled, 15);
+        ASSERT_EQ(remoteMetrics.clusterPeakTrackedMemBytes, 100);
     }
 
     // Schedule a second response.
@@ -3764,6 +3766,7 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         metrics.setWasDeprioritized(true);
         metrics.setWasMarkedNonDeprioritizable(true);
         metrics.setOverdueInterruptApproxMaxMillis(200);
+        metrics.setClusterPeakTrackedMemBytes(400);
         scheduleResponse(CursorId(0), {fromjson("{_id: 2}")}, std::move(metrics));
     }
 
@@ -3807,6 +3810,7 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         ASSERT_EQ(remoteMetrics.cardinalityEstimationMethods.getMetadata().value_or(0), 0);
         ASSERT_EQ(remoteMetrics.cardinalityEstimationMethods.getCode().value_or(0), 0);
         ASSERT_EQ(remoteMetrics.nDocsSampled, 31);
+        ASSERT_EQ(remoteMetrics.clusterPeakTrackedMemBytes, 500);
     }
 
     {
@@ -3837,6 +3841,7 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         ASSERT_EQ(remoteMetrics.nInserted, 0);
         ASSERT_EQ(remoteMetrics.planningTime, Microseconds(0));
         ASSERT_EQ(remoteMetrics.nDocsSampled, 0);
+        ASSERT_EQ(remoteMetrics.clusterPeakTrackedMemBytes, 0);
     }
 
     // Read the EOF

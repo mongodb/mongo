@@ -104,6 +104,9 @@ void QueryExecEntry::toBSON(BSONObjBuilder& queryStatsBuilder, bool buildAsSubse
     numInterruptChecksPerSec.appendTo(*builder, "numInterruptChecksPerSec");
     overdueInterruptApproxMaxMillis.appendTo(*builder, "overdueInterruptApproxMaxMillis");
 
+    peakTrackedMemBytes.appendTo(*builder, "peakTrackedMemBytes");
+    clusterPeakTrackedMemBytes.appendTo(*builder, "clusterPeakTrackedMemBytes");
+
     if (buildAsSubsection) {
         queryStatsBuilder.append("queryExec", builder->obj());
     }

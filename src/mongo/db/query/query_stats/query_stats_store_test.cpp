@@ -1546,6 +1546,9 @@ struct QueryStatsBSONParams {
     BSONObj planningTimeMicros = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
     CardinalityEstimationMethods cardinalityEstimationMethods;
     BSONObj nDocsSampled = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
+    BSONObj peakTrackedMemBytes = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
+    BSONObj clusterPeakTrackedMemBytes =
+        intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
 };
 
 void verifyQueryStatsBSON(QueryStatsEntry& qse, const QueryStatsBSONParams& params = {}) {
@@ -1585,7 +1588,9 @@ void verifyQueryStatsBSON(QueryStatsEntry& qse, const QueryStatsBSONParams& para
         .append("wasDeprioritized", boolMetricBson(0, 0))
         .append("wasMarkedNonDeprioritizable", boolMetricBson(0, 0))
         .append("numInterruptChecksPerSec", emptyIntMetric)
-        .append("overdueInterruptApproxMaxMillis", emptyIntMetric);
+        .append("overdueInterruptApproxMaxMillis", emptyIntMetric)
+        .append("peakTrackedMemBytes", params.peakTrackedMemBytes)
+        .append("clusterPeakTrackedMemBytes", params.clusterPeakTrackedMemBytes);
 
     BSONObjBuilder queryPlannerSection{};
     if (params.useSubsections) {
@@ -1697,6 +1702,8 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
             metrics->lastExecutionMicros += 123456;
             metrics->queryPlannerStats.usedDisk.aggregate(true);
             metrics->queryPlannerStats.hasSortStage.aggregate(false);
+            metrics->queryExecStats.peakTrackedMemBytes.aggregate(2048);
+            metrics->queryExecStats.clusterPeakTrackedMemBytes.aggregate(5000);
             metrics->writesStats.nMatched.aggregate(1);
             metrics->writesStats.nModified.aggregate(1);
             metrics->writesStats.nUpdateOps.aggregate(1);
@@ -1705,18 +1712,21 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
         // With some boolean and write metrics.
         {
             auto qse2 = getMetrics(query1);
-            verifyQueryStatsBSON(qse2,
-                                 {
-                                     .useSubsections = useSubsections,
-                                     .includeWriteMetrics = true,
-                                     .lastExecutionMicros = 246912LL,
-                                     .execCount = 2LL,
-                                     .hasSortStage = boolMetricBson(0, 1),
-                                     .usedDisk = boolMetricBson(1, 0),
-                                     .nMatched = intMetricBson(1, 1, 1, 1),
-                                     .nModified = intMetricBson(1, 1, 1, 1),
-                                     .nUpdateOps = intMetricBson(1, 1, 1, 1),
-                                 });
+            verifyQueryStatsBSON(
+                qse2,
+                {
+                    .useSubsections = useSubsections,
+                    .includeWriteMetrics = true,
+                    .lastExecutionMicros = 246912LL,
+                    .execCount = 2LL,
+                    .hasSortStage = boolMetricBson(0, 1),
+                    .usedDisk = boolMetricBson(1, 0),
+                    .nMatched = intMetricBson(1, 1, 1, 1),
+                    .nModified = intMetricBson(1, 1, 1, 1),
+                    .nUpdateOps = intMetricBson(1, 1, 1, 1),
+                    .peakTrackedMemBytes = intMetricBson(2048, 2048, 2048, 2048LL * 2048),
+                    .clusterPeakTrackedMemBytes = intMetricBson(5000, 5000, 5000, 5000LL * 5000),
+                });
         }
     }
 }

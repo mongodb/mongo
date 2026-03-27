@@ -85,7 +85,8 @@ static const BSONObj basicMetricsObj = fromjson(R"({
     nUpserted: {"$numberLong": "0"},
     nModified: {"$numberLong": "0"},
     nDeleted: {"$numberLong": "0"},
-    nInserted: {"$numberLong": "0"}
+    nInserted: {"$numberLong": "0"},
+    clusterPeakTrackedMemBytes: {"$numberLong": "4096"}
 })");
 
 static const std::string defaultNssStr = "db.coll";
@@ -360,6 +361,7 @@ TEST(CursorResponseTest, parseFromBSONCursorMetrics) {
     ASSERT_EQ(metrics.getNModified(), 0);
     ASSERT_EQ(metrics.getNDeleted(), 0);
     ASSERT_EQ(metrics.getNInserted(), 0);
+    ASSERT_EQ(metrics.getClusterPeakTrackedMemBytes(), 4096);
 }
 
 TEST(CursorResponseTest, parseFromBSONCursorMetricsWrongType) {
@@ -985,6 +987,7 @@ TEST_F(CursorResponseBuilderTest, buildResponseWithAllKnownFields) {
     metrics.setNModified(1);
     metrics.setNDeleted(0);
     metrics.setNInserted(0);
+    metrics.setClusterPeakTrackedMemBytes(1000);
     CardinalityEstimationMethods ceMethods;
     ceMethods.setHistogram(2);
     ceMethods.setSampling(1);
@@ -1035,6 +1038,7 @@ TEST_F(CursorResponseBuilderTest, buildResponseWithAllKnownFields) {
     ASSERT_EQ(parsedMetrics->getNModified(), 1);
     ASSERT_EQ(parsedMetrics->getNDeleted(), 0);
     ASSERT_EQ(parsedMetrics->getNInserted(), 0);
+    ASSERT_EQ(parsedMetrics->getClusterPeakTrackedMemBytes(), 1000);
 
     const auto& parsedCeMethods = parsedMetrics->getCardinalityEstimationMethods();
     ASSERT_EQ(parsedCeMethods.getHistogram().value_or(0), 2);
@@ -1090,6 +1094,7 @@ TEST(CursorResponseTest, parseFromBSONCursorMetricsToleratesMissingDefaultFields
     ASSERT_FALSE(metrics.getWasLoadShed());
     ASSERT_FALSE(metrics.getWasDeprioritized());
     ASSERT_FALSE(metrics.getWasMarkedNonDeprioritizable());
+    ASSERT_EQ(metrics.getClusterPeakTrackedMemBytes(), 0);
 }
 
 }  // namespace

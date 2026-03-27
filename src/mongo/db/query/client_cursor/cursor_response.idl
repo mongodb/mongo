@@ -227,6 +227,11 @@ structs:
                 type: bool
                 stability: unstable
                 default: false
+            clusterPeakTrackedMemBytes:
+                description: "Sum of local peak tracked memory and peak tracked memory from all remote shards contacted during query execution."
+                type: long
+                stability: unstable
+                default: 0
 
     ResponseCursorBase:
         description: "Common fields of initial and subsequent cursor responses."

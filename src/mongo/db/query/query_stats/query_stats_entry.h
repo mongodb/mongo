@@ -99,6 +99,17 @@ struct QueryExecEntry {
      */
     AggregatedMetric<uint64_t> numInterruptChecksPerSec;
     AggregatedMetric<int64_t> overdueInterruptApproxMaxMillis;
+
+    /**
+     * Aggregates the local peak tracked memory usage in bytes.
+     */
+    AggregatedMetric<uint64_t> peakTrackedMemBytes;
+
+    /**
+     * Aggregates the total peak tracked memory usage in bytes (sum of local
+     * peak + per-shard peak when node is acting as a router).
+     */
+    AggregatedMetric<uint64_t> clusterPeakTrackedMemBytes;
 };
 
 struct CostBasedRankerEntry {

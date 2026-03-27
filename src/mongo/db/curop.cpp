@@ -555,6 +555,15 @@ void CurOp::_setEndOfOpMetrics(OpDebug::AdditiveMetrics& metrics) {
     if (_debug.storageStats) {
         metrics.aggregateStorageStats(*_debug.storageStats);
     }
+
+    if (int64_t peakMem = getPeakTrackedMemoryBytes()) {
+        int64_t prevLocalPeak = metrics.peakTrackedMemBytes.value_or(0);
+        metrics.peakTrackedMemBytes = peakMem;
+        // clusterPeakTrackedMemBytes should only include peakTrackedMemBytes value once so we add
+        // the difference here.
+        metrics.clusterPeakTrackedMemBytes =
+            metrics.clusterPeakTrackedMemBytes.value_or(0) + (peakMem - prevLocalPeak);
+    }
 }
 
 void CurOp::setEndOfOpMetrics(long long nreturned) {

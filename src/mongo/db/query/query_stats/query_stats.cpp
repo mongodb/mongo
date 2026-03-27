@@ -307,6 +307,10 @@ void updateQueryExecStatistics(QueryExecEntry& queryExecEntryToUpdate,
     queryExecEntryToUpdate.numInterruptChecksPerSec.aggregate(numInterruptChecksPerSec);
     queryExecEntryToUpdate.overdueInterruptApproxMaxMillis.aggregate(
         snapshot.overdueInterruptApproxMaxMillis);
+
+    queryExecEntryToUpdate.peakTrackedMemBytes.aggregate(snapshot.peakTrackedMemBytes);
+    queryExecEntryToUpdate.clusterPeakTrackedMemBytes.aggregate(
+        snapshot.clusterPeakTrackedMemBytes);
 }
 
 void updateQueryPlannerStatistics(QueryPlannerEntry& queryPlannerEntryToUpdate,
@@ -582,7 +586,9 @@ QueryStatsSnapshot captureMetrics(const OperationContext* opCtx,
         static_cast<uint64_t>(metrics.totalAdmissions.value_or(0)),
         metrics.wasLoadShed.value_or(false),
         metrics.wasDeprioritized.value_or(false),
-        metrics.wasMarkedNonDeprioritizable.value_or(false)};
+        metrics.wasMarkedNonDeprioritizable.value_or(false),
+        metrics.peakTrackedMemBytes.value_or(0),
+        metrics.clusterPeakTrackedMemBytes.value_or(0)};
 
     return snapshot;
 }

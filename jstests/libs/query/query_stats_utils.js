@@ -476,6 +476,8 @@ export function getQueryExecMetrics(metrics) {
         maxAcquisitionDelinquencyMillis: metrics.maxAcquisitionDelinquencyMillis,
         numInterruptChecksPerSec: metrics.numInterruptChecksPerSec,
         overdueInterruptApproxMaxMillis: metrics.overdueInterruptApproxMaxMillis,
+        peakTrackedMemBytes: metrics.peakTrackedMemBytes,
+        clusterPeakTrackedMemBytes: metrics.clusterPeakTrackedMemBytes,
     };
 }
 
