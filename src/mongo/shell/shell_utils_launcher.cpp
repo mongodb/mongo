@@ -600,9 +600,15 @@ BSONObj StopMongoProgramByPid(const BSONObj& a, void* data) {
 
 BSONObj ConvertTrafficRecordingToBSON(const BSONObj& a, void* data) {
     int nFields = a.nFields();
-    uassert(ErrorCodes::FailedToParse, "wrong number of arguments", nFields == 1);
+    uassert(ErrorCodes::FailedToParse, "wrong number of arguments", nFields > 0 && nFields <= 2);
 
-    auto arr = trafficRecordingFileToBSONArr(a.firstElement().String());
+    std::vector<BSONElement> elems;
+    a.elems(elems);
+
+    std::string dir = elems[0].String();
+    bool embedBodies = elems.size() == 2 ? elems[1].Bool() : false;
+
+    auto arr = trafficRecordingFileToBSONArr(dir, embedBodies);
     return BSON("" << arr);
 }
 

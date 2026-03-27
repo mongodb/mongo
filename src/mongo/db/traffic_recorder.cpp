@@ -500,6 +500,10 @@ StatusReply TrafficRecorder::status() const {
     return res;
 }
 
+bool TrafficRecorder::isActive() const {
+    return _shouldRecord.load();
+}
+
 void TrafficRecorder::sessionStarted(const transport::Session& ts) {
     auto id = ts.id();
     auto session = ts.toBSON().toString();

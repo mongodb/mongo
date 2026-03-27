@@ -53,6 +53,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/traffic_recorder.h"
+#include "mongo/db/traffic_recorder/stashed_request.h"
 #include "mongo/executor/split_timer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_severity_suppressor.h"
@@ -793,7 +794,12 @@ Future<DbResponse> SessionWorkflow::Impl::_dispatchWork() {
     invariant(_work);
     invariant(!_work->in().empty());
 
-    TrafficRecorder::get(_serviceContext).observeRequest(*session(), _work->in());
+    // If a traffic recording is active, we may need to record this request.
+    // The decision as to whether to record depends on the _parsed_ request
+    // (to know if the request is "sensitive" e.g., auth), but we wish to record
+    // exactly what was received off the wire.
+    auto requestForTrafficRecording =
+        boost::make_optional(TrafficRecorder::get(_serviceContext).isActive(), _work->in());
 
     _work->decompressRequest();
 
@@ -805,6 +811,14 @@ Future<DbResponse> SessionWorkflow::Impl::_dispatchWork() {
 
     // Pass sourced Message to handler to generate response.
     _work->initOperation();
+
+    if (requestForTrafficRecording) {
+        // The opCtx has been initialized, stash the request.
+        // If processing the request finds it to be "sensitive",
+        // this stashed request will be cleared, and will not be
+        // written to disk.
+        StashedRequest::get(_work->opCtx()).set(std::move(*requestForTrafficRecording));
+    }
 
     return _sep->handleRequest(_work->opCtx(), _work->in(), _work->started());
 }
@@ -855,7 +869,19 @@ void SessionWorkflow::Impl::_acceptResponse(DbResponse response) {
 
     toSink = work.compressResponse(toSink);
 
-    TrafficRecorder::get(_serviceContext).observeResponse(*session(), toSink);
+    // If opCtx is null, this is a case which returned a response before parsing
+    // and executing the request e.g., a rate limit rejection.
+    // In that case, we don't know if the request contains sensitive data,
+    // and there is no opCtx to have stashed it in anyway.
+    if (auto* opCtx = _work->opCtx()) {
+        if (const auto& request = StashedRequest::get(opCtx).take()) {
+            // We stashed a request, and it was not found to contain sensitive data,
+            // so we can now write out the request and corresponding response.
+            auto& rec = TrafficRecorder::get(_serviceContext);
+            rec.observeRequest(*session(), std::move(*request));
+            rec.observeResponse(*session(), toSink);
+        }
+    }
 
     work.setOut(std::move(toSink));
 }

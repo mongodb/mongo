@@ -237,3 +237,14 @@ declare function numberDecimalsAlmostEqual(a: NumberDecimal, b: NumberDecimal, p
  * @returns True if the values are exactly equal, false otherwise
  */
 declare function numberDecimalsEqual(a: NumberDecimal, b: NumberDecimal): boolean
+
+/**
+ * Read the recorded requests/responses/meta from recordingDir.
+ * @param recordingDir Directory from which to read recorded data
+ * @param embedBody If true, embed request/response body as a nested bson document, else, include
+ *     the full raw response as BinData.
+ */
+declare function convertTrafficRecordingToBSON(
+    recordingDir: string,
+    embedBody?: boolean,
+): object;

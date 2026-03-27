@@ -1227,6 +1227,7 @@ mongo_cc_library(
         "traffic_recorder.cpp",
         "traffic_recorder_gen",
         "traffic_recorder_validators.cpp",
+        "//src/mongo/db/traffic_recorder:stashed_request.cpp",
     ],
     deps = [
         ":server_base",

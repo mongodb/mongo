@@ -124,6 +124,8 @@ public:
 
     StatusReply status() const;
 
+    bool isActive() const;
+
 
     void sessionStarted(const transport::Session& ts);
     void sessionEnded(const transport::Session& ts);
