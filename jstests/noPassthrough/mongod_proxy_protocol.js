@@ -13,7 +13,9 @@ if (_isWindows()) {
 import {
     emptyMessageTest,
     fuzzingTest,
-    testProxyProtocolReplicaSet
+    testProxyProtocolReplicaSet,
+    testProxyProtocolReplicaSetWithProxyUnixSocket,
+    testClientMetadataLogOverUnixSocket,
 } from "jstests/noPassthrough/libs/proxy_protocol_helpers.js";
 import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
 
@@ -29,8 +31,9 @@ function sendHelloMaybeLB(node, port, loadBalanced, count) {
 
     if (loadBalanced) {
         assert(checkLog.checkContainsWithCountJson(
-            node, kLoadBalancerNoOpMessage, {}, count, undefined, true),
-            `Did not find log id ${tojson(kLoadBalancerNoOpMessage)} ${tojson(count)} times in the log`);
+                   node, kLoadBalancerNoOpMessage, {}, count, undefined, true),
+               `Did not find log id ${tojson(kLoadBalancerNoOpMessage)} ${
+                   tojson(count)} times in the log`);
     }
 }
 
@@ -44,7 +47,8 @@ function failInvalidProtocol(node, port, id, attrs, loadBalanced, count) {
         assert(false, 'Client was unable to connect to the load balancer port');
     } catch (err) {
         assert(checkLog.checkContainsWithCountJson(node, id, attrs, count, undefined, true),
-            `Did not find log id ${tojson(id)} with attr ${tojson(attrs)} ${tojson(id)} times in the log`);
+               `Did not find log id ${tojson(id)} with attr ${tojson(attrs)} ${
+                   tojson(id)} times in the log`);
     }
 }
 
@@ -76,7 +80,7 @@ function standardPortTest(ingressPort, egressPort, version) {
     const rs = new ReplSetTest({nodes: 1, nodeOptions: {"proxyPort": egressPort}});
     rs.startSet({
         setParameter: {
-            "logComponentVerbosity": { "network": { "verbosity": 5 } },
+            "logComponentVerbosity": {"network": {"verbosity": 5}},
             "proxyProtocolTimeoutSecs": 10,
             "proxyProtocolMaximumWaitBackoffMillis": 500,
             "featureFlagMongodProxyProcolSupport": true,
@@ -116,3 +120,5 @@ testProxyProtocolReplicaSet(ingressPort, egressPort, 2, emptyMessageTest);
 
 testProxyProtocolReplicaSet(ingressPort, egressPort, 1, fuzzingTest);
 testProxyProtocolReplicaSet(ingressPort, egressPort, 2, fuzzingTest);
+
+testProxyProtocolReplicaSetWithProxyUnixSocket(ingressPort, testClientMetadataLogOverUnixSocket);
