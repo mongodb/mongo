@@ -175,7 +175,65 @@ using FieldMap = absl::flat_hash_map<StringPool::Id, FieldId>;
 /// When a stage depends on a field definition, it means that the stage references a field that was
 /// most recently modified by that field definition node. Similarly, field definition A can depend
 /// on field definition B if A references B through a rename or in an expression.
-using FieldDependencies = absl::flat_hash_set<FieldId>;
+class FieldDependencies {
+public:
+    static FieldDependencies wholeDocument() {
+        return FieldDependencies(true);
+    }
+
+    /// Empty field dependencies.
+    FieldDependencies() {}
+
+    /// Initialize with known field dependencies.
+    FieldDependencies(std::initializer_list<FieldId> fields) : _fields(fields) {}
+
+    FieldDependencies(const FieldDependencies&) = default;
+    FieldDependencies(FieldDependencies&&) = default;
+
+    FieldDependencies& operator=(const FieldDependencies&) = default;
+    FieldDependencies& operator=(FieldDependencies&&) = default;
+
+    /**
+     * Checks if the entire document is a dependency (including all fields).
+     */
+    bool dependsOnWholeDocument() const {
+        return _dependsOnWholeDocument;
+    }
+
+    auto begin() const {
+        tassert(12194201,
+                "Called begin() when dependsOnWholeDocument() is true",
+                !_dependsOnWholeDocument);
+        return _fields.begin();
+    }
+
+    auto end() const {
+        tassert(12194202,
+                "Called end() when dependsOnWholeDocument() is true",
+                !_dependsOnWholeDocument);
+        return _fields.end();
+    }
+
+    /**
+     * Adds a dependency on the specified field.
+     * Does nothing if the field is already a dependency.
+     */
+    void insert(FieldId field) {
+        if (_dependsOnWholeDocument) {
+            // We depend on all fields in this case, including this one.
+            return;
+        }
+        _fields.insert(field);
+    }
+
+private:
+    /// Private constructor for creating dependency on the whole document.
+    explicit FieldDependencies(bool dependsOnWholeDocument)
+        : _dependsOnWholeDocument(dependsOnWholeDocument) {}
+
+    absl::flat_hash_set<FieldId> _fields;
+    bool _dependsOnWholeDocument{false};
+};
 
 /**
  * Represents a DocumentSource that references or defines fields (or both).
@@ -321,11 +379,17 @@ public:
         : _documentSource(documentSource),
           _isSingleDocumentTransformation(documentSource.getId() ==
                                           DocumentSourceSingleDocumentTransformation::id) {
-        documentSource.getDependencies(&_deps);
+        if (documentSource.getDependencies(&_deps) == DepsTracker::State::NOT_SUPPORTED) {
+            _deps.needWholeDocument = true;
+        }
     }
 
     void describeTransformation(document_transformation::DocumentOperationVisitor& visitor) const {
         _documentSource.describeTransformation(visitor);
+    }
+
+    bool dependsOnWholeDocument() const {
+        return _deps.needWholeDocument;
     }
 
     const OrderedPathSet& getPathDependencies() const {
@@ -601,7 +665,7 @@ private:
                 : ScopeId::none();
             if (parentEmbeddedScope) {
                 // The new field depends on the previous field, since it inherits paths.
-                _fields[newBaseField].dependencies.emplace(existingBaseField);
+                _fields[newBaseField].dependencies.insert(existingBaseField);
             }
             declareScope(_scopes[scope].stage, exhaustiveEmbeddedScope, parentEmbeddedScope);
             _scopes[scope].fields[basePath.front()] = newBaseField;
@@ -616,7 +680,7 @@ private:
                                           std::move(dependencies),
                                           std::move(metadata),
                                           nestedPrefix);
-        _fields[newBaseField].dependencies.emplace(embeddedField);
+        _fields[newBaseField].dependencies.insert(embeddedField);
         return newBaseField;
     }
 
@@ -1003,20 +1067,24 @@ private:
 
         auto parentScopeId = _stages.empty() ? ScopeId::none() : _stages.back().scope;
         FieldDependencies dependencies;
-        if (parentScopeId) {
-            for (auto&& path : dsInfo.getPathDependencies()) {
-                auto parsedPath = internPath(path);
-                // The dependency could be:
-                // - exact field
-                // - shadowing field
-                // - <missing> field
-                // - collection field / FieldId::none()
-                auto fieldId = lookupField(parentScopeId, parsedPath).fieldId;
-                dependencies.insert(fieldId);
+        if (dsInfo.dependsOnWholeDocument()) {
+            dependencies = FieldDependencies::wholeDocument();
+        } else {
+            if (parentScopeId) {
+                for (auto&& path : dsInfo.getPathDependencies()) {
+                    auto parsedPath = internPath(path);
+                    // The dependency could be:
+                    // - exact field
+                    // - shadowing field
+                    // - <missing> field
+                    // - collection field / FieldId::none()
+                    auto fieldId = lookupField(parentScopeId, parsedPath).fieldId;
+                    dependencies.insert(fieldId);
+                }
+            } else if (!dsInfo.getPathDependencies().empty()) {
+                // Any dependency in the first stage is always a collection field.
+                dependencies.insert(FieldId::none());
             }
-        } else if (!dsInfo.getPathDependencies().empty()) {
-            // Any dependency in the first stage is always a collection field.
-            dependencies.insert(FieldId::none());
         }
         const auto nextNewScopeId = _scopes.getNextId();
         auto scopeId = processScope(dsInfo, stageId, parentScopeId, dependencies);
@@ -1313,6 +1381,10 @@ private:
     }
 
     void serializeDependencies(const FieldDependencies& deps, BSONObjBuilder& bob) {
+        if (deps.dependsOnWholeDocument()) {
+            bob.append("dependencies", "<all>");
+            return;
+        }
         BSONArrayBuilder depsBuilder = bob.subarrayStart("dependencies");
         for (auto depFieldId : sortedFieldDeps(deps)) {
             depsBuilder.append(formatField(depFieldId));

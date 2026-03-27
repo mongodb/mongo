@@ -414,5 +414,19 @@ TEST_F(PipelineDependencyGraphGoldenTest, GroupKeyFromBaseDocument) {
     });
 }
 
+TEST_F(PipelineDependencyGraphGoldenTest, InternalInhibitOptimization) {
+    runVariation({
+        .name = "InternalInhibitOptimization",
+        .pipeline = "[{$_internalInhibitOptimization: {}}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, MiddleStageDependsOnWholeDocument) {
+    runVariation({
+        .name = "MiddleStageDependsOnWholeDocument",
+        .pipeline = "[{$set: {}}, {$_internalInhibitOptimization: {}}, {$set: {}}]",
+    });
+}
+
 }  // namespace
 }  // namespace mongo::pipeline::dependency_graph

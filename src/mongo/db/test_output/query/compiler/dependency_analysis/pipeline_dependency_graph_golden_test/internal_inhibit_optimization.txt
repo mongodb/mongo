@@ -1,0 +1,23 @@
+VARIATION InternalInhibitOptimization
+input: {
+    "pipeline": [
+        {
+            "$_internalInhibitOptimization": {}
+        }
+    ]
+}
+output: {
+    "$_internalInhibitOptimization:0": {
+        "scope:0": {
+            "exhaustiveScope": "scope:0",
+            "fields": {
+                "<missing>:0": {
+                    "declaringScope": "scope:0",
+                    "dependencies": []
+                }
+            }
+        },
+        "dependencies": "<all>"
+    }
+}
+

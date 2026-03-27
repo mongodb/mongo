@@ -1,0 +1,45 @@
+VARIATION MiddleStageDependsOnWholeDocument
+input: {
+    "pipeline": [
+        {
+            "$set": {}
+        },
+        {
+            "$_internalInhibitOptimization": {}
+        },
+        {
+            "$set": {}
+        }
+    ]
+}
+output: {
+    "$set:0": {
+        "scope:0": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:0": {
+                    "declaringScope": "scope:0",
+                    "dependencies": []
+                }
+            }
+        },
+        "dependencies": []
+    },
+    "$_internalInhibitOptimization:1": {
+        "scope:1": {
+            "exhaustiveScope": "scope:1",
+            "fields": {
+                "<missing>:1": {
+                    "declaringScope": "scope:1",
+                    "dependencies": []
+                }
+            }
+        },
+        "dependencies": "<all>"
+    },
+    "$set:2": {
+        "scope:1": "scope:1",
+        "dependencies": []
+    }
+}
+
