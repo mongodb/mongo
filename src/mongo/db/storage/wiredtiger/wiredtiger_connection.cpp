@@ -255,10 +255,11 @@ void WiredTigerConnection::_releaseSession(std::unique_ptr<WiredTigerSession> se
     std::swap(currentEngineTime, session->_storageEngineTime);
 
     {
-        // Release resources in the session we're about to cache.
-        session->closeAllCursors("");
-        invariant(session->cachedCursors() == 0);
-
+        // Intentionally skip closeAllCursors("") so that MongoDB's per-session cursor
+        // cache (_cursors list) survives across OpCtx boundaries in the session pool,
+        // eliminating the per-request WT close->cache->reopen round-trip (~1.6% CPU).
+        // Before any exclusive DDL operation, callers must invoke closePooledCursorsForUri()
+        // to release session_ref counts on the target dhandle. See SERVER-122455.
         session->resetSessionConfiguration();
         invariantWTOK(session->reset(), *session);
     }
@@ -277,6 +278,13 @@ void WiredTigerConnection::_releaseSession(std::unique_ptr<WiredTigerSession> se
 
     if (_engine) {
         _engine->sizeStorerPeriodicFlush();
+    }
+}
+
+void WiredTigerConnection::closePooledCursorsForUri(const std::string& uri) {
+    stdx::lock_guard<stdx::mutex> lock(_cacheLock);
+    for (auto& session : _sessions) {
+        session->closeAllCursors(uri);
     }
 }
 

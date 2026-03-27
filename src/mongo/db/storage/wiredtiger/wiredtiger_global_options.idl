@@ -89,12 +89,15 @@ server_parameters:
     # Not supported.
     #
     # wiredTigerCursorCacheSize < 0
-    # This is a hybrid approach of the above two, and is the default. The the
+    # This is a hybrid approach of the above two, and is the default. The
     # absolute value of the setting is used as the number of cursors cached above
-    # the storage engine. When a session is released, all cursors are closed, and
-    # will be cached in WiredTiger. Exclusive operations should only be blocked
-    # for a short time, except if a cursor is held by a long running session. This
-    # is a good compromise for most workloads.
+    # the storage engine. Cursors are retained in MongoDB's per-session cache
+    # across OpCtx boundaries (they are not closed when a session is returned to
+    # the pool), eliminating the WT close->cache->reopen round-trip on each
+    # request. Before any exclusive DDL operation (drop, verify, salvage), the
+    # engine explicitly sweeps all parked cursors for the target URI via
+    # WiredTigerConnection::closePooledCursorsForUri, releasing session_ref counts
+    # so that WiredTiger's exclusive-lock protocol can proceed. See SERVER-122455.
     wiredTigerCursorCacheSize:
         description: "Wired tiger cursor cache size"
         set_at: [startup, runtime]

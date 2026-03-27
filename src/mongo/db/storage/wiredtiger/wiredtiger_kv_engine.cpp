@@ -1035,6 +1035,8 @@ Status WiredTigerKVEngine::repairIdent(RecoveryUnit& ru, StringData ident) {
 }
 
 Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
+    _connection->closePooledCursorsForUri(uri);
+
     // Using a side session to avoid transactional issues
     WiredTigerSession session(_connection.get());
 
@@ -1750,6 +1752,8 @@ Status WiredTigerKVEngine::recoverOrphanedIdent(const rss::PersistenceProvider& 
     auto start = Date_t::now();
     LOGV2(22335, "Salvaging ident", "ident"_attr = ident);
 
+    _connection->closePooledCursorsForUri(WiredTigerUtil::buildTableUri(ident));
+
     WiredTigerSession session(_connection.get());
     status = wtRCToStatus(session.salvage(WiredTigerUtil::buildTableUri(ident).c_str(), nullptr),
                           session,
@@ -1905,8 +1909,11 @@ Status WiredTigerKVEngine::importSortedDataInterface(RecoveryUnit& ru,
 }
 
 Status WiredTigerKVEngine::dropSortedDataInterface(RecoveryUnit& ru, StringData ident) {
-    return WiredTigerIndex::Drop(WiredTigerRecoveryUnit::get(ru),
-                                 WiredTigerUtil::buildTableUri(ident));
+    auto uri = WiredTigerUtil::buildTableUri(ident);
+    auto& wtRu = WiredTigerRecoveryUnit::get(ru);
+    wtRu.getSessionNoTxn()->closeAllCursors(uri);
+    _connection->closePooledCursorsForUri(uri);
+    return WiredTigerIndex::Drop(wtRu, uri);
 }
 
 std::unique_ptr<SortedDataInterface> WiredTigerKVEngine::getSortedDataInterface(
@@ -2039,6 +2046,11 @@ Status WiredTigerKVEngine::alterMetadata(StringData uri, StringData config) {
     auto uriNullTerminated = std::string{uri};
     auto configNullTerminated = std::string{config};
 
+    // Release any parked cursors on this URI from pooled sessions before requesting exclusive
+    // access. Without this, pooled sessions with cached cursors hold dhandle session_ref counts
+    // that cause alter() to return EBUSY even after a checkpoint retry. See SERVER-122455.
+    _connection->closePooledCursorsForUri(uriNullTerminated);
+
     auto ret = session.alter(uriNullTerminated.c_str(), configNullTerminated.c_str());
     // WT may return EBUSY if the database contains dirty data. If we checkpoint and retry the
     // operation it will attempt to clean up the dirty elements during checkpointing, thus
@@ -2060,6 +2072,7 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
 
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
     wtRu.getSessionNoTxn()->closeAllCursors(uri);
+    _connection->closePooledCursorsForUri(uri);
 
     // Use a separate session to avoid transactional issues, because a drop may impact the
     // in-progress transaction.
@@ -2096,6 +2109,7 @@ void WiredTigerKVEngine::dropIdentForImport(Interruptible& interruptible,
 
     WiredTigerRecoveryUnit* wtRu = checked_cast<WiredTigerRecoveryUnit*>(&ru);
     wtRu->getSessionNoTxn()->closeAllCursors(uri);
+    _connection->closePooledCursorsForUri(uri);
 
     // Use a separate session to avoid transactional issues, because a drop may impact the
     // in-progress transaction.
