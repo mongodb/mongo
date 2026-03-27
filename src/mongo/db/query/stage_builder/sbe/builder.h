@@ -98,7 +98,7 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
                                     const CanonicalQuery& cq,
                                     const MultipleCollectionAccessor& collections,
                                     PlanYieldPolicySBE* yieldPolicy,
-                                    bool preparingFromCache,
+                                    bool preparingFromSbeCache,
                                     RemoteCursorMap* remoteCursors = nullptr);
 
 std::pair<SbStage, PlanStageData> buildSearchMetadataExecutorSBE(OperationContext* opCtx,

@@ -99,7 +99,8 @@ WorkingSet* ClassicPlannerInterface::ws() const {
 }
 
 SavedExecState ClassicPlannerInterface::extractExecState() && {
-    return {.workingSet = std::move(_plannerData.workingSet), .root = std::move(_root)};
+    return ClassicExecState{.workingSet = std::move(_plannerData.workingSet),
+                            .root = std::move(_root)};
 }
 
 void ClassicPlannerInterface::addDeleteStage(ParsedDelete* parsedDelete,

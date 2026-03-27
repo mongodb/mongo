@@ -49,6 +49,20 @@ EngineChoice chooseEngine(OperationContext* opCtx,
                           bool needsMerge,
                           std::unique_ptr<QueryPlannerParams> plannerParams,
                           const QuerySolution* solution = nullptr,
-                          const std::function<void()>& extendSolutionWithPipelineFn = nullptr);
+                          const std::function<void()>& extendSolutionWithPipelineFn = nullptr,
+                          bool attachPipelineStages = true);
+
+/*
+ * Selects the execution engine, guaranteeing that if SBE is chosen, the query solution will be
+ * extended with the SBE-eligible pipeline prefix. If classic is chosen and the solution was
+ * extended for the eligibility check, the extension is removed.
+ */
+EngineChoice extendSolutionAndSelectEngine(std::unique_ptr<QuerySolution>& solution,
+                                           OperationContext* opCtx,
+                                           CanonicalQuery* cq,
+                                           Pipeline* pipeline,
+                                           const MultipleCollectionAccessor& collections,
+                                           QueryPlannerParams& plannerParams,
+                                           bool attachPipelineStages = true);
 
 }  // namespace mongo

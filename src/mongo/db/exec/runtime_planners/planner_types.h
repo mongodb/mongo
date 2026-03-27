@@ -30,9 +30,12 @@
 #pragma once
 
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/engine_selection.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_planner_params.h"
+#include "mongo/db/query/sbe_plan_ranker.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
@@ -76,18 +79,48 @@ struct PlannerData {
 
 
 /**
- * Stores relevant state required to resume executing a partially
- * evaluated PlanStage at a later time.
+ * Stores relevant state required to resume executing a partially evaluated PlanStage at a later
+ * time.
  *
  * Later, a SingleSolutionPassthroughPlanner can be rebuilt using this.
  *
- * This allows CBR strategies which use multiplanning internally to
- * "stash" the work done, so the caller can create an executor
- * which does not need to repeat the work done by multiplanning.
+ * This allows any planning method (multiplanning, CBR fallback, cache trialing) to "stash" the work
+ * done, so the caller can create an executor which does not need to repeat work. The classic saved
+ * exec state is used to save multiplanning work and classic cached plan trialing work. The SBE
+ * saved exec state is used to save SBE cached plan trialing work.
  */
-struct SavedExecState {
+struct ClassicExecState {
     std::unique_ptr<WorkingSet> workingSet;
     std::unique_ptr<PlanStage> root;
+};
+struct SbeExecState {
+    sbe::plan_ranker::CandidatePlan sbeCandidate;
+    std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy;
+};
+struct SavedExecState {
+    SavedExecState(ClassicExecState c) : savedState(std::move(c)) {}
+    SavedExecState(SbeExecState s) : savedState(std::move(s)) {}
+
+    template <class T>
+    const T* peekExecState() const {
+        return std::get_if<T>(&savedState);
+    }
+
+    template <class T>
+    T* peekExecState() {
+        return std::get_if<T>(&savedState);
+    }
+
+    template <class T>
+    T extractExecState() {
+        tassert(11756605,
+                "Expected SavedExecState to hold requested execution state",
+                std::holds_alternative<T>(savedState));
+        return std::get<T>(std::move(savedState));
+    }
+
+private:
+    std::variant<ClassicExecState, SbeExecState> savedState;
 };
 
 struct PlanRankingResult {
@@ -115,5 +148,10 @@ struct PlanRankingResult {
 
     // Hash of the plan for this query that exists in the cache.
     boost::optional<size_t> cachedPlanHash;
+
+    // Populated only if `featureFlagGetExecutorDeferredEngineChoice` is enabled.
+    // If a plan was fetched from the plan cache, we need to know which engine to
+    // use for trialing, so we call engine selection early and store the result here.
+    boost::optional<EngineChoice> engineSelection;
 };
 }  // namespace mongo

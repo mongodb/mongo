@@ -172,7 +172,7 @@ export function checkSbeEqLookupUnwindEnabled(theDB) {
     }
 }
 
-function isDeferredGetExecutorEnabled(theDB) {
+export function isDeferredGetExecutorEnabled(theDB) {
     if (theDB !== null) {
         return discoverNodesAndCheck(theDB, (conn) => {
             return FeatureFlagUtil.isPresentAndEnabled(conn, "GetExecutorDeferredEngineChoice");

@@ -191,8 +191,8 @@ TEST_F(DeferredEngineChoiceLoweringTest, IdhackUsesClassic) {
     // Mark that IdHack was used, and provide the existing exec state.
     PlanRankingResult rankingResult{
         .usedIdhack = true,
-        .execState = SavedExecState{.workingSet = std::move(plannerData.workingSet),
-                                    .root = std::move(idHackStage)},
+        .execState = SavedExecState{ClassicExecState{
+            .workingSet = std::move(plannerData.workingSet), .root = std::move(idHackStage)}},
         .plannerParams = std::move(plannerData.plannerParams)};
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec =
         lowerPlanRankingResult(std::move(cq),

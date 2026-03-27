@@ -15,17 +15,6 @@ selector:
     # Query settings are not supported on standalone.
     - jstests/core/query/query_settings/**/*.js
 
-    # TODO SERVER-117566 implement caching in new get_executor
-    - jstests/core/administrative/profile/profile_find.js
-    - jstests/core/query/explain/explain_plan_cache.js
-    - jstests/core/timeseries/query/bucket_unpacking_with_sort_plan_cache.js
-
-    # TODO SERVER-119602 enable PBT
-    - jstests/core/**/*_pbt.js
-
-    # TODO SERVER-117566 implement caching in new get_executor
-    - jstests/core/query/cbr_plan_in_cache_cbr_disabled.js
-
     # TODO SERVER-119773 implement SBE plan cache
     - jstests/core/query/sbe/sbe_plan_cache_duplicate_or_clauses.js
     - jstests/core/query/sbe/sbe_plan_cache_autoparameterize_ixscan.js

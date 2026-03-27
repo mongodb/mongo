@@ -7,7 +7,11 @@
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 import {getAggPlanStages, getEngine, getPlanStage} from "jstests/libs/query/analyze_plan.js";
 import {assertCacheUsage, setUpActiveCacheEntry} from "jstests/libs/query/plan_cache_utils.js";
-import {sbePlanCacheEnabled, checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {
+    isDeferredGetExecutorEnabled,
+    sbePlanCacheEnabled,
+    checkSbeRestrictedOrFullyEnabled,
+} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
@@ -543,7 +547,11 @@ testReplanningAndCacheInvalidationOnForeignCollSizeIncrease(false /* singleSolut
             .getPlanCache()
             .list([{$match: {planCacheShapeHash: profileObj.planCacheShapeHash}}]);
         assert.eq(1, matchingCacheEntries.length);
-    } else if (lookupUsedSbeByDefault && engineAfterDisableLookupPushdown == "classic") {
+    } else if (
+        lookupUsedSbeByDefault &&
+        engineAfterDisableLookupPushdown == "classic" &&
+        !isDeferredGetExecutorEnabled(db)
+    ) {
         // If the lookup used SBE by default, then we cannot re-use the cache entry when we re-run
         // it in classic.
         runLookupQuery();
@@ -574,8 +582,11 @@ testReplanningAndCacheInvalidationOnForeignCollSizeIncrease(false /* singleSolut
             cachedIndexName: "b_1",
         });
     } else {
-        // Otherwise, we did not use SBE for the $lookup pipeline by default. In this case we can
-        // re-use the cache entry that was created earlier.
+        // Otherwise, either:
+        //   - We did not use SBE for the $lookup pipeline by default.
+        //   - The deferred get_executor path is enabled, so the classic cache entries are shared between
+        //     queries that use SBE and queries that use classic.
+        // So we can re-use the cache entry that was created earlier.
         runLookupQuery();
         assertCacheUsage({
             queryColl: coll,
@@ -668,7 +679,11 @@ if (usingSbePlanCache) {
         .getPlanCache()
         .list([{$match: {planCacheShapeHash: profileObj.planCacheShapeHash}}]);
     assert.eq(1, matchingCacheEntries.length);
-} else if (groupUsedSbeByDefault && engineUsedAfterGroupPushdownDisabled === "classic") {
+} else if (
+    groupUsedSbeByDefault &&
+    engineUsedAfterGroupPushdownDisabled === "classic" &&
+    !isDeferredGetExecutorEnabled(db)
+) {
     // In other cases, we will NOT be able to re-use the same cache entry, since the group query
     // ran in SBE, and now that group pushdown is disabled, it will be marked as SBE incompatible.
     runGroupQuery();

@@ -28,9 +28,18 @@
  */
 #include "mongo/db/query/engine_selection_plan.h"
 
+#include "mongo/util/fail_point.h"
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+
+// Test-only failpoint that overrides plan-based engine selection using index names. When active,
+// if the winning plan's IXSCAN uses the index named "sbe", SBE is forced; if it uses
+// the index named "classic", classic is forced. This overrides the normal rules
+// (GROUP/LOOKUP -> SBE, etc.) and exists solely to let JS tests exercise cross-engine replanning
+// where a cached plan for one engine is evicted and replaced by one that uses the other engine.
+MONGO_FAIL_POINT_DEFINE(engineSelectionOverrideByIndexName);
 
 namespace {
 
@@ -230,6 +239,26 @@ public:
 static_assert(HasPreVisit<HashedIndexScanPatternRule, IndexScanNode>);
 
 /**
+ * Test-only rule that matches when the plan contains an IXSCAN whose catalog name equals
+ * 'targetIndexName'. Used by the engineSelectionOverrideByIndexName failpoint.
+ */
+class IndexNameRule_ForTest {
+public:
+    explicit IndexNameRule_ForTest(StringData targetIndexName)
+        : _targetIndexName(targetIndexName) {}
+
+    void preVisit(RuleEngine& engine, const IndexScanNode& node) {
+        if (node.index.identifier.catalogName == _targetIndexName) {
+            engine.match();
+        }
+    }
+
+private:
+    StringData _targetIndexName;
+};
+static_assert(HasPreVisit<IndexNameRule_ForTest, IndexScanNode>);
+
+/**
  * This rule matches:
  * 1. A query solution that has at least one AND_HASH or AND_SORTED node. (SERVER-90818).
  */
@@ -244,7 +273,6 @@ public:
 };
 static_assert(HasPreVisit<AndHashOrSortedRule, AndSortedNode>);
 static_assert(HasPreVisit<AndHashOrSortedRule, AndHashNode>);
-
 }  // namespace
 
 bool isPlanSbeEligible(const QuerySolution* solution) {
@@ -257,6 +285,20 @@ EngineChoice engineSelectionForPlan(const QuerySolution* solution) {
                 1,
                 "Plan-based engine selection logic invoked.",
                 "solution"_attr = solution->toString());
+
+    // Test-only: when the failpoint is active, override engine selection based on the index name
+    // used by the winning plan's IXSCAN. An IXSCAN named "sbe" forces SBE; an IXSCAN named
+    // "classic" forces classic. This takes precedence over all other rules.
+    if (auto scoped = engineSelectionOverrideByIndexName.scoped();
+        MONGO_unlikely(scoped.isActive())) {
+        if (treeMatchesAny(solution, IndexNameRule_ForTest("sbe"))) {
+            return EngineChoice::kSbe;
+        }
+        if (treeMatchesAny(solution, IndexNameRule_ForTest("classic"))) {
+            return EngineChoice::kClassic;
+        }
+    }
+
     return treeMatchesAny(solution, LookupUnwindRule(), LookupRule(), GroupRule())
         ? EngineChoice::kSbe
         : EngineChoice::kClassic;

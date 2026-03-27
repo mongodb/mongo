@@ -32,16 +32,20 @@
 #include "mongo/db/exec/classic/multi_plan.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
+#include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
+#include "mongo/db/exec/runtime_planners/classic_runtime_planner_for_sbe/planner_interface.h"
 #include "mongo/db/exec/runtime_planners/exec_deferred_engine_choice_runtime_planner/planner_interface.h"
 #include "mongo/db/exec/runtime_planners/planner_types.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/engine_selection.h"
 #include "mongo/db/query/get_executor_fast_paths.h"
 #include "mongo/db/query/get_executor_helpers.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_ranking/plan_ranker.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
+#include "mongo/db/query/query_planner_params_diagnostic_printer.h"
 #include "mongo/db/stats/counters.h"
 
 #include <memory>
@@ -49,8 +53,81 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::exec_deferred_engine_choice {
-
 namespace {
+
+using CachedSolutionPair =
+    std::pair<std::unique_ptr<CachedSolution>, std::unique_ptr<QuerySolution>>;
+
+boost::optional<CachedSolutionPair> retrievePlanFromCache(
+    const PlanCacheKey& planCacheKey,
+    CanonicalQuery* cq,
+    const MultipleCollectionAccessor& collections,
+    const QueryPlannerParams& plannerParams) {
+    auto cs = CollectionQueryInfo::get(collections.getMainCollection())
+                  .getPlanCache()
+                  ->getCacheEntryIfActive(planCacheKey);
+    if (!cs) {
+        return boost::none;
+    }
+
+    // We have a CachedSolution.  Have the planner turn it into a QuerySolution.
+    auto statusWithQs = QueryPlanner::planFromCache(*cq, plannerParams, *cs->cachedPlan.get());
+    if (!statusWithQs.isOK()) {
+        return boost::none;
+    }
+
+    return {std::make_pair(std::move(cs), std::move(statusWithQs.getValue()))};
+}
+
+// If the given query should read from the plan cache, fetches the cached solution data, runs engine
+// selection, and returns the appropriate cached planner.
+std::unique_ptr<PlannerInterface> buildCachedPlan(
+    const PlanCacheKey& planCacheKey,
+    OperationContext* opCtx,
+    CanonicalQuery* cq,
+    Pipeline* pipeline,
+    const MultipleCollectionAccessor& collections,
+    std::shared_ptr<QueryPlannerParams> plannerParams,
+    std::function<PlannerData(boost::optional<size_t>)> makePlannerData) {
+    if (!shouldCacheQuery(*cq)) {
+        planCacheCounters.incrementClassicSkippedCounter();
+        return nullptr;
+    }
+
+    auto cachedSolutionPair = retrievePlanFromCache(planCacheKey, cq, collections, *plannerParams);
+    if (!cachedSolutionPair.has_value()) {
+        planCacheCounters.incrementClassicMissesCounter();
+        return nullptr;
+    }
+
+    planCacheCounters.incrementClassicHitsCounter();
+    auto [cachedSolution, querySolution] = std::move(*cachedSolutionPair);
+
+    const auto engine = extendSolutionAndSelectEngine(
+        querySolution, opCtx, cq, pipeline, collections, *plannerParams);
+    if (engine == EngineChoice::kClassic) {
+        auto classicCachePlanner = std::make_unique<classic_runtime_planner::CachedPlanner>(
+            makePlannerData(boost::none), std::move(cachedSolution), std::move(querySolution));
+        uassertStatusOK(classicCachePlanner->plan());
+        return classicCachePlanner;
+    } else {
+        auto plannerData = makePlannerData(boost::none);
+        auto sbeYieldPolicy = PlanYieldPolicySBE::make(
+            plannerData.opCtx, plannerData.yieldPolicy, collections, cq->nss());
+        return makePlannerForClassicCacheEntry(classic_runtime_planner_for_sbe::PlannerDataForSBE(
+                                                   std::move(plannerData),
+                                                   collections,
+                                                   // To be shared between all instances of this
+                                                   // type and the prepare helper creating them.
+                                                   plannerParams,
+                                                   std::move(sbeYieldPolicy),
+                                                   false),
+                                               std::move(querySolution),
+                                               cachedSolution->cachedPlan->solutionHash,
+                                               cachedSolution->decisionReads());
+    }
+}
+
 StatusWith<std::unique_ptr<PlannerInterface>> planWithCBR(
     OperationContext* opCtx,
     CanonicalQuery* cq,
@@ -93,7 +170,12 @@ StatusWith<std::unique_ptr<PlannerInterface>> planWithCBR(
         // MultiPlanStage. Extract the actual winning solution from the MultiPlanStage so downstream
         // code can use it.
         if (!rankerResult.solutions.empty() && rankerResult.solutions[0] == nullptr) {
-            auto* mps = dynamic_cast<MultiPlanStage*>(rankerResult.execState->root.get());
+            ClassicExecState* classicExecState =
+                rankerResult.execState->peekExecState<ClassicExecState>();
+            tassert(11756602,
+                    "Expected ranker to have saved classic execution state",
+                    classicExecState);
+            auto mps = dynamic_cast<MultiPlanStage*>(classicExecState->root.get());
             tassert(11960601, "Expected MultiPlanStage in execState when solution is null", mps);
             rankerResult.solutions[0] = mps->extractBestSolution();
         }
@@ -129,6 +211,9 @@ StatusWith<std::unique_ptr<PlannerInterface>> preparePlanner(
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     const MultipleCollectionAccessor& collections,
     Pipeline* pipeline) {
+    ScopedDebugInfo queryPlannerParams(
+        "queryPlannerParams", diagnostic_printers::QueryPlannerParamsPrinter{*plannerParams});
+
     auto makePlannerData = [&](boost::optional<size_t> cachedPlanHash) {
         return PlannerData{opCtx,
                            cq,
@@ -180,21 +265,41 @@ StatusWith<std::unique_ptr<PlannerInterface>> preparePlanner(
         return {{std::move(idHackPlan)}};
     }
 
+    // Planning logic is slightly different if we are replanning. We should not check the cache, and
+    // subplanning should not occur.
+    const bool replanning = plannerParams->replanningData.has_value();
+
     auto planCacheKey =
         plan_cache_key_factory::make<PlanCacheKey>(*cq, collections.getMainCollectionAcquisition());
     PlanCacheInfo planCacheInfo{planCacheKey.planCacheKeyHash(), planCacheKey.planCacheShapeHash()};
     setOpDebugPlanCacheInfo(opCtx, planCacheInfo);
 
-    boost::optional<size_t> cachedPlanHash = boost::none;
-    if (auto cs = CollectionQueryInfo::get(collections.getMainCollection())
-                      .getPlanCache()
-                      ->getCacheEntryIfActive(planCacheKey)) {
-        // TODO SERVER-117566 Implement plan cache lookup, including failpoint for forced replanning
-        // to get additional cache + replanning coverage.
-        cachedPlanHash = cs->cachedPlan->solutionHash;
+    if (!replanning) {
+        if (auto cachedPlanner = buildCachedPlan(
+                planCacheKey, opCtx, cq, pipeline, collections, plannerParams, makePlannerData);
+            cachedPlanner) {
+            return {std::move(cachedPlanner)};
+        }
     }
 
-    if (SubplanStage::needsSubplanning(*cq)) {
+    // If we are processing an explain, get the cached plan hash if there is one. This is
+    // used for the "isCached" field.
+    boost::optional<size_t> cachedPlanHash = boost::none;
+    if (MONGO_unlikely(cq->isExplainAndCacheIneligible())) {
+        auto cs = CollectionQueryInfo::get(collections.getMainCollection())
+                      .getPlanCache()
+                      ->getCacheEntryIfActive(planCacheKey);
+        if (cs) {
+            cachedPlanHash = cs->cachedPlan->solutionHash;
+        }
+    }
+
+    // If there's no plan in the cache for this query, we invoke planning.
+    incrementPlannerInvocationCount();
+
+    // TODO SERVER-120492: Investigate if we can remove the replanning restriction on
+    // subplanning. If not, add a descriptive comment here about why.
+    if (!replanning && SubplanStage::needsSubplanning(*cq)) {
         return std::make_unique<SubPlanner>(makePlannerData(cachedPlanHash));
     }
 
@@ -233,12 +338,9 @@ PlanRankingResult planRanking(OperationContext* opCtx,
     // If no express executor was returned, we can reuse the planner params created by `tryExpress`
     // for other planning logic.
     tassert(11974306, "Expected planner params to be initialized.", expressResult.plannerParams);
-    incrementPlannerInvocationCount();
     auto paramsForSingleCollectionQuery = std::move(expressResult.plannerParams);
 
-    auto makePlannerHelper = [&](std::unique_ptr<QueryPlannerParams> plannerParams,
-                                 boost::optional<std::string> replanReason = boost::none,
-                                 boost::optional<bool> shouldCache = boost::none) {
+    auto makePlannerHelper = [&](std::unique_ptr<QueryPlannerParams> plannerParams) {
         return uassertStatusOK(preparePlanner(opCtx,
                                               canonicalQuery.get(),
                                               std::move(plannerParams),

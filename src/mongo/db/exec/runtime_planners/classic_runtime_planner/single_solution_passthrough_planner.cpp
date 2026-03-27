@@ -55,7 +55,7 @@ SingleSolutionPassthroughPlanner::SingleSolutionPassthroughPlanner(
     PlannerData plannerData,
     std::unique_ptr<QuerySolution> querySolution,
     PlanExplainerData explainData,
-    SavedExecState&& state)
+    ClassicExecState&& state)
     : ClassicPlannerInterface(
           replaceWorkingSet(std::move(plannerData), std::move(state.workingSet)),
           std::move(explainData)),

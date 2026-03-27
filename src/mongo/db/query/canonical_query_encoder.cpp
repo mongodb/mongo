@@ -1305,6 +1305,18 @@ CanonicalQuery::QueryShapeString encodeClassic(const CanonicalQuery& cq) {
         cq.getOpCtx() && APIParameters::get(cq.getOpCtx()).getAPIStrict().value_or(false);
     keyBuilder << (apiStrict ? "t" : "f");
 
+    // In the deferred get_executor, we cannot encode the engine choice because it is not known
+    // during query optimization. We only encode whether the subplanner is used, to avoid the case
+    // under 'o' below, where cache entries created during subplanning do not have meaningful
+    // works/reads values.
+    if (MONGO_unlikely(feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.isEnabled())) {
+        if (cq.forSubPlanner()) {
+            keyBuilder << "s";  // Subplanning code path
+        } else {
+            keyBuilder << "r";  // Regular code path
+        }
+        return keyBuilder.str();
+    }
 
     // Encode a flag with three possible values:
     // 1 ('c'): The cache entry is intended to use the classic code path completely. In this case

@@ -10,10 +10,7 @@ selector:
     # TODO SERVER-121812 Investigate multiplan backup test failure in deferred get executor
     - jstests/noPassthroughWithMongod/query/explain/explain_with_backup_plans.js
 
-    # TODO SERVER-117566 implement plan cache in new get executor
-    - jstests/noPassthroughWithMongod/query/plan_cache_replanned_plan_is_cached_plan.js
-    - jstests/noPassthroughWithMongod/query/plan_cache_replanning.js
-    - jstests/noPassthroughWithMongod/query/plan_ranking/cbr_plan_cache.js
+    # TODO SERVER-119773 implement SBE plan cache in new get executors
     - jstests/noPassthroughWithMongod/query/sbe/sbe_index_count_scan_cache.js
 
     # TODO SERVER-117707 fully support SBE in CBR

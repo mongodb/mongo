@@ -238,7 +238,8 @@ TEST_F(CBRForNoMPResultsTest, NoResultsMultiPlannerUsesCBR) {
     ASSERT_EQ(status.getValue().needsWorksMeasuredForPlanCache, true);
 
     ASSERT_TRUE(status.getValue().execState);
-    auto mp = dynamic_cast<MultiPlanStage*>(status.getValue().execState->root.get());
+    auto mp = dynamic_cast<MultiPlanStage*>(
+        status.getValue().execState->peekExecState<ClassicExecState>()->root.get());
     ASSERT_TRUE(mp);
     ASSERT_EQ(mp->getStats()->children.size(), 2);  // One winning and one rejected plan
 }

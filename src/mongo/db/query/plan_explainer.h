@@ -59,6 +59,7 @@ struct PlanExplainerData {
     boost::optional<double> multiPlannerWinningPlanScore;
     stage_builder::PlanStageToQsnMap planStageQsnMap;
     cost_based_ranker::EstimateMap estimates;
+    bool fromPlanCache = false;
 };
 
 inline PlanExplainerData& operator<<(PlanExplainerData& lhs, PlanExplainerData&& rhs) {

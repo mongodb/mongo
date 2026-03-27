@@ -58,4 +58,22 @@ std::unique_ptr<QuerySolution> CachedPlanner::extractQuerySolution() {
 const QuerySolution* CachedPlanner::querySolution() const {
     return _querySolution.get();
 }
+
+PlanRankingResult CachedPlanner::extractPlanRankingResult() {
+    tassert(11756603,
+            "Expected `extractPlanRankingResult` to only be called with get executor deferred "
+            "feature flag enabled.",
+            feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.isEnabled());
+    std::vector<std::unique_ptr<QuerySolution>> solutions;
+    solutions.push_back(extractQuerySolution());
+    return PlanRankingResult{
+        .solutions = std::move(solutions),
+        .maybeExplainData = PlanExplainerData{.fromPlanCache = true},
+        .execState =
+            SavedExecState{ClassicExecState{.workingSet = extractWs(), .root = extractRoot()}},
+        .plannerParams = extractPlannerParams(),
+        .cachedPlanHash = cachedPlanHash(),
+        .engineSelection = EngineChoice::kClassic,
+    };
+}
 }  // namespace mongo::classic_runtime_planner

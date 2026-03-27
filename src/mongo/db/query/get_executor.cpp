@@ -651,9 +651,10 @@ private:
         // the plan to be cached.
         // Ensure that ranking returning anything but a multi-plan stage in the future will draw
         // dev attention to this, as it is not trivial to assert "plan has been cached".
+        auto classicExecState = maybeExecState->extractExecState<ClassicExecState>();
         tassert(11727701,
                 "Ranker saved execution state but it wasn't a multi plan stage",
-                dynamic_cast<MultiPlanStage*>(maybeExecState->root.get()));
+                dynamic_cast<MultiPlanStage*>(classicExecState.root.get()));
 
         auto result = releaseResult();
         result->runtimePlanner =
@@ -662,7 +663,7 @@ private:
                 nullptr,  // The solution is owned by the MultiPlanStage, so we pass a nullptr here
                           // to avoid confusion.
                 std::move(explainData),
-                std::move(*maybeExecState));
+                std::move(classicExecState));
         return result;
     }
 

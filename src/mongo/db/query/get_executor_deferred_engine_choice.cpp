@@ -58,6 +58,7 @@
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/update/update_driver.h"
@@ -85,6 +86,14 @@ getExecutorFindDeferredEngineChoice(OperationContext* opCtx,
                                                  makeQueryPlannerParams);
     if (rankerResult.expressExecutor) {
         return {std::move(rankerResult.expressExecutor)};
+    }
+    // If we replanned and the old plan and new plan are the same, update the counter.
+    if (rankerResult.plannerParams->replanningData && !rankerResult.solutions.empty()) {
+        const auto replanningData = rankerResult.plannerParams->replanningData;
+        const auto qsn = rankerResult.solutions.at(0).get();
+        if (qsn && replanningData->oldPlanHash == qsn->hash()) {
+            planCacheCounters.incrementClassicReplannedPlanIsCachedPlanCounter();
+        }
     }
     return lowerPlanRankingResult(std::move(canonicalQuery),
                                   std::move(rankerResult),

@@ -37,8 +37,6 @@
 #include "mongo/db/query/engine_selection.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/query/planner_analysis.h"
-#include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
@@ -95,73 +93,33 @@ public:
             return makeClassicExecutor(std::move(solution));
         }
 
-        const auto engine = attachPipelineStagesAndSelectEngine(solution);
-        return engine == EngineChoice::kClassic ? makeClassicExecutor(std::move(solution))
-                                                : makeSbePlanExecutor(std::move(solution));
+        // If the engine has already been selected, it means a plan was retrieved from the cache
+        // and trialed. The pipeline stages are attached to the QSN and we have a partially executed
+        // plan stage that can be continued.
+        if (_rankingResult.engineSelection) {
+            const auto engine = *_rankingResult.engineSelection;
+            return engine == EngineChoice::kClassic
+                ? makeClassicExecutor(std::move(solution))
+                : makeSbePlanExecutor(std::move(solution), true /*fromCandidate*/);
+        }
+
+        // If this ranking result is from replanning, the canonical query already has the SBE
+        // eligible stages attached.
+        const bool needToAttachStagesToCq =
+            !_rankingResult.plannerParams->replanningData.has_value();
+        const auto engine = extendSolutionAndSelectEngine(solution,
+                                                          _opCtx,
+                                                          _cq.get(),
+                                                          _pipeline,
+                                                          _collections,
+                                                          *plannerParams(),
+                                                          needToAttachStagesToCq);
+        return engine == EngineChoice::kClassic
+            ? makeClassicExecutor(std::move(solution))
+            : makeSbePlanExecutor(std::move(solution), false /*fromCandidate*/);
     }
 
 private:
-    /*
-     * Selects the engine to execute in, guaranteeing that if SBE is chosen, the QSN will be
-     * extended with SBE-eligible pipeline prefix.
-     */
-    EngineChoice attachPipelineStagesAndSelectEngine(std::unique_ptr<QuerySolution>& solution) {
-        bool qsnExtendFnCalled = false;
-        bool qsnExtendedForSbe = false;
-        // If there is an eligible pipeline prefix to attach to the QSN, fills out the planner
-        // params for secondary collections and attaches the stages to the QSN.
-        //    - Tracks if this function was called already via `qsnExtendFnCalled`, since engine
-        //      selection won't always need to call it.
-        //    - Tracks `qsnExtendedForSbe` so we know if the resulting QSN contains a SentinelNode
-        //      that needs to be removed.
-        auto extendSolutionWithPipelineFn = [&]() {
-            qsnExtendFnCalled = true;
-            if (_cq->cqPipeline().empty()) {
-                // Nothing to extend if the CQ pipeline is empty.
-                return;
-            }
-            qsnExtendedForSbe = true;
-            plannerParams()->fillOutSecondaryCollectionsPlannerParams(_opCtx, *_cq, _collections);
-            extendSolutionWithPipeline(solution);
-        };
-
-        const auto engine = chooseEngine(
-            _opCtx,
-            _collections,
-            _cq.get(),
-            _pipeline,
-            _cq->getExpCtx()->getNeedsMerge(),
-            std::make_unique<QueryPlannerParams>(QueryPlannerParams::ArgsForPushDownStagesDecision{
-                .opCtx = _opCtx,
-                .canonicalQuery = *_cq,
-                .collections = _collections,
-                .plannerOptions = _rankingResult.plannerParams->providedOptions,
-            }),
-            solution.get(),
-            extendSolutionWithPipelineFn);
-
-
-        if (engine == EngineChoice::kClassic && qsnExtendedForSbe) {
-            // If classic was chosen and we extended the QSN to check for SBE eligibility, remove
-            // the extension.
-            solution->removeRootToSentinel();
-        } else if (engine == EngineChoice::kSbe) {
-            // If SBE is chosen, we might still need to call the extension function.
-            if (!qsnExtendFnCalled) {
-                extendSolutionWithPipelineFn();
-            }
-            // If there was a pipeline to extend the QSN with, the QSN now has a SentinelNode that
-            // we need to remove. There is also an additional optimization we may perform if a
-            // $project is its child.
-            if (qsnExtendedForSbe) {
-                solution->removeSentinelNode();
-                solution =
-                    QueryPlannerAnalysis::removeInclusionProjectionBelowGroup(std::move(solution));
-            }
-        }
-        return engine;
-    }
-
     QueryPlannerParams* plannerParams() {
         return _rankingResult.plannerParams.get();
     }
@@ -170,7 +128,11 @@ private:
         if (!_rankingResult.execState) {
             return nullptr;
         }
-        const PlanStage* planStage = _rankingResult.execState->root.get();
+        auto classicExecState = _rankingResult.execState->peekExecState<ClassicExecState>();
+        if (!classicExecState) {
+            return nullptr;
+        }
+        const PlanStage* planStage = classicExecState->root.get();
         if (!planStage || planStage->stageType() != STAGE_MULTI_PLAN) {
             return nullptr;
         }
@@ -181,7 +143,11 @@ private:
         if (!_rankingResult.execState) {
             return nullptr;
         }
-        auto& planStage = _rankingResult.execState->root;
+        auto classicExecState = _rankingResult.execState->peekExecState<ClassicExecState>();
+        if (!classicExecState) {
+            return nullptr;
+        }
+        auto& planStage = classicExecState->root;
         if (!planStage || planStage->stageType() != STAGE_MULTI_PLAN) {
             return nullptr;
         }
@@ -207,15 +173,9 @@ private:
     }
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeSbePlanExecutor(
-        std::unique_ptr<QuerySolution> solution) {
+        std::unique_ptr<QuerySolution> solution, bool fromCandidate) {
         // Remove any stages from `pipeline` that will be pushed down to SBE.
         finalizePipelineStages(_pipeline, _cq.get());
-
-        auto sbeYieldPolicy =
-            PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, _cq->nss());
-        auto sbePlanAndData = stage_builder::buildSlotBasedExecutableTree(
-            _opCtx, _collections, *_cq, *solution, sbeYieldPolicy.get());
-
         const auto* expCtx = _cq->getExpCtxRaw();
         auto remoteCursors = expCtx->getExplain()
             ? nullptr
@@ -223,25 +183,53 @@ private:
         auto remoteExplains = expCtx->getExplain()
             ? search_helpers::getSearchRemoteExplains(expCtx, _cq->cqPipeline())
             : nullptr;
+        auto nss = _cq->nss();
+        tassert(11742306,
+                "Solution must be present if cachedPlanHash is present: ",
+                solution != nullptr || !_rankingResult.cachedPlanHash.has_value());
 
-        // SERVER-117566 integrate with plan cache.
-        static const bool isFromPlanCache = false;
+        // If we already have a plan that has been created and partially executed, reuse it.
+        // Otherwise, build the plan from scratch and prepare it.
+        if (fromCandidate) {
+            auto execState = _rankingResult.execState->extractExecState<SbeExecState>();
+            execState.sbeCandidate.solution = std::move(solution);
+            return uassertStatusOK(
+                plan_executor_factory::make(_opCtx,
+                                            std::move(_cq),
+                                            std::move(execState.sbeCandidate),
+                                            _collections,
+                                            _rankingResult.plannerParams->providedOptions,
+                                            std::move(nss),
+                                            std::move(execState.sbeYieldPolicy),
+                                            std::move(remoteCursors),
+                                            std::move(remoteExplains),
+                                            _rankingResult.cachedPlanHash));
+        }
+
+        auto sbeYieldPolicy =
+            PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, _cq->nss());
+        auto sbePlanAndData = stage_builder::buildSlotBasedExecutableTree(
+            _opCtx, _collections, *_cq, *solution, sbeYieldPolicy.get());
+
+        if (_rankingResult.plannerParams->replanningData) {
+            sbePlanAndData.second.replanReason =
+                _rankingResult.plannerParams->replanningData->replanReason;
+        }
+        // SERVER-119773 integrate with SBE plan cache.
+        static const bool preparingFromSbeCache = false;
         stage_builder::prepareSlotBasedExecutableTree(_opCtx,
                                                       sbePlanAndData.first.get(),
                                                       &sbePlanAndData.second,
                                                       *_cq.get(),
                                                       _collections,
                                                       sbeYieldPolicy.get(),
-                                                      isFromPlanCache,
+                                                      preparingFromSbeCache,
                                                       remoteCursors.get());
 
         // Count queries are not supported in SBE
         buildRejectedExecutableTreesForExplain(solution.get(), false /*isCountQuery*/);
 
-        auto nss = _cq->nss();
-        tassert(11742306,
-                "Solution must be present if cachedPlanHash is present: ",
-                solution != nullptr || !_rankingResult.cachedPlanHash.has_value());
+        static const bool isFromSbePlanCache = false;
         return uassertStatusOK(
             plan_executor_factory::make(_opCtx,
                                         std::move(_cq),
@@ -251,7 +239,7 @@ private:
                                         plannerParams()->providedOptions,
                                         std::move(nss),
                                         std::move(sbeYieldPolicy),
-                                        isFromPlanCache,
+                                        isFromSbePlanCache,
                                         _rankingResult.cachedPlanHash,
                                         false /*usedJoinOpt*/,
                                         {} /*estimates*/,
@@ -278,8 +266,9 @@ private:
         std::unique_ptr<WorkingSet> workingSet;
         std::unique_ptr<PlanStage> planStage;
         if (_rankingResult.execState) {
-            workingSet = std::move(_rankingResult.execState->workingSet);
-            planStage = std::move(_rankingResult.execState->root);
+            auto execState = _rankingResult.execState->extractExecState<ClassicExecState>();
+            workingSet = std::move(execState.workingSet);
+            planStage = std::move(execState.root);
         } else {
             workingSet = std::make_unique<WorkingSet>();
             if (!_rankingResult.maybeExplainData.has_value()) {
@@ -318,13 +307,6 @@ private:
                       std::move(_rankingResult.plannerParams->replanningData->replanReason))
                 : boost::none,
             std::move(_rankingResult.maybeExplainData)));
-    }
-
-    void extendSolutionWithPipeline(std::unique_ptr<QuerySolution>& solution) {
-        solution = QueryPlanner::extendWithAggPipeline(*_cq,
-                                                       std::move(solution),
-                                                       plannerParams()->secondaryCollectionsInfo,
-                                                       true /* keepSentinel */);
     }
 
     void buildRejectedExecutableTreesForExplain(const QuerySolution* solution,

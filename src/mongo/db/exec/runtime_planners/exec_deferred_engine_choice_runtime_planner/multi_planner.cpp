@@ -77,11 +77,11 @@ PlanRankingResult MultiPlanner::extractPlanRankingResult() {
     _maybeExplainData->planStageQsnMap.insert(std::make_move_iterator(_planStageQsnMap.begin()),
                                               std::make_move_iterator(_planStageQsnMap.end()));
 
-    return PlanRankingResult{
-        .solutions = makeQsnResult(std::move(querySolution)),
-        .maybeExplainData = std::move(_maybeExplainData),
-        .execState = SavedExecState{.workingSet = extractWs(), .root = std::move(_multiplanStage)},
-        .plannerParams = extractPlannerParams(),
-        .cachedPlanHash = cachedPlanHash()};
+    return PlanRankingResult{.solutions = makeQsnResult(std::move(querySolution)),
+                             .maybeExplainData = std::move(_maybeExplainData),
+                             .execState = SavedExecState{ClassicExecState{
+                                 .workingSet = extractWs(), .root = std::move(_multiplanStage)}},
+                             .plannerParams = extractPlannerParams(),
+                             .cachedPlanHash = cachedPlanHash()};
 }
 }  // namespace mongo::exec_deferred_engine_choice

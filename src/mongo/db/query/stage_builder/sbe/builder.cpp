@@ -227,7 +227,7 @@ SbSlotVector getSlotsToForward(StageBuilderState& state,
  * from the current query 'cq' into the plan if it was cloned from the SBE plan cache.
  *   root - root node of the execution tree
  *   data - slot metadata (not actual parameter data!) that goes with the execution tree
- *   preparingFromCache - if true, 'root' and 'data' may have come from the SBE plan cache. This
+ *   preparingFromSbeCache - if true, 'root' and 'data' may have come from the SBE plan cache. This
  *     means current parameters from 'cq' need to be substituted into the execution plan.
  */
 void prepareSlotBasedExecutableTree(OperationContext* opCtx,
@@ -236,7 +236,7 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
                                     const CanonicalQuery& cq,
                                     const MultipleCollectionAccessor& collections,
                                     PlanYieldPolicySBE* yieldPolicy,
-                                    const bool preparingFromCache,
+                                    const bool preparingFromSbeCache,
                                     RemoteCursorMap* remoteCursors) {
     tassert(6183502, "PlanStage cannot be null", root);
     tassert(6142205, "PlanStageData cannot be null", data);
@@ -299,11 +299,11 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
     // done in encodeSBE() (canonical_query_encoder.cpp). The main MatchExpression was parameterized
     // in CanonicalQuery::cqInit() and the pushed-down ones in QueryPlanner::extendWithAggPipeline()
     // (query_planner.cpp).
-    input_params::bind(cq.getPrimaryMatchExpression(), *data, preparingFromCache);
+    input_params::bind(cq.getPrimaryMatchExpression(), *data, preparingFromSbeCache);
     for (auto& innerStage : cq.cqPipeline()) {
         auto matchStage = dynamic_cast<DocumentSourceMatch*>(innerStage.get());
         if (matchStage) {
-            input_params::bind(matchStage->getMatchExpression(), *data, preparingFromCache);
+            input_params::bind(matchStage->getMatchExpression(), *data, preparingFromSbeCache);
         }
     }
 
@@ -313,11 +313,11 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
             cq, indexBoundsInfo, env.runtimeEnv, &indexBoundsEvaluationCache);
     }
 
-    if (preparingFromCache && data->staticData->doClusteredCollectionScanSbe) {
+    if (preparingFromSbeCache && data->staticData->doClusteredCollectionScanSbe) {
         input_params::bindClusteredCollectionBounds(cq, root, data, env.runtimeEnv);
     }
 
-    if (preparingFromCache && cq.shouldParameterizeLimitSkip()) {
+    if (preparingFromSbeCache && cq.shouldParameterizeLimitSkip()) {
         input_params::bindLimitSkipInputSlots(cq, data, env.runtimeEnv);
     }
 

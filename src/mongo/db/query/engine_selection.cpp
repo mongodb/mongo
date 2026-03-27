@@ -32,6 +32,8 @@
 #include "mongo/db/pipeline/sbe_pushdown.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/engine_selection_plan.h"
+#include "mongo/db/query/planner_analysis.h"
+#include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_utils.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -211,7 +213,8 @@ EngineChoice chooseEngine(OperationContext* opCtx,
                           bool needsMerge,
                           std::unique_ptr<QueryPlannerParams> plannerParams,
                           const QuerySolution* solution,
-                          const std::function<void()>& extendSolutionWithPipelineFn) {
+                          const std::function<void()>& extendSolutionWithPipelineFn,
+                          bool shouldAttachPipelineStages) {
     const bool hasSolution = solution != nullptr;
     const bool deferredEngineChoice =
         feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.isEnabled();
@@ -231,7 +234,9 @@ EngineChoice chooseEngine(OperationContext* opCtx,
     // Add the stages that are candidates for SBE lowering from the 'pipeline' into the
     // 'canonicalQuery'. This must be done _before_ checking shouldUseRegularSbe() or
     // creating the planner.
-    attachPipelineStages(collections, pipeline, needsMerge, cq, std::move(plannerParams));
+    if (shouldAttachPipelineStages) {
+        attachPipelineStages(collections, pipeline, needsMerge, cq, std::move(plannerParams));
+    }
 
     const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabled();
     if (sbeFull) {
@@ -241,6 +246,73 @@ EngineChoice chooseEngine(OperationContext* opCtx,
         ? shouldUseRegularSbeDeferredEngineSelection(
               opCtx, *cq, mainColl, sbeFull, solution, extendSolutionWithPipelineFn)
         : shouldUseRegularSbe(opCtx, *cq, mainColl, sbeFull);
+}
+
+EngineChoice extendSolutionAndSelectEngine(std::unique_ptr<QuerySolution>& solution,
+                                           OperationContext* opCtx,
+                                           CanonicalQuery* cq,
+                                           Pipeline* pipeline,
+                                           const MultipleCollectionAccessor& collections,
+                                           QueryPlannerParams& plannerParams,
+                                           bool attachPipelineStages) {
+    bool qsnExtendFnCalled = false;
+    bool qsnExtendedForSbe = false;
+    // If there is an eligible pipeline prefix to attach to the QSN, fills out the planner
+    // params for secondary collections and attaches the stages to the QSN.
+    //    - Tracks if this function was called already via `qsnExtendFnCalled`, since engine
+    //      selection won't always need to call it.
+    //    - Tracks `qsnExtendedForSbe` so we know if the resulting QSN contains a SentinelNode
+    //      that needs to be removed.
+    auto extendSolutionWithPipelineFn = [&]() {
+        qsnExtendFnCalled = true;
+        if (cq->cqPipeline().empty()) {
+            // Nothing to extend if the CQ pipeline is empty.
+            return;
+        }
+        qsnExtendedForSbe = true;
+        plannerParams.fillOutSecondaryCollectionsPlannerParams(opCtx, *cq, collections);
+        solution = QueryPlanner::extendWithAggPipeline(*cq,
+                                                       std::move(solution),
+                                                       plannerParams.secondaryCollectionsInfo,
+                                                       true /* keepSentinel */);
+    };
+
+    const auto engine = chooseEngine(
+        opCtx,
+        collections,
+        cq,
+        pipeline,
+        cq->getExpCtx()->getNeedsMerge(),
+        std::make_unique<QueryPlannerParams>(QueryPlannerParams::ArgsForPushDownStagesDecision{
+            .opCtx = opCtx,
+            .canonicalQuery = *cq,
+            .collections = collections,
+            .plannerOptions = plannerParams.providedOptions,
+        }),
+        solution.get(),
+        extendSolutionWithPipelineFn,
+        attachPipelineStages);
+
+
+    if (engine == EngineChoice::kClassic && qsnExtendedForSbe) {
+        // If classic was chosen and we extended the QSN to check for SBE eligibility, remove
+        // the extension.
+        solution->removeRootToSentinel();
+    } else if (engine == EngineChoice::kSbe) {
+        // If SBE is chosen, we might still need to call the extension function.
+        if (!qsnExtendFnCalled) {
+            extendSolutionWithPipelineFn();
+        }
+        // If there was a pipeline to extend the QSN with, the QSN now has a SentinelNode that
+        // we need to remove. There is also an additional optimization we may perform if a
+        // $project is its child.
+        if (qsnExtendedForSbe) {
+            solution->removeSentinelNode();
+            solution =
+                QueryPlannerAnalysis::removeInclusionProjectionBelowGroup(std::move(solution));
+        }
+    }
+    return engine;
 }
 
 }  // namespace mongo

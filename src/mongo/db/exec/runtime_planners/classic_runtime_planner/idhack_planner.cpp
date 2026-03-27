@@ -112,8 +112,8 @@ PlanRankingResult IdHackPlanner::extractPlanRankingResult() {
             "feature flag enabled.",
             feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.isEnabled());
     return PlanRankingResult{.usedIdhack = true,
-                             .execState =
-                                 SavedExecState{.workingSet = extractWs(), .root = extractRoot()},
+                             .execState = SavedExecState{ClassicExecState{.workingSet = extractWs(),
+                                                                          .root = extractRoot()}},
                              .plannerParams = extractPlannerParams()};
 }
 

@@ -726,6 +726,9 @@ bool findSbeCompatibleStagesForPushdown(
 
 void finalizePipelineStages(Pipeline* pipeline, const CanonicalQuery* canonicalQuery) {
     if (!pipeline || pipeline->empty()) {
+        tassert(11756601,
+                "Expected empty cqPipeline if pipeline doesn't exist",
+                canonicalQuery->cqPipeline().empty());
         return;
     }
 

@@ -73,10 +73,10 @@ PlanRankingResult SubPlanner::extractPlanRankingResult() {
     incrementClassicSubplannerChoseWinningPlan();
     auto querySolution = _subPlanStage->extractBestWholeQuerySolution();
 
-    return PlanRankingResult{
-        .solutions = makeQsnResult(std::move(querySolution)),
-        .execState = SavedExecState{.workingSet = extractWs(), .root = std::move(_subPlanStage)},
-        .plannerParams = extractPlannerParams(),
-        .cachedPlanHash = cachedPlanHash()};
+    return PlanRankingResult{.solutions = makeQsnResult(std::move(querySolution)),
+                             .execState = SavedExecState{ClassicExecState{
+                                 .workingSet = extractWs(), .root = std::move(_subPlanStage)}},
+                             .plannerParams = extractPlannerParams(),
+                             .cachedPlanHash = cachedPlanHash()};
 }
 }  // namespace mongo::exec_deferred_engine_choice

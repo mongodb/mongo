@@ -180,7 +180,7 @@ public:
     SingleSolutionPassthroughPlanner(PlannerData plannerData,
                                      std::unique_ptr<QuerySolution> querySolution,
                                      PlanExplainerData explainData,
-                                     SavedExecState&& state);
+                                     ClassicExecState&& state);
 
     const QuerySolution* querySolution() const override;
 
@@ -203,6 +203,7 @@ public:
                   std::unique_ptr<QuerySolution> querySolution);
 
     const QuerySolution* querySolution() const override;
+    PlanRankingResult extractPlanRankingResult() override;
 
 private:
     Status doPlan(PlanYieldPolicy* planYieldPolicy) override;

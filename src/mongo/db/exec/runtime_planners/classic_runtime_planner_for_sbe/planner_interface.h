@@ -71,6 +71,21 @@ struct PlannerDataForSBE final : public PlannerData {
           sbeYieldPolicy(std::move(sbeYieldPolicy)),
           useSbePlanCache(useSbePlanCache) {}
 
+    PlannerDataForSBE(PlannerData plannerData,
+                      const MultipleCollectionAccessor& collections,
+                      std::shared_ptr<QueryPlannerParams> plannerParams,
+                      std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy,
+                      bool useSbePlanCache)
+        : PlannerDataForSBE(plannerData.opCtx,
+                            plannerData.cq,
+                            std::move(plannerData.workingSet),
+                            collections,
+                            std::move(plannerParams),
+                            plannerData.yieldPolicy,
+                            plannerData.cachedPlanHash,
+                            std::move(sbeYieldPolicy),
+                            useSbePlanCache) {}
+
     std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy;
 
     // If true, runtime planners will use the SBE plan cache rather than the classic plan cache.
@@ -160,6 +175,10 @@ protected:
 
     const QueryPlannerParams& plannerParams() const {
         return *_plannerData.plannerParams;
+    }
+
+    std::shared_ptr<QueryPlannerParams> extractPlannerParams() {
+        return std::move(_plannerData.plannerParams);
     }
 
     PlannerDataForSBE extractPlannerData() {

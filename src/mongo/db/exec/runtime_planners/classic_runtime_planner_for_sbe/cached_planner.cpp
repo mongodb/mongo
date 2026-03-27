@@ -35,6 +35,7 @@
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/planner_analysis.h"
+#include "mongo/db/query/replanning_required_info.h"
 #include "mongo/db/query/sbe_trial_runtime_executor.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
 #include "mongo/db/stats/counters.h"
@@ -70,6 +71,24 @@ public:
                                                            extractSbeYieldPolicy(),
                                                            std::move(remoteCursors),
                                                            std::move(remoteExplains)));
+    }
+
+
+    PlanRankingResult extractPlanRankingResult() override {
+        tassert(11756604,
+                "Expected `extractPlanRankingResult` to only be called with get executor deferred "
+                "feature flag enabled.",
+                feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.isEnabled());
+        std::vector<std::unique_ptr<QuerySolution>> v;
+        v.push_back(std::move(_candidate.solution));
+        return PlanRankingResult{
+            .solutions = std::move(v),
+            .maybeExplainData = PlanExplainerData{.fromPlanCache = true},
+            .execState = SavedExecState{SbeExecState{.sbeCandidate = std::move(_candidate),
+                                                     .sbeYieldPolicy = extractSbeYieldPolicy()}},
+            .plannerParams = extractPlannerParams(),
+            .cachedPlanHash = cachedPlanHash(),
+            .engineSelection = EngineChoice::kSbe};
     }
 
 private:
@@ -251,9 +270,21 @@ std::unique_ptr<PlannerInterface> attemptToUsePlan(
                     "error"_attr = candidate.status.toString());
         std::string replanReason = str::stream() << "cached plan returned: " << candidate.status;
         recoverWhereExpression(plannerData.cq, std::move(candidate));
+
+        if (MONGO_unlikely(
+                feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.isEnabled())) {
+            // If we're using the deferred get_executor, we throw an exception which is caught be a
+            // higher level replanning try/catch, and will reuse the top-level planning path. If
+            // we're using the regular get_executor, this counter is incremented in `replan`.
+            incrementReplanCounterCb();
+            uassertStatusOK(Status(ReplanningRequiredInfo(plan_cache_util::CacheMode::NeverCache,
+                                                          *plannerData.cachedPlanSolutionHash),
+                                   std::move(replanReason)));
+        }
+
         return replan(std::move(plannerData),
                       indexExistenceChecker,
-                      std::move(replanReason),
+                      std::move(replanReason),  // NOLINT(bugprone-use-after-move)
                       /* shouldCache */ false,
                       incrementReplanCounterCb,
                       incrementReplannedPlanIsCachedPlanCounterCb);
@@ -281,9 +312,17 @@ std::unique_ptr<PlannerInterface> attemptToUsePlan(
             << "cached plan was less efficient than expected: expected trial execution to take "
             << decisionReads << " reads but it took at least " << numReads << " reads";
         recoverWhereExpression(plannerData.cq, std::move(candidate));
+
+        if (MONGO_unlikely(
+                feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.isEnabled())) {
+            incrementReplanCounterCb();
+            uassertStatusOK(Status(ReplanningRequiredInfo(plan_cache_util::CacheMode::AlwaysCache,
+                                                          *plannerData.cachedPlanSolutionHash),
+                                   std::move(replanReason)));  // NOLINT(bugprone-use-after-move)
+        }
         return replan(std::move(plannerData),
                       indexExistenceChecker,
-                      std::move(replanReason),
+                      std::move(replanReason),  // NOLINT(bugprone-use-after-move)
                       /* shouldCache */ true,
                       incrementReplanCounterCb,
                       incrementReplannedPlanIsCachedPlanCounterCb);

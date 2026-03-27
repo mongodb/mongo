@@ -9,14 +9,6 @@ selector:
     - jstests/aggregation/extras/*.js
     - jstests/aggregation/data/*.js
 
-    # TODO SERVER-119037 implement replanning in new get_executor
-    - jstests/aggregation/sbe/sbe_pushdown_replan_reason.js
-
-    # TODO SERVER-117566 implement caching in new get_executor
-    - jstests/aggregation/sources/lookup/lookup_single_solution_cache.js
-
-    # TODO SERVER-119602 enable PBT
-    - jstests/aggregation/**/*_pbt.js
 executor:
   archive:
     hooks:

@@ -761,9 +761,7 @@ struct MultiPlanStats : public SpecificStats {
     }
 
     // Currently this is only used for queries destined for SBE. Classic plans should not populate
-    // this field.
-    // TODO SERVER-117566: Update the comment here to reflect that this should now only be used in
-    // the old get_executor code path for SBE queries.
+    // this field. Only used in the old get_executor path for SBE queries.
     boost::optional<std::string> replanReason;
 
     // Total number of works across all candidate plans.
