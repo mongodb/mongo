@@ -31,7 +31,12 @@ def get_deps_dirs(deps):
 
 def add_module_to_path(poetry_dir, modules_added):
     for module in poetry_dir.iterdir():
-        for dist_info in module.iterdir():
+        try:
+            entries = list(module.iterdir())
+        except FileNotFoundError:
+            # Entry may be a dangling symlink in the bazel output tree
+            continue
+        for dist_info in entries:
             if str(dist_info).endswith(".dist-info"):
                 dirname = dist_info.parent
                 module = dirname.name
