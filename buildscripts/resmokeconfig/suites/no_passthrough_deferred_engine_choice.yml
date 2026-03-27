@@ -30,10 +30,6 @@ selector:
     - jstests/noPassthrough/query/queryStats/query_stats_cbr_metrics.js
     - jstests/noPassthrough/query/server_status/server_status_cbr.js
 
-    # TODO SERVER-122039 Investigate unknown failures
-    - jstests/noPassthrough/query/multiplanner/tie_breaking_index_prefix.js
-    - jstests/noPassthrough/query/server_status/server_status_subplanner.js
-
   exclude_with_any_tags:
 
 # noPassthrough tests start their own mongod's.

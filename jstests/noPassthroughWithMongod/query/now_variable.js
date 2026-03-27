@@ -4,7 +4,8 @@
 import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {getWinningPlanFromExplain, isIxscan} from "jstests/libs/query/analyze_plan.js";
-import {sbePlanCacheEnabled} from "jstests/libs/query/sbe_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {checkSbeFullFeatureFlagEnabled, sbePlanCacheEnabled} from "jstests/libs/query/sbe_util.js";
 
 const coll = db[jsTest.name()];
 const otherColl = db[coll.getName() + "_other"];
@@ -166,7 +167,8 @@ runTestsExpectFailure(baseCollectionClusterTimeAgg);
 runTestsExpectFailure(fromViewWithClusterTime);
 runTestsExpectFailure(withExprClusterTime);
 
-if (sbePlanCacheEnabled(db)) {
+// TODO SERVER-119773 Handle SBE plan cache in new get executor
+if (sbePlanCacheEnabled(db) && !FeatureFlagUtil.isPresentAndEnabled(db, "GetExecutorDeferredEngineChoice")) {
     function verifyPlanCacheSize(query) {
         coll.getPlanCache().clear();
 
@@ -216,7 +218,7 @@ if (sbePlanCacheEnabled(db)) {
 
     // Test that $$NOW is able to use index.
     // TODO SERVER-91535: Enable this test with SBE plan cache.
-    if (!sbePlanCacheEnabled(db)) {
+    if (!checkSbeFullFeatureFlagEnabled(db)) {
         assert.commandWorked(futureColl.createIndex({timeField: 1}));
         const explainResults = futureColl
             .find({$expr: {$lt: ["$timeField", {$subtract: ["$$NOW", 100]}]}})

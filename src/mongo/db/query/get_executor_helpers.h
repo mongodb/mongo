@@ -97,6 +97,11 @@ void setOpDebugPlanCacheInfo(OperationContext* opCtx, const PlanCacheInfo& cache
  */
 void incrementPlannerInvocationCount();
 
+/**
+ * Increments the query.subPlanner.classicChoseWinningPlan server status metric.
+ */
+void incrementClassicSubplannerChoseWinningPlan();
+
 using MakePlannerParamsFn = std::function<std::unique_ptr<QueryPlannerParams>(
     const CanonicalQuery&, size_t, boost::optional<QueryPlannerParams::ReplanningData>)>;
 using MakePlannerFn =

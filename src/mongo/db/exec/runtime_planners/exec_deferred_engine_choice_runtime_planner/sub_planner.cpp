@@ -29,6 +29,7 @@
 
 
 #include "mongo/db/exec/runtime_planners/exec_deferred_engine_choice_runtime_planner/planner_interface.h"
+#include "mongo/db/query/get_executor_helpers.h"
 #include "mongo/db/query/plan_yield_policy_impl.h"
 
 namespace mongo::exec_deferred_engine_choice {
@@ -69,6 +70,7 @@ PlanRankingResult SubPlanner::extractPlanRankingResult() {
     auto trialPeriodYieldPolicy = makeClassicYieldPolicy(
         opCtx(), cq()->nss(), static_cast<PlanStage*>(_subPlanStage.get()), yieldPolicy());
     uassertStatusOK(_subPlanStage->pickBestPlan(*plannerParams(), trialPeriodYieldPolicy.get()));
+    incrementClassicSubplannerChoseWinningPlan();
     auto querySolution = _subPlanStage->extractBestWholeQuerySolution();
 
     return PlanRankingResult{

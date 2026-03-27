@@ -27,20 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
+#include "mongo/db/query/get_executor_helpers.h"
 
 namespace mongo {
-
-namespace {
-/**
- * Aggregation of the total number of times the classic subplanner chose the winning plan.
- */
-auto& classicChoseWinningPlan =
-    *MetricBuilder<Counter64>{"query.subPlanner.classicChoseWinningPlan"};
-
-}  // namespace
 
 namespace classic_runtime_planner {
 
@@ -80,7 +71,7 @@ std::unique_ptr<QuerySolution> SubPlanner::extractQuerySolution() {
     // This function is called when the plan executor is created to extract the winning plan from
     // the planner, so if this code runs then we know the subplanner was invoked and chose the
     // winning plan.
-    classicChoseWinningPlan.increment();
+    incrementClassicSubplannerChoseWinningPlan();
     return nullptr;
 }
 

@@ -82,6 +82,12 @@ namespace {
  */
 auto& plannerInvocationCount = *MetricBuilder<Counter64>{"query.planning.invocationCount"};
 
+/**
+ * Aggregation of the total number of times the classic subplanner chose the winning plan.
+ */
+auto& classicChoseWinningPlan =
+    *MetricBuilder<Counter64>{"query.subPlanner.classicChoseWinningPlan"};
+
 void inspectPlannerResult(
     const std::unique_ptr<PlannerInterface>& result,
     const boost::optional<QueryPlannerParams::ReplanningData>& replanningData) {
@@ -148,6 +154,10 @@ void setOpDebugPlanCacheInfo(OperationContext* opCtx, const PlanCacheInfo& cache
 
 void incrementPlannerInvocationCount() {
     plannerInvocationCount.increment();
+}
+
+void incrementClassicSubplannerChoseWinningPlan() {
+    classicChoseWinningPlan.increment();
 }
 
 std::unique_ptr<PlannerInterface> retryMakePlanner(
