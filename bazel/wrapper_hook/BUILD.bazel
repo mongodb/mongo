@@ -1,4 +1,4 @@
-load("@rules_python//python:defs.bzl", "py_library")
+load("@rules_python//python:defs.bzl", "py_library", "py_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -39,4 +39,15 @@ py_library(
         "flag_sync.py",
     ],
     visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "lint_test",
+    srcs = [
+        "lint_test.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":wrapper_hook",
+    ],
 )

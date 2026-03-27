@@ -1,4 +1,5 @@
 import argparse
+import difflib
 import os
 import pathlib
 import platform
@@ -12,6 +13,66 @@ REPO_ROOT = pathlib.Path(__file__).parent.parent.parent
 sys.path.append(str(REPO_ROOT))
 
 LARGE_FILE_THRESHOLD = 10 * 1024 * 1024  # 10MiB
+
+
+def _read_optional_bytes(path: pathlib.Path) -> bytes | None:
+    try:
+        return path.read_bytes()
+    except FileNotFoundError:
+        return None
+
+
+def _restore_optional_bytes(path: pathlib.Path, data: bytes | None) -> None:
+    if data is None:
+        path.unlink(missing_ok=True)
+        return
+
+    path.write_bytes(data)
+
+
+def _display_path(path: pathlib.Path) -> str:
+    try:
+        return str(path.relative_to(REPO_ROOT))
+    except ValueError:
+        return str(path)
+
+
+def _print_unified_diff(path: pathlib.Path, before: bytes | None, after: bytes | None) -> None:
+    display_path = _display_path(path).lstrip("/\\")
+    before_lines = (before or b"").decode("utf-8", errors="replace").splitlines(keepends=True)
+    after_lines = (after or b"").decode("utf-8", errors="replace").splitlines(keepends=True)
+    diff = difflib.unified_diff(
+        before_lines,
+        after_lines,
+        fromfile=f"a/{display_path}",
+        tofile=f"b/{display_path}",
+    )
+    print("".join(diff), end="")
+
+
+def _lockfile_has_git_diff(path: pathlib.Path) -> bool:
+    display_path = _display_path(path)
+    result = subprocess.run(
+        ["git", "status", "--porcelain", "--", display_path],
+        capture_output=True,
+        text=True,
+        check=True,
+        cwd=REPO_ROOT,
+    )
+    return bool(result.stdout.strip())
+
+
+def _print_git_diff_against_head(path: pathlib.Path) -> None:
+    display_path = _display_path(path)
+    result = subprocess.run(
+        ["git", "diff", "--no-ext-diff", "HEAD", "--", display_path],
+        capture_output=True,
+        text=True,
+        check=True,
+        cwd=REPO_ROOT,
+    )
+    if result.stdout:
+        print(result.stdout, end="")
 
 
 def _get_buildozer() -> Optional[str]:
@@ -179,6 +240,66 @@ class LintRunner:
             self.fail = True
             if not self.keep_going:
                 raise LinterFail("Linter failed")
+
+    def refresh_module_lockfile(
+        self,
+        *,
+        fix: bool,
+        dry_run: bool,
+        lockfile_path: pathlib.Path | None = None,
+    ) -> None:
+        lockfile_path = lockfile_path or REPO_ROOT / "MODULE.bazel.lock"
+        lockfile_display = _display_path(lockfile_path)
+        original_contents = _read_optional_bytes(lockfile_path)
+
+        print(f"Refreshing {lockfile_display}...")
+        result = subprocess.run(
+            [self.bazel_bin, "mod", "deps", "--lockfile_mode=refresh"],
+            check=False,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+        )
+
+        refreshed_contents = _read_optional_bytes(lockfile_path)
+        changed = refreshed_contents != original_contents
+
+        if result.returncode != 0:
+            if changed:
+                _restore_optional_bytes(lockfile_path, original_contents)
+            self.fail = True
+            if not self.keep_going:
+                raise LinterFail(f"Failed to refresh {lockfile_display}")
+            return
+
+        if dry_run:
+            if not changed:
+                print(f"{lockfile_display} is up to date.")
+                return
+            print(
+                f"{lockfile_display} would be updated by `bazel mod deps --lockfile_mode=refresh`:"
+            )
+            _print_unified_diff(lockfile_path, original_contents, refreshed_contents)
+            _restore_optional_bytes(lockfile_path, original_contents)
+            return
+
+        if fix:
+            if changed:
+                print(f"Updated {lockfile_display} via `bazel mod deps --lockfile_mode=refresh`.")
+            else:
+                print(f"{lockfile_display} is up to date.")
+            return
+
+        if not _lockfile_has_git_diff(lockfile_path):
+            print(f"{lockfile_display} is up to date.")
+            return
+
+        print(f"{lockfile_display} has diffs after `bazel mod deps --lockfile_mode=refresh`.")
+        _print_git_diff_against_head(lockfile_path)
+        print("Run the following to attempt to fix the issue automatically:")
+        print("\tbazel run lint --fix")
+        self.fail = True
+        if not self.keep_going:
+            raise LinterFail(f"{lockfile_display} has diffs after refresh")
 
     def simple_file_size_check(self, files_to_lint: list[str]):
         for file in files_to_lint:
@@ -400,6 +521,7 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
 
     keep_going = parsed_args.keep_going
     lr = LintRunner(keep_going, bazel_bin)
+    lr.refresh_module_lockfile(fix=parsed_args.fix, dry_run=parsed_args.dry_run)
 
     files_with_targets = list_files_with_targets(bazel_bin)
     lr.list_files_without_targets(files_with_targets, "C++", "cpp", ["src/mongo"])

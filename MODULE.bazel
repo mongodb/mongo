@@ -1,5 +1,5 @@
 # Apple cc toolchain needs to be loaded before regular cc toolchain or else Apple will just use regular cc toolchain
-bazel_dep(name = "apple_support", version = "1.17.1", repo_name = "build_bazel_apple_support")
+bazel_dep(name = "apple_support", version = "1.24.1", repo_name = "build_bazel_apple_support")
 bazel_dep(name = "bazel_features", version = "1.37.0")
 
 bazel_features_deps = use_extension("//bazel:bzlmod.bzl", "bazel_features_deps")
@@ -110,7 +110,7 @@ single_version_override(
     version = "0.0.11",
 )
 
-# TODO move over from WORKSPACE
+# TODO SERVER-122884: move over from WORKSPACE
 # buf does not support s390x
 #bazel_dep(name = "aspect_rules_lint", version = "1.1.0")
 #single_version_override(
@@ -174,6 +174,14 @@ local_path_override(
     path = "src/third_party/grpc/dist",
 )
 
+# googleapis still requests older grpc-java releases that import repos from
+# grpc_repo_deps_ext. Keep grpc-java on a newer module that declares those
+# dependencies directly so Bazel's module graph stays consistent with grpc@1.74.
+single_version_override(
+    module_name = "grpc-java",
+    version = "1.74.0",
+)
+
 bazel_dep(name = "boringssl", version = "")
 local_path_override(
     module_name = "boringssl",
@@ -226,7 +234,7 @@ multitool = use_extension("@rules_multitool//multitool:extension.bzl", "multitoo
 multitool.hub(lockfile = "//tools/lint:multitool.lock.json")
 use_repo(multitool, "multitool")
 
-# TODO port over from WORKSPACE
+# TODO SERVER-122885: port over from WORKSPACE
 # currently breaks pyright
 ##node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node", dev_dependency = True)
 ##node.toolchain(node_version = "18.20.4")
@@ -250,7 +258,7 @@ setup_local_config_platform(name = "internal_platforms_do_not_use")
 
 register_execution_platforms("@internal_platforms_do_not_use//host:host")
 
-# TODO port over from WORKSPACE
+# TODO SERVER-122886: port over from WORKSPACE
 # cannot be moved without changing the path or creating a symlink
 # to _main~setup_mongo_toolchains~mongo_toolchain_v4 and _main~setup_mongo_toolchains~mongo_toolchain_v5
 ##setup_mongo_toolchains_extension = use_extension("//bazel/toolchains:mongo_toolchain.bzl", "setup_mongo_toolchains_extension")

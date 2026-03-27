@@ -831,7 +831,7 @@ tasks:
       - func: "bazel run"
         vars:
           target: >-
-            --lockfile_mode=error lint //... --lint-yaml=${project} --large-files
+            lint //... --lint-yaml=${project} --large-files
 
   # Check that the mutational fuzzer can parse all JS filess.
   - name: lint_fuzzer_sanity_all
