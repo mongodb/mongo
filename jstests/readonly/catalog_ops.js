@@ -43,25 +43,46 @@ runReadOnlyTest(
                 // Check that we can read our collections out.
                 const db = readableCollection.getDB();
 
-                // Check that listCollections is working and prints collection information with readOnly
-                // true.
-                const collections = db.getCollectionInfos();
+                // Check that listCollections and $listClusterCatalog are working and prints collection
+                // information with readOnly true.
+                const collectionsFromListCollections = db.getCollectionInfos();
+                const collectionsFromListClusterCatalog = db.aggregate([{$listClusterCatalog: {}}]).toArray();
 
                 this.collectionNames.forEach((expectedCollectionName) => {
-                    const outputColl = collections.find((coll) => coll.name === expectedCollectionName);
-                    assert(
-                        outputColl,
-                        "expected collection '" +
-                            expectedCollectionName +
-                            "' to be readOnly, but according to listCollections output it isn't. " +
-                            tojson(collections),
+                    const outputColl = collectionsFromListCollections.find(
+                        (coll) => coll.name === expectedCollectionName,
                     );
                     assert(
-                        outputColl.info.readOnly,
+                        outputColl,
                         "Collection '" +
                             expectedCollectionName +
                             "' not found in the output of listCollections, which was " +
-                            tojson(collections),
+                            tojson(collectionsFromListCollections),
+                    );
+                    assert(
+                        outputColl.info.readOnly,
+                        "Expected collection '" +
+                            expectedCollectionName +
+                            "' to be readOnly, but according to listCollections output it isn't. " +
+                            tojson(collectionsFromListCollections),
+                    );
+
+                    const listClusterCatalogEntry = collectionsFromListClusterCatalog.find(
+                        (entry) => entry.ns === db.getName() + "." + expectedCollectionName,
+                    );
+                    assert(
+                        listClusterCatalogEntry,
+                        "Collection '" +
+                            expectedCollectionName +
+                            "' not found in the output of listCollections, which was " +
+                            tojson(collectionsFromListClusterCatalog),
+                    );
+                    assert(
+                        listClusterCatalogEntry.info.readOnly,
+                        "Expected collection '" +
+                            expectedCollectionName +
+                            "' to be readOnly, but according to $listClusterCatalog output it isn't. " +
+                            tojson(collectionsFromListClusterCatalog),
                     );
                 });
 
