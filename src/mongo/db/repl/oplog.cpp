@@ -1348,13 +1348,20 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                                     << ns.toStringForErrorMsg(),
                       coll.exists());
 
+              // During recovery, replication frontiers (lastAppliedOpTime / allDurableTimestamp)
+              // are not yet fully initialized, so the RecordId range validation inside
+              // truncateRange would incorrectly reject valid ranges. The oplog entry itself is the
+              // authoritative source of truth here.
+              const bool shouldValidateRecordIdRange = !OplogApplication::inRecovering(mode);
+
               WriteUnitOfWork wuow(opCtx);
               collection_internal::truncateRange(opCtx,
                                                  coll.getCollectionPtr(),
                                                  truncateRangeEntry.getMinRecordId(),
                                                  truncateRangeEntry.getMaxRecordId(),
                                                  truncateRangeEntry.getBytesDeleted(),
-                                                 truncateRangeEntry.getDocsDeleted());
+                                                 truncateRangeEntry.getDocsDeleted(),
+                                                 shouldValidateRecordIdRange);
               wuow.commit();
           });
           return Status::OK();
@@ -2140,8 +2147,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 // This satisfies an assertion within insertDocuments that we are holding this lock
                 // when writing to a capped collection and have reserved oplog slots. However, in
                 // practice there shouldn't be any concurrency here, since all inserts to a
-                // non-clustered capped collection should belong to the same batch. TODO
-                // SERVER-106004: Revisit this acquisition.
+                // non-clustered capped collection should belong to the same batch.
+                // TODO SERVER-106004: Revisit this acquisition.
                 if (collection->needsCappedLock()) {
                     Lock::ResourceLock heldUntilEndOfWUOW{
                         opCtx, ResourceId(RESOURCE_METADATA, collection->ns()), MODE_X};
