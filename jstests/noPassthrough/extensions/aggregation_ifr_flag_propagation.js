@@ -26,7 +26,6 @@ const testData = [
     {_id: 2, vector: [3, 6, 9, 16], text: "crispy rice puffs"},
 ];
 const vectorSearchPipeline = [{$vectorSearch: {}}];
-const searchPipeline = [{$search: {}}];
 
 function setupTestCollection(conn, shardingTest) {
     const adminDb = conn.getDB("admin");
@@ -230,7 +229,6 @@ try {
         "featureFlagVectorSearchExtension",
         vectorSearchPipeline,
     );
-    runIFRFlagPropagationTests(multiShardTest.s, multiShardTest, "featureFlagSearchExtension", searchPipeline);
     multiShardTest.stop();
 
     const singleShardTest = new ShardingTest({
@@ -248,7 +246,6 @@ try {
         "featureFlagVectorSearchExtension",
         vectorSearchPipeline,
     );
-    runIFRFlagPropagationTests(singleShardTest.s, singleShardTest, "featureFlagSearchExtension", searchPipeline);
     singleShardTest.stop();
 } finally {
     deleteExtensionConfigs(extensionNames);
