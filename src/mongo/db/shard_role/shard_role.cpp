@@ -487,7 +487,7 @@ SnapshotedServices acquireServicesSnapshot(OperationContext* opCtx,
         return boost::none;
     }();
 
-    // TODO SERVER-122491: This will be removed when we no longer snapshot sharding state on
+    // TODO SERVER-79296: This will be removed when we no longer snapshot sharding state on
     // CollectionPtr.
     if (holds_alternative<CollectionPtr>(collOrView) && collectionDescription.isSharded()) {
         get<CollectionPtr>(collOrView).setShardKeyPattern(collectionDescription.getKeyPattern());
@@ -2026,7 +2026,7 @@ void restoreTransactionResourcesToOperationContext(
             direct_connection_util::checkDirectShardOperationAllowed(
                 opCtx, transactionResources.acquiredCollections.front().prerequisites.nss);
 
-            // TODO SERVER-122491: This will be removed when we no longer snapshot sharding state on
+            // TODO SERVER-79296: This will be removed when we no longer snapshot sharding state on
             // CollectionPtr
             invariant(acquiredCollection.collectionDescription);
             if (acquiredCollection.collectionDescription->isSharded()) {
