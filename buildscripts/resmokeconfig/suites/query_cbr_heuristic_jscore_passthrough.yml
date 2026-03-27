@@ -51,6 +51,9 @@ selector:
   exclude_with_any_tags:
     # Profiler entries will have different shape in CBR
     - requires_profiling
+    # CBR can run multiplanning trials even for CBR chosen solutions in which case it will be a single solution.
+    # This can break tests that expect explain to succeed in the single solution case.
+    - does_not_support_multiplanning_single_solutions
 executor:
   config:
     shell_options:
