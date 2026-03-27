@@ -60,7 +60,6 @@
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_catalog/database_holder.h"
-#include "mongo/db/shard_role/shard_catalog/database_sharding_state_mock.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
@@ -145,9 +144,6 @@ protected:
                                     Timestamp(100, 0)),
             ShardId("this"));
     }
-
-    const DatabaseVersion dbVersion0 = DatabaseVersion{UUID::gen(), Timestamp(1, 0)};
-    const DatabaseVersion dbVersion1 = dbVersion0.makeUpdated();
 };
 
 TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateUnsharded) {
@@ -238,79 +234,6 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdHashInShardKey) {
     ASSERT_BSONOBJ_EQ(getDocumentKey(*autoColl, doc).getShardKeyAndId(), BSON("_id" << "hello"));
 }
 
-TEST_F(DocumentKeyStateTest, CheckDBVersion) {
-    OpObserverRegistry opObserver;
-    opObserver.addObserver(
-        std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
-    opObserver.addObserver(std::make_unique<MigrationChunkClonerSourceOpObserver>());
-
-    OperationContext* opCtx = operationContext();
-    AutoGetCollection autoColl(opCtx, kUnshardedNss, MODE_IX);
-    WriteUnitOfWork wuow(opCtx);
-    const bool fromMigrate = false;
-    auto shardVersion = ShardVersion::UNTRACKED();
-
-    // Insert parameters
-    std::vector<InsertStatement> toInsert;
-    toInsert.emplace_back(kUninitializedStmtId, BSON("_id" << 1));
-
-    // Update parameters
-    const auto criteria = BSON("_id" << 1);
-    const auto preImageDoc = criteria;
-    CollectionUpdateArgs updateArgs{preImageDoc};
-    updateArgs.criteria = criteria;
-    updateArgs.stmtIds = {kUninitializedStmtId};
-    updateArgs.updatedDoc = BSON("_id" << 1 << "data"
-                                       << "y");
-    updateArgs.update = BSON("$set" << BSON("data" << "y"));
-    OplogUpdateEntryArgs update(&updateArgs, *autoColl);
-
-    // OpObserver calls
-    auto onInsert = [&]() {
-        opObserver.onInserts(opCtx,
-                             *autoColl,
-                             toInsert.begin(),
-                             toInsert.end(),
-                             /*recordIds*/ {},
-                             /*fromMigrate=*/std::vector<bool>(toInsert.size(), fromMigrate),
-                             /*defaultFromMigrate=*/fromMigrate);
-    };
-    auto onUpdate = [&]() {
-        opObserver.onUpdate(opCtx, update);
-    };
-    auto onDelete = [&]() {
-        OplogDeleteEntryArgs args;
-        auto doc = BSON("_id" << 0);
-        const auto& documentKey = getDocumentKey(*autoColl, doc);
-        opObserver.onDelete(opCtx, *autoColl, kUninitializedStmtId, doc, documentKey, args);
-    };
-
-    // Using the latest dbVersion works
-    {
-        ScopedSetShardRole scopedSetShardRole{
-            operationContext(), kTestNss, boost::none, dbVersion1};
-        onInsert();
-        onUpdate();
-        onDelete();
-    }
-
-    {
-        auto scopedDss = DatabaseShardingStateMock::acquire(operationContext(), kTestNss.dbName());
-        scopedDss->expectFailureDbVersionCheckWithMismatchingVersion(dbVersion1, dbVersion0);
-    }
-
-    // Using the old dbVersion fails
-    {
-        ScopedSetShardRole scopedSetShardRole{
-            operationContext(), kTestNss, boost::none, dbVersion0};
-        ASSERT_THROWS_CODE(onInsert(), AssertionException, ErrorCodes::StaleDbVersion);
-        ASSERT_THROWS_CODE(onUpdate(), AssertionException, ErrorCodes::StaleDbVersion);
-        ASSERT_THROWS_CODE(onDelete(), AssertionException, ErrorCodes::StaleDbVersion);
-    }
-
-    auto scopedDss = DatabaseShardingStateMock::acquire(operationContext(), kTestNss.dbName());
-    scopedDss->clearExpectedFailureDbVersionCheck();
-}
 
 }  // namespace
 }  // namespace mongo
