@@ -91,6 +91,7 @@ executor:
         featureFlagExtensionsAPI: true
         featureFlagVectorSearchExtension: true
         featureFlagExtensionViewsAndUnionWith: false
+        featureFlagSearchExtension: false
     mongod_options:
       keyFile: *keyFile
       loadExtensions: mongot-extension
@@ -100,6 +101,7 @@ executor:
         featureFlagVectorSearchExtension: true
         # TODO SERVER-120179: enable this flag.
         featureFlagExtensionViewsAndUnionWith: false
+        featureFlagSearchExtension: false
         featureFlagEgressGrpcForSearch: true
         useGrpcForSearch: 1
         skipAuthenticationToMongot: true

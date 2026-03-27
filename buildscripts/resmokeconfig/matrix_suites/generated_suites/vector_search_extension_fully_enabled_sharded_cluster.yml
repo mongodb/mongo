@@ -47,6 +47,7 @@ executor:
         featureFlagEgressGrpcForSearch: true
         featureFlagExtensionViewsAndUnionWith: true
         featureFlagExtensionsAPI: true
+        featureFlagSearchExtension: false
         featureFlagVectorSearchExtension: true
         skipAuthenticationToMongot: true
         useGrpcForSearch: 1
@@ -57,6 +58,7 @@ executor:
         featureFlagEgressGrpcForSearch: true
         featureFlagExtensionViewsAndUnionWith: true
         featureFlagExtensionsAPI: true
+        featureFlagSearchExtension: false
         featureFlagVectorSearchExtension: true
         skipAuthenticationToMongot: true
         useGrpcForSearch: 1

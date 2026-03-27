@@ -1661,6 +1661,7 @@ tasks:
           resmoke_jobs_max: 5
           resmoke_args: >-
             --disableFeatureFlags=featureFlagExtensionViewsAndUnionWith
+            --disableFeatureFlags=featureFlagSearchExtension
 
   - <<: *task_template
     name: vector_search_extension_fully_enabled
@@ -1681,6 +1682,8 @@ tasks:
       - func: "run tests"
         vars:
           resmoke_jobs_max: 5
+          resmoke_args: >-
+            --disableFeatureFlags=featureFlagSearchExtension
 
   - <<: *task_template
     name: vector_search_extension_disabled
@@ -1704,6 +1707,7 @@ tasks:
           resmoke_args: >-
             --disableFeatureFlags=featureFlagVectorSearchExtension
             --disableFeatureFlags=featureFlagExtensionViewsAndUnionWith
+            --disableFeatureFlags=featureFlagSearchExtension
 
   - <<: *task_template
     name: vector_search_extension_enabled_sharded_collections
@@ -1727,6 +1731,7 @@ tasks:
           resmoke_jobs_max: 5
           resmoke_args: >-
             --disableFeatureFlags=featureFlagExtensionViewsAndUnionWith
+            --disableFeatureFlags=featureFlagSearchExtension
 
   - <<: *task_template
     name: vector_search_extension_fully_enabled_sharded_collections
@@ -1748,6 +1753,8 @@ tasks:
       - func: "run tests"
         vars:
           resmoke_jobs_max: 5
+          resmoke_args: >-
+            --disableFeatureFlags=featureFlagSearchExtension
 
   - <<: *task_template
     name: vector_search_extension_disabled_sharded_collections
@@ -1772,6 +1779,7 @@ tasks:
           resmoke_args: >-
             --disableFeatureFlags=featureFlagVectorSearchExtension
             --disableFeatureFlags=featureFlagExtensionViewsAndUnionWith
+            --disableFeatureFlags=featureFlagSearchExtension
 
   - <<: *task_template
     name: vector_search_extension_enabled_sharded_cluster
@@ -1795,6 +1803,7 @@ tasks:
           resmoke_jobs_max: 5
           resmoke_args: >-
             --disableFeatureFlags=featureFlagExtensionViewsAndUnionWith
+            --disableFeatureFlags=featureFlagSearchExtension
 
   - <<: *task_template
     name: vector_search_extension_fully_enabled_sharded_cluster
@@ -1816,6 +1825,8 @@ tasks:
       - func: "run tests"
         vars:
           resmoke_jobs_max: 5
+          resmoke_args: >-
+            --disableFeatureFlags=featureFlagSearchExtension
 
   - <<: *task_template
     name: vector_search_extension_disabled_sharded_cluster
@@ -1840,6 +1851,7 @@ tasks:
           resmoke_args: >-
             --disableFeatureFlags=featureFlagVectorSearchExtension
             --disableFeatureFlags=featureFlagExtensionViewsAndUnionWith
+            --disableFeatureFlags=featureFlagSearchExtension
 
   - <<: *task_template
     name: vector_search_extension_enabled_single_shard
@@ -1863,6 +1875,7 @@ tasks:
           resmoke_jobs_max: 5
           resmoke_args: >-
             --disableFeatureFlags=featureFlagExtensionViewsAndUnionWith
+            --disableFeatureFlags=featureFlagSearchExtension
 
   - <<: *task_template
     name: vector_search_extension_fully_enabled_single_shard
@@ -1884,6 +1897,8 @@ tasks:
       - func: "run tests"
         vars:
           resmoke_jobs_max: 5
+          resmoke_args: >-
+            --disableFeatureFlags=featureFlagSearchExtension
 
   - <<: *task_template
     name: vector_search_extension_disabled_single_shard
@@ -1908,6 +1923,7 @@ tasks:
           resmoke_args: >-
             --disableFeatureFlags=featureFlagVectorSearchExtension
             --disableFeatureFlags=featureFlagExtensionViewsAndUnionWith
+            --disableFeatureFlags=featureFlagSearchExtension
 
   - <<: *task_template
     name: mongot_community_e2e_sharded_collections
@@ -1974,6 +1990,8 @@ tasks:
           # Small number of tests (at least upon authoring), and concurrency tests are more resource
           # intensive.
           resmoke_jobs_max: 1
+          resmoke_args: >-
+            --disableFeatureFlags=featureFlagSearchExtension
 
   - <<: *task_template
     name: concurrency_with_mongot_extension_mongos
@@ -1997,6 +2015,8 @@ tasks:
           # Small number of tests (at least upon authoring), and concurrency tests are more resource
           # intensive.
           resmoke_jobs_max: 1
+          resmoke_args: >-
+            --disableFeatureFlags=featureFlagSearchExtension
 
   - <<: *task_template
     name: concurrency_with_mongot_extension_sharded_collections
@@ -2020,6 +2040,8 @@ tasks:
           # Small number of tests (at least upon authoring), and concurrency tests are more resource
           # intensive.
           resmoke_jobs_max: 1
+          resmoke_args: >-
+            --disableFeatureFlags=featureFlagSearchExtension
 
   - <<: *task_template
     name: search_ssl
