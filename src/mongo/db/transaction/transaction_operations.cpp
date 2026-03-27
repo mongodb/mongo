@@ -372,6 +372,13 @@ std::size_t TransactionOperations::logOplogEntries(
         oplogEntry.setObject(applyOpsBuilder.done());
         oplogEntry.setTid(stmtsIter->getTid());
 
+        // Set fromMigrate on the applyOps entry if all sub-operations in this entry have
+        // fromMigrate set.
+        bool allFromMigrate = std::all_of(stmtsIter, nextStmt, [](const auto& op) {
+            return op.getFromMigrate().value_or(false);
+        });
+        oplogEntry.setFromMigrateIfTrue(allFromMigrate);
+
         prevWriteOpTime =
             logApplyOpsFn(&oplogEntry,
                           firstOp,

@@ -64,7 +64,8 @@ void writeChangeStreamPreImagesForApplyOpsEntry(
     for (auto stmtIterator = stmtBegin; stmtIterator != stmtEnd; ++stmtIterator) {
         auto& operation = *stmtIterator;
         if (operation.isChangeStreamPreImageRecordedInPreImagesCollection() &&
-            !operation.getNss().isTemporaryReshardingCollection()) {
+            !operation.getNss().isTemporaryReshardingCollection() &&
+            !operation.getFromMigrate().value_or(false)) {
             invariant(operation.getUuid());
             invariant(!operation.getPreImage().isEmpty());
             invariant(operation.getTid() == boost::none);

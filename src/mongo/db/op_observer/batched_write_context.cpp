@@ -67,7 +67,6 @@ TransactionOperations* BatchedWriteContext::getBatchedOperations(OperationContex
 
 void BatchedWriteContext::clearBatchedOperations(OperationContext* opCtx) {
     _batchedOperations.clear();
-    _defaultFromMigrate = false;
 }
 
 bool BatchedWriteContext::writesAreBatched() const {
@@ -76,10 +75,4 @@ bool BatchedWriteContext::writesAreBatched() const {
 void BatchedWriteContext::setWritesAreBatched(bool batched) {
     _batchWrites = batched;
 }
-
-void BatchedWriteContext::setDefaultFromMigrate(bool defaultFromMigrate) {
-    _defaultFromMigrate = defaultFromMigrate;
-}
-
-
 }  // namespace mongo

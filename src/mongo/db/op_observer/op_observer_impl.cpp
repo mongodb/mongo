@@ -818,11 +818,6 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
     const bool useReplicatedSizeCount = isReplicatedFastCountEnabled(opCtx);
 
     if (inBatchedWrite) {
-        dassert(!defaultFromMigrate ||
-                std::all_of(
-                    fromMigrate.begin(), fromMigrate.end(), [](bool migrate) { return migrate; }));
-        batchedWriteContext.setDefaultFromMigrate(defaultFromMigrate);
-
         size_t i = 0;
         for (auto iter = first; iter != last; iter++) {
             const auto docKey = getDocumentKey(coll, iter->doc).getShardKeyAndId();
@@ -2282,14 +2277,12 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
     }
 
     auto logApplyOpsForBatchedWrite =
-        [opCtx,
-         defaultFromMigrate = batchedWriteContext.getDefaultFromMigrate(),
-         operationLogger =
-             _operationLogger.get()](repl::MutableOplogEntry* oplogEntry,
-                                     bool firstOp,
-                                     bool lastOp,
-                                     std::vector<StmtId> stmtIdsWritten,
-                                     WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat) {
+        [opCtx, operationLogger = _operationLogger.get()](
+            repl::MutableOplogEntry* oplogEntry,
+            bool firstOp,
+            bool lastOp,
+            std::vector<StmtId> stmtIdsWritten,
+            WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat) {
             // Remove 'prevOpTime' when replicating as a single applyOps oplog entry.
             // This preserves backwards compatibility with the legacy atomic applyOps oplog
             // entry format that we use to replicate batched writes.
@@ -2301,7 +2294,6 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
             if (firstOp && lastOp) {
                 oplogEntry->setPrevWriteOpTimeInTransaction(boost::none);
             }
-            oplogEntry->setFromMigrateIfTrue(defaultFromMigrate);
             oplogEntry->setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
             const bool updateTxnTable =
                 oplogGroupingFormat == WriteUnitOfWork::kGroupForPossiblyRetryableOperations;
