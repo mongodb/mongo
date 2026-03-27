@@ -663,7 +663,10 @@ public:
         return value() + 5;
     }
     /**
-     * Get binary data.  Element must be of type BinData. Handles type 2
+     * Get binary data.  Element must be of type BinData.
+     *
+     * Handles ByteArrayDeprecated (subtype 2) for legacy support. New callers should never
+     * use this subtype.
      */
     const char* binDataClean(int& len) const {
         // BinData: <int len> <byte subtype> <byte[len] data>
