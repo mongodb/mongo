@@ -34,8 +34,9 @@
 
 namespace mongo {
 
+// This fixture tests spilling behavior directly, requiring the spill WiredTiger instance.
 SpillingTestFixture::SpillingTestFixture()
-    : ServiceContextMongoDTest(),
+    : ServiceContextMongoDTest(Options{}.enableSpillEngine()),
       _opCtx(makeOperationContext()),
       _expCtx(new ExpressionContextForTest(_opCtx.get(),
                                            NamespaceString::createNamespaceString_forTest(

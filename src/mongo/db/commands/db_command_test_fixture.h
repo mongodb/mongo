@@ -39,6 +39,9 @@
 namespace mongo {
 class DBCommandTestFixture : public ServiceContextMongoDTest {
 public:
+    using Options = ServiceContextMongoDTest::Options;
+    using ServiceContextMongoDTest::ServiceContextMongoDTest;
+
     void setUp() override {
         ServiceContextMongoDTest::setUp();
 

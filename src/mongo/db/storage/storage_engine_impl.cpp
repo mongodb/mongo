@@ -699,6 +699,7 @@ Status StorageEngineImpl::repairRecordStore(OperationContext* opCtx,
 std::unique_ptr<SpillTable> StorageEngineImpl::makeSpillTable(OperationContext* opCtx,
                                                               KeyFormat keyFormat,
                                                               int64_t thresholdBytes) {
+    invariant(_spillEngine, "Spill engine is disabled; cannot create spill tables in this context");
     auto ru = _spillEngine->newRecoveryUnit();
     auto rs =
         _spillEngine->makeTemporaryRecordStore(*ru, ident::generateNewInternalIdent(), keyFormat);

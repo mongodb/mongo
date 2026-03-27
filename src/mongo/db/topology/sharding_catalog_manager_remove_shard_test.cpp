@@ -88,6 +88,10 @@ using unittest::assertGet;
 const KeyPattern kKeyPattern(BSON("_id" << 1));
 
 class RemoveShardTest : public ConfigServerTestFixture {
+public:
+    // removeShard's drain-checking logic uses hash aggregation which may spill to disk.
+    RemoveShardTest() : ConfigServerTestFixture(Options{}.enableSpillEngine()) {}
+
 protected:
     /**
      * Performs the test setup steps from the parent class and then configures the config shard and
