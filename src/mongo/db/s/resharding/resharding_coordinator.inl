@@ -160,7 +160,8 @@ ReshardingCoordinator::ReshardingCoordinator(
       _coordinatorDao(resharding::ReshardingCoordinatorDao(coordinatorDoc.getReshardingUUID())),
       _markKilledExecutor{resharding::makeThreadPoolForMarkKilledExecutor(
           "ReshardingCoordinatorCancelableOpCtxPool")},
-      _reshardingCoordinatorExternalState(externalState) {
+      _reshardingCoordinatorExternalState(externalState),
+      _sessionTracker(this) {
     _reshardingCoordinatorObserver = std::make_shared<ReshardingCoordinatorObserver>();
 
     // If the coordinator is recovering from step-up, make sure to properly initialize the
@@ -227,6 +228,35 @@ void ReshardingCoordinator::installCoordinatorDocOnStateTransition(
                                            _coordinatorDoc.getSourceNss(),
                                            bob.obj(),
                                            resharding::kMajorityWriteConcern);
+}
+
+boost::optional<OperationSessionInfo> ReshardingCoordinator::readSession(OperationContext*) const {
+    const auto& session = _coordinatorDoc.getSession();
+    if (!session) {
+        return boost::none;
+    }
+
+    OperationSessionInfo osi;
+    osi.setSessionId(session->getLsid());
+    osi.setTxnNumber(session->getTxnNumber());
+    return osi;
+}
+
+void ReshardingCoordinator::writeSession(OperationContext* opCtx,
+                                         const boost::optional<OperationSessionInfo>& osi) {
+    boost::optional<CoordinatorSession> session;
+    if (osi) {
+        session.emplace(*osi->getSessionId(), *osi->getTxnNumber());
+    }
+    _installCoordinatorDoc(_coordinatorDao.updateSession(opCtx, session));
+}
+
+OperationSessionInfo ReshardingCoordinator::_getNewSession(OperationContext* opCtx) {
+    return _sessionTracker.getNextSession(opCtx);
+}
+
+void ReshardingCoordinator::_releaseSession(OperationContext* opCtx) {
+    _sessionTracker.releaseSession(opCtx);
 }
 #endif  // RESHARDING_COORDINATOR_PART_0
 
@@ -1872,6 +1902,8 @@ void ReshardingCoordinator::_updateCoordinatorDocStateAndCatalogEntries(
 
 void ReshardingCoordinator::_removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
     OperationContext* opCtx, boost::optional<Status> abortReason) {
+    _releaseSession(opCtx);
+
     auto updatedCoordinatorDoc = resharding::removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
         opCtx,
         _metrics.get(),

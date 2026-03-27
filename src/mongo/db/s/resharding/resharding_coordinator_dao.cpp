@@ -354,13 +354,18 @@ BSONObjBuilder ReshardingCoordinatorDao::_documentsCopyUpdateBuilder(
 }
 
 ReshardingCoordinatorDocument ReshardingCoordinatorDao::updateSession(
-    OperationContext* opCtx, const CoordinatorSession& newSession) {
+    OperationContext* opCtx, const boost::optional<CoordinatorSession>& newSession) {
     auto client = _clientFactory->createDaoStorageClient(boost::none);
 
     BSONObjBuilder updateBuilder;
-    {
+    if (newSession) {
         BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
-        setBuilder.append(ReshardingCoordinatorDocument::kSessionFieldName, newSession.toBSON());
+        setBuilder.append(ReshardingCoordinatorDocument::kSessionFieldName, newSession->toBSON());
+    } else {
+        // If no session is provided, the session is being released back to the pool. Clear it
+        // from the coordinator document to prevent a double-release in the event of a failover.
+        BSONObjBuilder unsetBuilder(updateBuilder.subobjStart("$unset"));
+        unsetBuilder.append(ReshardingCoordinatorDocument::kSessionFieldName, 1);
     }
 
     return buildAndExecuteRequest(opCtx, std::move(client), _reshardingUUID, updateBuilder);

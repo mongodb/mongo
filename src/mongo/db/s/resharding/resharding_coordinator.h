@@ -33,6 +33,7 @@
 #include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/s/primary_only_service_helpers/operation_session_tracker.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_dao.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service_util.h"
@@ -143,7 +144,8 @@ private:
 };
 
 class ReshardingCoordinator final
-    : public repl::PrimaryOnlyService::TypedInstance<ReshardingCoordinator> {
+    : public repl::PrimaryOnlyService::TypedInstance<ReshardingCoordinator>,
+      public OperationSessionPersistence {
 public:
     struct AbortRequest {
         Status reason;
@@ -569,6 +571,18 @@ private:
                                   const std::string& spanName,
                                   bool keepSpan = false);
 
+    // OperationSessionPersistence functions.
+    boost::optional<OperationSessionInfo> readSession(OperationContext* opCtx) const override;
+    void writeSession(OperationContext* opCtx,
+                      const boost::optional<OperationSessionInfo>& osi) override;
+
+    // Returns the next OSI (acquiring a session or incrementing txnNumber).
+    // Call before dispatching each remote-command.
+    OperationSessionInfo _getNewSession(OperationContext* opCtx);
+
+    // Returns the session to the pool. Called during coordinator cleanup.
+    void _releaseSession(OperationContext* opCtx);
+
     // The unique key for a given resharding operation. InstanceID is an alias for BSONObj. The
     // value of this is the UUID that will be used as the collection UUID for the new sharded
     // collection. The object looks like: {_id: 'reshardingUUID'}
@@ -644,6 +658,8 @@ private:
     // If we recovered a completed resharding coordinator (quiesced) on failover, the
     // resharding status when it actually ran.
     boost::optional<Status> _originalReshardingStatus;
+
+    OperationSessionTracker _sessionTracker;
 };
 
 }  // namespace mongo

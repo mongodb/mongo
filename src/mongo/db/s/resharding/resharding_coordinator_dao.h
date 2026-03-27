@@ -38,6 +38,8 @@
 
 #include <memory>
 
+#include <boost/optional/optional.hpp>
+
 namespace mongo {
 namespace resharding {
 
@@ -142,8 +144,8 @@ public:
         Status abortReason,
         boost::optional<TxnNumber> txnNumber = boost::none);
 
-    ReshardingCoordinatorDocument updateSession(OperationContext* opCtx,
-                                                const CoordinatorSession& newSession);
+    ReshardingCoordinatorDocument updateSession(
+        OperationContext* opCtx, const boost::optional<CoordinatorSession>& newSession);
 
 private:
     const UUID _reshardingUUID;

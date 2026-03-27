@@ -499,5 +499,14 @@ TEST_F(ReshardingCoordinatorDaoFixture, UpdateSessionIncrementsTxnNumberWithSame
         .set = BSON(ReshardingCoordinatorDocument::kSessionFieldName << newSession.toBSON())});
 }
 
+TEST_F(ReshardingCoordinatorDaoFixture, UpdateSessionWithNoneClearsSessionField) {
+    _state->document.setSession(makeSession(makeLogicalSessionIdForTest(), TxnNumber(1)));
+
+    runPhaseTransitionTest(PhaseTransitionTestCase{
+        .initialPhase = CoordinatorStateEnum::kApplying,
+        .transitionFn = [&]() { _dao->updateSession(_opCtx, boost::none); },
+        .unset = BSON(ReshardingCoordinatorDocument::kSessionFieldName << 1)});
+}
+
 }  // namespace resharding
 }  // namespace mongo
