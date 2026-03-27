@@ -42,11 +42,20 @@
 
 namespace mongo {
 
-// TODO SERVER-119235: Remove this once these commands support rawData.
-static const StringDataSet kCommandsAllowedToTargetBuckets = {
-    "moveChunk"_sd,
-    "split"_sd,
-};
+// This is a list of commands that do not support rawData, hence it is allowed to target
+// system.buckets.
+// getMore command can be called on system.buckets even if the user didn't target
+// the buckets directly, hence it should be allowed to target system.buckets.
+static const StringDataSet kCommandsAllowedToTargetBuckets = {"moveChunk"_sd,
+                                                              "split"_sd,
+                                                              "mergeChunks"_sd,
+                                                              "moveRange"_sd,
+                                                              "clearJumboFlag"_sd,
+                                                              "cleanupOrphaned"_sd,
+                                                              "mergeAllChunksOnShard"_sd,
+                                                              "configureCollectionBalancing"_sd,
+                                                              "balancerCollectionStatus"_sd,
+                                                              "getMore"_sd};
 
 SystemBucketsMetricsCommandHooks::SystemBucketsMetricsCommandHooks() {
     _commandsExecuted = &*MetricBuilder<Counter64>("numCommandsTargetingSystemBuckets");
