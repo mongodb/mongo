@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Linter that fails if any TODO comments referencing SERVER tickets are found.
+"""Linter that fails if any TODO comments not referencing SERVER tickets are found.
 
 Matches patterns like:
   // TODO(SERVER-XXXXX): fix this
@@ -20,8 +20,9 @@ if __name__ == "__main__" and __package__ is None:
 
 from buildscripts.linter import git, parallel
 
-_RE_TODO_SERVER = re.compile(r"(?<!\(Ignore linting\) )(TODO\W.*SERVER-X{5,}|TODO:\s+(?!SERVER))")
-
+EXCLUSION_VALUE = "(Ignore linting)"
+TODO_REGEX = re.compile(r'[^"]TODO[^"]')
+JIRA_TICKET_REGEX = re.compile(r"\w+-\d+")
 FILES_RE = re.compile(r"\.(cpp|c|h|hpp|py|js|mjs|inl|idl|yml|bazel)$")
 
 
@@ -39,7 +40,7 @@ def is_interesting_file(file_name: str) -> bool:
 
 
 def check_file(file_name: str) -> bool:
-    """Check a single file for TODO SERVER-XXXXX patterns. Returns True if no violations."""
+    """Check a single file for TODO comments without any SERVER ticket attached. Returns True if no violations."""
     try:
         with open(file_name, encoding="utf-8") as f:
             lines = f.readlines()
@@ -48,13 +49,17 @@ def check_file(file_name: str) -> bool:
 
     errors = []
     for lineno, line in enumerate(lines, 1):
-        if _RE_TODO_SERVER.search(line):
+        if EXCLUSION_VALUE in line:
+            continue
+        if TODO_REGEX.search(line) and not JIRA_TICKET_REGEX.search(line):
+            # The regex found a TODO without any SERVER ticket present next to it
             errors.append((lineno, line.rstrip()))
 
     for lineno, line in errors:
         print(
             f"Error: {file_name}:{lineno} - todo/server_ticket"
-            f" - Found TODO with unlinked SERVER ticket reference: {line.strip()}"
+            f" - Found TODO with unlinked SERVER ticket reference, make sure to add a valid ticket"
+            f' to track its cleanup or add "(Ignore linting)" to the line to silence the linter: {line.strip()}'
         )
 
     return len(errors) == 0
@@ -84,7 +89,12 @@ def lint_all(args) -> None:
 
 def lint_patch(args) -> None:
     """Lint all files that are divergent from the most recent fork point off of the main branch"""
-    origin_branch = "origin/master"
+    repo = git.Repo(git.get_base_dir())
+    if repo.does_branch_exist(args.origin_branch):
+        origin_branch = args.origin_branch
+    else:
+        # We're running this against a stacked PR potentially. Make sure we only test against the parent branch.
+        origin_branch = repo.get_branch_name()
     files = git.get_my_files_to_check(is_interesting_file, origin_branch)
     files = [f for f in files if os.path.exists(f)]
 
@@ -112,6 +122,9 @@ def main() -> None:
     parser_lint_patch = sub.add_parser(
         "lint-patch",
         help="Lint files that are different from the most recent fork point from master",
+    )
+    parser_lint_patch.add_argument(
+        "--branch", dest="origin_branch", default="origin/master", help="Branch to compare against"
     )
     parser_lint_patch.set_defaults(func=lint_patch)
 

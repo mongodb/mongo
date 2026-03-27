@@ -376,7 +376,7 @@ def get_parsed_args(args):
 
 def lint_mod(lint_runner: LintRunner):
     lint_runner.run_bazel("//modules_poc:mod_mapping", ["--validate-modules"])
-    # TODO add support for the following steps
+    # TODO SERVER-122848: add support for the following steps
     # subprocess.run([bazel_bin, "run", "//modules_poc:merge_decls"], check=True)
     # subprocess.run([bazel_bin, "run", "//modules_poc:browse", "--", "merged_decls.json", "--parse-only"], check=True)
 
@@ -449,7 +449,9 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
         )
         for file in files_to_lint
     ):
-        lr.run_bazel("//buildscripts:todo_linter", ["lint-patch"])
+        lr.run_bazel(
+            "//buildscripts:todo_linter", ["lint-patch", "--branch", parsed_args.origin_branch]
+        )
 
     if lint_all or any(
         file.endswith((".cpp", ".c", ".h", ".py", ".idl")) for file in files_to_lint
