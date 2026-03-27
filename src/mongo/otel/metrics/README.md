@@ -108,16 +108,40 @@ counter.add(10); // Increment by 10
 **Important:** Counter values must only increase. Attempting to add a negative value will throw an
 exception.
 
-### Gauge
+### UpDownCounter
 
-**Use when:** You need to track a value that can go up or down.
+**Use when:** You need a cumulative sum that can increase **and** decrease via `add()` (OpenTelemetry
+[UpDownCounter](https://opentelemetry.io/docs/specs/otel/metrics/api/#updowncounter)). This is
+distinct from a **Gauge**, which represents an observed point-in-time value (see below).
 
 **Examples:**
 
-- Current number of active connections
+- Number of open ingress sessions (increment on accept, decrement on disconnect)
+- In-flight requests or queue depth when updated synchronously with `add(±n)`
+
+```cpp
+auto& openSessions = otel::metrics::MetricsService::instance().createInt64UpDownCounter(
+    otel::metrics::MetricNames::kOpenConnections,
+    "Total number of open sessions",
+    otel::metrics::MetricUnit::kConnections);
+
+openSessions.add(1);   // Session started
+openSessions.add(-1);  // Session ended
+```
+
+### Gauge
+
+**Use when:** You need to track a value that can go up or down **as an observed snapshot** (last
+value), usually via the observable gauge callback rather than only synchronous `add()`.
+
+**Examples:**
+
 - Memory usage
 - Queue depth
 - Cache size
+
+For a **running total** that goes up and down with explicit `add(1)` / `add(-1)` in application
+code, prefer **UpDownCounter**.
 
 ### Histogram
 
@@ -147,12 +171,12 @@ the Networking and Observability team if you'd like this feature prioritized ([S
 Understanding the performance characteristics of each metric type is critical for avoiding latency
 regressions in hot code paths.
 
-### Counters and Gauges: Lock-Free (Preferred for Hot Paths)
+### Counters, UpDownCounters, and Gauges: Lock-Free (Preferred for Hot Paths)
 
-Counters and Gauges use **lock-free atomic operations** and are safe to use in
+Counters, UpDownCounters, and Gauges use **lock-free atomic operations** and are safe to use in
 performance-sensitive code.
 
-**Use Counters and Gauges** for metrics recorded on every request or in latency-critical paths.
+**Use Counters, UpDownCounters, and Gauges** for metrics recorded on every request or in latency-critical paths.
 
 ### Histograms: Acquires Locks (Avoid in Hot Paths)
 
