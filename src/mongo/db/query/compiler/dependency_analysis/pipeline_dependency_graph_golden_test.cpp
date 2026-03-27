@@ -406,14 +406,13 @@ TEST_F(PipelineDependencyGraphGoldenTest, SetGroupSet) {
     });
 }
 
-// TODO(SERVER-121639): Enable.
-// TEST_F(PipelineDependencyGraphGoldenTest, GroupKeyFromBaseDocument) {
-//     runVariation({
-//         .name = "GroupKeyFromBaseDocument",
-//         .pipeline = "[{$group: { _id: '$x' }},"
-//                     "{$match: { _id: 1, x: 1 }}]",
-//     });
-// }
+TEST_F(PipelineDependencyGraphGoldenTest, GroupKeyFromBaseDocument) {
+    runVariation({
+        .name = "GroupKeyFromBaseDocument",
+        .pipeline = "[{$group: { _id: '$x' }},"
+                    "{$match: { _id: 1, x: 1 }}]",
+    });
+}
 
 }  // namespace
 }  // namespace mongo::pipeline::dependency_graph

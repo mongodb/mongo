@@ -1,0 +1,48 @@
+VARIATION GroupKeyFromBaseDocument
+input: {
+    "pipeline": [
+        {
+            "$group": {
+                "_id": "$x",
+                "$willBeMerged": false
+            }
+        },
+        {
+            "$match": {
+                "_id": 1,
+                "x": 1
+            }
+        }
+    ]
+}
+output: {
+    "$group:0": {
+        "scope:0": {
+            "exhaustiveScope": "scope:0",
+            "fields": {
+                "<missing>:0": {
+                    "declaringScope": "scope:0",
+                    "dependencies": []
+                },
+                "_id:1": {
+                    "declaringScope": "scope:0",
+                    "collectionAlias": "x",
+                    "dependencies": [
+                        "<base document>:-1"
+                    ]
+                }
+            }
+        },
+        "dependencies": [
+            "<base document>:-1"
+        ]
+    },
+    "$match:1": {
+        "scope:0": "scope:0",
+        "dependencies": [
+            "<missing>:0",
+            "_id:1"
+        ]
+    }
+}
+

@@ -802,18 +802,17 @@ TEST_F(PipelineDependencyGraphTest, GroupSimpleKey) {
     });
 }
 
-// TODO(SERVER-121639): Enable.
-// TEST_F(PipelineDependencyGraphTest, GroupKeyFromBaseDocument) {
-//     setPipeline(
-//         "[{$group: { _id: '$x' }},"
-//         "{$match: { _id: 1 }}]");
-//
-//     runTest([&] {
-//         auto* last = stages.back().get();
-//         // _id declared by $group.
-//         ASSERT_EQUALS(graph->getDeclaringStage(last, "_id"), stages[0]);
-//     });
-// }
+TEST_F(PipelineDependencyGraphTest, GroupKeyFromBaseDocument) {
+    setPipeline(
+        "[{$group: { _id: '$x' }},"
+        "{$match: { _id: 1 }}]");
+
+    runTest([&] {
+        auto* last = stages.back().get();
+        // _id declared by $group.
+        ASSERT_EQUALS(graph->getDeclaringStage(last, "_id"), stages[0]);
+    });
+}
 
 TEST_F(PipelineDependencyGraphTest, GroupCompoundKey) {
     setPipeline(
