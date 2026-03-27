@@ -37,6 +37,7 @@
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_dao.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service_util.h"
+#include "mongo/db/s/resharding/resharding_donor_post_cloning_delta_collector.h"
 #include "mongo/db/s/resharding/shardsvr_resharding_commands_gen.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/otel/telemetry_context.h"
@@ -383,20 +384,17 @@ private:
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
-     * If verification is enabled, fetches the change in the number of documents from all donor
-     * shards involved in resharding between the clone timestamp and blocking-writes timestamp, and
-     * persists the final number of documents for each donor shard in the coordinator state
-     * document.
-     */
-    ExecutorFuture<void> _fetchAndPersistNumDocumentsFinalFromDonors(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
-
-    /**
      * Waits on _reshardingCoordinatorObserver to notify that all recipients have finished
      * applying oplog entries. Transitions to 'kBlockingWrites'.
      */
     ExecutorFuture<void> _awaitAllRecipientsFinishedApplying(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+    /**
+     * Computes the final document count for each donor shard from the given per-shard delta map
+     * and persists the result in the coordinator state document.
+     */
+    void _persistDocumentsDelta(OperationContext* opCtx, std::map<ShardId, int64_t> documentsDelta);
 
     /**
      * Waits on _reshardingCoordinatorObserver to notify that all recipients have entered
@@ -405,6 +403,12 @@ private:
     ExecutorFuture<ReshardingCoordinatorDocument> _awaitAllRecipientsInStrictConsistency(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
+    /**
+     * If verification is enabled, fetches the latest coordinator doc from disk and runs the final
+     * collection verification check. Returns the (possibly refreshed) coordinator document.
+     */
+    ReshardingCoordinatorDocument _verifyFinalCollection(
+        ReshardingCoordinatorDocument coordinatorDocChangedOnDisk);
 
     /**
      * Sets the callback handle for scheduled work to handle critical section timeout.
@@ -536,6 +540,14 @@ private:
                                      bool isUserAborted);
 
     /**
+     * If verification is enabled and the collector has not already been launched, creates and
+     * launches the donor post-cloning delta collector.
+     */
+    void _launchDonorPostCloningDeltaCollector(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        std::shared_ptr<otel::TelemetryContext> telemetryCtx);
+
+    /**
      * Best effort attempt to update the chunk imbalance metrics.
      */
     void _updateChunkImbalanceMetrics(const NamespaceString& nss);
@@ -648,6 +660,9 @@ private:
 
     SharedSemiFuture<void> _commitMonitorQuiesced;
     std::shared_ptr<resharding::CoordinatorCommitMonitor> _commitMonitor;
+
+    std::shared_ptr<ReshardingDonorPostCloningDeltaCollector> _deltaCollector;
+    boost::optional<SharedSemiFuture<std::map<ShardId, int64_t>>> _deltaFuture;
 
     std::shared_ptr<ReshardingCoordinatorExternalState> _reshardingCoordinatorExternalState;
 

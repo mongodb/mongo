@@ -779,7 +779,7 @@ TEST_F(ReshardingCoordinatorServiceExternalStateTest,
     ReshardingCoordinatorExternalStateImpl externalState;
     ASSERT_THROWS_CODE(externalState.verifyFinalCollection(operationContext(), coordinatorDoc),
                        DBException,
-                       9929904);
+                       ErrorCodes::ReshardingValidationIncompleteData);
 }
 
 TEST_F(ReshardingCoordinatorServiceExternalStateTest,
@@ -798,7 +798,7 @@ TEST_F(ReshardingCoordinatorServiceExternalStateTest,
     ReshardingCoordinatorExternalStateImpl externalState;
     ASSERT_THROWS_CODE(externalState.verifyFinalCollection(operationContext(), coordinatorDoc),
                        DBException,
-                       9929904);
+                       ErrorCodes::ReshardingValidationIncompleteData);
 }
 
 TEST_F(ReshardingCoordinatorServiceExternalStateTest,
@@ -815,7 +815,7 @@ TEST_F(ReshardingCoordinatorServiceExternalStateTest,
     ReshardingCoordinatorExternalStateImpl externalState;
     ASSERT_THROWS_CODE(externalState.verifyFinalCollection(operationContext(), coordinatorDoc),
                        DBException,
-                       9929905);
+                       ErrorCodes::ReshardingValidationIncompleteData);
 }
 
 TEST_F(ReshardingCoordinatorServiceExternalStateTest,
@@ -833,7 +833,7 @@ TEST_F(ReshardingCoordinatorServiceExternalStateTest,
     ReshardingCoordinatorExternalStateImpl externalState;
     ASSERT_THROWS_CODE(externalState.verifyFinalCollection(operationContext(), coordinatorDoc),
                        DBException,
-                       9929905);
+                       ErrorCodes::ReshardingValidationIncompleteData);
 }
 
 TEST_F(ReshardingCoordinatorServiceExternalStateTest, GetDocumentsToCopyFromDonors_SuccessBasic) {

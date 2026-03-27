@@ -577,7 +577,7 @@ void ReshardingCoordinatorExternalStateImpl::verifyFinalCollection(
     int64_t numDocsOriginal = 0;
     BSONObjBuilder donorReportBuilder;
     for (const auto& donorEntry : coordinatorDoc.getDonorShards()) {
-        uassert(9929904,
+        uassert(ErrorCodes::ReshardingValidationIncompleteData,
                 str::stream() << "Expected the coordinator document to have the "
                                  "final number of documents on the donor shard '"
                               << donorEntry.getId() << "'",
@@ -590,7 +590,7 @@ void ReshardingCoordinatorExternalStateImpl::verifyFinalCollection(
     BSONObjBuilder recipientReportBuilder;
     for (const auto& recipientEntry : coordinatorDoc.getRecipientShards()) {
         auto mutableState = recipientEntry.getMutableState();
-        uassert(9929905,
+        uassert(ErrorCodes::ReshardingValidationIncompleteData,
                 str::stream() << "Expected the coordinator document to have the "
                                  "final number of documents on the recipient shard '"
                               << recipientEntry.getId() << "'",

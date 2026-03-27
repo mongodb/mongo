@@ -170,6 +170,31 @@ private:
 };
 
 /**
+ * Always fails with a non-retryable error. Used to verify that unrecoverable errors propagate
+ * immediately without retrying.
+ */
+class UnrecoverableMockExternalState : public StubExternalState {
+public:
+    std::map<ShardId, int64_t> getDocumentsDeltaFromDonors(
+        OperationContext*,
+        const std::shared_ptr<executor::TaskExecutor>&,
+        CancellationToken,
+        const UUID&,
+        const NamespaceString&,
+        const std::vector<ShardId>&) override {
+        ++_callCount;
+        uasserted(ErrorCodes::InternalError, "simulated unrecoverable error");
+    }
+
+    int callCount() const {
+        return _callCount.load();
+    }
+
+private:
+    std::atomic<int> _callCount{0};  // NOLINT
+};
+
+/**
  * Blocks in getDocumentsDeltaFromDonors until the opCtx is killed or the object is destroyed,
  * simulating the scenario where the operation is waiting (e.g. for the critical section) and
  * resharding is aborted.
@@ -389,6 +414,20 @@ TEST_F(ReshardingDonorPostCloningDeltaCollectorTest,
     ASSERT_EQ(externalState->callCount(), 2);
     ASSERT_EQ(result.size(), 1U);
     ASSERT_EQ(result.at(shard0), 10);
+}
+
+TEST_F(ReshardingDonorPostCloningDeltaCollectorTest, UnrecoverableErrorPropagatesWithoutRetry) {
+    CancellationSource abortSource;
+    auto externalState = std::make_shared<UnrecoverableMockExternalState>();
+    auto doc = makeDoc(CoordinatorStateEnum::kBlockingWrites, {ShardId("shard0")});
+    auto collector = makeCollector(doc, externalState, abortSource.token());
+
+    auto future = collector->launch(scopedExecutor(), makeSpanForCollector());
+
+    auto status = future.getNoThrow();
+    ASSERT_EQ(status.getStatus().code(), ErrorCodes::InternalError);
+    // A non-retryable error must not trigger any retry: exactly one call expected.
+    ASSERT_EQ(externalState->callCount(), 1);
 }
 
 TEST_F(ReshardingDonorPostCloningDeltaCollectorTest,

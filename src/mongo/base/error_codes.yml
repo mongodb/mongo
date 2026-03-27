@@ -1205,8 +1205,8 @@ error_codes:
       name: StreamProcessorPubSubConnectionError,
       categories: [StreamProcessorUserError, StreamProcessorRetryableError],
     }
-
   - {code: 495, name: TimeseriesBucketMetadataInconsistent}
+  - {code: 496, name: ReshardingValidationIncompleteData}
 
   # ^^^^
   # Add new codes, sequentially numbered, above.

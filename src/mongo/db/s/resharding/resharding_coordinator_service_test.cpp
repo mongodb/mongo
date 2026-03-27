@@ -111,6 +111,7 @@ public:
         boost::optional<ErrorCodes::Error> getDocumentsDeltaErrorCode;
         boost::optional<ErrorCodes::Error> verifyClonedErrorCode;
         boost::optional<ErrorCodes::Error> verifyFinalErrorCode;
+        bool blockInGetDocumentsDelta = false;
     };
 
     enum class ExternalFunction {
@@ -227,6 +228,13 @@ public:
             uasserted(*_options.getDocumentsDeltaErrorCode, "Failing call to getDocumentsDelta");
         }
 
+        if (_options.blockInGetDocumentsDelta) {
+            stdx::unique_lock lk(_mutex);
+            opCtx->waitForConditionOrInterrupt(_blockInGetDocumentsDeltaCV, lk, [this] {
+                return !_doKeepBlockingInGetDocumentsDelta;
+            });
+        }
+
         std::map<ShardId, int64_t> docsDelta;
         for (const auto& shardId : shardIds) {
             auto it = _options.documentsDelta.find(shardId);
@@ -256,11 +264,21 @@ public:
         _errorFunction = std::make_tuple(phase, func);
     }
 
+    void unblockGetDocumentsDelta() {
+        stdx::lock_guard lk(_mutex);
+        _doKeepBlockingInGetDocumentsDelta = false;
+        _blockInGetDocumentsDeltaCV.notify_all();
+    }
+
 private:
     const Options _options;
 
     boost::optional<std::tuple<CoordinatorStateEnum, ExternalFunction>> _errorFunction =
         boost::none;
+
+    stdx::mutex _mutex;
+    stdx::condition_variable _blockInGetDocumentsDeltaCV;
+    bool _doKeepBlockingInGetDocumentsDelta = true;
 
     CoordinatorStateEnum _getCurrentPhaseOnDisk(OperationContext* opCtx) {
         DBDirectClient client(opCtx);
@@ -399,6 +417,7 @@ public:
     void tearDown() override {
         globalFailPointRegistry().disableAllFailpoints();
 
+        externalState()->unblockGetDocumentsDelta();
         TransactionCoordinatorService::get(operationContext())->interruptForStepDown();
         WaitForMajorityService::get(getServiceContext()).shutDown();
         ConfigServerTestFixture::tearDown();
@@ -1303,6 +1322,59 @@ public:
     }
 };
 
+class ReshardingCoordinatorServiceCriticalSectionWithBlockingDeltaTest
+    : public ReshardingCoordinatorServiceTestBase {
+public:
+    ExternalStateForTest::Options getExternalStateOptions() const override {
+        return {.documentsToCopy = documentsToCopy,
+                .documentsDelta = documentsDelta,
+                .blockInGetDocumentsDelta = true};
+    }
+};
+
+TEST_F(ReshardingCoordinatorServiceCriticalSectionWithBlockingDeltaTest,
+       CriticalSectionTimeoutAbortsWhileDeltaFetchIsInProgress) {
+    RAIIServerParameterControllerForTest criticalSectionTimeout{
+        "reshardingCriticalSectionTimeoutMillis", 1};
+
+    PauseDuringStateTransitions stateTransitionsGuard{controller(),
+                                                      CoordinatorStateEnum::kAborting};
+    auto opCtx = operationContext();
+
+    auto reshardingOptions = makeDefaultReshardingOptions();
+    reshardingOptions.performVerification = true;
+
+    auto coordinator = initializeAndGetCoordinator(_reshardingUUID,
+                                                   _originalNss,
+                                                   _tempNss,
+                                                   _newShardKey,
+                                                   _originalUUID,
+                                                   _oldShardKey,
+                                                   reshardingOptions);
+
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kPreparingToDonate);
+    makeDonorsReadyToDonateWithAssert(opCtx);
+
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCloning);
+    makeRecipientsFinishedCloningWithAssert(opCtx);
+    coordinator->onOkayToEnterCritical();
+
+    // The coordinator now transitions to kBlockingWrites. The delta collector is launched
+    // asynchronously that is configured to be stuck forever. The delta fetcher getting
+    // stucked should not prevent the 1ms critical section timeout from aborting resharding.
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kAborting);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kAborting);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kAborting);
+
+    makeRecipientsProceedToDone(opCtx);
+    makeDonorsProceedToDone(opCtx);
+
+    ASSERT_THROWS_CODE(coordinator->getCompletionFuture().get(opCtx),
+                       DBException,
+                       ErrorCodes::ReshardingCriticalSectionTimeout);
+}
+
 TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorSuccessfullyTransitionsTokDone) {
     runReshardingToCompletion();
 }
@@ -2078,6 +2150,30 @@ TEST_F(ReshardingCoordinatorServiceFailFinalVerificationTest, AbortIfPerformVeri
         coordinator->getCompletionFuture().get(opCtx), DBException, verifyFinalErrorCode);
 }
 
+class ReshardingCoordinatorServiceIncompleteDataVerificationTest
+    : public ReshardingCoordinatorServiceTestBase {
+public:
+    ExternalStateForTest::Options getExternalStateOptions() const override {
+        return {.documentsToCopy = documentsToCopy,
+                .documentsDelta = documentsDelta,
+                .verifyFinalErrorCode = ErrorCodes::ReshardingValidationIncompleteData};
+    }
+};
+
+TEST_F(ReshardingCoordinatorServiceIncompleteDataVerificationTest,
+       CommitIfIncompleteDataVerificationError) {
+    auto reshardingOptions = makeDefaultReshardingOptions();
+
+    runReshardingToCompletion(TransitionFunctionMap{},
+                              nullptr /* stateTransitionsGuard */,
+                              {CoordinatorStateEnum::kPreparingToDonate,
+                               CoordinatorStateEnum::kCloning,
+                               CoordinatorStateEnum::kApplying,
+                               CoordinatorStateEnum::kBlockingWrites,
+                               CoordinatorStateEnum::kCommitting},
+                              reshardingOptions);
+}
+
 TEST_F(ReshardingCoordinatorServiceFailFinalVerificationTest, CommitIfNotPerformVerification) {
     auto reshardingOptions = makeDefaultReshardingOptions();
     reshardingOptions.performVerification = false;
@@ -2132,7 +2228,48 @@ TEST_F(ReshardingCoordinatorServiceTest, UnrecoverableErrorDuringApplying) {
 
 TEST_F(ReshardingCoordinatorServiceTest, UnrecoverableErrorDuringBlockingWrites) {
     runReshardingWithUnrecoverableError(CoordinatorStateEnum::kBlockingWrites,
-                                        kGetDocumentsDeltaFromDonors);
+                                        kTellAllDonorsToRefresh);
+}
+
+TEST_F(ReshardingCoordinatorServiceTest, UnrecoverableErrorInDeltaCollectorDuringBlockingWrites) {
+    // The delta collector runs asynchronously after the coordinator enters kBlockingWrites. Its
+    // error is only surfaced when _verifyFinalCollection awaits the delta future, which happens
+    // after all recipients reach strict consistency. Unlike kTellAllDonorsToRefresh (which fails
+    // synchronously before the recipients wait), we must drive recipients to strict consistency
+    // so the coordinator calls _verifyFinalCollection and observes the error. This means
+    // runReshardingWithUnrecoverableError cannot be used here.
+    PauseDuringStateTransitions stateTransitionsGuard{
+        controller(), {CoordinatorStateEnum::kBlockingWrites, CoordinatorStateEnum::kAborting}};
+
+    externalState()->throwUnrecoverableErrorIn(CoordinatorStateEnum::kBlockingWrites,
+                                               kGetDocumentsDeltaFromDonors);
+
+    auto opCtx = operationContext();
+    auto coordinator = initializeAndGetCoordinator();
+
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kPreparingToDonate);
+    makeDonorsReadyToDonateWithAssert(opCtx);
+
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCloning);
+    makeRecipientsFinishedCloningWithAssert(opCtx);
+
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kApplying);
+    coordinator->onOkayToEnterCritical();
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kBlockingWrites);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kBlockingWrites);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kBlockingWrites);
+    makeRecipientsBeInStrictConsistencyWithAssert(opCtx);
+
+    stateTransitionsGuard.wait(CoordinatorStateEnum::kAborting);
+    stateTransitionsGuard.unset(CoordinatorStateEnum::kAborting);
+    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kAborting);
+
+    makeRecipientsProceedToDone(opCtx);
+    makeDonorsProceedToDone(opCtx);
+
+    ASSERT_EQ(coordinator->getCompletionFuture().getNoThrow(), ErrorCodes::InternalError);
+    checkCoordinatorDocumentRemoved(opCtx);
 }
 
 class ReshardingCoordinatorServiceFailGetDocumentsToCopy
@@ -2271,6 +2408,7 @@ protected:
 TEST_F(ReshardingCoordinatorServiceFailGetDocumentsDelta, AbortIfPerformVerification) {
     const std::vector<CoordinatorStateEnum> states = {CoordinatorStateEnum::kPreparingToDonate,
                                                       CoordinatorStateEnum::kCloning,
+                                                      CoordinatorStateEnum::kApplying,
                                                       CoordinatorStateEnum::kBlockingWrites,
                                                       CoordinatorStateEnum::kAborting};
 
@@ -2308,6 +2446,8 @@ TEST_F(ReshardingCoordinatorServiceFailGetDocumentsDelta, AbortIfPerformVerifica
     stateTransitionsGuard.wait(CoordinatorStateEnum::kBlockingWrites);
     stateTransitionsGuard.unset(CoordinatorStateEnum::kBlockingWrites);
     waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kBlockingWrites);
+
+    makeRecipientsBeInStrictConsistencyWithAssert(opCtx);
 
     stateTransitionsGuard.wait(CoordinatorStateEnum::kAborting);
     stateTransitionsGuard.unset(CoordinatorStateEnum::kAborting);
