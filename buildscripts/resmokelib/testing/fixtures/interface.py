@@ -13,7 +13,7 @@ import pymongo.errors
 
 from buildscripts.resmokelib.utils import registry
 
-# TODO: if we ever fix the circular deps in resmoke we will be able to get rid of this
+# TODO: (Ignore linting) if we ever fix the circular deps in resmoke we will be able to get rid of this
 if TYPE_CHECKING:
     from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 
@@ -82,6 +82,7 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):
     _NODE_NOT_FOUND = 74
     _NEW_REPLICA_SET_CONFIGURATION_INCOMPATIBLE = 103
     _CONFIGURATION_IN_PROGRESS = 109
+    _FAILED_TO_SATISFY_READ_PREFERENCE = 133
     _CURRENT_CONFIG_NOT_COMMITTED_YET = 308
     _INTERRUPTED_DUE_TO_REPL_STATE_CHANGE = 11602
     _INTERRUPTED_DUE_TO_STORAGE_CHANGE = 355

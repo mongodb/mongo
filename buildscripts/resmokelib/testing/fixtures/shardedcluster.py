@@ -408,10 +408,36 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
                 {"getClusterParameter": self.set_cluster_parameter["parameter"]}
             )
 
+    _STOP_BALANCER_MAX_ATTEMPTS = 3
+    _STOP_BALANCER_RETRY_INTERVAL_SECS = 10
+
     def stop_balancer(self, timeout_ms=300000, join_migrations=True):
         """Stop the balancer."""
-        client = interface.build_client(self, self.auth_options, timeout_millis=timeout_ms)
-        client.admin.command({"balancerStop": 1}, maxTimeMS=timeout_ms)
+
+        # Sleep and retry on FailedToSatisfyReadPreference and connection errors. This handles cases where
+        # the config server primary is momentarily unreachable (e.g. during elections on slow TSAN
+        # variants).
+        for attempt in range(1, self._STOP_BALANCER_MAX_ATTEMPTS + 1):
+            try:
+                client = interface.build_client(self, self.auth_options, timeout_millis=timeout_ms)
+                client.admin.command({"balancerStop": 1}, maxTimeMS=timeout_ms)
+                break
+            except (pymongo.errors.OperationFailure, pymongo.errors.ConnectionFailure) as err:
+                if (
+                    isinstance(err, pymongo.errors.OperationFailure)
+                    and err.code != self._FAILED_TO_SATISFY_READ_PREFERENCE
+                ):
+                    raise
+                if attempt == self._STOP_BALANCER_MAX_ATTEMPTS:
+                    raise
+                self.logger.info(
+                    "Retrying stop_balancer (attempt %d/%d) due to transient error: %s.",
+                    attempt,
+                    self._STOP_BALANCER_MAX_ATTEMPTS,
+                    err,
+                )
+                time.sleep(self._STOP_BALANCER_RETRY_INTERVAL_SECS)
+
         if join_migrations:
             for shard in self.shards:
                 shard_client = interface.build_client(
