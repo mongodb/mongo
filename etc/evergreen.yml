@@ -112,7 +112,7 @@ parameters:
 
 commit_queue_aliases:
   - variant: "^(commit-queue)$"
-    task: "^(bazel_.*|run_.*|unit_test.*|compile_.*|lint_.*|resmoke_tests|check_for_noexcept|version_gen_validation|validate_commit_message|resmoke_validation_tests|buildscripts_test)$"
+    task: "^(bazel_.*|run_.*|unit_test.*|compile_.*|lint_.*|resmoke_tests|check_for_noexcept|version_gen_validation|validate_commit_message|resmoke_validation_tests|buildscripts_test|check_for_todos)$"
     variant_tags: []
     task_tags: []
   - variant: "^(amazon-linux2023-arm64-static-compile)$"
@@ -130,7 +130,7 @@ commit_queue_aliases:
 
 github_pr_aliases:
   - variant: "^(commit-queue)$"
-    task: "^(bazel_.*|run_.*|unit_test.*|compile_.*|lint_.*|resmoke_tests|check_for_noexcept|version_gen_validation|validate_commit_message|resmoke_validation_tests|buildscripts_test)$"
+    task: "^(bazel_.*|run_.*|unit_test.*|compile_.*|lint_.*|resmoke_tests|check_for_noexcept|version_gen_validation|validate_commit_message|resmoke_validation_tests|buildscripts_test|check_for_todos)$"
     variant_tags: []
     task_tags: []
   - variant: "^(amazon-linux2023-arm64-static-compile)$"

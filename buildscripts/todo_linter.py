@@ -33,8 +33,9 @@ def is_interesting_file(file_name: str) -> bool:
         and not file_name.startswith("src/mongo/gotools/")
         and not file_name.startswith("src/streams/third_party")
         and not file_name.startswith("src/mongo/db/modules/enterprise/src/streams/third_party")
-        # Exclude this file because it's filled with TODO SERVER-XXXXX patterns
+        # Exclude these two files because they are filled with TODO SERVER-XXXXX patterns
         and not file_name == "buildscripts/todo_linter.py"
+        and not file_name == "buildscripts/todo_check.py"
         and FILES_RE.search(file_name) is not None
     )
 

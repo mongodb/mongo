@@ -10,6 +10,10 @@ from typing import Callable, Iterable, NamedTuple, Optional
 
 import click
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__)))))
+
+
+from buildscripts.validate_commit_message import get_merge_queue_commits
 from evergreen import RetryingEvergreenApi
 
 EVG_CONFIG_FILE = "./.evergreen.yml"
@@ -151,7 +155,7 @@ class TodoChecker:
 
         return True
 
-    def validate_commit_queue(self, commit_message: str) -> bool:
+    def validate_from_commit(self, commit_message: str) -> bool:
         """
         Check that the given commit message does not reference TODO comments.
 
@@ -214,15 +218,20 @@ def get_summary_for_patch(version_id: str) -> str:
 @click.option("--ticket", help="Only report on TODOs associated with given Jira ticket.")
 @click.option("--base-dir", default=BASE_SEARCH_DIR, help="Base directory to search in.")
 @click.option(
-    "--commit-message", help="For commit-queue execution only, ensure no TODOs for this commit"
-)
-@click.option(
     "--patch-build",
     type=str,
     help="For patch build execution only, check for any TODOs from patch description",
 )
+@click.option(
+    "--merge-queue-branch",
+    type=str,
+    help="For merge queue execution only, branch name to compare against HEAD",
+)
 def main(
-    ticket: Optional[str], base_dir: str, commit_message: Optional[str], patch_build: Optional[str]
+    ticket: Optional[str],
+    base_dir: str,
+    patch_build: Optional[str],
+    merge_queue_branch: Optional[str],
 ):
     """
     Search for and report on TODO comments in the code base.
@@ -266,23 +275,24 @@ def main(
     \f
     :param ticket: Only report on TODOs associated with this jira ticket.
     :param base_dir: Search files in this base directory.
-    :param commit_message: Commit message if running in the commit-queue.
+    :param merge_queue_branch: Branch name to compare against HEAD if running in the merge queue.
     :param patch_build: Version ID of patch build to check.
 
     """
-    if commit_message and ticket is not None:
+    if merge_queue_branch and ticket is not None:
         raise click.UsageError("--ticket cannot be used in commit queue.")
+
+    todo_checker = TodoChecker()
+    todo_checker.check_all_files(base_dir)
 
     if patch_build:
         if ticket is not None:
             raise click.UsageError("--ticket cannot be used in patch builds.")
         commit_message = get_summary_for_patch(patch_build)
-
-    todo_checker = TodoChecker()
-    todo_checker.check_all_files(base_dir)
-
-    if commit_message:
-        found_todos = todo_checker.validate_commit_queue(commit_message)
+        found_todos = todo_checker.validate_from_commit(commit_message)
+    elif merge_queue_branch:
+        commits = get_merge_queue_commits(merge_queue_branch)
+        found_todos = any(todo_checker.validate_from_commit(commit.message) for commit in commits)
     elif ticket:
         found_todos = todo_checker.report_on_ticket(ticket)
     else:

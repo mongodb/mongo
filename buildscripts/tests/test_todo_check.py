@@ -181,7 +181,7 @@ class TestValidateCommitQueue(unittest.TestCase):
         todos = under_test.TodoChecker()
         todos.check_file("my file", create_file_iterator(file_contents))
 
-        self.assertFalse(todos.validate_commit_queue(commit_message))
+        self.assertFalse(todos.validate_from_commit(commit_message))
 
     def test_todos_associated_with_commit_message_should_be_found(self):
         commit_message = "SERVER-1234 making a commit"
@@ -196,7 +196,7 @@ class TestValidateCommitQueue(unittest.TestCase):
         todos = under_test.TodoChecker()
         todos.check_file("my file", create_file_iterator(file_contents))
 
-        self.assertTrue(todos.validate_commit_queue(commit_message))
+        self.assertTrue(todos.validate_from_commit(commit_message))
 
     def test_commit_messages_with_multiple_commits_search_all_of_them(self):
         commit_message = """
@@ -217,7 +217,7 @@ class TestValidateCommitQueue(unittest.TestCase):
         todos = under_test.TodoChecker()
         todos.check_file("my file", create_file_iterator(file_contents))
 
-        self.assertTrue(todos.validate_commit_queue(commit_message))
+        self.assertTrue(todos.validate_from_commit(commit_message))
 
     def test_commit_messages_with_no_tickets_doesnt_cause_issues(self):
         commit_message = "A random commit"
@@ -232,7 +232,7 @@ class TestValidateCommitQueue(unittest.TestCase):
         todos = under_test.TodoChecker()
         todos.check_file("my file", create_file_iterator(file_contents))
 
-        self.assertFalse(todos.validate_commit_queue(commit_message))
+        self.assertFalse(todos.validate_from_commit(commit_message))
 
 
 def write_file(path: str, contents: str):
