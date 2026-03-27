@@ -302,19 +302,19 @@ Status MultiPlanStage::runTrials(PlanYieldPolicy* yieldPolicy,
             "should be choosing the best plan instead.",
             !_specificStats.earlyExit);
 
-    const size_t candidatesSize = _candidates.size();
+    const size_t childrenSize = _children.size();
 
     const auto concurrentMultiPlanJobs =
-        MultiPlanRateLimiter::concurrentMultiPlansCounter.addAndFetch(candidatesSize);
-    ON_BLOCK_EXIT([candidatesSize]() {
-        MultiPlanRateLimiter::concurrentMultiPlansCounter.subtractAndFetch(candidatesSize);
+        MultiPlanRateLimiter::concurrentMultiPlansCounter.addAndFetch(childrenSize);
+    ON_BLOCK_EXIT([childrenSize]() {
+        MultiPlanRateLimiter::concurrentMultiPlansCounter.subtractAndFetch(childrenSize);
     });
 
     boost::optional<MultiPlanTicket> multiPlanTicket{};
     if (expCtx()->getIfrContext()->getSavedFlagValue(feature_flags::gfeatureFlagMultiPlanLimiter) &&
         concurrentMultiPlanJobs > internalQueryConcurrentMultiPlanningThreshold.load() &&
         yieldPolicy->canAutoYield()) {
-        multiPlanTicket = rateLimit(yieldPolicy, candidatesSize);
+        multiPlanTicket = rateLimit(yieldPolicy, childrenSize);
         if (!expCtx()->wasRateLimited() && multiPlanTicket->isTicketHolderReleased()) {
             // A ticket holder is usually released when the corresponing plan cache entry has been
             // created.
@@ -336,8 +336,8 @@ Status MultiPlanStage::runTrials(PlanYieldPolicy* yieldPolicy,
     auto startTicks = tickSource->getTicks();
 
     if (!_shouldNotCollectMetrics) {
-        classicNumPlansHistogram.increment(_candidates.size());
-        classicNumPlansTotal.increment(_candidates.size());
+        classicNumPlansHistogram.increment(childrenSize);
+        classicNumPlansTotal.increment(childrenSize);
         classicCount.increment();
     }
 
@@ -348,7 +348,7 @@ Status MultiPlanStage::runTrials(PlanYieldPolicy* yieldPolicy,
         for (; ix < trialConfig.maxNumWorksPerPlan && moreToDo; ++ix) {
             moreToDo = workAllPlans(trialConfig.targetNumResults, yieldPolicy);
         }
-        auto totalWorks = ix * _candidates.size();
+        auto totalWorks = ix * childrenSize;
 
         if (!_shouldNotCollectMetrics) {
             classicWorksHistogram.increment(totalWorks);
@@ -569,9 +569,16 @@ void MultiPlanStage::removeRejectedPlans() {
         startIndex = 2;
     }
 
-    _rejected.reserve(_children.size() - startIndex);
+    auto rejectedOld = std::move(_rejected);
+    // _rejected might be non-empty at this point, eg. if abandonTrialsExceptHash
+    // has been called. Make sure any new additions to _rejected preceed the existing
+    // candidates to ensure the parallelism between _candidates and _rejected.
+    _rejected.reserve(rejectedOld.size() + _children.size() - startIndex);
     for (size_t i = startIndex; i < _children.size(); ++i) {
         rejectPlan(i);
+    }
+    for (auto&& oldRejection : rejectedOld) {
+        _rejected.push_back(std::move(oldRejection));
     }
     _children.resize(startIndex);
 }
@@ -624,29 +631,33 @@ bool MultiPlanStage::hasBackupPlan() const {
     return planExplainerData;
 }
 
-void MultiPlanStage::abandonTrialsExceptHash(size_t hash) {
+void MultiPlanStage::abandonTrialsExceptHashes(const boost::container::flat_set<size_t>& hashes) {
     if (_isStateSaved) {
         restoreState(&collectionPtr());
     }
 
     tassert(11542002, "cannot abandon trials after best plan has been chosen", !bestPlanChosen());
     size_t idx;
+    size_t matchCount = 0;
     for (idx = 0; idx < _candidates.size(); idx++) {
-        if (_candidates[idx].solution->hash() == hash) {
+        if (hashes.contains(_candidates[idx].solution->hash())) {
             // Move the selected plan to the beginning
-            std::swap(_candidates[0], _candidates[idx]);
-            std::swap(_children[0], _children[idx]);
-            break;
+            std::swap(_candidates[matchCount], _candidates[idx]);
+            std::swap(_children[matchCount], _children[idx]);
+            matchCount++;
+            if (matchCount == hashes.size()) {
+                break;
+            }
         }
     }
-    tassert(11763501, "Expected plan not found.", idx < _candidates.size());
+    tassert(11763501, "An expected plan was not found.", matchCount == hashes.size());
 
     // Reject all the other plans
-    for (size_t idx = 1; idx < _candidates.size(); idx++) {
+    for (size_t idx = matchCount; idx < _candidates.size(); idx++) {
         rejectPlan(idx);
     }
 
-    _children.resize(1);
+    _children.resize(matchCount);
 }
 
 bool MultiPlanStage::bestPlanChosen() const {

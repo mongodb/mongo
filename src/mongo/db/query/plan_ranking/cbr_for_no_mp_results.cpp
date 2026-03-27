@@ -111,7 +111,7 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
         _multiPlanner->stopCollectingMetrics();
 
         // TODO(SERVER-104684): Avoid abandoning the backup plan.
-        _multiPlanner->abandonTrialsExceptHash(resultValue.solutions[0]->hash());
+        _multiPlanner->abandonTrialsExceptHashes({resultValue.solutions[0]->hash()});
         auto remainingMultiPlannerWorksPerPlan =
             trialsConfig.maxNumWorksPerPlan - cappedTrialsConfig.maxNumWorksPerPlan;
         auto status =
@@ -130,18 +130,28 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
         // MP decides) & re-introduce the tassert in get_executor.cpp from SERVER-120784.
 
         return resultValue;
-    } else {
-        // move solutions from cbrResult into maybeExplainData.rejectedPlansWithStages
-        for (size_t i = 0; i < cbrResult.getValue().solutions.size(); i++) {
-            // TODO SERVER-117373. Only if explain is needed.
-            cbrResult.getValue().maybeExplainData->rejectedPlansWithStages.push_back(
-                {std::move(cbrResult.getValue().solutions[i]), nullptr});
-        }
     }
 
-    // Previous multi-planning phase didn't exit early.
-    // Resume it since CBR couldn't pick a single best plan either.
-    // TODO SERVER-117488. Only resume the plan that CBR considered best and the not estimable ones.
+    // CBR could not decide either (there are uncostable solutions).
+    // Abandon all plans not among the ones returned by CBR.
+    auto computeCBRSolutionHashes = [&]() {
+        boost::container::flat_set<size_t> cbrSolutionHashes;
+        std::transform(cbrResult.getValue().solutions.begin(),
+                       cbrResult.getValue().solutions.end(),
+                       std::inserter(cbrSolutionHashes, cbrSolutionHashes.end()),
+                       [](const std::unique_ptr<QuerySolution>& sol) { return sol->hash(); });
+        return cbrSolutionHashes;
+    };
+    _multiPlanner->abandonTrialsExceptHashes(computeCBRSolutionHashes());
+
+    // move solutions from cbrResult into maybeExplainData.rejectedPlansWithStages
+    for (size_t i = 0; i < cbrResult.getValue().solutions.size(); i++) {
+        // TODO SERVER-117373. Only if explain is needed.
+        cbrResult.getValue().maybeExplainData->rejectedPlansWithStages.push_back(
+            {std::move(cbrResult.getValue().solutions[i]), nullptr});
+    }
+
+    // Resume trials on the remainder of the plans.
     auto remainingMultiPlannerWorksPerPlan =
         trialsConfig.maxNumWorksPerPlan - cappedTrialsConfig.maxNumWorksPerPlan;
     auto result =
