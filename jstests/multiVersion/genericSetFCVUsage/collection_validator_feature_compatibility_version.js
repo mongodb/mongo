@@ -26,8 +26,9 @@ const testCasesLastContinuous = [
     // Populate with any new expressions.
     //
 ];
-const testCasesLastContinuousWithFeatureFlags = [
-    // TODO(SERVER-115778): Move arrayIndexAs/as/valueAs queries to 'testCasesLastStable' when 8.3 becomes last continuous.
+const testCasesLastContinuousWithFeatureFlags = [];
+
+const testCasesLastStable = testCasesLastContinuous.concat([
     // TODO(SERVER-90514): Remove arrayIndexAs/as/valueAs queries when feature flag is removed.
     {
         validator: {
@@ -117,9 +118,7 @@ const testCasesLastContinuousWithFeatureFlags = [
         },
         nonMatchingDocument: {a: [0, 0]},
     },
-];
-
-const testCasesLastStable = testCasesLastContinuous.concat([]);
+]);
 const testCasesLastStableWithFeatureFlags = testCasesLastContinuousWithFeatureFlags.concat([]);
 
 // Tests Feature Compatibility Version behavior of the validator of a collection by executing test

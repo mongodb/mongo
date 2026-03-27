@@ -18,8 +18,11 @@ const featureFlagsToEnable = ["featureFlagExposeArrayIndexInMapFilterReduce"];
 // latest version, and rejects it when the feature compatibility version is the last
 // version.
 const testCasesLastContinuous = [];
-const testCasesLastContinuousWithFeatureFlags = [
-    // TODO(SERVER-115778): Move arrayIndexAs/as/valueAs queries to 'testCasesLastStable' when 8.3 becomes last continuous.
+const testCasesLastContinuousWithFeatureFlags = [];
+
+// Anything that's incompatible with the last continuous release is incompatible with the last
+// stable release.
+const testCasesLastStable = testCasesLastContinuous.concat([
     // TODO(SERVER-90514): Remove arrayIndexAs/as/valueAs queries when feature flag is removed.
     [
         {
@@ -114,11 +117,7 @@ const testCasesLastContinuousWithFeatureFlags = [
             },
         },
     ],
-];
-
-// Anything that's incompatible with the last continuous release is incompatible with the last
-// stable release.
-const testCasesLastStable = testCasesLastContinuous.concat([]);
+]);
 
 const testCasesLastStableWithFeatureFlags = testCasesLastContinuousWithFeatureFlags.concat([]);
 
