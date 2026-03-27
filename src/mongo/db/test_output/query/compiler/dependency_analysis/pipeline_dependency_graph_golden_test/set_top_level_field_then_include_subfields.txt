@@ -48,9 +48,7 @@ output: {
                     "metadata": {
                         "array": false
                     },
-                    "dependencies": [
-                        "<base document>:-1"
-                    ]
+                    "dependencies": []
                 },
                 "b:2": {
                     "declaringScope": "scope:0",
@@ -66,9 +64,7 @@ output: {
                                 "metadata": {
                                     "array": false
                                 },
-                                "dependencies": [
-                                    "<base document>:-1"
-                                ]
+                                "dependencies": []
                             }
                         }
                     },

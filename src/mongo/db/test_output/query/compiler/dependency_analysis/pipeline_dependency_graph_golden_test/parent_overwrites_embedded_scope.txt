@@ -50,18 +50,14 @@ output: {
                                 "metadata": {
                                     "array": false
                                 },
-                                "dependencies": [
-                                    "<base document>:-1"
-                                ]
+                                "dependencies": []
                             },
                             "c:4": {
                                 "declaringScope": "scope:1",
                                 "metadata": {
                                     "array": false
                                 },
-                                "dependencies": [
-                                    "<base document>:-1"
-                                ]
+                                "dependencies": []
                             }
                         }
                     },

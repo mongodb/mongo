@@ -61,9 +61,7 @@ output: {
                                 "metadata": {
                                     "array": false
                                 },
-                                "dependencies": [
-                                    "<missing>:0"
-                                ]
+                                "dependencies": []
                             }
                         }
                     },

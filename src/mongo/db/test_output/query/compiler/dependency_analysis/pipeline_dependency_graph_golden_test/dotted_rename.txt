@@ -60,9 +60,7 @@ output: {
                                             "metadata": {
                                                 "array": false
                                             },
-                                            "dependencies": [
-                                                "<base document>:-1"
-                                            ]
+                                            "dependencies": []
                                         }
                                     }
                                 },
@@ -90,9 +88,7 @@ output: {
                                 "metadata": {
                                     "array": false
                                 },
-                                "dependencies": [
-                                    "<base document>:-1"
-                                ]
+                                "dependencies": []
                             }
                         }
                     },

@@ -947,12 +947,19 @@ private:
                 [&](const ModifyPath& p) {
                     maybeDeclareInheritedScope();
                     auto parsedPath = internPath(p.getPath());
+                    FieldDependencies deps{};
                     FieldMetadata metadata{};
                     if (auto expr = p.getExpression()) {
                         updateMetadataFromExpression(metadata, *expr);
-                        // TODO(SERVER-121942): Extract correct field-level dependencies.
+                        deps = processExpressionDependencies(*expr, parentScope);
+                    } else {
+                        // If the modification is not determined by an expression, we cannot get
+                        // more precise dependency information. The stage dependencies will always
+                        // be a superset of any modified path dependencies, so we can use those.
+                        // Example: {$unwind: '$x'}
+                        deps = depsFromStage;
                     }
-                    declareField(scopeId, parsedPath, depsFromStage, std::move(metadata));
+                    declareField(scopeId, parsedPath, std::move(deps), std::move(metadata));
                 },
                 [&](const RenamePath& p) {
                     maybeDeclareInheritedScope();
@@ -1066,26 +1073,8 @@ private:
         _dsToStageId.emplace(documentSource.get(), stageId);
 
         auto parentScopeId = _stages.empty() ? ScopeId::none() : _stages.back().scope;
-        FieldDependencies dependencies;
-        if (dsInfo.dependsOnWholeDocument()) {
-            dependencies = FieldDependencies::wholeDocument();
-        } else {
-            if (parentScopeId) {
-                for (auto&& path : dsInfo.getPathDependencies()) {
-                    auto parsedPath = internPath(path);
-                    // The dependency could be:
-                    // - exact field
-                    // - shadowing field
-                    // - <missing> field
-                    // - collection field / FieldId::none()
-                    auto fieldId = lookupField(parentScopeId, parsedPath).fieldId;
-                    dependencies.insert(fieldId);
-                }
-            } else if (!dsInfo.getPathDependencies().empty()) {
-                // Any dependency in the first stage is always a collection field.
-                dependencies.insert(FieldId::none());
-            }
-        }
+        FieldDependencies dependencies = processStageDependencies(dsInfo, parentScopeId);
+
         const auto nextNewScopeId = _scopes.getNextId();
         auto scopeId = processScope(dsInfo, stageId, parentScopeId, dependencies);
 
@@ -1094,6 +1083,49 @@ private:
                              std::move(dependencies),
                              dsInfo.isSingleDocumentTransformation(),
                              nextNewScopeId});
+    }
+
+    /**
+     * Creates dependencies for a stage.
+     */
+    FieldDependencies processStageDependencies(const DocumentSourceInfo& dsInfo,
+                                               ScopeId parentScope) {
+        return processPathDependencies(
+            dsInfo.getPathDependencies(), dsInfo.dependsOnWholeDocument(), parentScope);
+    }
+
+    /**
+     * Creates dependencies for an expression.
+     */
+    FieldDependencies processExpressionDependencies(const Expression& expr, ScopeId parentScope) {
+        DepsTracker depsTracker = expression::getDependencies(&expr);
+        return processPathDependencies(
+            depsTracker.fields, depsTracker.needWholeDocument, parentScope);
+    }
+
+    /**
+     * Creates dependencies from a set of paths.
+     */
+    FieldDependencies processPathDependencies(const OrderedPathSet& paths,
+                                              bool dependsOnWholeDocument,
+                                              ScopeId parentScope) {
+        if (dependsOnWholeDocument) {
+            return FieldDependencies::wholeDocument();
+        }
+        if (paths.empty()) {
+            return FieldDependencies{};
+        }
+        if (parentScope) {
+            FieldDependencies dependencies;
+            for (auto&& path : paths) {
+                auto parsedPath = internPath(path);
+                auto fieldId = lookupField(parentScope, parsedPath).fieldId;
+                dependencies.insert(fieldId);
+            }
+            return dependencies;
+        }
+        // Any dependency in the first stage is always a collection field.
+        return FieldDependencies{FieldId::none()};
     }
 
     /**

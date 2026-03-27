@@ -428,5 +428,46 @@ TEST_F(PipelineDependencyGraphGoldenTest, MiddleStageDependsOnWholeDocument) {
     });
 }
 
+TEST_F(PipelineDependencyGraphGoldenTest, ExpressionDependencies) {
+    runVariation({
+        .name = "ExpressionDependencies",
+        .pipeline = "[{$set: {a: 1, b: 1, c: 1}},"
+                    " {$set: {a_plus_b: {$add: ['$a', '$b']}, b_plus_c: {$add: ['$b', '$c']}}},"
+                    " {$set: {a_plus_x: {$add: ['$a', '$x']}, x_plus_d: {$add: ['$x', '$d']}}}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, SetFieldExpressionDependencies) {
+    runVariation({
+        .name = "SetFieldExpressionDependencies",
+        .pipeline = "[{$set: {'a.b': 1, c: 1}},"
+                    " {$set: {d: {$setField: {field: 'c', input: '$a', value: 2}}, e: '$c'}}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, GetFieldExpressionDependencies) {
+    runVariation({
+        .name = "GetFieldExpressionDependencies",
+        .pipeline = "[{$set: {'a.b': 1, c: 1}},"
+                    " {$set: {d: {$getField: {field: 'b', input: '$a'}}, e: '$c'}}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, NonExpressionModificationDependencies) {
+    runVariation({
+        .name = "NonExpressionModificationDependencies",
+        .pipeline = "[{$set: {a: [1, 2]}},"
+                    " {$unwind: '$a'}]",
+    });
+}
+
+// TODO(SERVER-122744): Enable.
+// TEST_F(PipelineDependencyGraphGoldenTest, ExpressionWholeDocumentDependency) {
+//     runVariation({
+//         .name = "ExpressionWholeDocumentDependency",
+//         .pipeline = "[{$set: {a: '$$ROOT'}}]",
+//     });
+// }
+
 }  // namespace
 }  // namespace mongo::pipeline::dependency_graph
