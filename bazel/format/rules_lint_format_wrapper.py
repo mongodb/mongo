@@ -226,6 +226,20 @@ def main() -> int:
         else:
             files_to_format = _get_files_changed_since_fork_point(origin_branch)
 
+    # If the total size of all file paths exceeds 128 KiB, the argument list
+    # may blow past the OS ARG_MAX limit (typically 2 MiB on Linux) once the
+    # base command, environment variables, and exclude flags are added.
+    # Fall back to formatting all files to avoid an OSError.
+    max_arg_bytes = 128 * 1024
+    if files_to_format != "all":
+        total_bytes = sum(len(f.encode("utf-8")) + 1 for f in files_to_format)
+        if total_bytes > max_arg_bytes:
+            print(
+                f"WARNING: Too many changed files ({len(files_to_format)} files, {total_bytes} bytes of paths). "
+                "Defaulting to formatting all files to avoid 'Argument list too long' errors."
+            )
+            files_to_format = "all"
+
     def files_to_format_contains_bazel_file(files: Union[list[str], str]) -> bool:
         if files == "all":
             return True
