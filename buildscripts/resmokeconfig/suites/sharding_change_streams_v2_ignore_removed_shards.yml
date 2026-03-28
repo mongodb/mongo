@@ -9,6 +9,8 @@ selector:
     # Test removes primary shard after some documents were inserted, thus (expectedly) produces
     # different result with missing documents in ignoreRemovedShards mode.
     - jstests/sharding/query/change_streams/change_streams_with_config_transitions.js
+    # Test assumes strict mode.
+    - jstests/sharding/query/change_streams/change_stream_all_databases_v2_white_box.js
 
     # Test assumes strict mode.
     - jstests/sharding/query/change_streams/change_stream_collection_v2_strict_whitebox.js
