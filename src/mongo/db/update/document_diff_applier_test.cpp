@@ -170,6 +170,50 @@ TEST(DiffApplierTest, BinaryIsIdempotentMultipleWithShrink) {
     checkDiff(thirdImage, thirdImage, diffShrink());
 }
 
+TEST(DiffApplierTest, BinaryAppendNonColumnSubtype) {
+    // Binary diff can be applied to a pre-image with a non-Column subtype (e.g. BinDataGeneral).
+    // The original subtype is preserved in the result.
+    const BSONObj preImage(BSON("b1" << BSONBinData("abc", 3, BinDataType::BinDataGeneral)));
+
+    const BSONObj storage(
+        BSON("a" << BSON("o" << 3 << "d" << BSONBinData("def", 3, BinDataType::BinDataGeneral))));
+
+    diff_tree::DocumentSubDiffNode diffNode;
+    diffNode.addBinary("b1", storage["a"]);
+
+    auto diff = diffNode.serialize();
+    checkDiff(preImage, BSON("b1" << BSONBinData("abcdef", 6, BinDataType::BinDataGeneral)), diff);
+}
+
+TEST(DiffApplierTest, BinaryOverwriteNonColumnSubtype) {
+    // Replaces "abc" with "abdef" on a pre-image with UUID subtype.
+    // The original subtype is preserved in the result.
+    const BSONObj preImage(BSON("b1" << BSONBinData("abc", 3, BinDataType::newUUID)));
+
+    const BSONObj storage(
+        BSON("a" << BSON("o" << 2 << "d" << BSONBinData("def", 3, BinDataType::BinDataGeneral))));
+
+    diff_tree::DocumentSubDiffNode diffNode;
+    diffNode.addBinary("b1", storage["a"]);
+
+    auto diff = diffNode.serialize();
+    checkDiff(preImage, BSON("b1" << BSONBinData("abdef", 5, BinDataType::newUUID)), diff);
+}
+
+TEST(DiffApplierTest, BinaryIsIdempotentNonColumnSubtype) {
+    // Applying the same append diff twice to a non-Column pre-image. The original subtype is
+    // preserved in both applications.
+    const BSONObj storage(
+        BSON("a" << BSON("o" << 3 << "d" << BSONBinData("def", 3, BinDataType::BinDataGeneral))));
+
+    diff_tree::DocumentSubDiffNode diffNode;
+    diffNode.addBinary("b1", storage["a"]);
+    auto diff = diffNode.serialize();
+
+    const BSONObj preImage(BSON("b1" << BSONBinData("abc", 3, BinDataType::BinDataGeneral)));
+    checkDiff(preImage, BSON("b1" << BSONBinData("abcdef", 6, BinDataType::BinDataGeneral)), diff);
+}
+
 TEST(DiffApplierTest, UpdateSimple) {
     const BSONObj preImage(BSON("f1" << 0 << "foo" << 2 << "f2" << 3));
 
@@ -438,6 +482,29 @@ TEST(DiffApplierTest, UpdateArrayOfObjectsWithUpdateOperationNonContiguous) {
     // Case where pre image 'arr' field is a scalar. Again, we set it to null.
     preImage = fromjson("{dummyA: 1, arr: 1, dummyB: 1}");
     checkDiff(preImage, fromjson("{dummyA: 1, arr: null, dummyB: 1}"), diff);
+}
+
+TEST(DiffApplierTest, BinaryMalformedDiffNotObject) {
+    // The binary section element must be a BSON object. A non-object value should throw, not crash.
+    const BSONObj preImage(BSON("b1" << BSONBinData("abc", 3, BinDataType::Column)));
+    const BSONObj diff = BSON("b" << BSON("b1" << "not_an_object"));
+    ASSERT_THROWS_CODE(applyDiffTestHelper(preImage, diff), DBException, 10065);
+}
+
+TEST(DiffApplierTest, BinaryNegativeDiffOffset) {
+    // A negative offset in a binary diff is invalid and should throw
+    const BSONObj preImage(BSON("b1" << BSONBinData("abc", 3, BinDataType::Column)));
+    const BSONObj diff =
+        BSON("b" << BSON("b1" << BSON("o" << -1 << "d"
+                                          << BSONBinData("def", 3, BinDataType::BinDataGeneral))));
+    ASSERT_THROWS_CODE(applyDiffTestHelper(preImage, diff), DBException, 12262901);
+}
+
+TEST(DiffApplierTest, BinaryMalformedDiffFieldNotBinData) {
+    // The 'd' field in a binary diff must be binData. A non-binData value should throw, not crash.
+    const BSONObj preImage(BSON("b1" << BSONBinData("abc", 3, BinDataType::Column)));
+    const BSONObj diff = BSON("b" << BSON("b1" << BSON("o" << 3 << "d" << "not_bindata")));
+    ASSERT_THROWS_CODE(applyDiffTestHelper(preImage, diff), DBException, 12262900);
 }
 
 TEST(DiffApplierTest, DiffWithDuplicateFields) {
