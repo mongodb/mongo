@@ -96,6 +96,11 @@ public:
         "network.ingress_tls_handshake_latency"};
     static constexpr MetricName kOpenConnections = {"network.open_ingress_connections"};
 
+    // Query Execution Team Metrics
+    static constexpr MetricName kChangeStreamCursorsTotalOpened = {
+        "change_streams.cursor.total_opened"};
+    static constexpr MetricName kChangeStreamCursorsLifespan = {"change_streams.cursor.lifespan"};
+
     // Storage Execution Team Metrics
     static constexpr MetricName kIndexBuildSideWritesInserted = {
         "index_builds.side_writes.inserted"};

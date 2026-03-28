@@ -52,6 +52,7 @@ enum class MetricUnit {
     // Database
     kOperations,
     kQueries,
+    kCursors,
 
     // Networking
     kConnections,

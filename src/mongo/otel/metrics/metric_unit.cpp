@@ -58,6 +58,8 @@ StringData toString(MetricUnit unit) {
             return "operations";
         case MetricUnit::kQueries:
             return "queries";
+        case MetricUnit::kCursors:
+            return "cursors";
 
         // Networking
         case MetricUnit::kConnections:

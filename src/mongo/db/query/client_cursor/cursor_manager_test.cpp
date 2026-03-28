@@ -38,6 +38,7 @@
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/client.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/queued_data_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
@@ -57,6 +58,8 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -909,6 +912,88 @@ TEST_F(CursorManagerTest, KillCursorWithFailingAuthCheckFails) {
     ASSERT_THROWS_CODE(_cursorManager.killCursorWithAuthCheck(_opCtx.get(), cursorId, pinCheck),
                        DBException,
                        ErrorCodes::Unauthorized);
+}
+
+/**
+ * Tests that change stream cursor OTel metrics correctly track 'total_opened' (counter) and
+ * 'lifespan' (histogram) across the full cursor lifecycle.
+ */
+TEST_F(CursorManagerTest, ChangeStreamCursorMetricsTrackTotalOpenedAndLifespan) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    using otel::metrics::MetricNames;
+
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    // total_opened starts at zero.
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsTotalOpened), 0);
+
+    // Opening a change stream cursor increments 'total_opened'; 'lifespan' is unchanged until
+    // the cursor is closed.
+    CurOp::get(_opCtx.get())->debug().isChangeStreamQuery = true;
+    auto pin = makeCursor(_opCtx.get());
+    CursorId cursorId = pin.getCursor()->cursorid();
+
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsTotalOpened), 1);
+
+    // Releasing the pin does not affect either metric.
+    pin.release();
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsTotalOpened), 1);
+
+    // Advance the mock clock so the cursor has a measurable lifespan.
+    const Milliseconds lifespanMs{200};
+    useClock()->advance(lifespanMs);
+
+    // Killing the cursor records its lifespan in the histogram; total_opened remains at 1.
+    ASSERT_OK(_cursorManager.killCursor(_opCtx.get(), cursorId));
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsTotalOpened), 1);
+
+    auto hist1 = capturer.readInt64Histogram(MetricNames::kChangeStreamCursorsLifespan);
+    ASSERT_EQ(hist1.count, 1);
+    ASSERT_EQ(hist1.sum, durationCount<Milliseconds>(lifespanMs) * 1000);
+
+    // Opening and closing a second cursor accumulates into the histogram.
+    CurOp::get(_opCtx.get())->debug().isChangeStreamQuery = true;
+    auto pin2 = makeCursor(_opCtx.get());
+    CursorId cursorId2 = pin2.getCursor()->cursorid();
+    pin2.release();
+
+    const Milliseconds lifespan2Ms{400};
+    useClock()->advance(lifespan2Ms);
+
+    ASSERT_OK(_cursorManager.killCursor(_opCtx.get(), cursorId2));
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsTotalOpened), 2);
+
+    auto hist2 = capturer.readInt64Histogram(MetricNames::kChangeStreamCursorsLifespan);
+    ASSERT_EQ(hist2.count, 2);
+    // 200 ms + 400 ms = 600 000 µs cumulative.
+    ASSERT_EQ(hist2.sum, 600'000);
+}
+
+/**
+ * Tests that a regular (non-change-stream) cursor does not affect the change stream metrics.
+ */
+TEST_F(CursorManagerTest, RegularCursorDoesNotAffectChangeStreamMetrics) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    using otel::metrics::MetricNames;
+
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    CurOp::get(_opCtx.get())->debug().isChangeStreamQuery = false;
+    auto pin = makeCursor(_opCtx.get());
+    CursorId cursorId = pin.getCursor()->cursorid();
+    pin.release();
+
+    useClock()->advance(Milliseconds{100});
+    ASSERT_OK(_cursorManager.killCursor(_opCtx.get(), cursorId));
+
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsTotalOpened), 0);
+    // No change stream cursor was disposed, so the lifespan histogram has no data.
+    ASSERT_THROWS(capturer.readInt64Histogram(MetricNames::kChangeStreamCursorsLifespan),
+                  DBException);
 }
 
 }  // namespace

@@ -39,6 +39,8 @@
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/shard_role/shard_catalog/external_data_source_scope_guard.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/util/background.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
@@ -56,6 +58,39 @@ namespace mongo {
 namespace {
 
 auto& gCursorStats = *new CursorStats{};
+
+namespace ChangeStreamMetrics {
+
+auto& gCursorsTotalOpened = otel::metrics::MetricsService::instance().createInt64Counter(
+    otel::metrics::MetricNames::kChangeStreamCursorsTotalOpened,
+    "Total number of change stream cursors opened (on router or shard).",
+    otel::metrics::MetricUnit::kCursors,
+    {.inServerStatus = true});
+
+// Histogram provide accurate and thread-safe average for every bucket. This is achieved by locking,
+// so there might be some overhead.
+auto& gLifespan = otel::metrics::MetricsService::instance().createInt64Histogram(
+    otel::metrics::MetricNames::kChangeStreamCursorsLifespan,
+    "Lifespan of closed change stream cursors in microseconds.",
+    otel::metrics::MetricUnit::kMicroseconds,
+    {.inServerStatus = true,
+     // Using the same histogram buckets as 'metrics.cursor.lifespan'. For change stream cursors we
+     // expect that most of the cursors will land in (10min, +inf) bucket.
+     .explicitBucketBoundaries = std::vector<double>({
+         1 * 1e6,   // lifespan <= 1 second will probably capture one-fetch or no-fetch cursors,
+                    // unless the query is slow for some reason
+         10 * 1e6,  // lifespan <= 10 seconds will probably capture other 'short-lived' change
+                    // stream cursors
+         10 * 60 * 1e6,  // lifespan <= 10 minutes will probably capture not 'short-lived', but
+                         // before the default cursor timeout
+         20 * 60 * 1e6,  // lifespan <= 20 minutes will probably capture increased probability for
+                         // cursor timeouts
+         60 * 60 * 1e6,  // lifespan <= 1 hour will probably capture some hourly patterns
+         24 * 60 * 60 * 1e6,     // lifetime <= 1 day will probably capture some daily patterns
+         7 * 24 * 60 * 60 * 1e6  // lifetime <= 1 week will probably capture some weekly patterns
+     })});
+
+}  // namespace ChangeStreamMetrics
 }  // namespace
 
 Counter64& CursorStats::_makeStat(StringData name) {
@@ -134,6 +169,10 @@ ClientCursor::ClientCursor(ClientCursorParams params,
     cursorStats().open.increment();
     cursorStats().totalOpened.increment();
 
+    if (_isChangeStreamQuery) {
+        ChangeStreamMetrics::gCursorsTotalOpened.add(1);
+    }
+
     if (isNoTimeout()) {
         // cursors normally timeout after an inactivity period to prevent excess memory use
         // setting this prevents timeout of the cursor in question.
@@ -162,6 +201,11 @@ void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now)
 
     if (now) {
         incrementCursorLifespanMetric(_createdDate, *now);
+
+        if (_isChangeStreamQuery) {
+            const int64_t lifespanUs = (*now - _createdDate).count() * 1000;
+            ChangeStreamMetrics::gLifespan.record(lifespanUs);
+        }
     }
 
     cursorStats().open.decrement();

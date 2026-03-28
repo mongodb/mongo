@@ -132,6 +132,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/shard_role:service_context_non_d",
+        "//src/mongo/otel/metrics:metrics_test_util",
         "//src/mongo/util:clock_source_mock",
     ],
 )
