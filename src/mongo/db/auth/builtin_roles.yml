@@ -454,13 +454,11 @@ roles:
           - listIndexes
           - listSearchIndexes
       - matchType: any_normal
-        actions:
+        actions: &queryableBackupReadActions
           - find
           - performRawDataOperations
       - matchType: any_system_buckets
-        actions:
-          - find
-          - performRawDataOperations
+        actions: *queryableBackupReadActions
       - matchType: cluster
         actions:
           - getParameter
@@ -468,43 +466,43 @@ roles:
           - useUUID
       - matchType: database
         db: "config"
-        actions: [find]
+        actions: *queryableBackupReadActions
       - matchType: database
         db: "local"
-        actions: [find]
+        actions: *queryableBackupReadActions
       - matchType: exact_namespace
         db: "local"
         collection: "replset.election"
-        actions: [find]
+        actions: *queryableBackupReadActions
       - matchType: exact_namespace
         db: "local"
         collection: "replset.minvalid"
-        actions: [find]
+        actions: *queryableBackupReadActions
       - matchType: collection
         collection: "system.js"
-        actions: [find]
+        actions: *queryableBackupReadActions
       - matchType: collection
         collection: "system.users"
-        actions: [find]
+        actions: *queryableBackupReadActions
       - matchType: collection
         collection: "system.profile"
-        actions: [find]
+        actions: *queryableBackupReadActions
       - matchType: exact_namespace
         db: "admin"
         collection: "system.backup_users"
-        actions: [find]
+        actions: *queryableBackupReadActions
       - matchType: exact_namespace
         db: "admin"
         collection: "system.roles"
-        actions: [find]
+        actions: *queryableBackupReadActions
       - matchType: exact_namespace
         db: "admin"
         collection: "system.version"
-        actions: [find]
+        actions: *queryableBackupReadActions
       - matchType: exact_namespace
         db: "config"
         collection: "settings"
-        actions: [find]
+        actions: *queryableBackupReadActions
 
   backup:
     adminOnly: true
