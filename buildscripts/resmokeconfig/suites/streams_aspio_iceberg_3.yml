@@ -7,6 +7,7 @@ selector:
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_bad_setup.js
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_dlq.js
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_compact_with_deletes.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_replace_compact.js
 
 executor:
   fixture:
