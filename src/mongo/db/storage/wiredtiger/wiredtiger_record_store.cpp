@@ -232,7 +232,6 @@ std::string WiredTigerRecordStore::generateCreateString(
 
     ss << "block_compressor=" << wtTableConfig.blockCompressor << ",";
 
-    // TODO: Replace WiredTigerCustomizationHooks with WiredTigerCustomizationHooksRegistry.
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
               ->getTableCreateConfig(tableName);
     ss << WiredTigerCustomizationHooksRegistry::get(getGlobalServiceContext())

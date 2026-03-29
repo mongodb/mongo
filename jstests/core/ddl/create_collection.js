@@ -238,6 +238,7 @@ if (
         collName = getCollectionName();
         assert.commandWorked(db.createCollection(collName, {storageTier: {collection: "cold"}}));
         assert(getConfigString(collName).includes("disaggregated=(storage_tier=cold)"));
+        assert(getConfigString(collName).includes("leaf_page_max=128KB")); // default for cold collection
 
         // Create cold collection (append to existing config string)
         collName = getCollectionName();

@@ -3167,7 +3167,8 @@ BSONObj WiredTigerKVEngine::setStorageTierToStorageOptions(const BSONObj& storag
         }
     }
 
-    const std::string disaggConfigString = "disaggregated=(storage_tier=" + value + ")";
+    const std::string disaggConfigString = "disaggregated=(storage_tier=" + value + ")" +
+        (value == "cold" ? ",leaf_page_max=128KB" : "");
 
     const auto newConfigString =
         (configString ? WiredTigerUtil::concatConfigs(disaggConfigString, *configString)
