@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
@@ -34,6 +35,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/matcher/match_expression_test_util.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_test_service_context.h"
@@ -41,6 +43,7 @@
 
 namespace mongo {
 namespace {
+
 class MatchExpressionHasherTest : public mongo::unittest::Test {
 public:
     /**
@@ -233,6 +236,49 @@ TEST_F(MatchExpressionHasherTest, BitsAllSet) {
     assertEquivalent(bits1, bits2);
     assertNotEquivalent(bits1, bits3);
     assertNotEquivalent(bits1, bits4);
+}
+
+TEST_F(MatchExpressionHasherTest, BitsBinDataEquivalentToArray) {
+    // Verify that a BinData mask and an array of bit positions that encode the same bits
+    // are considered equivalent and hash to the same value, for all four operators.
+    auto makeBinDataFilter = [](StringData op, std::vector<uint32_t> positions) {
+        auto buf = bitPositionsToBinData(positions);
+        auto binData = BSONBinData(buf.data(), buf.size(), BinDataGeneral);
+        return BSON("a" << BSON(op << binData));
+    };
+
+    std::vector<uint32_t> singleBytePositions{1, 2, 4, 5};
+    assertEquivalent(makeBinDataFilter("$bitsAllSet", singleBytePositions),
+                     fromjson("{a: {$bitsAllSet: [1, 2, 4, 5]}}"));
+    assertEquivalent(makeBinDataFilter("$bitsAllClear", singleBytePositions),
+                     fromjson("{a: {$bitsAllClear: [1, 2, 4, 5]}}"));
+    assertEquivalent(makeBinDataFilter("$bitsAnySet", singleBytePositions),
+                     fromjson("{a: {$bitsAnySet: [1, 2, 4, 5]}}"));
+    assertEquivalent(makeBinDataFilter("$bitsAnyClear", singleBytePositions),
+                     fromjson("{a: {$bitsAnyClear: [1, 2, 4, 5]}}"));
+
+    // Multi-byte: bits 9, 10, 12, 13 live in byte 1 (bits 1, 2, 4, 5 of that byte).
+    std::vector<uint32_t> multiBytePositions{9, 10, 12, 13};
+    assertEquivalent(makeBinDataFilter("$bitsAllSet", multiBytePositions),
+                     fromjson("{a: {$bitsAllSet: [9, 10, 12, 13]}}"));
+
+    // Different bits → not equivalent.
+    assertNotEquivalent(makeBinDataFilter("$bitsAllSet", singleBytePositions),
+                        fromjson("{a: {$bitsAllSet: [1, 2, 4]}}"));
+}
+
+TEST_F(MatchExpressionHasherTest, BitsBinDataTrailingZeroesEquivalent) {
+    // {0x36} and {0x36, 0x00} encode the same bit positions — the trailing zero byte
+    // contributes no bits, so both expressions must produce the same hash.
+    auto buf1 = bitPositionsToBinData({1, 2, 4, 5});  // 1 byte: 0x36
+    auto buf2 = buf1;
+    buf2.push_back(0x00);  // 2 bytes: 0x36 0x00
+
+    auto filter1 =
+        BSON("a" << BSON("$bitsAllSet" << BSONBinData(buf1.data(), buf1.size(), BinDataGeneral)));
+    auto filter2 =
+        BSON("a" << BSON("$bitsAllSet" << BSONBinData(buf2.data(), buf2.size(), BinDataGeneral)));
+    assertEquivalent(filter1, filter2);
 }
 
 TEST_F(MatchExpressionHasherTest, Mod) {

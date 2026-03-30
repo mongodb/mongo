@@ -1,0 +1,3658 @@
+
+
+[jsTest] ----
+[jsTest] === $bitsAllSet ===
+[jsTest] ----
+
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet int-mask 0
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet int-mask 1
+[jsTest] ----
+
+{ "val" : 1 }
+{ "val" : 255 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet int-mask 54
+[jsTest] ----
+
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet int-mask 128
+[jsTest] ----
+
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet int-mask 255
+[jsTest] ----
+
+{ "val" : 255 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet int-mask 13824
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(65280) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet int-mask 65280
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(65280) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet int-mask -1
+[jsTest] ----
+
+9
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet int-mask -5
+[jsTest] ----
+
+9
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet array [ ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet array [ 0 ]
+[jsTest] ----
+
+{ "val" : 1 }
+{ "val" : 255 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet array [ 7 ]
+[jsTest] ----
+
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet array [ 1, 2, 4, 5 ]
+[jsTest] ----
+
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet array [ 3, 4, 6 ]
+[jsTest] ----
+
+{ "val" : 255 }
+{ "val" : 88 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet array [ 0, 1, 2, 3, 4, 5, 6, 7 ]
+[jsTest] ----
+
+{ "val" : 255 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet array [ 8 ]
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(65280) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet array [ 15 ]
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet array [ 9, 10, 12, 13 ]
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(65280) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet array [ 8, 9, 10, 11, 12, 13, 14, 15 ]
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(65280) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet array [ 16 ]
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet array [ 32 ]
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet array [ 56 ]
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet array [ 64 ]
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet array [ 71 ]
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet array [ 0, 8, 16, 24, 32, 40, 48, 56, 64 ]
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet array [ 63 ]
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet array [ 200 ]
+[jsTest] ----
+
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet BinData-mask BinData(0,"AA==")
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet BinData-mask BinData(0,"AQ==")
+[jsTest] ----
+
+{ "val" : 1 }
+{ "val" : 255 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet BinData-mask BinData(0,"gA==")
+[jsTest] ----
+
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet BinData-mask BinData(0,"Ng==")
+[jsTest] ----
+
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet BinData-mask BinData(0,"/w==")
+[jsTest] ----
+
+{ "val" : 255 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet BinData-mask BinData(0,"AAE=")
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(65280) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet BinData-mask BinData(0,"AIA=")
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet BinData-mask BinData(0,"ADY=")
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(65280) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet BinData-mask BinData(0,"AP8=")
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(65280) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet BinData-mask BinData(0,"//8=")
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet BinData-mask BinData(0,"AAAAAAE=")
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet BinData-mask BinData(0,"AAAAAAAAAAAB")
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllSet BinData-mask BinData(0,"////////////")
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : NumberLong(-1) }
+
+
+[jsTest] ----
+[jsTest] === $bitsAllClear ===
+[jsTest] ----
+
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear int-mask 0
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear int-mask 1
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 128 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear int-mask 54
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear int-mask 128
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear int-mask 255
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear int-mask 13824
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear int-mask 65280
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear int-mask -1
+[jsTest] ----
+
+9
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear int-mask -5
+[jsTest] ----
+
+9
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear array [ ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear array [ 0 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 128 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear array [ 7 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear array [ 1, 2, 4, 5 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear array [ 3, 4, 6 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear array [ 0, 1, 2, 3, 4, 5, 6, 7 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear array [ 8 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear array [ 15 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear array [ 9, 10, 12, 13 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear array [ 8, 9, 10, 11, 12, 13, 14, 15 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear array [ 16 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear array [ 32 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear array [ 56 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear array [ 64 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear array [ 71 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear array [ 0, 8, 16, 24, 32, 40, 48, 56, 64 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 128 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(32768) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear array [ 63 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear array [ 200 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear BinData-mask BinData(0,"AA==")
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear BinData-mask BinData(0,"AQ==")
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 128 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear BinData-mask BinData(0,"gA==")
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear BinData-mask BinData(0,"Ng==")
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear BinData-mask BinData(0,"/w==")
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear BinData-mask BinData(0,"AAE=")
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear BinData-mask BinData(0,"AIA=")
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear BinData-mask BinData(0,"ADY=")
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear BinData-mask BinData(0,"AP8=")
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear BinData-mask BinData(0,"//8=")
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear BinData-mask BinData(0,"AAAAAAE=")
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear BinData-mask BinData(0,"AAAAAAAAAAAB")
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAllClear BinData-mask BinData(0,"////////////")
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : BinData(0,"AA==") }
+
+
+[jsTest] ----
+[jsTest] === $bitsAnySet ===
+[jsTest] ----
+
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet int-mask 0
+[jsTest] ----
+
+
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet int-mask 1
+[jsTest] ----
+
+{ "val" : 1 }
+{ "val" : 255 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet int-mask 54
+[jsTest] ----
+
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet int-mask 128
+[jsTest] ----
+
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet int-mask 255
+[jsTest] ----
+
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet int-mask 13824
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(65280) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet int-mask 65280
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet int-mask -1
+[jsTest] ----
+
+9
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet int-mask -5
+[jsTest] ----
+
+9
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet array [ ]
+[jsTest] ----
+
+
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet array [ 0 ]
+[jsTest] ----
+
+{ "val" : 1 }
+{ "val" : 255 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet array [ 7 ]
+[jsTest] ----
+
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet array [ 1, 2, 4, 5 ]
+[jsTest] ----
+
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet array [ 3, 4, 6 ]
+[jsTest] ----
+
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet array [ 0, 1, 2, 3, 4, 5, 6, 7 ]
+[jsTest] ----
+
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet array [ 8 ]
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(65280) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet array [ 15 ]
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet array [ 9, 10, 12, 13 ]
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(65280) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet array [ 8, 9, 10, 11, 12, 13, 14, 15 ]
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet array [ 16 ]
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet array [ 32 ]
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet array [ 56 ]
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet array [ 64 ]
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet array [ 71 ]
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet array [ 0, 8, 16, 24, 32, 40, 48, 56, 64 ]
+[jsTest] ----
+
+{ "val" : 1 }
+{ "val" : 255 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet array [ 63 ]
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet array [ 200 ]
+[jsTest] ----
+
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet BinData-mask BinData(0,"AA==")
+[jsTest] ----
+
+
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet BinData-mask BinData(0,"AQ==")
+[jsTest] ----
+
+{ "val" : 1 }
+{ "val" : 255 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet BinData-mask BinData(0,"gA==")
+[jsTest] ----
+
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet BinData-mask BinData(0,"Ng==")
+[jsTest] ----
+
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet BinData-mask BinData(0,"/w==")
+[jsTest] ----
+
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet BinData-mask BinData(0,"AAE=")
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(65280) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet BinData-mask BinData(0,"AIA=")
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet BinData-mask BinData(0,"ADY=")
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(65280) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet BinData-mask BinData(0,"AP8=")
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet BinData-mask BinData(0,"//8=")
+[jsTest] ----
+
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet BinData-mask BinData(0,"AAAAAAE=")
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet BinData-mask BinData(0,"AAAAAAAAAAAB")
+[jsTest] ----
+
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnySet BinData-mask BinData(0,"////////////")
+[jsTest] ----
+
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-1) }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] === $bitsAnyClear ===
+[jsTest] ----
+
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear int-mask 0
+[jsTest] ----
+
+
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear int-mask 1
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 128 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear int-mask 54
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 88 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear int-mask 128
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear int-mask 255
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear int-mask 13824
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear int-mask 65280
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear int-mask -1
+[jsTest] ----
+
+9
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear int-mask -5
+[jsTest] ----
+
+9
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear array [ ]
+[jsTest] ----
+
+
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear array [ 0 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 128 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear array [ 7 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear array [ 1, 2, 4, 5 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 88 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear array [ 3, 4, 6 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 54 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear array [ 0, 1, 2, 3, 4, 5, 6, 7 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear array [ 8 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear array [ 15 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear array [ 9, 10, 12, 13 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear array [ 8, 9, 10, 11, 12, 13, 14, 15 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear array [ 16 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear array [ 32 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear array [ 56 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear array [ 64 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear array [ 71 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear array [ 0, 8, 16, 24, 32, 40, 48, 56, 64 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear array [ 63 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear array [ 200 ]
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"////////////") }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear BinData-mask BinData(0,"AA==")
+[jsTest] ----
+
+
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear BinData-mask BinData(0,"AQ==")
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 128 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear BinData-mask BinData(0,"gA==")
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear BinData-mask BinData(0,"Ng==")
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 88 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear BinData-mask BinData(0,"/w==")
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear BinData-mask BinData(0,"AAE=")
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear BinData-mask BinData(0,"AIA=")
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear BinData-mask BinData(0,"ADY=")
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear BinData-mask BinData(0,"AP8=")
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear BinData-mask BinData(0,"//8=")
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear BinData-mask BinData(0,"AAAAAAE=")
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear BinData-mask BinData(0,"AAAAAAAAAAAB")
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }
+
+
+[jsTest] ----
+[jsTest] $bitsAnyClear BinData-mask BinData(0,"////////////")
+[jsTest] ----
+
+{ "val" : 0 }
+{ "val" : 1 }
+{ "val" : 128 }
+{ "val" : 255 }
+{ "val" : 54 }
+{ "val" : 88 }
+{ "val" : BinData(0,"//8=") }
+{ "val" : BinData(0,"/w==") }
+{ "val" : BinData(0,"AA==") }
+{ "val" : BinData(0,"AAAAAAAAAAAB") }
+{ "val" : BinData(0,"AAAAAAAAAACA") }
+{ "val" : BinData(0,"AAAAAAE=") }
+{ "val" : BinData(0,"AAAB") }
+{ "val" : BinData(0,"AACA") }
+{ "val" : BinData(0,"AAE=") }
+{ "val" : BinData(0,"ADY=") }
+{ "val" : BinData(0,"AIA=") }
+{ "val" : BinData(0,"AP8=") }
+{ "val" : BinData(0,"AQ==") }
+{ "val" : BinData(0,"AQEBAQEBAQEB") }
+{ "val" : BinData(0,"Ng==") }
+{ "val" : BinData(0,"NjY=") }
+{ "val" : BinData(0,"WA==") }
+{ "val" : BinData(0,"gA==") }
+{ "val" : NumberLong("4294967296") }
+{ "val" : NumberLong("72057594037927936") }
+{ "val" : NumberLong("9223372036854775807") }
+{ "val" : NumberLong(-5) }
+{ "val" : NumberLong(13824) }
+{ "val" : NumberLong(256) }
+{ "val" : NumberLong(32768) }
+{ "val" : NumberLong(65280) }
+{ "val" : NumberLong(65536) }

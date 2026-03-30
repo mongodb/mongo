@@ -65,6 +65,7 @@ mongo_cc_unit_test(
         "expression_with_placeholder_test.cpp",
         "in_list_data_test.cpp",
         "match_expression_hasher_test.cpp",
+        "match_expression_test_util.cpp",
         "match_expression_util_test.cpp",
         "matcher_type_set_test.cpp",
         "path_test.cpp",
