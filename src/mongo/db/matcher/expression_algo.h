@@ -66,6 +66,12 @@ bool hasPredicateOnPaths(const MatchExpression& expr,
                          mongo::MatchExpression::MatchType searchType,
                          const OrderedPathSet& paths);
 
+/**
+ * Return true if the expression tree contains an $in-list whose equalities vector exceeds
+ * 'maxInListSize'.
+ */
+bool containsLargeInList(const MatchExpression& expr, size_t maxInListSize);
+
 using PathOrExprMatchExpression =
     std::variant<PathMatchExpression*, ExprMatchExpression*, InternalSchemaCondMatchExpression*>;
 

@@ -47,6 +47,8 @@
 #include "mongo/db/matcher/expression_path.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/expression_type.h"
+#include "mongo/db/matcher/expression_visitor.h"
+#include "mongo/db/matcher/match_expression_walker.h"
 #include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -913,6 +915,27 @@ bool hasPredicateOnPaths(const MatchExpression& expr,
                          mongo::MatchExpression::MatchType searchType,
                          const OrderedPathSet& paths) {
     return hasPredicateOnPathsHelper(expr, searchType, paths, boost::none /* parentPath */);
+}
+
+bool containsLargeInList(const MatchExpression& expr, size_t maxInListSize) {
+    struct Visitor : public SelectiveMatchExpressionVisitorBase<true> {
+        using SelectiveMatchExpressionVisitorBase<true>::visit;
+        size_t maxSize;
+        bool found = false;
+
+        explicit Visitor(size_t maxSize) : maxSize(maxSize) {}
+
+        void visit(const InMatchExpression* expr) final {
+            if (expr->getEqualities().size() > maxSize) {
+                found = true;
+            }
+        }
+    };
+
+    Visitor visitor(maxInListSize);
+    MatchExpressionWalker walker(&visitor, nullptr, nullptr);
+    tree_walker::walk<true, MatchExpression>(&expr, &walker);
+    return visitor.found;
 }
 
 bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs) {

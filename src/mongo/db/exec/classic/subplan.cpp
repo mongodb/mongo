@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/compiler/ce/exact/exact_cardinality_impl.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
@@ -41,6 +42,7 @@
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
+#include "mongo/db/query/plan_ranking/cbr_plan_ranking.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
 #include "mongo/util/assert_util.h"
@@ -237,6 +239,8 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
         }
     }
 
+    // Run the plan enumerator for each of the $or branches thus enumerating all plans for each
+    // $or branch.
     auto subplanningStatus = samplingEstimator
         ? QueryPlanner::planSubqueries(expCtx()->getOperationContext(),
                                        getSolutionCachedData,
@@ -258,7 +262,10 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
     // If the plan ranking is a CBR strategy, plan each branch of the $or using the respective
     // cost-based ranking. Multiplanning and automaticCE strategy plan each branch
     // of the $or using multiplanning as defined in the multiplanCallback below.
-    bool useMultiplanner = !cbrEnabled || rankerMode == QueryPlanRankerModeEnum::kAutomaticCE;
+    // Disable CBR for queries with large $in lists.
+    bool useMultiplanner = !cbrEnabled || rankerMode == QueryPlanRankerModeEnum::kAutomaticCE ||
+        expression::containsLargeInList(*_query->getPrimaryMatchExpression(),
+                                        plan_ranking::kMaxInListSize);
     if (!useMultiplanner && subplanningStatus.isOK()) {
         if (rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
             // If we do not have any fields that we want to sample then we just include all the
