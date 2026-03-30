@@ -461,7 +461,7 @@ TEST_F(OrderedTicketSemaphoreTest, LoadShedExemptOperationsBypassesMaxWaitersLim
  * only two alternatives this property cannot be distinguished from a simple "permit is not lost"
  * check, so this test uses three waiters.
  */
-TEST_F(OrderedTicketSemaphoreTest, PassTheBatonRoutesPermitToNextPriorityWaiter) {
+TEST_F(OrderedTicketSemaphoreTest, InterruptRoutesPermitToNextPriorityWaiter) {
     auto sem = makeSemaphore(0, 10);
 
     auto kHighPriorityAdmissions = 1;
@@ -557,5 +557,62 @@ TEST_F(OrderedTicketSemaphoreTest, EqualAdmissionCountsAllServed) {
     // Release the n permits still held so the semaphore destructs cleanly.
     for (int i = 0; i < n; ++i)
         sem->release();
+}
+
+TEST_F(OrderedTicketSemaphoreTest, AcquireReleaseTryAcquireResizeMockMultipleIterations) {
+    auto sem = makeSemaphore(2, 10);
+    size_t kNumThreads = 3;
+    int kNumIterations = 20000;
+
+    unittest::Barrier barrier{kNumThreads + 3};
+    std::vector<Future<void>> futures;
+    MockAdmissionContext admCtx, resizeAdmCtx;
+    admCtx.setAdmission_forTest(1);
+    // Today kGradual resize is done with 0 admissions, putting the resize at the top of the queue.
+    resizeAdmCtx.setAdmission_forTest(0);
+    for (size_t i = 0; i < kNumThreads; ++i) {
+        futures.push_back(launchAsync([&, i]() {
+            auto [client, opCtx] = makeOpCtx();
+            barrier.countDownAndWait();
+            for (int j = kNumIterations; j > 0; j--) {
+                ASSERT_TRUE(sem->acquire(opCtx.get(), &admCtx, Date_t::max(), true));
+                ASSERT_GTE(sem->available(), 0);
+                sem->release();
+            }
+        }));
+    }
+
+    futures.push_back(launchAsync([&]() {
+        auto [client, opCtx] = makeOpCtx();
+        barrier.countDownAndWait();
+        for (int j = kNumIterations; j > 0; j--) {
+            bool acquired = sem->tryAcquire();
+            ASSERT_GTE(sem->available(), 0);
+            if (acquired) {
+                sem->release();
+            }
+            sleepFor(Microseconds(10));
+        }
+    }));
+
+    // This emulates the current kGradual ticketholder resize implementation, which executes several
+    // acquires and releases consecutively.
+    futures.push_back(launchAsync([&]() {
+        auto [client, opCtx] = makeOpCtx();
+        barrier.countDownAndWait();
+        for (int j = kNumIterations; j > 0; j--) {
+            ASSERT_TRUE(sem->acquire(opCtx.get(), &resizeAdmCtx, Date_t::max(), true));
+            ASSERT_GTE(sem->available(), 0);
+            ASSERT_TRUE(sem->acquire(opCtx.get(), &resizeAdmCtx, Date_t::max(), true));
+            ASSERT_GTE(sem->available(), 0);
+            sem->release();
+            sem->release();
+        }
+    }));
+
+    barrier.countDownAndWait();
+    for (auto& f : futures)
+        f.get();
+    ASSERT_EQ(sem->waiters(), 0);
 }
 }  // namespace mongo

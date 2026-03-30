@@ -144,7 +144,10 @@ void OrderedTicketSemaphore::_wakeUpWaiters(WithLock, int count) {
 }
 
 bool OrderedTicketSemaphore::_tryAcquireWithoutQueuing(WithLock) {
-    if (_permits.load() > 0 && _waitQueue.empty()) {
+    // We can take a ticket immediately if there's a surplus after taking into account all queued
+    // operations.
+    auto permits = _permits.load();
+    if (permits > 0 && static_cast<size_t>(permits) > _waitQueue.size()) {
         _permits.fetchAndSubtractRelaxed(1);
         return true;
     }
