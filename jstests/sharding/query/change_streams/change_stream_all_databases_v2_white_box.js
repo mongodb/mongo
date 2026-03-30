@@ -101,7 +101,10 @@ describe("$changeStream v2", function () {
 
         // Open a change stream.
         csTest = new ChangeStreamTest(adminDB);
-        const csCursor = csTest.startWatchingAllChangesForCluster({comment: jsTestName()}, {version: "v2"});
+        const csCursor = csTest.startWatchingAllChangesForCluster(
+            {comment: jsTestName(), cursor: {batchSize: 0}},
+            {version: "v2"},
+        );
         coll.insertMany([
             {_id: 2, a: 2},
             {_id: 3, a: 3},
@@ -156,7 +159,10 @@ describe("$changeStream v2", function () {
         // Open a change stream.
         csTest = new ChangeStreamTest(adminDB);
 
-        let csCursor = csTest.startWatchingAllChangesForCluster({comment: jsTestName()}, {version: "v2"});
+        let csCursor = csTest.startWatchingAllChangesForCluster(
+            {comment: jsTestName(), cursor: {batchSize: 0}},
+            {version: "v2"},
+        );
 
         awaitLogMessageCodes(st.s, [kSetEventHandler, kInitStrictMode], () => {
             csTest.assertNoChange(csCursor);
@@ -225,7 +231,10 @@ describe("$changeStream v2", function () {
         // Open a change stream.
         csTest = new ChangeStreamTest(adminDB);
 
-        let csCursor = csTest.startWatchingAllChangesForCluster({comment: jsTestName()}, {version: "v2"});
+        let csCursor = csTest.startWatchingAllChangesForCluster(
+            {comment: jsTestName(), cursor: {batchSize: 0}},
+            {version: "v2"},
+        );
         awaitLogMessageCodes(st.s, [kSetEventHandler, kInitStrictMode], () => {
             csTest.assertNoChange(csCursor);
         });
@@ -277,7 +286,10 @@ describe("$changeStream v2", function () {
         // Open a change stream.
         csTest = new ChangeStreamTest(adminDB);
 
-        const csCursor = csTest.startWatchingAllChangesForCluster({comment: jsTestName()}, {version: "v2"});
+        const csCursor = csTest.startWatchingAllChangesForCluster(
+            {comment: jsTestName(), cursor: {batchSize: 0}},
+            {version: "v2"},
+        );
 
         coll.insert([{_id: 1, a: 1}]);
         assert.soon(() => csTest.getOneChange(csCursor), "expected change event for {_id: 1} ");
@@ -303,7 +315,7 @@ describe("$changeStream v2", function () {
         assert.soon(() => csTest.getOneChange(csCursor), "expected change event for {_id: 2} ");
     });
 
-    it.skip("test open cursors in an all databases change stream after reshard", function () {
+    it("test open cursors in an all databases change stream after reshard", function () {
         // Create a sharded collection
         assertCreateCollection(db, coll.getName());
         assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
@@ -315,7 +327,10 @@ describe("$changeStream v2", function () {
         // Open a change stream.
         csTest = new ChangeStreamTest(adminDB);
 
-        const csCursor = csTest.startWatchingAllChangesForCluster({comment: jsTestName()}, {version: "v2"});
+        const csCursor = csTest.startWatchingAllChangesForCluster(
+            {comment: jsTestName(), cursor: {batchSize: 0}},
+            {version: "v2"},
+        );
 
         awaitLogMessageCodes(st.s, [kSetEventHandler, kInitStrictMode], () => {
             csTest.assertNoChange(csCursor);
