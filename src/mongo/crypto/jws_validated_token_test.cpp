@@ -498,6 +498,51 @@ TEST_F(JWKManagerTest, parsingErrors) {
         ErrorCodes::IDLFailedToParse);
 }
 
+TEST_F(JWKManagerTest, getLastAttemptedFetchTime) {
+    RAIIServerParameterControllerForTest quiesceController("JWKSMinimumQuiescePeriodSecs", 0);
+
+    // Load just the second key (custom-key-2) from testJWKSet into the JWKManager.
+    auto key = [this]() {
+        BSONObjBuilder singleKeySetBuilder;
+        BSONArrayBuilder keysBuilder(singleKeySetBuilder.subarrayStart("keys"_sd));
+
+        auto fullJWKSet = getTestJWKSet();
+        keysBuilder.append(fullJWKSet.getField("keys").Array()[1]);
+        keysBuilder.doneFast();
+
+        return singleKeySetBuilder.obj();
+    }();
+    jwksFetcher()->setKeys(key);
+
+    // Validating a JWSValidatedToken signed by custom-key-2 should trigger a successful
+    // just-in-time refresh. Validation should succeed and the lastAttemptedFetchTime should
+    // advance.
+    auto initialLastAttemptedFetchTime = jwksFetcher()->getLastAttemptedFetchTime();
+    getClock()->advance(Seconds{3});
+    auto validCustomKey2Token =
+        validTokenHeaderRS + "."_sd + validTokenBodyRS + "."_sd + validTokenSignatureRS;
+    ASSERT_DOES_NOT_THROW(JWSValidatedToken(jwkManager(), validCustomKey2Token));
+    ASSERT_LT(initialLastAttemptedFetchTime, jwksFetcher()->getLastAttemptedFetchTime());
+
+    // Validating a JWSValidatedToken signed by ec-prime256v1 should trigger a failed
+    // just-in-time refresh. Validation should fail but the lastAttemptedFetchTime should
+    // still advance.
+    initialLastAttemptedFetchTime = jwksFetcher()->getLastAttemptedFetchTime();
+    getClock()->advance(Seconds{3});
+    auto validECToken =
+        validTokenHeaderES256 + "."_sd + validTokenBodyES256 + "."_sd + validTokenSignatureES256;
+    ASSERT_THROWS(JWSValidatedToken(jwkManager(), validECToken), DBException);
+    ASSERT_LT(initialLastAttemptedFetchTime, jwksFetcher()->getLastAttemptedFetchTime());
+
+    // After updating the JWKSet to also include ec-prime256v1, token validation should succeed
+    // thanks to a successful just-in-time refresh. lastAttemptedFetchTime should advance.
+    jwksFetcher()->setKeys(getTestJWKSet());
+    initialLastAttemptedFetchTime = jwksFetcher()->getLastAttemptedFetchTime();
+    getClock()->advance(Seconds{3});
+    ASSERT_DOES_NOT_THROW(JWSValidatedToken(jwkManager(), validECToken));
+    ASSERT_LT(initialLastAttemptedFetchTime, jwksFetcher()->getLastAttemptedFetchTime());
+}
+
 #endif
 }  // namespace mongo::crypto::test
 

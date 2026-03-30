@@ -32,7 +32,9 @@
 #include "mongo/crypto/jwt_types_gen.h"
 #include "mongo/util/modules.h"
 
-namespace mongo::crypto {
+namespace mongo {
+class ClockSource;
+namespace crypto {
 
 /** Interface for objects which acquire JWKSes.
  */
@@ -47,18 +49,15 @@ public:
     virtual JWKSet fetch() = 0;
 
     /**
-     * Returns TRUE if a fetch SHOULD NOT be performed at this time.
-     * e.g. If a fetch was performed too recently.
-     * Implementations MAY allow fetch() to be called anyway, or MAY throw.
+     * Get the most recent fetch attempt time.
      */
-    virtual bool quiesce() const {
-        return false;
-    }
+    virtual Date_t getLastAttemptedFetchTime() const = 0;
 
     /**
-     * Sets a date to be used as the latest time a fetch happened.
+     * Retrieves the ClockSource used to compute the lastAttemptedFetchTime.
      */
-    virtual void setQuiesce(Date_t quiesce) = 0;
+    virtual ClockSource* getClockSource() const = 0;
 };
 
-}  // namespace mongo::crypto
+}  // namespace crypto
+}  // namespace mongo
