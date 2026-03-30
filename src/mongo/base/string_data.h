@@ -97,10 +97,11 @@ public:
 
     /**
      * Used where string length is not known in advance.
-     * 'c' must be null or point to a null-terminated string.
+     * `ptr` must be non-null and point to a null-terminated string.
      */
-    constexpr StringData(const char* c)
-        : StringData{c ? std::string_view{c} : std::string_view{}} {}
+    constexpr StringData(const char* ptr) : _sv{ptr ? std::string_view{ptr} : std::string_view{}} {
+        dassert(ptr, "StringData(nullptr) is disallowed. See `stringDataDefaultIfNull`");
+    }
 
     StringData(const std::string& s) : StringData{std::string_view{s}} {}
 
@@ -369,6 +370,11 @@ constexpr std::string_view toStdStringViewForInterop(StringData s) {
  */
 constexpr StringData toStringDataForInterop(std::string_view s) {
     return {s.data(), s.size()};
+}
+
+/** Produces a `StringData` from a possibly-null pointer. */
+constexpr StringData stringDataDefaultIfNull(const char* ptr, StringData defaultString = {}) {
+    return ptr ? StringData{ptr} : defaultString;
 }
 
 inline namespace literals {

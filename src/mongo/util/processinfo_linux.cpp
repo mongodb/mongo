@@ -1032,7 +1032,10 @@ StatusWith<std::string> ProcessInfo::readTransparentHugePagesParameter(StringDat
 }
 
 bool ProcessInfo::checkGlibcRseqTunable() {
-    StringData glibcEnv = getenv(kGlibcTunableEnvVar);
+    const char* envPtr = getenv(kGlibcTunableEnvVar);
+    if (!envPtr)
+        return false;
+    StringData glibcEnv = envPtr;
     auto foundIndex = glibcEnv.find(kRseqKey);
 
     if (foundIndex != std::string::npos) {

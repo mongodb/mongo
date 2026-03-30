@@ -69,10 +69,15 @@ TEST(Construction, FromCString) {
 }
 
 TEST(Construction, FromNullCString) {
-    char* c = nullptr;
-    StringData strData(c);
-    ASSERT_EQUALS(strData.size(), 0U);
-    ASSERT_TRUE(strData.data() == nullptr);
+    constexpr const char* p = nullptr;
+    constexpr StringData sd = stringDataDefaultIfNull(p);
+    ASSERT_EQ(sd.size(), 0);
+    ASSERT_EQ(sd.data(), nullptr);
+}
+
+TEST(Construction, FromNullCStringWithDefault) {
+    constexpr StringData sd = stringDataDefaultIfNull(static_cast<const char*>(nullptr), "oops");
+    ASSERT_EQ(sd, "oops");
 }
 
 TEST(Construction, FromUserDefinedLiteral) {
@@ -502,6 +507,10 @@ TEST(StringData, GtestPrintTo) {
         ASSERT_EQ(testing::PrintToString(sd),
                   testing::PrintToString(toStdStringViewForInterop(sd)));
 }
+
+#if 0  // This line should not compile.
+StringData{static_cast<const char*>(nullptr)};
+#endif
 
 }  // namespace
 }  // namespace mongo

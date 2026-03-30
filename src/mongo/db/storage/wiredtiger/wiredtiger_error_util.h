@@ -63,7 +63,7 @@ Status wtRCToStatus_slow(int retCode, WiredTigerSession& session, StringData pre
 inline Status wtRCToStatus_error(int retCode, WT_SESSION* session, const char* prefix = nullptr) {
     invariant(retCode != 0);
     dumpErrorLog(retCode);
-    return wtRCToStatus_slow(retCode, session, prefix);
+    return wtRCToStatus_slow(retCode, session, stringDataDefaultIfNull(prefix));
 }
 
 inline Status wtRCToStatus_error(int retCode,
@@ -71,7 +71,7 @@ inline Status wtRCToStatus_error(int retCode,
                                  const char* prefix = nullptr) {
     invariant(retCode != 0);
     dumpErrorLog(retCode);
-    return wtRCToStatus_slow(retCode, session, prefix);
+    return wtRCToStatus_slow(retCode, session, stringDataDefaultIfNull(prefix));
 }
 
 /**
@@ -81,14 +81,14 @@ inline Status wtRCToStatus(int retCode, WT_SESSION* session, const char* prefix 
     if (MONGO_likely(retCode == 0))
         return Status::OK();
 
-    return wtRCToStatus_slow(retCode, session, prefix);
+    return wtRCToStatus_slow(retCode, session, stringDataDefaultIfNull(prefix));
 }
 
 inline Status wtRCToStatus(int retCode, WiredTigerSession& session, const char* prefix = nullptr) {
     if (MONGO_likely(retCode == 0))
         return Status::OK();
 
-    return wtRCToStatus_slow(retCode, session, prefix);
+    return wtRCToStatus_slow(retCode, session, stringDataDefaultIfNull(prefix));
 }
 
 template <typename ContextExpr>
