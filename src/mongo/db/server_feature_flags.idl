@@ -296,6 +296,11 @@ feature_flags:
         cpp_varname: gFeatureFlagQEPrefixSuffixSearch
         default: false
         fcv_gated: true
+    featureFlagIncludeDeltaHeaderForPhylog:
+        description: "Enable including delta headers for phylog pages."
+        cpp_varname: gFeatureFlagIncludeDeltaHeaderForPhylog
+        default: false
+        fcv_gated: false
 
 server_parameters:
     allowDirectSystemBucketsAccess:
