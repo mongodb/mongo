@@ -58,10 +58,9 @@ public:
     /**
      * Initialize the extension by providing it with a HostPortal and HostServices.
      *
-     * Note that the HostServices is passed as a pointer since its lifetime extends beyond
-     * the call to initialize() and will be saved by the extension. The HostPortal, on the other
-     * hand, will go out of scope immediately after the call to initialize() so it is passed by
-     * reference.
+     * Both are passed as pointers, but they have different lifetime semantics. The HostServices
+     * pointer remains valid for the lifetime of the extension and will be saved by the extension.
+     * The HostPortal pointer is only valid during the call to initialize() and must not be saved.
      */
     void initialize(const MongoExtensionHostPortal* portal,
                     const MongoExtensionHostServices* hostServices) const {

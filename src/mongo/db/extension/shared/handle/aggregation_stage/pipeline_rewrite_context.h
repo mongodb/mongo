@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2025-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -26,36 +26,33 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/extension/host_connector/adapter/host_portal_adapter.h"
+#pragma once
 
-#include "mongo/db/extension/shared/extension_status.h"
-#include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
+#include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/shared/handle/handle.h"
+#include "mongo/util/modules.h"
 
-namespace mongo::extension::host_connector {
+#include <vector>
 
-::MongoExtensionStatus* HostPortalAdapter::_extRegisterStageDescriptor(
-    const MongoExtensionHostPortal* hostPortal,
-    const MongoExtensionAggStageDescriptor* stageDesc) noexcept {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        const auto& impl = static_cast<const HostPortalAdapter*>(hostPortal)->getImpl();
-        impl.registerStageDescriptor(stageDesc);
-    });
-}
+namespace mongo::extension {
+enum PipelineRewriteRuleTags : uint32_t {
+    // Rules that optimize the internals of a stage in place but never touch adjacent stages.
+    kInPlace = 1 << 0,
+    // Rules that may e.g. reorder, combine or remove stages.
+    kReordering = 1 << 1,
+};
 
-::MongoExtensionStatus* HostPortalAdapter::_extRegisterStageRules(
-    const MongoExtensionHostPortal* hostPortal,
-    ::MongoExtensionByteView stageName,
-    const ::MongoExtensionPipelineRewriteRule* rules,
-    size_t numRules) noexcept {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        const auto& impl = static_cast<const HostPortalAdapter*>(hostPortal)->getImpl();
-        impl.registerStageRules(stageName, rules, numRules);
-    });
-}
+class PipelineRewriteRule {
+public:
+    PipelineRewriteRule(std::string name, uint32_t tags) : name(std::move(name)), tags(tags) {};
 
-::MongoExtensionByteView HostPortalAdapter::_extGetOptions(
-    const ::MongoExtensionHostPortal* portal) noexcept {
-    return stringViewAsByteView(static_cast<const HostPortalAdapter*>(portal)->_extensionOpts);
-}
+    ::MongoExtensionPipelineRewriteRule convertToCRule() const {
+        return {.name = {reinterpret_cast<const uint8_t*>(name.c_str()), name.size()},
+                .tags = static_cast<::MongoExtensionPipelineRewriteRuleTags>(tags)};
+    }
 
-}  // namespace mongo::extension::host_connector
+    std::string name;
+    uint32_t tags;
+};
+
+}  // namespace mongo::extension

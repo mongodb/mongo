@@ -453,6 +453,43 @@ typedef struct MongoExtensionCatalogContext {
 ////////////////////////////////////////////////////////////////
 //
 //
+//       OPTIMIZATIONS
+//
+//
+////////////////////////////////////////////////////////////////
+/**
+ * Tags that control when and how a pipeline rewrite rule is evaluated.
+ *
+ * Each rule must have exactly one tag. The tag determines which optimization pass the rule
+ * participates in:
+ *
+ *   kPipelineRewriteRuleTagInPlace    - The rule modifies only the internals of this stage and
+ *                                       never touches adjacent stages in the pipeline.
+ *
+ *   kPipelineRewriteRuleTagReordering - The rule may modify adjacent stages, for example by
+ *                                       reordering, merging, absorbing, or removing stages relative
+ *                                       to this one.
+ *
+ */
+typedef enum MongoExtensionPipelineRewriteRuleTags : uint32_t {
+    kPipelineRewriteRuleTagInPlace = 1 << 0,
+    kPipelineRewriteRuleTagReordering = 1 << 1,
+} MongoExtensionPipelineRewriteRuleTags;
+
+/**
+ * A pipeline optimization rule provided by an extension. Pipeline rules must be registered on a
+ * per-stage-name basis at startup via MongoExtensionHostPortal. For each rule that the stage
+ * registers, it must implement the rule's corresponding precondition/transform logic via the
+ * evaluatePrecondition and evaluateTransform functions on the LogicalAggStage.
+ */
+typedef struct MongoExtensionPipelineRewriteRule {
+    MongoExtensionByteView name;
+    MongoExtensionPipelineRewriteRuleTags tags;
+} MongoExtensionPipelineRewriteRule;
+
+////////////////////////////////////////////////////////////////
+//
+//
 //       AGGREGATION STAGE NODES
 //
 //
@@ -782,6 +819,35 @@ typedef struct MongoExtensionLogicalAggStageVTable {
     MongoExtensionStatus* (*set_vector_search_limit_for_optimization)(
         MongoExtensionLogicalAggStage* logicalStage, long long* extractedLimitVal);
 
+
+    /**
+     * Evaluates the precondition of the rule identified by `ruleName`. This method is called to
+     * determine if the rewrite rule's transform method should be invoked—if yes, returns true,
+     * otherwise false.
+     *
+     * The host calls this instead of a per-rule function pointer, so that the extension stage can
+     * dispatch to the correct rule internally. Writes the boolean result to `*result`.
+     */
+    MongoExtensionStatus* (*evaluate_rule_precondition)(
+        const MongoExtensionLogicalAggStage* logicalStage,
+        MongoExtensionByteView ruleName,
+        bool* result);
+
+    /**
+     * Applies the transform of the rule identified by `ruleName`.
+     *
+     * The host calls this instead of a per-rule function pointer. Writes true to `*result` if the
+     * pipeline was modified. `*result` controls whether the rule will be requeued (reapplied)
+     * during optimization.
+     *
+     * Requeuing is important for reordering rules: returning true causes the rule to be
+     * re-evaluated on the next stage, allowing the transform to process a run of consecutive
+     * matching stages one at a time. Return false once no further modification is possible to stop
+     * requeuing.
+     */
+    MongoExtensionStatus* (*evaluate_rule_transform)(MongoExtensionLogicalAggStage* logicalStage,
+                                                     MongoExtensionByteView ruleName,
+                                                     bool* result);
 } MongoExtensionLogicalAggStageVTable;
 
 /**
@@ -1177,6 +1243,15 @@ typedef struct MongoExtensionHostPortalVTable {
      * extension.
      */
     MongoExtensionByteView (*get_extension_options)(const MongoExtensionHostPortal* portal);
+
+    /**
+     * Register pipeline optimization rules for a named extension stage. Called during
+     * initialize() so the host can cache rules before any query is processed.
+     */
+    MongoExtensionStatus* (*register_stage_rules)(const MongoExtensionHostPortal* hostPortal,
+                                                  MongoExtensionByteView stageName,
+                                                  const MongoExtensionPipelineRewriteRule* rules,
+                                                  size_t numRules);
 } MongoExtensionHostPortalVTable;
 
 /**

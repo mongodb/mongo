@@ -41,6 +41,9 @@ class HostPortalBase {
 public:
     virtual ~HostPortalBase() = default;
     virtual void registerStageDescriptor(const ::MongoExtensionAggStageDescriptor*) const = 0;
+    virtual void registerStageRules(::MongoExtensionByteView stageName,
+                                    const ::MongoExtensionPipelineRewriteRule* rules,
+                                    size_t numRules) const = 0;
 };
 
 class HostPortalAdapter final : public ::MongoExtensionHostPortal {
@@ -72,9 +75,16 @@ private:
     static ::MongoExtensionByteView _extGetOptions(
         const ::MongoExtensionHostPortal* portal) noexcept;
 
+    static ::MongoExtensionStatus* _extRegisterStageRules(
+        const ::MongoExtensionHostPortal* hostPortal,
+        ::MongoExtensionByteView stageName,
+        const ::MongoExtensionPipelineRewriteRule* rules,
+        size_t numRules) noexcept;
+
     static constexpr ::MongoExtensionHostPortalVTable VTABLE = {
         .register_stage_descriptor = &_extRegisterStageDescriptor,
         .get_extension_options = &_extGetOptions,
+        .register_stage_rules = &_extRegisterStageRules,
     };
 
     const std::string _extensionOpts;

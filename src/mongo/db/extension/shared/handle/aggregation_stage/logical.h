@@ -92,6 +92,17 @@ public:
      */
     void setExtractedLimitVal(boost::optional<long long> extractedLimitVal);
 
+    /**
+     * Evaluates the precondition of the rule identified by name. Return the precondition value.
+     */
+    bool evaluateRulePrecondition(StringData ruleName) const;
+
+    /**
+     * Applies the transform of the rule identified by name. Returns true if pipeline was modified
+     * and rule should be requeued in RBR engine.
+     */
+    bool evaluateRuleTransform(StringData ruleName);
+
     static void assertVTableConstraints(const VTable_t& vtable) {
         tassert(11420603,
                 "ExtensionLogicalAggStageAdapter 'get_name' is null",
@@ -117,6 +128,12 @@ public:
             11553300,
             "ExtensionLogicalAggStageAdapter 'set_vector_search_limit_for_optimization' is null",
             vtable.set_vector_search_limit_for_optimization != nullptr);
+        tassert(12201402,
+                "LogicalAggStage 'evaluate_rule_precondition' is null",
+                vtable.evaluate_rule_precondition != nullptr);
+        tassert(12201403,
+                "LogicalAggStage 'evaluate_rule_transform' is null",
+                vtable.evaluate_rule_transform != nullptr);
     }
 };
 

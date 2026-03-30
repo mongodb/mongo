@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2025-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -26,36 +26,21 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/extension/host_connector/adapter/host_portal_adapter.h"
+#pragma once
 
-#include "mongo/db/extension/shared/extension_status.h"
-#include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
+#include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/pipeline_rewrite_context.h"
+#include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::extension::host_connector {
 
-::MongoExtensionStatus* HostPortalAdapter::_extRegisterStageDescriptor(
-    const MongoExtensionHostPortal* hostPortal,
-    const MongoExtensionAggStageDescriptor* stageDesc) noexcept {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        const auto& impl = static_cast<const HostPortalAdapter*>(hostPortal)->getImpl();
-        impl.registerStageDescriptor(stageDesc);
-    });
-}
-
-::MongoExtensionStatus* HostPortalAdapter::_extRegisterStageRules(
-    const MongoExtensionHostPortal* hostPortal,
-    ::MongoExtensionByteView stageName,
-    const ::MongoExtensionPipelineRewriteRule* rules,
-    size_t numRules) noexcept {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        const auto& impl = static_cast<const HostPortalAdapter*>(hostPortal)->getImpl();
-        impl.registerStageRules(stageName, rules, numRules);
-    });
-}
-
-::MongoExtensionByteView HostPortalAdapter::_extGetOptions(
-    const ::MongoExtensionHostPortal* portal) noexcept {
-    return stringViewAsByteView(static_cast<const HostPortalAdapter*>(portal)->_extensionOpts);
-}
+/**
+ * Wraps an extension PipelineRewriteRule into a host-side PipelineRewriteRule by adapting the
+ * extension's evaluateRulePrecondition/evaluateRuleTransform vtable calls into the host's
+ * rule-based rewriter precondition/transform function signatures.
+ */
+rule_based_rewrites::pipeline::PipelineRewriteRule wrapExtensionRule(
+    const extension::PipelineRewriteRule& extRule, MongoExtensionLogicalAggStage* extensionStage);
 
 }  // namespace mongo::extension::host_connector

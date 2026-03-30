@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2025-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -26,36 +26,39 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/extension/host_connector/adapter/host_portal_adapter.h"
 
-#include "mongo/db/extension/shared/extension_status.h"
-#include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
+#include "mongo/db/extension/host_connector/adapter/pipeline_rewrite_context_adapter.h"
+
+#include "mongo/db/extension/shared/handle/aggregation_stage/logical.h"
 
 namespace mongo::extension::host_connector {
 
-::MongoExtensionStatus* HostPortalAdapter::_extRegisterStageDescriptor(
-    const MongoExtensionHostPortal* hostPortal,
-    const MongoExtensionAggStageDescriptor* stageDesc) noexcept {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        const auto& impl = static_cast<const HostPortalAdapter*>(hostPortal)->getImpl();
-        impl.registerStageDescriptor(stageDesc);
-    });
-}
+using PipelineRewriteContext = rule_based_rewrites::pipeline::PipelineRewriteContext;
+using HostPipelineRewriteRule = rule_based_rewrites::pipeline::PipelineRewriteRule;
 
-::MongoExtensionStatus* HostPortalAdapter::_extRegisterStageRules(
-    const MongoExtensionHostPortal* hostPortal,
-    ::MongoExtensionByteView stageName,
-    const ::MongoExtensionPipelineRewriteRule* rules,
-    size_t numRules) noexcept {
-    return wrapCXXAndConvertExceptionToStatus([&]() {
-        const auto& impl = static_cast<const HostPortalAdapter*>(hostPortal)->getImpl();
-        impl.registerStageRules(stageName, rules, numRules);
-    });
-}
+HostPipelineRewriteRule wrapExtensionRule(const extension::PipelineRewriteRule& extRule,
+                                          MongoExtensionLogicalAggStage* extensionStage) {
+    using namespace rule_based_rewrites::pipeline;
+    rule_based_rewrites::TagSet tags = 0;
+    if (extRule.tags & kPipelineRewriteRuleTagReordering) {
+        tags |= static_cast<rule_based_rewrites::TagSet>(PipelineRewriteContext::Tags::Reordering);
+    }
+    if (extRule.tags & kPipelineRewriteRuleTagInPlace) {
+        tags |= static_cast<rule_based_rewrites::TagSet>(PipelineRewriteContext::Tags::InPlace);
+    }
 
-::MongoExtensionByteView HostPortalAdapter::_extGetOptions(
-    const ::MongoExtensionHostPortal* portal) noexcept {
-    return stringViewAsByteView(static_cast<const HostPortalAdapter*>(portal)->_extensionOpts);
+    const auto& ruleName = extRule.name;
+    extension::LogicalAggStageAPI stageApi(extensionStage);
+    return HostPipelineRewriteRule{
+        .name = ruleName,
+        .precondition = [stageApi, ruleName](PipelineRewriteContext& c) -> bool {
+            return stageApi.evaluateRulePrecondition(StringData(ruleName.data(), ruleName.size()));
+        },
+        .transform = [stageApi, ruleName](PipelineRewriteContext& c) mutable -> bool {
+            return stageApi.evaluateRuleTransform(StringData(ruleName.data(), ruleName.size()));
+        },
+        .tags = tags,
+    };
 }
 
 }  // namespace mongo::extension::host_connector

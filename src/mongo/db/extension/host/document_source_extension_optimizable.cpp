@@ -32,6 +32,7 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/extension/host/document_source_extension_for_query_shape.h"
 #include "mongo/db/extension/host/extension_vector_search_server_status.h"
+#include "mongo/db/extension/host_connector/adapter/pipeline_rewrite_context_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/view_info_adapter.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
@@ -541,12 +542,91 @@ DocumentSourceContainer::iterator DocumentSourceExtensionOptimizable::optimizeAt
     _logicalStage->setExtractedLimitVal(_limit);
     return std::next(itr);
 }
+
+stdx::unordered_map<std::string, std::vector<PipelineRewriteRule>>
+    DocumentSourceExtensionOptimizable::_extensionRuleRegistry;
+
+// static
+void DocumentSourceExtensionOptimizable::registerStageRules(
+    StringData stageName, const std::vector<extension::PipelineRewriteRule>& rules) {
+    auto [_, inserted] = _extensionRuleRegistry.emplace(stageName, rules);
+    tassert(12201405, "Rules already registered for stage: " + stageName, inserted);
+}
+
+// static
+void DocumentSourceExtensionOptimizable::unregisterStageRules_forTest(StringData stageName) {
+    _extensionRuleRegistry.erase(std::string_view(stageName));
+}
+
+// static
+const std::vector<PipelineRewriteRule>* DocumentSourceExtensionOptimizable::getStageRules_forTest(
+    StringData stageName) {
+    auto it = _extensionRuleRegistry.find(std::string_view(stageName));
+    if (it == _extensionRuleRegistry.end()) {
+        return nullptr;
+    }
+    return &it->second;
+}
+
+// static
+std::vector<rule_based_rewrites::pipeline::PipelineRewriteRule>
+DocumentSourceExtensionOptimizable::_buildOwnedRewriteRules(
+    const std::string& stageName, MongoExtensionLogicalAggStage* logicalStage) {
+    auto it = _extensionRuleRegistry.find(stageName);
+    if (it == _extensionRuleRegistry.end()) {
+        return {};
+    }
+    std::vector<rule_based_rewrites::pipeline::PipelineRewriteRule> rules;
+    rules.reserve(it->second.size());
+    for (const auto& rule : it->second) {
+        rules.push_back(host_connector::wrapExtensionRule(rule, logicalStage));
+    }
+    return rules;
+}
+
+using PipelineRewriteContext = rule_based_rewrites::pipeline::PipelineRewriteContext;
+
+bool DocumentSourceExtensionOptimizable::dispatchExtensionRules(PipelineRewriteContext& ctx,
+                                                                PipelineRewriteRuleTags tagFilter) {
+    for (const auto& rule : _ownedRewriteRules) {
+        if (rule.tags & tagFilter) {
+            ctx.addRule(rule);
+        }
+    }
+    return false;
+}
+
+bool extensionDispatcherReorderingPrecondition(PipelineRewriteContext& ctx) {
+    auto* stage = dynamic_cast<DocumentSourceExtensionOptimizable*>(&ctx.current());
+    return stage && stage->dispatchExtensionRules(ctx, kReordering);
+}
+
+bool extensionDispatcherInPlacePrecondition(PipelineRewriteContext& ctx) {
+    auto* stage = dynamic_cast<DocumentSourceExtensionOptimizable*>(&ctx.current());
+    return stage && stage->dispatchExtensionRules(ctx, kInPlace);
+}
 }  // namespace mongo::extension::host
 
 namespace mongo::rule_based_rewrites::pipeline {
 using DocumentSourceExtensionOptimizable =
     mongo::extension::host::DocumentSourceExtensionOptimizable;
+REGISTER_RULES_WITH_FEATURE_FLAG(
+    DocumentSourceExtensionOptimizable,
+    &feature_flags::gFeatureFlagExtensionsOptimizations,
+    {
+        .name = "EXTENSION_DISPATCHER_REORDERING",
+        .precondition = mongo::extension::host::extensionDispatcherReorderingPrecondition,
+        .transform = Transforms::noop,
+        .priority = kDefaultOptimizeAtPriority + 1,
+        .tags = PipelineRewriteContext::Tags::Reordering,
+    },
+    {
+        .name = "EXTENSION_DISPATCHER_IN_PLACE",
+        .precondition = mongo::extension::host::extensionDispatcherInPlacePrecondition,
+        .transform = Transforms::noop,
+        .priority = kDefaultOptimizeInPlacePriority,
+        .tags = PipelineRewriteContext::Tags::InPlace,
+    });
 REGISTER_RULES(DocumentSourceExtensionOptimizable,
                OPTIMIZE_AT_RULE(DocumentSourceExtensionOptimizable));
-
 }  // namespace mongo::rule_based_rewrites::pipeline

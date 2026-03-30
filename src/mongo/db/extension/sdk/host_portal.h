@@ -32,6 +32,7 @@
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/assert_util.h"
 #include "mongo/db/extension/shared/extension_status.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/pipeline_rewrite_context.h"
 #include "mongo/util/modules.h"
 
 #include <yaml-cpp/yaml.h>
@@ -70,6 +71,21 @@ public:
         });
     }
 
+    void registerStageRules(std::string_view stageName,
+                            const std::vector<PipelineRewriteRule>& rules) const {
+        ::MongoExtensionByteView stageNameView{reinterpret_cast<const uint8_t*>(stageName.data()),
+                                               stageName.size()};
+        std::vector<::MongoExtensionPipelineRewriteRule> cRules;
+        cRules.reserve(rules.size());
+        for (const auto& rule : rules) {
+            cRules.push_back(rule.convertToCRule());
+        }
+        invokeCAndConvertStatusToException([&] {
+            return _vtable().register_stage_rules(
+                get(), stageNameView, cRules.data(), cRules.size());
+        });
+    }
+
     ::MongoExtensionAPIVersion getHostExtensionsAPIVersion() const {
         assertValid();
         return get()->hostExtensionsAPIVersion;
@@ -92,6 +108,9 @@ public:
         sdk_tassert(10999108,
                     "Extension 'get_extension_options' is null",
                     vtable.get_extension_options != nullptr);
+        sdk_tassert(12201401,
+                    "Extension 'register_stage_rules' is null",
+                    vtable.register_stage_rules != nullptr);
     };
 };
 }  // namespace sdk

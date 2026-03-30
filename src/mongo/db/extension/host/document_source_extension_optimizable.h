@@ -38,9 +38,11 @@
 #include "mongo/db/extension/shared/handle/aggregation_stage/distributed_plan_logic.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/logical.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/pipeline_rewrite_context.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/lite_parsed_desugarer.h"
+#include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/modules.h"
@@ -440,6 +442,27 @@ public:
     DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
                                                  DocumentSourceContainer* container);
 
+    /**
+     * Looks up the extension rules for the current extension stage in the extension rule registry
+     * and queues them in the RBR engine according to whether the rule's tags match the tag filter.
+     * Note that this function ensures that the queued rules remain valid for the entire
+     * optimizations pass by storing them in a dedicated structure on
+     * DocumentSourceExtensionOptimizable.
+     */
+    bool dispatchExtensionRules(rule_based_rewrites::pipeline::PipelineRewriteContext& ctx,
+                                PipelineRewriteRuleTags tagFilter);
+
+    /**
+     * Static function that registers each given vector of extension pipeline rewrite rules with the
+     * given extension stage name in a static extension rule registry that is populated once at
+     * startup and accessible by all DocumentSourceExtensionOptimizable instances.
+     */
+    static void registerStageRules(StringData stageName,
+                                   const std::vector<PipelineRewriteRule>& rules);
+
+    static void unregisterStageRules_forTest(StringData stageName);
+    static const std::vector<PipelineRewriteRule>* getStageRules_forTest(StringData stageName);
+
 protected:
     /**
      * NB : Here we keep a copy of the stage name to service getSourceName().
@@ -463,7 +486,8 @@ protected:
                       expCtx.get() != nullptr);
               auto catalogContext = CatalogContext(*expCtx);
               return astNode->bind(catalogContext.getAsBoundaryType());
-          }()) {}
+          }()),
+          _ownedRewriteRules(_buildOwnedRewriteRules(_stageName, _logicalStage->get())) {}
 
     DocumentSourceExtensionOptimizable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        LogicalAggStageHandle logicalStage,
@@ -471,7 +495,8 @@ protected:
         : DocumentSource(logicalStage->getName(), expCtx),
           _stageName(std::string(logicalStage->getName())),
           _properties(properties),
-          _logicalStage(std::move(logicalStage)) {}
+          _logicalStage(std::move(logicalStage)),
+          _ownedRewriteRules(_buildOwnedRewriteRules(_stageName, _logicalStage->get())) {}
 
 private:
     // Do not support copy or move.
@@ -481,11 +506,29 @@ private:
         delete;
     DocumentSourceExtensionOptimizable& operator=(DocumentSourceExtensionOptimizable&&) = delete;
 
-    // Limit value for the pipeline as a whole. This is not the limit that we send to mongot,
-    // rather, it is used when adding the $limit stage to the merging pipeline in a sharded cluster.
-    // This allows us to limit the documents that are returned from the shards as much as possible
-    // without adding complicated rules for pipeline splitting.
+    // Limit value for the pipeline as a whole. This is not the limit that we send
+    // to mongot, rather, it is used when adding the $limit stage to the merging
+    // pipeline in a sharded cluster. This allows us to limit the documents that
+    // are returned from the shards as much as possible without adding complicated
+    // rules for pipeline splitting.
     boost::optional<long long> _limit;
+
+    // Shared registry: stageName -> rules, populated during initialization of the extension. This
+    // map is not thread-safe and must only be written to at startup.
+    static stdx::unordered_map<std::string, std::vector<PipelineRewriteRule>>
+        _extensionRuleRegistry;
+
+    // Builds the wrapped host-side rules for this stage from the extension rule registry.
+    // Called once during construction.
+    static std::vector<rule_based_rewrites::pipeline::PipelineRewriteRule> _buildOwnedRewriteRules(
+        const std::string& stageName, MongoExtensionLogicalAggStage* logicalStage);
+
+    // Owns the dynamically-created extension rules so that the ctx holds stable pointers into this
+    // vector for the lifetime of the optimization pass. This is necessary because the
+    // RewriteEngine does not own rules, it holds pointers to them. This is fine for host-defined
+    // rules, because they are declared statically. Extension rules, however, are created
+    // dynamically at query execution time. Therefore, we must keep them alive here.
+    const std::vector<rule_based_rewrites::pipeline::PipelineRewriteRule> _ownedRewriteRules;
 };
 
 namespace helper {

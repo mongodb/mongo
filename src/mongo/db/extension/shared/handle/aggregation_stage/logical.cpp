@@ -113,4 +113,23 @@ void LogicalAggStageAPI::setExtractedLimitVal(boost::optional<long long> extract
     });
 }
 
+bool LogicalAggStageAPI::evaluateRulePrecondition(StringData ruleName) const {
+    bool result = false;
+    auto nameView = ::MongoExtensionByteView{reinterpret_cast<const uint8_t*>(ruleName.data()),
+                                             ruleName.size()};
+    invokeCAndConvertStatusToException(
+        [&]() { return _vtable().evaluate_rule_precondition(get(), nameView, &result); });
+    return result;
+}
+
+bool LogicalAggStageAPI::evaluateRuleTransform(StringData ruleName) {
+    bool result = false;
+    auto nameView = ::MongoExtensionByteView{reinterpret_cast<const uint8_t*>(ruleName.data()),
+                                             ruleName.size()};
+    invokeCAndConvertStatusToException(
+        [&]() { return _vtable().evaluate_rule_transform(get(), nameView, &result); });
+    return result;
+}
+
+
 }  // namespace mongo::extension

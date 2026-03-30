@@ -38,6 +38,7 @@
 
 namespace sdk = mongo::extension::sdk;
 using namespace mongo;
+using mongo::extension::PipelineRewriteRule;
 
 static const std::string kStageNameVectorSearchOpt = "$testVectorSearchOptimization";
 
@@ -74,11 +75,26 @@ public:
     }
 
     mongo::BSONObj serialize() const override {
-        return BSON(_name << _buildSpecWithExtractedLimit());
+        BSONObjBuilder spec;
+        spec.append("limit", _buildSpecWithExtractedLimit());
+        spec.append("inPlaceRuleApplied", true);
+        return BSON(_name << spec.obj());
     }
 
     mongo::BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
-        return BSON(_name << _buildSpecWithExtractedLimit());
+        return serialize();
+    }
+
+    bool evaluateRulePrecondition(std::string_view ruleName) const override {
+        return ruleName == "noopReorder" || ruleName == "noopInPlace";
+    }
+
+    bool evaluateRuleTransform(std::string_view ruleName) override {
+        if (ruleName == "noopInPlace") {
+            _inPlaceRuleApplied = true;
+            return true;
+        }
+        return false;
     }
 
 private:
@@ -91,6 +107,8 @@ private:
         }
         return builder.obj();
     }
+
+    mutable bool _inPlaceRuleApplied = false;
 };
 
 class TestVectorSearchAstNode : public sdk::TestAstNode<TestVectorSearchLogicalStage> {
@@ -219,6 +237,11 @@ public:
     void initialize(const sdk::HostPortalHandle& portal) override {
         _registerStage<TestVectorSearchOptStageDescriptor>(portal);
         _registerStage<TestVectorSearchStageDescriptor>(portal);
+        std::vector<PipelineRewriteRule> rules{
+            {"noopReorder", kPipelineRewriteRuleTagReordering},
+            {"noopInPlace", kPipelineRewriteRuleTagInPlace},
+        };
+        _registerStageRules<TestVectorSearchOptStageDescriptor>(portal, rules);
     }
 };
 

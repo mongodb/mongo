@@ -118,13 +118,13 @@ const getExtractedLimit = (explainOutput) => {
     // Check splitPipeline first (sharded case)
     const vectorSearchInSplit = getStageFromSplitPipeline(explainOutput, "$testVectorSearch");
     if (vectorSearchInSplit && vectorSearchInSplit.$testVectorSearch) {
-        return vectorSearchInSplit.$testVectorSearch.extractedLimit;
+        return vectorSearchInSplit.$testVectorSearch.limit.extractedLimit;
     }
 
     // Fall back to regular stages (non-sharded case)
     const vectorSearchStages = getAggPlanStages(explainOutput, "$testVectorSearch");
     if (vectorSearchStages.length > 0 && vectorSearchStages[0].$testVectorSearch) {
-        return vectorSearchStages[0].$testVectorSearch.extractedLimit;
+        return vectorSearchStages[0].$testVectorSearch.limit.extractedLimit;
     }
 
     return undefined;
@@ -200,3 +200,22 @@ testLimitExtraction(buildTestVectorSearchOptStage({storedSource: true}));
 
 // Test limit extraction when desugar is false - stage only expands to $testVectorSearch
 testLimitExtraction(desugarFalseStage);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// vectorSearch Rewrite Rule Optimization Tests
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Verify the in-place rule fired: $testVectorSearch explain output should contain
+// inPlaceRuleApplied: true (set unconditionally by the new serialize() implementation).
+{
+    const explain = coll.explain("queryPlanner").aggregate([desugarFalseStage]);
+    const stages = getAggPlanStages(explain, "$testVectorSearch");
+    assert.gt(stages.length, 0, "Expected $testVectorSearch in explain output: " + tojson(explain));
+
+    const stageSpec = stages[0]["$testVectorSearch"];
+    assert(stageSpec !== undefined, "Expected $testVectorSearch spec in explain stage: " + tojson(stages[0]));
+    assert.eq(
+        stageSpec.inPlaceRuleApplied,
+        true,
+        "Expected inPlaceRuleApplied:true in explain, got: " + tojson(stageSpec),
+    );
+}

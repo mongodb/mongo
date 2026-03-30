@@ -99,6 +99,21 @@ public:
         return _limit;
     }
 
+    /**
+     * Evaluates the precondition of the rule identified by name. Extensions override this.
+     */
+    virtual bool evaluateRulePrecondition(std::string_view ruleName) const {
+        return false;
+    }
+
+    /**
+     * Applies the transform of the rule identified by name. Extensions override this.
+     * Returns true if the pipeline was modified.
+     */
+    virtual bool evaluateRuleTransform(std::string_view ruleName) {
+        return false;
+    }
+
 protected:
     LogicalAggStage() = delete;  // No default constructor.
     explicit LogicalAggStage(std::string_view name) : _name(name) {}
@@ -135,6 +150,10 @@ public:
 
     LogicalAggStage& getImpl() const noexcept {
         return *_stage;
+    }
+
+    static ::MongoExtensionLogicalAggStageVTable getVTable() {
+        return VTABLE;
     }
 
 private:
@@ -226,6 +245,28 @@ private:
         });
     }
 
+    static ::MongoExtensionStatus* _extEvaluateRulePrecondition(
+        const ::MongoExtensionLogicalAggStage* extLogicalStage,
+        ::MongoExtensionByteView ruleName,
+        bool* result) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([&]() {
+            *result = false;
+            auto& adapter = *static_cast<const ExtensionLogicalAggStageAdapter*>(extLogicalStage);
+            *result = adapter.getImpl().evaluateRulePrecondition(byteViewAsStringView(ruleName));
+        });
+    }
+
+    static ::MongoExtensionStatus* _extEvaluateRuleTransform(
+        ::MongoExtensionLogicalAggStage* extLogicalStage,
+        ::MongoExtensionByteView ruleName,
+        bool* result) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([&]() {
+            *result = false;
+            auto& adapter = *static_cast<ExtensionLogicalAggStageAdapter*>(extLogicalStage);
+            *result = adapter.getImpl().evaluateRuleTransform(byteViewAsStringView(ruleName));
+        });
+    }
+
     static constexpr ::MongoExtensionLogicalAggStageVTable VTABLE = {
         .destroy = &_extDestroy,
         .get_name = &_extGetName,
@@ -235,7 +276,9 @@ private:
         .get_distributed_plan_logic = &_extGetDistributedPlanLogic,
         .clone = &_extClone,
         .is_stage_sorted_by_vector_search_score = &_extIsStageSortedByVectorSearchScore,
-        .set_vector_search_limit_for_optimization = &_extSetVectorSearchLimitForOptimization};
+        .set_vector_search_limit_for_optimization = &_extSetVectorSearchLimitForOptimization,
+        .evaluate_rule_precondition = &_extEvaluateRulePrecondition,
+        .evaluate_rule_transform = &_extEvaluateRuleTransform};
     std::unique_ptr<LogicalAggStage> _stage;
 };
 

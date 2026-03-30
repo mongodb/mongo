@@ -38,6 +38,7 @@
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/distributed_plan_logic.h"
 #include "mongo/db/extension/sdk/dpl_array_container.h"
+#include "mongo/db/extension/sdk/host_portal.h"
 #include "mongo/db/extension/sdk/tests/fruits_test_stage.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 #include "mongo/db/extension/shared/get_next_result.h"
@@ -433,6 +434,31 @@ DEATH_TEST(DistributedPlanLogicVTableDeathTest, InvalidDPLVTableFailsGetSortPatt
     vtable.get_sort_pattern = nullptr;
     DistributedPlanLogicAPI::assertVTableConstraints(vtable);
 };
+
+DEATH_TEST(LogicalAggStageVTableDeathTest, NullEvaluateRulePreconditionTasserts, "12201402") {
+    auto vtable = sdk::ExtensionLogicalAggStageAdapter::getVTable();
+    vtable.evaluate_rule_precondition = nullptr;
+    LogicalAggStageAPI::assertVTableConstraints(vtable);
+}
+
+DEATH_TEST(LogicalAggStageVTableDeathTest, NullEvaluateRuleTransformTasserts, "12201403") {
+    auto vtable = sdk::ExtensionLogicalAggStageAdapter::getVTable();
+    vtable.evaluate_rule_transform = nullptr;
+    LogicalAggStageAPI::assertVTableConstraints(vtable);
+}
+
+DEATH_TEST_F(AggStageErrorFixtureDeathTest, NullRegisterStageRulesTasserts, "12201401") {
+    ::MongoExtensionHostPortalVTable vtable{
+        .register_stage_descriptor = [](const ::MongoExtensionHostPortal*,
+                                        const ::MongoExtensionAggStageDescriptor*)
+            -> ::MongoExtensionStatus* { return nullptr; },
+        .get_extension_options = [](const ::MongoExtensionHostPortal*) -> ::MongoExtensionByteView {
+            return {};
+        },
+        .register_stage_rules = nullptr,
+    };
+    sdk::HostPortalAPI::assertVTableConstraints(vtable);
+}
 
 DEATH_TEST_F(AggStageErrorFixtureDeathTest,
              SourceStageForTransformExtensionStageBecomesInvalid,

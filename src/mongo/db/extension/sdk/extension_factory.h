@@ -36,6 +36,8 @@
 #include "mongo/db/extension/sdk/host_services.h"
 #include "mongo/db/extension/sdk/versioned_extension.h"
 #include "mongo/db/extension/shared/extension_status.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/pipeline_rewrite_context.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -68,9 +70,23 @@ protected:
         _stageDescriptors.emplace(StageDescriptor::kStageName, std::move(stageDesc));
     }
 
+    template <class StageDescriptor>
+    void _registerStageRules(const HostPortalHandle& portal,
+                             const std::vector<PipelineRewriteRule>& rules) {
+        sdk_uassert(12201400, "No rules to register", !rules.empty());
+        stdx::unordered_set<std::string> seenRuleNames;
+        for (const auto& rule : rules) {
+            sdk_uassert(12201404,
+                        "Cannot register rule with duplicate rule name for same stage",
+                        seenRuleNames.insert(rule.name).second);
+        }
+        portal->registerStageRules(StageDescriptor::kStageName, rules);
+    }
+
 private:
     stdx::unordered_map<std::string, std::unique_ptr<ExtensionAggStageDescriptorAdapter>>
         _stageDescriptors;
+    stdx::unordered_map<std::string, std::unique_ptr<ExtensionAggStageDescriptorAdapter>> _rules;
 };
 
 /**

@@ -38,6 +38,7 @@
 #include "mongo/db/extension/host/host_portal.h"
 #include "mongo/db/extension/host_connector/adapter/host_services_adapter.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
+#include "mongo/db/extension/sdk/extension_factory.h"
 #include "mongo/db/extension/sdk/host_services.h"
 #include "mongo/db/extension/sdk/query_shape_opts_handle.h"
 #include "mongo/db/extension/sdk/tests/fruits_test_stage.h"
@@ -2672,6 +2673,121 @@ TEST_F(DocumentSourceExtensionOptimizableTest, ExtensionStageDocsNeededBoundsRet
 
     ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::Unknown>(bounds.getMinBounds()));
     ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::Unknown>(bounds.getMaxBounds()));
+}
+
+// Tests for registerStageRules / _extensionRuleRegistry.
+
+class StageRulesTest : public DocumentSourceExtensionOptimizableTest {
+public:
+    static constexpr StringData kStageName = "$testRulesStage"_sd;
+
+    inline static const PipelineRewriteRule kReorderRule{"reorderRule",
+                                                         kPipelineRewriteRuleTagReordering};
+    inline static const PipelineRewriteRule kInPlaceRule{"inPlaceRule",
+                                                         kPipelineRewriteRuleTagInPlace};
+    inline static const std::vector<PipelineRewriteRule> kBothRules{kReorderRule, kInPlaceRule};
+
+    void tearDown() override {
+        host::DocumentSourceExtensionOptimizable::unregisterStageRules_forTest(kStageName);
+        DocumentSourceExtensionOptimizableTest::tearDown();
+    }
+};
+
+TEST_F(StageRulesTest, RegisterStageRulesStoresMultipleRules) {
+    host::DocumentSourceExtensionOptimizable::registerStageRules(kStageName, kBothRules);
+
+    const auto* stored =
+        host::DocumentSourceExtensionOptimizable::getStageRules_forTest(kStageName);
+    ASSERT_TRUE(stored != nullptr);
+    ASSERT_EQ(stored->size(), 2u);
+    ASSERT_EQ((*stored)[0].name, kReorderRule.name);
+    ASSERT_EQ((*stored)[0].tags, kReorderRule.tags);
+    ASSERT_EQ((*stored)[1].name, kInPlaceRule.name);
+    ASSERT_EQ((*stored)[1].tags, kInPlaceRule.tags);
+}
+
+TEST_F(StageRulesTest, UnregisteredStageHasNoRules) {
+    ASSERT_TRUE(host::DocumentSourceExtensionOptimizable::getStageRules_forTest(kStageName) ==
+                nullptr);
+}
+
+TEST_F(StageRulesTest, HostPortalRegisterStageRulesConvertsRules) {
+    std::unique_ptr<host::HostPortal> hostPortal = std::make_unique<host::HostPortal>();
+    host_connector::HostPortalAdapter portal{
+        MONGODB_EXTENSION_API_VERSION, 1, "", std::move(hostPortal)};
+
+    MongoExtensionPipelineRewriteRule cRules[2] = {
+        {.name = {reinterpret_cast<const uint8_t*>(kReorderRule.name.data()),
+                  kReorderRule.name.size()},
+         .tags = kPipelineRewriteRuleTagReordering},
+        {.name = {reinterpret_cast<const uint8_t*>(kInPlaceRule.name.data()),
+                  kInPlaceRule.name.size()},
+         .tags = kPipelineRewriteRuleTagInPlace},
+    };
+    MongoExtensionByteView stageNameView{reinterpret_cast<const uint8_t*>(kStageName.data()),
+                                         kStageName.size()};
+
+    portal.getImpl().registerStageRules(stageNameView, cRules, 2);
+
+    const auto* stored =
+        host::DocumentSourceExtensionOptimizable::getStageRules_forTest(kStageName);
+    ASSERT_TRUE(stored != nullptr);
+    ASSERT_EQ(stored->size(), 2u);
+    ASSERT_EQ((*stored)[0].name, kReorderRule.name);
+    ASSERT_EQ((*stored)[0].tags, kReorderRule.tags);
+    ASSERT_EQ((*stored)[1].name, kInPlaceRule.name);
+    ASSERT_EQ((*stored)[1].tags, kInPlaceRule.tags);
+}
+
+// Subclass that makes _registerStageRules accessible for testing.
+class TestExtension : public sdk::Extension {
+public:
+    void initialize(const sdk::HostPortalHandle&) override {}
+
+    template <class StageDescriptor>
+    void callRegisterStageRules(const sdk::HostPortalHandle& portal,
+                                const std::vector<PipelineRewriteRule>& rules) {
+        _registerStageRules<StageDescriptor>(portal, rules);
+    }
+};
+
+using TestStageDescriptor =
+    sdk::TestStageDescriptor<"$testRulesStage",
+                             sdk::shared_test_stages::TransformAggStageParseNode>;
+
+TEST_F(StageRulesTest, RegisterStageRulesUassertsOnEmptyRules) {
+    std::unique_ptr<host::HostPortal> hostPortal = std::make_unique<host::HostPortal>();
+    host_connector::HostPortalAdapter portal{
+        MONGODB_EXTENSION_API_VERSION, 1, "", std::move(hostPortal)};
+    sdk::HostPortalHandle portalHandle{&portal};
+
+    TestExtension ext;
+    ASSERT_THROWS_CODE(ext.callRegisterStageRules<TestStageDescriptor>(portalHandle, {}),
+                       AssertionException,
+                       12201400);
+}
+
+TEST_F(StageRulesTest, RegisterStageRulesUassertsOnDuplicateRuleName) {
+    std::unique_ptr<host::HostPortal> hostPortal = std::make_unique<host::HostPortal>();
+    host_connector::HostPortalAdapter portal{
+        MONGODB_EXTENSION_API_VERSION, 1, "", std::move(hostPortal)};
+    sdk::HostPortalHandle portalHandle{&portal};
+
+    TestExtension ext;
+    ASSERT_THROWS_CODE(ext.callRegisterStageRules<TestStageDescriptor>(
+                           portalHandle,
+                           {PipelineRewriteRule{"myRule", kPipelineRewriteRuleTagReordering},
+                            PipelineRewriteRule{"myRule", kPipelineRewriteRuleTagInPlace}}),
+                       AssertionException,
+                       12201404);
+}
+
+using StageRulesDeathTest = StageRulesTest;
+DEATH_TEST_REGEX_F(StageRulesDeathTest, RegisterStageRulesTassertsOnDuplicateStage, "12201405") {
+    host::DocumentSourceExtensionOptimizable::unregisterStageRules_forTest(kStageName);
+    host::DocumentSourceExtensionOptimizable::registerStageRules(kStageName, kBothRules);
+    // Second registration for the same stage must tassert.
+    host::DocumentSourceExtensionOptimizable::registerStageRules(kStageName, kBothRules);
 }
 
 }  // namespace
