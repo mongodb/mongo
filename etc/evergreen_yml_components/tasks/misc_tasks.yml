@@ -323,6 +323,27 @@ tasks:
             --runAllFeatureFlagTests
 
   - <<: *antithesis_task_template
+    name: antithesis_jstestfuzz_replication_continuous_stepdown
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "experimental",
+        "antithesis",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "do setup for antithesis"
+      - func: "set up remote credentials"
+        vars:
+          aws_key_remote: ${aws_key}
+          aws_secret_remote: ${aws_secret}
+      - func: "antithesis image build and push"
+        vars:
+          suite: jstestfuzz_replication_continuous_stepdown
+          resmoke_args: >-
+            --runAllFeatureFlagTests
+
+  - <<: *antithesis_task_template
     name: antithesis_replica_sets_jscore_passthrough
     tags:
       [
