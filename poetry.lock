@@ -3715,7 +3715,7 @@ all = ["numpy"]
 
 [[package]]
 name = "rapidyaml"
-version = "0.9.0.post2"
+version = "0.9.1.dev6+ga5d485f"
 description = "Rapid YAML - a library to parse and emit YAML, and do it fast"
 optional = false
 python-versions = ">=3.6"
@@ -3729,9 +3729,9 @@ deprecation = "*"
 
 [package.source]
 type = "git"
-url = "https://github.com/biojppm/rapidyaml"
-reference = "HEAD"
-resolved_reference = "338385b46a312bd8e05016033dd452dccc67e372"
+url = "https://github.com/mongodb-forks/rapidyaml.git"
+reference = "a5d485fd44719e1c03e059177fc1f695fc462b66"
+resolved_reference = "a5d485fd44719e1c03e059177fc1f695fc462b66"
 
 [[package]]
 name = "referencing"
@@ -5688,4 +5688,4 @@ libdeps = ["cxxfilt", "eventlet", "flask", "flask-cors", "gevent", "lxml", "prog
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "cd6dff96b8df7f3bd3433f667a435826b332d8c6d3f3dccb26fd89f1992b4a78"
+content-hash = "179f66af47e3937ad837ba8f09e18c5b4a9ee2f159af9a7568faa01eb96509f9"
