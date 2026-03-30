@@ -13,6 +13,8 @@ import {
     emptyMessageTest,
     fuzzingTest,
     testProxyProtocolReplicaSet,
+    testProxyProtocolReplicaSetWithProxyUnixSocket,
+    testClientMetadataLogOverUnixSocket,
 } from "jstests/noPassthrough/libs/proxy_protocol_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
@@ -125,3 +127,5 @@ testProxyProtocolReplicaSet(ingressPort, egressPort, 2, emptyMessageTest);
 
 testProxyProtocolReplicaSet(ingressPort, egressPort, 1, fuzzingTest);
 testProxyProtocolReplicaSet(ingressPort, egressPort, 2, fuzzingTest);
+
+testProxyProtocolReplicaSetWithProxyUnixSocket(ingressPort, testClientMetadataLogOverUnixSocket);
