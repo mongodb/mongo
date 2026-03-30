@@ -14,6 +14,10 @@ POOLS_X86 = {
         "cpus": 2,
         "memory_gb": 7,
     },
+    "high_mem_2core_x86_64": {
+        "cpus": 2,
+        "memory_gb": 14,
+    },
 }
 
 POOLS_ARM = {
@@ -28,6 +32,10 @@ POOLS_ARM = {
     "large_memory_2core_arm64": {
         "cpus": 2,
         "memory_gb": 7,
+    },
+    "high_memory_2core_arm64": {
+        "cpus": 2,
+        "memory_gb": 14,
     },
 }
 
