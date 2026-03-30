@@ -347,7 +347,7 @@ private:
         _retryingCancelableOpCtxFactory;
 
     // Protects the state below
-    stdx::mutex _mutex;
+    mutable stdx::mutex _mutex;
 
     // Manages abort state and provides cancellation tokens for async operations. Initialized in
     // _initCancelState().

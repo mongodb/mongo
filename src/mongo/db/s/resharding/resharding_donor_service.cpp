@@ -326,8 +326,12 @@ ReshardingDonorService::DonorStateMachine::DonorStateMachine(
 
 CancelableOperationContext ReshardingDonorService::DonorStateMachine::_makeOperationContext(
     std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) const {
-    return resharding::makeReshardingOperationContext(
-        *factory, _donorCtx.getState() >= DonorStateEnum::kBlockingWrites);
+    auto state = [this] {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        return _donorCtx.getState();
+    }();
+    return resharding::makeReshardingOperationContext(*factory,
+                                                      state >= DonorStateEnum::kBlockingWrites);
 }
 
 ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockingWritesOrErrored(

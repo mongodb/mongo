@@ -361,8 +361,12 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
 
 CancelableOperationContext ReshardingRecipientService::RecipientStateMachine::_makeOperationContext(
     std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) const {
-    return resharding::makeReshardingOperationContext(
-        *factory, _recipientCtx.getState() >= RecipientStateEnum::kApplying);
+    auto state = [this] {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        return _recipientCtx.getState();
+    }();
+    return resharding::makeReshardingOperationContext(*factory,
+                                                      state >= RecipientStateEnum::kApplying);
 }
 
 ExecutorFuture<void>
