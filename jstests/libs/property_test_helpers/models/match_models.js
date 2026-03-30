@@ -1,7 +1,7 @@
 /*
  * Fast-check models for $match.
  */
-import {fieldArb, nonEmptyFieldArb, leafParameterArb} from "jstests/libs/property_test_helpers/models/basic_models.js";
+import {fieldArb, leafParameterArb} from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {oneof, singleKeyObjArb} from "jstests/libs/property_test_helpers/models/model_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
@@ -67,9 +67,6 @@ export function getMatchPredicateSpec({
     allowOrs = true,
     allowNors = true,
     allowNot = true,
-    // $match predicates allow empty string field names, but FieldPath expressions (used in
-    // partial filter expressions, indexes, etc.) do not. Set this to true only for plain $match.
-    allowEmptyField = false,
     // Leaf comparison types, like $eq, $ne, $gt, etc.
     allowedSimpleComparisons = simpleComparators,
     allowIn = true,
@@ -123,7 +120,7 @@ export function getMatchPredicateSpec({
                 fc.array(tie("predicate"), {minLength: 1, maxLength: 3}),
             ),
             // Example: {a: {$eq: 5}}
-            singleSimplePredicate: singleKeyObjArb(allowEmptyField ? fieldArb : nonEmptyFieldArb, tie("condition")),
+            singleSimplePredicate: singleKeyObjArb(fieldArb, tie("condition")),
             // A single predicate is a simple predicate, or a compound predicate.
             singlePredicate: fc.oneof(
                 {withCrossShrink: true, maxDepth},

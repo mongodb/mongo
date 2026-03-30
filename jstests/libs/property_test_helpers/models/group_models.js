@@ -3,18 +3,18 @@
  *
  * Note that $avg cannot be supported because it can cause floating point differences in results.
  */
-import {nonEmptyAssignableFieldArb, dollarFieldArb} from "jstests/libs/property_test_helpers/models/basic_models.js";
+import {assignableFieldArb, dollarFieldArb} from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {oneof} from "jstests/libs/property_test_helpers/models/model_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 // These all model accumulated fields, which is the output field and the accumulator. An example
 // is `a: {count: {}}` which can by used in a $group.
-const countAccArb = nonEmptyAssignableFieldArb.map((out) => {
+const countAccArb = assignableFieldArb.map((out) => {
     return {[out]: {$count: {}}};
 });
 
 // $sum. Example is `a: {$sum: '$b'}`.
-const sumAccArb = fc.record({input: dollarFieldArb, output: nonEmptyAssignableFieldArb}).map(({input, output}) => {
+const sumAccArb = fc.record({input: dollarFieldArb, output: assignableFieldArb}).map(({input, output}) => {
     return {[output]: {$sum: input}};
 });
 
@@ -23,7 +23,7 @@ const minMaxAccArb = fc
     .record({
         acc: fc.constantFrom("$min", "$max"),
         input: dollarFieldArb,
-        output: nonEmptyAssignableFieldArb,
+        output: assignableFieldArb,
         n: fc.option(fc.integer({min: 1, max: 3})),
     })
     .map(({acc, input, output, n}) => {
@@ -44,7 +44,7 @@ const minMaxAccArb = fc
 const accumulatedFieldArb = oneof(countAccArb, sumAccArb, minMaxAccArb);
 
 // A groupby key could be a single field `$a` or an object, `{a: '$b', c: '$d'}`
-const objectGbKeyArb = fc.dictionary(nonEmptyAssignableFieldArb, dollarFieldArb, {minKeys: 1, maxKeys: 3});
+const objectGbKeyArb = fc.dictionary(assignableFieldArb, dollarFieldArb, {minKeys: 1, maxKeys: 3});
 const groupByKeyArb = oneof(
     dollarFieldArb,
     // TODO SERVER-102229, re-enable object group keys once issue is fixed.
