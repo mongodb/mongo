@@ -13,7 +13,6 @@
 import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 import {isLinux} from "jstests/libs/os_helpers.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
-
 let testDB = db.getSiblingDB("profile_find");
 assert.commandWorked(testDB.dropDatabase());
 const collName = jsTestName();

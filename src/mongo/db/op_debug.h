@@ -216,6 +216,7 @@ public:
         // set) to make the "sticky towards false" logic work.
         boost::optional<bool> fromPlanCache;
 
+
         // If query stats are being collected for this operation, stores the estimated cpu time
         // across the cluster. In a mongod, this is the local cpu time and in mongos this track the
         // total cpu time across the cluster.
@@ -670,6 +671,10 @@ public:
 
     // Stores storage statistics from the spill engine.
     std::unique_ptr<StorageStats> spillStorageStats;
+
+    // True if the query had applicable query settings that failed to produce a plan,
+    // causing a fallback to multi-planning without query settings.
+    bool multiPlannerFallbackEngaged{false};
 
     bool waitingForFlowControl{false};
 
