@@ -114,17 +114,26 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
                               << keyPattern.clientReadable().toString(),
                 shardKeyIdx);
 
-        // extend min to get (min, MinKey, MinKey, ....)
         KeyPattern kp(shardKeyIdx->keyPattern());
         BSONObj minKey = Helpers::toKeyFormat(kp.extendRangeBound(min, false));
         BSONObj maxKey;
+        bool isMaxGlobal = false;
         if (max.isEmpty()) {
-            // if max not specified, make it (MaxKey, Maxkey, MaxKey...)
             maxKey = Helpers::toKeyFormat(kp.extendRangeBound(max, true));
+            isMaxGlobal = true;
         } else {
-            // otherwise make it (max,MinKey,MinKey...) so that bound is non-inclusive
-            maxKey = Helpers::toKeyFormat(kp.extendRangeBound(max, false));
+            // Use makeUpperInclusive=true when max is all-MaxKey so that trailing
+            // fields are padded with MaxKey instead of MinKey.
+            isMaxGlobal = kp.isGlobalMax(max);
+            maxKey = Helpers::toKeyFormat(kp.extendRangeBound(max, isMaxGlobal));
         }
+
+        // When the max bound is the global max (all fields MaxKey), use inclusive
+        // bounds so the scan includes documents whose shard key is exactly MaxKey.
+        const auto fwdInclusion = isMaxGlobal ? BoundInclusion::kIncludeBothStartAndEndKeys
+                                              : BoundInclusion::kIncludeStartKeyOnly;
+        const auto bwdInclusion = isMaxGlobal ? BoundInclusion::kIncludeBothStartAndEndKeys
+                                              : BoundInclusion::kIncludeEndKeyOnly;
 
         // Get the size estimate for this namespace
         const long long recCount = collectionPtr->numRecords(opCtx);
@@ -189,7 +198,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
                                                        *shardKeyIdx,
                                                        minKey,
                                                        maxKey,
-                                                       BoundInclusion::kIncludeStartKeyOnly,
+                                                       fwdInclusion,
                                                        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                        InternalPlanner::FORWARD);
 
@@ -209,7 +218,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
                                                    *shardKeyIdx,
                                                    maxKey,
                                                    minKey,
-                                                   BoundInclusion::kIncludeEndKeyOnly,
+                                                   bwdInclusion,
                                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                                    InternalPlanner::BACKWARD);
 
@@ -322,7 +331,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
                                                       *shardKeyIdx,
                                                       minKey,
                                                       maxKey,
-                                                      BoundInclusion::kIncludeStartKeyOnly,
+                                                      fwdInclusion,
                                                       PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                       InternalPlanner::FORWARD);
 

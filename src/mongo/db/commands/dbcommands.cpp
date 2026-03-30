@@ -242,17 +242,21 @@ public:
                         "Couldn't find valid index containing key pattern",
                         shardKeyIdx);
 
-                // If both min and max non-empty, append MinKey's to make them fit chosen index
+                // Use inclusive upper bound when max is all-MaxKey.
                 KeyPattern kp(shardKeyIdx->keyPattern());
+                const bool isMaxGlobal = kp.isGlobalMax(max);
                 min = Helpers::toKeyFormat(kp.extendRangeBound(min, false));
-                max = Helpers::toKeyFormat(kp.extendRangeBound(max, false));
+                max = Helpers::toKeyFormat(kp.extendRangeBound(max, isMaxGlobal));
+                const auto boundInclusion = isMaxGlobal
+                    ? BoundInclusion::kIncludeBothStartAndEndKeys
+                    : BoundInclusion::kIncludeStartKeyOnly;
 
                 exec = InternalPlanner::shardKeyIndexScan(opCtx,
                                                           collection,
                                                           *shardKeyIdx,
                                                           min,
                                                           max,
-                                                          BoundInclusion::kIncludeStartKeyOnly,
+                                                          boundInclusion,
                                                           PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
             }
 

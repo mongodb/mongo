@@ -330,6 +330,61 @@ TEST_F(AssignKeyRangeToZoneTestFixture, MaxThatIsAShardKeyPrefixShouldConvertToF
     assertOnlyZone(ns, fullRange, zoneName());
 }
 
+TEST_F(AssignKeyRangeToZoneTestFixture, MaxPrefixWithMaxKeyShouldExtendWithMaxKey) {
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest("compound.shard");
+    CollectionType shardedCollection(
+        ns, OID::gen(), Timestamp(1, 1), Date_t::now(), UUID::gen(), BSON("x" << 1 << "y" << 1));
+
+    ASSERT_OK(insertToConfigCollection(operationContext(),
+                                       NamespaceString::kConfigsvrCollectionsNamespace,
+                                       shardedCollection.toBSON()));
+
+    const ChunkRange newRange(BSON("x" << 0), BSONObjBuilder().appendMaxKey("x").obj());
+    ShardingCatalogManager::get(operationContext())
+        ->assignKeyRangeToZone(operationContext(), ns, newRange, zoneName());
+
+    const ChunkRange expectedRange(fromjson("{ x: 0, y: { $minKey: 1 }}"),
+                                   BSON("x" << MAXKEY << "y" << MAXKEY));
+    assertOnlyZone(ns, expectedRange, zoneName());
+}
+
+TEST_F(AssignKeyRangeToZoneTestFixture, MinMaxPrefixWithMaxKeyShouldExtendCorrectly) {
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest("compound.shard");
+    CollectionType shardedCollection(
+        ns, OID::gen(), Timestamp(1, 1), Date_t::now(), UUID::gen(), BSON("x" << 1 << "y" << 1));
+
+    ASSERT_OK(insertToConfigCollection(operationContext(),
+                                       NamespaceString::kConfigsvrCollectionsNamespace,
+                                       shardedCollection.toBSON()));
+
+    const ChunkRange newRange(BSONObjBuilder().appendMinKey("x").obj(),
+                              BSONObjBuilder().appendMaxKey("x").obj());
+    ShardingCatalogManager::get(operationContext())
+        ->assignKeyRangeToZone(operationContext(), ns, newRange, zoneName());
+
+    const ChunkRange expectedRange(BSON("x" << MINKEY << "y" << MINKEY),
+                                   BSON("x" << MAXKEY << "y" << MAXKEY));
+    assertOnlyZone(ns, expectedRange, zoneName());
+}
+
+TEST_F(AssignKeyRangeToZoneTestFixture, MaxPrefixWithNonMaxKeyShouldExtendWithMinKey) {
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest("compound.shard");
+    CollectionType shardedCollection(
+        ns, OID::gen(), Timestamp(1, 1), Date_t::now(), UUID::gen(), BSON("x" << 1 << "y" << 1));
+
+    ASSERT_OK(insertToConfigCollection(operationContext(),
+                                       NamespaceString::kConfigsvrCollectionsNamespace,
+                                       shardedCollection.toBSON()));
+
+    const ChunkRange newRange(BSON("x" << 0 << "y" << 0), BSON("x" << 10));
+    ShardingCatalogManager::get(operationContext())
+        ->assignKeyRangeToZone(operationContext(), ns, newRange, zoneName());
+
+    const ChunkRange expectedRange(BSON("x" << 0 << "y" << 0),
+                                   fromjson("{ x: 10, y: { $minKey: 1 }}"));
+    assertOnlyZone(ns, expectedRange, zoneName());
+}
+
 TEST_F(AssignKeyRangeToZoneTestFixture, MinThatIsNotAShardKeyPrefixShouldFail) {
     ASSERT_THROWS_CODE(
         ShardingCatalogManager::get(operationContext())

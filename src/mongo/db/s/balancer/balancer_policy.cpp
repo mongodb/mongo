@@ -268,10 +268,11 @@ StatusWith<ZoneInfo> ZoneInfo::getZonesForCollection(OperationContext* opCtx,
     ZoneInfo zoneInfo;
 
     for (const auto& zone : collectionZones) {
-        auto status =
-            zoneInfo.addRangeToZone(ZoneRange(keyPattern.extendRangeBound(zone.getMinKey(), false),
-                                              keyPattern.extendRangeBound(zone.getMaxKey(), false),
-                                              zone.getTag()));
+        // Use makeUpperInclusive=true when zone max is all-MaxKey.
+        auto status = zoneInfo.addRangeToZone(ZoneRange(
+            keyPattern.extendRangeBound(zone.getMinKey(), false),
+            keyPattern.extendRangeBound(zone.getMaxKey(), keyPattern.isGlobalMax(zone.getMaxKey())),
+            zone.getTag()));
 
         if (!status.isOK()) {
             return status;

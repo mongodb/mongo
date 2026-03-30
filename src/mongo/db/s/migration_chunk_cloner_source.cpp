@@ -393,9 +393,9 @@ Status MigrationChunkClonerSource::startClone(OperationContext* opCtx,
         return startChunkCloneResponseStatus.getStatus();
     }
 
-    // TODO (Kal): Setting the state to kCloning below means that if cancelClone was called we will
-    // send a cancellation command to the recipient. The reason to limit the cases when we send
-    // cancellation is for backwards compatibility with 3.2 nodes, which cannot differentiate
+    // TODO SERVER-122998: Setting the state to kCloning below means that if cancelClone was called
+    // we will send a cancellation command to the recipient. The reason to limit the cases when we
+    // send cancellation is for backwards compatibility with 3.2 nodes, which cannot differentiate
     // between cancellations for different migration sessions. It is thus possible that a second
     // migration from different donor, but the same recipient would certainly abort an already
     // running migration.
@@ -1022,7 +1022,6 @@ StatusWith<BSONObj> MigrationChunkClonerSource::_callRecipient(OperationContext*
             responseStatus = args.response;
         });
 
-    // TODO: Update RemoteCommandTargeter on NotWritablePrimary errors.
     if (!scheduleStatus.isOK()) {
         return scheduleStatus.getStatus();
     }
@@ -1070,11 +1069,17 @@ MigrationChunkClonerSource::_getIndexScanExecutor(OperationContext* opCtx,
                               << " in storeCurrentRecordId for " << nss().toStringForErrorMsg()};
     }
 
-    // Assume both min and max non-empty, append MinKey's to make them fit chosen index
     const KeyPattern kp(shardKeyIdx->keyPattern());
 
+    // When the chunk max is the global max (all fields MaxKey), extend with
+    // makeUpperInclusive=true so that wider-than-shard-key indexes pad trailing fields with
+    // MaxKey instead of MinKey, and use inclusive upper bound so the scan includes documents
+    // whose shard key is exactly MaxKey (matching isKeyInRange semantics).
+    const bool isMaxGlobal = kp.isGlobalMax(getMax());
     BSONObj min = Helpers::toKeyFormat(kp.extendRangeBound(getMin(), false));
-    BSONObj max = Helpers::toKeyFormat(kp.extendRangeBound(getMax(), false));
+    BSONObj max = Helpers::toKeyFormat(kp.extendRangeBound(getMax(), isMaxGlobal));
+    const auto boundInclusion = isMaxGlobal ? BoundInclusion::kIncludeBothStartAndEndKeys
+                                            : BoundInclusion::kIncludeStartKeyOnly;
 
     // We can afford to yield here because any change to the base data that we might miss is already
     // being queued and will migrate in the 'transferMods' stage.
@@ -1083,7 +1088,7 @@ MigrationChunkClonerSource::_getIndexScanExecutor(OperationContext* opCtx,
                                               *shardKeyIdx,
                                               min,
                                               max,
-                                              BoundInclusion::kIncludeStartKeyOnly,
+                                              boundInclusion,
                                               PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                               InternalPlanner::Direction::FORWARD,
                                               scanOption);

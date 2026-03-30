@@ -1985,14 +1985,12 @@ TEST_F(SamplingBasedInitSplitTest, ZonesIsPrefixOfShardKey) {
 
     std::vector<ChunkRange> expectedChunkRanges = {
         ChunkRange(BSON("y" << MINKEY << "z" << MINKEY), BSON("y" << 0 << "z" << MINKEY)),
-        ChunkRange(BSON("y" << 0 << "z" << MINKEY), BSON("y" << MAXKEY << "z" << MINKEY)),
-        ChunkRange(BSON("y" << MAXKEY << "z" << MINKEY), BSON("y" << MAXKEY << "z" << MAXKEY)),
+        ChunkRange(BSON("y" << 0 << "z" << MINKEY), BSON("y" << MAXKEY << "z" << MAXKEY)),
     };
 
     std::vector<boost::optional<ShardId>> expectedShardForEachChunk = {
         shardId("1"),  // ZoneB
         shardId("0"),  // ZoneA
-        boost::none,   // hole
     };
 
     checkGeneratedInitialZoneChunks(

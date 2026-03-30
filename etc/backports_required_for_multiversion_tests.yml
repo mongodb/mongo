@@ -167,6 +167,10 @@ last-continuous:
       ticket: SERVER-119413
     - test_file: jstests/core/repro/dbcase2.js
       ticket: SERVER-95530
+    - test_file: jstests/sharding/chunk_migration_maxkey_boundary.js
+      ticket: SERVER-121533
+    - test_file: jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_with_maxkey_docs.js
+      ticket: SERVER-121533
   suites: null
 last-lts:
   all:
@@ -832,4 +836,8 @@ last-lts:
       ticket: SERVER-119413
     - test_file: jstests/core/repro/dbcase2.js
       ticket: SERVER-95530
+    - test_file: jstests/sharding/chunk_migration_maxkey_boundary.js
+      ticket: SERVER-121533
+    - test_file: jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_with_maxkey_docs.js
+      ticket: SERVER-121533
   suites: null

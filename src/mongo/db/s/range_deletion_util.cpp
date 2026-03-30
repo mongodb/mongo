@@ -132,14 +132,18 @@ StatusWith<std::pair<int, int>> deleteNextBatch(OperationContext* opCtx,
                                 << keyPattern.toString() << "'");
     }
 
-    // Extend bounds to match the index we found
+    // Extend bounds to match the index we found.
+    // When the range max is the global max (all fields MaxKey), extend with
+    // makeUpperInclusive=true and use inclusive upper bound so the range deleter can reach
+    // documents whose shard key is exactly MaxKey.
     const KeyPattern indexKeyPattern(shardKeyIdx->keyPattern());
-    const auto extend = [&](const auto& key) {
-        return Helpers::toKeyFormat(indexKeyPattern.extendRangeBound(key, false));
-    };
+    const bool isMaxGlobal = indexKeyPattern.isGlobalMax(range.getMax());
 
-    const auto min = extend(range.getMin());
-    const auto max = extend(range.getMax());
+    const auto min = Helpers::toKeyFormat(indexKeyPattern.extendRangeBound(range.getMin(), false));
+    const auto max =
+        Helpers::toKeyFormat(indexKeyPattern.extendRangeBound(range.getMax(), isMaxGlobal));
+    const auto boundInclusion = isMaxGlobal ? BoundInclusion::kIncludeBothStartAndEndKeys
+                                            : BoundInclusion::kIncludeStartKeyOnly;
 
     auto usingBatchedDeletes = useBatchedDeletesForRangeDeletion.load();
 
@@ -175,7 +179,7 @@ StatusWith<std::pair<int, int>> deleteNextBatch(OperationContext* opCtx,
                                                      *shardKeyIdx,
                                                      min,
                                                      max,
-                                                     BoundInclusion::kIncludeStartKeyOnly,
+                                                     boundInclusion,
                                                      PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                      std::move(batchedDeleteStageParams),
                                                      InternalPlanner::FORWARD);

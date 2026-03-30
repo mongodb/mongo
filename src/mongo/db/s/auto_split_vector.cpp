@@ -82,25 +82,30 @@ BSONObj prettyKey(const BSONObj& keyPattern, const BSONObj& key) {
 /*
  * Takes the given min/max BSON objects that are a prefix of the shardKey and return two new BSON
  * object extended to cover the entire shardKey. See KeyPattern::extendRangeBound documentation for
- * some examples.
+ * some examples. Also returns whether the max bound is the global max (all fields MaxKey), which
+ * callers need to adjust BoundInclusion for index scans.
  */
-std::tuple<BSONObj, BSONObj> getMinMaxExtendedBounds(const ShardKeyIndex& shardKeyIdx,
-                                                     const BSONObj& min,
-                                                     const BSONObj& max) {
+std::tuple<BSONObj, BSONObj, bool> getMinMaxExtendedBounds(const ShardKeyIndex& shardKeyIdx,
+                                                           const BSONObj& min,
+                                                           const BSONObj& max) {
     KeyPattern kp(shardKeyIdx.keyPattern());
 
     // Extend min to get (min, MinKey, MinKey, ....)
     BSONObj minKey = Helpers::toKeyFormat(kp.extendRangeBound(min, false /* upperInclusive */));
     BSONObj maxKey;
+    bool isMaxGlobal = false;
     if (max.isEmpty()) {
         // if max not specified, make it (MaxKey, Maxkey, MaxKey...)
         maxKey = Helpers::toKeyFormat(kp.extendRangeBound(max, true /* upperInclusive */));
+        isMaxGlobal = true;
     } else {
-        // otherwise make it (max,MinKey,MinKey...) so that bound is non-inclusive
-        maxKey = Helpers::toKeyFormat(kp.extendRangeBound(max, false /* upperInclusive*/));
+        // Use makeUpperInclusive=true when max is all-MaxKey so that trailing
+        // fields are padded with MaxKey instead of MinKey.
+        isMaxGlobal = kp.isGlobalMax(max);
+        maxKey = Helpers::toKeyFormat(kp.extendRangeBound(max, isMaxGlobal));
     }
 
-    return {minKey, maxKey};
+    return {minKey, maxKey, isMaxGlobal};
 }
 
 /*
@@ -162,7 +167,14 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
                               << keyPattern.clientReadable().toString(),
                 shardKeyIdx);
 
-        const auto [minKey, maxKey] = getMinMaxExtendedBounds(*shardKeyIdx, min, max);
+        const auto [minKey, maxKey, isMaxGlobal] = getMinMaxExtendedBounds(*shardKeyIdx, min, max);
+
+        // When the max bound is the global max (all fields MaxKey), use inclusive
+        // bounds so the scan includes documents whose shard key is exactly MaxKey.
+        const auto fwdInclusion = isMaxGlobal ? BoundInclusion::kIncludeBothStartAndEndKeys
+                                              : BoundInclusion::kIncludeStartKeyOnly;
+        const auto bwdInclusion = isMaxGlobal ? BoundInclusion::kIncludeBothStartAndEndKeys
+                                              : BoundInclusion::kIncludeEndKeyOnly;
 
         auto getIdxScanner = [&](const BSONObj& minKey,
                                  const BSONObj& maxKey,
@@ -182,12 +194,12 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
         // Setup the index scanner that will be used to find the split points
         auto idxScanner = forward ? getIdxScanner(minKey,
                                                   maxKey,
-                                                  BoundInclusion::kIncludeStartKeyOnly,
+                                                  fwdInclusion,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   InternalPlanner::FORWARD)
                                   : getIdxScanner(maxKey,
                                                   minKey,
-                                                  BoundInclusion::kIncludeEndKeyOnly,
+                                                  bwdInclusion,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   InternalPlanner::BACKWARD);
         // Get first key belonging to the chunk
@@ -210,12 +222,12 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
             auto rangeEndIdxScanner = forward
                 ? getIdxScanner(maxKey,
                                 minKey,
-                                BoundInclusion::kIncludeEndKeyOnly,
+                                bwdInclusion,
                                 PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                 InternalPlanner::BACKWARD)
                 : getIdxScanner(minKey,
                                 maxKey,
-                                BoundInclusion::kIncludeStartKeyOnly,
+                                fwdInclusion,
                                 PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                 InternalPlanner::FORWARD);
 
@@ -352,7 +364,7 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
                 idxScanner = forward
                     ? getIdxScanner(splitKeys.empty() ? firstKeyElement : splitKeys.back(),
                                     maxKey,
-                                    BoundInclusion::kIncludeStartKeyOnly,
+                                    fwdInclusion,
                                     PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                     InternalPlanner::FORWARD)
                     : getIdxScanner(splitKeys.empty() ? firstKeyElement : splitKeys.back(),

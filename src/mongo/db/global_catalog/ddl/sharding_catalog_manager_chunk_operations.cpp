@@ -1349,8 +1349,11 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
                         if (nextZoneMin.woCompare(currentZone->getMax()) > 0) {
                             currentZone = ChunkRange(currentZone->getMax(), nextZoneMin);
                         } else {
+                            // Use makeUpperInclusive=true when zone max
+                            // is all-MaxKey.
+                            const auto nextZoneMaxField = nextZone.getObjectField(TagsType::max());
                             const auto nextZoneMax = keyPattern.extendRangeBound(
-                                nextZone.getObjectField(TagsType::max()), false);
+                                nextZoneMaxField, keyPattern.isGlobalMax(nextZoneMaxField));
                             currentZone = ChunkRange(nextZoneMin, nextZoneMax);
                             zonesCursor->nextSafe();  // Advance cursor
                         }

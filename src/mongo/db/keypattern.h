@@ -140,6 +140,15 @@ public:
      * that the output bound will compare *greater* than the bound being extended (note that
      * -1's in the keyPattern will swap MinKey/MaxKey vals. See examples).
      *
+     * IMPORTANT: When extending the upper bound of the last chunk (where the bound is the
+     * global max, i.e., all fields are MaxKey), callers MUST pass makeUpperInclusive=true.
+     * Otherwise, trailing fields are padded with MinKey, producing a bound that compares
+     * *lower* than the original all-MaxKey bound. This causes index scans to miss documents
+     * whose shard key fields are MaxKey. Use isGlobalMax() to detect this case. Additionally,
+     * callers performing index scans should use BoundInclusion::kIncludeBothStartAndEndKeys
+     * when the max bound is the global max so that documents at the exact MaxKey boundary are
+     * not excluded by the default exclusive upper bound. See SERVER-121533.
+     *
      * Examples:
      * If this keyPattern is {a : 1}
      *   extendRangeBound( {a : 55}, false) --> {a : 55}
@@ -159,6 +168,17 @@ public:
     BSONObj globalMax() const;
 
     size_t getApproximateSize() const;
+
+    /**
+     * Returns true if every field in 'bound' is MaxKey. The bound may be a prefix of the
+     * pattern (fewer fields), in which case it is still considered a global max if all present
+     * fields are MaxKey. An empty bound returns false.
+     *
+     * This is used to detect the upper bound of the last chunk in a sharded collection, where
+     * callers need to adjust extendRangeBound() and BoundInclusion behavior to avoid excluding
+     * documents whose shard key is exactly MaxKey. See SERVER-121533.
+     */
+    bool isGlobalMax(const BSONObj& bound) const;
 
 private:
     static StringBuilder& addToStringBuilder(StringBuilder& sb, const BSONObj& pattern);

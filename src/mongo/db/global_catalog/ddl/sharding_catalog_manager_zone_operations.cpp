@@ -117,10 +117,13 @@ Status checkForOverlappingZonedKeyRange(OperationContext* opCtx,
         // Always extend ranges to full shard key to be compatible with tags created before
         // the zone commands were implemented.
         const auto& parsedTagDoc = tagParseStatus.getValue();
-        auto overlapStatus = zoneInfo.addRangeToZone(
-            ZoneRange(shardKeyPattern.extendRangeBound(parsedTagDoc.getMinKey(), false),
-                      shardKeyPattern.extendRangeBound(parsedTagDoc.getMaxKey(), false),
-                      parsedTagDoc.getTag()));
+        // Use makeUpperInclusive=true when zone max is all-MaxKey so that
+        // wider-than-shard-key patterns pad trailing fields with MaxKey instead of MinKey.
+        auto overlapStatus = zoneInfo.addRangeToZone(ZoneRange(
+            shardKeyPattern.extendRangeBound(parsedTagDoc.getMinKey(), false),
+            shardKeyPattern.extendRangeBound(parsedTagDoc.getMaxKey(),
+                                             shardKeyPattern.isGlobalMax(parsedTagDoc.getMaxKey())),
+            parsedTagDoc.getTag()));
         if (!overlapStatus.isOK()) {
             return overlapStatus;
         }
@@ -178,8 +181,10 @@ ChunkRange includeFullShardKey(OperationContext* opCtx,
                           << shardKeyBSON << " of ns: " << nss.toStringForErrorMsg(),
             range.getMax().isFieldNamePrefixOf(shardKeyBSON));
 
+    // Use makeUpperInclusive=true when range max is all-MaxKey.
     return ChunkRange(shardKeyPattern.extendRangeBound(range.getMin(), false),
-                      shardKeyPattern.extendRangeBound(range.getMax(), false));
+                      shardKeyPattern.extendRangeBound(
+                          range.getMax(), shardKeyPattern.isGlobalMax(range.getMax())));
 }
 
 /**

@@ -124,6 +124,27 @@ BSONObj KeyPattern::globalMax() const {
     return extendRangeBound(BSONObj(), true);
 }
 
+bool KeyPattern::isGlobalMax(const BSONObj& bound) const {
+    if (bound.isEmpty())
+        return false;
+    BSONObjIterator boundIt(bound);
+    BSONObjIterator patternIt(_pattern);
+    while (boundIt.more()) {
+        massert(ErrorCodes::KeyPatternShorterThanBound,
+                str::stream() << "keyPattern " << _pattern << " shorter than bound " << bound,
+                patternIt.more());
+        BSONElement boundElem = boundIt.next();
+        BSONElement patternElem = patternIt.next();
+        massert(12153300,
+                str::stream() << "field names of bound " << bound
+                              << " do not match those of keyPattern " << _pattern,
+                boundElem.fieldNameStringData() == patternElem.fieldNameStringData());
+        if (boundElem.type() != BSONType::maxKey)
+            return false;
+    }
+    return true;
+}
+
 size_t KeyPattern::getApproximateSize() const {
     auto size = sizeof(KeyPattern);
     size += _pattern.isOwned() ? _pattern.objsize() : 0;

@@ -765,8 +765,11 @@ BSONObjSet SamplingBasedSplitPolicy::createFirstSplitPoints(OperationContext* op
                                                             const ShardKeyPattern& shardKey) {
     if (_zones) {
         for (auto& zone : *_zones) {
-            zone.setRange({shardKey.getKeyPattern().extendRangeBound(zone.getMinKey(), false),
-                           shardKey.getKeyPattern().extendRangeBound(zone.getMaxKey(), false)});
+            // Use makeUpperInclusive=true when zone max is all-MaxKey.
+            const auto& kp = shardKey.getKeyPattern();
+            zone.setRange(
+                {kp.extendRangeBound(zone.getMinKey(), false),
+                 kp.extendRangeBound(zone.getMaxKey(), kp.isGlobalMax(zone.getMaxKey()))});
         }
     }
 
@@ -997,8 +1000,10 @@ InitialSplitPolicy::ShardCollectionConfig ShardDistributionSplitPolicy::createFi
 
     if (_zones) {
         for (auto& zone : *_zones) {
+            // Use makeUpperInclusive=true when zone max is all-MaxKey.
             zone.setRange({keyPattern.extendRangeBound(zone.getMinKey(), false),
-                           keyPattern.extendRangeBound(zone.getMaxKey(), false)});
+                           keyPattern.extendRangeBound(zone.getMaxKey(),
+                                                       keyPattern.isGlobalMax(zone.getMaxKey()))});
         }
     }
 
@@ -1035,8 +1040,9 @@ void ShardDistributionSplitPolicy::_appendChunks(const SplitPolicyParams& params
     while (shardDistributionIdx < _shardDistribution.size()) {
         auto shardMin =
             keyPattern.extendRangeBound(*_shardDistribution[shardDistributionIdx].getMin(), false);
-        auto shardMax =
-            keyPattern.extendRangeBound(*_shardDistribution[shardDistributionIdx].getMax(), false);
+        // Use makeUpperInclusive=true when shard distribution max is all-MaxKey.
+        const auto& distMax = *_shardDistribution[shardDistributionIdx].getMax();
+        auto shardMax = keyPattern.extendRangeBound(distMax, keyPattern.isGlobalMax(distMax));
         auto lastChunkMax =
             chunks.empty() ? keyPattern.globalMin() : chunks.back().getRange().getMax();
 

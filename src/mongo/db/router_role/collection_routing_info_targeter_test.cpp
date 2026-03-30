@@ -634,6 +634,74 @@ TEST_F(CollectionRoutingInfoTargeterTest, TestRoutingWithout_id) {
                        ErrorCodes::InvalidIdField);
 }
 
+// Verify that documents with MaxKey shard key values are targeted to the last chunk.
+TEST_F(CollectionRoutingInfoTargeterTest, TargetInsertWithMaxKeyToLastChunk) {
+    // Create 3 chunks: shard '0' has [MinKey, 0), '1' has [0, 100), '2' has [100, MaxKey).
+    std::vector<BSONObj> splitPoints = {BSON("x" << 0), BSON("x" << 100)};
+    auto criTargeter = prepare(BSON("x" << 1), splitPoints);
+
+    // A document with x: MaxKey should be targeted to the last chunk (shard '2').
+    auto res = criTargeter.targetInsert(operationContext(),
+                                        BSONObjBuilder().appendMaxKey("x").append("_id", 1).obj());
+    ASSERT_EQUALS(res.shardName, "2");
+
+    // A normal doc in the last chunk range should also go to shard '2'.
+    res = criTargeter.targetInsert(operationContext(), BSON("x" << 999 << "_id" << 2));
+    ASSERT_EQUALS(res.shardName, "2");
+
+    // Verify via findIntersectingChunk that MaxKey lands in the last chunk.
+    auto chunk = collectionRoutingInfo->getChunkManager().findIntersectingChunkWithSimpleCollation(
+        BSONObjBuilder().appendMaxKey("x").obj());
+    ASSERT_EQUALS(chunk.getShardId(), ShardId("2"));
+}
+
+TEST_F(CollectionRoutingInfoTargeterTest, TargetInsertWithMaxKeyCompoundShardKey) {
+    // Compound shard key {x: 1, y: 1} with 3 chunks:
+    // shard '0': [MinKey, {x:0, y:0}), '1': [{x:0, y:0}, {x:100, y:100}), '2': [{x:100, y:100},
+    // MaxKey).
+    std::vector<BSONObj> splitPoints = {BSON("x" << 0 << "y" << 0), BSON("x" << 100 << "y" << 100)};
+    auto criTargeter = prepare(BSON("x" << 1 << "y" << 1), splitPoints);
+
+    // {x: MaxKey, y: MaxKey} should go to the last chunk (shard '2').
+    auto res = criTargeter.targetInsert(
+        operationContext(),
+        BSONObjBuilder().appendMaxKey("x").appendMaxKey("y").append("_id", 1).obj());
+    ASSERT_EQUALS(res.shardName, "2");
+
+    // {x: MaxKey, y: 10} should also go to the last chunk — MaxKey in the leading field
+    // places it past all split points.
+    res = criTargeter.targetInsert(
+        operationContext(),
+        BSONObjBuilder().appendMaxKey("x").append("y", 10).append("_id", 2).obj());
+    ASSERT_EQUALS(res.shardName, "2");
+
+    // {x: 10, y: MaxKey} should go to shard '1' — x=10 is in [0, 100) range.
+    res = criTargeter.targetInsert(operationContext(),
+                                   BSON("x" << 10 << "y" << MAXKEY << "_id" << 3));
+    ASSERT_EQUALS(res.shardName, "1");
+}
+
+TEST_F(CollectionRoutingInfoTargeterTest, TargetUpdateAndDeleteWithMaxKey) {
+    // shard '0': [MinKey, 0), '1': [0, 100), '2': [100, MaxKey).
+    std::vector<BSONObj> splitPoints = {BSON("x" << 0), BSON("x" << 100)};
+    auto criTargeter = prepare(BSON("x" << 1), splitPoints);
+
+    // Update targeting a MaxKey doc should go to shard '2'.
+    auto updateReq = buildUpdate(kNss,
+                                 BSONObjBuilder().appendMaxKey("x").obj(),
+                                 fromjson("{$set: {val: 1}}"),
+                                 /*upsert=*/false);
+    auto res = criTargeter.targetUpdate(operationContext(), BatchItemRef(&updateReq, 0)).endpoints;
+    ASSERT_EQUALS(res.size(), 1u);
+    ASSERT_EQUALS(res[0].shardName, "2");
+
+    // Delete targeting a MaxKey doc should go to shard '2'.
+    auto deleteReq = buildDelete(kNss, BSONObjBuilder().appendMaxKey("x").obj());
+    res = criTargeter.targetDelete(operationContext(), BatchItemRef(&deleteReq, 0)).endpoints;
+    ASSERT_EQUALS(res.size(), 1u);
+    ASSERT_EQUALS(res[0].shardName, "2");
+}
+
 TEST_F(CollectionRoutingInfoTargeterTest, ThrowOnCollectionlessAggregateNss) {
     const auto kCollectionlessAggNss =
         NamespaceString::createNamespaceString_forTest("db", "$cmd.aggregate");

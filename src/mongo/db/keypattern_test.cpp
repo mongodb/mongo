@@ -140,4 +140,57 @@ TEST(KeyPattern, GlobalMinMax) {
     ASSERT_BSONOBJ_EQ(KeyPattern(BSON("a.b.c" << -1)).globalMin(), BSON("a.b.c" << MAXKEY));
     ASSERT_BSONOBJ_EQ(KeyPattern(BSON("a.b.c" << -1)).globalMax(), BSON("a.b.c" << MINKEY));
 }
+
+TEST(KeyPattern, IsGlobalMax) {
+    KeyPattern singleKey(BSON("a" << 1));
+    KeyPattern compoundKey(BSON("a" << 1 << "b" << 1));
+
+    ASSERT_TRUE(singleKey.isGlobalMax(BSON("a" << MAXKEY)));
+    ASSERT_TRUE(compoundKey.isGlobalMax(BSON("a" << MAXKEY << "b" << MAXKEY)));
+
+    ASSERT_FALSE(singleKey.isGlobalMax(BSON("a" << MINKEY)));
+    ASSERT_FALSE(singleKey.isGlobalMax(BSON("a" << 5)));
+    ASSERT_FALSE(compoundKey.isGlobalMax(BSON("a" << MAXKEY << "b" << MINKEY)));
+    ASSERT_FALSE(compoundKey.isGlobalMax(BSON("a" << MAXKEY << "b" << 10)));
+    ASSERT_FALSE(singleKey.isGlobalMax(BSONObj()));
+
+    // Prefix bound (fewer fields than pattern) with all-MaxKey is still global max.
+    ASSERT_TRUE(compoundKey.isGlobalMax(BSON("a" << MAXKEY)));
+
+    // Bound with mismatched field names should fail with massert, same as extendRangeBound.
+    ASSERT_THROWS_CODE(singleKey.isGlobalMax(BSON("z" << MAXKEY)), DBException, 12153300);
+    ASSERT_THROWS_CODE(
+        compoundKey.isGlobalMax(BSON("a" << MAXKEY << "z" << MAXKEY)), DBException, 12153300);
+    ASSERT_THROWS_CODE(
+        compoundKey.isGlobalMax(BSON("z" << MAXKEY << "b" << MAXKEY)), DBException, 12153300);
+
+    // Bound with more fields than the pattern should fail with massert.
+    ASSERT_THROWS_CODE(singleKey.isGlobalMax(BSON("a" << MAXKEY << "b" << MAXKEY)),
+                       DBException,
+                       ErrorCodes::KeyPatternShorterThanBound);
+}
+
+TEST(KeyPattern, ExtendRangeBoundMaxKeyWithMakeUpperInclusive) {
+    // When the bound is the global max and makeUpperInclusive=true,
+    // trailing fields should be padded with MaxKey instead of MinKey.
+    {
+        KeyPattern kp(BSON("a" << 1 << "b" << 1));
+        BSONObj maxBound = BSON("a" << MAXKEY);
+        BSONObj extended = kp.extendRangeBound(maxBound, true);
+        ASSERT_BSONOBJ_EQ(extended, BSON("a" << MAXKEY << "b" << MAXKEY));
+    }
+    {
+        KeyPattern kp(BSON("a" << 1 << "b" << 1 << "c" << 1));
+        BSONObj maxBound = BSON("a" << MAXKEY);
+        BSONObj extended = kp.extendRangeBound(maxBound, true);
+        ASSERT_BSONOBJ_EQ(extended, BSON("a" << MAXKEY << "b" << MAXKEY << "c" << MAXKEY));
+    }
+    // Non-MaxKey bound with makeUpperInclusive=true pads with MaxKey.
+    {
+        KeyPattern kp(BSON("a" << 1 << "b" << 1));
+        BSONObj normalBound = BSON("a" << 5);
+        BSONObj extended = kp.extendRangeBound(normalBound, true);
+        ASSERT_BSONOBJ_EQ(extended, BSON("a" << 5 << "b" << MAXKEY));
+    }
+}
 }  // namespace

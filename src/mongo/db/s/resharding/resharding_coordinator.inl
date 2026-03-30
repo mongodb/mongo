@@ -2045,9 +2045,11 @@ void ReshardingCoordinator::_updateChunkImbalanceMetrics(const NamespaceString& 
 
         ZoneInfo zoneInfo;
         for (const auto& tag : collectionZones) {
+            // Use makeUpperInclusive=true when zone max is all-MaxKey.
             uassertStatusOK(zoneInfo.addRangeToZone(
                 ZoneRange(keyPattern.extendRangeBound(tag.getMinKey(), false),
-                          keyPattern.extendRangeBound(tag.getMaxKey(), false),
+                          keyPattern.extendRangeBound(tag.getMaxKey(),
+                                                      keyPattern.isGlobalMax(tag.getMaxKey())),
                           tag.getTag())));
         }
 
