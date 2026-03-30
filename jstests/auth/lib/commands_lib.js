@@ -8585,6 +8585,44 @@ export const authCommandsLib = {
             testcases: testcases_transformationOnly,
         },
         {
+            testname: "aggregate_$_internalJoinHint",
+            command: {
+                aggregate: "foo",
+                pipeline: [
+                    {$_internalJoinHint: {perSubsetLevelMode: [{level: NumberInt(0), mode: "ALL"}]}},
+                    {$lookup: {from: "foo", localField: "i", foreignField: "i", as: "z"}},
+                    {$unwind: "$z"},
+                ],
+                cursor: {},
+            },
+            testcases: testcases_transformationOnly,
+            skipTest: (conn) => {
+                // Can't run on mongos.
+                return !isStandalone(conn);
+            },
+            setup: function (db) {
+                // Only works with join optimization enabled.
+                assert.commandWorked(
+                    db.adminCommand({
+                        setParameter: 1,
+                        internalEnableJoinOptimization: true,
+                    }),
+                );
+                // Add a document to collection "foo".
+                assert.commandWorked(db.foo.insertOne({_id: 0, i: 0}));
+            },
+            teardown: function (db) {
+                assert.commandWorked(
+                    db.adminCommand({
+                        setParameter: 1,
+                        internalEnableJoinOptimization: false,
+                    }),
+                );
+                // Clean up doc.
+                assert.commandWorked(db.foo.deleteOne({_id: 0, i: 0}));
+            },
+        },
+        {
             testname: "aggregate_$addFields",
             command: {
                 aggregate: "foo",

@@ -29,6 +29,8 @@
 
 #include "mongo/db/query/compiler/optimizer/join/hint.h"
 
+#include "mongo/db/query/compiler/optimizer/join/join_graph.h"
+
 namespace mongo::join_ordering {
 namespace {
 bool isHintValid(const JoinHint& hint) {
@@ -269,7 +271,9 @@ EnumerationStrategy EnumerationStrategy::fromBSON(const BSONObj& obj) {
             uassertExpectedType(elem, BSONType::string);
             planShape = planShapeFromString(elem.String());
         } else if (elem.fieldNameStringData() == "perSubsetLevelMode") {
-            uassertExpectedType(elem, BSONType::object);
+            uassert(12016317,
+                    str::stream() << "Expected 'perSubsetLevelMode' to be an array",
+                    elem.isABSONObj());
             auto obj = elem.Obj();
             mode = PerSubsetLevelEnumerationMode::fromBSON(obj);
         } else if (elem.fieldNameStringData() == "enableHJOrderPruning") {

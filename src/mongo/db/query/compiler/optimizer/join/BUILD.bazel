@@ -46,15 +46,37 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "plan_enumerator",
+    name = "join_method",
+    srcs = [
+        "join_method.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "join_hint",
     srcs = [
         "hint.cpp",
+    ],
+    deps = [
+        ":join_method",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/pipeline:field_path",
+    ],
+)
+
+mongo_cc_library(
+    name = "plan_enumerator",
+    srcs = [
         "join_plan.cpp",
         "plan_enumerator.cpp",
         "plan_enumerator_helpers.cpp",
     ],
     deps = [
         ":join_estimates",
+        ":join_hint",
         ":join_ordering",
         ":solution_storage",
         "//src/mongo/db/query/compiler/ce:ce_common",

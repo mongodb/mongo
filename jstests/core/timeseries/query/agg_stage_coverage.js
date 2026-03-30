@@ -133,6 +133,11 @@ const errorTests = [
             10170100, // hybrid search must be the first stage of the pipeline.
         ],
     },
+    {
+        stage: "$_internalJoinHint",
+        pipeline: [{$_internalJoinHint: {perSubsetLevelMode: [{level: NumberInt(0), mode: "ALL"}]}}],
+        expectedErrorCodes: [40602, 10557302, 40324, ErrorCodes.IllegalOperation],
+    },
 ];
 
 // TODO SERVER-101599 remove 10170100 once 9.0 becomes lastLTS, and timeseries collections

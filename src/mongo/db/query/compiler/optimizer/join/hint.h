@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/query/compiler/optimizer/join/join_plan.h"
+#include "mongo/db/query/compiler/optimizer/join/join_method.h"
 #include "mongo/db/query/compiler/optimizer/join/logical_defs.h"
 #include "mongo/util/modules.h"
 namespace mongo::join_ordering {

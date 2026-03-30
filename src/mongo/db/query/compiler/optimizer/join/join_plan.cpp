@@ -51,29 +51,6 @@ std::string joinNodeStringPrefix(const JoinPlanNode& node,
 }
 }  // namespace
 
-std::string joinMethodToString(JoinMethod method) {
-    switch (method) {
-        case JoinMethod::HJ:
-            return "HJ";
-        case JoinMethod::NLJ:
-            return "NLJ";
-        case JoinMethod::INLJ:
-            return "INLJ";
-    }
-
-    MONGO_UNREACHABLE_TASSERT(11336901);
-}
-
-JoinMethod joinMethodFromString(const std::string& mode) {
-    if (mode == "HJ") {
-        return JoinMethod::HJ;
-    } else if (mode == "NLJ") {
-        return JoinMethod::NLJ;
-    }
-    uassert(12016300, str::stream() << "Unexpected join method " << mode, mode == "INLJ");
-    return JoinMethod::INLJ;
-}
-
 std::string BaseNode::toString(size_t numNodesToPrint, std::string indentStr) const {
     return str::stream() << joinNodeStringPrefix(*this, numNodesToPrint, indentStr) << "["
                          << nss.toString_forTest() << "] " << soln->summaryString();

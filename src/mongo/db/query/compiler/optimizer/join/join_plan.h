@@ -31,6 +31,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/compiler/optimizer/join/join_estimates.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
+#include "mongo/db/query/compiler/optimizer/join/join_method.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/util/bitset_util.h"
 #include "mongo/util/modules.h"
@@ -93,25 +94,6 @@ struct JoinSubset {
 
     std::string toString(size_t numNodesToPrint = kHardMaxNodesInJoin) const;
 };
-
-/**
- * The types of joins we support in JoinPlans.
- */
-enum class JoinMethod {
-    // Hash join.
-    HJ,
-    // Index-nested loop join.
-    INLJ,
-    // Nested loop join.
-    NLJ
-};
-
-/**
- * Helpers to serialize/deserialize join method. Deserialization uasserts if string is not a valid
- * join method.
- */
-std::string joinMethodToString(JoinMethod method);
-JoinMethod joinMethodFromString(const std::string& method);
 
 /**
  * A JoinPlan node representing a base collection access.

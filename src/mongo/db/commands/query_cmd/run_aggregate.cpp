@@ -61,6 +61,7 @@
 #include "mongo/db/pipeline/change_stream_invalidation_info.h"
 #include "mongo/db/pipeline/document_source_exchange.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
+#include "mongo/db/pipeline/document_source_internal_join_hint.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_diagnostic_printer.h"
@@ -1268,6 +1269,9 @@ Status executeResolvedAggregate(const AggExState& aggExState,
                                             {} /* additionalExecutors */,
                                             false /* hasGeoNear */);
     } else {
+        uassert(12016316,
+                "$_internalJoinHint is not permitted without join optimization",
+                !dynamic_cast<DocumentSourceInternalJoinHint*>(pipeline->peekFront()));
         execs = prepareExecutors(aggExState, aggCatalogState, std::move(pipeline));
     }
 

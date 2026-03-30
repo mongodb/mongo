@@ -415,6 +415,7 @@ const skips = new Set([
     "$_internalFindAndModifyImageLookup",
     "$_internalInhibitOptimization",
     "$_internalListCollections",
+    "$_internalJoinHint",
     "$_internalReshardingIterateTransaction",
     "$_internalReshardingOwnershipMatch",
     "$_internalSearchIdLookup",
