@@ -164,9 +164,6 @@ enum class MONGO_MOD_NEEDS_REPLACEMENT TypeTags : uint8_t {
     // and is never created, copied, or destroyed by SBE.
     sortKeyComponentVector,
 
-    // TODO SERVER-95276: Remove this.
-    csiCell,
-
     StringSmall,
 
     // Special marker
