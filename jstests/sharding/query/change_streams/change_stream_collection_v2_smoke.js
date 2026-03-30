@@ -16,8 +16,7 @@ import {describe, it, before, afterEach, after, beforeEach} from "jstests/libs/m
 import {assertCreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {
     ChangeStreamTest,
-    assertCollDataDistribution,
-    ensureShardDistribution,
+    distributeCollectionDataOverShards,
     getClusterTime,
 } from "jstests/libs/query/change_stream_util.js";
 
@@ -53,6 +52,23 @@ describe("$changeStream v2", function () {
         st.stop();
     });
 
+    function assertCollDataDistribution(expectedCounts) {
+        for (const [shardConn, expectedCount] of expectedCounts) {
+            assert.soon(
+                () => {
+                    const docs = shardConn.getDB(db.getName())[coll.getName()].find().toArray();
+                    return expectedCount == docs.length;
+                },
+                "Expected " + expectedCount + " documents on " + shardConn,
+            );
+        }
+    }
+
+    function ensureShardDistribution(coll, distributionConfig) {
+        distributeCollectionDataOverShards(db, coll, distributionConfig);
+        assertCollDataDistribution(distributionConfig.expectedCounts);
+    }
+
     it("returns events before and after resharding until invalidation", function () {
         // Create and shard a collection and allocate collection to shard set {shard0, shard1}.
         assertCreateCollection(db, coll.getName());
@@ -61,7 +77,7 @@ describe("$changeStream v2", function () {
             {_id: -1, a: -1},
             {_id: 1, a: 1},
         ]);
-        ensureShardDistribution(db, coll, {
+        ensureShardDistribution(coll, {
             middle: {_id: 0},
             chunks: [
                 {find: {_id: -1}, to: st.shard0.shardName},
@@ -83,7 +99,7 @@ describe("$changeStream v2", function () {
             {_id: 2, a: 2},
             {_id: 3, a: 3},
         ]);
-        assertCollDataDistribution(db, coll, [
+        assertCollDataDistribution([
             [st.shard0, 1],
             [st.shard1, 3],
             [st.shard2, 0],
@@ -93,7 +109,7 @@ describe("$changeStream v2", function () {
         assert.commandWorked(
             st.s.adminCommand({reshardCollection: coll.getFullName(), key: {a: 1}, numInitialChunks: 1}),
         );
-        ensureShardDistribution(db, coll, {
+        ensureShardDistribution(coll, {
             middle: {a: 2},
             chunks: [
                 {find: {a: 1}, to: st.shard1.shardName},
@@ -111,7 +127,7 @@ describe("$changeStream v2", function () {
             {_id: 4, a: 4},
             {_id: 5, a: 5},
         ]);
-        assertCollDataDistribution(db, coll, [
+        assertCollDataDistribution([
             [st.shard0, 0],
             [st.shard1, 2],
             [st.shard2, 4],

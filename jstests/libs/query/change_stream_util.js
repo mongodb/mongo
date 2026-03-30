@@ -1099,6 +1099,7 @@ export function awaitLogMessageCodes(conn, expectedCodes, fn, codeAssertionFnMap
                 .slice(offsetBefore)
                 .map(tryParseJson)
                 .filter((e) => e !== null);
+
             let matchIdx = 0;
             for (const entry of logs) {
                 if (matchIdx < expectedCodes.length && entry.id === expectedCodes[matchIdx]) {
@@ -1118,12 +1119,14 @@ export function awaitLogMessageCodes(conn, expectedCodes, fn, codeAssertionFnMap
             return `Timed out waiting for log codes ${tojsononeline(missing)} in ${logs.length} entries`;
         },
     );
+
     const matchedLogAttrs = {};
     for (const log of logs) {
         if (expectedCodes.includes(log.id) && !(log.id in matchedLogAttrs)) {
             matchedLogAttrs[log.id] = log.attr || {};
         }
     }
+
     for (const [code, assertFn] of Object.entries(codeAssertionFnMap)) {
         const numCode = Number(code);
         assert(numCode in matchedLogAttrs, `Code ${code} not found in captured logs`);
