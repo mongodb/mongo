@@ -47,13 +47,12 @@ const getQueryPlan = function (explain) {
     return winningPlan.queryPlan ? [winningPlan.queryPlan, winningPlan.slotBasedPlan] : [winningPlan, null];
 };
 
-// Verify that this query uses a COUNT_SCAN.
 const runAndVerify = function (expectedCount, pipeline, stage, sbePlanStage) {
     assert.eq(expectedCount, coll.aggregate(pipeline).next().count);
     let explain = getSingleNodeExplain(coll.explain().aggregate(pipeline));
     const [queryPlan, sbePlan] = getQueryPlan(explain);
-    let countScan = getPlanStage(queryPlan, stage);
-    assert.neq(null, countScan, explain);
+    let scanStage = getPlanStage(queryPlan, stage);
+    assert.neq(null, scanStage, explain);
     if (sbePlan) {
         assert.eq(true, sbePlan.stages.includes(sbePlanStage), sbePlan);
     }

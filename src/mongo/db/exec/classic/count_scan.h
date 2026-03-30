@@ -31,20 +31,16 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/classic/plan_stage.h"
+#include "mongo/db/exec/classic/recordid_deduplicator.h"
 #include "mongo/db/exec/classic/requires_index_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
-#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
-#include "mongo/db/query/plan_executor.h"
-#include "mongo/db/record_id.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
-#include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
@@ -152,7 +148,7 @@ private:
 
     // The set of record ids we've returned so far. Used to avoid returning duplicates, if
     // '_shouldDedup' is set to true.
-    stdx::unordered_set<RecordId, RecordId::Hasher> _returned;
+    RecordIdDeduplicator _recordIdDeduplicator;
 
     CountScanStats _specificStats;
 };

@@ -32,8 +32,6 @@
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/ordering.h"
-#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/storage/index_entry_comparison.h"
@@ -97,7 +95,8 @@ CountScan::CountScan(ExpressionContext* expCtx,
       _startKey(std::move(params.startKey)),
       _startKeyInclusive(params.startKeyInclusive),
       _endKey(std::move(params.endKey)),
-      _endKeyInclusive(params.endKeyInclusive) {
+      _endKeyInclusive(params.endKeyInclusive),
+      _recordIdDeduplicator(expCtx) {
     _specificStats.indexName = params.name;
     _specificStats.keyPattern = _keyPattern;
     _specificStats.isMultiKey = params.isMultiKey;
@@ -170,8 +169,8 @@ PlanStage::StageState CountScan::doWork(WorkingSetID* out) {
         return PlanStage::IS_EOF;
     }
 
-    if (_shouldDedup && !_returned.insert(entry->loc).second) {
-        // *loc was already in _returned.
+    if (_shouldDedup && !_recordIdDeduplicator.insert(entry->loc)) {
+        // *loc has been returned already
         return PlanStage::NEED_TIME;
     }
 
