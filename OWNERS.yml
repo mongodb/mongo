@@ -8,7 +8,7 @@ filters:
       - 10gen/server-root-ownership
     metadata:
       emeritus_approvers:
-        - visemet # TODO: add back to approvers once project work is finished
+        - visemet # TODO: add back to approvers once project work is finished (Ignore linting)
   - "/BUILD.bazel":
     approvers:
       - 10gen/devprod-build
@@ -38,10 +38,10 @@ filters:
       - 10gen/server-programmability
   - "AGENTS.md":
     approvers:
-      - 10gen/genai-coding-policy
+      - 10gen/server-programmability
   - "CLAUDE.md":
     approvers:
-      - 10gen/genai-coding-policy
+      - 10gen/server-programmability
   - "/.editorconfig":
     approvers:
       - 10gen/devprod-build
