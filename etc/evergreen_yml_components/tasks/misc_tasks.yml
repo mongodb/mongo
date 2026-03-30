@@ -1181,7 +1181,7 @@ tasks:
             --keep_going
             --test_arg=--showEachTest
             --define GIT_COMMIT_HASH=nogitversion
-            --define=MONGO_VERSION=8.3.0-alpha-patch-nogitversion
+            --define=MONGO_VERSION=9.0.0-alpha-patch-nogitversion
             --run_under=//bazel:test_wrapper
 
   - name: unit_tests_remote_exec_incompatible
@@ -1213,7 +1213,7 @@ tasks:
             --keep_going
             --test_arg=--showEachTest
             --define GIT_COMMIT_HASH=nogitversion
-            --define=MONGO_VERSION=8.3.0-alpha-patch-nogitversion
+            --define=MONGO_VERSION=9.0.0-alpha-patch-nogitversion
             --run_under=//bazel:test_wrapper
 
   - name: unit_test_group1

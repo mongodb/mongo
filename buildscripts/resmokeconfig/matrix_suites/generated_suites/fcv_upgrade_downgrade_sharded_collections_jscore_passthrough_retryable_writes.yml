@@ -242,6 +242,7 @@ selector:
     - requires_fcv_81
     - requires_fcv_82
     - requires_fcv_83
+    - requires_fcv_90
     - cannot_run_during_upgrade_downgrade
     - does_not_support_causal_consistency
     - does_not_support_retryable_writes

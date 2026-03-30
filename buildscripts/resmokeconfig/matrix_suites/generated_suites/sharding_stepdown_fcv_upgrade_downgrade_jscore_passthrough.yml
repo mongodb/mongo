@@ -158,6 +158,7 @@ selector:
     - requires_fcv_81
     - requires_fcv_82
     - requires_fcv_83
+    - requires_fcv_90
     - cannot_run_during_upgrade_downgrade
     - assumes_standalone_mongod
     - requires_getmore
