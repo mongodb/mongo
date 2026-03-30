@@ -36,8 +36,28 @@
 
 namespace mongo::replicated_fast_count {
 
+/**
+ * The `SizeCountTimestampStore` provides read and write access to a single, persisted timestamp.
+ *
+ * This class is useful for tracking when persisted size and count metadata were last known to be
+ * accurate and thus the timestamp after which the oplog is needed for correctness.
+ */
 class SizeCountTimestampStore {
 public:
+    /**
+     * Returns the last written timestamp.
+     *
+     * If no timestamp exists, read() returns boost::none.
+     */
     [[nodiscard]] boost::optional<Timestamp> read(OperationContext* opCtx) const;
+
+    /**
+     * Upserts `timestamp` into the `config.fast_count_metadata_store_timestamps` store. If a
+     * timestamp already exists, it will be replaced.
+     *
+     * write() must be called within a WriteUnitOfWork. Otherwise, the function raises an assertion
+     * error.
+     */
+    void write(OperationContext* opCtx, Timestamp timestamp);
 };
 }  // namespace mongo::replicated_fast_count

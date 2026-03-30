@@ -29,10 +29,105 @@
 
 #include "mongo/db/replicated_fast_count/size_count_timestamp_store.h"
 
+#include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
+#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
+#include "mongo/db/shard_role/shard_role.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/update/document_diff_calculator.h"
+#include "mongo/db/update/update_oplog_entry_serialization.h"
+
 namespace mongo::replicated_fast_count {
+namespace {
+
+constexpr int32_t kTimestampDocId = 0;
+
+boost::optional<CollectionOrViewAcquisition> acquireTimestampCollectionForRead(
+    OperationContext* opCtx) {
+    CollectionOrViewAcquisition acquisition =
+        acquireCollectionOrView(opCtx,
+                                CollectionOrViewAcquisitionRequest::fromOpCtx(
+                                    opCtx,
+                                    NamespaceString::makeGlobalConfigCollection(
+                                        NamespaceString::kReplicatedFastCountStoreTimestamps),
+                                    AcquisitionPrerequisites::OperationType::kRead),
+                                LockMode::MODE_IS);
+
+    if (acquisition.getCollectionPtr()) {
+        return acquisition;
+    }
+
+    return boost::none;
+}
+
+boost::optional<CollectionOrViewAcquisition> acquireTimestampCollectionForWrite(
+    OperationContext* opCtx) {
+    CollectionOrViewAcquisition acquisition =
+        acquireCollectionOrView(opCtx,
+                                CollectionOrViewAcquisitionRequest::fromOpCtx(
+                                    opCtx,
+                                    NamespaceString::makeGlobalConfigCollection(
+                                        NamespaceString::kReplicatedFastCountStoreTimestamps),
+                                    AcquisitionPrerequisites::OperationType::kWrite),
+                                LockMode::MODE_IX);
+
+    if (acquisition.getCollectionPtr()) {
+        return acquisition;
+    }
+
+    return boost::none;
+}
+}  // namespace
 
 boost::optional<Timestamp> SizeCountTimestampStore::read(OperationContext* opCtx) const {
-    // TODO(SERVER-122804): Implement.
-    return Timestamp(0, 0);
+    const auto acquisition = acquireTimestampCollectionForRead(opCtx).value();
+    const CollectionPtr& coll = acquisition.getCollectionPtr();
+    const RecordId rid =
+        record_id_helpers::keyForDoc(BSON("_id" << kTimestampDocId),
+                                     clustered_util::makeDefaultClusteredIdIndex().getIndexSpec(),
+                                     /*collator=*/nullptr)
+            .getValue();
+    Snapshotted<BSONObj> document;
+    if (!coll->findDoc(opCtx, rid, &document)) {
+        return boost::none;
+    }
+
+    const BSONObj& data = document.value();
+    return data.getField(kValidAsOfKey).timestamp();
+}
+
+void SizeCountTimestampStore::write(OperationContext* opCtx, Timestamp timestamp) {
+    massert(12280400,
+            "SizeCountTimestampStore::write() must be called within a WriteUnitOfWork",
+            shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
+
+    const auto acquisition = acquireTimestampCollectionForWrite(opCtx).value();
+    const CollectionPtr& coll = acquisition.getCollectionPtr();
+    const RecordId rid =
+        record_id_helpers::keyForDoc(BSON("_id" << kTimestampDocId),
+                                     clustered_util::makeDefaultClusteredIdIndex().getIndexSpec(),
+                                     /*collator=*/nullptr)
+            .getValue();
+    const BSONObj newDoc = BSON("_id" << kTimestampDocId << kValidAsOfKey << timestamp);
+
+    Snapshotted<BSONObj> existingDoc;
+    if (coll->findDoc(opCtx, rid, &existingDoc)) {
+        const auto diff = doc_diff::computeOplogDiff(existingDoc.value(), newDoc, /*padding=*/0);
+        invariant(diff.has_value(),
+                  fmt::format("Expected computed diff to be smaller than the post-image: "
+                              "pre={}, post={}",
+                              existingDoc.value().toString(),
+                              newDoc.toString()));
+        if (!diff->isEmpty()) {
+            CollectionUpdateArgs args(existingDoc.value());
+            args.update = update_oplog_entry::makeDeltaOplogEntry(*diff);
+            args.criteria = BSON("_id" << kTimestampDocId);
+            collection_internal::updateDocument(
+                opCtx, coll, rid, existingDoc, newDoc, &args.update, nullptr, nullptr, &args);
+        }
+    } else {
+        massertStatusOK(collection_internal::insertDocument(
+            opCtx, coll, InsertStatement(newDoc), /*opDebug=*/nullptr));
+    }
 }
 }  // namespace mongo::replicated_fast_count

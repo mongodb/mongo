@@ -43,7 +43,7 @@ class SizeCountStore {
 public:
     /**
      * In-memory representation of the persisted `size` and `count` for a collection. The
-     * `timestamp` indicates when the `size` and `count` values were last known to be accurate.
+     * `timestamp` indicates when the `size` and `count` values were last flushed.
      */
     struct Entry {
         Timestamp timestamp{0, 0};

@@ -109,7 +109,28 @@ mongo_cc_library(
         "size_count_timestamp_store.cpp",
     ],
     deps = [
-        "//src/mongo/db:server_base",
+        "replicated_fast_count_delta_utils",
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/shard_role",
+        "//src/mongo/db/shard_role/shard_catalog:collection_options",
+        "//src/mongo/db/update:update_common",
+        "//src/mongo/db/update:update_document_diff",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "size_count_timestamp_store_test",
+    srcs = [
+        "size_count_timestamp_store_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_fifth_group",
+        "server-collection-write-path",
+    ],
+    deps = [
+        "size_count_timestamp_store",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
     ],
 )
 
