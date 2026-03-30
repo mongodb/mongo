@@ -346,6 +346,8 @@ void OpDebug::report(OperationContext* opCtx,
     OPDEBUG_TOATTR_HELP_OPTIONAL("keysInserted", additiveMetrics.keysInserted);
     OPDEBUG_TOATTR_HELP_OPTIONAL("keysDeleted", additiveMetrics.keysDeleted);
 
+    OPDEBUG_TOATTR_HELP_BOOL_NAMED("multiPlannerFallbackEngaged", multiPlannerFallbackEngaged);
+
     if (prepareReadConflicts > 0) {
         pAttrs->add("prepareReadConflicts", prepareReadConflicts);
     }
@@ -628,6 +630,7 @@ void OpDebug::append(OperationContext* opCtx,
     OPDEBUG_APPEND_BOOL2(b, "hasSortStage", additiveMetrics.hasSortStage);
     OPDEBUG_APPEND_BOOL2(b, "usedDisk", additiveMetrics.usedDisk);
     OPDEBUG_APPEND_BOOL2(b, "fromMultiPlanner", additiveMetrics.fromMultiPlanner);
+    OPDEBUG_APPEND_BOOL2(b, "multiPlannerFallbackEngaged", multiPlannerFallbackEngaged);
     OPDEBUG_APPEND_BOOL2(b, "fromPlanCache", additiveMetrics.fromPlanCache.value_or(false));
     if (replanReason) {
         bool replanned = true;

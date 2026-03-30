@@ -671,6 +671,10 @@ public:
     // Stores storage statistics from the spill engine.
     std::unique_ptr<StorageStats> spillStorageStats;
 
+    // True if the query had applicable query settings that failed to produce a plan,
+    // causing a fallback to multi-planning without query settings.
+    bool multiPlannerFallbackEngaged{false};
+
     bool waitingForFlowControl{false};
 
     // Records the WC that was waited on during the operation. (The WC in opCtx can't be used
