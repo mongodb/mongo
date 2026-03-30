@@ -19,6 +19,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const collName = jsTestName();
 const warnLogId = 20294;
 const errorAndLogId = 7488700;
+const hasEnterpriseModule = getBuildInfo().modules.includes("enterprise");
 
 function checkLogsForFailedValidation(db, logId) {
     // In case of sharded deployments, look on all shards and expect the log to be found on one of
@@ -84,11 +85,75 @@ function runTest(db) {
     assert.eq("warn", info.options.validationAction, tojson(info));
 }
 
+function runTestWithRedaction(db) {
+    if (!hasEnterpriseModule) {
+        jsTest.log.info("Skipping redaction test: enterprise module not available");
+        return;
+    }
+
+    const t = db[collName + "_redact"];
+    t.drop();
+
+    const redactedErrInfo = {
+        failingDocumentId: 1,
+        details: {
+            operatorName: "$eq",
+            specifiedAs: {a: 1},
+            reason: "comparison failed",
+            consideredValue: "###",
+        },
+    };
+
+    // Test warn mode with redaction.
+    assert.commandWorked(db.createCollection(t.getName(), {validator: {a: 1}, validationAction: "warn"}));
+    assert.commandWorked(t.insert({_id: 1, a: 1}));
+
+    assert.commandWorked(db.adminCommand({setParameter: 1, redactClientLogData: true}));
+    try {
+        assert.commandWorked(t.update({}, {$set: {a: 2}}));
+    } finally {
+        assert.commandWorked(db.adminCommand({setParameter: 1, redactClientLogData: false}));
+    }
+
+    assert(
+        checkLog.checkContainsOnceJson(db, warnLogId, {
+            "errInfo": function (obj) {
+                return documentEq(obj, redactedErrInfo);
+            },
+        }),
+    );
+
+    // Test errorAndLog mode with redaction.
+    if (FeatureFlagUtil.isPresentAndEnabled(db, "ErrorAndLogValidationAction")) {
+        const res = assert.commandWorkedOrFailedWithCode(
+            t.runCommand("collMod", {validationAction: "errorAndLog"}),
+            ErrorCodes.InvalidOptions,
+        );
+        if (res.ok) {
+            assert.commandWorked(db.adminCommand({setParameter: 1, redactClientLogData: true}));
+            try {
+                assertFailsValidation(t.update({_id: 1}, {$set: {a: 3}}));
+            } finally {
+                assert.commandWorked(db.adminCommand({setParameter: 1, redactClientLogData: false}));
+            }
+
+            assert(
+                checkLog.checkContainsOnceJson(db, errorAndLogId, {
+                    "errInfo": function (obj) {
+                        return documentEq(obj, redactedErrInfo);
+                    },
+                }),
+            );
+        }
+    }
+}
+
 (function testStandalone() {
     const conn = MongoRunner.runMongod();
     const db = conn.getDB(jsTestName());
     try {
         runTest(db);
+        runTestWithRedaction(db);
     } finally {
         MongoRunner.stopMongod(conn);
     }

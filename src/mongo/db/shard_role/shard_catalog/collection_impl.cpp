@@ -634,7 +634,7 @@ Status CollectionImpl::checkValidationAndParseResult(OperationContext* opCtx,
                 "document"_attr = redact(document),
                 "errInfo"_attr =
                     result.second.extraInfo<doc_validation_error::DocumentValidationFailureInfo>()
-                        ->getDetails());
+                        ->getRedactedDetails());
             return Status::OK();
         case SchemaValidationResult::kErrorAndLog:
             LOGV2_WARNING(
@@ -644,7 +644,7 @@ Status CollectionImpl::checkValidationAndParseResult(OperationContext* opCtx,
                 "document"_attr = redact(document),
                 "errInfo"_attr =
                     result.second.extraInfo<doc_validation_error::DocumentValidationFailureInfo>()
-                        ->getDetails());
+                        ->getRedactedDetails());
             return result.second;
         case SchemaValidationResult::kError:
             return result.second;

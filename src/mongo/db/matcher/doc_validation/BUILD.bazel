@@ -25,6 +25,7 @@ mongo_cc_unit_test(
     name = "doc_validation_test",
     srcs = [
         "doc_validation_error_json_schema_test.cpp",
+        "doc_validation_error_redaction_test.cpp",
         "doc_validation_error_test.cpp",
     ],
     tags = ["mongo_unittest_fourth_group"],
