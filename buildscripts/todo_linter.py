@@ -19,11 +19,15 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__)))))
 
 from buildscripts.linter import git, parallel
+from evergreen import RetryingEvergreenApi
 
 EXCLUSION_VALUE = "(Ignore linting)"
 TODO_REGEX = re.compile(r'[^"]TODO[^"]')
 JIRA_TICKET_REGEX = re.compile(r"\w+-\d+")
 FILES_RE = re.compile(r"\.(cpp|c|h|hpp|py|js|mjs|inl|idl|yml|bazel)$")
+EVG_CONFIG_FILE = "./.evergreen.yml"
+AUTO_REVERT_APP_BOT_MARKER = "auto-revert-app[bot]"
+GITHUB_PULL_REQUEST_IDENTIFIERS = {"github_pr", "github_pull_request"}
 
 
 def is_interesting_file(file_name: str) -> bool:
@@ -48,7 +52,7 @@ def check_file(file_name: str) -> bool:
     except (OSError, UnicodeDecodeError):
         return True
 
-    errors = []
+    errors: list[tuple[int, str]] = []
     for lineno, line in enumerate(lines, 1):
         if EXCLUSION_VALUE in line:
             continue
@@ -66,8 +70,47 @@ def check_file(file_name: str) -> bool:
     return len(errors) == 0
 
 
+def get_patch_description(version_id: str) -> str:
+    """Return the Evergreen patch description for the given version."""
+    evg_api = RetryingEvergreenApi.get_api(config_file=EVG_CONFIG_FILE)
+    version = evg_api.version_by_id(version_id)
+    return version.message or ""
+
+
+def should_ignore_todo_lint_failure() -> bool:
+    """Return whether TODO lint failures should be ignored for this run."""
+    requester = os.environ.get("requester") or os.environ.get("REQUESTER")
+    evergreen_user = os.environ.get("author") or os.environ.get("AUTHOR")
+    if not any(
+        identifier in GITHUB_PULL_REQUEST_IDENTIFIERS
+        for identifier in (requester, evergreen_user)
+        if identifier
+    ):
+        return False
+
+    version_id = os.environ.get("version_id") or os.environ.get("VERSION_ID")
+    if not version_id:
+        return False
+
+    try:
+        patch_description = get_patch_description(version_id)
+    except Exception as exc:  # pylint: disable=broad-except
+        logging.warning("Unable to determine patch description for TODO lint skip: %s", exc)
+        return False
+
+    # The auto-revert marker is attached to Evergreen's patch description, so use the version
+    # message rather than trying to infer it from GitHub PR metadata.
+    return AUTO_REVERT_APP_BOT_MARKER in patch_description.lower()
+
+
 def _lint_files(file_names: list[str]) -> None:
     if not parallel.parallel_process([os.path.abspath(f) for f in file_names], check_file):
+        if should_ignore_todo_lint_failure():
+            print(
+                "Skipping TODO lint failure because this Evergreen GitHub pull request was "
+                "created by auto-revert-app[bot]."
+            )
+            return
         print(
             "ERROR: Found TODO comments referencing unlinked SERVER tickets."
             " Please resolve or remove them before committing."
