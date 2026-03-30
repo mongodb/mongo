@@ -29,11 +29,11 @@
 
 #pragma once
 
+#include "mongo/db/exec/classic/recordid_deduplicator.h"
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/update/update_driver.h"
@@ -139,7 +139,7 @@ private:
     const CanonicalQuery* _canonicalQuery; /* can be nullptr */
 };
 
-typedef stdx::unordered_set<RecordId, RecordId::Hasher> RecordIdSet;
+typedef RecordIdDeduplicator RecordIdSet;
 
 /**
  * Computes the result of applying mods to the document 'oldObj' at RecordId 'recordId' in memory,

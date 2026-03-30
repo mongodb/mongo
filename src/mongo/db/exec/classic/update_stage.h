@@ -31,7 +31,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/requires_collection_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
@@ -44,14 +43,11 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/s/resharding/sharding_write_router.h"
 #include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
 #include "mongo/db/shard_role/shard_role.h"
-#include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/update/update_driver.h"
 #include "mongo/db/update/update_util.h"
-#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>

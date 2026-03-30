@@ -30,47 +30,25 @@
 #include "mongo/db/exec/classic/update_stage.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/db/basic_types.h"
-#include "mongo/db/client.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/matcher/match_details.h"
-#include "mongo/db/exec/matcher/matcher.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_operation_source.h"
-#include "mongo/db/shard_role/shard_catalog/document_validation.h"
-#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/transaction_resources.h"
-#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/storage/exceptions.h"
-#include "mongo/db/storage/record_data.h"
-#include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
-#include "mongo/util/str.h"
 
 #include <string>
 #include <vector>
@@ -140,7 +118,8 @@ UpdateStage::UpdateStage(ExpressionContext* expCtx,
       _doc(params.driver->getDocument()),
       _idRetrying(WorkingSet::INVALID_ID),
       _idReturning(WorkingSet::INVALID_ID),
-      _updatedRecordIds(params.request->isMulti() ? new update::RecordIdSet() : nullptr),
+      _updatedRecordIds(params.request->isMulti() ? std::make_unique<update::RecordIdSet>(expCtx)
+                                                  : nullptr),
       _preWriteFilter(opCtx(), collection.nss()) {
 
     // Should the modifiers validate their embedded docs via storage_validation::scanDocument()?
@@ -169,7 +148,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
 
     boost::optional<repl::UnreplicatedWritesBlock> unReplBlock;
     if (collectionPtr()->ns().isImplicitlyReplicated() && !_isUserInitiatedWrite) {
-        // Implictly replicated collections do not replicate updates.
+        // Implicitly replicated collections do not replicate updates.
         // However, user-initiated writes and some background maintenance tasks are allowed
         // to replicate as they cannot be derived from the oplog.
         unReplBlock.emplace(opCtx());
@@ -219,7 +198,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         invariant(member->hasObj());
 
         // We fill this with the new RecordIds of moved doc so we don't double-update.
-        if (_updatedRecordIds && _updatedRecordIds->count(recordId) > 0) {
+        if (_updatedRecordIds && _updatedRecordIds->contains(recordId)) {
             // Found a RecordId that refers to a document we had already updated. Note that
             // we can never remove from _updatedRecordIds because updates by other clients
             // could cause us to encounter a document again later.
