@@ -117,6 +117,106 @@ def normalize_deps(x: Union[None, Node, set[Node]]):
         return {x}
 
 
+def schedule_evergreen_patch(project: str) -> None:
+    # Get the current branch name for the description
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        branch_name = result.stdout.strip()
+    except subprocess.CalledProcessError:
+        branch_name = "unknown"
+
+    description = f"{ROOT} on branch: {branch_name}"
+
+    print("Saving original git staged state...")
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--cached", "--name-only"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        originally_staged = result.stdout.strip().split("\n") if result.stdout.strip() else []
+    except subprocess.CalledProcessError as e:
+        print(f"Warning: Failed to get staged files: {e.stderr}")
+        originally_staged = []
+
+    print("Temporarily staging all changes (including untracked files) for Evergreen patch...")
+    try:
+        subprocess.run(
+            ["git", "add", "-A"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as e:
+        print(f"Warning: Failed to stage changes: {e.stderr}")
+
+    command = [
+        "evergreen",
+        "patch",
+        "--yes",
+        "--finalize",
+        "--uncommitted",
+        "--alias",
+        "required",
+        "--project",
+        project,
+        "--description",
+        description,
+    ]
+
+    print(f"Scheduling Evergreen patch on project '{project}' with alias 'required'...")
+    patch_success = False
+    try:
+        result = subprocess.run(
+            command,
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        patch_success = True
+        print("Evergreen patch submitted successfully:")
+        print(result.stdout)
+    except subprocess.CalledProcessError as e:
+        print("Failed to schedule Evergreen patch:")
+        print(f"Error: {e.stderr}")
+    finally:
+        print("Restoring original git staged state...")
+        try:
+            # Unstage everything
+            subprocess.run(
+                ["git", "reset"],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            # Re-stage originally staged files
+            if originally_staged:
+                for file in originally_staged:
+                    subprocess.run(
+                        ["git", "add", file],
+                        cwd=ROOT,
+                        capture_output=True,
+                        text=True,
+                        check=True,
+                    )
+        except subprocess.CalledProcessError as e:
+            print(f"Warning: Failed to restore git staged state: {e.stderr}")
+
+        if not patch_success:
+            raise RuntimeError("Failed to create Evergreen patch")
+
+
 def send_slack_notification(nodes: list[Node], total_elapsed: float, component_name: str):
     overall_success = True
     lines = [
@@ -173,6 +273,7 @@ class CommandRunner:
         notify_slack: bool,
         parallelism: int,
         component_name: str,
+        schedule_patch: Optional[str],
     ):
         self._log_path = log_path
         self._parallelism = parallelism
@@ -186,6 +287,7 @@ class CommandRunner:
         self._finish_time: Optional[float] = None
         self._notify_slack = notify_slack
         self._component_name = component_name
+        self._schedule_patch = schedule_patch
 
     def _notify(self, event: str, node: Node):
         if event == "spawn":
@@ -266,6 +368,10 @@ class CommandRunner:
                 self._update_display()
 
             elapsed = time.monotonic() - self._start_time
+
+            if self._schedule_patch:
+                schedule_evergreen_patch(self._schedule_patch)
+
             if self._notify_slack:
                 send_slack_notification(
                     nodes=sorted(self._nodes),
@@ -332,6 +438,7 @@ def run_smoke_tests(
     bazel_args: list[str],
     run_clang_tidy: bool,
     send_slack_notification: bool,
+    schedule_patch: Optional[str],
 ):
     log_path = log_path.joinpath(REPO_UNIQUE_NAME)
     log_path.mkdir(parents=True, exist_ok=True)
@@ -355,6 +462,7 @@ def run_smoke_tests(
         log_path=log_path,
         notify_slack=send_slack_notification,
         parallelism=os.cpu_count(),
+        schedule_patch=schedule_patch,
     )
 
     formatters = [
@@ -464,6 +572,18 @@ def main():
         help='Send a slack notification based on the local evergreen configuration to "yourself"',
     )
 
+    p.add_argument(
+        "--schedule-patch",
+        type=str,
+        nargs="?",
+        const="mongodb-mongo-master",
+        default=None,
+        help="Automatically schedule an Evergreen patch with the 'required' alias after successful smoke tests. "
+        "The patch will include any uncommitted changes. "
+        "If provided without a value, uses 'mongodb-mongo-master'. "
+        "Examples: --schedule-patch, --schedule-patch=mongodb-mongo-v8.0",
+    )
+
     args, bazel_args = p.parse_known_args()
     run_smoke_tests(
         component_name=args.component,
@@ -471,6 +591,7 @@ def main():
         bazel_args=bazel_args,
         run_clang_tidy=args.run_clang_tidy,
         send_slack_notification=args.send_slack_notification,
+        schedule_patch=args.schedule_patch,
     )
 
 
