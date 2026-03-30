@@ -71,6 +71,39 @@ constexpr int kMaxCapacity = BSONObjMaxUserSize;
 constexpr int kElementValueOffset = 2;
 
 
+// Write a BSON sub-object header into the allocator: type byte + field name + null + 4-byte size
+// placeholder. Returns the offset of the size field for later fill-in.
+int writeSubObjHeader(BSONElementStorage& allocator, StringData fieldName, BSONType type) {
+    auto fieldNameSize = fieldName.size();
+    char* objdata = allocator.allocate(6 + fieldNameSize);
+    objdata[0] = stdx::to_underlying(type);
+    if (fieldNameSize > 0) {
+        memcpy(objdata + 1, fieldName.data(), fieldNameSize);
+    }
+    objdata[fieldNameSize + 1] = '\0';
+
+    // The 4 bytes after the header are reserved for the sub-object size, filled in by
+    // writeSubObjFooter once all fields are written.
+    return allocator.position() - allocator.contiguous() - 4;
+}
+
+// Finalize a sub-object: write EOO + fill in size, or deallocate if empty and not allowed.
+void writeSubObjFooter(BSONElementStorage& allocator,
+                       int sizeOffset,
+                       StringData fieldName,
+                       bool allowEmpty) {
+    // No scalars were written — empty subobject not present in this element.
+    if (!allowEmpty && allocator.position() == allocator.contiguous() + sizeOffset + 4) {
+        allocator.deallocate(fieldName.size() + 6);
+        return;
+    }
+
+    auto eoo = allocator.allocate(1);
+    *eoo = '\0';
+    int32_t size = allocator.position() - allocator.contiguous() - sizeOffset;
+    DataView(allocator.contiguous() + sizeOffset).write<LittleEndian<uint32_t>>(size);
+}
+
 }  // namespace
 
 BSONElementStorage::Element::Element(char* buffer, int nameSize, int valueSize)
@@ -275,129 +308,45 @@ void BSONColumn::Iterator::_incrementRegular(Regular& regular) {
 }
 
 void BSONColumn::Iterator::_incrementInterleaved(Interleaved& interleaved) {
-    // Notify the internal allocator to keep all allocations in contigous memory. That way we can
-    // produce the full BSONObj that we need to return.
+    if (!interleaved.schema) {
+        interleaved.schema.emplace(
+            interleaved.referenceObj, interleaved.rootType, interleaved.arrays);
+        uassert(ErrorCodes::InvalidBSONColumn,
+                "Wrong number of interleaved states in BSON Column encoding",
+                interleaved.schema->scalarCount() == interleaved.states.size());
+    }
+    using Op = InterleavedSchema::Op;
+
     auto contiguous = _allocator->startContiguous();
 
-    // Iterate over the reference interleaved object. We match scalar subfields with our interleaved
-    // states in order. Internally the necessary recursion is performed and the second lambda below
-    // is called for scalar fields. Every element writes its data to the allocator so a full BSONObj
-    // is produced, this usually happens within _loadDelta() but must explicitly be done in the
-    // cases where re-materialization of the Element wasn't required (same as previous for example).
-    // The first lambda outputs an RAII object that is instantiated every time we recurse deeper.
-    // This handles writing the BSONObj size and EOO bytes for subobjects.
-    auto stateIt = interleaved.states.begin();
-    auto stateEnd = interleaved.states.end();
-    int processed = 0;
-    BSONObjTraversal t(
-        interleaved.arrays,
-        interleaved.rootType,
-        [this](StringData fieldName, const BSONObj& obj, BSONType type) {
-            // Called every time we recurse into a subobject. It makes sure we write the size and
-            // EOO bytes.
-            return BSONSubObjectAllocator(*_allocator, fieldName, obj, type);
-        },
-        [this, &stateIt, &stateEnd, &processed](const BSONElement& referenceField) {
-            // Called for every scalar field in the reference interleaved BSONObj. We have as many
-            // decoding states as scalars.
-            uassert(ErrorCodes::InvalidBSONColumn,
-                    "Wrong number of interleaved states in BSON Column encoding",
-                    stateIt != stateEnd);
-            auto& state = *(stateIt++);
+    // Stack of sizeOffsets for nested sub-objects. Nesting is typically 1-2 levels deep.
+    boost::container::small_vector<int, 4> subObjStack;
 
-            // Remember the iterator position before writing anything. This is to detect that
-            // nothing was written and we need to copy the element into the allocator position.
-            auto allocatorPosition = _allocator->position();
-            BSONElement elem;
-            // Load deltas if decoders are setup. nullptr is always used for "current". So even if
-            // we are iterating the second time we are going to allocate new memory. This is a
-            // tradeoff to avoid a decoded list of literals for every state that will only be used
-            // if we iterate multiple times.
-            if (auto d64 = get_if<DecodingState::Decoder64>(&state.decoder);
-                d64 && d64->pos.valid() && (++d64->pos).more()) {
-                elem = state.loadDelta(*_allocator, *d64);
-            } else if (auto d128 = get_if<DecodingState::Decoder128>(&state.decoder);
-                       d128 && d128->pos.valid() && (++d128->pos).more()) {
-                elem = state.loadDelta(*_allocator, *d128);
-            } else if (*_control == stdx::to_underlying(BSONType::eoo)) {
-                // Decoders are exhausted and the next control byte was EOO then we should exit
-                // interleaved mode. Return false to end the recursion early.
-                ++_control;
-                return false;
-            } else {
-                // Decoders are exhausted so we need to load the next control byte that by
-                // definition belong to this decoder state as we iterate in the same known order.
-                auto result = state.loadControl(*_allocator, _control, _end);
-                _control += result.size;
-                elem = result.element;
-
-                // If the loaded control byte was a literal it is stored without field name. We need
-                // to create a new BSONElement with the field name added as this is a sub-field in
-                // an object.
-                auto fieldName = referenceField.fieldNameStringData();
-                if (!elem.eoo() && elem.fieldNameStringData() != fieldName) {
-                    auto allocatedElem =
-                        _allocator->allocate(elem.type(), fieldName, elem.valuesize());
-                    memcpy(allocatedElem.value(), elem.value(), elem.valuesize());
-                    elem = allocatedElem.element();
-                    state.lastValue = elem;
+    for (const auto& entry : interleaved.schema->entries()) {
+        switch (entry.op) {
+            case Op::kEnterSubObj:
+                subObjStack.push_back(writeSubObjHeader(*_allocator, entry.fieldName, entry.type));
+                break;
+            case Op::kScalar:
+                if (!_processScalar(interleaved.states[entry.stateIdx], entry.fieldName)) {
+                    // EOO encountered — exit interleaved mode. Must be the first scalar.
+                    uassert(ErrorCodes::InvalidBSONColumn,
+                            "Cannot load regular mode after processing interleaved mode",
+                            entry.stateIdx == 0);
+                    auto stateIdx = entry.stateIdx;  // save before reset invalidates entry
+                    interleaved.schema.reset();
+                    _drainAndVerifyDecoders(interleaved.states, stateIdx + 1);
+                    _exitInterleavedMode();
+                    return;
                 }
-            }
-
-            // If the encoded element wasn't stored in the allocator above we need to copy it here
-            // as we're building a full BSONObj.
-            if (!elem.eoo()) {
-                if (_allocator->position() == allocatorPosition) {
-                    auto size = elem.size();
-                    memcpy(_allocator->allocate(size), elem.rawdata(), size);
-                }
-
-                // Remember last known value, needed for further decompression.
-                state.lastValue = elem;
-            }
-
-            ++processed;
-            return true;
-        });
-
-    // Traverse interleaved reference object, we will match interleaved states with literals.
-    auto res = t.traverse(interleaved.referenceObj);
-    if (!res) {
-        // Exit interleaved mode and load as regular. Re-instantiate the state and set last known
-        // value.
-        uassert(ErrorCodes::InvalidBSONColumn,
-                "Cannot load regular mode after processing interleaved mode",
-                processed == 0);
-
-        // Before exiting interleaved mode, verify all of the decoders are exhausted.
-        while (stateIt != stateEnd) {
-            auto& state = *stateIt;
-            if (auto d64 = get_if<DecodingState::Decoder64>(&state.decoder);
-                d64 && d64->pos.valid()) {
-                uassert(ErrorCodes::InvalidBSONColumn,
-                        "Not all 64-bit BSON Column interleaved encoding decoders are exhausted",
-                        !((++d64->pos).more()));
-            } else if (auto d128 = get_if<DecodingState::Decoder128>(&state.decoder);
-                       d128 && d128->pos.valid()) {
-                uassert(ErrorCodes::InvalidBSONColumn,
-                        "Not all 128-bit BSON Column interleaved encoding decoders are exhausted",
-                        !((++d128->pos).more()));
-            }
-            stateIt++;
+                break;
+            case Op::kExitSubObj:
+                writeSubObjFooter(
+                    *_allocator, subObjStack.back(), entry.fieldName, entry.allowEmpty);
+                subObjStack.pop_back();
+                break;
         }
-
-        // This invalidates 'interleaved' reference, may no longer be dereferenced.
-        Regular& regular = _mode.emplace<Regular>();
-        get<0>(regular.state.decoder).deltaOfDelta = false;
-        regular.state.lastValue = _decompressed;
-        _incrementRegular(regular);
-        return;
     }
-
-    // There should have been as many interleaved states as scalar fields.
-    uassert(ErrorCodes::InvalidBSONColumn,
-            "Too many interleaved states in BSON Column encoding",
-            stateIt == stateEnd);
 
     // Store built BSONObj in the decompressed list
     auto [objdata, objsize] = contiguous.done();
@@ -412,6 +361,81 @@ void BSONColumn::Iterator::_incrementInterleaved(Interleaved& interleaved) {
     BSONElement obj(objdata, 1, BSONElement::TrustedInitTag{});
 
     _decompressed = obj;
+}
+
+bool BSONColumn::Iterator::_processScalar(DecodingState& state, StringData fieldName) {
+    auto allocatorPosition = _allocator->position();
+    BSONElement elem;
+
+    // Load deltas if decoders are setup. nullptr is always used for "current". So even if
+    // we are iterating the second time we are going to allocate new memory. This is a
+    // tradeoff to avoid a decoded list of literals for every state that will only be used
+    // if we iterate multiple times.
+    if (auto d64 = get_if<DecodingState::Decoder64>(&state.decoder);
+        d64 && d64->pos.valid() && (++d64->pos).more()) {
+        elem = state.loadDelta(*_allocator, *d64);
+    } else if (auto d128 = get_if<DecodingState::Decoder128>(&state.decoder);
+               d128 && d128->pos.valid() && (++d128->pos).more()) {
+        elem = state.loadDelta(*_allocator, *d128);
+    } else if (*_control == stdx::to_underlying(BSONType::eoo)) {
+        // Decoders are exhausted and the next control byte was EOO — signal caller to exit
+        // interleaved mode.
+        ++_control;
+        return false;
+    } else {
+        // Decoders are exhausted so we need to load the next control byte that by
+        // definition belong to this decoder state as we iterate in the same known order.
+        auto result = state.loadControl(*_allocator, _control, _end);
+        _control += result.size;
+        elem = result.element;
+
+        // If the loaded control byte was a literal it is stored without field name. We need
+        // to create a new BSONElement with the field name added as this is a sub-field in
+        // an object.
+        if (!elem.eoo() && elem.fieldNameStringData() != fieldName) {
+            auto allocatedElem = _allocator->allocate(elem.type(), fieldName, elem.valuesize());
+            memcpy(allocatedElem.value(), elem.value(), elem.valuesize());
+            elem = allocatedElem.element();
+        }
+    }
+
+    if (elem.eoo()) {
+        return true;
+    }
+
+    // If the encoded element wasn't stored in the allocator above we need to copy it here
+    // as we're building a full BSONObj.
+    if (_allocator->position() == allocatorPosition) {
+        auto size = elem.size();
+        memcpy(_allocator->allocate(size), elem.rawdata(), size);
+    }
+    state.lastValue = elem;
+
+    return true;
+}
+
+void BSONColumn::Iterator::_drainAndVerifyDecoders(std::vector<DecodingState>& states,
+                                                   size_t startIdx) {
+    for (size_t i = startIdx; i < states.size(); ++i) {
+        auto& state = states[i];
+        if (auto d64 = get_if<DecodingState::Decoder64>(&state.decoder); d64 && d64->pos.valid()) {
+            uassert(ErrorCodes::InvalidBSONColumn,
+                    "Not all 64-bit BSON Column interleaved encoding decoders are exhausted",
+                    !((++d64->pos).more()));
+        } else if (auto d128 = get_if<DecodingState::Decoder128>(&state.decoder);
+                   d128 && d128->pos.valid()) {
+            uassert(ErrorCodes::InvalidBSONColumn,
+                    "Not all 128-bit BSON Column interleaved encoding decoders are exhausted",
+                    !((++d128->pos).more()));
+        }
+    }
+}
+
+void BSONColumn::Iterator::_exitInterleavedMode() {
+    Regular& regular = _mode.emplace<Regular>();
+    get<0>(regular.state.decoder).deltaOfDelta = false;
+    regular.state.lastValue = _decompressed;
+    _incrementRegular(regular);
 }
 
 void BSONColumn::Iterator::_handleEOO() {
@@ -764,7 +788,7 @@ bool BSONColumn::contains_forTest(BSONType elementType) const {
             if (control == stdx::to_underlying(elementType)) {
                 return true;
             } else if (control == stdx::to_underlying(BSONType::eoo)) {
-                // TODO: check for valid encoding
+                // TODO(SERVER-74926): check for valid encoding
                 // reached end of column
                 return false;
             }
