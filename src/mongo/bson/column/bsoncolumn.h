@@ -37,6 +37,7 @@
 #include "mongo/bson/column/bson_element_storage.h"
 #include "mongo/bson/column/bsoncolumn_interleaved.h"
 #include "mongo/bson/column/bsoncolumn_util.h"
+#include "mongo/bson/column/interleaved_schema.h"
 #include "mongo/bson/column/simple8b.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/platform/int128.h"
@@ -254,11 +255,25 @@ public:
 
             // Type for root object/reference object. May be Object or Array.
             BSONType rootType;
+
+            // Schema discovered from the reference object. Populated on first decode.
+            boost::optional<InterleavedSchema> schema;
         };
+
+        // Advance and verify all decoders in [startIdx, states.size()) are exhausted. Throws on
+        // violation.
+        static void _drainAndVerifyDecoders(std::vector<DecodingState>& states, size_t startIdx);
 
         // Helpers to increment the iterator in regular and interleaved mode.
         void _incrementRegular(Regular& regular);
         void _incrementInterleaved(Interleaved& interleaved);
+
+        // Exit interleaved mode and switch to regular decoding.
+        void _exitInterleavedMode();
+
+        // Process a single scalar field: advance its decoder, load delta or control byte,
+        // copy into allocator if needed. Returns false if EOO encountered (exit interleaved).
+        bool _processScalar(DecodingState& state, StringData fieldName);
 
         std::variant<Regular, Interleaved> _mode = Regular{};
     };

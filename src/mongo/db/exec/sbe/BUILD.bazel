@@ -464,6 +464,18 @@ mongo_cc_benchmark(
 )
 
 mongo_cc_benchmark(
+    name = "sbe_ts_block_bm",
+    srcs = [
+        "ts_block_bm.cpp",
+    ],
+    deps = [
+        ":query_sbe",
+        "//src/mongo:base",
+        "//src/mongo/db/timeseries:bucket_compression",
+    ],
+)
+
+mongo_cc_benchmark(
     name = "sbe_hash_lookup_bm",
     srcs = [
         "sbe_hash_lookup_shared_test.cpp",
