@@ -355,6 +355,9 @@ filters:
   - "action_duration_metrics*":
     approvers:
       - 10gen/server-storage-engine-integration
+  - "startup_check_rseq*":
+    approvers:
+      - 10gen/server-workload-resilience
   - "feature_flag.*":
     approvers:
       - 10gen/server-programmability

@@ -34,6 +34,19 @@ buildvariants:
       - name: hydrate_bazel_profile_TG
       - name: .clang_tidy
 
+  - name: &ubuntu2404-kernel619-rseq-check ubuntu2404-kernel619-rseq-check
+    display_name: "~ Ubuntu 24.04 Kernel 6.19 rseq Check"
+    tags: []
+    cron: "0 4 * * 0" # Weekly on Sunday at 04:00 UTC
+    run_on:
+      - DEVPROD-30151-ubuntu2404-kernel619-m6i-4xlarge
+    stepback: false
+    expansions:
+      compile_variant: *ubuntu2404-kernel619-rseq-check
+      evergreen_remote_exec: on
+    tasks:
+      - name: rseq_kernel_compatibility_check_TG
+
   - name: &upload_source_graph_index upload_source_graph_index
     display_name: "~ Upload Source Graph Index"
     tags: ["source_graph_indexing"]

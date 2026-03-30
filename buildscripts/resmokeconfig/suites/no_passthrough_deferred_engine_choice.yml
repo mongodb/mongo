@@ -32,6 +32,7 @@ selector:
     - jstests/noPassthrough/query/plan_cache/sbe_plan_cache_key_reporting.js
 
   exclude_with_any_tags:
+    - requires_kernel_619
 
 # noPassthrough tests start their own mongod's.
 executor:

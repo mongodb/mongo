@@ -188,6 +188,7 @@
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_initialization_mongod.h"
 #include "mongo/db/sharding_environment/sharding_ready.h"
+#include "mongo/db/startup_check_rseq.h"
 #include "mongo/db/startup_recovery.h"
 #include "mongo/db/startup_warnings_mongod.h"
 #include "mongo/db/stats/system_buckets_metrics.h"
@@ -2042,6 +2043,8 @@ int mongod_main(int argc, char* argv[]) {
     waitForDebugger();
 
     setupSignalHandlers();
+
+    validateRseqKernelCompat();
 
     srand(static_cast<unsigned>(curTimeMicros64()));  // NOLINT
 

@@ -117,6 +117,7 @@ core.servers:
     - src/mongo/s/mongos.cpp
     - src/mongo/s/mongos_main.*
     - src/mongo/s/mongos_options*
+    - src/mongo/db/startup_check_rseq*
 
 core.commands:
   meta:

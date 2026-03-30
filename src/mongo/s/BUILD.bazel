@@ -585,6 +585,7 @@ mongo_cc_library(
         # library to inject a static or mongo initializer to mongos,
         # please add that library as a private libdep of
         # mongos_initializers.
+        "//src/mongo/db:startup_check_rseq",
         "//src/mongo/client:remote_command_targeter",
         "//src/mongo/db:audit",
         "//src/mongo/db/auth:authserver",

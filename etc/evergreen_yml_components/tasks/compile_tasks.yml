@@ -1453,6 +1453,23 @@ tasks:
           args:
             - "./src/evergreen/packages_crypt_publish.sh"
 
+  - name: rseq_kernel_compatibility_check_jstest
+    tags: ["assigned_to_jira_team_server_workload_scheduling", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: install-devcore
+          bazel_args: >-
+            --config=evg
+      - func: "f_expansions_write"
+      - func: "run tests"
+        vars:
+          suite: rseq_kernel_check
+          install_dir: bazel-bin/install/bin
+
 ################################################
 #                 Task Groups                  #
 ################################################
@@ -1471,6 +1488,11 @@ task_groups:
     name: run_bazel_TG
     tasks:
       - run_bazel_program
+
+  - <<: *compile_bazel_task_group_template
+    name: rseq_kernel_compatibility_check_TG
+    tasks:
+      - rseq_kernel_compatibility_check_jstest
 
   # We want to run these sequentially to put less load on the cluster
   - <<: *compile_task_group_template

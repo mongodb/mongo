@@ -216,6 +216,9 @@ filters:
   - "*rate_limited.yml":
     approvers:
       - 10gen/server-workload-resilience
+  - "*rseq_kernel_check*":
+    approvers:
+      - 10gen/server-workload-resilience
   - "replica_sets_with_priority_ports.yml":
     approvers:
       - 10gen/server-catalog-and-routing

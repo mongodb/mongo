@@ -49,6 +49,29 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "startup_check_rseq",
+    srcs = ["startup_check_rseq.cpp"],
+    hdrs = ["startup_check_rseq.h"],
+    deps = [
+        "//src/mongo:base",
+    ] + select({
+        "//bazel/config:tcmalloc_google_enabled": [
+            "//src/third_party/tcmalloc:tcmalloc_internal_percpu",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_unit_test(
+    name = "startup_check_rseq_test",
+    srcs = ["startup_check_rseq_test.cpp"],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        "startup_check_rseq",
+    ],
+)
+
 render_template(
     name = "feature_flag_test_tpl",
     srcs = [
@@ -2656,6 +2679,7 @@ mongo_cc_library(
         # satisfy symbol dependencies from the files listed above in `sources`. If you need to add a
         # library to inject a static or mongo initializer to mongod, please add that library as a
         # private libdep of mongod_initializers.
+        "startup_check_rseq",
         "//src/mongo/client:clientdriver_minimal",
         "//src/mongo/db/auth:user_cache_invalidator",
         "//src/mongo/db/query/search:search_task_executors",
