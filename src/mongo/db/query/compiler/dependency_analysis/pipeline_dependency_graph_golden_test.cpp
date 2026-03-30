@@ -461,13 +461,14 @@ TEST_F(PipelineDependencyGraphGoldenTest, NonExpressionModificationDependencies)
     });
 }
 
-// TODO(SERVER-122744): Enable.
-// TEST_F(PipelineDependencyGraphGoldenTest, ExpressionWholeDocumentDependency) {
-//     runVariation({
-//         .name = "ExpressionWholeDocumentDependency",
-//         .pipeline = "[{$set: {a: '$$ROOT'}}]",
-//     });
-// }
+TEST_F(PipelineDependencyGraphGoldenTest, ExpressionWholeDocumentDependencyInLaterStage) {
+    runVariation({
+        .name = "ExpressionWholeDocumentDependencyInLaterStage",
+        .pipeline = "[{$set: {a: 1}},"
+                    " {$set: {b: '$$ROOT'}},"
+                    " {$set: {c: 2}}]",
+    });
+}
 
 }  // namespace
 }  // namespace mongo::pipeline::dependency_graph

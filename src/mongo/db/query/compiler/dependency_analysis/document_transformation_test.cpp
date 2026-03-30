@@ -493,6 +493,62 @@ TEST(DocumentTransformationTest, DescribeComputedPathsOtherRenames) {
     EXPECT_EQ(visitor.maxArrayTraversals.at("d.e.f"s), std::make_pair(0, 2));
 }
 
+TEST(DocumentTransformationTest, DescribeComputedPathsUsingVariable) {
+    auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
+    auto expr = ExpressionFieldPath::parse(expCtx.get(), "$$ROOT.x", expCtx->variablesParseState);
+    StringMap<boost::intrusive_ptr<Expression>> paths{{"a"s, expr}, {"b.c"s, expr}};
+
+    TestVisitor visitor;
+    document_transformation::describeComputedPaths(visitor, paths.begin(), paths.end(), {});
+
+    EXPECT_THAT(visitor.preserved, IsEmpty());
+    EXPECT_THAT(visitor.modified, IsEmpty());
+    EXPECT_THAT(visitor.renamed, UnorderedElementsAre(Pair("a"s, "x"s), Pair("b.c"s, "x"s)));
+}
+
+TEST(DocumentTransformationTest, DescribeComputedPathsROOT) {
+    auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
+    auto expr = ExpressionFieldPath::parse(expCtx.get(), "$$ROOT", expCtx->variablesParseState);
+    StringMap<boost::intrusive_ptr<Expression>> paths{{"a"s, expr}, {"b.c"s, expr}};
+
+    TestVisitor visitor;
+    document_transformation::describeComputedPaths(visitor, paths.begin(), paths.end(), {});
+
+    EXPECT_THAT(visitor.preserved, IsEmpty());
+    EXPECT_THAT(visitor.modified, UnorderedElementsAre("a"s, "b.c"s));
+    EXPECT_THAT(visitor.renamed, IsEmpty());
+}
+
+TEST(DocumentTransformationTest, DescribeComputedPathsCURRENT) {
+    auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
+    auto expr = ExpressionFieldPath::parse(expCtx.get(), "$$CURRENT", expCtx->variablesParseState);
+    StringMap<boost::intrusive_ptr<Expression>> paths{{"a"s, expr}, {"b.c"s, expr}};
+
+    TestVisitor visitor;
+    document_transformation::describeComputedPaths(visitor, paths.begin(), paths.end(), {});
+
+    EXPECT_THAT(visitor.preserved, IsEmpty());
+    EXPECT_THAT(visitor.modified, UnorderedElementsAre("a"s, "b.c"s));
+    EXPECT_THAT(visitor.renamed, IsEmpty());
+}
+
+TEST(DocumentTransformationTest, DescribeComputedPathsOtherVariable) {
+    auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
+    auto expr = ExpressionFieldPath::parse(expCtx.get(), "$$NOW", expCtx->variablesParseState);
+    StringMap<boost::intrusive_ptr<Expression>> paths{{"a"s, expr}, {"b.c"s, expr}};
+
+    TestVisitor visitor;
+    document_transformation::describeComputedPaths(visitor, paths.begin(), paths.end(), {});
+
+    EXPECT_THAT(visitor.preserved, IsEmpty());
+    EXPECT_THAT(visitor.modified, UnorderedElementsAre("a"s, "b.c"s));
+    EXPECT_THAT(visitor.renamed, IsEmpty());
+}
+
 TEST(DocumentTransformationTest, DescribeComputedPathsObjectEmpty) {
     auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
@@ -609,6 +665,21 @@ TEST(DocumentTransformationTest, DescribeComputedPathsObjectMixed) {
     EXPECT_THAT(visitor.renamed, UnorderedElementsAre(Pair("_id.a.b"s, "x.y.z"s)));
     // _id.a and _id.a.b cannot contain arrays.
     EXPECT_EQ(visitor.maxArrayTraversals.at("_id.a.b"s), std::make_pair(0, 2));
+}
+
+TEST(DocumentTransformationTest, DescribeComputedPathsObjectROOT) {
+    auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
+    auto expr = ExpressionObject::parse(
+        expCtx.get(), fromjson("{a: '$$ROOT', d: 1}"), expCtx->variablesParseState);
+    StringMap<boost::intrusive_ptr<Expression>> paths{{"_id"s, expr}};
+
+    TestVisitor visitor;
+    document_transformation::describeComputedPaths(visitor, paths.begin(), paths.end(), {});
+
+    EXPECT_THAT(visitor.preserved, IsEmpty());
+    EXPECT_THAT(visitor.modified, UnorderedElementsAre("_id.a"_sd, "_id.d"_sd));
+    EXPECT_THAT(visitor.renamed, IsEmpty());
 }
 
 }  // namespace

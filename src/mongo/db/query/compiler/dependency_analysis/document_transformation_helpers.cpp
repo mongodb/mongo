@@ -132,8 +132,11 @@ public:
         if (expr->isVariableReference()) {
             return;
         }
-        _handled = true;
         const FieldPath& oldFieldPath = expr->getFieldPath();
+        if (oldFieldPath.getPathLength() == 1) {
+            return;
+        }
+        _handled = true;
         StringData oldPath = oldFieldPath.tailPath();
         BSONDepthIndex oldPathMaxArrayTraversals = std::count(oldPath.begin(), oldPath.end(), '.');
         _visitor(RenamePathWithFixedArrayness{_path, oldPath, _depth, oldPathMaxArrayTraversals});
