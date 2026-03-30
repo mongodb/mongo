@@ -86,6 +86,8 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
     if (stats->earlyExit || stats->numResultsFound > 0) {
         auto remainingMultiPlannerWorksPerPlan =
             trialsConfig.maxNumWorksPerPlan - cappedTrialsConfig.maxNumWorksPerPlan;
+        // The best plan, once chosen by the multiplanner, will be inserted into the plan cache by
+        // the multiplanner here.
         return resumeMultiPlannerAndPickBestPlan(
             {.maxNumWorksPerPlan = remainingMultiPlannerWorksPerPlan,
              .targetNumResults = trialsConfig.targetNumResults});
@@ -120,6 +122,10 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
         if (!status.isOK()) {
             return status;
         }
+        // This call will put the CBR-chosen plan into the plan cache. Because we ran additional
+        // trials above, we are caching the plan with the same number of works as if
+        // multiplanning had picked the plan. Calling 'pickBestPlan' here also ensures that later
+        // calls to 'doWork' function correctly.
         status = _multiPlanner->pickBestPlan();
         if (!status.isOK()) {
             return status;
@@ -154,6 +160,8 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
     // Resume trials on the remainder of the plans.
     auto remainingMultiPlannerWorksPerPlan =
         trialsConfig.maxNumWorksPerPlan - cappedTrialsConfig.maxNumWorksPerPlan;
+    // The best plan, once chosen by the multiplanner, will be inserted into the plan cache by the
+    // multiplanner here.
     auto result =
         resumeMultiPlannerAndPickBestPlan({.maxNumWorksPerPlan = remainingMultiPlannerWorksPerPlan,
                                            .targetNumResults = trialsConfig.targetNumResults});

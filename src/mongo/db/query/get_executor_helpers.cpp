@@ -245,24 +245,14 @@ bool shouldMultiPlanForSingleSolution(const PlanRankingResult& rankerResult,
     bool forceMultiPlanForSingleSolution = expCtx->getForcePlanCache() ||
         expCtx->getQueryKnobConfiguration().getUseMultiplannerForSingleSolutions();
 
-    // If there is rejected plans in the  result from 'rankPlans()' and the
-    // 'needsWorksMeasuredForPlanCache' flag is set, we run the single CBR picked solution
-    // through multiplanner to measure its number of works and add the plan to the plan cache.
-    // If 'internalQueryDisablePlanCache' disables the plan cache, we will ignore
-    // 'needsWorksMeasuredForPlanCache' and the number of rejected plans and instead only check
-    // whether we should force running the single solution plan through the multiplanner.
-    auto shouldMultiplanForCBRChosenPlan =
-        !internalQueryDisablePlanCache.load() && rankerResult.needsWorksMeasuredForPlanCache;
-
-    // We will not cache for an explain command.
-    if (!expCtx->getExplain().has_value() && shouldMultiplanForCBRChosenPlan) {
-        LOGV2_DEBUG(11918000,
-                    2,
-                    "CBR picked the best plan and it will be cached via multiplanning",
-                    "query"_attr = cq->toString());
-    }
-
-    return shouldMultiplanForCBRChosenPlan || forceMultiPlanForSingleSolution;
+    // If we have reached this point and 'needsWorksMeasuredForPlanCache' is true, then there
+    // has been no multiplanning work done so far and we will run the single CBR-chosen solution
+    // through the multiplanner to measure its number of works and add the plan to the plan
+    // cache. If 'internalQueryDisablePlanCache' disables the plan cache, we will ignore
+    // 'needsWorksMeasuredForPlanCache' and instead only check whether we should force running the
+    // single solution plan through the multiplanner.
+    return (!internalQueryDisablePlanCache.load() && rankerResult.needsWorksMeasuredForPlanCache) ||
+        forceMultiPlanForSingleSolution;
 }
 
 void captureCardinalityEstimationMethodForQueryStats(

@@ -166,9 +166,10 @@ StatusWith<std::unique_ptr<PlannerInterface>> planWithCBR(
     }
 
     if (rankerResult.execState) {
-        // Some CBR strategies use MultiPlanner internally and they keep QuerySolution owned by
-        // MultiPlanStage. Extract the actual winning solution from the MultiPlanStage so downstream
-        // code can use it.
+        // At this point, the plan was already put into the plan cache inside rankPlans() via
+        // pickBestPlan() on the internal MultiPlanner. Some CBR strategies use MultiPlanner
+        // internally and they keep QuerySolution owned by MultiPlanStage. Extract the actual
+        // winning solution from the MultiPlanStage so downstream code can use it.
         if (!rankerResult.solutions.empty() && rankerResult.solutions[0] == nullptr) {
             ClassicExecState* classicExecState =
                 rankerResult.execState->peekExecState<ClassicExecState>();
@@ -197,6 +198,9 @@ StatusWith<std::unique_ptr<PlannerInterface>> planWithCBR(
             std::move(rankerResult.maybeExplainData));
     }
 
+    // Either multiple solutions exist, or we are forcing single solutions to be cached, or there is
+    // a single CBR-chosen solution that still needs its work measured for the plan cache. The
+    // MultiPlanner will cache the winning plan when it calls pickBestPlan().
     return std::make_unique<MultiPlanner>(makePlannerData(),
                                           std::move(rankerResult.solutions),
                                           rankerResult.needsWorksMeasuredForPlanCache,
