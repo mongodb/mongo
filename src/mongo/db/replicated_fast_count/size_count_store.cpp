@@ -29,9 +29,12 @@
 
 #include "mongo/db/replicated_fast_count/size_count_store.h"
 
+#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
+#include "mongo/db/update/document_diff_calculator.h"
+#include "mongo/db/update/update_oplog_entry_serialization.h"
 
 namespace mongo::replicated_fast_count {
 
@@ -54,5 +57,38 @@ boost::optional<SizeCountStore::Entry> SizeCountStore::read(OperationContext* op
         .timestamp = data.getField(kValidAsOfKey).timestamp(),
         .size = data.getField(kMetadataKey).Obj().getField(kSizeKey).Long(),
         .count = data.getField(kMetadataKey).Obj().getField(kCountKey).Long()};
+}
+
+void SizeCountStore::write(OperationContext* opCtx, UUID uuid, const Entry& entry) {
+    const auto acquisition = acquireFastCountCollectionForWrite(opCtx).value();
+    const CollectionPtr& coll = acquisition.getCollectionPtr();
+    const RecordId rid =
+        record_id_helpers::keyForDoc(BSON("_id" << uuid),
+                                     clustered_util::makeDefaultClusteredIdIndex().getIndexSpec(),
+                                     /*collator=*/nullptr)
+            .getValue();
+
+    const BSONObj newDoc = BSON("_id" << uuid << kValidAsOfKey << entry.timestamp << kMetadataKey
+                                      << BSON(kCountKey << entry.count << kSizeKey << entry.size));
+
+    Snapshotted<BSONObj> existingDoc;
+    if (coll->findDoc(opCtx, rid, &existingDoc)) {
+        const auto diff = doc_diff::computeOplogDiff(existingDoc.value(), newDoc, /*padding=*/0);
+        invariant(diff.has_value(),
+                  fmt::format("Expected computed diff to be smaller than the post-image: "
+                              "pre={}, post={}",
+                              existingDoc.value().toString(),
+                              newDoc.toString()));
+        if (!diff->isEmpty()) {
+            CollectionUpdateArgs args(existingDoc.value());
+            args.update = update_oplog_entry::makeDeltaOplogEntry(*diff);
+            args.criteria = BSON("_id" << uuid);
+            collection_internal::updateDocument(
+                opCtx, coll, rid, existingDoc, newDoc, &args.update, nullptr, nullptr, &args);
+        }
+    } else {
+        massertStatusOK(collection_internal::insertDocument(
+            opCtx, coll, InsertStatement(newDoc), /*opDebug=*/nullptr));
+    }
 }
 }  // namespace mongo::replicated_fast_count

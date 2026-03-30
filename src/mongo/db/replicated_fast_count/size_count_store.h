@@ -33,6 +33,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/util/uuid.h"
 
+#include <ostream>
+
 #include <boost/optional/optional.hpp>
 
 namespace mongo::replicated_fast_count {
@@ -47,6 +49,7 @@ public:
         Timestamp timestamp{0, 0};
         int64_t size{0};
         int64_t count{0};
+        bool operator==(const Entry&) const = default;
     };
 
     /**
@@ -55,5 +58,16 @@ public:
      * If no entry exists for `uuid`, read() returns boost::none.
      */
     [[nodiscard]] boost::optional<Entry> read(OperationContext* opCtx, UUID uuid) const;
+
+    /**
+     * Upserts `entry` into the `config.fast_count_metadata_store` store. `entry` will
+     * overwrite any pre-existing document for `uuid`.
+     */
+    void write(OperationContext* opCtx, UUID uuid, const Entry& entry);
 };
+
+inline std::ostream& operator<<(std::ostream& os, const SizeCountStore::Entry& e) {
+    return os << "{ timestamp: " << e.timestamp.toString() << ", size: " << e.size
+              << ", count: " << e.count << " }";
+}
 }  // namespace mongo::replicated_fast_count
