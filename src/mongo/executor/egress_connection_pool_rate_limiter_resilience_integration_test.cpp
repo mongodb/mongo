@@ -40,7 +40,8 @@
 
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonmisc.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/database_name.h"
 #include "mongo/executor/connection_pool_stats.h"
@@ -58,7 +59,10 @@
 #include "mongo/util/time_support.h"
 
 #include <functional>
+#include <string>
 #include <vector>
+
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -71,6 +75,7 @@ public:
         auto opts = makeDefaultConnectionPoolOptions();
         opts.hostTimeout = Hours{24};
         opts.refreshTimeout = Seconds{5};
+        _poolOptionsSnapshotForDiagnostics = opts;
         setConnectionPoolOptions(opts);
 
         startNet();
@@ -109,15 +114,53 @@ public:
 
     void waitForRateLimiterStat(std::function<bool(const BSONObj&)> pred, StringData description) {
         const auto deadline = Date_t::now() + Seconds{30};
+        int pollIterations = 0;
+        BSONObj lastServerStatus;
         while (Date_t::now() < deadline) {
-            auto status = runSetupCommandSync(DatabaseName::kAdmin, BSON("serverStatus" << 1));
-            const auto& rl = status["connections"]["establishmentRateLimit"];
-            if (pred(rl.Obj())) {
-                return;
+            ++pollIterations;
+            lastServerStatus = runSetupCommandSync(DatabaseName::kAdmin, BSON("serverStatus" << 1));
+            if (lastServerStatus.hasField("connections")) {
+                const BSONObj connections = lastServerStatus["connections"].Obj();
+                if (connections.hasField("establishmentRateLimit")) {
+                    const BSONObj rl = connections["establishmentRateLimit"].Obj();
+                    if (pred(rl)) {
+                        return;
+                    }
+                }
             }
             sleepmillis(100);
         }
-        FAIL(fmt::format("Timed out waiting for rate-limiter stat: {}", description));
+
+        const std::string rlJson = lastServerStatus.hasField("connections") &&
+                lastServerStatus["connections"].Obj().hasField("establishmentRateLimit")
+            ? lastServerStatus["connections"]["establishmentRateLimit"].Obj().jsonString()
+            : std::string("(missing establishmentRateLimit)");
+        const std::string connectionsJson = lastServerStatus.hasField("connections")
+            ? lastServerStatus["connections"].Obj().jsonString()
+            : std::string("(missing connections)");
+        const std::string poolStatsJson = _dumpEgressConnectionPoolStatsJson();
+
+        LOGV2_ERROR(1196902,
+                    "EgressPoolRateLimiterResilienceTest timed out waiting for rate limiter stat",
+                    "description"_attr = description,
+                    "pollIterations"_attr = pollIterations,
+                    "grpcEgress"_attr = unittest::shouldUseGRPCEgress(),
+                    "establishmentRateLimit"_attr = rlJson,
+                    "connectionsSectionChars"_attr = connectionsJson.size());
+        FAIL(
+            fmt::format("Timed out waiting for rate-limiter stat: {}. "
+                        "pollIterations={} grpcEgress={} "
+                        "poolOptionsSnapshot: {} "
+                        "lastEstablishmentRateLimit: {} "
+                        "lastServerStatus.connections: {} "
+                        "egressConnectionPoolStats: {}",
+                        description,
+                        pollIterations,
+                        unittest::shouldUseGRPCEgress(),
+                        _dumpConnectionPoolOptionsSnapshot(),
+                        rlJson,
+                        connectionsJson,
+                        poolStatsJson));
     }
 
     std::vector<Future<RemoteCommandResponse>> sendPings(int count, Milliseconds timeout) {
@@ -167,20 +210,138 @@ public:
     }
 
     void assertAllRequestsSucceeded(std::vector<Future<RemoteCommandResponse>>& futures) {
-        for (auto& f : futures) {
-            auto res = f.getNoThrow(interruptible());
-            ASSERT_OK(res.getStatus()) << "Request failed at transport level";
-            ASSERT_OK(res.getValue().status) << "Request failed at command level";
+        for (size_t i = 0; i < futures.size(); ++i) {
+            auto res = futures[i].getNoThrow(interruptible());
+            if (!res.isOK()) {
+                const BSONObj lastServerStatus =
+                    runSetupCommandSync(DatabaseName::kAdmin, BSON("serverStatus" << 1));
+                LOGV2_ERROR(1196903,
+                            "EgressPoolRateLimiterResilienceTest assertAllRequestsSucceeded failed "
+                            "(transport)",
+                            "index"_attr = i,
+                            "status"_attr = res.getStatus().toString());
+                FAIL(
+                    fmt::format("Request failed at transport level (index={}): {}. "
+                                "Diagnostics: grpcEgress={} poolOptions={} "
+                                "serverStatus.connections.establishmentRateLimit={} "
+                                "egressConnectionPoolStats={}",
+                                i,
+                                res.getStatus().toString(),
+                                unittest::shouldUseGRPCEgress(),
+                                _dumpConnectionPoolOptionsSnapshot(),
+                                _dumpEstablishmentRateLimitJson(lastServerStatus),
+                                _dumpEgressConnectionPoolStatsJson()));
+            }
+            if (!res.getValue().status.isOK()) {
+                const BSONObj lastServerStatus =
+                    runSetupCommandSync(DatabaseName::kAdmin, BSON("serverStatus" << 1));
+                LOGV2_ERROR(1196904,
+                            "EgressPoolRateLimiterResilienceTest assertAllRequestsSucceeded failed "
+                            "(response status)",
+                            "index"_attr = i,
+                            "response"_attr = res.getValue().toString());
+                FAIL(
+                    fmt::format("Request failed at response status (index={}): {}. "
+                                "Full response: {}. "
+                                "Diagnostics: grpcEgress={} poolOptions={} "
+                                "serverStatus.connections.establishmentRateLimit={} "
+                                "egressConnectionPoolStats={}",
+                                i,
+                                res.getValue().status.toString(),
+                                res.getValue().toString(),
+                                unittest::shouldUseGRPCEgress(),
+                                _dumpConnectionPoolOptionsSnapshot(),
+                                _dumpEstablishmentRateLimitJson(lastServerStatus),
+                                _dumpEgressConnectionPoolStatsJson()));
+            }
         }
     }
 
     void assertAllRequestsFailed(std::vector<Future<RemoteCommandResponse>>& futures) {
+        std::vector<StatusWith<RemoteCommandResponse>> results;
+        results.reserve(futures.size());
         for (auto& f : futures) {
-            auto res = f.getNoThrow(interruptible());
-            Status failStatus = res.isOK() ? res.getValue().status : res.getStatus();
-            ASSERT_EQ(failStatus.code(), ErrorCodes::HostUnreachable)
-                << "Expected HostUnreachable, got: " << failStatus;
+            results.push_back(f.getNoThrow(interruptible()));
         }
+
+        for (size_t i = 0; i < results.size(); ++i) {
+            const auto& res = results[i];
+            const Status failStatus = res.isOK() ? res.getValue().status : res.getStatus();
+            if (failStatus.code() == ErrorCodes::HostUnreachable) {
+                continue;
+            }
+
+            const BSONObj lastServerStatus =
+                runSetupCommandSync(DatabaseName::kAdmin, BSON("serverStatus" << 1));
+            std::string allResponses;
+            for (size_t j = 0; j < results.size(); ++j) {
+                const auto& rj = results[j];
+                if (rj.isOK()) {
+                    allResponses += fmt::format(
+                        "[{}] OK transport; response: {}\n", j, rj.getValue().toString());
+                } else {
+                    allResponses +=
+                        fmt::format("[{}] StatusWith error: {}\n", j, rj.getStatus().toString());
+                }
+            }
+            LOGV2_ERROR(1196905,
+                        "EgressPoolRateLimiterResilienceTest assertAllRequestsFailed mismatch",
+                        "index"_attr = i,
+                        "expected"_attr = ErrorCodes::HostUnreachable,
+                        "actual"_attr = failStatus.toString());
+            FAIL(
+                fmt::format("Expected HostUnreachable for all requests; mismatch at index={}. "
+                            "Got: {}. "
+                            "All futures: ---\n{}---\n"
+                            "Diagnostics: grpcEgress={} poolOptions={} "
+                            "serverStatus.connections.establishmentRateLimit={} "
+                            "egressConnectionPoolStats={}",
+                            i,
+                            failStatus.toString(),
+                            allResponses,
+                            unittest::shouldUseGRPCEgress(),
+                            _dumpConnectionPoolOptionsSnapshot(),
+                            _dumpEstablishmentRateLimitJson(lastServerStatus),
+                            _dumpEgressConnectionPoolStatsJson()));
+        }
+    }
+
+private:
+    /**
+     * Snapshot of pool options from setUp; included in failure diagnostics only.
+     */
+    ConnectionPool::Options _poolOptionsSnapshotForDiagnostics{};
+
+    std::string _dumpConnectionPoolOptionsSnapshot() const {
+        const auto& o = _poolOptionsSnapshotForDiagnostics;
+        return fmt::format(
+            "minConnections={} maxConnections={} maxConnecting={} "
+            "refreshTimeout={}ms refreshRequirement={}ms hostTimeout={}ms",
+            o.minConnections,
+            o.maxConnections,
+            o.maxConnecting,
+            o.refreshTimeout.count(),
+            o.refreshRequirement.count(),
+            o.hostTimeout.count());
+    }
+
+    std::string _dumpEgressConnectionPoolStatsJson() {
+        ConnectionPoolStats stats;
+        net().appendConnectionStats(&stats);
+        BSONObjBuilder bob;
+        stats.appendToBSON(bob);
+        return bob.obj().jsonString();
+    }
+
+    static std::string _dumpEstablishmentRateLimitJson(const BSONObj& serverStatus) {
+        if (!serverStatus.hasField("connections")) {
+            return "(serverStatus has no connections)";
+        }
+        const BSONObj connections = serverStatus["connections"].Obj();
+        if (!connections.hasField("establishmentRateLimit")) {
+            return "(connections has no establishmentRateLimit)";
+        }
+        return connections["establishmentRateLimit"].Obj().jsonString();
     }
 };
 
