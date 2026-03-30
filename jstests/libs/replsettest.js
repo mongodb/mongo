@@ -2031,14 +2031,28 @@ export class ReplSetTest {
 
     /**
      * Waits for the last oplog entry on the primary to be visible in the committed snapshot view
-     * of the oplog on *all* secondaries. When majority read concern is disabled, there is no
-     * committed snapshot view, so this function waits for the knowledge of the majority commit
-     * point on each node to advance to the optime of the last oplog entry on the primary.
+     * of the oplog on *all* secondaries (or on passed in members).
+     * Same as awaitLastOpCommittedFromNode() but uses this.getPrimary() as the primary node to get
+     * the last oplog entry from.
      * Returns last oplog entry.
      */
     awaitLastOpCommitted(timeout, members) {
+        const primary = this.getPrimary();
+        return this.awaitLastOpCommittedFromNode(timeout, primary, members);
+    }
+
+    /**
+     * Waits for the last oplog entry on the primary (passed in) to be visible in the committed
+     * snapshot view of the oplog on *all* secondaries (or on passed in members).
+     * Same as awaitLastOpCommitted() but allows passing in a primary node in case the ReplSetTest
+     * object has an inaccurate view of the current primary.
+     * When majority read concern is disabled, there is no committed snapshot view, so this function
+     * waits for the knowledge of the majority commit point on each node to advance to the optime of
+     * the last oplog entry on the primary.
+     * Returns last oplog entry.
+     */
+    awaitLastOpCommittedFromNode(timeout, primary, members) {
         let rst = this;
-        let primary = rst.getPrimary();
         let primaryOpTime = _getLastOpTime(this, primary);
 
         let membersToCheck;
