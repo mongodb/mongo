@@ -2939,6 +2939,33 @@ class TestBinder(testcase.IDLTestcase):
             idl.errors.ERROR_ID_INCREMENTAL_ROLLOUT_PHASE_INVALID_VALUE,
         )
 
+        # IFR flag with serialize_on_outgoing_requests
+        self.assert_bind(
+            textwrap.dedent("""
+            feature_flags:
+                featureFlagToaster:
+                    description: "Make toast"
+                    cpp_varname: gToaster
+                    incremental_rollout_phase: in_development
+                    fcv_gated: false
+                    serialize_on_outgoing_requests: true
+            """)
+        )
+
+        # serialize_on_outgoing_requests not allowed on non-IFR flags (fcv_gated: false)
+        self.assert_bind_fail(
+            textwrap.dedent("""
+            feature_flags:
+                featureFlagToaster:
+                    description: "Make toast"
+                    cpp_varname: gToaster
+                    default: true
+                    fcv_gated: false
+                    serialize_on_outgoing_requests: true
+            """),
+            idl.errors.ERROR_ID_SERIALIZE_ON_OUTGOING_REQUESTS_ON_NON_IFR_FLAG,
+        )
+
         # if set for incremental feature rollout (IFR), version not allowed
         self.assert_bind_fail(
             textwrap.dedent("""

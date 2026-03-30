@@ -876,6 +876,7 @@ class FeatureFlag(common.SourceLocation):
         self.fcv_gated = None  # type: Expression
         self.enable_on_transitional_fcv_UNSAFE = None  # type: bool
         self.incremental_rollout_phase = None  # type: Optional[str]
+        self.serialize_on_outgoing_requests = None  # type: Optional[bool]
         self.check_against_fcv = None  # type: Optional[str]
 
         super(FeatureFlag, self).__init__(file_name, line, column)

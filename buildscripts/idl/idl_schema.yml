@@ -953,6 +953,12 @@ properties:
               - in_development
               - rollout
               - released
+          serialize_on_outgoing_requests:
+            type: boolean
+            description: >
+              If true, this IFR flag's current value will be serialized on outgoing requests
+              (e.g., to shards) so that remote nodes use the same value as the sender.
+              Only valid on IFR flags (those with an incremental_rollout_phase specified).
           check_against_fcv:
             type: string
             description: >

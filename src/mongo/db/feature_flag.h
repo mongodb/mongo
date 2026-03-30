@@ -355,8 +355,16 @@ class IncrementalRolloutFeatureFlag : public FeatureFlag {
 public:
     static IncrementalRolloutFeatureFlag* findByName(StringData flagName);
 
-    IncrementalRolloutFeatureFlag(StringData flagName, RolloutPhase phase, bool value)
-        : _flagName(std::string{flagName}), _phase(phase), _value(value) {}
+    static std::vector<IncrementalRolloutFeatureFlag*> getFlagsForOutgoingRequests();
+
+    IncrementalRolloutFeatureFlag(StringData flagName,
+                                  RolloutPhase phase,
+                                  bool value,
+                                  bool serializeOnOutgoingRequests = false)
+        : _flagName(std::string{flagName}),
+          _phase(phase),
+          _value(value),
+          _serializeOnOutgoingRequests(serializeOnOutgoingRequests) {}
 
     /**
      * Returns true if the feature is currently enabled, false otherwise. Also increments the
@@ -385,6 +393,10 @@ public:
 
     const std::string& getName() const {
         return _flagName;
+    }
+
+    bool shouldSerializeOnOutgoingRequests() const {
+        return _serializeOnOutgoingRequests;
     }
 
     bool allowRuntimeToggle() const override {
@@ -428,6 +440,7 @@ private:
     std::string _flagName;
     RolloutPhase _phase;
     Atomic<bool> _value;
+    bool _serializeOnOutgoingRequests;
 
     Atomic<int64_t> _numFalseChecks;
     Atomic<int64_t> _numTrueChecks;

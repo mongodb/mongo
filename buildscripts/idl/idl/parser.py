@@ -55,7 +55,6 @@ class _RuleDesc(object):
     Similar for sequence_parser_func.
     """
 
-    # TODO: after porting to Python 3, use an enum
     REQUIRED = 1
     OPTIONAL = 2
 
@@ -984,6 +983,7 @@ def _parse_feature_flag(ctxt, spec, name, node):
             ),
             "enable_on_transitional_fcv_UNSAFE": _RuleDesc("bool_scalar"),
             "incremental_rollout_phase": _RuleDesc("scalar"),
+            "serialize_on_outgoing_requests": _RuleDesc("bool_scalar"),
             "check_against_fcv": _RuleDesc("scalar"),
         },
     )

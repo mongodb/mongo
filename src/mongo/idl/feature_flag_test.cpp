@@ -577,5 +577,21 @@ TEST(IDLFeatureFlag, SerializeFlagValues) {
     ASSERT_TRUE(serializedResult[0]["value"].Bool());
 }
 
+TEST(IDLFeatureFlag, ShouldSerializeOnOutgoingRequestsFalse) {
+    ASSERT_FALSE(
+        feature_flags::gFeatureFlagInDevelopmentForTest.shouldSerializeOnOutgoingRequests());
+}
+
+TEST(IDLFeatureFlag, ShouldSerializeOnOutgoingRequestsTrue) {
+    ASSERT_TRUE(feature_flags::gFeatureFlagSerializeForTest.shouldSerializeOnOutgoingRequests());
+}
+
+TEST(IDLFeatureFlag, GetFlagsForOutgoingRequests) {
+    auto flags = IncrementalRolloutFeatureFlag::getFlagsForOutgoingRequests();
+    for (auto* flag : flags) {
+        ASSERT_TRUE(flag->shouldSerializeOnOutgoingRequests());
+    }
+}
+
 }  // namespace
 }  // namespace mongo

@@ -355,3 +355,9 @@ filters:
   - "action_duration_metrics*":
     approvers:
       - 10gen/server-storage-engine-integration
+  - "feature_flag.*":
+    approvers:
+      - 10gen/server-programmability
+  - "feature_flag_test.idl.tpl":
+    approvers:
+      - 10gen/server-programmability
