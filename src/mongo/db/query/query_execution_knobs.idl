@@ -962,20 +962,6 @@ server_parameters:
             gte: 0
         redact: false
 
-    internalQueryMaxBitTestIntermediatePositions:
-        description: >-
-            Maximum number of bit positions that a $bitTest expression (bitsAllSet, bitsAllClear,
-            bitsAnySet, bitsAnyClear) may accumulate when constructed from a BinData mask. This
-            limits peak memory usage when parsing queries with very large binary bitmasks.
-        set_at: [startup, runtime]
-        cpp_varname: "internalQueryMaxBitTestIntermediatePositions"
-        cpp_vartype: AtomicWord<int>
-        default:
-            expr: std::numeric_limits<int>::max()
-        validator:
-            gte: 64
-        redact: false
-
     internalQueryEnableWriteConflictBackoffWithoutTicket:
         description: >-
             Enables behavior where the query engine will release resources before sleeping for write
