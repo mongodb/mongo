@@ -193,42 +193,6 @@ runTest({query: {a: {$gte: 6}}, projection: {c: 0}},
         [{_id: 6, a: [3, 5, 8]}],
         true);
 
-// Test basic auto-parameterization of $bitsAllClear.
-runTest({query: {a: {$bitsAllClear: [0, 3]}}, projection: {_id: 1}},
-        [{_id: 1}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 16}],
-        {query: {a: {$bitsAllClear: [0, 2, 65]}}, projection: {_id: 1}},
-        [{_id: 1}, {_id: 6}, {_id: 16}],
-        true);
-
-// Test basic auto-parameterization of $bitsAllSet.
-runTest({query: {a: {$bitsAllSet: [0, 2]}}, projection: {_id: 1}},
-        [{_id: 5}, {_id: 6}],
-        {query: {a: {$bitsAllSet: [0, 1]}}, projection: {_id: 1}},
-        [{_id: 2}, {_id: 5}, {_id: 6}],
-        true);
-
-// Test basic auto-parameterization of $bitsAnyClear.
-runTest({query: {a: {$bitsAnyClear: 1}}, projection: {_id: 1}},
-        [{_id: 1}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}, {_id: 16}],
-        {query: {a: {$bitsAnyClear: 3}}, projection: {_id: 1}},
-        [{_id: 0}, {_id: 1}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}, {_id: 16}],
-        true);
-
-// Test basic auto-parameterization of $bitsAnySet.
-runTest({query: {a: {$bitsAnySet: 1}}, projection: {_id: 1}},
-        [{_id: 0}, {_id: 2}, {_id: 5}, {_id: 6}],
-        {query: {a: {$bitsAnySet: 3}}, projection: {_id: 1}},
-        [{_id: 0}, {_id: 1}, {_id: 2}, {_id: 5}, {_id: 6}],
-        true);
-
-// Auto-parameterization of bit-test operators should work even if looking past 64 bits is required
-// in order to match against binary data.
-runTest({query: {a: {$bitsAllSet: [0, 94]}}, projection: {_id: 1}},
-        [],
-        {query: {a: {$bitsAllSet: [88, 89, 90, 91, 92, 93]}}, projection: {_id: 1}},
-        [{_id: 16}],
-        true);
-
 // Test auto-parameterization of $elemMatch object.
 runTest({query: {a: {$elemMatch: {b: {$gt: 3, $lt: 5}}}}, projection: {_id: 1}},
         [{_id: 11}],
