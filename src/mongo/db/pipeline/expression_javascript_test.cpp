@@ -50,6 +50,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/scopeguard.h"
 
 #include <memory>
 
@@ -272,7 +273,9 @@ TEST_F(ExpressionJavascriptTest, ExpressionInternalJsEmitFailsIfEvalIsNotCorrect
 
 TEST_F(ExpressionJavascriptTest,
        ExpressionInternalJsErrorsIfProducesTooManyDocumentsForNonDefaultValue) {
+    auto origLimit = internalQueryMaxJsEmitBytes.load();
     internalQueryMaxJsEmitBytes.store(1);
+    ON_BLOCK_EXIT([&] { internalQueryMaxJsEmitBytes.store(origLimit); });
     auto bsonExpr = BSON(
         "expr" << BSON("this" << "$$ROOT"
                               << "eval"
@@ -280,6 +283,76 @@ TEST_F(ExpressionJavascriptTest,
     auto expr = ExpressionInternalJsEmit::parse(getExpCtxRaw(), bsonExpr.firstElement(), getVPS());
     ASSERT_THROWS_CODE(
         expr->evaluate(Document{BSON("val" << 1)}, getVariables()), AssertionException, 31292);
+}
+
+// ExpressionFunction and ExpressionInternalJsEmit that share an ExpressionContext also share
+// the same MozJS scope, so globalThis written by one is visible to the other.
+TEST_F(ExpressionJavascriptTest, GlobalThisIsSharedBetweenExpressionFunctionAndInternalJsEmit) {
+    auto expCtx = getExpCtxRaw();
+    auto funcBson =
+        BSON("expr" << BSON("body" << "function() { globalThis._shared = true; return 1; }"
+                                   << "args" << BSONArray() << "lang"
+                                   << ExpressionFunction::kJavaScript));
+    auto funcExpr = ExpressionFunction::parse(expCtx, funcBson.firstElement(), getVPS());
+    funcExpr->evaluate(Document{BSONObj{}}, getVariables());
+
+    auto emitBson =
+        BSON("expr" << BSON("this" << "$$ROOT"
+                                   << "eval"
+                                   << "function() { emit(this.c, globalThis._shared ? 1 : 0); }"));
+    auto emitExpr = ExpressionInternalJsEmit::parse(expCtx, emitBson.firstElement(), getVPS());
+    Value result = emitExpr->evaluate(Document{Document{BSON("c" << 3)}}, getVariables());
+    ASSERT_VALUE_EQ(result, Value(BSON_ARRAY(BSON("k" << 3 << "v" << 1))));
+}
+
+// Calling a stale emit() reference (stored in globalThis) from ExpressionFunction after
+// the owning ExpressionInternalJsEmit evaluate() has returned must throw error 9712400.
+TEST_F(ExpressionJavascriptTest,
+       ExpressionInternalJsEmitStaleEmitCalledFromExpressionFunctionThrows) {
+    auto expCtx = getExpCtxRaw();
+    auto emitBson =
+        BSON("expr" << BSON("this" << "$$ROOT"
+                                   << "eval"
+                                   << "function() { if (!globalThis._staleEmit) "
+                                      "globalThis._staleEmit = emit; emit(this.x, 1); }"));
+    auto emitExpr = ExpressionInternalJsEmit::parse(expCtx, emitBson.firstElement(), getVPS());
+    Value emitResult = emitExpr->evaluate(Document{BSON("x" << 5)}, getVariables());
+    ASSERT_VALUE_EQ(emitResult, Value(BSON_ARRAY(BSON("k" << 5 << "v" << 1))));
+
+    auto funcBson = BSON("expr" << BSON("body" << "function() { if (globalThis._staleEmit) "
+                                                  "globalThis._staleEmit(this.x, 999); return 42; }"
+                                               << "args" << BSONArray() << "lang"
+                                               << ExpressionFunction::kJavaScript));
+    auto funcExpr = ExpressionFunction::parse(expCtx, funcBson.firstElement(), getVPS());
+    ASSERT_THROWS_CODE(
+        funcExpr->evaluate(Document{BSON("x" << 5)}, getVariables()), AssertionException, 9712400);
+}
+
+// The results of an ExpressionInternalJsEmit evaluation must not be polluted by a stale emit
+// reference that happens to be called from a $function stage between two document evaluations.
+TEST_F(ExpressionJavascriptTest,
+       ExpressionInternalJsEmitResultsAreCleanAfterStaleEmitCalledBetweenEvaluations) {
+    // First evaluate on doc {x:1}: saves emit to globalThis, produces [{k:1,v:1}].
+    auto expCtx = getExpCtxRaw();
+    auto emitBson1 =
+        BSON("expr" << BSON("this" << "$$ROOT"
+                                   << "eval"
+                                   << "function() { if (!globalThis._staleEmit2) "
+                                      "globalThis._staleEmit2 = emit; emit(this.x, 1); }"));
+    auto emitExpr = ExpressionInternalJsEmit::parse(expCtx, emitBson1.firstElement(), getVPS());
+    Value r1 = emitExpr->evaluate(Document{BSON("x" << 1)}, getVariables());
+    ASSERT_VALUE_EQ(r1, Value(BSON_ARRAY(BSON("k" << 1 << "v" << 1))));
+
+    // Stale emit should still act like emit() within another internal JS emit evaluation.
+    auto emitBson2 =
+        BSON("expr" << BSON(
+                 "this" << "$$ROOT"
+                        << "eval"
+                        << "function() { emit(this.x, 1); globalThis._staleEmit2(this.x, 999); }"));
+    auto emitExpr2 = ExpressionInternalJsEmit::parse(expCtx, emitBson2.firstElement(), getVPS());
+    Value r2 = emitExpr2->evaluate(Document{BSON("x" << 2)}, getVariables());
+    ASSERT_VALUE_EQ(r2,
+                    Value(BSON_ARRAY(BSON("k" << 2 << "v" << 1) << BSON("k" << 2 << "v" << 999))));
 }
 }  // namespace
 }  // namespace mongo

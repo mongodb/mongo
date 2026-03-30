@@ -124,7 +124,8 @@ public:
      * user-defined functions.
      */
     void injectEmit(NativeFunction emitFn, void* data) {
-        _scope->injectNative("emit", emitFn, data);
+        emitData = data;
+        _scope->injectNative("emit", emitFn, &emitData);
     }
 
     Scope* getScope() {
@@ -136,6 +137,7 @@ private:
     std::unique_ptr<Scope> _scope;
     bool _storedProceduresLoaded = false;
     int _fnCallTimeoutMillis;
+    void* emitData = nullptr;
 
     Value doCallFunction(ScriptingFunction func,
                          const BSONObj& params,
