@@ -32,6 +32,7 @@ export function getDocModel({allowUnicode, allowNullBytes} = {}) {
         array: oneof(scalarArb, arrayFieldModel),
         a: scalarArb,
         b: scalarArb,
+        "": scalarArb,
     });
 }
 

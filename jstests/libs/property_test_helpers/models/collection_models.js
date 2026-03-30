@@ -17,5 +17,13 @@ export function getCollectionModel({isTS = false, indexesModel, docsModel} = {})
         indexesModel = fc.array(indexModel, {minLength: 0, maxLength: 15, size: "+2"});
     }
 
-    return fc.record({isTS: fc.constant(isTSCollection), docs: docsModel, indexes: indexesModel});
+    // For time-series collections, vary the metaField between the standard "m" and the empty
+    // string "" to exercise empty-field meta paths. For non-TS collections this is unused.
+    const metaFieldArb = isTSCollection ? fc.constantFrom("m", "", "meta") : fc.constant(undefined);
+    return fc.record({
+        isTS: fc.constant(isTSCollection),
+        metaField: metaFieldArb,
+        docs: docsModel,
+        indexes: indexesModel,
+    });
 }

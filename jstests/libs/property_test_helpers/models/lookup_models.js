@@ -2,14 +2,14 @@
  * $lookup models for our core property tests.
  */
 
-import {assignableFieldArb, fieldArb} from "jstests/libs/property_test_helpers/models/basic_models.js";
+import {assignableFieldArb, nonEmptyFieldArb} from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 export function getEqLookupArb(from) {
     return fc
         .record({
-            localField: fieldArb,
-            foreignField: fieldArb,
+            localField: nonEmptyFieldArb,
+            foreignField: nonEmptyFieldArb,
             as: assignableFieldArb,
         })
         .map(({localField, foreignField, as}) => {
@@ -21,8 +21,8 @@ export function getEqLookupUnwindArb(fromArb) {
     return fc
         .record({
             from: fromArb,
-            localField: fieldArb,
-            foreignField: fieldArb,
+            localField: nonEmptyFieldArb,
+            foreignField: nonEmptyFieldArb,
             as: assignableFieldArb,
             preserveNullAndEmptyArrays: fc.boolean(),
         })

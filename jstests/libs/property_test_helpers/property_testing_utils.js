@@ -34,8 +34,8 @@ export function concreteQueryFromFamily(queryShape, leafId) {
     return queryShape;
 }
 
-function createColl(db, coll, isTS = false) {
-    const args = isTS ? {timeseries: {timeField: "t", metaField: "m"}} : {};
+function createColl(db, coll, isTS = false, metaField = "m") {
+    const args = isTS ? {timeseries: {timeField: "t", metaField}} : {};
     assert.commandWorked(db.createCollection(coll.getName(), args));
 }
 
@@ -102,9 +102,9 @@ function runProperty(propertyFn, namespaces, workload, sortArrays) {
     let {collSpec, foreignCollSpec, queries, extraParams} = workload;
     const {controlColl, experimentColl, foreignControlColl, foreignExperimentColl} = namespaces;
 
-    function setUpCollection({collection, docs, isTS = false, indexes = []}) {
+    function setUpCollection({collection, docs, isTS = false, metaField = "m", indexes = []}) {
         assertDropCollection(collection.getDB(), collection.getName());
-        createColl(collection.getDB(), collection, isTS);
+        createColl(collection.getDB(), collection, isTS, metaField);
         assert.commandWorked(collection.insert(docs));
         createIndexesForPBT(collection, indexes);
     }
@@ -115,6 +115,7 @@ function runProperty(propertyFn, namespaces, workload, sortArrays) {
         collection: experimentColl,
         docs: collSpec.docs,
         isTS: collSpec.isTS,
+        metaField: collSpec.metaField,
         indexes: collSpec.indexes,
     });
 
@@ -131,6 +132,7 @@ function runProperty(propertyFn, namespaces, workload, sortArrays) {
             collection: foreignExperimentColl,
             docs: foreignCollSpec.docs,
             isTS: foreignCollSpec.isTS,
+            metaField: foreignCollSpec.metaField,
             indexes: foreignCollSpec.indexes,
         });
     }
