@@ -174,6 +174,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context",
         "//src/mongo/db/auth:authprivilege",
         "//src/mongo/db/auth:security_token_auth",
+        "//src/mongo/db/query:query_knobs",
         "//src/mongo/db/shard_role/lock_manager",
         "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter",
         "//src/mongo/rpc:message",
