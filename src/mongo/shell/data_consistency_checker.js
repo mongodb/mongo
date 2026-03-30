@@ -54,8 +54,9 @@ class CollInfos {
                 throw e;
             }
         }
-        const result = assert.commandWorked(conn.getDB("admin").runCommand({serverStatus: 1}));
-        this.binVersion = MongoRunner.getBinVersionFor(result.version);
+        // Use only "major.minor" since full versions may be incomparable (e.g. "9.0.0-foo" and "9.0.0-bar").
+        const {versionArray} = assert.commandWorked(conn.adminCommand({buildInfo: 1}));
+        this.binVersion = `${versionArray[0]}.${versionArray[1]}`;
     }
 
     ns(collName) {
