@@ -26,6 +26,7 @@ class Writer {
         const host = conn.host;
         const thread = new Thread(
             async function (host, config) {
+                for (const override of TestData.threadOverrides || []) await import(override);
                 const {Writer} = await import("jstests/libs/util/change_stream/change_stream_writer.js");
                 const {Connector} = await import("jstests/libs/util/change_stream/change_stream_connector.js");
                 const conn = new Mongo(host);
@@ -37,8 +38,9 @@ class Writer {
                         error: e.toString(),
                         stack: e.stack,
                     });
-                    Connector.notifyDone(conn, config.instanceName);
                     throw e;
+                } finally {
+                    Connector.notifyDone(conn, config.instanceName);
                 }
             },
             host,
@@ -84,7 +86,6 @@ class Writer {
         }
 
         jsTest.log.info(`Writer [${config.instanceName}]: all ${config.commandSpecs.length} commands completed`);
-        Connector.notifyDone(conn, config.instanceName);
     }
 }
 

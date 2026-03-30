@@ -14,10 +14,21 @@ import {ChangeEventMatcher} from "jstests/libs/util/change_stream/change_stream_
 import {SingleChangeStreamMatcher} from "jstests/libs/util/change_stream/change_stream_matcher.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ChangeStreamReader, ChangeStreamReadingMode} from "jstests/libs/util/change_stream/change_stream_reader.js";
+import {
+    Verifier,
+    SingleReaderVerificationTestCase,
+    PrefixReadTestCase,
+    SequentialPairwiseFetchingTestCase,
+} from "jstests/libs/util/change_stream/change_stream_verifier.js";
 import {ChangeStreamWatchMode} from "jstests/libs/query/change_stream_util.js";
+import {
+    BackgroundMutator,
+    BackgroundMutatorOpType,
+} from "jstests/libs/util/change_stream/change_stream_background_mutator.js";
 
-// Default test database name - all tests use this.
+// Default test database and collection names.
 const TEST_DB = "test_cs";
+const TEST_COLL = "test_coll_fsm";
 
 // TODO SERVER-121182: Replace with a random seed (already logged in setupFsmTest).
 const TEST_SEED = 42;
@@ -27,8 +38,10 @@ const TEST_SEED = 42;
  * These events have unpredictable behavior in multi-shard clusters:
  * - createIndexes: Emitted per-shard, count depends on shard distribution
  * - dropIndexes: Emitted per-shard, count depends on shard distribution
+ * - modify: Emitted when collection metadata changes during FCV transitions
+ *   triggered by the BackgroundMutator (flipFCV op).
  */
-const kExcludedOperationTypes = ["createIndexes", "dropIndexes"];
+const kExcludedOperationTypes = ["createIndexes", "dropIndexes", "modify"];
 
 /**
  * Get a fresh cluster time by doing a no-op write.
@@ -156,9 +169,9 @@ function setupFsmTest(ctx, testName, options = {}) {
     const startState = options.startState || State.DATABASE_ABSENT;
     jsTest.log.info(`FSM ${testName}: using seed ${TEST_SEED}`);
     Random.setRandomSeed(TEST_SEED);
-    const dbName = TEST_DB;
-    const collName = "test_coll_fsm";
     const ts = Date.now();
+    const dbName = TEST_DB;
+    const collName = TEST_COLL;
 
     const params = new ShardingCommandGeneratorParams(dbName, collName, ctx.fsmShards);
     const generator = new ShardingCommandGenerator(TEST_SEED);
@@ -183,6 +196,21 @@ function setupFsmTest(ctx, testName, options = {}) {
     const writerInstanceName = `writer_${testName}_${ts}`;
     ctx.fsmInstancesToCleanup.push(writerInstanceName);
     Writer.run(ctx.fsmSt.s, writerInstanceName, commands, TEST_SEED);
+
+    // When the bg_mutator suite variant is active, start a BackgroundMutator that
+    // runs concurrent cluster operations (FCV flips, resetPlacementHistory) until
+    // the writer completes. Controlled entirely by TestData — tests don't need to
+    // pass any bg mutator options.
+    if (TestData.enableBgMutator) {
+        const mutatorInstanceName = `bgmutator_${testName}_${ts}`;
+        ctx.fsmInstancesToCleanup.push(mutatorInstanceName);
+        BackgroundMutator.start(ctx.fsmSt.s, {
+            ops: [BackgroundMutatorOpType.ResetPlacementHistory, BackgroundMutatorOpType.FlipFCV],
+            shardingTest: ctx.fsmSt,
+            seed: TEST_SEED,
+            instanceName: mutatorInstanceName,
+        });
+    }
 
     const expectedEvents = computeAndLogExpectedEvents(testName, commands);
     const commandTrace = buildCommandTrace(commands);
@@ -253,6 +281,7 @@ function runWithFsmCluster(testName, testFn, options = {}) {
     } finally {
         runTeardownSteps(
             () => Writer.joinAll(),
+            () => BackgroundMutator.join(),
             () => ChangeStreamReader.joinAll(),
             ...instancesToCleanup.map((name) => () => Connector.cleanup(fsmSt.s, name)),
             () => fsmSt.s.getDB(TEST_DB).dropDatabase(),
@@ -261,8 +290,114 @@ function runWithFsmCluster(testName, testFn, options = {}) {
     }
 }
 
+function verifyContinuous(fsmSt, {expectedEvents, baseReaderConfig, createInstanceName}) {
+    const readerInstanceName = createInstanceName("reader");
+    const verifierInstanceName = createInstanceName("verifier");
+
+    const readerConfig = {...baseReaderConfig, instanceName: readerInstanceName};
+    ChangeStreamReader.run(fsmSt.s, readerConfig);
+
+    new Verifier().run(
+        fsmSt.s,
+        {
+            changeStreamReaderConfigs: {[readerInstanceName]: readerConfig},
+            matcherSpecsByInstance: {[readerInstanceName]: createMatcher(expectedEvents)},
+            instanceName: verifierInstanceName,
+        },
+        [new SingleReaderVerificationTestCase(readerInstanceName)],
+    );
+}
+
+function verifyResume(fsmSt, {expectedEvents, baseReaderConfig, createInstanceName}) {
+    const readerInstanceName = createInstanceName("reader");
+    const verifierInstanceName = createInstanceName("verifier");
+
+    const readerConfig = {...baseReaderConfig, instanceName: readerInstanceName};
+    ChangeStreamReader.run(fsmSt.s, readerConfig);
+
+    const shardConnections = [];
+    for (let i = 0; fsmSt[`rs${i}`]; i++) {
+        shardConnections.push(fsmSt[`rs${i}`].getPrimary());
+    }
+
+    new Verifier().run(
+        fsmSt.s,
+        {
+            changeStreamReaderConfigs: {[readerInstanceName]: readerConfig},
+            matcherSpecsByInstance: {[readerInstanceName]: createMatcher(expectedEvents)},
+            instanceName: verifierInstanceName,
+            shardConnections,
+        },
+        [new PrefixReadTestCase(readerInstanceName, 3)],
+    );
+}
+
+function verifyFetchAndResume(fsmSt, {expectedEvents, baseReaderConfig, createInstanceName}) {
+    const readerContinuous = createInstanceName("reader_continuous");
+    const readerFoar = createInstanceName("reader_foar");
+    const verifierInstanceName = createInstanceName("verifier");
+
+    const continuousConfig = {
+        ...baseReaderConfig,
+        instanceName: readerContinuous,
+        readingMode: ChangeStreamReadingMode.kContinuous,
+    };
+    ChangeStreamReader.run(fsmSt.s, continuousConfig);
+
+    const foarConfig = {
+        ...baseReaderConfig,
+        instanceName: readerFoar,
+        readingMode: ChangeStreamReadingMode.kFetchOneAndResume,
+    };
+    ChangeStreamReader.run(fsmSt.s, foarConfig);
+
+    new Verifier().run(
+        fsmSt.s,
+        {
+            changeStreamReaderConfigs: {
+                [readerContinuous]: continuousConfig,
+                [readerFoar]: foarConfig,
+            },
+            matcherSpecsByInstance: {
+                [readerContinuous]: createMatcher(expectedEvents),
+                [readerFoar]: createMatcher(expectedEvents),
+            },
+            instanceName: verifierInstanceName,
+        },
+        [new SequentialPairwiseFetchingTestCase(readerContinuous, readerFoar)],
+    );
+}
+
+function verifyV1V2(fsmSt, {expectedEvents, baseReaderConfig, createInstanceName}) {
+    const readerV1 = createInstanceName("reader_v1");
+    const readerV2 = createInstanceName("reader_v2");
+    const verifierInstanceName = createInstanceName("verifier");
+
+    const readerConfigs = {
+        [readerV1]: {...baseReaderConfig, instanceName: readerV1, version: "v1"},
+        [readerV2]: {...baseReaderConfig, instanceName: readerV2, version: "v2"},
+    };
+
+    ChangeStreamReader.run(fsmSt.s, readerConfigs[readerV1]);
+    ChangeStreamReader.run(fsmSt.s, readerConfigs[readerV2]);
+
+    new Verifier().run(
+        fsmSt.s,
+        {
+            changeStreamReaderConfigs: readerConfigs,
+            matcherSpecsByInstance: {
+                [readerV1]: createMatcher(expectedEvents),
+                [readerV2]: createMatcher(expectedEvents),
+            },
+            instanceName: verifierInstanceName,
+        },
+        [new SequentialPairwiseFetchingTestCase(readerV1, readerV2)],
+    );
+}
+
 export {
     TEST_DB,
+    TEST_COLL,
     TEST_SEED,
     kExcludedOperationTypes,
     getCurrentClusterTime,
@@ -271,4 +406,9 @@ export {
     cleanupTestDatabase,
     setupFsmTest,
     runWithFsmCluster,
+    BackgroundMutatorOpType,
+    verifyContinuous,
+    verifyResume,
+    verifyFetchAndResume,
+    verifyV1V2,
 };

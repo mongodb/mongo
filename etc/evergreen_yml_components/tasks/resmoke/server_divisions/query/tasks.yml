@@ -2090,6 +2090,21 @@ tasks:
       - func: "do setup"
       - func: "run tests"
 
+  - <<: *gen_task_template
+    name: change_streams_sharding_fsm_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "change_streams",
+        "requires_all_feature_flags",
+        "sharding",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
   - <<: *task_template
     name: sharding_api_strict_passthrough
     tags:

@@ -2,6 +2,9 @@
  * FSM test: Continuous reading mode verification.
  * Verifies that continuous reading mode captures all expected events.
  *
+ * When run via a bg_mutator matrix suite variant, a concurrent BackgroundMutator
+ * performs FCV flips and placement history resets alongside the Writer.
+ *
  * @tags: [
  *   assumes_balancer_off,
  *   does_not_support_stepdowns,
@@ -9,29 +12,9 @@
  *   uses_change_streams,
  * ]
  */
-import {ChangeStreamReader} from "jstests/libs/util/change_stream/change_stream_reader.js";
-import {Verifier, SingleReaderVerificationTestCase} from "jstests/libs/util/change_stream/change_stream_verifier.js";
-import {createMatcher, runWithFsmCluster} from "jstests/libs/util/change_stream/change_stream_sharding_utils.js";
+import {runWithFsmCluster, verifyContinuous} from "jstests/libs/util/change_stream/change_stream_sharding_utils.js";
 import {State} from "jstests/libs/util/change_stream/change_stream_state.js";
 import {describe, it} from "jstests/libs/mochalite.js";
-
-function verifyContinuous(fsmSt, {expectedEvents, baseReaderConfig, createInstanceName}) {
-    const readerInstanceName = createInstanceName("reader");
-    const verifierInstanceName = createInstanceName("verifier");
-
-    const readerConfig = {...baseReaderConfig, instanceName: readerInstanceName};
-    ChangeStreamReader.run(fsmSt.s, readerConfig);
-
-    new Verifier().run(
-        fsmSt.s,
-        {
-            changeStreamReaderConfigs: {[readerInstanceName]: readerConfig},
-            matcherSpecsByInstance: {[readerInstanceName]: createMatcher(expectedEvents)},
-            instanceName: verifierInstanceName,
-        },
-        [new SingleReaderVerificationTestCase(readerInstanceName)],
-    );
-}
 
 describe("FSM Continuous", function () {
     it("db absent", function () {

@@ -1,0 +1,30 @@
+### Overrides for change_streams_sharding_fsm suites ###
+- name: bg_mutator
+  value:
+    executor:
+      config:
+        shell_options:
+          eval: >-
+            await import('jstests/libs/override_methods/implicit_change_stream_v2.js');
+            await import('jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js');
+            await import('jstests/libs/override_methods/implicitly_retry_on_fcv_upgrade_downgrade.js');
+          global_vars:
+            TestData:
+              enableBgMutator: true
+              migrationRetryExtraDDLCommands:
+                - "drop"
+                - "dropDatabase"
+                - "dropIndexes"
+                - "insert"
+                - "moveChunk"
+                - "movePrimary"
+                - "renameCollection"
+                - "shardCollection"
+                - "split"
+              migrationRetryExtraDDLErrors:
+                - "ReshardCollectionInterruptedDueToFCVChange"
+                - "Interrupted"
+              migrationRetryMatchFCVErrors: true
+              threadOverrides:
+                - "jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js"
+                - "jstests/libs/override_methods/implicitly_retry_on_fcv_upgrade_downgrade.js"

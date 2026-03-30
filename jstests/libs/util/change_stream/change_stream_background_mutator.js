@@ -3,7 +3,7 @@
  *
  * Responsibilities:
  * - Runs a configurable sequence of background operations in a loop.
- * - Waits for a stop signal from another instance via Connector.
+ * - Waits for a stop signal via Connector (set by join() in the main thread).
  * - Applies random jitter to delays for realistic timing variation.
  * - Signals completion via Connector.notifyDone(instanceName).
  */
@@ -33,14 +33,15 @@ class BackgroundMutator {
     static kDefaultVersionChangeDelayMs = 100;
     static kDefaultMinDelayMs = 2 * 1000;
     static kDefaultMaxDelayMs = 5 * 1000;
-    static _threads = [];
+    static _thread = null;
+    static _host = null;
+    static _instanceName = null;
 
     /**
      * Launch the background mutator in a background thread.
      * @param {Mongo} conn - MongoDB connection.
      * @param {Object} config - Configuration object containing:
      *   - instanceName: Name of the mutator instance (for signaling completion).
-     *   - stopInstanceNames: Array of instance names; mutator stops when all are done.
      *   - ops: (Optional) Array of BackgroundMutatorOpType values. Defaults to all op types.
      *   - minDelayMs: (Optional) Minimum delay between operations (default: 2s).
      *   - maxDelayMs: (Optional) Maximum delay between operations (default: 5s).
@@ -50,7 +51,9 @@ class BackgroundMutator {
      *   - oldBinaryVersion: (Optional) Old binary version to downgrade to for FlipBinary (e.g., "last-lts").
      */
     static start(conn, config) {
-        const host = conn.host;
+        assert(!BackgroundMutator._thread, "BackgroundMutator is already running");
+        BackgroundMutator._host = conn.host;
+        BackgroundMutator._instanceName = config.instanceName;
         const thread = new Thread(
             async function (host, config) {
                 const {BackgroundMutator} = await import(
@@ -66,53 +69,51 @@ class BackgroundMutator {
                         error: e.toString(),
                         stack: e.stack,
                     });
-                    Connector.notifyDone(conn, config.instanceName);
                     throw e;
+                } finally {
+                    Connector.notifyDone(conn, config.instanceName);
                 }
             },
-            host,
+            BackgroundMutator._host,
             config,
         );
         thread.start();
-        BackgroundMutator._threads.push(thread);
+        BackgroundMutator._thread = thread;
     }
 
-    static joinAll() {
-        const threads = BackgroundMutator._threads;
-        BackgroundMutator._threads = [];
-        const errors = [];
-        for (const t of threads) {
-            try {
-                t.join();
-            } catch (e) {
-                errors.push(e);
-            }
+    /**
+     * Signal the running mutator to stop, then join the thread.
+     */
+    static join() {
+        if (!BackgroundMutator._thread) {
+            return;
         }
-        if (errors.length > 0) {
-            jsTest.log.error("BackgroundMutator threads failed", {errors});
-            throw new Error(
-                `${errors.length} BackgroundMutator thread(s) failed: ${errors.map((e) => e.toString()).join("; ")}`,
-            );
+        Connector.notifyDone(new Mongo(BackgroundMutator._host), `${BackgroundMutator._instanceName}_stop`);
+        try {
+            BackgroundMutator._thread.join();
+        } finally {
+            BackgroundMutator._thread = null;
+            BackgroundMutator._host = null;
+            BackgroundMutator._instanceName = null;
         }
     }
 
     static _execute(conn, config) {
+        const stopFlag = `${config.instanceName}_stop`;
         const ops = config.ops || Object.values(BackgroundMutatorOpType);
-        const stopNames = config.stopInstanceNames;
-        assert(stopNames && stopNames.length > 0, "stopInstanceNames must be a non-empty array");
         const minDelayMs = config.minDelayMs || BackgroundMutator.kDefaultMinDelayMs;
         const maxDelayMs = config.maxDelayMs || BackgroundMutator.kDefaultMaxDelayMs;
 
         Random.setRandomSeed(config.seed);
 
-        while (!BackgroundMutator._allDone(conn, stopNames)) {
+        while (!Connector.isDone(conn, stopFlag)) {
             const opType = ops[Random.randInt(ops.length)];
             const delay = minDelayMs + Random.randInt(maxDelayMs - minDelayMs);
 
             jsTest.log.info(`BackgroundMutator [${config.instanceName}]: sleeping ${delay}ms before ${opType}`);
             sleep(delay);
 
-            if (BackgroundMutator._allDone(conn, stopNames)) {
+            if (Connector.isDone(conn, stopFlag)) {
                 break;
             }
 
@@ -120,13 +121,7 @@ class BackgroundMutator {
             BackgroundMutator._runOp(conn, opType, config);
         }
 
-        jsTest.log.info(`BackgroundMutator [${config.instanceName}]: all writers done, stopping`);
-        Connector.notifyDone(conn, config.instanceName);
-    }
-
-    static _allDone(conn, stopNames) {
-        assert(stopNames && stopNames.length > 0, "stopNames must be a non-empty array");
-        return stopNames.every((name) => Connector.isDone(conn, name));
+        jsTest.log.info(`BackgroundMutator [${config.instanceName}]: stop requested, exiting`);
     }
 
     /**

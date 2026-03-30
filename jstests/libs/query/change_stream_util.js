@@ -232,6 +232,11 @@ export function ChangeStreamTest(_db, options) {
     let self = this;
     options = options || {};
     const eventModifier = options.eventModifier || canonicalizeEventForTesting;
+    const _extraRetryableErrors = options.extraRetryableErrors || [];
+
+    function _isRetryableError(error) {
+        return isResumableChangeStreamError(error) || _extraRetryableErrors.includes(error.code);
+    }
 
     function updateResumeToken(cursor, changeEvents) {
         // This isn't fool proof since anyone can just a getMore command on the raw cursor.
@@ -290,7 +295,7 @@ export function ChangeStreamTest(_db, options) {
                     );
                     break;
                 } catch (e) {
-                    if (attemptNumber === maxTries || !isResumableChangeStreamError(e)) {
+                    if (attemptNumber === maxTries || !_isRetryableError(e)) {
                         throw e;
                     }
 
@@ -374,7 +379,7 @@ export function ChangeStreamTest(_db, options) {
                 updateResumeToken(cursor, getBatchFromCursorDocument(cursor));
                 return cursor;
             } catch (e) {
-                if (attemptNumber === maxRetries || !isResumableChangeStreamError(e)) {
+                if (attemptNumber === maxRetries || !_isRetryableError(e)) {
                     throw e;
                 }
                 self.restartChangeStream(cursor);

@@ -119,7 +119,7 @@ describe("ShardingCommandGenerator", function () {
         jsTest.log.info(`✓ Writer completed successfully`);
     });
 
-    it("should execute two Writers in parallel on different databases", () => {
+    it("should execute two Writers in parallel on different databases", function () {
         const dbNameA = TEST_DB + "_writer_a";
         const dbNameB = TEST_DB + "_writer_b";
         const collName = "test_coll";
