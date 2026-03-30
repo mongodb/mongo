@@ -169,6 +169,7 @@ mongo_cc_library(
     deps = [
         ":plan_enumerator",
         ":solution_storage",
+        "//src/mongo/db/query:query_knobs",
         "//src/mongo/db/query:random_utils",
     ],
 )

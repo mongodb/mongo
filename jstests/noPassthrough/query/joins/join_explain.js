@@ -1,7 +1,7 @@
 /**
  * Ensures that the join optimizer populates estimate information (e.g., CE) in the explain output.
  * @tags: [
- *   requires_fcv_83,
+ *   requires_fcv_90,
  *   requires_sbe
  * ]
  */
@@ -12,6 +12,7 @@ import {
     getQueryPlanner,
     getRejectedPlans,
 } from "jstests/libs/query/analyze_plan.js";
+import {plannerStageIsJoinOptNode} from "jstests/libs/query/join_utils.js";
 
 let conn = MongoRunner.runMongod();
 
@@ -133,5 +134,44 @@ runTest(pipeline, false /* expectRejected */);
 assert.commandWorked(coll2.createIndex({b: 1}));
 assert.commandWorked(coll3.createIndex({c: 1}));
 runTest(pipeline, true /* expectRejected */);
+
+// Test joinCostComponents explain output (internalQueryExplainJoinCostComponents knob).
+{
+    // Verify that when the knob is OFF, joinCostComponents is absent (default behaviour).
+    assert.commandWorked(conn.adminCommand({setParameter: 1, internalQueryExplainJoinCostComponents: false}));
+    {
+        const explain = coll1.explain().aggregate(pipeline);
+        const joinStages = getAllPlanStages(getWinningPlanFromExplain(explain)).filter(plannerStageIsJoinOptNode);
+        assert.gt(joinStages.length, 0, "Expected join opt stages: " + tojson(explain));
+        for (const stage of joinStages) {
+            assert(
+                !stage.hasOwnProperty("joinCostComponents"),
+                "joinCostComponents should be absent when knob is off: " + tojson(stage),
+            );
+        }
+    }
+
+    // Verify that when the knob is ON, joinCostComponents is present on every join opt stage.
+    assert.commandWorked(conn.adminCommand({setParameter: 1, internalQueryExplainJoinCostComponents: true}));
+    {
+        const explain = coll1.explain().aggregate(pipeline);
+        const joinStages = getAllPlanStages(getWinningPlanFromExplain(explain)).filter(plannerStageIsJoinOptNode);
+        assert.gt(joinStages.length, 0, "Expected join opt stages: " + tojson(explain));
+        for (const stage of joinStages) {
+            assert(
+                stage.hasOwnProperty("joinCostComponents"),
+                "joinCostComponents missing from join opt stage: " + tojson(stage),
+            );
+            const c = stage.joinCostComponents;
+            for (const field of ["docsProcessed", "docsOutput", "sequentialIOPages", "randomIOPages", "localOpCost"]) {
+                assert(c.hasOwnProperty(field), field + " missing from joinCostComponents: " + tojson(c));
+                assert.gte(c[field], 0, field + " must be non-negative: " + tojson(c));
+            }
+        }
+    }
+
+    // Reset the knob to its default.
+    assert.commandWorked(conn.adminCommand({setParameter: 1, internalQueryExplainJoinCostComponents: false}));
+}
 
 MongoRunner.stopMongod(conn);

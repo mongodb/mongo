@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/util/modules.h"
 
@@ -122,5 +123,25 @@ private:
 inline std::ostream& operator<<(std::ostream& os, const JoinCostEstimate& cost) {
     return os << cost.toString();
 }
+
+/**
+ * A QSNEstimate subclass for join embedding nodes that includes a detailed cost breakdown.
+ * When attached to a join node in the EstimateMap, its serialize() emits a 'joinCostComponents'
+ * sub-object in addition to the base costEstimate/cardinalityEstimate fields.
+ */
+class JoinExtraEstimateInfo : public cost_based_ranker::QSNEstimate {
+public:
+    JoinExtraEstimateInfo(cost_based_ranker::CardinalityEstimate outCE,
+                          cost_based_ranker::CostEstimate cost)
+        : QSNEstimate(std::move(outCE), std::move(cost)) {}
+
+    double docsProcessed{0};
+    double docsOutput{0};
+    double sequentialIOPages{0};
+    double randomIOPages{0};
+    double localOpCost{0};
+
+    void serialize(BSONObjBuilder& bob) const override;
+};
 
 }  // namespace mongo::join_ordering

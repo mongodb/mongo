@@ -520,6 +520,17 @@ server_parameters:
         on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
 
+    internalQueryExplainJoinCostComponents:
+        description: >-
+            When true, explain output for join embedding nodes includes a 'joinCostComponents'
+            sub-object with the detailed cost breakdown (docsProcessed, docsOutput,
+            sequentialIOPages, randomIOPages, localOpCost).
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryExplainJoinCostComponents"
+        cpp_vartype: AtomicWord<bool>
+        default: false
+        redact: false
+
     internalJoinReorderMode:
         description: "Picks which method is used to reorder joins (when enabled)."
         set_at: [startup, runtime]

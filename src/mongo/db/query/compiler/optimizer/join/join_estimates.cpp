@@ -29,7 +29,19 @@
 
 #include "mongo/db/query/compiler/optimizer/join/join_estimates.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
+
 namespace mongo::join_ordering {
+
+void JoinExtraEstimateInfo::serialize(BSONObjBuilder& bob) const {
+    QSNEstimate::serialize(bob);
+    BSONObjBuilder subBob(bob.subobjStart("joinCostComponents"));
+    subBob.append("docsProcessed", docsProcessed);
+    subBob.append("docsOutput", docsOutput);
+    subBob.append("sequentialIOPages", sequentialIOPages);
+    subBob.append("randomIOPages", randomIOPages);
+    subBob.append("localOpCost", localOpCost);
+}
 
 // These coefficients were calibrated in /buildscripts/cost_model/join_start.py,
 // which indicated that processing a single document takes 612 nanoseconds.

@@ -35,6 +35,7 @@
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator.h"
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator_helpers.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/random_utils.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -165,8 +166,17 @@ void addEstimatesIfExplain(const JoinReorderingContext& ctx,
     }
 
     auto ce = peCtx.getJoinCardinalityEstimator()->getOrEstimateSubsetCardinality(set);
-    estimates.insert_or_assign(
-        node, std::make_unique<cost_based_ranker::QSNEstimate>(ce, cost.getTotalCost()));
+    auto est = std::make_unique<cost_based_ranker::QSNEstimate>(ce, cost.getTotalCost());
+    if (internalQueryExplainJoinCostComponents.load()) {
+        auto joinEst = std::make_unique<JoinExtraEstimateInfo>(ce, cost.getTotalCost());
+        joinEst->docsProcessed = cost.getNumDocsProcessed().toDouble();
+        joinEst->docsOutput = cost.getNumDocsOutput().toDouble();
+        joinEst->sequentialIOPages = cost.getIoSeqPages().toDouble();
+        joinEst->randomIOPages = cost.getIoRandPages().toDouble();
+        joinEst->localOpCost = cost.getLocalOpCost().toDouble();
+        est = std::move(joinEst);
+    }
+    estimates.insert_or_assign(node, std::move(est));
 }
 
 // Forward-declare because of mutual recursion.
