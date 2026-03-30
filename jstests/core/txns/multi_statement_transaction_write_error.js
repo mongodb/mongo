@@ -83,11 +83,6 @@ function exerciseWriteInTxn({collNames, cmdName, goodOp, badOp, code}) {
             cmd = newCmd();
             cmd[docsField] = [goodOp, badOp];
             let expected = 1;
-            if (cmdName == "delete" && db.getMongo().isMongos()) {
-                // The bad delete write will cause mongos to fail during targetting and not
-                // do any write at all.
-                expected = 0;
-            }
             runInTxn({
                 cmd: cmd,
                 msg: `one bad ${cmdName} after a good one on ${collName} collection, ordered ${ordered}`,
@@ -99,11 +94,6 @@ function exerciseWriteInTxn({collNames, cmdName, goodOp, badOp, code}) {
             cmd = newCmd();
             cmd[docsField] = [goodOp, goodOp, badOp];
             expected = 2;
-            if (cmdName == "delete" && db.getMongo().isMongos()) {
-                // The bad delete write will cause mongos to fail during targetting and not
-                // do any write at all.
-                expected = 0;
-            }
             runInTxn({
                 cmd: cmd,
                 msg: `one bad ${cmdName} after two good ones on ${collName} collection, ordered ${ordered}`,
@@ -115,11 +105,6 @@ function exerciseWriteInTxn({collNames, cmdName, goodOp, badOp, code}) {
             cmd = newCmd();
             cmd[docsField] = [goodOp, goodOp, badOp, badOp];
             expected = 2;
-            if (cmdName == "delete" && db.getMongo().isMongos()) {
-                // The bad delete write will cause mongos to fail during targetting and not
-                // do any write at all.
-                expected = 0;
-            }
             runInTxn({
                 cmd: cmd,
                 msg: `two bad ${cmdName}s after two good ones on ${collName} collection, ordered ${ordered}`,
