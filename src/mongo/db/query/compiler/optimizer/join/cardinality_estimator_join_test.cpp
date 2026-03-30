@@ -184,12 +184,12 @@ TEST_F(JoinPredicateEstimatorFixture, ExtractNodeCardinalities) {
     cost_based_ranker::EstimateMap estimates;
     {
         auto aPlan = makeCollScanPlan(aNss);
-        estimates[aPlan->root()] = {inCE, aCE};
+        estimates[aPlan->root()] = std::make_unique<cost_based_ranker::QSNEstimate>(inCE, aCE);
         cbrCqQsns[graph.getNode(aNodeId).accessPath.get()] = std::move(aPlan);
     }
     {
         auto bPlan = makeCollScanPlan(bNss);
-        estimates[bPlan->root()] = {inCE, bCE};
+        estimates[bPlan->root()] = std::make_unique<cost_based_ranker::QSNEstimate>(inCE, bCE);
         cbrCqQsns[graph.getNode(bNodeId).accessPath.get()] = std::move(bPlan);
     }
 

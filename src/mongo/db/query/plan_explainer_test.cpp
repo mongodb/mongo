@@ -609,14 +609,14 @@ TEST_F(PlanExplainerTest, PlanExplainerDataMergeFull) {
     // Use distinct pointer values to avoid key collision
     data1.planStageQsnMap.emplace(reinterpret_cast<const PlanStage*>(0x1), nullptr);
     data1.estimates.emplace(reinterpret_cast<const QuerySolutionNode*>(0x1),
-                            cost_based_ranker::QSNEstimate{});
+                            std::make_unique<cost_based_ranker::QSNEstimate>());
 
     PlanExplainerData data2;
     auto qsn2 = std::make_unique<QuerySolution>();
     data2.rejectedPlansWithStages.push_back({std::move(qsn2), nullptr});
     data2.planStageQsnMap.emplace(reinterpret_cast<const PlanStage*>(0x2), nullptr);
     data2.estimates.emplace(reinterpret_cast<const QuerySolutionNode*>(0x2),
-                            cost_based_ranker::QSNEstimate{});
+                            std::make_unique<cost_based_ranker::QSNEstimate>());
 
     data1 << std::move(data2);
 

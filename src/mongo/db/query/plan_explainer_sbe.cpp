@@ -294,12 +294,7 @@ void statsToBSON(const QuerySolutionNode* node,
 
     // Cost and cardinality of the stage.
     if (estimates.contains(node)) {
-        const auto& est = estimates.at(node);
-        bob->append("costEstimate", est.cost.toDouble());
-        bob->append("cardinalityEstimate", est.outCE.toDouble());
-        BSONObjBuilder metadataBob(bob->subobjStart("estimatesMetadata"));
-        metadataBob.append("ceSource", toStringData(est.outCE.source()));
-        metadataBob.done();
+        estimates.at(node)->serialize(*bob);
     }
 
     // Display the BSON representation of the filter, if there is one.

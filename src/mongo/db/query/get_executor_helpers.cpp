@@ -264,7 +264,7 @@ void captureCardinalityEstimationMethodForQueryStats(
         if (it != maybeExplainData->estimates.end()) {
             auto& ceMethods =
                 CurOp::get(opCtx)->debug().getAdditiveMetrics().cardinalityEstimationMethods;
-            switch (it->second.outCE.source()) {
+            switch (it->second->outCE.source()) {
                 case cost_based_ranker::EstimationSource::Histogram:
                     ceMethods.setHistogram(ceMethods.getHistogram().value_or(0) + 1);
                     break;

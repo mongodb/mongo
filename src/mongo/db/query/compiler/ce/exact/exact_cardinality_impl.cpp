@@ -53,9 +53,8 @@ CEResult ExactCardinalityImpl::populateCardinalities(
     }
 
     const auto commonStats = execStage->getCommonStats();
-    cost_based_ranker::QSNEstimate card{
-        .outCE = CardinalityEstimate{CardinalityType{(double)commonStats->advanced},
-                                     EstimationSource::Code}};
+    cost_based_ranker::QSNEstimate card{CardinalityEstimate{
+        CardinalityType{(double)commonStats->advanced}, EstimationSource::Code}};
     // If we are at a leaf node, we must record inCE as well. We get this from the SpecificStats.
     if (execStage->getChildren().empty()) {
         // TODO SERVER-99075: Add a case for distinct scan here
@@ -83,7 +82,7 @@ CEResult ExactCardinalityImpl::populateCardinalities(
         }
     }
     CardinalityEstimate res{card.outCE};
-    cardinalities.emplace(node, std::move(card));
+    cardinalities.emplace(node, std::make_unique<cost_based_ranker::QSNEstimate>(std::move(card)));
 
     tassert(10659801,
             "A QSN should have the same number of children as its corresponding execution stage",

@@ -592,6 +592,23 @@ struct QSNEstimate {
     boost::optional<CardinalityEstimate> inCE;
     CardinalityEstimate outCE{CardinalityType{0}, EstimationSource::Code};
     CostEstimate cost{CostType::maxValue(), EstimationSource::Code};
+
+    QSNEstimate() = default;
+    QSNEstimate(CardinalityEstimate outCE,
+                CostEstimate cost = CostEstimate{CostType::maxValue(), EstimationSource::Code})
+        : outCE(std::move(outCE)), cost(std::move(cost)) {}
+    QSNEstimate(boost::optional<CardinalityEstimate> inCE, CardinalityEstimate outCE)
+        : inCE(std::move(inCE)), outCE(std::move(outCE)) {}
+
+    virtual ~QSNEstimate() = default;
+
+    virtual void serialize(BSONObjBuilder& bob) const {
+        bob.append("costEstimate", cost.toDouble());
+        bob.append("cardinalityEstimate", outCE.toDouble());
+        BSONObjBuilder metadataBob(bob.subobjStart("estimatesMetadata"));
+        metadataBob.append("ceSource", toStringData(outCE.source()));
+        metadataBob.done();
+    }
 };
 
 // Predefined constants

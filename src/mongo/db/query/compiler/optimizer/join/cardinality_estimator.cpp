@@ -92,7 +92,7 @@ NodeCardinalities JoinCardinalityEstimator::extractNodeCardinalities(
         tassert(11514600, "Missing QSN for CanonicalQuery", qsn != ctx.cbrCqQsns.end());
         auto cbrRes = estimates.find(qsn->second->root());
         tassert(11514601, "Missing estimate for QSN root", cbrRes != estimates.end());
-        nodeCardinalities.push_back(cbrRes->second.outCE);
+        nodeCardinalities.push_back(cbrRes->second->outCE);
     }
     return nodeCardinalities;
 }

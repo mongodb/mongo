@@ -33,11 +33,13 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/util/modules.h"
 
+#include <memory>
+
 namespace mongo::cost_based_ranker {
 
 /**
  * EstimateMap is a type representing a mapping from QuerySolutionNodes to cost estimates.
  */
-using EstimateMap = absl::flat_hash_map<const QuerySolutionNode*, QSNEstimate>;
+using EstimateMap = absl::flat_hash_map<const QuerySolutionNode*, std::unique_ptr<QSNEstimate>>;
 
 }  // namespace mongo::cost_based_ranker

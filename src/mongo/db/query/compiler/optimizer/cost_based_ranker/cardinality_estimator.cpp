@@ -133,7 +133,7 @@ CEResult CardinalityEstimator::estimate(const QuerySolutionNode* node) {
             break;
         }
         case STAGE_EOF: {
-            _qsnEstimates[node] = QSNEstimate{.inCE = zeroCE, .outCE = zeroCE};
+            _qsnEstimates[node] = std::make_unique<QSNEstimate>(zeroCE, zeroCE);
             return zeroCE;
         }
         case STAGE_LIMIT:
@@ -365,7 +365,7 @@ CEResult CardinalityEstimator::scanCard(const QuerySolutionNode* node,
 
     if (_inputCard == zeroCE) {
         est.outCE = _inputCard;
-        _qsnEstimates.emplace(node, std::move(est));
+        _qsnEstimates.emplace(node, std::make_unique<QSNEstimate>(std::move(est)));
         return _inputCard;
     }
 
@@ -379,7 +379,7 @@ CEResult CardinalityEstimator::scanCard(const QuerySolutionNode* node,
         est.outCE = card;
     }
     CardinalityEstimate outCE{est.outCE};
-    _qsnEstimates.emplace(node, std::move(est));
+    _qsnEstimates.emplace(node, std::make_unique<QSNEstimate>(std::move(est)));
 
     return outCE;
 }
@@ -466,7 +466,7 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
          node->bounds.isUnbounded())) {
         est.inCE = _inputCard;
         est.outCE = _inputCard;
-        _qsnEstimates.emplace(node, std::move(est));
+        _qsnEstimates.emplace(node, std::make_unique<QSNEstimate>(std::move(est)));
         return _inputCard;
     }
 
@@ -529,7 +529,7 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
         }
 
         CardinalityEstimate outCE{est.outCE};
-        _qsnEstimates.emplace(node, std::move(est));
+        _qsnEstimates.emplace(node, std::make_unique<QSNEstimate>(std::move(est)));
         return outCE;
     }
 
@@ -546,11 +546,11 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
     }
 
     // Estimate the cardinality of the combined index scan and filter conditions.
-    // TODO: conjCard doesn't account for double-counting because some of the filter conditions
-    // may re-evaluate the interval bounds.
+    // TODO SERVER-122570: conjCard doesn't account for double-counting because some of the filter
+    // conditions may re-evaluate the interval bounds.
     est.outCE = conjCard(selOffset, _inputCard);
     CardinalityEstimate outCE{est.outCE};
-    _qsnEstimates.emplace(node, std::move(est));
+    _qsnEstimates.emplace(node, std::make_unique<QSNEstimate>(std::move(est)));
     return outCE;
 }
 
@@ -568,7 +568,7 @@ CEResult CardinalityEstimator::estimate(const FetchNode* node) {
 
     if (ceRes1 == zeroCE) {
         est.outCE = ceRes1.getValue();
-        _qsnEstimates.emplace(node, std::move(est));
+        _qsnEstimates.emplace(node, std::make_unique<QSNEstimate>(std::move(est)));
         return ceRes1.getValue();
     }
 
@@ -578,7 +578,7 @@ CEResult CardinalityEstimator::estimate(const FetchNode* node) {
         // from its input cardinality.
         if (node->filter == nullptr) {
             est.outCE = ceRes1.getValue();
-            _qsnEstimates.emplace(node, std::move(est));
+            _qsnEstimates.emplace(node, std::make_unique<QSNEstimate>(std::move(est)));
             return ceRes1.getValue();
         }
 
@@ -604,7 +604,7 @@ CEResult CardinalityEstimator::estimate(const FetchNode* node) {
             popSelectivities();
             _conjSels.emplace_back(ce / _inputCard);
             est.outCE = ce;
-            _qsnEstimates.emplace(node, std::move(est));
+            _qsnEstimates.emplace(node, std::make_unique<QSNEstimate>(std::move(est)));
             return ce;
         }
     }
@@ -622,7 +622,7 @@ CEResult CardinalityEstimator::estimate(const FetchNode* node) {
     // Combine the selectivity of this node's filter (if any) with its child selectivities.
     est.outCE = conjCard(0, _inputCard);
     CardinalityEstimate outCE{est.outCE};
-    _qsnEstimates.emplace(node, std::move(est));
+    _qsnEstimates.emplace(node, std::make_unique<QSNEstimate>(std::move(est)));
 
     return outCE;
 }
@@ -635,7 +635,7 @@ CEResult CardinalityEstimator::passThroughNodeCard(const QuerySolutionNode* node
     if (!ceRes.isOK()) {
         return ceRes;
     }
-    _qsnEstimates.emplace(node, QSNEstimate{.outCE = ceRes.getValue()});
+    _qsnEstimates.emplace(node, std::make_unique<QSNEstimate>(ceRes.getValue()));
     return ceRes.getValue();
 }
 
@@ -645,13 +645,13 @@ CEResult CardinalityEstimator::limitNodeCard(const QuerySolutionNode* node, size
         return ceRes;
     }
     if (ceRes == zeroCE) {
-        _qsnEstimates.emplace(node, QSNEstimate{.outCE = ceRes.getValue()});
+        _qsnEstimates.emplace(node, std::make_unique<QSNEstimate>(ceRes.getValue()));
         return ceRes.getValue();
     }
     auto limitCE = CardinalityEstimate{CardinalityType{static_cast<double>(limit)},
                                        EstimationSource::Metadata};
     auto est = std::min(limitCE, ceRes.getValue());
-    _qsnEstimates.emplace(node, QSNEstimate{.outCE = est});
+    _qsnEstimates.emplace(node, std::make_unique<QSNEstimate>(est));
     return est;
 }
 
@@ -682,7 +682,7 @@ CEResult CardinalityEstimator::indexIntersectionCard(const T* node) {
     }
 
     CardinalityEstimate outCE{est.outCE};
-    _qsnEstimates.emplace(node, std::move(est));
+    _qsnEstimates.emplace(node, std::make_unique<QSNEstimate>(std::move(est)));
 
     return outCE;
 }
@@ -719,7 +719,7 @@ CEResult CardinalityEstimator::indexUnionCard(const T* node) {
     if (_inputCard != zeroCE) {
         _conjSels.emplace_back(outCE / _inputCard);
     }
-    _qsnEstimates.emplace(node, std::move(est));
+    _qsnEstimates.emplace(node, std::make_unique<QSNEstimate>(std::move(est)));
 
     return outCE;
 }
@@ -765,7 +765,7 @@ CEResult CardinalityEstimator::estimateConjWithHistogram(
             return zeroMetadataCE;
         }
     }
-    // TODO: SERVER-98094 use tightness depending the context in which a predicate is estimated
+    // TODO SERVER-98094: use tightness depending the context in which a predicate is estimated
 
     return estimate(&oil, true);
 }
@@ -844,7 +844,7 @@ CEResult CardinalityEstimator::estimate(const SortNode* node) {
 
 CEResult CardinalityEstimator::estimate(const LimitNode* node) {
     auto ceRes = limitNodeCard(node, node->limit);
-    if (ceRes != zeroCE) {
+    if (ceRes.isOK() && ceRes != zeroCE) {
         propagateLimit(node->children[0].get(), node->limit);
     }
     return ceRes;
@@ -856,7 +856,7 @@ CEResult CardinalityEstimator::estimate(const SkipNode* node) {
         return ceRes;
     }
     if (ceRes == zeroCE) {
-        _qsnEstimates.emplace(node, QSNEstimate{.outCE = ceRes.getValue()});
+        _qsnEstimates.emplace(node, std::make_unique<QSNEstimate>(ceRes.getValue()));
         return ceRes.getValue();
     }
     auto childEst = ceRes.getValue();
@@ -869,7 +869,7 @@ CEResult CardinalityEstimator::estimate(const SkipNode* node) {
     if (skip <= childEst) {
         card = childEst - skip;
     }
-    _qsnEstimates.emplace(node, QSNEstimate{.outCE = card});
+    _qsnEstimates.emplace(node, std::make_unique<QSNEstimate>(card));
     _conjSels.push_back(card / _inputCard);
     return card;
 }
@@ -927,15 +927,18 @@ CEResult CardinalityEstimator::estimate(const AndMatchExpression* node) {
     }
 
     // Try to use histograms to estimate all children of this AndMatchExpression.
-    // TODO: Suppose we have an AND with some predicates on 'a' that can answered with a
-    // histogram and some predicates on 'b' that can't. Should we still try to use histogram for
+    // TODO SERVER-122571: Suppose we have an AND with some predicates on 'a' that can answered with
+    // a histogram and some predicates on 'b' that can't. Should we still try to use histogram for
     // 'a'? The code as written will not.
     if (_rankerMode == QueryPlanRankerModeEnum::kHistogramCE ||
         _rankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
+        size_t selOffset = _conjSels.size();
         auto ceRes = tryHistogramAnd(node);
         if (ceRes.isOK()) {
             return ceRes.getValue();
         }
+        // Clean up any selectivities leaked by partial histogram estimation before falling back.
+        popSelectivities(selOffset);
         // Fallback to generic AndMatchExpression estimation.
     }
 
@@ -1173,8 +1176,8 @@ CEResult CardinalityEstimator::estimate(const IndexBounds* node) {
     }
 
     if (_rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
-        // TODO: avoid copies to construct the equality prefix. We could do this by teaching
-        // SamplingEstimator or IndexBounds about the equality prefix concept.
+        // TODO SERVER-122572: avoid copies to construct the equality prefix. We could do this by
+        // teaching SamplingEstimator or IndexBounds about the equality prefix concept.
         auto eqPrefix = equalityPrefix(node);
         if (eqPrefix.isIndexSkipScan) {
             return Status(ErrorCodes::UnsupportedCbrNode, "encountered index skip scan case");
@@ -1289,7 +1292,7 @@ CEResult CardinalityEstimator::estimate(const OrderedIntervalList* node, bool fo
 }
 
 void CardinalityEstimator::propagateLimit(const QuerySolutionNode* node, size_t limit) {
-    auto& outCE = _qsnEstimates[node].outCE;
+    auto& outCE = _qsnEstimates[node]->outCE;
 
     const auto limitCE =
         CardinalityEstimate{CardinalityType{double(limit)}, EstimationSource::Metadata};
@@ -1325,7 +1328,7 @@ void CardinalityEstimator::propagateLimit(const QuerySolutionNode* node, size_t 
         case STAGE_COLLSCAN:
         case STAGE_VIRTUAL_SCAN:
         case STAGE_IXSCAN: {
-            auto& inCE = *_qsnEstimates[node].inCE;
+            auto& inCE = *_qsnEstimates[node]->inCE;
             if (inCE == zeroCE) {
                 break;
             }
@@ -1334,7 +1337,7 @@ void CardinalityEstimator::propagateLimit(const QuerySolutionNode* node, size_t 
             break;
         }
         case STAGE_FETCH: {
-            const auto& inCE = _qsnEstimates[node->children[0].get()].outCE;
+            const auto& inCE = _qsnEstimates[node->children[0].get()]->outCE;
             if (inCE == zeroCE) {
                 break;
             }
@@ -1379,7 +1382,7 @@ void CardinalityEstimator::propagateLimit(const QuerySolutionNode* node, size_t 
             //      ...
             //      * _inputCard = 2000
             for (auto& child : node->children) {
-                const auto& childCE = _qsnEstimates[child.get()].outCE;
+                const auto& childCE = _qsnEstimates[child.get()]->outCE;
                 if (childCE == zeroCE) {
                     continue;
                 }

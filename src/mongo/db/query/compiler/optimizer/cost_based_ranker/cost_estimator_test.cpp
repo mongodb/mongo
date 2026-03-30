@@ -42,27 +42,27 @@ TEST(CostEstimator, FullCollScanVsFilteredCollScan) {
     EstimateMap estimates;
 
     auto fullCollScan = makeCollScanPlan(nullptr);
-    estimates[fullCollScan->root()] = QSNEstimate{.inCE = makeCard(100), .outCE = makeCard(100)};
+    estimates[fullCollScan->root()] = std::make_unique<QSNEstimate>(makeCard(100), makeCard(100));
 
     BSONObj query = fromjson("{a: {$gt: 5}}");
     auto collScanFilter = makeCollScanPlan(parse(query));
     // The predicate filters out 50 documents.
-    estimates[collScanFilter->root()] = QSNEstimate{.inCE = makeCard(100), .outCE = makeCard(50)};
+    estimates[collScanFilter->root()] = std::make_unique<QSNEstimate>(makeCard(100), makeCard(50));
 
     CostEstimator costEstimator{estimates};
     costEstimator.estimatePlan(*fullCollScan);
     costEstimator.estimatePlan(*collScanFilter);
 
-    ASSERT_LT(estimates[fullCollScan->root()].cost, estimates[collScanFilter->root()].cost);
+    ASSERT_LT(estimates[fullCollScan->root()]->cost, estimates[collScanFilter->root()]->cost);
 }
 
 CostEstimate getCollScanWithFilterCost(const BSONObj& filterObj) {
     EstimateMap estimates;
     auto plan = makeCollScanPlan(parse(filterObj));
-    estimates[plan->root()] = QSNEstimate{.inCE = makeCard(100), .outCE = makeCard(50)};
+    estimates[plan->root()] = std::make_unique<QSNEstimate>(makeCard(100), makeCard(50));
     CostEstimator costEstimator{estimates};
     costEstimator.estimatePlan(*plan);
-    return estimates[plan->root()].cost;
+    return estimates[plan->root()]->cost;
 }
 
 TEST(CostEstimator, FilterCostForSingleLeaf) {
@@ -119,18 +119,18 @@ TEST(CostEstimator, VirtualScan) {
     EstimateMap estimates;
 
     auto fullCollScan = makeVirtualCollScanPlan(100, nullptr);
-    estimates[fullCollScan->root()] = QSNEstimate{.inCE = makeCard(100), .outCE = makeCard(100)};
+    estimates[fullCollScan->root()] = std::make_unique<QSNEstimate>(makeCard(100), makeCard(100));
 
     BSONObj query = fromjson("{a: {$gt: 5}}");
     auto collScanFilter = makeVirtualCollScanPlan(100, parse(query));
     // The predicate filters out 50 documents.
-    estimates[collScanFilter->root()] = QSNEstimate{.inCE = makeCard(100), .outCE = makeCard(50)};
+    estimates[collScanFilter->root()] = std::make_unique<QSNEstimate>(makeCard(100), makeCard(50));
 
     CostEstimator costEstimator{estimates};
     costEstimator.estimatePlan(*fullCollScan);
     costEstimator.estimatePlan(*collScanFilter);
 
-    ASSERT_LT(estimates[fullCollScan->root()].cost, estimates[collScanFilter->root()].cost);
+    ASSERT_LT(estimates[fullCollScan->root()]->cost, estimates[collScanFilter->root()]->cost);
 }
 
 TEST(CostEstimator, PointIndexScanLessCostThanRange) {
@@ -139,10 +139,10 @@ TEST(CostEstimator, PointIndexScanLessCostThanRange) {
     auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     auto pointIndexScan = makeIndexScanFetchPlan(testNss, makePointIntervalBounds(1, "a"), {"a"});
     // Fetch
-    estimates[pointIndexScan->root()] = QSNEstimate{.outCE = makeCard(1)};
+    estimates[pointIndexScan->root()] = std::make_unique<QSNEstimate>(makeCard(1));
     // IndexScan
     estimates[pointIndexScan->root()->children[0].get()] =
-        QSNEstimate{.inCE = makeCard(100), .outCE = makeCard(1)};
+        std::make_unique<QSNEstimate>(makeCard(100), makeCard(1));
 
     auto rangeIndexScan = makeIndexScanFetchPlan(
         testNss,
@@ -150,27 +150,27 @@ TEST(CostEstimator, PointIndexScanLessCostThanRange) {
             BSON("" << 5 << "" << 6), BoundInclusion::kIncludeBothStartAndEndKeys, "a"),
         {"a"});
     // Fetch
-    estimates[rangeIndexScan->root()] = QSNEstimate{.outCE = makeCard(10)};
+    estimates[rangeIndexScan->root()] = std::make_unique<QSNEstimate>(makeCard(10));
     // IndexScan
     estimates[rangeIndexScan->root()->children[0].get()] =
-        QSNEstimate{.inCE = makeCard(100), .outCE = makeCard(10)};
+        std::make_unique<QSNEstimate>(makeCard(100), makeCard(10));
 
     CostEstimator costEstimator{estimates};
     costEstimator.estimatePlan(*pointIndexScan);
     costEstimator.estimatePlan(*rangeIndexScan);
 
     // Cost of point scan plan should be less than that of the range scan
-    ASSERT_LT(estimates[pointIndexScan->root()].cost, estimates[rangeIndexScan->root()].cost);
+    ASSERT_LT(estimates[pointIndexScan->root()]->cost, estimates[rangeIndexScan->root()]->cost);
     // Cost of fetch node should be greater than cost of the index scan as costs are cumulative
-    ASSERT_GT(estimates[pointIndexScan->root()].cost,
-              estimates[pointIndexScan->root()->children[0].get()].cost);
+    ASSERT_GT(estimates[pointIndexScan->root()]->cost,
+              estimates[pointIndexScan->root()->children[0].get()]->cost);
 }
 
 std::unique_ptr<IndexScanNode> indexScanNode(const NamespaceString& nss,
                                              EstimateMap& estimates,
                                              QSNEstimate est) {
     auto node = makeIndexScan(nss, makePointIntervalBounds(1, "a"), {"a"});
-    estimates[node.get()] = est;
+    estimates[node.get()] = std::make_unique<QSNEstimate>(std::move(est));
     return node;
 }
 
@@ -181,33 +181,33 @@ void testIndexCombinationDependsOnChildren() {
     auto indexIntersectNode = std::make_unique<IndexCombinationNode>();
     indexIntersectNode->addChildren([&]() {
         std::vector<std::unique_ptr<QuerySolutionNode>> children;
-        children.push_back(indexScanNode(
-            testNss, estimates, QSNEstimate{.inCE = makeCard(10), .outCE = makeCard(10)}));
-        children.push_back(indexScanNode(
-            testNss, estimates, QSNEstimate{.inCE = makeCard(10), .outCE = makeCard(10)}));
+        children.push_back(
+            indexScanNode(testNss, estimates, QSNEstimate{makeCard(10), makeCard(10)}));
+        children.push_back(
+            indexScanNode(testNss, estimates, QSNEstimate{makeCard(10), makeCard(10)}));
         return children;
     }());
-    estimates[indexIntersectNode.get()] = QSNEstimate{.outCE = makeCard(5)};
+    estimates[indexIntersectNode.get()] = std::make_unique<QSNEstimate>(makeCard(5));
     auto cheapPlan = std::make_unique<QuerySolution>();
     cheapPlan->setRoot(std::move(indexIntersectNode));
 
     auto expensiveIndexIntersectNode = std::make_unique<IndexCombinationNode>();
     expensiveIndexIntersectNode->addChildren([&]() {
         std::vector<std::unique_ptr<QuerySolutionNode>> children;
-        children.push_back(indexScanNode(
-            testNss, estimates, QSNEstimate{.inCE = makeCard(100), .outCE = makeCard(100)}));
-        children.push_back(indexScanNode(
-            testNss, estimates, QSNEstimate{.inCE = makeCard(100), .outCE = makeCard(100)}));
+        children.push_back(
+            indexScanNode(testNss, estimates, QSNEstimate{makeCard(100), makeCard(100)}));
+        children.push_back(
+            indexScanNode(testNss, estimates, QSNEstimate{makeCard(100), makeCard(100)}));
         return children;
     }());
-    estimates[expensiveIndexIntersectNode.get()] = QSNEstimate{.outCE = makeCard(5)};
+    estimates[expensiveIndexIntersectNode.get()] = std::make_unique<QSNEstimate>(makeCard(5));
     auto expensivePlan = std::make_unique<QuerySolution>();
     expensivePlan->setRoot(std::move(expensiveIndexIntersectNode));
 
     CostEstimator costEstimator{estimates};
     costEstimator.estimatePlan(*cheapPlan);
     costEstimator.estimatePlan(*expensivePlan);
-    ASSERT_LT(estimates[cheapPlan->root()].cost, estimates[expensivePlan->root()].cost);
+    ASSERT_LT(estimates[cheapPlan->root()]->cost, estimates[expensivePlan->root()]->cost);
 }
 
 // Increasing child cost increases the cost of index intersection and union plans
@@ -220,33 +220,31 @@ TEST(CostEstimator, IndexCombinationDependsOnChildren) {
 
 std::unique_ptr<CollectionScanNode> collScanNode(EstimateMap& estimates, QSNEstimate est) {
     auto node = std::make_unique<CollectionScanNode>();
-    estimates[node.get()] = est;
+    estimates[node.get()] = std::make_unique<QSNEstimate>(std::move(est));
     return node;
 }
 
 template <typename SortNode>
 void testSortCostDependsOnChildren() {
     EstimateMap estimates;
-    auto cheapCollScan =
-        collScanNode(estimates, QSNEstimate{.inCE = makeCard(10), .outCE = makeCard(10)});
+    auto cheapCollScan = collScanNode(estimates, QSNEstimate{makeCard(10), makeCard(10)});
     auto cheapSort = std::make_unique<SortNode>(
         std::move(cheapCollScan), BSON("a" << 1), 0, LimitSkipParameterization::Disabled);
-    estimates[cheapSort.get()] = QSNEstimate{.outCE = makeCard(10)};
+    estimates[cheapSort.get()] = std::make_unique<QSNEstimate>(makeCard(10));
     auto cheapPlan = std::make_unique<QuerySolution>();
     cheapPlan->setRoot(std::move(cheapSort));
 
-    auto expsensiveCollScan =
-        collScanNode(estimates, QSNEstimate{.inCE = makeCard(100), .outCE = makeCard(100)});
+    auto expsensiveCollScan = collScanNode(estimates, QSNEstimate{makeCard(100), makeCard(100)});
     auto expensiveSort = std::make_unique<SortNode>(
         std::move(expsensiveCollScan), BSON("a" << 1), 0, LimitSkipParameterization::Disabled);
-    estimates[expensiveSort.get()] = QSNEstimate{.outCE = makeCard(100)};
+    estimates[expensiveSort.get()] = std::make_unique<QSNEstimate>(makeCard(100));
     auto expensivePlan = std::make_unique<QuerySolution>();
     expensivePlan->setRoot(std::move(expensiveSort));
 
     CostEstimator costEstimator{estimates};
     costEstimator.estimatePlan(*cheapPlan);
     costEstimator.estimatePlan(*expensivePlan);
-    ASSERT_LT(estimates[cheapPlan->root()].cost, estimates[expensivePlan->root()].cost);
+    ASSERT_LT(estimates[cheapPlan->root()]->cost, estimates[expensivePlan->root()]->cost);
 }
 
 TEST(CostEstimator, SortDefaultOrSimple) {

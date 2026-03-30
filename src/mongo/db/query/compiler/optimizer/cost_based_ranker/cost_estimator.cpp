@@ -40,12 +40,12 @@ CostEstimate CostEstimator::costTree(const QuerySolutionNode* qsn) {
         childCosts.push_back(childCost);
         auto foundChildEst = _estimateMap.find(child.get());
         tassert(9695101, "All QSNs must have a CE.", foundChildEst != _estimateMap.end());
-        childCEs.push_back(foundChildEst->second.outCE);
+        childCEs.push_back(foundChildEst->second->outCE);
     }
 
     auto foundQSNEst = _estimateMap.find(qsn);
     tassert(9695100, "All QSNs must have a CE.", foundQSNEst != _estimateMap.end());
-    QSNEstimate& qsnEstimate = foundQSNEst->second;
+    QSNEstimate& qsnEstimate = *foundQSNEst->second;
     computeAndSetNodeCost(qsn, childCosts, childCEs, qsnEstimate);
     return qsnEstimate.cost;
 }

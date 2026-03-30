@@ -45,7 +45,7 @@ using SingleTableAccessTestFixture = JoinOrderingTestFixture;
 void assertQuerySolutionHasEstimate(const QuerySolutionNode* qsn, const EstimateMap& estimates) {
     auto it = estimates.find(qsn);
     ASSERT(it != estimates.end());
-    ASSERT_EQ(EstimationSource::Sampling, it->second.outCE.source());
+    ASSERT_EQ(EstimationSource::Sampling, it->second->outCE.source());
     for (auto&& child : qsn->children) {
         assertQuerySolutionHasEstimate(child.get(), estimates);
     }

@@ -2186,7 +2186,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildHashJoinEmbedding
     if (_estimates) {
         if (auto it = _estimates->find(hashJoinEmbeddingNode->children[0].get());
             it != _estimates->end()) {
-            estimatedBuildCardinality = static_cast<size_t>(it->second.outCE.toDouble());
+            estimatedBuildCardinality = static_cast<size_t>(it->second->outCE.toDouble());
         }
     }
 

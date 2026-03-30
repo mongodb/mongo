@@ -166,7 +166,7 @@ void addEstimatesIfExplain(const JoinReorderingContext& ctx,
 
     auto ce = peCtx.getJoinCardinalityEstimator()->getOrEstimateSubsetCardinality(set);
     estimates.insert_or_assign(
-        node, cost_based_ranker::QSNEstimate{.outCE = ce, .cost = cost.getTotalCost()});
+        node, std::make_unique<cost_based_ranker::QSNEstimate>(ce, cost.getTotalCost()));
 }
 
 // Forward-declare because of mutual recursion.

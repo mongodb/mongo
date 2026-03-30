@@ -270,9 +270,8 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
 
     // Cost and cardinality of the stage.
     if (querySolutionNode && estimates.contains(querySolutionNode)) {
-        const auto& est = estimates.at(querySolutionNode);
-        bob->append("costEstimate", est.cost.toDouble());
-        bob->append("cardinalityEstimate", est.outCE.toDouble());
+        const auto& est = *estimates.at(querySolutionNode);
+        est.serialize(*bob);
         // Display 'inCE' as 'numKeys' for index scan and 'numDocs' for collection scan.
         if (est.inCE.has_value()) {
             double ce = est.inCE->toDouble();
@@ -282,9 +281,6 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
                 bob->append("numDocsEstimate", ce);
             }
         }
-        BSONObjBuilder metadataBob(bob->subobjStart("estimatesMetadata"));
-        metadataBob.append("ceSource", toStringData(est.outCE.source()));
-        metadataBob.done();
     }
 
     // Display the BSON representation of the filter, if there is one.
