@@ -47,6 +47,10 @@ auto& totalAggStageExecTime =
 
 using namespace extension::host;
 
+/**
+ * Converts a DocumentSourceExtensionOptimizable (pipeline stage) into an exec::agg::ExtensionStage.
+ * Compiles the document source to an ExecAggStageHandle and wraps it in ExtensionStage.
+ */
 boost::intrusive_ptr<exec::agg::Stage> documentSourceExtensionToStageFn(
     const boost::intrusive_ptr<DocumentSource>& source) {
     auto* documentSource = dynamic_cast<DocumentSourceExtensionOptimizable*>(source.get());

@@ -35,6 +35,10 @@
 
 #include <string_view>
 
+/**
+ * Helpers for converting between MongoExtensionByteView and host types (BSONObj, string_view,
+ * StringData) and for creating empty byte containers. Used on both sides of the extension boundary.
+ */
 namespace mongo::extension {
 
 inline std::string_view byteViewAsStringView(const MongoExtensionByteView& view) {

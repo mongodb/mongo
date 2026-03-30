@@ -37,6 +37,10 @@
 
 namespace mongo::extension::host {
 
+/**
+ * Concrete HostPortal used at extension load time. Registers each extension's stage descriptors
+ * with DocumentSourceExtensionOptimizable so the server can parse and optimize those stages.
+ */
 class HostPortal : public host_connector::HostPortalBase {
 public:
     void registerStageDescriptor(

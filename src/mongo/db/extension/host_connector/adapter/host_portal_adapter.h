@@ -37,6 +37,11 @@
 
 namespace mongo::extension::host_connector {
 
+/**
+ * Abstract base for the host-side implementation of the extension HostPortal. The host connector
+ * wraps a concrete implementation in HostPortalAdapter to satisfy the C API
+ * (MongoExtensionHostPortal) passed to extensions during initialize().
+ */
 class HostPortalBase {
 public:
     virtual ~HostPortalBase() = default;
@@ -46,6 +51,11 @@ public:
                                     size_t numRules) const = 0;
 };
 
+/**
+ * Adapts a C++ HostPortalBase to the C MongoExtensionHostPortal passed to extensions during
+ * initialize(). Forwards register_stage_descriptor and get_extension_options to the wrapped
+ * implementation. Owns the HostPortalBase and the serialized extension options.
+ */
 class HostPortalAdapter final : public ::MongoExtensionHostPortal {
 public:
     HostPortalAdapter(::MongoExtensionAPIVersion apiVersion,

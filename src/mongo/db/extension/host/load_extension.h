@@ -41,11 +41,17 @@
 
 namespace mongo::extension::host {
 
+/**
+ * Parsed contents of an extension's .conf file.
+ */
 struct ExtensionConfig {
     std::string sharedLibraryPath;
     YAML::Node extOptions;
 };
 
+/**
+ * A loaded extension: the opened SharedLibrary and its config. Kept alive for the process lifetime.
+ */
 struct LoadedExtension {
     std::unique_ptr<SharedLibrary> library;
     ExtensionConfig config;

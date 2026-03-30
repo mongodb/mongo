@@ -55,8 +55,10 @@ class LoadNativeVectorSearchTest;
 
 using LiteParsedList = std::list<std::unique_ptr<LiteParsedDocumentSource>>;
 
-// Custom StageParams classes for LPDSExpandable and LPDSExpanded that own a parseNode and astNode
-// respectively.
+/**
+ * StageParams that carries an extension parse node (AggStageParseNodeHandle) before expansion.
+ * Used for extension stages that participate in query shape.
+ */
 class ExpandableStageParams : public StageParams {
 public:
     ExpandableStageParams(AggStageParseNodeHandle parseNode) : _parseNode(std::move(parseNode)) {}
@@ -75,7 +77,10 @@ private:
     AggStageParseNodeHandle _parseNode;
 };
 
-
+/**
+ * StageParams that carries an extension AST node (AggStageAstNodeHandle) to be promoted to a
+ * logical stage.
+ */
 class ExpandedStageParams : public StageParams {
 public:
     ExpandedStageParams(AggStageAstNodeHandle astNode) : _astNode(std::move(astNode)) {}

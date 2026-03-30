@@ -1,5 +1,7 @@
 # MongoDB Extensions Public API
 
+The canonical Public API header is `mongo/db/extension/public/api.h`.
+
 ## Implementing Polymorphism Across API Boundary
 
 The API aims to provide flexibility to extension developers in choosing how an implementation

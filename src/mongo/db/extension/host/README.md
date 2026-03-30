@@ -39,7 +39,7 @@ startup option were successfully loaded, and we will log a success message.
 Each extension loaded at startup must have:
 
 1. A `SharedLibrary` file (`*.so`) - the compiled extension
-2. A configuration file (`<extensionName>.conf`) - located under `/etc/mongo/extensions`.
+2. A configuration file (`<extensionName>.conf`) - located under `/etc/mongo/extensions`. In test environments (when test commands are enabled), the config directory is `/tmp/mongo/extensions` instead.
 
 Configuration files use YAML syntax and must define:
 

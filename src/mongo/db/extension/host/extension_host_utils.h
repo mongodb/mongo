@@ -27,16 +27,17 @@
  *    it in the license file.
  */
 #pragma once
-#include "mongo/base/counter.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/public/extension_agg_stage_static_properties_gen.h"
-#include "mongo/db/extension/shared/extension_status.h"
-#include "mongo/db/extension/shared/handle/handle.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/util/modules.h"
 
+/**
+ * Utilities for mapping Extensions Public API enums to host types (e.g. ActionType,
+ * StageConstraints, ViewPolicy).
+ */
 namespace mongo::extension::host {
 namespace static_properties_util {
 

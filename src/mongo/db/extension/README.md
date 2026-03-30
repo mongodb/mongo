@@ -14,7 +14,7 @@ This is a work in progress and more sections will be added gradually.
 The Extensions API’s primary goal is to provide a header which specifies the data structures and
 functions that extension developers must use and implement in order to fully implement an
 aggregation stage as an extension. This API header is referred to as the Public API, and can be
-under `mongo/db/extensions/public/api.h`. The Public API establishes the contracts and protocol
+under `mongo/db/extension/public/api.h`. The Public API establishes the contracts and protocol
 through which the host can load an extension, make function calls into an extension, and likewise,
 how the extension can expect to interface with the host. The Public API will be versioned, vendored
 and distributed to extension developers. It is written in C to ensure we maintain a stable ABI.
@@ -57,7 +57,7 @@ API.
 The Extensions API initiative will only support Rust extensions in production. The Search team will
 own the Rust SDK. However, the Query team develops and maintains a C++ SDK for the purpose of
 writing internal unit and integration tests. The C++ SDK can be found under
-`mongo/db/extensions/sdk` directory.
+`mongo/db/extension/sdk` directory.
 
 In general, every abstraction in the Public API has a respective C++ interface implemented in the
 C++ SDK which extension developers are expected to use to build their extension. This includes

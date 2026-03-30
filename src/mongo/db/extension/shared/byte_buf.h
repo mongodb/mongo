@@ -28,8 +28,8 @@
  */
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/public/api.h"
-#include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
@@ -38,6 +38,11 @@
 
 namespace mongo::extension {
 
+/**
+ * C++ implementation of MongoExtensionByteBuf for use when crossing the API boundary. Owns a buffer
+ * and exposes it via the C API vtable so the extension or host can pass byte data without owning
+ * the underlying memory. Used by both host and SDK.
+ */
 class ByteBuf final : public ::MongoExtensionByteBuf {
 public:
     ByteBuf();

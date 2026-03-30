@@ -32,6 +32,11 @@
 #include "mongo/base/counter.h"
 #include "mongo/util/modules.h"
 
+/**
+ * Counters for vector search behavior and extension $vectorSearch usage. Used by server status
+ * and metrics; extensionVectorSearchQueryCount is incremented when an extension $vectorSearch
+ * stage is executed.
+ */
 namespace mongo::vector_search_metrics {
 
 extern Counter64& legacyVectorSearchQueryCount;

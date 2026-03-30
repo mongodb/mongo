@@ -29,6 +29,8 @@
 
 #include "mongo/db/extension/shared/byte_buf.h"
 
+#include "mongo/util/assert_util.h"
+
 namespace mongo::extension {
 
 ByteBuf::ByteBuf() : ::MongoExtensionByteBuf{&VTABLE} {}

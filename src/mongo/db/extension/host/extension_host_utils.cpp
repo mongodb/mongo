@@ -31,6 +31,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
+#include "mongo/db/extension/shared/extension_status.h"
 
 namespace mongo::extension::host {
 
