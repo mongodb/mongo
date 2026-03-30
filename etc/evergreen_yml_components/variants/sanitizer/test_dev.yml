@@ -252,6 +252,16 @@ variables:
     multiversion_platform: rhel8
     multiversion_edition: enterprise
 
+  - &enterprise-rhel8-debug-tsan-expansions-template-arm64
+    <<: *enterprise-rhel8-debug-tsan-expansions-template
+    large_distro_name: rhel8.8-arm64-m8g-8xlarge
+    xlarge_distro_name: rhel8.8-arm64-m8g-8xlarge
+    core_analyzer_distro_name: rhel8.8-arm64-m8g-8xlarge
+    multiversion_platform: rhel8
+    multiversion_edition: enterprise
+    compile_variant: enterprise-rhel8-arm64-debug-tsan-compile
+    evergreen_remote_exec: on
+
 buildvariants:
   - <<: *generic_linux_compile_params_m8g
     name: &linux-arm64-debug-compile-required linux-arm64-debug-compile-required # TODO DEVPROD-30483: replace with Sanitizer.
@@ -666,6 +676,41 @@ buildvariants:
       - name: .default .requires_compile_variant .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan
         distros:
           - rhel8.8-xlarge
+
+  - name: enterprise-rhel8-arm64-debug-tsan-compile
+    display_name: "* TSAN Enterprise RHEL 8 arm64 DEBUG Compile"
+    tags:
+      [
+        "suggested",
+        "forbid_tasks_tagged_with_experimental",
+        "emergency_release",
+      ]
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - rhel8.8-arm64-m8g-8xlarge
+    stepback: false
+    expansions:
+      <<: *enterprise-rhel8-debug-tsan-expansions-template-arm64
+    tasks:
+      - name: compile_test_parallel_core_stream_TG !.multiversion
+      - name: run_unit_tests_TG !.multiversion
+        distros:
+          - rhel8.8-arm64-m8g-8xlarge
+      - name: compile_test_parallel_dbtest_stream_TG !.multiversion
+      - name: compile_integration_and_test_parallel_stream_TG !.multiversion
+      - name: compile_jstestshell_TG !.multiversion
+      - name: .development_critical .requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.multiversion
+      - name: .development_critical .requires_compile_variant .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.multiversion
+        distros:
+          - rhel8.8-arm64-m8g-8xlarge
+      - name: .release_critical .requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.multiversion
+      - name: .release_critical .requires_compile_variant .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.multiversion
+        distros:
+          - rhel8.8-arm64-m8g-8xlarge
+      - name: .default .requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.multiversion
+      - name: .default .requires_compile_variant .requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.multiversion
+        distros:
+          - rhel8.8-arm64-m8g-8xlarge
 
   - name: &linux-arm64-tsan-essential-required linux-arm64-tsan-essential-required
     display_name: "! Amazon Linux 2023 arm64 TSAN Enterprise Essential"
