@@ -2,7 +2,7 @@
  * Fast-check models for indexes.
  * See property_test_helpers/README.md for more detail on the design.
  */
-import {nonEmptyFieldArb, getScalarArb} from "jstests/libs/property_test_helpers/models/basic_models.js";
+import {fieldArb, getScalarArb} from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {collationArb} from "jstests/libs/property_test_helpers/models/collation_models.js";
 import {getPartialFilterPredicateArb} from "jstests/libs/property_test_helpers/models/match_models.js";
 import {oneof} from "jstests/libs/property_test_helpers/models/model_utils.js";
@@ -48,7 +48,7 @@ function replaceKeyValAtPosition(obj, ix, {newKey, newVal}) {
 
 // Regular indexes
 // Tuple of indexed field, and it's sort direction.
-const singleIndexDefArb = fc.record({field: nonEmptyFieldArb, dir: fc.constantFrom(1, -1)});
+const singleIndexDefArb = fc.record({field: fieldArb, dir: fc.constantFrom(1, -1)});
 // Unique array of [[a, true], [b, false], ...] to be mapped to an index definition. Unique on the
 // indexed field. Filter out any indexes that only use the _id field.
 const arrayOfSingleIndexDefsArb = fc
@@ -138,7 +138,7 @@ const wildcardProjectionIncludeExcludeArb = fc.oneof(
 
 const wildcardProjectionArb = fc
     .record({
-        fields: fc.uniqueArray(nonEmptyFieldArb, {minLength: 1, maxLength: 8}),
+        fields: fc.uniqueArray(fieldArb, {minLength: 1, maxLength: 8}),
         // use the same value throughout the projection
         value: wildcardProjectionIncludeExcludeArb,
     })
@@ -176,7 +176,7 @@ const fullWildcardDefArb = fc
 const dottedWildcardDefArb = fc
     .record({
         indexDef: simpleIndexDefArb,
-        fieldPrefix: nonEmptyFieldArb,
+        fieldPrefix: fieldArb,
         wcIx: fc.integer({min: 0, max: 4}),
     })
     .map(({indexDef, fieldPrefix, wcIx}) => {

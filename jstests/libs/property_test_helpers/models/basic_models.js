@@ -59,21 +59,9 @@ export function getScalarArb({allowUnicode, allowNullBytes} = {}) {
     return oneof(intArb, fc.boolean(), getStringArb({allowUnicode, allowNullBytes}), dateArb, fc.constant(null));
 }
 
-// FieldPath (used by aggregation operators, indexes, etc.) does not support empty strings.
-// Use getFieldArb(false) wherever the field is used as a FieldPath expression.
-export function getFieldArb(allowEmpty) {
-    const arb = fc.constantFrom("a", "b", "t", "m", "_id", "m.m1", "m.m2", "array", "");
-    return allowEmpty ? arb : arb.filter((f) => f !== "");
-}
-export const fieldArb = getFieldArb(true);
-export const nonEmptyFieldArb = getFieldArb(false);
-export const dollarFieldArb = nonEmptyFieldArb.map((f) => "$" + f);
-export function getAssignableFieldArb(allowEmpty) {
-    const arb = fc.constantFrom("a", "b", "t", "m", "");
-    return allowEmpty ? arb : arb.filter((f) => f !== "");
-}
-export const assignableFieldArb = getAssignableFieldArb(true);
-export const nonEmptyAssignableFieldArb = getAssignableFieldArb(false);
+export const fieldArb = fc.constantFrom("a", "b", "t", "m", "_id", "m.m1", "m.m2", "array");
+export const dollarFieldArb = fieldArb.map((f) => "$" + f);
+export const assignableFieldArb = fc.constantFrom("a", "b", "t", "m");
 
 export const leafParametersPerFamily = 10;
 export class LeafParameter {
