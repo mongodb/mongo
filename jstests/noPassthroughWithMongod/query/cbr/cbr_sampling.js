@@ -3,7 +3,7 @@
  */
 
 import {getRejectedPlans, getWinningPlanFromExplain, isCollscan} from "jstests/libs/query/analyze_plan.js";
-import {getCBRConfig, restoreCBRConfig} from "jstests/libs/query/cbr_utils.js";
+import {getCBRConfig, setCBRConfig} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 // TODO SERVER-92589: Remove this exemption
@@ -165,7 +165,7 @@ try {
     assertAllPlansUseSampling({d: /^h/}, 10);
     assertAllPlansUseSampling({d: /^e/}, 0);
 } finally {
-    restoreCBRConfig(db, prevCBRConfig);
+    setCBRConfig(db, prevCBRConfig);
     assert.commandWorked(
         db.adminCommand({
             setParameter: 1,
