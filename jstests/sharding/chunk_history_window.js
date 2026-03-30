@@ -15,46 +15,30 @@
  * - Read at insertTS and assert failure with StaleChunkHistory.
  * - Read at T2 - 1 sec, assert success.
  */
+import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {flushRoutersAndRefreshShardMetadata} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
-// The snapshot window is the max of minSnapshotHistoryWindowInSeconds and
-// transactionLifetimeLimitSeconds.
-const transactionLifetimeLimitSecs = 15;
-const minSnapshotHistoryWindowSecs = transactionLifetimeLimitSecs;
-const snapshotHistoryWindowSecs = Math.max(minSnapshotHistoryWindowSecs, transactionLifetimeLimitSecs);
+const snapshotHistoryWindowSecs = 5;
 
 const st = new ShardingTest({
     shards: {rs0: {nodes: 2}, rs1: {nodes: 2}},
     other: {
         configOptions: {
             setParameter: {
-                minSnapshotHistoryWindowInSeconds: minSnapshotHistoryWindowSecs,
-                transactionLifetimeLimitSeconds: transactionLifetimeLimitSecs,
                 logComponentVerbosity: tojson({sharding: {verbosity: 2}}),
-            },
-        },
-        rsOptions: {
-            setParameter: {
-                minSnapshotHistoryWindowInSeconds: minSnapshotHistoryWindowSecs,
-                transactionLifetimeLimitSeconds: transactionLifetimeLimitSecs,
             },
         },
     },
 });
 
-const primaryAdmin = st.rs0.getPrimary().getDB("admin");
-assert.eq(
-    assert.commandWorked(primaryAdmin.runCommand({getParameter: 1, minSnapshotHistoryWindowInSeconds: 1}))
-        .minSnapshotHistoryWindowInSeconds,
-    minSnapshotHistoryWindowSecs,
-);
-
-const configAdmin = st.configRS.getPrimary().getDB("admin");
-assert.eq(
-    assert.commandWorked(configAdmin.runCommand({getParameter: 1, minSnapshotHistoryWindowInSeconds: 1}))
-        .minSnapshotHistoryWindowInSeconds,
-    minSnapshotHistoryWindowSecs,
+// Override the history window on the config RS with the failpoint. This bypasses
+// getHistoryWindowInSeconds() entirely and works regardless of the storage backend.
+configureFailPointForRS(
+    st.configRS.nodes,
+    "overrideHistoryWindowInSecs",
+    {seconds: snapshotHistoryWindowSecs},
+    "alwaysOn",
 );
 
 const mongosDB = st.s.getDB(jsTestName());
@@ -133,5 +117,7 @@ assert.commandFailedWithCode(
 // One second before the newest history entry is valid (check we don't delete *all* old entries).
 let recentTS = Timestamp(chunk.history[0].validAfter.getTime() - 1, 0);
 assert.commandWorked(mongosDB.runCommand({find: "test", readConcern: {level: "snapshot", atClusterTime: recentTS}}));
+
+configureFailPointForRS(st.configRS.nodes, "overrideHistoryWindowInSecs", {}, "off");
 
 st.stop();
