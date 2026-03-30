@@ -591,7 +591,9 @@ void executeUntilFirstBatch(const AggExState& aggExState,
  * single vector element.
  */
 std::vector<std::unique_ptr<Pipeline>> createExchangePipelinesIfNeeded(
-    const AggExState& aggExState, std::unique_ptr<Pipeline> pipeline) {
+    const AggExState& aggExState,
+    const AggCatalogState& aggCatalogState,
+    std::unique_ptr<Pipeline> pipeline) {
     std::vector<std::unique_ptr<Pipeline>> pipelines;
 
     if (aggExState.getRequest().getExchange() && !pipeline->getContext()->getExplain()) {
@@ -600,10 +602,8 @@ std::vector<std::unique_ptr<Pipeline>> createExchangePipelinesIfNeeded(
         // opCtx for the ExpressionContextBuilder call below, store the pointer ahead of the
         // Exchange() call.
         auto* opCtx = aggExState.getOpCtx();
-        auto exchange =
-            make_intrusive<exec::agg::Exchange>(aggExState.getOpCtx(),
-                                                aggExState.getRequest().getExchange().value(),
-                                                std::move(pipeline));
+        auto exchange = make_intrusive<exec::agg::Exchange>(
+            opCtx, aggExState.getRequest().getExchange().value(), std::move(pipeline));
 
         for (size_t idx = 0; idx < exchange->getConsumers(); ++idx) {
             // For every new pipeline we have create a new ExpressionContext as the context
@@ -612,14 +612,13 @@ std::vector<std::unique_ptr<Pipeline>> createExchangePipelinesIfNeeded(
             // shared between different exchange-producer cursors.
             auto collator = expCtx->getCollator() ? expCtx->getCollator()->clone() : nullptr;
             expCtx = ExpressionContextBuilder{}
-                         .fromRequest(aggExState.getOpCtx(),
-                                      aggExState.getRequest(),
-                                      allowDiskUseByDefault.load())
+                         .fromRequest(opCtx, aggExState.getRequest(), allowDiskUseByDefault.load())
                          .collator(std::move(collator))
                          .collUUID(expCtx->getUUID())
                          .mongoProcessInterface(MongoProcessInterface::create(opCtx))
-                         .mayDbProfile(CurOp::get(aggExState.getOpCtx())->dbProfileLevel() > 0)
-                         .resolvedNamespace(uassertStatusOK(aggExState.resolveInvolvedNamespaces()))
+                         .mayDbProfile(CurOp::get(opCtx)->dbProfileLevel() > 0)
+                         .resolvedNamespace(
+                             uassertStatusOK(aggCatalogState.resolveInvolvedNamespaces(opCtx)))
                          .tmpDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp")
                          .collationMatchesDefault(expCtx->getCollationMatchesDefault())
                          .canBeRejected(query_settings::canPipelineBeRejected(
@@ -721,7 +720,8 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecuto
                 aggExState, aggCatalogState, std::move(pipeline), mongotBounds);
         } else {
             // Takes ownership of 'pipeline'.
-            pipelines = createExchangePipelinesIfNeeded(aggExState, std::move(pipeline));
+            pipelines =
+                createExchangePipelinesIfNeeded(aggExState, aggCatalogState, std::move(pipeline));
         }
 
         for (auto&& pipelineIt : pipelines) {
@@ -968,6 +968,7 @@ enum class SecondParseRequirement { kNone, kReparseFromLPP, kReparseFromBson };
  * second parse.
  */
 SecondParseRequirement maybeApplyViewPipeline(const AggExState& aggExState,
+                                              const AggCatalogState& aggCatalogState,
                                               LiteParsedPipeline* desugaredLPP,
                                               const SecondParseRequirement& currentRequirement) {
     if (!aggExState.isView()) {
@@ -997,7 +998,7 @@ SecondParseRequirement maybeApplyViewPipeline(const AggExState& aggExState,
         desugaredLPP,
         aggExState.getResolvedView(),
         aggExState.getOriginalNss(),
-        uassertStatusOK(aggExState.resolveInvolvedNamespaces()));
+        uassertStatusOK(aggCatalogState.resolveInvolvedNamespaces(aggExState.getOpCtx())));
     return SecondParseRequirement::kReparseFromLPP;
 }
 
@@ -1083,7 +1084,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     }
 
     secondParseRequirement =
-        maybeApplyViewPipeline(aggExState, &desugaredLPP, secondParseRequirement);
+        maybeApplyViewPipeline(aggExState, aggCatalogState, &desugaredLPP, secondParseRequirement);
 
     expCtx->startExpressionCounters();
     pipeline = buildFinalPipeline(

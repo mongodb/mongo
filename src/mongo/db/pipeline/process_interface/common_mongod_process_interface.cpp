@@ -311,9 +311,11 @@ bool acquireCollectionsForPipeline(const boost::intrusive_ptr<ExpressionContext>
             auto mainTimeseriesColl = CollectionCatalog::get(opCtx)->establishConsistentCollection(
                 opCtx, mainTimeseriesNss, boost::none /* readTimestamp */);
             if (mainTimeseriesColl && mainTimeseriesColl->isTimeseriesCollection()) {
-                uasserted(ErrorCodes::CollectionBecameView,
-                          fmt::format("Detected metadata upgrade for timeseries collection '{}'",
-                                      primaryNss.toStringForErrorMsg()));
+                uasserted(
+                    ErrorCodes::CollectionBecameView,
+                    fmt::format(
+                        "Detected metadata upgrade for timeseries collection in a subpipeline '{}'",
+                        primaryNss.toStringForErrorMsg()));
             }
         }
     };

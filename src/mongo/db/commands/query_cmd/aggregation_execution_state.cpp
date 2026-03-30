@@ -30,7 +30,9 @@
 #include "mongo/db/commands/query_cmd/aggregation_execution_state.h"
 
 #include "mongo/db/exec/disk_use_options_gen.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/collection_query_info.h"
@@ -117,6 +119,84 @@ public:
         const NamespaceString& nss,
         boost::optional<BSONObj> timeSeriesCollator) const override {
         return view_catalog_helpers::resolveView(opCtx, _catalog, nss, timeSeriesCollator);
+    }
+
+    StatusWith<ResolvedNamespaceMap> resolveInvolvedNamespaces(
+        OperationContext* opCtx) const override {
+        auto request = _aggExState.getRequest();
+        auto pipelineInvolvedNamespaces = _aggExState.getInvolvedNamespaces();
+
+        // If there are no involved namespaces, return before attempting to take any locks.
+        if (pipelineInvolvedNamespaces.empty()) {
+            return {ResolvedNamespaceMap()};
+        }
+
+        std::deque<NamespaceString> involvedNamespacesQueue(pipelineInvolvedNamespaces.begin(),
+                                                            pipelineInvolvedNamespaces.end());
+        ResolvedNamespaceMap resolvedNamespaces;
+
+        while (!involvedNamespacesQueue.empty()) {
+            NamespaceString involvedNs = std::move(involvedNamespacesQueue.front());
+            involvedNamespacesQueue.pop_front();
+            if (resolvedNamespaces.find(involvedNs) != resolvedNamespaces.end()) {
+                continue;
+            }
+
+            // If 'ns' refers to a view namespace, then we resolve its definition.
+            auto resolveViewDefinition = [&](const NamespaceString& ns) -> Status {
+                auto resolvedView =
+                    view_catalog_helpers::resolveView(opCtx, _catalog, ns, boost::none);
+                if (!resolvedView.isOK()) {
+                    return resolvedView.getStatus().withContext(
+                        str::stream()
+                        << "Failed to resolve view '" << involvedNs.toStringForErrorMsg());
+                }
+
+                auto&& underlyingNs = resolvedView.getValue().getNamespace();
+                // Attempt to acquire UUID of the underlying collection using lock free method.
+                boost::optional<UUID> uuid = _catalog->lookupUUIDByNSS(opCtx, underlyingNs);
+                resolvedNamespaces[ns] = {underlyingNs,
+                                          resolvedView.getValue().getPipeline(),
+                                          uuid,
+                                          true /*involvedNamespaceIsAView*/};
+
+                // We parse the pipeline corresponding to the resolved view in case we must
+                // resolve other view namespaces that are also involved.
+                LiteParsedPipeline resolvedViewLitePipeline(resolvedView.getValue().getNamespace(),
+                                                            resolvedView.getValue().getPipeline());
+
+                const auto& resolvedViewInvolvedNamespaces =
+                    resolvedViewLitePipeline.getInvolvedNamespaces();
+                involvedNamespacesQueue.insert(involvedNamespacesQueue.end(),
+                                               resolvedViewInvolvedNamespaces.begin(),
+                                               resolvedViewInvolvedNamespaces.end());
+                return Status::OK();
+            };
+
+            // We must look up collection using the catalog acquired above with the same storage
+            // snapshot that the acquisitions above used.
+            boost::optional<Timestamp> readTimestamp =
+                shard_role_details::getRecoveryUnit(_aggExState.getOpCtx())
+                    ->getPointInTimeReadTimestamp();
+            CollectionPtr collPtr = CollectionPtr(_catalog->establishConsistentCollection(
+                _aggExState.getOpCtx(), NamespaceStringOrUUID(involvedNs), readTimestamp));
+
+            if (collPtr) {
+                resolvedNamespaces[involvedNs] = {
+                    involvedNs, std::vector<BSONObj>{}, collPtr->uuid()};
+            } else if (_catalog->lookupView(opCtx, involvedNs)) {
+                auto status = resolveViewDefinition(involvedNs);
+                if (!status.isOK()) {
+                    return status;
+                }
+            } else {
+                // 'involvedNs' is neither a view nor a collection, so resolve it as an empty
+                // pipeline to treat it as reading from a non-existent collection.
+                resolvedNamespaces[involvedNs] = {involvedNs, std::vector<BSONObj>{}};
+            }
+        }
+
+        return resolvedNamespaces;
     }
 
     boost::optional<UUID> getUUID() const override {
@@ -416,6 +496,11 @@ public:
         return view_catalog_helpers::resolveView(opCtx, _catalog, nss, timeSeriesCollator);
     }
 
+    StatusWith<ResolvedNamespaceMap> resolveInvolvedNamespaces(
+        OperationContext* opCtx) const override {
+        return {ResolvedNamespaceMap()};
+    }
+
     boost::optional<UUID> getUUID() const override {
         return boost::none;
     }
@@ -439,86 +524,6 @@ private:
 const MultipleCollectionAccessor CollectionlessAggCatalogState::_emptyMultipleCollectionAccessor{};
 
 }  // namespace
-
-StatusWith<ResolvedNamespaceMap> AggExState::resolveInvolvedNamespaces() const {
-    auto request = getRequest();
-    auto pipelineInvolvedNamespaces = getInvolvedNamespaces();
-
-    // If there are no involved namespaces, return before attempting to take any locks. This is
-    // important for collectionless aggregations, which may be expected to run without locking.
-    if (pipelineInvolvedNamespaces.empty()) {
-        return {ResolvedNamespaceMap()};
-    }
-
-    // Acquire a single const view of the CollectionCatalog and use it for all view and collection
-    // lookups and view definition resolutions that follow. This prevents the view definitions
-    // cached in 'resolvedNamespaces' from changing relative to those in the acquired ViewCatalog.
-    // The resolution of the view definitions below might lead into an endless cycle if any are
-    // allowed to change.
-    auto catalog = CollectionCatalog::get(_opCtx);
-
-    std::deque<NamespaceString> involvedNamespacesQueue(pipelineInvolvedNamespaces.begin(),
-                                                        pipelineInvolvedNamespaces.end());
-    ResolvedNamespaceMap resolvedNamespaces;
-
-    while (!involvedNamespacesQueue.empty()) {
-        auto involvedNs = std::move(involvedNamespacesQueue.front());
-        involvedNamespacesQueue.pop_front();
-
-        if (resolvedNamespaces.find(involvedNs) != resolvedNamespaces.end()) {
-            continue;
-        }
-
-        // If 'ns' refers to a view namespace, then we resolve its definition.
-        auto resolveViewDefinition = [&](const NamespaceString& ns) -> Status {
-            auto resolvedView = view_catalog_helpers::resolveView(_opCtx, catalog, ns, boost::none);
-            if (!resolvedView.isOK()) {
-                return resolvedView.getStatus().withContext(str::stream()
-                                                            << "Failed to resolve view '"
-                                                            << involvedNs.toStringForErrorMsg());
-            }
-
-            auto&& underlyingNs = resolvedView.getValue().getNamespace();
-            // Attempt to acquire UUID of the underlying collection using lock free method.
-            auto uuid = catalog->lookupUUIDByNSS(_opCtx, underlyingNs);
-            resolvedNamespaces[ns] = {underlyingNs,
-                                      resolvedView.getValue().getPipeline(),
-                                      uuid,
-                                      true /*involvedNamespaceIsAView*/};
-
-            // We parse the pipeline corresponding to the resolved view in case we must resolve
-            // other view namespaces that are also involved.
-            LiteParsedPipeline resolvedViewLitePipeline(resolvedView.getValue().getNamespace(),
-                                                        resolvedView.getValue().getPipeline());
-
-            const auto& resolvedViewInvolvedNamespaces =
-                resolvedViewLitePipeline.getInvolvedNamespaces();
-            involvedNamespacesQueue.insert(involvedNamespacesQueue.end(),
-                                           resolvedViewInvolvedNamespaces.begin(),
-                                           resolvedViewInvolvedNamespaces.end());
-            return Status::OK();
-        };
-
-        if (catalog->lookupCollectionByNamespace(_opCtx, involvedNs)) {
-            // Attempt to acquire UUID of the collection using lock free method.
-            auto uuid = catalog->lookupUUIDByNSS(_opCtx, involvedNs);
-            // If 'involvedNs' refers to a collection namespace, then we resolve it as an empty
-            // pipeline in order to read directly from the underlying collection.
-            resolvedNamespaces[involvedNs] = {involvedNs, std::vector<BSONObj>{}, uuid};
-        } else if (catalog->lookupView(_opCtx, involvedNs)) {
-            auto status = resolveViewDefinition(involvedNs);
-            if (!status.isOK()) {
-                return status;
-            }
-        } else {
-            // 'involvedNs' is neither a view nor a collection, so resolve it as an empty pipeline
-            // to treat it as reading from a non-existent collection.
-            resolvedNamespaces[involvedNs] = {involvedNs, std::vector<BSONObj>{}};
-        }
-    }
-
-    return resolvedNamespaces;
-}
 
 void AggExState::performValidationChecks() const {
     auto request = getRequest();
@@ -789,7 +794,8 @@ boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext
 
     // If any involved collection contains extended-range data, set a flag which individual
     // DocumentSource parsers can check.
-    const auto& resolvedNamespaces = uassertStatusOK(_aggExState.resolveInvolvedNamespaces());
+    const auto& resolvedNamespaces =
+        uassertStatusOK(resolveInvolvedNamespaces(_aggExState.getOpCtx()));
     auto requiresExtendedRange = requiresExtendedRangeSupportForTimeseries(resolvedNamespaces);
 
     ExpressionContextBuilder builder;

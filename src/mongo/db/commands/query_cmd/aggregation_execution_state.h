@@ -181,8 +181,6 @@ public:
         return _aggReqDerivatives->liteParsedPipeline.getForeignExecutionNamespaces();
     }
 
-    StatusWith<ResolvedNamespaceMap> resolveInvolvedNamespaces() const;
-
     /**
      * Setter functions
      */
@@ -491,6 +489,12 @@ public:
      * Get the acquired catalog.
      */
     virtual std::shared_ptr<const CollectionCatalog> getCatalog() const = 0;
+
+    /**
+     * Use the acquired catalog to resolve the involved namespaces.
+     */
+    virtual StatusWith<ResolvedNamespaceMap> resolveInvolvedNamespaces(
+        OperationContext* opCtx) const = 0;
 
     /**
      * Use the acquired catalog to resolve the view.
