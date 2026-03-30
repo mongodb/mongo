@@ -199,6 +199,11 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    boost::optional<std::string> getStorageTierFromStorageOptions(
+        const BSONObj& storageEngineOptions) const override {
+        MONGO_UNREACHABLE;
+    }
+
     void dump() const override {
         MONGO_UNREACHABLE;
     }

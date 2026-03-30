@@ -1216,6 +1216,11 @@ BSONObj StorageEngineImpl::setStorageTierToStorageOptions(const BSONObj& storage
     return _engine->setStorageTierToStorageOptions(storageEngineOptions, value);
 }
 
+boost::optional<std::string> StorageEngineImpl::getStorageTierFromStorageOptions(
+    const BSONObj& storageEngineOptions) const {
+    return _engine->getStorageTierFromStorageOptions(storageEngineOptions);
+}
+
 BSONObj StorageEngineImpl::getSanitizedStorageOptionsForSecondaryReplication(
     const BSONObj& options) const {
     return _engine->getSanitizedStorageOptionsForSecondaryReplication(options);

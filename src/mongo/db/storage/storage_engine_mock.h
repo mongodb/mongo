@@ -292,6 +292,11 @@ public:
         return storageEngineOptions;
     }
 
+    boost::optional<std::string> getStorageTierFromStorageOptions(
+        const BSONObj& storageEngineOptions) const override {
+        return boost::none;
+    }
+
     BSONObj getSanitizedStorageOptionsForSecondaryReplication(const BSONObj& options) const final {
         return options;
     }

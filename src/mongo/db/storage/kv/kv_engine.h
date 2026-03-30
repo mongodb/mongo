@@ -620,6 +620,13 @@ public:
         const BSONObj& storageEngineOptions, StringData value) const = 0;
 
     /**
+     * Returns the value of `disaggregated.storage_tier` from the storage engine BSON object of a
+     * collection / index, or boost::none if not set.
+     */
+    virtual boost::optional<std::string> getStorageTierFromStorageOptions(
+        const BSONObj& storageEngineOptions) const = 0;
+
+    /**
      * Returns the input storage engine options, sanitized to remove options that may not apply to
      * this node, such as encryption. Might be called for both collection and index options. See
      * SERVER-68122.

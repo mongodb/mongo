@@ -3184,6 +3184,29 @@ BSONObj WiredTigerKVEngine::setStorageTierToStorageOptions(const BSONObj& storag
     return WiredTigerUtil::setConfigStringToStorageOptions(storageEngineOptions, newConfigString);
 }
 
+boost::optional<std::string> WiredTigerKVEngine::getStorageTierFromStorageOptions(
+    const BSONObj& storageEngineOptions) const {
+    const auto configString =
+        WiredTigerUtil::getConfigStringFromStorageOptions(storageEngineOptions);
+    if (!configString) {
+        return boost::none;
+    }
+
+    WiredTigerConfigParser parser(*configString);
+    WT_CONFIG_ITEM disaggValue;
+    if (parser.get("disaggregated", &disaggValue) != 0) {
+        return boost::none;
+    }
+
+    WiredTigerConfigParser disaggParser(StringData(disaggValue.str, disaggValue.len));
+    WT_CONFIG_ITEM storageTierValue;
+    if (disaggParser.get("storage_tier", &storageTierValue) != 0) {
+        return boost::none;
+    }
+
+    return std::string(storageTierValue.str, storageTierValue.len);
+}
+
 BSONObj WiredTigerKVEngine::getSanitizedStorageOptionsForSecondaryReplication(
     const BSONObj& options) const {
 

@@ -50,6 +50,7 @@
 #include "mongo/db/shard_role/ddl/list_collections_gen.h"
 #include "mongo/db/shard_role/shard_catalog/coll_mod.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog_helper.h"
+#include "mongo/db/shard_role/shard_catalog/collection_options_gen.h"
 #include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/sharding_environment/grid.h"
@@ -330,12 +331,18 @@ private:
         bool constraintValidationLevelDisabled =
             (gFeatureFlagConstraintValidationLevel.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
                 requestedVersion, originalVersion));
-        if (errorAndLogValidationDisabled || constraintValidationLevelDisabled) {
+        bool storageTierDisabled =
+            gFeatureFlagCreateSupportsStorageTierOptions
+                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion);
+        if (errorAndLogValidationDisabled || constraintValidationLevelDisabled ||
+            storageTierDisabled) {
             for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
                 Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
                 catalog::forEachCollectionFromDb(
                     opCtx, dbName, MODE_IS, [&](const Collection* collection) -> bool {
-                        uassert(ErrorCodes::CannotDowngrade,
+                        if (errorAndLogValidationDisabled) {
+                            uassert(
+                                ErrorCodes::CannotDowngrade,
                                 fmt::format(
                                     "Cannot downgrade the cluster when there are collections with "
                                     "'errorAndLog' validation action. Please unset the option or "
@@ -345,8 +352,11 @@ private:
                                     collection->uuid().toString()),
                                 collection->getValidationAction() !=
                                     ValidationActionEnum::errorAndLog);
+                        }
 
-                        uassert(ErrorCodes::CannotDowngrade,
+                        if (constraintValidationLevelDisabled) {
+                            uassert(
+                                ErrorCodes::CannotDowngrade,
                                 fmt::format(
                                     "Cannot downgrade the cluster when there are collections with "
                                     "'constraint' validation level. Please unset the option or "
@@ -356,6 +366,24 @@ private:
                                     collection->uuid().toString()),
                                 collection->getValidationLevel() !=
                                     ValidationLevelEnum::constraint);
+                        }
+
+                        if (storageTierDisabled) {
+                            auto storageEngine = getGlobalServiceContext()->getStorageEngine();
+                            auto storageTier = storageEngine->getStorageTierFromStorageOptions(
+                                collection->getCollectionOptions().storageEngine);
+                            uassert(ErrorCodes::CannotDowngrade,
+                                    fmt::format(
+                                        "Cannot downgrade the cluster when there are collections "
+                                        "with a cold storage tier. Please drop the collection(s) "
+                                        "before downgrading. First detected collection: {} "
+                                        "(UUID: {}).",
+                                        collection->ns().toStringForErrorMsg(),
+                                        collection->uuid().toString()),
+                                    !storageTier.has_value() ||
+                                        storageTier.value() !=
+                                            idlSerialize(StorageTierLevelEnum::cold));
+                        }
 
                         return true;
                     });

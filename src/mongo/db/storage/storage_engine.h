@@ -767,7 +767,7 @@ public:
      * Sets the last materialized LSN, marking the highest phylog LSN
      * that has been successfully written to the page server and should have no holes.
      *
-     * TODO: Revisit how to handle cases where mongod speaks with a log server
+     * TODO (SERVER-122746): Revisit how to handle cases where mongod speaks with a log server
      * in a non-local zone due to failover.
      */
     virtual void setLastMaterializedLsn(uint64_t lsn) = 0;
@@ -1054,6 +1054,13 @@ public:
      */
     [[nodiscard]] virtual BSONObj setStorageTierToStorageOptions(
         const BSONObj& storageEngineOptions, StringData value) const = 0;
+
+    /**
+     * Returns the value of `disaggregated.storage_tier` from the storage engine BSON object of a
+     * collection / index, or boost::none if not set.
+     */
+    virtual boost::optional<std::string> getStorageTierFromStorageOptions(
+        const BSONObj& storageEngineOptions) const = 0;
 
     /**
      * Returns the input storage engine options, sanitized to remove options that may not apply to

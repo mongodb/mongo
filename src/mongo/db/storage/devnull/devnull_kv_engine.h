@@ -236,6 +236,11 @@ public:
         return storageEngineOptions;
     }
 
+    boost::optional<std::string> getStorageTierFromStorageOptions(
+        const BSONObj& storageEngineOptions) const override {
+        return boost::none;
+    }
+
     void dump() const override {}
 
     Status insertIntoIdent(RecoveryUnit& ru,
