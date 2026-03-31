@@ -112,7 +112,10 @@ if [[ "$RET" != "0" ]]; then
     eval ${BAZEL_BINARY} run ${CONFIG_FLAGS} //buildscripts:gather_failed_tests || true
 fi
 
-eval ${BAZEL_BINARY} run ${CONFIG_FLAGS} //buildscripts:append_result_tasks -- --outfile=generated_tasks.json
+if [ "${generate_burn_in_targets}" != "true" ]; then
+    echo "Activating result task group..."
+    python buildscripts/evergreen_activate_result_tasks.py --expansion-file ../expansions.yml --build-events-file build_events.json
+fi
 
 eval ${BAZEL_BINARY} shutdown # Explicitly shutdown the bazel server in case the Evergreen agent is tracking it for completion of this process.
 

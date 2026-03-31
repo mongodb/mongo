@@ -94,6 +94,18 @@ bool_flag(
     build_setting_default = False,
 )
 
+bool_flag(
+    name = "skip_deps_for_cquery",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "skip_deps_for_cquery_enabled",
+    flag_values = {
+        "//bazel/resmoke:skip_deps_for_cquery": "True",
+    },
+)
+
 config_setting(
     name = "installed_dist_test_enabled",
     flag_values = {

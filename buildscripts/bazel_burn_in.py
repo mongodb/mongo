@@ -34,6 +34,7 @@ import yaml
 from git import Repo
 from shrub.v2 import BuildVariant, FunctionCall, ShrubProject, Task, TaskGroup
 from shrub.v2.command import BuiltInCommand
+from shrub.v2.task import ExistingTask
 from typing_extensions import Annotated
 
 if __name__ == "__main__" and __package__ is None:
@@ -45,7 +46,7 @@ from buildscripts.burn_in_tests import (
     MockFileChangeDetector,
 )
 from buildscripts.ciconfig.evergreen import parse_evergreen_file
-from buildscripts.generate_result_tasks import make_results_task
+from buildscripts.generate_result_tasks import make_results_task, make_task_group
 from buildscripts.util import buildozer_utils as buildozer
 
 BAZEL_BURN_IN_TESTS = r"resmoke_tests_burn_in_*"
@@ -220,26 +221,27 @@ def make_task(targets_to_run, variant_name):
                         "--test_tag_filters=${resmoke_tests_tag_filter},-incompatible_with_bazel_remote_test "
                         "--test_arg=--testTimeout=960 "
                         "--test_timeout=1500 "
-                        "--test_sharding_strategy=disabled "
-                        "--test_arg=--sanityCheck"
+                        "--config=evg "
                     ),
                     "task_compile_flags": (
                         "--keep_going "
                         "--verbose_failures "
                         "--simple_build_id=True "
                         "--define=MONGO_VERSION=${version} "
-                        "--config=evg "
+                        "--linkstatic=True "
                         "--features=strip_debug "
                         "--separate_debug=False "
                         "--remote_download_outputs=minimal "
                         "--zip_undeclared_test_outputs"
                     ),
                     "generate_burn_in_targets": True,
+                    "compiling_for_test": True,
+                    "build_timeout_seconds": 1800,
                 },
             ),
         ],
     )
-    return TaskGroup(
+    return task, TaskGroup(
         name=f"resmoke_tests_burn_in_{variant_name}-TG",
         tasks=[task],
         max_hosts=-1,
@@ -256,35 +258,7 @@ def make_task(targets_to_run, variant_name):
             FunctionCall("get engflow creds"),
         ],
         teardown_task=[
-            BuiltInCommand("generate.tasks", {"optional": True, "files": ["generated_tasks.json"]}),
-            BuiltInCommand(
-                "s3.put",
-                {
-                    "optional": True,
-                    "aws_key": "${aws_key}",
-                    "aws_secret": "${aws_secret}",
-                    "local_file": "src/generated_tasks.json",
-                    "remote_file": "${project}/${version_id}/${build_variant}/${task_name}/generated_tasks.json",
-                    "bucket": "mciuploads",
-                    "permissions": "private",
-                    "visibility": "signed",
-                    "content_type": "application/json",
-                },
-            ),
-            BuiltInCommand(
-                "s3.put",
-                {
-                    "optional": True,
-                    "aws_key": "${aws_key}",
-                    "aws_secret": "${aws_secret}",
-                    "local_file": "src/build_events.json",
-                    "remote_file": "${project}/${version_id}/${build_variant}/${task_name}/build_events.json",
-                    "bucket": "mciuploads",
-                    "permissions": "private",
-                    "visibility": "signed",
-                    "content_type": "application/json",
-                },
-            ),
+            FunctionCall("s3.put bazel build events"),
             FunctionCall("debug full disk"),
             FunctionCall("attach bazel invocation"),
             FunctionCall("save failed tests"),
@@ -333,10 +307,14 @@ def generate_tasks(
 
     evg_conf = parse_evergreen_file("etc/evergreen.yml")
 
+    project = {"tasks": [], "task_groups": [], "buildvariants": []}
+
     shrub_project = ShrubProject.empty()
 
-    results_tasks = []
-    seen_targets = set()
+    targets_all = set()
+
+    resmoke_tests_tasks = []
+    result_tasks = {}
     for variant_name in evg_conf.variant_names:
         variant = evg_conf.get_variant(variant_name)
         if not (variant.is_required_variant() or variant.is_suggested_variant()):
@@ -354,26 +332,60 @@ def generate_tasks(
                 if target.original_target in targets_with_tag
             ]
             if burn_in_targets_to_run:
-                burn_in_task = make_task(burn_in_targets_to_run, variant_name)
+                targets_all.update(burn_in_targets_to_run)
 
-                for target in burn_in_targets_to_run:
-                    if target not in seen_targets:
-                        seen_targets.add(target)
-                        results_tasks.append(make_results_task(target))
+                build_variant = BuildVariant(name=variant.name)
 
-                build_variant = BuildVariant(name=variant_name)
-                build_variant.add_task_group(burn_in_task)
+                burn_in_task, burn_in_task_group = make_task(burn_in_targets_to_run, variant_name)
+                resmoke_tests_tasks.append(burn_in_task)
+                build_variant.add_task_group(burn_in_task_group)
+
+                results_task_group = make_task_group(
+                    "resmoke_tests_burn_in",
+                    variant.name,
+                    targets,
+                    f"resmoke_tests_burn_in_{variant.name}",
+                )
+                result_tasks[results_task_group.name] = burn_in_targets_to_run
+                build_variant.add_task_group(results_task_group)
+
+                build_variant.display_task(
+                    display_name="burn_in_tests",
+                    execution_existing_tasks=[ExistingTask(burn_in_task.name)]
+                    + [ExistingTask(task) for task in burn_in_targets_to_run],
+                    activate=False,
+                )
+
                 shrub_project.add_build_variant(build_variant)
 
-    # Patch in fields that not supported by shrub
     project = shrub_project.as_dict()
-    project["tasks"] = project.get("tasks", [])
+    tasks = [make_results_task(target) for target in targets_all] + [
+        task.as_dict() for task in resmoke_tests_tasks
+    ]
+    project["tasks"] = tasks
+
     for variant in project.get("buildvariants", []):
         for task in variant.get("tasks", []):
             task["activate"] = False
+
+            # Typical variants running resmoke tests set a variant-wide dependency. During conversion,
+            # these are not a dependency for the `resmoke_tests` task or the results tasks added here.
+            # Set an explicitly depends_on in the task group's reference to override it. Remove with SERVER-119809.
+            if task["name"] in result_tasks:
+                task["depends_on"] = {
+                    "name": f"resmoke_tests_burn_in_{variant["name"]}",
+                }
+            else:
+                task["depends_on"] = {
+                    "name": "version_burn_in_gen",
+                    "variant": "generate-tasks-for-version",
+                    "omit_generated_tasks": True,
+                }
     for task in project["tasks"]:
-        task["exec_timeout_secs"] = 1800
-    project["tasks"].extend([task for task in results_tasks])
+        task["exec_timeout_secs"] = 3720
+    for task_group in project.get("task_groups", []):
+        if task_group["name"] in result_tasks:
+            task_group["tasks"] = result_tasks[task_group["name"]]
 
     with open(outfile, "w") as f:
         f.write(json.dumps(project, indent=4))

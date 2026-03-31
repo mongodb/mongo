@@ -50,7 +50,7 @@ filters:
   - "ciconfig":
     approvers:
       - 10gen/devprod-correctness
-  - "append_result_tasks.py":
+  - "evergreen_activate_result_tasks.py":
     approvers:
       - 10gen/devprod-correctness
   - "generate_result_tasks.py":
