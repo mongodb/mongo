@@ -156,9 +156,13 @@ public:
     // Used to specify a scan direction of the chunk map.
     enum class Direction { Forward, Backward };
 
-    explicit ChunkMap(OID epoch, const Timestamp& timestamp, size_t chunkVectorSize)
+    explicit ChunkMap(OID epoch,
+                      const Timestamp& timestamp,
+                      size_t chunkVectorSize,
+                      bool allowGaps = false)
         : _collectionPlacementVersion({epoch, timestamp}, {0, 0}),
-          _maxChunkVectorSize(chunkVectorSize) {}
+          _maxChunkVectorSize(chunkVectorSize),
+          _allowGaps(allowGaps) {}
 
     size_t size() const;
 
@@ -335,6 +339,9 @@ private:
     // Bigger vectors will imply slower incremental refreshes (more chunks to copy) but
     // faster map copy (less chunk vector pointers to copy).
     size_t _maxChunkVectorSize;
+
+    // Allow gaps between chunks
+    bool _allowGaps;
 };
 
 /**
@@ -364,6 +371,23 @@ public:
      * inside the config.collections entry when refreshing.
      */
     static RoutingTableHistory makeNew(
+        NamespaceString nss,
+        UUID uuid,
+        KeyPattern shardKeyPattern,
+        bool unsplittable,
+        std::unique_ptr<CollatorInterface> defaultCollator,
+        bool unique,
+        OID epoch,
+        const Timestamp& timestamp,
+        boost::optional<TypeCollectionTimeseriesFields> timeseriesFields,
+        boost::optional<TypeCollectionReshardingFields> reshardingFields,
+        bool allowMigrations,
+        const std::vector<ChunkType>& chunks);
+
+    /**
+     * Makes an instance with a routing table, that allows gaps between chunks.
+     */
+    static RoutingTableHistory makeNewAllowingGaps(
         NamespaceString nss,
         UUID uuid,
         KeyPattern shardKeyPattern,

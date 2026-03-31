@@ -80,21 +80,25 @@ void checkAllElementsAreOfType(BSONType type, const BSONObj& o) {
             ChunkMap::allElementsAreOfType(type, o));
 }
 
-void checkChunksAreContiguous(const ChunkInfo& left, const ChunkInfo& right) {
+void checkChunksAreContiguous(const ChunkInfo& left,
+                              const ChunkInfo& right,
+                              bool onlyOverlapCheck) {
     const auto& leftKeyString = left.getMaxKeyString();
     const auto rightKeyString = ShardKeyPattern::toKeyString(right.getMin());
     if (leftKeyString == rightKeyString) {
         return;
     }
 
-    if (SimpleBSONObjComparator::kInstance.evaluate(left.getMax() < right.getMin())) {
-        uasserted(metadataInconsistencyErrorCode(),
-                  str::stream() << "Gap exists in the routing table between chunks "
-                                << left.getRange().toString() << " and "
-                                << right.getRange().toString());
-    } else {
+    if (SimpleBSONObjComparator::kInstance.evaluate(left.getMax() > right.getMin())) {
         uasserted(metadataInconsistencyErrorCode(),
                   str::stream() << "Overlap exists in the routing table between chunks "
+                                << left.getRange().toString() << " and "
+                                << right.getRange().toString());
+    } else if (onlyOverlapCheck) {
+        return;
+    } else {
+        uasserted(metadataInconsistencyErrorCode(),
+                  str::stream() << "Gap exists in the routing table between chunks "
                                 << left.getRange().toString() << " and "
                                 << right.getRange().toString());
     }
@@ -255,20 +259,21 @@ void ChunkMap::_commitUpdatedChunkVector(std::shared_ptr<ChunkVector>&& chunkVec
     const auto& vectorMaxKeyString = chunkVectorPtr->back()->getMaxKeyString();
     const auto nextMapIt = _chunkVectorMap.lower_bound(vectorMaxKeyString);
 
-    // Check lower bound is consistent
-    if (nextMapIt == _chunkVectorMap.begin()) {
+    // Check lower bound is consistent only if gaps are not allowed
+    if (nextMapIt != _chunkVectorMap.begin()) {
+        checkChunksAreContiguous(
+            *(std::prev(nextMapIt)->second->back()), *(chunkVectorPtr->front()), _allowGaps);
+    } else if (!_allowGaps) {
         checkAllElementsAreOfType(BSONType::minKey, chunkVectorPtr->front()->getMin());
-    } else {
-        checkChunksAreContiguous(*(std::prev(nextMapIt)->second->back()),
-                                 *(chunkVectorPtr->front()));
     }
 
     if (checkMaxKeyConsistency) {
-        // Check upper bound is consistent
-        if (nextMapIt == _chunkVectorMap.end()) {
+        // Check upper bound is consistent only if gaps are not allowed
+        if (nextMapIt != _chunkVectorMap.end()) {
+            checkChunksAreContiguous(
+                *(chunkVectorPtr->back()), *(nextMapIt->second->front()), _allowGaps);
+        } else if (!_allowGaps) {
             checkAllElementsAreOfType(BSONType::maxKey, chunkVectorPtr->back()->getMax());
-        } else {
-            checkChunksAreContiguous(*(chunkVectorPtr->back()), *(nextMapIt->second->front()));
         }
     }
 
@@ -433,7 +438,7 @@ ChunkMap ChunkMap::_makeUpdated(ChunkVector&& updateChunks) const {
             // we do not update `lastCommitedIsNew` flag.
         } else {
             if (!newVectorPtr->empty() && lastCommittedIsNew) {
-                checkChunksAreContiguous(*newVectorPtr->back(), *nextChunkPtr);
+                checkChunksAreContiguous(*newVectorPtr->back(), *nextChunkPtr, _allowGaps);
             }
             lastCommittedIsNew = false;
             newVectorPtr->emplace_back(nextChunkPtr);
@@ -460,7 +465,7 @@ ChunkMap ChunkMap::_makeUpdated(ChunkVector&& updateChunks) const {
                      compareResult == std::partial_ordering::equivalent));
 
         if (!newVectorPtr->empty()) {
-            checkChunksAreContiguous(*newVectorPtr->back(), *nextChunkPtr);
+            checkChunksAreContiguous(*newVectorPtr->back(), *nextChunkPtr, _allowGaps);
         }
         lastCommittedIsNew = true;
         newVectorPtr->emplace_back(std::move(nextChunkPtr));
@@ -663,21 +668,32 @@ ChunkVector::const_iterator ChunkMap::_findIntersectingChunkIterator(
     ChunkVector::const_iterator last,
     bool isMaxInclusive) const {
 
+    ChunkVector::const_iterator it;
     if (!isMaxInclusive) {
-        return std::lower_bound(first,
-                                last,
-                                shardKeyString,
-                                [&](const auto& chunkInfo, const std::string& shardKeyString) {
-                                    return chunkInfo->getMaxKeyString() < shardKeyString;
-                                });
+        it = std::lower_bound(first,
+                              last,
+                              shardKeyString,
+                              [&](const auto& chunkInfo, const std::string& shardKeyString) {
+                                  return chunkInfo->getMaxKeyString() < shardKeyString;
+                              });
     } else {
-        return std::upper_bound(first,
-                                last,
-                                shardKeyString,
-                                [&](const std::string& shardKeyString, const auto& chunkInfo) {
-                                    return shardKeyString < chunkInfo->getMaxKeyString();
-                                });
+        it = std::upper_bound(first,
+                              last,
+                              shardKeyString,
+                              [&](const std::string& shardKeyString, const auto& chunkInfo) {
+                                  return shardKeyString < chunkInfo->getMaxKeyString();
+                              });
     }
+
+    // In case there are gaps present, it's possible that the searched shard key is missing
+    // despite lower or upper bound being present
+    if (_allowGaps && it != last) {
+        if (MONGO_unlikely((*it)->getMinKeyString() > shardKeyString)) {
+            return last;
+        }
+    }
+
+    return it;
 }
 
 
@@ -978,6 +994,36 @@ RoutingTableHistory RoutingTableHistory::makeNew(
         std::move(reshardingFields),
         allowMigrations,
         ChunkMap{epoch, timestamp, static_cast<size_t>(gRoutingTableCacheChunkBucketSize)}
+            .createMerged(std::move(changedChunkInfos)));
+}
+
+RoutingTableHistory RoutingTableHistory::makeNewAllowingGaps(
+    NamespaceString nss,
+    UUID uuid,
+    KeyPattern shardKeyPattern,
+    bool unsplittable,
+    std::unique_ptr<CollatorInterface> defaultCollator,
+    bool unique,
+    OID epoch,
+    const Timestamp& timestamp,
+    boost::optional<TypeCollectionTimeseriesFields> timeseriesFields,
+    boost::optional<TypeCollectionReshardingFields> reshardingFields,
+    bool allowMigrations,
+    const std::vector<ChunkType>& chunks) {
+
+    auto changedChunkInfos = flatten(chunks);
+
+    return RoutingTableHistory(
+        std::move(nss),
+        std::move(uuid),
+        std::move(shardKeyPattern),
+        std::move(unsplittable),
+        std::move(defaultCollator),
+        std::move(unique),
+        std::move(timeseriesFields),
+        std::move(reshardingFields),
+        allowMigrations,
+        ChunkMap{epoch, timestamp, static_cast<size_t>(gRoutingTableCacheChunkBucketSize), true}
             .createMerged(std::move(changedChunkInfos)));
 }
 

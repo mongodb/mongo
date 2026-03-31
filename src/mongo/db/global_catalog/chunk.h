@@ -56,6 +56,7 @@ public:
 
     ChunkInfo(ChunkRange range,
               std::string maxKeyString,
+              std::string minKeyString,
               ShardId shardId,
               ChunkVersion version,
               std::vector<ChunkHistory> history,
@@ -82,6 +83,10 @@ public:
 
     const std::string& getMaxKeyString() const {
         return _maxKeyString;
+    }
+
+    const std::string& getMinKeyString() const {
+        return _minKeyString;
     }
 
     const ShardId& getShardId() const {
@@ -134,6 +139,8 @@ private:
     // '_maxKeyString' must remain first member of this class because it is frequently
     // accessed by the ChunkManager.
     const std::string _maxKeyString;
+
+    const std::string _minKeyString;
 
     const ChunkRange _range;
 

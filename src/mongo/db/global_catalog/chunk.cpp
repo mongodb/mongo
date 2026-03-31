@@ -48,6 +48,7 @@ namespace mongo {
 
 ChunkInfo::ChunkInfo(const ChunkType& from)
     : _maxKeyString(ShardKeyPattern::toKeyString(from.getRange().getMax())),
+      _minKeyString(ShardKeyPattern::toKeyString(from.getRange().getMin())),
       _range(from.getRange()),
       _shardId(from.getShard()),
       _lastmod(from.getVersion()),
@@ -58,11 +59,13 @@ ChunkInfo::ChunkInfo(const ChunkType& from)
 
 ChunkInfo::ChunkInfo(ChunkRange range,
                      std::string maxKeyString,
+                     std::string minKeyString,
                      ShardId shardId,
                      ChunkVersion version,
                      std::vector<ChunkHistory> history,
                      bool jumbo)
     : _maxKeyString(std::move(maxKeyString)),
+      _minKeyString(std::move(minKeyString)),
       _range(std::move(range)),
       _shardId(shardId),
       _lastmod(std::move(version)),
@@ -122,6 +125,7 @@ BSONObj ChunkInfo::toBSON() const {
     BSONObjBuilder bob;
     _range.serialize(&bob);
     bob.append("maxKeyString", _maxKeyString);
+    bob.append("minKeyString", _minKeyString);
     bob.append("shardId", _shardId);
     _lastmod.serialize("lastmod", &bob);
     bob.append("jumbo", _jumbo.load());
