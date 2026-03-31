@@ -7,6 +7,7 @@
  *   # tags set.
  *   config_shard_incompatible,
  *   requires_majority_read_concern,
+ *   requires_profiling,
  *   # This test has some timing dependency causing failures when run with a non-streamable rsm
  *   # (e.g. sdam), because non-streamable rsm is generally slower to learn of new replica set info.
  *   requires_streamable_rsm,
