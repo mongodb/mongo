@@ -658,8 +658,8 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_runMand
 SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& stepdownToken) noexcept {
-    auto telemetryCtx = _recipientCtx.getTelemetryContext()
-        ? otel::traces::TelemetryContextSerializer::fromBSON(*_recipientCtx.getTelemetryContext())
+    auto telemetryCtx = _metadata.getTelemetryContext()
+        ? otel::traces::TelemetryContextSerializer::fromBSON(*_metadata.getTelemetryContext())
         : otel::traces::Span::createTelemetryContext();
     auto span = _startSpan(telemetryCtx, "ReshardingRecipientService::run");
 

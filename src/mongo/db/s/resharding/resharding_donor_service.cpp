@@ -624,8 +624,8 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runMandatoryCle
 SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& stepdownToken) noexcept {
-    auto telemetryCtx = _donorCtx.getTelemetryContext()
-        ? otel::traces::TelemetryContextSerializer::fromBSON(*_donorCtx.getTelemetryContext())
+    auto telemetryCtx = _metadata.getTelemetryContext()
+        ? otel::traces::TelemetryContextSerializer::fromBSON(*_metadata.getTelemetryContext())
         : otel::traces::Span::createTelemetryContext();
     auto span = _startSpan(telemetryCtx, "ReshardingDonorService::DonorStateMachine::run");
 

@@ -137,9 +137,9 @@ public:
         RecipientShardContext recipientCtx;
         recipientCtx.setState(RecipientStateEnum::kAwaitingFetchTimestamp);
 
-        ReshardingRecipientDocument doc(std::move(recipientCtx),
-                                        donorShardTimestamps,
-                                        durationCount<Milliseconds>(Milliseconds{5}));
+        ReshardingRecipientDocument doc(std::move(recipientCtx));
+        doc.setDonorShards(donorShardTimestamps);
+        doc.setMinimumOperationDurationMillis(durationCount<Milliseconds>(Milliseconds{5}));
 
         auto commonMetadata = CommonReshardingMetadata(
             UUID::gen(), sourceNss(), sourceUUID(), outputNss(), {BSON(_currentShardKey << 1)});

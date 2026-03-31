@@ -93,7 +93,6 @@ void tellAllDonorsToInitialize(OperationContext* opCtx,
     cmd.setCommonReshardingMetadata(doc.getCommonReshardingMetadata());
     cmd.setRecipientShards(
         resharding::extractShardIdsFromParticipantEntries(doc.getRecipientShards()));
-    cmd.setTelemetryContext(doc.getTelemetryContext());
 
     sendReshardingCommand(opCtx,
                           cmd,

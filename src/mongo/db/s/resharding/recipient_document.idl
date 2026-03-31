@@ -83,6 +83,7 @@ structs:
         inline_chained_structs: true
         chained_structs:
             CommonReshardingMetadata: CommonReshardingMetadata
+            ReshardingRecipientOptions: ReshardingRecipientOptions
         generate_comparison_operators: false
         # Use strict:false to avoid complications around upgrade/downgrade. This isn't technically
         # required for resharding because durable state from all resharding operations is cleaned up
@@ -93,39 +94,12 @@ structs:
                 type: timestamp
                 optional: true
                 description: "The timestamp for the snapshot read while cloning from the donors."
-            skipCloningAndApplying:
-                type: optionalBool
-                description:
-                    "Whether this recipient can skip cloning documents and
-                    fetching/applying oplog entries because it is not going to own any
-                    chunks for the collection after resharding."
-            skipCloning:
-                type: optionalBool
-                description:
-                    "Whether this recipient can skip cloning documents because it is not going to
-                    own any chunks for the collection after resharding."
-            skipBuildingIndexes:
-                type: optionalBool
-                description:
-                    "Whether this recipient can skip building indexes because it is not going to
-                    own any chunks for the collection after resharding."
-            storeOplogFetcherProgress:
-                type: optionalBool
-                description:
-                    "Whether this recipient should store the count of oplog entries
-                    fetched in a progress document and use this count instead of the fast
-                    count to recover metrics upon recovery."
             changeStreamsMonitor:
                 type: ChangeStreamsMonitorContext
                 optional: true
             # We intentionally have the mutable state nested in a subobject to make it easy to
             # overwrite with a single $set.
             mutableState: RecipientShardContext
-            donorShards:
-                type: array<DonorShardFetchTimestamp>
-                description: "The list of donor shards that report to this recipient."
-            minimumOperationDurationMillis:
-                type: long
             startConfigTxnCloneTime:
                 type: date
                 optional: true
@@ -133,15 +107,3 @@ structs:
                 type: ReshardingRecipientMetrics
                 description: "Metrics related to this recipient."
                 optional: true
-            oplogBatchTaskCount:
-                type: long
-                description: >-
-                    "The number of subtasks to divide a single oplog batch into,
-                    so that it may be applied concurrently by multiple threads."
-                optional: true
-            relaxed:
-                type: optionalBool
-                description: >-
-                    "Runs the cloner aggregation without specifying a collection
-                    UUID to avoid errors in a scenario where the collection UUIDs
-                    are inconsistent among shards."

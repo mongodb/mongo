@@ -94,7 +94,9 @@ BSONObj makeDonorDocBson(const CommonReshardingMetadata& metadata) {
 BSONObj makeRecipientDocBson(const CommonReshardingMetadata& metadata) {
     RecipientShardContext recipientCtx;
     recipientCtx.setState(RecipientStateEnum::kAwaitingFetchTimestamp);
-    ReshardingRecipientDocument doc(std::move(recipientCtx), {ShardId{"donor1"}}, 5);
+    ReshardingRecipientDocument doc(std::move(recipientCtx));
+    doc.setDonorShards({DonorShardFetchTimestamp(ShardId{"donor1"})});
+    doc.setMinimumOperationDurationMillis(5);
     doc.setCommonReshardingMetadata(metadata);
     return doc.toBSON();
 }

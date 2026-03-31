@@ -326,10 +326,6 @@ ReshardingDonorDocument constructDonorDocumentFromReshardingFields(
     DonorShardContext donorCtx;
     donorCtx.setState(DonorStateEnum::kPreparingToDonate);
 
-    if (reshardingFields.getTelemetryContext()) {
-        donorCtx.setTelemetryContext(*reshardingFields.getTelemetryContext());
-    }
-
     auto donorDoc = ReshardingDonorDocument{
         std::move(donorCtx), reshardingFields.getDonorFields()->getRecipientShardIds()};
 
@@ -344,6 +340,9 @@ ReshardingDonorDocument constructDonorDocumentFromReshardingFields(
     commonMetadata.setProvenance(reshardingFields.getProvenance());
     resharding::validatePerformVerification(vCtx, reshardingFields.getPerformVerification());
     commonMetadata.setPerformVerification(reshardingFields.getPerformVerification());
+    if (reshardingFields.getTelemetryContext()) {
+        commonMetadata.setTelemetryContext(*reshardingFields.getTelemetryContext());
+    }
 
     donorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
 
@@ -363,14 +362,12 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
     RecipientShardContext recipientCtx;
     recipientCtx.setState(RecipientStateEnum::kAwaitingFetchTimestamp);
 
-    if (reshardingFields.getTelemetryContext()) {
-        recipientCtx.setTelemetryContext(*reshardingFields.getTelemetryContext());
-    }
-
-    auto recipientDoc =
-        ReshardingRecipientDocument{std::move(recipientCtx),
-                                    recipientFields->getDonorShards(),
-                                    recipientFields->getMinimumOperationDurationMillis()};
+    auto recipientDoc = ReshardingRecipientDocument{std::move(recipientCtx)};
+    ReshardingRecipientOptions recipientOptions(
+        recipientFields->getDonorShards(), recipientFields->getMinimumOperationDurationMillis());
+    recipientOptions.setOplogBatchTaskCount(recipientFields->getOplogBatchTaskCount());
+    recipientOptions.setRelaxed(recipientFields->getRelaxed());
+    recipientDoc.setReshardingRecipientOptions(std::move(recipientOptions));
 
     auto sourceNss = recipientFields->getSourceNss();
     auto sourceUUID = recipientFields->getSourceUUID();
@@ -383,6 +380,9 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
     commonMetadata.setProvenance(reshardingFields.getProvenance());
     resharding::validatePerformVerification(vCtx, reshardingFields.getPerformVerification());
     commonMetadata.setPerformVerification(reshardingFields.getPerformVerification());
+    if (reshardingFields.getTelemetryContext()) {
+        commonMetadata.setTelemetryContext(*reshardingFields.getTelemetryContext());
+    }
 
     ReshardingRecipientMetrics metrics;
     metrics.setApproxDocumentsToCopy(recipientFields->getApproxDocumentsToCopy());
@@ -410,10 +410,6 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
             vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         recipientDoc.setStoreOplogFetcherProgress(true);
     }
-
-    recipientDoc.setOplogBatchTaskCount(recipientFields->getOplogBatchTaskCount());
-
-    recipientDoc.setRelaxed(recipientFields->getRelaxed());
 
     return recipientDoc;
 }

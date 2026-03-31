@@ -113,7 +113,9 @@ public:
                                                         const UUID& operationId) {
         RecipientShardContext recipientCtx;
         recipientCtx.setState(state);
-        ReshardingRecipientDocument doc{std::move(recipientCtx), {ShardId{"donor1"}}, 5};
+        ReshardingRecipientDocument doc{std::move(recipientCtx)};
+        doc.setDonorShards({DonorShardFetchTimestamp(ShardId{"donor1"})});
+        doc.setMinimumOperationDurationMillis(5);
         doc.setCommonReshardingMetadata(createCommonReshardingMetadata(operationId));
         return doc;
     }

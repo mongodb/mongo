@@ -210,8 +210,10 @@ protected:
         RecipientShardContext recipCtx;
         recipCtx.setState(RecipientStateEnum::kCloning);
 
-        ReshardingRecipientDocument doc(
-            std::move(recipCtx), {kThisShard.getShardId(), kOtherShard.getShardId()}, 1000);
+        ReshardingRecipientDocument doc(std::move(recipCtx));
+        doc.setDonorShards({DonorShardFetchTimestamp(kThisShard.getShardId()),
+                            DonorShardFetchTimestamp(kOtherShard.getShardId())});
+        doc.setMinimumOperationDurationMillis(1000);
 
         NamespaceString sourceNss = kOriginalNss;
         auto sourceUUID = UUID::gen();
@@ -283,8 +285,8 @@ protected:
         ASSERT(donorDoc.getMutableState().getState() == DonorStateEnum::kPreparingToDonate);
         ASSERT(donorDoc.getMutableState().getMinFetchTimestamp() == boost::none);
         if (reshardingFields.getTelemetryContext()) {
-            ASSERT_TRUE(donorDoc.getMutableState().getTelemetryContext().has_value());
-            ASSERT_BSONOBJ_EQ(*donorDoc.getMutableState().getTelemetryContext(),
+            ASSERT_TRUE(donorDoc.getTelemetryContext().has_value());
+            ASSERT_BSONOBJ_EQ(*donorDoc.getTelemetryContext(),
                               *reshardingFields.getTelemetryContext());
         }
     }
@@ -306,8 +308,8 @@ protected:
         ASSERT(!recipientDoc.getCloneTimestamp());
 
         if (reshardingFields.getTelemetryContext()) {
-            ASSERT_TRUE(recipientDoc.getMutableState().getTelemetryContext().has_value());
-            ASSERT_BSONOBJ_EQ(*recipientDoc.getMutableState().getTelemetryContext(),
+            ASSERT_TRUE(recipientDoc.getTelemetryContext().has_value());
+            ASSERT_BSONOBJ_EQ(*recipientDoc.getTelemetryContext(),
                               *reshardingFields.getTelemetryContext());
         }
 
@@ -657,8 +659,10 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest,
        PerformVerificationDefaultRecipientStateDocument) {
     RecipientShardContext recipientCtx;
     recipientCtx.setState(RecipientStateEnum::kCloning);
-    ReshardingRecipientDocument doc(
-        std::move(recipientCtx), {kThisShard.getShardId(), kOtherShard.getShardId()}, 1000);
+    ReshardingRecipientDocument doc(std::move(recipientCtx));
+    doc.setDonorShards({DonorShardFetchTimestamp(kThisShard.getShardId()),
+                        DonorShardFetchTimestamp(kOtherShard.getShardId())});
+    doc.setMinimumOperationDurationMillis(1000);
     // The default should be false since the absence of this field implies that the cluster might
     // contain nodes that do not support verification.
     ASSERT_EQ(doc.getPerformVerification(), false);

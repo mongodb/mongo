@@ -140,6 +140,10 @@ structs:
             performVerification:
                 type: optionalBool
                 description: "Whether to perform data comparison verification."
+            telemetryContext:
+                type: object_owned
+                optional: true
+                description: "Tracing context for distributed tracing across all participants."
 
     AbortReason:
         description: "Not meant to be used directly. Only use internal fields."
@@ -223,9 +227,6 @@ structs:
                 type: ReshardingMetricsTimeInterval
                 description: Start and end times for the critical section.
                 optional: true
-            telemetryContext:
-                type: object_owned
-                optional: true
 
     DonorShardFetchTimestamp:
         description: "Used for tracking donor min fetch timestamp"
@@ -242,6 +243,51 @@ structs:
                 description:
                     "Timestamp after which this donor shard has guaranteed that oplog
                     entries contain recipient shard information."
+
+    ReshardingRecipientOptions:
+        description: "Immutable options relevant only to recipient shards."
+        mod_visibility: private
+        strict: false
+        fields:
+            donorShards:
+                type: array<DonorShardFetchTimestamp>
+                description: "The list of donor shards that report to this recipient."
+            minimumOperationDurationMillis:
+                type: long
+            oplogBatchTaskCount:
+                type: long
+                description: >-
+                    The number of subtasks to divide a single oplog batch into,
+                    so that it may be applied concurrently by multiple threads.
+                optional: true
+            relaxed:
+                type: optionalBool
+                description: >-
+                    Runs the cloner aggregation without specifying a collection
+                    UUID to avoid errors in a scenario where the collection UUIDs
+                    are inconsistent among shards.
+            skipCloningAndApplying:
+                type: optionalBool
+                description:
+                    "Whether this recipient can skip cloning documents and
+                    fetching/applying oplog entries because it is not going to own any
+                    chunks for the collection after resharding."
+            skipCloning:
+                type: optionalBool
+                description:
+                    "Whether this recipient can skip cloning documents because it is not going to
+                    own any chunks for the collection after resharding."
+            skipBuildingIndexes:
+                type: optionalBool
+                description:
+                    "Whether this recipient can skip building indexes because it is not going to
+                    own any chunks for the collection after resharding."
+            storeOplogFetcherProgress:
+                type: optionalBool
+                description:
+                    "Whether this recipient should store the count of oplog entries
+                    fetched in a progress document and use this count instead of the fast
+                    count to recover metrics upon recovery."
 
     RecipientShardContext:
         description:
@@ -287,9 +333,6 @@ structs:
             phaseDurations:
                 type: object_owned
                 description: "Time spent in each phase so far."
-                optional: true
-            telemetryContext:
-                type: object_owned
                 optional: true
 
     ReshardingApproxCopySize:

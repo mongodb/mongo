@@ -775,8 +775,10 @@ const internalCommandsMap = {
                 tempNs: "test.resharding.x",
                 reshardingKey: {x: 1},
             },
-            donorShards: [],
-            minimumOperationDurationMillis: NumberLong(0),
+            recipientOptions: {
+                donorShards: [],
+                minimumOperationDurationMillis: NumberLong(0),
+            },
         },
     },
     _shardsvrReshardRecipientClone: {

@@ -63,9 +63,6 @@ commands:
             recipientShards:
                 type: array<shard_id>
                 description: "The list of recipient shards participating in the resharding operation."
-            telemetryContext:
-                type: object_owned
-                optional: true
 
     _shardsvrReshardingDonorStartChangeStreamsMonitor:
         command_name: _shardsvrReshardingDonorStartChangeStreamsMonitor
@@ -117,19 +114,7 @@ commands:
         api_version: ""
         fields:
             commonReshardingMetadata: CommonReshardingMetadata
-            donorShards:
-                type: array<DonorShardFetchTimestamp>
-                description: "The list of donor shards for this recipient to clone and apply from."
-            minimumOperationDurationMillis:
-                type: long
-            oplogBatchTaskCount:
-                type: long
-                optional: true
-            relaxed:
-                type: optionalBool
-            telemetryContext:
-                type: object_owned
-                optional: true
+            recipientOptions: ReshardingRecipientOptions
 
     _shardsvrReshardRecipientClone:
         description: "The internal recipient clone command."

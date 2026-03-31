@@ -813,12 +813,12 @@ public:
         RecipientShardContext recipientCtx;
         recipientCtx.setState(RecipientStateEnum::kUnused);
 
-        ReshardingRecipientDocument doc(
-            std::move(recipientCtx),
-            {ShardId{"donor1"},
-             testOptions.isAlsoDonor ? recipientShardId : ShardId{"donor2"},
-             ShardId{"donor3"}},
-            durationCount<Milliseconds>(Milliseconds{5}));
+        ReshardingRecipientDocument doc(std::move(recipientCtx));
+        doc.setDonorShards({DonorShardFetchTimestamp(ShardId{"donor1"}),
+                            DonorShardFetchTimestamp(testOptions.isAlsoDonor ? recipientShardId
+                                                                             : ShardId{"donor2"}),
+                            DonorShardFetchTimestamp(ShardId{"donor3"})});
+        doc.setMinimumOperationDurationMillis(durationCount<Milliseconds>(Milliseconds{5}));
 
         NamespaceString sourceNss =
             NamespaceString::createNamespaceString_forTest("sourcedb", "sourcecollection");

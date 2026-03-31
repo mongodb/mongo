@@ -87,7 +87,6 @@ public:
 
             DonorShardContext donorCtx;
             donorCtx.setState(DonorStateEnum::kPreparingToDonate);
-            donorCtx.setTelemetryContext(req.getTelemetryContext());
 
             ReshardingDonorDocument donorDoc{std::move(donorCtx), req.getRecipientShards()};
             donorDoc.setCommonReshardingMetadata(req.getCommonReshardingMetadata());

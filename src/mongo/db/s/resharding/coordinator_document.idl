@@ -195,9 +195,6 @@ structs:
                     "When set to true, overrides reshardingMinimumOperationDurationMillis
                     and reshardingDelayBeforeRemainingOperationTimeQueryMillis values to 0
                     for quick demo of reshardCollection operation"
-            telemetryContext:
-                type: object_owned
-                optional: true
             session:
                 type: CoordinatorSession
                 optional: true
