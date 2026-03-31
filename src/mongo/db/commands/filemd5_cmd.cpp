@@ -225,6 +225,8 @@ public:
                     exec->saveState();
                     // UNLOCKED
                     auto yieldResources = yieldTransactionResourcesFromOperationContext(opCtx);
+                    ON_BLOCK_EXIT(  // Make it safe to throw before reaching restoreTransaction.
+                        [&] { yieldResources.transitionTransactionResourcesToFailedState(opCtx); });
 
                     int len;
                     const char* data = owned["data"].binDataClean(len);
