@@ -31,6 +31,8 @@
 
 #include "mongo/unittest/unittest.h"
 
+#include <limits>
+
 #include <tomcrypt.h>
 
 namespace mongo {
@@ -80,5 +82,31 @@ TEST(MD5, BuiltIn1) {
     ASSERT_EQUALS(0, do_md5_test());
     // Run tomcrypt test
     ASSERT_EQUALS(0, md5_test());
+}
+
+// LibTomCrypt returns an error when internal state is inconsistent (e.g. corrupted curlen or
+// length). Our wrappers must surface that as uassert 12220700.
+TEST(MD5, Md5FinishFailsWhenCurlenEqualsBlockSize) {
+    md5_state_t state;
+    md5_init_state_deprecated(&state);
+    state.md5.curlen = 64;
+    md5_byte_t digest[16];
+    ASSERT_THROWS_CODE(md5_finish_deprecated(&state, digest), DBException, 12220700);
+}
+
+TEST(MD5, Md5AppendFailsWhenCurlenGreaterThanBlockSize) {
+    md5_state_t state;
+    md5_init_state_deprecated(&state);
+    state.md5.curlen = 65;
+    md5_byte_t b = 0;
+    ASSERT_THROWS_CODE(md5_append_deprecated(&state, &b, 1), DBException, 12220700);
+}
+
+TEST(MD5, Md5AppendFailsOnLengthOverflow) {
+    md5_state_t state;
+    md5_init_state_deprecated(&state);
+    state.md5.length = std::numeric_limits<decltype(state.md5.length)>::max();
+    md5_byte_t b = 0;
+    ASSERT_THROWS_CODE(md5_append_deprecated(&state, &b, 1), DBException, 12220700);
 }
 }  // namespace mongo

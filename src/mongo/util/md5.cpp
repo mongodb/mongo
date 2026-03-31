@@ -29,6 +29,8 @@
 
 #include "mongo/util/md5.h"
 
+#include "mongo/util/assert_util.h"
+
 #include <cstring>
 #include <sstream>
 
@@ -41,13 +43,21 @@
  */
 namespace mongo {
 
+namespace {
+inline void check_md5_return(int ret) {
+    // Intentionally not providing any details and using the same report for all errors.
+    uassert(12220700, "MD5 operation failed", ret == CRYPT_OK);
+}
+}  // namespace
+
 [[deprecated(
     "This API is deprecated. Use SHA-256 instead of MD-5 for all new cryptographic applications. "
     "For non-cryptographic purposes, consider using a modern hash function like XXHash or "
     "CityHash.")]]
 void md5_init_state_deprecated(md5_state_t* pms) {
+    invariant(pms);
     memset(pms, 0, sizeof(md5_state_t));
-    md5_init(pms);
+    check_md5_return(md5_init(pms));  // won't fail unless pms is null
 }
 
 [[deprecated(
@@ -55,7 +65,8 @@ void md5_init_state_deprecated(md5_state_t* pms) {
     "For non-cryptographic purposes, consider using a modern hash function like XXHash or "
     "CityHash.")]]
 void md5_append_deprecated(md5_state_t* pms, const md5_byte_t* data, int nbytes) {
-    md5_process(pms, data, nbytes);
+    invariant(pms);
+    check_md5_return(md5_process(pms, data, nbytes));
 }
 
 [[deprecated(
@@ -63,7 +74,9 @@ void md5_append_deprecated(md5_state_t* pms, const md5_byte_t* data, int nbytes)
     "For non-cryptographic purposes, consider using a modern hash function like XXHash or "
     "CityHash.")]]
 void md5_finish_deprecated(md5_state_t* pms, md5_byte_t digest[16]) {
-    md5_done(pms, digest);
+    invariant(pms);
+    invariant(digest);
+    check_md5_return(md5_done(pms, digest));
 }
 
 [[deprecated(
