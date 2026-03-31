@@ -149,6 +149,10 @@ class TestExternalModule(unittest.TestCase):
         self.assertIn("/testfiles/two.js", result.stdout)
         self.assertNotIn("/testfiles/one.js", result.stdout)
 
+    # skipping on TSAN because of the supressions file being relative to the root repo
+    # This would work fine on TSAN in an exteral repo beause they would specify the correct
+    # relative path.
+    @unittest.skipIf("TSAN_OPTIONS" in os.environ, "Skipping when TSAN_OPTIONS is set")
     def test_external_suite_with_fixture_runs(self):
         """Test that external suite with MongoDFixture can run both external and builtin tests."""
         env = os.environ.copy()
