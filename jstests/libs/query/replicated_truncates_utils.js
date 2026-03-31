@@ -6,6 +6,35 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 
 /**
+ * Determines whether the persistence provider requires replicated truncates.
+ *
+ * This function checks if all nodes in the replica set have the "shouldUseReplicatedTruncates"
+ * property set to true.
+ *
+ * @param {Object} conn - The connection object to the MongoDB instance or replica set.
+ * @param {Array} nodes - Optional array of specific nodes to check. If null,
+ *                        all nodes in the replica set will be checked.
+ * @returns {boolean} - True if all nodes have shouldUseReplicatedTruncates set to true,
+ *                      false otherwise.
+ */
+export function persistenceProviderRequiresReplicatedTruncates(conn, nodes) {
+    return PersistenceProviderUtil.allNodesHavePropertyWithValue(conn, "shouldUseReplicatedTruncates", true, nodes);
+}
+
+/**
+ * Determines whether the feature flag mandates replicated truncates for deletions.
+ *
+ * This function checks if the "UseReplicatedTruncatesForDeletions" feature flag is present
+ * and enabled on the provided connection.
+ *
+ * @param {Object} conn - The database connection object used to query feature flag status.
+ * @returns {boolean} - True if the feature flag is present and enabled, false otherwise.
+ */
+export function featureFlagMandatesReplicatedTruncates(conn) {
+    return FeatureFlagUtil.isPresentAndEnabled(conn, "UseReplicatedTruncatesForDeletions");
+}
+
+/**
  * Determines whether the system uses replicated truncates for deleting pre-images.
  *
  * There are two modes for deleting pre-images from the "system.preimages" collection:
@@ -28,7 +57,7 @@ export function systemUsesReplicatedTruncates(conn, nodes = null) {
     // go with it. If the persistence provider does not have replicated truncates enabled, check the
     // current value of the feature flag.
     return (
-        PersistenceProviderUtil.allNodesHavePropertyWithValue(conn, "shouldUseReplicatedTruncates", true, nodes) ||
-        FeatureFlagUtil.isPresentAndEnabled(conn, "UseReplicatedTruncatesForDeletions")
+        persistenceProviderRequiresReplicatedTruncates(conn, nodes) ||
+        featureFlagMandatesReplicatedTruncates(conn, nodes)
     );
 }

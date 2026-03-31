@@ -310,8 +310,13 @@ class DataConsistencyChecker {
         };
     }
 
-    static canIgnoreCollectionDiff(sourceCollInfos, syncingCollInfos, collName, usesReplicatedTruncates) {
-        if (collName === "system.preimages" && !usesReplicatedTruncates) {
+    static canIgnoreCollectionDiff(
+        sourceCollInfos,
+        syncingCollInfos,
+        collName,
+        shouldCheckDifferencesInPreImagesCollection,
+    ) {
+        if (collName === "system.preimages" && !shouldCheckDifferencesInPreImagesCollection) {
             // When not using replicated truncates for the change streams pre-images collection, all
             // nodes in the replica set individually delete expired pre-images locally. The nodes in
             // the replica set thus can have different state for this collection.
@@ -436,7 +441,7 @@ class DataConsistencyChecker {
         ignoreUUIDs,
         syncingHasIndexes,
         collectionPrinted,
-        systemUsesReplicatedTruncates,
+        shouldCheckDifferencesInPreImagesCollection,
     ) {
         let success = true;
 
@@ -495,7 +500,7 @@ class DataConsistencyChecker {
                     sourceCollInfos,
                     syncingCollInfos,
                     coll.name,
-                    systemUsesReplicatedTruncates,
+                    shouldCheckDifferencesInPreImagesCollection,
                 );
                 if (shouldIgnoreFailure) {
                     prettyPrint(
