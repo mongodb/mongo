@@ -27,6 +27,9 @@ analyze:
       REVERSE_OVERRUN:
         enabled: true
       # Checkers with customized options
+      ASSERT_SIDE_EFFECT:
+        enabled: true
+        macro_name_lacks: ^[fimtu]assert
       CHECKED_RETURN:
         enabled: true
         options:
