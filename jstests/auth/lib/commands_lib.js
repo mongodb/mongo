@@ -238,16 +238,6 @@ const skippedAuthTestingAggStages = [
     "$set", // Alias for "$addFields" and already covered.
 ];
 
-// The following stages are required to be tested in stream processors.
-// Only included in skip list when streams feature is available.
-const streamsSkippedAuthTestingAggStages = [
-    "$hoppingWindow",
-    "$tumblingWindow",
-    "$sessionWindow",
-    "$validate",
-    "$setStreamMeta",
-];
-
 // The following commands are skipped in 'authCommandsLib' because they are unable to be
 // tested here and already have auth tests elsewhere.
 // TODO SERVER-112286: Audit commands skipped.
@@ -8711,6 +8701,71 @@ export const authCommandsLib = {
             testcases: testcases_transformationOnlyExpectFail, // Not allowed in user requests.
         },
         {
+            testname: "aggregate_$hoppingWindow",
+            command: {
+                aggregate: "foo",
+                pipeline: [{$hoppingWindow: {}}],
+                cursor: {},
+            },
+            // TODO SERVER-74961: Windows is not yet supported in stream processing.
+            skipTest: (conn) =>
+                !isFeatureEnabled(conn, "featureFlagStreams") || _isWindows() || getBuildInfo().version < "8.1",
+            skipSharded: true,
+            testcases: testcases_transformationOnlyExpectFail, // Not allowed in user requests.
+        },
+        {
+            testname: "aggregate_$sessionWindow",
+            command: {
+                aggregate: "foo",
+                pipeline: [{$sessionWindow: {}}],
+                cursor: {},
+            },
+            // TODO SERVER-74961: Windows is not yet supported in stream processing.
+            skipTest: (conn) =>
+                !isFeatureEnabled(conn, "featureFlagStreams") || _isWindows() || getBuildInfo().version < "8.1",
+            skipSharded: true,
+            testcases: testcases_transformationOnlyExpectFail, // Not allowed in user requests.
+        },
+        {
+            testname: "aggregate_$setStreamMeta",
+            command: {
+                aggregate: "foo",
+                pipeline: [{$setStreamMeta: {}}],
+                cursor: {},
+            },
+            // TODO SERVER-74961: Windows is not yet supported in stream processing.
+            skipTest: (conn) =>
+                !isFeatureEnabled(conn, "featureFlagStreams") || _isWindows() || getBuildInfo().version < "8.1",
+            skipSharded: true,
+            testcases: testcases_transformationOnlyExpectFail, // Not allowed in user requests.
+        },
+        {
+            testname: "aggregate_$tumblingWindow",
+            command: {
+                aggregate: "foo",
+                pipeline: [{$tumblingWindow: {}}],
+                cursor: {},
+            },
+            // TODO SERVER-74961: Windows is not yet supported in stream processing.
+            skipTest: (conn) =>
+                !isFeatureEnabled(conn, "featureFlagStreams") || _isWindows() || getBuildInfo().version < "8.1",
+            skipSharded: true,
+            testcases: testcases_transformationOnlyExpectFail, // Not allowed in user requests.
+        },
+        {
+            testname: "aggregate_$validate",
+            command: {
+                aggregate: "foo",
+                pipeline: [{$validate: {}}],
+                cursor: {},
+            },
+            // TODO SERVER-74961: Windows is not yet supported in stream processing.
+            skipTest: (conn) =>
+                !isFeatureEnabled(conn, "featureFlagStreams") || _isWindows() || getBuildInfo().version < "8.1",
+            skipSharded: true,
+            testcases: testcases_transformationOnlyExpectFail, // Not allowed in user requests.
+        },
+        {
             testname: "aggregate_$fill",
             command: {
                 aggregate: "foo",
@@ -9702,21 +9757,12 @@ function checkAggStageCoverage(conn) {
         .toArray()
         .map((obj) => obj.name);
 
-    // Only skip streams stages when the feature flag is disabled. When enabled, they should
-    // be tested. When not compiled in, they won't appear anyway.
-    let skipList = skippedAuthTestingAggStages;
-    if (
-        streamsSkippedAuthTestingAggStages.some((stage) => aggStages.includes(stage)) &&
-        !FeatureFlagUtil.isPresentAndEnabled(adminDb, "Streams")
-    ) {
-        skipList = skipList.concat(streamsSkippedAuthTestingAggStages);
-    }
     adminDb.logout();
 
     const unvisited = {};
     for (let aggStage of aggStages) {
-        // Tracks 'aggStage' unless listed in the exception list 'skipList'.
-        if (!skipList.includes(aggStage)) {
+        // Tracks 'aggStage' unless listed in the exception list 'skippedAuthTestingAggStages'.
+        if (!skippedAuthTestingAggStages.includes(aggStage)) {
             unvisited[aggStage] = 1;
         }
     }
