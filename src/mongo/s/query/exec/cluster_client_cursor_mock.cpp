@@ -149,6 +149,10 @@ bool ClusterClientCursorMock::remotesExhausted() const {
     return _remotesExhausted;
 }
 
+bool ClusterClientCursorMock::isEOF() const {
+    return _resultsQueue.empty() && _remotesExhausted;
+}
+
 bool ClusterClientCursorMock::hasBeenKilled() const {
     return _killed;
 }

@@ -397,5 +397,50 @@ TEST_F(ClusterClientCursorImplTest, ShouldStoreAPIParameters) {
     ASSERT_TRUE(*storedAPIParams.getAPIDeprecationErrors());
 }
 
+TEST_F(ClusterClientCursorImplTest, IsEOF) {
+    auto mockStage = std::make_unique<RouterStageMock>(_opCtx.get());
+    RouterStageMock* mockStagePtr = mockStage.get();
+    mockStagePtr->queueResult(BSON("a" << 1));
+
+    ClusterClientCursorImpl cursor(
+        _opCtx.get(),
+        std::move(mockStage),
+        ClusterClientCursorParams(NamespaceString::createNamespaceString_forTest("unused"),
+                                  APIParameters(),
+                                  boost::none /* ReadPreferenceSetting */,
+                                  boost::none /* repl::ReadConcernArgs */,
+                                  OperationSessionInfoFromClient()),
+        boost::none);
+
+    // Stage has a buffered result and remotes are not exhausted.
+    ASSERT_FALSE(cursor.isEOF());
+
+    auto result = cursor.next();
+    ASSERT_OK(result.getStatus());
+    ASSERT_BSONOBJ_EQ(*result.getValue().getResult(), BSON("a" << 1));
+
+    // Stage buffer is empty but remotes are still not exhausted.
+    ASSERT_FALSE(cursor.isEOF());
+
+    mockStagePtr->queueResult(BSON("a" << 2));
+    mockStagePtr->markRemotesExhausted();
+    // Remotes are exhausted, but stage has a buffered results.
+    ASSERT_FALSE(cursor.isEOF());
+
+    result = cursor.next();
+    ASSERT_OK(result.getStatus());
+    ASSERT_BSONOBJ_EQ(*result.getValue().getResult(), BSON("a" << 2));
+    // Remotes are exhausted, and stage has no buffered results.
+    ASSERT_TRUE(cursor.isEOF());
+
+    cursor.queueResult(BSON("a" << 3));
+    // The stage is empty and exhausted, but the cursor itself has a stash.
+    ASSERT_FALSE(cursor.isEOF());
+    result = cursor.next();
+    ASSERT_OK(result.getStatus());
+    ASSERT_BSONOBJ_EQ(*result.getValue().getResult(), BSON("a" << 3));
+    ASSERT_TRUE(cursor.isEOF());
+}
+
 }  // namespace
 }  // namespace mongo

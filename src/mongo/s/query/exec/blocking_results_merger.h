@@ -98,6 +98,10 @@ public:
         return _arm->remotesExhausted();
     }
 
+    bool isEOF() const {
+        return _arm->isEOF();
+    }
+
     bool partialResultsReturned() const {
         return _arm->partialResultsReturned();
     }

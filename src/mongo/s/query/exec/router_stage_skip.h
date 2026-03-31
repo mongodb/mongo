@@ -49,6 +49,10 @@ public:
 
     StatusWith<ClusterQueryResult> next() final;
 
+    bool isEOF() const final {
+        return getChildStage()->isEOF();
+    }
+
 private:
     long long _skip;
 
