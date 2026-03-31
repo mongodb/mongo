@@ -46,7 +46,7 @@ MultiPlanner::MultiPlanner(PlannerData plannerData,
         cq(),
         plan_cache_util::ClassicPlanCacheWriter{opCtx(),
                                                 collections().getMainCollectionPtrOrAcquisition()},
-        boost::none /*replanReason TODO SERVER-119037*/,
+        boost::none /*replan reason, if present, will be returned via planner params*/,
         addingCBRChosenPlanToPlanCache);
     for (auto&& solution : solutions) {
         solution->indexFilterApplied = plannerParams()->indexFiltersApplied;
