@@ -31,16 +31,6 @@ TYPES_SRCS = [
     "//src/mongo/scripting/mozjs/common/types:timestamp.cpp",
 ]
 
-# Filegroup for WASI builds - exports source files for compilation in genrules.
-# WASI builds use a stub status.cpp from the wasm package.
-filegroup(
-    name = "wasi_sources",
-    srcs = glob(["*.cpp"]) + TYPES_SRCS + [
-        "//src/mongo/scripting/mozjs/wasm:status.cpp",
-    ],
-    visibility = ["//src/mongo/scripting/mozjs/wasm:__pkg__"],
-)
-
 mongo_cc_library(
     name = "mozjs_common",
     srcs = glob(["*.cpp"]) + TYPES_SRCS,
@@ -54,6 +44,16 @@ mongo_cc_library(
             "/wd5105",
         ],
         "//conditions:default": [],
+    }) + select({
+        "//bazel/config:wasi": [
+            "-include",
+            "js-confdefs.h",
+        ],
+        "//conditions:default": [],
+    }),
+    local_defines = select({
+        "//bazel/config:wasi": ["MONGO_MOZJS_WASI_BUILD"],
+        "//conditions:default": [],
     }),
     srcs_select = [
         {
@@ -65,8 +65,11 @@ mongo_cc_library(
     deps = select({
         "//bazel/config:wasi": [
             # WASI builds don't need scripting_common (avoids networking/SSL dependencies)
-            # and use SpiderMonkey headers from @spidermonkey, not //src/third_party/mozjs
+            # and use SpiderMonkey headers from @spidermonkey_wasi, not //src/third_party/mozjs
             "//src/mongo/util:buildinfo",
+            "@spidermonkey_wasi//:headers",
+            "//src/mongo/scripting/mozjs/wasm/engine:headers",
+            "//src/mongo/scripting/mozjs/shared:mozjs_shared_types",
         ],
         "//conditions:default": [
             "//src/mongo/scripting:scripting_common",

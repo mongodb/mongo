@@ -192,8 +192,10 @@ def _wasi_cc_toolchain_config_wasip2_impl(ctx):
         )],
     )
 
-    # WASI SDK sysroot path (relative to execroot)
-    wasi_sysroot = "external/_main~_repo_rules~wasi_sdk/share/wasi-sysroot"
+    # WASI SDK paths (relative to execroot), matching the default search order
+    # reported by: wasm32-wasip2-clang++ -v -x c++ /dev/null -fsyntax-only
+    wasi_sdk = "external/_main~_repo_rules~wasi_sdk"
+    wasi_sysroot = wasi_sdk + "/share/wasi-sysroot"
 
     # Construct the toolchain.
     return [cc_common.create_cc_toolchain_config_info(
@@ -210,8 +212,11 @@ def _wasi_cc_toolchain_config_wasip2_impl(ctx):
         abi_libc_version = "wasi",
         builtin_sysroot = wasi_sysroot,
         cxx_builtin_include_directories = [
-            wasi_sysroot + "/include",
+            wasi_sysroot + "/include/wasm32-wasip2/c++/v1",
+            wasi_sysroot + "/include/c++/v1",
+            wasi_sdk + "/lib/clang/21/include",
             wasi_sysroot + "/include/wasm32-wasip2",
+            wasi_sysroot + "/include",
         ],
         features = [
             compile_flags,
@@ -219,6 +224,7 @@ def _wasi_cc_toolchain_config_wasip2_impl(ctx):
             link_flags,
             include_paths_feature,
             external_include_paths_feature,
+            feature(name = "archive_param_file", enabled = True),
             feature(name = "supports_dynamic_linker", enabled = False),
         ],
     )]
@@ -233,19 +239,19 @@ wasi_cc_toolchain_config_wasip2 = rule(
             executable = True,
             cfg = "exec",
             allow_files = True,
-            default = Label("@wasi_sdk//:bin/wasm32-wasip2-clang"),
+            default = Label("@wasi_sdk//:wasm32-wasip2-clang"),
         ),
         "clangpp": attr.label(
             executable = True,
             cfg = "exec",
             allow_files = True,
-            default = Label("@wasi_sdk//:bin/wasm32-wasip2-clang++"),
+            default = Label("@wasi_sdk//:wasm32-wasip2-clang++"),
         ),
         "ar": attr.label(
             executable = True,
             cfg = "exec",
             allow_files = True,
-            default = Label("@wasi_sdk//:bin/llvm-ar"),
+            default = Label("@wasi_sdk//:llvm-ar"),
         ),
     },
     provides = [CcToolchainConfigInfo],

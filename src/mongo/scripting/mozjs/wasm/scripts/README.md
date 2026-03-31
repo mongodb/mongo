@@ -16,8 +16,6 @@ To build **mozjs_wasm_api.wasm** (the main WASM API module) outside Bazel, run s
 
 Step 3 needs the tarball, `rust_shims.a`, the MongoDB base **linkset** response files (`.libs.rsp` etc.), and all MozJS/WIT sources. The linkset files normally come from building `//src/mongo/scripting/mozjs/wasm:mongo_base_linkset` in Bazel; for a fully standalone build you'd need to copy those RSP files out of the Bazel output tree.
 
-**Optional:** `link_mongo_base_wasm.sh` builds **mongo_base.wasm** (MongoDB base as a single WASM). It only needs the same linkset RSP files and the WASI SDK; it does not depend on SpiderMonkey. Run it whenever you have the linkset and want `mongo_base.wasm`.
-
 **Helper (not run directly):** `compile_wasi_source.sh` — compiles one C/C++ file at a time; called by `compile_mozjs_wasm_api.sh` via `xargs`.
 
 ---
@@ -54,31 +52,7 @@ export OUTPUT=out/rust_shims.a
 bash scripts/extract_rust_shims.sh
 ```
 
-### 3. Build mongo_base.wasm (optional)
-
-You need the three linkset response files (e.g. from a Bazel build of `:mongo_base_linkset`). If they live in `bazel-bin/.../mongo_base_linkset/` as `*.objects.rsp`, `*.libs.rsp`, `*.flags.rsp`:
-
-```bash
-cd src/mongo/scripting/mozjs/wasm
-
-export CXX=/opt/wasi-sdk/bin/wasm32-wasi-clang++
-export OBJS_RSP=/path/to/xxx.objects.rsp
-export LIBS_RSP=/path/to/xxx.libs.rsp
-export FLAGS_RSP=/path/to/xxx.flags.rsp
-export OUTPUT=out/mongo_base.wasm
-
-bash scripts/link_mongo_base_wasm.sh
-```
-
-Or pass the directory and let the script find the RSPs:
-
-```bash
-export LINKSET_FILES="/path/to/foo.objects.rsp /path/to/foo.libs.rsp /path/to/foo.flags.rsp"
-export OUTPUT=out/mongo_base.wasm
-bash scripts/link_mongo_base_wasm.sh
-```
-
-### 4. Build mozjs_wasm_api.wasm
+### 3. Build mozjs_wasm_api.wasm
 
 Requires the SpiderMonkey tarball, `rust_shims.a`, the linkset files, all MozJS/WIT sources, and the WIT component-type object. Easiest is to run from the package dir and point at Bazel's outputs for linkset and WIT object; fill in the source lists from the genrule in `BUILD.bazel` if needed.
 
@@ -120,7 +94,3 @@ For the exact source lists and paths, run the corresponding genrule once and ins
 | Script                           | Purpose                                                                                                                                                              |
 | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **build_spidermonkey_wasip2.sh** | Builds SpiderMonkey for WASI Preview 2 (mozconfig + `mach build`), builds the Rust encoding shims, and packs static libs, headers, and extra objects into a tarball. |
-| **extract_rust_shims.sh**        | Unpacks `libmongo_wasip2_rust_shims.a` from the SpiderMonkey tarball into a single `.a` file.                                                                        |
-| **compile_mozjs_wasm_api.sh**    | Unpacks the SM tarball, compiles all MozJS wrapper and WIT glue sources in parallel, gathers MongoDB base libs from the linkset, and links `mozjs_wasm_api.wasm`.    |
-| **link_mongo_base_wasm.sh**      | Links the MongoDB base library into a single `mongo_base.wasm` using the WASI linkset RSP files and `wasm32-wasi-clang++`.                                           |
-| **compile_wasi_source.sh**       | Compiles one C or C++ file for WASI. Used by `compile_mozjs_wasm_api.sh` via `xargs`; not intended to be run directly.                                               |

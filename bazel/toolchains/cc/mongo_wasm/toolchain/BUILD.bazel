@@ -23,9 +23,6 @@ cc_toolchain(
 
 toolchain(
     name = "wasi_cc_toolchain_wasip2",
-    exec_compatible_with = [
-        "@platforms//os:linux",
-    ],
     target_compatible_with = [
         "@platforms//os:wasi",
         "@platforms//cpu:wasm32",

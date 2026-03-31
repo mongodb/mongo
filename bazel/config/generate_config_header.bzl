@@ -5,7 +5,6 @@ load("//bazel:utils.bzl", "write_target")
 
 def generate_config_header_impl(ctx):
     cc_toolchain = find_cpp_toolchain(ctx)
-    compiler_bin = cc_toolchain.compiler_executable
     input = ctx.attr.template.files.to_list()[0].path
     checks = ctx.attr.checks.files.to_list()[0].path
 
@@ -13,6 +12,10 @@ def generate_config_header_impl(ctx):
     feature_configuration = cc_common.configure_features(
         ctx = ctx,
         cc_toolchain = cc_toolchain,
+    )
+    compiler_bin = cc_common.get_tool_for_action(
+        feature_configuration = feature_configuration,
+        action_name = ACTION_NAMES.cpp_compile,
     )
     compile_variables = cc_common.create_compile_variables(
         feature_configuration = feature_configuration,

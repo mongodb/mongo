@@ -5,6 +5,7 @@ def _impl(settings, attr):
         "//command_line_option:platforms": "//bazel/platforms:wasm32",
         "//bazel/config:libunwind": "off",
         "//bazel/config:allocator": "system",
+        "//bazel/config:ssl": False,
         "//bazel/config:linkstatic": True,
         "//bazel/config:asan": False,
         "//bazel/config:fsan": False,
@@ -29,5 +30,6 @@ wasi_transition = transition(
         "//bazel/config:msan",
         "//bazel/config:tsan",
         "//bazel/config:ubsan",
+        "//bazel/config:ssl",
     ],
 )
