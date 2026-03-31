@@ -193,7 +193,8 @@ CollectionShardingRuntime::ScopedSharedCollectionShardingRuntime
 CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(OperationContext* opCtx,
                                                                   const NamespaceString& nss) {
     dassert(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IS) ||
-            (nss.isCommand() && opCtx->inMultiDocumentTransaction()));
+            ((nss.isCommand() || nss == NamespaceString::kContainerNamespace) &&
+             opCtx->inMultiDocumentTransaction()));
     return ScopedSharedCollectionShardingRuntime(
         ScopedCollectionShardingState::acquire(opCtx, nss));
 }
