@@ -164,11 +164,7 @@ class ChangeStreamReader {
         const db =
             config.watchMode === ChangeStreamWatchMode.kCluster ? conn.getDB("admin") : conn.getDB(config.dbName);
 
-        const cstOptions = {};
-        if (TestData.enableBgMutator) {
-            cstOptions.extraRetryableErrors = ChangeStreamReader.kFCVRetryableErrors;
-        }
-        const cst = new ChangeStreamTest(db, cstOptions);
+        const cst = new ChangeStreamTest(db);
 
         const changeStreamSpec = {
             showExpandedEvents: config.showExpandedEvents ?? true,
@@ -224,9 +220,10 @@ class ChangeStreamReader {
     ];
 
     /**
-     * Open (or reopen) a change stream and read one event.
-     * FCV-related transient errors are retried by ChangeStreamTest when
-     * extraRetryableErrors is configured (see _openChangeStream).
+     * Open (or reopen) a change stream and read one event. On FCV-related
+     * transient errors (only when bgMutator is enabled), cleans up and retries.
+     * Non-retryable errors are thrown immediately. This is the single place
+     * where transient error retry lives.
      *
      * @param {Mongo} conn - MongoDB connection.
      * @param {Object} cfg - Reader configuration.
@@ -237,11 +234,33 @@ class ChangeStreamReader {
      * @returns {{ changeEvent, cst, cursor }}
      */
     static _readOneEvent(conn, cfg, cst, cursor, resumeToken, wasInvalidate) {
-        if (!cst || !cursor) {
-            ({cst, cursor} = ChangeStreamReader._openChangeStream(conn, cfg, resumeToken, wasInvalidate));
-        }
-        const changeEvent = cst.getNextChanges(cursor, 1, false)[0];
-        return {changeEvent, cst, cursor};
+        let result;
+        assert.soon(() => {
+            try {
+                if (!cst || !cursor) {
+                    ({cst, cursor} = ChangeStreamReader._openChangeStream(conn, cfg, resumeToken, wasInvalidate));
+                }
+                // Always use skipFirst=false to check the current batch before issuing getMore.
+                // This ensures we don't miss events in firstBatch (after open) or nextBatch.
+                const changeEvent = cst.getNextChanges(cursor, 1, false)[0];
+                result = {changeEvent, cst, cursor};
+                return true;
+            } catch (e) {
+                if (!TestData.enableBgMutator || !ChangeStreamReader.kFCVRetryableErrors.includes(e.code)) {
+                    throw e;
+                }
+                jsTest.log.info("ChangeStreamReader FCV error, will retry", {
+                    instanceName: cfg.instanceName,
+                    code: e.code,
+                    error: e.message,
+                });
+                tryCleanUp(cst, cfg.instanceName);
+                cst = null;
+                cursor = null;
+                return false;
+            }
+        }, `ChangeStreamReader [${cfg.instanceName}]: timed out reading event`);
+        return result;
     }
 
     /**
@@ -251,6 +270,7 @@ class ChangeStreamReader {
         assert(changeEvent, `Expected change event at index ${count}, but got none`);
         assert(changeEvent._id, `Change event at index ${count} missing _id (resume token)`);
 
+        const isInvalidate = isInvalidated(changeEvent);
         readEventTypes.push(changeEvent.operationType);
 
         jsTest.log.info("ChangeStreamReader Read event", {
@@ -260,10 +280,13 @@ class ChangeStreamReader {
             operationType: changeEvent.operationType,
         });
 
+        // cursorClosed is true for invalidate events (server closes cursor after invalidate).
         Connector.writeChangeEvent(conn, cfg.instanceName, {
             changeEvent,
-            cursorClosed: isInvalidated(changeEvent),
+            cursorClosed: isInvalidate,
         });
+
+        return isInvalidate;
     }
 
     /**
@@ -284,11 +307,11 @@ class ChangeStreamReader {
             cst = result.cst;
             cursor = result.cursor;
 
-            ChangeStreamReader._processEvent(conn, cfg, result.changeEvent, count, readEventTypes);
+            const isInvalidate = ChangeStreamReader._processEvent(conn, cfg, result.changeEvent, count, readEventTypes);
             lastResumeToken = result.changeEvent._id;
-            lastWasInvalidate = isInvalidated(result.changeEvent);
+            lastWasInvalidate = isInvalidate;
 
-            if (lastWasInvalidate) {
+            if (isInvalidate) {
                 tryCleanUp(cst, cfg.instanceName);
                 cst = null;
                 cursor = null;
@@ -314,9 +337,9 @@ class ChangeStreamReader {
         for (let count = 0; count < cfg.numberOfEventsToRead; count++) {
             const result = ChangeStreamReader._readOneEvent(conn, cfg, null, null, resumeToken, useStartAfter);
 
-            ChangeStreamReader._processEvent(conn, cfg, result.changeEvent, count, readEventTypes);
+            const isInvalidate = ChangeStreamReader._processEvent(conn, cfg, result.changeEvent, count, readEventTypes);
             resumeToken = result.changeEvent._id;
-            useStartAfter = isInvalidated(result.changeEvent);
+            useStartAfter = isInvalidate;
 
             tryCleanUp(result.cst, cfg.instanceName);
         }

@@ -43,6 +43,19 @@ class Connector {
         const db = conn.getDB(Connector.controlDatabase);
         const coll = db.getCollection(instanceName);
         assert.commandWorked(coll.insertOne(record));
+        Connector.heartbeat(conn, instanceName);
+    }
+
+    /**
+     * Read the notification document for a test instance.
+     * @param {Mongo} conn - MongoDB connection.
+     * @param {string} instanceName - Name of the test instance.
+     * @returns {Object|null} The notification document, or null if not found.
+     */
+    static _getNotification(conn, instanceName) {
+        const db = conn.getDB(Connector.controlDatabase);
+        const coll = db.getCollection(Connector.notificationsCollection);
+        return coll.findOne({_id: instanceName});
     }
 
     /**
@@ -52,28 +65,57 @@ class Connector {
      * @returns {boolean} True if the instance is done, false otherwise.
      */
     static isDone(conn, instanceName) {
-        const db = conn.getDB(Connector.controlDatabase);
-        const coll = db.getCollection(Connector.notificationsCollection);
-        const doc = coll.findOne({_id: instanceName});
+        const doc = Connector._getNotification(conn, instanceName);
         return !!doc && doc.done === true;
     }
 
     /**
-     * Wait for a test instance to complete.
-     * TODO SERVER-121782: Replace timeout-based waitForDone with heartbeat-driven
-     * progress tracking.
+     * Increment the heartbeat counter for a test instance.
+     * Called by Writer/Reader after each unit of work (command executed / event read)
+     * to signal progress. waitForDone() uses this to distinguish "slow but alive"
+     * from "hung".
      * @param {Mongo} conn - MongoDB connection.
      * @param {string} instanceName - Name of the test instance.
-     * @param {number} [timeoutMs] - Optional timeout in ms. Defaults to assert.soon's
-     *   built-in default (90s locally, 10min on Evergreen). Raise for tests with
-     *   parallel writers running moveChunk or sharding DDL that can exceed 90s locally.
      */
-    static waitForDone(conn, instanceName, timeoutMs = undefined) {
-        assert.soonNoExcept(
-            () => Connector.isDone(conn, instanceName),
-            `Timed out waiting for ${instanceName} to complete`,
-            timeoutMs,
-        );
+    static heartbeat(conn, instanceName) {
+        const db = conn.getDB(Connector.controlDatabase);
+        const coll = db.getCollection(Connector.notificationsCollection);
+        assert.commandWorked(coll.updateOne({_id: instanceName}, {$inc: {heartbeatSeq: 1}}, {upsert: true}));
+    }
+
+    /**
+     * Wait for a test instance to complete, using heartbeat-based progress detection.
+     *
+     * Loops using assert.soonNoExcept, each iteration bounded to one unit of work.
+     * Each call waits for either "done" or "heartbeat counter incremented". If the
+     * heartbeat increments, the loop resets and waits again. If neither happens
+     * within the default assert.soon window (90s local / 10min Evergreen), the hang
+     * analyzer fires — which is the correct behavior for a truly hung command.
+     *
+     * Total wait is unbounded as long as the background thread keeps making progress.
+     *
+     * @param {Mongo} conn - MongoDB connection.
+     * @param {string} instanceName - Name of the test instance.
+     */
+    static waitForDone(conn, instanceName) {
+        let lastSeq = -1;
+        let latestDoc = null;
+        while (true) {
+            assert.soonNoExcept(() => {
+                latestDoc = Connector._getNotification(conn, instanceName);
+                if (latestDoc && latestDoc.done === true) {
+                    return true;
+                }
+                if (latestDoc && latestDoc.heartbeatSeq > lastSeq) {
+                    return true;
+                }
+                return false;
+            }, `Timed out waiting for ${instanceName} — no heartbeat progress (lastSeq=${lastSeq})`);
+            if (latestDoc && latestDoc.done === true) {
+                return;
+            }
+            lastSeq = latestDoc.heartbeatSeq;
+        }
     }
 
     /**

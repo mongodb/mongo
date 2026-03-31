@@ -83,6 +83,7 @@ class Writer {
                 });
                 throw e;
             }
+            Connector.heartbeat(conn, config.instanceName);
         }
 
         jsTest.log.info(`Writer [${config.instanceName}]: all ${config.commandSpecs.length} commands completed`);

@@ -28,7 +28,9 @@ import {
 
 // Default test database and collection names.
 const TEST_DB = "test_cs";
+const TEST_DB_2 = "test_cs_2";
 const TEST_COLL = "test_coll_fsm";
+const TEST_COLL_2 = "test_coll_fsm_2";
 
 // TODO SERVER-121182: Replace with a random seed (already logged in setupFsmTest).
 const TEST_SEED = 42;
@@ -103,43 +105,12 @@ function createMatcher(expectedEvents) {
 }
 
 /**
- * Drop the specified database.
- * @param {Mongo} mongos - The mongos connection
- * @param {string} [dbName=TEST_DB] - Database name to drop
+ * Compute expected change stream events from a command sequence for a given watch mode.
  */
-function cleanupTestDatabase(mongos, dbName = TEST_DB) {
-    assert.commandWorked(mongos.getDB(dbName).dropDatabase());
-}
-
-/**
- * Compute expected change stream events from commands (after Writer.run()) and log them.
- * Event prediction runs after execution so move commands can use runtime state.
- * @param {string} testName - Test name for logging
- * @param {Array} commands - Executed commands with collectionCtx and getChangeEvents()
- * @returns {Array<{event: Object, cursorClosed: boolean}>} Expected events for the matcher
- */
-function computeAndLogExpectedEvents(testName, commands) {
-    const expectedEvents = commands
-        .flatMap((cmd) => cmd.getChangeEvents(ChangeStreamWatchMode.kCollection))
+function computeExpectedEvents(commands, watchMode) {
+    return commands
+        .flatMap((cmd) => cmd.getChangeEvents(watchMode))
         .map((e) => ({event: e, cursorClosed: e.operationType === "invalidate"}));
-
-    jsTest.log.info("FSM expected events", {
-        testName,
-        count: expectedEvents.length,
-        types: expectedEvents.map((e) => e.event.operationType),
-    });
-    for (let i = 0; i < commands.length; i++) {
-        const cmd = commands[i];
-        const events = cmd.getChangeEvents(ChangeStreamWatchMode.kCollection);
-        jsTest.log.info("FSM cmd", {
-            testName,
-            cmdIndex: i,
-            cmdName: cmd.constructor.name,
-            events: events.map((e) => e.operationType),
-            ctx: cmd.collectionCtx ?? null,
-        });
-    }
-    return expectedEvents;
 }
 
 function buildCommandTrace(commands) {
@@ -158,63 +129,134 @@ function buildCommandTrace(commands) {
 }
 
 /**
- * Set up an FSM test with generated commands and reader configuration.
- * @param {Object} ctx - Test context with fsmSt, fsmShards, fsmInstancesToCleanup
- * @param {string} testName - Unique test name for logging and instance naming
- * @param {Object} [options] - Optional configuration
- * @param {number} [options.startState] - FSM start state (default: DATABASE_ABSENT)
- * @returns {Object} Setup result with dbName, collName, commands, expectedEvents, baseReaderConfig, createInstanceName
+ * Build reader specs for each writer's collection.
+ * Each spec bundles expected events, reader config, label, and a createMatcher() factory.
  */
-function setupFsmTest(ctx, testName, options = {}) {
-    const startState = options.startState || State.DATABASE_ABSENT;
-    jsTest.log.info(`FSM ${testName}: using seed ${TEST_SEED}`);
-    Random.setRandomSeed(TEST_SEED);
-    const ts = Date.now();
-    const dbName = TEST_DB;
-    const collName = TEST_COLL;
+function buildReaderSpecs(commandsByWriter, startTime) {
+    const specs = [];
 
-    const params = new ShardingCommandGeneratorParams(dbName, collName, ctx.fsmShards);
-    const generator = new ShardingCommandGenerator(TEST_SEED);
-    const testModel = new CollectionTestModel(startState);
-
-    // Ensure database exists for non-absent start states.
-    if (startState !== State.DATABASE_ABSENT) {
-        ctx.fsmSt.s.getDB(dbName).dropDatabase();
-        new CreateDatabaseCommand(dbName, collName, ctx.fsmShards).execute(ctx.fsmSt.s);
-    }
-
-    const commands = generator.generateCommands(testModel, params);
-
-    jsTest.log.info("FSM setup", {
-        testName,
-        shards: ctx.fsmShards.length,
-        commands: commands.length,
-    });
-
-    const startTime = getCurrentClusterTime(ctx.fsmSt.s, dbName);
-
-    const writerInstanceName = `writer_${testName}_${ts}`;
-    ctx.fsmInstancesToCleanup.push(writerInstanceName);
-    Writer.run(ctx.fsmSt.s, writerInstanceName, commands, TEST_SEED);
-
-    // When the bg_mutator suite variant is active, start a BackgroundMutator that
-    // runs concurrent cluster operations (FCV flips, resetPlacementHistory) until
-    // the writer completes. Controlled entirely by TestData — tests don't need to
-    // pass any bg mutator options.
-    if (TestData.enableBgMutator) {
-        const mutatorInstanceName = `bgmutator_${testName}_${ts}`;
-        ctx.fsmInstancesToCleanup.push(mutatorInstanceName);
-        BackgroundMutator.start(ctx.fsmSt.s, {
-            ops: [BackgroundMutatorOpType.ResetPlacementHistory, BackgroundMutatorOpType.FlipFCV],
-            shardingTest: ctx.fsmSt,
-            seed: TEST_SEED,
-            instanceName: mutatorInstanceName,
+    for (const w of commandsByWriter) {
+        const expectedEvents = computeExpectedEvents(w.commands, ChangeStreamWatchMode.kCollection);
+        const commandTrace = buildCommandTrace(w.commands);
+        specs.push({
+            label: `coll_${w.dbName}_${w.collName}`,
+            expectedEvents,
+            createMatcher: () => createMatcher(expectedEvents),
+            config: {
+                watchMode: ChangeStreamWatchMode.kCollection,
+                dbName: w.dbName,
+                collName: w.collName,
+                readingMode: ChangeStreamReadingMode.kContinuous,
+                startAtClusterTime: startTime,
+                numberOfEventsToRead: expectedEvents.length,
+                excludeOperationTypes: kExcludedOperationTypes,
+                debugCommandTrace: commandTrace,
+            },
         });
     }
 
-    const expectedEvents = computeAndLogExpectedEvents(testName, commands);
-    const commandTrace = buildCommandTrace(commands);
-    const numberOfEventsToRead = expectedEvents.length;
+    return specs;
+}
+
+/**
+ * Pre-create databases for writers that start from a non-absent state.
+ */
+function ensureDatabasesExist(writerDefs, mongos, fsmShards) {
+    const createdDbs = new Set();
+    for (const w of writerDefs) {
+        const startState = w.startState || State.DATABASE_PRESENT_COLLECTION_ABSENT;
+        if (startState !== State.DATABASE_ABSENT && !createdDbs.has(w.dbName)) {
+            createdDbs.add(w.dbName);
+            mongos.getDB(w.dbName).dropDatabase();
+            new CreateDatabaseCommand(w.dbName, w.collName, fsmShards).execute(mongos);
+        }
+    }
+}
+
+/**
+ * Generate FSM commands for each writer definition.
+ */
+function generateCommandsForWriters(writerDefs, fsmShards) {
+    const commandsByWriter = [];
+    for (const w of writerDefs) {
+        const startState = w.startState || State.DATABASE_PRESENT_COLLECTION_ABSENT;
+        const params = new ShardingCommandGeneratorParams(w.dbName, w.collName, fsmShards);
+        const generator = new ShardingCommandGenerator(TEST_SEED);
+        const testModel = new CollectionTestModel(startState);
+        const commands = generator.generateCommands(testModel, params);
+        commandsByWriter.push({dbName: w.dbName, collName: w.collName, commands});
+    }
+    return commandsByWriter;
+}
+
+/**
+ * Launch a Writer for each generated command sequence.
+ */
+function runWriters(ctx, testName, ts, commandsByWriter) {
+    const writerInstanceNames = [];
+    for (const w of commandsByWriter) {
+        const writerInstanceName = `writer_${testName}_${w.dbName}_${w.collName}_${ts}`;
+        ctx.fsmInstancesToCleanup.push(writerInstanceName);
+        writerInstanceNames.push(writerInstanceName);
+        Writer.run(ctx.fsmSt.s, writerInstanceName, w.commands, TEST_SEED);
+    }
+    return writerInstanceNames;
+}
+
+/**
+ * Start a BackgroundMutator that runs concurrent cluster operations
+ * (e.g. FCV flips, resetPlacementHistory) until all writers complete.
+ */
+function startBackgroundMutator(ctx, testName, ts, bgMutatorOpts, writerInstanceNames) {
+    const mutatorInstanceName = `bgmutator_${testName}_${ts}`;
+    ctx.fsmInstancesToCleanup.push(mutatorInstanceName);
+    BackgroundMutator.start(ctx.fsmSt.s, {
+        ops: [BackgroundMutatorOpType.ResetPlacementHistory, BackgroundMutatorOpType.FlipFCV],
+        shardingTest: ctx.fsmSt,
+        seed: TEST_SEED,
+        ...bgMutatorOpts,
+        instanceName: mutatorInstanceName,
+        stopInstanceNames: writerInstanceNames,
+    });
+}
+
+/**
+ * Set up an FSM test with one or more parallel writers and reader specs.
+ *
+ * @param {Object} ctx - Test context with fsmSt, fsmShards, fsmInstancesToCleanup
+ * @param {string} testName - Unique test name for logging and instance naming
+ * @param {Object} [options] - Optional configuration
+ * @param {Array<{dbName: string, collName: string, startState: number}>} options.writers -
+ *   Writer definitions.  Each entry specifies the database, collection, and FSM start state.
+ *   Writers sharing a database should use DB_PRESENT_COLLECTION_ABSENT to avoid
+ *   one writer's DROP_DATABASE destroying another's collections.
+ * @returns {Object} { readerSpecs, createInstanceName }
+ */
+function setupFsmTest(ctx, testName, options = {}) {
+    jsTest.log.info(`FSM ${testName}: using seed ${TEST_SEED}`);
+    Random.setRandomSeed(TEST_SEED);
+    const ts = Date.now();
+
+    const writerDefs = options.writers;
+
+    ensureDatabasesExist(writerDefs, ctx.fsmSt.s, ctx.fsmShards);
+
+    const commandsByWriter = generateCommandsForWriters(writerDefs, ctx.fsmShards);
+    const startTime = getCurrentClusterTime(ctx.fsmSt.s);
+    const writerInstanceNames = runWriters(ctx, testName, ts, commandsByWriter);
+
+    if (options.bgMutator) {
+        startBackgroundMutator(ctx, testName, ts, options.bgMutator, writerInstanceNames);
+    }
+
+    const readerSpecs = buildReaderSpecs(commandsByWriter, startTime);
+
+    jsTest.log.info("FSM setup complete", {
+        testName,
+        shards: ctx.fsmShards.length,
+        writers: writerDefs.length,
+        readerLabels: readerSpecs.map((r) => `${r.label}(${r.expectedEvents.length})`),
+    });
 
     const createInstanceName = (prefix) => {
         const name = `${prefix}_${testName}_${ts}`;
@@ -222,19 +264,7 @@ function setupFsmTest(ctx, testName, options = {}) {
         return name;
     };
 
-    const baseReaderConfig = {
-        watchMode: ChangeStreamWatchMode.kCollection,
-        dbName,
-        collName,
-        readingMode: ChangeStreamReadingMode.kContinuous,
-        startAtClusterTime: startTime,
-        numberOfEventsToRead,
-        excludeOperationTypes: kExcludedOperationTypes,
-        // Used by verifier to print richer mismatch diagnostics.
-        debugCommandTrace: commandTrace,
-    };
-
-    return {dbName, collName, commands, expectedEvents, commandTrace, baseReaderConfig, createInstanceName};
+    return {readerSpecs, createInstanceName};
 }
 
 /**
@@ -261,12 +291,12 @@ function runTeardownSteps(...steps) {
  * Run an FSM test with automatic cluster setup and teardown.
  * Creates a ShardingTest, sets up the FSM test, runs the test function, and cleans up.
  * @param {string} testName - Unique test name
- * @param {Function} testFn - Test function receiving (fsmSt, setupResult, instancesToCleanup)
+ * @param {Function} testFn - Test function receiving (fsmSt, setupResult)
  * @param {Object} [options] - Optional configuration
  * @param {number} [options.mongos=1] - Number of mongos instances
  * @param {number} [options.shards=3] - Number of shards
  * @param {number} [options.rsNodes=1] - Number of replica set nodes per shard
- * @param {number} [options.startState] - FSM start state (passed to setupFsmTest)
+ * @param {Array} [options.writers] - Writer definitions (passed to setupFsmTest)
  */
 function runWithFsmCluster(testName, testFn, options = {}) {
     const {mongos = 1, shards = 3, rsNodes = 1} = options;
@@ -277,138 +307,123 @@ function runWithFsmCluster(testName, testFn, options = {}) {
     try {
         const ctx = {fsmSt, fsmShards, fsmInstancesToCleanup: instancesToCleanup};
         const setupResult = setupFsmTest(ctx, testName, options);
-        testFn(fsmSt, setupResult, instancesToCleanup);
+        testFn(fsmSt, setupResult);
     } finally {
         runTeardownSteps(
             () => Writer.joinAll(),
             () => BackgroundMutator.join(),
             () => ChangeStreamReader.joinAll(),
             ...instancesToCleanup.map((name) => () => Connector.cleanup(fsmSt.s, name)),
-            () => fsmSt.s.getDB(TEST_DB).dropDatabase(),
             () => fsmSt.stop(),
         );
     }
 }
 
-function verifyContinuous(fsmSt, {expectedEvents, baseReaderConfig, createInstanceName}) {
-    const readerInstanceName = createInstanceName("reader");
-    const verifierInstanceName = createInstanceName("verifier");
+/**
+ * Generic scope-level verification: spin up readers, build matchers, and run a Verifier.
+ *
+ * @param {ShardingTest} fsmSt - The sharding test fixture.
+ * @param {Object} spec - Reader spec from buildReaderSpecs (label, config, createMatcher).
+ * @param {Function} createInstanceName - Factory returned by setupFsmTest.
+ * @param {Object} opts
+ * @param {Array<{suffix: string, configOverrides: Object}>} opts.readers -
+ *   One entry per reader to create.  Each gets an instance name derived from
+ *   `spec.label` and the suffix, and a config that merges spec.config with
+ *   the overrides.
+ * @param {Function} opts.createTestCases - (readerNamesBySuffix) => TestCase[].
+ * @param {Object} [opts.extraVerifierConfig] - Extra fields merged into the
+ *   Verifier config (e.g. shardConnections).
+ */
+function verifyScope(fsmSt, spec, createInstanceName, {readers, createTestCases, extraVerifierConfig = {}}) {
+    const readerNamesBySuffix = {};
+    const readerConfigs = {};
+    const matcherSpecsByInstance = {};
 
-    const readerConfig = {...baseReaderConfig, instanceName: readerInstanceName};
-    ChangeStreamReader.run(fsmSt.s, readerConfig);
-
-    new Verifier().run(
-        fsmSt.s,
-        {
-            changeStreamReaderConfigs: {[readerInstanceName]: readerConfig},
-            matcherSpecsByInstance: {[readerInstanceName]: createMatcher(expectedEvents)},
-            instanceName: verifierInstanceName,
-        },
-        [new SingleReaderVerificationTestCase(readerInstanceName)],
-    );
-}
-
-function verifyResume(fsmSt, {expectedEvents, baseReaderConfig, createInstanceName}) {
-    const readerInstanceName = createInstanceName("reader");
-    const verifierInstanceName = createInstanceName("verifier");
-
-    const readerConfig = {...baseReaderConfig, instanceName: readerInstanceName};
-    ChangeStreamReader.run(fsmSt.s, readerConfig);
-
-    const shardConnections = [];
-    for (let i = 0; fsmSt[`rs${i}`]; i++) {
-        shardConnections.push(fsmSt[`rs${i}`].getPrimary());
+    for (const {suffix, configOverrides} of readers) {
+        const name = createInstanceName(`reader_${suffix}_${spec.label}`);
+        const config = {...spec.config, ...configOverrides, instanceName: name};
+        readerNamesBySuffix[suffix] = name;
+        readerConfigs[name] = config;
+        ChangeStreamReader.run(fsmSt.s, config);
+        matcherSpecsByInstance[name] = spec.createMatcher();
     }
 
     new Verifier().run(
         fsmSt.s,
         {
-            changeStreamReaderConfigs: {[readerInstanceName]: readerConfig},
-            matcherSpecsByInstance: {[readerInstanceName]: createMatcher(expectedEvents)},
-            instanceName: verifierInstanceName,
-            shardConnections,
-        },
-        [new PrefixReadTestCase(readerInstanceName, 3)],
-    );
-}
-
-function verifyFetchAndResume(fsmSt, {expectedEvents, baseReaderConfig, createInstanceName}) {
-    const readerContinuous = createInstanceName("reader_continuous");
-    const readerFoar = createInstanceName("reader_foar");
-    const verifierInstanceName = createInstanceName("verifier");
-
-    const continuousConfig = {
-        ...baseReaderConfig,
-        instanceName: readerContinuous,
-        readingMode: ChangeStreamReadingMode.kContinuous,
-    };
-    ChangeStreamReader.run(fsmSt.s, continuousConfig);
-
-    const foarConfig = {
-        ...baseReaderConfig,
-        instanceName: readerFoar,
-        readingMode: ChangeStreamReadingMode.kFetchOneAndResume,
-    };
-    ChangeStreamReader.run(fsmSt.s, foarConfig);
-
-    new Verifier().run(
-        fsmSt.s,
-        {
-            changeStreamReaderConfigs: {
-                [readerContinuous]: continuousConfig,
-                [readerFoar]: foarConfig,
-            },
-            matcherSpecsByInstance: {
-                [readerContinuous]: createMatcher(expectedEvents),
-                [readerFoar]: createMatcher(expectedEvents),
-            },
-            instanceName: verifierInstanceName,
-        },
-        [new SequentialPairwiseFetchingTestCase(readerContinuous, readerFoar)],
-    );
-}
-
-function verifyV1V2(fsmSt, {expectedEvents, baseReaderConfig, createInstanceName}) {
-    const readerV1 = createInstanceName("reader_v1");
-    const readerV2 = createInstanceName("reader_v2");
-    const verifierInstanceName = createInstanceName("verifier");
-
-    const readerConfigs = {
-        [readerV1]: {...baseReaderConfig, instanceName: readerV1, version: "v1"},
-        [readerV2]: {...baseReaderConfig, instanceName: readerV2, version: "v2"},
-    };
-
-    ChangeStreamReader.run(fsmSt.s, readerConfigs[readerV1]);
-    ChangeStreamReader.run(fsmSt.s, readerConfigs[readerV2]);
-
-    new Verifier().run(
-        fsmSt.s,
-        {
             changeStreamReaderConfigs: readerConfigs,
-            matcherSpecsByInstance: {
-                [readerV1]: createMatcher(expectedEvents),
-                [readerV2]: createMatcher(expectedEvents),
-            },
-            instanceName: verifierInstanceName,
+            matcherSpecsByInstance,
+            instanceName: createInstanceName(`verifier_${spec.label}`),
+            ...extraVerifierConfig,
         },
-        [new SequentialPairwiseFetchingTestCase(readerV1, readerV2)],
+        createTestCases(readerNamesBySuffix),
     );
+}
+
+function verifyContinuous(fsmSt, {readerSpecs, createInstanceName}) {
+    for (const spec of readerSpecs) {
+        verifyScope(fsmSt, spec, createInstanceName, {
+            readers: [{suffix: "cont", configOverrides: {}}],
+            createTestCases: (m) => [new SingleReaderVerificationTestCase(m.cont)],
+        });
+    }
+}
+
+function verifyResume(fsmSt, {readerSpecs, createInstanceName}) {
+    const shardConnections = [];
+    for (let i = 0; fsmSt[`rs${i}`]; i++) {
+        shardConnections.push(fsmSt[`rs${i}`].getPrimary());
+    }
+    for (const spec of readerSpecs) {
+        verifyScope(fsmSt, spec, createInstanceName, {
+            readers: [{suffix: "resume", configOverrides: {}}],
+            createTestCases: (m) => [new PrefixReadTestCase(m.resume, 3)],
+            extraVerifierConfig: {shardConnections},
+        });
+    }
+}
+
+function verifyV1V2(fsmSt, {readerSpecs, createInstanceName}) {
+    for (const spec of readerSpecs) {
+        verifyScope(fsmSt, spec, createInstanceName, {
+            readers: [
+                {suffix: "v1", configOverrides: {version: "v1"}},
+                {suffix: "v2", configOverrides: {version: "v2"}},
+            ],
+            createTestCases: (m) => [new SequentialPairwiseFetchingTestCase(m.v1, m.v2)],
+        });
+    }
+}
+
+function verifyFetchAndResume(fsmSt, {readerSpecs, createInstanceName}) {
+    for (const spec of readerSpecs) {
+        verifyScope(fsmSt, spec, createInstanceName, {
+            readers: [
+                {suffix: "cont", configOverrides: {readingMode: ChangeStreamReadingMode.kContinuous}},
+                {suffix: "foar", configOverrides: {readingMode: ChangeStreamReadingMode.kFetchOneAndResume}},
+            ],
+            createTestCases: (m) => [new SequentialPairwiseFetchingTestCase(m.cont, m.foar)],
+        });
+    }
 }
 
 export {
     TEST_DB,
+    TEST_DB_2,
     TEST_COLL,
+    TEST_COLL_2,
     TEST_SEED,
     kExcludedOperationTypes,
     getCurrentClusterTime,
     createShardingTest,
     createMatcher,
-    cleanupTestDatabase,
+    computeExpectedEvents,
     setupFsmTest,
     runWithFsmCluster,
     BackgroundMutatorOpType,
+    verifyScope,
     verifyContinuous,
     verifyResume,
-    verifyFetchAndResume,
     verifyV1V2,
+    verifyFetchAndResume,
 };
