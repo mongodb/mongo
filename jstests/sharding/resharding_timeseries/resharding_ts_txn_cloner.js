@@ -31,7 +31,7 @@ const inputCollection = reshardingTest.createShardedCollection({
         {min: {"meta.x": 0}, max: {"meta.x": 100}, shard: donorShardNames[1]},
         {min: {"meta.x": 100}, max: {"meta.x": MaxKey}, shard: donorShardNames[2]},
     ],
-    collOptions: {
+    shardCollOptions: {
         timeseries: timeseriesInfo,
     },
 });

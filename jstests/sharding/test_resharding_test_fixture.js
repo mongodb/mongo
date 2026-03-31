@@ -21,6 +21,7 @@ const sourceCollection = reshardingTest.createShardedCollection({
         {min: {oldKey: MinKey}, max: {oldKey: 0}, shard: donorShardNames[0]},
         {min: {oldKey: 0}, max: {oldKey: MaxKey}, shard: donorShardNames[1]},
     ],
+    createCollOptions: {clusteredIndex: {key: {_id: 1}, unique: true}},
 });
 
 // Perform some inserts before resharding starts so there's data to clone.
@@ -58,5 +59,11 @@ const ops = mongos
     .aggregate([{$currentOp: {allUsers: true, localOps: true}}, {$match: {"command.reshardCollection": ns}}])
     .toArray();
 assert.eq(1, ops.length, "failed to find reshardCollection in $currentOp output");
+
+// Test options parsing
+const collectionInfos = sourceCollection.getDB().getCollectionInfos({name: sourceCollection.getName()});
+const collInfo = collectionInfos[0];
+
+assert(collInfo.options.clusteredIndex, "collection should have a clustered index: " + tojson(collInfo));
 
 reshardingTest.teardown();

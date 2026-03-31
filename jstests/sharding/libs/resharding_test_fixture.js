@@ -346,13 +346,16 @@ export var ReshardingTest = class {
      * @param chunks - an array of
      * {min: <shardKeyValue0>, max: <shardKeyValue1>, shard: <shardName>} objects. The chunks must
      * form a partition of the {shardKey: MinKey} --> {shardKey: MaxKey} space.
+     * @param shardCollOptions - options that are passed into the shardCollection cmd
+     * @param createCollOPtions - options that are passed into the createCollection cmd before sharding
      */
     createShardedCollection({
         ns,
         shardKeyPattern,
         chunks,
         primaryShardName = this.donorShardNames[0],
-        collOptions = {},
+        shardCollOptions = {},
+        createCollOptions = {},
     }) {
         this._ns = ns;
         this._currentShardKey = Object.assign({}, shardKeyPattern);
@@ -369,9 +372,18 @@ export var ReshardingTest = class {
         );
         this._primaryShardName = primaryShardName;
 
-        CreateShardedCollectionUtil.shardCollectionWithChunks(sourceCollection, shardKeyPattern, chunks, collOptions);
+        if (Object.keys(createCollOptions).length > 0) {
+            assert.commandWorked(sourceDB.createCollection(sourceCollection.getName(), createCollOptions));
+        }
 
-        const tempCollNamePrefix = this._setupTimeseriesState(sourceDB, sourceCollection.getName(), collOptions);
+        CreateShardedCollectionUtil.shardCollectionWithChunks(
+            sourceCollection,
+            shardKeyPattern,
+            chunks,
+            shardCollOptions,
+        );
+
+        const tempCollNamePrefix = this._setupTimeseriesState(sourceDB, sourceCollection.getName(), shardCollOptions);
         const sourceCollectionUUIDString = extractUUIDFromObject(this._sourceCollectionUUID);
         this._tempNs = `${sourceDB.getName()}.${tempCollNamePrefix}.${sourceCollectionUUIDString}`;
 

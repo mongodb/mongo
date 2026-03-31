@@ -29,7 +29,7 @@ const collection = reshardingTest.createShardedCollection({
     ns: ns,
     shardKeyPattern: {oldKey: 1},
     chunks: [{min: {oldKey: MinKey}, max: {oldKey: MaxKey}, shard: donorShardNames[0]}],
-    collOptions: {collation: {locale: "simple"}},
+    shardCollOptions: {collation: {locale: "simple"}},
 });
 
 const idxSimpleCollationName = "idxSimpleCollation";
