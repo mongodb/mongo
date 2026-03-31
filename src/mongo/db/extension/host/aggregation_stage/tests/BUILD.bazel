@@ -14,6 +14,7 @@ mongo_cc_unit_test(
         "host_aggregation_stage_ast_node_test.cpp",
         "host_aggregation_stage_parse_node_test.cpp",
         "host_exec_agg_stage_test.cpp",
+        "host_logical_agg_stage_test.cpp",
     ],
     tags = ["mongo_unittest_third_group"],
     deps = [
@@ -22,6 +23,25 @@ mongo_cc_unit_test(
         "//src/mongo/db/extension/host/aggregation_stage",
         "//src/mongo/db/extension/host_connector/adapter:host_adapters",
         "//src/mongo/db/extension/host_connector/adapter:host_services_adapter",
+        "//src/mongo/db/extension/shared/handle/aggregation_stage:aggregation_stage_handles",
+        "//src/mongo/db/pipeline:aggregation_context_fixture",
+        "//src/mongo/db/pipeline:document_source_mock",
+    ],
+)
+
+# Separate target for long-running tests (death tests). Death tests spawn separate processes
+# and may take longer to execute than regular unit tests.
+mongo_cc_unit_test(
+    name = "host_aggregation_stage_lrt_tests",
+    srcs = [
+        "host_aggregation_stage_death_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/extension/host:extension_host",
+        "//src/mongo/db/extension/host/aggregation_stage",
+        "//src/mongo/db/extension/host_connector/adapter:host_adapters",
         "//src/mongo/db/extension/shared/handle/aggregation_stage:aggregation_stage_handles",
         "//src/mongo/db/pipeline:aggregation_context_fixture",
         "//src/mongo/db/pipeline:document_source_mock",

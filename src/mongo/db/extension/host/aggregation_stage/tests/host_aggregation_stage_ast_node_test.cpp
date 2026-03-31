@@ -103,6 +103,8 @@ TEST(HostAstNodeTest, IsNotHostAllocated) {
     ASSERT_FALSE(host::HostAggStageAstNodeAdapter::isHostAllocated(*handle.get()));
 }
 
+// TODO SERVER-123101: Move these death tests to host_aggregation_stage_death_test.cpp alongside the
+// other host adapter death tests (see host_aggregation_stage_death_test.cpp).
 DEATH_TEST(HostAstNodeVTableTestDeathTest, InvalidAstNodeVTableFailsGetName, "11217601") {
     auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
     vtable.get_name = nullptr;

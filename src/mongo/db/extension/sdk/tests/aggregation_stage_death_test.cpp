@@ -522,6 +522,8 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest, NoSourceStageForTransformStage, "109
     [[maybe_unused]] auto result = transformStage->getNext(&ctxAdapter, nullptr);
 }
 
+// TODO SERVER-123101: Move these death tests to host_aggregation_stage_death_test.cpp alongside the
+// other host adapter death tests (see host_aggregation_stage_death_test.cpp).
 DEATH_TEST_F(AggStageErrorFixtureDeathTest, HostExecAggStageAdapterNullStageAsserts, "10957207") {
     [[maybe_unused]] auto adapter = host_connector::HostExecAggStageAdapter{nullptr};
 }

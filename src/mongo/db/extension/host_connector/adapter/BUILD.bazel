@@ -15,6 +15,7 @@ mongo_cc_library(
     srcs = [
         "executable_agg_stage_adapter.cpp",
         "host_portal_adapter.cpp",
+        "logical_agg_stage_adapter.cpp",
         "pipeline_rewrite_context_adapter.cpp",
         "query_execution_context_adapter.cpp",
         "query_shape_opts_adapter.cpp",
