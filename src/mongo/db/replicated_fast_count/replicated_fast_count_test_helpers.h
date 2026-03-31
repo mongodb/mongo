@@ -306,5 +306,28 @@ CollectionSizeCount scanForAccurateSizeCount(OperationContext* opCtx, const Name
 absl::flat_hash_map<UUID, CollectionSizeCount> extractSizeCountDeltasForApplyOps(
     const repl::OplogEntry& applyOpsEntry, const boost::optional<UUID>& uuidFilter = boost::none);
 
-
 }  // namespace mongo::replicated_fast_count_test_helpers
+namespace mongo::replicated_fast_count::test_helpers {
+/**
+ * Simple wrapper to ease creation and testing of replicated fast count and size.
+ */
+struct NsAndUUID {
+    NamespaceString nss;
+    UUID uuid;
+};
+
+/**
+ * Generates an oplog entry with the provided inputs and placeholders for all other required fields.
+ */
+repl::OplogEntry makeOplogEntry(Timestamp ts,
+                                NsAndUUID userColl,
+                                repl::OpTypeEnum opType,
+                                int32_t sizeDelta);
+repl::OplogEntry makeOplogEntry(Timestamp ts, NsAndUUID userColl, repl::OpTypeEnum opType);
+
+/**
+ * Inserts `oplogEntry` into the oplog collection.
+ */
+void writeToOplog(OperationContext* opCtx, const repl::OplogEntry& oplogEntry);
+
+}  // namespace mongo::replicated_fast_count::test_helpers

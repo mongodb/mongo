@@ -72,14 +72,25 @@ void extractSizeCountDeltasForApplyOps(
     absl::flat_hash_map<UUID, CollectionSizeCount>& sizeCountDeltasOut);
 
 /**
+ * The result of scanning the oplog for size and count deltas.
+ *
+ * `deltas` contains an entry for each `uuid` which has replicated size count information within the
+ * scanned oplog range. May include entries where size count deltas sum to 0.
+ *
+ * `lastTimestamp` is the timestamp of the final oplog entry visited during the scan, or boost::none
+ * if no entries were scanned (i.e. the seek landed past the end of the oplog).
+ */
+struct OplogScanResult {
+    absl::flat_hash_map<UUID, CollectionSizeCount> deltas;
+    boost::optional<Timestamp> lastTimestamp;
+};
+
+/**
  * Given a cursor to the oplog, scans the oplog starting after "seekAfterTS" (exclusive bound) and
  * aggregates the size count deltas across UUIDs. Only accumulates size count information for
  * "uuidFilter" when provided.
- *
- * The map contains an entry for each 'uuid' which has replicated size count information within the
- * scanned oplog range. May include entries where size count deltas sum to 0.
  */
-absl::flat_hash_map<UUID, CollectionSizeCount> aggregateSizeCountDeltasInOplog(
+OplogScanResult aggregateSizeCountDeltasInOplog(
     SeekableRecordCursor& oplogCursor,
     const Timestamp& seekAfterTS,
     const boost::optional<UUID>& uuidFilter = boost::none);

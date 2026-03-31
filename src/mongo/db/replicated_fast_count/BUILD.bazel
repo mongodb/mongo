@@ -91,6 +91,37 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "replicated_fast_count_advance_checkpoint",
+    srcs = [
+        "replicated_fast_count_advance_checkpoint.cpp",
+    ],
+    deps = [
+        "replicated_fast_count_delta_utils",
+        "size_count_store",
+        "size_count_timestamp_store",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "replicated_fast_count_advance_checkpoint_test",
+    srcs = [
+        "replicated_fast_count_advance_checkpoint_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_first_group",
+        "server-collection-write-path",
+    ],
+    deps = [
+        "replicated_fast_count_advance_checkpoint",
+        "replicated_fast_count_delta_utils",
+        "replicated_fast_count_test_helpers",
+        "size_count_store",
+        "size_count_timestamp_store",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+    ],
+)
+
+mongo_cc_library(
     name = "size_count_store",
     srcs = [
         "size_count_store.cpp",
@@ -157,6 +188,7 @@ mongo_cc_library(
     deps = [
         "replicated_fast_count_delta_utils",
         "replicated_fast_count_manager",
+        "//src/mongo/db:record_id_helpers",
         "//src/mongo/db/op_observer:operation_logger_impl",
         "//src/mongo/db/repl:oplog_entry",
         "//src/mongo/db/repl:oplog_interface_local",
@@ -183,6 +215,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/op_observer:operation_logger_impl",
         "//src/mongo/db/repl:mock_repl_coord_server_fixture",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/db/storage:recovery_unit_base",
     ],
 )
 

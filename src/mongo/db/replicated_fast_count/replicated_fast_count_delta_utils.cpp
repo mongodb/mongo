@@ -148,28 +148,28 @@ void extractSizeCountDeltasForApplyOps(
     }
 }
 
-absl::flat_hash_map<UUID, CollectionSizeCount> aggregateSizeCountDeltasInOplog(
-    SeekableRecordCursor& oplogCursor,
-    const Timestamp& seekAfterTS,
-    const boost::optional<UUID>& uuidFilter) {
-    absl::flat_hash_map<UUID, CollectionSizeCount> aggregatedDeltas;
+OplogScanResult aggregateSizeCountDeltasInOplog(SeekableRecordCursor& oplogCursor,
+                                                const Timestamp& seekAfterTS,
+                                                const boost::optional<UUID>& uuidFilter) {
+    OplogScanResult result;
     RecordId seekRid =
         massertStatusOK(record_id_helpers::keyForOptime(seekAfterTS, KeyFormat::Long));
     for (auto rec = oplogCursor.seek(seekRid, SeekableRecordCursor::BoundInclusion::kExclude); rec;
          rec = oplogCursor.next()) {
         const auto entry = massertStatusOK(repl::OplogEntry::parse(rec->data.toBson()));
+        result.lastTimestamp = entry.getTimestamp();
         if (entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
-            extractSizeCountDeltasForApplyOps(entry, uuidFilter, aggregatedDeltas);
+            extractSizeCountDeltasForApplyOps(entry, uuidFilter, result.deltas);
             continue;
         }
         if (uuidFilter && entry.getUuid() != uuidFilter) {
             continue;
         }
         if (auto delta = extractSizeCountDeltaForOp(entry); delta.has_value()) {
-            recordCollectionSizeCountDelta(*entry.getUuid(), *delta, aggregatedDeltas);
+            recordCollectionSizeCountDelta(*entry.getUuid(), *delta, result.deltas);
         }
     }
-    return aggregatedDeltas;
+    return result;
 }
 
 boost::optional<CollectionOrViewAcquisition> acquireFastCountCollectionForRead(

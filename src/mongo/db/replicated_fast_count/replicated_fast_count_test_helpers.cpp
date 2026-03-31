@@ -29,7 +29,9 @@
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 
+#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -470,3 +472,52 @@ absl::flat_hash_map<UUID, CollectionSizeCount> extractSizeCountDeltasForApplyOps
 }
 
 }  // namespace mongo::replicated_fast_count_test_helpers
+
+namespace mongo::replicated_fast_count::test_helpers {
+namespace {
+repl::OplogEntrySizeMetadata makeOperationSizeMetadata(int32_t replicatedSizeDelta) {
+    repl::OplogEntrySizeMetadata m;
+    m.setSz(replicatedSizeDelta);
+    return m;
+}
+}  // namespace
+
+repl::OplogEntry makeOplogEntry(Timestamp ts,
+                                NsAndUUID userColl,
+                                repl::OpTypeEnum opType,
+                                int32_t sizeDelta) {
+    return repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(ts, 1),
+        .opType = opType,
+        .nss = userColl.nss,
+        .uuid = userColl.uuid,
+        .oField = BSONObj(),
+        .sizeMetadata = makeOperationSizeMetadata(sizeDelta),
+        .wallClockTime = Date_t::now(),
+    }};
+}
+
+repl::OplogEntry makeOplogEntry(const Timestamp ts, NsAndUUID userColl, repl::OpTypeEnum opType) {
+    return repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(ts, 1),
+        .opType = opType,
+        .nss = userColl.nss,
+        .uuid = userColl.uuid,
+        .oField = BSONObj(),
+        .wallClockTime = Date_t::now(),
+    }};
+}
+
+void writeToOplog(OperationContext* opCtx, const repl::OplogEntry& oplogEntry) {
+    InsertStatement insert(oplogEntry.getEntry().toBSON());
+    insert.replicatedRecordId = massertStatusOK(
+        record_id_helpers::keyForOptime(oplogEntry.getTimestamp(), KeyFormat::Long));
+
+    AutoGetOplogFastPath oplogWrite(opCtx, OplogAccessMode::kWrite);
+    const auto& coll = oplogWrite.getCollection();
+    WriteUnitOfWork wuow(opCtx);
+    ASSERT_OK(collection_internal::insertDocument(opCtx, coll, insert, nullptr));
+    wuow.commit();
+}
+
+}  // namespace mongo::replicated_fast_count::test_helpers
