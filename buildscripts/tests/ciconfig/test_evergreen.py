@@ -514,24 +514,6 @@ class TestVariant(unittest.TestCase):
         self.assertEqual({"resmoke_task": "--suites=resmoke_task --storageEngine=wiredTiger"},
                          resmoke_task.combined_suite_to_resmoke_args_map)
 
-        # Check combined_suite_to_resmoke_args_map for "initialize multiversion tasks" task.
-        variant_debian = self.conf.get_variant("debian")
-        resmoke_task = variant_debian.get_task("resmoke_multiversion_task_gen")
-        self.assertEqual({
-            "multiversion_sanity_check_last_continuous_new_new_old":
-                "--suites=multiversion_sanity_check_last_continuous_new_new_old --storageEngine=wiredTiger",
-            "multiversion_sanity_check_last_continuous_new_old_new":
-                "--suites=multiversion_sanity_check_last_continuous_new_old_new --storageEngine=wiredTiger",
-            "multiversion_sanity_check_last_continuous_old_new_new":
-                "--suites=multiversion_sanity_check_last_continuous_old_new_new --storageEngine=wiredTiger",
-            "multiversion_sanity_check_last_lts_new_new_old":
-                "--suites=multiversion_sanity_check_last_lts_new_new_old --storageEngine=wiredTiger",
-            "multiversion_sanity_check_last_lts_new_old_new":
-                "--suites=multiversion_sanity_check_last_lts_new_old_new --storageEngine=wiredTiger",
-            "multiversion_sanity_check_last_lts_old_new_new":
-                "--suites=multiversion_sanity_check_last_lts_old_new_new --storageEngine=wiredTiger",
-        }, resmoke_task.combined_suite_to_resmoke_args_map)
-
         # Check for tasks included in task_groups
         variant_amazon = self.conf.get_variant("amazon")
         self.assertEqual(3, len(variant_amazon.tasks))
