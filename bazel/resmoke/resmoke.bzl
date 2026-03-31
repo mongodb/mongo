@@ -245,7 +245,7 @@ def resmoke_suite_test(
         "//src/third_party/schemastore.org:schemas",
         "//x509:generate_main_certificates",
     ]
-    merged_data = data + srcs + [d for d in default_data if d not in data]
+    merged_data = data + [d for d in srcs if d not in data] + [d for d in default_data if d not in data and d not in srcs]
 
     py_test(
         name = name,
