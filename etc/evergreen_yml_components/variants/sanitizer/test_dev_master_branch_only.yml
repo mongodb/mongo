@@ -431,6 +431,48 @@ buildvariants:
       - name: disk_wiredtiger
       - name: generate_buildid_to_debug_symbols_mapping
 
+  - name: &rhel8-arm64-debug-ubsan-all-feature-flags rhel8-arm64-debug-ubsan-all-feature-flags
+    display_name: "* Shared Library UBSAN Enterprise RHEL 8 arm64 DEBUG (all feature flags)"
+    tags: ["suggested", "emergency_release"]
+    cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - rhel8.8-arm64-m8g-8xlarge
+    stepback: false
+    expansions:
+      evergreen_remote_exec: on
+      core_analyzer_gdb_index_cache: off
+      toolchain_version: stable
+      additional_package_targets: >-
+        archive-mongocryptd-stripped
+        archive-mongocryptd-debug
+      lang_environment: LANG=C
+      san_options: *ubsan_options
+      bazel_compile_flags: >-
+        --dbg=True
+        --opt=on
+        --ubsan=True
+        --compiler_type=clang
+        --dtlto=False
+        --pgo_profile_use=False
+        --allocator=tcmalloc-gperf
+        --separate_debug=False
+      compile_variant: *rhel8-arm64-debug-ubsan-all-feature-flags
+      # To force disable feature flags even on the all feature flags variant, please use this file:
+      # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
+      test_flags: >-
+        --excludeWithAnyTags=requires_increased_memlock_limits,all_feature_flags_incompatible
+        --runAllFeatureFlagTests
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"
+      multiversion_platform: rhel8
+      multiversion_edition: enterprise
+      resmoke_jobs_factor: 0.3 # Avoid starting too many mongod's under UBSAN build.
+      large_distro_name: rhel8.8-arm64-m8g-8xlarge
+    tasks:
+      - name: compile_and_archive_dist_test_TG
+      - name: .concurrency !.requires_extra_system_deps !.no_txns !.kill_terminate
+      - name: disk_wiredtiger
+      - name: generate_buildid_to_debug_symbols_mapping
+
   - name: rhel8-debug-ubsan-all-non-rollback-feature-flags
     display_name: "Shared Library UBSAN Enterprise RHEL 8 DEBUG (all non-rollback feature flags)"
     tags: []
