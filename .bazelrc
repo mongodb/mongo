@@ -456,6 +456,7 @@ coverage --remote_download_outputs=all
 coverage --fission=no
 coverage --build_runfile_links
 coverage --legacy_external_runfiles
+coverage --instrumentation_filter=^//src/mongo[/:],-^//src/mongo/util:boost_assert_shim,-^//src/mongo/util:icu,-^//src/mongo/db/modules/enterprise/src/streams/third_party[/:]
 # This is set in .bazelrc.evergreen:
 # coverage --config=no-remote-exec
 

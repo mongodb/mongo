@@ -955,7 +955,6 @@ tasks:
             --test_tag_filters=mongo_unittest,-intermediate_debug,-code_coverage_quarantine
             --test_timeout=1800
             --verbose_failures
-            --instrumentation_filter=^//src/mongo[/:],-^//src/mongo/util:boost_assert_shim,-^//src/mongo/util:icu,-^//src/mongo/db/modules/enterprise/src/streams/third_party[/:]
 
   - name: unit_test_group1_no_sandbox
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]

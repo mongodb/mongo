@@ -72,6 +72,10 @@ extern "C" void __llvm_profile_dump();
 extern "C" void __llvm_profile_reset_counters();
 #endif
 
+#ifdef MONGO_COVERAGE
+extern "C" int __llvm_profile_write_file();
+#endif
+
 #ifdef MONGO_GCOV
 extern "C" void __gcov_flush();
 extern "C" void __gcov_dump();
@@ -102,6 +106,10 @@ void quickExitWithoutLogging(ExitCode code) {
 #ifdef MONGO_PGO_PROFILE
     __llvm_profile_dump();
     __llvm_profile_reset_counters();
+#endif
+
+#ifdef MONGO_COVERAGE
+    __llvm_profile_write_file();
 #endif
 
 #if __has_feature(xray_instrument)

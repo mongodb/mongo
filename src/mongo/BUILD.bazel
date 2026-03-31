@@ -231,6 +231,9 @@ mongo_cc_library(
         "//bazel/config:pgo_profile_generate_clang_enabled": ["MONGO_PGO_PROFILE"],
         "//bazel/config:pgo_profile_generate_gcc_enabled": ["MONGO_GCOV"],
         "//conditions:default": [],
+    }) + select({
+        "//bazel/config:coverage_enabled": ["MONGO_COVERAGE"],
+        "//conditions:default": [],
     }),
     srcs_select = [
         {
