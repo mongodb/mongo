@@ -33,6 +33,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/namespace_string.h"
@@ -118,14 +119,13 @@ protected:
     /**
      * Returns table from ident. Requires that the table exists.
      */
-    std::unique_ptr<TemporaryRecordStore> getTable(StringData ident) {
-        auto trs = operationContext()
-                       ->getServiceContext()
-                       ->getStorageEngine()
-                       ->makeTemporaryRecordStoreFromExistingIdent(
-                           operationContext(), ident, KeyFormat::Long);
-        trs->keep();
-        return trs;
+    std::unique_ptr<RecordStore> getTable(StringData ident) {
+        auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
+        return operationContext()
+            ->getServiceContext()
+            ->getStorageEngine()
+            ->getEngine()
+            ->getInternalRecordStore(ru, ident, KeyFormat::Long);
     }
 
     bool hasTable(StringData ident) {
@@ -133,10 +133,10 @@ protected:
             *shard_role_details::getRecoveryUnit(operationContext()), ident);
     }
 
-    std::vector<BSONObj> getTableContents(std::unique_ptr<TemporaryRecordStore> table) {
+    std::vector<BSONObj> getTableContents(std::unique_ptr<RecordStore> table) {
         std::vector<BSONObj> contents;
-        auto cursor = table->rs()->getCursor(
-            operationContext(), *shard_role_details::getRecoveryUnit(operationContext()));
+        auto cursor = table->getCursor(operationContext(),
+                                       *shard_role_details::getRecoveryUnit(operationContext()));
         while (auto record = cursor->next()) {
             contents.push_back(record->data.toBson().getOwned());
         }
@@ -154,7 +154,7 @@ protected:
     std::vector<std::string> getDuplicateKeyTableContents(const IndexBuildInfo& info) {
         std::vector<std::string> contents;
         auto duplicateKeyTable = getTable(*info.constraintViolationsIdent);
-        auto cursor = duplicateKeyTable->rs()->getCursor(
+        auto cursor = duplicateKeyTable->getCursor(
             operationContext(), *shard_role_details::getRecoveryUnit(operationContext()));
         while (auto record = cursor->next()) {
             contents.emplace_back(record->data.data(), record->data.size());
@@ -628,34 +628,6 @@ DEATH_TEST_F(IndexBuilderInterceptorTestDeathTest,
     createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::openExisting);
 }
 
-TEST_F(IndexBuilderInterceptorTest, KeepTemporaryTablesCreatesMissingTables) {
-    auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
-    auto interceptor =
-        createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::deferred);
-
-    ASSERT_TRUE(hasTable(*indexBuildInfo.sideWritesIdent));
-    ASSERT_FALSE(hasTable(*indexBuildInfo.skippedRecordsIdent));
-    ASSERT_FALSE(indexBuildInfo.constraintViolationsIdent);
-    ASSERT_FALSE(hasTable(*indexBuildInfo.sorterIdent));
-
-    interceptor->keepTemporaryTables(operationContext());
-
-    // Skipped record table is created, but the duplicate key is not because the index is not unique
-    // and sorter table is not because it is only used for primary driven index builds.
-    ASSERT_TRUE(hasTable(*indexBuildInfo.sideWritesIdent));
-    ASSERT_TRUE(hasTable(*indexBuildInfo.skippedRecordsIdent));
-    ASSERT_FALSE(indexBuildInfo.constraintViolationsIdent);
-    ASSERT_FALSE(hasTable(*indexBuildInfo.sorterIdent));
-
-    // Creating a new interceptor in openExisting mode should work
-    interceptor.reset();
-    IndexBuildInterceptor(operationContext(),
-                          indexBuildInfo,
-                          LazyRecordStore::CreateMode::openExisting,
-                          getIndexEntry("a_1")->descriptor()->unique(),
-                          /*generateTableWrites=*/true);
-}
-
 TEST_F(IndexBuilderInterceptorTest, OpenExistingPreservesExistingData) {
     auto indexBuildInfo =
         buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}, unique: true}"));
@@ -683,8 +655,6 @@ TEST_F(IndexBuilderInterceptorTest, OpenExistingPreservesExistingData) {
         ASSERT_OK(
             interceptor->recordDuplicateKey(operationContext(), *_coll.get(), entry, keyString));
         wuow.commit();
-
-        interceptor->keepTemporaryTables(operationContext());
     }
 
     // Creating a new interceptor in openExisting mode should preserve the existing data.
@@ -709,7 +679,7 @@ TEST_F(IndexBuilderInterceptorTest, DropTemporaryTables) {
     ASSERT_TRUE(hasTable(*indexBuildInfo.skippedRecordsIdent));
     ASSERT_TRUE(hasTable(*indexBuildInfo.constraintViolationsIdent));
 
-    interceptor->dropTemporaryTables();
+    interceptor->dropTemporaryTables(operationContext(), Timestamp::min());
 
     auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
 
@@ -740,7 +710,7 @@ TEST_F(IndexBuilderInterceptorTest, DropTemporaryTablesOnDeferredTableIsNoOp) {
     ASSERT_FALSE(hasTable(*indexBuildInfo.skippedRecordsIdent));
 
     // Dropping should not crash even though some tables were never created.
-    ASSERT_NO_THROW(interceptor->dropTemporaryTables());
+    ASSERT_NO_THROW(interceptor->dropTemporaryTables(operationContext(), Timestamp::min()));
 
     ASSERT_FALSE(hasTable(*indexBuildInfo.skippedRecordsIdent));
 }
@@ -752,11 +722,11 @@ TEST_F(IndexBuilderInterceptorTest, GetTableAfterDropReturnsNull) {
                         *indexBuildInfo.sideWritesIdent,
                         LazyRecordStore::CreateMode::immediate);
 
-    ASSERT_NE(nullptr, lrs.getTableIfExists());
+    ASSERT_TRUE(lrs.tableExists());
 
-    lrs.drop();
+    lrs.drop(operationContext(), Timestamp::min());
 
-    ASSERT_EQ(nullptr, lrs.getTableIfExists());
+    ASSERT_FALSE(lrs.tableExists());
 }
 
 }  // namespace

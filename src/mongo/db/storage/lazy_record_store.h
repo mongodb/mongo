@@ -30,9 +30,9 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -40,7 +40,7 @@
 
 namespace mongo {
 /**
- * A wrapper around a temporary record store which creates the table when required.
+ * A wrapper around a record store which creates the table when required.
  */
 class MONGO_MOD_PUBLIC LazyRecordStore {
 public:
@@ -62,32 +62,34 @@ public:
     LazyRecordStore(OperationContext* opCtx, StringData ident, CreateMode createMode);
 
     /**
-     * Create the backing table if it hasn't been, and do not drop it on destruction. Calling this
-     * is required to be able to create a later LazyRecordStore in 'openExisting' mode.
-     */
-    void keepTemporaryTable(OperationContext* opCtx);
-
-    /**
-     * Creates the internal table if needed and then returns the record store. Never returns null.
+     * Creates the internal table if needed and then returns the record store.
      */
     RecordStore& getOrCreateTable(OperationContext* opCtx);
 
     /**
-     * Returns the record store if it exists, or nullptr if it has not yet been created.
+     * Returns true if the backing table has been created or opened.
      */
-    RecordStore* getTableIfExists() const;
+    bool tableExists() const;
 
     /**
-     * Schedules the table for drop via the storage engine's deferred drop mechanism. If the table
-     * was never created (deferred mode), this is a no-op. After calling this, getTableIfExists()
-     * will re-create the table on next use.
+     * Returns a reference to the record store. Throws if the table has not been created.
      */
-    void drop();
+    RecordStore& getTableOrThrow() const;
+
+    /**
+     * Drops the table via the reaper. If the table was never created (deferred mode), this is a
+     * no-op. After calling this, tableExists() will return false, and getOrCreateTable() will
+     * re-create the table on next use.
+     * Requires a minimum timestamp to be provided, which acts as a lower bound for the drop reaper,
+     * ensuring the table will stay alive until the oldest timestamp has advanced past the drop
+     * time.
+     */
+    void drop(OperationContext* opCtx, Timestamp dropTime);
 
 private:
-    std::variant<std::string, std::unique_ptr<TemporaryRecordStore>> _tableOrIdent;
+    std::variant<std::string, std::unique_ptr<RecordStore>> _tableOrIdent;
 
-    TemporaryRecordStore& _getOrCreateTemporaryRecordStore(OperationContext* opCtx);
+    RecordStore& _getOrCreateRecordStore(OperationContext* opCtx);
 };
 
 }  // namespace mongo

@@ -52,13 +52,13 @@ public:
 
     ~SpillWiredTigerKVEngine() override;
 
-    std::unique_ptr<RecordStore> getTemporaryRecordStore(RecoveryUnit& ru,
+    std::unique_ptr<RecordStore> getInternalRecordStore(RecoveryUnit& ru,
+                                                        StringData ident,
+                                                        KeyFormat keyFormat) override;
+
+    std::unique_ptr<RecordStore> makeInternalRecordStore(RecoveryUnit& ru,
                                                          StringData ident,
                                                          KeyFormat keyFormat) override;
-
-    std::unique_ptr<RecordStore> makeTemporaryRecordStore(RecoveryUnit& ru,
-                                                          StringData ident,
-                                                          KeyFormat keyFormat) override;
 
     int64_t storageSize(RecoveryUnit& ru);
 

@@ -200,11 +200,6 @@ public:
                                        bool isResumable);
 
     /**
-     * Informs the given index build that its temporary tables should not be cleaned up.
-     */
-    bool keepTemporaryTables(OperationContext* opCtx, const UUID& buildUUID);
-
-    /**
      * Returns true if the index build supports background writes while building an index. This is
      * true for the kHybrid method.
      */

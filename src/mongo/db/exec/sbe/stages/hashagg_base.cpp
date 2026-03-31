@@ -110,7 +110,7 @@ typename HashAggBaseStage<Derived>::SpilledRow HashAggBaseStage<Derived>::deseri
 }
 
 template <class Derived>
-void HashAggBaseStage<Derived>::makeTemporaryRecordStore() {
+void HashAggBaseStage<Derived>::makeInternalRecordStore() {
     tassert(
         5907500,
         "HashAggStage attempted to write to disk in an environment which is not prepared to do so",
@@ -187,7 +187,7 @@ void HashAggBaseStage<Derived>::spill() {
         static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.load())));
 
     if (!_recordStore) {
-        makeTemporaryRecordStore();
+        makeInternalRecordStore();
     }
 
     int64_t spilledBytes = 0;

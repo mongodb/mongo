@@ -263,7 +263,7 @@ private:
         return _recordStoreHt != nullptr;
     }
 
-    void makeTemporaryRecordStore();
+    void makeInternalRecordStore();
 
     // Determines if we should perform the check for sufficient disk space for spilling.
     // We do the check after every 100MB of spilling.

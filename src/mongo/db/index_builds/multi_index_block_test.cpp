@@ -148,7 +148,7 @@ boost::optional<std::string> findPersistedResumeState(
             continue;
         }
 
-        std::unique_ptr<RecordStore> rs = storageEngine->getEngine()->getTemporaryRecordStore(
+        std::unique_ptr<RecordStore> rs = storageEngine->getEngine()->getInternalRecordStore(
             *shard_role_details::getRecoveryUnit(opCtx), *it, KeyFormat::Long);
         auto cursor = rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
         auto record = cursor->next();

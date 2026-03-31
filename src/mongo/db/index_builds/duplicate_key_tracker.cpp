@@ -70,8 +70,8 @@ DuplicateKeyTracker::DuplicateKeyTracker(OperationContext* opCtx,
                                          LazyRecordStore::CreateMode createMode)
     : _keyConstraintsTable(opCtx, ident, createMode) {}
 
-void DuplicateKeyTracker::keepTemporaryTable(OperationContext* opCtx) {
-    _keyConstraintsTable.keepTemporaryTable(opCtx);
+void DuplicateKeyTracker::createDeferredTable(OperationContext* opCtx) {
+    _keyConstraintsTable.getOrCreateTable(opCtx);
 }
 
 Status DuplicateKeyTracker::recordKey(OperationContext* opCtx,
@@ -149,12 +149,12 @@ boost::optional<SortedDataInterface::DuplicateKey> DuplicateKeyTracker::checkCon
     const CollectionPtr& coll,
     const IndexCatalogEntry* indexCatalogEntry) const {
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
-    auto rs = _keyConstraintsTable.getTableIfExists();
-    if (!rs) {
+    if (!_keyConstraintsTable.tableExists()) {
         return boost::none;
     }
+    auto& rs = _keyConstraintsTable.getTableOrThrow();
 
-    auto constraintsCursor = rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+    auto constraintsCursor = rs.getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     auto record = constraintsCursor->next();
 
     auto index = indexCatalogEntry->accessMethod()->asSortedData()->getSortedDataInterface();
@@ -187,10 +187,10 @@ boost::optional<SortedDataInterface::DuplicateKey> DuplicateKeyTracker::checkCon
             uassertStatusOK(container_write::remove(
                 opCtx,
                 *shard_role_details::getRecoveryUnit(opCtx),
-                std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs->getContainer()).get(),
+                std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs.getContainer()).get(),
                 record->id.getLong()));
         } else {
-            rs->deleteRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), record->id);
+            rs.deleteRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), record->id);
         }
 
         constraintsCursor->save();

@@ -108,14 +108,14 @@ public:
                                                         const RecordStore::Options& options,
                                                         boost::optional<UUID> uuid) = 0;
     /**
-     * Opens an existing ident as a temporary record store. Must be used for record stores created
-     * with `makeTemporaryRecordStore`. Using `getRecordStore` would cause the record store to use
+     * Opens an existing ident as an internal record store. Must be used for record stores created
+     * with `makeInternalRecordStore`. Using `getRecordStore` would cause the record store to use
      * the same settings as a regular collection, and would differ in behaviour as when it was
-     * originally created with `makeTemporaryRecordStore`.
+     * originally created with `makeInternalRecordStore`.
      */
-    virtual std::unique_ptr<RecordStore> getTemporaryRecordStore(RecoveryUnit& ru,
-                                                                 StringData ident,
-                                                                 KeyFormat keyFormat) = 0;
+    virtual std::unique_ptr<RecordStore> getInternalRecordStore(RecoveryUnit& ru,
+                                                                StringData ident,
+                                                                KeyFormat keyFormat) = 0;
 
     virtual std::unique_ptr<SortedDataInterface> getSortedDataInterface(OperationContext* opCtx,
                                                                         RecoveryUnit& ru,
@@ -141,12 +141,12 @@ public:
                                      const RecordStore::Options& options) = 0;
 
     /**
-     * RecordStores initially created with `makeTemporaryRecordStore` must be opened with
-     * `getTemporaryRecordStore`.
+     * RecordStores initially created with `makeInternalRecordStore` must be opened with
+     * `getInternalRecordStore`.
      */
-    virtual std::unique_ptr<RecordStore> makeTemporaryRecordStore(RecoveryUnit& ru,
-                                                                  StringData ident,
-                                                                  KeyFormat keyFormat) = 0;
+    virtual std::unique_ptr<RecordStore> makeInternalRecordStore(RecoveryUnit& ru,
+                                                                 StringData ident,
+                                                                 KeyFormat keyFormat) = 0;
 
     /**
      * Similar to createRecordStore but this imports from an existing table with the provided ident

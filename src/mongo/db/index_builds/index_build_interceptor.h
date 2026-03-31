@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_builds/duplicate_key_tracker.h"
@@ -84,12 +85,6 @@ public:
     bool sideWritesAllowed() const {
         return _generateTableWrites;
     }
-
-    /**
-     * Keeps the temporary side writes, duplicate key constraint violations, and skipped records
-     * tables.
-     */
-    void keepTemporaryTables(OperationContext* opCtx);
 
     /**
      * Client writes that are concurrent with an index build will have their index updates written
@@ -189,21 +184,30 @@ public:
      */
     IntegerKeyedContainer& getSorterContainer() {
         invariant(_sorterTable);
-        auto rs = _sorterTable->getTableIfExists();
-        // Sorter table is guaranteed to be created immediately
-        invariant(rs);
-        return std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs->getContainer()).get();
+        auto& rs = _sorterTable->getTableOrThrow();
+        return std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs.getContainer()).get();
     }
 
-    void dropTemporaryTables() {
+    /**
+     * Force-creates any backing tables still in deferred mode.
+     */
+    void createDeferredTables(OperationContext* opCtx) {
+        _sideWritesTracker.createDeferredTable(opCtx);
+        _skippedRecordTracker.createDeferredTable(opCtx);
+        if (_duplicateKeyTracker) {
+            _duplicateKeyTracker->createDeferredTable(opCtx);
+        }
+    }
+
+    void dropTemporaryTables(OperationContext* opCtx, Timestamp timestamp) {
         if (_sorterTable) {
-            _sorterTable->drop();
+            _sorterTable->drop(opCtx, timestamp);
         }
         if (_duplicateKeyTracker) {
-            _duplicateKeyTracker->dropTemporaryTable();
+            _duplicateKeyTracker->dropTemporaryTable(opCtx, timestamp);
         }
-        _skippedRecordTracker.dropTemporaryTable();
-        _sideWritesTracker.dropTemporaryTable();
+        _skippedRecordTracker.dropTemporaryTable(opCtx, timestamp);
+        _sideWritesTracker.dropTemporaryTable(opCtx, timestamp);
     }
 
 private:

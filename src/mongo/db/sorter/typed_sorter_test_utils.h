@@ -40,8 +40,8 @@
 #include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/db/sorter/sorter_test_utils.h"
 #include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/unittest.h"
 
@@ -200,7 +200,7 @@ struct ContainerTraits {
         auto* replCoordMock = dynamic_cast<repl::ReplicationCoordinatorMock*>(replCoord);
         ASSERT(replCoordMock);
         replCoordMock->alwaysAllowWrites(true);
-        _writerTable = _makeTemporaryRecordStore();
+        _writerTable = _makeInternalRecordStore();
     }
 
     std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper, IWComparator>> makeSpiller(
@@ -209,14 +209,13 @@ struct ContainerTraits {
         const SorterChecksumVersion checksumVersion = sorter::kLatestChecksumVersion) {
         using Spiller = ContainerBasedSpiller<IntWrapper, IntWrapper, IWComparator>;
         struct SpillerOwner {
-            std::shared_ptr<TemporaryRecordStore> table;
+            std::shared_ptr<RecordStore> table;
             Spiller spiller;
         };
 
-        auto table = _makeTemporaryRecordStore();
+        auto table = _makeInternalRecordStore();
         auto& container =
-            std::get<std::reference_wrapper<IntegerKeyedContainer>>(table->rs()->getContainer())
-                .get();
+            std::get<std::reference_wrapper<IntegerKeyedContainer>>(table->getContainer()).get();
         const auto insertionBatchSize = 1000;
 
         auto& ru = *shard_role_details::getRecoveryUnit(_opCtx.get());
@@ -247,9 +246,9 @@ struct ContainerTraits {
         const SortOptions& opts, const boost::filesystem::path& spillDir) {
         auto& ru = *shard_role_details::getRecoveryUnit(_opCtx.get());
         const auto settings = SortedContainerWriter<IntWrapper, IntWrapper>::Settings{};
-        auto& container = std::get<std::reference_wrapper<IntegerKeyedContainer>>(
-                              _writerTable->rs()->getContainer())
-                              .get();
+        auto& container =
+            std::get<std::reference_wrapper<IntegerKeyedContainer>>(_writerTable->getContainer())
+                .get();
         return std::make_unique<SortedContainerWriter<IntWrapper, IntWrapper>>(
             *_opCtx,
             ru,
@@ -283,21 +282,21 @@ struct ContainerTraits {
     }
 
 private:
-    std::shared_ptr<TemporaryRecordStore> _makeTemporaryRecordStore() {
+    std::shared_ptr<RecordStore> _makeInternalRecordStore() {
         auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
         ASSERT(storageEngine);
         WriteUnitOfWork wuow(_opCtx.get());
-        auto trs = storageEngine->makeTemporaryRecordStore(
+        auto rs = storageEngine->makeInternalRecordStore(
             _opCtx.get(), storageEngine->generateNewInternalIdent(), KeyFormat::Long);
-        ASSERT(trs);
+        ASSERT(rs);
         wuow.commit();
-        return std::shared_ptr<TemporaryRecordStore>(trs.release());
+        return std::shared_ptr<RecordStore>(rs.release());
     }
 
     ServiceContext::UniqueOperationContext _opCtx;
     SorterTracker _tracker;
     SorterContainerStats _containerStats;
-    std::shared_ptr<TemporaryRecordStore> _writerTable;
+    std::shared_ptr<RecordStore> _writerTable;
     int64_t _nextKey = 1;
 };
 

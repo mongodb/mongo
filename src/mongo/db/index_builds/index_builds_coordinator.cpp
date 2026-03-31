@@ -2246,8 +2246,6 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
                 auto skippedRecordsIdent = storageEngine->generateNewInternalIdent();
                 auto lazyRecordStore = LazyRecordStore(
                     opCtx, skippedRecordsIdent, LazyRecordStore::CreateMode::immediate);
-                lazyRecordStore.keepTemporaryTable(opCtx);
-                // Immediate creation ensures the table is created.
                 indexBuildInfo.skippedRecordsIdent.emplace(skippedRecordsIdent);
             }
             if (auto ident = indexStateInfo.getDuplicateKeyTrackerTable()) {

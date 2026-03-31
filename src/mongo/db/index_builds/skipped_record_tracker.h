@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -73,10 +74,9 @@ public:
     void record(OperationContext* opCtx, const CollectionPtr& coll, const RecordId& recordId);
 
     /**
-     * Keeps the temporary table managed by this tracker. Creates the table if it has not yet been
-     * created.
+     * Force-creates the backing table if it was deferred.
      */
-    void keepTemporaryTable(OperationContext* opCtx);
+    void createDeferredTable(OperationContext* opCtx);
 
     /**
      * Returns true if the temporary table is empty.
@@ -100,10 +100,12 @@ public:
     }
 
     /**
-     * Schedules the temporary table for drop.
+     * Drops the temporary table. Requires a minimum timestamp to be provided, which acts as a lower
+     * bound for the drop reaper, ensuring the table will stay alive until the oldest timestamp has
+     * advanced past the drop time.
      */
-    void dropTemporaryTable() {
-        _skippedRecordsTable.drop();
+    void dropTemporaryTable(OperationContext* opCtx, Timestamp dropTime) {
+        _skippedRecordsTable.drop(opCtx, dropTime);
     }
 
 private:

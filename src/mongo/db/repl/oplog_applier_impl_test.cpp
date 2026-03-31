@@ -2338,7 +2338,7 @@ TEST_F(OplogApplierImplTest, ApplyApplyOpsContainerOperations) {
     auto ident = storageEngine->generateNewInternalIdent();
     auto ru = storageEngine->newRecoveryUnit();
     StorageWriteTransaction swt(*ru);
-    auto trs = storageEngine->getEngine()->makeTemporaryRecordStore(*ru, ident, KeyFormat::String);
+    auto trs = storageEngine->getEngine()->makeInternalRecordStore(*ru, ident, KeyFormat::String);
     swt.commit();
 
     auto k = BSONBinData("K", 1, BinDataGeneral);
@@ -2397,7 +2397,7 @@ TEST_F(OplogApplierImplTest, ApplyContainerOperations) {
     auto ident = storageEngine->generateNewInternalIdent();
     auto ru = storageEngine->newRecoveryUnit();
     StorageWriteTransaction swt(*ru);
-    auto trs = storageEngine->getEngine()->makeTemporaryRecordStore(*ru, ident, KeyFormat::String);
+    auto trs = storageEngine->getEngine()->makeInternalRecordStore(*ru, ident, KeyFormat::String);
     swt.commit();
 
     auto k = BSONBinData("K", 1, BinDataGeneral);

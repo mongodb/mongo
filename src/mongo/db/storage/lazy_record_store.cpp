@@ -29,72 +29,95 @@
 
 #include "mongo/db/storage/lazy_record_store.h"
 
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
-std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStore(OperationContext* opCtx,
-                                                               StringData ident,
-                                                               KeyFormat keyFormat) {
-    WriteUnitOfWork wuow(opCtx);
-    auto rs = opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
-        opCtx, ident, keyFormat);
-    wuow.commit();
+std::unique_ptr<RecordStore> createRecordStore(StorageEngine* storageEngine,
+                                               OperationContext* opCtx,
+                                               StringData ident,
+                                               KeyFormat keyFormat) {
+    auto rs = storageEngine->makeInternalRecordStore(opCtx, ident, keyFormat);
+
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    ru.onRollback([ident = std::string(ident)](OperationContext* rollbackOpCtx) {
+        auto se = rollbackOpCtx->getServiceContext()->getStorageEngine();
+        se->addDropPendingIdent(Timestamp::min(), std::make_shared<Ident>(ident));
+    });
+
     return rs;
+}
+
+std::unique_ptr<RecordStore> openExistingRecordStore(StorageEngine* storageEngine,
+                                                     OperationContext* opCtx,
+                                                     StringData ident,
+                                                     KeyFormat keyFormat) {
+    auto engine = storageEngine->getEngine();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    return engine->getInternalRecordStore(ru, ident, keyFormat);
 }
 }  // namespace
 
-std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStoreFromExistingIdent(
-    OperationContext* opCtx, StringData ident, KeyFormat keyFormat) {
-    WriteUnitOfWork wuow(opCtx);
-    auto rs =
-        opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStoreFromExistingIdent(
-            opCtx, ident, keyFormat);
-    wuow.commit();
-    return rs;
-}
-
 LazyRecordStore::LazyRecordStore(OperationContext* opCtx, StringData ident, CreateMode createMode)
     : _tableOrIdent([&]() -> decltype(_tableOrIdent) {
+          auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
           switch (createMode) {
-              case CreateMode::immediate:
-                  return makeTemporaryRecordStore(opCtx, ident, KeyFormat::Long);
+              case CreateMode::immediate: {
+                  WriteUnitOfWork wuow(opCtx);
+                  auto rs = createRecordStore(storageEngine, opCtx, ident, KeyFormat::Long);
+                  wuow.commit();
+                  return rs;
+              }
               case CreateMode::deferred:
                   return std::string{ident};
-              case CreateMode::openExisting:
-                  return makeTemporaryRecordStoreFromExistingIdent(opCtx, ident, KeyFormat::Long);
+              case CreateMode::openExisting: {
+                  auto rs = openExistingRecordStore(storageEngine, opCtx, ident, KeyFormat::Long);
+                  return rs;
+              }
+              default:
+                  MONGO_UNREACHABLE;
           }
-          MONGO_UNREACHABLE;
       }()) {}
 
-TemporaryRecordStore& LazyRecordStore::_getOrCreateTemporaryRecordStore(OperationContext* opCtx) {
+RecordStore& LazyRecordStore::_getOrCreateRecordStore(OperationContext* opCtx) {
     if (auto ident = std::get_if<std::string>(&_tableOrIdent)) {
-        _tableOrIdent = makeTemporaryRecordStore(opCtx, *ident, KeyFormat::Long);
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        WriteUnitOfWork wuow(opCtx);
+        _tableOrIdent = createRecordStore(storageEngine, opCtx, *ident, KeyFormat::Long);
+        wuow.commit();
     }
-    return *std::get<std::unique_ptr<TemporaryRecordStore>>(_tableOrIdent);
-}
-
-void LazyRecordStore::keepTemporaryTable(OperationContext* opCtx) {
-    _getOrCreateTemporaryRecordStore(opCtx).keep();
+    return *std::get<std::unique_ptr<RecordStore>>(_tableOrIdent);
 }
 
 RecordStore& LazyRecordStore::getOrCreateTable(OperationContext* opCtx) {
-    return *_getOrCreateTemporaryRecordStore(opCtx).rs();
+    return _getOrCreateRecordStore(opCtx);
 }
 
-RecordStore* LazyRecordStore::getTableIfExists() const {
-    if (auto table = std::get_if<std::unique_ptr<TemporaryRecordStore>>(&_tableOrIdent)) {
-        return (*table)->rs();
-    }
-    return nullptr;
+bool LazyRecordStore::tableExists() const {
+    return std::holds_alternative<std::unique_ptr<RecordStore>>(_tableOrIdent);
 }
 
-void LazyRecordStore::drop() {
-    if (auto table = std::get_if<std::unique_ptr<TemporaryRecordStore>>(&_tableOrIdent)) {
-        _tableOrIdent = std::string{table->get()->rs()->getIdent()};
+
+RecordStore& LazyRecordStore::getTableOrThrow() const {
+    auto table = std::get_if<std::unique_ptr<RecordStore>>(&_tableOrIdent);
+    tassert(12129700, "LazyRecordStore table has not been created", table);
+    return **table;
+}
+
+void LazyRecordStore::drop(OperationContext* opCtx, Timestamp timestamp) {
+    if (auto table = std::get_if<std::unique_ptr<RecordStore>>(&_tableOrIdent)) {
+        auto identStr = std::string{(*table)->getIdent()};
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        storageEngine->addDropPendingIdent(timestamp, std::make_shared<Ident>(identStr));
+        _tableOrIdent = std::move(identStr);
     }
 }
 

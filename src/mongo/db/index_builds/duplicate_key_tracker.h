@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/storage/key_string/key_string.h"
@@ -55,10 +56,9 @@ public:
                         LazyRecordStore::CreateMode createMode);
 
     /**
-     * Keeps the temporary table for duplicate key constraint violations. Creates the table if it
-     * has not yet been created.
+     * Force-creates the backing table if it was deferred and has not already been created.
      */
-    void keepTemporaryTable(OperationContext* opCtx);
+    void createDeferredTable(OperationContext* opCtx);
 
     /**
      * Given a duplicate key, insert it into the key constraint table.
@@ -81,10 +81,12 @@ public:
         const IndexCatalogEntry* indexCatalogEntry) const;
 
     /**
-     * Schedules the temporary table for drop.
+     * Drops the temporary table. Requires a minimum timestamp to be provided, which acts as a lower
+     * bound for the drop reaper, ensuring the table will stay alive until the oldest timestamp has
+     * advanced past the drop time.
      */
-    void dropTemporaryTable() {
-        _keyConstraintsTable.drop();
+    void dropTemporaryTable(OperationContext* opCtx, Timestamp dropTime) {
+        _keyConstraintsTable.drop(opCtx, dropTime);
     }
 
 private:

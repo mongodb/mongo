@@ -48,7 +48,6 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
@@ -135,12 +134,9 @@ public:
 
     void dropSpillTable(RecoveryUnit& ru, StringData ident) override;
 
-    std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStore(OperationContext* opCtx,
-                                                                   StringData ident,
-                                                                   KeyFormat keyFormat) override;
-
-    std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStoreFromExistingIdent(
-        OperationContext* opCtx, StringData ident, KeyFormat keyFormat) override;
+    std::unique_ptr<RecordStore> makeInternalRecordStore(OperationContext* opCtx,
+                                                         StringData ident,
+                                                         KeyFormat keyFormat) override;
 
     void cleanShutdown(ServiceContext* svcCtx, bool memLeakAllowed) override;
 

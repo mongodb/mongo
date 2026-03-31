@@ -370,7 +370,6 @@ mongo_cc_library(
 mongo_cc_library(
     name = "storage_engine_impl",
     srcs = [
-        "deferred_drop_record_store.cpp",
         "storage_engine_impl.cpp",
     ],
     deps = [

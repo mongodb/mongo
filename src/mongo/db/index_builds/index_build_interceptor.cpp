@@ -117,17 +117,6 @@ IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
     }
 }
 
-void IndexBuildInterceptor::keepTemporaryTables(OperationContext* opCtx) {
-    _sideWritesTracker.keepTemporaryTable(opCtx);
-    if (_duplicateKeyTracker) {
-        _duplicateKeyTracker->keepTemporaryTable(opCtx);
-    }
-    _skippedRecordTracker.keepTemporaryTable(opCtx);
-    if (_sorterTable) {
-        _sorterTable->keepTemporaryTable(opCtx);
-    }
-}
-
 Status IndexBuildInterceptor::recordDuplicateKey(OperationContext* opCtx,
                                                  const CollectionPtr& coll,
                                                  const IndexCatalogEntry* indexCatalogEntry,

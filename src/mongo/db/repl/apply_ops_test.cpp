@@ -660,8 +660,8 @@ TEST_F(ApplyOpsTest, ContainerOpsRequireFeatureFlagAndTestCommands) {
     std::string containerIdent = storageEngine->generateNewInternalIdent();
     auto ru = storageEngine->newRecoveryUnit();
     StorageWriteTransaction swt(*ru);
-    auto rs = storageEngine->getEngine()->makeTemporaryRecordStore(
-        *ru, containerIdent, KeyFormat::String);
+    auto rs =
+        storageEngine->getEngine()->makeInternalRecordStore(*ru, containerIdent, KeyFormat::String);
     swt.commit();
 
     auto makeApplyOpsCmd = [&](OpTime opTime) {

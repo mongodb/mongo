@@ -72,12 +72,13 @@ protected:
 
         _kvEngine->setRecordStoreExtraOptions(kExtraOpenOptions);
 
-        _recordStore = makeTemporaryRecordStore("a.b", KeyFormat::Long);
+        _recordStore = makeInternalRecordStore("a.b", KeyFormat::Long);
         auto ru = _kvEngine->newRecoveryUnit();
         ASSERT_TRUE(_kvEngine->hasIdent(*ru, "collection-a-b"));
     }
 
     ~SpillWiredTigerKVEngineTest() override {
+        _recordStore.reset();
 #if __has_feature(address_sanitizer)
         constexpr bool memLeakAllowed = false;
 #else
@@ -86,12 +87,12 @@ protected:
         _kvEngine->cleanShutdown(memLeakAllowed);
     }
 
-    std::unique_ptr<WiredTigerRecordStore> makeTemporaryRecordStore(const std::string& ns,
-                                                                    KeyFormat keyFormat) {
+    std::unique_ptr<WiredTigerRecordStore> makeInternalRecordStore(const std::string& ns,
+                                                                   KeyFormat keyFormat) {
         std::string ident = "collection-" + ns;
         std::replace(ident.begin(), ident.end(), '.', '-');
         auto ru = _kvEngine->newRecoveryUnit();
-        auto rs = _kvEngine->makeTemporaryRecordStore(*ru, ident, keyFormat);
+        auto rs = _kvEngine->makeInternalRecordStore(*ru, ident, keyFormat);
         return std::unique_ptr<WiredTigerRecordStore>(
             static_cast<WiredTigerRecordStore*>(rs.release()));
     }

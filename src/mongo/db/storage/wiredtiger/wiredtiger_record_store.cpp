@@ -805,7 +805,7 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
         // unique int64_t RecordIds if RecordIds are not set.
         for (size_t i = 0; i < nRecords; i++) {
             auto& record = (*records)[i];
-            // Some RecordStores, like TemporaryRecordStores, may want to set their own RecordIds.
+            // Some RecordStores may want to set their own RecordIds.
             if (!areRecordIdsProvided) {
                 // Since a recordId wasn't provided for the first record, the recordId shouldn't
                 // have been provided for any record.

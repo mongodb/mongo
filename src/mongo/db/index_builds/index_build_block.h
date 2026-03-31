@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/index_builds/index_build_interceptor.h"
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/resumable_index_builds_gen.h"
@@ -64,11 +65,6 @@ public:
                     boost::optional<UUID> indexBuildUUID);
 
     ~IndexBuildBlock();
-
-    /**
-     * Prevent any temporary tables from being dropped when this IndexBuildBlock is destructed.
-     */
-    void keepTemporaryTables(OperationContext* opCtx);
 
     /**
      * Initializes a new entry for the index in the IndexCatalog.
@@ -144,9 +140,19 @@ public:
                                   Collection* collection,
                                   const IndexBuildInfo& indexBuildInfo);
 
-    void dropTemporaryTables() {
+    /**
+     * Force-creates any backing tables still in deferred mode. Must be called before persisting
+     * resume state so that the idents in the resume info exist on disk.
+     */
+    void createDeferredTables(OperationContext* opCtx) {
         if (_indexBuildInterceptor) {
-            _indexBuildInterceptor->dropTemporaryTables();
+            _indexBuildInterceptor->createDeferredTables(opCtx);
+        }
+    }
+
+    void dropTemporaryTables(OperationContext* opCtx, Timestamp timestamp) {
+        if (_indexBuildInterceptor) {
+            _indexBuildInterceptor->dropTemporaryTables(opCtx, timestamp);
         }
     }
 

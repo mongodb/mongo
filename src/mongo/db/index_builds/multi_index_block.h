@@ -323,9 +323,11 @@ public:
                              bool isResumable);
 
     /**
-     * Keeps the temporary tables upon destruction, rather than cleaning them up.
+     * Marks this build as cleaned up. Used during teardown when no actual table cleanup is needed.
      */
-    void keepTemporaryTables(OperationContext* opCtx);
+    void markAsCleanedUp() {
+        _buildIsCleanedUp = true;
+    }
 
     /**
      * Returns true if this build block supports background writes while building an index. This is

@@ -81,12 +81,6 @@ IndexBuildBlock::IndexBuildBlock(const NamespaceString& nss,
                                  boost::optional<UUID> indexBuildUUID)
     : _nss(nss), _spec(spec.getOwned()), _method(method), _buildUUID(indexBuildUUID) {}
 
-void IndexBuildBlock::keepTemporaryTables(OperationContext* opCtx) {
-    if (_indexBuildInterceptor) {
-        _indexBuildInterceptor->keepTemporaryTables(opCtx);
-    }
-}
-
 void IndexBuildBlock::_completeInit(OperationContext* opCtx, Collection* collection) {
     // Register this index with the CollectionQueryInfo to regenerate the cache. This way, updates
     // occurring while an index is being build in the background will be aware of whether or not

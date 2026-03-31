@@ -1955,9 +1955,9 @@ std::unique_ptr<SortedDataInterface> WiredTigerKVEngine::getSortedDataInterface(
             provider, nss, _isReplSet, _shouldRecoverFromOplogAsStandalone));
 }
 
-std::unique_ptr<RecordStore> WiredTigerKVEngine::getTemporaryRecordStore(RecoveryUnit& ru,
-                                                                         StringData ident,
-                                                                         KeyFormat keyFormat) {
+std::unique_ptr<RecordStore> WiredTigerKVEngine::getInternalRecordStore(RecoveryUnit& ru,
+                                                                        StringData ident,
+                                                                        KeyFormat keyFormat) {
     // We don't log writes to temporary record stores.
     const bool isLogged = false;
     WiredTigerRecordStore::Params params;
@@ -1978,9 +1978,9 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getTemporaryRecordStore(Recover
     return std::make_unique<WiredTigerRecordStore>(this, WiredTigerRecoveryUnit::get(ru), params);
 }
 
-std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(RecoveryUnit& ru,
-                                                                          StringData ident,
-                                                                          KeyFormat keyFormat) {
+std::unique_ptr<RecordStore> WiredTigerKVEngine::makeInternalRecordStore(RecoveryUnit& ru,
+                                                                         StringData ident,
+                                                                         KeyFormat keyFormat) {
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
 
     WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig;
@@ -1996,7 +1996,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Recove
     std::string uri = WiredTigerUtil::buildTableUri(ident);
     LOGV2_DEBUG(22337,
                 2,
-                "WiredTigerKVEngine::makeTemporaryRecordStore",
+                "WiredTigerKVEngine::makeInternalRecordStore",
                 "uri"_attr = uri,
                 "config"_attr = config);
     {
@@ -2004,7 +2004,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Recove
         uassertStatusOK(WiredTigerUtil::createTable(wtRu, uri.c_str(), config.c_str()));
     }
 
-    return getTemporaryRecordStore(ru, ident, keyFormat);
+    return getInternalRecordStore(ru, ident, keyFormat);
 }
 
 void WiredTigerKVEngine::alterIdentMetadata(RecoveryUnit& ru,

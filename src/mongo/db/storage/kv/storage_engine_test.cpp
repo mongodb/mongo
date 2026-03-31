@@ -49,6 +49,7 @@
 #include "mongo/db/shard_role/shard_catalog/durable_catalog.h"
 #include "mongo/db/startup_recovery.h"
 #include "mongo/db/storage/control/storage_control.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/mdb_catalog.h"
@@ -60,7 +61,6 @@
 #include "mongo/db/storage/storage_engine_test_fixture.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_repair_observer.h"
-#include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
@@ -109,8 +109,8 @@ TEST_F(StorageEngineTest, DirectWritesInsertTest) {
     ASSERT(intRs.get());
     ASSERT(strRs.get());
 
-    const auto intIdent = intRs->rs()->getIdent();
-    const auto strIdent = strRs->rs()->getIdent();
+    const auto intIdent = intRs->getIdent();
+    const auto strIdent = strRs->getIdent();
 
     // Perform direct writes.
     {
@@ -147,8 +147,8 @@ TEST_F(StorageEngineTest, DirectWritesDeleteTest) {
     ASSERT(intRs.get());
     ASSERT(strRs.get());
 
-    const auto intIdent = intRs->rs()->getIdent();
-    const auto strIdent = strRs->rs()->getIdent();
+    const auto intIdent = intRs->getIdent();
+    const auto strIdent = strRs->getIdent();
 
     // Initial insertions.
     {
@@ -206,8 +206,8 @@ TEST_F(StorageEngineTest, DirectWritesFailures) {
     ASSERT(intRs.get());
     ASSERT(strRs.get());
 
-    const auto intIdent = intRs->rs()->getIdent();
-    const auto strIdent = strRs->rs()->getIdent();
+    const auto intIdent = intRs->getIdent();
+    const auto strIdent = strRs->getIdent();
 
     // Initial insertions.
     {
@@ -280,7 +280,7 @@ DEATH_TEST_F(StorageEngineTestDeathTest,
     ASSERT(intRs.get());
     ASSERT(strRs.get());
 
-    const auto intIdent = intRs->rs()->getIdent();
+    const auto intIdent = intRs->getIdent();
 
     // This should fail an invariant from missing a storage transaction.
     {
@@ -306,7 +306,7 @@ DEATH_TEST_F(StorageEngineTestDeathTest,
     ASSERT(intRs.get());
     ASSERT(strRs.get());
 
-    const auto intIdent = intRs->rs()->getIdent();
+    const auto intIdent = intRs->getIdent();
 
     {
         StorageWriteTransaction txn(*ru);
@@ -382,14 +382,13 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphansAfterUncleanShutdown) {
     ASSERT(!collectionExists(opCtx.get(), collNs));
 }
 
-TEST_F(StorageEngineTest, TemporaryRecordStoreClustered) {
+TEST_F(StorageEngineTest, InternalRecordStoreClustered) {
     auto opCtx = cc().makeOperationContext();
 
     Lock::GlobalLock lk(&*opCtx, MODE_IS);
-    auto trs = makeTemporaryClustered(opCtx.get());
-    ASSERT(trs.get());
+    auto rs = makeTemporaryClustered(opCtx.get());
+    ASSERT(rs.get());
 
-    auto rs = trs->rs();
     ASSERT(identExists(opCtx.get(), rs->getIdent()));
 
     // Insert record with RecordId of KeyFormat::String.
@@ -413,18 +412,18 @@ TEST_F(StorageEngineTest, TemporaryRecordStoreClustered) {
     ASSERT_EQ(0, memcmp(data, rd.data(), strlen(data)));
 }
 
-TEST_F(StorageEngineTest, TemporaryRecordStoreReuseOrErrorExistingIdent) {
+TEST_F(StorageEngineTest, InternalRecordStoreReuseOrErrorExistingIdent) {
     const std::string ident = ident::generateNewInternalIdent();
     auto opCtx = cc().makeOperationContext();
     WriteUnitOfWork wuow(opCtx.get());
-    auto tempRs = _storageEngine->makeTemporaryRecordStore(opCtx.get(), ident, KeyFormat::Long);
+    auto tempRs = _storageEngine->makeInternalRecordStore(opCtx.get(), ident, KeyFormat::Long);
     ASSERT(tempRs);
 
-    // makeTemporaryRecordStore colliding with an empty on disk ident is tolerated.
+    // makeInternalRecordStore colliding with an empty on disk ident is tolerated.
     auto& retryRu = *shard_role_details::getRecoveryUnit(opCtx.get());
-    auto reused = _storageEngine->makeTemporaryRecordStore(opCtx.get(), ident, KeyFormat::Long);
+    auto reused = _storageEngine->makeInternalRecordStore(opCtx.get(), ident, KeyFormat::Long);
     ASSERT(reused);
-    auto cursor = reused->rs()->getCursor(opCtx.get(), retryRu);
+    auto cursor = reused->getCursor(opCtx.get(), retryRu);
     ASSERT_FALSE(cursor->next());
     wuow.commit();
 }
@@ -436,20 +435,20 @@ protected:
     std::string resumableIndexFileName = "foo";
 
     // Makes an empty internal table.
-    std::unique_ptr<TemporaryRecordStore> makeInternalTable(OperationContext* opCtx) {
-        std::unique_ptr<TemporaryRecordStore> ret;
+    std::unique_ptr<RecordStore> makeInternalTable(OperationContext* opCtx) {
+        std::unique_ptr<RecordStore> ret;
         {
             Lock::GlobalLock lk(opCtx, MODE_IS);
             ret = makeTemporary(opCtx);
         }
-        ASSERT_TRUE(identExists(opCtx, ret->rs()->getIdent()));
+        ASSERT_TRUE(identExists(opCtx, ret->getIdent()));
         return ret;
     }
 
     std::unique_ptr<RecordStore> makeSpillTable(OperationContext* opCtx) {
         Lock::GlobalLock lk{opCtx, MODE_IS};
         auto spillEngine = opCtx->getServiceContext()->getStorageEngine()->getSpillEngine();
-        auto spillTable = spillEngine->makeTemporaryRecordStore(
+        auto spillTable = spillEngine->makeInternalRecordStore(
             *spillEngine->newRecoveryUnit(), ident::generateNewInternalIdent(), KeyFormat::Long);
         ASSERT_TRUE(spillIdentExists(opCtx, spillTable->getIdent()));
         return spillTable;
@@ -483,41 +482,41 @@ protected:
 
     // Makes an internal table that contains index-resume metadata, where |pretendSideTable| and
     // |pretendSkippedRecordTable| are internal tables used for that resume.
-    std::unique_ptr<TemporaryRecordStore> makeIndexBuildResumeTable(
+    std::unique_ptr<RecordStore> makeIndexBuildResumeTable(
         OperationContext* opCtx,
-        const TemporaryRecordStore& pretendSideTable,
-        const TemporaryRecordStore& pretendSkippedRecordTable,
+        const RecordStore& pretendSideTable,
+        const RecordStore& pretendSkippedRecordTable,
         const BSONObj& indexSpec = {}) {
-        std::unique_ptr<TemporaryRecordStore> ret;
+        std::unique_ptr<RecordStore> ret;
         {
             Lock::GlobalLock lk(opCtx, MODE_IX);
             WriteUnitOfWork wuow(opCtx);
-            ret = _storageEngine->makeTemporaryRecordStore(
+            ret = _storageEngine->makeInternalRecordStore(
                 opCtx, ident::generateNewInternalIdent(kResumableIndexIdentStem), KeyFormat::Long);
             BSONObj resInfo =
                 makePretendResumeInfo(pretendSideTable, pretendSkippedRecordTable, indexSpec);
-            ASSERT_OK(ret->rs()->insertRecord(opCtx,
-                                              *shard_role_details::getRecoveryUnit(opCtx),
-                                              resInfo.objdata(),
-                                              resInfo.objsize(),
-                                              Timestamp()));
+            ASSERT_OK(ret->insertRecord(opCtx,
+                                        *shard_role_details::getRecoveryUnit(opCtx),
+                                        resInfo.objdata(),
+                                        resInfo.objsize(),
+                                        Timestamp()));
             wuow.commit();
         }
-        ASSERT_TRUE(identExists(opCtx, ret->rs()->getIdent()));
+        ASSERT_TRUE(identExists(opCtx, ret->getIdent()));
         return ret;
     }
 
     // Returns index-resume metadata which would use the given |pretendSideTable| and
     // |pretendSkippedRecordTable| in the index's build.
-    BSONObj makePretendResumeInfo(const TemporaryRecordStore& pretendSideTable,
-                                  const TemporaryRecordStore& pretendSkippedRecordTable,
+    BSONObj makePretendResumeInfo(const RecordStore& pretendSideTable,
+                                  const RecordStore& pretendSkippedRecordTable,
                                   const BSONObj& indexSpec) {
         IndexStateInfo indexInfo;
         indexInfo.setSpec(indexSpec);
         indexInfo.setIsMultikey({});
         indexInfo.setMultikeyPaths({});
-        indexInfo.setSideWritesTable(pretendSideTable.rs()->getIdent());
-        indexInfo.setSkippedRecordTrackerTable(pretendSkippedRecordTable.rs()->getIdent());
+        indexInfo.setSideWritesTable(pretendSideTable.getIdent());
+        indexInfo.setSkippedRecordTrackerTable(pretendSkippedRecordTable.getIdent());
         indexInfo.setStorageIdentifier(resumableIndexFileName);
         indexInfo.setRanges({{}});
         ResumeIndexInfo resumeInfo;
@@ -532,10 +531,10 @@ protected:
 TEST_F(StorageEngineReconcileTest, ReconcileDropsAllIdentsForUncleanShutdown) {
     auto opCtx = cc().makeOperationContext();
 
-    std::unique_ptr<TemporaryRecordStore> irrelevantRs = makeInternalTable(opCtx.get());
-    std::unique_ptr<TemporaryRecordStore> necessaryRs = makeInternalTable(opCtx.get());
-    std::unique_ptr<TemporaryRecordStore> skippedRecordRs = makeInternalTable(opCtx.get());
-    std::unique_ptr<TemporaryRecordStore> resumableIndexRs =
+    std::unique_ptr<RecordStore> irrelevantRs = makeInternalTable(opCtx.get());
+    std::unique_ptr<RecordStore> necessaryRs = makeInternalTable(opCtx.get());
+    std::unique_ptr<RecordStore> skippedRecordRs = makeInternalTable(opCtx.get());
+    std::unique_ptr<RecordStore> resumableIndexRs =
         makeIndexBuildResumeTable(opCtx.get(), *necessaryRs, *skippedRecordRs);
 
     // Reconcile will drop all temporary idents when starting up after an unclean shutdown.
@@ -543,19 +542,19 @@ TEST_F(StorageEngineReconcileTest, ReconcileDropsAllIdentsForUncleanShutdown) {
 
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToResume.size());
-    ASSERT_FALSE(identExists(opCtx.get(), irrelevantRs->rs()->getIdent()));
-    ASSERT_FALSE(identExists(opCtx.get(), resumableIndexRs->rs()->getIdent()));
-    ASSERT_FALSE(identExists(opCtx.get(), necessaryRs->rs()->getIdent()));
-    ASSERT_FALSE(identExists(opCtx.get(), skippedRecordRs->rs()->getIdent()));
+    ASSERT_FALSE(identExists(opCtx.get(), irrelevantRs->getIdent()));
+    ASSERT_FALSE(identExists(opCtx.get(), resumableIndexRs->getIdent()));
+    ASSERT_FALSE(identExists(opCtx.get(), necessaryRs->getIdent()));
+    ASSERT_FALSE(identExists(opCtx.get(), skippedRecordRs->getIdent()));
 }
 
 TEST_F(StorageEngineReconcileTest, ReconcileOnlyKeepsNecessaryIdentsForCleanShutdown) {
     auto opCtx = cc().makeOperationContext();
 
-    std::unique_ptr<TemporaryRecordStore> irrelevantRs = makeInternalTable(opCtx.get());
-    std::unique_ptr<TemporaryRecordStore> necessaryRs = makeInternalTable(opCtx.get());
-    std::unique_ptr<TemporaryRecordStore> skippedRecordRs = makeInternalTable(opCtx.get());
-    std::unique_ptr<TemporaryRecordStore> resumableIndexRs =
+    std::unique_ptr<RecordStore> irrelevantRs = makeInternalTable(opCtx.get());
+    std::unique_ptr<RecordStore> necessaryRs = makeInternalTable(opCtx.get());
+    std::unique_ptr<RecordStore> skippedRecordRs = makeInternalTable(opCtx.get());
+    std::unique_ptr<RecordStore> resumableIndexRs =
         makeIndexBuildResumeTable(opCtx.get(), *necessaryRs, *skippedRecordRs);
 
     auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
@@ -564,10 +563,10 @@ TEST_F(StorageEngineReconcileTest, ReconcileOnlyKeepsNecessaryIdentsForCleanShut
     // an index build.
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
     ASSERT_EQUALS(1UL, reconcileResult.indexBuildsToResume.size());
-    ASSERT_FALSE(identExists(opCtx.get(), irrelevantRs->rs()->getIdent()));
-    ASSERT_FALSE(identExists(opCtx.get(), resumableIndexRs->rs()->getIdent()));
-    ASSERT_TRUE(identExists(opCtx.get(), necessaryRs->rs()->getIdent()));
-    ASSERT_TRUE(identExists(opCtx.get(), skippedRecordRs->rs()->getIdent()));
+    ASSERT_FALSE(identExists(opCtx.get(), irrelevantRs->getIdent()));
+    ASSERT_FALSE(identExists(opCtx.get(), resumableIndexRs->getIdent()));
+    ASSERT_TRUE(identExists(opCtx.get(), necessaryRs->getIdent()));
+    ASSERT_TRUE(identExists(opCtx.get(), skippedRecordRs->getIdent()));
 }
 
 void createTempFile(const boost::filesystem::path& path) {
@@ -580,10 +579,10 @@ TEST_F(StorageEngineReconcileTest, StartupRecoveryForUncleanShutdown) {
                                 std::make_unique<repl::StorageInterfaceImpl>());
     auto opCtx = cc().makeOperationContext();
 
-    std::unique_ptr<TemporaryRecordStore> irrelevantRs = makeInternalTable(opCtx.get());
-    std::unique_ptr<TemporaryRecordStore> necessaryRs = makeInternalTable(opCtx.get());
-    std::unique_ptr<TemporaryRecordStore> skippedRecordRs = makeInternalTable(opCtx.get());
-    std::unique_ptr<TemporaryRecordStore> resumableIndexRs =
+    std::unique_ptr<RecordStore> irrelevantRs = makeInternalTable(opCtx.get());
+    std::unique_ptr<RecordStore> necessaryRs = makeInternalTable(opCtx.get());
+    std::unique_ptr<RecordStore> skippedRecordRs = makeInternalTable(opCtx.get());
+    std::unique_ptr<RecordStore> resumableIndexRs =
         makeIndexBuildResumeTable(opCtx.get(), *necessaryRs, *skippedRecordRs);
     auto spillTable = makeSpillTable(opCtx.get());
 
@@ -591,10 +590,10 @@ TEST_F(StorageEngineReconcileTest, StartupRecoveryForUncleanShutdown) {
                                                 StorageEngine::LastShutdownState::kUnclean);
 
     // Reconcile will drop all temporary idents when starting up after an unclean shutdown.
-    ASSERT_FALSE(identExists(opCtx.get(), irrelevantRs->rs()->getIdent()));
-    ASSERT_FALSE(identExists(opCtx.get(), resumableIndexRs->rs()->getIdent()));
-    ASSERT_FALSE(identExists(opCtx.get(), necessaryRs->rs()->getIdent()));
-    ASSERT_FALSE(identExists(opCtx.get(), skippedRecordRs->rs()->getIdent()));
+    ASSERT_FALSE(identExists(opCtx.get(), irrelevantRs->getIdent()));
+    ASSERT_FALSE(identExists(opCtx.get(), resumableIndexRs->getIdent()));
+    ASSERT_FALSE(identExists(opCtx.get(), necessaryRs->getIdent()));
+    ASSERT_FALSE(identExists(opCtx.get(), skippedRecordRs->getIdent()));
     ASSERT_FALSE(spillIdentExists(opCtx.get(), spillTable->getIdent()));
 }
 
@@ -617,12 +616,12 @@ TEST_F(StorageEngineReconcileTest, StartupRecoveryResumableIndexForCleanShutdown
                                 std::make_unique<repl::StorageInterfaceImpl>());
     auto opCtx = cc().makeOperationContext();
 
-    std::unique_ptr<TemporaryRecordStore> irrelevantRs = makeInternalTable(opCtx.get());
-    std::unique_ptr<TemporaryRecordStore> necessaryRs = makeInternalTable(opCtx.get());
-    std::unique_ptr<TemporaryRecordStore> skippedRecordRs = makeInternalTable(opCtx.get());
+    std::unique_ptr<RecordStore> irrelevantRs = makeInternalTable(opCtx.get());
+    std::unique_ptr<RecordStore> necessaryRs = makeInternalTable(opCtx.get());
+    std::unique_ptr<RecordStore> skippedRecordRs = makeInternalTable(opCtx.get());
     BSONObj indexSpec;
     auto indexIdent = prepareIndexBuild(opCtx.get(), indexSpec);
-    std::unique_ptr<TemporaryRecordStore> resumableIndexRs =
+    std::unique_ptr<RecordStore> resumableIndexRs =
         makeIndexBuildResumeTable(opCtx.get(), *necessaryRs, *skippedRecordRs, indexSpec);
 
     // Test cleanup of temporary directory used by resumable index build
@@ -644,10 +643,10 @@ TEST_F(StorageEngineReconcileTest, StartupRecoveryResumableIndexForCleanShutdown
 
     // After clean shutdown, an internal ident should be kept if-and-only-if it is needed to resume
     // an index build.
-    ASSERT_FALSE(identExists(opCtx.get(), irrelevantRs->rs()->getIdent()));
-    ASSERT_FALSE(identExists(opCtx.get(), resumableIndexRs->rs()->getIdent()));
-    ASSERT_TRUE(identExists(opCtx.get(), necessaryRs->rs()->getIdent()));
-    ASSERT_TRUE(identExists(opCtx.get(), skippedRecordRs->rs()->getIdent()));
+    ASSERT_FALSE(identExists(opCtx.get(), irrelevantRs->getIdent()));
+    ASSERT_FALSE(identExists(opCtx.get(), resumableIndexRs->getIdent()));
+    ASSERT_TRUE(identExists(opCtx.get(), necessaryRs->getIdent()));
+    ASSERT_TRUE(identExists(opCtx.get(), skippedRecordRs->getIdent()));
     ASSERT_TRUE(identExists(opCtx.get(), indexIdent));
 }
 
@@ -656,9 +655,9 @@ TEST_F(StorageEngineReconcileTest, StartupRecoveryResumableIndexFallbackToRestar
                                 std::make_unique<repl::StorageInterfaceImpl>());
     auto opCtx = cc().makeOperationContext();
 
-    std::unique_ptr<TemporaryRecordStore> irrelevantRs = makeInternalTable(opCtx.get());
-    std::unique_ptr<TemporaryRecordStore> necessaryRs = makeInternalTable(opCtx.get());
-    std::unique_ptr<TemporaryRecordStore> skippedRecordRs = makeInternalTable(opCtx.get());
+    std::unique_ptr<RecordStore> irrelevantRs = makeInternalTable(opCtx.get());
+    std::unique_ptr<RecordStore> necessaryRs = makeInternalTable(opCtx.get());
+    std::unique_ptr<RecordStore> skippedRecordRs = makeInternalTable(opCtx.get());
     std::string indexIdent;
     {
         BSONObj unusedSpec;
@@ -667,7 +666,7 @@ TEST_F(StorageEngineReconcileTest, StartupRecoveryResumableIndexFallbackToRestar
 
     // Use an empty indexSpec which is invalid to resume.
     // The resumable index build will fail and fall back to restart.
-    std::unique_ptr<TemporaryRecordStore> resumableIndexRs =
+    std::unique_ptr<RecordStore> resumableIndexRs =
         makeIndexBuildResumeTable(opCtx.get(), *necessaryRs, *skippedRecordRs);
 
     // Test cleanup of temporary directory used by resumable index build
@@ -683,9 +682,9 @@ TEST_F(StorageEngineReconcileTest, StartupRecoveryResumableIndexFallbackToRestar
     // When resumable index build fails its temp file is removed.
     ASSERT_FALSE(boost::filesystem::exists(indexFile));
 
-    ASSERT_FALSE(identExists(opCtx.get(), irrelevantRs->rs()->getIdent()));
-    ASSERT_FALSE(identExists(opCtx.get(), resumableIndexRs->rs()->getIdent()));
-    ASSERT_TRUE(identExists(opCtx.get(), necessaryRs->rs()->getIdent()));
+    ASSERT_FALSE(identExists(opCtx.get(), irrelevantRs->getIdent()));
+    ASSERT_FALSE(identExists(opCtx.get(), resumableIndexRs->getIdent()));
+    ASSERT_TRUE(identExists(opCtx.get(), necessaryRs->getIdent()));
     ASSERT_TRUE(identExists(opCtx.get(), indexIdent));
 }
 
@@ -741,7 +740,7 @@ TEST_F(StorageEngineTest, StartupRecoveryClearLocalTempCollections) {
     ASSERT_FALSE(coll);
 }
 
-TEST_F(StorageEngineTest, TemporaryRecordStoreDoesNotTrackSizeAdjustments) {
+TEST_F(StorageEngineTest, InternalRecordStoreDoesNotTrackSizeAdjustments) {
     auto opCtx = cc().makeOperationContext();
 
     const auto insertRecordAndAssertSize = [&](RecordStore* rs, const RecordId& rid) {
@@ -762,27 +761,24 @@ TEST_F(StorageEngineTest, TemporaryRecordStoreDoesNotTrackSizeAdjustments) {
         ASSERT_EQ(rs->dataSize(), 0);
     };
 
-    // Create the temporary record store and get its ident.
+    // Create the internal record store and get its ident.
+    std::unique_ptr<RecordStore> rs;
     const std::string ident = [&]() {
-        std::unique_ptr<TemporaryRecordStore> rs;
         Lock::GlobalLock lk(&*opCtx, MODE_IS);
         rs = makeTemporary(opCtx.get());
         ASSERT(rs.get());
 
-        insertRecordAndAssertSize(rs->rs(), RecordId(1));
+        insertRecordAndAssertSize(rs.get(), RecordId(1));
 
-        // Keep ident even when TemporaryRecordStore goes out of scope.
-        rs->keep();
-        return std::string{rs->rs()->getIdent()};
+        return std::string{rs->getIdent()};
     }();
     ASSERT(identExists(opCtx.get(), ident));
 
-    std::unique_ptr<TemporaryRecordStore> rs;
-    rs = _storageEngine->makeTemporaryRecordStoreFromExistingIdent(
-        opCtx.get(), ident, KeyFormat::Long);
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+    auto reopened = _storageEngine->getEngine()->getInternalRecordStore(ru, ident, KeyFormat::Long);
 
-    // Verify a temporary record store does not track size adjustments after re-opening.
-    insertRecordAndAssertSize(rs->rs(), RecordId(2));
+    // Verify an internal record store does not track size adjustments after re-opening.
+    insertRecordAndAssertSize(reopened.get(), RecordId(2));
 }
 
 class StorageEngineTimestampMonitorTest : public StorageEngineTest {
@@ -809,44 +805,47 @@ public:
     }
 };
 
-TEST_F(StorageEngineTimestampMonitorTest, TemporaryRecordStoreEventuallyDropped) {
+TEST_F(StorageEngineTimestampMonitorTest, InternalRecordStoreDroppedByCallerEventually) {
     auto opCtx = cc().makeOperationContext();
 
     std::string ident;
+    std::unique_ptr<RecordStore> tempRs;
     {
         WriteUnitOfWork wuow(opCtx.get());
-        auto tempRs = _storageEngine->makeTemporaryRecordStore(
+        tempRs = _storageEngine->makeInternalRecordStore(
             opCtx.get(), _storageEngine->generateNewInternalIdent(), KeyFormat::Long);
         ASSERT(tempRs.get());
-        ident = std::string{tempRs->rs()->getIdent()};
+        ident = std::string{tempRs->getIdent()};
 
         ASSERT(identExists(opCtx.get(), ident));
         wuow.commit();
     }
 
-    // The temporary record store RAII object should queue itself to be dropped by the storage
-    // engine eventually.
+    // Caller drops the record store manually.
+    _storageEngine->addDropPendingIdent(Timestamp::min(), std::make_shared<Ident>(ident));
+    tempRs.reset();
+
     waitForTimestampMonitorPass();
     ASSERT(!identExists(opCtx.get(), ident));
 }
 
-TEST_F(StorageEngineTimestampMonitorTest, TemporaryRecordStoreKeep) {
+TEST_F(StorageEngineTimestampMonitorTest, InternalRecordStoreNotDroppedWithoutExplicitDrop) {
     auto opCtx = cc().makeOperationContext();
 
     std::string ident;
     {
         WriteUnitOfWork wuow(opCtx.get());
-        auto tempRs = _storageEngine->makeTemporaryRecordStore(
+        auto tempRs = _storageEngine->makeInternalRecordStore(
             opCtx.get(), _storageEngine->generateNewInternalIdent(), KeyFormat::Long);
         ASSERT(tempRs.get());
-        ident = std::string{tempRs->rs()->getIdent()};
+        ident = std::string{tempRs->getIdent()};
 
         ASSERT(identExists(opCtx.get(), ident));
-        tempRs->keep();
         wuow.commit();
     }
 
-    // The ident for the record store should still exist even after a pass of the timestamp monitor.
+    // The ident for the record store should still exist even after a pass of the timestamp monitor,
+    // since the caller did not explicitly schedule a drop.
     waitForTimestampMonitorPass();
     ASSERT(identExists(opCtx.get(), ident));
 }

@@ -209,7 +209,7 @@ void LookupHashTable::addHashTableEntry(value::SlotAccessor* keyAccessor, size_t
         } else {
             // Write record to rs.
             if (!hasSpilledHtToDisk()) {
-                makeTemporaryRecordStore();
+                makeInternalRecordStore();
             }
 
             auto val = std::vector<size_t>{valueIndex};
@@ -223,7 +223,7 @@ void LookupHashTable::addHashTableEntry(value::SlotAccessor* keyAccessor, size_t
         _computedTotalMemUsage += sizeof(size_t);
         if (_computedTotalMemUsage > _memoryUseInBytesBeforeSpill) {
             if (!hasSpilledHtToDisk()) {
-                makeTemporaryRecordStore();
+                makeInternalRecordStore();
             }
 
             _computedTotalMemUsage -= size_estimator::estimate(keyView.tag, keyView.value);
@@ -278,7 +278,7 @@ size_t LookupHashTable::bufferValueOrSpill(value::FixedSizeRow<1 /*N*/>& value) 
             _hashLookupStats.peakTrackedMemBytes, static_cast<uint64_t>(_computedTotalMemUsage));
     } else {
         if (!hasSpilledBufToDisk()) {
-            makeTemporaryRecordStore();
+            makeInternalRecordStore();
         }
         spillBufferedValueToDisk(_recordStoreBuf.get(), _valueId, value);
     }
@@ -352,7 +352,7 @@ void LookupHashTable::spillIndicesToRecordStore(SpillingStore* rs,
     _recordStoreHt->updateSpillStorageStatsForOperation(_opCtx);
 }
 
-void LookupHashTable::makeTemporaryRecordStore() {
+void LookupHashTable::makeInternalRecordStore() {
     tassert(8229808,
             "HashLookupUnwindStage attempted to write to disk in an environment which is not "
             "prepared to do so",
@@ -440,7 +440,7 @@ void LookupHashTable::forceSpill() {
     }
 
     if (!hasSpilledHtToDisk()) {
-        makeTemporaryRecordStore();
+        makeInternalRecordStore();
     }
 
     // Every record in the buffer of the inner collection is assigned an index. This index is

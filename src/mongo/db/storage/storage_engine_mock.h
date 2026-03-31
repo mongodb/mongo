@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/modules.h"
 
@@ -94,17 +95,20 @@ public:
         return {};
     }
 
-    void dropSpillTable(RecoveryUnit& ru, StringData ident) final {};
+    void dropSpillTable(RecoveryUnit& ru, StringData ident) final {
+        _droppedSpillIdents.emplace_back(ident);
+    };
 
-    std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStore(OperationContext* opCtx,
-                                                                   StringData ident,
-                                                                   KeyFormat keyFormat) final {
+    const std::vector<std::string>& getDroppedSpillIdents() const {
+        return _droppedSpillIdents;
+    }
+
+    std::unique_ptr<RecordStore> makeInternalRecordStore(OperationContext* opCtx,
+                                                         StringData ident,
+                                                         KeyFormat keyFormat) final {
         return {};
     }
-    std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStoreFromExistingIdent(
-        OperationContext* opCtx, StringData ident, KeyFormat keyFormat) final {
-        return {};
-    }
+
     void cleanShutdown(ServiceContext* svcCtx, bool memLeakAllowed) final {}
     SnapshotManager* getSnapshotManager() const final {
         return nullptr;
@@ -317,6 +321,7 @@ public:
 
 private:
     uint64_t _lastSetMaterializedLsn;
+    std::vector<std::string> _droppedSpillIdents;
 };
 
 }  // namespace mongo

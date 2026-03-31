@@ -106,13 +106,11 @@ Status SideWritesTracker::bufferSideWrite(OperationContext* opCtx,
             sharedCounter->fetchAndSubtract(size);
         });
 
-    auto rs = _table.getTableIfExists();
-    invariant(rs);
+    auto& rs = _table.getTableOrThrow();
 
     // Reserve the record ids which will be used for either the table insert or the container write.
     std::vector<RecordId> rids;
-    rs->reserveRecordIds(
-        opCtx, *shard_role_details::getRecoveryUnit(opCtx), &rids, toInsert.size());
+    rs.reserveRecordIds(opCtx, *shard_role_details::getRecoveryUnit(opCtx), &rids, toInsert.size());
 
     // TODO(SERVER-110289): Use utility function instead of checking fcvSnapshot.
     auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
@@ -127,9 +125,9 @@ Status SideWritesTracker::bufferSideWrite(OperationContext* opCtx,
                 "index"_attr = indexCatalogEntry->descriptor()->indexName());
 
     if (primaryDrivenFeatureFlagEnabled) {
-        invariant(rs->keyFormat() == KeyFormat::Long);
+        invariant(rs.keyFormat() == KeyFormat::Long);
         IntegerKeyedContainer& container =
-            std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs->getContainer()).get();
+            std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs.getContainer()).get();
 
         for (size_t i = 0; i < toInsert.size(); ++i) {
             auto& doc = toInsert[i];
@@ -159,12 +157,12 @@ Status SideWritesTracker::bufferSideWrite(OperationContext* opCtx,
     // but rather with the timestamp of the owning operation.
     std::vector<Timestamp> timestamps(records.size());
 
-    return rs->insertRecords(
+    return rs.insertRecords(
         opCtx, *shard_role_details::getRecoveryUnit(opCtx), &records, timestamps);
 }
 
-void SideWritesTracker::keepTemporaryTable(OperationContext* opCtx) {
-    _table.keepTemporaryTable(opCtx);
+void SideWritesTracker::createDeferredTable(OperationContext* opCtx) {
+    _table.getOrCreateTable(opCtx);
 }
 
 void SideWritesTracker::_checkDrainPhaseFailPoint(OperationContext* opCtx,
@@ -233,8 +231,7 @@ Status SideWritesTracker::drainWritesIntoIndex(
     DrainYieldPolicy drainYieldPolicy) {
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
-    auto rs = _table.getTableIfExists();
-    invariant(rs);
+    auto& rs = _table.getTableOrThrow();
 
     // These are used for logging only.
     int64_t totalDeleted = 0;
@@ -303,7 +300,7 @@ Status SideWritesTracker::drainWritesIntoIndex(
         int32_t batchSize = 0;
         int64_t batchSizeBytes = 0;
 
-        auto cursor = rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+        auto cursor = rs.getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
 
         // We use an ordered container because the order of deletion for the records in the side
         // table matters.
@@ -367,7 +364,7 @@ Status SideWritesTracker::drainWritesIntoIndex(
         for (const auto& recordId : recordsAddedToIndex) {
             if (primaryDrivenFeatureFlagEnabled) {
                 IntegerKeyedContainer& container =
-                    std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs->getContainer())
+                    std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs.getContainer())
                         .get();
                 auto status = container_write::remove(opCtx,
                                                       *shard_role_details::getRecoveryUnit(opCtx),
@@ -377,7 +374,7 @@ Status SideWritesTracker::drainWritesIntoIndex(
                     return status;
                 }
             } else {
-                rs->deleteRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), recordId);
+                rs.deleteRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), recordId);
             }
         }
 
@@ -454,11 +451,10 @@ Status SideWritesTracker::drainWritesIntoIndex(
 
 
 bool SideWritesTracker::checkAllWritesApplied(OperationContext* opCtx, bool fatal) const {
-    auto rs = _table.getTableIfExists();
-    invariant(rs);
+    auto& rs = _table.getTableOrThrow();
 
     // The table is empty only when all writes are applied.
-    auto cursor = rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+    auto cursor = rs.getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     auto record = cursor->next();
     if (fatal) {
         invariant(

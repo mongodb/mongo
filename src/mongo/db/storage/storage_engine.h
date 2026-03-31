@@ -35,8 +35,9 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/index_builds/index_builds.h"
 #include "mongo/db/index_builds/resumable_index_builds_gen.h"
+#include "mongo/db/storage/compact_options.h"
 #include "mongo/db/storage/ident.h"
-#include "mongo/db/storage/temporary_record_store.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/str.h"
@@ -530,21 +531,13 @@ public:
     virtual void dropSpillTable(RecoveryUnit& ru, StringData ident) = 0;
 
     /**
-     * Creates a temporary RecordStore on the storage engine. If an ident is provided, uses it for
-     * the new table. If an ident is not provided, generates a new unique ident. On startup after an
-     * unclean shutdown, the storage engine will drop any un-dropped temporary record stores.
+     * Creates an internal RecordStore on the storage engine. On startup after an unclean shutdown,
+     * the storage engine will drop any un-dropped internal record stores. It is the caller's
+     * responsibility to drop the table when done.
      */
-    virtual std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStore(OperationContext* opCtx,
-                                                                           StringData ident,
-                                                                           KeyFormat keyFormat) = 0;
-
-    /**
-     * Creates a temporary RecordStore on the storage engine from an existing ident on disk. On
-     * startup after an unclean shutdown, the storage engine will drop any un-dropped temporary
-     * record stores.
-     */
-    virtual std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStoreFromExistingIdent(
-        OperationContext* opCtx, StringData ident, KeyFormat keyFormat) = 0;
+    virtual std::unique_ptr<RecordStore> makeInternalRecordStore(OperationContext* opCtx,
+                                                                 StringData ident,
+                                                                 KeyFormat keyFormat) = 0;
 
     /**
      * This method will be called before there is a clean shutdown.  Storage engines should
@@ -906,8 +899,8 @@ public:
                                               const DatabaseName& dbName) const = 0;
 
     /**
-     * Generates a unique ident for an internal table that can be used to create a temporary
-     * RecordStore instance using makeTemporaryRecordStore().
+     * Generates a unique ident for an internal table that can be used to create a RecordStore
+     * instance using makeInternalRecordStore().
      */
     std::string generateNewInternalIdent() const {
         return ident::generateNewInternalIdent();

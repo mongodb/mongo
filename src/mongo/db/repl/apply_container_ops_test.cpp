@@ -100,8 +100,8 @@ protected:
         _intIdent = se->generateNewInternalIdent();
         auto ru = se->newRecoveryUnit();
         StorageWriteTransaction swt(*ru);
-        _trsBytes = se->getEngine()->makeTemporaryRecordStore(*ru, _bytesIdent, KeyFormat::String);
-        _trsInt = se->getEngine()->makeTemporaryRecordStore(*ru, _intIdent, KeyFormat::Long);
+        _trsBytes = se->getEngine()->makeInternalRecordStore(*ru, _bytesIdent, KeyFormat::String);
+        _trsInt = se->getEngine()->makeInternalRecordStore(*ru, _intIdent, KeyFormat::Long);
         swt.commit();
         _nss = NamespaceString::kContainerNamespace;
     }

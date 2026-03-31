@@ -74,8 +74,8 @@ SkippedRecordTracker::SkippedRecordTracker(OperationContext* opCtx,
                                            LazyRecordStore::CreateMode createMode)
     : _skippedRecordsTable(opCtx, ident, createMode) {}
 
-void SkippedRecordTracker::keepTemporaryTable(OperationContext* opCtx) {
-    _skippedRecordsTable.keepTemporaryTable(opCtx);
+void SkippedRecordTracker::createDeferredTable(OperationContext* opCtx) {
+    _skippedRecordsTable.getOrCreateTable(opCtx);
 }
 
 void SkippedRecordTracker::record(OperationContext* opCtx,
@@ -133,11 +133,11 @@ void SkippedRecordTracker::record(OperationContext* opCtx,
 }
 
 bool SkippedRecordTracker::areAllRecordsApplied(OperationContext* opCtx) const {
-    auto rs = _skippedRecordsTable.getTableIfExists();
-    if (!rs) {
+    if (!_skippedRecordsTable.tableExists()) {
         return true;
     }
-    auto cursor = rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+    auto& rs = _skippedRecordsTable.getTableOrThrow();
+    auto cursor = rs.getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     // The table is empty only when all writes are applied.
     return !cursor->next();
 }
@@ -152,10 +152,10 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
     dassert(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
         collection->ns(), keyGenerationOnly ? MODE_IX : MODE_X));
 
-    auto recordStore = _skippedRecordsTable.getTableIfExists();
-    if (!recordStore) {
+    if (!_skippedRecordsTable.tableExists()) {
         return Status::OK();
     }
+    auto& recordStore = _skippedRecordsTable.getTableOrThrow();
 
     InsertDeleteOptions options;
     collection->getIndexCatalog()->prepareInsertDeleteOptions(
@@ -190,7 +190,7 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
     SharedBufferFragmentBuilder pooledBuilder(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
     auto& containerPool = PreallocatedContainerPool::get(opCtx);
 
-    auto cursor = recordStore->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+    auto cursor = recordStore.getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     while (auto record = cursor->next()) {
         const BSONObj doc = record->data.toBson();
 
@@ -273,7 +273,7 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
         }
 
         // Delete the record so that it is not applied more than once.
-        recordStore->deleteRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), record->id);
+        recordStore.deleteRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), record->id);
 
         cursor->save();
         wuow->commit();

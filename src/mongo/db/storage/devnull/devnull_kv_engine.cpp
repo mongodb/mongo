@@ -478,15 +478,15 @@ std::unique_ptr<RecordStore> DevNullKVEngine::getRecordStore(OperationContext* o
     return std::make_unique<DevNullRecordStore>(uuid, ident, options.keyFormat);
 }
 
-std::unique_ptr<RecordStore> DevNullKVEngine::getTemporaryRecordStore(RecoveryUnit& ru,
-                                                                      StringData ident,
-                                                                      KeyFormat keyFormat) {
-    return makeTemporaryRecordStore(ru, ident, keyFormat);
+std::unique_ptr<RecordStore> DevNullKVEngine::getInternalRecordStore(RecoveryUnit& ru,
+                                                                     StringData ident,
+                                                                     KeyFormat keyFormat) {
+    return makeInternalRecordStore(ru, ident, keyFormat);
 }
 
-std::unique_ptr<RecordStore> DevNullKVEngine::makeTemporaryRecordStore(RecoveryUnit& ru,
-                                                                       StringData ident,
-                                                                       KeyFormat keyFormat) {
+std::unique_ptr<RecordStore> DevNullKVEngine::makeInternalRecordStore(RecoveryUnit& ru,
+                                                                      StringData ident,
+                                                                      KeyFormat keyFormat) {
     return std::make_unique<DevNullRecordStore>(boost::none /* uuid */, ident, keyFormat);
 }
 

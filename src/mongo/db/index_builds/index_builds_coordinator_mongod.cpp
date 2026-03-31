@@ -261,7 +261,6 @@ void IndexBuildsCoordinatorMongod::shutdown(OperationContext* opCtx) {
             return replState.isAwaitingPrimaryAbort();
         };
         for (const auto& replState : activeIndexBuilds.filterIndexBuilds(indexBuildFilter)) {
-            _indexBuildsManager.keepTemporaryTables(opCtx, replState->buildUUID);
             activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
         }
     }

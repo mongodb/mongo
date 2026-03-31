@@ -29,7 +29,10 @@
 
 #include "mongo/db/storage/lazy_record_store.h"
 
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/storage/storage_engine_test_fixture.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
@@ -41,11 +44,11 @@ TEST_F(LazyRecordStoreTest, DeferredDoesNotCreateTableUntilAccess) {
     auto ident = _storageEngine->generateNewInternalIdent();
 
     LazyRecordStore lrs(opCtx.get(), ident, LazyRecordStore::CreateMode::deferred);
-    ASSERT_EQ(lrs.getTableIfExists(), nullptr);
+    ASSERT_FALSE(lrs.tableExists());
 
     auto& rs = lrs.getOrCreateTable(opCtx.get());
-    ASSERT_NE(lrs.getTableIfExists(), nullptr);
-    ASSERT_EQ(lrs.getTableIfExists(), &rs);
+    ASSERT_TRUE(lrs.tableExists());
+    ASSERT_EQ(&lrs.getTableOrThrow(), &rs);
 }
 
 TEST_F(LazyRecordStoreTest, ImmediateCreatesTableRightAway) {
@@ -53,7 +56,7 @@ TEST_F(LazyRecordStoreTest, ImmediateCreatesTableRightAway) {
     auto ident = _storageEngine->generateNewInternalIdent();
 
     LazyRecordStore lrs(opCtx.get(), ident, LazyRecordStore::CreateMode::immediate);
-    ASSERT_NE(lrs.getTableIfExists(), nullptr);
+    ASSERT_TRUE(lrs.tableExists());
 }
 
 TEST_F(LazyRecordStoreTest, GetOrCreateTableIsIdempotent) {
@@ -71,10 +74,10 @@ TEST_F(LazyRecordStoreTest, DropResetsToUninitialized) {
     auto ident = _storageEngine->generateNewInternalIdent();
 
     LazyRecordStore lrs(opCtx.get(), ident, LazyRecordStore::CreateMode::immediate);
-    ASSERT_NE(lrs.getTableIfExists(), nullptr);
+    ASSERT_TRUE(lrs.tableExists());
 
-    lrs.drop();
-    ASSERT_EQ(lrs.getTableIfExists(), nullptr);
+    lrs.drop(opCtx.get(), Timestamp::min());
+    ASSERT_FALSE(lrs.tableExists());
 }
 
 TEST_F(LazyRecordStoreTest, DropOnDeferredIsNoOp) {
@@ -82,8 +85,8 @@ TEST_F(LazyRecordStoreTest, DropOnDeferredIsNoOp) {
     auto ident = _storageEngine->generateNewInternalIdent();
 
     LazyRecordStore lrs(opCtx.get(), ident, LazyRecordStore::CreateMode::deferred);
-    lrs.drop();
-    ASSERT_EQ(lrs.getTableIfExists(), nullptr);
+    lrs.drop(opCtx.get(), Timestamp::min());
+    ASSERT_FALSE(lrs.tableExists());
 }
 
 TEST_F(LazyRecordStoreTest, OpenExistingOpensExistingTable) {
@@ -92,11 +95,30 @@ TEST_F(LazyRecordStoreTest, OpenExistingOpensExistingTable) {
 
     {
         LazyRecordStore lrs(opCtx.get(), ident, LazyRecordStore::CreateMode::immediate);
-        lrs.keepTemporaryTable(opCtx.get());
     }
 
     LazyRecordStore lrs(opCtx.get(), ident, LazyRecordStore::CreateMode::openExisting);
-    ASSERT_NE(lrs.getTableIfExists(), nullptr);
+    ASSERT_TRUE(lrs.tableExists());
+}
+
+TEST_F(LazyRecordStoreTest, GetTableOrThrowSucceedsWhenTableExists) {
+    auto opCtx = makeOperationContext();
+    auto ident = _storageEngine->generateNewInternalIdent();
+
+    LazyRecordStore lrs(opCtx.get(), ident, LazyRecordStore::CreateMode::immediate);
+    ASSERT_NO_THROW(lrs.getTableOrThrow());
+    ASSERT_EQ(&lrs.getTableOrThrow(), &lrs.getOrCreateTable(opCtx.get()));
+}
+
+TEST_F(LazyRecordStoreTest, GetTableOrThrowFailsWhenTableDoesNotExist) {
+    auto opCtx = makeOperationContext();
+    auto ident = _storageEngine->generateNewInternalIdent();
+
+    LazyRecordStore lrs(opCtx.get(), ident, LazyRecordStore::CreateMode::deferred);
+    ASSERT_THROWS_WITH_CHECK(lrs.getTableOrThrow(), DBException, [](const DBException& ex) {
+        ASSERT_EQ(ex.code(), 12129700);
+        assertionCount.tripwire.subtractAndFetch(1);
+    });
 }
 
 }  // namespace

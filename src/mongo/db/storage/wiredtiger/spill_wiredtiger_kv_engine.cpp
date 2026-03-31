@@ -109,16 +109,15 @@ void SpillWiredTigerKVEngine::_openWiredTiger(const std::string& path,
     }
 }
 
-std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::getTemporaryRecordStore(RecoveryUnit& ru,
-                                                                              StringData ident,
-                                                                              KeyFormat keyFormat) {
+std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::getInternalRecordStore(RecoveryUnit& ru,
+                                                                             StringData ident,
+                                                                             KeyFormat keyFormat) {
     WiredTigerRecordStore::Params params;
     params.uuid = boost::none;
     params.ident = std::string{ident};
     params.engineName = _canonicalName;
     params.keyFormat = keyFormat;
     params.overwrite = true;
-    // We don't log writes to spill tables.
     params.isLogged = false;
     params.forceUpdateWithFullDocument = false;
     params.inMemory = false;
@@ -128,8 +127,9 @@ std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::getTemporaryRecordStore(Re
         this, WiredTigerRecoveryUnit::get(ru), std::move(params));
 }
 
-std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::makeTemporaryRecordStore(
-    RecoveryUnit& ru, StringData ident, KeyFormat keyFormat) {
+std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::makeInternalRecordStore(RecoveryUnit& ru,
+                                                                              StringData ident,
+                                                                              KeyFormat keyFormat) {
     auto& session = *WiredTigerRecoveryUnit::get(ru).getSessionNoTxn();
 
     WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig;
@@ -144,12 +144,12 @@ std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::makeTemporaryRecordStore(
     std::string uri = WiredTigerUtil::buildTableUri(ident);
     LOGV2_DEBUG(10158008,
                 2,
-                "SpillWiredTigerKVEngine::makeTemporaryRecordStore",
+                "SpillWiredTigerKVEngine::makeInternalRecordStore",
                 "uri"_attr = uri,
                 "config"_attr = config);
     uassertStatusOK(wtRCToStatus(session.create(uri.c_str(), config.c_str()), session));
 
-    return getTemporaryRecordStore(ru, ident, keyFormat);
+    return getInternalRecordStore(ru, ident, keyFormat);
 }
 
 int64_t SpillWiredTigerKVEngine::storageSize(RecoveryUnit& ru) {

@@ -396,7 +396,7 @@ TEST_F(KVEngineTestHarness, SimpleSorted1) {
     }
 }
 
-TEST_F(KVEngineTestHarness, TemporaryRecordStoreSimple) {
+TEST_F(KVEngineTestHarness, InternalRecordStoreSimple) {
     std::unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create(getServiceContext()));
     KVEngine* engine = helper->getEngine();
     ASSERT(engine);
@@ -406,7 +406,7 @@ TEST_F(KVEngineTestHarness, TemporaryRecordStoreSimple) {
     {
         auto opCtx = _makeOperationContext(engine);
         WriteUnitOfWork wuow(opCtx.get());
-        rs = engine->makeTemporaryRecordStore(
+        rs = engine->makeInternalRecordStore(
             *shard_role_details::getRecoveryUnit(opCtx.get()), ident, KeyFormat::Long);
         wuow.commit();
         ASSERT(rs);

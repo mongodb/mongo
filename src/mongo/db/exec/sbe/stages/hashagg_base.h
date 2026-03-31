@@ -128,7 +128,7 @@ protected:
                                         size_t numKeys,
                                         BufBuilder& keyBuffer);
 
-    void makeTemporaryRecordStore();
+    void makeInternalRecordStore();
 
     /**
      * Inserts a key and value pair to the '_recordStore'. They key is serialized to a

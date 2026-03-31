@@ -77,10 +77,9 @@ public:
                            const std::vector<BSONObj>& toInsert);
 
     /**
-     * Keeps the temporary table managed by this tracker. Creates the table if it has not yet been
-     * created.
+     * Force-creates the backing table if it was deferred and has not already been created.
      */
-    void keepTemporaryTable(OperationContext* opCtx);
+    void createDeferredTable(OperationContext* opCtx);
 
     uint64_t count() const {
         return _counter->load();
@@ -112,10 +111,12 @@ public:
     }
 
     /**
-     * Schedules the temporary table for drop.
+     * Drops the temporary table. Requires a minimum timestamp to be provided, which acts as a lower
+     * bound for the drop reaper, ensuring the table will stay alive until the oldest timestamp has
+     * advanced past the drop time.
      */
-    void dropTemporaryTable() {
-        _table.drop();
+    void dropTemporaryTable(OperationContext* opCtx, Timestamp dropTime) {
+        _table.drop(opCtx, dropTime);
     }
 
 private:
