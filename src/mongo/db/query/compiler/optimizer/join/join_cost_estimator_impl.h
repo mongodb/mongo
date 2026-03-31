@@ -75,6 +75,15 @@ private:
  */
 double estimateYaoDistinctPages(double numLeafPages, double numEntriesRequested);
 
+/*
+ * Return type for estimateMackertLohmanRandIO, bundling the estimated page count with the formula
+ * branch that was taken—useful for explain output.
+ */
+struct MackertLohmanResult {
+    double randIOPages;
+    MackertLohmanCase theCase;
+};
+
 /**
  * Estimates the number of random disk I/Os required to read leaf pages from a b-tree, accounting
  * for a finite LRU buffer (the WiredTiger cache). When the number of requested pages exceeds the
@@ -108,8 +117,8 @@ double estimateYaoDistinctPages(double numLeafPages, double numEntriesRequested)
  *
  * Returns the estimated number of physical random disk reads.
  */
-double estimateMackertLohmanRandIO(double numDistinctPagesNeededFromBtree,
-                                   double numPagesInStorageEngineCache,
-                                   double numLogicalPageRequests);
+MackertLohmanResult estimateMackertLohmanRandIO(double numDistinctPagesNeededFromBtree,
+                                                double numPagesInStorageEngineCache,
+                                                double numLogicalPageRequests);
 
 }  // namespace mongo::join_ordering

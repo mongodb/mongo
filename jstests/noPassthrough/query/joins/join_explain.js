@@ -137,6 +137,8 @@ runTest(pipeline, true /* expectRejected */);
 
 // Test joinCostComponents explain output (internalQueryExplainJoinCostComponents knob).
 {
+    const validMackertLohmanCases = new Set(["collection-fits-cache", "returned-docs-fit-cache", "partial-eviction"]);
+
     // Verify that when the knob is OFF, joinCostComponents is absent (default behaviour).
     assert.commandWorked(conn.adminCommand({setParameter: 1, internalQueryExplainJoinCostComponents: false}));
     {
@@ -152,26 +154,52 @@ runTest(pipeline, true /* expectRejected */);
     }
 
     // Verify that when the knob is ON, joinCostComponents is present on every join opt stage.
-    assert.commandWorked(conn.adminCommand({setParameter: 1, internalQueryExplainJoinCostComponents: true}));
+    // Force INLJ so that every join stage is an INLJ and mackertLohmanCase is always present.
+    assert.commandWorked(
+        conn.adminCommand({
+            setParameter: 1,
+            internalQueryExplainJoinCostComponents: true,
+            internalJoinMethod: "INLJ",
+        }),
+    );
     {
         const explain = coll1.explain().aggregate(pipeline);
         const joinStages = getAllPlanStages(getWinningPlanFromExplain(explain)).filter(plannerStageIsJoinOptNode);
         assert.gt(joinStages.length, 0, "Expected join opt stages: " + tojson(explain));
+
         for (const stage of joinStages) {
             assert(
                 stage.hasOwnProperty("joinCostComponents"),
                 "joinCostComponents missing from join opt stage: " + tojson(stage),
             );
             const c = stage.joinCostComponents;
+
+            // All join types expose these numeric fields.
             for (const field of ["docsProcessed", "docsOutput", "sequentialIOPages", "randomIOPages", "localOpCost"]) {
                 assert(c.hasOwnProperty(field), field + " missing from joinCostComponents: " + tojson(c));
                 assert.gte(c[field], 0, field + " must be non-negative: " + tojson(c));
             }
+
+            // All stages are INLJ, so mackertLohmanCase must always be present.
+            assert(
+                c.hasOwnProperty("mackertLohmanCase"),
+                "mackertLohmanCase missing from INLJ costComponents: " + tojson(c),
+            );
+            assert(
+                validMackertLohmanCases.has(c.mackertLohmanCase),
+                "Unexpected mackertLohmanCase value '" + c.mackertLohmanCase + "': " + tojson(c),
+            );
         }
     }
 
-    // Reset the knob to its default.
-    assert.commandWorked(conn.adminCommand({setParameter: 1, internalQueryExplainJoinCostComponents: false}));
+    // Reset the knobs to their defaults.
+    assert.commandWorked(
+        conn.adminCommand({
+            setParameter: 1,
+            internalQueryExplainJoinCostComponents: false,
+            internalJoinMethod: "any",
+        }),
+    );
 }
 
 MongoRunner.stopMongod(conn);

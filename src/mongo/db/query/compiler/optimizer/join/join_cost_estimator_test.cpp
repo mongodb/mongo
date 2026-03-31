@@ -258,16 +258,25 @@ TEST_F(JoinCostEstimatorTest, NLJLowerCostThanHashJoin) {
 }
 
 TEST(MackertLohmanTest, CollectionFitsInCache) {
-    ASSERT_EQ(10, estimateMackertLohmanRandIO(100, 1000, 10));
-    ASSERT_EQ(100, estimateMackertLohmanRandIO(100, 1000, 10000));
+    auto result1 = estimateMackertLohmanRandIO(100, 1000, 10);
+    ASSERT_EQ(10, result1.randIOPages);
+    ASSERT_EQ(MackertLohmanCase::kCollectionFitsCache, result1.theCase);
+
+    auto result2 = estimateMackertLohmanRandIO(100, 1000, 10000);
+    ASSERT_EQ(100, result2.randIOPages);
+    ASSERT_EQ(MackertLohmanCase::kCollectionFitsCache, result2.theCase);
 }
 
 TEST(MackerLohmanTest, CollectionDoesntFitInCacheResultSetFitsInCache) {
-    ASSERT_EQ(10, estimateMackertLohmanRandIO(1000, 100, 10));
+    auto result = estimateMackertLohmanRandIO(1000, 100, 10);
+    ASSERT_EQ(10, result.randIOPages);
+    ASSERT_EQ(MackertLohmanCase::kReturnedDocsFitCache, result.theCase);
 }
 
 TEST(MackerLohmanTest, CollectionDoesntFitInCacheResultSetDoesntFitInCache) {
-    ASSERT_EQ(910, estimateMackertLohmanRandIO(1000, 100, 1000));
+    auto result = estimateMackertLohmanRandIO(1000, 100, 1000);
+    ASSERT_EQ(910, result.randIOPages);
+    ASSERT_EQ(MackertLohmanCase::kPartialEviction, result.theCase);
 }
 
 }  // namespace mongo::join_ordering

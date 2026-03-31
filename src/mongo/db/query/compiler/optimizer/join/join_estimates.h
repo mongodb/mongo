@@ -29,13 +29,31 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/util/modules.h"
 
+#include <boost/optional.hpp>
+
 namespace mongo::join_ordering {
 
 using namespace cost_based_ranker;
+
+/**
+ * Represents which branch of the Mackert-Lohman Y_wap formula a particular estimate used.
+ */
+enum class MackertLohmanCase {
+    // The entire collection fits into the WT cache.
+    kCollectionFitsCache,
+    // The estimated fetched pages all fit into the WT cache.
+    kReturnedDocsFitCache,
+    // The estimated fetched pages do not fit into the WT cache and thus cause WT cache eviction
+    // during the scan.
+    kPartialEviction,
+};
+
+StringData toStringData(MackertLohmanCase c);
 
 /**
  * Represents the cost estimate for a single join operation. It stores all of its inputs for
@@ -55,6 +73,16 @@ public:
                      CardinalityEstimate numRandIOs,
                      JoinCostEstimate leftCost,
                      JoinCostEstimate rightCost);
+
+    // Overload for INLJ nodes that also records which branch of the Mackert-Lohman formula was
+    // taken when estimating random I/Os.
+    JoinCostEstimate(CardinalityEstimate numDocsProcessed,
+                     CardinalityEstimate numDocsOutput,
+                     CardinalityEstimate numSeqIOs,
+                     CardinalityEstimate numRandIOs,
+                     JoinCostEstimate leftCost,
+                     JoinCostEstimate rightCost,
+                     MackertLohmanCase mackertLohmanCase);
 
     JoinCostEstimate(CostEstimate totalCost);
 
@@ -84,6 +112,10 @@ public:
 
     CostEstimate getTotalCost() const {
         return _totalCost;
+    }
+
+    boost::optional<MackertLohmanCase> getMackertLohmanCase() const {
+        return _mackertLohmanCase;
     }
 
     std::string toString() const;
@@ -118,6 +150,10 @@ private:
     // Cumulative estimate for the cost of this join including the cost of children. This value of
     // derived from all the other components in this class.
     CostEstimate _totalCost;
+
+    // The branch of the Mackert-Lohman Y_wap formula used to estimate random I/Os. Only set for
+    // INDEXED_NESTED_LOOP_JOIN nodes; boost::none for all other join types.
+    boost::optional<MackertLohmanCase> _mackertLohmanCase;
 };
 
 inline std::ostream& operator<<(std::ostream& os, const JoinCostEstimate& cost) {
@@ -140,6 +176,8 @@ public:
     double sequentialIOPages{0};
     double randomIOPages{0};
     double localOpCost{0};
+    // Only set for INDEXED_NESTED_LOOP_JOIN nodes; absent for HJ and NLJ.
+    boost::optional<MackertLohmanCase> mackertLohmanCase;
 
     void serialize(BSONObjBuilder& bob) const override;
 };

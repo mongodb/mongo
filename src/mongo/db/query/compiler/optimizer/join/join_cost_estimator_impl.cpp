@@ -71,11 +71,14 @@ JoinCostEstimate JoinCostEstimatorImpl::costIndexScanFragment(NodeId nodeId) {
     const auto& nss = _jCtx.joinGraph.getNode(nodeId).collectionName;
     auto& collStats = _jCtx.catStats.collStats.at(nss);
     double numPagesColl = collStats.onDiskSizeBytes / collStats.pageSizeBytes;
+    // The Mackert-Lohman case is not propagated for base index-scan fragments since they are not
+    // exposed as join embedding nodes in the explain output.
     CardinalityEstimate numRandIOs =
         CardinalityEstimate{CardinalityType{estimateMackertLohmanRandIO(
-                                numPagesColl,
-                                _jCtx.catStats.numPagesInStorageEngineCache(nss),
-                                numDocsOutput.toDouble())},
+                                                numPagesColl,
+                                                _jCtx.catStats.numPagesInStorageEngineCache(nss),
+                                                numDocsOutput.toDouble())
+                                                .randIOPages},
                             EstimationSource::Sampling};
     return JoinCostEstimate(numDocsProcessed, numDocsOutput, numSeqIOs, numRandIOs);
 }
@@ -190,25 +193,25 @@ JoinCostEstimate JoinCostEstimatorImpl::costINLJFragment(const JoinPlanNode& lef
     // single probe will return.
     double numDocsReturnedFromProbe = numProbes * rightBaseCard * joinPredSel;
     double numPagesAccessedColl = estimateYaoDistinctPages(numPagesColl, numDocsReturnedFromProbe);
-    CardinalityEstimate numRandIOsCollection = CardinalityEstimate{
-        CardinalityType{estimateMackertLohmanRandIO(
-            numPagesAccessedColl,
-            _jCtx.catStats.numPagesInStorageEngineCache(nss),
-            // In a MongoDB index, we append the RecordId (RID) to the index key. This means that a
-            // single index probe will read index keys for the same join key in RID order. Because
-            // MongoDB collections are clustered on RID, each fetch is not performing a truely
-            // random I/O but rather a sorted-sparse access pattern over the collection. For now, we
-            // ignore the I/O cost of this sorted-sparse and assume that each index probe only
-            // performs a single random I/O.
-            numProbes)},
-        EstimationSource::Sampling};
+    auto [numRandIOsCollection, mlCase] = estimateMackertLohmanRandIO(
+        numPagesAccessedColl,
+        _jCtx.catStats.numPagesInStorageEngineCache(nss),
+        // In a MongoDB index, we append the RecordId (RID) to the index key. This means that a
+        // single index probe will read index keys for the same join key in RID order. Because
+        // MongoDB collections are clustered on RID, each fetch is not performing a truely
+        // random I/O but rather a sorted-sparse access pattern over the collection. For now, we
+        // ignore the I/O cost of this sorted-sparse and assume that each index probe only
+        // performs a single random I/O.
+        numProbes);
 
-    return JoinCostEstimate(numDocsProcessed,
-                            numDocsOutput,
-                            numSeqIOs,
-                            numRandIOsCollection,
-                            getNodeCost(left),
-                            JoinCostEstimate(zeroCE, zeroCE, zeroCE, zeroCE));
+    return JoinCostEstimate(
+        numDocsProcessed,
+        numDocsOutput,
+        numSeqIOs,
+        CardinalityEstimate{CardinalityType{numRandIOsCollection}, EstimationSource::Sampling},
+        getNodeCost(left),
+        JoinCostEstimate(zeroCE, zeroCE, zeroCE, zeroCE),
+        mlCase);
 }
 
 JoinCostEstimate JoinCostEstimatorImpl::costNLJFragment(const JoinPlanNode& left,
@@ -272,9 +275,9 @@ double estimateYaoDistinctPages(double numLeafPages, double numEntriesRequested)
     return numLeafPages * (1 - std::pow(1 - (1 / numLeafPages), numEntriesRequested));
 }
 
-double estimateMackertLohmanRandIO(double numDistinctPagesNeededFromBtree,
-                                   double numPagesInStorageEngineCache,
-                                   double numLogicalPageRequests) {
+MackertLohmanResult estimateMackertLohmanRandIO(double numDistinctPagesNeededFromBtree,
+                                                double numPagesInStorageEngineCache,
+                                                double numLogicalPageRequests) {
     tassert(11943801,
             "estimateMackertLohmanRandIO() expected numDistinctPagesNeededFromBtree >= 0",
             numDistinctPagesNeededFromBtree >= 0);
@@ -295,24 +298,26 @@ double estimateMackertLohmanRandIO(double numDistinctPagesNeededFromBtree,
 
     // Case 1: The entire collection fits in the WT cache.
     if (numDistinctPagesNeededFromBtree <= numPagesInStorageEngineCache) {
-        return std::min(numLogicalPageRequests, numDistinctPagesNeededFromBtree);
+        return {std::min(numLogicalPageRequests, numDistinctPagesNeededFromBtree),
+                MackertLohmanCase::kCollectionFitsCache};
     }
 
     // Case 2: The collection is bigger than the cache, but all the returned documents fit in the WT
     // cache. We assume that have a totally unclustered index, meaning that every key returned from
     // the index scan results in a random I/O.
     if (numLogicalPageRequests <= numPagesInStorageEngineCache) {
-        return numLogicalPageRequests;
+        return {numLogicalPageRequests, MackertLohmanCase::kReturnedDocsFitCache};
     }
 
     // Case 3: The collection is bigger than the cache and the sum of pages that are fetched are
     // also bigger than the cache. This results in cache eviction and means that fetching the same
     // page multiple times may result multiple random I/Os (whereas in the case of a smaller result
     // set, that page would be cached).
-    return numPagesInStorageEngineCache +
-        (numLogicalPageRequests - numPagesInStorageEngineCache) *
-        (numDistinctPagesNeededFromBtree - numPagesInStorageEngineCache) /
-        numDistinctPagesNeededFromBtree;
+    return {numPagesInStorageEngineCache +
+                (numLogicalPageRequests - numPagesInStorageEngineCache) *
+                    (numDistinctPagesNeededFromBtree - numPagesInStorageEngineCache) /
+                    numDistinctPagesNeededFromBtree,
+            MackertLohmanCase::kPartialEviction};
 }
 
 }  // namespace mongo::join_ordering

@@ -174,6 +174,7 @@ void addEstimatesIfExplain(const JoinReorderingContext& ctx,
         joinEst->sequentialIOPages = cost.getIoSeqPages().toDouble();
         joinEst->randomIOPages = cost.getIoRandPages().toDouble();
         joinEst->localOpCost = cost.getLocalOpCost().toDouble();
+        joinEst->mackertLohmanCase = cost.getMackertLohmanCase();
         est = std::move(joinEst);
     }
     estimates.insert_or_assign(node, std::move(est));
