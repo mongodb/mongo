@@ -392,9 +392,11 @@ TEST_F(TTLTest, TTLPassSingleCollectionClusteredIndexes) {
     ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments + docCount);
     ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys);
 
-    // The query planner only reports docs/keys examined to find documents to delete.
+    // The query planner can report more docs examined in case of write conflict retries or when
+    // checking if document still matches after yielding.
+    ASSERT_GTE(getTTLExaminedDocuments(), initTTLExaminedDocuments + docCount);
+    ASSERT_LTE(getTTLExaminedDocuments(), initTTLExaminedDocuments + 2 * docCount);
     // For a clustered collection without additional indexes, 0 keys examined is valid.
-    ASSERT_EQ(getTTLExaminedDocuments(), initTTLExaminedDocuments + docCount);
     ASSERT_EQ(getTTLExaminedKeys(), initTTLExaminedKeys);
 }
 
@@ -433,10 +435,13 @@ TEST_F(TTLTest, TTLPassSingleCollectionMixedIndexes) {
     ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments + docCount);
     ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys + docCount);
 
-    // The query planner only reports docs/keys examined to find documents to delete.
+    // The query planner can report more docs examined in case of write conflict retries or when
+    // checking if document still matches after yielding.
+    ASSERT_GTE(getTTLExaminedDocuments(), initTTLExaminedDocuments + docCount);
+    ASSERT_LTE(getTTLExaminedDocuments(), initTTLExaminedDocuments + 2 * docCount);
     // As the index on _id is clustered, only the keys examined on the foo index are counted.
-    ASSERT_EQ(getTTLExaminedDocuments(), initTTLExaminedDocuments + docCount);
-    ASSERT_EQ(getTTLExaminedKeys(), initTTLExaminedKeys + 50);
+    ASSERT_GTE(getTTLExaminedKeys(), initTTLExaminedKeys + 50);
+    ASSERT_LTE(getTTLExaminedKeys(), initTTLExaminedKeys + 100);
 }
 
 TEST_F(TTLTest, TTLPassSingleCollectionMultipleDeletes) {
