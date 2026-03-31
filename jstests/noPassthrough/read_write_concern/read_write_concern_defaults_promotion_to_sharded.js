@@ -94,6 +94,7 @@ describe("Read/write concern defaults directly against shard servers", function 
     });
 
     afterEach(() => {
+        restartReplicationOnSecondaries(this.replSet);
         if (this.cluster !== undefined) {
             this.cluster.stop();
         }
