@@ -707,6 +707,15 @@ TEST_F(ReshardingDonorServiceTest, StepDownStepUpEachTransition) {
         {DonorStateEnum::kDone, true}};
 
     for (auto& testOptions : makeAllTestOptions()) {
+        // TODO SERVER-123091: Remove skip once the intermittent hang is fixed (SERVER-121975)
+        if (testOptions.performVerification) {
+            LOGV2(12308701,
+                  "Skipping case when performVerification is enabled",
+                  "test"_attr = unittest::getTestName(),
+                  "testOptions"_attr = testOptions);
+            continue;
+        }
+
         LOGV2(5641801,
               "Running case",
               "test"_attr = unittest::getTestName(),
@@ -986,6 +995,15 @@ TEST_F(ReshardingDonorServiceTest, RenamesTemporaryReshardingCollectionWhenDone)
 
 TEST_F(ReshardingDonorServiceTest, CompletesWithStepdownAfterAbort) {
     for (auto& testOptions : makeAllTestOptions()) {
+        // TODO SERVER-123091: Remove skip once the intermittent hang is fixed (SERVER-121975)
+        if (testOptions.performVerification) {
+            LOGV2(12308702,
+                  "Skipping case when performVerification is enabled",
+                  "test"_attr = unittest::getTestName(),
+                  "testOptions"_attr = testOptions);
+            continue;
+        }
+
         LOGV2(5641802,
               "Running case",
               "test"_attr = unittest::getTestName(),
