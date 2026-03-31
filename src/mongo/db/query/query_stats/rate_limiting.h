@@ -124,8 +124,9 @@ class RateLimiter {
 
         /*
          * Count of requests handled in the current window.
+         * Atomic to allow a lock-free pre-check in handle() before acquiring _windowMutex.
          */
-        RequestCount _currentCount = 0;
+        AtomicWord<RequestCount> _currentCount{0};
 
         /*
          * Mutex used when reading/writing the window.

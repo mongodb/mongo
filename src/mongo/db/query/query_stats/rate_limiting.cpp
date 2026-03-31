@@ -40,13 +40,22 @@ Date_t RateLimiter::WindowBasedPolicy::tickWindow() {
     // Elapsed time since window start exceeds the time period. Start a new window.
     if (currentTime - _windowStart > _timePeriod) {
         _windowStart = currentTime;
-        _prevCount = _currentCount;
-        _currentCount = 0;
+        _prevCount = _currentCount.loadRelaxed();
+        _currentCount.storeRelaxed(0);
     }
     return currentTime;
 }
 
 bool RateLimiter::WindowBasedPolicy::handle() {
+    // Fast path: if the current window count already meets or exceeds the limit, reject without
+    // acquiring the mutex or calling the clock. At high throughput with a low rate limit (e.g.,
+    // 256 req/sec vs ~400K req/sec in ycsb), this eliminates ~99.94% of mutex acquisitions.
+    // A false rejection at a window boundary (when _currentCount was just reset to 0 by another
+    // thread) is harmless — query stats is observability data.
+    if (_currentCount.loadRelaxed() >= _requestLimit.loadRelaxed()) {
+        return false;
+    }
+
     stdx::unique_lock windowLock{_windowMutex};
 
     Date_t currentTime = tickWindow();
@@ -66,10 +75,13 @@ bool RateLimiter::WindowBasedPolicy::handle() {
     // in the previous period by the percentage of time remaining in the current period.
     double estimatedRemaining = prevCount * percentRemainingOfCurrentWindow;
     // Add this estimate to the requests we know have taken place within the current time block.
-    double estimatedCount = _currentCount + estimatedRemaining;
+    double estimatedCount = _currentCount.loadRelaxed() + estimatedRemaining;
 
-    if (estimatedCount < _requestLimit.load()) {
-        _currentCount += 1;
+    if (estimatedCount < _requestLimit.loadRelaxed()) {
+        // Relaxed increment is sufficient: the mutex prevents concurrent writers, and
+        // the lock-free fast path above tolerates briefly stale values (false rejections
+        // are harmless for observability data).
+        _currentCount.fetchAndAddRelaxed(1);
         return true;
     }
     return false;
