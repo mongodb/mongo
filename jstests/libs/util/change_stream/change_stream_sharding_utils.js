@@ -32,8 +32,8 @@ const TEST_DB_2 = "test_cs_2";
 const TEST_COLL = "test_coll_fsm";
 const TEST_COLL_2 = "test_coll_fsm_2";
 
-// TODO SERVER-121182: Replace with a random seed (already logged in setupFsmTest).
-const TEST_SEED = 42;
+// Random seed for the entire test run, logged for reproducibility.
+const TEST_SEED = Date.now();
 
 /**
  * Operation types to filter out before comparison.
@@ -69,13 +69,14 @@ function getCurrentClusterTime(conn, dbName) {
  * @param {number} [mongos=1] - Number of mongos instances
  * @param {number} [shards=3] - Number of shards (3 enables moveChunk across shards)
  * @param {number} [rsNodes=1] - Number of replica set nodes per shard
+ * @param {boolean} [configShard=false] - If true, one shard doubles as the config server
  * @returns {ShardingTest} The configured sharding test
  */
-function createShardingTest(mongos = 1, shards = 3, rsNodes = 1) {
-    return new ShardingTest({
+function createShardingTest(mongos = 1, shards = 3, rsNodes = 1, configShard = false) {
+    const stOptions = {
         shards: shards,
         mongos: mongos,
-        config: 1,
+        configShard: configShard,
         rs: {
             nodes: rsNodes,
             setParameter: {
@@ -92,7 +93,13 @@ function createShardingTest(mongos = 1, shards = 3, rsNodes = 1) {
                 },
             },
         },
-    });
+    };
+    // With a dedicated config server (non-configShard), use a single-member RS
+    // instead of the default 3: these tests don't exercise config server failover.
+    if (!configShard) {
+        stOptions.config = 1;
+    }
+    return new ShardingTest(stOptions);
 }
 
 /**
@@ -131,8 +138,13 @@ function buildCommandTrace(commands) {
 /**
  * Build reader specs for each writer's collection.
  * Each spec bundles expected events, reader config, label, and a createMatcher() factory.
+ *
+ * @param {Array<{dbName: string, collName: string, commands: Array}>} commandsByWriter
+ * @param {Timestamp} startTime - Cluster time to start reading from.
+ * @param {number} [batchSize] - Optional cursor batch size (undefined = server default).
+ * @returns {Array<Object>} Reader specs with label, expectedEvents, createMatcher, config.
  */
-function buildReaderSpecs(commandsByWriter, startTime) {
+function buildReaderSpecs(commandsByWriter, startTime, batchSize) {
     const specs = [];
 
     for (const w of commandsByWriter) {
@@ -150,6 +162,7 @@ function buildReaderSpecs(commandsByWriter, startTime) {
                 startAtClusterTime: startTime,
                 numberOfEventsToRead: expectedEvents.length,
                 excludeOperationTypes: kExcludedOperationTypes,
+                batchSize,
                 debugCommandTrace: commandTrace,
             },
         });
@@ -249,7 +262,8 @@ function setupFsmTest(ctx, testName, options = {}) {
         startBackgroundMutator(ctx, testName, ts, options.bgMutator, writerInstanceNames);
     }
 
-    const readerSpecs = buildReaderSpecs(commandsByWriter, startTime);
+    const batchSize = TestData.batchSize || undefined;
+    const readerSpecs = buildReaderSpecs(commandsByWriter, startTime, batchSize);
 
     jsTest.log.info("FSM setup complete", {
         testName,
@@ -300,7 +314,8 @@ function runTeardownSteps(...steps) {
  */
 function runWithFsmCluster(testName, testFn, options = {}) {
     const {mongos = 1, shards = 3, rsNodes = 1} = options;
-    const fsmSt = createShardingTest(mongos, shards, rsNodes);
+    const configShard = TestData.configShard || false;
+    const fsmSt = createShardingTest(mongos, shards, rsNodes, configShard);
     const fsmShards = assert.commandWorked(fsmSt.s.adminCommand({listShards: 1})).shards;
     const instancesToCleanup = [];
 

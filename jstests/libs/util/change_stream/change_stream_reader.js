@@ -201,12 +201,15 @@ class ChangeStreamReader {
             pipeline.push({$match: {operationType: {$nin: config.excludeOperationTypes}}});
         }
 
+        const cursorOptions = {};
+        if (config.batchSize !== undefined) {
+            cursorOptions.batchSize = config.batchSize;
+        }
+
         const watchOptions = {
             pipeline: pipeline,
-            collection: config.watchMode === ChangeStreamWatchMode.kCollection ? config.collName : 1, // 1 means watch all collections
-            aggregateOptions: {
-                cursor: {batchSize: config.batchSize ?? ChangeStreamReader.kDefaultGetMoreBatchSize},
-            },
+            collection: config.watchMode === ChangeStreamWatchMode.kCollection ? config.collName : 1,
+            aggregateOptions: {cursor: cursorOptions},
         };
 
         const cursor = cst.startWatchingChanges(watchOptions);

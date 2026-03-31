@@ -35,6 +35,10 @@ import {
 } from "jstests/libs/util/change_stream/change_stream_sharding_utils.js";
 import {after, afterEach, before, describe, it} from "jstests/libs/mochalite.js";
 
+jsTest.log.info(
+    `test_change_stream_sharding_command_generator: using seed ${TEST_SEED} (to reproduce, rerun with this seed)`,
+);
+
 /**
  * Helper function to set up writer configuration.
  * @param {number} seed - Random seed for command generation

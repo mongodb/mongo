@@ -1,4 +1,22 @@
 ### Overrides for change_streams_sharding_fsm suites ###
+- name: batch_size_1
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              batchSize: 1
+
+- name: embedded
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              configShard: true
+
 - name: bg_mutator
   value:
     executor:

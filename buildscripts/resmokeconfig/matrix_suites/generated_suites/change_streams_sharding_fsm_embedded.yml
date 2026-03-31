@@ -1,0 +1,47 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_sharding_fsm_embedded.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+##########################################################
+description:
+  Runs the change stream sharding FSM tests with an embedded config server
+  (config shard) instead of a dedicated config server.
+executor:
+  archive:
+    tests:
+      - jstests/change_stream_fsm/test_change_stream_sharding_fsm_*.js
+      - jstests/change_stream_fsm/test_change_stream_sharding_command_generator.js
+  config:
+    shell_options:
+      eval:
+        await import('jstests/libs/override_methods/implicit_change_stream_v2.js');
+        await import('jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js');
+      global_vars:
+        TestData:
+          configShard: true
+          migrationRetryExtraDDLCommands:
+            - drop
+            - dropDatabase
+            - dropIndexes
+            - insert
+            - moveChunk
+            - movePrimary
+            - renameCollection
+            - shardCollection
+            - split
+          migrationRetryExtraDDLErrors:
+            - ReshardCollectionInterruptedDueToFCVChange
+            - Interrupted
+          migrationRetryMatchFCVErrors: true
+          threadOverrides:
+            - jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js
+      nodb: ""
+matrix_suite: true
+selector:
+  roots:
+    - jstests/change_stream_fsm/test_change_stream_sharding_fsm_*.js
+    - jstests/change_stream_fsm/test_change_stream_sharding_command_generator.js
+test_kind: js_test

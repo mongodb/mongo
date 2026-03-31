@@ -79,7 +79,7 @@ class Command {
     /**
      * Runs the command logic. Subclasses must override this.
      * Transient DDL errors are handled by the runCommand override
-     * (implicitly_retry_on_migration_in_progress.js) loaded by the suite.
+     * (implicitly_retry_on_migration_in_progress_fsm.js) loaded by the suite.
      * @param {Object} connection - The MongoDB connection.
      */
     execute(connection) {
