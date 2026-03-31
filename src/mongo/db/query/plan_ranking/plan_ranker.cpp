@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/plan_ranking/plan_ranker.h"
 
+#include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_ranking/cbr_for_no_mp_results.h"
@@ -88,7 +89,9 @@ StatusWith<PlanRankingResult> PlanRanker::rankPlans(OperationContext* opCtx,
                                                     bool isClassic) {
     auto rankerMode = plannerParams.planRankerMode;
 
-    const bool canUseCBR = plannerParams.cbrEnabled && isClassic;
+    const bool canUseCBR = plannerParams.cbrEnabled && isClassic &&
+        // Disable CBR for queries with large $in lists.
+        !expression::containsLargeInList(*query.getPrimaryMatchExpression(), kMaxInListSize);
     std::unique_ptr<PlanRankingStrategy> strategy;
     if (!canUseCBR) {
         strategy = std::make_unique<MPPlanRankingStrategy>();

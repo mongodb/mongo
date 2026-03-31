@@ -1,8 +1,15 @@
 /**
  * Verify that collection, index and query types unsupported by CBR fallback to multiplanning.
  */
-import {getAllPlans, getPlanStages, isExpress} from "jstests/libs/query/analyze_plan.js";
-import {assertPlanNotCosted} from "jstests/libs/query/cbr_utils.js";
+import {
+    getAllPlans,
+    getPlanStages,
+    getWinningPlanFromExplain,
+    isExpress,
+    isSubplannerCompositePlan,
+    planHasStage,
+} from "jstests/libs/query/analyze_plan.js";
+import {assertPlanCosted, assertPlanNotCosted} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 // TODO SERVER-92589: Remove this exemption
@@ -212,6 +219,89 @@ function testSortKeyGenerator() {
     assert.commandWorked(coll.dropIndexes());
 }
 
+// Maximum $in-list size that CBR will estimate. Must match plan_ranking::kMaxInListSize.
+const kMaxInListSize = 2048;
+
+function testLargeInList() {
+    const bulk = coll.initializeUnorderedBulkOp();
+    for (let i = 0; i < kMaxInListSize + 1000; i++) {
+        bulk.insert({a: i, b: i % 100});
+    }
+    assert.commandWorked(bulk.execute());
+
+    // Two indexes on different fields so the planner enumerates at least two plans
+    // (one per index) when both fields appear in the query predicate.
+    assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}]));
+
+    // Use samplingCE so the test does not depend on histograms.
+    const prevCEMode = assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryCBRCEMode: "samplingCE"}));
+
+    // Two non-overlapping small $in-lists and one large $in-list reused across all sub-tests.
+    const smallIn1 = Array.from({length: 100}, (_, i) => i);
+    const smallIn2 = Array.from({length: 100}, (_, i) => i + 100);
+    const largeIn = Array.from({length: kMaxInListSize + 1}, (_, i) => i);
+
+    // Runs a find query and asserts that all enumerated plans are costed (or not costed).
+    function testQuery(query, cbrExpected) {
+        const explain = coll.find(query).explain();
+        const plans = getAllPlans(explain);
+        assert.gte(plans.length, 2, "Expected at least two plans");
+        plans.forEach(cbrExpected ? assertPlanCosted : assertPlanNotCosted);
+    }
+
+    // Small $in-list: CBR should be able to estimate it.
+    testQuery({a: {$in: smallIn1}, b: {$lt: 50}}, true);
+
+    // Large $in-list (> kMaxInListSize elements): CBR should fall back to multiplanning.
+    testQuery({a: {$in: largeIn}, b: {$lt: 50}}, false);
+
+    // $or with small $in in both branches: CBR should be used.
+    // The $or is combined with a top-level predicate on 'b' so the query goes through the regular
+    // planner (not subplanning). With indexes {a: 1} and {b: 1}, the planner enumerates at
+    // least two candidate plans. containsLargeInList walks the full expression tree, so it detects
+    // $in-lists inside $or branches.
+    testQuery({b: {$lt: 50}, $or: [{a: {$in: smallIn1}}, {a: {$in: smallIn2}}]}, true);
+
+    // $or where the second branch has a large $in-list: should fall back to multiplanning.
+    testQuery({b: {$lt: 50}, $or: [{a: {$in: smallIn1}}, {a: {$in: largeIn}}]}, false);
+
+    // Rooted $or (subplanner path): each branch has predicates on 'a' and 'b' so that with
+    // indexes {a: 1} and {b: 1} each branch independently has at least two candidate plans.
+    // The subplanner combines per-branch winners into a single composite plan. We verify the
+    // subplanner is used and the plan structure is correct. Note: the subplanner composite
+    // explain does not expose costEstimate on per-branch plans, so we can only exercise the code
+    // path, veryfy it via other means, and verify structural plan properties here.
+    function testRootedOrQuery(query) {
+        const explain = coll.find(query).explain();
+        assert(isSubplannerCompositePlan(explain), "Expected subplanner composite plan");
+        const winningPlan = getWinningPlanFromExplain(explain);
+        assert(planHasStage(db, winningPlan, "OR"), "Expected OR stage in subplanner composite plan");
+        const ixscans = getPlanStages(winningPlan, "IXSCAN");
+        assert.eq(ixscans.length, 2, "Expected one IXSCAN per $or branch");
+    }
+
+    // Rooted $or with small $in in both branches: exercises the CBR-per-branch code path.
+    testRootedOrQuery({
+        $or: [
+            {a: {$in: smallIn1}, b: {$lt: 50}},
+            {a: {$in: smallIn2}, b: {$lt: 50}},
+        ],
+    });
+
+    // Rooted $or where the second branch has a large $in: exercises the multiplanning-per-branch
+    // fallback code path in the subplanner.
+    testRootedOrQuery({
+        $or: [
+            {a: {$in: smallIn1}, b: {$lt: 50}},
+            {a: {$in: largeIn}, b: {$lt: 50}},
+        ],
+    });
+
+    // Restore CE mode for the remaining tests.
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryCBRCEMode: prevCEMode.was}));
+    assert.commandWorked(coll.dropIndexes());
+}
+
 function testDistictScan() {
     assert.commandWorked(coll.createIndex({a: 1, b: 1}));
     const explain = coll.explain().aggregate([{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", f: {$first: "$b"}}}]);
@@ -244,6 +334,7 @@ try {
     testReturnKey();
     testSortKeyGenerator();
     testDistictScan();
+    testLargeInList();
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
     assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));

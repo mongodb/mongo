@@ -40,6 +40,10 @@
 namespace mongo {
 namespace plan_ranking {
 
+// Maximum number of elements in an $in-list that CBR will attempt to estimate. Queries with larger
+// $in-lists fall back to multiplanning.
+inline constexpr size_t kMaxInListSize = 2048;
+
 // SERVER-118020: Investigate a more distinctive name to contrast with CostBasedPlanRankingStrategy
 class CBRPlanRankingStrategy : public PlanRankingStrategy {
 public:
