@@ -1080,7 +1080,7 @@ private:
     void processStage(boost::intrusive_ptr<DocumentSource> documentSource,
                       const DocumentSourceInfo& dsInfo) {
         StageId stageId = _stages.getNextId();
-        _dsToStageId.emplace(documentSource.get(), stageId);
+        _dsToStageId[documentSource.get()] = stageId;
 
         auto parentScopeId = _stages.empty() ? ScopeId::none() : _stages.back().scope;
         FieldDependencies dependencies = processStageDependencies(dsInfo, parentScopeId);
@@ -1139,32 +1139,20 @@ private:
     }
 
     /**
-     * Clears the DocumentSource <-> StageId mapping and rebuilds it, stopping at 'end'. Returns a
-     * StageId of the next stage after 'end'.
+     * Find the lowest ID stage, scope and field nodes corresponding to the given stage. These IDs
+     * can be used to determine the valid portion of a graph. If the range [container.begin(),
+     * stageIt) is valid, then so are [0, minId) for all node types.
      */
-    StageId clearAndRebuildMapping(const DocumentSourceContainer& container,
-                                   DocumentSourceContainer::const_iterator stageIt) {
-        _dsToStageId.clear();
-        // Rebuild mapping from begin to stageIt.
-        StageId index{0};
-        for (auto it = container.begin(); it != stageIt; it++) {
-            _dsToStageId.emplace(it->get(), index);
-            ++index.value;
-        }
-        return index;
-    }
-
-    /**
-     * Find the lowest ID scope and field nodes corresponding to the given stage.
-     * These IDs can be used to determine the valid portion of a graph.
-     * If the range [container.begin(), stageIt) is valid, then so are
-     * [0, minId) for all node types.
-     */
-    std::tuple<ScopeId, FieldId> earliestDescendants(StageId stageId) const {
-        if (stageId.value < 1) {
-            return {ScopeId{0}, FieldId{0}};
+    std::tuple<StageId, ScopeId, FieldId> earliestDescendants(
+        const DocumentSourceContainer& container,
+        DocumentSourceContainer::const_iterator stageIt) const {
+        // Compute the StageId of the first stage to invalidate. Stages before stageIt are
+        // unchanged, so their map entries and StageIds remain valid.
+        if (stageIt == container.begin()) {
+            return {StageId{0}, ScopeId{0}, FieldId{0}};
         }
 
+        StageId stageId = {getStageId(std::prev(stageIt)->get()).value + 1};
         ScopeId scopeId = _stages[stageId].nextNewScope;
         FieldId fieldId = scopeId == _scopes.getNextId()
             // No scope to invalidate so no fields to invalidate.
@@ -1172,7 +1160,7 @@ private:
             // Invalidate every field declared by or after the scope.
             : _scopes[scopeId].missingField;
 
-        return {scopeId, fieldId};
+        return {stageId, scopeId, fieldId};
     }
 
     /**
@@ -1180,11 +1168,8 @@ private:
      */
     void invalidate(const DocumentSourceContainer& container,
                     DocumentSourceContainer::const_iterator stageIt) {
-        // TODO(SERVER-119842): See if we can just leave the dangling entries
-        StageId invalidStage = clearAndRebuildMapping(container, stageIt);
-
         // Invalidate all nodes originating from the given stage.
-        auto [invalidScope, invalidField] = earliestDescendants(invalidStage);
+        auto [invalidStage, invalidScope, invalidField] = earliestDescendants(container, stageIt);
 
         // Clean up aliases for invalidated fields.
         absl::erase_if(_aliases,
@@ -1244,7 +1229,9 @@ private:
     // String interning pool. Each entry is a path component.
     StringPool _strings;
 
-    // Mapping between DocumentSource and StageId, recomputed when the graph is recomputed.
+    // Mapping between DocumentSource and StageId. May contain dangling entries for DocumentSources
+    // that have been removed from the pipeline. This is safe because this map is never iterated and
+    // is only ever queried with valid DocumentSource pointers.
     absl::flat_hash_map<const DocumentSource*, StageId> _dsToStageId;
 
     // Maps a FieldId to the collection path it aliases (as interned StringPool IDs).
