@@ -212,6 +212,8 @@ void describeGetModPathsReturn(DocumentOperationVisitor& visitor,
             visitor(ReplaceRoot{});
             return;
         case GetModPathsReturnType::kAllExcept:
+            // kAllExcept means preserved fields are known, but doesn't give any guarantees about
+            // the fields which are not listed.
             visitor(ReplaceRoot{});
             break;
         case GetModPathsReturnType::kFiniteSet:

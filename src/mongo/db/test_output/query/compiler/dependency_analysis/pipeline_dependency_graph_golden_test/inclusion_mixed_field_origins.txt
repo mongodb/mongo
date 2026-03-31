@@ -50,6 +50,10 @@ output: {
             "fields": {
                 "<missing>:2": {
                     "declaringScope": "scope:1",
+                    "metadata": {
+                        "array": false,
+                        "missing": true
+                    },
                     "dependencies": []
                 },
                 "_id:-1": "_id:-1",

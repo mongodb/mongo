@@ -116,6 +116,7 @@ public:
     void operator()(const ReplaceRoot& op) override {
         ASSERT_FALSE(replacedRoot);
         replacedRoot = true;
+        replacedRootIsKnownEmpty = op.isEmpty();
     }
     void operator()(const PreservePath& op) override {
         ASSERT_TRUE(replacedRoot);
@@ -132,6 +133,7 @@ public:
     }
 
     bool replacedRoot{false};
+    bool replacedRootIsKnownEmpty{false};
     std::vector<std::string> preserved;
     std::vector<std::string> modified;
     std::vector<std::pair<std::string, std::string>> renamed;
@@ -170,6 +172,7 @@ TEST(DocumentTransformationTest, FromAllPaths) {
     describeGetModPathsReturn(visitor, modPaths);
 
     EXPECT_TRUE(visitor.replacedRoot);
+    EXPECT_FALSE(visitor.replacedRootIsKnownEmpty);
     EXPECT_THAT(visitor.preserved, IsEmpty());
     EXPECT_THAT(visitor.modified, IsEmpty());
     EXPECT_THAT(visitor.renamed, IsEmpty());
@@ -188,6 +191,7 @@ TEST(DocumentTransformationTest, FromNotSupported) {
     describeGetModPathsReturn(visitor, modPaths);
 
     EXPECT_TRUE(visitor.replacedRoot);
+    EXPECT_FALSE(visitor.replacedRootIsKnownEmpty);
     EXPECT_THAT(visitor.preserved, IsEmpty());
     EXPECT_THAT(visitor.modified, IsEmpty());
     EXPECT_THAT(visitor.renamed, IsEmpty());
@@ -206,6 +210,7 @@ TEST(DocumentTransformationTest, FromEmptyAllExcept) {
     describeGetModPathsReturn(visitor, modPaths);
 
     EXPECT_TRUE(visitor.replacedRoot);
+    EXPECT_FALSE(visitor.replacedRootIsKnownEmpty);
     EXPECT_THAT(visitor.preserved, IsEmpty());
     EXPECT_THAT(visitor.modified, IsEmpty());
     EXPECT_THAT(visitor.renamed, IsEmpty());
@@ -224,6 +229,7 @@ TEST(DocumentTransformationTest, FromAllExcept) {
     describeGetModPathsReturn(visitor, modPaths);
 
     EXPECT_TRUE(visitor.replacedRoot);
+    EXPECT_FALSE(visitor.replacedRootIsKnownEmpty);
     EXPECT_THAT(visitor.preserved, UnorderedElementsAre("a"s));
     EXPECT_THAT(visitor.modified, IsEmpty());
     EXPECT_THAT(visitor.renamed, IsEmpty());

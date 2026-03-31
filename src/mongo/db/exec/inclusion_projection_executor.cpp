@@ -286,7 +286,7 @@ std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInAddFields(
 
 void InclusionProjectionExecutor::describeTransformation(
     document_transformation::DocumentOperationVisitor& visitor) const {
-    visitor(document_transformation::ReplaceRoot{});
+    visitor(document_transformation::ReplaceRoot{!_rootReplacementExpression /*isEmpty*/});
     if (_rootReplacementExpression) {
         return;
     }

@@ -93,6 +93,10 @@ output: {
             "fields": {
                 "<missing>:6": {
                     "declaringScope": "scope:2",
+                    "metadata": {
+                        "array": false,
+                        "missing": true
+                    },
                     "dependencies": []
                 },
                 "_id:-1": "_id:-1",

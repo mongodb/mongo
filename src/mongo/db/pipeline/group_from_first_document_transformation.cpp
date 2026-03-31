@@ -95,6 +95,7 @@ DocumentSource::GetModPathsReturn GroupFromFirstDocumentTransformation::getModif
 void GroupFromFirstDocumentTransformation::describeTransformation(
     document_transformation::DocumentOperationVisitor& visitor) const {
     // Replaces the entire root, so all paths are modified.
+    // TODO(SERVER-122971): Revisit this.
     visitor(document_transformation::ReplaceRoot{});
 }
 

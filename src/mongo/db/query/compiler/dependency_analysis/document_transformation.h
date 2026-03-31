@@ -63,7 +63,22 @@ public:
  * Can only ever be the first operation.
  * Note: For GetModifiedPaths, this represents a kAllPaths or kAllExcept projection.
  */
-class ReplaceRoot final : public DocumentOperation {};
+class ReplaceRoot final : public DocumentOperation {
+public:
+    /// When isEmpty is true, the new root is known to be the empty document. Any field not
+    /// explicitly added by subsequent operations is definitely missing.
+    explicit ReplaceRoot(bool isEmpty = false) : _isEmpty(isEmpty) {}
+
+    /// Returns true if the new root is known to be the empty document, meaning any field not
+    /// explicitly added by subsequent operations is definitely missing. When false, the new root
+    /// may contain unknown fields (e.g. $replaceRoot: {newRoot: "$x"}).
+    bool isEmpty() const {
+        return _isEmpty;
+    }
+
+private:
+    const bool _isEmpty;
+};
 
 /**
  * Describes a path preservation, such as for an inclusion projection.

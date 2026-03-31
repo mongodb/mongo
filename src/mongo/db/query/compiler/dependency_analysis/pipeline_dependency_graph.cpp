@@ -322,12 +322,18 @@ struct FieldMetadata {
         return *this == FieldMetadata{};
     }
 
-    auto operator<=>(const FieldMetadata&) const = default;
+    bool operator==(const FieldMetadata&) const = default;
 
     /**
      * True if the value of this field can be type array.
      */
-    bool canFieldBeArray{true};
+    bool canFieldBeArray : 1 {true};
+
+    /**
+     * True if the value of this field is known to be the BSON missing value. I.e., the field is
+     * guaranteed to be absent.
+     */
+    bool knownToBeMissing : 1 {false};
 };
 
 // It's fine to change the assert and increase the size of the FieldMetadata, but there should be a
@@ -451,9 +457,9 @@ enum class FieldMatchType : uint8_t {
     kShadowed,
     /**
      * We did not find a matching field node, but we know that it could originate at the scope
-     * whose <missing> field we return.
-     * Example: lookup was for x.y, but the previous stage was a $replaceRoot which affects all
-     * fields. We return the <missing> field for the $replaceRoot scope.
+     * whose <missing> field we return. The <missing> field's metadata indicates whether the field
+     * is truly absent (knownToBeMissing=true, e.g. after inclusion projection) or merely unknown
+     * (knownToBeMissing=false, e.g. after $replaceRoot with an expression).
      */
     kMissing,
     /**
@@ -555,8 +561,9 @@ public:
                 return true;
             }
             case FieldMatchType::kMissing:
-                // If we do not know what this field is, we have to assume it can be an array.
-                return true;
+                // Check the <missing> field's metadata: if it's known to be BSON Missing, the
+                // field is definitely absent and cannot be an array. Otherwise, it's unknown.
+                return !_fields[fieldId].metadata.knownToBeMissing;
             case FieldMatchType::kBaseDocument:
                 return _canMainCollPathBeArray(path);
         }
@@ -591,11 +598,7 @@ private:
     void declareScope(StageId stage, ScopeId exhaustiveScope, ScopeId parentScope) {
         auto scopeId = _scopes.getNextId();
         auto missingField = _fields.append(Field{scopeId});
-        _scopes.append(Scope{
-            stage,
-            exhaustiveScope,
-            missingField,
-        });
+        _scopes.append(Scope{stage, exhaustiveScope, missingField});
         if (parentScope) {
             _scopes[scopeId].fields = _scopes[parentScope].fields;
         }
@@ -629,18 +632,18 @@ private:
         // Check if we already have 'a' in the current scope that we are building. If we do, we will
         // preserve any fields it may already contain.
         auto [existingBaseField, existingBaseFieldType] = lookupField(scope, basePath);
-        bool canReuseBaseField;
-        switch (existingBaseFieldType) {
-            case FieldMatchType::kExact:
-                canReuseBaseField = _fields[existingBaseField].declaringScope == scope &&
-                    _fields[existingBaseField].embeddedScope;
-                break;
-            case FieldMatchType::kShadowed:
-            case FieldMatchType::kMissing:
-            case FieldMatchType::kBaseDocument:
-                canReuseBaseField = false;
-                break;
-        }
+        bool canReuseBaseField = [&] {
+            switch (existingBaseFieldType) {
+                case FieldMatchType::kExact:
+                    return _fields[existingBaseField].declaringScope == scope &&
+                        _fields[existingBaseField].embeddedScope;
+                case FieldMatchType::kShadowed:
+                case FieldMatchType::kMissing:
+                case FieldMatchType::kBaseDocument:
+                    return false;
+            }
+            MONGO_UNREACHABLE_TASSERT(12227301);
+        }();
 
         // Scope for declaring 'b' field of 'a'.
         FieldId newBaseField;
@@ -751,8 +754,7 @@ private:
         // value that shadows any subpath. That is, the subfield that is being included is either
         // not known or is known to not exist. We currently don't properly distinguish between the
         // two, so we declare the field to avoid incorrect dependency tracking.
-        // TODO(SERVER-122273): Revisit this when we properly distinguish between unknown and
-        // missing fields.
+        // TODO(SERVER-119392): Track whether or not the parent field is known to be a scalar.
         if (shadowedByParent) {
             declareField(scope, path, {parentBaseField});
             return;
@@ -821,8 +823,9 @@ private:
         }
 
         if (scope.exhaustiveScope) {
-            // The exact field is not explicitly known in the graph but we know the scope that
-            // could have modified it.
+            // The field is not explicitly known in the graph but we know the scope that could
+            // have modified it. The <missing> field's metadata indicates whether the field is
+            // truly absent (knownToBeMissing) or merely unknown.
             return FieldMatch::missing(_scopes[scope.exhaustiveScope].missingField);
         }
 
@@ -929,12 +932,17 @@ private:
 
         document_transformation::describeTransformation(
             OverloadedVisitor{
-                [&](const ReplaceRoot&) {
+                [&](const ReplaceRoot& op) {
                     // All paths might be modified. This scope does not inherit the parent scope
-                    // fields. It also doesn't know all fields - all lookups will fail and we should
-                    // say we have no information about the field (as opposed to saying the field is
-                    // definitely missing like for kAllExcept).
+                    // fields. If 'isEmpty' is true (e.g. inclusion projection), any
+                    // field not explicitly added is truly missing. Otherwise (e.g. $replaceRoot
+                    // with expression), unknown fields may still exist.
                     declareScope(stage, scopeId /*exhaustiveScope*/, ScopeId::none());
+                    if (op.isEmpty()) {
+                        auto& missingField = _fields[_scopes[scopeId].missingField];
+                        missingField.metadata.knownToBeMissing = true;
+                        missingField.metadata.canFieldBeArray = false;
+                    }
                     tassert(
                         11996201, "Did not expect ReplaceRoot in this position", !hasDeclaredScope);
                     hasDeclaredScope = true;
@@ -1002,8 +1010,10 @@ private:
                                 break;
                             }
                             case FieldMatchType::kMissing: {
-                                // We don't know anything about the arrayness of missing/unknown
-                                // fields.
+                                // A truly missing field cannot be an array. An unknown field
+                                // might be.
+                                metadata.canFieldBeArray =
+                                    !_fields[oldPathField].metadata.knownToBeMissing;
                                 break;
                             }
                             case FieldMatchType::kShadowed: {
@@ -1409,6 +1419,9 @@ private:
         BSONObjBuilder metaBuilder = bob.subobjStart("metadata");
         if (!metadata.canFieldBeArray) {
             metaBuilder.append("array", false);
+        }
+        if (metadata.knownToBeMissing) {
+            metaBuilder.append("missing", true);
         }
     }
 

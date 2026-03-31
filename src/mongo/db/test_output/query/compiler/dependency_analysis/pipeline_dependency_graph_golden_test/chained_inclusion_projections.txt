@@ -75,6 +75,10 @@ output: {
             "fields": {
                 "<missing>:4": {
                     "declaringScope": "scope:1",
+                    "metadata": {
+                        "array": false,
+                        "missing": true
+                    },
                     "dependencies": []
                 },
                 "_id:-1": "_id:-1",
@@ -94,6 +98,10 @@ output: {
             "fields": {
                 "<missing>:5": {
                     "declaringScope": "scope:2",
+                    "metadata": {
+                        "array": false,
+                        "missing": true
+                    },
                     "dependencies": []
                 },
                 "_id:-1": "_id:-1",
