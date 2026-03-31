@@ -28,7 +28,6 @@ selector:
     - uses_transactions
     # Exclude tests that require a specific fcv.
     # Once SERVER-81054 is complete this is no longer needed.
-    - requires_fcv_80
     - requires_fcv_81
     - requires_fcv_82
     - requires_fcv_83
@@ -52,7 +51,7 @@ selector:
     # TODO (SERVER-78220): Investigate failing api version tests in the fcv jscore passthrough suite.
     - jstests/core/query/api/api_version_unstable_indexes.js
 
-    # TODO: Remove after fixing SERVER-78201: the following received command without explicit readConcern.
+    # TODO (SERVER-78201): Remove after fixing SERVER-78201: the following received command without explicit readConcern.
     - jstests/aggregation/sources/densify/internal_parse.js
     - jstests/aggregation/parsing/api_version_stage_allowance_checks.js
 

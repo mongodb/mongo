@@ -35,7 +35,7 @@ selector:
     - jstests/core/**/geo_s2explain.js # inputStage in different spot in explain().
     - jstests/core/**/geo_s2sparse.js # keysPerIndex in different spot in validate().
     - jstests/core/**/operation_latency_histogram.js # Stats are counted differently on mongos, SERVER-24880.
-    # TODO: Remove after fixing SERVER-103278. executionStats.nReturned is incorrect for sharded distinct commands.
+    # TODO (SERVER-103278): Remove after fixing SERVER-103278. executionStats.nReturned is incorrect for sharded distinct commands.
     - jstests/core/**/distinct_index1.js
     # TODO SERVER-32311: These tests use plan stage helpers which can't handle sharded explain output.
     - jstests/core/**/expr_index_use.js
@@ -48,7 +48,7 @@ selector:
     # TODO (SERVER-78220): Investigate failing api version tests in the fcv jscore passthrough suite.
     - jstests/core/query/api/api_version_unstable_indexes.js
 
-    # TODO: Remove after fixing SERVER-78201: the following received command without explicit readConcern.
+    # TODO (SERVER-78201): Remove after fixing SERVER-78201: the following received command without explicit readConcern.
     - jstests/aggregation/sources/densify/internal_parse.js
     - jstests/aggregation/parsing/api_version_stage_allowance_checks.js
 
@@ -178,7 +178,7 @@ selector:
     - jstests/aggregation/optimization/use_query_project_and_sort.js
     - jstests/aggregation/optimization/use_query_projection.js
     - jstests/aggregation/optimization/use_query_sort.js
-    # TODO: Remove when SERVER-23229 is fixed.
+    # TODO (SERVER-23229): Remove when SERVER-23229 is fixed.
     - jstests/aggregation/sources/group/groupMissing.js
     - jstests/aggregation/sources/graphLookup/variables.js
     # TODO (SERVER-77935): Investigate timeout from fcv downgrade in jstests/core/query/push/push2.js.
@@ -227,7 +227,6 @@ selector:
     - uses_transactions
     # Exclude tests that require a specific fcv.
     # Once SERVER-81054 is complete this is no longer needed.
-    - requires_fcv_80
     - requires_fcv_81
     - requires_fcv_82
     - requires_fcv_83
