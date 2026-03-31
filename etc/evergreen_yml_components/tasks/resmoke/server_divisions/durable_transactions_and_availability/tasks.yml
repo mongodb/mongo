@@ -2658,29 +2658,30 @@ tasks:
           suite: disagg_concurrency_sharded_multi_stmt_txn
           use_large_distro: "true"
 
-  - <<: *gen_task_template
-    name: disagg_concurrency_sharded_multi_stmt_txn_with_balancer_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_repl",
-        "default",
-        "large",
-        "clustered_collections",
-        "requires_extra_system_deps",
-        "incompatible_mac",
-        "incompatible_ppc",
-        "incompatible_s390x",
-        "incompatible_debug_mode",
-        "concurrency",
-        "common",
-        "sharded",
-        "txn",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          suite: disagg_concurrency_sharded_multi_stmt_txn_with_balancer
-          use_large_distro: "true"
+  # TODO (SERVER-123074): Re-enable balancer related disagg suites
+  #  - <<: *gen_task_template
+  #    name: disagg_concurrency_sharded_multi_stmt_txn_with_balancer_gen
+  #    tags:
+  #      [
+  #        "assigned_to_jira_team_server_repl",
+  #        "default",
+  #        "large",
+  #        "clustered_collections",
+  #        "requires_extra_system_deps",
+  #        "incompatible_mac",
+  #        "incompatible_ppc",
+  #        "incompatible_s390x",
+  #        "incompatible_debug_mode",
+  #        "concurrency",
+  #        "common",
+  #        "sharded",
+  #        "txn",
+  #      ]
+  #    commands:
+  #      - func: "generate resmoke tasks"
+  #        vars:
+  #          suite: disagg_concurrency_sharded_multi_stmt_txn_with_balancer
+  #          use_large_distro: "true"
 
   - <<: *gen_task_template
     name: disagg_concurrency_sharded_local_read_write_multi_stmt_txn_gen
@@ -2705,27 +2706,27 @@ tasks:
         vars:
           suite: disagg_concurrency_sharded_local_read_write_multi_stmt_txn
           use_large_distro: "true"
-
-  - <<: *gen_task_template
-    name: disagg_concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_repl",
-        "default",
-        "large",
-        "clustered_collections",
-        "requires_extra_system_deps",
-        "incompatible_mac",
-        "incompatible_ppc",
-        "incompatible_s390x",
-        "incompatible_debug_mode",
-        "concurrency",
-        "common",
-        "sharded",
-        "txn",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          suite: disagg_concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer
-          use_large_distro: "true"
+# TODO (SERVER-123074): Re-enable balancer related disagg suites
+#  - <<: *gen_task_template
+#    name: disagg_concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer_gen
+#    tags:
+#      [
+#        "assigned_to_jira_team_server_repl",
+#        "default",
+#        "large",
+#        "clustered_collections",
+#        "requires_extra_system_deps",
+#        "incompatible_mac",
+#        "incompatible_ppc",
+#        "incompatible_s390x",
+#        "incompatible_debug_mode",
+#        "concurrency",
+#        "common",
+#        "sharded",
+#        "txn",
+#      ]
+#    commands:
+#      - func: "generate resmoke tasks"
+#        vars:
+#          suite: disagg_concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer
+#          use_large_distro: "true"
