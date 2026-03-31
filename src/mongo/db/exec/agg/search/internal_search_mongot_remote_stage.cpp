@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/extension/host/extension_search_server_status.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/search/mongot_cursor.h"
@@ -67,6 +68,9 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceInternalSearchMongotRemoteT
     auto documentSource = dynamic_cast<DocumentSourceInternalSearchMongotRemote*>(source.get());
 
     tassert(10807803, "expected 'DocumentSourceInternalSearchMongotRemote' type", documentSource);
+
+    // Increment legacySearchQueryCount when legacy $search is converted to executable stage.
+    search_metrics::legacySearchQueryCount.increment(1);
 
     return make_intrusive<exec::agg::InternalSearchMongotRemoteStage>(
         documentSource->kStageName,

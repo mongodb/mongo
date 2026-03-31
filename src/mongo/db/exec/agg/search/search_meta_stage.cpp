@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/exec/agg/search/search_meta_stage.h"
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/extension/host/extension_search_server_status.h"
 #include "mongo/db/pipeline/search/document_source_search_meta.h"
 
 namespace mongo {
@@ -40,6 +40,9 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceSearchMetaToStageFn(
     auto documentSource = dynamic_cast<DocumentSourceSearchMeta*>(source.get());
 
     tassert(10807801, "expected 'DocumentSourceSearchMeta' type", documentSource);
+
+    // Increment legacySearchQueryCount when legacy $searchMeta is converted to executable stage.
+    search_metrics::legacySearchQueryCount.increment(1);
 
     return make_intrusive<exec::agg::SearchMetaStage>(documentSource->kStageName,
                                                       documentSource->_spec,

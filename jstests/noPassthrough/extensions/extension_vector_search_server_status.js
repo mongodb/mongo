@@ -4,15 +4,15 @@
  * @tags: [featureFlagExtensionsAPI]
  */
 import {checkPlatformCompatibleWithExtensions, withExtensions} from "jstests/noPassthrough/libs/extension_helpers.js";
+import {
+    assertOnlyTheseMetricsChanged,
+    setupExtensionMetricsTest,
+} from "jstests/noPassthrough/libs/extension_server_status_helpers.js";
 
 const conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "mongod failed to start");
 
 const adminDB = conn.getDB("admin");
-
-function getTargetSection(serverStatusOutput) {
-    return serverStatusOutput.metrics.extension.vectorSearch;
-}
 
 (function VectorSearchServerStatusMetricsAppearByDefault() {
     // Get serverStatus and verify the extension.vectorSearch section exists.
@@ -50,67 +50,18 @@ MongoRunner.stopMongod(conn);
     withExtensions(
         {"libvector_search_extension.so": {}},
         (testConn) => {
-            const testAdminDB = testConn.getDB("admin");
-            const testDB = testConn.getDB("test");
-            const coll = testDB[jsTestName()];
-            const testData = [
-                {_id: 0, text: "apple"},
-                {_id: 1, text: "banana"},
-            ];
-            assert.commandWorked(coll.insertMany(testData));
+            const {coll, testData, getMetrics} = setupExtensionMetricsTest(
+                testConn,
+                "featureFlagVectorSearchExtension",
+                "extension.vectorSearch",
+            );
 
-            assert.commandWorked(testAdminDB.runCommand({setParameter: 1, featureFlagVectorSearchExtension: true}));
-
-            // Get initial metrics.
-            const initialServerStatus = testAdminDB.runCommand({serverStatus: 1});
-            assert.commandWorked(initialServerStatus);
-
-            const initialMetrics = getTargetSection(initialServerStatus);
-            const initialExtensionCount = initialMetrics.extensionVectorSearchUsed;
-            const initialLegacyCount = initialMetrics.legacyVectorSearchUsed;
-            const initialOnViewKickbackCount = initialMetrics.onViewKickbackRetries;
-            const initialInUnionWithKickbackCount = initialMetrics.inUnionWithKickbackRetries;
-
-            // Run a vector search query to trigger the extension.
-            const pipeline = [{$vectorSearch: {}}];
-            const result = coll.aggregate(pipeline).toArray();
+            const initialMetrics = getMetrics();
+            const result = coll.aggregate([{$vectorSearch: {}}]).toArray();
             assert.eq(result.length, testData.length, "Vector search should return all documents");
+            const finalMetrics = getMetrics();
 
-            // Get final metrics.
-            const finalServerStatus = testAdminDB.runCommand({serverStatus: 1});
-            assert.commandWorked(finalServerStatus);
-
-            const finalMetrics = getTargetSection(finalServerStatus);
-
-            // Verify extensionVectorSearchUsed was incremented.
-            const finalExtensionCount = finalMetrics.extensionVectorSearchUsed;
-            assert.gt(
-                finalExtensionCount,
-                initialExtensionCount,
-                `extensionVectorSearchUsed should have increased from ${initialExtensionCount} to ${finalExtensionCount}:` +
-                    tojson(finalMetrics),
-            );
-
-            // Verify other metrics remain at 0.
-            const finalLegacyCount = finalMetrics.legacyVectorSearchUsed;
-            const finalOnViewKickbackCount = finalMetrics.onViewKickbackRetries;
-            const finalInUnionWithKickbackCount = finalMetrics.inUnionWithKickbackRetries;
-
-            assert.eq(
-                finalLegacyCount,
-                initialLegacyCount,
-                `legacyVectorSearchUsed should remain at ${initialLegacyCount}, got ${finalLegacyCount}`,
-            );
-            assert.eq(
-                finalOnViewKickbackCount,
-                initialOnViewKickbackCount,
-                `onViewKickbackRetries should remain at ${initialOnViewKickbackCount}, got ${finalOnViewKickbackCount}`,
-            );
-            assert.eq(
-                finalInUnionWithKickbackCount,
-                initialInUnionWithKickbackCount,
-                `inUnionWithKickbackRetries should remain at ${initialInUnionWithKickbackCount}, got ${finalInUnionWithKickbackCount}`,
-            );
+            assertOnlyTheseMetricsChanged(initialMetrics, finalMetrics, ["extensionVectorSearchUsed"]);
         },
         ["standalone"],
     );

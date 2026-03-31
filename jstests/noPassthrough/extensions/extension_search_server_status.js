@@ -3,6 +3,12 @@
  *
  * @tags: [featureFlagExtensionsAPI]
  */
+import {checkPlatformCompatibleWithExtensions, withExtensions} from "jstests/noPassthrough/libs/extension_helpers.js";
+import {
+    assertOnlyTheseMetricsChanged,
+    getMetricsSection,
+    setupExtensionMetricsTest,
+} from "jstests/noPassthrough/libs/extension_server_status_helpers.js";
 
 const conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "mongod failed to start");
@@ -41,10 +47,136 @@ const adminDB = conn.getDB("admin");
 
 MongoRunner.stopMongod(conn);
 
-// TODO SERVER-122716: Add tests to verify extensionSearchUsed and legacySearchUsed are incremented
-// as expected. This can be modeled on extension_vector_search_server_status.js.
-// Also add additional tests for each of the following:
-//   - onViewKickbackRetries (TODO SERVER-122432)
-//   - inUnionWithKickbackRetries (TODO SERVER-122430)
-//   - inLookupKickbackRetries (TODO SERVER-122433)
-//   - inHybridSearchKickbackRetries (TODO SERVER-122434)
+const kExtensionLib = "libsearch_extension.so";
+const kFeatureFlag = "featureFlagSearchExtension";
+const kMetricsPath = "extension.search";
+
+checkPlatformCompatibleWithExtensions();
+
+(function ExtensionSearchUsedGetsIncremented() {
+    withExtensions(
+        {[kExtensionLib]: {}},
+        (testConn) => {
+            const {coll, testData, getMetrics} = setupExtensionMetricsTest(testConn, kFeatureFlag, kMetricsPath);
+
+            const initialMetrics = getMetrics();
+            const result = coll.aggregate([{$search: {}}]).toArray();
+            assert.eq(result.length, testData.length, "Search should return all documents");
+            const finalMetrics = getMetrics();
+
+            assertOnlyTheseMetricsChanged(initialMetrics, finalMetrics, ["extensionSearchUsed"]);
+        },
+        ["standalone"],
+    );
+})();
+
+(function ExtensionSearchMetaUsedGetsIncremented() {
+    withExtensions(
+        {[kExtensionLib]: {}},
+        (testConn) => {
+            const {coll, getMetrics} = setupExtensionMetricsTest(testConn, kFeatureFlag, kMetricsPath);
+
+            const initialMetrics = getMetrics();
+            coll.aggregate([{$searchMeta: {}}]).toArray();
+            const finalMetrics = getMetrics();
+
+            assertOnlyTheseMetricsChanged(initialMetrics, finalMetrics, ["extensionSearchUsed"]);
+        },
+        ["standalone"],
+    );
+})();
+
+(function ExtensionSearchUsedNotIncrementedForNonSearchStages() {
+    withExtensions(
+        {[kExtensionLib]: {}},
+        (testConn) => {
+            const {coll, getMetrics} = setupExtensionMetricsTest(testConn, kFeatureFlag, kMetricsPath);
+
+            const initialMetrics = getMetrics();
+            coll.aggregate([{$match: {a: 1}}]).toArray();
+            const finalMetrics = getMetrics();
+
+            assertOnlyTheseMetricsChanged(initialMetrics, finalMetrics, []);
+        },
+        ["standalone"],
+    );
+})();
+
+(function ExplainIncrementsExtensionSearchUsed() {
+    withExtensions(
+        {[kExtensionLib]: {}},
+        (testConn) => {
+            const {coll, getMetrics} = setupExtensionMetricsTest(testConn, kFeatureFlag, kMetricsPath);
+
+            const initialMetrics = getMetrics();
+            coll.explain().aggregate([{$search: {}}]);
+            const finalMetrics = getMetrics();
+
+            assertOnlyTheseMetricsChanged(initialMetrics, finalMetrics, ["extensionSearchUsed"]);
+        },
+        ["standalone"],
+    );
+})();
+
+(function VectorSearchDoesNotIncrementSearchCounters() {
+    withExtensions(
+        {[kExtensionLib]: {}, "libvector_search_extension.so": {}},
+        (testConn) => {
+            const {coll, getMetrics} = setupExtensionMetricsTest(testConn, kFeatureFlag, kMetricsPath);
+            assert.commandWorked(
+                testConn.getDB("admin").runCommand({setParameter: 1, featureFlagVectorSearchExtension: true}),
+            );
+
+            const initialMetrics = getMetrics();
+            coll.aggregate([{$vectorSearch: {}}]).toArray();
+            const finalMetrics = getMetrics();
+
+            assertOnlyTheseMetricsChanged(initialMetrics, finalMetrics, []);
+        },
+        ["standalone"],
+    );
+})();
+
+(function ShardedExtensionSearchIncrementsOnShardPrimary() {
+    withExtensions(
+        {[kExtensionLib]: {}},
+        (testConn, shardingTest) => {
+            const {coll, getMetrics} = setupExtensionMetricsTest(testConn, kFeatureFlag, kMetricsPath);
+
+            const shardPrimary = shardingTest.rs0.getPrimary();
+            const initialShardMetrics = getMetricsSection(shardPrimary, kMetricsPath);
+            const initialMongosMetrics = getMetrics();
+
+            coll.aggregate([{$search: {}}]).toArray();
+
+            const finalShardMetrics = getMetricsSection(shardPrimary, kMetricsPath);
+            assertOnlyTheseMetricsChanged(initialShardMetrics, finalShardMetrics, ["extensionSearchUsed"]);
+            // Mongos does not execute stages, so its counters should not change.
+            const finalMongosMetrics = getMetrics();
+            assertOnlyTheseMetricsChanged(initialMongosMetrics, finalMongosMetrics, []);
+        },
+        ["sharded"],
+    );
+})();
+
+(function ShardedExplainIncrementsOnShardPrimary() {
+    withExtensions(
+        {[kExtensionLib]: {}},
+        (testConn, shardingTest) => {
+            const {coll, getMetrics} = setupExtensionMetricsTest(testConn, kFeatureFlag, kMetricsPath);
+
+            const shardPrimary = shardingTest.rs0.getPrimary();
+            const initialShardMetrics = getMetricsSection(shardPrimary, kMetricsPath);
+            const initialMongosMetrics = getMetrics();
+
+            coll.explain().aggregate([{$search: {}}]);
+
+            const finalShardMetrics = getMetricsSection(shardPrimary, kMetricsPath);
+            assertOnlyTheseMetricsChanged(initialShardMetrics, finalShardMetrics, ["extensionSearchUsed"]);
+            // Mongos does not execute stages, so its counters should not change.
+            const finalMongosMetrics = getMetrics();
+            assertOnlyTheseMetricsChanged(initialMongosMetrics, finalMongosMetrics, []);
+        },
+        ["sharded"],
+    );
+})();
