@@ -31,6 +31,7 @@ from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
 # test_layered76.py
+# Checkpoint size verification
 
 @disagg_test_class
 class test_layered76(wttest.WiredTigerTestCase):
@@ -56,12 +57,26 @@ class test_layered76(wttest.WiredTigerTestCase):
 
         self.verifyUntilSuccess()
 
-    def test_ckpt_size_verify_multi(self):
+    def test_ckpt_size_verify_multi_insert(self):
         self.session.create(self.uri, self.create_session_config)
 
         # Insert data.
         cursor = self.session.open_cursor(self.uri)
-        for i in range(1000):
+        for i in range(10):
+            cursor[i] = 'a' * 100
+        cursor.close()
+
+        # Do a checkpoint.
+        self.session.checkpoint()
+
+        self.verifyUntilSuccess()
+
+    def test_ckpt_size_verify_large_dataset(self):
+        self.session.create(self.uri, self.create_session_config)
+
+        # Insert data.
+        cursor = self.session.open_cursor(self.uri)
+        for i in range(100000):
             cursor[i] = 'a' * 100
         cursor.close()
 
@@ -72,7 +87,7 @@ class test_layered76(wttest.WiredTigerTestCase):
 
     def test_ckpt_size_verify_many_ckpt(self):
         session_config = 'key_format=S,value_format=S'
-        nitems = 10
+        nitems = 10000
 
         self.session.create(self.uri, session_config)
 

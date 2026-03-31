@@ -174,6 +174,11 @@ struct __wt_btree {
     /* Total size of all blocks in this btree. Tracked for disaggregated storage. */
     wt_shared uint64_t bytes_total;
 
+    /* Root page size tracking for checkpoint size accounting. */
+    uint64_t current_root_size;  /* Size of current root page */
+    uint64_t previous_root_size; /* Size of previous root page */
+    uint64_t root_size_gen;      /* Checkpoint generation of the last root size update */
+
     /*
      * Reconciliation...
      */

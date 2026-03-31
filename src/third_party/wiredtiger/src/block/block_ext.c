@@ -632,8 +632,6 @@ __wt_block_free(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint8_t *addr, 
     wt_off_t offset;
     uint32_t checksum, objectid, size;
 
-    WT_STAT_DSRC_INCR(session, block_free);
-
     /* Crack the cookie. */
     WT_RET(__wt_block_addr_unpack(
       session, block, addr, addr_size, &objectid, &offset, &size, &checksum));
@@ -701,6 +699,12 @@ __wti_block_off_free(
         ret = __block_merge(session, block, &block->live.avail, offset, size);
     else if (ret == WT_NOTFOUND)
         ret = __block_merge(session, block, &block->live.discard, offset, size);
+
+    /* Increment the free block statistic when not running salvage. */
+    if (!F_ISSET(S2BT(session), WT_BTREE_SALVAGE)) {
+        WT_STAT_DSRC_INCR(session, block_free);
+    }
+
     return (ret);
 }
 

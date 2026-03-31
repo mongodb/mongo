@@ -397,7 +397,7 @@ functions:
           echo "Find CMake"
           . test/evergreen/find_cmake.sh
           # If we've fetched the wiredtiger artifact from a previous compilation/build, it's best to remove
-          # the previous build directory so we can create a fresh configuration. We can't use the the previous
+          # the previous build directory so we can create a fresh configuration. We can't use the previous
           # CMake Cache configuration as its likely it will have absolute paths related to the previous build machine.
           echo "Remove the cmake_build directory, if it already exists"
           if [ -d cmake_build ]; then rm -r cmake_build; fi
@@ -573,7 +573,7 @@ functions:
           # file.
           file=$(mktemp --suffix ".json")
 
-          # Use '|' as the delimiter instead of default behaviour because the private key contains
+          # Use '|' as the delimiter instead of default behavior because the private key contains
           # slash characters.
           sed -e 's|gcp_project_id|${gcp_sdk_ext_project_id}|'                      \
               -e 's|gcp_private_key|'"${gcp_sdk_ext_private_key}"'|'                \
@@ -751,7 +751,7 @@ functions:
       # The tests need to be executed in the cppsuite directory as some required libraries have
       # their paths defined relative to this directory.
       # The below script saves the exit code from the test to use it later in this function. By
-      # doing this we can define our own custom artifact upload task without it being cancelled by
+      # doing this we can define our own custom artifact upload task without it being canceled by
       # the test failing.
       # Additionally if the test fails perf statistics won't be uploaded as they may be invalid
       # due to the test failure.
@@ -814,7 +814,7 @@ functions:
       remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${task_name}_${build_id}${postfix|}.tgz
 
   # FIXME-WT-8538 This task prevents us from saving the same artifacts to evergreen twice. It can be
-  # removed when we implement a generalised approach in WT-8538
+  # removed when we implement a generalized approach in WT-8538
   "cppsuite remove dir": &cppsuite_remove_dir
     command: shell.exec
     params:
@@ -1376,7 +1376,7 @@ functions:
 
   "run-perf-test":
     # Run a performance test
-    # Parameterised using the 'perf-test-name' and 'maxruns' variables
+    # Parameterized using the 'perf-test-name' and 'maxruns' variables
     - command: shell.exec
       params:
         working_dir: "wiredtiger/cmake_build/bench/wtperf"
@@ -1457,7 +1457,7 @@ functions:
           - task_id
           - execution
     # Push the json results to the 'Files' tab of the task in Evergreen
-    # Parameterised using the 'test-name' variable
+    # Parameterized using the 'test-name' variable
     - command: s3.put
       type: setup
       params:
@@ -1658,7 +1658,7 @@ variables:
 # The following stress tests are configured to run for six hours via the "-t 360"
 # argument to format.sh: format-stress-test, format-stress-asan-test, and
 # race-condition-stress-asan-test. The recovery tests run in a loop, with
-# the number of runs adjusted to provide aproximately six hours of testing.
+# the number of runs adjusted to provide approximately six hours of testing.
 #########################################################################################
 
   - &format-stress-test
@@ -1836,7 +1836,7 @@ variables:
 
 tasks:
   # Check the python configuration
-  # Base compile task on posix flavours
+  # Base compile task on posix flavors
   - name: compile
     tags: ["pull_request"]
     commands:
@@ -2391,7 +2391,7 @@ tasks:
   - name: cppsuite-api-instruction-count-benchmarks-default-perf
     depends_on:
       - name: compile
-    # This and the later test only run on ARM as the required harsware counter is missing on x86.
+    # This and the later test only run on ARM as the required hardware counter is missing on x86.
     tags: ["cppsuite-perf-test-arm"]
     commands:
       - func: "fetch artifacts"
@@ -4298,7 +4298,7 @@ tasks:
             # file.
             file=$(mktemp --suffix ".json")
 
-            # Use '|' as the delimiter instead of default behaviour because the private key contains
+            # Use '|' as the delimiter instead of default behavior because the private key contains
             # slash characters.
             sed -e 's|gcp_project_id|${gcp_sdk_ext_project_id}|'                      \
                 -e 's|gcp_private_key|'"${gcp_sdk_ext_private_key}"'|'                \
@@ -4827,7 +4827,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            # -V option displays Wiredtiger library version
+            # -V option displays WiredTiger library version
             ./wt -V
 
             if [ $? -ne 0 ]; then
@@ -6766,7 +6766,7 @@ buildvariants:
       export LSAN_OPTIONS="$COMMON_SAN_OPTIONS:allocator_may_return_null=1:print_suppressions=0:suppressions=$(git rev-parse --show-toplevel)/test/evergreen/asan_leaks.supp"
     # Parallel execution hides ASAN warnings for python tests. Force sequential execution of python
     # tests by setting num_jobs to 1.
-    # FIXME-WT-16067: AFAIS even with num_jobs=1 some tests (e.g. format.sh) could be executed in
+    # FIXME-WT-16067: AFAIK even with num_jobs=1 some tests (e.g. format.sh) could be executed in
     # a separate process. It's worth investigating whether it could lead to hiding some warnings.
     num_jobs: 1
     # Exclude wt12015_backup_corruption for ASan builds. It creates false positives when it deliberately kills processes that invoke corruption.
@@ -6865,7 +6865,7 @@ buildvariants:
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=MSan
     # MemorySanitizer requires that all program code is instrumented, otherwise it may generate false reports.
     posix_configure_flags: -DENABLE_LZ4=0 -DENABLE_SNAPPY=0 -DENABLE_ZLIB=0 -DENABLE_ZSTD=0
-    # Use optimisation level -O0 since Clang treats -Og (our default optimisation for non-release
+    # Use optimization level -O0 since Clang treats -Og (our default optimization for non-release
     # builds) as -O1, making test binaries more difficult to debug.
     CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
     ENABLE_TCMALLOC: 0
@@ -6894,7 +6894,7 @@ buildvariants:
   expansions:
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=UBSan
-    # Use optimisation level -O0 since Clang treats -Og (our default optimisation for non-release
+    # Use optimization level -O0 since Clang treats -Og (our default optimization for non-release
     # builds) as -O1, making test binaries more difficult to debug.
     CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
     ENABLE_TCMALLOC: 0
@@ -7535,7 +7535,7 @@ buildvariants:
       export LSAN_OPTIONS="$COMMON_SAN_OPTIONS:allocator_may_return_null=1:print_suppressions=0:suppressions=$(git rev-parse --show-toplevel)/test/evergreen/asan_leaks.supp"
     # Parallel execution hides ASAN warnings for python tests. Force sequential execution of python
     # tests by setting num_jobs to 1.
-    # FIXME-WT-16067: AFAIS even with num_jobs=1 some tests (e.g. format.sh) could be executed in
+    # FIXME-WT-16067: AFAIK even with num_jobs=1 some tests (e.g. format.sh) could be executed in
     # a separate process. It's worth investigating whether it could lead to hiding some warnings.
     num_jobs: 1
     # Exclude wt12015_backup_corruption for ASan builds. It creates false positives when it deliberately kills processes that invoke corruption.
@@ -7609,7 +7609,7 @@ buildvariants:
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=MSan
     # MemorySanitizer requires that all program code is instrumented, otherwise it may generate false reports.
     posix_configure_flags: -DENABLE_LZ4=0 -DENABLE_SNAPPY=0 -DENABLE_ZLIB=0 -DENABLE_ZSTD=0
-    # Use optimisation level -O0 since Clang treats -Og (our default optimisation for non-release
+    # Use optimization level -O0 since Clang treats -Og (our default optimization for non-release
     # builds) as -O1, making test binaries more difficult to debug.
     CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
     ENABLE_TCMALLOC: 0
@@ -7641,7 +7641,7 @@ buildvariants:
   expansions:
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=UBSan
-    # Use optimisation level -O0 since Clang treats -Og (our default optimisation for non-release
+    # Use optimization level -O0 since Clang treats -Og (our default optimization for non-release
     # builds) as -O1, making test binaries more difficult to debug.
     CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
     ENABLE_TCMALLOC: 0

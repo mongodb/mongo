@@ -319,7 +319,7 @@ __wt_logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfig)
 
     WT_RET(__wt_config_gets(session, cfg, "log.force_write_wait", &cval));
     if (cval.val != 0)
-        log_mgr->force_write_wait = (uint32_t)cval.val;
+        log_mgr->force_write_wait = (uint64_t)cval.val;
 
     /*
      * Note it's meaningless to reconfigure this value during runtime, it only matters on create

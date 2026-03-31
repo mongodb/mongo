@@ -654,19 +654,19 @@ connection_runtime_config = [
             type='category', subconfig=[
             Config('before_insert_colgroup', 'false', r'''
                 if true, force crash in table creation before inserting the colgroup metadata entry.
-                This is intended for testing purposes only.''', 
+                This is intended for testing purposes only.''',
                 type='boolean'),
             Config('before_insert_file', 'false', r'''
-                if true, force crash in table creation before inserting the file metadata entry. 
+                if true, force crash in table creation before inserting the file metadata entry.
                 This is intended for testing purposes only.''',
                 type='boolean'),
             Config('after_drop_colgroup', 'false', r'''
                 if true, force crash in table drop after dropping the table metadata entry. This is
-                intended for testing purposes only.''', 
+                intended for testing purposes only.''',
                 type='boolean'),
             Config('after_drop_file', 'false', r'''
-                if true, force crash in table drop after dropping the colgroup metadata entry. This 
-                is intended for testing purposes only.''', 
+                if true, force crash in table drop after dropping the colgroup metadata entry. This
+                is intended for testing purposes only.''',
                 type='boolean')
             ]),
         Config('corruption_abort', 'true', r'''

@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 
-# This script parses the WiredTiger code base to find all function definitions and automatically 
-# generates their declarations. Declarations are added to src/include/extern.h by default, or to 
+# This script parses the WiredTiger code base to find all function definitions and automatically
+# generates their declarations. Declarations are added to src/include/extern.h by default, or to
 # module-specific header files if the module is added to the SELF_CONTAINED_MODULES list
 
 # Attention! This script makes the following assumptions about the WiredTiger code directory:
-# - All module-related files should reside in a single src/module/ folder as a result of adding 
+# - All module-related files should reside in a single src/module/ folder as a result of adding
 #   a module to SELF_CONTAINED_MODULES
-# - Header files are named using the format {folder_name/module_name}.h or 
+# - Header files are named using the format {folder_name/module_name}.h or
 #   {folder_name/module_name}_private.h.
-# - Header files that are modified by this script have also been automatically created by this 
+# - Header files that are modified by this script have also been automatically created by this
 #   script as a result of adding a module to the SELF_CONTAINED_MODULES list.
 
 # Generate WiredTiger function prototypes.
@@ -19,9 +19,9 @@ from common_functions import filter_if_fast
 
 from collections import defaultdict
 
-# This is the list of modules that have their respective headers located in the src/module/ folder 
-# instead of in src/include/. As a result all relevant code is contained to a single folder. 
-# Adding modules to this list will automatically generate those headers, and we expect this list to 
+# This is the list of modules that have their respective headers located in the src/module/ folder
+# instead of in src/include/. As a result all relevant code is contained to a single folder.
+# Adding modules to this list will automatically generate those headers, and we expect this list to
 # grow as we modularise the code base.
 SELF_CONTAINED_MODULES = ["checkpoint", "evict", "log", "reconcile", "live_restore"]
 
@@ -169,13 +169,13 @@ def output(fns, tests, f):
     format_srcfile(tmp_file)
     compare_srcfile(tmp_file, f)
 
-# Build a mapping from a module to its public functions, private functions, 
+# Build a mapping from a module to its public functions, private functions,
 # and HAVE_UNITTEST functions.
 def build_module_functions_dicts():
     public_fns_dict = defaultdict(list)
     private_fns_dict = defaultdict(list)
     tests_dict = defaultdict(list)
-    
+
     for name in source_files():
         if not fnmatch.fnmatch(name, '*.c') + fnmatch.fnmatch(name, '*_inline.h'):
             continue
@@ -198,12 +198,12 @@ def build_module_functions_dicts():
         if fnmatch.fnmatch(name, '../src/*'):
             module_name = name.split("/")[2]
             if module_name not in SELF_CONTAINED_MODULES:
-                # Non-self-contained modules put all their function prototypes in 
+                # Non-self-contained modules put all their function prototypes in
                 # src/include/extern.h This is indicated by belonging to the include folder.
-                fn_prototypes(public_fns_dict["include"], private_fns_dict["include"], 
+                fn_prototypes(public_fns_dict["include"], private_fns_dict["include"],
                     tests_dict["include"], name)
             else:
-                fn_prototypes(public_fns_dict[module_name], private_fns_dict[module_name], 
+                fn_prototypes(public_fns_dict[module_name], private_fns_dict[module_name],
                     tests_dict[module_name], name)
         else:
             print(f"Unexpected filepath {name}")
@@ -211,28 +211,28 @@ def build_module_functions_dicts():
 
     return (public_fns_dict, private_fns_dict, tests_dict)
 
-# Given a list of dicts that map a module to their public, private, and HAVE_UNITTEST functions, 
+# Given a list of dicts that map a module to their public, private, and HAVE_UNITTEST functions,
 # write their header files with function declarations.
 def write_header_files(public_fns_dict, private_fns_dict, tests_dict):
-    # Trust that the public functions dict lists all modules. 
+    # Trust that the public functions dict lists all modules.
     # If a module doesn't have a public function then it can't be accessed and is dead code.
     modules = public_fns_dict.keys()
     for mod in modules:
         if mod == "include":
             # Functions defined in the include folder belong in extern.h
-            output(public_fns_dict[mod] + private_fns_dict[mod], tests_dict[mod], 
+            output(public_fns_dict[mod] + private_fns_dict[mod], tests_dict[mod],
                 f"../src/include/extern.h")
         else:
             output(public_fns_dict[mod], tests_dict[mod], f"../src/{mod}/{mod}.h")
             if len(private_fns_dict[mod]) > 0:
                 # The second argument (tests_dict) is empty. These test functions are defined to
-                # expose module internals outside the module, so it doens't make sense for them 
+                # expose module internals outside the module, so it doens't make sense for them
                 # to be private.
                 output(private_fns_dict[mod], {}, f"../src/{mod}/{mod}_private.h")
 
 def prototypes_os():
     """
-    The operating system abstraction layer duplicates function names. So each 
+    The operating system abstraction layer duplicates function names. So each
     os gets its own extern header file.
     """
     ports = 'posix win linux darwin'.split()
@@ -242,7 +242,7 @@ def prototypes_os():
         if m := re.match(r'^.*/os_(posix|win|linux|darwin)/.*', name):
             port = m.group(1)
             assert port in ports
-            # The operating system folders have special handling and write all functions 
+            # The operating system folders have special handling and write all functions
             # into a single extern_*.h file. Save all functions into the same fns list.
             fn_prototypes(fns[port], fns[port], tests[port], name)
 

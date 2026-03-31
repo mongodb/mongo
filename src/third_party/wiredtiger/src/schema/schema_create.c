@@ -24,21 +24,17 @@ __check_imported_ts(
 {
     WT_CKPT *ckptbase, *ckpt;
     WT_DECL_RET;
-    WT_TXN_GLOBAL *txn_global;
     wt_timestamp_t ts;
     const char *ts_name;
 
     ckptbase = NULL;
-    txn_global = &S2C(session)->txn_global;
 
     if (against_stable) {
         ts_name = "stable";
         ts = __wt_get_stable_timestamp(session);
     } else {
         ts_name = "oldest";
-        /* FIXME-WT-16776: use an atomic read operation similar to the stable timestamp
-         * implementation. */
-        ts = txn_global->oldest_timestamp;
+        ts = __wt_get_oldest_timestamp(session);
     }
 
     WT_ERR_NOTFOUND_OK(

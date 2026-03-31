@@ -1045,6 +1045,7 @@ __rec_upd_select_inmem(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPAC
   WT_UPDATE *first_upd, WTI_UPDATE_SELECT *upd_select, WT_UPDATE **first_txn_updp,
   bool *has_newer_updatesp, size_t *upd_memsizep)
 {
+    static WT_UPDATE upd_tombstone = {.txnid = WT_TXN_NONE, .type = WT_UPDATE_TOMBSTONE};
     WT_BTREE *btree;
     WT_UPDATE *upd, *first_pruned_update;
     wt_timestamp_t max_ts;
@@ -1191,6 +1192,12 @@ __rec_upd_select_inmem(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPAC
         } else if (first_pruned_update != NULL) {
             if (*first_txn_updp != first_pruned_update)
                 *has_newer_updatesp = true;
+            else if (WT_REC_HAS_ON_DISK(vpack))
+                /*
+                 * If we choose to garbage collect the key and it has an associated on-page value,
+                 * ensure that the on-page value is forcefully deleted as well.
+                 */
+                upd_select->upd = &upd_tombstone;
         } else
             *has_newer_updatesp = true;
     }
@@ -1199,8 +1206,10 @@ __rec_upd_select_inmem(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPAC
      * If there's an on-page value, we only want to write upd_select if the oldest update is
      * globally visible, otherwise we will lose the on-page update. Check if there's an on-page
      * update and reset upd_select if the update is not visible.
+     *
+     * If the goal is to prune the entire key, avoid resetting upd_select.
      */
-    if (WT_REC_HAS_ON_DISK(vpack) && !found_last_upd_to_keep) {
+    if (WT_REC_HAS_ON_DISK(vpack) && !found_last_upd_to_keep && first_pruned_update == NULL) {
         *has_newer_updatesp |= (upd_select->upd != NULL);
         upd_select->upd = NULL;
     }
@@ -1217,7 +1226,8 @@ __rec_upd_select_inmem(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPAC
     if (max_ts > r->max_ts)
         r->max_ts = max_ts;
 
-    if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT) && !*has_newer_updatesp && upd_select->upd == NULL)
+    if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT) &&
+      (upd_select->upd == &upd_tombstone || (!*has_newer_updatesp && upd_select->upd == NULL)))
         WT_STAT_CONN_DSRC_INCR(session, rec_ingest_garbage_collection_keys_update_chain);
 
     return (0);

@@ -26,20 +26,21 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, shutil, threading, time
+import os, threading, time
 from wtthread import checkpoint_thread
 from helper import simulate_crash_restart
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from wiredtiger import stat
+from wtbackup import backup_base
 
 # test_checkpoint_snapshot02.py
 #   This test is to run checkpoint and eviction in parallel with timing
 #   stress for checkpoint and let eviction write more data than checkpoint.
 #
 @wttest.skip_for_hook("disagg", "Disagg requires precise checkpoint which does not work well with small cache size.")
-class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
+class test_checkpoint_snapshot02(backup_base):
 
     # Create a table.
     uri = "table:test_checkpoint_snapshot02"
@@ -66,23 +67,6 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
         self.extraconfig = ''
         self.nrows = 1000
         self.valuea = "aaaaa" * 100
-
-    def take_full_backup(self, fromdir, todir):
-        # Open up the backup cursor, and copy the files.  Do a full backup.
-        cursor = self.session.open_cursor('backup:', None, None)
-        self.pr('Full backup from '+ fromdir + ' to ' + todir + ': ')
-        os.mkdir(todir)
-        while True:
-            ret = cursor.next()
-            if ret != 0:
-                break
-            bkup_file = cursor.get_key()
-            copy_file = os.path.join(fromdir, bkup_file)
-            sz = os.path.getsize(copy_file)
-            self.pr('Copy from: ' + bkup_file + ' (' + str(sz) + ') to ' + todir)
-            shutil.copy(copy_file, todir)
-        self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
-        cursor.close()
 
     def large_updates(self, uri, value, ds, nrows, commit_ts):
         # Update a large number of records.
@@ -125,7 +109,7 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
             simulate_crash_restart(self, fromdir, todir)
         else:
             #Take a backup and restore it.
-            self.take_full_backup(fromdir, todir)
+            self.take_full_backup(todir, home=fromdir)
             self.reopen_conn(todir)
 
     def ckpt_snapshot(self, sessionX):

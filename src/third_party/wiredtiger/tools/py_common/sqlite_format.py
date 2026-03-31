@@ -12,6 +12,7 @@ import sys
 from typing import Iterable, List, Optional
 
 from py_common import disagg
+from py_common.decode_opts import DecodeOptions
 
 
 SQLITE3_SIGNATURE = b'SQLite format 3\x00'
@@ -175,24 +176,24 @@ def _load_disagg_pages_for_page_id(
     return [_rows_to_disagg_pages(rows)]
 
 
-def load_disagg_pages(filename: str, opts) -> List[List[disagg.DisaggPage]]:
+def load_disagg_pages(filename: str, *, lsn=None, page_id=None, pages: int = 0) -> List[List[disagg.DisaggPage]]:
     with sqlite3.connect(filename) as conn:
         conn.row_factory = sqlite3.Row
 
         # Specific lsn takes precedence over page_id selection,
         # since it provides a more precise selection of the page to decode.
-        if opts.lsn is not None:
-            return _load_disagg_pages_for_lsn(conn, opts.lsn, opts.page_id)
+        if lsn is not None:
+            return _load_disagg_pages_for_lsn(conn, lsn, page_id)
 
         # Select entire page chain for given page_id.
-        if opts.page_id is not None:
-            return _load_disagg_pages_for_page_id(conn, opts.page_id)
+        if page_id is not None:
+            return _load_disagg_pages_for_page_id(conn, page_id)
 
         # No specific selection criteria provided; return all pages up to the limit.
-        pages_limit = opts.pages if opts.pages > 0 else sys.maxsize
+        pages_limit = pages if pages > 0 else sys.maxsize
         return _load_disagg_pages_all(conn, pages_limit)
 
 
-def process_sqlite_file(filename: str, opts) -> disagg.DisaggTableSummary:
-    disagg_pages = load_disagg_pages(filename, opts)
+def process_sqlite_file(filename: str, opts: DecodeOptions) -> disagg.DisaggTableSummary:
+    disagg_pages = load_disagg_pages(filename, lsn=opts.lsn, page_id=opts.page_id, pages=opts.pages)
     return disagg.process_disagg_pages(disagg_pages, opts)

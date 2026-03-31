@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "wt": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "--directory",
+        "./tools/wt-mcp",
+        "run",
+        "server.py"
+      ]
+    }
+  }
+}

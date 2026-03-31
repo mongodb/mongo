@@ -12,6 +12,7 @@ import logging
 from typing import List, Optional
 
 from py_common import binary_data, btree_format
+from py_common.decode_opts import DecodeOptions
 from py_common.printer import Printer
 
 
@@ -74,7 +75,7 @@ class DisaggPage:
     page_bytes: bytes
 
 
-def process_disagg_pages(disagg_pages, opts) -> DisaggTableSummary:
+def process_disagg_pages(disagg_pages, opts: DecodeOptions) -> DisaggTableSummary:
     table_summary = DisaggTableSummary()
 
     for pages in disagg_pages:
@@ -84,7 +85,7 @@ def process_disagg_pages(disagg_pages, opts) -> DisaggTableSummary:
             metadata = disagg_page.metadata
             page_bytes = disagg_page.page_bytes
             b = binary_data.BinaryFile(io.BytesIO(page_bytes))
-            p = Printer(b, opts)
+            p = Printer(b, split=opts.split)
 
             p.rint(metadata)
 
@@ -101,7 +102,10 @@ def process_disagg_pages(disagg_pages, opts) -> DisaggTableSummary:
                 continue
 
             page = btree_format.WTPage()
-            page = page.parse(b, len(page_bytes), opts)
+            page = page.parse(b, len(page_bytes),
+                              disagg=True,
+                              skip_data=opts.skip_data,
+                              cont=opts.cont)
 
             if metadata.is_delta():
                 if page.block_header.magic != btree_format.BlockDisaggHeader.WT_BLOCK_DISAGG_MAGIC_DELTA:
@@ -141,7 +145,9 @@ def process_disagg_pages(disagg_pages, opts) -> DisaggTableSummary:
                 p.rint(page.page_header)
                 p.rint(page.block_header)
             else:
-                page.print_page(opts)
+                page.print_page(split=opts.split,
+                                decode_as_bson=opts.bson,
+                                disagg=True)
             p.rint('')
 
     return table_summary

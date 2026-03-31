@@ -182,6 +182,9 @@ struct __wti_reconcile {
     uint64_t max_txn;
     wt_timestamp_t max_ts;
 
+    /* Track the total time in msecs spent in block writes */
+    uint64_t blkcache_write_time;
+
     /*
      * When we do not find any update to be written for the whole page, we would like to mark
      * eviction failed in the case of update-restore unless all the updates for a key are found

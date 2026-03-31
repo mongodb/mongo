@@ -161,6 +161,16 @@ struct __wt_layered_table_manager {
 #define WT_DISAGG_CHECKPOINT_META_COMPATIBLE_VERSION 1
 
 /*
+ * Turtle/checkpoint metadata version constants:
+ * - DEFAULT: Version defaulted to for old checkpoints without version fields (backward compatible).
+ * - VERSION: The version this code writes and the maximum version it can read.
+ * - COMPATIBLE_VERSION: The minimum reader version required to read what this code writes.
+ */
+#define WT_DISAGG_CHECKPOINT_TURTLE_VERSION_DEFAULT 1
+#define WT_DISAGG_CHECKPOINT_TURTLE_VERSION 1
+#define WT_DISAGG_CHECKPOINT_TURTLE_COMPATIBLE_VERSION 1
+
+/*
  * Identify the shared metadata operations inside the shared metadata queue.
  */
 typedef enum {

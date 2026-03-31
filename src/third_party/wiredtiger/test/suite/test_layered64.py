@@ -105,4 +105,4 @@ class test_layered64(wttest.WiredTigerTestCase):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.conn.reconfigure(
                 f'disaggregated=(checkpoint_meta="{corrupted_checkpoint_meta}")'),
-            "/Checkpoint metadata checksum mismatch/")
+            "/Checkpoint metadata corruption detected/")

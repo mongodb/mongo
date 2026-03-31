@@ -518,9 +518,11 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT
       ckpt_meta->metadata_lsn);
 
 err:
-    if (ret == 0)
+    if (ret == 0) {
         WT_STAT_CONN_INCR(session, layered_table_manager_checkpoints_disagg_pick_up_succeed);
-    else {
+        if (!conn->layered_table_manager.leader)
+            WT_STAT_CONN_INCR(session, layered_table_manager_checkpoints_disagg_pick_up_follower);
+    } else {
         WT_STAT_CONN_INCR(session, layered_table_manager_checkpoints_disagg_pick_up_failed);
         __wt_verbose_level(session, WT_VERB_LAYERED, WT_VERBOSE_ERROR,
           "Failed to pick up disaggregated storage checkpoint for metadata_lsn=%" PRIu64 ": ret=%d",
@@ -901,6 +903,44 @@ __disagg_shared_metadata_op(WT_SESSION_IMPL *session, WT_DISAGG_METADATA_OP *ent
       session, entry->stable_uri, entry->stable_value, entry->metadata_op));
 err:
     __wt_scr_free(session, &md_key);
+    return (ret);
+}
+
+/*
+ * __wt_disagg_shared_metadata_queue_drop_size --
+ *     Walk the metadata queue and sum the checkpoint sizes of non-deferred drop operations. This is
+ *     a read-only operation on the queue.
+ */
+int
+__wt_disagg_shared_metadata_queue_drop_size(WT_SESSION_IMPL *session, uint64_t *drop_sizep)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
+    WT_DISAGG_METADATA_OP *entry;
+
+    conn = S2C(session);
+    *drop_sizep = 0;
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->schema_lock);
+
+    __wt_spin_lock(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
+
+    TAILQ_FOREACH (entry, &conn->disaggregated_storage.shared_metadata_qh, q) {
+        if (!entry->deferred && entry->metadata_op == WT_SHARED_METADATA_REMOVE &&
+          entry->stable_value != NULL) {
+            uint64_t size;
+            /*
+             * A table that was created and dropped without ever being checkpointed won't have a
+             * checkpoint entry in its metadata, so WT_NOTFOUND is expected.
+             */
+            WT_ERR_NOTFOUND_OK(__wt_ckpt_last_size(session, entry->stable_value, &size), false);
+            *drop_sizep += size;
+        }
+    }
+
+err:
+    __wt_spin_unlock(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
+
     return (ret);
 }
 

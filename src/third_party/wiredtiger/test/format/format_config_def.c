@@ -300,6 +300,8 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
 
   {"ops.prepare", "configure transaction prepare", C_BOOL, 5, 0, 0, V_GLOBAL_OPS_PREPARE},
 
+  {"ops.reserve", "cursor reserve operations (percentage)", 0, 0, 20, 100, V_GLOBAL_OPS_RESERVE},
+
   {"ops.random_cursor", "configure random cursor reads", C_BOOL, 10, 0, 0,
     V_GLOBAL_OPS_RANDOM_CURSOR},
 

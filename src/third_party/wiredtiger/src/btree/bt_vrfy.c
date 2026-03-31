@@ -341,8 +341,10 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
             /* Validate the size of the btree */
             if (F_ISSET(btree, WT_BTREE_DISAGGREGATED) && ckpt->size != vs->total_block_size) {
                 /*
-                 * FIXME-WT-16738: verify currently encounters checkpoint size mismatches. Re-enable
-                 * this check once this is resolved.
+                 * FIXME-WT-16660: We are seeing mismatches due to nuanced reconciliation issues,
+                 * where bytes_total increments happen before the reconciliation panic boundary,
+                 * leaving us in an inconsistent state if reconciliation fails after the increment
+                 * but before completion. Re-enable this check once this is resolved.
                  */
                 if (false)
                     WT_ERR_MSG(session, WT_ERROR,
@@ -701,7 +703,8 @@ __verify_tree(
      *
      * Report progress occasionally.
      */
-    WT_RET(__wt_progress_backoff(session, NULL, ++vs->fcnt));
+    if (__wt_counter_backoff(++vs->fcnt, 100))
+        WT_RET(__wt_progress(session, NULL, vs->fcnt));
 
 #ifdef HAVE_DIAGNOSTIC
     /* Optionally dump the blocks or page in debugging mode. */

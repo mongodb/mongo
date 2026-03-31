@@ -220,7 +220,7 @@ struct __wt_bm {
     int (*compact_start)(WT_BM *, WT_SESSION_IMPL *);
     int (*corrupt)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
     size_t (*encrypt_skip)(WT_BM *, WT_SESSION_IMPL *);
-    int (*free)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
+    int (*free)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t, bool);
     int (*get_page_ids)(WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, size_t *, uint64_t);
     bool (*is_mapped)(WT_BM *, WT_SESSION_IMPL *);
     int (*map_discard)(WT_BM *, WT_SESSION_IMPL *, void *, size_t);

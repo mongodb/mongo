@@ -26,16 +26,14 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-from suite_subprocess import suite_subprocess
-import os
-import shutil
-import wiredtiger, wttest
+import wiredtiger
+from wtbackup import backup_base
 
 # test_bug023.py
 #   JIRA WT-5930: starting up a backup database with an error in wiredtiger_open
 # then leaves the database in an incorrect state so that the next wiredtiger_open
 # without an error loses data.
-class test_bug023(wttest.WiredTigerTestCase, suite_subprocess):
+class test_bug023(backup_base):
     '''Test backup, compatibility levels and an error opening the backup'''
 
     conn_config = 'config_base=false,log=(enabled),compatibility=(release=3.2.0)'
@@ -44,22 +42,6 @@ class test_bug023(wttest.WiredTigerTestCase, suite_subprocess):
     dir='backup.dir'
     nentries = 10
     uri = 'file:bug023.wt'
-
-    def take_full_backup(self, dir):
-        # Open up the backup cursor, and copy the files.  Do a full backup.
-        cursor = self.session.open_cursor('backup:', None, None)
-        self.pr('Full backup to ' + dir + ': ')
-        os.mkdir(dir)
-        while True:
-            ret = cursor.next()
-            if ret != 0:
-                break
-            bkup_file = cursor.get_key()
-            sz = os.path.getsize(bkup_file)
-            self.pr('Copy from: ' + bkup_file + ' (' + str(sz) + ') to ' + dir)
-            shutil.copy(bkup_file, dir)
-        self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
-        cursor.close()
 
     def test_bug023(self):
         '''Test backup and compatibility levels and an error opening the backup'''

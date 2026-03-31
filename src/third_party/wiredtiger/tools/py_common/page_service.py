@@ -37,6 +37,7 @@ import tempfile
 from typing import Dict, List, Optional
 
 from py_common import disagg
+from py_common.decode_opts import DecodeOptions
 
 
 logger = logging.getLogger(__name__)
@@ -75,7 +76,7 @@ def parse_metadata(page: Dict) -> disagg.Metadata:
     )
 
 
-def decrypt_page(page, page_metadata, opts):
+def decrypt_page(page, page_metadata, keyfile):
     """
     Call the pagedecryptor tool from the mongo repo.
     """
@@ -89,7 +90,7 @@ def decrypt_page(page, page_metadata, opts):
             "bazel build //src/mongo/db/modules/atlas/src/disagg_storage/encryption:pagedecryptor"
         )
 
-    if not opts.keyfile or not os.path.exists(opts.keyfile):
+    if not keyfile or not os.path.exists(keyfile):
         raise FileNotFoundError(
             "keyfile not found: Decryption requires the test_keyfile for the KEK."
         )
@@ -116,7 +117,7 @@ def decrypt_page(page, page_metadata, opts):
             'pagedecryptor',
             '--inputPath', temp_input.name,
             '--outputPath', temp_output.name,
-            '--keyFile', opts.keyfile,
+            '--keyFile', keyfile,
             '--lsn', str(lsn),
             '--tableId', str(table_id),
             '--pageId', str(page_id),
@@ -143,7 +144,7 @@ def decrypt_page(page, page_metadata, opts):
 
     return decrypted_bytes
 
-def process_disagg_table(disagg_table, opts) -> disagg.DisaggTableSummary:
+def process_disagg_table(disagg_table, opts: DecodeOptions) -> disagg.DisaggTableSummary:
     '''
     Extract pages as json objects from the GetTableAtLSN API on the Object Read Proxy.
 
@@ -168,7 +169,7 @@ def process_disagg_table(disagg_table, opts) -> disagg.DisaggTableSummary:
                 logger.info(f'page_id: {page_metadata.page_id} - empty page')
                 continue
 
-            decrypted_page_bytes = decrypt_page(page, page_metadata, opts)
+            decrypted_page_bytes = decrypt_page(page, page_metadata, opts.keyfile)
             page_disagg_pages.append(disagg.DisaggPage(page_metadata,
                                                        decrypted_page_bytes))
 

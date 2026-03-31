@@ -178,6 +178,14 @@ function(get_clang_base_flags flags)
         list(APPEND clang_flags "-Wno-maybe-uninitialized")
     endif()
 
+    if(${cmake_compiler_version} VERSION_GREATER_EQUAL 21)
+        # Clang 21+ warns when a function returns a result from an allocator
+        # call but isn't itself annotated as an allocator. WiredTiger has
+        # several thin wrappers around malloc/calloc/realloc that intentionally
+        # follow this pattern.
+        list(APPEND clang_flags "-Wno-allocator-wrappers")
+    endif()
+
     set(${flags} ${clang_flags} PARENT_SCOPE)
 
 endfunction()

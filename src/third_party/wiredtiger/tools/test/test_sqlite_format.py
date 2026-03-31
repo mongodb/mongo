@@ -11,7 +11,6 @@ import sys
 import tempfile
 import unittest
 import logging
-from types import SimpleNamespace
 
 # Add tools directory to sys.path so we can import py_common
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -20,11 +19,6 @@ from py_common import sqlite_format
 
 
 class TestSqliteFormat(unittest.TestCase):
-    def _make_opts(self, **overrides):
-        defaults = dict(page_id=None, lsn=None, pages=0)
-        defaults.update(overrides)
-        return SimpleNamespace(**defaults)
-
 
     def _create_test_db(self):
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.db')
@@ -101,9 +95,8 @@ class TestSqliteFormat(unittest.TestCase):
 
 
     def test_page_id_latest_lsn(self):
-        opts = self._make_opts(page_id=10)
         with self.assertLogs('py_common.sqlite_format', level=logging.WARNING) as logs:
-            pages = sqlite_format.load_disagg_pages(self.db_path, opts)
+            pages = sqlite_format.load_disagg_pages(self.db_path, page_id=10)
 
         self.assertEqual(len(pages), 1)
         self.assertEqual([entry.metadata.lsn for entry in pages[0]], [11, 9])
@@ -111,32 +104,28 @@ class TestSqliteFormat(unittest.TestCase):
 
 
     def test_page_id_specific_lsn(self):
-        opts = self._make_opts(page_id=10, lsn=5)
-        pages = sqlite_format.load_disagg_pages(self.db_path, opts)
+        pages = sqlite_format.load_disagg_pages(self.db_path, page_id=10, lsn=5)
 
         self.assertEqual(len(pages), 1)
         self.assertEqual([entry.metadata.lsn for entry in pages[0]], [5])
 
 
     def test_page_id_single_base_no_warning(self):
-        opts = self._make_opts(page_id=11)
-        pages = sqlite_format.load_disagg_pages(self.db_path, opts)
+        pages = sqlite_format.load_disagg_pages(self.db_path, page_id=11)
 
         self.assertEqual(len(pages), 1)
         self.assertEqual([entry.metadata.lsn for entry in pages[0]], [17])
 
 
     def test_without_page_id_respects_pages_limit(self):
-        opts = self._make_opts(pages=1)
-        pages = sqlite_format.load_disagg_pages(self.db_path, opts)
+        pages = sqlite_format.load_disagg_pages(self.db_path, pages=1)
 
         self.assertEqual(len(pages), 1)
         self.assertEqual([entry.metadata.page_id for entry in pages[0]], [10, 10])
 
 
     def test_lsn_without_page_id(self):
-        opts = self._make_opts(lsn=7)
-        pages = sqlite_format.load_disagg_pages(self.db_path, opts)
+        pages = sqlite_format.load_disagg_pages(self.db_path, lsn=7)
 
         self.assertEqual(len(pages), 1)
         self.assertEqual(len(pages[0]), 1)
@@ -153,8 +142,7 @@ class TestSqliteFormat(unittest.TestCase):
 
 
     def test_page_id_returns_base_page_chain(self):
-        opts = self._make_opts(page_id=12)
-        pages = sqlite_format.load_disagg_pages(self.db_path, opts)
+        pages = sqlite_format.load_disagg_pages(self.db_path, page_id=12)
 
         self.assertEqual(len(pages), 1)
         self.assertEqual([page.metadata.lsn for page in pages[0]], [30, 25, 20])
@@ -163,9 +151,8 @@ class TestSqliteFormat(unittest.TestCase):
 
 
     def test_lsn_and_page_id_mismatch(self):
-        opts = self._make_opts(page_id=11, lsn=7)
         with self.assertRaises(ValueError):
-            sqlite_format.load_disagg_pages(self.db_path, opts)
+            sqlite_format.load_disagg_pages(self.db_path, page_id=11, lsn=7)
 
 
 if __name__ == "__main__":

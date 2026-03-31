@@ -26,20 +26,20 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, shutil, threading, time
+import threading, time
 from wtthread import checkpoint_thread
 from helper import simulate_crash_restart
-import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from helper import copy_wiredtiger_home
 from wiredtiger import stat
+from wtbackup import backup_base
 
 # test_checkpoint_snapshot06.py
 #   This test is to run checkpoint and truncate and insert followed by eviction
 #   for one table in parallel with timing stress for checkpoint and let eviction
 #   write more data than checkpoint.
-class test_checkpoint_snapshot06(wttest.WiredTigerTestCase):
+class test_checkpoint_snapshot06(backup_base):
 
     # Create two tables.
     uri_1 = "table:test_checkpoint_snapshot06_1"
@@ -67,23 +67,6 @@ class test_checkpoint_snapshot06(wttest.WiredTigerTestCase):
         self.nrows = 1000
         self.valuea = "aaaaa" * 100
         self.valueb = "bbbbb" * 100
-
-    def take_full_backup(self, fromdir, todir):
-        # Open up the backup cursor, and copy the files.  Do a full backup.
-        cursor = self.session.open_cursor('backup:', None, None)
-        self.pr('Full backup from '+ fromdir + ' to ' + todir + ': ')
-        os.mkdir(todir)
-        while True:
-            ret = cursor.next()
-            if ret != 0:
-                break
-            bkup_file = cursor.get_key()
-            copy_file = os.path.join(fromdir, bkup_file)
-            sz = os.path.getsize(copy_file)
-            self.pr('Copy from: ' + bkup_file + ' (' + str(sz) + ') to ' + todir)
-            shutil.copy(copy_file, todir)
-        self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
-        cursor.close()
 
     def evict_cursor(self, uri, ds, nrows):
         # Configure debug behavior on a cursor to evict the page positioned on when the reset API is used.
@@ -131,8 +114,8 @@ class test_checkpoint_snapshot06(wttest.WiredTigerTestCase):
             simulate_crash_restart(self, fromdir, todir)
         else:
             #Take a backup and restore it.
-            self.take_full_backup(fromdir, todir)
-            self.take_full_backup(fromdir, todir + ".copy")
+            self.take_full_backup(todir, home=fromdir)
+            self.take_full_backup(todir + ".copy", home=fromdir)
             self.reopen_conn(todir)
 
     def test_checkpoint_snapshot(self):

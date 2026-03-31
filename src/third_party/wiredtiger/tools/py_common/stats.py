@@ -113,13 +113,13 @@ class PageStats:
         ]
         
     @staticmethod
-    def outfile_stats_start(opts, blockid):
-        if opts.output != None:
-            opts.output.write("\n" + blockid + ",")
+    def outfile_stats_start(output, blockid):
+        if output != None:
+            output.write("\n" + blockid + ",")
     
     @staticmethod
-    def outfile_stats_end(opts, pagehead, blockhead, pagestats):
-        if opts.output != None:
+    def outfile_stats_end(output, pagehead, blockhead, pagestats):
+        if output != None:
             line = [
                 # page head
                 pagehead.write_gen,
@@ -132,7 +132,7 @@ class PageStats:
                 # page_stats
                 *pagestats.to_csv_cols(),
             ]
-            opts.output.write(",".join(str(x) for x in line))
+            output.write(",".join(str(x) for x in line))
 
     def process_timestamps(self, cell) -> None:
         """

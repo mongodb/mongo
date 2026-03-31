@@ -98,6 +98,15 @@ __sweep_mark(WT_SESSION_IMPL *session, uint64_t now)
         }
 
         /*
+         * Never close the layered dhandle. If sweep server removes the layered dhandle, it will not
+         * be processed when we drain the ingest table during step-up.
+         *
+         * FIXME-WT-16982: Optimization to close layered dhandles with empty ingest tables and on
+         * leader mode.
+         */
+        if (dhandle->type == WT_DHANDLE_TYPE_LAYERED)
+            continue;
+        /*
          * Never close out the history store handle via sweep. It can cause a deadlock if eviction
          * needs to re-open a handle to the history store while a checkpoint is getting started.
          */

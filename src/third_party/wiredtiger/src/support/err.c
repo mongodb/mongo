@@ -788,23 +788,22 @@ __wt_progress(WT_SESSION_IMPL *session, const char *s, uint64_t v)
 }
 
 /*
- * __wt_progress_backoff --
- *     Emit progress messages only when the leading two digits of 'v' change, so the reporting
- *     interval grows with 'v' and avoids excessive logging.
+ * __wt_counter_backoff --
+ *     Return true only when the leading two digits of 'v' change, so the reporting interval grows
+ *     with 'v' and avoids excessive logging.
  */
-int
-__wt_progress_backoff(WT_SESSION_IMPL *session, const char *s, uint64_t v)
+bool
+__wt_counter_backoff(uint64_t v, uint64_t accuracy)
 {
-    WT_DECL_RET;
     /*
-     * Using v - 1 is safe even when v == 0 because the check is edge-triggered.
+     * Using v - 1 causes unsigned underflow when v == 0, resulting in v_last/base being very large.
+     * This makes the function return true for v == 0, which is acceptable since the first call
+     * should always trigger.
      */
     uint64_t base, v_last = v - 1;
-    for (base = 1; v / base > 100; base *= 10)
+    for (base = 1; v / base > accuracy; base *= 10)
         ;
-    if (v / base != v_last / base)
-        ret = __wt_progress(session, s, v);
-    return (ret);
+    return (v / base != v_last / base);
 }
 
 /*

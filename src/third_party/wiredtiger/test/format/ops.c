@@ -796,7 +796,7 @@ table_op(TINFO *tinfo, bool intxn, iso_level_t iso_level, thread_op op)
          * unexpected. A row cannot be reserved with ignore prepare.
          */
         if (intxn && iso_level == ISOLATION_SNAPSHOT && tinfo->ignore_prepare == false &&
-          mmrand(&tinfo->data_rnd, 0, 20) == 1) {
+          mmrand(&tinfo->data_rnd, 0, 100) < GV(OPS_RESERVE)) {
             switch (table->type) {
             case ROW:
                 ret = row_reserve(tinfo, positioned);
@@ -1305,6 +1305,13 @@ rollback_retry:
             skip2 = table;
         }
         if (ret == 0 && table->mirror) {
+            /*
+             * For mirrored truncates, we record that a truncate was executed in this transaction.
+             * That record is set before we know whether any of the truncate calls will return
+             * WT_ROLLBACK. If the transaction later rolls back, the record remains set and we still
+             * run the mirrored-truncate verification at the end, so this path is checked for both
+             * committed and rolled-back truncates.
+             */
             if (op == TRUNCATE)
                 mirrored_truncate = true;
             for (i = 1; i <= ntables; ++i)
@@ -1412,6 +1419,10 @@ rollback:
             break;
         }
 
+        /*
+         * If this operation was a mirrored truncate, verify the mirrors. This runs after both
+         * successfully committed truncates and truncates that were rolled back.
+         */
         if (mirrored_truncate)
             wts_verify_mirrored_truncate(tinfo);
 

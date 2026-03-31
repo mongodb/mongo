@@ -195,9 +195,13 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
     # Optional arguments:
     # backup_cur: A backup cursor that can be given into the function, but function caller
     #    holds responsibility of closing the cursor.
+    # home: The directory to use as the source "home" when copying files. When None,
+    #    the file names returned by the backup cursor are used as-is.
+    #    When set, each key from the backup cursor is joined with this directory
+    #    to form the path to copy from.
     #
     def take_full_backup(self, backup_dir, backup_cur=None, home=None):
-        assert os.path.exists(backup_dir), f"The directory '{backup_dir}' does not exist"
+        os.makedirs(backup_dir, exist_ok=True)
         self.pr(f"Full backup to '{backup_dir}'")
         bkup_c = backup_cur
         if backup_cur == None:
@@ -210,12 +214,13 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
         # We cannot use 'for newfile in bkup_c:' usage because backup cursors don't have
         # values and adding in get_values returns ENOTSUP and causes the usage to fail.
         # If that changes then this, and the use of the duplicate below can change.
-        while bkup_c.next() == 0:
-            newfile = bkup_c.get_key() if home is None else f'{self.conn.get_home()}/{bkup_c.get_key()}'
+        while (ret := bkup_c.next()) == 0:
+            newfile = bkup_c.get_key() if home is None else os.path.join(home, bkup_c.get_key())
             sz = os.path.getsize(newfile)
             self.pr(f'Copy from: {newfile} ({sz}) to {backup_dir}')
             self.copy_file(newfile, backup_dir)
             all_files.append(newfile)
+        self.assertEqual(wiredtiger.WT_NOTFOUND, ret)
         if backup_cur == None:
             bkup_c.close()
         return all_files

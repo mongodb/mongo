@@ -591,7 +591,7 @@ __recovery_set_oldest_timestamp(WT_RECOVERY *r)
       &conn->txn_global.has_oldest_timestamp, oldest_timestamp != WT_TS_NONE);
 
     __wt_verbose_multi(session, WT_VERB_RECOVERY_ALL, "Set global oldest timestamp: %s",
-      __wt_timestamp_to_string(conn->txn_global.oldest_timestamp, ts_string));
+      __wt_timestamp_to_string(oldest_timestamp, ts_string));
 
     return (0);
 }
@@ -1329,10 +1329,8 @@ done:
           WT_VERBOSE_INFO,
           "[RECOVERY_RTS] performing recovery rollback_to_stable with stable_timestamp=%s and "
           "oldest_timestamp=%s",
-          __wt_timestamp_to_string(
-            __wt_atomic_load_uint64_relaxed(&conn->txn_global.stable_timestamp), ts_string[0]),
-          __wt_timestamp_to_string(
-            __wt_atomic_load_uint64_relaxed(&conn->txn_global.oldest_timestamp), ts_string[1]));
+          __wt_timestamp_to_string(__wt_get_stable_timestamp(session), ts_string[0]),
+          __wt_timestamp_to_string(__wt_get_oldest_timestamp(session), ts_string[1]));
         rts_executed = true;
         WT_ERR(conn->rts->rollback_to_stable(session, rts_cfg, true));
 
@@ -1347,8 +1345,8 @@ done:
         WT_TXN_GLOBAL *txn_global = &conn->txn_global;
         txn_global->has_durable_timestamp =
           __wt_atomic_load_bool_relaxed(&txn_global->has_stable_timestamp);
-        __wt_atomic_store_uint64_relaxed(&txn_global->durable_timestamp,
-          __wt_atomic_load_uint64_relaxed(&txn_global->stable_timestamp));
+        __wt_atomic_store_uint64_relaxed(
+          &txn_global->durable_timestamp, __wt_get_stable_timestamp(session));
 
         if (disagg)
             __wt_verbose_info(session, WT_VERB_RTS, "%s", "skipped recovery RTS due to disagg");

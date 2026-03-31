@@ -114,12 +114,10 @@ __wt_ovfl_remove(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK_KV *unp
 int
 __wt_ovfl_discard(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell)
 {
-    WT_BM *bm;
     WT_BTREE *btree;
     WT_CELL_UNPACK_KV *unpack, _unpack;
 
     btree = S2BT(session);
-    bm = btree->bm;
     unpack = &_unpack;
 
     __wt_cell_unpack_kv(session, page->dsk, cell, unpack);
@@ -149,5 +147,5 @@ __wt_ovfl_discard(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell)
     __wt_writeunlock(session, &btree->ovfl_lock);
 
     /* Free the backing disk blocks. */
-    return (bm->free(bm, session, unpack->data, unpack->size));
+    return (__wt_btree_block_free(session, unpack->data, unpack->size));
 }

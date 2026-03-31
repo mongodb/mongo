@@ -30,6 +30,7 @@ bflag()
 {
     # Return if the branch's format command takes the -B flag for backward compatibility.
     test "$1" = "develop" && echo "-B "
+    test "$1" = "mongodb-8.3" && echo "-B"
     test "$1" = "mongodb-8.2" && echo "-B"
     test "$1" = "mongodb-8.0" && echo "-B"
     test "$1" = "mongodb-7.0" && echo "-B "
@@ -806,6 +807,7 @@ upgrade_to_latest=false
 # then the branch name itself will be used for the checkout
 declare -A gittags
 gittags['develop']="develop"
+gittags['mongodb-8.3']="mongodb-8.3"
 gittags['mongodb-8.0']="mongodb-8.0"
 gittags['mongodb-7.0']="mongodb-7.0"
 gittags['mongodb-6.0']="mongodb-6.0"

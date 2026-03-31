@@ -51,6 +51,8 @@ static const char *const __stats_dsrc_desc[] = {
   "btree: row-store empty values",
   "btree: row-store internal pages",
   "btree: row-store leaf pages",
+  "btree: time spent walking the tree for checkpoint including dirty page reconciliation time "
+  "(usecs)",
   "cache: application threads eviction requested with cache fill ratio < 25%",
   "cache: application threads eviction requested with cache fill ratio >= 25% and < 50%",
   "cache: application threads eviction requested with cache fill ratio >= 50% and < 75%",
@@ -297,6 +299,7 @@ static const char *const __stats_dsrc_desc[] = {
   "cursor: update calls",
   "cursor: update key and value bytes",
   "cursor: update value size change",
+  "layered: Layered table cursor advances to a newer checkpoint for the stable btree",
   "layered: Layered table cursor insert operations",
   "layered: Layered table cursor modify operations",
   "layered: Layered table cursor next operations",
@@ -306,6 +309,7 @@ static const char *const __stats_dsrc_desc[] = {
   "layered: Layered table cursor prev operations from the ingest btrees",
   "layered: Layered table cursor prev operations from the stable btrees",
   "layered: Layered table cursor remove operations",
+  "layered: Layered table cursor reopens ingest btree",
   "layered: Layered table cursor search near operations",
   "layered: Layered table cursor search near operations from the ingest btrees",
   "layered: Layered table cursor search near operations from the stable btrees",
@@ -313,8 +317,6 @@ static const char *const __stats_dsrc_desc[] = {
   "layered: Layered table cursor search operations from the ingest btrees",
   "layered: Layered table cursor search operations from the stable btrees",
   "layered: Layered table cursor update operations",
-  "layered: Layered table cursor upgrade state for the ingest btrees",
-  "layered: Layered table cursor upgrade state for the stable btrees",
   "layered: checkpoints performed on this table by the layered table manager",
   "layered: disagg pick up checkpoints failed",
   "layered: disagg pick up checkpoints succeeded",
@@ -515,6 +517,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->btree_row_empty_values = 0;
     stats->btree_row_internal = 0;
     stats->btree_row_leaf = 0;
+    /* not clearing btree_checkpoint_reconcile_duration */
     stats->cache_eviction_app_threads_fill_ratio_lt_25 = 0;
     stats->cache_eviction_app_threads_fill_ratio_25_50 = 0;
     stats->cache_eviction_app_threads_fill_ratio_50_75 = 0;
@@ -743,6 +746,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->cursor_update = 0;
     stats->cursor_update_bytes = 0;
     stats->cursor_update_bytes_changed = 0;
+    stats->layered_curs_advance_stable = 0;
     stats->layered_curs_insert = 0;
     stats->layered_curs_modify = 0;
     stats->layered_curs_next = 0;
@@ -752,6 +756,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->layered_curs_prev_ingest = 0;
     stats->layered_curs_prev_stable = 0;
     stats->layered_curs_remove = 0;
+    stats->layered_curs_reopen_ingest = 0;
     stats->layered_curs_search_near = 0;
     stats->layered_curs_search_near_ingest = 0;
     stats->layered_curs_search_near_stable = 0;
@@ -759,8 +764,6 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->layered_curs_search_ingest = 0;
     stats->layered_curs_search_stable = 0;
     stats->layered_curs_update = 0;
-    stats->layered_curs_upgrade_ingest = 0;
-    stats->layered_curs_upgrade_stable = 0;
     stats->layered_table_manager_checkpoints = 0;
     stats->layered_table_manager_checkpoints_disagg_pick_up_failed = 0;
     stats->layered_table_manager_checkpoints_disagg_pick_up_succeed = 0;
@@ -937,6 +940,7 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->btree_row_empty_values += from->btree_row_empty_values;
     to->btree_row_internal += from->btree_row_internal;
     to->btree_row_leaf += from->btree_row_leaf;
+    to->btree_checkpoint_reconcile_duration += from->btree_checkpoint_reconcile_duration;
     to->cache_eviction_app_threads_fill_ratio_lt_25 +=
       from->cache_eviction_app_threads_fill_ratio_lt_25;
     to->cache_eviction_app_threads_fill_ratio_25_50 +=
@@ -1187,6 +1191,7 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->cursor_update += from->cursor_update;
     to->cursor_update_bytes += from->cursor_update_bytes;
     to->cursor_update_bytes_changed += from->cursor_update_bytes_changed;
+    to->layered_curs_advance_stable += from->layered_curs_advance_stable;
     to->layered_curs_insert += from->layered_curs_insert;
     to->layered_curs_modify += from->layered_curs_modify;
     to->layered_curs_next += from->layered_curs_next;
@@ -1196,6 +1201,7 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->layered_curs_prev_ingest += from->layered_curs_prev_ingest;
     to->layered_curs_prev_stable += from->layered_curs_prev_stable;
     to->layered_curs_remove += from->layered_curs_remove;
+    to->layered_curs_reopen_ingest += from->layered_curs_reopen_ingest;
     to->layered_curs_search_near += from->layered_curs_search_near;
     to->layered_curs_search_near_ingest += from->layered_curs_search_near_ingest;
     to->layered_curs_search_near_stable += from->layered_curs_search_near_stable;
@@ -1203,8 +1209,6 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->layered_curs_search_ingest += from->layered_curs_search_ingest;
     to->layered_curs_search_stable += from->layered_curs_search_stable;
     to->layered_curs_update += from->layered_curs_update;
-    to->layered_curs_upgrade_ingest += from->layered_curs_upgrade_ingest;
-    to->layered_curs_upgrade_stable += from->layered_curs_upgrade_stable;
     to->layered_table_manager_checkpoints += from->layered_table_manager_checkpoints;
     to->layered_table_manager_checkpoints_disagg_pick_up_failed +=
       from->layered_table_manager_checkpoints_disagg_pick_up_failed;
@@ -1386,6 +1390,8 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->btree_row_empty_values += WT_STAT_DSRC_READ(from, btree_row_empty_values);
     to->btree_row_internal += WT_STAT_DSRC_READ(from, btree_row_internal);
     to->btree_row_leaf += WT_STAT_DSRC_READ(from, btree_row_leaf);
+    to->btree_checkpoint_reconcile_duration +=
+      WT_STAT_DSRC_READ(from, btree_checkpoint_reconcile_duration);
     to->cache_eviction_app_threads_fill_ratio_lt_25 +=
       WT_STAT_DSRC_READ(from, cache_eviction_app_threads_fill_ratio_lt_25);
     to->cache_eviction_app_threads_fill_ratio_25_50 +=
@@ -1671,6 +1677,7 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->cursor_update += WT_STAT_DSRC_READ(from, cursor_update);
     to->cursor_update_bytes += WT_STAT_DSRC_READ(from, cursor_update_bytes);
     to->cursor_update_bytes_changed += WT_STAT_DSRC_READ(from, cursor_update_bytes_changed);
+    to->layered_curs_advance_stable += WT_STAT_DSRC_READ(from, layered_curs_advance_stable);
     to->layered_curs_insert += WT_STAT_DSRC_READ(from, layered_curs_insert);
     to->layered_curs_modify += WT_STAT_DSRC_READ(from, layered_curs_modify);
     to->layered_curs_next += WT_STAT_DSRC_READ(from, layered_curs_next);
@@ -1680,6 +1687,7 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->layered_curs_prev_ingest += WT_STAT_DSRC_READ(from, layered_curs_prev_ingest);
     to->layered_curs_prev_stable += WT_STAT_DSRC_READ(from, layered_curs_prev_stable);
     to->layered_curs_remove += WT_STAT_DSRC_READ(from, layered_curs_remove);
+    to->layered_curs_reopen_ingest += WT_STAT_DSRC_READ(from, layered_curs_reopen_ingest);
     to->layered_curs_search_near += WT_STAT_DSRC_READ(from, layered_curs_search_near);
     to->layered_curs_search_near_ingest += WT_STAT_DSRC_READ(from, layered_curs_search_near_ingest);
     to->layered_curs_search_near_stable += WT_STAT_DSRC_READ(from, layered_curs_search_near_stable);
@@ -1687,8 +1695,6 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->layered_curs_search_ingest += WT_STAT_DSRC_READ(from, layered_curs_search_ingest);
     to->layered_curs_search_stable += WT_STAT_DSRC_READ(from, layered_curs_search_stable);
     to->layered_curs_update += WT_STAT_DSRC_READ(from, layered_curs_update);
-    to->layered_curs_upgrade_ingest += WT_STAT_DSRC_READ(from, layered_curs_upgrade_ingest);
-    to->layered_curs_upgrade_stable += WT_STAT_DSRC_READ(from, layered_curs_upgrade_stable);
     to->layered_table_manager_checkpoints +=
       WT_STAT_DSRC_READ(from, layered_table_manager_checkpoints);
     to->layered_table_manager_checkpoints_disagg_pick_up_failed +=
@@ -2299,6 +2305,7 @@ static const char *const __stats_connection_desc[] = {
   "checkpoint: total failed number of checkpoints",
   "checkpoint: total succeed number of checkpoints",
   "checkpoint: total time (msecs)",
+  "checkpoint: total time (msecs) writing pages to stable storage during checkpoint reconciliation",
   "checkpoint: wait cycles while cache dirty level is decreasing",
   "chunk-cache: aggregate number of spanned chunks on read",
   "chunk-cache: chunks evicted",
@@ -2442,6 +2449,7 @@ static const char *const __stats_connection_desc[] = {
   "disagg: role leader",
   "disagg: step down most recent time (msecs)",
   "disagg: step up most recent time (msecs)",
+  "layered: Layered table cursor advances to a newer checkpoint for the stable btree",
   "layered: Layered table cursor insert operations",
   "layered: Layered table cursor modify operations",
   "layered: Layered table cursor next operations",
@@ -2451,6 +2459,7 @@ static const char *const __stats_connection_desc[] = {
   "layered: Layered table cursor prev operations from the ingest btrees",
   "layered: Layered table cursor prev operations from the stable btrees",
   "layered: Layered table cursor remove operations",
+  "layered: Layered table cursor reopens ingest btree",
   "layered: Layered table cursor search near operations",
   "layered: Layered table cursor search near operations from the ingest btrees",
   "layered: Layered table cursor search near operations from the stable btrees",
@@ -2458,14 +2467,13 @@ static const char *const __stats_connection_desc[] = {
   "layered: Layered table cursor search operations from the ingest btrees",
   "layered: Layered table cursor search operations from the stable btrees",
   "layered: Layered table cursor update operations",
-  "layered: Layered table cursor upgrade state for the ingest btrees",
-  "layered: Layered table cursor upgrade state for the stable btrees",
   "layered: checkpoints performed on this table by the layered table manager",
   "layered: disagg pick up checkpoints failed",
   "layered: disagg pick up checkpoints succeeded",
   "layered: how many log applications the layered table manager applied on this tree",
   "layered: how many log applications the layered table manager skipped on this tree",
   "layered: how many previously-applied LSNs the layered table manager skipped on this tree",
+  "layered: number of checkpoints picked up by a follower",
   "layered: the number of tables the layered table manager has open",
   "live-restore: number of bytes copied from the source to the destination",
   "live-restore: number of files remaining for migration completion",
@@ -3353,6 +3361,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->checkpoints_total_failed = 0;
     stats->checkpoints_total_succeed = 0;
     /* not clearing checkpoint_time_total */
+    stats->checkpoint_rec_blkcache_write = 0;
     stats->checkpoint_wait_reduce_dirty = 0;
     stats->chunkcache_spans_chunks_read = 0;
     stats->chunkcache_chunks_evicted = 0;
@@ -3494,6 +3503,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->disagg_role_leader = 0;
     stats->disagg_step_down_time = 0;
     stats->disagg_step_up_time = 0;
+    stats->layered_curs_advance_stable = 0;
     stats->layered_curs_insert = 0;
     stats->layered_curs_modify = 0;
     stats->layered_curs_next = 0;
@@ -3503,6 +3513,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->layered_curs_prev_ingest = 0;
     stats->layered_curs_prev_stable = 0;
     stats->layered_curs_remove = 0;
+    stats->layered_curs_reopen_ingest = 0;
     stats->layered_curs_search_near = 0;
     stats->layered_curs_search_near_ingest = 0;
     stats->layered_curs_search_near_stable = 0;
@@ -3510,14 +3521,13 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->layered_curs_search_ingest = 0;
     stats->layered_curs_search_stable = 0;
     stats->layered_curs_update = 0;
-    stats->layered_curs_upgrade_ingest = 0;
-    stats->layered_curs_upgrade_stable = 0;
     stats->layered_table_manager_checkpoints = 0;
     stats->layered_table_manager_checkpoints_disagg_pick_up_failed = 0;
     stats->layered_table_manager_checkpoints_disagg_pick_up_succeed = 0;
     stats->layered_table_manager_logops_applied = 0;
     stats->layered_table_manager_logops_skipped = 0;
     stats->layered_table_manager_skip_lsn = 0;
+    stats->layered_table_manager_checkpoints_disagg_pick_up_follower = 0;
     stats->layered_table_manager_tables = 0;
     stats->live_restore_bytes_copied = 0;
     /* not clearing live_restore_work_remaining */
@@ -4508,6 +4518,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->checkpoints_total_failed += WT_STAT_CONN_READ(from, checkpoints_total_failed);
     to->checkpoints_total_succeed += WT_STAT_CONN_READ(from, checkpoints_total_succeed);
     to->checkpoint_time_total += WT_STAT_CONN_READ(from, checkpoint_time_total);
+    to->checkpoint_rec_blkcache_write += WT_STAT_CONN_READ(from, checkpoint_rec_blkcache_write);
     to->checkpoint_wait_reduce_dirty += WT_STAT_CONN_READ(from, checkpoint_wait_reduce_dirty);
     to->chunkcache_spans_chunks_read += WT_STAT_CONN_READ(from, chunkcache_spans_chunks_read);
     to->chunkcache_chunks_evicted += WT_STAT_CONN_READ(from, chunkcache_chunks_evicted);
@@ -4662,6 +4673,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->disagg_role_leader += WT_STAT_CONN_READ(from, disagg_role_leader);
     to->disagg_step_down_time += WT_STAT_CONN_READ(from, disagg_step_down_time);
     to->disagg_step_up_time += WT_STAT_CONN_READ(from, disagg_step_up_time);
+    to->layered_curs_advance_stable += WT_STAT_CONN_READ(from, layered_curs_advance_stable);
     to->layered_curs_insert += WT_STAT_CONN_READ(from, layered_curs_insert);
     to->layered_curs_modify += WT_STAT_CONN_READ(from, layered_curs_modify);
     to->layered_curs_next += WT_STAT_CONN_READ(from, layered_curs_next);
@@ -4671,6 +4683,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->layered_curs_prev_ingest += WT_STAT_CONN_READ(from, layered_curs_prev_ingest);
     to->layered_curs_prev_stable += WT_STAT_CONN_READ(from, layered_curs_prev_stable);
     to->layered_curs_remove += WT_STAT_CONN_READ(from, layered_curs_remove);
+    to->layered_curs_reopen_ingest += WT_STAT_CONN_READ(from, layered_curs_reopen_ingest);
     to->layered_curs_search_near += WT_STAT_CONN_READ(from, layered_curs_search_near);
     to->layered_curs_search_near_ingest += WT_STAT_CONN_READ(from, layered_curs_search_near_ingest);
     to->layered_curs_search_near_stable += WT_STAT_CONN_READ(from, layered_curs_search_near_stable);
@@ -4678,8 +4691,6 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->layered_curs_search_ingest += WT_STAT_CONN_READ(from, layered_curs_search_ingest);
     to->layered_curs_search_stable += WT_STAT_CONN_READ(from, layered_curs_search_stable);
     to->layered_curs_update += WT_STAT_CONN_READ(from, layered_curs_update);
-    to->layered_curs_upgrade_ingest += WT_STAT_CONN_READ(from, layered_curs_upgrade_ingest);
-    to->layered_curs_upgrade_stable += WT_STAT_CONN_READ(from, layered_curs_upgrade_stable);
     to->layered_table_manager_checkpoints +=
       WT_STAT_CONN_READ(from, layered_table_manager_checkpoints);
     to->layered_table_manager_checkpoints_disagg_pick_up_failed +=
@@ -4691,6 +4702,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->layered_table_manager_logops_skipped +=
       WT_STAT_CONN_READ(from, layered_table_manager_logops_skipped);
     to->layered_table_manager_skip_lsn += WT_STAT_CONN_READ(from, layered_table_manager_skip_lsn);
+    to->layered_table_manager_checkpoints_disagg_pick_up_follower +=
+      WT_STAT_CONN_READ(from, layered_table_manager_checkpoints_disagg_pick_up_follower);
     to->layered_table_manager_tables += WT_STAT_CONN_READ(from, layered_table_manager_tables);
     to->live_restore_bytes_copied += WT_STAT_CONN_READ(from, live_restore_bytes_copied);
     to->live_restore_work_remaining += WT_STAT_CONN_READ(from, live_restore_work_remaining);

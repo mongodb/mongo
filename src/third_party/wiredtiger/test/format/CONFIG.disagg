@@ -24,6 +24,8 @@ ops.salvage=0
 ops.throttle=0
 # FIXME-WT-15795 should allow prepared operations for layered tables.
 ops.prepare=0
+# FIXME-WT-16483 enable reserve back for layered cursors.
+ops.reserve=0
 quiet=0
 runs.in_memory=0
 transaction.timestamps=1

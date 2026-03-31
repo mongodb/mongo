@@ -53,8 +53,7 @@ class test_layered31(wttest.WiredTigerTestCase):
 
     # Reset a cursor on the follower.  Generally, the test will open a layered: uri,
     # and a reset is a signal have the cursor move to the next checkpoint. This works
-    # for layered cursors but not cursors in general.  In the m4 milestone where we don't
-    # use a layered cursor, to get similar behavior, we need to reopen the cursor.
+    # for layered cursors but not cursors in general.
     def reset_follow_cursor(self, cursor):
         cursor.reset()
         return cursor

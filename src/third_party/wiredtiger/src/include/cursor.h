@@ -540,8 +540,8 @@ struct __wt_cursor_layered {
 #define WT_CLAYERED_ACTIVE 0x01u         /* Incremented the session count */
 #define WT_CLAYERED_ITERATE_NEXT 0x02u   /* Forward iteration */
 #define WT_CLAYERED_ITERATE_PREV 0x04u   /* Backward iteration */
-#define WT_CLAYERED_OPEN_READ 0x08u      /* Open for reads */
-#define WT_CLAYERED_RANDOM 0x10u         /* Random cursor operations only */
+#define WT_CLAYERED_RANDOM 0x08u         /* Random cursor operations only */
+#define WT_CLAYERED_READ_STABLE 0x10u    /* Open for reads */
 #define WT_CLAYERED_STABLE_NO_CKPT 0x20u /* Stable constituent didn't have a checkpoint */
                                          /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;

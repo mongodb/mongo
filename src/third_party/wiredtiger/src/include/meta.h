@@ -148,4 +148,7 @@ typedef struct __wt_disagg_metadata {
 
     const char *key_provider; /* Key provider metadata string */
     size_t key_provider_len;  /* Length of key provider metadata string */
+
+    int version;            /* Metadata version */
+    int compatible_version; /* Minimum compatible reader version */
 } WT_DISAGG_METADATA;

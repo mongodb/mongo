@@ -30,7 +30,6 @@ import io
 import os
 import sys
 import unittest
-from types import SimpleNamespace
 
 # Add tools directory to sys.path so we can import py_common
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -42,37 +41,21 @@ import py_common.mdb_log_parse as log_parse
 class Test(unittest.TestCase):
     """Unit tests for decoding a single WT pages using only."""
 
-    def make_opts(self):
-        """Mock an opts object used by WTPage/Printer/PageStats."""
-        return SimpleNamespace(
-            disagg=False,
-            skip_data=True,  # only check the headers
-            cont=False,
-            debug=False,
-            # Printer options
-            split=False,
-            verbose=False,
-            ext=False,
-            output=None,
-        )
-
-    def load_page_bytes(self, opts):
+    def load_page_bytes(self):
         """Read WiredTiger01.txt and convert its hex dump into raw bytes."""
         cur_dir = os.path.dirname(os.path.abspath(__file__))
         file_path = os.path.join(cur_dir, "binary_files", "WiredTiger01.txt")
         with open(file_path, "r", encoding="utf-8") as f:
-            return log_parse.encode_bytes(f, opts)
+            return log_parse.encode_bytes(f)
 
     def test_wtpage_headers_from_wiredtiger01(self):
         """Decode WiredTiger01.txt and verify page and block header fields."""
-        opts = self.make_opts()
-        
-        page_bytes = self.load_page_bytes(opts)
+        page_bytes = self.load_page_bytes()
         self.assertGreater(len(page_bytes), 0, "Encoded page bytes should not be empty")
 
         b = binary_data.BinaryFile(io.BytesIO(page_bytes))
 
-        page = btree_format.WTPage.parse(b, len(page_bytes), opts)
+        page = btree_format.WTPage.parse(b, len(page_bytes), skip_data=True)
         self.assertTrue(page.success, "WTPage parsing failed")
 
         # Validate Page Header fields

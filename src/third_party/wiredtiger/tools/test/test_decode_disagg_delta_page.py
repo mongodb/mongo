@@ -29,7 +29,6 @@
 import os
 import sys
 import unittest
-from types import SimpleNamespace
 
 # Add tools directory to sys.path so we can import py_common
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -39,27 +38,8 @@ from py_common import binary_data, btree_format
 class TestDecodeDeltaPage(unittest.TestCase):
     """Unit tests for decoding a delta page from disaggregated storage."""
 
-    def make_opts(self) -> SimpleNamespace:
-        """Create an opts object required for decoding a disagg page."""
-        return SimpleNamespace(
-            # Disagg / decoding options
-            disagg=True,
-            disagg_table=False,
-            bson=True,
-            # General decode options
-            skip_data=False,
-            cont=False,
-            debug=False,
-            # Printer options
-            split=False,
-            verbose=True,
-            ext=False,
-            output=None,
-        )
-
     def test_decode_disagg_delta_page(self):
         """Decode delta page from MongoDB oplog."""
-        opts = self.make_opts()
         cur_dir = os.path.dirname(os.path.abspath(__file__))
         page_path = os.path.join(cur_dir, "binary_files", "disagg_delta_oplog.bin")
 
@@ -72,9 +52,9 @@ class TestDecodeDeltaPage(unittest.TestCase):
             b = binary_data.BinaryFile(disagg_file)
             nbytes = os.path.getsize(page_path)
 
-            page = btree_format.WTPage.parse(b, nbytes, opts)
+            page = btree_format.WTPage.parse(b, nbytes, disagg=True)
 
-            page.print_page(opts)
+            page.print_page(decode_as_bson=True, disagg=True)
 
             # Verify the parse succeeded and we can inspect the page
             self.assertTrue(getattr(page, 'success', True), 'WTPage.parse failed')

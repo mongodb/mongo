@@ -40,7 +40,7 @@ except:
     HAVE_SNAPPY = False
 
 
-def snappy_decompress_page(b: binary_data.BinaryFile, page_header, header_length, disk_size, disk_pos, opts) -> bytearray:
+def snappy_decompress_page(b: binary_data.BinaryFile, page_header, header_length, disk_size, disk_pos) -> bytearray:
     if not HAVE_SNAPPY:
         raise ModuleNotFoundError('python-snappy is required to decode compressed pages')
 

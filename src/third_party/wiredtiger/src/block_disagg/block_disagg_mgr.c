@@ -69,14 +69,15 @@ __bmd_close(WT_BM *bm, WT_SESSION_IMPL *session)
  *     Free a block of space to the underlying file.
  */
 static int
-__bmd_free(WT_BM *bm, WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
+__bmd_free(WT_BM *bm, WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size, bool is_root)
 {
     WT_BLKCACHE *blkcache;
     WT_DECL_RET;
 
     blkcache = &S2C(session)->blkcache;
 
-    ret = __wti_block_disagg_page_discard(session, (WT_BLOCK_DISAGG *)bm->block, addr, addr_size);
+    ret = __wti_block_disagg_page_discard(
+      session, (WT_BLOCK_DISAGG *)bm->block, addr, addr_size, is_root);
 
     /* Evict the freed block from the block cache */
     if (ret == 0 && blkcache->type != WT_BLKCACHE_UNCONFIGURED)

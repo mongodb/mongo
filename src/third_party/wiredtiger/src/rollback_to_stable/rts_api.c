@@ -105,7 +105,7 @@ __rollback_to_stable_int(WT_SESSION_IMPL *session, bool no_ckpt)
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_TXN_GLOBAL *txn_global;
-    wt_timestamp_t pinned_timestamp, rollback_timestamp, stable_timestamp;
+    wt_timestamp_t oldest_timestamp, pinned_timestamp, rollback_timestamp, stable_timestamp;
     uint32_t threads;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
     bool dryrun;
@@ -135,9 +135,8 @@ __rollback_to_stable_int(WT_SESSION_IMPL *session, bool no_ckpt)
      */
     WT_ERR(__wt_txn_update_oldest(session, WT_TXN_OLDEST_STRICT | WT_TXN_OLDEST_WAIT));
 
-    WT_ASSERT_ALWAYS(session,
-      (txn_global->has_pinned_timestamp ||
-        !__wt_atomic_load_bool_relaxed(&txn_global->has_oldest_timestamp)),
+    oldest_timestamp = __wt_get_oldest_timestamp(session);
+    WT_ASSERT_ALWAYS(session, txn_global->has_pinned_timestamp || oldest_timestamp == WT_TS_NONE,
       "Database has no pinned timestamp but an oldest timestamp. Pinned timestamp is required to "
       "find out the global visibility/obsolete of an update.");
 
@@ -153,7 +152,7 @@ __rollback_to_stable_int(WT_SESSION_IMPL *session, bool no_ckpt)
       "start rollback to stable with stable_timestamp=%s and oldest_timestamp=%s using %u worker "
       "threads",
       __wt_timestamp_to_string(stable_timestamp, ts_string[0]),
-      __wt_timestamp_to_string(txn_global->oldest_timestamp, ts_string[1]), threads);
+      __wt_timestamp_to_string(oldest_timestamp, ts_string[1]), threads);
 
     /* If the stable timestamp is not set, do not roll back based on it. */
     if (stable_timestamp != WT_TS_NONE)

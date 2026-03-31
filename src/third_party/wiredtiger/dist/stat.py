@@ -56,7 +56,7 @@ def check_description_format(stat):
 ##########################################
 def remove_suffix_digits(str):
     return re.sub(r'\d+$', '', str)
-    
+
 ##########################################
 # For each stat subclass check the names are sorted in alphabetical order.
 ##########################################
@@ -65,8 +65,8 @@ def check_name_sorted(stat_list):
     for stat in stat_list:
         stat_dict[type(stat)].append(stat)
     for stat_type, stats in stat_dict.items():
-        # In alphabetical order, stat_name_100 comes before stat_name_50. 
-        # For this reason, remove any numerical suffix before sorting the stats. 
+        # In alphabetical order, stat_name_100 comes before stat_name_50.
+        # For this reason, remove any numerical suffix before sorting the stats.
         # Print an error if the stats are not sorted correctly.
         sorted_stats = sorted(stats, key=lambda stat: remove_suffix_digits(stat.name))
         for sorted_stat, stat in zip(sorted_stats, stats):

@@ -105,4 +105,3 @@ class test_layered77(eviction_util, wttest.WiredTigerTestCase):
             count += 1
         cursor.close()
         self.assertEqual(count, nrows)
-

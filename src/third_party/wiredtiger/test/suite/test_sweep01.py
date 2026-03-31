@@ -36,7 +36,7 @@ from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
 from wiredtiger import stat
 import wttest
-
+@wttest.skip_for_hook("disagg", "Disagg doesn't sweep layered dhandles")
 class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
     tablebase = 'test_sweep01'
     uri = 'table:' + tablebase

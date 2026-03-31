@@ -26,7 +26,11 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+import logging
+
 from py_common import binary_data
+
+logger = logging.getLogger(__name__)
 
 # Manages printing to output.
 # We keep track of cells, the first line printed for a new cell
@@ -35,11 +39,9 @@ from py_common import binary_data
 # in decoding before the regular decoding output appears.
 # Those 'input bytes' are shown shifted to the right.
 class Printer(object):
-    def __init__(self, binfile, opts):
+    def __init__(self, binfile, *, split=False):
         self.binfile = binfile
-        self.issplit = opts.split
-        self.verbose = opts.verbose
-        self.ext = opts.ext
+        self.issplit = split
         self.cellpfx = ''
         self.in_cell = False
 
@@ -88,14 +90,6 @@ class Printer(object):
             pfx = '  '
         print(pfx + str(s))
 
-    def rint_v(self, s):
-        if self.verbose:
-            self.rint(s)
-
-    def rint_ext(self, s):
-        if self.ext:
-            self.rint(s)
-            
 def raw_bytes(b):
     if type(b) != type(b''):
         # Not bytes, it's already a string.
@@ -157,13 +151,14 @@ def binary_to_pretty_string(b, per_line=16, line_prefix='  ', start_with_line_pr
     result += '  ' + printable
     return result
 
-def dumpraw(p, b, pos):
+def dumpraw_to_log(b, pos):
+    """Dump raw bytes around a position to the logger for debugging (no Printer needed)."""
     savepos = b.tell()
     b.seek(pos)
     i = 0
     per_line = 16
     s = binary_to_pretty_string(b.read(256), per_line=per_line, line_prefix='')
     for line in s.splitlines():
-        p.rint_v(hex(pos + i) + ':  ' + line)
+        logger.error(hex(pos + i) + ':  ' + line)
         i += per_line
     b.seek(savepos)

@@ -31,14 +31,13 @@ import enum
 import io
 import json
 import logging
-
 from dataclasses import dataclass
 from typing import Optional, List, Union, Final
 
 # Tools and data structures for reading and decoding the on-disk format of WiredTiger's files.
 from py_common import binary_data
 from py_common.stats import PageStats
-from py_common.printer import Printer, binary_to_pretty_string, raw_bytes, dumpraw
+from py_common.printer import Printer, binary_to_pretty_string, raw_bytes, dumpraw_to_log
 from py_common.snappy_util import snappy_decompress_page
 
 logger = logging.getLogger(__name__)
@@ -642,23 +641,23 @@ class Cell(object):
         if self.extra_descriptor == 0:
             return
 
-        p.rint_v('cell has timestamps:')
+        p.rint('cell has timestamps:')
         if self.prepared:
-            p.rint_v(' prepared')
+            p.rint(' prepared')
 
         if self.start_ts is not None:
-            p.rint_v(' start ts: ' + binary_data.ts(self.start_ts))
+            p.rint(' start ts: ' + binary_data.ts(self.start_ts))
         if self.start_txn is not None:
-            p.rint_v(' start txn: ' + binary_data.txn(self.start_txn))
+            p.rint(' start txn: ' + binary_data.txn(self.start_txn))
         if self.durable_start_ts is not None:
-            p.rint_v(' durable start ts: ' + binary_data.ts(self.durable_start_ts))
+            p.rint(' durable start ts: ' + binary_data.ts(self.durable_start_ts))
 
         if self.stop_ts is not None:
-            p.rint_v(' stop ts: ' + binary_data.ts(self.stop_ts))
+            p.rint(' stop ts: ' + binary_data.ts(self.stop_ts))
         if self.stop_txn is not None:
-            p.rint_v(' stop txn: ' + binary_data.txn(self.stop_txn))
+            p.rint(' stop txn: ' + binary_data.txn(self.stop_txn))
         if self.durable_stop_ts is not None:
-            p.rint_v(' durable stop ts: ' + binary_data.ts(self.durable_stop_ts))
+            p.rint(' durable stop ts: ' + binary_data.ts(self.durable_stop_ts))
 
     def process_timestamps(self, pagestats: PageStats):
         pagestats.process_timestamps(self)
@@ -732,15 +731,16 @@ class DisaggAddr(object):
         return addr_string
 
 
-def verify_block_checksum(b: binary_data.BinaryFile, disk_pos: int, disk_size: int, page, opts) -> bool:
+def verify_block_checksum(b: binary_data.BinaryFile, disk_pos: int, disk_size: int, page,
+                          *, disagg: bool = False, cont: bool = False) -> bool:
     """Validate block checksum using crc32c when available."""
     if not HAVE_CRC32C:
         return True
 
     savepos = b.tell()
     b.seek(disk_pos)
-    if (opts.disagg and page.block_header.flags & BlockDisaggFlags.WT_BLOCK_DISAGG_DATA_CKSUM) \
-        or (not opts.disagg and page.block_header.flags & BlockFlags.WT_BLOCK_DATA_CKSUM):
+    if (disagg and page.block_header.flags & BlockDisaggFlags.WT_BLOCK_DISAGG_DATA_CKSUM) \
+        or (not disagg and page.block_header.flags & BlockFlags.WT_BLOCK_DATA_CKSUM):
         check_size = disk_size
     else:
         check_size = 64
@@ -757,7 +757,7 @@ def verify_block_checksum(b: binary_data.BinaryFile, disk_pos: int, disk_size: i
     checksum = crc32c.crc32c(data)
     if checksum != page.block_header.checksum:
         logger.error(f'? the calculated checksum {hex(checksum)} does not match header checksum {page.block_header.checksum}')
-        return opts.cont
+        return cont
 
     return True
 
@@ -774,18 +774,20 @@ class WTPage:
     block_header: Optional[Union[BlockHeader, BlockDisaggHeader]] = None
     cells: Optional[List[Cell]] = None
     extents: Optional[List[ExtentItem]] = None
+    pagestats: Optional[PageStats] = None
 
     raw_bytes: binary_data.BinaryFile = None
 
     @staticmethod
-    def parse(b: binary_data.BinaryFile, nbytes: int, opts) -> 'WTPage':
+    def parse(b: binary_data.BinaryFile, nbytes: int,
+              *, disagg: bool = False, skip_data: bool = False, cont: bool = False) -> 'WTPage':
         page = WTPage(success=False)
 
         page.raw_bytes = b
 
         disk_pos = b.tell()
 
-        if opts.disagg:
+        if disagg:
             # Size of WT_PAGE_HEADER
             page_data = bytearray(b.read(44))
         else:
@@ -794,12 +796,10 @@ class WTPage:
         b.saved_bytes()
         b_page = binary_data.BinaryFile(io.BytesIO(page_data))
 
-        p = Printer(b_page, opts)
-
         # WT_PAGE_HEADER in btmem.h (28 bytes)
         page.page_header = PageHeader.parse(b_page)
         # WT_BLOCK_HEADER in block.h (12 bytes or 44 bytes)
-        if opts.disagg:
+        if disagg:
             page.block_header = BlockDisaggHeader.parse(b_page)
         else:
             page.block_header = BlockHeader.parse(b_page)
@@ -815,23 +815,20 @@ class WTPage:
             logger.error('garbage in unused bytes')
             return page
 
-        disk_size = nbytes if opts.disagg else page.block_header.disk_size
+        disk_size = nbytes if disagg else page.block_header.disk_size
 
         if disk_size > 17 * 1024 * 1024:
             # The maximum document size in MongoDB is 16MB. Larger block sizes are suspect.
             logger.error('the block is too big')
             return page
-        if disk_size < 40 and not opts.disagg:
+        if disk_size < 40 and not disagg:
             # The disk size is too small
             return page
 
-        pagestats = PageStats()
+        page.pagestats = PageStats()
 
-        if not verify_block_checksum(b, disk_pos, disk_size, page, opts):
+        if not verify_block_checksum(b, disk_pos, disk_size, page, disagg=disagg, cont=cont):
             return page
-
-        # Skip the rest if we don't want to display the data
-        skip_data = opts.skip_data
 
         if skip_data:
             b.seek(disk_pos + disk_size)
@@ -842,16 +839,15 @@ class WTPage:
         payload_pos = b.tell()
         header_length = payload_pos - disk_pos
         if page.page_header.flags & PageFlags.WT_PAGE_COMPRESSED:
-            payload_data = snappy_decompress_page(b, page.page_header, header_length, disk_size, disk_pos, opts)
+            payload_data = snappy_decompress_page(b, page.page_header, header_length, disk_size, disk_pos)
         else:
             payload_data = b.read(page.page_header.mem_size - header_length)
             b.seek(disk_pos + disk_size)
 
-        # Add the payload to the page data & reinitialize the stream and the printer
+        # Add the payload to the page data & reinitialize the stream
         page_data.extend(payload_data)
         b_page = binary_data.BinaryFile(io.BytesIO(page_data))
         b_page.seek(header_length)
-        p = Printer(b_page, opts)
 
         # Parse the block contents
         if page.page_header.type == PageType.WT_PAGE_INVALID:
@@ -861,78 +857,76 @@ class WTPage:
             page.extents = extents
         elif page.page_header.type == PageType.WT_PAGE_ROW_INT or \
             page.page_header.type == PageType.WT_PAGE_ROW_LEAF:
-            cells = page.decode_rows(b_page, p, pagestats)
+            cells = page.decode_rows(b_page, page.pagestats)
             page.cells = cells
         else:
             logger.warning('? unimplemented decode for page type {}'.format(page.page_header.type))
 
-        PageStats.outfile_stats_end(opts, page.page_header, page.block_header, pagestats)
         page.success = True
         return page
 
-    def print_page(self, opts):
-        p = Printer(self.raw_bytes, opts)
+    def print_page(self, *, split: bool = False,
+                   decode_as_bson: bool = False, disagg: bool = False):
+        p = Printer(self.raw_bytes, split=split)
         p.rint(self.page_header)
         p.rint(self.block_header)
-
-        # Don't print the cell data unless configured.
-        if not opts.verbose:
-            return
 
         if self.page_header.type == PageType.WT_PAGE_INVALID:
             pass    # a blank page: TODO maybe should check that it's all zeros?
         elif self.page_header.type == PageType.WT_PAGE_BLOCK_MANAGER:
-            self.print_extents(p, opts)
+            if self.extents is not None:
+                self.print_extents(p)
         elif self.page_header.type == PageType.WT_PAGE_ROW_INT or \
             self.page_header.type == PageType.WT_PAGE_ROW_LEAF:
-            self.print_cells(p, opts)
+            if self.cells is not None:
+                self.print_cells(p, decode_as_bson=decode_as_bson, disagg=disagg)
         elif self.page_header.type == PageType.WT_PAGE_OVFL:
             # Use b_page.read() so that we can also print the raw bytes in the split mode
             b_page = self.raw_bytes
-            p.rint_v(raw_bytes(b_page.read(len(self.raw_bytes))))
+            p.rint(raw_bytes(b_page.read(len(self.raw_bytes))))
         else:
             logger.warning(f'? unimplemented decode for page type {self.page_header.type}')
-            p.rint_v(binary_to_pretty_string(self.raw_bytes))
+            p.rint(binary_to_pretty_string(self.raw_bytes))
 
         return
 
-    def print_cells(self, p, opts):
+    def print_cells(self, p, *, decode_as_bson: bool = False, disagg: bool = False):
         for cellnum, cell in enumerate(self.cells):
             p.begin_cell(cellnum)
-            p.rint_v(cell.descriptor_string())
-            p.rint_v(cell.type_string())
+            p.rint(cell.descriptor_string())
+            p.rint(cell.type_string())
             cell.print_timestamps(p)
 
             # Print the contents of the cell.
             try:
                 # Attempt the decode the cell as BSON.
-                if (cell.is_value and opts.bson and HAVE_BSON):
+                if (cell.is_value and decode_as_bson and HAVE_BSON):
                     decoded_data = bson.BSON(cell.data).decode()
-                    p.rint_v(pprint.pformat(decoded_data, indent=2))
+                    p.rint(pprint.pformat(decoded_data, indent=2))
                 # If the cell is an address and we're in disagg mode, print the cell as a DisaggAddr
                 # type.
-                elif cell.is_address and opts.disagg:
+                elif cell.is_address and disagg:
                     addr = DisaggAddr.parse(cell.data)
                     p.rint(json.dumps(addr.__dict__))
                 else:
-                    p.rint_v(raw_bytes(cell.data))
+                    p.rint(raw_bytes(cell.data))
             except (IndexError, ValueError):
                 # FIXME-WT-13000 theres a bug in raw_bytes
                 pass
             except Exception as e:
                 if HAVE_BSON and isinstance(e, bson.InvalidBSON):
-                    p.rint_v(f"cannot decode cell as BSON: {e}")
-                    p.rint_v(raw_bytes(cell.data))
+                    p.rint(f"cannot decode cell as BSON: {e}")
+                    p.rint(raw_bytes(cell.data))
                 else:
                     raise
 
             p.end_cell()
 
-    def print_extents(self, p, opts):
-        p.rint_ext('extent list follows:')
+    def print_extents(self, p):
+        p.rint('extent list follows:')
         for extnum, extent in enumerate(self.extents):
             p.begin_cell(extnum)
-            p.rint_ext(f'  {extent.offset}, {extent.size}{extent.extra_stuff}')
+            p.rint(f'  {extent.offset}, {extent.size}{extent.extra_stuff}')
 
     def is_delta(self):
         if not isinstance(self.block_header, BlockDisaggHeader):
@@ -940,7 +934,7 @@ class WTPage:
 
         return self.block_header.magic == BlockDisaggHeader.WT_BLOCK_DISAGG_MAGIC_DELTA
 
-    def decode_rows(self, b, p , pagestats) -> List[Cell]:
+    def decode_rows(self, b, pagestats) -> List[Cell]:
         cells = []
         for cellnum in range(0, self.page_header.entries):
             cellpos = b.tell()
@@ -960,7 +954,7 @@ class WTPage:
 
             # If the cell cannot be decoded as a valid type, dump the raw bytes and raise an error.
             if not cell.is_valid_type():
-                dumpraw(p, b, cellpos)
+                dumpraw_to_log(b, cellpos)
                 raise ValueError('Unexpected cell type')
 
         return cells
@@ -971,7 +965,6 @@ class WTPage:
         okay = True
         cellnum = -1
         lastoff = 0
-        # p.rint_ext('extent list follows:')
         while True:
             cellnum += 1
             cellpos = b.tell()

@@ -25,7 +25,7 @@ is_layercparse_cache_outdated() {
 
 want_update() {
     ! is_layercparse_cached && REMOTE_HASH=$(get_remote_hash) && return 0
-    
+
     if is_layercparse_cache_outdated; then
         touch "$HASH_FILE"
         local cached_hash=$(cat "$HASH_FILE")
@@ -36,7 +36,7 @@ want_update() {
 }
 
 if want_update; then
-    # Force reinstall `layercparse` to ensure the latest changes are applied, 
+    # Force reinstall `layercparse` to ensure the latest changes are applied,
     # as `pip install` does not update automatically for new commits.
     pip3 -q --disable-pip-version-check install --force-reinstall git+"$REPO_URL@$BRANCH"
     echo "$REMOTE_HASH" > "$HASH_FILE"

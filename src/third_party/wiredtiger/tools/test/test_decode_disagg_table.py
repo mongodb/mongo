@@ -29,7 +29,6 @@
 import os
 import sys
 import unittest
-from types import SimpleNamespace
 
 # Add tools directory to sys.path so we can import py_common
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -39,34 +38,13 @@ from py_common import page_service
 class TestDecodeDisaggTable(unittest.TestCase):
     """Unit tests for decoding a table from disaggregated storage."""
 
-    def make_opts(self) -> SimpleNamespace:
-        """Create an opts object required for decoding a disagg table."""
+    def test_decode_disagg_table_bson(self):
+        """Decode the disagg table in JSONL format."""
         keyfile = os.environ.get("DISAGG_KEYFILE")
         if not keyfile:
             self.skipTest(
                 f"Environment variable DISAGG_KEYFILE must be set to the encryption keyfile path"
             )
-
-        return SimpleNamespace(
-            # Disagg / decoding options
-            disagg=True,
-            disagg_table=True,
-            bson=True,
-            keyfile=keyfile,
-            # General decode options
-            skip_data=False,
-            cont=False,
-            debug=False,
-            # Printer options
-            split=False,
-            verbose=True,
-            ext=False,
-            output=None,
-        )
-
-    def test_decode_disagg_table_bson(self):
-        """Decode the disagg table in JSONL format."""
-        opts = self.make_opts()
         cur_dir = os.path.dirname(os.path.abspath(__file__))
         table_path = os.path.join(cur_dir, "binary_files", "disagg_oplog.jsonl")
 
@@ -76,7 +54,10 @@ class TestDecodeDisaggTable(unittest.TestCase):
         )
 
         with open(table_path, "r", encoding="utf-8") as disagg_file:
-            table_summary = page_service.process_disagg_table(disagg_file, opts)
+            table_summary = page_service.process_disagg_table(
+                disagg_file,
+                DecodeOptions(keyfile=keyfile, bson=True),
+            )
 
             self.assertEqual(table_summary.delta_pages, 2)
             self.assertEqual(table_summary.full_pages, 6)

@@ -27,13 +27,12 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 from suite_subprocess import suite_subprocess
-import os
-import shutil
 import wiredtiger, wttest
+from wtbackup import backup_base
 
 # test_backup.py
 #   Test error message if verifying metadata on a backup restore.
-class test_backup23(wttest.WiredTigerTestCase, suite_subprocess):
+class test_backup23(backup_base):
     '''Test backup, verifying metadata and an error opening the backup'''
 
     #conn_config = 'config_base=false,log=(enabled,remove=false),verbose=(recovery,log)'
@@ -43,22 +42,6 @@ class test_backup23(wttest.WiredTigerTestCase, suite_subprocess):
     dir='backup.dir'
     nentries = 10
     uri = 'file:backup.wt'
-
-    def take_full_backup(self, dir):
-        # Open up the backup cursor, and copy the files.  Do a full backup.
-        cursor = self.session.open_cursor('backup:', None, None)
-        self.pr('Full backup to ' + dir + ': ')
-        os.mkdir(dir)
-        while True:
-            ret = cursor.next()
-            if ret != 0:
-                break
-            bkup_file = cursor.get_key()
-            sz = os.path.getsize(bkup_file)
-            self.pr('Copy from: ' + bkup_file + ' (' + str(sz) + ') to ' + dir)
-            shutil.copy(bkup_file, dir)
-        self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
-        cursor.close()
 
     def test_backup23(self):
         '''Test backup, verifying metadata and an error opening the backup'''

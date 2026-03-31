@@ -36,6 +36,7 @@ import unittest
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import wt_binary_decode
+from py_common.decode_opts import DecodeOptions
 
 
 class TestDecodeMongoDBLog(unittest.TestCase):
@@ -44,21 +45,15 @@ class TestDecodeMongoDBLog(unittest.TestCase):
     def setUp(self):
         self.cur_dir = os.path.dirname(os.path.abspath(__file__))
         self.binary_files_dir = os.path.join(self.cur_dir, "binary_files")
-        self.parser = wt_binary_decode.get_arg_parser()
 
     def run_decode(self, filename):
         log_path = os.path.join(self.binary_files_dir, filename)
         self.assertTrue(os.path.exists(log_path), f"Missing log file at {log_path}")
 
-        opts = self.parser.parse_args([
-            "--dumpin",
-            log_path,
-        ])
-
         buffer = io.StringIO()
         with self.assertLogs("py_common.mdb_log_parse", level=logging.INFO) as logs:
             with contextlib.redirect_stdout(buffer):
-                wt_binary_decode.wtdecode(opts)
+                wt_binary_decode.wtdecode(log_path, DecodeOptions(dumpin=True))
         return buffer.getvalue(), "\n".join(logs.output)
 
     def test_decode_log_mongodb_valid(self):

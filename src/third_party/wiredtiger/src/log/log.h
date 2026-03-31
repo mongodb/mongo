@@ -147,7 +147,7 @@ struct __wt_log_manager {
     wt_off_t dirty_max;             /* configuration : Log dirty system cache max size */
     wt_off_t extend_len;            /* configuration : file_extend log length */
     wt_off_t file_max;              /* configuration : Log file max size */
-    uint32_t force_write_wait;      /* configuration : Log force write wait */
+    uint64_t force_write_wait;      /* configuration : Log force write wait */
     const char *log_path;           /* configuration : Logging path format */
     wt_shared uint32_t txn_logsync; /* configuration : Log sync */
 

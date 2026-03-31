@@ -26,19 +26,20 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, shutil, threading, time
+import os, threading, time
 from wtthread import checkpoint_thread
 from wttest import open_cursor
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from wiredtiger import stat
+from wtbackup import backup_base
 
 # test_checkpoint_snapshot05.py
 #   This test is to run checkpoint and eviction in parallel with timing
 #   stress for checkpoint and let eviction write more data than checkpoint
 #   after a bulk load on a table to check the backup recovery.
-class test_checkpoint_snapshot05(wttest.WiredTigerTestCase):
+class test_checkpoint_snapshot05(backup_base):
     # Create a table.
     uri = "table:test_checkpoint_snapshot05"
     backup_dir = "BACKUP"
@@ -59,23 +60,6 @@ class test_checkpoint_snapshot05(wttest.WiredTigerTestCase):
         self.nrows = 1000
         self.valuea = "aaaaa" * 100
         self.valueb = "bbbbb" * 100
-
-    def take_full_backup(self, fromdir, todir):
-        # Open up the backup cursor, and copy the files.  Do a full backup.
-        cursor = self.session.open_cursor('backup:', None, None)
-        self.pr('Full backup from '+ fromdir + ' to ' + todir + ': ')
-        os.mkdir(todir)
-        while True:
-            ret = cursor.next()
-            if ret != 0:
-                break
-            bkup_file = cursor.get_key()
-            copy_file = os.path.join(fromdir, bkup_file)
-            sz = os.path.getsize(copy_file)
-            self.pr('Copy from: ' + bkup_file + ' (' + str(sz) + ') to ' + todir)
-            shutil.copy(copy_file, todir)
-        self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
-        cursor.close()
 
     def check(self, check_value, uri, nrows):
         session = self.session
@@ -159,7 +143,7 @@ class test_checkpoint_snapshot05(wttest.WiredTigerTestCase):
             assert stat_cursor[stat.conn.checkpoint_skipped][2] == 0
 
         # The restoration of the backup is expected to fix the inconsistent checkpoint.
-        self.take_full_backup(".", self.backup_dir)
+        self.take_full_backup(self.backup_dir, home=".")
         self.reopen_conn(self.backup_dir)
 
         # Check the table contains the last checkpointed value.

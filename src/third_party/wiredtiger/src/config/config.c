@@ -746,6 +746,22 @@ __wt_config_getones(
 }
 
 /*
+ * __wt_config_getones_n --
+ *     Get the value for a given string key from a non-null-terminated config string of a specified
+ *     length.
+ */
+int
+__wt_config_getones_n(WT_SESSION_IMPL *session, const char *config, size_t config_len,
+  const char *key, WT_CONFIG_ITEM *value)
+{
+    WT_CONFIG cparser;
+    WT_CONFIG_ITEM key_item = {key, strlen(key), 0, WT_CONFIG_ITEM_STRING};
+
+    __wt_config_initn(session, &cparser, config, config_len);
+    return (__config_getraw(&cparser, &key_item, value, true));
+}
+
+/*
  * __wt_config_getones_none --
  *     Get the value for a given string key from a single config string. Treat "none" as empty.
  */

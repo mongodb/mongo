@@ -2340,7 +2340,7 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
     }
 
     durable_timestamp = __wt_atomic_load_uint64_relaxed(&txn_global->durable_timestamp);
-    oldest_timestamp = __wt_atomic_load_uint64_relaxed(&txn_global->oldest_timestamp);
+    oldest_timestamp = __wt_get_oldest_timestamp(session);
     pinned_timestamp = __wt_atomic_load_uint64_relaxed(&txn_global->pinned_timestamp);
 
     if (checkpoint_timestamp != WT_TS_NONE && checkpoint_timestamp < pinned_timestamp)
@@ -2759,6 +2759,8 @@ __wt_verbose_dump_txn_one(
           session, snapshot_buf, "%s%" PRIu64, i == 0 ? "" : ", ", txn->snapshot_data.snapshot[i]));
     WT_ERR(__wt_buf_catfmt(session, snapshot_buf, "%s", "]\0"));
     buf_len = (uint32_t)snapshot_buf->size + 512;
+    if (txn_err_info->err_msg != NULL)
+        buf_len += strlen(txn_err_info->err_msg);
     WT_ERR(__wt_scr_alloc(session, buf_len, &buf));
 
     WT_ERR(__wt_lsn_string(&txn->ckpt_lsn, sizeof(ckpt_lsn_str), ckpt_lsn_str));

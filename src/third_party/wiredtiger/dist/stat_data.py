@@ -524,6 +524,7 @@ conn_stats = [
     CheckpointStat('checkpoint_prep_running', 'prepare currently running', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_prep_total', 'prepare total time (msecs)', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_presync', 'number of handles visited after writes complete'),
+    CheckpointStat('checkpoint_rec_blkcache_write', 'total time (msecs) writing pages to stable storage during checkpoint reconciliation'),
     CheckpointStat('checkpoint_scrub_max', 'scrub max time (msecs)', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_scrub_min', 'scrub min time (msecs)', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_scrub_recent', 'scrub most recent time (msecs)', 'no_clear,no_scale'),
@@ -643,6 +644,7 @@ conn_stats = [
     ##########################################
     # Layered table statistics
     ##########################################
+    LayeredStat('layered_table_manager_checkpoints_disagg_pick_up_follower', 'number of checkpoints picked up by a follower'),
     LayeredStat('layered_table_manager_tables', 'the number of tables the layered table manager has open'),
 
     ##########################################
@@ -1024,6 +1026,7 @@ dsrc_stats = [
     ##########################################
     BtreeStat('btree_checkpoint_generation', 'btree checkpoint generation', 'no_clear,no_scale'),
     BtreeStat('btree_checkpoint_pages_reconciled', 'btree number of pages reconciled during checkpoint', 'no_clear,no_scale'),
+    BtreeStat('btree_checkpoint_reconcile_duration', 'time spent walking the tree for checkpoint including dirty page reconciliation time (usecs)', 'no_clear,no_scale'),
     BtreeStat('btree_clean_checkpoint_timer', 'btree clean tree checkpoint expiration time', 'no_clear,no_scale'),
     BtreeStat('btree_column_deleted', 'column-store variable-size deleted values', 'no_scale,tree_walk'),
     BtreeStat('btree_column_internal', 'column-store internal pages', 'no_scale,tree_walk'),
@@ -1362,6 +1365,7 @@ conn_dsrc_stats = [
     ##########################################
     # Layered table statistics
     ##########################################
+    LayeredStat('layered_curs_advance_stable', 'Layered table cursor advances to a newer checkpoint for the stable btree'),
     LayeredStat('layered_curs_insert', 'Layered table cursor insert operations'),
     LayeredStat('layered_curs_modify', 'Layered table cursor modify operations'),
     LayeredStat('layered_curs_next', 'Layered table cursor next operations'),
@@ -1371,6 +1375,7 @@ conn_dsrc_stats = [
     LayeredStat('layered_curs_prev_ingest', 'Layered table cursor prev operations from the ingest btrees'),
     LayeredStat('layered_curs_prev_stable', 'Layered table cursor prev operations from the stable btrees'),
     LayeredStat('layered_curs_remove', 'Layered table cursor remove operations'),
+    LayeredStat('layered_curs_reopen_ingest', 'Layered table cursor reopens ingest btree'),
     LayeredStat('layered_curs_search', 'Layered table cursor search operations'),
     LayeredStat('layered_curs_search_ingest', 'Layered table cursor search operations from the ingest btrees'),
     LayeredStat('layered_curs_search_near', 'Layered table cursor search near operations'),
@@ -1378,8 +1383,6 @@ conn_dsrc_stats = [
     LayeredStat('layered_curs_search_near_stable', 'Layered table cursor search near operations from the stable btrees'),
     LayeredStat('layered_curs_search_stable', 'Layered table cursor search operations from the stable btrees'),
     LayeredStat('layered_curs_update', 'Layered table cursor update operations'),
-    LayeredStat('layered_curs_upgrade_ingest', 'Layered table cursor upgrade state for the ingest btrees'),
-    LayeredStat('layered_curs_upgrade_stable', 'Layered table cursor upgrade state for the stable btrees'),
 
     LayeredStat('layered_table_manager_checkpoints', 'checkpoints performed on this table by the layered table manager'),
     LayeredStat('layered_table_manager_checkpoints_disagg_pick_up_failed', 'disagg pick up checkpoints failed'),
