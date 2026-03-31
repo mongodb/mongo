@@ -1208,6 +1208,9 @@ public:
                 (WiredTigerRecoveryUnit & ru, StringData ident, Timestamp publishTimestamp),
                 (override));
 
+    MOCK_METHOD(void, pinAllDurableTimestamp, (uint64_t ts), (override));
+    MOCK_METHOD(void, unpinAllDurableTimestamp, (uint64_t ts), (override));
+
     bool _shouldTimestampTableCreations = false;
 };
 
@@ -1230,12 +1233,15 @@ public:
     }
 };
 
-TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest,
-       CommitCallsPublishWhenTimestampTableCreationsEnabled) {
+TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest, PrimaryPathPublishesWithPinning) {
     mockEngine()->_shouldTimestampTableCreations = true;
 
     {
+        // Primary path (no _commitTimestamp set): should pin all_durable around commit+publish.
         EXPECT_CALL(*mockEngine(), publishIdent(testing::_, testing::_, Timestamp(2, 0))).Times(1);
+        EXPECT_CALL(*mockEngine(), pinAllDurableTimestamp(testing::_)).Times(1);
+        EXPECT_CALL(*mockEngine(), unpinAllDurableTimestamp(testing::_)).Times(1);
+
         StorageWriteTransaction txn(*ru1);
         ASSERT_OK(ru1->setTimestamp(Timestamp(2, 0)));
         ru1->onCreateTable("my-table");
@@ -1281,6 +1287,27 @@ TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest,
     ASSERT_OK(ru1->setTimestamp(Timestamp(2, 0)));
     ru1->onCreateTable("my-table");
     txn.commit();
+}
+
+TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest,
+       SecondaryPathPublishesWithCapturedTimestampWithoutPinning) {
+    mockEngine()->_shouldTimestampTableCreations = true;
+
+    // Simulate the secondary (non-MDT) path: TimestampBlock sets _commitTimestamp before the
+    // WUOW begins. Tables should be published at the captured per-table timestamp without pinning
+    // all_durable.
+    EXPECT_CALL(*mockEngine(), publishIdent(testing::_, testing::_, Timestamp(5, 0))).Times(1);
+    EXPECT_CALL(*mockEngine(), pinAllDurableTimestamp(testing::_)).Times(0);
+    EXPECT_CALL(*mockEngine(), unpinAllDurableTimestamp(testing::_)).Times(0);
+
+    // setCommitTimestamp must be called outside the WUOW, mirroring TimestampBlock behavior.
+    ru1->setCommitTimestamp(Timestamp(5, 0));
+    StorageWriteTransaction txn(*ru1);
+    // Activate the WT session (simulates actual writes during oplog application).
+    ru1->getSession();
+    ru1->onCreateTable("my-table");
+    txn.commit();
+    ru1->clearCommitTimestamp();
 }
 
 }  // namespace

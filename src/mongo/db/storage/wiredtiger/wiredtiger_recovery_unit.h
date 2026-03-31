@@ -240,7 +240,9 @@ private:
 
     void _abort();
     void _commit();
-    void _commitAndPublishTables(WiredTigerKVEngineBase* kvEngine, Timestamp commitTime);
+    void _commitAndPublishTables(WiredTigerKVEngineBase* kvEngine,
+                                 Timestamp commitTime,
+                                 bool needsAllDurablePin);
 
     void _ensureSession();
     void _txnClose(bool commit);
