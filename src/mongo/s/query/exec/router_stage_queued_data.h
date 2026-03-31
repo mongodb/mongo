@@ -63,10 +63,6 @@ public:
 
     bool remotesExhausted() const final;
 
-    bool isEOF() const final {
-        return _resultsQueue.empty();
-    }
-
     std::size_t getNumRemotes() const final;
 
     /**

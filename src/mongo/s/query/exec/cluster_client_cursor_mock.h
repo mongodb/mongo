@@ -141,8 +141,6 @@ public:
      */
     bool remotesExhausted() const final;
 
-    bool isEOF() const final;
-
     bool hasBeenKilled() const final;
 
     /**

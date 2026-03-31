@@ -59,8 +59,6 @@ public:
 
     bool remotesExhausted() const final;
 
-    bool isEOF() const final;
-
     /**
      * Queues a BSONObj to be returned.
      */

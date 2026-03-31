@@ -124,15 +124,6 @@ public:
         return _child->remotesExhausted();
     }
 
-    /*
-     * Returns true if there are no more results to return. Can be false-negative, but not
-     * false-positive. By default returns false. Stages that can easily determine if they reached
-     * EOF should implement this.
-     */
-    virtual bool isEOF() const {
-        return false;
-    }
-
     /**
      * Sets the maxTimeMS value that the cursor should forward with any internally issued getMore
      * requests.

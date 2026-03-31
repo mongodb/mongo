@@ -73,10 +73,6 @@ bool RouterStageMock::remotesExhausted() const {
     return _remotesExhausted;
 }
 
-bool RouterStageMock::isEOF() const {
-    return _resultsQueue.empty() && _remotesExhausted;
-}
-
 Status RouterStageMock::doSetAwaitDataTimeout(Milliseconds awaitDataTimeout) {
     _awaitDataTimeout = awaitDataTimeout;
     return Status::OK();
