@@ -52,12 +52,9 @@ MONGO_FAIL_POINT_DEFINE(preImagesTruncateOnlyOnSecondaries);
 
 PreImagesTruncateStats PreImagesTruncateManager::truncateExpiredPreImages(
     OperationContext* opCtx, bool useReplicatedTruncates) {
-    // Pre-images collections can multiply the amount of user data inserted and deleted
-    // on each node. It is imperative that truncate marker generation and pre-image removal are
-    // prioritized so they can keep up with inserts and prevent users from running out of disk
-    // space.
-    ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
-        opCtx, AdmissionContext::Priority::kExempt);
+    // Pre image truncation is marked non-deprio, as with this it has the same pace as the user
+    // writes that generates new entries in the config.system.preimages collection
+    admission::execution_control::ScopedTaskTypeNonDeprioritizable prioGuard(opCtx);
 
     try {
         if (auto truncateMarkers = _getInitializedMarkersForPreImagesCollection(opCtx)) {
