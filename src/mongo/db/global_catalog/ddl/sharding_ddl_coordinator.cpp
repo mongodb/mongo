@@ -168,7 +168,7 @@ ExecutorFuture<void> ShardingDDLCoordinatorMixin::_acquireDDLLockAsync(
     const T& resource,
     LockMode lockMode) {
     return AsyncTry([this, &self, resource, lockMode] {
-               auto opCtxHolder = self.makeOperationContext();
+               auto opCtxHolder = self.makeOperationContext(/*deprioritizable=*/true);
                auto* opCtx = opCtxHolder.get();
 
                const auto coorName = idl::serialize(self._coordId.getOperationType());

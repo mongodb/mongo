@@ -121,6 +121,10 @@ private:
         this->_releaseDDLLocks(opCtx);
     }
 
+    bool _isInCriticalSectionGeneric(CoordinatorGenericPhase phase) const final {
+        return false;
+    }
+
     friend class ShardingDDLCoordinatorTest;
 };
 
@@ -176,6 +180,11 @@ private:
 
     StringData serializeGenericPhase(CoordinatorGenericPhase phase) const final {
         return this->serializePhase(phase);
+    }
+
+    bool _isInCriticalSectionGeneric(CoordinatorGenericPhase phase) const final {
+        return this->isInCriticalSection(
+            CoordinatorStateDocImpl<StateDoc>::castToCoordinatorPhase(phase));
     }
 };
 

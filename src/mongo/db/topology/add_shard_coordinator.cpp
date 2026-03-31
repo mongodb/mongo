@@ -500,6 +500,10 @@ ExecutorFuture<void> AddShardCoordinator::_cleanupOnAbort(
     });
 }
 
+bool AddShardCoordinator::isInCriticalSection(Phase phase) const {
+    return phase >= Phase::kEnterCriticalSection && phase <= Phase::kExitCriticalSection;
+}
+
 void AddShardCoordinator::checkIfOptionsConflict(const BSONObj& stateDoc) const {
     // Only one add shard can run at any time, so all the user supplied parameters must match.
     const auto otherDoc = AddShardCoordinatorDocument::parse(

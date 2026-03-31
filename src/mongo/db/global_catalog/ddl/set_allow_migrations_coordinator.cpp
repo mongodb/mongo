@@ -105,7 +105,7 @@ ExecutorFuture<void> SetAllowMigrationsCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor).then([this, anchor = shared_from_this()] {
-        auto opCtxHolder = this->makeOperationContext();
+        auto opCtxHolder = this->makeOperationContext(/*deprioritizable=*/true);
         auto* opCtx = opCtxHolder.get();
 
         uassert(ErrorCodes::NamespaceNotSharded,

@@ -114,7 +114,7 @@ ShardingCoordinator::~ShardingCoordinator() {
 ExecutorFuture<bool> ShardingCoordinator::_removeDocumentUntillSuccessOrStepdown(
     std::shared_ptr<executor::TaskExecutor> executor) {
     return AsyncTry([this, anchor = shared_from_this()] {
-               auto opCtxHolder = makeOperationContext();
+               auto opCtxHolder = makeOperationContext(/*deprioritizable=*/false);
                auto* opCtx = opCtxHolder.get();
 
                return StatusWith(_removeDocument(opCtx));
@@ -172,7 +172,7 @@ ExecutorFuture<void> ShardingCoordinator::_translateTimeseriesNss(
     std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
 
     return AsyncTry([this] {
-               auto opCtxHolder = makeOperationContext();
+               auto opCtxHolder = makeOperationContext(/*deprioritizable=*/false);
                auto* opCtx = opCtxHolder.get();
 
                const auto bucketNss = originalNss().makeTimeseriesBucketsNamespace();
@@ -238,24 +238,24 @@ SemiFuture<void> ShardingCoordinator::run(std::shared_ptr<executor::ScopedTaskEx
                                           const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
         .then([this, executor, token, anchor = shared_from_this()] {
-            auto opCtxHolder = makeOperationContext();
+            auto opCtxHolder = makeOperationContext(/*deprioritizable=*/false);
             auto* opCtx = opCtxHolder.get();
             _initialize(opCtx);
         })
         .then([this, executor, token, anchor = shared_from_this()] {
             // Check preconditions before acquiring locks, as a "best effort".
-            auto opCtxHolder = makeOperationContext();
+            auto opCtxHolder = makeOperationContext(/*deprioritizable=*/false);
             auto* opCtx = opCtxHolder.get();
             _checkCoordinatorPreconditions(opCtx, /*afterAcquiringLocks=*/false);
         })
         .then([this, executor, token, anchor = shared_from_this()] {
-            auto opCtxHolder = makeOperationContext();
+            auto opCtxHolder = makeOperationContext(/*deprioritizable=*/false);
             auto* opCtx = opCtxHolder.get();
             return _acquireLocksAsync(opCtx, executor, token);
         })
         .then([this, executor, token, anchor = shared_from_this()] {
             // Check preconditions again now that we have the locks.
-            auto opCtxHolder = makeOperationContext();
+            auto opCtxHolder = makeOperationContext(/*deprioritizable=*/false);
             auto* opCtx = opCtxHolder.get();
             _checkCoordinatorPreconditions(opCtx, /*afterAcquiringLocks=*/true);
         })
@@ -367,7 +367,7 @@ SemiFuture<void> ShardingCoordinator::run(std::shared_ptr<executor::ScopedTaskEx
                 .on(**executor, CancellationToken::uncancelable());
         })
         .onCompletion([this, executor, token, anchor = shared_from_this()](const Status& status) {
-            auto opCtxHolder = makeOperationContext();
+            auto opCtxHolder = makeOperationContext(/*deprioritizable=*/false);
             auto* opCtx = opCtxHolder.get();
 
             // If we are stepping down the token MUST be cancelled. Each implementation of the
@@ -518,7 +518,8 @@ std::function<void()> RecoverableShardingCoordinator::_buildPhaseHandlerGeneric(
             return;
         }
 
-        auto opCtxHolder = this->makeOperationContext();
+        const auto deprioritizable = !_isInCriticalSectionGeneric(newPhase);
+        auto opCtxHolder = this->makeOperationContext(deprioritizable);
         auto* opCtx = opCtxHolder.get();
 
         if (!shouldExecute(opCtx)) {
@@ -551,7 +552,7 @@ void RecoverableShardingCoordinator::_enterPhaseGeneric(CoordinatorGenericPhase 
     ServiceContext::UniqueOperationContext uniqueOpCtx;
     auto opCtx = cc().getOperationContext();
     if (!opCtx) {
-        uniqueOpCtx = this->makeOperationContext();
+        uniqueOpCtx = this->makeOperationContext(/*deprioritizable=*/false);
         opCtx = uniqueOpCtx.get();
     }
 

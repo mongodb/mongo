@@ -72,6 +72,8 @@ private:
                                          const CancellationToken& token,
                                          const Status& status) noexcept override;
 
+    bool isInCriticalSection(Phase phase) const override;
+
     void _verifyInput() const;
 
     bool _isPristineReplicaset(OperationContext* opCtx, RemoteCommandTargeter& targeter) const;
