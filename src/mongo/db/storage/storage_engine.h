@@ -757,11 +757,8 @@ public:
     virtual boost::optional<Timestamp> getLastStableRecoveryTimestamp() const = 0;
 
     /**
-     * Sets the last materialized LSN, marking the highest phylog LSN
-     * that has been successfully written to the page server and should have no holes.
-     *
-     * TODO (SERVER-122746): Revisit how to handle cases where mongod speaks with a log server
-     * in a non-local zone due to failover.
+     * Sets the last materialized LSN, marking the highest phylog LSN where it, and all entries
+     * before it, have been written durably (i.e. all entries before it are readable).
      */
     virtual void setLastMaterializedLsn(uint64_t lsn) = 0;
 
