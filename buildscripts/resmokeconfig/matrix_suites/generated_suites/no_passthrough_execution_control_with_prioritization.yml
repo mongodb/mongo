@@ -36,6 +36,7 @@ selector:
   exclude_files:
     - jstests/noPassthrough/libs/**/*.js
   exclude_with_any_tags:
+    - requires_kernel_619
     - incompatible_with_execution_control_with_prioritization
   roots:
     - jstests/noPassthrough/**/*.js

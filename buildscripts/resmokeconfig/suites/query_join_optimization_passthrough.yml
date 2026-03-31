@@ -50,6 +50,8 @@ selector:
     - jstests/aggregation/sources/lookup/lookup_unwind_equijoin.js
     # TODO SERVER-118416 Fix join reordering tripwire assertions for lookup+unwind pipelines and re-enable lookup_unwind_pbt PBT
     - jstests/aggregation/sources/lookup/lookup_unwind_pbt.js
+  exclude_with_any_tags:
+    - requires_kernel_619
 executor:
   config:
     shell_options:
