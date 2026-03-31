@@ -6,7 +6,6 @@
  *   does_not_support_zones,
  *   requires_fcv_81,
  *   requires_non_retryable_commands,
- *   simulate_atlas_proxy_incompatible,
  *   uses_api_parameters,
  * ]
  */

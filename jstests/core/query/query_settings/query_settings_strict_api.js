@@ -7,7 +7,6 @@
 //   # now only on one).
 //   assumes_balancer_off,
 //   directly_against_shardsvrs_incompatible,
-//   simulate_atlas_proxy_incompatible,
 //   # 'planCacheClear' command is not allowed with the security token.
 //   not_allowed_with_signed_security_token,
 //   # The test sets API parameter values.

@@ -4,8 +4,6 @@
 // @tags: [
 //   assumes_no_implicit_index_creation,
 //   uses_multiple_connections,
-//   # benchRun does not use runCommand which is required by the `simulate_atlas_proxy` override.
-//   simulate_atlas_proxy_incompatible,
 //   grpc_incompatible,
 // ]
 const t = db.bench_test1;

@@ -17,8 +17,6 @@
  *   requires_non_retryable_commands,
  *   requires_non_retryable_writes,
  *   requires_replication,
- *   # Test depends on hardcoded database name equality which is incompatible with tenant prefixing.
- *   simulate_atlas_proxy_incompatible,
  *   references_foreign_collection,
  *   requires_getmore,
  *   # $text is not supported on views.

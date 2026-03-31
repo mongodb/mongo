@@ -2,7 +2,6 @@
 // directly through setClusterParameter.
 // @tags: [
 //   directly_against_shardsvrs_incompatible,
-//   simulate_atlas_proxy_incompatible,
 //   requires_sharding,
 //   requires_replication,
 // ]

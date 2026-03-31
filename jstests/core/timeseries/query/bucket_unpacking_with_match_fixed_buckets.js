@@ -11,8 +11,6 @@
  *     # Refusing to run a test that issues an aggregation command with explain because it may
  *     # return incomplete results if interrupted by a stepdown.
  *     does_not_support_stepdowns,
- *     # The `simulate_atlas_proxy` override cannot deep copy very large or small dates.
- *     simulate_atlas_proxy_incompatible,
  *     featureFlagTSBucketingParametersUnchanged,
  *     requires_getmore,
  * ]

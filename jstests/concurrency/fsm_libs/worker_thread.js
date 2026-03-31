@@ -7,7 +7,6 @@ const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 export const workerThread = (function () {
     // workloads = list of workload filenames
     // args.tid = the thread identifier
-    // args.tenantId = the tenant id
     // args.data = map of workload -> 'this' parameter passed to the FSM state functions
     // args.host = the address to make a new connection to
     // args.latch = CountDownLatch instance for starting all threads
@@ -64,11 +63,6 @@ export const workerThread = (function () {
             } else {
                 // mongo will be a Mongo or MultiRouterMongo depending on the connection string.
                 mongo = connect(connectionString).getMongo();
-            }
-
-            if (typeof args.tenantId !== "undefined") {
-                TestData.tenantId = args.tenantId;
-                await import("jstests/libs/override_methods/simulate_atlas_proxy.js");
             }
 
             // Retry operations that fail due to in-progress background operations. Load this early

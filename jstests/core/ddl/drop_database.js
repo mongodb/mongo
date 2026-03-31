@@ -1,11 +1,5 @@
 /**
  * Test that a db does not exist after it is dropped.
- *
- * @tags: [
- *   # listDatabases with explicit filter on db names doesn't work with the simulate_atlas_proxy
- *   # override.
- *   simulate_atlas_proxy_incompatible,
- * ]
  */
 
 let testDB = db.getSiblingDB("jstests_dropdb");

@@ -5,7 +5,6 @@
 //   # 'sharding_kill_stepdown_terminate_jscore_passthrough'.
 //   does_not_support_stepdowns,
 //   directly_against_shardsvrs_incompatible,
-//   simulate_atlas_proxy_incompatible,
 //   assumes_read_preference_unchanged,
 //   assumes_read_concern_unchanged,
 //   does_not_support_transactions,

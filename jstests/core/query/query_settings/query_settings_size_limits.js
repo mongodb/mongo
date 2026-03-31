@@ -7,7 +7,6 @@
  *   does_not_support_stepdowns,
  *   directly_against_shardsvrs_incompatible,
  *   requires_non_retryable_commands,
- *   simulate_atlas_proxy_incompatible,
  *   # TODO SERVER-89461 Investigate why test using huge batch size timeout in suites with balancer.
  *   assumes_balancer_off,
  *   # TODO(SERVER-113800): Enable setClusterParameters with replicaset started with --shardsvr

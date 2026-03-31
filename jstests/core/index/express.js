@@ -9,9 +9,6 @@
  *   does_not_support_stepdowns,
  *   # "Explain for the aggregate command cannot run within a multi-document transaction"
  *   does_not_support_transactions,
- *   # This test uses QuerySettingsUtils to set query settings on a namespace. The utils do not
- *   # support injecting tenant ID, which is required by certain passthrough suites.
- *   simulate_atlas_proxy_incompatible,
  *   # Setting query settings directly against shardsvrs is not allowed.
  *   directly_against_shardsvrs_incompatible,
  *   # setParameter not permitted with security tokens

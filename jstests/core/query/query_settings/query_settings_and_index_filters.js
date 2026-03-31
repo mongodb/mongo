@@ -12,8 +12,6 @@
 //   directly_against_shardsvrs_incompatible,
 //   # Index filter commands do not accept security token.
 //   not_allowed_with_signed_security_token,
-//   # Query settings commands can not be handled by atlas proxy.
-//   simulate_atlas_proxy_incompatible,
 //   # TODO(SERVER-113800): Enable setClusterParameters with replicaset started with --shardsvr
 //   transitioning_replicaset_incompatible,
 //   # Ignore because index filters are applied directly to collections, not views (or TS).

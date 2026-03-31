@@ -72,12 +72,6 @@ async function runWorkloads(workloads, {cluster: clusterOptions = {}, execution:
 
     await cluster.setup();
 
-    if (typeof executionOptions.tenantId !== "undefined") {
-        // Import simulate_atlas_proxy.js to override requests for tenant during preparing
-        // collections, setup and teardown of workloads.
-        await import("jstests/libs/override_methods/simulate_atlas_proxy.js");
-    }
-
     jsTest.log("Workload(s) started: " + workloads.join(" "));
 
     prepareCollections(workloads, context, cluster, clusterOptions, executionOptions);
@@ -268,7 +262,6 @@ if (TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns) {
 
 const executionOptions = {
     dbNamePrefix: TestData.dbNamePrefix || "",
-    tenantId: TestData.tenantId,
 };
 const resmokeDbPathPrefix = TestData.resmokeDbPathPrefix || ".";
 

@@ -6,8 +6,6 @@
  *   # The test runs commands that are not allowed with security token: bulkWrite.
  *   command_not_supported_in_serverless,
  *   requires_timeseries,
- *   # TODO SERVER-80796 Timeseries unordered error handling incompatible with proxy simulation.
- *   simulate_atlas_proxy_incompatible,
  *   requires_fcv_80,
  *   # Time-series collection behavior is already tested within this directory.
  *   exclude_from_timeseries_crud_passthrough,

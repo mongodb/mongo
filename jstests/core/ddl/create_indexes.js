@@ -4,8 +4,6 @@
  *
  * @tags: [
  *   assumes_superuser_permissions,
- *   # simulate_atlas_proxy.js can't simulate req on config.transaction as tested
- *   simulate_atlas_proxy_incompatible,
  * ]
  */
 import {afterEach, beforeEach, describe, it} from "jstests/libs/mochalite.js";

@@ -6,7 +6,6 @@
 //   change_stream_does_not_expect_txns,
 //   uses_change_streams,
 //   directly_against_shardsvrs_incompatible,
-//   simulate_atlas_proxy_incompatible,
 //   does_not_support_stepdowns,
 //   # Modifies the pipeline so PQS won't match
 //   do_not_run_in_whole_cluster_passthrough,

@@ -20,7 +20,6 @@
 //   assumes_no_implicit_index_creation,
 //   # Query settings are atlas proxy and direct shard execution incompatible.
 //   directly_against_shardsvrs_incompatible,
-//   simulate_atlas_proxy_incompatible,
 //   # The test examines the SBE plan cache, which initial sync may change the contents of.
 //   examines_sbe_cache,
 //   # This test checks a new field "solutionHash" in $planCacheStats, not available in previous

@@ -1,9 +1,3 @@
-// @tags: [
-//   # This test does not support tojson of command objects so the simulate_atlas_proxy.js override
-//   # cannot deep copy the command objects correctly.
-//   simulate_atlas_proxy_incompatible,
-// ]
-
 let t = db[jsTestName()];
 
 t.mycoll.drop();

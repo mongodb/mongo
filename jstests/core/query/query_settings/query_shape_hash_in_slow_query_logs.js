@@ -15,7 +15,6 @@
 //   directly_against_shardsvrs_incompatible,
 //   # Profile command doesn't support stepdowns.
 //   does_not_support_stepdowns,
-//   simulate_atlas_proxy_incompatible,
 //   # Does not support transactions as the test is issuing getMores and transaction can not be started with getMore.
 //   does_not_support_transactions,
 // ]

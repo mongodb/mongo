@@ -1,10 +1,5 @@
 /*
  * Provides basic coverage for the enableSharding command
- * @tags: [
- *   # listDatabases with explicit filter on db names doesn't work with the simulate_atlas_proxy
- *   # override.
- *   simulate_atlas_proxy_incompatible,
- * ]
  */
 
 import {setupDbName} from "jstests/libs/cluster_helpers/sharded_cluster_fixture_helpers.js";

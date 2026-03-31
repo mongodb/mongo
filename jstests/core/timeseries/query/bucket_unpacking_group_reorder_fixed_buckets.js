@@ -13,8 +13,6 @@
  *     # Refusing to run a test that issues an aggregation command with explain because it may
  *     # return incomplete results if interrupted by a stepdown.
  *     does_not_support_stepdowns,
- *     # The `simulate_atlas_proxy` override cannot deep copy very large or small dates.
- *     simulate_atlas_proxy_incompatible,
  *     # TODO (SERVER-88275) a moveCollection can cause the original collection to be dropped and
  *     # re-created with a different uuid, causing the aggregation to fail with QueryPlannedKilled
  *     # when the mongos is fetching data from the shard using getMore(). Remove the tag the issue

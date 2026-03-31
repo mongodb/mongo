@@ -4,9 +4,6 @@
  * @tags: [
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   # $listCatalog will not prefix namespaces in its responses, and therefore is incompatible
- *   # with prefix checking.
- *   simulate_atlas_proxy_incompatible,
  *   # In a multitenancy environment the catalog will always return tenant-prefixed entries, and the
  *   # override we use in the multitenancy suites hecks for the absence of this prefix.
  *   simulate_mongoq_incompatible,

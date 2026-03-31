@@ -16,7 +16,6 @@ SUITE_HIERARCHY = {
     # Concurrency suites
     "concurrency": {},
     "concurrency_compute_mode": {},
-    "concurrency_multitenancy_replication_with_atlas_proxy": {},
     "simulate_crash_concurrency_replication": {},
     "concurrency_sharded_replication_with_balancer_and_config_transitions_and_add_remove_shard": {
         "concurrency_sharded_with_balancer_and_config_shard": {},
