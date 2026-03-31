@@ -3,10 +3,24 @@
 import collections
 import datetime
 import itertools
-import os.path
+import os
 import time
+from pathlib import Path
 
 import buildscripts.resmokelib.setup_multiversion.config as multiversion_config
+
+# Resmoke root directory (MongoDB repo root where resmoke is installed)
+# This is the parent directory of buildscripts/
+RESMOKE_ROOT = str(Path(__file__).parent.parent.parent)
+
+# External module root directory (current working directory where resmoke is being run from)
+# This is used when external projects import and use resmoke as a module
+EXTERNAL_MODULE_ROOT = os.getcwd()
+
+# Whether or not resmoke is being run from an external module
+IN_EXTERNAL_MODULE = os.path.normpath(EXTERNAL_MODULE_ROOT) != os.path.normpath(
+    RESMOKE_ROOT
+)
 
 # Subdirectory under the dbpath prefix that contains directories with data files of mongod's started
 # by resmoke.py.
@@ -73,6 +87,7 @@ DEFAULTS = {
     "fuzz_mongos_configs": None,
     "config_fuzz_seed": None,
     "genny_executable": None,
+    "append_mongo_path": [],
     "include_with_any_tags": None,
     "include_with_all_tags": None,
     "install_dir": None,
@@ -112,6 +127,9 @@ DEFAULTS = {
     "stagger_jobs": None,
     "majority_read_concern": "on",
     "enable_enterprise_tests": "on",
+    "resmoke_modules_path": os.path.join(
+        "buildscripts", "resmokeconfig", "resmoke_modules.yml"
+    ),
     "shell_seed": None,
     "storage_engine": "wiredTiger",
     "storage_engine_cache_size_gb": None,
@@ -163,6 +181,8 @@ DEFAULTS = {
     "config_dir": "buildscripts/resmokeconfig",
     # Directory with jstests
     "jstests_dir": "jstests",
+    # External module configuration file
+    "external_module_config": None,
     # UndoDB options
     "undo_recorder_path": None,
     # Generate multiversion exclude tags options
@@ -345,6 +365,27 @@ EMBEDDED_ROUTER = None
 # if set, enables enterprise jstest to automatically be included
 ENABLE_ENTERPRISE_TESTS = None
 
+# path for the resmoke module config, should only be changed in testing.
+MODULES_CONFIG_PATH = None
+
+# list of dirs from enabled modules to get suites from
+MODULE_SUITE_DIRS = []
+
+# list of dirs from enabled modules to get matrix suites from
+MODULE_MATRIX_SUITE_DIRS = []
+
+# list of dirs from disabled modules to filter out of suite selectors
+MODULE_DISABLED_JSTEST_DIRS = []
+
+# External module configuration file path (YAML file defining external modules)
+EXTERNAL_MODULE_CONFIG = None
+
+# List of suite directories from external modules
+EXTERNAL_MODULE_SUITE_DIRS = []
+
+# List of matrix suite directories from external modules
+EXTERNAL_MODULE_MATRIX_SUITE_DIRS = []
+
 # URL to connect to the Evergreen service.
 EVERGREEN_URL = None
 
@@ -419,6 +460,9 @@ CONFIG_FUZZ_SEED = None
 
 # Executable file for genny, passed in as a command line arg.
 GENNY_EXECUTABLE = None
+
+# List of directories to append to MONGO_PATH for searching JavaScript modules.
+APPEND_MONGO_PATH = []
 
 # If set, then only jstests that have at least one of the specified tags will be run during the
 # jstest portion of the suite(s).
@@ -707,7 +751,7 @@ EXTERNAL_SUITE_SELECTORS = (
 )
 
 # Where to look for logging and suite configuration files
-CONFIG_DIR = None
+CONFIG_DIR = os.path.join(RESMOKE_ROOT, "buildscripts", "resmokeconfig")
 LOGGER_DIR = None
 
 # Where to look for jstests existence

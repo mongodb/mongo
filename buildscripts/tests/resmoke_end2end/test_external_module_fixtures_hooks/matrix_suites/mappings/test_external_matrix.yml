@@ -1,0 +1,5 @@
+base_suite: core
+description: Test matrix suite from external module that references built-in core suite
+overrides:
+  - "test_override.external_test"
+  - "test_override.external_env"

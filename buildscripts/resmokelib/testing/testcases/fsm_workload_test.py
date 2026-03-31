@@ -32,7 +32,7 @@ class _SingleFSMWorkloadTestCase(jsrunnerfile.JSRunnerFileTestCase):
 
     def configure(self, fixture, *args, **kwargs):
         """Configure the FSMWorkloadTestCase runner."""
-        interface.ProcessTestCase.configure(self, fixture, *args, **kwargs)
+        jsrunnerfile.JSRunnerFileTestCase.configure(self, fixture, *args, **kwargs)
 
 
 class _FSMWorkloadTestCaseBuilder(interface.TestCaseFactory):

@@ -1,0 +1,14 @@
+# Example pytest suite showing how to define environment variables
+# For Python tests, env_vars can be defined directly in executor.config
+
+test_kind: py_test
+
+selector:
+  roots:
+    - buildscripts/tests/**/test_*.py
+
+executor:
+  config:
+    env_vars:
+      PYTEST_VAR_1: "pytest_value1"
+      PYTEST_VAR_2: "pytest_value2"

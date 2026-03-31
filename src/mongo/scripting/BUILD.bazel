@@ -27,6 +27,7 @@ mongo_cc_library(
         "//src/mongo/scripting:deadline_monitor.cpp",
         "//src/mongo/scripting:engine.cpp",
         "//src/mongo/scripting:jsexception.cpp",
+        "//src/mongo/scripting:mongo_path_util.cpp",
         "//src/mongo/scripting:utils.cpp",
     ],
     deps = [

@@ -387,6 +387,7 @@ class ReplSetBuilder(FixtureBuilder):
                 mongod_executable=executables[BinVersionEnum.OLD],
                 mongod_options=mongod_options,
                 preserve_dbpath=replset.preserve_dbpath,
+                uds_path_prefix=replset.uds_path_prefix,
             )
 
             # Assign the same port for old and new fixtures so upgrade/downgrade can be done without
@@ -408,6 +409,7 @@ class ReplSetBuilder(FixtureBuilder):
             preserve_dbpath=replset.preserve_dbpath,
             port=new_fixture_port,
             launch_mongot=launch_mongot,
+            uds_path_prefix=replset.uds_path_prefix,
         )
 
         return FixtureContainer(new_fixture, old_fixture, cur_version)

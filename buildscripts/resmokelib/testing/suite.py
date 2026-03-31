@@ -1,12 +1,14 @@
 """Holder for the (test kind, list of tests) pair with additional metadata their execution."""
 
 import itertools
+import os
 import threading
 import time
 from typing import Any, Dict, List
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import selector as _selector
+from buildscripts.resmokelib import suitesconfig
 from buildscripts.resmokelib.testing import report as _report
 from buildscripts.resmokelib.testing import summary as _summary
 
@@ -112,6 +114,27 @@ class Suite(object):
             self._tests, self._excluded = self._get_tests_for_kind(self.test_kind)
         return self._excluded
 
+    def _get_suite_root(self) -> str:
+        """Get the root directory for this suite to resolve test paths."""
+
+        # If a manual path is specified on the command line then use the cwd
+        # as the resmoke root
+        if os.path.exists(self._suite_name):
+            return os.getcwd()
+
+        # Try ExplicitSuiteConfig
+        suite_root = suitesconfig.ExplicitSuiteConfig.get_suite_root(self._suite_name)
+        if suite_root is not None:
+            return suite_root
+
+        # Try MatrixSuiteConfig
+        suite_root = suitesconfig.MatrixSuiteConfig.get_suite_root(self._suite_name)
+        if suite_root is None:
+            raise ValueError(
+                f"Could not find suite root for suite {self._suite_name} in either ExplicitSuiteConfig or MatrixSuiteConfig"
+            )
+        return suite_root
+
     def _get_tests_for_kind(self, test_kind):
         """Return the tests to run based on the 'test_kind'-specific filtering policy."""
         selector_config = self.get_selector_config()
@@ -124,7 +147,8 @@ class Suite(object):
                 raise TypeError("Expected dictionary of arguments to mongos")
             return [mongos_options], []
 
-        return _selector.filter_tests(test_kind, selector_config)
+        suite_root = self._get_suite_root()
+        return _selector.filter_tests(test_kind, selector_config, suite_root=suite_root)
 
     def get_name(self):
         """Return the name of the test suite."""

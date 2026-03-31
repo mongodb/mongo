@@ -1,5 +1,7 @@
 """The unittest.TestCase for tests using a MongoDB vendored version of Google Benchmark."""
 
+import copy
+
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import core, utils
 from buildscripts.resmokelib.testing.testcases import interface
@@ -10,11 +12,11 @@ class BenchmarkTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = "benchmark_test"
 
-    def __init__(self, logger, program_executable, program_options=None):
+    def __init__(self, logger, program_executable, program_options=None, **kwargs):
         """Initialize the BenchmarkTestCase with the executable to run."""
 
         interface.ProcessTestCase.__init__(
-            self, logger, "Benchmark test", program_executable
+            self, logger, "Benchmark test", program_executable, **kwargs
         )
         self.validate_benchmark_options()
 
@@ -74,6 +76,11 @@ class BenchmarkTestCase(interface.ProcessTestCase):
                 if key == "benchmark_min_time":
                     value = value.total_seconds()
                 bm_options[key] = value
+
+        process_kwargs = copy.deepcopy(bm_options.get("process_kwargs", {}))
+        # Merge test and fixture environment variables into process_kwargs
+        self._merge_environment_variables(process_kwargs)
+        bm_options["process_kwargs"] = process_kwargs
 
         self.bm_options = bm_options
 

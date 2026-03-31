@@ -13,10 +13,10 @@ class SDAMJsonTestCase(interface.ProcessTestCase):
     REGISTERED_NAME = "sdam_json_test"
     TEST_DIR = os.path.normpath("src/mongo/client/sdam/json_tests/sdam_tests")
 
-    def __init__(self, logger, json_test_file, program_options=None):
+    def __init__(self, logger, json_test_file, program_options=None, **kwargs):
         """Initialize the TestCase with the executable to run."""
         interface.ProcessTestCase.__init__(
-            self, logger, "SDAM Json Test", json_test_file
+            self, logger, "SDAM Json Test", json_test_file, **kwargs
         )
 
         self.program_executable = self._find_executable()
@@ -35,9 +35,11 @@ class SDAMJsonTestCase(interface.ProcessTestCase):
         return binary
 
     def _make_process(self):
+        # Merge environment variables into program_options
+        program_options = self.program_options.copy()
+        self._merge_environment_variables(program_options)
+
         command_line = [self.program_executable]
         command_line += ["--source-dir", self.TEST_DIR]
         command_line += ["-f", self.json_test_file]
-        return core.programs.make_process(
-            self.logger, command_line, **self.program_options
-        )
+        return core.programs.make_process(self.logger, command_line, **program_options)

@@ -21,10 +21,18 @@ class _SingleJSTestCase(interface.ProcessTestCase):
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
 
     def __init__(
-        self, logger, js_filename, _id, shell_executable=None, shell_options=None
+        self,
+        logger,
+        js_filename,
+        _id,
+        shell_executable=None,
+        shell_options=None,
+        **kwargs,
     ):
         """Initialize the _SingleJSTestCase with the JS file to run."""
-        interface.ProcessTestCase.__init__(self, logger, "JSTest", js_filename)
+        interface.ProcessTestCase.__init__(
+            self, logger, "JSTest", js_filename, **kwargs
+        )
 
         # Command line options override the YAML configuration.
         self.shell_executable = utils.default_if_none(
@@ -111,6 +119,9 @@ class _SingleJSTestCase(interface.ProcessTestCase):
 
             process_kwargs["env_vars"]["KRB5CCNAME"] = "DIR:" + krb5_dir
 
+        # Add test and fixture environment variables to process_kwargs
+        self._merge_environment_variables(process_kwargs)
+
         self.shell_options["process_kwargs"] = process_kwargs
 
     def _get_data_dir(self, global_vars):
@@ -144,12 +155,19 @@ class JSTestCaseBuilder(interface.TestCaseFactory):
     """Build the real TestCase in the JSTestCase wrapper."""
 
     def __init__(
-        self, logger, js_filename, test_id, shell_executable=None, shell_options=None
+        self,
+        logger,
+        js_filename,
+        test_id,
+        shell_executable=None,
+        shell_options=None,
+        **kwargs,
     ):
         """Initialize the JSTestCase with the JS file to run."""
         self.test_case_template = _SingleJSTestCase(
-            logger, js_filename, test_id, shell_executable, shell_options
+            logger, js_filename, test_id, shell_executable, shell_options, **kwargs
         )
+        self._test_kwargs = kwargs
         interface.TestCaseFactory.__init__(self, _SingleJSTestCase, shell_options)
 
     def configure(self, fixture, *args, **kwargs):
@@ -169,6 +187,7 @@ class JSTestCaseBuilder(interface.TestCaseFactory):
             self.test_case_template._id,
             self.test_case_template.shell_executable,
             shell_options,
+            **self._test_kwargs,
         )
         test_case.configure(self.test_case_template.fixture)
         return test_case
@@ -315,12 +334,14 @@ class JSTestCase(MultiClientsTestCase):
     REGISTERED_NAME = "js_test"
     TEST_KIND = "JSTest"
 
-    def __init__(self, logger, js_filename, shell_executable=None, shell_options=None):
+    def __init__(
+        self, logger, js_filename, shell_executable=None, shell_options=None, **kwargs
+    ):
         """Initialize the TestCase for running JS files."""
 
         test_id = uuid.uuid4()
         factory = JSTestCaseBuilder(
-            logger, js_filename, test_id, shell_executable, shell_options
+            logger, js_filename, test_id, shell_executable, shell_options, **kwargs
         )
         MultiClientsTestCase.__init__(
             self, logger, self.TEST_KIND, js_filename, test_id, factory

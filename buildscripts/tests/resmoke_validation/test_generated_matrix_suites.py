@@ -2,13 +2,21 @@ import logging
 import os
 import unittest
 
-from buildscripts.resmokelib import config, suitesconfig
+from buildscripts.resmokelib import config, configure_resmoke, suitesconfig
 from buildscripts.resmokelib.logging import loggers
 
 
 class ValidateGeneratedSuites(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        # make sure we have modules set up for the test
+        config.MODULES_CONFIG_PATH = os.path.join(
+            "buildscripts", "resmokeconfig", "resmoke_modules.yml"
+        )
+        modules = configure_resmoke._get_module_configs()
+        config.MODULES = modules.keys()
+        configure_resmoke._set_up_modules()
+
         config.CONFIG_DIR = "buildscripts/resmokeconfig"
         cls.matrix_suite_config = suitesconfig.MatrixSuiteConfig()
         loggers.ROOT_EXECUTOR_LOGGER = logging
@@ -29,25 +37,24 @@ class ValidateGeneratedSuites(unittest.TestCase):
 
     def test_stray_generated_files(self):
         suite_names = set(self.matrix_suite_config.get_named_suites())
-        suites_dir = os.path.join(
-            self.matrix_suite_config.get_suites_dir(), "generated_suites"
-        )
-        generated_files = os.listdir(suites_dir)
-        for filename in generated_files:
-            (suite_name, ext) = os.path.splitext(filename)
-            self.assertEqual(
-                ext,
-                ".yml",
-                msg=f"{filename} has the wrong file extension, expected `.yml`",
-            )
-            expected_mapping_file = os.path.join(
-                self.matrix_suite_config.get_suites_dir(), f"mappings/{suite_name}.yml"
-            )
-            self.assertIn(
-                suite_name,
-                suite_names,
-                msg=f"{filename} does not have a correlated mapping file . Make a mapping file or delete it."
-                f"You have a generated file {filename} that does not have a corresponding mapping file {expected_mapping_file}. "
-                + "If you have added a non matrix suite to resmokeconfig/matrix_suites/generated_suites, move it to the resmokeconfig/suites."
-                + " If you have removed the mapping file be sure to remove the generated file.",
-            )
+        for suites_dir in self.matrix_suite_config.get_suites_dirs():
+            gen_dir = os.path.join(suites_dir, "generated_suites")
+            generated_files = os.listdir(gen_dir)
+            for filename in generated_files:
+                (suite_name, ext) = os.path.splitext(filename)
+                self.assertEqual(
+                    ext,
+                    ".yml",
+                    msg=f"{filename} has the wrong file extension, expected `.yml`",
+                )
+                expected_mapping_file = os.path.join(
+                    suites_dir, f"mappings/{suite_name}.yml"
+                )
+                self.assertIn(
+                    suite_name,
+                    suite_names,
+                    msg=f"{filename} does not have a correlated mapping file . Make a mapping file or delete it."
+                    f"You have a generated file {filename} that does not have a corresponding mapping file {expected_mapping_file}. "
+                    + "If you have added a non matrix suite to resmokeconfig/matrix_suites/generated_suites, move it to the resmokeconfig/suites."
+                    + " If you have removed the mapping file be sure to remove the generated file.",
+                )

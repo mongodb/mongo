@@ -1,5 +1,6 @@
 """The unittest.TestCase for dbtests."""
 
+import copy
 import os
 import os.path
 import shutil
@@ -14,11 +15,18 @@ class DBTestCase(interface.ProcessTestCase):
     REGISTERED_NAME = "db_test"
 
     def __init__(
-        self, logger, dbtest_suite, dbtest_executable=None, dbtest_options=None
+        self,
+        logger,
+        dbtest_suite,
+        dbtest_executable=None,
+        dbtest_options=None,
+        **kwargs,
     ):
         """Initialize the DBTestCase with the dbtest suite to run."""
 
-        interface.ProcessTestCase.__init__(self, logger, "dbtest suite", dbtest_suite)
+        interface.ProcessTestCase.__init__(
+            self, logger, "dbtest suite", dbtest_suite, **kwargs
+        )
 
         # Command line options override the YAML configuration.
         self.dbtest_executable = utils.default_if_none(
@@ -46,6 +54,11 @@ class DBTestCase(interface.ProcessTestCase):
         except os.error:
             # Directory already exists.
             pass
+
+        process_kwargs = copy.deepcopy(self.dbtest_options.get("process_kwargs", {}))
+        # Merge test and fixture environment variables into process_kwargs
+        self._merge_environment_variables(process_kwargs)
+        self.dbtest_options["process_kwargs"] = process_kwargs
 
     def _execute(self, process):
         interface.ProcessTestCase._execute(self, process)

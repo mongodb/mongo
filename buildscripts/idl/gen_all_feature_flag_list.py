@@ -42,14 +42,18 @@ sys.path.append(os.path.normpath(os.path.join(os.path.abspath(__file__), "../../
 # pylint: disable=wrong-import-position
 from buildscripts.idl import lib
 from buildscripts.idl.idl import parser
+from buildscripts.resmokelib import config as resmoke_config
+
+DEFAULT_IDL_DIRS = [
+    os.path.join(resmoke_config.RESMOKE_ROOT, "src"),
+    os.path.join(resmoke_config.RESMOKE_ROOT, "buildscripts"),
+]
 
 
 def get_all_feature_flags(idl_dirs: List[str] = None):
     """Generate a dict of all feature flags with their default value."""
-    default_idl_dirs = ["src", "buildscripts"]
-
     if not idl_dirs:
-        idl_dirs = default_idl_dirs
+        idl_dirs = DEFAULT_IDL_DIRS
 
     all_flags = {}
     for idl_dir in idl_dirs:
@@ -69,21 +73,23 @@ def get_all_feature_flags(idl_dirs: List[str] = None):
     return all_flags
 
 
-def get_all_feature_flags_turned_on_by_default(idl_dirs: List[str] = None):
+def get_all_feature_flags_turned_on_by_default(idl_dirs: List[str] = DEFAULT_IDL_DIRS):
     """Generate a list of all feature flags that default to true."""
     all_flags = get_all_feature_flags(idl_dirs)
 
     return [flag for flag in all_flags if all_flags[flag] == "true"]
 
 
-def get_all_feature_flags_turned_off_by_default(idl_dirs: List[str] = None):
+def get_all_feature_flags_turned_off_by_default(idl_dirs: List[str] = DEFAULT_IDL_DIRS):
     """Generate a list of all feature flags that default to false."""
     all_flags = get_all_feature_flags(idl_dirs)
     all_default_false_flags = [flag for flag in all_flags if all_flags[flag] != "true"]
 
-    with open(
-        "buildscripts/resmokeconfig/fully_disabled_feature_flags.yml"
-    ) as fully_disabled_ffs:
+    fully_disabled_path = os.path.join(
+        resmoke_config.RESMOKE_ROOT,
+        "buildscripts/resmokeconfig/fully_disabled_feature_flags.yml",
+    )
+    with open(fully_disabled_path) as fully_disabled_ffs:
         force_disabled_flags = yaml.safe_load(fully_disabled_ffs)
 
     return list(set(all_default_false_flags) - set(force_disabled_flags))

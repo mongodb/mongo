@@ -1,0 +1,3 @@
+suite_directories:
+  - external_module_test/suites
+matrix_suite_directories: []

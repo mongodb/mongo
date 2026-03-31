@@ -1,5 +1,7 @@
 """The unittest.TestCase for tests with a static JavaScript runner file."""
 
+import copy
+
 from buildscripts.resmokelib import config, core, utils
 from buildscripts.resmokelib.testing.testcases import interface
 from buildscripts.resmokelib.utils import registry
@@ -18,10 +20,11 @@ class JSRunnerFileTestCase(interface.ProcessTestCase):
         test_runner_file,
         shell_executable=None,
         shell_options=None,
+        **kwargs,
     ):
         """Initialize the JSRunnerFileTestCase with the 'test_name' file."""
 
-        interface.ProcessTestCase.__init__(self, logger, test_kind, test_name)
+        interface.ProcessTestCase.__init__(self, logger, test_kind, test_name, **kwargs)
 
         # Command line options override the YAML configuration.
         self.shell_executable = utils.default_if_none(
@@ -42,6 +45,11 @@ class JSRunnerFileTestCase(interface.ProcessTestCase):
 
         global_vars["TestData"] = test_data
         self.shell_options["global_vars"] = global_vars
+
+        process_kwargs = copy.deepcopy(self.shell_options.get("process_kwargs", {}))
+        # Merge test and fixture environment variables into process_kwargs
+        self._merge_environment_variables(process_kwargs)
+        self.shell_options["process_kwargs"] = process_kwargs
 
     def _populate_test_data(self, test_data):
         """Provide base method.
