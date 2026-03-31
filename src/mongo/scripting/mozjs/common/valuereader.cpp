@@ -274,6 +274,9 @@ void ValueReader::fromBSONArray(const BSONObj& obj, const BSONObj* parent, bool 
     if (!array) {
         uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS::NewArrayObject");
     }
+    if (readOnly && !JS_FreezeObject(_context, array)) {
+        uasserted(ErrorCodes::JSInterpreterFailure, "Failed to freeze JS array");
+    }
     _value.setObjectOrNull(array);
 }
 
@@ -287,8 +290,8 @@ void ValueReader::fromBSONArray(const BSONObj& obj, const BSONObj* parent, bool 
 void ValueReader::fromStringData(StringData sd) {
     size_t utf16Len;
 
-    // TODO: we have tests that involve dropping garbage in. Do we want to
-    //       throw, or to take the lossy conversion?
+    // TODO SERVER-122825: we have tests that involve dropping garbage in. Do we want to throw, or
+    // to take the lossy conversion?
     auto utf16 = JS::LossyUTF8CharsToNewTwoByteCharsZ(
         _context, JS::UTF8Chars(sd.data(), sd.size()), &utf16Len, js::StringBufferArena);
 

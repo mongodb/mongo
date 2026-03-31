@@ -74,12 +74,13 @@ namespace mozjs {
 
 const char* const BSONInfo::className = "BSON";
 
-const JSFunctionSpec BSONInfo::freeFunctions[6] = {
+const JSFunctionSpec BSONInfo::freeFunctions[7] = {
     MONGO_ATTACH_JS_FUNCTION(bsonWoCompare),
     MONGO_ATTACH_JS_FUNCTION(bsonUnorderedFieldsCompare),
     MONGO_ATTACH_JS_FUNCTION(bsonBinaryEqual),
     MONGO_ATTACH_JS_FUNCTION(bsonObjToArray),
     MONGO_ATTACH_JS_FUNCTION(bsonToBase64),
+    MONGO_ATTACH_JS_FUNCTION(bsonGetImmutable),
     JS_FS_END,
 };
 
@@ -160,7 +161,7 @@ void definePropertyFromBSONElement(JSContext* cx,
     JS::RootedValue vp(cx);
     ValueReader(cx, &vp).fromBSONElement(elem, holder.getOwner(), holder._readOnly);
     ObjectWrapper o(cx, obj);
-    o.defineProperty(id, vp, JSPROP_ENUMERATE);
+    o.defineProperty(id, vp, JSPROP_ENUMERATE | JSPROP_RESOLVING);
 
     if (!holder._readOnly && (elem.type() == BSONType::object || elem.type() == BSONType::array)) {
         // if accessing a subobject, we have no way to know if
@@ -228,8 +229,8 @@ void BSONInfo::enumerate(JSContext* cx,
     while (i.more()) {
         BSONElement e = i.next();
 
-        // TODO: when we get heterogenous set lookup, switch to StringData
-        // rather than involving the temporary string
+        // TODO SERVER-122826: when we get heterogeneous set lookup, switch to StringData rather
+        // than involving the temporary string
         auto fieldNameStringData = e.fieldNameStringData();
         if (holder->_removed.find(std::string{fieldNameStringData}) != holder->_removed.end())
             continue;
@@ -402,6 +403,22 @@ void BSONInfo::Functions::bsonToBase64::call(JSContext* cx, JS::CallArgs args) {
 
     auto encoded = mongo::base64::encode(StringData(bsonObject.objdata(), bsonObject.objsize()));
     ValueReader(cx, args.rval()).fromStringData(encoded);
+}
+
+void BSONInfo::Functions::bsonGetImmutable::call(JSContext* cx, JS::CallArgs args) {
+    uassert(ErrorCodes::BadValue, "bsonGetImmutable needs 1 argument", args.length() == 1);
+
+    auto* runtime = getCommonRuntime(cx);
+    bool isBSON = getProto<BSONInfo>(runtime).instanceOf(args.get(0));
+    BSONObj bsonObject = getBSONFromArg(cx, args.get(0), isBSON);
+
+    // A 'BSONHolder'-managed object can store unowned BSON that references a sub-document of some
+    // parent object. The BSONHolder keeps the unowned memory valid by maintaining an owned
+    // reference to the parent BSONObj. This new object does not copy that reference, so it cannot
+    // safely store unowned BSON.
+    bsonObject.makeOwned();
+
+    ValueReader(cx, args.rval()).fromBSON(bsonObject, nullptr, true);
 }
 
 void BSONInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto) {

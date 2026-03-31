@@ -85,9 +85,10 @@ struct BSONInfo : public BaseInfo {
         MONGO_DECLARE_JS_FUNCTION(bsonBinaryEqual);
         MONGO_DECLARE_JS_FUNCTION(bsonObjToArray);
         MONGO_DECLARE_JS_FUNCTION(bsonToBase64);
+        MONGO_DECLARE_JS_FUNCTION(bsonGetImmutable);
     };
 
-    static const JSFunctionSpec freeFunctions[6];
+    static const JSFunctionSpec freeFunctions[7];
 
     static std::tuple<BSONObj*, bool> originalBSON(JSContext* cx, JS::HandleObject obj);
     static void make(

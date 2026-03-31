@@ -249,6 +249,7 @@ export default [
 
                 // src/mongo/scripting/mozjs/bson.d.ts
                 bsonBinaryEqual: true,
+                bsonGetImmutable: true,
                 bsonObjToArray: true,
                 bsonToBase64: true,
                 bsonUnorderedFieldsCompare: true,
@@ -306,7 +307,7 @@ export default [
                 hex_md5: true,
                 tostrictjson: true,
 
-                // TODO: where are these defined?
+                // TODO SERVER-122824: where are these defined?
                 debug: true,
                 emit: true,
                 port: true,

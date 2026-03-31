@@ -4149,6 +4149,13 @@ function checkOplogs(rst, msgPrefix = "checkOplogs", secondaries) {
     secondaries = secondaries || rst._secondaries;
 
     function assertOplogEntriesEq(oplogEntry0, oplogEntry1, reader0, reader1, prevOplogEntry) {
+        // We want to compare the exact bytes that we got back from the server, so we use an
+        // immutable reference that prevents any behind-the-scenes rematerialization. Even reading
+        // a sub-document of a mutable BSON object triggers reserialization, which is not guaranteed
+        // to produce the exact original bytes.
+        oplogEntry0 = bsonGetImmutable(oplogEntry0);
+        oplogEntry1 = bsonGetImmutable(oplogEntry1);
+
         // TODO SERVER-116413: Remove the skipConsistencyCheckForNewPrimaryOpEntry param and this early return.
         if (
             TestData.skipConsistencyCheckForNewPrimaryOpEntry &&

@@ -88,6 +88,7 @@ const expectedGlobalVars = [
     "__lastres__",
     "assert",
     "bsonBinaryEqual",
+    "bsonGetImmutable",
     "bsonObjToArray",
     "bsonToBase64",
     "bsonUnorderedFieldsCompare",
