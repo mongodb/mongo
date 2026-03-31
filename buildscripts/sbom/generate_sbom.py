@@ -73,7 +73,7 @@ script_directory = script_path.parent
 REGEX_COMMIT_SHA = r"^[0-9a-fA-F]{40}$"
 REGEX_GIT_BRANCH = r"^[a-zA-Z0-9_.\-/]+$"
 REGEX_GITHUB_URL = r"^(https://github.com/)([a-zA-Z0-9-]{1,39}/[a-zA-Z0-9-_.]{1,100})(\.git)$"
-REGEX_RELEASE_BRANCH = r"^v\d\.\d$"
+REGEX_RELEASE_BRANCH = r"^v\d\.\d(-staging)?$"
 REGEX_RELEASE_TAG = r"^r\d\.\d.\d(-\w*)?$"
 
 # endregion init
@@ -633,11 +633,11 @@ def main() -> None:
 
     # Release branch e.g., v7.0 or v8.2
     elif target == "branch" and re.fullmatch(REGEX_RELEASE_BRANCH, git_info.branch):
-        version = git_info.branch
-        purl_version = git_info.branch
+        version = git_info.branch.replace("-staging", "")
+        purl_version = version
         # remove leading 'v', add wildcard. e.g. 8.2.*
         cpe_version = version[1:] + ".*"
-        logger.info("Using release branch '%s' as MongoDB version", git_info.branch)
+        logger.info("Using release branch '%s' as MongoDB version", version)
 
     # Previous SBOM app version, if all needed specifiers exist
     elif (

@@ -3,22 +3,14 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "serialNumber": "urn:uuid:71d980f0-95c5-4dfa-8987-307eb8880ce2",
-  "version": 6,
+  "version": 8,
   "metadata": {
-    "timestamp": "2026-03-23T17:40:57Z",
+    "timestamp": "2026-03-31T18:41:31Z",
     "lifecycles": [
       {
         "phase": "pre-build"
       }
     ],
-    "tools": {
-      "services": [
-        {
-          "name": "Endor Labs Inc",
-          "version": "v1.7.870"
-        }
-      ]
-    },
     "component": {
       "type": "application",
       "bom-ref": "pkg:github/mongodb/mongo@master",
@@ -65,6 +57,14 @@
       "name": "MongoDB, Inc.",
       "url": [
         "https://mongodb.com"
+      ]
+    },
+    "tools": {
+      "services": [
+        {
+          "name": "Endor Labs Inc",
+          "version": "v1.7.870"
+        }
       ]
     }
   },
