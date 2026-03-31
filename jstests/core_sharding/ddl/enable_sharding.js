@@ -72,17 +72,31 @@ jsTest.log("enableSharding is implicitly invoked when sharding a collection");
     checkDbNameExistenceOnConfigCatalog(testDbName, 1);
 }
 
+const binVersion = assert.commandWorked(
+    db.adminCommand({
+        serverStatus: 1,
+    }),
+).version;
+
+const is90orAbove = MongoRunner.compareBinVersions(binVersion, "9.0") >= 0;
+
 jsTest.log("Testing enableSharding VS listDatabases");
 {
     const testDbName = setupDbName(db, "_vs_list_databases");
-
     checkDbNameExistenceOnConfigCatalog(testDbName, false);
     assert.eq(0, listDatabasesFilteredByDbName(testDbName).databases.length);
 
-    // Enabling sharding on a database name is not equivalent to a database creation
+    // Enabling sharding registers the database in the config catalog as empty.
     assert.commandWorked(db.adminCommand({enableSharding: testDbName}));
     checkDbNameExistenceOnConfigCatalog(testDbName, true);
-    assert.eq(0, listDatabasesFilteredByDbName(testDbName).databases.length);
+    // Verify the database appears in listDatabases and is marked as empty.
+    let listShardingDatabasesResponse = listDatabasesFilteredByDbName(testDbName).databases;
+    if (is90orAbove) {
+        assert.eq(1, listShardingDatabasesResponse.length);
+        assert(listShardingDatabasesResponse[0].empty);
+    } else {
+        assert.eq(0, listShardingDatabasesResponse.length);
+    }
     // TODO SERVER-92098 Add a test case - $listDatabases is expected to return an entry for an
     // empty database.
 

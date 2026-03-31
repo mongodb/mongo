@@ -48,19 +48,9 @@
 #include "mongo/util/modules.h"
 
 namespace mongo {
-namespace MONGO_MOD_PRIVATE list_databases {
 
+namespace MONGO_MOD_PARENT_PRIVATE list_databases {
 constexpr auto kName = "name"_sd;
-
-// Initialize ListDatabasesForAllTenantsReplyItem reply item by setting the tenantId
-void inline initializeItemWithTenantId(ListDatabasesForAllTenantsReplyItem& item,
-                                       const DatabaseName& dbName) {
-    item.setTenantId(dbName.tenantId());
-}
-// Do nothing if provided ListDatabasesReplyItem to satisy the compiler
-void inline initializeItemWithTenantId(ListDatabasesReplyItem& item, const DatabaseName& dbName) {
-    /* No-op */
-}
 
 template <class CommandType>
 std::unique_ptr<MatchExpression> getFilter(CommandType cmd,
@@ -75,6 +65,19 @@ std::unique_ptr<MatchExpression> getFilter(CommandType cmd,
         return matcher;
     }
     return std::unique_ptr<MatchExpression>{};
+}
+}  // namespace MONGO_MOD_PARENT_PRIVATE list_databases
+
+namespace MONGO_MOD_PRIVATE list_databases {
+
+// Initialize ListDatabasesForAllTenantsReplyItem reply item by setting the tenantId
+void inline initializeItemWithTenantId(ListDatabasesForAllTenantsReplyItem& item,
+                                       const DatabaseName& dbName) {
+    item.setTenantId(dbName.tenantId());
+}
+// Do nothing if provided ListDatabasesReplyItem to satisy the compiler
+void inline initializeItemWithTenantId(ListDatabasesReplyItem& item, const DatabaseName& dbName) {
+    /* No-op */
 }
 
 int64_t sizeOnDiskForDb(OperationContext* opCtx,
