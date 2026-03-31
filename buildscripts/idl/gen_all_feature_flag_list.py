@@ -43,14 +43,18 @@ sys.path.append(os.path.normpath(os.path.join(os.path.abspath(__file__), '../../
 # pylint: disable=wrong-import-position
 import buildscripts.idl.lib as lib
 from buildscripts.idl.idl import parser
+from buildscripts.resmokelib import config as resmoke_config
+
+DEFAULT_IDL_DIRS = [
+    os.path.join(resmoke_config.RESMOKE_ROOT, "src"),
+    os.path.join(resmoke_config.RESMOKE_ROOT, "buildscripts"),
+]
 
 
 def gen_all_feature_flags(idl_dirs: List[str] = None):
     """Generate a list of all feature flags."""
-    default_idl_dirs = ["src", "buildscripts"]
-
     if not idl_dirs:
-        idl_dirs = default_idl_dirs
+        idl_dirs = DEFAULT_IDL_DIRS
 
     all_flags = []
     for idl_dir in idl_dirs:
@@ -68,7 +72,9 @@ def gen_all_feature_flags(idl_dirs: List[str] = None):
                 if feature_flag.default.literal != "true":
                     all_flags.append(feature_flag.name)
 
-    with open("buildscripts/resmokeconfig/fully_disabled_feature_flags.yml") as fully_disabled_ffs:
+    fully_disabled_path = os.path.join(resmoke_config.RESMOKE_ROOT, "buildscripts", "resmokeconfig",
+                                       "fully_disabled_feature_flags.yml")
+    with open(fully_disabled_path, "r") as fully_disabled_ffs:
         force_disabled_flags = yaml.safe_load(fully_disabled_ffs)
 
     return list(set(all_flags) - set(force_disabled_flags))
@@ -76,7 +82,8 @@ def gen_all_feature_flags(idl_dirs: List[str] = None):
 
 def gen_all_feature_flags_file(filename: str = lib.ALL_FEATURE_FLAG_FILE):
     flags = gen_all_feature_flags()
-    with open(filename, "w") as output_file:
+    file_path = os.path.join(resmoke_config.RESMOKE_ROOT, filename)
+    with open(file_path, "w") as output_file:
         output_file.write("\n".join(flags))
         print("Generated: ", os.path.realpath(output_file.name))
 

@@ -13,8 +13,10 @@ import random
 import glob
 import textwrap
 import shlex
+from functools import cache
 
 import pymongo.uri_parser
+import yaml
 
 from buildscripts.idl import gen_all_feature_flag_list
 from buildscripts.idl.lib import ALL_FEATURE_FLAG_FILE
@@ -22,6 +24,7 @@ from buildscripts.idl.lib import ALL_FEATURE_FLAG_FILE
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import utils
 from buildscripts.resmokelib import mongod_fuzzer_configs
+from buildscripts.resmokelib.utils import autoloader
 from buildscripts.resmokelib.suitesconfig import SuiteFinder
 from buildscripts.util.read_config import read_config_file
 
@@ -32,7 +35,131 @@ def validate_and_update_config(parser, args):
     _update_config_vars(args)
     _update_symbolizer_secrets()
     _validate_config(parser)
+    _set_up_modules()
     _set_logging_config()
+
+
+@cache
+def _get_module_configs() -> dict:
+    """Load module configurations from the YAML file."""
+    with open(_config.MODULES_CONFIG_PATH, "r") as file:
+        return yaml.safe_load(file) or {}
+
+
+def _set_up_modules():
+    """Set up external modules by loading fixtures, hooks, and suite directories."""
+    module_configs = _get_module_configs()
+
+    # It is possible for multiple resmoke invocations to share the same python environment
+    # We reset these variables to ensure we don't double load modules or suite dirs
+    _config.MODULE_SUITE_DIRS = []
+    _config.MODULE_MATRIX_SUITE_DIRS = []
+
+    # Loop through all configured modules
+    for _, module_config in module_configs.items():
+        if not isinstance(module_config, dict):
+            continue
+
+        # Check if all paths exist for this module
+        all_paths_present = True
+        for key in ("fixture_dirs", "hook_dirs", "suite_dirs"):
+            if key not in module_config:
+                continue
+            if not isinstance(module_config[key], list):
+                continue
+            for module_dir in module_config[key]:
+                if not os.path.exists(module_dir):
+                    all_paths_present = False
+                    break
+            if not all_paths_present:
+                break
+
+        # Only load module if all its paths exist
+        if all_paths_present:
+            # Load fixtures and hooks so they get registered
+            for resource_dir in module_config.get("fixture_dirs", []) + module_config.get(
+                    "hook_dirs", []):
+                norm_path = os.path.normpath(resource_dir)
+                package = resource_dir.replace("/", ".")
+                autoloader.load_all_modules(package, [norm_path])
+
+            # Add suite directories to the list
+            for suite_dir in module_config.get("suite_dirs", []):
+                _config.MODULE_SUITE_DIRS.append(suite_dir)
+
+            # Add matrix suite directories to the list
+            for matrix_suite_dir in module_config.get("matrix_suite_dirs", []):
+                _config.MODULE_MATRIX_SUITE_DIRS.append(matrix_suite_dir)
+
+
+def _load_external_module_config(config_path: str):
+    """Load external module configuration from YAML file.
+
+    Expected YAML format:
+    suite_directories: [list of suite directories relative to EXTERNAL_MODULE_ROOT]
+    matrix_suite_directories: [list of matrix suite directories relative to EXTERNAL_MODULE_ROOT]
+    fixture_directories: [list of fixture directories relative to EXTERNAL_MODULE_ROOT]
+    hook_directories: [list of hook directories relative to EXTERNAL_MODULE_ROOT]
+    """
+    if not os.path.isabs(config_path):
+        # If relative path provided, resolve relative to EXTERNAL_MODULE_ROOT
+        config_path = os.path.join(_config.EXTERNAL_MODULE_ROOT, config_path)
+
+    if not os.path.exists(config_path):
+        raise RuntimeError(f"External module config file not found: {config_path}")
+
+    with open(config_path, "r") as file:
+        external_config = yaml.safe_load(file)
+
+    if not external_config:
+        raise RuntimeError(f"External module config file is empty: {config_path}")
+
+    # Reset external module lists
+    _config.EXTERNAL_MODULE_SUITE_DIRS = []
+    _config.EXTERNAL_MODULE_MATRIX_SUITE_DIRS = []
+
+    # Load suite directories
+    suite_dirs = external_config.get("suite_directories", [])
+    if not isinstance(suite_dirs, list):
+        raise RuntimeError("'suite_directories' must be a list")
+
+    for suite_dir in suite_dirs:
+        full_path = os.path.join(_config.EXTERNAL_MODULE_ROOT, suite_dir)
+        if os.path.exists(full_path):
+            _config.EXTERNAL_MODULE_SUITE_DIRS.append(full_path)
+        else:
+            print(f"Warning: External suite directory not found: {full_path}")
+
+    # Load matrix suite directories
+    matrix_suite_dirs = external_config.get("matrix_suite_directories", [])
+    if not isinstance(matrix_suite_dirs, list):
+        raise RuntimeError("'matrix_suite_directories' must be a list")
+
+    for suite_dir in matrix_suite_dirs:
+        full_path = os.path.join(_config.EXTERNAL_MODULE_ROOT, suite_dir)
+        if os.path.exists(full_path):
+            _config.EXTERNAL_MODULE_MATRIX_SUITE_DIRS.append(full_path)
+        else:
+            print(f"Warning: External matrix suite directory not found: {full_path}")
+
+    for config_key, dir_type in [
+        ("fixture_directories", "fixture"),
+        ("hook_directories", "hook"),
+    ]:
+        dirs = external_config.get(config_key, [])
+        if not isinstance(dirs, list):
+            raise RuntimeError(f"'{config_key}' must be a list")
+
+        for dir_path in dirs:
+            full_path = os.path.join(_config.EXTERNAL_MODULE_ROOT, dir_path)
+            if not os.path.exists(full_path):
+                print(f"Warning: External {dir_type} directory not found: {full_path}")
+                continue
+
+            # Convert directory path to Python package name (replace slashes with dots)
+            package_name = dir_path.replace("/", ".")
+            # Use autoloader to load all modules in the directory
+            autoloader.load_all_modules(name=package_name, path=[full_path])
 
 
 def _validate_options(parser, args):
@@ -147,7 +274,12 @@ def _find_resmoke_wrappers():
     # /data/mongo, build-dir at /data/build)
     # We assume that users who fall under either case will explicitly pass the
     # --installDir argument.
-    candidate_installs = glob.glob("**/bin/resmoke.py", recursive=True)
+    # Search from RESMOKE_ROOT (MongoDB repo) rather than cwd (which might be external module)
+    search_pattern = os.path.join(_config.RESMOKE_ROOT, "**/bin/resmoke.py")
+    candidate_installs = glob.glob(search_pattern, recursive=True)
+    candidate_installs = [
+        wrapper for wrapper in candidate_installs if not wrapper.startswith("bazel-mongo/")
+    ]
     return list(candidate_installs)
 
 
@@ -202,7 +334,8 @@ be invoked as either:
         all_ff = []
         enabled_feature_flags = []
         try:
-            all_ff = process_feature_flag_file(ALL_FEATURE_FLAG_FILE)
+            all_ff = process_feature_flag_file(
+                os.path.join(_config.RESMOKE_ROOT, ALL_FEATURE_FLAG_FILE))
         except FileNotFoundError:
             # If we ask resmoke to run with all feature flags, the feature flags file
             # needs to exist.
@@ -255,10 +388,14 @@ be invoked as either:
     _config.INCLUDE_TAGS = _tags_from_list(config.pop("include_with_all_tags"))
 
     _config.GENNY_EXECUTABLE = _expand_user(config.pop("genny_executable"))
+    _config.APPEND_MONGO_PATH = config.pop("append_mongo_path")
     _config.JOBS = config.pop("jobs")
     _config.LINEAR_CHAIN = config.pop("linear_chain") == "on"
     _config.MAJORITY_READ_CONCERN = config.pop("majority_read_concern") == "on"
     _config.ENABLE_ENTERPRISE_TESTS = config.pop("enable_enterprise_tests")
+    modules_path = config.pop("resmoke_modules_path")
+    _config.MODULES_CONFIG_PATH = (os.path.join(_config.RESMOKE_ROOT, modules_path)
+                                   if modules_path else None)
     _config.MIXED_BIN_VERSIONS = config.pop("mixed_bin_versions")
     if _config.MIXED_BIN_VERSIONS is not None:
         _config.MIXED_BIN_VERSIONS = _config.MIXED_BIN_VERSIONS.split("-")
@@ -331,14 +468,24 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
     _config.CONFIG_SHARD = utils.pick_catalog_shard_node(
         config.pop("config_shard"), _config.NUM_SHARDS)
     _config.PERF_REPORT_FILE = config.pop("perf_report_file")
-    _config.CEDAR_REPORT_FILE = config.pop("cedar_report_file")
+    # Make report file paths absolute relative to RESMOKE_ROOT to avoid creating reports
+    # in external module directories when running from outside the MongoDB repo
+    cedar_report_file = config.pop("cedar_report_file")
+    if cedar_report_file and not os.path.isabs(cedar_report_file):
+        cedar_report_file = os.path.join(_config.RESMOKE_ROOT, cedar_report_file)
+    _config.CEDAR_REPORT_FILE = cedar_report_file
+
     _config.RANDOM_SEED = config.pop("seed")
     _config.REPEAT_SUITES = config.pop("repeat_suites")
     _config.REPEAT_TESTS = config.pop("repeat_tests")
     _config.REPEAT_TESTS_MAX = config.pop("repeat_tests_max")
     _config.REPEAT_TESTS_MIN = config.pop("repeat_tests_min")
     _config.REPEAT_TESTS_SECS = config.pop("repeat_tests_secs")
-    _config.REPORT_FILE = config.pop("report_file")
+
+    report_file = config.pop("report_file")
+    if report_file and not os.path.isabs(report_file):
+        report_file = os.path.join(_config.RESMOKE_ROOT, report_file)
+    _config.REPORT_FILE = report_file
     _config.SERVICE_EXECUTOR = config.pop("service_executor")
     _config.EXPORT_MONGOD_CONFIG = config.pop("export_mongod_config")
     _config.SHELL_SEED = config.pop("shell_seed")
@@ -407,7 +554,14 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
     _config.BENCHMARK_REPETITIONS = config.pop("benchmark_repetitions")
 
     # Config Dir options.
-    _config.CONFIG_DIR = config.pop("config_dir")
+    config_dir = config.pop("config_dir")
+    _config.CONFIG_DIR = (os.path.join(_config.RESMOKE_ROOT, config_dir) if config_dir else None)
+
+    # External module configuration
+    external_module_config = config.pop("external_module_config")
+    _config.EXTERNAL_MODULE_CONFIG = external_module_config
+    if external_module_config:
+        _load_external_module_config(external_module_config)
 
     # Configure evergreen task documentation
     if _config.EVERGREEN_TASK_NAME:

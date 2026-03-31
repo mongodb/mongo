@@ -1,0 +1,13 @@
+test_kind: py_test
+
+selector:
+  roots:
+    - buildscripts/tests/resmoke_end2end/testfiles/test_fixture_env_vars_with_uds.py
+
+executor:
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    uds_path_prefix: /tmp/mongodb-test-sockets

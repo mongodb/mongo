@@ -12,10 +12,11 @@ class CPPUnitTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = "cpp_unit_test"
 
-    def __init__(self, logger, program_executable, program_options=None):
+    def __init__(self, logger, program_executable, program_options=None, **kwargs):
         """Initialize the CPPUnitTestCase with the executable to run."""
 
-        interface.ProcessTestCase.__init__(self, logger, "C++ unit test", program_executable)
+        interface.ProcessTestCase.__init__(self, logger, "C++ unit test", program_executable,
+                                           **kwargs)
 
         self.program_executable = program_executable
         self.program_options = utils.default_if_none(program_options, {}).copy()
@@ -43,5 +44,8 @@ class CPPUnitTestCase(interface.ProcessTestCase):
             raise
 
     def _make_process(self):
-        return core.programs.make_process(self.logger, [self.program_executable],
-                                          **self.program_options)
+        # Merge environment variables into program_options
+        program_options = self.program_options.copy()
+        self._merge_environment_variables(program_options)
+
+        return core.programs.make_process(self.logger, [self.program_executable], **program_options)

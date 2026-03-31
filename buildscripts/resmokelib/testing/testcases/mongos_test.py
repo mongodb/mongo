@@ -11,13 +11,14 @@ class MongosTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = "mongos_test"
 
-    def __init__(self, logger, mongos_options):
+    def __init__(self, logger, mongos_options, **kwargs):
         """Initialize the mongos test and saves the options."""
 
         self.mongos_executable = utils.default_if_none(config.MONGOS_EXECUTABLE,
                                                        config.DEFAULT_MONGOS_EXECUTABLE)
         # Use the executable as the test name.
-        interface.ProcessTestCase.__init__(self, logger, "mongos test", self.mongos_executable)
+        interface.ProcessTestCase.__init__(self, logger, "mongos test", self.mongos_executable,
+                                           **kwargs)
         self.options = mongos_options.copy()
 
     def configure(self, fixture, *args, **kwargs):
@@ -27,6 +28,11 @@ class MongosTestCase(interface.ProcessTestCase):
         # Always specify test option to ensure the mongos will terminate.
         if "test" not in self.options:
             self.options["test"] = ""
+
+        process_kwargs = self.options.get("process_kwargs", {})
+        # Merge test and fixture environment variables into process_kwargs
+        self._merge_environment_variables(process_kwargs)
+        self.options["process_kwargs"] = process_kwargs
 
     def _make_process(self):
         return core.programs.mongos_program(self.logger, self.fixture.job_num,

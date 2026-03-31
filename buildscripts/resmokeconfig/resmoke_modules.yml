@@ -1,0 +1,5 @@
+# Configuration for external resmoke modules
+# Each module can define:
+#   fixture_dirs: directories containing fixture classes
+#   hook_dirs: directories containing hook classes
+#   suite_dirs: directories containing suite YAML files

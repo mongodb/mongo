@@ -1,6 +1,7 @@
 """A service for working with multiversion testing."""
 from __future__ import annotations
 
+import os
 import re
 from bisect import bisect_left, bisect_right
 from typing import List, NamedTuple, Optional
@@ -9,9 +10,13 @@ from packaging.version import Version
 from pydantic import BaseModel, Field
 import yaml
 
+import buildscripts.resmokelib.config as _config
+
 # These values must match the include paths for artifacts.tgz in evergreen.yml.
-MONGO_VERSION_YAML = ".resmoke_mongo_version.yml"
-RELEASES_YAML = ".resmoke_mongo_release_values.yml"
+# We use RESMOKE_ROOT so these files are always in the repo root, even when running
+# from external module directories.
+MONGO_VERSION_YAML = os.path.join(_config.RESMOKE_ROOT, ".resmoke_mongo_version.yml")
+RELEASES_YAML = os.path.join(_config.RESMOKE_ROOT, ".resmoke_mongo_release_values.yml")
 VERSION_RE = re.compile(r'^[0-9]+\.[0-9]+')
 
 

@@ -18,7 +18,8 @@ class MongoDFixture(interface.Fixture):
     """Fixture which provides JSTests with a standalone mongod to run against."""
 
     def __init__(self, logger, job_num, fixturelib, mongod_executable=None, mongod_options=None,
-                 add_feature_flags=False, dbpath_prefix=None, preserve_dbpath=False, port=None):
+                 add_feature_flags=False, dbpath_prefix=None, preserve_dbpath=False, port=None,
+                 uds_path_prefix=None):
         """Initialize MongoDFixture with different options for the mongod process."""
         interface.Fixture.__init__(self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix)
         self.mongod_options = self.fixturelib.make_historic(
@@ -56,6 +57,14 @@ class MongoDFixture(interface.Fixture):
         self.port = port or fixturelib.get_next_port(job_num)
         self.mongod_options["port"] = self.port
 
+        # Unix domain socket support
+        self.uds_path_prefix = uds_path_prefix
+        self.uds_path = None
+        if self.uds_path_prefix:
+            # MongoDB creates socket at {unixSocketPrefix}/mongodb-{port}.sock
+            self.uds_path = os.path.join(self.uds_path_prefix, f"mongodb-{self.port}.sock")
+            self.mongod_options["unixSocketPrefix"] = self.uds_path_prefix
+
         # Always log backtraces to a file in the dbpath in our testing.
         backtrace_log_file_name = os.path.join(self.get_dbpath_prefix(),
                                                uuid.uuid4().hex + ".stacktrace")
@@ -68,6 +77,10 @@ class MongoDFixture(interface.Fixture):
 
         os.makedirs(self._dbpath, exist_ok=True)
 
+        # Create UDS directory if needed
+        if self.uds_path_prefix:
+            os.makedirs(self.uds_path_prefix, exist_ok=True)
+
         launcher = MongodLauncher(self.fixturelib)
         # Second return val is the port, which we ignore because we explicitly created the port above.
         # The port is used to set other mongod_option's here:
@@ -76,9 +89,15 @@ class MongoDFixture(interface.Fixture):
                                                    executable=self.mongod_executable,
                                                    mongod_options=self.mongod_options)
         try:
-            self.logger.info("Starting mongod on port %d...\n%s", self.port, mongod.as_command())
+            msg = f"Starting mongod on port { self.port }...\n{ mongod.as_command() }"
+            if self.uds_path:
+                msg += f"\nUnix domain socket: { self.uds_path }"
+            self.logger.info(msg)
             mongod.start()
-            self.logger.info("mongod started on port %d with pid %d.", self.port, mongod.pid)
+            msg = f"mongod started on port { self.port } with pid { mongod.pid }"
+            if self.uds_path:
+                msg += f" (UDS: { self.uds_path })"
+            self.logger.info(msg)
         except Exception as err:
             msg = "Failed to start mongod on port {:d}: {}".format(self.port, err)
             self.logger.exception(msg)
@@ -182,6 +201,31 @@ class MongoDFixture(interface.Fixture):
     def get_driver_connection_url(self):
         """Return the driver connection URL."""
         return "mongodb://" + self.get_internal_connection_string() + "/?directConnection=true"
+
+    def get_uds_path(self):
+        """Return the Unix domain socket path for this mongod."""
+        return self.uds_path
+
+    def get_uds_connection_string(self):
+        """Return connection string using Unix domain socket."""
+        return self.uds_path if self.uds_path else None
+
+    def get_environment_variables(self):
+        """Return environment variables for standalone mongod fixture."""
+        env_vars = {}
+
+        # Provide fixture type
+        env_vars["MONGODB_FIXTURE_TYPE"] = "MongoDFixture"
+
+        # Provide UDS path if available (single and list forms for consistency)
+        if self.uds_path:
+            env_vars["MONGODB_UDS_PATH"] = self.uds_path
+            env_vars["MONGODB_UDS_PATHS"] = (self.uds_path)  # Single item, but consistent naming
+
+        # Provide connection string
+        env_vars["MONGODB_CONNECTION_STRING"] = self.get_internal_connection_string()
+
+        return env_vars
 
 
 # The below parameters define the default 'logComponentVerbosity' object passed to mongod processes

@@ -16,7 +16,7 @@ class FSMWorkloadTestCase(jsrunnerfile.JSRunnerFileTestCase):
     _COUNTER = 0
 
     def __init__(self, logger, selected_tests, shell_executable=None, shell_options=None,
-                 same_db=False, same_collection=False, db_name_prefix=None):
+                 same_db=False, same_collection=False, db_name_prefix=None, **kwargs):
         """Initialize the FSMWorkloadTestCase with the FSM workload file."""
 
         self.same_collection = same_collection
@@ -30,7 +30,7 @@ class FSMWorkloadTestCase(jsrunnerfile.JSRunnerFileTestCase):
         jsrunnerfile.JSRunnerFileTestCase.__init__(
             self, logger, "FSM workload", test_name,
             test_runner_file="jstests/concurrency/fsm_libs/resmoke_runner.js",
-            shell_executable=shell_executable, shell_options=shell_options)
+            shell_executable=shell_executable, shell_options=shell_options, **kwargs)
 
     def configure(self, fixture, *args, **kwargs):
         """Configure the FSMWorkloadTestCase runner."""

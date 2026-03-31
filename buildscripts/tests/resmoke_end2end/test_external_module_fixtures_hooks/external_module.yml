@@ -1,0 +1,17 @@
+# Example external module configuration for resmoke
+
+# Directories containing test suite YAML files
+suite_directories:
+  - suites
+
+# Directories containing matrix suite configurations
+matrix_suite_directories:
+  - matrix_suites
+
+# Directories containing custom fixture classes
+fixture_directories:
+  - fixtures
+
+# Directories containing custom hook classes
+hook_directories:
+  - hooks

@@ -1,0 +1,15 @@
+- name: external_test
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              externalModuleTest: true
+
+- name: external_env
+  value:
+    executor:
+      config:
+        env_vars:
+          TEST_EXTERNAL_MODULE: "1"

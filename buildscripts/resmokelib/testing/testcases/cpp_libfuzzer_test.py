@@ -16,10 +16,11 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
     DEFAULT_TIMEOUT = datetime.timedelta(hours=1)
 
     def __init__(self, logger, program_executable, program_options=None, runs=1000000,
-                 corpus_directory_stem="corpora"):
+                 corpus_directory_stem="corpora", **kwargs):
         """Initialize the CPPLibfuzzerTestCase with the executable to run."""
 
-        interface.ProcessTestCase.__init__(self, logger, "C++ libfuzzer test", program_executable)
+        interface.ProcessTestCase.__init__(self, logger, "C++ libfuzzer test", program_executable,
+                                           **kwargs)
 
         self.program_executable = program_executable
         self.program_options = utils.default_if_none(program_options, {}).copy()
@@ -32,6 +33,10 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
         os.makedirs(self.corpus_directory, exist_ok=True)
 
     def _make_process(self):
+        # Merge environment variables into program_options
+        program_options = self.program_options.copy()
+        self._merge_environment_variables(program_options)
+
         default_args = [
             self.program_executable,
             "-max_len=100000",
@@ -40,4 +45,4 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
             f"-runs={self.runs}",
             self.corpus_directory,
         ]
-        return core.programs.make_process(self.logger, default_args, **self.program_options)
+        return core.programs.make_process(self.logger, default_args, **program_options)

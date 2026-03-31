@@ -47,7 +47,8 @@ class ReplicaSetFixture(interface.ReplFixture):
                  replset_config_options=None, voting_secondaries=True, all_nodes_electable=False,
                  use_replica_set_connection_string=None, linear_chain=False,
                  default_read_concern=None, default_write_concern=None, shard_logging_prefix=None,
-                 replicaset_logging_prefix=None, replset_name=None, config_shard=None):
+                 replicaset_logging_prefix=None, replset_name=None, config_shard=None,
+                 uds_path_prefix=None):
         """Initialize ReplicaSetFixture."""
 
         interface.ReplFixture.__init__(self, logger, job_num, fixturelib,
@@ -96,6 +97,8 @@ class ReplicaSetFixture(interface.ReplFixture):
 
         # Set the default oplogSize to 511MB.
         self.mongod_options.setdefault("oplogSize", 511)
+
+        self.uds_path_prefix = uds_path_prefix
 
         # The dbpath in mongod_options is used as the dbpath prefix for replica set members and
         # takes precedence over other settings. The ShardedClusterFixture uses this parameter to
@@ -794,6 +797,34 @@ class ReplicaSetFixture(interface.ReplFixture):
             # We return a direct connection to the expected pimary when only the first node is
             # electable because we want the client to error out if a stepdown occurs.
             return self.nodes[0].get_driver_connection_url()
+
+    def get_uds_paths(self):
+        """Return list of UDS paths for all replica set members."""
+        return [node.get_uds_path() for node in self.nodes if node.get_uds_path()]
+
+    def get_environment_variables(self):
+        """Return environment variables for replica set fixture."""
+        env_vars = {}
+
+        # Provide fixture type
+        env_vars["MONGODB_FIXTURE_TYPE"] = "ReplicaSetFixture"
+
+        # Provide replica set name
+        env_vars["MONGODB_REPLSET_NAME"] = self.replset_name
+
+        # Provide connection string
+        env_vars["MONGODB_CONNECTION_STRING"] = self.get_internal_connection_string()
+
+        # Provide UDS paths if available
+        uds_paths = self.get_uds_paths()
+        if uds_paths:
+            # Provide comma-separated list of all UDS paths
+            env_vars["MONGODB_UDS_PATHS"] = ",".join(uds_paths)
+            # First node is typically the primary
+            env_vars["MONGODB_UDS_PATH"] = uds_paths[0]
+            env_vars["MONGODB_PRIMARY_UDS_PATH"] = uds_paths[0]
+
+        return env_vars
 
     def write_historic(self, obj):
         """Convert the obj to a record to track history."""

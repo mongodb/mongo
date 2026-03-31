@@ -42,6 +42,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
+#include "mongo/scripting/mongo_path_util.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/file.h"
@@ -69,6 +70,7 @@ const fileofs kMaxJsFileLength = fileofs(2) * 1024 * 1024 * 1024;
 const ServiceContext::Decoration<std::unique_ptr<ScriptEngine>> forService =
     ServiceContext::declareDecoration<std::unique_ptr<ScriptEngine>>();
 static std::unique_ptr<ScriptEngine> globalScriptEngine;
+const std::vector<std::string> cachedMongoPath = parseMongoPath();
 
 }  // namespace
 
@@ -163,8 +165,22 @@ bool Scope::execFile(const string& filename, bool printResult, bool reportError,
     boost::filesystem::path p(filename);
 #endif
     if (!exists(p)) {
-        LOGV2_ERROR(22779, "file [{filename}] doesn't exist", "filename"_attr = filename);
-        return false;
+        bool found = false;
+        // If file not found and path is relative, search MONGO_PATH directories
+        if (!p.is_absolute()) {
+            for (const auto& searchPath : cachedMongoPath) {
+                boost::filesystem::path fullPath = boost::filesystem::path(searchPath) / filename;
+                if (boost::filesystem::exists(fullPath)) {
+                    p = fullPath;
+                    found = true;
+                    break;
+                }
+            }
+        }
+        if (!found) {
+            LOGV2_ERROR(22779, "file [{filename}] doesn't exist", "filename"_attr = filename);
+            return false;
+        }
     }
 
     // iterate directories and recurse using all *.js files in the directory
@@ -192,7 +208,7 @@ bool Scope::execFile(const string& filename, bool printResult, bool reportError,
     }
 
     File f;
-    f.open(filename.c_str(), true);
+    f.open(p.string().c_str(), true);
 
     if (!f.is_open() || f.bad())
         return false;

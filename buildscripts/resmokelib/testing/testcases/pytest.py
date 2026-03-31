@@ -11,15 +11,16 @@ class PyTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = "py_test"
 
-    def __init__(self, logger, py_filename):
+    def __init__(self, logger, py_filename, **kwargs):
         """Initialize PyTestCase."""
-        interface.ProcessTestCase.__init__(self, logger, "PyTest", py_filename)
+        interface.ProcessTestCase.__init__(self, logger, "PyTest", py_filename, **kwargs)
 
     def _make_process(self):
+        program_options = {}
+        # Merge test and fixture environment variables into program_options
+        self._merge_environment_variables(program_options)
         return core.programs.generic_program(
-            self.logger, [sys.executable, "-m", "unittest", self.test_module_name])
-
-    @property
-    def test_module_name(self):
-        """Get the dotted module name from the path."""
-        return os.path.splitext(self.test_name)[0].replace(os.sep, ".")
+            self.logger,
+            [sys.executable, "-m", "unittest", self.test_name],
+            program_options,
+        )

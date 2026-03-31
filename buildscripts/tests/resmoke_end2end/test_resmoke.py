@@ -557,3 +557,28 @@ class TestMultiversionConfig(unittest.TestCase):
             self.fail(msg="`resmoke.py multiversion-config` does not output valid yaml.")
 
         os.remove(file_name)
+
+
+class TestModuleLoading(unittest.TestCase):
+    """Test that external modules can be loaded with fixtures, hooks, and suites."""
+
+    def test_module_fixtures_and_hooks_loaded(self):
+        """Test that a suite using external fixture and hook classes works."""
+        # This suite uses MongoDFixtureTesting (fixture) and ValidateCollectionsTesting (hook)
+        # from the testing module. If the module loading fails, these classes won't be
+        # registered and the suite will fail to load.
+        resmoke_args = [
+            "--resmokeModulesPath=buildscripts/tests/resmoke_end2end/test_resmoke_modules.yml",
+            "--suite=resmoke_test_module_worked",
+        ]
+
+        result = execute_resmoke(resmoke_args)
+
+        # If the fixture and hook weren't loaded, resmoke would fail with an error
+        # about unknown fixture/hook classes
+        self.assertEqual(
+            result.returncode,
+            0,
+            f"Module loading failed. The test fixture and hook should have been loaded.\n"
+            f"stdout: {result.stdout}\nstderr: {result.stderr}",
+        )

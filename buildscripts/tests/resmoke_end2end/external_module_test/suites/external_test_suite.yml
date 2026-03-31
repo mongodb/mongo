@@ -1,0 +1,4 @@
+test_kind: js_test
+selector:
+  roots:
+    - external_module_test/tests/*.js

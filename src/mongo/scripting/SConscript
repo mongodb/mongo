@@ -15,6 +15,7 @@ env.Library(
         'dbdirectclient_factory.cpp',
         'engine.cpp',
         'jsexception.cpp',
+        'mongo_path_util.cpp',
         'utils.cpp',
     ],
     LIBDEPS=[

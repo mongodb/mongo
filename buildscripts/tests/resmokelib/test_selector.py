@@ -335,7 +335,7 @@ class TestTestList(unittest.TestCase):
         roots = ["dir/subdir1/*.js", "dir/subdir2/test21.*"]
         test_list = selector._TestList(self.test_file_explorer, roots)
         test_list.exclude_files(["dir/subdir1/test11.js"])
-        test_list.include_files(["dir/subdir1/test11.js"], force=False)
+        test_list.include_files(["dir/subdir1/test11.js"])
         selected, excluded = test_list.get_tests()
         self.assertEqual([], selected)
         self.assertEqual(

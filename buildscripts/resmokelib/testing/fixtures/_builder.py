@@ -329,7 +329,8 @@ class ReplSetBuilder(FixtureBuilder):
         new_fixture = make_fixture(classes[BinVersionEnum.NEW], mongod_logger, replset.job_num,
                                    mongod_executable=executables[BinVersionEnum.NEW],
                                    mongod_options=new_fixture_mongod_options,
-                                   preserve_dbpath=replset.preserve_dbpath, port=new_fixture_port)
+                                   preserve_dbpath=replset.preserve_dbpath, port=new_fixture_port,
+                                   uds_path_prefix=replset.uds_path_prefix)
 
         return FixtureContainer(new_fixture, old_fixture, cur_version)
 
@@ -578,9 +579,11 @@ class ShardedClusterBuilder(FixtureBuilder):
         old_fixture = None
 
         if is_multiversion:
+            # Old mongos fixtures don't support uds_path_prefix, so filter it out
+            old_mongos_kwargs = {k: v for k, v in mongos_kwargs.items() if k != 'uds_path_prefix'}
             old_fixture = make_fixture(
                 classes[BinVersionEnum.OLD], mongos_logger, sharded_cluster.job_num,
-                mongos_executable=executables[BinVersionEnum.OLD], **mongos_kwargs)
+                mongos_executable=executables[BinVersionEnum.OLD], **old_mongos_kwargs)
 
         # We can't restart mongos since explicit ports are not supported.
         new_fixture_mongos_kwargs = sharded_cluster.get_mongos_kwargs()

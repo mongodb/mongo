@@ -142,6 +142,7 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot
   - name: sharding_gen
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
+  - name: resmoke_end2end_tests
 
 - &enterprise-windows-template
   <<: *windows_compile_variant_dependency

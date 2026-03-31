@@ -11,7 +11,7 @@ class TLAPlusTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = "tla_plus_test"
 
-    def __init__(self, logger, model_config_file, java_binary=None):
+    def __init__(self, logger, model_config_file, java_binary=None, **kwargs):
         """Initialize the TLAPlusTestCase with a TLA+ model config file.
 
         model_config_file is the full path to a file like
@@ -34,12 +34,18 @@ class TLAPlusTestCase(interface.ProcessTestCase):
 
         self.java_binary = java_binary
 
-        interface.ProcessTestCase.__init__(self, logger, "TLA+ test", specname)
+        interface.ProcessTestCase.__init__(self, logger, "TLA+ test", specname, **kwargs)
 
     def _make_process(self):
         process_kwargs = {"cwd": self.working_dir}
         if self.java_binary is not None:
             process_kwargs["env_vars"] = {"JAVA_BINARY": self.java_binary}
 
-        return core.programs.generic_program(self.logger, ["sh", "model-check.sh", self.test_name],
-                                             process_kwargs=process_kwargs)
+        # Merge test and fixture environment variables into process_kwargs
+        self._merge_environment_variables(process_kwargs)
+
+        return core.programs.generic_program(
+            self.logger,
+            ["sh", "model-check.sh", self.test_name],
+            process_kwargs=process_kwargs,
+        )

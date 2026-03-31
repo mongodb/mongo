@@ -11,6 +11,7 @@ import os.path
 import random
 import subprocess
 import sys
+from typing import List, NamedTuple
 
 import buildscripts.resmokelib.testing.tags as _tags
 from buildscripts.resmokelib import config
@@ -142,6 +143,13 @@ class TestFileExplorer(object):
         return tagged_tests
 
 
+class _EvaluatePathsResult(NamedTuple):
+    """Results of paths evaluation."""
+
+    evaluated: List[str]
+    unrecognized: List[str]
+
+
 class _TestList(object):
     """
     A list of tests on which filtering operations can be applied.
@@ -152,70 +160,117 @@ class _TestList(object):
         tests_are_files: indicates if the tests are file paths. If so the _TestList will perform
             glob expansion of paths and check if they are existing files. If not, calling
             'include_files()' or 'exclude_files()' will raise an TypeError.
+        suite_root: the root directory to resolve relative paths against. Defaults to current directory.
     """
 
-    def __init__(self, test_file_explorer, roots, tests_are_files=True):
+    def __init__(
+            self,
+            test_file_explorer: TestFileExplorer,
+            roots: List[str],
+            tests_are_files: bool = True,
+            suite_root: str = None,
+    ) -> None:
         """Initialize the _TestList with a TestFileExplorer component and a list of root tests."""
         self._test_file_explorer = test_file_explorer
         self._tests_are_files = tests_are_files
-        self._roots = self._expand_files(roots) if tests_are_files else roots
+        self._suite_root = suite_root or os.getcwd()
+        self._roots = self._expand_roots(roots) if tests_are_files else roots
         self._filtered = set(self._roots)
 
-    def _expand_files(self, tests):
-        expanded_tests = []
-        for test in tests:
-            if self._test_file_explorer.is_glob_pattern(test):
-                expanded_tests.extend(self._test_file_explorer.iglob(test))
+    def _resolve_path(self, path: str) -> str:
+        """Resolve a potentially relative path against suite_root.
+
+        Supports 'builtin:' prefix to reference MongoDB built-in tests from external modules.
+
+        When suite_root equals cwd, paths are kept relative.
+        When suite_root differs from cwd, paths are made absolute (for external modules).
+
+        Examples
+            'builtin:jstests/core/*.js' -> resolves relative to RESMOKE_ROOT
+            'external_tests/*.js' -> resolves relative to suite_root
+            '/absolute/path/*.js' -> used as-is
+        """
+
+        builtin_prefix = "builtin:"
+        # Handle builtin: prefix for cross-root references
+        if path.startswith(builtin_prefix):
+            # Strip 'builtin:' prefix and resolve relative to RESMOKE_ROOT
+            builtin_path = path.removeprefix(builtin_prefix)
+            return os.path.join(config.RESMOKE_ROOT, builtin_path)
+
+        # Handle absolute paths
+        if os.path.isabs(path):
+            return path
+
+        # If suite_root equals cwd, keep paths relative
+        normalized_suite_root = os.path.normpath(os.path.abspath(self._suite_root))
+        normalized_cwd = os.path.normpath(os.path.abspath(os.getcwd()))
+        if normalized_suite_root == normalized_cwd:
+            return path
+
+        # For external modules, resolve relative paths against suite_root
+        return os.path.join(self._suite_root, path)
+
+    def _evaluate_paths(self, paths: List[str]) -> _EvaluatePathsResult:
+        evaluated = []
+        unrecognized = []
+
+        for path in paths:
+            # Resolve paths against suite_root
+            resolved_path = self._resolve_path(path)
+
+            if self._test_file_explorer.is_glob_pattern(resolved_path):
+                expanded_paths = self._test_file_explorer.iglob(resolved_path)
+                evaluated.extend(expanded_paths)
+
+            elif self._test_file_explorer.isfile(resolved_path):
+                evaluated.append(os.path.normpath(resolved_path))
+
             else:
-                if not self._test_file_explorer.isfile(test):
-                    raise ValueError("Unrecognized test file: {}".format(test))
-                expanded_tests.append(os.path.normpath(test))
-        return expanded_tests
+                # Not a glob pattern and not an existing file
+                unrecognized.append(path)
 
-    def include_files(self, include_files, force=False):
-        """Filter the test list so that it only includes files matching 'include_files'.
+        return _EvaluatePathsResult(evaluated, unrecognized)
 
-        Args:
-            include_files: a list of paths or glob patterns that match the files to include.
-            force: if True include the matching files that were previously excluded, otherwise only
-                   include files that match and were not previously excluded from this _TestList.
+    def _expand_roots(self, tests: List[str]) -> List[str]:
+        paths = self._evaluate_paths(tests)
+        if paths.unrecognized:
+            raise ValueError("Unrecognized test file: {}".format(paths.unrecognized[0]))
+        return paths.evaluated
+
+    def include_files(self, include_files: List[str], force: bool = False) -> None:
+        """
+        Filter the test list so that it only includes files matching 'include_files'.
+
+        :param include_files: List of paths or glob patterns that match the files to include.
+        :param force: if True, include matching files even if previously excluded. Otherwise,
+                      only include files that match and were not previously excluded.
         """
         if not self._tests_are_files:
             raise TypeError("_TestList does not contain files.")
-        expanded_include_files = set()
-        for path in include_files:
-            if self._test_file_explorer.is_glob_pattern(path):
-                expanded_include_files.update(set(self._test_file_explorer.iglob(path)))
-            else:
-                expanded_include_files.add(os.path.normpath(path))
+
+        paths = self._evaluate_paths(include_files)
+        expanded_include_files = set(paths.evaluated)
+
+        # Intersect with current filtered set
         self._filtered = self._filtered & expanded_include_files
+
+        # If force=True, also add back any matching files from original roots
         if force:
             self._filtered |= set(self._roots) & expanded_include_files
 
-    def exclude_files(self, exclude_files):  # noqa: D406,D407,D411,D413
-        """Exclude from the test list the files that match elements from 'exclude_files'.
+    def exclude_files(self, exclude_files: List[str]) -> None:
+        """
+        Exclude from the test list the files that match elements from 'exclude_files'.
 
-        Args:
-            exclude_files: a list of paths or glob patterns that match the files to exclude.
-        Raises:
-            ValueError: if exclude_files contains a non-globbed path that does not correspond to
-                an existing file.
+        :param exclude_files: List of paths or glob patterns that match the files to exclude.
         """
         if not self._tests_are_files:
             raise TypeError("_TestList does not contain files.")
-        for path in exclude_files:
-            if self._test_file_explorer.is_glob_pattern(path):
-                paths = self._test_file_explorer.iglob(path)
-                for expanded_path in paths:
-                    self._filtered.discard(expanded_path)
-            else:
-                path = os.path.normpath(path)
-                if path not in self._roots:
-                    raise ValueError(
-                        ("Excluded test file {} does not exist, perhaps it was renamed or removed"
-                         " , and should be modified in, or removed from, the exclude_files list.".
-                         format(path)))
-                self._filtered.discard(path)
+
+        paths = self._evaluate_paths(exclude_files)
+        for path in paths.evaluated:
+            self._filtered.discard(path)
 
     def filter_enterprise_tests(self):
         """Exclude tests that start with the enterprise module directory from the test list."""
@@ -435,11 +490,12 @@ class _Selector(object):
         self._test_file_explorer = test_file_explorer
         self._tests_are_files = tests_are_files
 
-    def select(self, selector_config):  # noqa: D406,D407,D411,D413
+    def select(self, selector_config, suite_root=None):  # noqa: D406,D407,D411,D413
         """Select the test files that match the given configuration.
 
         Args:
             selector_config: a _SelectorConfig instance.
+            suite_root: the root directory to resolve relative paths against.
         Returns:
             A tuple with the list of selected tests and the list of excluded tests.
         """
@@ -453,14 +509,14 @@ class _Selector(object):
             roots = []
 
         # 2. Create a _TestList.
-        test_list = _TestList(self._test_file_explorer, roots, self._tests_are_files)
+        test_list = _TestList(self._test_file_explorer, roots, self._tests_are_files, suite_root)
         # 3. Apply the exclude_files.
         if self._tests_are_files and selector_config.exclude_files:
             test_list.exclude_files(selector_config.exclude_files)
         # 4. Apply the tag filters.
         if selector_config.tags_expression:
             test_list.match_tag_expression(selector_config.tags_expression, self.get_tags)
-        # 5. Apply the include files last with force=True to take precedence over the tags.
+        # 5. Apply the include files last to take precedence over the tags.
         if self._tests_are_files and selector_config.include_files:
             test_list.include_files(selector_config.include_files, force=True)
         # 6: Apply the enterprise tests filter
@@ -507,10 +563,10 @@ class _JSTestSelector(_Selector):
         _Selector.__init__(self, test_file_explorer)
         self._tags = self._test_file_explorer.parse_tag_files("js_test", config.TAG_FILES)
 
-    def select(self, selector_config):
+    def select(self, selector_config, suite_root=None):
         self._tags = self._test_file_explorer.parse_tag_files("js_test", [selector_config.tag_file],
                                                               self._tags)
-        return _Selector.select(self, selector_config)
+        return _Selector.select(self, selector_config, suite_root)
 
     def get_tags(self, test_file):
         """Return tags from test_file."""
@@ -545,14 +601,14 @@ class _MultiJSTestSelector(_JSTestSelector):
     E.g. [[test1.js, test2.js], [test3.js, test4.js]].
     """
 
-    def select(self, selector_config):
+    def select(self, selector_config, suite_root=None):
         """Select the tests as follows.
 
         1. Create a corpus of tests to group by concatenating shuffled lists of raw tests
            until we exceed "total_tests" number of tests.
         2. Slice the corpus into "group_size" lists, put these lists in "grouped_tests".
         """
-        tests, excluded = _JSTestSelector.select(self, selector_config)
+        tests, excluded = _JSTestSelector.select(self, selector_config, suite_root=suite_root)
 
         group_size = selector_config.group_size
         multi = selector_config.group_count_multiplier
@@ -611,14 +667,15 @@ class _CppTestSelector(_Selector):
         """Initialize _CppTestSelector."""
         _Selector.__init__(self, test_file_explorer)
 
-    def select(self, selector_config):
+    def select(self, selector_config, suite_root=None):
         """Return selected tests."""
         if selector_config.roots:
             # Tests have been specified on the command line. We use them without additional
             # filtering.
-            test_list = _TestList(self._test_file_explorer, selector_config.roots)
+            test_list = _TestList(self._test_file_explorer, selector_config.roots,
+                                  suite_root=suite_root)
             return test_list.get_tests()
-        return _Selector.select(self, selector_config)
+        return _Selector.select(self, selector_config, suite_root)
 
 
 class _DbTestSelectorConfig(_SelectorConfig):
@@ -646,7 +703,7 @@ class _DbTestSelector(_Selector):
         """Initialize _DbTestSelector."""
         _Selector.__init__(self, test_file_explorer, tests_are_files=False)
 
-    def select(self, selector_config):
+    def select(self, selector_config, suite_root=None):
         """Return selected tests."""
         if selector_config.roots:
             roots = selector_config.roots
@@ -753,7 +810,12 @@ _SELECTOR_REGISTRY = {
 }
 
 
-def filter_tests(test_kind, selector_config, test_file_explorer=_DEFAULT_TEST_FILE_EXPLORER):
+def filter_tests(
+        test_kind,
+        selector_config,
+        test_file_explorer=_DEFAULT_TEST_FILE_EXPLORER,
+        suite_root=None,
+):
     """Filter the tests according to a specified configuration.
 
     Args:
@@ -761,10 +823,11 @@ def filter_tests(test_kind, selector_config, test_file_explorer=_DEFAULT_TEST_FI
         selector_config: a dict containing the selector configuration.
         test_file_explorer: the TestFileExplorer to use. Using a TestFileExplorer other than
         the default one should not be needed except for mocking purposes.
+        suite_root: the root directory to resolve relative test paths against.
     """
     if test_kind not in _SELECTOR_REGISTRY:
         raise ValueError("Unknown test kind '{}'".format(test_kind))
     selector_config_class, selector_class = _SELECTOR_REGISTRY[test_kind]
     selector = selector_class(test_file_explorer)
     selector_config = selector_config_class(**selector_config)
-    return selector.select(selector_config)
+    return selector.select(selector_config, suite_root)

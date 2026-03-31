@@ -695,6 +695,16 @@ class RunPlugin(PluginInterface):
                             help="The path to the genny executable for resmoke to use.")
 
         parser.add_argument(
+            "--appendMongoPath",
+            dest="append_mongo_path",
+            action="append",
+            metavar="PATH",
+            help=("Append a directory to MONGO_PATH for searching JavaScript modules used by "
+                  "load() and import(). Can be specified multiple times. Paths are searched in "
+                  "the order specified."),
+        )
+
+        parser.add_argument(
             "--includeWithAnyTags", action="append", dest="include_with_any_tags",
             metavar="TAG1,TAG2",
             help=("Comma separated list of tags. For the jstest portion of the suite(s),"
@@ -1013,6 +1023,14 @@ class RunPlugin(PluginInterface):
             help=("Exports a yaml containing the history of each mongod config option to"
                   " {nodeName}_config.yml."
                   " Defaults to 'off'. A 'detailed' export will include locations of accesses."))
+
+        internal_options.add_argument(
+            "--resmokeModulesPath",
+            dest="resmoke_modules_path",
+            type=str,
+            help=("Sets the path to the resmoke modules config to allow loading external"
+                  " fixtures, hooks, and suites."),
+        )
 
         evergreen_options = parser.add_argument_group(
             title=_EVERGREEN_ARGUMENT_TITLE, description=(
