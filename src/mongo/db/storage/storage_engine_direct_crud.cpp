@@ -56,6 +56,22 @@ Status insert(StorageEngine& engine,
     return engine.getEngine()->insertIntoIdent(ru, ident, key, value);
 }
 
+Status update(StorageEngine& engine,
+              RecoveryUnit& ru,
+              StringData ident,
+              std::span<const char> key,
+              std::span<const char> value) {
+    return engine.getEngine()->updateInIdent(ru, ident, key, value);
+}
+
+Status update(StorageEngine& engine,
+              RecoveryUnit& ru,
+              StringData ident,
+              int64_t key,
+              std::span<const char> value) {
+    return engine.getEngine()->updateInIdent(ru, ident, key, value);
+}
+
 StatusWith<UniqueBuffer> get(StorageEngine& engine,
                              RecoveryUnit& ru,
                              StringData ident,

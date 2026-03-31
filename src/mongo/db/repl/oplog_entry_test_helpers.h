@@ -95,6 +95,16 @@ OplogEntry makeContainerInsertOplogEntry(OpTime opTime,
                                          BSONBinData key,
                                          BSONBinData value);
 
+OplogEntry makeContainerUpdateOplogEntry(OpTime opTime,
+                                         StringData containerIdent,
+                                         int64_t key,
+                                         BSONBinData value);
+
+OplogEntry makeContainerUpdateOplogEntry(OpTime opTime,
+                                         StringData containerIdent,
+                                         BSONBinData key,
+                                         BSONBinData value);
+
 OplogEntry makeContainerDeleteOplogEntry(OpTime opTime, StringData containerIdent, int64_t key);
 
 OplogEntry makeContainerDeleteOplogEntry(OpTime opTime, StringData containerIdent, BSONBinData key);

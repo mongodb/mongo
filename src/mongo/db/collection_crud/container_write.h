@@ -62,6 +62,26 @@ Status insert(OperationContext* opCtx,
               container::ExistingKeyPolicy policy);
 
 /**
+ * Updates the value at the given key in the container and logs the operation in the oplog.
+ * The key must already exist.
+ */
+Status update(OperationContext* opCtx,
+              RecoveryUnit& ru,
+              IntegerKeyedContainer& container,
+              int64_t key,
+              std::span<const char> value);
+
+/**
+ * Updates the value at the given key in the container and logs the operation in the oplog.
+ * The key must already exist.
+ */
+Status update(OperationContext* opCtx,
+              RecoveryUnit& ru,
+              StringKeyedContainer& container,
+              std::span<const char> key,
+              std::span<const char> value);
+
+/**
  * Removes from the given container and logs the operation in the oplog.
  */
 Status remove(OperationContext* opCtx,

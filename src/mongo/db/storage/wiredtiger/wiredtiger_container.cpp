@@ -102,6 +102,25 @@ int WiredTigerIntegerKeyedContainer::insert(WiredTigerRecoveryUnit& ru,
     return WT_OP_CHECK(wiredTigerCursorInsert(ru, &cursor));
 }
 
+Status WiredTigerIntegerKeyedContainer::update(RecoveryUnit& ru,
+                                               int64_t key,
+                                               std::span<const char> value) {
+    auto& wtRu = WiredTigerRecoveryUnit::get(ru);
+    WiredTigerCursor cursor{getWiredTigerCursorParams(wtRu, tableId()), uri(), *wtRu.getSession()};
+    wtRu.assertInActiveTxn();
+    int ret = update(wtRu, *cursor.get(), key, value);
+    return wtRCToStatus(ret, cursor->session);
+}
+
+int WiredTigerIntegerKeyedContainer::update(WiredTigerRecoveryUnit& ru,
+                                            WT_CURSOR& cursor,
+                                            int64_t key,
+                                            std::span<const char> value) {
+    cursor.set_key(&cursor, key);
+    cursor.set_value(&cursor, WiredTigerItem{value}.get());
+    return WT_OP_CHECK(wiredTigerCursorUpdate(ru, &cursor));
+}
+
 Status WiredTigerIntegerKeyedContainer::remove(RecoveryUnit& ru, int64_t key) {
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
     WiredTigerCursor cursor{getWiredTigerCursorParams(wtRu, tableId()), uri(), *wtRu.getSession()};
@@ -174,6 +193,25 @@ int WiredTigerStringKeyedContainer::insert(WiredTigerRecoveryUnit& ru,
     cursor.set_key(&cursor, WiredTigerItem{key}.get());
     cursor.set_value(&cursor, WiredTigerItem{value}.get());
     return WT_OP_CHECK(wiredTigerCursorInsert(ru, &cursor));
+}
+
+Status WiredTigerStringKeyedContainer::update(RecoveryUnit& ru,
+                                              std::span<const char> key,
+                                              std::span<const char> value) {
+    auto& wtRu = WiredTigerRecoveryUnit::get(ru);
+    WiredTigerCursor cursor{getWiredTigerCursorParams(wtRu, tableId()), uri(), *wtRu.getSession()};
+    wtRu.assertInActiveTxn();
+    int ret = update(wtRu, *cursor.get(), key, value);
+    return wtRCToStatus(ret, cursor->session);
+}
+
+int WiredTigerStringKeyedContainer::update(WiredTigerRecoveryUnit& ru,
+                                           WT_CURSOR& cursor,
+                                           std::span<const char> key,
+                                           std::span<const char> value) {
+    cursor.set_key(&cursor, WiredTigerItem{key}.get());
+    cursor.set_value(&cursor, WiredTigerItem{value}.get());
+    return WT_OP_CHECK(wiredTigerCursorUpdate(ru, &cursor));
 }
 
 Status WiredTigerStringKeyedContainer::remove(RecoveryUnit& ru, std::span<const char> key) {

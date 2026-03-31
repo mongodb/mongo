@@ -50,6 +50,17 @@ enum class ExistingKeyPolicy {
     reject,
 };
 
+/**
+ * The format for container update oplog entries.
+ */
+enum class UpdateOplogEntryVersion {
+    // Full replacement semantics, currently the only supported oplog format.
+    kFullReplacementV1 = 1,
+
+    // Must be last.
+    kNumVersions
+};
+
 }  // namespace container
 
 /**
@@ -93,6 +104,12 @@ public:
                           int64_t key,
                           std::span<const char> value,
                           container::ExistingKeyPolicy policy) = 0;
+
+    /**
+     * Updates the value at the given key. The key must already exist. Must be in an active storage
+     * transaction.
+     */
+    virtual Status update(RecoveryUnit& ru, int64_t key, std::span<const char> value) = 0;
 
     /**
      * Removes the given key (and its corresponding value) from the container. Must be in an active
@@ -147,6 +164,14 @@ public:
                           std::span<const char> key,
                           std::span<const char> value,
                           container::ExistingKeyPolicy policy) = 0;
+
+    /**
+     * Updates the value at the given key. The key must already exist. Must be in an active storage
+     * transaction.
+     */
+    virtual Status update(RecoveryUnit& ru,
+                          std::span<const char> key,
+                          std::span<const char> value) = 0;
 
     /**
      * Removes the given key (and its corresponding value) from the container. Must be in an active

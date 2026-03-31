@@ -168,6 +168,98 @@ TEST_F(ApplyContainerOpsTest, ContainerOpApplyByteKey) {
     ASSERT_EQ(0, std::memcmp(g3.getValue().get(), v3.data, v3.length));
 }
 
+TEST_F(ApplyContainerOpsTest, ContainerOpUpdateByteKey) {
+    const char k1[] = "K1", k2[] = "K2";
+    auto v1 = BSONBinData("A", 1, BinDataGeneral);
+    auto v2 = BSONBinData("B", 1, BinDataGeneral);
+    auto v1New = BSONBinData("X", 1, BinDataGeneral);
+    auto v2New = BSONBinData("Y", 1, BinDataGeneral);
+
+    auto makeInsert = [&](BSONBinData k, BSONBinData v) {
+        return makeContainerInsertOplogEntry(OpTime(), _bytesIdent, k, v);
+    };
+    auto makeUpdate = [&](BSONBinData k, BSONBinData v) {
+        return makeContainerUpdateOplogEntry(OpTime(), _bytesIdent, k, v);
+    };
+    auto makeGet = [&](auto k) {
+        return _get(_opCtx.get(), _bytesIdent, std::span<const char>(k, strlen(k)));
+    };
+
+    // Insert initial values
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), makeInsert({k1, 2, BinDataGeneral}, v1)));
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), makeInsert({k2, 2, BinDataGeneral}, v2)));
+
+    // Update values
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), makeUpdate({k1, 2, BinDataGeneral}, v1New)));
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), makeUpdate({k2, 2, BinDataGeneral}, v2New)));
+
+    // Read and verify updated values
+    auto g1 = makeGet(k1);
+    auto g2 = makeGet(k2);
+    ASSERT_OK(g1.getStatus());
+    ASSERT_OK(g2.getStatus());
+    ASSERT_EQ(0, std::memcmp(g1.getValue().get(), v1New.data, v1New.length));
+    ASSERT_EQ(0, std::memcmp(g2.getValue().get(), v2New.data, v2New.length));
+}
+
+TEST_F(ApplyContainerOpsTest, ContainerOpUpdateIntKey) {
+    int64_t k1 = 1, k2 = 2;
+    auto v1 = BSONBinData("A", 1, BinDataGeneral);
+    auto v2 = BSONBinData("B", 1, BinDataGeneral);
+    auto v1New = BSONBinData("X", 1, BinDataGeneral);
+    auto v2New = BSONBinData("Y", 1, BinDataGeneral);
+
+    auto makeInsert = [&](int64_t k, BSONBinData v) {
+        return makeContainerInsertOplogEntry(OpTime(), _intIdent, k, v);
+    };
+    auto makeUpdate = [&](int64_t k, BSONBinData v) {
+        return makeContainerUpdateOplogEntry(OpTime(), _intIdent, k, v);
+    };
+    auto makeGet = [&](int64_t k) {
+        return _get(_opCtx.get(), _intIdent, k);
+    };
+
+    // Insert initial values
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), makeInsert(k1, v1)));
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), makeInsert(k2, v2)));
+
+    // Update values
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), makeUpdate(k1, v1New)));
+    ASSERT_OK(applyContainerOpHelper(_opCtx.get(), makeUpdate(k2, v2New)));
+
+    // Read and verify updated values
+    auto g1 = makeGet(k1);
+    auto g2 = makeGet(k2);
+    ASSERT_OK(g1.getStatus());
+    ASSERT_OK(g2.getStatus());
+    ASSERT_EQ(0, std::memcmp(g1.getValue().get(), v1New.data, v1New.length));
+    ASSERT_EQ(0, std::memcmp(g2.getValue().get(), v2New.data, v2New.length));
+}
+
+TEST_F(ApplyContainerOpsTest, ContainerOpUpdateNonexistentKeyFails) {
+    int64_t kInserted = 1;
+    int64_t kMissing = 2;
+    auto v = BSONBinData("A", 1, BinDataGeneral);
+
+    // Insert a key so the container is non-empty.
+    ASSERT_OK(applyContainerOpHelper(
+        _opCtx.get(), makeContainerInsertOplogEntry(OpTime(), _intIdent, kInserted, v)));
+
+    // Updating a different, non-existent key should fail.
+    auto entry = makeContainerUpdateOplogEntry(OpTime(), _intIdent, kMissing, v);
+    auto status = applyContainerOpHelper(_opCtx.get(), entry);
+    ASSERT_EQ(status.code(), ErrorCodes::NoSuchKey);
+}
+
+TEST_F(ApplyContainerOpsTest, ContainerOpUpdateOplogVersion) {
+    // Container update oplog entries should have version 1.
+    int64_t k = 1;
+    auto v = BSONBinData("V", 1, BinDataGeneral);
+    auto entry = makeContainerUpdateOplogEntry(OpTime(), _intIdent, k, v);
+    ASSERT_EQ(entry.getObject()["$v"].safeNumberInt(),
+              static_cast<int64_t>(container::UpdateOplogEntryVersion::kFullReplacementV1));
+}
+
 TEST_F(ApplyContainerOpsTest, ContainerOpApplyIntKey) {
     int64_t k1 = 1, k2 = 2, k3 = 3, k4 = 4;
     auto v1 = BSONBinData("A", 1, BinDataGeneral);
@@ -330,6 +422,57 @@ TEST_F(ApplyContainerOpsTest, ContainerOpsRejectMismatchedExistingCommitTimestam
     ASSERT_THROWS_CODE(applyContainerOpHelper(_opCtx.get(), deleteEntry), DBException, 11348301);
 
     ru->clearCommitTimestamp();
+}
+
+TEST_F(ApplyContainerOpsTest, ParseContainerUpdateFormatFailures) {
+    int64_t k = 1;
+    auto v = BSONBinData("V", 1, BinDataGeneral);
+    auto wrongTypeV = "notBinData";
+    auto version = static_cast<int64_t>(container::UpdateOplogEntryVersion::kFullReplacementV1);
+
+    auto base = [&]() {
+        return makeBaseParams(_nss,
+                              _intIdent,
+                              OpTypeEnum::kContainerUpdate,
+                              BSON("k" << k << "v" << v << "$v" << version));
+    };
+
+    // missing container
+    {
+        auto p = base();
+        p.container = boost::none;
+        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 10704701);
+    }
+    // missing key
+    {
+        auto p = base();
+        p.oField = BSON("v" << v << "$v" << 1);
+        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 10704702);
+    }
+    // missing $v
+    {
+        auto p = base();
+        p.oField = BSON("k" << k << "v" << v);
+        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 12178904);
+    }
+    // $v must be numeric
+    {
+        auto p = base();
+        p.oField = BSON("k" << k << "v" << v << "$v" << "notANumber");
+        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 12178903);
+    }
+    // missing value
+    {
+        auto p = base();
+        p.oField = BSON("k" << k << "$v" << 1);
+        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 12178902);
+    }
+    // value type must be binData
+    {
+        auto p = base();
+        p.oField = BSON("k" << k << "v" << wrongTypeV << "$v" << version);
+        ASSERT_THROWS_CODE(DurableOplogEntry(p), DBException, 12178901);
+    }
 }
 
 TEST_F(ApplyContainerOpsTest, ParseContainerOpFormatFailures) {

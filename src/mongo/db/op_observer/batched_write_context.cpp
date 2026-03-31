@@ -63,12 +63,13 @@ void BatchedWriteContext::addBatchedOperation(OperationContext* opCtx,
     invariant(_batchWrites);
     assertNoMixedBatchedOps(/*isDDL=*/false);
 
-    // Current support is limited to only insert, update, delete, container insert, and container
-    // delete operations. No multi-doc transactions.
+    // Current support is limited to only insert, update, delete, and container operations. No
+    // multi-doc transactions.
     invariant(operation.getOpType() == repl::OpTypeEnum::kDelete ||
               operation.getOpType() == repl::OpTypeEnum::kInsert ||
               operation.getOpType() == repl::OpTypeEnum::kUpdate ||
               operation.getOpType() == repl::OpTypeEnum::kContainerInsert ||
+              operation.getOpType() == repl::OpTypeEnum::kContainerUpdate ||
               operation.getOpType() == repl::OpTypeEnum::kContainerDelete);
     invariant(!opCtx->inMultiDocumentTransaction());
     invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());

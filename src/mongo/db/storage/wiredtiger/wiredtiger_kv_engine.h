@@ -286,6 +286,11 @@ public:
                            IdentKey key,
                            std::span<const char> value) override;
 
+    Status updateInIdent(RecoveryUnit& ru,
+                         StringData ident,
+                         IdentKey key,
+                         std::span<const char> value) override;
+
     StatusWith<UniqueBuffer> getFromIdent(RecoveryUnit& ru,
                                           StringData ident,
                                           IdentKey key) override;

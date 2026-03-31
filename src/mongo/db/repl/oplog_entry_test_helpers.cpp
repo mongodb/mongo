@@ -35,6 +35,7 @@
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
+#include "mongo/db/storage/container.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/unittest/assert.h"
@@ -137,6 +138,38 @@ OplogEntry makeContainerInsertOplogEntry(OpTime opTime,
         .nss = NamespaceString::kContainerNamespace,
         .container = containerIdent,
         .oField = BSON("k" << key << "v" << value),
+        .wallClockTime = Date_t::now(),
+    }}};
+}
+
+OplogEntry makeContainerUpdateOplogEntry(OpTime opTime,
+                                         StringData containerIdent,
+                                         int64_t key,
+                                         BSONBinData value) {
+    return {DurableOplogEntry{DurableOplogEntryParams{
+        .opTime = opTime,
+        .opType = OpTypeEnum::kContainerUpdate,
+        .nss = NamespaceString::kContainerNamespace,
+        .container = containerIdent,
+        .oField = BSON(
+            "k" << key << "v" << value << "$v"
+                << static_cast<int64_t>(container::UpdateOplogEntryVersion::kFullReplacementV1)),
+        .wallClockTime = Date_t::now(),
+    }}};
+}
+
+OplogEntry makeContainerUpdateOplogEntry(OpTime opTime,
+                                         StringData containerIdent,
+                                         BSONBinData key,
+                                         BSONBinData value) {
+    return {DurableOplogEntry{DurableOplogEntryParams{
+        .opTime = opTime,
+        .opType = OpTypeEnum::kContainerUpdate,
+        .nss = NamespaceString::kContainerNamespace,
+        .container = containerIdent,
+        .oField = BSON(
+            "k" << key << "v" << value << "$v"
+                << static_cast<int64_t>(container::UpdateOplogEntryVersion::kFullReplacementV1)),
         .wallClockTime = Date_t::now(),
     }}};
 }

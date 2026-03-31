@@ -250,6 +250,13 @@ public:
         return Status::OK();
     }
 
+    Status updateInIdent(RecoveryUnit& ru,
+                         StringData ident,
+                         IdentKey key,
+                         std::span<const char> value) override {
+        return Status::OK();
+    }
+
     StatusWith<UniqueBuffer> getFromIdent(RecoveryUnit& ru,
                                           StringData ident,
                                           IdentKey key) override {

@@ -499,6 +499,20 @@ DEATH_TEST_REGEX(ChangeStreamEventTransformDeathTest,
 }
 
 DEATH_TEST_REGEX(ChangeStreamEventTransformDeathTest,
+                 TestUnexpectedContainerUpdate,
+                 "Tripwire assertion.*12178900") {
+    // Container update ("cu") oplog type is not supported by the event transformer.
+    auto oplogEntry =
+        repl::makeContainerUpdateOplogEntry(repl::OpTime(Timestamp(10, 10), 1 /* term */),
+                                            "containerIdent"_sd,
+                                            1LL,
+                                            BSONBinData("V", 1, BinDataGeneral));
+
+    // This will tassert in the event transformer, because it does not expect a 'cu' oplog entry.
+    ASSERT_THROWS_CODE(applyTransformation(oplogEntry), AssertionException, 12178900);
+}
+
+DEATH_TEST_REGEX(ChangeStreamEventTransformDeathTest,
                  TestUnexpectedContainerDelete,
                  "Tripwire assertion.*11888301") {
     // Container delete ("cd") oplog type is not supported by the event transformer.

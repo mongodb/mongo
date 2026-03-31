@@ -132,6 +132,7 @@ Status _applyOps(OperationContext* opCtx,
 
                     switch (entry.getOpType()) {
                         case OpTypeEnum::kContainerInsert:
+                        case OpTypeEnum::kContainerUpdate:
                         case OpTypeEnum::kContainerDelete: {
                             if (oplogApplicationMode == OplogApplication::Mode::kApplyOpsCmd) {
                                 uassert(ErrorCodes::InvalidOptions,

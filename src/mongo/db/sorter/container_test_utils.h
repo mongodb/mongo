@@ -110,6 +110,14 @@ public:
         return Status::OK();
     }
 
+    Status update(RecoveryUnit&, int64_t key, std::span<const char> value) override {
+        auto it = std::find_if(_entries.begin(), _entries.end(), [key](const Entry& entry) {
+            return entry.first == key;
+        });
+        it->second = std::string(value.begin(), value.end());
+        return Status::OK();
+    }
+
     Status remove(RecoveryUnit&, int64_t key) override {
         _entries.erase(std::find_if(_entries.begin(), _entries.end(), [key](const Entry& entry) {
             return entry.first == key;

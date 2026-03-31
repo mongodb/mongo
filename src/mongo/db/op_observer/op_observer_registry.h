@@ -307,6 +307,26 @@ public:
         }
     }
 
+    void onContainerUpdate(OperationContext* opCtx,
+                           StringData ident,
+                           int64_t key,
+                           std::span<const char> value) override {
+        ReservedTimes times{opCtx};
+        for (auto&& observer : _observers) {
+            observer->onContainerUpdate(opCtx, ident, key, value);
+        }
+    }
+
+    void onContainerUpdate(OperationContext* opCtx,
+                           StringData ident,
+                           std::span<const char> key,
+                           std::span<const char> value) override {
+        ReservedTimes times{opCtx};
+        for (auto&& observer : _observers) {
+            observer->onContainerUpdate(opCtx, ident, key, value);
+        }
+    }
+
     void onContainerDelete(OperationContext* opCtx, StringData ident, int64_t key) override {
         ReservedTimes times{opCtx};
         for (auto&& observer : _observers) {

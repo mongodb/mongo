@@ -55,6 +55,7 @@ enums:
             kUpdate: "u"
             kDelete: "d"
             kContainerInsert: "ci"
+            kContainerUpdate: "cu"
             kContainerDelete: "cd"
             kNoop: "n"
             kKeyMaterial: "km"

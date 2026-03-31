@@ -537,6 +537,18 @@ public:
                                    std::span<const char> value) = 0;
 
     /**
+     * Updates the value associated with 'key' in the specified 'ident'. The key must already exist.
+     * Must be called from within a storage transaction.
+     *
+     * Returns OK on success, 'NoSuchKey' if the key does not exist, or the error returned by
+     * the underlying storage engine on other failures.
+     */
+    virtual Status updateInIdent(RecoveryUnit& ru,
+                                 StringData ident,
+                                 IdentKey key,
+                                 std::span<const char> value) = 0;
+
+    /**
      * Retrieves the value associated with 'key' from the specified 'ident'.
      *
      * Returns a 'UniqueBuffer' containing the value on success, 'KeyNotFound' if the key does not

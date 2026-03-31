@@ -2945,6 +2945,15 @@ Status applyContainerOperation(OperationContext* opCtx,
             });
             break;
         }
+        case repl::OpTypeEnum::kContainerUpdate: {
+            int vlen = 0;
+            const char* v = o["v"].binData(vlen);
+            const std::span<const char> val{v, static_cast<size_t>(vlen)};
+            s = withKey(k, [&](auto key) {
+                return storage_engine_direct_crud::update(*engine, *ru, *ident, key, val);
+            });
+            break;
+        }
         case repl::OpTypeEnum::kContainerDelete: {
             s = withKey(k, [&](auto key) {
                 return storage_engine_direct_crud::remove(*engine, *ru, *ident, key);

@@ -78,6 +78,7 @@
 #include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/storage/container.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -1303,8 +1304,10 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
 
 namespace {
 
-BSONObj buildContainerOpObject(std::variant<int64_t, std::span<const char>> key,
-                               boost::optional<std::span<const char>> value = boost::none) {
+BSONObj buildContainerOpObject(
+    std::variant<int64_t, std::span<const char>> key,
+    boost::optional<std::span<const char>> value = boost::none,
+    boost::optional<container::UpdateOplogEntryVersion> version = boost::none) {
     BSONObjBuilder builder;
     std::visit(OverloadedVisitor{[&builder](int64_t key) { builder.append("k", key); },
                                  [&builder](std::span<const char> key) {
@@ -1314,6 +1317,9 @@ BSONObj buildContainerOpObject(std::variant<int64_t, std::span<const char>> key,
                key);
     if (value) {
         builder.appendBinData("v", value->size(), BinDataType::BinDataGeneral, value->data());
+    }
+    if (version) {
+        builder.append("$v", static_cast<int64_t>(*version));
     }
     return builder.obj();
 }
@@ -1384,7 +1390,7 @@ void _onContainerInsert(OperationContext* opCtx,
     SessionTxnRecord sessionTxnRecord;
     sessionTxnRecord.setLastWriteOpTime(opTime.writeOpTime);
     sessionTxnRecord.setLastWriteDate(opTime.wallClockTime);
-    // We don't have any StmtId's so we don't need to call onWriteOpCompleted().
+    onWriteOpCompleted(opCtx, {kUninitializedStmtId}, sessionTxnRecord, ns);
 }
 
 OpTimeBundle logContainerDelete(OperationContext* opCtx,
@@ -1451,7 +1457,78 @@ void _onContainerDelete(OperationContext* opCtx,
     SessionTxnRecord sessionTxnRecord;
     sessionTxnRecord.setLastWriteOpTime(opTime.writeOpTime);
     sessionTxnRecord.setLastWriteDate(opTime.wallClockTime);
-    // We don't have any StmtId's so we don't need to call onWriteOpCompleted().
+    onWriteOpCompleted(opCtx, {kUninitializedStmtId}, sessionTxnRecord, ns);
+}
+
+OpTimeBundle logContainerUpdate(OperationContext* opCtx,
+                                StringData container,
+                                std::variant<int64_t, std::span<const char>> key,
+                                std::span<const char> value,
+                                OperationLogger& logger) {
+    const auto& ns = NamespaceString::kContainerNamespace;
+    MutableOplogEntry entry;
+    entry.setTid(ns.tenantId());
+    entry.setNss(ns);
+    entry.setContainer(container);
+    entry.setOpType(repl::OpTypeEnum::kContainerUpdate);
+    entry.setObject(
+        buildContainerOpObject(key, value, container::UpdateOplogEntryVersion::kFullReplacementV1));
+
+    OpTimeBundle opTime;
+    opTime.writeOpTime = logOperation(opCtx, &entry, true /*assignCommonFields*/, &logger);
+    opTime.wallClockTime = entry.getWallClockTime();
+
+    return opTime;
+}
+
+void _onContainerUpdate(OperationContext* opCtx,
+                        StringData ident,
+                        std::variant<int64_t, std::span<const char>> key,
+                        std::span<const char> value,
+                        OperationLogger& logger) {
+    const auto& ns = NamespaceString::kContainerNamespace;
+    auto oplogDisabled = repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns);
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    auto inMultiDocumentTransaction =
+        txnParticipant && !oplogDisabled && txnParticipant.transactionIsOpen();
+    auto inBatchedWrite = BatchedWriteContext::get(opCtx).writesAreBatched();
+
+    auto makeOp = [&] {
+        repl::ReplOperation op;
+        op.setOpType(repl::OpTypeEnum::kContainerUpdate);
+        op.setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
+        op.setTid(ns.tenantId());
+        op.setNss(ns);
+        op.setContainer(ident);
+        op.setObject(buildContainerOpObject(
+            key, value, container::UpdateOplogEntryVersion::kFullReplacementV1));
+        return op;
+    };
+
+    if (inBatchedWrite) {
+        BatchedWriteContext::get(opCtx).addBatchedOperation(opCtx, makeOp());
+        return;
+    }
+
+    if (inMultiDocumentTransaction) {
+        txnParticipant.addTransactionOperation(opCtx, makeOp());
+        return;
+    }
+
+    if (_skipOplogOps(oplogDisabled,
+                      inBatchedWrite,
+                      inMultiDocumentTransaction,
+                      ns,
+                      {kUninitializedStmtId})) {
+        return;
+    }
+
+    auto opTime = logContainerUpdate(opCtx, ident, key, value, logger);
+
+    SessionTxnRecord sessionTxnRecord;
+    sessionTxnRecord.setLastWriteOpTime(opTime.writeOpTime);
+    sessionTxnRecord.setLastWriteDate(opTime.wallClockTime);
+    onWriteOpCompleted(opCtx, {kUninitializedStmtId}, sessionTxnRecord, ns);
 }
 
 }  // namespace
@@ -1468,6 +1545,20 @@ void OpObserverImpl::onContainerInsert(OperationContext* opCtx,
                                        std::span<const char> key,
                                        std::span<const char> value) {
     _onContainerInsert(opCtx, ident, key, value, *_operationLogger);
+}
+
+void OpObserverImpl::onContainerUpdate(OperationContext* opCtx,
+                                       StringData ident,
+                                       int64_t key,
+                                       std::span<const char> value) {
+    _onContainerUpdate(opCtx, ident, key, value, *_operationLogger);
+}
+
+void OpObserverImpl::onContainerUpdate(OperationContext* opCtx,
+                                       StringData ident,
+                                       std::span<const char> key,
+                                       std::span<const char> value) {
+    _onContainerUpdate(opCtx, ident, key, value, *_operationLogger);
 }
 
 void OpObserverImpl::onContainerDelete(OperationContext* opCtx, StringData ident, int64_t key) {
@@ -2200,6 +2291,7 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
                 [[fallthrough]];
             }
             case repl::OpTypeEnum::kContainerDelete:
+            case repl::OpTypeEnum::kContainerUpdate:
             case repl::OpTypeEnum::kContainerInsert: {
                 auto opTime = logOperation(
                     opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());

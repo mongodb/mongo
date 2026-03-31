@@ -146,6 +146,16 @@ public:
                            std::span<const char> key,
                            std::span<const char> value) final;
 
+    void onContainerUpdate(OperationContext* opCtx,
+                           StringData ident,
+                           int64_t key,
+                           std::span<const char> value) final;
+
+    void onContainerUpdate(OperationContext* opCtx,
+                           StringData ident,
+                           std::span<const char> key,
+                           std::span<const char> value) final;
+
     void onContainerDelete(OperationContext* opCtx, StringData ident, int64_t key) final;
 
     void onContainerDelete(OperationContext* opCtx,

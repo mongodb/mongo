@@ -86,6 +86,13 @@ public:
                int64_t key,
                std::span<const char> value);
 
+    Status update(RecoveryUnit& ru, int64_t key, std::span<const char> value) final;
+
+    int update(WiredTigerRecoveryUnit& ru,
+               WT_CURSOR& cursor,
+               int64_t key,
+               std::span<const char> value);
+
     Status remove(RecoveryUnit& ru, int64_t key) final;
 
     int remove(WiredTigerRecoveryUnit& ru, WT_CURSOR& cursor, int64_t key);
@@ -116,6 +123,13 @@ public:
                   container::ExistingKeyPolicy policy) final;
 
     int insert(WiredTigerRecoveryUnit& ru,
+               WT_CURSOR& cursor,
+               std::span<const char> key,
+               std::span<const char> value);
+
+    Status update(RecoveryUnit& ru, std::span<const char> key, std::span<const char> value) final;
+
+    int update(WiredTigerRecoveryUnit& ru,
                WT_CURSOR& cursor,
                std::span<const char> key,
                std::span<const char> value);

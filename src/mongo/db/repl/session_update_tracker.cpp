@@ -237,6 +237,7 @@ std::vector<OplogEntry> SessionUpdateTracker::_flush(const OplogEntry& entry) {
     switch (entry.getOpType()) {
         case OpTypeEnum::kInsert:
         case OpTypeEnum::kContainerInsert:
+        case OpTypeEnum::kContainerUpdate:
         case OpTypeEnum::kContainerDelete:
         case OpTypeEnum::kNoop:
         case OpTypeEnum::kKeyMaterial:

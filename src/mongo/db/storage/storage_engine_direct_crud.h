@@ -57,6 +57,20 @@ Status insert(StorageEngine& engine,
               int64_t key,
               std::span<const char> value);
 
+// This function has the same behavior as KVEngine::updateInIdent()
+Status update(StorageEngine& engine,
+              RecoveryUnit& ru,
+              StringData ident,
+              std::span<const char> key,
+              std::span<const char> value);
+
+// This function has the same behavior as KVEngine::updateInIdent()
+Status update(StorageEngine& engine,
+              RecoveryUnit& ru,
+              StringData ident,
+              int64_t key,
+              std::span<const char> value);
+
 // This function has the same behavior as KVEngine::getFromIdent()
 StatusWith<UniqueBuffer> get(StorageEngine& engine,
                              RecoveryUnit& ru,

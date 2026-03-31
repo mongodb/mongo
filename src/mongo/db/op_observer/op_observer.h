@@ -309,6 +309,16 @@ public:
                                    std::span<const char> key,
                                    std::span<const char> value) = 0;
 
+    virtual void onContainerUpdate(OperationContext* opCtx,
+                                   StringData ident,
+                                   int64_t key,
+                                   std::span<const char> value) = 0;
+
+    virtual void onContainerUpdate(OperationContext* opCtx,
+                                   StringData ident,
+                                   std::span<const char> key,
+                                   std::span<const char> value) = 0;
+
     virtual void onContainerDelete(OperationContext* opCtx, StringData ident, int64_t key) = 0;
 
     virtual void onContainerDelete(OperationContext* opCtx,

@@ -118,6 +118,16 @@ public:
                            std::span<const char> key,
                            std::span<const char> value) override {}
 
+    void onContainerUpdate(OperationContext* opCtx,
+                           StringData ident,
+                           int64_t key,
+                           std::span<const char> value) override {}
+
+    void onContainerUpdate(OperationContext* opCtx,
+                           StringData ident,
+                           std::span<const char> key,
+                           std::span<const char> value) override {}
+
     void onContainerDelete(OperationContext* opCtx, StringData ident, int64_t key) override {}
 
     void onContainerDelete(OperationContext* opCtx,

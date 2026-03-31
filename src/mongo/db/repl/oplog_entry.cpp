@@ -362,6 +362,25 @@ DurableOplogEntry::DurableOplogEntry(BSONObj rawInput) : _raw(std::move(rawInput
                         vBSON.type() == BSONType::binData);
                 break;
             }
+            case OpTypeEnum::kContainerUpdate: {
+                const BSONElement updateVersion = o["$v"];
+                uassert(12178904,
+                        str::stream() << "missing $v element for update: " << redact(o),
+                        updateVersion);
+                uassert(12178903,
+                        str::stream()
+                            << "$v must be numeric, got " << typeName(updateVersion.type()),
+                        updateVersion.isNumber());
+                const BSONElement vBSON = o["v"];
+                uassert(12178902,
+                        str::stream() << "missing value element for update: " << redact(o),
+                        vBSON);
+                uassert(12178901,
+                        str::stream()
+                            << "value must be type binData, got " << typeName(vBSON.type()),
+                        vBSON.type() == BSONType::binData);
+                break;
+            }
             case OpTypeEnum::kContainerDelete: {
                 uassert(10704704,
                         str::stream() << "delete should not contain value: " << redact(o),
@@ -433,6 +452,7 @@ bool DurableOplogEntry::isCrudOpType(OpTypeEnum opType) {
         case OpTypeEnum::kUpdate:
             return true;
         case OpTypeEnum::kContainerInsert:
+        case OpTypeEnum::kContainerUpdate:
         case OpTypeEnum::kContainerDelete:
         case OpTypeEnum::kCommand:
         case OpTypeEnum::kNoop:
@@ -459,6 +479,7 @@ bool DurableOplogEntry::isUpdateOrDelete() const {
         case OpTypeEnum::kInsert:
         case OpTypeEnum::kCommand:
         case OpTypeEnum::kContainerInsert:
+        case OpTypeEnum::kContainerUpdate:
         case OpTypeEnum::kContainerDelete:
         case OpTypeEnum::kNoop:
         case OpTypeEnum::kKeyMaterial:
@@ -468,7 +489,8 @@ bool DurableOplogEntry::isUpdateOrDelete() const {
 }
 
 bool DurableOplogEntry::isContainerOpType(OpTypeEnum opType) {
-    return opType == OpTypeEnum::kContainerInsert || opType == OpTypeEnum::kContainerDelete;
+    return opType == OpTypeEnum::kContainerInsert || opType == OpTypeEnum::kContainerUpdate ||
+        opType == OpTypeEnum::kContainerDelete;
 }
 
 bool DurableOplogEntry::shouldPrepare() const {

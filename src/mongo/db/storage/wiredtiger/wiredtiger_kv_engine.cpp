@@ -516,6 +516,30 @@ Status WiredTigerKVEngineBase::insertIntoIdent(RecoveryUnit& ru,
     return wtRCToStatus(rc, cursor->session);
 }
 
+Status WiredTigerKVEngineBase::updateInIdent(RecoveryUnit& ru,
+                                             StringData ident,
+                                             std::variant<std::span<const char>, int64_t> key,
+                                             std::span<const char> value) {
+    invariant(ru.inUnitOfWork());
+    auto& wtRu = WiredTigerRecoveryUnit::get(ru);
+
+    // TODO (SERVER-109454): `genTableId()` may be replaced with different cache logic.
+    WiredTigerCursor cursor{getWiredTigerCursorParams(wtRu, WiredTigerUtil::genTableId()),
+                            WiredTigerUtil::buildTableUri(ident),
+                            *wtRu.getSession()};
+    wtRu.assertInActiveTxn();
+    WT_CURSOR* c = cursor.get();
+
+    setKeyOnCursor(c, key);
+
+    c->set_value(c, WiredTigerItem{value}.get());
+
+    int rc = WT_OP_CHECK(wiredTigerCursorUpdate(wtRu, c));
+    if (rc == WT_NOTFOUND)
+        return Status(ErrorCodes::NoSuchKey, "No such key exists in ident");
+    return wtRCToStatus(rc, cursor->session);
+}
+
 StatusWith<UniqueBuffer> WiredTigerKVEngineBase::getFromIdent(
     RecoveryUnit& ru, StringData ident, std::variant<std::span<const char>, int64_t> key) {
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);

@@ -86,6 +86,48 @@ Status insert(OperationContext* opCtx,
     return Status::OK();
 }
 
+Status update(OperationContext* opCtx,
+              RecoveryUnit& ru,
+              IntegerKeyedContainer& container,
+              int64_t key,
+              std::span<const char> value) {
+    uassert(ErrorCodes::NotWritablePrimary,
+            "Not primary while updating container",
+            repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(
+                opCtx, NamespaceString::kContainerNamespace));
+
+    auto status = container.update(ru, key, value);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    opCtx->getServiceContext()->getOpObserver()->onContainerUpdate(
+        opCtx, container.ident()->getIdent(), key, value);
+
+    return Status::OK();
+}
+
+Status update(OperationContext* opCtx,
+              RecoveryUnit& ru,
+              StringKeyedContainer& container,
+              std::span<const char> key,
+              std::span<const char> value) {
+    uassert(ErrorCodes::NotWritablePrimary,
+            "Not primary while updating container",
+            repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(
+                opCtx, NamespaceString::kContainerNamespace));
+
+    auto status = container.update(ru, key, value);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    opCtx->getServiceContext()->getOpObserver()->onContainerUpdate(
+        opCtx, container.ident()->getIdent(), key, value);
+
+    return Status::OK();
+}
+
 Status remove(OperationContext* opCtx,
               RecoveryUnit& ru,
               IntegerKeyedContainer& container,

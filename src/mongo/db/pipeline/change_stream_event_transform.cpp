@@ -616,6 +616,11 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
             // should have been filtered out by the change stream's oplog match filter already.
             tasserted(11888300, "Change stream encountered unexpected 'ci' oplog entry");
         }
+        case repl::OpTypeEnum::kContainerUpdate: {
+            // Container update ('cu') oplog entries should not show up in change streams. They
+            // should have been filtered out by the change stream's oplog match filter already.
+            tasserted(12178900, "Change stream encountered unexpected 'cu' oplog entry");
+        }
         case repl::OpTypeEnum::kContainerDelete: {
             // Container delete ('cd') oplog entries should not show up in change streams. They
             // should have been filtered out by the change stream's oplog match filter already.
@@ -633,7 +638,7 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
             // simply adjust the number of expected oplog entry types below. If the new oplog entry
             // type needs to be handled in change streams, add it to the code below and also to the
             // change stream oplog match filter.
-            constexpr size_t kExpectedOplogEntryTypes = 8;
+            constexpr size_t kExpectedOplogEntryTypes = 9;
             static_assert(
                 idlEnumCount<repl::OpTypeEnum> == kExpectedOplogEntryTypes,
                 "unexpected number of oplog entry types - when adding a new oplog entry type, "

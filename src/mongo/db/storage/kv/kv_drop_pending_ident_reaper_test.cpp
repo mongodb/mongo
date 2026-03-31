@@ -257,6 +257,13 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    Status updateInIdent(RecoveryUnit& ru,
+                         StringData ident,
+                         IdentKey key,
+                         std::span<const char> value) override {
+        MONGO_UNREACHABLE;
+    }
+
     StatusWith<UniqueBuffer> getFromIdent(RecoveryUnit& ru,
                                           StringData ident,
                                           IdentKey key) override {
