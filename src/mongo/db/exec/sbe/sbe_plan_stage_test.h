@@ -137,10 +137,7 @@ inline std::vector<std::unique_ptr<HashAggAccumulator>> makeHashAggAccumulatorLi
  */
 class PlanStageTestFixture : public CatalogTestFixture {
 public:
-    // SBE plan stages such as HashAgg and Sort may spill to disk, requiring the spill WiredTiger
-    // instance.
-    PlanStageTestFixture(bool enableYield = true)
-        : CatalogTestFixture(Options{}.enableSpillEngine()), _enableYield(enableYield) {};
+    PlanStageTestFixture(bool enableYield = true) : _enableYield(enableYield) {};
 
     void setUp() override {
         CatalogTestFixture::setUp();

@@ -120,9 +120,6 @@ void assertPlacementsEqual(const HistoricalPlacement& expected, const Historical
 
 class GetHistoricalPlacementTestFixture : public ConfigServerTestFixture {
 public:
-    // Placement history queries use aggregation pipelines that may spill to disk.
-    GetHistoricalPlacementTestFixture() : ConfigServerTestFixture(Options{}.enableSpillEngine()) {}
-
     struct PlacementDescriptor {
         PlacementDescriptor(Timestamp timestamp, std::string ns, std::vector<std::string> shardsIds)
             : timestamp(std::move(timestamp)), ns(std::move(ns)), shardsIds(std::move(shardsIds)) {}

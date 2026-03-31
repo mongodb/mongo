@@ -54,15 +54,13 @@ using namespace test;
 using GraphLookUpTest = AggregationContextFixture;
 
 /**
- * Fixture for testing $graphLookup spilling behavior. Enables the spill WiredTiger instance
- * since $graphLookup spills its visited set to disk when memory limits are exceeded.
+ * This fixture also provides storage engine for spilling.
  */
 class DocumentSourceGraphLookUpSpillingTest : public GraphLookUpTest {
 public:
     DocumentSourceGraphLookUpSpillingTest()
         : AggregationContextFixture(std::make_unique<MongoDScopedGlobalServiceContextForTest>(
-              MongoDScopedGlobalServiceContextForTest::Options{}.enableSpillEngine(),
-              shouldSetupTL)) {}
+              MongoDScopedGlobalServiceContextForTest::Options{}, shouldSetupTL)) {}
 };
 
 //

@@ -94,11 +94,8 @@ bool SpillWiredTigerServerStatusSection::includeByDefault() const {
  */
 BSONObj SpillWiredTigerServerStatusSection::generateSection(
     OperationContext* opCtx, const BSONElement& configElement) const {
-    auto* spillKV = opCtx->getServiceContext()->getStorageEngine()->getSpillEngine();
-    if (!spillKV) {
-        return BSONObj();
-    }
-    SpillWiredTigerKVEngine* engine = checked_cast<SpillWiredTigerKVEngine*>(spillKV);
+    SpillWiredTigerKVEngine* engine = checked_cast<SpillWiredTigerKVEngine*>(
+        opCtx->getServiceContext()->getStorageEngine()->getSpillEngine());
     BSONObjBuilder bob;
 
     bob.append("storageSize", [engine] {

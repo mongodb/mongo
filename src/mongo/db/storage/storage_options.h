@@ -148,22 +148,6 @@ struct StorageGlobalParams {
     // Test-only option. Disables table logging.
     bool forceDisableTableLogging = false;
 
-    // Test-only flag which disables the spill WiredTiger instance.
-    //
-    // In unit tests, each test spins up and tears down its own WiredTiger instance (main + spill),
-    // so WiredTiger is initialized and destroyed thousands of times across a test run, often with
-    // concurrent initializations on the same machine. This creates contention on OS/disk resources
-    // that does not exist in production, where a mongod opens its main and spill WiredTiger
-    // instances exactly once at startup and keeps them alive for the lifetime of the process (days
-    // or months). The brief contention during that single initialization is a non-issue.
-    //
-    // An in-memory storage engine for the spill engine was considered to avoid this overhead, but
-    // ruled out because spilling inherently requires disk.
-    //
-    // Tests that exercise spill-to-disk behavior must opt in explicitly (e.g. via
-    // Options{}.enableSpillEngine()).
-    bool disableSpillEngine = false;
-
 private:
     void _reset();
 };

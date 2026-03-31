@@ -107,15 +107,6 @@ public:
             return std::move(*this);
         }
 
-        // The spill engine is disabled by default to avoid contention from opening the spill
-        // WiredTiger instance during concurrent unit test runs. Tests that exercise spilling
-        // behavior (e.g., hash aggregation, graph lookup, window functions) must call this
-        // method to opt in.
-        Options enableSpillEngine() {
-            _disableSpillEngine = false;
-            return std::move(*this);
-        }
-
         Options useIndexBuildsCoordinator(
             std::unique_ptr<IndexBuildsCoordinator> indexBuildsCoordinator) {
             _indexBuildsCoordinator = std::move(indexBuildsCoordinator);
@@ -172,7 +163,6 @@ public:
         std::unique_ptr<JournalListener> _journalListener;
         std::unique_ptr<IndexBuildsCoordinator> _indexBuildsCoordinator;
         bool _forceDisableTableLogging = false;
-        bool _disableSpillEngine = true;
         bool _createShardingState = true;
         std::vector<std::unique_ptr<ServiceContext::ClientObserver>> _clientObservers;
         std::vector<RAIIServerParameterControllerForTest> _parameters;

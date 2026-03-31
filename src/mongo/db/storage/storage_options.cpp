@@ -73,7 +73,6 @@ void StorageGlobalParams::_reset() {
     oplogMinRetentionInitializedUsingDefault = true;
     allowOplogTruncation = true;
     forceDisableTableLogging = false;
-    disableSpillEngine = false;
 }
 
 boost::filesystem::path StorageGlobalParams::getSpillDbPath() const {
