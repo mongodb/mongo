@@ -1,7 +1,12 @@
 // Helper functions for testing time-series collections.
 
 import {documentEq} from "jstests/aggregation/extras/utils.js";
-import {isShardedTimeseries, runTimeseriesChunkCommand} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {
+    getTimeseriesCollForDDLOps,
+    isShardedTimeseries,
+    isViewlessTimeseriesOnlySuite,
+    runTimeseriesChunkCommand,
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {isStableFCVSuite} from "jstests/libs/feature_compatibility_version.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
@@ -248,51 +253,88 @@ export var TimeseriesTest = class {
         testFn(insert(false));
     }
 
+    /**
+     * Ensures the given collection is distributed on multiple shards by calling moveRange on @coll with @splitPointDate
+     * @param {*} coll The collection to distribute
+     * @param {*} splitPointDate The splitpoint to use to split the data
+     */
     static ensureDataIsDistributedIfSharded(coll, splitPointDate) {
+        if (!isShardedTimeseries(coll)) {
+            return;
+        }
+
         const db = coll.getDB();
-        if (isShardedTimeseries(coll)) {
-            const timeFieldName = db.getCollectionInfos({name: coll.getName()})[0].options.timeseries.timeField;
-
-            const splitPoint = {[`control.min.${timeFieldName}`]: splitPointDate};
-            assert.commandWorked(runTimeseriesChunkCommand(db, {split: coll.getFullName(), middle: splitPoint}));
-
-            const allShards = db
-                .getSiblingDB("config")
-                .shards.find()
-                .sort({_id: 1})
-                .toArray()
-                .map((doc) => doc._id);
-            const currentShards = coll
-                .aggregate([{"$collStats": {storageStats: {}}}, {$project: {shard: 1}}, {$sort: {shard: 1}}])
-                .toArray()
-                .map((doc) => doc.shard);
-
-            if (!documentEq(allShards, currentShards)) {
-                let otherShard;
-                for (let i in allShards) {
-                    if (!currentShards.includes(allShards[i])) {
-                        otherShard = allShards[i];
-                        break;
-                    }
-                }
-                assert(otherShard);
-
-                assert.commandWorked(
-                    runTimeseriesChunkCommand(db, {
-                        movechunk: coll.getFullName(),
-                        find: splitPoint,
-                        to: otherShard,
-                        _waitForDelete: true,
-                    }),
-                );
-
-                const updatedShards = coll
+        const getDataBearingShards = () => {
+            // TODO SERVER-120014: Remove once 9.0 becomes last LTS and all timeseries collections are viewless.
+            if (!isViewlessTimeseriesOnlySuite(db)) {
+                return coll
                     .aggregate([{"$collStats": {storageStats: {}}}, {$project: {shard: 1}}, {$sort: {shard: 1}}])
                     .toArray()
                     .map((doc) => doc.shard);
+            }
+
+            const shardedDataDistribution = db
+                .getSiblingDB("admin")
+                .aggregate([{$shardedDataDistribution: {}}, {$match: {ns: coll.getFullName()}}])
+                .toArray();
+
+            assert.eq(shardedDataDistribution.length, 1);
+            return shardedDataDistribution[0].shards.map((shard) => shard.shardName);
+        };
+
+        assert.soon(() => {
+            const allShards = db.adminCommand({listShards: 1}).shards.map((shard) => shard._id);
+            const currentShards = getDataBearingShards();
+
+            if (documentEq(allShards, currentShards)) {
+                return true;
+            }
+
+            const otherShard = (() => {
+                for (let i in allShards) {
+                    if (!currentShards.includes(allShards[i])) {
+                        return allShards[i];
+                    }
+                }
+                return undefined;
+            })();
+            if (!otherShard) {
+                return false;
+            }
+
+            const timeFieldName = `control.min.${db.getCollectionInfos({name: coll.getName()})[0].options.timeseries.timeField}`;
+            try {
+                assert.commandWorked(
+                    runTimeseriesChunkCommand(db, {
+                        moveRange: coll.getFullName(),
+                        min: {[timeFieldName]: splitPointDate},
+                        max: {[timeFieldName]: MaxKey},
+                        toShard: otherShard,
+                        waitForDelete: true,
+                    }),
+                );
+            } catch (error) {
+                const acceptedErrors = [
+                    // If there is an active chunk moving operation, this move range will fail
+                    ErrorCodes.ConflictingOperationInProgress,
+                ];
+                if (TestData.shardsAddedRemoved) {
+                    // If this is a suite that adds and removes shards, it's acceptable to have a shard not found as we might had removed the target given shard already
+                    acceptedErrors.push(ErrorCodes.ShardNotFound);
+                    // If this is a suite that adds and removes shards, it's acceptable to have an operation failed as we might selected a target shard that is actively draining (preparing for remove)
+                    acceptedErrors.push(ErrorCodes.OperationFailed);
+                }
+                assert.commandFailedWithCode(error, acceptedErrors);
+                return false;
+            }
+
+            if (!TestData.runningWithBalancer) {
+                const updatedShards = getDataBearingShards();
                 assert.eq(updatedShards.length, currentShards.length + 1);
             }
-        }
+
+            return true;
+        });
     }
 
     static assertInsertWorked(res) {
