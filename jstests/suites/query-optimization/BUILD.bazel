@@ -2,16 +2,10 @@ load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
 
 resmoke_suite_test(
     name = "aggregation_disabled_optimization",
-    srcs = ["//jstests/aggregation:all_subpackage_javascript_files"],
     config = "//buildscripts/resmokeconfig:suites/aggregation_disabled_optimization.yml",
     data = [
         "//jstests/with_mongot/e2e_lib",
     ],
-    exclude_files = [
-        "//jstests/aggregation/data:all_javascript_files",
-        "//jstests/aggregation/extras:all_javascript_files",
-    ],
-    exclude_with_any_tags = ["requires_pipeline_optimization"],
     shard_count = 4,
     tags = [
         "aggregation",

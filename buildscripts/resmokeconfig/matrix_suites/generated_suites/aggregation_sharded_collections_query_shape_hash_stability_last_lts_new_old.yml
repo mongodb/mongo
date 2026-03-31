@@ -43,8 +43,8 @@ executor:
 matrix_suite: true
 selector:
   exclude_files:
-    - jstests/aggregation/data/*.js
     - jstests/aggregation/extras/*.js
+    - jstests/aggregation/data/*.js
     - jstests/aggregation/sources/geonear/geonear_hint.js
     - jstests/aggregation/sources/lookup/lookup_query_stats.js
     - jstests/aggregation/sources/unionWith/unionWith_query_stats.js

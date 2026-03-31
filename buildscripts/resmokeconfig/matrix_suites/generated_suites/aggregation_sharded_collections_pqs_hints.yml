@@ -29,19 +29,12 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
-        internalQueryStatsWriteCmdSampleRate: 1
     mongos_options:
       set_parameters:
         enableTestCommands: 1
-        internalQueryStatsErrorsAreCommandFatal: true
-        internalQueryStatsRateLimit: -1
-        internalQueryStatsWriteCmdSampleRate: 1
     num_mongos: 3
     num_shards: 2
   hooks:
-    - class: RunQueryStats
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
     - class: ValidateCollections
@@ -51,15 +44,15 @@ executor:
 matrix_suite: true
 selector:
   exclude_files:
-    - jstests/aggregation/data/*.js
     - jstests/aggregation/extras/*.js
+    - jstests/aggregation/data/*.js
     - jstests/aggregation/exec/spill_to_disk.js
     - jstests/aggregation/optimization/match_swapping_renamed_fields.js
-    - jstests/aggregation/optimization/use_query_sort.js
     - jstests/aggregation/optimization/use_query_project_and_sort.js
     - jstests/aggregation/optimization/use_query_projection.js
-    - jstests/aggregation/sources/graphLookup/variables.js
+    - jstests/aggregation/optimization/use_query_sort.js
     - jstests/aggregation/sources/group/groupMissing.js
+    - jstests/aggregation/sources/graphLookup/variables.js
     - jstests/aggregation/accumulators/accumulator_js_size_limits.js
     - jstests/aggregation/exec/query_limits_test.js
     - jstests/aggregation/sources/geonear/geonear_hint.js

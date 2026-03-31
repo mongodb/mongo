@@ -2,14 +2,9 @@ load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
 
 resmoke_suite_test(
     name = "aggregation",
-    srcs = ["//jstests/aggregation:all_subpackage_javascript_files"],
     config = "//buildscripts/resmokeconfig:suites/aggregation.yml",
     data = [
         "//jstests/with_mongot/e2e_lib",
-    ],
-    exclude_files = [
-        "//jstests/aggregation/data:all_javascript_files",
-        "//jstests/aggregation/extras:all_javascript_files",
     ],
     shard_count = 4,
     tags = [
@@ -25,15 +20,10 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "aggregation_auth",
-    srcs = ["//jstests/aggregation:all_subpackage_javascript_files"],
     config = "//buildscripts/resmokeconfig:suites/aggregation_auth.yml",
     data = [
         "//jstests/libs:authTestsKey",
         "//jstests/with_mongot/e2e_lib",
-    ],
-    exclude_files = [
-        "//jstests/aggregation/extras:all_javascript_files",
-        "//jstests/aggregation/data:all_javascript_files",
     ],
     shard_count = 4,
     tags = [
@@ -55,32 +45,9 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "aggregation_read_concern_majority_passthrough",
-    srcs = ["//jstests/aggregation:all_subpackage_javascript_files"],
     config = "//buildscripts/resmokeconfig:suites/aggregation_read_concern_majority_passthrough.yml",
     data = [
         "//jstests/with_mongot/e2e_lib",
-    ],
-    exclude_files = [
-        "//jstests/aggregation/data:all_javascript_files",
-        "//jstests/aggregation/extras:all_javascript_files",
-
-        # This test fails due to the inability to specify a writeConcern when secondaryThrottle is not
-        # set as part of the moveChunk command.
-        "//jstests/aggregation/sources/facet:use_cases.js",
-
-        # This test specifies a $out stage not as the last stage in the aggregation pipeline, causing a
-        # non-local readConcern to erroneously be sent with the command.
-        "//jstests/aggregation/sources/out:required_last_position.js",
-    ],
-    exclude_with_any_tags = [
-        # The next two tags correspond to the special errors thrown by the
-        # set_read_and_write_concerns.js override when it refuses to replace the readConcern or
-        # writeConcern of a particular command. Above each tag are the message(s) that cause the tag to be
-        # warranted.
-        # "Cowardly refusing to override read concern of command: ..."
-        "assumes_read_concern_unchanged",
-        # "Cowardly refusing to override write concern of command: ..."
-        "assumes_write_concern_unchanged",
     ],
     shard_count = 8,
     tags = [
@@ -101,42 +68,9 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "aggregation_sharded_collections_passthrough",
-    srcs = ["//jstests/aggregation:all_subpackage_javascript_files"],
     config = "//buildscripts/resmokeconfig:suites/aggregation_sharded_collections_passthrough.yml",
     data = [
         "//jstests/with_mongot/e2e_lib",
-    ],
-    exclude_files = [
-        "//jstests/aggregation/data:all_javascript_files",
-        "//jstests/aggregation/extras:all_javascript_files",
-
-        # This test makes assertions about whether aggregations will need to spill to disk, which assumes
-        # all the data is located on a single shard.
-        "//jstests/aggregation/exec:spill_to_disk.js",
-
-        # TODO SERVER-32311: These tests use getAggPlanStage(), which can't handle sharded explain output.
-        "//jstests/aggregation/optimization:match_swapping_renamed_fields.js",
-        "//jstests/aggregation/optimization:use_query_sort.js",
-        "//jstests/aggregation/optimization:use_query_project_and_sort.js",
-        "//jstests/aggregation/optimization:use_query_projection.js",
-
-        # TODO: Remove when SERVER-23229 is fixed.
-        "//jstests/aggregation/sources/graphLookup:variables.js",
-        "//jstests/aggregation/sources/group:groupMissing.js",
-    ],
-    exclude_with_any_tags = [
-        # This passthrough implicitly shards the accessed collections. Do not run tests where collections
-        # can't be created on `getCollection` call.
-        "assumes_no_implicit_collection_creation_on_get_collection",
-
-        # Tests tagged with the following will fail because they assume collections are not sharded.
-        "assumes_against_mongod_not_mongos",
-        "assumes_no_implicit_collection_creation_after_drop",
-        "assumes_no_implicit_index_creation",
-        "assumes_unsharded_collection",
-        "cannot_create_unique_index_when_using_hashed_shard_key",
-        "requires_sharding",
-        "requires_profiling",
     ],
     shard_count = 8,
     tags = [

@@ -32,9 +32,9 @@ executor:
 matrix_suite: true
 selector:
   exclude_files:
+    - jstests/core/txns/**/*.js
     - jstests/core/query/queryable_encryption/**/*.js
     - jstests/core/query/query_settings/**/*.js
-    - jstests/core/txns/**/*.js
     - jstests/core/**/express.js
     - jstests/core/query/sort/sortk.js
     - jstests/core/query/sort/sorth.js

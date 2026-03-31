@@ -3,44 +3,8 @@ load("//jstests/suites/query-execution:common.bzl", "CORE_DATA")
 
 resmoke_suite_test(
     name = "timeseries_crud_jscore_passthrough",
-    srcs = [
-        "//jstests/core/query:all_subpackage_javascript_files",
-        "//jstests/core/write:all_subpackage_javascript_files",
-    ],
     config = "//buildscripts/resmokeconfig:suites/timeseries_crud_jscore_passthrough.yml",
     data = CORE_DATA,
-    exclude_files = [
-        "//jstests/core/query/where:all_subpackage_javascript_files",
-        "//jstests/core/query/js:all_subpackage_javascript_files",
-
-        # The paths below are excluded from running in this suite because prior to moving under the
-        # 'query' directory, they were not running in this suite.
-        # TODO SERVER-94567 Determine if any of these tests can be enabled.
-        "//jstests/core/query/json_schema:all_subpackage_javascript_files",
-        "//jstests/core/query/doc_validation:all_subpackage_javascript_files",
-        "//jstests/core/query/api:all_subpackage_javascript_files",
-        "//jstests/core/query/queryable_encryption:all_subpackage_javascript_files",
-        "//jstests/core/query/sbe:all_subpackage_javascript_files",
-
-        # Hashed indexes.
-        "//jstests/core/query/internal_hash_eq:all_subpackage_javascript_files",
-
-        # Explain will return different plan than expected when a collection becomes a time-series
-        # collection. Also, query shape will be different.
-        "//jstests/core/query/explain:all_subpackage_javascript_files",
-
-        # elemMatch
-        "//jstests/core/query/elemmatch:all_subpackage_javascript_files",
-
-        # Time-series collections are views which don't support map-reduce
-        "//jstests/core/query/map_reduce:all_subpackage_javascript_files",
-    ],
-    exclude_with_any_tags = [
-        "requires_sharding",
-        "requires_capped",
-        "assumes_standalone_mongod",
-        "exclude_from_timeseries_crud_passthrough",
-    ],
     shard_count = 4,
     tags = [
         "ci-release-critical",

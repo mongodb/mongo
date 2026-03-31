@@ -2,7 +2,6 @@ load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
 
 resmoke_suite_test(
     name = "failpoints",
-    srcs = ["//jstests/fail_point:all_javascript_files"],
     config = "//buildscripts/resmokeconfig:suites/failpoints.yml",
     tags = [
         "ci-release-critical",
@@ -17,7 +16,6 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "failpoints_auth",
-    srcs = ["//jstests/fail_point:all_javascript_files"],
     config = "//buildscripts/resmokeconfig:suites/failpoints_auth.yml",
     data = [
         "//jstests/libs:authTestsKey",
@@ -40,7 +38,6 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "libunwind",
-    srcs = ["//jstests/libunwind:all_javascript_files"],
     config = "//buildscripts/resmokeconfig:suites/libunwind.yml",
     tags = ["ci-release-critical"],
     target_compatible_with = select({

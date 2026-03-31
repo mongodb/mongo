@@ -7,7 +7,11 @@ description: >-
   testing.
 
 selector:
-  from_target: //jstests/suites/query-integration-search:search_community_ssl
+  roots:
+    - jstests/with_mongot/search_mocked/ssl/*.js
+  exclude_with_any_tags:
+    - requires_auth
+    - search_community_incompatible
 
 executor:
   config:

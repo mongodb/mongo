@@ -1,7 +1,8 @@
 test_kind: js_test
 
 selector:
-  from_target: //jstests/suites/security:ssl_x509
+  roots:
+    - jstests/ssl_x509/*.js
 
 # ssl tests start their own mongod's.
 executor:

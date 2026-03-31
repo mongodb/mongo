@@ -33,9 +33,9 @@ executor:
 matrix_suite: true
 selector:
   exclude_files:
+    - jstests/core/txns/**/*.js
     - jstests/core/query/queryable_encryption/**/*.js
     - jstests/core/query/query_settings/**/*.js
-    - jstests/core/txns/**/*.js
   exclude_with_any_tags:
     - does_not_support_repeated_reads
     - requires_profiling

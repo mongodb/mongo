@@ -1,7 +1,12 @@
 test_kind: js_test
 
 selector:
-  from_target: //jstests/suites/query-integration-search:search_community
+  roots:
+    - jstests/with_mongot/search_mocked/*.js
+    - jstests/with_mongot/mongotmock/*.js
+  exclude_with_any_tags:
+    - requires_auth
+    - search_community_incompatible
 
 executor:
   config:

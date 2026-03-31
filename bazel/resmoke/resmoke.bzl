@@ -1,4 +1,5 @@
 load("//bazel:test_exec_properties.bzl", "test_exec_properties")
+load("//bazel/resmoke:.resmoke_suites_derived.bzl", "SUITE_SELECTORS")
 load("@rules_python//python:defs.bzl", "py_test")
 
 def _collect_python_imports_impl(ctx):
@@ -32,94 +33,148 @@ _collect_python_imports = rule(
     doc = "Helper rule to collect Python imports from data dependencies",
 )
 
-def resmoke_config_impl(ctx):
+def _resmoke_config_impl(ctx):
+    """Produces a resmoke config YAML for a suite.
+
+    In passthrough mode, copies the base config verbatim.
+    Otherwise, generates a config by replacing roots with resolved srcs.
+    """
     base_name = ctx.label.name.removesuffix("_config")
-    test_list_file = ctx.actions.declare_file(base_name + ".txt")
     generated_config_file = ctx.actions.declare_file(base_name + ".yml")
     base_config_file = ctx.files.base_config[0]
 
-    python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
-    python_path = []
-    for path in ctx.attr.generator[PyInfo].imports.to_list():
-        if path not in python_path:
-            python_path.append(ctx.expand_make_variables("python_library_imports", "$(BINDIR)/external/" + path, ctx.var))
-    generator_deps = [ctx.attr.generator[PyInfo].transitive_sources]
+    if ctx.attr.passthrough:
+        # Copy the original config as-is.
+        ctx.actions.symlink(
+            output = generated_config_file,
+            target_file = base_config_file,
+        )
+    else:
+        # Generate a config with resolved roots from srcs.
+        test_list_file = ctx.actions.declare_file(base_name + ".txt")
 
-    test_list = [test.short_path for test in ctx.files.srcs]
-    for exclude in [test.short_path for test in ctx.files.exclude_files]:
-        if exclude in test_list:
-            test_list.remove(exclude)
-    ctx.actions.write(test_list_file, "\n".join(test_list))
+        python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
+        python_path = []
+        for path in ctx.attr.generator[PyInfo].imports.to_list():
+            if path not in python_path:
+                python_path.append(ctx.expand_make_variables("python_library_imports", "$(BINDIR)/external/" + path, ctx.var))
+        generator_deps = [ctx.attr.generator[PyInfo].transitive_sources]
 
-    deps = depset([test_list_file, base_config_file] + ctx.files.srcs, transitive = [python.files] + generator_deps)
+        test_list = [test.short_path for test in ctx.files.srcs]
+        ctx.actions.write(test_list_file, "\n".join(test_list))
 
-    args = [
-        "bazel/resmoke/resmoke_config_generator.py",
-        "--output",
-        generated_config_file.path,
-        "--test-list",
-        test_list_file.path,
-        "--base-config",
-        base_config_file.path,
-        "--exclude-with-any-tags",
-        ",".join(ctx.attr.exclude_with_any_tags),
-        "--include-with-any-tags",
-        ",".join(ctx.attr.include_with_any_tags),
-    ]
-    if ctx.attr.group_size > 0:
-        args.extend(["--group-size", str(ctx.attr.group_size)])
-    if ctx.attr.group_count_multiplier != "":
-        args.extend(["--group-count-multiplier", ctx.attr.group_count_multiplier])
+        deps = depset([test_list_file, base_config_file] + ctx.files.srcs, transitive = [python.files] + generator_deps)
 
-    ctx.actions.run(
-        executable = python.interpreter.path,
-        inputs = deps,
-        outputs = [generated_config_file],
-        arguments = args,
-        env = {"PYTHONPATH": ctx.configuration.host_path_separator.join(python_path)},
-    )
+        args = [
+            "bazel/resmoke/resmoke_config_generator.py",
+            "--output",
+            generated_config_file.path,
+            "--test-list",
+            test_list_file.path,
+            "--base-config",
+            base_config_file.path,
+        ]
+
+        ctx.actions.run(
+            executable = python.interpreter.path,
+            inputs = deps,
+            outputs = [generated_config_file],
+            arguments = args,
+            env = {"PYTHONPATH": ctx.configuration.host_path_separator.join(python_path)},
+        )
 
     return [DefaultInfo(files = depset([generated_config_file]))]
 
 resmoke_config = rule(
-    resmoke_config_impl,
+    _resmoke_config_impl,
     attrs = {
         "generator": attr.label(
             doc = "The config generator to use.",
             default = "//bazel/resmoke:resmoke_config_generator",
         ),
         "srcs": attr.label_list(allow_files = True, doc = "Tests to write as the 'roots' of the selector"),
-        "exclude_files": attr.label_list(allow_files = True),
-        "exclude_with_any_tags": attr.string_list(),
-        "include_with_any_tags": attr.string_list(),
-        "group_size": attr.int(default = 0, doc = "Number of tests to run in each group (for test_kind: parallel_fsm_workload_test)"),
-        "group_count_multiplier": attr.string(default = "", doc = "Multiplier for the number of groups (for test_kind: parallel_fsm_workload_test)"),
+        "passthrough": attr.bool(default = False, doc = "If true, copy the base config verbatim instead of generating."),
         "base_config": attr.label(
             allow_files = True,
             doc = "The base resmoke YAML config for the suite",
         ),
     },
-    doc = "Generates a resmoke config YAML",
+    doc = "Produces a resmoke config YAML. In passthrough mode, copies the base config verbatim. Otherwise, replaces roots with resolved srcs.",
     toolchains = ["@rules_python//python:toolchain_type"],
 )
+
+def _resolve_suite_srcs(config):
+    """Resolve srcs for a suite from the auto-generated selector data.
+
+    Extracts the config label's target path and looks it up in SUITE_SELECTORS.
+    Returns the list of srcs labels, or an empty list if not found.
+    """
+    config_str = str(config)
+
+    # Try direct lookup first (config is already a full label like
+    # "//buildscripts/resmokeconfig:suites/auth.yml")
+    if config_str in SUITE_SELECTORS:
+        return SUITE_SELECTORS[config_str]
+
+    # Handle Label objects: convert to string "//pkg:target"
+    if hasattr(config, "package") and hasattr(config, "name"):
+        label_str = "//%s:%s" % (config.package, config.name)
+        if label_str in SUITE_SELECTORS:
+            return SUITE_SELECTORS[label_str]
+
+    return []
 
 def resmoke_suite_test(
         name,
         config,
         data = [],
         deps = [],
-        exclude_files = [],
-        exclude_with_any_tags = [],
-        include_with_any_tags = [],
         resmoke_args = [],
         size = "small",
         srcs = [],
         tags = [],
         timeout = "eternal",
         exec_properties = {},
-        group_size = 0,
-        group_count_multiplier = "",
         **kwargs):
+    """Creates a Bazel test target for a resmoke suite.
+
+    The suite's test files (srcs) are automatically derived from the YAML
+    config's selector.roots field via pre-build generation. When srcs are
+    auto-derived, the original YAML config is passed directly to resmoke.
+    When explicit srcs are provided, a generated config with resolved roots
+    is created instead.
+
+    Args:
+        name: Target name.
+        config: Label of the resmoke suite YAML config file.
+        data: Additional data dependencies (JS libraries, certs, etc.).
+        deps: Binary dependencies (mongod, mongos, etc.).
+        resmoke_args: Additional command-line arguments for resmoke.
+        size: Bazel test size.
+        srcs: Override for test source files. If empty, auto-derived from config.
+        tags: Bazel tags.
+        timeout: Bazel test timeout.
+        exec_properties: Execution properties for remote execution.
+        **kwargs: Additional arguments passed to py_test (e.g., shard_count).
+    """
+
+    # Auto-derive srcs from the suite YAML if not explicitly provided.
+    passthrough = not srcs
+    if not srcs:
+        srcs = _resolve_suite_srcs(config)
+    if not srcs:
+        fail("resmoke_suite_test '%s': no srcs provided and config '%s' not found in SUITE_SELECTORS. " +
+             "Either provide explicit srcs or ensure the suite YAML has selector.roots." % (name, config))
+
+    generated_config = name + "_config"
+    resmoke_config(
+        name = generated_config,
+        srcs = srcs,
+        base_config = config,
+        passthrough = passthrough,
+        tags = ["resmoke_config"],
+    )
+
     historic_runtimes = name + "_historic_runtimes"
     native.genrule(
         name = historic_runtimes,
@@ -129,19 +184,6 @@ def resmoke_suite_test(
         tools = ["//bazel/resmoke:download_historic_runtimes"],
         stamp = True,
         tags = ["no-remote", "external", "no-cache"],
-    )
-
-    generated_config = name + "_config"
-    resmoke_config(
-        name = generated_config,
-        srcs = srcs,
-        exclude_files = exclude_files,
-        base_config = config,
-        exclude_with_any_tags = exclude_with_any_tags,
-        include_with_any_tags = include_with_any_tags,
-        group_size = group_size,
-        group_count_multiplier = group_count_multiplier,
-        tags = ["resmoke_config"],
     )
 
     # Collect Python imports from data dependencies
@@ -207,8 +249,6 @@ def resmoke_suite_test(
 
     py_test(
         name = name,
-        # To a user of resmoke_suite_test, the `srcs` is the list of tests to select. However, to the py_test rule,
-        # the `srcs` are expected to be Python files only.
         srcs = [resmoke_shim],
         data = merged_data + select({
             "//bazel/resmoke:installed_dist_test_enabled": ["//:installed-dist-test", "//:.resmoke_mongo_version.yml"],

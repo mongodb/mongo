@@ -6,7 +6,8 @@ config_variables:
 test_kind: js_test
 
 selector:
-  from_target: //jstests/suites/programmability:failpoints_auth
+  roots:
+    - jstests/fail_point/*.js
 
 # Failpoint tests start their own mongod's.
 executor:

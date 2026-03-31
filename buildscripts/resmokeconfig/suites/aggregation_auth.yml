@@ -11,7 +11,11 @@ config_variables:
 test_kind: js_test
 
 selector:
-  from_target: //jstests/suites/query:aggregation_auth
+  roots:
+    - jstests/aggregation/**/*.js
+  exclude_files:
+    - jstests/aggregation/extras/*.js
+    - jstests/aggregation/data/*.js
 
 executor:
   config:

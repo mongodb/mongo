@@ -2,10 +2,6 @@ load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
 
 resmoke_suite_test(
     name = "search_community",
-    srcs = [
-        "//jstests/with_mongot/mongotmock:all_javascript_files",
-        "//jstests/with_mongot/search_mocked:all_javascript_files",
-    ],
     config = "//buildscripts/resmokeconfig:suites/search_community.yml",
     data = [
         "//jstests/libs:key1",
@@ -14,11 +10,6 @@ resmoke_suite_test(
         "//jstests/with_mongot/mongotmock/lib",
         "//jstests/with_mongot/search_mocked/lib:all_javascript_files",
         "//x509:generate_main_certificates",
-    ],
-    exclude_files = [],
-    exclude_with_any_tags = [
-        "requires_auth",
-        "search_community_incompatible",
     ],
     shard_count = 4,
     tags = [
@@ -42,7 +33,6 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "search_community_ssl",
-    srcs = ["//jstests/with_mongot/search_mocked/ssl:all_javascript_files"],
     config = "//buildscripts/resmokeconfig:suites/search_community_ssl.yml",
     data = [
         "//jstests/multiVersion/libs:all_javascript_files",
@@ -50,10 +40,6 @@ resmoke_suite_test(
         "//jstests/with_mongot/mongotmock/lib",
         "//jstests/with_mongot/search_mocked/ssl/lib:all_javascript_files",
         "//x509:generate_main_certificates",
-    ],
-    exclude_with_any_tags = [
-        "requires_auth",
-        "search_community_incompatible",
     ],
     tags = [
         "ci-release-critical",

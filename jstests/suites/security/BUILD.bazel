@@ -3,7 +3,6 @@ load("//jstests/suites/query-execution:common.bzl", "CORE_DATA")
 
 resmoke_suite_test(
     name = "auth",
-    srcs = ["//jstests/auth:all_javascript_files"],
     config = "//buildscripts/resmokeconfig:suites/auth.yml",
     data = [
         "//jstests/auth/lib:all_subpackage_javascript_files",
@@ -19,9 +18,6 @@ resmoke_suite_test(
         "//jstests/sharding/libs:proxy_protocol_server",
         "//jstests/ssl/libs",
         "//jstests/with_mongot/mongotmock/lib",
-    ],
-    exclude_files = [
-        "//jstests/auth:repl.js",  # Skip until SERVER-25618 is resolved.
     ],
     shard_count = 20,
     tags = [
@@ -39,7 +35,6 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "client_encrypt",
-    srcs = ["//jstests/client_encrypt:all_javascript_files"],
     config = "//buildscripts/resmokeconfig:suites/client_encrypt.yml",
     data = [
         "//jstests/ssl/libs",
@@ -59,10 +54,6 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "ssl",
-    srcs = [
-        "//jstests/ssl:all_javascript_files",
-        "//src/mongo/db/modules/enterprise/jstests/fips:all_javascript_files",
-    ],
     config = "//buildscripts/resmokeconfig:suites/ssl.yml",
     data = [
         "//jstests/libs:8k-prime.dhparam",
@@ -91,7 +82,6 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "ssl_special",
-    srcs = ["//jstests/sslSpecial:all_javascript_files"],
     config = "//buildscripts/resmokeconfig:suites/ssl_special.yml",
     data = [
         "//jstests/libs:key1",
@@ -114,31 +104,9 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "core_auth",
-    srcs = ["//jstests/core:all_subpackage_javascript_files"],
     config = "//buildscripts/resmokeconfig:suites/core_auth.yml",
     data = CORE_DATA + [
         "//jstests/libs:authTestsKey",
-    ],
-    exclude_files = [
-        # Transactions are not supported on MongoDB standalone nodes.
-        "//jstests/core/txns:all_subpackage_javascript_files",
-        # Queryable encryption is not supported on standalone.
-        "//jstests/core/query/queryable_encryption:all_subpackage_javascript_files",
-
-        # Commands using UUIDs are not compatible with name-based auth
-        "//jstests/core/query:commands_with_uuid.js",
-
-        # Query settings are not supported on standalone.
-        "//jstests/core/query/query_settings:all_subpackage_javascript_files",
-
-        # Skip any tests that run with auth explicitly.
-        "//jstests/core/query/bulk:bulk_write_non_auth.js",
-        "//jstests/core/administrative:auth1.js",
-        "//jstests/core/administrative:auth2.js",
-    ],
-    exclude_with_any_tags = [
-        # Multiple users cannot be authenticated on one connection within a session.
-        "creates_and_authenticates_user",
     ],
     shard_count = 4,
     tags = [
@@ -160,7 +128,6 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "ocsp",
-    srcs = ["//jstests/ocsp:all_javascript_files"],
     config = "//buildscripts/resmokeconfig:suites/ocsp.yml",
     data = [
         "//jstests/ocsp/lib:all_javascript_files",
@@ -184,7 +151,6 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "ssl_linear",
-    srcs = ["//jstests/ssl_linear:all_javascript_files"],
     config = "//buildscripts/resmokeconfig:suites/ssl_linear.yml",
     data = [
         "//jstests/libs:key1",
@@ -206,7 +172,6 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "ssl_x509",
-    srcs = ["//jstests/ssl_x509:all_javascript_files"],
     config = "//buildscripts/resmokeconfig:suites/ssl_x509.yml",
     data = [
         "//jstests/libs:key1",

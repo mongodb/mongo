@@ -2,9 +2,6 @@ load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
 
 resmoke_suite_test(
     name = "backup_restore",
-    srcs = [
-        "//src/mongo/db/modules/enterprise/jstests/hot_backups:all_subpackage_javascript_files",
-    ],
     config = "//buildscripts/resmokeconfig:suites/backup_restore.yml",
     data = [
         "//buildscripts/resmokeconfig:suites/concurrency_replication_for_backup_restore.yml",
@@ -42,9 +39,6 @@ resmoke_suite_test(
 
 resmoke_suite_test(
     name = "queryable_wt",
-    srcs = [
-        "//src/mongo/db/modules/enterprise/jstests/queryable_wt:all_javascript_files",
-    ],
     config = "//buildscripts/resmokeconfig:suites/queryable_wt.yml",
     data = [
         "//src/mongo/db/modules/enterprise/jstests/hot_backups/libs:all_javascript_files",

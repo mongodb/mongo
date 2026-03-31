@@ -132,6 +132,19 @@ def create_burn_in_target(target_original: str, target_burn_in: str, test: str):
     buildozer.bd_set([target_burn_in], "resmoke_args", resmoke_args_str)
 
 
+def _test_matches_roots(test_path: str, roots: list[str]) -> bool:
+    """Check if a test file path matches any of the selector roots patterns."""
+    from pathlib import PurePosixPath
+
+    for root in roots:
+        if root == test_path:
+            return True
+        if "*" in root or "?" in root or "[" in root:
+            if PurePosixPath(test_path).match(root):
+                return True
+    return False
+
+
 class BurnInTargetInfo(NamedTuple):
     burn_in_target: str
     original_target: str
@@ -173,7 +186,7 @@ def query_targets_to_burn_in(
         for test in tests_changed:
             if test in exclusions["selector"].get(test_kind, {}).get("exclude_tests", []):
                 continue
-            if test not in config["selector"].get("roots"):
+            if not _test_matches_roots(test, config["selector"].get("roots", [])):
                 continue
 
             burn_in_target = (

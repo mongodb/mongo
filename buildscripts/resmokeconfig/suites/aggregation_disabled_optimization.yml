@@ -1,7 +1,13 @@
 test_kind: js_test
 
 selector:
-  from_target: //jstests/suites/query-optimization:aggregation_disabled_optimization
+  roots:
+    - jstests/aggregation/**/*.js
+  exclude_files:
+    - jstests/aggregation/extras/*.js
+    - jstests/aggregation/data/*.js
+  exclude_with_any_tags:
+    - requires_pipeline_optimization
 
 executor:
   archive:

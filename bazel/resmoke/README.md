@@ -6,19 +6,17 @@ Rules for running resmoke test suites in Bazel.
 
 Runs a resmoke test suite in Bazel.
 
-This rule generates a resmoke configuration file based on the provided test sources and base config,
-then executes the tests using the resmoke.py test runner.
-
 **EXAMPLE**
 
 ```bzl
 load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
 
 resmoke_suite_test(
-    name = "jscore",
-    config = "//buildscripts/resmokeconfig/suites:core.yml",
-    srcs = ["//jstests/core:all_subpackage_javascript_files"],
-    exclude_with_any_tags = ["requires_sharding"],
+    name = "core",
+    config = "//buildscripts/resmokeconfig:suites/core.yml",
+    data = [
+        "//jstests/libs:all_subpackage_javascript_files",
+    ],
     deps = [
         "//src/mongo/db:mongod",
         "//src/mongo/shell:mongo",
@@ -28,20 +26,15 @@ resmoke_suite_test(
 
 **ATTRIBUTES**
 
-| Name                   | Description                                                                                                                                                                        | Type                                                                | Mandatory | Default |
-| :--------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------ | :-------- | :------ |
-| name                   | A unique name for this test target.                                                                                                                                                | <a href="https://bazel.build/concepts/labels#target-names">Name</a> | required  |         |
-| config                 | The base resmoke YAML configuration file for the suite. This provides the default configuration that will be augmented with the selected tests.                                    | <a href="https://bazel.build/concepts/labels">Label</a>             | required  |         |
-| srcs                   | Test files to include in the suite. These files are written as the 'roots' of the test selector in the generated configuration. Typically JavaScript test files for jstest suites. | <a href="https://bazel.build/concepts/labels">List of labels</a>    | required  |         |
-| data                   | Additional files required by the tests during runtime. Typically JavaScript files from jstests/libs.                                                                               | <a href="https://bazel.build/concepts/labels">List of labels</a>    | optional  | `[]`    |
-| deps                   | MongoDB binaries and other executables that the tests depend on (e.g., mongod, mongos). These are placed on the PATH when running the test suite.                                  | <a href="https://bazel.build/concepts/labels">List of labels</a>    | optional  | `[]`    |
-| exclude_files          | Test files to explicitly exclude from the suite, even if they appear in srcs.                                                                                                      | <a href="https://bazel.build/concepts/labels">List of labels</a>    | optional  | `[]`    |
-| exclude_with_any_tags  | List of test tags. Tests with any of these tags will be excluded from the suite.                                                                                                   | List of strings                                                     | optional  | `[]`    |
-| include_with_any_tags  | List of test tags. Only tests with at least one of these tags will be included in the suite.                                                                                       | List of strings                                                     | optional  | `[]`    |
-| resmoke_args           | Additional command-line arguments to pass to the resmoke runner.                                                                                                                   | List of strings                                                     | optional  | `[]`    |
-| shard_count            | The number of parallel shards to split the test suite across. Each shard runs a subset of the tests. See the Test Sharding section below for details.                              | Integer                                                             | optional  | `None`  |
-| group_size             | Number of tests to run in each group. Only applicable for `test_kind: parallel_fsm_workload_test` suites.                                                                          | Integer                                                             | optional  | `None`  |
-| group_count_multiplier | Multiplier for the number of groups. Only applicable for `test_kind: parallel_fsm_workload_test` suites. Should be a float value passed as a string (e.g., `"2.5"`).               | String                                                              | optional  | `""`    |
+| Name         | Description                                                                                                                                           | Type                                                                | Mandatory | Default |
+| :----------- | :---------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------ | :-------- | :------ |
+| name         | A unique name for this test target.                                                                                                                   | <a href="https://bazel.build/concepts/labels#target-names">Name</a> | required  |         |
+| config       | The resmoke YAML configuration file for the suite. Must have a `selector.roots` field. Passed directly to resmoke at runtime.                         | <a href="https://bazel.build/concepts/labels">Label</a>             | required  |         |
+| srcs         | Override for test source files. If empty (default), automatically derived from the suite YAML's `selector.roots` via the pre-build generator.         | <a href="https://bazel.build/concepts/labels">List of labels</a>    | optional  | `[]`    |
+| data         | Additional files required by the tests during runtime. Typically JavaScript library files from jstests/libs.                                          | <a href="https://bazel.build/concepts/labels">List of labels</a>    | optional  | `[]`    |
+| deps         | MongoDB binaries and other executables that the tests depend on (e.g., mongod, mongos). These are placed on the PATH when running the test suite.     | <a href="https://bazel.build/concepts/labels">List of labels</a>    | optional  | `[]`    |
+| resmoke_args | Additional command-line arguments to pass to the resmoke runner.                                                                                      | List of strings                                                     | optional  | `[]`    |
+| shard_count  | The number of parallel shards to split the test suite across. Each shard runs a subset of the tests. See the Test Sharding section below for details. | Integer                                                             | optional  | `None`  |
 
 ### Test Sharding
 
@@ -58,10 +51,10 @@ Note: sharding is an alternative to the resmoke `--jobs` flag, which should not 
 
 Bazel creates a dedicated output directory for each test run under the `bazel-testlogs` symlink in your workspace root.
 
-For a test target `//buildscripts/resmokeconfig:core`, the outputs are like:
+For a test target `//jstests/suites/query-execution:core`, the outputs are like:
 
 ```
-bazel-testlogs/buildscripts/resmokeconfig/core/
+bazel-testlogs/jstests/suites/query-execution/core/
 ├── test.log                           # Primary test output log. Contains the output of resmoke.py
 ├── test.outputs/
 │   ├── report.json                    # Test results in JSON format
@@ -80,7 +73,7 @@ bazel-testlogs/buildscripts/resmokeconfig/core/
 #### Run a single test from a suite:
 
 ```
-bazel test //buildscripts/resmokeconfig:core --test_sharding_strategy=disabled --test_arg=jstests/core/js/jssymbol.js
+bazel test //jstests/suites/query-execution:core --test_sharding_strategy=disabled --test_arg=jstests/core/js/jssymbol.js
 ```
 
 #### Run with additional resmoke flags:
@@ -90,19 +83,10 @@ Any `--test_arg` in the bazel command will be propagated as a flag to resmoke.py
 ```
 # Runs all tests from the core suite with timeseries in their name, twice, with all feature flags enabled.
 
-bazel test //buildscripts/resmokeconfig:core \
+bazel test //jstests/suites/query-execution:core \
 --test_sharding_strategy=disabled \
 --test_arg=--repeatTests=2 \
 --test_arg=--runAllFeatureFlagTests \
 --test_arg=--skipExcludedTests \
 `fdfind -t f --full-path ".timeseries\.js$" jstests/core | awk '{print "--test_arg=" $0}'`
-```
-
-#### Run resmoke.py outside of bazel with the suite's config:
-
-```
-# Build binaries and the suite's config (the *_config target)
-bazel build install-dist-test //buildscripts/resmokeconfig:core_config
-
-python buildscripts/resmoke.py run --suite bazel-bin/buildscripts/resmokeconfig/core.yml
 ```
