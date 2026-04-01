@@ -21,7 +21,7 @@ import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/txns/mul
 
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.data.verifyMongosSessionsWithTxns = function verifyMongosSessionsWithTxns(sessions) {
-        const acceptableReadConcernLevels = ["snapshot", "local"];
+        const acceptableReadConcernLevels = ["snapshot", "local", "majority"];
         sessions.forEach((session) => {
             const transactionDocument = session.transaction;
 
