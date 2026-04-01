@@ -581,7 +581,7 @@ void TrafficRecorder::observeResponse(const transport::Session& ts, const Messag
 
 std::pair<TrafficRecorder::LockedRecordingHandle, bool> TrafficRecorder::_prepare(
     const StartTrafficRecording& options, ServiceContext* svcCtx) {
-    auto globalRecordingDirectory = gTrafficRecordingDirectory;
+    auto globalRecordingDirectory = gTrafficRecordingDirectory.get();
     uassert(ErrorCodes::BadValue,
             "Traffic recording directory not set",
             !globalRecordingDirectory.empty());
@@ -702,7 +702,7 @@ std::shared_ptr<TrafficRecorder::Recording> TrafficRecorderForTest::_makeRecordi
 
 TrafficRecorderForTest::RecordingForTest::RecordingForTest(const StartTrafficRecording& options,
                                                            TickSource* tickSource)
-    : TrafficRecorder::Recording(options, gTrafficRecordingDirectory, tickSource) {}
+    : TrafficRecorder::Recording(options, gTrafficRecordingDirectory.get(), tickSource) {}
 
 TrafficRecorderForTest::RecordingForTest::RecordingForTest(
     const StartTrafficRecording& options,
