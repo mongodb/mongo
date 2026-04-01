@@ -10,8 +10,11 @@ from pathlib import Path
 import buildscripts.resmokelib.setup_multiversion.config as multiversion_config
 
 # Resmoke root directory (MongoDB repo root where resmoke is installed)
-# This is the parent directory of buildscripts/
-RESMOKE_ROOT = str(Path(__file__).parent.parent.parent)
+# This is the parent directory of buildscripts/.
+# When invoked via `bazel run`, use BUILD_WORKSPACE_DIRECTORY, set by bazel.
+RESMOKE_ROOT = os.environ.get("BUILD_WORKSPACE_DIRECTORY") or str(
+    Path(__file__).parent.parent.parent
+)
 
 # External module root directory (current working directory where resmoke is being run from)
 # This is used when external projects import and use resmoke as a module

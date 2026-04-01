@@ -3,6 +3,9 @@ filters:
   - "*":
     approvers:
       - 10gen/devprod-build
+  - "test_bazel_run_resmoke.py":
+    approvers:
+      - 10gen/devprod-correctness
   - "test_evergreen_task_timeout.py":
     approvers:
       - 10gen/devprod-correctness
