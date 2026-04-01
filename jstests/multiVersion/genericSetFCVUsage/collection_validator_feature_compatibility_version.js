@@ -22,10 +22,16 @@ const featureFlagsToEnable = ["featureFlagExposeArrayIndexInMapFilterReduce"];
 // compatibility version is the latest version, and rejects it when the feature compatibility
 // version is the last version.
 const testCasesLastContinuous = [
-    //
-    // Populate with any new expressions.
-    //
+    // '$_testFeatureFlagLatest' is an expression permanently enabled in the latest FCV, gated by
+    // gFeatureFlagBlender. This allows for a permanent test to validate feature flag logic.
+    {
+        validator: {
+            $expr: {$eq: ["$stuff", {$_testFeatureFlagLatest: 1}]},
+        },
+        nonMatchingDocument: {stuff: 2},
+    },
 ];
+
 const testCasesLastContinuousWithFeatureFlags = [];
 
 const testCasesLastStable = testCasesLastContinuous.concat([

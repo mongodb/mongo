@@ -12,12 +12,25 @@ const dbpath = MongoRunner.dataPath + testName;
 // An array of feature flags that must be enabled to run feature flag tests.
 const featureFlagsToEnable = ["featureFlagExposeArrayIndexInMapFilterReduce"];
 
+// '$_testFeatureFlagLatest' is an expression permanently enabled in the latest FCV, gated by
+// gFeatureFlagBlender. This allows for a permanent test to validate feature flag logic.
+// skipOldBinaryTests: $_testFeatureFlagLatest is always enabled on whatever binary considers itself
+// "latest", so old binaries that include it will successfully execute it rather than rejecting it.
+const testFeatureFlagLatestPipeline = [
+    {
+        $match: {
+            $expr: {$eq: ["$stuff", {$_testFeatureFlagLatest: 1}]},
+        },
+    },
+];
+testFeatureFlagLatestPipeline.skipOldBinaryTests = true;
+
 // These arrays should be populated with aggregation pipelines that use
 // aggregation features in new versions of mongod. This test ensures that a view
 // definition accepts the new aggregation feature when the feature compatibility version is the
 // latest version, and rejects it when the feature compatibility version is the last
 // version.
-const testCasesLastContinuous = [];
+const testCasesLastContinuous = [testFeatureFlagLatestPipeline];
 const testCasesLastContinuousWithFeatureFlags = [];
 
 // Anything that's incompatible with the last continuous release is incompatible with the last
@@ -231,6 +244,9 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
     // Not checking the code returned on failure as it is not uniform across the various
     // 'pipeline' arguments tested.
     testCases.forEach((pipe, i) => {
+        if (pipe.skipOldBinaryTests) {
+            return;
+        }
         assert.commandFailed(
             testDB.runCommand({find: "firstView" + i}),
             `Expected read against view with pipeline ${tojson(pipe)} to fail on version` +
