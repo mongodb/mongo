@@ -580,3 +580,14 @@ mongo_cc_library(
         "//src/mongo/s:sharding_api",
     ],
 )
+
+idl_generator(
+    name = "test_chunk_operation_sharding_coordinator_document_gen",
+    src = "test_chunk_operation_sharding_coordinator_document.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_coordinator_gen",
+        "//src/mongo/db/shard_role/ddl:coll_mod_gen",
+        "//src/mongo/db/sharding_environment:sharding_types_gen",
+    ],
+)
