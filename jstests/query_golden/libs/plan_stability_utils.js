@@ -261,6 +261,13 @@ export function runPlanStabilityPipelines(db, collName, pipelines) {
             parameters[param] = result[param];
         }
 
+        // Strip the FCV version from any server parameters that have it.
+        for (const [param, value] of Object.entries(parameters)) {
+            if (value && typeof value === "object" && "version" in value) {
+                delete parameters[param].version;
+            }
+        }
+
         print(`">>>parameters": ${JSON.stringify(parameters)}}`);
 
         jsTest.log.info("See README.plan_stability.md for more information.");
