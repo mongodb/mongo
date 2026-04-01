@@ -30,7 +30,7 @@
 		"python.autoComplete.extraPaths": [
 			"/opt/mongodbtoolchain/v5/share/gcc-14.2.0/python"
 		],
-		"python.defaultInterpreterPath": "python3-venv/bin/python",
+		"python.defaultInterpreterPath": "${workspaceFolder}/python3-venv/bin/python",
 		"python.analysis.extraPaths": [
 			"/opt/mongodbtoolchain/v5/share/gcc-14.2.0/python"
 		],
