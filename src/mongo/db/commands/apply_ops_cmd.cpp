@@ -63,7 +63,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-namespace {
+namespace repl {
 
 bool checkCOperationType(const BSONObj& opObj, const StringData opName) {
     BSONElement opTypeElem = opObj["op"];
@@ -219,6 +219,73 @@ OplogApplicationValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
     return ret;
 }
 
+/*
+ * Helper function that re-creates the given applyOpsObj with the 'rid' field removed from all
+ * operations. This function calls itself recursively on nested applyOps commands.
+ * It performs some validation of the input object but it is not intended to do an extensive
+ * validation as that is done prior via validateApplyOpsCommand. The nesting level of applyOps is
+ * not checked in this function as it is also validated in validateApplyOpsCommand.
+ */
+void _removeRidFieldFromOps(const BSONObj& applyOpsObj, BSONObjBuilder& builder) {
+    checkBSONType(BSONType::array, applyOpsObj.firstElement());
+    {
+        BSONArrayBuilder arr(builder.subarrayStart("applyOps"));
+
+        // For each applyOps command, iterate the ops.
+        for (BSONElement element : applyOpsObj.firstElement().Array()) {
+            BSONObj opObj = element.Obj();
+
+            // If the op contains a nested applyOps, filter it recursively
+            if (checkCOperationType(opObj, "applyOps"_sd)) {
+                BSONObjBuilder opBuilder(arr.subobjStart());
+                // Copy all non-'o', non-'rid' elements
+                for (auto&& elem : opObj) {
+                    if (elem.fieldNameStringData() != "o"_sd &&
+                        elem.fieldNameStringData() != "rid"_sd) {
+                        opBuilder.append(elem);
+                    }
+                }
+
+                // Process the 'o' entry recursively
+                {
+                    BSONObjBuilder oBuilder(opBuilder.subobjStart("o"));
+                    BSONObj oObj = opObj["o"].Obj();
+                    _removeRidFieldFromOps(oObj, oBuilder);
+                }
+            } else {
+                // Strip 'rid' from all ops unconditionally
+                BSONObjBuilder opBuilder(arr.subobjStart());
+                for (auto&& elem : opObj) {
+                    if (elem.fieldNameStringData() != "rid"_sd) {
+                        opBuilder.append(elem);
+                    }
+                }
+            }
+        }
+    }
+
+    // Append any extra top-level fields verbatim (e.g. preCondition).
+    // These are unknown to this function but must be preserved so the command
+    // remains structurally equivalent after filtering.
+    for (auto&& elem : applyOpsObj) {
+        if (elem.fieldNameStringData() != "applyOps"_sd) {
+            builder.append(elem);
+        }
+    }
+}
+
+/*
+ * Strip the 'rid' field from all operations in an applyOps command and return the filtered object.
+ *
+ * External tools use the applyOps command for migration/dump/restore use cases where 'rid' fields
+ * are not valid in the target environment, so they must be removed from all applyOps invocations.
+ */
+BSONObj removeRidFieldFromOps(const BSONObj& applyOpsObj) {
+    BSONObjBuilder builder;
+    _removeRidFieldFromOps(applyOpsObj, builder);
+    return builder.obj();
+}
+
 class ApplyOpsCmd : public BasicCommand {
 public:
     ApplyOpsCmd() : BasicCommand("applyOps") {}
@@ -293,8 +360,9 @@ public:
                                                << repl::ApplyOps::kOplogApplicationModeFieldName));
         }
 
+        BSONObj cmdObjFiltered = removeRidFieldFromOps(cmdObj);
         const auto applyOpsStatus =
-            repl::applyOps(opCtx, dbName, cmdObj, oplogApplicationMode, &result);
+            repl::applyOps(opCtx, dbName, cmdObjFiltered, oplogApplicationMode, &result);
 
         if (isStaleShardingMetadataError(applyOpsStatus.code())) {
             // Set the error on the OperationShardingState so that the shard ServiceEntryPoint can
@@ -307,5 +375,5 @@ public:
 };
 MONGO_REGISTER_COMMAND(ApplyOpsCmd).forShard();
 
-}  // namespace
+}  // namespace repl
 }  // namespace mongo

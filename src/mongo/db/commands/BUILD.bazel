@@ -1093,6 +1093,7 @@ mongo_cc_unit_test(
 mongo_cc_unit_test(
     name = "db_commands_test",
     srcs = [
+        "apply_ops_cmd_test.cpp",
         "parse_log_component_settings_test.cpp",
         "profile_cmd_test.cpp",
         "set_profiling_filter_globally_cmd_test.cpp",

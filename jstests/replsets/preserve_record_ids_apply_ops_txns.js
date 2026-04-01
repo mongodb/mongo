@@ -1,6 +1,6 @@
 /**
  * Tests recordIds show up when inserting into a collection with the 'recordIdsReplicated'
- * flag set even when inserting from within a transaction or when using the applyOps command.
+ * flag set when inserting from within a transaction.
  *
  * @tags: [
  *   featureFlagRecordIdsReplicated
@@ -200,88 +200,5 @@ assert.commandWorked(replRidColl.remove({}));
 validateMostRecentApplyOpsInOplogs();
 
 assert.commandWorked(unReplRidColl.remove({}));
-
-jsTestLog("Testing that providing recordIds to applyOps keeps those recordIds.");
-ops = [];
-const numIters = 20;
-let docsRemovedPerColl = 0;
-for (let i = 0; i < numIters; i++) {
-    ops.push({
-        op: "i",
-        ns: unReplRidColl.getFullName(),
-        o: {_id: i},
-        o2: {_id: i},
-    });
-    ops.push({
-        op: "i",
-        ns: replRidColl.getFullName(),
-        o: {_id: i},
-        o2: {_id: i},
-        rid: NumberLong(2000 + i),
-    });
-
-    ops.push({
-        op: "u",
-        ns: unReplRidColl.getFullName(),
-        o: {$v: 2, diff: {u: {a: i + 1}}},
-        o2: {_id: i},
-    });
-    ops.push({
-        op: "u",
-        ns: replRidColl.getFullName(),
-        o: {$v: 2, diff: {u: {a: i + 1}}},
-        o2: {_id: i},
-        rid: NumberLong(2000 + i),
-    });
-
-    if (i % 4 == 0) {
-        ops.push({
-            op: "d",
-            ns: unReplRidColl.getFullName(),
-            o: {_id: i},
-            o2: {_id: i},
-        });
-        ops.push({
-            op: "d",
-            ns: replRidColl.getFullName(),
-            o: {_id: i},
-            o2: {_id: i},
-            rid: NumberLong(2000 + i),
-        });
-        docsRemovedPerColl++;
-    }
-}
-
-assert.commandWorked(primDB.runCommand({applyOps: ops}));
-replSet.awaitReplication();
-assert.eq(replRidColl.find().count(), numIters - docsRemovedPerColl);
-validateShowRecordIdReplicatesAcrossNodes(replSet.nodes, dbName, replRidNs);
-validateMostRecentApplyOpsInOplogs();
-
-jsTestLog("Testing that providing non-existent recordIds to applyOps are no-ops.");
-assert.commandWorked(replRidColl.remove({}));
-
-ops = [];
-docsRemovedPerColl = 0;
-for (let i = 0; i < numIters; i++) {
-    ops.push({
-        op: "i",
-        ns: replRidColl.getFullName(),
-        o: {_id: i, a: 1},
-        o2: {_id: i},
-        rid: NumberLong(i + 1), // RecordId(0) is a Null RecordId, which is not allowed.
-    });
-
-    ops.push({
-        op: "d",
-        ns: replRidColl.getFullName(),
-        o: {_id: i},
-        o2: {_id: i},
-        rid: NumberLong(2000 + i),
-    });
-}
-
-assert.commandWorked(primDB.runCommand({applyOps: ops}));
-assert.eq(replRidColl.find().count(), numIters - docsRemovedPerColl);
 
 replSet.stopSet();

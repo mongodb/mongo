@@ -3,12 +3,17 @@
  * 'alwaysUpsert' defaults to false and 'oplogApplicationMode' defaults to 'ApplyOps'. We test
  * that these default values do not lead to command failure.
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-
-let rid = 1;
 
 let standalone = MongoRunner.runMongod();
 var db = standalone.getDB("test");
+
+// Disable recordIdsReplicated for apply_ops_mode1 as it will trigger an invariant
+// the execution of applyOps on other mode not kApplyOpsCmd when the operation is
+// over a collection with recordIdsReplicated and there is no `rid` field on the
+// operation. We cannot add `rid` field as they are stripped from applyOps commands.
+assert.commandWorked(
+    standalone.adminCommand({configureFailPoint: "overrideRecordIdsReplicatedFalse", mode: "alwaysOn"}),
+);
 
 let coll = db.getCollection("apply_ops_mode1");
 
@@ -23,9 +28,6 @@ for (let updateOp of [
 ]) {
     coll.drop();
     assert.writeOK(coll.insert({_id: 1}));
-    if (FeatureFlagUtil.isPresentAndEnabled(db, "RecordIdsReplicated")) {
-        updateOp["rid"] = rid++;
-    }
 
     jsTestLog(`Test applyOps with the following op:\n${tojson(updateOp)}`);
     assert.commandFailed(db.adminCommand({applyOps: [updateOp]}));

@@ -10,6 +10,7 @@
  * ]
  */
 
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 import {reconnect} from "jstests/replsets/rslib.js";
@@ -133,22 +134,10 @@ assertDocsInColl(node, []);
 // committed documents, the test must take care to make sure the document inserted as a standalone
 // doesn't use a recordId that collides with the non-majority committed documents' recordIds.
 if (node.getDB(dbName).getCollectionInfos({name: collName})[0].info.recordIdsReplicated) {
-    assert.commandWorked(
-        node.getDB(dbName).runCommand({
-            applyOps: [
-                {
-                    op: "i",
-                    ns: getColl(node).getFullName(),
-                    o: {_id: 6},
-                    // This happens to be a recordId that doesn't clash.
-                    rid: NumberLong(6),
-                },
-            ],
-        }),
-    );
-} else {
-    assert.commandWorked(getColl(node).insert({_id: 6}));
+    configureFailPoint(node, "explicitlySetRecordIdOnInsert", {doc: {_id: 6}, rid: 6}, {times: 1});
 }
+
+assert.commandWorked(getColl(node).insert({_id: 6}));
 assertDocsInColl(node, [6]);
 node = rst.restart(node, {
     noReplSet: true,
