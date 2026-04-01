@@ -223,7 +223,7 @@ void OplogBufferCollection::_push(WithLock,
     // (16MB user data  + additional bytes for oplog fields like ’’op”, “ns”, “ui”).
     DisableDocumentValidation documentValidationDisabler(
         opCtx,
-        DocumentValidationSettings::kDisableSchemaValidation |
+        DocumentValidationSettings::kDisableSchemaValidationForInternalOp |
             DocumentValidationSettings::kDisableInternalValidation);
 
     write_ops::InsertCommandRequest insertOp(_nss);

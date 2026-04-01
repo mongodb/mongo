@@ -69,7 +69,7 @@ using logv2::LogComponent;
 StatusWith<int64_t> compactCollection(OperationContext* opCtx,
                                       const CompactOptions& options,
                                       const CollectionPtr& collection) {
-    DisableDocumentValidation validationDisabler(opCtx);
+    DisableDocumentValidationForInternalOp validationDisabler(opCtx);
 
     auto collectionNss = collection->ns();
     auto recordStore = collection->getRecordStore();

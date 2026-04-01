@@ -1764,8 +1764,8 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
     const auto& ops = req.getOps();
     const auto& bypassDocumentValidation = req.getBypassDocumentValidation();
 
-    DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(opCtx,
-                                                                      bypassDocumentValidation);
+    DisableDocumentSchemaValidationRequestedByUserIfTrue docSchemaValidationDisabler(
+        opCtx, bypassDocumentValidation);
 
     DisableSafeContentValidationIfTrue safeContentValidationDisabler(
         opCtx, bypassDocumentValidation, false);

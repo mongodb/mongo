@@ -250,7 +250,7 @@ public:
              BSONObjBuilder& result) override {
         validateApplyOpsCommand(cmdObj);
 
-        boost::optional<DisableDocumentValidation> maybeDisableValidation;
+        boost::optional<DisableDocumentValidationForInternalOp> maybeDisableValidation;
         if (shouldBypassDocumentValidationForCommand(cmdObj))
             maybeDisableValidation.emplace(opCtx);
 

@@ -587,8 +587,9 @@ std::pair<Collection::SchemaValidationResult, Status> CollectionImpl::checkValid
     if (validationLevelOrDefault(_metadata->options.validationLevel) == ValidationLevelEnum::off)
         return {SchemaValidationResult::kPass, Status::OK()};
 
-    if (DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled())
+    if (DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled()) {
         return {SchemaValidationResult::kPass, Status::OK()};
+    }
 
     if (ns().isTemporaryReshardingCollection()) {
         // In resharding, the donor shard primary is responsible for performing document validation
