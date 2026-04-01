@@ -345,26 +345,6 @@ plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const NamespaceString& nss,
                 }
                 break;
             }
-            case STAGE_EQ_LOOKUP: {
-                auto eln = static_cast<const EqLookupNode*>(node);
-                // We used to treat the EOF input stream as a collection scan.
-                if (eln->lookupStrategy ==
-                    EqLookupNode::LookupStrategy::kNonExistentForeignCollection) {
-                    auto& stats = getStatsForNss(eln->foreignCollection);
-                    stats.collectionScans++;
-                }
-                break;
-            }
-            case STAGE_EQ_LOOKUP_UNWIND: {
-                auto eln = static_cast<const EqLookupUnwindNode*>(node);
-                // We used to treat the EOF input stream as a collection scan.
-                if (eln->lookupStrategy ==
-                    EqLookupNode::LookupStrategy::kNonExistentForeignCollection) {
-                    auto& stats = getStatsForNss(eln->foreignCollection);
-                    stats.collectionScans++;
-                }
-                break;
-            }
             default:
                 break;
         }
