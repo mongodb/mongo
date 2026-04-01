@@ -1218,7 +1218,12 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollbackImpl::_findComm
     auto stableTimestamp =
         _storageInterface->getLastStableRecoveryTimestamp(opCtx->getServiceContext());
 
-    LOGV2(21607, "Rollback common point", "commonPointOpTime"_attr = commonPointOpTime);
+    LOGV2(21607,
+          "Checking rollback common point",
+          "commonPointOpTime"_attr = commonPointOpTime,
+          "lastCommittedOpTime"_attr = lastCommittedOpTime,
+          "committedSnapshot"_attr = committedSnapshot,
+          "stableTimestamp"_attr = stableTimestamp);
 
     // This failpoint is used for testing the invariant below.
     if (MONGO_unlikely(rollbackToTimestampHangCommonPointBeforeReplCommitPoint.shouldFail()) &&
