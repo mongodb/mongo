@@ -84,6 +84,7 @@
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/repl/truncate_range_oplog_entry_gen.h"
+#include "mongo/db/replicated_fast_count/init_replicated_fast_count_oplog_entry_gen.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
@@ -1457,7 +1458,51 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
              return Status::OK();
          },
          {}},
-    }};
+    },
+    {"initReplicatedFastCount",
+     {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
+          -> Status {
+          if (!op->getObject2()) {
+              return Status(ErrorCodes::BadValue,
+                            "initReplicatedFastCount oplog entry missing o2 field");
+          }
+          const auto parsedO2 = InitReplicatedFastCountO2::parse(*op->getObject2());
+
+          auto createContainerRecordStore = [&](StringData ident, int keyFormatInt) -> Status {
+              if (keyFormatInt != static_cast<int>(KeyFormat::Long) &&
+                  keyFormatInt != static_cast<int>(KeyFormat::String)) {
+                  return Status(ErrorCodes::BadValue,
+                                fmt::format("Invalid keyFormat value: {}", keyFormatInt));
+              }
+
+              auto keyFormat = static_cast<KeyFormat>(keyFormatInt);
+              auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+              auto* ru = shard_role_details::getRecoveryUnit(opCtx);
+              auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+
+              RecordStore::Options options;
+              options.keyFormat = keyFormat;
+              return storageEngine->getEngine()->createRecordStore(
+                  provider, *ru, op->getNss(), ident, options);
+          };
+
+          WriteUnitOfWork wuow(opCtx);
+          auto status = createContainerRecordStore(parsedO2.getFastCountMetadataStoreIdent(),
+                                                   parsedO2.getFastCountMetadataStoreKeyFormat());
+          if (!status.isOK()) {
+              return status;
+          }
+          status =
+              createContainerRecordStore(parsedO2.getFastCountMetadataStoreTimestampsIdent(),
+                                         parsedO2.getFastCountMetadataStoreTimestampsKeyFormat());
+          if (!status.isOK()) {
+              return status;
+          }
+          wuow.commit();
+
+          return Status::OK();
+      },
+      {}}}};
 
 // Writes a change stream pre-image 'preImage' associated with oplog entry 'oplogEntry' and a write
 // operation to collection 'collection'.
@@ -3023,14 +3068,15 @@ Status applyCommand_inlock(OperationContext* opCtx,
     // for each collection dropped. 'applyOps' and 'commitTransaction' will try to apply each
     // individual operation, and those will be caught then if they are a problem. 'abortTransaction'
     // won't ever change the server configuration collection.
-    constexpr std::array<StringData, 8> allowlistedOps{"dropDatabase",
+    constexpr std::array<StringData, 9> allowlistedOps{"dropDatabase",
                                                        "applyOps",
                                                        "dbCheck",
                                                        "commitTransaction",
                                                        "abortTransaction",
                                                        "startIndexBuild",
                                                        "commitIndexBuild",
-                                                       "abortIndexBuild"};
+                                                       "abortIndexBuild",
+                                                       "initReplicatedFastCount"};
     if ((mode == OplogApplication::Mode::kInitialSync) &&
         (std::find(allowlistedOps.begin(), allowlistedOps.end(), o.firstElementFieldName()) ==
          allowlistedOps.end()) &&

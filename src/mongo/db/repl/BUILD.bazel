@@ -837,6 +837,7 @@ mongo_cc_library(
         "//src/mongo/db/query/write_ops",
         "//src/mongo/db/repl/dbcheck",
         "//src/mongo/db/repl/dbcheck:health_log_interface",
+        "//src/mongo/db/replicated_fast_count:init_replicated_fast_count_oplog_entry_idl",
         "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/session:session_catalog_mongod",
         "//src/mongo/db/shard_role",

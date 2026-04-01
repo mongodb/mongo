@@ -107,6 +107,7 @@ enums:
             kUpgradeDowngradeViewlessTimeseries: "upgradeDowngradeViewlessTimeseries"
             kSetMultikeyMetadata: "setMultikeyMetadata"
             kDropIdent: "dropIdent"
+            kInitReplicatedFastCount: "initReplicatedFastCount"
 
 types:
     zeroOneManyStmtId:
