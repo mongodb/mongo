@@ -81,6 +81,11 @@ public:
     ~ReadWriteConcernDefaults();
 
     /**
+     * Shut down and join thread pool. Needs to be called before destruction.
+     */
+    void shutDownAndJoin();
+
+    /**
      * Syntactic sugar around 'getDefault' below. A return value of boost::none means that there is
      * no default specified for that particular concern.
      */

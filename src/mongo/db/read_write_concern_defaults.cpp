@@ -382,7 +382,14 @@ ReadWriteConcernDefaults::ReadWriteConcernDefaults(Service* service,
     _threadPool.startup();
 }
 
-ReadWriteConcernDefaults::~ReadWriteConcernDefaults() = default;
+ReadWriteConcernDefaults::~ReadWriteConcernDefaults() {
+    shutDownAndJoin();
+}
+
+void ReadWriteConcernDefaults::shutDownAndJoin() {
+    _threadPool.shutdown();
+    _threadPool.join();
+}
 
 ReadWriteConcernDefaults::Cache::Cache(Service* service,
                                        ThreadPoolInterface& threadPool,
