@@ -366,7 +366,11 @@ while IFS= read -r test_result; do
         if [[ "$is_timeout_flag" -eq 1 ]]; then
             shard_statuses+=("TIMEOUT")
         elif [[ "$is_failure_flag" -eq 1 ]]; then
-            shard_statuses+=("FAILED")
+            if [[ "$total_tests" -eq 0 ]]; then
+                shard_statuses+=("NO_REPORT")
+            else
+                shard_statuses+=("FAILED")
+            fi
         else
             shard_statuses+=("PASSED")
         fi
