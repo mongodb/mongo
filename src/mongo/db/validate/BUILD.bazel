@@ -129,6 +129,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_eighth_group"],
     deps = [
         ":collection_validation",
+        "//src/mongo/db/replicated_fast_count:replicated_fast_count_init",
         "//src/mongo/db/replicated_fast_count:replicated_fast_count_test_helpers",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
     ],

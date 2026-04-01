@@ -175,6 +175,7 @@ mongo_cc_unit_test(
         "server-collection-write-path",
     ],
     deps = [
+        "replicated_fast_count_init",
         "size_count_store",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
     ],
@@ -230,6 +231,7 @@ mongo_cc_unit_test(
     ],
     deps = [
         "replicated_fast_count_delta_utils",
+        "replicated_fast_count_init",
         "//src/mongo/db:dbhelpers",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
         "//src/mongo/db/shard_role/shard_catalog:collection_options",

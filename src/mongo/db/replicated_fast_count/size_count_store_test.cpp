@@ -33,6 +33,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
@@ -40,14 +41,6 @@
 
 namespace mongo::replicated_fast_count {
 namespace {
-
-void createReplicatedFastCountCollection(repl::StorageInterface* storageInterface,
-                                         OperationContext* opCtx) {
-    ASSERT_OK(storageInterface->createCollection(
-        opCtx,
-        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore),
-        CollectionOptions{.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex()}));
-}
 
 /**
  * Test wrapper for writes to the `SizeCountStore`.
@@ -63,14 +56,14 @@ void sizeCountStoreWrite(OperationContext* opCtx,
 class SizeCountStoreTest : public CatalogTestFixture {};
 
 TEST_F(SizeCountStoreTest, ReadReturnsNoneWhenDocumentDoesNotExist) {
-    createReplicatedFastCountCollection(storageInterface(), operationContext());
+    ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
     const SizeCountStore store;
 
     EXPECT_FALSE(store.read(operationContext(), UUID::gen()).has_value());
 }
 
 TEST_F(SizeCountStoreTest, ReadWriteRoundTripNewEntry) {
-    createReplicatedFastCountCollection(storageInterface(), operationContext());
+    ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
     SizeCountStore store;
     const UUID uuid = UUID::gen();
     const SizeCountStore::Entry entry{.timestamp = Timestamp(10, 1), .size = 42, .count = 7};
@@ -83,7 +76,7 @@ TEST_F(SizeCountStoreTest, ReadWriteRoundTripNewEntry) {
 }
 
 TEST_F(SizeCountStoreTest, WriteUpdateExistingEntry) {
-    createReplicatedFastCountCollection(storageInterface(), operationContext());
+    ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
     SizeCountStore store;
     const UUID uuid = UUID::gen();
     const SizeCountStore::Entry initialEntry{.timestamp = Timestamp(10, 1), .size = 42, .count = 7};
@@ -102,7 +95,7 @@ TEST_F(SizeCountStoreTest, WriteUpdateExistingEntry) {
 }
 
 TEST_F(SizeCountStoreTest, ReadWriteTwoEntries) {
-    createReplicatedFastCountCollection(storageInterface(), operationContext());
+    ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
     SizeCountStore store;
     const UUID uuid0 = UUID::gen();
     const UUID uuid1 = UUID::gen();
@@ -122,7 +115,7 @@ TEST_F(SizeCountStoreTest, ReadWriteTwoEntries) {
 }
 
 TEST_F(SizeCountStoreTest, WriterUpdateToOneOfTwoEntries) {
-    createReplicatedFastCountCollection(storageInterface(), operationContext());
+    ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
     SizeCountStore store;
     const UUID uuid0 = UUID::gen();
     const UUID uuid1 = UUID::gen();

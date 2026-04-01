@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/storage_interface.h"
 
 namespace mongo {
 /**
@@ -38,4 +39,13 @@ namespace mongo {
  * collections cannot be created.
  */
 MONGO_MOD_PUBLIC void setUpReplicatedFastCount(OperationContext* opCtx);
+
+namespace replicated_fast_count {
+/**
+ * Creates the replicated fast count collection using the global namespace string
+ * kReplicatedFastCountStore.
+ */
+Status createReplicatedFastCountCollection(repl::StorageInterface* storageInterface,
+                                           OperationContext* opCtx);
+}  // namespace replicated_fast_count
 }  // namespace mongo

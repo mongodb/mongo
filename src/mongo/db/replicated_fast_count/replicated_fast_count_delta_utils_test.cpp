@@ -31,24 +31,13 @@
 
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 
 namespace mongo::replicated_fast_count {
 namespace {
-
-/**
- * Creates a replicated fast count collection using the global namespace string
- * kReplicatedFastCountStore.
- */
-void createReplicatedFastCountCollection(repl::StorageInterface* storageInterface,
-                                         OperationContext* opCtx) {
-    ASSERT_OK(storageInterface->createCollection(
-        opCtx,
-        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore),
-        CollectionOptions{.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex()}));
-}
 
 /**
  * Inserts a document directly into the replicated fast count collection with the given UUID,
@@ -73,7 +62,7 @@ void insertSizeCountDocument(OperationContext* opCtx, UUID uuid, int64_t size, i
 class ReadAndIncrementSizeCountsTest : public CatalogTestFixture {};
 
 TEST_F(ReadAndIncrementSizeCountsTest, IncrementZeros) {
-    createReplicatedFastCountCollection(storageInterface(), operationContext());
+    ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
 
     const UUID uuid = UUID::gen();
     absl::flat_hash_map<UUID, CollectionSizeCount> deltas;
@@ -97,7 +86,7 @@ TEST_F(ReadAndIncrementSizeCountsTest, IncrementZeros) {
 }
 
 TEST_F(ReadAndIncrementSizeCountsTest, NegativeResult) {
-    createReplicatedFastCountCollection(storageInterface(), operationContext());
+    ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
 
     const UUID uuid = UUID::gen();
     insertSizeCountDocument(operationContext(), uuid, 200, 10);
@@ -118,7 +107,7 @@ TEST_F(ReadAndIncrementSizeCountsTest, NegativeResult) {
  * document UUIDs ∩ delta UUIDs = {}
  */
 TEST_F(ReadAndIncrementSizeCountsTest, ReadEmptySet) {
-    createReplicatedFastCountCollection(storageInterface(), operationContext());
+    ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
 
     const UUID uuid1 = UUID::gen();
     insertSizeCountDocument(operationContext(), uuid1, 200, 10);
@@ -139,7 +128,7 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadEmptySet) {
  * document UUIDs ∩ delta UUIDs = {uuid1, uuid2}
  */
 TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentEqualSet) {
-    createReplicatedFastCountCollection(storageInterface(), operationContext());
+    ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
 
     const UUID uuid1 = UUID::gen();
     insertSizeCountDocument(operationContext(), uuid1, 200, 10);
@@ -166,7 +155,7 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentEqualSet) {
  * document UUIDs ∩ delta UUIDs = {uuid1}
  */
 TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentSubset) {
-    createReplicatedFastCountCollection(storageInterface(), operationContext());
+    ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
 
     const UUID uuid1 = UUID::gen();
     insertSizeCountDocument(operationContext(), uuid1, 200, 10);
@@ -190,7 +179,7 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentSubset) {
  * document UUIDs ∩ delta UUIDs = {uuid1}
  */
 TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentSuperset) {
-    createReplicatedFastCountCollection(storageInterface(), operationContext());
+    ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
 
     const UUID uuid1 = UUID::gen();
     insertSizeCountDocument(operationContext(), uuid1, 200, 10);
@@ -215,7 +204,7 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentSuperset) {
  * document UUIDs ∩ delta UUIDs = {}
  */
 TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentsDisjointSet) {
-    createReplicatedFastCountCollection(storageInterface(), operationContext());
+    ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
 
     const UUID uuid1 = UUID::gen();
     insertSizeCountDocument(operationContext(), uuid1, 200, 10);
