@@ -226,7 +226,7 @@ export function isResumableChangeStreamError(error) {
 export function ChangeStreamTest(_db, options) {
     // Keeps track of cursors opened during the test so that we can be sure to
     // clean them up before the test completes.
-    let _allCursors = [];
+    let _allCursors = new CursorList();
     // Map to store cursor-specific data
     let _cursorData = new Map();
     let self = this;
@@ -310,7 +310,7 @@ export function ChangeStreamTest(_db, options) {
                 doNotModifyInPassthroughs: doNotModifyInPassthroughs,
             });
             updateResumeToken(res.cursor, res.cursor.firstBatch);
-            _allCursors.push({db: _db.getName(), coll: collName, cursorId: res.cursor.id});
+            _allCursors.add(new DBCommandCursor(_db, res));
             return {...res.cursor, _changeStreamVersion: res._changeStreamVersion};
         });
     };
@@ -622,25 +622,7 @@ export function ChangeStreamTest(_db, options) {
      * Kills all outstanding cursors.
      */
     self.cleanUp = function () {
-        for (let testCursor of _allCursors) {
-            if (typeof testCursor.coll === "string") {
-                assert.commandWorked(
-                    _db.getSiblingDB(testCursor.db).runCommand({
-                        killCursors: testCursor.coll,
-                        cursors: [testCursor.cursorId],
-                    }),
-                );
-            } else if (testCursor.coll == 1) {
-                // Collection '1' indicates that the change stream was opened against an entire
-                // database and is considered 'collectionless'.
-                assert.commandWorked(
-                    _db.getSiblingDB(testCursor.db).runCommand({
-                        killCursors: "$cmd.aggregate",
-                        cursors: [testCursor.cursorId],
-                    }),
-                );
-            }
-        }
+        _allCursors.closeAll();
     };
 
     /**
@@ -1161,4 +1143,30 @@ export function assertCollDataDistribution(db, coll, expectedCounts) {
 export function ensureShardDistribution(db, coll, distributionConfig) {
     distributeCollectionDataOverShards(db, coll, distributionConfig);
     assertCollDataDistribution(db, coll, distributionConfig.expectedCounts);
+}
+
+/** Helper class to hold cursors and close them all at once. */
+export class CursorList {
+    constructor() {
+        this._cursors = [];
+    }
+
+    // Adds one or more cursors to the list and returns the first cursor.
+    add(firstCursor, ...additionalCursors) {
+        this._cursors.push(firstCursor, ...additionalCursors);
+        return firstCursor;
+    }
+
+    length() {
+        return this._cursors.length;
+    }
+
+    // Closes all closable cursors in the list and empties the list.
+    closeAll() {
+        for (const cursor of this._cursors) {
+            if (cursor instanceof DBCommandCursor && !cursor.isClosed()) {
+                cursor.close();
+            }
+        }
+    }
 }
