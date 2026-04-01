@@ -73,6 +73,11 @@ function assertSbeLookupUnwind(explain) {
         planHasStage(db, queryPlan, "EQ_LOOKUP_UNWIND"),
         `Expected plan to have stage EQ_LOOKUP_UNWIND, explain: ${tojson(queryPlan)}`,
     );
+    assert.gt(
+        getNestedProperties(queryPlan, "unwinding").length,
+        0,
+        "Expected EQ_LOOKUP_UNWIND stage to have unwinding property, explain: " + tojson(queryPlan),
+    );
 }
 
 /**

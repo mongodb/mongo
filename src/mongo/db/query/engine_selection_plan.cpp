@@ -94,6 +94,7 @@ void visit(F&& f, const QuerySolutionNode& node) {
     // We'll add specializations as the rules need them.
     switch (node.getType()) {
         case STAGE_EQ_LOOKUP:
+        case STAGE_EQ_LOOKUP_UNWIND:
             f(static_cast<const EqLookupNode&>(node));
             break;
         case STAGE_GROUP:
@@ -101,9 +102,6 @@ void visit(F&& f, const QuerySolutionNode& node) {
             break;
         case STAGE_IXSCAN:
             f(static_cast<const IndexScanNode&>(node));
-            break;
-        case STAGE_EQ_LOOKUP_UNWIND:
-            f(static_cast<const EqLookupUnwindNode&>(node));
             break;
         case STAGE_DISTINCT_SCAN:
             f(static_cast<const DistinctNode&>(node));
@@ -187,12 +185,14 @@ static_assert(HasPreVisit<GroupRule, GroupNode>);
 
 /**
  * This rule matches when:
- * 1. There is at least one LOOKUP in the tree.
+ * 1. There is at least one LOOKUP in the tree (without absorbed $unwind).
  */
 class LookupRule {
 public:
     void preVisit(RuleEngine& engine, const EqLookupNode& node) {
-        engine.match();
+        if (!node.unwindSpec) {
+            engine.match();
+        }
     }
 };
 static_assert(HasPreVisit<LookupRule, EqLookupNode>);
@@ -205,11 +205,13 @@ static_assert(HasPreVisit<LookupRule, EqLookupNode>);
  */
 class LookupUnwindRule {
 public:
-    void preVisit(RuleEngine& engine, const EqLookupUnwindNode& node) {
-        engine.match();
+    void preVisit(RuleEngine& engine, const EqLookupNode& node) {
+        if (node.unwindSpec) {
+            engine.match();
+        }
     }
 };
-static_assert(HasPreVisit<LookupUnwindRule, EqLookupUnwindNode>);
+static_assert(HasPreVisit<LookupUnwindRule, EqLookupNode>);
 
 /**
  * This rule matches:

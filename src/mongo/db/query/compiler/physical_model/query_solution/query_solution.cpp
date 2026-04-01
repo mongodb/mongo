@@ -1880,7 +1880,7 @@ std::unique_ptr<QuerySolutionNode> GroupNode::clone() const {
  */
 void EqLookupNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
-    *ss << "EQ_LOOKUP\n";
+    *ss << (unwindSpec ? "EQ_LOOKUP_UNWIND\n" : "EQ_LOOKUP\n");
     addIndent(ss, indent + 1);
     *ss << "from = " << toStringForLogging(foreignCollection) << "\n";
     addIndent(ss, indent + 1);
@@ -1893,6 +1893,15 @@ void EqLookupNode::appendToString(str::stream* ss, int indent) const {
     *ss << "lookupStrategy = " << serializeLookupStrategy(lookupStrategy) << "\n";
     addIndent(ss, indent + 1);
     *ss << "shouldProduceBson = " << shouldProduceBson << "\n";
+
+    if (unwindSpec) {
+        addIndent(ss, indent + 1);
+        *ss << "preserveNullAndEmptyArrays = " << unwindSpec->preserveNullAndEmptyArrays << "\n";
+        if (unwindSpec->indexPath) {
+            addIndent(ss, indent + 1);
+            *ss << "indexPath = " << unwindSpec->indexPath->fullPath() << "\n";
+        }
+    }
 
     addCommon(ss, indent);
     addIndent(ss, indent + 1);
@@ -1916,6 +1925,17 @@ std::unique_ptr<QuerySolutionNode> EqLookupNode::clone() const {
     for (auto& child : children) {
         childrenClone.emplace_back(child->clone());
     }
+    if (unwindSpec) {
+        return std::make_unique<EqLookupNode>(std::move(childrenClone),
+                                              foreignCollection,
+                                              joinFieldLocal,
+                                              joinFieldForeign,
+                                              joinField,
+                                              lookupStrategy,
+                                              shouldProduceBson,
+                                              unwindSpec->preserveNullAndEmptyArrays,
+                                              unwindSpec->indexPath);
+    }
     return std::make_unique<EqLookupNode>(std::move(childrenClone),
                                           foreignCollection,
                                           joinFieldLocal,
@@ -1923,69 +1943,6 @@ std::unique_ptr<QuerySolutionNode> EqLookupNode::clone() const {
                                           joinField,
                                           lookupStrategy,
                                           shouldProduceBson);
-}
-
-/**
- * EqLookupUnwindNode.
- */
-void EqLookupUnwindNode::appendToString(str::stream* ss, int indent) const {
-    addIndent(ss, indent);
-    *ss << "EQ_LOOKUP_UNWIND\n";
-
-    addIndent(ss, indent + 1);
-    *ss << "from = " << toStringForLogging(foreignCollection) << "\n";
-    addIndent(ss, indent + 1);
-    *ss << "as = " << joinField.fullPath() << "\n";
-    addIndent(ss, indent + 1);
-    *ss << "localField = " << joinFieldLocal.fullPath() << "\n";
-    addIndent(ss, indent + 1);
-    *ss << "foreignField = " << joinFieldForeign.fullPath() << "\n";
-    addIndent(ss, indent + 1);
-    *ss << "lookupStrategy = " << EqLookupNode::serializeLookupStrategy(lookupStrategy) << "\n";
-    addIndent(ss, indent + 1);
-    *ss << "shouldProduceBson = " << shouldProduceBson << "\n";
-
-    addIndent(ss, indent + 1);
-    *ss << "preserveNullAndEmptyArrays = " << unwindSpec.preserveNullAndEmptyArrays << "\n";
-    if (unwindSpec.indexPath) {
-        addIndent(ss, indent + 1);
-        *ss << "indexPath = " << unwindSpec.indexPath->fullPath() << "\n";
-    }
-
-    addCommon(ss, indent);
-    addIndent(ss, indent + 1);
-    *ss << "Outer:\n";
-    children[0]->appendToString(ss, indent + 2);
-    if (children.size() > 1) {
-        addIndent(ss, indent + 1);
-        *ss << "Inner:\n";
-        children[1]->appendToString(ss, indent + 2);
-    }
-    if (children.size() == 3) {
-        addIndent(ss, indent + 1);
-        *ss << "Fallback:\n";
-        children[2]->appendToString(ss, indent + 2);
-    }
-}
-
-std::unique_ptr<QuerySolutionNode> EqLookupUnwindNode::clone() const {
-    std::vector<std::unique_ptr<QuerySolutionNode>> childrenClone;
-    childrenClone.reserve(children.size());
-    for (auto& child : children) {
-        childrenClone.emplace_back(child->clone());
-    }
-    return std::make_unique<EqLookupUnwindNode>(std::move(childrenClone),
-                                                // Shared data members.
-                                                joinField,
-                                                // $lookup-specific data members.
-                                                foreignCollection,
-                                                joinFieldLocal,
-                                                joinFieldForeign,
-                                                lookupStrategy,
-                                                shouldProduceBson,
-                                                // $unwind-specific data members.
-                                                unwindSpec.preserveNullAndEmptyArrays,
-                                                unwindSpec.indexPath);
 }
 
 /**

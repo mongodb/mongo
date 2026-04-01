@@ -70,16 +70,15 @@ TEST_F(EngineSelectionPlanFixture, LookupUnwind) {
     children.emplace_back(
         std::make_unique<IndexScanNode>(nssLocal, buildSimpleIndexEntry(indexFields)));
     children.emplace_back(std::make_unique<CollectionScanNode>(nssForeign));
-    auto lookupUnwind =
-        std::make_unique<EqLookupUnwindNode>(std::move(children),
-                                             FieldPath("a"),
-                                             nssForeign,
-                                             FieldPath("b"),
-                                             FieldPath("c"),
-                                             EqLookupNode::LookupStrategy::kHashJoin,
-                                             false,
-                                             false,
-                                             boost::none);
+    auto lookupUnwind = std::make_unique<EqLookupNode>(std::move(children),
+                                                       nssForeign,
+                                                       FieldPath("b"),
+                                                       FieldPath("c"),
+                                                       FieldPath("a"),
+                                                       EqLookupNode::LookupStrategy::kHashJoin,
+                                                       false,
+                                                       false,
+                                                       boost::none);
     auto solution = std::make_unique<QuerySolution>();
     solution->setRoot(std::move(lookupUnwind));
     ASSERT_TRUE(engineSelectionForPlan(solution.get()) == EngineChoice::kSbe);

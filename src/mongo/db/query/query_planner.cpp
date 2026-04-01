@@ -1937,18 +1937,17 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
                 const boost::intrusive_ptr<DocumentSourceUnwind>& unwindSrc =
                     lookupStage->getUnwindSource();
                 solnForAgg =
-                    std::make_unique<EqLookupUnwindNode>(std::move(children),
-                                                         // Shared data members.
-                                                         lookupStage->getAsField().fullPath(),
-                                                         // $lookup-specific data members.
-                                                         lookupStage->getFromNs(),
-                                                         lookupStage->getLocalField()->fullPath(),
-                                                         lookupStage->getForeignField()->fullPath(),
-                                                         strategy,
-                                                         isLastSource /* shouldProduceBson */,
-                                                         // $unwind-specific data members.
-                                                         unwindSrc->preserveNullAndEmptyArrays(),
-                                                         unwindSrc->indexPath());
+                    std::make_unique<EqLookupNode>(std::move(children),
+                                                   // $lookup-specific data members.
+                                                   lookupStage->getFromNs(),
+                                                   lookupStage->getLocalField()->fullPath(),
+                                                   lookupStage->getForeignField()->fullPath(),
+                                                   lookupStage->getAsField().fullPath(),
+                                                   strategy,
+                                                   isLastSource /* shouldProduceBson */,
+                                                   // $unwind-specific data members.
+                                                   unwindSrc->preserveNullAndEmptyArrays(),
+                                                   unwindSrc->indexPath());
             }
             continue;
         }

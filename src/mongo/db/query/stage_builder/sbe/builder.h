@@ -1000,10 +1000,10 @@ private:
     /**
      * Enables an $LU stage to build the absorbed $unwind's unwinding and results projection only,
      * as the $lookup, which is conceptually the child of the $unwind, is built directly via a call
-     * to buildEqLookupUnwind() with no parent call to buildUnwind() since the $unwind was erased
-     * from the pipeline before the plan was finalized. Used for the special case of a nonexistent
-     * foreign collection, where the $lookup result array is empty and thus its materialization is
-     * not a performance or memory problem.
+     * to buildEqLookup() with no parent call to buildUnwind() since the $unwind was erased from the
+     * pipeline before the plan was finalized. Used for the special case of a nonexistent foreign
+     * collection, where the $lookup result array is empty and thus its materialization is not a
+     * performance or memory problem.
      */
     std::pair<SbStage, PlanStageSlots> buildOnlyUnwind(const UnwindNode::UnwindSpec& un,
                                                        const PlanStageReqs& reqs,
@@ -1084,9 +1084,6 @@ private:
 
     std::pair<SbStage, PlanStageSlots> buildEqLookup(const QuerySolutionNode* root,
                                                      const PlanStageReqs& reqs);
-
-    std::pair<SbStage, PlanStageSlots> buildEqLookupUnwind(const QuerySolutionNode* root,
-                                                           const PlanStageReqs& reqs);
 
     std::pair<SbStage, PlanStageSlots> buildNestedLoopJoinEmbeddingNode(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
