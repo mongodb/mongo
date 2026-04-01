@@ -187,10 +187,7 @@ buildvariants:
       resmoke_tests_tag_filter: ci-development-critical-single-variant
     tasks:
       - name: run_unit_tests_TG
-      - name: compile_test_parallel_core_stream_and_pretty_printer_tests_TG
-        distros:
-          - amazon2023-arm64-latest-xlarge
-      - name: compile_all_but_not_unittests_TG
+      - name: compile_test_parallel_core_stream_TG
         distros:
           - amazon2023-arm64-latest-m8gd-4xlarge
       - name: compile_test_parallel_dbtest_stream_TG
