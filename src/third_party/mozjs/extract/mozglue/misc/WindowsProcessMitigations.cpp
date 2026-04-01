@@ -10,6 +10,7 @@
 
 #include "mozilla/Assertions.h"
 #include "mozilla/DynamicallyLinkedFunctionPtr.h"
+#include "mozilla/WindowsVersion.h"
 
 static_assert(sizeof(PROCESS_MITIGATION_DYNAMIC_CODE_POLICY) == 4);
 
@@ -96,6 +97,56 @@ MFBT_API bool IsUserShadowStackEnabled() {
   }
 
   return polInfo.EnableUserShadowStack;
+}
+
+MFBT_API bool IsPreferLoadFromSystem32Available() {
+  return mozilla::IsWin10AnniversaryUpdateOrLater();
+}
+
+MFBT_API bool IsPreferLoadFromSystem32Enabled() {
+  auto pGetProcessMitigationPolicy = FetchGetProcessMitigationPolicyFunc();
+  if (!pGetProcessMitigationPolicy) {
+    return false;
+  }
+
+  PROCESS_MITIGATION_IMAGE_LOAD_POLICY imgLoadPol{};
+  if (!pGetProcessMitigationPolicy(::GetCurrentProcess(),
+                                   ProcessImageLoadPolicy, &imgLoadPol,
+                                   sizeof(imgLoadPol))) {
+    return false;
+  }
+
+  return imgLoadPol.PreferSystem32Images;
+}
+
+MFBT_API bool EnablePreferLoadFromSystem32() {
+  auto pGetProcessMitigationPolicy = FetchGetProcessMitigationPolicyFunc();
+  if (!pGetProcessMitigationPolicy) {
+    return false;
+  }
+
+  static const mozilla::StaticDynamicallyLinkedFunctionPtr<
+      decltype(&::SetProcessMitigationPolicy)>
+      pSetProcessMitigationPolicy(L"kernel32.dll",
+                                  "SetProcessMitigationPolicy");
+  if (!pSetProcessMitigationPolicy) {
+    return false;
+  }
+
+  PROCESS_MITIGATION_IMAGE_LOAD_POLICY imgLoadPol{};
+  if (!pGetProcessMitigationPolicy(::GetCurrentProcess(),
+                                   ProcessImageLoadPolicy, &imgLoadPol,
+                                   sizeof(imgLoadPol))) {
+    return false;
+  }
+
+  if (imgLoadPol.PreferSystem32Images) {
+    return true;
+  }
+
+  imgLoadPol.PreferSystem32Images = 1;
+  return pSetProcessMitigationPolicy(ProcessImageLoadPolicy, &imgLoadPol,
+                                     sizeof(imgLoadPol));
 }
 
 }  // namespace mozilla

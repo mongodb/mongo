@@ -887,13 +887,22 @@ bool GetIntrinsicValue(JSContext* cx, Handle<PropertyName*> name,
   return GlobalObject::getIntrinsicValue(cx, cx->global(), name, rval);
 }
 
+static uint32_t NumTraceableArgsForCreateThis(HandleFunction fun,
+                                              uint32_t argc) {
+  return argc + 1;  // Add 1 for newTarget
+}
+
 bool CreateThisFromIC(JSContext* cx, HandleObject callee,
-                      HandleObject newTarget, MutableHandleValue rval) {
+                      HandleObject newTarget, Value* argv, uint32_t argc,
+                      MutableHandleValue rval) {
   HandleFunction fun = callee.as<JSFunction>();
   MOZ_ASSERT(fun->isInterpreted());
   MOZ_ASSERT(fun->isConstructor());
   MOZ_ASSERT(cx->realm() == fun->realm(),
              "Realm switching happens before creating this");
+
+  RootedExternalValueArray args(cx, NumTraceableArgsForCreateThis(fun, argc),
+                                argv);
 
   // CreateThis expects rval to be this magic value.
   rval.set(MagicValue(JS_IS_CONSTRUCTING));

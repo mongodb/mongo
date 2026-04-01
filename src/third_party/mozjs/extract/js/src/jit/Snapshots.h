@@ -82,6 +82,7 @@ class RValueAllocation {
 #elif defined(JS_PUNBOX64)
     INT64_REG = 0x31,
     INT64_STACK = 0x32,
+    INT64_INT32_STACK = 0x33,
 #endif
 
     // This mask can be used with any other valid mode. When this flag is
@@ -347,6 +348,11 @@ class RValueAllocation {
 
   static RValueAllocation Int64(int32_t stackOffset) {
     return RValueAllocation(INT64_STACK, payloadOfStackOffset(stackOffset));
+  }
+
+  static RValueAllocation Int64Int32(int32_t stackOffset) {
+    return RValueAllocation(INT64_INT32_STACK,
+                            payloadOfStackOffset(stackOffset));
   }
 #endif
 

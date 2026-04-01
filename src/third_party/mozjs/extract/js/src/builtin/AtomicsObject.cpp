@@ -36,6 +36,7 @@
 
 #include "vm/Compartment-inl.h"
 #include "vm/JSObject-inl.h"
+#include "vm/Realm-inl.h"
 
 using namespace js;
 
@@ -1451,6 +1452,7 @@ bool js::atomics_notify_impl(JSContext* cx, SharedArrayRawBuffer* sarb,
   // avoid mutex ordering problems.
   RootedValue resultMsg(cx, StringValue(cx->names().ok));
   for (uint32_t i = 0; i < promisesToResolve.length(); i++) {
+    AutoRealm ar(cx, promisesToResolve[i]);
     if (!PromiseObject::resolve(cx, promisesToResolve[i], resultMsg)) {
       MOZ_ASSERT(cx->isThrowingOutOfMemory() || cx->isThrowingOverRecursed());
       return false;

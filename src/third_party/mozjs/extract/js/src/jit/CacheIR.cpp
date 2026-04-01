@@ -243,6 +243,9 @@ uint32_t CacheIRCloner::getRawInt32Field(uint32_t stubOffset) {
 const void* CacheIRCloner::getRawPointerField(uint32_t stubOffset) {
   return reinterpret_cast<const void*>(readStubWord(stubOffset));
 }
+const ICScript* CacheIRCloner::getICScriptField(uint32_t stubOffset) {
+  return reinterpret_cast<const ICScript*>(readStubWord(stubOffset));
+}
 uint64_t CacheIRCloner::getRawInt64Field(uint32_t stubOffset) {
   return static_cast<uint64_t>(readStubInt64(stubOffset));
 }

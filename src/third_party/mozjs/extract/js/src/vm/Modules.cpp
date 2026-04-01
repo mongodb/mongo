@@ -1366,8 +1366,9 @@ static bool InnerModuleLinking(JSContext* cx, Handle<ModuleObject*> module,
                                size_t* indexOut) {
   // Step 1. If module is not a Cyclic Module Record, then
   if (!module->hasCyclicModuleFields()) {
-    // Step 1.a. Perform ? module.Link(). (Skipped)
-    // Step 2.b. Return index.
+    // Step 1.a. Perform ? module.Link().
+    // (Skipped as we have already created the environment for these modules).
+    // Step 1.b. Return index.
     *indexOut = index;
     return true;
   }

@@ -2355,8 +2355,11 @@ uint64_t ICInterpretOps(uint64_t arg0, uint64_t arg1, ICStub* stub,
               ReservedRooted<JSObject*> calleeObj(&ctx.state.obj0, callee);
               ReservedRooted<JSObject*> newTargetRooted(
                   &ctx.state.obj1, &origArgs[0].asValue().toObject());
-              ReservedRooted<Value> result(&ctx.state.value0);
-              if (!CreateThisFromIC(cx, calleeObj, newTargetRooted, &result)) {
+              ReservedRooted<Value> result(&ctx.state.value0,
+                                           MagicValue(JS_IS_CONSTRUCTING));
+              HandleFunction fun = calleeObj.as<JSFunction>();
+              if (!js::CreateThis(cx, fun, newTargetRooted, GenericObject,
+                                  &result)) {
                 ctx.error = PBIResult::Error;
                 return IC_ERROR_SENTINEL();
               }

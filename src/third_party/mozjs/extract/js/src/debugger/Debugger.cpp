@@ -2025,26 +2025,27 @@ Completion Completion::fromJSFramePop(JSContext* cx, AbstractFramePtr frame,
   //
   // GetGeneratorObjectForFrame can return nullptr even when a generator
   // object does exist, if the frame is paused between the Generator and
-  // SetAliasedVar opcodes. But by checking the opcode first we eliminate that
-  // possibility, so it's fine to call genObj->isClosed().
+  // SetAliasedVar opcodes.
   Rooted<AbstractGeneratorObject*> generatorObj(
       cx, GetGeneratorObjectForFrame(cx, frame));
-  switch (JSOp(*pc)) {
-    case JSOp::InitialYield:
-      MOZ_ASSERT(!generatorObj->isClosed());
-      return Completion(InitialYield(generatorObj));
 
-    case JSOp::Yield:
-      MOZ_ASSERT(!generatorObj->isClosed());
-      return Completion(Yield(generatorObj, frame.returnValue()));
+  if (generatorObj && !generatorObj->isClosed()) {
+    switch (JSOp(*pc)) {
+      case JSOp::InitialYield:
+        return Completion(InitialYield(generatorObj));
 
-    case JSOp::Await:
-      MOZ_ASSERT(!generatorObj->isClosed());
-      return Completion(Await(generatorObj, frame.returnValue()));
+      case JSOp::Yield:
+        return Completion(Yield(generatorObj, frame.returnValue()));
 
-    default:
-      return Completion(Return(frame.returnValue()));
+      case JSOp::Await:
+        return Completion(Await(generatorObj, frame.returnValue()));
+
+      default:
+        break;
+    }
   }
+
+  return Completion(Return(frame.returnValue()));
 }
 
 void Completion::trace(JSTracer* trc) {

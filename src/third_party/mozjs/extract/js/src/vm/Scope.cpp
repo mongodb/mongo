@@ -161,11 +161,22 @@ SharedShape* js::CreateEnvironmentShapeForSyntheticModule(
 
   RootedId id(cx);
   uint32_t slotIndex = numSlots;
+
+  auto addProperty = [&](PropertyName* name) {
+    id = NameToId(name);
+    return SharedPropMap::addPropertyWithKnownSlot(
+        cx, cls, &map, &mapLength, id, propFlags, slotIndex, &objectFlags);
+  };
+
+  // Add internal *namespace* property.
+  if (!addProperty(cx->names().star_namespace_star_)) {
+    return nullptr;
+  }
+  slotIndex++;
+
+  // Add synthetic exports.
   for (JSAtom* exportName : module->syntheticExportNames()) {
-    id = NameToId(exportName->asPropertyName());
-    if (!SharedPropMap::addPropertyWithKnownSlot(cx, cls, &map, &mapLength, id,
-                                                 propFlags, slotIndex,
-                                                 &objectFlags)) {
+    if (!addProperty(exportName->asPropertyName())) {
       return nullptr;
     }
     slotIndex++;

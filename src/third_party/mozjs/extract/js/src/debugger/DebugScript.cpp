@@ -99,6 +99,7 @@ void DebugScriptObject::finalize(JS::GCContext* gcx, JSObject* obj) {
 
 /* static */
 DebugScript* DebugScript::get(JSScript* script) {
+  MOZ_ASSERT(!IsAboutToBeFinalizedUnbarriered(script));
   MOZ_ASSERT(script->hasDebugScript());
   DebugScriptMap* map = script->zone()->debugScriptMap;
   MOZ_ASSERT(map);
@@ -205,7 +206,12 @@ JSBreakpointSite* DebugScript::getOrCreateBreakpointSite(JSContext* cx,
 /* static */
 void DebugScript::destroyBreakpointSite(JS::GCContext* gcx, JSScript* script,
                                         jsbytecode* pc) {
+  if (IsAboutToBeFinalizedUnbarriered(script)) {
+    return;
+  }
+
   DebugScript* debug = get(script);
+
   JSBreakpointSite*& site = debug->breakpoints[script->pcToOffset(pc)];
   MOZ_ASSERT(site);
   MOZ_ASSERT(site->isEmpty());
@@ -283,6 +289,10 @@ bool DebugScript::incrementStepperCount(JSContext* cx, HandleScript script) {
 
 /* static */
 void DebugScript::decrementStepperCount(JS::GCContext* gcx, JSScript* script) {
+  if (IsAboutToBeFinalizedUnbarriered(script)) {
+    return;
+  }
+
   DebugScript* debug = get(script);
   MOZ_ASSERT(debug);
   MOZ_ASSERT(debug->stepperCount > 0);
@@ -328,6 +338,10 @@ bool DebugScript::incrementGeneratorObserverCount(JSContext* cx,
 /* static */
 void DebugScript::decrementGeneratorObserverCount(JS::GCContext* gcx,
                                                   JSScript* script) {
+  if (IsAboutToBeFinalizedUnbarriered(script)) {
+    return;
+  }
+
   DebugScript* debug = get(script);
   MOZ_ASSERT(debug);
   MOZ_ASSERT(debug->generatorObserverCount > 0);
@@ -393,6 +407,10 @@ void DebugAPI::checkDebugScriptAfterMovingGC(DebugScript* ds) {
 
 /* static */
 bool DebugAPI::stepModeEnabledSlow(JSScript* script) {
+  if (IsAboutToBeFinalizedUnbarriered(script)) {
+    return false;
+  }
+
   return DebugScript::get(script)->stepperCount > 0;
 }
 

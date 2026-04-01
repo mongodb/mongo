@@ -8,9 +8,9 @@ set -vx
 
 NAME=spidermonkey
 
-VERSION="140.7.0esr"
-LIB_GIT_BRANCH=spidermonkey-esr140.7-cpp-only
-LIB_GIT_REVISION=692674d55f1c4acfae4316efab0f79cd67250341
+VERSION="140.9.0esr"
+LIB_GIT_BRANCH=spidermonkey-esr140.9-cpp-only
+LIB_GIT_REVISION=0f9cdced95d8cb9ce25e75c07327a8bd7a235523
 LIB_GIT_REPO=git@github.com:mongodb-forks/spidermonkey.git
 # If a local spidermonkey repo exists, this is much faster than fetching from git:
 # LIB_GIT_REPO=/home/ubuntu/spidermonkey/.git
@@ -22,8 +22,12 @@ LIB_GIT_DIR=$(mktemp -d /tmp/import-spidermonkey.XXXXXX)
 # LIB_GIT_DIR=$(mktemp -d /z/import-spidermonkey.XXXXXX)
 trap "rm -rf $LIB_GIT_DIR" EXIT
 
-git clone $LIB_GIT_REPO $LIB_GIT_DIR
-git -C $LIB_GIT_DIR checkout $LIB_GIT_REVISION
+git clone \
+  --branch "$LIB_GIT_BRANCH" \
+  --depth 1 \
+  --single-branch \
+  "$LIB_GIT_REPO" \
+  "$LIB_GIT_DIR"
 
 test -d $DEST_DIR/mozilla-release && rm -rf $DEST_DIR/mozilla-release
 rm -rf $LIB_GIT_DIR/.git

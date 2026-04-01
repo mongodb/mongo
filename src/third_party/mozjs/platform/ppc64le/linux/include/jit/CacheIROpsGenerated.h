@@ -1896,12 +1896,12 @@ void callScriptedSetter_(ObjOperandId receiver, JSObject* setter, ValOperandId r
 }\
 public:\
 private:\
-void callInlinedSetter_(ObjOperandId receiver, JSObject* setter, ValOperandId rhs, const void* icScript, bool sameRealm, uint32_t nargsAndFlags) {\
+void callInlinedSetter_(ObjOperandId receiver, JSObject* setter, ValOperandId rhs, const ICScript* icScript, bool sameRealm, uint32_t nargsAndFlags) {\
   writeOp(CacheOp::CallInlinedSetter);\
   writeOperandId(receiver);\
   writeObjectField(setter);\
   writeOperandId(rhs);\
-  writeRawPointerField(icScript);\
+  writeICScriptField(icScript);\
   writeBoolImm(sameRealm);\
   writeRawInt32Field(nargsAndFlags);\
   assertLengthMatches();\
@@ -2056,11 +2056,11 @@ void callClassHook_(ObjOperandId callee, Int32OperandId argc, CallFlags flags, u
 }\
 public:\
 private:\
-void callInlinedFunction_(ObjOperandId callee, Int32OperandId argc, const void* icScript, CallFlags flags, uint32_t argcFixed) {\
+void callInlinedFunction_(ObjOperandId callee, Int32OperandId argc, const ICScript* icScript, CallFlags flags, uint32_t argcFixed) {\
   writeOp(CacheOp::CallInlinedFunction);\
   writeOperandId(callee);\
   writeOperandId(argc);\
-  writeRawPointerField(icScript);\
+  writeICScriptField(icScript);\
   writeCallFlagsImm(flags);\
   writeUInt32Imm(argcFixed);\
   assertLengthMatches();\
@@ -2406,11 +2406,11 @@ void callScriptedGetterResult_(ValOperandId receiver, JSObject* getter, bool sam
 }\
 public:\
 private:\
-void callInlinedGetterResult_(ValOperandId receiver, JSObject* getter, const void* icScript, bool sameRealm, uint32_t nargsAndFlags) {\
+void callInlinedGetterResult_(ValOperandId receiver, JSObject* getter, const ICScript* icScript, bool sameRealm, uint32_t nargsAndFlags) {\
   writeOp(CacheOp::CallInlinedGetterResult);\
   writeOperandId(receiver);\
   writeObjectField(getter);\
-  writeRawPointerField(icScript);\
+  writeICScriptField(icScript);\
   writeBoolImm(sameRealm);\
   writeRawInt32Field(nargsAndFlags);\
   assertLengthMatches();\
@@ -15723,8 +15723,8 @@ void cloneCallInlinedSetter(CacheIRReader& reader, CacheIRWriter& writer) {{\
   ValOperandId rhsId = reader.valOperandId();\
   writer.writeOperandId(rhsId);\
   uint32_t icScriptOffset = reader.stubOffset();\
-  const void* icScript = getRawPointerField(icScriptOffset);\
-  writer.writeRawPointerField(icScript);\
+  const ICScript* icScript = getICScriptField(icScriptOffset);\
+  writer.writeICScriptField(icScript);\
   bool sameRealm = reader.readBool();\
   writer.writeBoolImm(sameRealm);\
   uint32_t nargsAndFlagsOffset = reader.stubOffset();\
@@ -15962,8 +15962,8 @@ void cloneCallInlinedFunction(CacheIRReader& reader, CacheIRWriter& writer) {{\
   Int32OperandId argcId = reader.int32OperandId();\
   writer.writeOperandId(argcId);\
   uint32_t icScriptOffset = reader.stubOffset();\
-  const void* icScript = getRawPointerField(icScriptOffset);\
-  writer.writeRawPointerField(icScript);\
+  const ICScript* icScript = getICScriptField(icScriptOffset);\
+  writer.writeICScriptField(icScript);\
   CallFlags flags = reader.callFlags();\
   writer.writeCallFlagsImm(flags);\
   uint32_t argcFixed = reader.uint32Immediate();\
@@ -16476,8 +16476,8 @@ void cloneCallInlinedGetterResult(CacheIRReader& reader, CacheIRWriter& writer) 
   JSObject* getter = getObjectField(getterOffset);\
   writer.writeObjectField(getter);\
   uint32_t icScriptOffset = reader.stubOffset();\
-  const void* icScript = getRawPointerField(icScriptOffset);\
-  writer.writeRawPointerField(icScript);\
+  const ICScript* icScript = getICScriptField(icScriptOffset);\
+  writer.writeICScriptField(icScript);\
   bool sameRealm = reader.readBool();\
   writer.writeBoolImm(sameRealm);\
   uint32_t nargsAndFlagsOffset = reader.stubOffset();\
