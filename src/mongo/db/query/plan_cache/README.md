@@ -128,7 +128,9 @@ When a query is issued and an **active** plan cache entry already exists for the
 
 > ### Aside: Replanning
 >
-> If we've decided to use a cached plan, a trial execution period is run to gather the first batch of results. If the number of works required exceeds the [`internalQueryCacheEvictionRatio`](https://github.com/mongodb/mongo/blob/aaef082f46f3a48a1134ae870b25da28f4d94e08/src/mongo/db/query/query_knobs.idl#L288) (10x by default), this cache entry is deactivated and the query [replans](https://github.com/mongodb/mongo/blob/aaef082f46f3a48a1134ae870b25da28f4d94e08/src/mongo/db/exec/cached_plan.h#L112) using standard multiplanning.
+> If we've decided to use a cached plan, a trial execution period is run to gather the first batch of results. If the number of works required exceeds the [`internalQueryCacheEvictionRatio`](https://github.com/mongodb/mongo/blob/aaef082f46f3a48a1134ae870b25da28f4d94e08/src/mongo/db/query/query_knobs.idl#L288) (10x by default), this cache entry is deactivated and replanning is triggered.
+>
+> Replanning works by [returning a non-OK `ReplanningRequired` status](https://github.com/mongodb/mongo/blob/5f0af5b9f793b9a2e06e1d72e5553e7a7da891ed/src/mongo/db/exec/classic/cached_plan.cpp#L225-L229) from `CachedPlanStage`, carrying [`ReplanningRequiredInfo`](https://github.com/mongodb/mongo/blob/5f0af5b9f793b9a2e06e1d72e5553e7a7da891ed/src/mongo/db/query/replanning_required_info.h#L48) with the cache mode and old plan hash. This error is caught by [`retryMakePlanner`](https://github.com/mongodb/mongo/blob/5f0af5b9f793b9a2e06e1d72e5553e7a7da891ed/src/mongo/db/query/get_executor_helpers.cpp#L168), which re-runs the full query planning path, circumventing subplanning (TODO SERVER-120492: decide if this needs to be reworded).
 
 ```mermaid
 %%{ init: {'themeVariables':{'fontSize': '32px'}}}%%
