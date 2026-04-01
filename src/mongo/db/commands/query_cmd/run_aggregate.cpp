@@ -838,13 +838,6 @@ void executeExplain(const AggExState& aggExState,
         std::move(CurOp::get(aggExState.getOpCtx())->debug().getQueryStatsInfo().key));
 }
 
-/**
- * Executes the aggregation 'request' given a properly constructed AggregationExecutionState,
- * which holds the request and all necessary supporting context to execute request.
- *
- * On success, fills out 'result' with the command response.
- */
-Status _runAggregate(std::shared_ptr<AggExState> aggExState, rpc::ReplyBuilderInterface* result);
 
 /**
  * If this is a view aggregation, sets up the resolved namespace on the expression context. This is
@@ -1198,6 +1191,14 @@ StatusWith<std::unique_ptr<Pipeline>> preparePipeline(
     return std::move(pipeline);
 }
 
+/**
+ * Executes an aggregation after view resolution is complete. Receives an AggExState and
+ * AggCatalogState that already describe the final execution namespace (i.e. the underlying
+ * collection for view aggregations, or the original namespace for non-view aggregations). Does not
+ * perform any view resolution or routing decisions.
+ *
+ * On success, fills out 'result' with the command response.
+ */
 Status executeResolvedAggregate(const AggExState& aggExState,
                                 AggCatalogState& aggCatalogState,
                                 rpc::ReplyBuilderInterface* result) {
@@ -1289,9 +1290,17 @@ Status executeResolvedAggregate(const AggExState& aggExState,
     return Status::OK();
 }
 
+/**
+ * Executes a sharding-aware aggregation on a view. Transitions into the router role to obtain
+ * routing information for the underlying collection, sets up the shard role, and then runs the
+ * resolved aggregation locally via executeResolvedAggregate() if the underlying collection lives
+ * on this shard. If not, throws a kick-back exception to let mongos re-execute the resolved
+ * pipeline across the appropriate shards.
+ *
+ * On success, fills out 'result' with the command response.
+ */
 Status runAggregateOnShardedView(std::unique_ptr<ResolvedViewAggExState> resolvedViewAggExState,
                                  rpc::ReplyBuilderInterface* result) {
-    // Resolved view available after ResolvedViewAggExState construction.
     auto resolvedView = resolvedViewAggExState->getResolvedView();
 
     auto* opCtx = resolvedViewAggExState->getOpCtx();
@@ -1357,6 +1366,15 @@ Status runAggregateOnShardedView(std::unique_ptr<ResolvedViewAggExState> resolve
     return status;
 }
 
+/**
+ * Entry point for running an aggregation given an AggExState describing the request. Handles view
+ * resolution: if the target namespace is a view, resolves it into a ResolvedViewAggExState and
+ * either routes to runAggregateOnShardedView() (for sharding-aware operations) or continues
+ * locally by rebuilding the catalog state for the underlying collection. In all cases, delegates
+ * the final pipeline execution to executeResolvedAggregate().
+ *
+ * On success, fills out 'result' with the command response.
+ */
 Status _runAggregate(std::unique_ptr<AggExState> aggExState, rpc::ReplyBuilderInterface* result) {
     // Perform the validation checks on the request and its derivatives before proceeding.
     aggExState->performValidationChecks();
