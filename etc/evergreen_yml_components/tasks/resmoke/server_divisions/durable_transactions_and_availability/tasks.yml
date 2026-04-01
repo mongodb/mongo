@@ -294,6 +294,7 @@ tasks:
         "causally_consistent",
         "read_write_concern",
         "durable_history",
+        "has_bazel_target",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -350,6 +351,7 @@ tasks:
         "concurrency",
         "common",
         "repl",
+        "has_bazel_target",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -531,6 +533,7 @@ tasks:
         "read_concern_maj",
         "large",
         "sharded",
+        "has_bazel_target",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -597,6 +600,7 @@ tasks:
         "large",
         "repl",
         "random_name",
+        "has_bazel_target",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1237,6 +1241,7 @@ tasks:
         "common",
         "san",
         "large",
+        "has_bazel_target",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1304,6 +1309,7 @@ tasks:
         "common",
         "san",
         "large",
+        "has_bazel_target",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1717,6 +1723,7 @@ tasks:
         "misc_js",
         "non_win_dbg",
         "requires_large_host",
+        "has_bazel_target",
       ]
     commands:
       - func: "do setup"
@@ -1734,6 +1741,7 @@ tasks:
         "causally_consistent",
         "read_write_concern",
         "durable_history",
+        "has_bazel_target",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1753,6 +1761,7 @@ tasks:
         "initsync",
         "uninitialized_fcv",
         "large",
+        "has_bazel_target",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1790,6 +1799,7 @@ tasks:
         "incompatible_mac",
         "sharding",
         "jscore",
+        "has_bazel_target",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1811,6 +1821,7 @@ tasks:
         "initsync",
         "uninitialized_fcv",
         "large",
+        "has_bazel_target",
       ]
     commands:
       - func: "generate resmoke tasks"

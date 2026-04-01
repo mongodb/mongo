@@ -1,0 +1,369 @@
+load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
+load("//jstests/suites/query-execution:common.bzl", "CONCURRENCY_DATA", "CORE_DATA")
+
+resmoke_suite_test(
+    name = "causally_consistent_read_concern_snapshot_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/causally_consistent_read_concern_snapshot_passthrough.yml",
+    data = CORE_DATA,
+    shard_count = 20,
+    tags = [
+        "causally_consistent",
+        "ci-release-critical",
+        "durable_history",
+        "read_write_concern",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "concurrency_replication",
+    config = "//buildscripts/resmokeconfig:suites/concurrency_replication.yml",
+    data = ["//jstests/sharding/libs:all_subpackage_javascript_files"] + CONCURRENCY_DATA,
+    shard_count = 20,
+    tags = [
+        "ci-release-critical",
+        "common",
+        "concurrency",
+        "cpu:2",
+        "repl",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "concurrency_replication_causal_consistency",
+    config = "//buildscripts/resmokeconfig:suites/concurrency_replication_causal_consistency.yml",
+    data = CONCURRENCY_DATA,
+    shard_count = 30,
+    tags = [
+        "ci-release-critical",
+        "concurrency",
+        "cpu:2",
+        "incompatible_with_bazel_remote_test",  # Some tests require more memory than any remote executor has.
+        "large",
+        "non_live_record",
+        "repl",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "concurrency_replication_maintenance",
+    config = "//buildscripts/resmokeconfig:suites/concurrency_replication_maintenance.yml",
+    data = CONCURRENCY_DATA,
+    shard_count = 30,
+    tags = [
+        "ci-release-critical",
+        "concurrency",
+        "cpu:2",
+        "incompatible_with_bazel_remote_test",  # Some tests require more memory than any remote executor has.
+        "large",
+        "non_live_record",
+        "repl",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "concurrency_sharded_replication",
+    config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_replication.yml",
+    data = [
+        "//jstests/concurrency/reshard_collection_util:reshard_collection_util.js",
+        "//jstests/sharding/libs:all_subpackage_javascript_files",
+    ] + CONCURRENCY_DATA,
+    shard_count = 20,
+    tags = [
+        "ci-release-critical",
+        "common",
+        "concurrency",
+        "cpu:2",
+        "large",
+        "read_concern_maj",
+        "sharded",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "replica_sets",
+    config = "//buildscripts/resmokeconfig:suites/replica_sets.yml",
+    data = [
+        "//jstests/aggregation/extras:merge_helpers.js",
+        "//jstests/disk/libs:all_subpackage_javascript_files",
+        "//jstests/libs:key1",
+        "//jstests/libs:key2",
+        "//jstests/libs/config_files:set_replsetname.json",
+        "//jstests/sharding/libs:all_subpackage_javascript_files",
+    ],
+    shard_count = 40,
+    tags = [
+        "ci-release-critical",
+        "incompatible_with_bazel_remote_test",  # Some tests require more memory than any remote executor has.
+        "large",
+        "replica_sets",
+        "san",
+    ],
+    target_compatible_with = select({
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+        "//src/mongo/tools/mongobridge_tool:mongobridge",
+    ],
+)
+
+resmoke_suite_test(
+    name = "replica_sets_jscore_passthrough_base",
+    config = "//buildscripts/resmokeconfig:suites/replica_sets_jscore_passthrough_base.yml",
+    data = CORE_DATA,
+    tags = [
+        "manual",  # This is a base suite, exclude from expansion of target pattern wildcards (..., :*, :all, etc.)
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "replica_sets_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/replica_sets_jscore_passthrough.yml",
+    data = [
+        "//buildscripts/resmokeconfig:matrix_suites/mappings/replica_sets_jscore_passthrough.yml",
+        "//buildscripts/resmokeconfig:matrix_suites/overrides/replica_sets.yml",
+        "//buildscripts/resmokeconfig:suites/replica_sets_jscore_passthrough_base.yml",
+    ] + CORE_DATA,
+    shard_count = 20,
+    tags = [
+        "ci-release-critical",
+        "common",
+        "large",
+        "replica_sets",
+        "san",
+    ],
+    target_compatible_with = select({
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "replica_sets_lag_oplog_application_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/replica_sets_lag_oplog_application_jscore_passthrough.yml",
+    data = CORE_DATA,
+    shard_count = 20,
+    tags = [
+        "ci-release-critical",
+        "common",
+        "large",
+        "replica_sets",
+        "san",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharded_causally_consistent_read_concern_snapshot_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/sharded_causally_consistent_read_concern_snapshot_passthrough.yml",
+    data = [
+        "//jstests/sharding/analyze_shard_key/libs:all_subpackage_javascript_files",
+        "//jstests/sharding/libs:all_subpackage_javascript_files",
+    ] + CORE_DATA,
+    shard_count = 20,
+    tags = [
+        "causally_consistent",
+        "ci-release-critical",
+        "durable_history",
+        "read_write_concern",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharded_collections_uninitialized_fcv_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/sharded_collections_uninitialized_fcv_jscore_passthrough.yml",
+    data = [
+        "//jstests/sharding/libs:all_subpackage_javascript_files",
+    ] + CORE_DATA,
+    shard_count = 40,
+    tags = [
+        "ci-release-critical",
+        "initsync",
+        "jscore",
+        "large",
+        "sharding",
+        "uninitialized_fcv",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_api_version_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/sharding_api_version_jscore_passthrough.yml",
+    data = [
+        "//jstests/sharding/analyze_shard_key/libs:all_subpackage_javascript_files",
+        "//jstests/sharding/libs:all_subpackage_javascript_files",
+    ] + CORE_DATA,
+    shard_count = 20,
+    tags = [
+        "ci-release-critical",
+        "jscore",
+        "sharding",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_uninitialized_fcv_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/sharding_uninitialized_fcv_jscore_passthrough.yml",
+    data = [
+        "//jstests/sharding/analyze_shard_key/libs:all_subpackage_javascript_files",
+        "//jstests/sharding/libs:all_subpackage_javascript_files",
+    ] + CORE_DATA,
+    shard_count = 20,
+    tags = [
+        "ci-release-critical",
+        "initsync",
+        "jscore",
+        "large",
+        "sharding",
+        "uninitialized_fcv",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "serial_run",
+    config = "//buildscripts/resmokeconfig:suites/serial_run.yml",
+    tags = [
+        "ci-release-critical",
+        "misc_js",
+        "non_win_dbg",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+        "//src/mongo/tools/mongobridge_tool:mongobridge",
+    ],
+)
+
+resmoke_suite_test(
+    name = "concurrency_simultaneous_replication",
+    config = "//buildscripts/resmokeconfig:suites/concurrency_simultaneous_replication.yml",
+    data = [
+        "//jstests/fle2/libs:all_subpackage_javascript_files",
+        "//jstests/sharding/libs:all_subpackage_javascript_files",
+    ] + CONCURRENCY_DATA,
+    shard_count = 30,
+    tags = [
+        "ci-release-critical",
+        "common",
+        "concurrency",
+        "large",
+        "random_name",
+        "repl",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
