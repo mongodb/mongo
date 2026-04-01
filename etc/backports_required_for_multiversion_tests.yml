@@ -887,7 +887,7 @@ last-continuous:
     ticket: SERVER-107535
   - test_file: jstests/sharding/timeseries_user_system_buckets_sharding.js
     ticket: SERVER-113933
-  - test_file: jstests/core/timeseries/ddl/timeseries_collmod_timeseries_options.js
+  - test_file: jstests/core/timeseries/timeseries_collmod_timeseries_options.js
     ticket: SERVER-108801
   - test_file: jstests/core/query/regex/regex_max_pattern_length.js
     ticket: SERVER-86326
@@ -1874,7 +1874,7 @@ last-lts:
     ticket: SERVER-107535
   - test_file: jstests/sharding/timeseries_user_system_buckets_sharding.js
     ticket: SERVER-113933
-  - test_file: jstests/core/timeseries/ddl/timeseries_collmod_timeseries_options.js
+  - test_file: jstests/core/timeseries/timeseries_collmod_timeseries_options.js
     ticket: SERVER-108801
   - test_file: jstests/core/query/regex/regex_max_pattern_length.js
     ticket: SERVER-86326
