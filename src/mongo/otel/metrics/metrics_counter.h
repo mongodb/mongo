@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
+#include "mongo/otel/metrics/metrics_attributes.h"
 #include "mongo/otel/metrics/metrics_metric.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
@@ -44,57 +45,143 @@
 
 namespace mongo::otel::metrics {
 
-template <typename T>
+template <typename T, AttributeType... AttributeTs>
 class MONGO_MOD_PUBLIC Counter : public Metric {
 public:
+    using Attributes = std::tuple<AttributeTs...>;
+
     ~Counter() override = default;
 
-    // T must be nonnegative.
-    virtual void add(T value) = 0;
+    /** T must be nonnegative. */
+    virtual void add(T value, const Attributes& attributes) = 0;
 
+    // TODO SERVER-121408: Use values() and remove this.
     virtual T value() const = 0;
+
+    /**
+     * For each combination of attributes for which the counter has been incremented, returns the
+     * set of attributes and the counter value associated with this. Note that the result is valid
+     * only while this counter is valid.
+     */
+    virtual AttributesAndValues<T> values() const = 0;
 };
 
-// A lock free (non-decreasing) counter and metadata about it.
+/**
+ * Specialization when there are no attributes so we don't need to add an empty tuple to add. See
+ * the non-specialized version for documentation.
+ */
 template <typename T>
-class CounterImpl : public Counter<T> {
+class MONGO_MOD_PUBLIC Counter<T> : public Metric {
 public:
-    void add(T value) override;
-
-    T value() const override {
-        return _value.load();
+    using Attributes = std::tuple<>;
+    ~Counter() override = default;
+    virtual void add(T value, const std::tuple<>& attributes) = 0;
+    void add(T value) {
+        add(value, {});
     }
+    virtual T value() const = 0;
+    virtual AttributesAndValues<T> values() const = 0;
+};
 
-    BSONObj serializeToBson(const std::string& key) const override;
+/**
+ * A lock free (non-decreasing) counter with attribute support.
+ *
+ * TODO SERVER-117025: Update this to be safe when supplying view-type attributes (e.g. StringData,
+ * spans)
+ */
+template <typename T, typename... AttributeTs>
+class CounterImpl : public Counter<T, AttributeTs...> {
+public:
+    using Attributes = Counter<T, AttributeTs...>::Attributes;
+
+    explicit CounterImpl(const AttributeDefinition<AttributeTs>&... defs);
+
+    ~CounterImpl() override = default;
+    void add(T value, const Attributes& attributes) override;
+    using Counter<T, AttributeTs...>::add;
 
 #ifdef MONGO_CONFIG_OTEL
     void reset(opentelemetry::metrics::Meter* meter) override;
 #endif  // MONGO_CONFIG_OTEL
+    T value() const override;
+    AttributesAndValues<T> values() const override;
+
+    BSONObj serializeToBson(const std::string& key) const override;
 
 private:
-    Atomic<T> _value;
+    std::array<std::string, sizeof...(AttributeTs)> _attributeNames;
+    absl::flat_hash_map<Attributes, std::unique_ptr<Atomic<T>>> _counters;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
 // Implementation details
 ///////////////////////////////////////////////////////////////////////////////
 
-template <typename T>
-void CounterImpl<T>::add(T value) {
-    massert(ErrorCodes::BadValue, "Counter increment must be nonnegative", value >= 0);
-    _value.fetchAndAddRelaxed(value);
+template <typename T, typename... AttributeTs>
+CounterImpl<T, AttributeTs...>::CounterImpl(const AttributeDefinition<AttributeTs>&... defs)
+    : _attributeNames{defs.name...} {
+    for (Attributes attributes : safeMakeAttributeTuples(defs.values...)) {
+        _counters[std::move(attributes)] = std::make_unique<Atomic<T>>(0);
+    }
+    massert(ErrorCodes::BadValue,
+            "Attribute names are duplicated",
+            !containsDuplicates(_attributeNames));
 }
 
-template <typename T>
-BSONObj CounterImpl<T>::serializeToBson(const std::string& key) const {
-    return BSON(key << _value.loadRelaxed());
+template <typename T, typename... AttributeTs>
+void CounterImpl<T, AttributeTs...>::add(T value, const Attributes& attributes) {
+    massert(ErrorCodes::BadValue, "Counter increment must be nonnegative", value >= 0);
+    auto it = _counters.find(attributes);
+    massert(ErrorCodes::BadValue,
+            "Called add using undeclared set of attributes",
+            it != _counters.end());
+    it->second->fetchAndAddRelaxed(value);
+}
+
+template <typename T, typename... AttributeTs>
+T CounterImpl<T, AttributeTs...>::value() const {
+    T total = 0;
+    for (const auto& [attributes, counter] : _counters) {
+        total += counter->loadRelaxed();
+    }
+    return total;
+}
+
+template <typename T, typename... AttributeTs>
+BSONObj CounterImpl<T, AttributeTs...>::serializeToBson(const std::string& key) const {
+    return BSON(key << value());
 }
 
 #ifdef MONGO_CONFIG_OTEL
-template <typename T>
-void CounterImpl<T>::reset(opentelemetry::metrics::Meter* meter) {
+template <typename T, typename... AttributeTs>
+void CounterImpl<T, AttributeTs...>::reset(opentelemetry::metrics::Meter* meter) {
     invariant(!meter);
-    _value.store(0);
+    for (const auto& [attrs, counter] : _counters) {
+        counter->storeRelaxed(0);
+    }
 }
 #endif  // MONGO_CONFIG_OTEL
+
+template <typename T, typename... AttributeTs>
+AttributesAndValues<T> CounterImpl<T, AttributeTs...>::values() const {
+    AttributesAndValues<T> attributesAndValues;
+    for (const auto& [attributes, counter] : _counters) {
+        T value = counter->loadRelaxed();
+        // If there is a large number of possible attribute combinations but most aren't typically
+        // incremented, including them would massively increase the size of the metrics output
+        // without adding any significant value.
+        if (value == 0) {
+            continue;
+        }
+        attributesAndValues.push_back({.value = value});
+        std::apply(
+            [this, &attributesList = attributesAndValues.back().attributes](auto&&... attribute) {
+                size_t i = 0;
+                ((attributesList.push_back({.name = _attributeNames[i++], .value = attribute})),
+                 ...);
+            },
+            attributes);
+    }
+    return attributesAndValues;
+}
 }  // namespace mongo::otel::metrics

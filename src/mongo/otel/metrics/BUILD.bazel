@@ -75,6 +75,7 @@ mongo_cc_library(
     ],
     deps = [
         ":metric_unit",
+        ":metrics_counter",
         "//src/mongo/db:server_base",
     ] + select(
         {
@@ -161,6 +162,11 @@ mongo_cc_unit_test(
     deps = [":metrics_attributes_test_utils"],
 )
 
+mongo_cc_library(
+    name = "metrics_counter",
+    deps = [":metrics_attributes"],
+)
+
 mongo_cc_unit_test(
     name = "metrics_counter_test",
     srcs = [
@@ -168,6 +174,8 @@ mongo_cc_unit_test(
     ],
     tags = ["mongo_unittest_third_group"],
     deps = [
+        ":metrics_attributes_test_utils",
+        ":metrics_counter",
     ] + select(
         {
             "@//bazel/config:build_otel_enabled": [
@@ -327,6 +335,7 @@ test_suite(
     tests = [
         ":metric_names_test",
         ":metric_unit_test",
+        ":metrics_attributes_test",
         ":metrics_counter_test",
         ":metrics_gauge_test",
         ":metrics_histogram_test",
