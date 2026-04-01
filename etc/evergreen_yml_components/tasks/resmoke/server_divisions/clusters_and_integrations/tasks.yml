@@ -1987,6 +1987,7 @@ tasks:
         "sharding",
         "jscore",
         "common",
+        "has_bazel_target",
       ]
     commands:
       - func: "generate resmoke tasks"
