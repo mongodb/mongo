@@ -75,21 +75,23 @@ st.configRS.getSecondaries().forEach((conn) => {
                 0,
                 "Mechanism " + mech + " should have no egress speculativeAuthenticate attempts on " + conn.host,
             );
-            assert.eq(
-                stats.ingress.authenticate.total,
-                0,
-                "Mechanism " + mech + " should have no ingress authenticate attempts on " + conn.host,
-            );
-            assert.eq(
-                stats.ingress.speculativeAuthenticate.total,
-                0,
-                "Mechanism " + mech + " should have no ingress speculativeAuthenticate attempts on " + conn.host,
-            );
-            assert.eq(
-                stats.ingress.clusterAuthenticate.total,
-                0,
-                "Mechanism " + mech + " should have no ingress clusterAuthenticate attempts on " + conn.host,
-            );
+            if (stats.hasOwnProperty("ingress")) {
+                assert.eq(
+                    stats.ingress.authenticate.total,
+                    0,
+                    "Mechanism " + mech + " should have no ingress authenticate attempts on " + conn.host,
+                );
+                assert.eq(
+                    stats.ingress.speculativeAuthenticate.total,
+                    0,
+                    "Mechanism " + mech + " should have no ingress speculativeAuthenticate attempts on " + conn.host,
+                );
+                assert.eq(
+                    stats.ingress.clusterAuthenticate.total,
+                    0,
+                    "Mechanism " + mech + " should have no ingress clusterAuthenticate attempts on " + conn.host,
+                );
+            }
         }
     }
     // Check that egress speculative/normal auths are all logged, and that the counts match those

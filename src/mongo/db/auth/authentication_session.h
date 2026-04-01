@@ -285,7 +285,7 @@ private:
     UserName _ssmUserName;
 
     std::string _mechName;
-    boost::optional<AuthCounter::MechanismCounterHandle> _mechCounter;
+    boost::optional<AuthCounter::IngressMechanismCounterHandle> _mechCounter;
 
     // The user name can be provided partially by the command namespace or in full by a client
     // certificate. If we have a authN mechanism, we use its principal name instead.

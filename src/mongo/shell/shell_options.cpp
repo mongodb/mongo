@@ -359,8 +359,6 @@ Status storeMongoShellOptions(const moe::Environment& params,
         }
     }
 
-    saslGlobalParams.authenticationMechanisms = auth::kAllMechanisms;
-
     return Status::OK();
 }
 

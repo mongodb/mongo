@@ -209,27 +209,38 @@ void NetworkCounter::append(BSONObjBuilder& b) {
     b.append("tcpFastOpen", tfo.obj());
 }
 
-void AuthCounter::initializeMechanismMap(const std::vector<std::string>& mechanisms) {
+const std::vector<std::string> kAllMechanisms{std::string(auth::kMechanismMongoX509),
+                                              std::string(auth::kMechanismSaslPlain),
+                                              std::string(auth::kMechanismGSSAPI),
+                                              std::string(auth::kMechanismScramSha1),
+                                              std::string(auth::kMechanismScramSha256),
+                                              std::string(auth::kMechanismMongoAWS),
+                                              std::string(auth::kMechanismMongoOIDC)};
+
+void AuthCounter::initializeMechanismMap(const std::vector<std::string>& ingressMechanisms) {
     invariant(_mechanisms.empty());
 
-    const auto addMechanism = [this](const auto& mech) {
+    for (const auto& mech : kAllMechanisms) {
         _mechanisms.emplace(
             std::piecewise_construct, std::forward_as_tuple(mech), std::forward_as_tuple());
-    };
+    }
 
-    for (const auto& mech : mechanisms) {
-        addMechanism(mech);
+    for (const auto& mech : ingressMechanisms) {
+        uassert(12125800,
+                fmt::format("Unknown mechanism {} present in authenticationMechanisms", mech),
+                _mechanisms.contains(mech));
+        _mechanisms[mech].ingressAllowed = true;
     }
 
     // When clusterAuthMode == `x509` or `sendX509`, we'll use MONGODB-X509 for intra-cluster auth
     // even if it's not explicitly enabled by authenticationMechanisms.
-    // Ensure it's always included in counts.
-    addMechanism(std::string{auth::kMechanismMongoX509});
+    // Ensure it's always counted for ingress.
+    _mechanisms[std::string(auth::kMechanismMongoX509)].ingressAllowed = true;
 
     // It's possible for intracluster auth to use a default fallback mechanism of SCRAM-SHA-256
     // even if it's not configured to do so.
     // Explicitly add this to the map for now so that they can be incremented if this happens.
-    addMechanism(std::string{auth::kMechanismScramSha256});
+    _mechanisms[std::string(auth::kMechanismScramSha256)].ingressAllowed = true;
 }
 
 void AuthCounter::incSaslSupportedMechanismsReceived() {
@@ -244,54 +255,69 @@ void AuthCounter::incEgressAuthenticationCumulativeTime(long long micros) {
     _egressAuthenticationCumulativeMicros.fetchAndAddRelaxed(micros);
 }
 
-void AuthCounter::MechanismCounterHandle::incSpeculativeAuthenticateSent() {
-    _data->egress.speculativeAuthenticate.total.fetchAndAddRelaxed(1);
-}
 
-void AuthCounter::MechanismCounterHandle::incSpeculativeAuthenticateReceived() {
+void AuthCounter::IngressMechanismCounterHandle::incSpeculativeAuthenticateReceived() {
     _data->ingress.speculativeAuthenticate.total.fetchAndAddRelaxed(1);
 }
 
-void AuthCounter::MechanismCounterHandle::incIngressSpeculativeAuthenticateSuccessful() {
+void AuthCounter::IngressMechanismCounterHandle::incIngressSpeculativeAuthenticateSuccessful() {
     _data->ingress.speculativeAuthenticate.successful.fetchAndAddRelaxed(1);
 }
 
-void AuthCounter::MechanismCounterHandle::incEgressSpeculativeAuthenticateSuccessful() {
-    _data->egress.speculativeAuthenticate.successful.fetchAndAddRelaxed(1);
-}
-
-void AuthCounter::MechanismCounterHandle::incAuthenticateSent() {
-    _data->egress.authenticate.total.fetchAndAddRelaxed(1);
-}
-
-void AuthCounter::MechanismCounterHandle::incAuthenticateReceived() {
+void AuthCounter::IngressMechanismCounterHandle::incAuthenticateReceived() {
     _data->ingress.authenticate.total.fetchAndAddRelaxed(1);
 }
 
-void AuthCounter::MechanismCounterHandle::incIngressAuthenticateSuccessful() {
+void AuthCounter::IngressMechanismCounterHandle::incIngressAuthenticateSuccessful() {
     _data->ingress.authenticate.successful.fetchAndAddRelaxed(1);
 }
 
-void AuthCounter::MechanismCounterHandle::incEgressAuthenticateSuccessful() {
-    _data->egress.authenticate.successful.fetchAndAddRelaxed(1);
-}
-
-void AuthCounter::MechanismCounterHandle::incClusterAuthenticateReceived() {
+void AuthCounter::IngressMechanismCounterHandle::incClusterAuthenticateReceived() {
     _data->ingress.clusterAuthenticate.total.fetchAndAddRelaxed(1);
 }
 
-void AuthCounter::MechanismCounterHandle::incClusterAuthenticateSuccessful() {
+void AuthCounter::IngressMechanismCounterHandle::incClusterAuthenticateSuccessful() {
     _data->ingress.clusterAuthenticate.successful.fetchAndAddRelaxed(1);
 }
 
-auto AuthCounter::getMechanismCounter(StringData mechanism) -> MechanismCounterHandle {
+void AuthCounter::EgressMechanismCounterHandle::incSpeculativeAuthenticateSent() {
+    _data->egress.speculativeAuthenticate.total.fetchAndAddRelaxed(1);
+}
+
+void AuthCounter::EgressMechanismCounterHandle::incEgressSpeculativeAuthenticateSuccessful() {
+    _data->egress.speculativeAuthenticate.successful.fetchAndAddRelaxed(1);
+}
+
+void AuthCounter::EgressMechanismCounterHandle::incAuthenticateSent() {
+    _data->egress.authenticate.total.fetchAndAddRelaxed(1);
+}
+
+void AuthCounter::EgressMechanismCounterHandle::incEgressAuthenticateSuccessful() {
+    _data->egress.authenticate.successful.fetchAndAddRelaxed(1);
+}
+
+auto AuthCounter::getEgressMechanismCounter(StringData mechanism) -> EgressMechanismCounterHandle {
     auto it = _mechanisms.find(mechanism.data());
     uassert(ErrorCodes::MechanismUnavailable,
-            fmt::format("Received authentication for mechanism {} which is not enabled", mechanism),
+            fmt::format("Egress authentication using mechanism {} which is not known", mechanism),
             it != _mechanisms.end());
 
     auto& data = it->second;
-    return MechanismCounterHandle(&data);
+    return EgressMechanismCounterHandle(&data);
+}
+
+auto AuthCounter::getIngressMechanismCounter(StringData mechanism)
+    -> IngressMechanismCounterHandle {
+    auto it = _mechanisms.find(mechanism.data());
+    uassert(ErrorCodes::MechanismUnavailable,
+            fmt::format("Received authentication for mechanism {} which is not known", mechanism),
+            it != _mechanisms.end());
+    uassert(ErrorCodes::MechanismUnavailable,
+            fmt::format("Received authentication for mechanism {} which is not enabled", mechanism),
+            it->second.ingressAllowed);
+
+    auto& data = it->second;
+    return IngressMechanismCounterHandle(&data);
 }
 
 void AuthCounter::SuccessCounter::appendAsSubobj(BSONObjBuilder& bob, StringData fieldName) const {
@@ -327,14 +353,16 @@ void AuthCounter::append(BSONObjBuilder* b) {
 
     for (const auto& it : _mechanisms) {
         BSONObjBuilder mechBuilder(mechsBuilder.subobjStart(it.first));
-
-        BSONObjBuilder ingressBuilder(mechBuilder.subobjStart("ingress"));
-        it.second.ingress.speculativeAuthenticate.appendAsSubobj(ingressBuilder,
-                                                                 auth::kSpeculativeAuthenticate);
-        it.second.ingress.clusterAuthenticate.appendAsSubobj(ingressBuilder,
-                                                             auth::kClusterAuthenticate);
-        it.second.ingress.authenticate.appendAsSubobj(ingressBuilder, auth::kAuthenticateCommand);
-        ingressBuilder.done();
+        if (it.second.ingressAllowed) {
+            BSONObjBuilder ingressBuilder(mechBuilder.subobjStart("ingress"));
+            it.second.ingress.speculativeAuthenticate.appendAsSubobj(
+                ingressBuilder, auth::kSpeculativeAuthenticate);
+            it.second.ingress.clusterAuthenticate.appendAsSubobj(ingressBuilder,
+                                                                 auth::kClusterAuthenticate);
+            it.second.ingress.authenticate.appendAsSubobj(ingressBuilder,
+                                                          auth::kAuthenticateCommand);
+            ingressBuilder.done();
+        }
 
         BSONObjBuilder egressBuilder(mechBuilder.subobjStart("egress"));
         it.second.egress.speculativeAuthenticate.appendAsSubobj(egressBuilder,

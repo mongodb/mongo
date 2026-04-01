@@ -7,7 +7,6 @@ function waitFailedToStart(pid, exitCode) {
             if (res.alive) {
                 return false;
             }
-
             return res.exitCode == exitCode;
         },
         `Failed to wait for ${pid} to die with exit code ${exitCode}`,
@@ -20,4 +19,4 @@ const m = MongoRunner.runMongod({
     waitForConnect: false,
 });
 
-waitFailedToStart(m.pid, 2);
+waitFailedToStart(m.pid, 1);

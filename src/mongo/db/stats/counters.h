@@ -278,19 +278,17 @@ class AuthCounter {
     struct MechanismData;
 
 public:
-    class MechanismCounterHandle {
+    class IngressMechanismCounterHandle {
     public:
-        MechanismCounterHandle(MechanismData* data) : _data(data) {}
+        IngressMechanismCounterHandle(MechanismData* data) : _data(data) {
+            invariant(data->ingressAllowed);
+        }
 
-        void incSpeculativeAuthenticateSent();
         void incSpeculativeAuthenticateReceived();
         void incIngressSpeculativeAuthenticateSuccessful();
-        void incEgressSpeculativeAuthenticateSuccessful();
 
-        void incAuthenticateSent();
         void incAuthenticateReceived();
         void incIngressAuthenticateSuccessful();
-        void incEgressAuthenticateSuccessful();
 
         void incClusterAuthenticateReceived();
         void incClusterAuthenticateSuccessful();
@@ -299,7 +297,23 @@ public:
         MechanismData* _data;
     };
 
-    MechanismCounterHandle getMechanismCounter(StringData mechanism);
+    class EgressMechanismCounterHandle {
+    public:
+        EgressMechanismCounterHandle(MechanismData* data) : _data(data) {}
+
+        void incSpeculativeAuthenticateSent();
+        void incEgressSpeculativeAuthenticateSuccessful();
+
+        void incAuthenticateSent();
+        void incEgressAuthenticateSuccessful();
+
+
+    private:
+        MechanismData* _data;
+    };
+
+    IngressMechanismCounterHandle getIngressMechanismCounter(StringData mechanism);
+    EgressMechanismCounterHandle getEgressMechanismCounter(StringData mechanism);
 
     void incSaslSupportedMechanismsReceived();
 
@@ -327,15 +341,17 @@ private:
             SuccessCounter speculativeAuthenticate;
             SuccessCounter authenticate;
         } egress;
+        bool ingressAllowed = false;
     };
     using MechanismMap = std::map<std::string, MechanismData>;
 
     AtomicWord<long long> _saslSupportedMechanismsReceived;
     AtomicWord<long long> _ingressAuthenticationCumulativeMicros;
     AtomicWord<long long> _egressAuthenticationCumulativeMicros;
-    // Mechanism maps are initialized at startup to contain all
-    // mechanisms known to authenticationMechanisms setParam.
-    // After that they are kept to a fixed size.
+    // Mechanism maps are initialized at startup to contain all possible mechanisms. Mechanisms not
+    // present in the authenticationMechanisms setParam are marked as egress only; this is
+    // because this parameter only restricts which mechanisms can be used for ingress.  After
+    // startup, the set of enabled ingress mechanisms is fixed.
     MechanismMap _mechanisms;
 };
 extern AuthCounter authCounter;

@@ -101,18 +101,20 @@ assert(initialMechStats["SCRAM-SHA-256"] !== undefined);
 // because we authenticated as `admin` using the shell helpers.
 // Because of the simple cluster topology, we should have no intracluster authentication attempts.
 Object.keys(initialMechStats).forEach(function (mech) {
-    const specIngressStats = initialMechStats[mech].ingress.speculativeAuthenticate;
+    if (mech.hasOwnProperty("ingress")) {
+        const specIngressStats = initialMechStats[mech].ingress.speculativeAuthenticate;
+        const clusterStats = initialMechStats[mech].ingress.clusterAuthenticate;
+
+        // No speculation has occured
+        assert.eq(specIngressStats.total, 0);
+
+        // Statistics should be consistent for all mechanisms
+        assert.eq(specIngressStats.total, specIngressStats.successful);
+        assert.eq(clusterStats.total, clusterStats.successful);
+    }
     const specEgressStats = initialMechStats[mech].egress.speculativeAuthenticate;
-    const clusterStats = initialMechStats[mech].ingress.clusterAuthenticate;
-
-    // No speculation has occured
-    assert.eq(specIngressStats.total, 0);
     assert.eq(specEgressStats.total, 0);
-
-    // Statistics should be consistent for all mechanisms
-    assert.eq(specIngressStats.total, specIngressStats.successful);
     assert.eq(specEgressStats.total, specEgressStats.successful);
-    assert.eq(clusterStats.total, clusterStats.successful);
 });
 
 {

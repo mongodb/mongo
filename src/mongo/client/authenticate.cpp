@@ -71,14 +71,6 @@
 namespace mongo {
 namespace auth {
 
-const std::vector<std::string> kAllMechanisms{std::string(kMechanismMongoX509),
-                                              std::string(kMechanismSaslPlain),
-                                              std::string(kMechanismGSSAPI),
-                                              std::string(kMechanismScramSha1),
-                                              std::string(kMechanismScramSha256),
-                                              std::string(kMechanismMongoAWS),
-                                              std::string(kMechanismMongoOIDC)};
-
 using executor::RemoteCommandRequest;
 
 using AuthRequest = StatusWith<RemoteCommandRequest>;
@@ -159,7 +151,7 @@ Future<void> authX509(RunCommandHook runCommand,
     }
     auto targetDb = std::move(swTargetDb.getValue());
 
-    auto mechCounter = authCounter.getMechanismCounter(kMechanismMongoX509);
+    auto mechCounter = authCounter.getEgressMechanismCounter(kMechanismMongoX509);
     mechCounter.incAuthenticateSent();
 
     auto argsBlock =
@@ -392,7 +384,7 @@ StatusWith<std::shared_ptr<SaslClientSession>> _speculateSaslStart(
 
     std::string payload;
 
-    auto mechCounter = authCounter.getMechanismCounter(mechanism);
+    auto mechCounter = authCounter.getEgressMechanismCounter(mechanism);
     mechCounter.incAuthenticateSent();
     mechCounter.incSpeculativeAuthenticateSent();
 

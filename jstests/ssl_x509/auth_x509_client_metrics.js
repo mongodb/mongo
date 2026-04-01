@@ -77,21 +77,23 @@ st.configRS.getSecondaries().forEach((conn) => {
                 0,
                 "Mechanism " + mech + " should have no egress speculativeAuthenticate attempts on " + conn.host,
             );
-            assert.eq(
-                stats.ingress.authenticate.total,
-                0,
-                "Mechanism " + mech + " should have no ingress authenticate attempts on " + conn.host,
-            );
-            assert.eq(
-                stats.ingress.speculativeAuthenticate.total,
-                0,
-                "Mechanism " + mech + " should have no ingress speculativeAuthenticate attempts on " + conn.host,
-            );
-            assert.eq(
-                stats.ingress.clusterAuthenticate.total,
-                0,
-                "Mechanism " + mech + " should have no ingress clusterAuthenticate attempts on " + conn.host,
-            );
+            if (stats.hasOwnProperty("ingress")) {
+                assert.eq(
+                    stats.ingress.authenticate.total,
+                    0,
+                    "Mechanism " + mech + " should have no ingress authenticate attempts on " + conn.host,
+                );
+                assert.eq(
+                    stats.ingress.speculativeAuthenticate.total,
+                    0,
+                    "Mechanism " + mech + " should have no ingress speculativeAuthenticate attempts on " + conn.host,
+                );
+                assert.eq(
+                    stats.ingress.clusterAuthenticate.total,
+                    0,
+                    "Mechanism " + mech + " should have no ingress clusterAuthenticate attempts on " + conn.host,
+                );
+            }
         }
     }
     // getLog pulls a maximum of 1024 entries, which is sometimes not enough to find intra-cluster

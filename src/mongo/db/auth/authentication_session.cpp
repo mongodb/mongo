@@ -243,7 +243,7 @@ void AuthenticationSession::setMechanismName(StringData mechanismName) {
             _mechName.empty() || _mechName == mechanismName);
 
     _mechName = std::string{mechanismName};
-    _mechCounter = authCounter.getMechanismCounter(_mechName);
+    _mechCounter = authCounter.getIngressMechanismCounter(_mechName);
     _mechCounter->incAuthenticateReceived();
     if (_isSpeculative) {
         _mechCounter->incSpeculativeAuthenticateReceived();

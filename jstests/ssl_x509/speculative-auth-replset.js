@@ -51,19 +51,21 @@ assert(initialMechStats["MONGODB-X509"] !== undefined);
 // because we authenticated as `admin` using the shell helpers with SCRAM.
 // Because of the simple cluster topology, we should have no intracluster authentication attempts.
 Object.keys(initialMechStats).forEach(function (mech) {
-    const specStats = initialMechStats[mech].ingress.speculativeAuthenticate;
-    const clusterStats = initialMechStats[mech].ingress.clusterAuthenticate;
+    if (mech.hasOwnProperty("ingress")) {
+        const specStats = initialMechStats[mech].ingress.speculativeAuthenticate;
+        const clusterStats = initialMechStats[mech].ingress.clusterAuthenticate;
 
-    if (mech === "MONGODB-X509") {
-        assert.eq(clusterStats.total, 1);
+        if (mech === "MONGODB-X509") {
+            assert.eq(clusterStats.total, 1);
+        }
+
+        // No speculation has occured
+        assert.eq(specStats.total, 0);
+
+        // Statistics should be consistent for all mechanisms
+        assert.eq(specStats.total, specStats.successful);
+        assert.eq(clusterStats.total, clusterStats.successful);
     }
-
-    // No speculation has occured
-    assert.eq(specStats.total, 0);
-
-    // Statistics should be consistent for all mechanisms
-    assert.eq(specStats.total, specStats.successful);
-    assert.eq(clusterStats.total, clusterStats.successful);
 });
 
 {

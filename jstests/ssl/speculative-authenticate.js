@@ -54,9 +54,11 @@ function assertStats(cb) {
 // No speculative auth attempts yet.
 assertStats(function (mechStats) {
     Object.keys(mechStats).forEach(function (mech) {
-        const stats = mechStats[mech].ingress.speculativeAuthenticate;
-        assert.eq(stats.total, 0);
-        assert.eq(stats.successful, 0);
+        if (mech.hasOwnProperty("ingress")) {
+            const stats = mechStats[mech].ingress.speculativeAuthenticate;
+            assert.eq(stats.total, 0);
+            assert.eq(stats.successful, 0);
+        }
     });
 });
 

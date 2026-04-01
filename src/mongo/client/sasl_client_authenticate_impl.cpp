@@ -344,7 +344,7 @@ Future<void> saslClientAuthenticateImpl(auth::RunCommandHook runCommand,
 
     BSONObj inputObj = BSON(saslCommandPayloadFieldName << "");
 
-    auto mechCounter = authCounter.getMechanismCounter(mechanism);
+    auto mechCounter = authCounter.getEgressMechanismCounter(mechanism);
     mechCounter.incAuthenticateSent();
 
     auto argsBlock =

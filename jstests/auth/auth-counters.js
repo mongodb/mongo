@@ -24,6 +24,8 @@ test.createUser({user: "user", pwd: "pwd", roles: [], mechanisms: ["SCRAM-SHA-1"
 const expected = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication.mechanisms;
 admin.logout();
 
+const ingressMechs = ["SCRAM-SHA-1", "SCRAM-SHA-256", "MONGODB-X509"];
+
 function assertStats() {
     // Need to be authenticated to run serverStatus.
     assert(admin.auth("admin", "pwd"));
@@ -33,16 +35,23 @@ function assertStats() {
     const mechStats = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication.mechanisms;
     Object.keys(expected).forEach(function (mech) {
         try {
-            assert.eq(mechStats[mech].ingress.authenticate.total, expected[mech].ingress.authenticate.total);
-            assert.eq(mechStats[mech].ingress.authenticate.successful, expected[mech].ingress.authenticate.successful);
-            assert.eq(
-                mechStats[mech].ingress.clusterAuthenticate.total,
-                expected[mech].ingress.clusterAuthenticate.total,
-            );
-            assert.eq(
-                mechStats[mech].ingress.clusterAuthenticate.successful,
-                expected[mech].ingress.clusterAuthenticate.successful,
-            );
+            if (ingressMechs.includes(mech)) {
+                assert.eq(mechStats[mech].ingress.authenticate.total, expected[mech].ingress.authenticate.total);
+                assert.eq(
+                    mechStats[mech].ingress.authenticate.successful,
+                    expected[mech].ingress.authenticate.successful,
+                );
+                assert.eq(
+                    mechStats[mech].ingress.clusterAuthenticate.total,
+                    expected[mech].ingress.clusterAuthenticate.total,
+                );
+                assert.eq(
+                    mechStats[mech].ingress.clusterAuthenticate.successful,
+                    expected[mech].ingress.clusterAuthenticate.successful,
+                );
+            } else {
+                assert(!mechStats[mech].hasOwnProperty("ingress"));
+            }
             assert.eq(mechStats[mech].egress.authenticate.total, expected[mech].egress.authenticate.total);
             assert.eq(mechStats[mech].egress.authenticate.successful, expected[mech].egress.authenticate.successful);
         } catch (e) {

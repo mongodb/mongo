@@ -18,6 +18,8 @@ admin.auth("admin", "pwd");
 let lastStats = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication.mechanisms;
 jsTest.log("Inintial stats: " + lastStats);
 
+const ingressMechs = ["SCRAM-SHA-1", "SCRAM-SHA-256", "MONGODB-X509"];
+
 function test(uri, incrMech, isClusterAuth = false) {
     jsTest.log("Connecting to: " + uri);
     assert.eq(runMongoProgram("mongo", uri, "--eval", ";"), 0);
@@ -26,23 +28,27 @@ function test(uri, incrMech, isClusterAuth = false) {
     try {
         assert.eq(Object.keys(lastStats).length, Object.keys(stats).length);
         Object.keys(lastStats).forEach(function (mech) {
-            const inc = mech === incrMech ? 1 : 0;
-            const clusterInc = mech === incrMech && isClusterAuth ? 1 : 0;
+            if (ingressMechs.includes(mech)) {
+                const inc = mech === incrMech ? 1 : 0;
+                const clusterInc = mech === incrMech && isClusterAuth ? 1 : 0;
 
-            const specBefore = lastStats[mech].ingress.speculativeAuthenticate;
-            const specAfter = stats[mech].ingress.speculativeAuthenticate;
-            assert.eq(specAfter.total, specBefore.total + inc);
-            assert.eq(specAfter.successful, specBefore.successful + inc);
+                const specBefore = lastStats[mech].ingress.speculativeAuthenticate;
+                const specAfter = stats[mech].ingress.speculativeAuthenticate;
+                assert.eq(specAfter.total, specBefore.total + inc);
+                assert.eq(specAfter.successful, specBefore.successful + inc);
 
-            const clusterBefore = lastStats[mech].ingress.clusterAuthenticate;
-            const clusterAfter = stats[mech].ingress.clusterAuthenticate;
-            assert.eq(clusterAfter.total, clusterBefore.total + clusterInc);
-            assert.eq(clusterAfter.successful, clusterBefore.successful + clusterInc);
+                const clusterBefore = lastStats[mech].ingress.clusterAuthenticate;
+                const clusterAfter = stats[mech].ingress.clusterAuthenticate;
+                assert.eq(clusterAfter.total, clusterBefore.total + clusterInc);
+                assert.eq(clusterAfter.successful, clusterBefore.successful + clusterInc);
 
-            const allBefore = lastStats[mech].ingress.authenticate;
-            const allAfter = stats[mech].ingress.authenticate;
-            assert.eq(allAfter.total, allBefore.total + inc);
-            assert.eq(allAfter.successful, allBefore.successful + inc);
+                const allBefore = lastStats[mech].ingress.authenticate;
+                const allAfter = stats[mech].ingress.authenticate;
+                assert.eq(allAfter.total, allBefore.total + inc);
+                assert.eq(allAfter.successful, allBefore.successful + inc);
+            } else {
+                assert(!stats[mech].hasOwnProperty("ingress"));
+            }
         });
     } catch (e) {
         print("Stats: " + tojson(stats));
