@@ -261,14 +261,14 @@ class EndorCtl:
             **kwargs,
         )
 
-    def get_project(self, git_url):
+    def get_project_details(self, git_url):
         resource_kind = EndorResourceKind.PROJECT.value
         resource_description = (
             f"{resource_kind} with name '{git_url}' in namespace '{self.namespace}'"
         )
         project = self.get_resource(resource_kind, name=git_url)
         self._check_resource(project, resource_description)
-        return project
+        return project["uuid"], project["spec"]["git"]["full_name"]
 
     def get_repository_version(self, filter=None, retry=True):
         resource_kind = EndorResourceKind.REPOSITORY_VERSION.value
@@ -369,30 +369,26 @@ class EndorCtl:
     # endregion resource functions
 
     # region workflow functions
-    def get_sbom_for_commit(self, git_url: str, commit_sha: str) -> dict:
-        """Export SBOM for the PR commit (sha)"""
+    def get_sbom(self, git_url: str, target: str = "project", ref: str = "default") -> dict:
+        """Export lastest SBOM for reference"""
+
+        if target == "project" or ref in ["master", "main"]:
+            ref = "default"
+            context_type = EndorContextType.MAIN
+        elif target == "branch":
+            context_type = EndorContextType.REF
+        else:
+            context_type = EndorContextType.CI_RUN
 
         endor_filter = EndorFilter()
 
         try:
-            # Project: get uuid
-            project = self.get_project(git_url)
-            project_uuid = project["uuid"]
-            app_name = project["spec"]["git"]["full_name"]
-
-            # RepositoryVersion: get the context for the PR scan
-            endor_filter.context_type = EndorContextType.CI_RUN.value
-            filter_str = endor_filter.repository_version(project_uuid, commit_sha)
-            repository_version = self.get_repository_version(filter_str)
-            context_id = repository_version["context"]["id"]
-
-            # ScanResult: wait for a completed scan
-            endor_filter.context_id = context_id
-            filter_str = endor_filter.scan_result(project_uuid)
-            self.get_scan_result(filter_str)
+            # Project: get uuid and app name
+            project_uuid, app_name = self.get_project_details(git_url)
 
             # PackageVersions: get package versions for SBOM
-            filter_str = endor_filter.package_version(project_uuid)
+            context_id = ref
+            filter_str = endor_filter.package_version(context_type, context_id, project_uuid)
             package_versions = self.get_package_versions(filter_str)
             package_version_uuids = [
                 package_version["uuid"] for package_version in package_versions
@@ -403,80 +399,9 @@ class EndorCtl:
 
             # Export SBOM
             sbom = self.export_sbom(package_version_uuids=package_version_uuids, app_name=app_name)
-            print(
-                f"Retrieved: CycloneDX SBOM for PackageVersion(s), name: {package_version_names}, uuid: {package_version_uuids}"
-            )
-            return sbom
-
-        except Exception as e:
-            print(f"Exception: {e}")
-            return
-
-    def get_sbom_for_branch(self, git_url: str, branch: str) -> dict:
-        """Export lastest SBOM for a monitored branch/ref"""
-
-        endor_filter = EndorFilter()
-
-        try:
-            # Project: get uuid
-            project = self.get_project(git_url)
-            project_uuid = project["uuid"]
-            app_name = project["spec"]["git"]["full_name"]
-
-            # RepositoryVersion: get the context for the latest branch scan
-            filter_str = endor_filter.repository_version(project_uuid, ref=branch)
-            repository_version = self.get_repository_version(filter_str)
-            repository_version_uuid = repository_version["uuid"]
-            repository_version_ref = repository_version["spec"]["version"]["ref"]
-            repository_version_sha = repository_version["spec"]["version"]["sha"]
-            repository_version_scan_object_status = repository_version["scan_object"]["status"]
-            if repository_version_scan_object_status != "STATUS_SCANNED":
-                logger.warning(
-                    f"RepositoryVersion (uuid: {repository_version_uuid}, ref: {repository_version_ref}, sha: {repository_version_sha}) scan status is '{repository_version_scan_object_status}' (expected 'STATUS_SCANNED')"
-                )
-
-            # ScanResult: search for a completed scan
-            filter_str = endor_filter.scan_result(
-                EndorContextType.MAIN, project_uuid, repository_version_ref, repository_version_sha
-            )
-            scan_result = self.get_scan_result(filter_str, retry=False)
-            project_uuid = scan_result["meta"]["parent_uuid"]
-
-            # PackageVersions: get package versions for SBOM
-            if branch == "master":
-                context_type = EndorContextType.MAIN
-                context_id = "default"
-            else:
-                context_type = EndorContextType.REF
-                context_id = branch
-            filter_str = endor_filter.package_version(context_type, context_id, project_uuid)
-            package_version = self.get_package_versions(filter_str)[0]
-            package_version_name = package_version["meta"]["name"]
-            package_version_uuid = package_version["uuid"]
-
-            # Export SBOM
-            sbom = self.export_sbom(package_version_uuid=package_version_uuid, app_name=app_name)
             logger.info(
-                f"SBOM: Retrieved CycloneDX SBOM for PackageVersion, name: {package_version_name}, uuid {package_version_uuid}"
+                f"SBOM: Retrieved CycloneDX SBOM for {app_name}. PackageVersions: {package_version_names}"
             )
-            return sbom
-
-        except Exception as e:
-            print(f"Exception: {e}")
-            return
-
-    def get_sbom_for_project(self, git_url: str) -> dict:
-        """Export latest SBOM for EndorCtl project default branch"""
-
-        try:
-            # Project: get uuid
-            project = self.get_project(git_url)
-            project_uuid = project["uuid"]
-            app_name = project["spec"]["git"]["full_name"]
-
-            # Export SBOM
-            sbom = self.export_sbom(project_uuid=project_uuid, app_name=app_name)
-            logger.info(f"Retrieved: CycloneDX SBOM for Project {app_name}")
             return sbom
 
         except Exception as e:

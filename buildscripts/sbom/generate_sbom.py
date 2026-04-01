@@ -28,6 +28,7 @@ from endorctl_utils import EndorCtl
 from git import Commit, Repo
 
 from buildscripts.sbom.sbom_utils import (
+    add_component_dependsOn,
     add_component_property,
     check_metadata_sbom,
     convert_sbom_to_public,
@@ -348,8 +349,8 @@ def main() -> None:
     )
     endor.add_argument(
         "--target",
-        help="Target for generated SBOM. Commit: results from running/completed PR scan, Branch: results from latest monitoring scan, Project: results from latest monitoring scan of the 'default' branch (default: commit)",
-        choices=["commit", "branch", "project"],
+        help="Target for generated SBOM. Commit: results from running a CI scan, PR: the # of the scanned PR, Branch: results from latest monitoring scan, Project: results from latest monitoring scan of the 'default' branch (default: project)",
+        choices=["commit", "pr", "branch", "project"],
         default="project",
         type=str,
     )
@@ -370,6 +371,12 @@ def main() -> None:
         "--branch",
         help="Git repo branch monitored by Endor Labs [e.g., v8.0] (Default: current git org/repo)",
         type=str,
+    )
+    exclusive_target.add_argument(
+        "--pr",
+        help="PR number",
+        default=0,
+        type=int,
     )
 
     files = parser.add_argument_group("SBOM files")
@@ -493,21 +500,28 @@ def main() -> None:
 
     print_banner(f"Exporting Endor Labs SBOM for {target} {getattr(git_info, target)}")
     endorctl = EndorCtl(namespace, retry_limit, sleep_duration, endorctl_path, config_path)
-    if target == "commit":
-        endor_bom = endorctl.get_sbom_for_commit(git_info.project, git_info.commit)
-    elif target == "branch":
-        endor_bom = endorctl.get_sbom_for_branch(git_info.project, git_info.branch)
-    elif target == "project":
-        endor_bom = endorctl.get_sbom_for_project(git_info.project)
+
+    endor_bom = None
+    if target == "project":
+        git_info.branch = "master"
+        endor_bom = endorctl.get_sbom(git_info.project)
     else:
-        endor_bom = None
+        if target == "branch":
+            ref = git_info.branch
+        elif target == "commit":
+            ref = git_info.commit
+        elif target == "pr":
+            ref = f"pr/{args.pr}"
+        endor_bom = endorctl.get_sbom(git_info.project, target, ref)
 
     if not endor_bom:
         logger.error("Empty result for Endor SBOM!")
-        if target == "commit":
-            logger.error("Check Endor Labs for any unanticipated issues with the target PR scan.")
+        if target in ["commit", "pr"]:
+            logger.error(
+                f"Check Endor Labs for any unanticipated issues with the target {target} scan."
+            )
         else:
-            logger.error("Check Endor Labs for status of the target monitoring scan.")
+            logger.error(f"Check Endor Labs for status of the target {target} monitoring scan.")
         sys.exit(1)
 
     # endregion export Endor Labs SBOM
@@ -524,6 +538,12 @@ def main() -> None:
         component = endor_bom["components"][i]
         removed = False
         for remove in endor_components_remove:
+            if "components" in endor_bom["metadata"]["component"]:
+                endor_bom["metadata"]["component"]["components"] = [
+                    c
+                    for c in endor_bom["metadata"]["component"]["components"]
+                    if not c.get("bom-ref", "").startswith(remove)
+                ]
             if component["bom-ref"].startswith(remove):
                 logger.info("ENDOR SBOM PRE-PROCESS: removing %s", component["bom-ref"])
                 del endor_bom["components"][i]
@@ -606,6 +626,12 @@ def main() -> None:
     endor_components = sbom_components_to_dict(endor_bom)
     prev_components = sbom_components_to_dict(prev_bom)
 
+    meta_bom_ref = meta_bom["metadata"]["component"]["bom-ref"]
+
+    # If this is a multi-package SBOM export, add the Endor SBOM metadata.component.components[] as dependencies to the parent component in the metadata SBOM, so they are included in the dependency graph.
+    for component in endor_bom["metadata"]["component"].get("components", []):
+        add_component_dependsOn(meta_bom["dependencies"], meta_bom_ref, component["bom-ref"])
+
     # region MongoDB primary component
 
     # Attempt to determine the MongoDB Version being scanned
@@ -615,14 +641,13 @@ def main() -> None:
         git_info.branch,
         prev_bom["metadata"]["component"]["version"],
     )
-    meta_bom_ref = meta_bom["metadata"]["component"]["bom-ref"]
 
     # Project scan always set to 'master' or if using 'master' branch
-    if target == "project" or git_info.branch == "master":
-        version = "master"
-        purl_version = "master"
-        cpe_version = "master"
-        logger.info("Using branch 'master' as MongoDB version")
+    if target == "project" or git_info.branch in ["master", "main"]:
+        version = git_info.branch
+        purl_version = version
+        cpe_version = version
+        logger.info("Using branch '%s' as MongoDB version", git_info.branch)
 
     # tagged release. e.g., r8.1.0, r8.2.1-rc0
     elif git_info.release_tag:
@@ -631,7 +656,7 @@ def main() -> None:
         cpe_version = version  # without leading 'r'
         logger.info("Using release_tag '%s' as MongoDB version", git_info.release_tag)
 
-    # Release branch e.g., v7.0 or v8.2
+    # Release branch staging e.g., v7.0-staging or v8.2-staging
     elif target == "branch" and re.fullmatch(REGEX_RELEASE_BRANCH, git_info.branch):
         version = git_info.branch.replace("-staging", "")
         purl_version = version
@@ -663,6 +688,7 @@ def main() -> None:
 
     # Set main component version
     set_component_version(meta_bom["metadata"]["component"], version, purl_version, cpe_version)
+
     # Run through 'dependency' objects to set main component version
     set_dependency_version(meta_bom["dependencies"], meta_bom_ref, purl_version)
 
