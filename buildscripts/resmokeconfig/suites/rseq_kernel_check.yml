@@ -1,0 +1,20 @@
+test_kind: js_test
+description: |
+  Tests for rseq/tcmalloc kernel compatibility on Linux >= 6.19.
+  Only runs on the ubuntu2404-kernel619-rseq-check variant.
+
+selector:
+  roots:
+    - jstests/noPassthrough/rseq_linux_compatibility/**/*.js
+  include_with_any_tags:
+    - requires_kernel_619
+
+executor:
+  config:
+    shell_options:
+      nodb: ""
+      process_kwargs:
+        env_vars:
+          # We need to set the environment variable at the suite level because
+          # mongo shell would also crash due to the tcmalloc issue otherwise.
+          GLIBC_TUNABLES: "glibc.pthread.rseq=1"

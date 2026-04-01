@@ -1530,6 +1530,23 @@ tasks:
       filenames:
         - "src/mongo_crypt_shared_v1-${push_name}-${push_arch}*"
 
+- name: rseq_kernel_compatibility_check_jstest
+  tags: ["assigned_to_jira_team_server_servicearch", "auxiliary"]
+  depends_on:
+    - name: version_expansions_gen
+      variant: generate-tasks-for-version
+  commands:
+    - func: "bazel compile"
+      vars:
+        targets: install-devcore
+        bazel_args: >-
+          --config=evg
+    - func: "f_expansions_write"
+    - func: "run tests"
+      vars:
+        suite: rseq_kernel_check
+        install_dir: bazel-bin/install/bin
+
 ################################################
 #                 Task Groups                  #
 ################################################
@@ -1545,6 +1562,11 @@ task_groups:
   name: archive_dist_test_TG
   tasks:
   - archive_dist_test
+
+- <<: *compile_bazel_task_group_template
+  name: rseq_kernel_compatibility_check_TG
+  tasks:
+  - rseq_kernel_compatibility_check_jstest
 
 - <<: *compile_task_group_template
   name: compile_and_archive_dist_test_TG

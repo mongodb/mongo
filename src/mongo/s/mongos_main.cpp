@@ -93,6 +93,7 @@
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_killer.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/db/startup_check_rseq.h"
 #include "mongo/db/startup_warnings_common.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/task_executor.h"
@@ -1089,6 +1090,8 @@ ExitCode mongos_main(int argc, char* argv[]) {
     waitForDebugger();
 
     setupSignalHandlers();
+
+    validateRseqKernelCompat();
 
     Status status = runGlobalInitializers(std::vector<std::string>(argv, argv + argc));
     if (!status.isOK()) {

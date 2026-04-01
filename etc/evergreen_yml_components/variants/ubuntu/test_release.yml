@@ -601,3 +601,16 @@ buildvariants:
   tasks:
     - name: hydrate_bazel_profile_TG
     - name: .clang_tidy
+
+- name: &ubuntu2404-kernel619-rseq-check ubuntu2404-kernel619-rseq-check
+  display_name: "~ ubuntu 24.04 kernel 6.19 rseq check"
+  tags: []
+  cron: "0 4 * * 0" # weekly on sunday at 04:00 utc
+  run_on:
+    - DEVPROD-30151-ubuntu2404-kernel619-m6i-4xlarge
+  stepback: false
+  expansions:
+    compile_variant: *ubuntu2404-kernel619-rseq-check
+    evergreen_remote_exec: on
+  tasks:
+    - name: rseq_kernel_compatibility_check_TG
