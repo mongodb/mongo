@@ -186,7 +186,7 @@ void tellAllRecipientsCriticalSectionStarted(
     const ReshardingCoordinatorDocument& doc,
     CancellationToken abortToken,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    ShardsvrReshardRecipientCriticalSectionStarted cmd(doc.getReshardingUUID());
+    ShardsvrReshardingRecipientCriticalSectionStarted cmd(doc.getReshardingUUID());
 
     sendReshardingCommand(
         opCtx,

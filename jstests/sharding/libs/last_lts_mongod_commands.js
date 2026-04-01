@@ -58,7 +58,7 @@ export const commandsAddedToMongodSinceLastLTS = [
     "_shardsvrReshardDonorInitialize",
     "_shardsvrReshardRecipientInitialize",
     "_shardsvrReshardRecipientClone",
-    "_shardsvrReshardRecipientCriticalSectionStarted",
+    "_shardsvrReshardingRecipientCriticalSectionStarted",
     "_shardsvrResolveView",
     "_configsvrStartShardDraining",
     "_shardsvrDropIndexesParticipant",

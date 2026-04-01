@@ -1123,13 +1123,13 @@ const allTestCases = {
         _shardsvrReshardDonorInitialize: {skip: "TODO"},
         _shardsvrReshardRecipientInitialize: {skip: "TODO"},
         _shardsvrReshardRecipientClone: {skip: "TODO"},
-        _shardsvrReshardRecipientCriticalSectionStarted: {
+        _shardsvrReshardingRecipientCriticalSectionStarted: {
             run: {
                 sendsDbVersion: false,
                 runsAgainstAdminDb: true,
                 command: function (dbName, collName) {
                     return {
-                        _shardsvrReshardRecipientCriticalSectionStarted: UUID(),
+                        _shardsvrReshardingRecipientCriticalSectionStarted: UUID(),
                     };
                 },
                 // When the resharding recipient state machine does not exist, we throw

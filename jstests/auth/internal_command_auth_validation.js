@@ -793,10 +793,10 @@ const internalCommandsMap = {
             donorShards: [],
         },
     },
-    _shardsvrReshardRecipientCriticalSectionStarted: {
-        testname: "_shardsvrReshardRecipientCriticalSectionStarted",
+    _shardsvrReshardingRecipientCriticalSectionStarted: {
+        testname: "_shardsvrReshardingRecipientCriticalSectionStarted",
         command: {
-            _shardsvrReshardRecipientCriticalSectionStarted: UUID(),
+            _shardsvrReshardingRecipientCriticalSectionStarted: UUID(),
         },
     },
     _shardsvrRefineCollectionShardKey: {

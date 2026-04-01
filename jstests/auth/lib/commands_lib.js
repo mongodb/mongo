@@ -3571,9 +3571,9 @@ export const authCommandsLib = {
             ],
         },
         {
-            testname: "_shardsvrReshardRecipientCriticalSectionStarted",
+            testname: "_shardsvrReshardingRecipientCriticalSectionStarted",
             command: {
-                _shardsvrReshardRecipientCriticalSectionStarted: UUID(),
+                _shardsvrReshardingRecipientCriticalSectionStarted: UUID(),
             },
             skipSharded: true,
             testcases: [

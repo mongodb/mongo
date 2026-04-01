@@ -136,12 +136,12 @@ commands:
                 type: ReshardingApproxCopySize
                 description: "Not meant to be used directly. Only use internal fields."
 
-    _shardsvrReshardRecipientCriticalSectionStarted:
+    _shardsvrReshardingRecipientCriticalSectionStarted:
         description:
             "The internal command run by coordinator against recipients to notify them that the
             critical section has started."
-        command_name: _shardsvrReshardRecipientCriticalSectionStarted
-        cpp_name: ShardsvrReshardRecipientCriticalSectionStarted
+        command_name: _shardsvrReshardingRecipientCriticalSectionStarted
+        cpp_name: ShardsvrReshardingRecipientCriticalSectionStarted
         type: uuid
         strict: false
         namespace: type
