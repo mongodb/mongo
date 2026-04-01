@@ -88,18 +88,14 @@ public:
         jCtx->catStats = {
             .collStats = {
                 {smallNss,
-                 CollectionStats{
-                     .logicalDataSizeBytes = collCards[smallNodeId].toDouble() * docSizeBytes,
-                     .onDiskSizeBytes = collCards[smallNodeId].toDouble() * docSizeBytes}},
+                 CollectionStats{collCards[smallNodeId].toDouble() * docSizeBytes,
+                                 collCards[smallNodeId].toDouble() * docSizeBytes}},
                 {largeNss,
-                 CollectionStats{
-                     .logicalDataSizeBytes = collCards[largeNodeId].toDouble() * docSizeBytes,
-                     .onDiskSizeBytes = collCards[largeNodeId].toDouble() * docSizeBytes}},
+                 CollectionStats{collCards[largeNodeId].toDouble() * docSizeBytes,
+                                 collCards[largeNodeId].toDouble() * docSizeBytes}},
                 {extremelySmallNss,
-                 CollectionStats{.logicalDataSizeBytes =
-                                     collCards[extremelySmallNodeId].toDouble() * docSizeBytes,
-                                 .onDiskSizeBytes =
-                                     collCards[extremelySmallNodeId].toDouble() * docSizeBytes}},
+                 CollectionStats{collCards[extremelySmallNodeId].toDouble() * docSizeBytes,
+                                 collCards[extremelySmallNodeId].toDouble() * docSizeBytes}},
             }};
 
         costEstimator = std::make_unique<JoinCostEstimatorImpl>(*jCtx, *cardEstimator);

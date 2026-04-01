@@ -7,723 +7,723 @@ Level 2:
 111
 
 Output plans (best plan 7):
-0.(259.345)[111] INLJ
+0.(259.702)[111] INLJ
  -> left:
-    (4.06136)[011] INLJ
+    (4.1711)[011] INLJ
      -> left:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
      -> right:
         [010][test.nss1] INDEX_PROBE { a1: 1 }
  -> right:
     [100][test.nss2] INDEX_PROBE { a2: -1 }
 
-1.(258.297)[111] INLJ
+1.(258.565)[111] INLJ
  -> left:
-    (3.01311)[011] HJ
+    (3.03331)[011] HJ
      -> left:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
      -> right:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
  -> right:
     [100][test.nss2] INDEX_PROBE { a2: -1 }
 
-2.(279.634)[111] INLJ
+2.(280.085)[111] INLJ
  -> left:
-    (24.3506)[011] NLJ
+    (24.5537)[011] NLJ
      -> left:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
      -> right:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
  -> right:
     [100][test.nss2] INDEX_PROBE { a2: -1 }
 
-3.(260.373)[111] INLJ
+3.(260.641)[111] INLJ
  -> left:
-    (5.08965)[011] INLJ
+    (5.10997)[011] INLJ
      -> left:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
      -> right:
         [001][test.nss0] INDEX_PROBE { a0: -1 }
  -> right:
     [100][test.nss2] INDEX_PROBE { a2: -1 }
 
-4.(258.297)[111] INLJ
+4.(258.565)[111] INLJ
  -> left:
-    (3.01311)[011] HJ
+    (3.03331)[011] HJ
      -> left:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
      -> right:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
  -> right:
     [100][test.nss2] INDEX_PROBE { a2: -1 }
 
-5.(281.37)[111] INLJ
+5.(281.51)[111] INLJ
  -> left:
-    (26.0866)[011] NLJ
+    (25.9789)[011] NLJ
      -> left:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
      -> right:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
  -> right:
     [100][test.nss2] INDEX_PROBE { a2: -1 }
 
-6.(133.641)[111] HJ
+6.(133.797)[111] HJ
  -> left:
-    (4.06136)[011] INLJ
+    (4.1711)[011] INLJ
      -> left:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
      -> right:
         [010][test.nss1] INDEX_PROBE { a1: 1 }
  -> right:
-    (3.48943)[100][test.nss2] COLLSCAN
+    (3.5352)[100][test.nss2] COLLSCAN
 
-7.(132.593)[111] HJ
+7.(132.659)[111] HJ
  -> left:
-    (3.01311)[011] HJ
+    (3.03331)[011] HJ
      -> left:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
      -> right:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
  -> right:
-    (3.48943)[100][test.nss2] COLLSCAN
+    (3.5352)[100][test.nss2] COLLSCAN
 
-8.(153.93)[111] HJ
+8.(154.179)[111] HJ
  -> left:
-    (24.3506)[011] NLJ
+    (24.5537)[011] NLJ
      -> left:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
      -> right:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
  -> right:
-    (3.48943)[100][test.nss2] COLLSCAN
+    (3.5352)[100][test.nss2] COLLSCAN
 
-9.(134.669)[111] HJ
+9.(134.736)[111] HJ
  -> left:
-    (5.08965)[011] INLJ
+    (5.10997)[011] INLJ
      -> left:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
      -> right:
         [001][test.nss0] INDEX_PROBE { a0: -1 }
  -> right:
-    (3.48943)[100][test.nss2] COLLSCAN
+    (3.5352)[100][test.nss2] COLLSCAN
 
-10.(132.593)[111] HJ
+10.(132.659)[111] HJ
  -> left:
-    (3.01311)[011] HJ
+    (3.03331)[011] HJ
      -> left:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
      -> right:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
  -> right:
-    (3.48943)[100][test.nss2] COLLSCAN
+    (3.5352)[100][test.nss2] COLLSCAN
 
-11.(155.666)[111] HJ
+11.(155.604)[111] HJ
  -> left:
-    (26.0866)[011] NLJ
+    (25.9789)[011] NLJ
      -> left:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
      -> right:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
  -> right:
-    (3.48943)[100][test.nss2] COLLSCAN
+    (3.5352)[100][test.nss2] COLLSCAN
 
-12.(4895.04)[111] NLJ
+12.(4941.38)[111] NLJ
  -> left:
-    (4.06136)[011] INLJ
+    (4.1711)[011] INLJ
      -> left:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
      -> right:
         [010][test.nss1] INDEX_PROBE { a1: 1 }
  -> right:
-    (3.48943)[100][test.nss2] COLLSCAN
+    (3.5352)[100][test.nss2] COLLSCAN
 
-13.(4894)[111] NLJ
+13.(4940.24)[111] NLJ
  -> left:
-    (3.01311)[011] HJ
+    (3.03331)[011] HJ
      -> left:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
      -> right:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
  -> right:
-    (3.48943)[100][test.nss2] COLLSCAN
+    (3.5352)[100][test.nss2] COLLSCAN
 
-14.(4915.33)[111] NLJ
+14.(4961.77)[111] NLJ
  -> left:
-    (24.3506)[011] NLJ
+    (24.5537)[011] NLJ
      -> left:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
      -> right:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
  -> right:
-    (3.48943)[100][test.nss2] COLLSCAN
+    (3.5352)[100][test.nss2] COLLSCAN
 
-15.(4896.07)[111] NLJ
+15.(4942.32)[111] NLJ
  -> left:
-    (5.08965)[011] INLJ
+    (5.10997)[011] INLJ
      -> left:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
      -> right:
         [001][test.nss0] INDEX_PROBE { a0: -1 }
  -> right:
-    (3.48943)[100][test.nss2] COLLSCAN
+    (3.5352)[100][test.nss2] COLLSCAN
 
-16.(4894)[111] NLJ
+16.(4940.24)[111] NLJ
  -> left:
-    (3.01311)[011] HJ
+    (3.03331)[011] HJ
      -> left:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
      -> right:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
  -> right:
-    (3.48943)[100][test.nss2] COLLSCAN
+    (3.5352)[100][test.nss2] COLLSCAN
 
-17.(4917.07)[111] NLJ
+17.(4963.19)[111] NLJ
  -> left:
-    (26.0866)[011] NLJ
+    (25.9789)[011] NLJ
      -> left:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
      -> right:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
  -> right:
-    (3.48943)[100][test.nss2] COLLSCAN
+    (3.5352)[100][test.nss2] COLLSCAN
 
-18.(133.641)[111] HJ
+18.(133.797)[111] HJ
  -> left:
-    (3.48943)[100][test.nss2] COLLSCAN
+    (3.5352)[100][test.nss2] COLLSCAN
  -> right:
-    (4.06136)[011] INLJ
+    (4.1711)[011] INLJ
      -> left:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
      -> right:
         [010][test.nss1] INDEX_PROBE { a1: 1 }
 
-19.(132.593)[111] HJ
+19.(132.659)[111] HJ
  -> left:
-    (3.48943)[100][test.nss2] COLLSCAN
+    (3.5352)[100][test.nss2] COLLSCAN
  -> right:
-    (3.01311)[011] HJ
+    (3.03331)[011] HJ
      -> left:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
      -> right:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
 
-20.(153.93)[111] HJ
+20.(154.179)[111] HJ
  -> left:
-    (3.48943)[100][test.nss2] COLLSCAN
+    (3.5352)[100][test.nss2] COLLSCAN
  -> right:
-    (24.3506)[011] NLJ
+    (24.5537)[011] NLJ
      -> left:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
      -> right:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
 
-21.(134.669)[111] HJ
+21.(134.736)[111] HJ
  -> left:
-    (3.48943)[100][test.nss2] COLLSCAN
+    (3.5352)[100][test.nss2] COLLSCAN
  -> right:
-    (5.08965)[011] INLJ
+    (5.10997)[011] INLJ
      -> left:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
      -> right:
         [001][test.nss0] INDEX_PROBE { a0: -1 }
 
-22.(132.593)[111] HJ
+22.(132.659)[111] HJ
  -> left:
-    (3.48943)[100][test.nss2] COLLSCAN
+    (3.5352)[100][test.nss2] COLLSCAN
  -> right:
-    (3.01311)[011] HJ
+    (3.03331)[011] HJ
      -> left:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
      -> right:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
 
-23.(155.666)[111] HJ
+23.(155.604)[111] HJ
  -> left:
-    (3.48943)[100][test.nss2] COLLSCAN
+    (3.5352)[100][test.nss2] COLLSCAN
  -> right:
-    (26.0866)[011] NLJ
+    (25.9789)[011] NLJ
      -> left:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
      -> right:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
 
-24.(261.793)[111] INLJ
+24.(262.15)[111] INLJ
  -> left:
-    (8.0532)[101] INLJ
+    (8.30049)[101] INLJ
      -> left:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
      -> right:
         [100][test.nss2] INDEX_PROBE { a2: -1 }
  -> right:
     [010][test.nss1] INDEX_PROBE { a1: 1 }
 
-25.(259.713)[111] INLJ
+25.(259.869)[111] INLJ
  -> left:
-    (5.97315)[101] HJ
+    (6.01879)[101] HJ
      -> left:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
      -> right:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
  -> right:
     [010][test.nss1] INDEX_PROBE { a1: 1 }
 
-26.(302.183)[111] INLJ
+26.(302.75)[111] INLJ
  -> left:
-    (48.4429)[101] NLJ
+    (48.9005)[101] NLJ
      -> left:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
      -> right:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
  -> right:
     [010][test.nss1] INDEX_PROBE { a1: 1 }
 
-27.(263.014)[111] INLJ
+27.(263.169)[111] INLJ
  -> left:
-    (9.27368)[101] INLJ
+    (9.31945)[101] INLJ
      -> left:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
      -> right:
         [001][test.nss0] INDEX_PROBE { a0: -1 }
  -> right:
     [010][test.nss1] INDEX_PROBE { a1: 1 }
 
-28.(259.713)[111] INLJ
+28.(259.869)[111] INLJ
  -> left:
-    (5.97315)[101] HJ
+    (6.01879)[101] HJ
      -> left:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
      -> right:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
  -> right:
     [010][test.nss1] INDEX_PROBE { a1: 1 }
 
-29.(305.655)[111] INLJ
+29.(305.556)[111] INLJ
  -> left:
-    (51.915)[101] NLJ
+    (51.7059)[101] NLJ
      -> left:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
      -> right:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
  -> right:
     [010][test.nss1] INDEX_PROBE { a1: 1 }
 
-30.(135.897)[111] HJ
+30.(136.165)[111] HJ
  -> left:
-    (8.0532)[101] INLJ
+    (8.30049)[101] INLJ
      -> left:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
      -> right:
         [100][test.nss2] INDEX_PROBE { a2: -1 }
  -> right:
-    (1.75339)[010][test.nss1] COLLSCAN
+    (1.77372)[010][test.nss1] COLLSCAN
 
-31.(133.817)[111] HJ
+31.(133.883)[111] HJ
  -> left:
-    (5.97315)[101] HJ
+    (6.01879)[101] HJ
      -> left:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
      -> right:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
  -> right:
-    (1.75339)[010][test.nss1] COLLSCAN
+    (1.77372)[010][test.nss1] COLLSCAN
 
-32.(176.287)[111] HJ
+32.(176.765)[111] HJ
  -> left:
-    (48.4429)[101] NLJ
+    (48.9005)[101] NLJ
      -> left:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
      -> right:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
  -> right:
-    (1.75339)[010][test.nss1] COLLSCAN
+    (1.77372)[010][test.nss1] COLLSCAN
 
-33.(137.117)[111] HJ
+33.(137.184)[111] HJ
  -> left:
-    (9.27368)[101] INLJ
+    (9.31945)[101] INLJ
      -> left:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
      -> right:
         [001][test.nss0] INDEX_PROBE { a0: -1 }
  -> right:
-    (1.75339)[010][test.nss1] COLLSCAN
+    (1.77372)[010][test.nss1] COLLSCAN
 
-34.(133.817)[111] HJ
+34.(133.883)[111] HJ
  -> left:
-    (5.97315)[101] HJ
+    (6.01879)[101] HJ
      -> left:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
      -> right:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
  -> right:
-    (1.75339)[010][test.nss1] COLLSCAN
+    (1.77372)[010][test.nss1] COLLSCAN
 
-35.(179.759)[111] HJ
+35.(179.57)[111] HJ
  -> left:
-    (51.915)[101] NLJ
+    (51.7059)[101] NLJ
      -> left:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
      -> right:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
  -> right:
-    (1.75339)[010][test.nss1] COLLSCAN
+    (1.77372)[010][test.nss1] COLLSCAN
 
-36.(4899.04)[111] NLJ
+36.(4940.14)[111] NLJ
  -> left:
-    (8.0532)[101] INLJ
+    (8.30049)[101] INLJ
      -> left:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
      -> right:
         [100][test.nss2] INDEX_PROBE { a2: -1 }
  -> right:
-    (1.75339)[010][test.nss1] COLLSCAN
+    (1.77372)[010][test.nss1] COLLSCAN
 
-37.(4896.96)[111] NLJ
+37.(4937.86)[111] NLJ
  -> left:
-    (5.97315)[101] HJ
+    (6.01879)[101] HJ
      -> left:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
      -> right:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
  -> right:
-    (1.75339)[010][test.nss1] COLLSCAN
+    (1.77372)[010][test.nss1] COLLSCAN
 
-38.(4939.43)[111] NLJ
+38.(4980.74)[111] NLJ
  -> left:
-    (48.4429)[101] NLJ
+    (48.9005)[101] NLJ
      -> left:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
      -> right:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
  -> right:
-    (1.75339)[010][test.nss1] COLLSCAN
+    (1.77372)[010][test.nss1] COLLSCAN
 
-39.(4900.26)[111] NLJ
+39.(4941.16)[111] NLJ
  -> left:
-    (9.27368)[101] INLJ
+    (9.31945)[101] INLJ
      -> left:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
      -> right:
         [001][test.nss0] INDEX_PROBE { a0: -1 }
  -> right:
-    (1.75339)[010][test.nss1] COLLSCAN
+    (1.77372)[010][test.nss1] COLLSCAN
 
-40.(4896.96)[111] NLJ
+40.(4937.86)[111] NLJ
  -> left:
-    (5.97315)[101] HJ
+    (6.01879)[101] HJ
      -> left:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
      -> right:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
  -> right:
-    (1.75339)[010][test.nss1] COLLSCAN
+    (1.77372)[010][test.nss1] COLLSCAN
 
-41.(4942.9)[111] NLJ
+41.(4983.54)[111] NLJ
  -> left:
-    (51.915)[101] NLJ
+    (51.7059)[101] NLJ
      -> left:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
      -> right:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
  -> right:
-    (1.75339)[010][test.nss1] COLLSCAN
+    (1.77372)[010][test.nss1] COLLSCAN
 
-42.(135.897)[111] HJ
+42.(136.165)[111] HJ
  -> left:
-    (1.75339)[010][test.nss1] COLLSCAN
+    (1.77372)[010][test.nss1] COLLSCAN
  -> right:
-    (8.0532)[101] INLJ
+    (8.30049)[101] INLJ
      -> left:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
      -> right:
         [100][test.nss2] INDEX_PROBE { a2: -1 }
 
-43.(133.817)[111] HJ
+43.(133.883)[111] HJ
  -> left:
-    (1.75339)[010][test.nss1] COLLSCAN
+    (1.77372)[010][test.nss1] COLLSCAN
  -> right:
-    (5.97315)[101] HJ
+    (6.01879)[101] HJ
      -> left:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
      -> right:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
 
-44.(176.287)[111] HJ
+44.(176.765)[111] HJ
  -> left:
-    (1.75339)[010][test.nss1] COLLSCAN
+    (1.77372)[010][test.nss1] COLLSCAN
  -> right:
-    (48.4429)[101] NLJ
+    (48.9005)[101] NLJ
      -> left:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
      -> right:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
 
-45.(137.117)[111] HJ
+45.(137.184)[111] HJ
  -> left:
-    (1.75339)[010][test.nss1] COLLSCAN
+    (1.77372)[010][test.nss1] COLLSCAN
  -> right:
-    (9.27368)[101] INLJ
+    (9.31945)[101] INLJ
      -> left:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
      -> right:
         [001][test.nss0] INDEX_PROBE { a0: -1 }
 
-46.(133.817)[111] HJ
+46.(133.883)[111] HJ
  -> left:
-    (1.75339)[010][test.nss1] COLLSCAN
+    (1.77372)[010][test.nss1] COLLSCAN
  -> right:
-    (5.97315)[101] HJ
+    (6.01879)[101] HJ
      -> left:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
      -> right:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
 
-47.(179.759)[111] HJ
+47.(179.57)[111] HJ
  -> left:
-    (1.75339)[010][test.nss1] COLLSCAN
+    (1.77372)[010][test.nss1] COLLSCAN
  -> right:
-    (51.915)[101] NLJ
+    (51.7059)[101] NLJ
      -> left:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
      -> right:
-        (0.0173603)[001][test.nss0] COLLSCAN
+        (0.0172335)[001][test.nss0] COLLSCAN
 
-48.(754.869)[111] INLJ
+48.(755.137)[111] INLJ
  -> left:
-    (257.037)[110] INLJ
+    (257.305)[110] INLJ
      -> left:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
      -> right:
         [100][test.nss2] INDEX_PROBE { a2: -1 }
  -> right:
     [001][test.nss0] INDEX_PROBE { a0: -1 }
 
-49.(629.165)[111] INLJ
+49.(629.232)[111] INLJ
  -> left:
-    (131.333)[110] HJ
+    (131.399)[110] HJ
      -> left:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
      -> right:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
  -> right:
     [001][test.nss0] INDEX_PROBE { a0: -1 }
 
-50.(5390.57)[111] INLJ
+50.(5436.82)[111] INLJ
  -> left:
-    (4892.74)[110] NLJ
+    (4938.99)[110] NLJ
      -> left:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
      -> right:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
  -> right:
     [001][test.nss0] INDEX_PROBE { a0: -1 }
 
-51.(755.062)[111] INLJ
+51.(755.217)[111] INLJ
  -> left:
-    (257.229)[110] INLJ
+    (257.385)[110] INLJ
      -> left:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
      -> right:
         [010][test.nss1] INDEX_PROBE { a1: 1 }
  -> right:
     [001][test.nss0] INDEX_PROBE { a0: -1 }
 
-52.(629.165)[111] INLJ
+52.(629.232)[111] INLJ
  -> left:
-    (131.333)[110] HJ
+    (131.399)[110] HJ
      -> left:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
      -> right:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
  -> right:
     [001][test.nss0] INDEX_PROBE { a0: -1 }
 
-53.(5392.3)[111] INLJ
+53.(5433.2)[111] INLJ
  -> left:
-    (4894.47)[110] NLJ
+    (4935.37)[110] NLJ
      -> left:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
      -> right:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
  -> right:
     [001][test.nss0] INDEX_PROBE { a0: -1 }
 
-54.(1193.9)[111] HJ
+54.(1194.16)[111] HJ
  -> left:
-    (257.037)[110] INLJ
+    (257.305)[110] INLJ
      -> left:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
      -> right:
         [100][test.nss2] INDEX_PROBE { a2: -1 }
  -> right:
-    (0.0173603)[001][test.nss0] COLLSCAN
+    (0.0172335)[001][test.nss0] COLLSCAN
 
-55.(1068.19)[111] HJ
+55.(1068.26)[111] HJ
  -> left:
-    (131.333)[110] HJ
+    (131.399)[110] HJ
      -> left:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
      -> right:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
  -> right:
-    (0.0173603)[001][test.nss0] COLLSCAN
+    (0.0172335)[001][test.nss0] COLLSCAN
 
-56.(5829.6)[111] HJ
+56.(5875.84)[111] HJ
  -> left:
-    (4892.74)[110] NLJ
+    (4938.99)[110] NLJ
      -> left:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
      -> right:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
  -> right:
-    (0.0173603)[001][test.nss0] COLLSCAN
+    (0.0172335)[001][test.nss0] COLLSCAN
 
-57.(1194.09)[111] HJ
+57.(1194.24)[111] HJ
  -> left:
-    (257.229)[110] INLJ
+    (257.385)[110] INLJ
      -> left:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
      -> right:
         [010][test.nss1] INDEX_PROBE { a1: 1 }
  -> right:
-    (0.0173603)[001][test.nss0] COLLSCAN
+    (0.0172335)[001][test.nss0] COLLSCAN
 
-58.(1068.19)[111] HJ
+58.(1068.26)[111] HJ
  -> left:
-    (131.333)[110] HJ
+    (131.399)[110] HJ
      -> left:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
      -> right:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
  -> right:
-    (0.0173603)[001][test.nss0] COLLSCAN
+    (0.0172335)[001][test.nss0] COLLSCAN
 
-59.(5831.33)[111] HJ
+59.(5872.23)[111] HJ
  -> left:
-    (4894.47)[110] NLJ
+    (4935.37)[110] NLJ
      -> left:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
      -> right:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
  -> right:
-    (0.0173603)[001][test.nss0] COLLSCAN
+    (0.0172335)[001][test.nss0] COLLSCAN
 
-60.(5148.02)[111] NLJ
+60.(5122.55)[111] NLJ
  -> left:
-    (257.037)[110] INLJ
+    (257.305)[110] INLJ
      -> left:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
      -> right:
         [100][test.nss2] INDEX_PROBE { a2: -1 }
  -> right:
-    (0.0173603)[001][test.nss0] COLLSCAN
+    (0.0172335)[001][test.nss0] COLLSCAN
 
-61.(5022.32)[111] NLJ
+61.(4996.64)[111] NLJ
  -> left:
-    (131.333)[110] HJ
+    (131.399)[110] HJ
      -> left:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
      -> right:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
  -> right:
-    (0.0173603)[001][test.nss0] COLLSCAN
+    (0.0172335)[001][test.nss0] COLLSCAN
 
-62.(9783.72)[111] NLJ
+62.(9804.23)[111] NLJ
  -> left:
-    (4892.74)[110] NLJ
+    (4938.99)[110] NLJ
      -> left:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
      -> right:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
  -> right:
-    (0.0173603)[001][test.nss0] COLLSCAN
+    (0.0172335)[001][test.nss0] COLLSCAN
 
-63.(5148.21)[111] NLJ
+63.(5122.63)[111] NLJ
  -> left:
-    (257.229)[110] INLJ
+    (257.385)[110] INLJ
      -> left:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
      -> right:
         [010][test.nss1] INDEX_PROBE { a1: 1 }
  -> right:
-    (0.0173603)[001][test.nss0] COLLSCAN
+    (0.0172335)[001][test.nss0] COLLSCAN
 
-64.(5022.32)[111] NLJ
+64.(4996.64)[111] NLJ
  -> left:
-    (131.333)[110] HJ
+    (131.399)[110] HJ
      -> left:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
      -> right:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
  -> right:
-    (0.0173603)[001][test.nss0] COLLSCAN
+    (0.0172335)[001][test.nss0] COLLSCAN
 
-65.(9785.46)[111] NLJ
+65.(9800.62)[111] NLJ
  -> left:
-    (4894.47)[110] NLJ
+    (4935.37)[110] NLJ
      -> left:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
      -> right:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
  -> right:
-    (0.0173603)[001][test.nss0] COLLSCAN
+    (0.0172335)[001][test.nss0] COLLSCAN
 
-66.(505.545)[111] HJ
+66.(505.813)[111] HJ
  -> left:
-    (0.0173603)[001][test.nss0] COLLSCAN
+    (0.0172335)[001][test.nss0] COLLSCAN
  -> right:
-    (257.037)[110] INLJ
+    (257.305)[110] INLJ
      -> left:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
      -> right:
         [100][test.nss2] INDEX_PROBE { a2: -1 }
 
-67.(379.841)[111] HJ
+67.(379.907)[111] HJ
  -> left:
-    (0.0173603)[001][test.nss0] COLLSCAN
+    (0.0172335)[001][test.nss0] COLLSCAN
  -> right:
-    (131.333)[110] HJ
+    (131.399)[110] HJ
      -> left:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
      -> right:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
 
-68.(5141.24)[111] HJ
+68.(5187.49)[111] HJ
  -> left:
-    (0.0173603)[001][test.nss0] COLLSCAN
+    (0.0172335)[001][test.nss0] COLLSCAN
  -> right:
-    (4892.74)[110] NLJ
+    (4938.99)[110] NLJ
      -> left:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
      -> right:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
 
-69.(505.737)[111] HJ
+69.(505.893)[111] HJ
  -> left:
-    (0.0173603)[001][test.nss0] COLLSCAN
+    (0.0172335)[001][test.nss0] COLLSCAN
  -> right:
-    (257.229)[110] INLJ
+    (257.385)[110] INLJ
      -> left:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
      -> right:
         [010][test.nss1] INDEX_PROBE { a1: 1 }
 
-70.(379.841)[111] HJ
+70.(379.907)[111] HJ
  -> left:
-    (0.0173603)[001][test.nss0] COLLSCAN
+    (0.0172335)[001][test.nss0] COLLSCAN
  -> right:
-    (131.333)[110] HJ
+    (131.399)[110] HJ
      -> left:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
      -> right:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
 
-71.(5142.98)[111] HJ
+71.(5183.88)[111] HJ
  -> left:
-    (0.0173603)[001][test.nss0] COLLSCAN
+    (0.0172335)[001][test.nss0] COLLSCAN
  -> right:
-    (4894.47)[110] NLJ
+    (4935.37)[110] NLJ
      -> left:
-        (3.48943)[100][test.nss2] COLLSCAN
+        (3.5352)[100][test.nss2] COLLSCAN
      -> right:
-        (1.75339)[010][test.nss1] COLLSCAN
+        (1.77372)[010][test.nss1] COLLSCAN
 

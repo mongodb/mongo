@@ -40,23 +40,42 @@ namespace mongo::join_ordering {
  * Statisitics for a single collection.
  */
 struct CollectionStats {
+    CollectionStats(double logicalDataSizeBytes,
+                    double onDiskSizeBytes,
+                    double pageSizeBytes = 32 * 1024)
+        : logicalDataSizeBytes(logicalDataSizeBytes),
+          _onDiskSizeBytes(onDiskSizeBytes),
+          _pageSizeBytes(pageSizeBytes) {}
+
+    /**
+     * Returns the estimated number of on-disk pages for this collection, rounded to the nearest
+     * power of 2^(1/4). The purpose is to smooth-out small variations that can occur in
+     * onDiskSizeBytes across different runs of plan stability tests which invoke `mongorestore`
+     * each time. Returns 0 if the collection has no on-disk data. Callers should always prefer this
+     * over accessing the raw on-disk size directly, to avoid sensitivity to non-deterministic
+     * storage engine values.
+     */
+    double numPages() const;
+
     // Estimate of the data size of this collection when in-memory (uncompressed and unencrypted).
     double logicalDataSizeBytes;
 
-    // Estimate of the data size of this collection on-disk post compression.
-    double onDiskSizeBytes;
+private:
+    // Estimate of the data size of this collection on-disk post compression. Not exposed directly —
+    // callers must use numOnDiskPages() which applies quantization to absorb small
+    // platform-dependent differences in the raw value (e.g. between mongorestore runs).
+    double _onDiskSizeBytes;
 
     // Approximate size, in bytes, of a single WT data page on-disk. The optimizer uses this as the
     // I/O granularity when estimating the number of disk I/Os performed by an operator for cost
     // estimates. Default to 32KiB if not specified.
-    double pageSizeBytes{32 * 1024};
+    double _pageSizeBytes;
 };
 
 /**
  * Statistics extracted from the catalog useful for cost estimation.
  */
 struct CatalogStats {
-
     /**
      * Estimate the number of pages from the given collection that would fit in the WT cache. This
      * function is parameterized by collection as we've found that different collections can have

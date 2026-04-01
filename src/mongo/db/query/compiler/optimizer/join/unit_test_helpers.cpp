@@ -172,10 +172,7 @@ void JoinOrderingTestFixture::initGraph(size_t numNodes, bool withIndexes) {
         collCards.push_back(makeCard(i * 1000.0 + 10.0));
         subsetCards.emplace(makeNodeSet((NodeId)i), collCards[i]);
         const double dataSize = collCards[i].toDouble() * 420.0;
-        catStats.collStats[nss] = CollectionStats{
-            .logicalDataSizeBytes = dataSize,
-            .onDiskSizeBytes = dataSize / 4,
-        };
+        catStats.collStats.insert_or_assign(nss, CollectionStats{dataSize, dataSize / 4});
 
         auto cq = makeCanonicalQuery(nss, filterBSON);
         cbrCqQsns.emplace(cq.get(),
