@@ -1,5 +1,7 @@
 if [ "Windows_NT" = "$OS" ]; then
-  python='/cygdrive/c/python/python37/python.exe'
+  # `set up venv` runs before Evergreen expansions are loaded into bash, so
+  # default Windows bootstrap to Python 3.10 instead of the legacy 3.7 path.
+  python="${python:-/cygdrive/c/python/python310/python.exe}"
 else
   if [ -f /opt/mongodbtoolchain/v4/bin/python3 ]; then
     python="/opt/mongodbtoolchain/v4/bin/python3"
