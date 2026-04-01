@@ -342,6 +342,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                               .perCollIdxs = std::move(indexesPerColl),
                               .catStats = createCatalogStats(opCtx, mca),
                               .uniqueFieldInfo = std::move(uniqueFieldInfo),
+                              .samplingEstimators = &samplingEstimators,
                               .explain = expCtx->getExplain().has_value()};
 
     JoinCardinalityEstimator cardEstimator(

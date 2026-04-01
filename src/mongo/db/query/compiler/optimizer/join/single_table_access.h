@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates_storage.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
@@ -37,9 +36,6 @@
 #pragma once
 
 namespace mongo::join_ordering {
-
-using SamplingEstimatorMap =
-    stdx::unordered_map<NamespaceString, std::unique_ptr<ce::SamplingEstimator>>;
 
 /**
  * Struct containing results from 'singleTableAccessPlans()' function.
