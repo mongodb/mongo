@@ -119,6 +119,22 @@ class CoreAnalyzer(Subcommand):
             core_dump_dir = self.options["core_dir"] or os.path.curdir
             multiversion_dir = self.options["multiversion_dir"] or os.path.curdir
 
+        # If all cores were boring and filtered out, there's nothing to analyze.
+        if os.path.exists(core_dump_dir):
+            core_files = [f for f in os.listdir(core_dump_dir) if f.endswith((".core", ".mdmp"))]
+        else:
+            core_files = []
+        if not core_files:
+            self.root_logger.info(
+                "No core dumps to analyze (all were filtered as boring). Exiting successfully."
+            )
+            analysis_dir = os.path.join(base_dir, "analysis")
+            os.makedirs(analysis_dir, exist_ok=True)
+            if self.options["generate_report"]:
+                with open("report.json", "w") as file:
+                    json.dump({"cores_analyzed": 0, "all_boring": True}, file)
+            return
+
         analysis_dir = os.path.join(base_dir, "analysis")
         report = dumpers.dbg.analyze_cores(
             core_dump_dir,

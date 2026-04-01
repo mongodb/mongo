@@ -147,7 +147,7 @@ def filter_core_dumps(
         )
         interesting = interesting[:max_core_dumps]
 
-    # TODO: Keep the report/telemetry reporting from dumper.py if possible?
+    # TODO DEVPROD-31034 Keep the report/telemetry reporting from dumper.py if possible?
     logger.info(
         "Downloading %d of %d core dump(s) (%d boring skipped)",
         len(interesting),
@@ -168,12 +168,20 @@ def download_core_dumps(
     max_core_dumps: int = 10,
 ) -> bool:
     root_logger.info("Looking for core dumps")
+    all_core_dump_artifacts = [a for a in task.artifacts if a.name.startswith("Core Dump")]
     core_dump_artifacts = filter_core_dumps(
-        [a for a in task.artifacts if a.name.startswith("Core Dump")],
+        all_core_dump_artifacts,
         boring_core_dump_pids,
         max_core_dumps,
         root_logger,
     )
+
+    if not core_dump_artifacts and all_core_dump_artifacts:
+        root_logger.info(
+            "All %d core dump(s) were filtered as boring. Nothing to analyze.",
+            len(all_core_dump_artifacts),
+        )
+        return True
 
     core_dumps_found = 0
     core_dumps_dir = os.path.join(download_dir, "core-dumps")
