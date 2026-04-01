@@ -148,6 +148,14 @@ public:
 
     void flushTruncateMarkers();
 
+    /**
+     * Returns a reference to the initial marker creation statistics of the truncate manager.
+     * Does not need to be thread-safe as the underlying metrics in the statistics are atomics.
+     */
+    const PreImagesTruncateManager::MarkerCreationStats& getMarkerCreationStats() const {
+        return _truncateManager.getMarkerCreationStats();
+    }
+
 private:
     /**
      * Scans the 'config.system.preimages' collection and deletes the expired pre-images from it.

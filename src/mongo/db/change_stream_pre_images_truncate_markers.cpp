@@ -45,6 +45,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 
 #include <cstdint>
 
@@ -242,6 +243,10 @@ void PreImagesTruncateMarkers::refreshMarkers(OperationContext* opCtx) {
                                                                           preImagesCollection);
                            }
                        });
+}
+
+int64_t PreImagesTruncateMarkers::getNumberOfSampledCollections() const {
+    return static_cast<int64_t>(_markersMap.getUnderlyingSnapshot()->size());
 }
 
 PreImagesTruncateStats PreImagesTruncateMarkers::truncateExpiredPreImages(

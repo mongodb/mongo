@@ -38,6 +38,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/timer.h"
 
 #include <memory>
 #include <shared_mutex>
@@ -49,6 +50,14 @@
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(preImagesTruncateOnlyOnSecondaries);
+
+BSONObj PreImagesTruncateManager::MarkerCreationStats::toBSON() const {
+    BSONObjBuilder builder;
+    builder.append("totalPass", totalPass.loadRelaxed())
+        .append("scannedInternalCollections", scannedInternalCollections.loadRelaxed())
+        .append("timeElapsedMillis", timeElapsedMillis.loadRelaxed());
+    return builder.obj();
+}
 
 PreImagesTruncateStats PreImagesTruncateManager::truncateExpiredPreImages(
     OperationContext* opCtx, bool useReplicatedTruncates) {
@@ -132,39 +141,52 @@ PreImagesTruncateManager::_getInitializedMarkersForPreImagesCollection(Operation
     // '_truncateMarkers'.
     ScopeGuard uninstallIncompleteTruncateMarkers([&] { _setTruncateMarkers(nullptr); });
 
-    try {
-        // (A) Create 'PreImagesTenantMarkers' for the pre-images collection and install
-        // them into the '_truncateMarkers' instance. The '_truncateMarkers' instance might not
-        // account for concurrent pre-image insertions beyond the snapshot used to create the
-        // markers.
-        truncateMarkers = _createAndInstallMarkers(opCtx);
-        if (!truncateMarkers) {
-            return nullptr;
+    {
+        Timer setupTimer;
+        ScopeGuard statisticsUpdater([&] {
+            _markerCreationStats.totalPass.fetchAndAddRelaxed(1);
+            _markerCreationStats.timeElapsedMillis.fetchAndAddRelaxed(setupTimer.millis());
+            if (truncateMarkers) {
+                _markerCreationStats.scannedInternalCollections.fetchAndAddRelaxed(
+                    truncateMarkers->getNumberOfSampledCollections());
+            }
+        });
+
+        try {
+            // (A) Create 'PreImagesTenantMarkers' for the pre-images collection and install
+            // them into the '_truncateMarkers' instance. The '_truncateMarkers' instance might not
+            // account for concurrent pre-image insertions beyond the snapshot used to create the
+            // markers.
+            truncateMarkers = _createAndInstallMarkers(opCtx);
+            if (!truncateMarkers) {
+                return nullptr;
+            }
+            LOGV2_DEBUG(9023602,
+                        1,
+                        "Installed pre-image truncate markers. Markers must be finalized for safe "
+                        "truncation",
+                        "preImagesCollectionUUID"_attr =
+                            truncateMarkers->getPreImagesCollectionUUID());
+
+            // (B) Ensure that 'truncateMarkers' account for the most recent pre-image inserts -
+            // specifically, any inserts that occurred during (A) at a later snapshot than the
+            // snapshot used to create the markers in (A). Otherwise, the truncate markers won't
+            // know there are pre-images past the snapshot from (A) until a new insert comes along
+            // for each pre-image nsUUID out of date.
+            truncateMarkers->refreshMarkers(opCtx);
+
+            LOGV2(9023600,
+                  "Completed initialization of pre-image truncate markers",
+                  "preImagesCollectionUUID"_attr = truncateMarkers->getPreImagesCollectionUUID());
+        } catch (const DBException& ex) {
+            LOGV2_INFO(9030100,
+                       "Failed to complete pre-image truncate marker initialization",
+                       "reason"_attr = ex.toStatus());
+            throw;
         }
-        LOGV2_DEBUG(9023602,
-                    1,
-                    "Installed pre-image truncate markers. Markers must be finalized for safe "
-                    "truncation",
-                    "preImagesCollectionUUID"_attr = truncateMarkers->getPreImagesCollectionUUID());
-
-        // (B) Ensure that 'truncateMarkers' account for the most recent pre-image inserts -
-        // specifically, any inserts that occurred during (A) at a later snapshot than the
-        // snapshot used to create the markers in (A). Otherwise, the truncate markers won't
-        // know there are pre-images past the snapshot from (A) until a new insert comes along
-        // for each pre-image nsUUID out of date.
-        truncateMarkers->refreshMarkers(opCtx);
-
-        LOGV2(9023600,
-              "Completed initialization of pre-image truncate markers",
-              "preImagesCollectionUUID"_attr = truncateMarkers->getPreImagesCollectionUUID());
-    } catch (const DBException& ex) {
-        LOGV2_INFO(9030100,
-                   "Failed to complete pre-image truncate marker initialization",
-                   "reason"_attr = ex.toStatus());
-        throw;
     }
-
     uninstallIncompleteTruncateMarkers.dismiss();
+
     return truncateMarkers;
 }
 

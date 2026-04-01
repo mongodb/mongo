@@ -73,6 +73,10 @@ protected:
             std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
     }
 
+    PreImagesTruncateManager& getTruncateManager() {
+        return _truncateManager;
+    }
+
     auto acquirePreImagesCollectionForRead(NamespaceStringOrUUID nssOrUUID) {
         const auto opCtx = operationContext();
         return acquireCollection(
@@ -113,6 +117,10 @@ protected:
         auto& changeStreamPreImagesCollection = *preImagesCollectionRaii;
         ASSERT_OK(Helpers::insert(opCtx, changeStreamPreImagesCollection, preImageDocs));
         wuow.commit();
+    }
+
+    void flushTruncateMarkers() {
+        _truncateManager.flushTruncateMarkers();
     }
 
     std::shared_ptr<PreImagesTruncateMarkers> getInitializedTruncateMarkers() {
@@ -241,6 +249,11 @@ TEST_F(PreImagesTruncateManagerTest, ScanningSingleNsUUID) {
     auto truncateMarkers = getInitializedTruncateMarkers();
     ASSERT(truncateMarkers);
 
+    BSONObj markerCreationStats = getTruncateManager().getMarkerCreationStats().toBSON();
+    ASSERT_EQ(markerCreationStats["totalPass"].numberLong(), 1);
+    ASSERT_EQ(markerCreationStats["scannedInternalCollections"].numberLong(), 1);
+    ASSERT_GTE(markerCreationStats["timeElapsedMillis"].numberLong(), 0);
+
     const auto preImagesCollection =
         acquirePreImagesCollectionForRead(NamespaceString::kChangeStreamPreImagesNamespace);
 
@@ -266,6 +279,11 @@ TEST_F(PreImagesTruncateManagerTest, ScanningSingleNsUUID1Doc) {
     auto truncateMarkers = getInitializedTruncateMarkers();
     ASSERT(truncateMarkers);
 
+    BSONObj markerCreationStats = getTruncateManager().getMarkerCreationStats().toBSON();
+    ASSERT_EQ(markerCreationStats["totalPass"].numberLong(), 1);
+    ASSERT_EQ(markerCreationStats["scannedInternalCollections"].numberLong(), 1);
+    ASSERT_GTE(markerCreationStats["timeElapsedMillis"].numberLong(), 0);
+
     const auto preImagesCollection =
         acquirePreImagesCollectionForRead(NamespaceString::kChangeStreamPreImagesNamespace);
 
@@ -289,6 +307,11 @@ TEST_F(PreImagesTruncateManagerTest, EmptyCollection) {
     auto truncateMarkers = getInitializedTruncateMarkers();
     ASSERT(truncateMarkers);
 
+    BSONObj markerCreationStats = getTruncateManager().getMarkerCreationStats().toBSON();
+    ASSERT_EQ(markerCreationStats["totalPass"].numberLong(), 1);
+    ASSERT_EQ(markerCreationStats["scannedInternalCollections"].numberLong(), 0);
+    ASSERT_GTE(markerCreationStats["timeElapsedMillis"].numberLong(), 0);
+
     const auto preImagesCollection =
         acquirePreImagesCollectionForRead(NamespaceString::kChangeStreamPreImagesNamespace);
 
@@ -307,6 +330,11 @@ TEST_F(PreImagesTruncateManagerTest, ScanningTwoNsUUIDs) {
 
     auto truncateMarkers = getInitializedTruncateMarkers();
     ASSERT(truncateMarkers);
+
+    BSONObj markerCreationStats = getTruncateManager().getMarkerCreationStats().toBSON();
+    ASSERT_EQ(markerCreationStats["totalPass"].numberLong(), 1);
+    ASSERT_EQ(markerCreationStats["scannedInternalCollections"].numberLong(), 2);
+    ASSERT_GTE(markerCreationStats["timeElapsedMillis"].numberLong(), 0);
 
     const auto preImagesCollection =
         acquirePreImagesCollectionForRead(NamespaceString::kChangeStreamPreImagesNamespace);
@@ -334,6 +362,11 @@ TEST_F(PreImagesTruncateManagerTest, SamplingSingleNsUUID) {
 
     auto truncateMarkers = getInitializedTruncateMarkers();
     ASSERT(truncateMarkers);
+
+    BSONObj markerCreationStats = getTruncateManager().getMarkerCreationStats().toBSON();
+    ASSERT_EQ(markerCreationStats["totalPass"].numberLong(), 1);
+    ASSERT_EQ(markerCreationStats["scannedInternalCollections"].numberLong(), 1);
+    ASSERT_GTE(markerCreationStats["timeElapsedMillis"].numberLong(), 0);
 
     const auto preImagesCollection =
         acquirePreImagesCollectionForRead(NamespaceString::kChangeStreamPreImagesNamespace);
@@ -364,6 +397,11 @@ TEST_F(PreImagesTruncateManagerTest, SamplingTwoNsUUIDs) {
 
     auto truncateMarkers = getInitializedTruncateMarkers();
 
+    BSONObj markerCreationStats = getTruncateManager().getMarkerCreationStats().toBSON();
+    ASSERT_EQ(markerCreationStats["totalPass"].numberLong(), 1);
+    ASSERT_EQ(markerCreationStats["scannedInternalCollections"].numberLong(), 2);
+    ASSERT_GTE(markerCreationStats["timeElapsedMillis"].numberLong(), 0);
+
     const auto preImagesCollection =
         acquirePreImagesCollectionForRead(NamespaceString::kChangeStreamPreImagesNamespace);
 
@@ -391,6 +429,11 @@ TEST_F(PreImagesTruncateManagerTest, SamplingTwoNsUUIDsManyRecordsToFew) {
 
     auto truncateMarkers = getInitializedTruncateMarkers();
     ASSERT(truncateMarkers);
+
+    BSONObj markerCreationStats = getTruncateManager().getMarkerCreationStats().toBSON();
+    ASSERT_EQ(markerCreationStats["totalPass"].numberLong(), 1);
+    ASSERT_EQ(markerCreationStats["scannedInternalCollections"].numberLong(), 2);
+    ASSERT_GTE(markerCreationStats["timeElapsedMillis"].numberLong(), 0);
 
     const auto preImagesCollection =
         acquirePreImagesCollectionForRead(NamespaceString::kChangeStreamPreImagesNamespace);
@@ -427,6 +470,11 @@ TEST_F(PreImagesTruncateManagerTest, SamplingManyNsUUIDs) {
     auto truncateMarkers = getInitializedTruncateMarkers();
     ASSERT(truncateMarkers);
 
+    BSONObj markerCreationStats = getTruncateManager().getMarkerCreationStats().toBSON();
+    ASSERT_EQ(markerCreationStats["totalPass"].numberLong(), 1);
+    ASSERT_EQ(markerCreationStats["scannedInternalCollections"].numberLong(), numNssUUIDs);
+    ASSERT_GTE(markerCreationStats["timeElapsedMillis"].numberLong(), 0);
+
     const auto preImagesCollection =
         acquirePreImagesCollectionForRead(NamespaceString::kChangeStreamPreImagesNamespace);
 
@@ -440,4 +488,45 @@ TEST_F(PreImagesTruncateManagerTest, SamplingManyNsUUIDs) {
             truncateMarkers, nsUUID, CollectionTruncateMarkers::MarkersCreationMethod::Sampling);
     }
 }
+
+TEST_F(PreImagesTruncateManagerTest, SamplingMultiplePassesStatsAreCumulative) {
+    auto minBytesPerMarker = 1024 * 100;  // 100KB.
+    RAIIServerParameterControllerForTest minBytesPerMarkerController{
+        "preImagesCollectionTruncateMarkersMinBytes", minBytesPerMarker};
+
+    createPreImagesCollection();
+
+    std::vector<UUID> nsUUIDs{};
+    auto numNssUUIDs = 11;
+    for (int i = 0; i < numNssUUIDs; i++) {
+        nsUUIDs.push_back(UUID::gen());
+    }
+
+    for (const auto& nsUUID : nsUUIDs) {
+        insertPreImages(nsUUID, /*numPreImages*/ 555, /*docPaddingSize*/ 100);
+    }
+
+    boost::optional<long long> prevMillis;
+
+    for (int i = 1; i <= 5; ++i) {
+        // Clear previous state.
+        flushTruncateMarkers();
+
+        auto truncateMarkers = getInitializedTruncateMarkers();
+        ASSERT(truncateMarkers);
+
+        BSONObj markerCreationStats = getTruncateManager().getMarkerCreationStats().toBSON();
+        ASSERT_EQ(markerCreationStats["totalPass"].numberLong(), i);
+        ASSERT_EQ(markerCreationStats["scannedInternalCollections"].numberLong(), i * numNssUUIDs);
+
+        auto millis = markerCreationStats["timeElapsedMillis"].numberLong();
+        if (prevMillis.has_value()) {
+            ASSERT_GTE(millis, prevMillis.value());
+        } else {
+            ASSERT_GTE(millis, 0);
+        }
+        prevMillis = millis;
+    }
+}
+
 }  // namespace mongo

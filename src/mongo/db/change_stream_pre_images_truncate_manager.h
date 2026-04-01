@@ -29,9 +29,11 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/change_stream_pre_images_truncate_markers.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/rwmutex.h"
 #include "mongo/util/modules.h"
 
@@ -44,6 +46,31 @@ namespace mongo {
  */
 class PreImagesTruncateManager {
 public:
+    /**
+     * Statistics for initial marker creation.
+     */
+    struct MarkerCreationStats {
+        /**
+         * Total number of marker creation passes completed.
+         */
+        AtomicWord<int64_t> totalPass;
+
+        /**
+         * Cumulative number of pre-image collections scanned for the marker creation.
+         */
+        AtomicWord<int64_t> scannedInternalCollections;
+
+        /**
+         * Cumulative number of milliseconds elapsed during the marker creation.
+         */
+        AtomicWord<int64_t> timeElapsedMillis;
+
+        /**
+         * Serializes the marker creation statistics to the BSON object.
+         */
+        BSONObj toBSON() const;
+    };
+
     /*
      * Truncates expired pre-images spanning the pre-images collection.
      */
@@ -64,6 +91,14 @@ public:
      * time.
      */
     void flushTruncateMarkers();
+
+    /**
+     * Returns a reference to the initial marker creation statistics. Does not need to be
+     * thread-safe as the underlying metrics in the statistics are atomics.
+     */
+    const MarkerCreationStats& getMarkerCreationStats() const {
+        return _markerCreationStats;
+    }
 
     /**
      * Returns true if the '_truncateMarkers' instance variable is populated, false otherwise.
@@ -125,5 +160,10 @@ private:
      * directly, but only via calls to ' _getTruncateMarkers()' and ' _setTruncateMarkers()'.
      */
     std::shared_ptr<PreImagesTruncateMarkers> _truncateMarkers;
+
+    /**
+     * Statistics for initial marker creation. Not protected by '_mutex'.
+     */
+    MarkerCreationStats _markerCreationStats;
 };
 }  // namespace mongo

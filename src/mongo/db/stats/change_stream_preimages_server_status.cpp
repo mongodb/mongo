@@ -120,6 +120,10 @@ public:
         // Report pre-images collection specific metrics.
         appendPreImagesCollectionStats(opCtx, &builder);
 
+        const auto& markerCreationStats =
+            ChangeStreamPreImagesCollectionManager::get(opCtx).getMarkerCreationStats();
+        builder.append("markerCreation", markerCreationStats.toBSON());
+
         return builder.obj();
     }
 };

@@ -34,13 +34,10 @@
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/util/concurrent_shared_values_map.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstdint>
-#include <vector>
 
 #include <boost/optional/optional.hpp>
 
@@ -129,6 +126,11 @@ public:
     UUID getPreImagesCollectionUUID() const {
         return _preImagesCollectionUUID;
     }
+
+    /**
+     * Returns the number of sampled user collection ranges inside the pre-images collection.
+     */
+    int64_t getNumberOfSampledCollections() const;
 
     const pre_image_marker_initialization_internal::MarkersMap& getMarkersMap_forTest() const {
         return _markersMap;
