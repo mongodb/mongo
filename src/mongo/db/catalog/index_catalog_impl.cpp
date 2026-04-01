@@ -1344,6 +1344,14 @@ Status IndexCatalogImpl::resetUnfinishedIndexForRecovery(OperationContext* opCtx
     auto engine = opCtx->getServiceContext()->getStorageEngine();
     const std::string ident = released->getIdent();
     Status status = engine->getEngine()->dropIdent(opCtx->recoveryUnit(), ident);
+
+    // Retry the drop if we fail with an EBUSY code. If this is caused by dirty data, it will be
+    // resolved by a checkpoint here. Otherwise, propagate the failure to drop.
+    if (status.code() == ErrorCodes::ObjectIsBusy) {
+        engine->getEngine()->checkpoint(opCtx);
+        status = engine->getEngine()->dropIdent(opCtx->recoveryUnit(), ident);
+    }
+
     if (!status.isOK()) {
         return status;
     }
