@@ -780,6 +780,9 @@ const internalCommandsMap = {
                 minimumOperationDurationMillis: NumberLong(0),
             },
         },
+        postcommand: (db) => {
+            db.getSiblingDB("config").localReshardingOperations.recipient.drop();
+        },
     },
     _shardsvrReshardRecipientClone: {
         testname: "_shardsvrReshardRecipientClone",

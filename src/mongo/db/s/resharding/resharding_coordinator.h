@@ -491,9 +491,11 @@ private:
     /**
      * Sends '_flushRoutingTableCacheUpdatesWithWriteConcern' to ensure recipient state machine
      * creation by the time the refresh completes.
+     *
+     * If featureFlagReshardingInitNoRefresh feature flag is enabled, this function sends
+     * _shardsvrReshardRecipientInitialize command to all recipient shards.
      */
-    void _establishAllRecipientsAsParticipants(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+    void _initializeAllRecipients(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
      * Sends '_shardsvrReshardRecipientClone' to all recipient shards.

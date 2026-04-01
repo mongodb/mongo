@@ -117,6 +117,7 @@ public:
     enum class ExternalFunction {
         kTellAllDonorsToRefresh,
         kEstablishAllDonorsAsParticipants,
+        kEstablishAllRecipientsAsParticipants,
         kGetDocumentsToCopyFromDonors,
         kGetDocumentsDeltaFromDonors,
     };
@@ -189,6 +190,8 @@ public:
         const std::vector<mongo::RecipientShardEntry>& recipientShards,
         const std::shared_ptr<executor::TaskExecutor>& executor,
         CancellationToken token) override {
+        _maybeThrowErrorForFunction(opCtx, ExternalFunction::kEstablishAllRecipientsAsParticipants);
+
         auto recipientShardIds = resharding::extractShardIdsFromParticipantEntries(recipientShards);
         resharding::sendFlushRoutingTableCacheUpdatesToShards(
             opCtx, tempNss, recipientShardIds, executor, token);
@@ -2627,16 +2630,23 @@ TEST_F(ReshardingCoordinatorServiceTest, AbortDuringCommitDoesNotCauseInfiniteRe
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, FeatureFlagReshardingInitNoRefreshSendsInitCmd) {
-    const std::vector<CoordinatorStateEnum> states = {
-        CoordinatorStateEnum::kPreparingToDonate,
-    };
-
     RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
         "featureFlagReshardingInitNoRefresh", true);
     // If establishAllDonorsAsParticipants is called during kPreparingToDonate, it throws
     // InternalError and resharding fails.
     externalState()->throwUnrecoverableErrorIn(CoordinatorStateEnum::kPreparingToDonate,
                                                kEstablishAllDonorsAsParticipants);
+
+    runReshardingToCompletion();
+}
+
+TEST_F(ReshardingCoordinatorServiceTest, FeatureFlagReshardingInitNoRefreshSendsRecipientInitCmd) {
+    RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
+        "featureFlagReshardingInitNoRefresh", true);
+    // If establishAllRecipientsAsParticipants is called during kPreparingToDonate, it throws
+    // InternalError and resharding fails.
+    externalState()->throwUnrecoverableErrorIn(CoordinatorStateEnum::kPreparingToDonate,
+                                               kEstablishAllRecipientsAsParticipants);
 
     runReshardingToCompletion();
 }

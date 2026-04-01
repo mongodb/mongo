@@ -56,6 +56,11 @@ void tellAllDonorsToInitialize(OperationContext* opCtx,
                                CancellationToken stepdownToken,
                                const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
+void tellAllRecipientsToInitialize(OperationContext* opCtx,
+                                   const ReshardingCoordinatorDocument& doc,
+                                   CancellationToken stepdownToken,
+                                   const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
 void tellAllDonorsToStartChangeStreamsMonitor(
     OperationContext* opCtx,
     const ReshardingCoordinatorDocument& doc,

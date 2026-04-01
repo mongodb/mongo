@@ -36,15 +36,27 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/router_role/routing_cache/catalog_cache.h"
+#include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
+#include "mongo/db/s/resharding/resharding_recipient_service.h"
 #include "mongo/db/s/resharding/shardsvr_resharding_commands_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/topology/cluster_role.h"
+#include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/version_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 
 #include <string>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
 namespace mongo {
 namespace {
@@ -64,6 +76,74 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     "_shardsvrReshardRecipientInitialize can only be run on shard servers",
                     serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
+
+            if (resharding::tryGetReshardingStateMachine<
+                    ReshardingRecipientService,
+                    ReshardingRecipientService::RecipientStateMachine,
+                    ReshardingRecipientDocument>(opCtx, uuid())) {
+                LOGV2(12092602,
+                      "Recipient state machine already exists for resharding operation",
+                      "reshardingUUID"_attr = uuid());
+                return;
+            }
+
+            const auto& req = request();
+
+            RecipientShardContext recipientCtx;
+            recipientCtx.setState(RecipientStateEnum::kAwaitingFetchTimestamp);
+
+            ReshardingRecipientDocument recipientDoc{std::move(recipientCtx)};
+            recipientDoc.setCommonReshardingMetadata(req.getCommonReshardingMetadata());
+            recipientDoc.setReshardingRecipientOptions(req.getRecipientOptions());
+
+            // We clear the routing information for the temporary resharding namespace to ensure
+            // this recipient shard primary will refresh from the config server and see the chunk
+            // distribution for the new resharding operation.
+            auto tempNss = req.getCommonReshardingMetadata().getTempReshardingNss();
+            auto* catalogCache = Grid::get(opCtx)->catalogCache();
+            catalogCache->invalidateCollectionEntry_LINEARIZABLE(tempNss);
+
+            // Refresh routing info for the temp namespace and check whether this shard owns
+            // any chunks. This determines whether we can skip cloning/applying phases.
+            auto cri = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, tempNss));
+            bool noChunksOnThisShard = false;
+            if (cri.hasRoutingTable()) {
+                std::set<ShardId> shards;
+                cri.getCurrentChunkManager().getAllShardIds(&shards);
+                noChunksOnThisShard =
+                    shards.find(ShardingState::get(opCtx)->shardId()) == shards.end();
+            }
+
+            const auto& vCtx = VersionContext::getDecoration(opCtx);
+            auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+            if (noChunksOnThisShard) {
+                if (resharding::gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable.isEnabled(
+                        vCtx, fcvSnapshot)) {
+                    recipientDoc.setSkipCloningAndApplying(true);
+                }
+                if (resharding::gFeatureFlagReshardingSkipCloningIfApplicable.isEnabled(
+                        vCtx, fcvSnapshot)) {
+                    recipientDoc.setSkipCloning(true);
+                }
+                if (resharding::gFeatureFlagReshardingSkipBuildingIndexesIfApplicable.isEnabled(
+                        vCtx, fcvSnapshot)) {
+                    recipientDoc.setSkipBuildingIndexes(true);
+                }
+            }
+            if (resharding::gFeatureFlagReshardingStoreOplogFetcherProgress.isEnabled(
+                    vCtx, fcvSnapshot)) {
+                recipientDoc.setStoreOplogFetcherProgress(true);
+            }
+
+            resharding::createReshardingStateMachine<
+                ReshardingRecipientService,
+                ReshardingRecipientService::RecipientStateMachine,
+                ReshardingRecipientDocument>(opCtx, recipientDoc, true);
+
+            LOGV2(12092603,
+                  "Initialized resharding recipient state machine via "
+                  "_shardsvrReshardRecipientInitialize command",
+                  "reshardingUUID"_attr = uuid());
         }
 
     private:

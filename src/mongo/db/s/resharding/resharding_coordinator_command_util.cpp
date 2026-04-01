@@ -30,6 +30,7 @@
 #include "mongo/db/s/resharding/resharding_coordinator_command_util.h"
 
 #include "mongo/db/generic_argument_util.h"
+#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/shardsvr_resharding_commands_gen.h"
 #include "mongo/s/request_types/abort_reshard_collection_gen.h"
 #include "mongo/s/request_types/commit_reshard_collection_gen.h"
@@ -99,6 +100,33 @@ void tellAllDonorsToInitialize(OperationContext* opCtx,
                           stepdownToken,
                           executor,
                           resharding::extractShardIdsFromParticipantEntries(doc.getDonorShards()));
+}
+
+void tellAllRecipientsToInitialize(OperationContext* opCtx,
+                                   const ReshardingCoordinatorDocument& doc,
+                                   CancellationToken stepdownToken,
+                                   const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    std::vector<DonorShardFetchTimestamp> donorShards;
+    for (const auto& donor : doc.getDonorShards()) {
+        DonorShardFetchTimestamp donorFetchTimestamp(donor.getId());
+        donorShards.push_back(std::move(donorFetchTimestamp));
+    }
+
+    ReshardingRecipientOptions recipientOptions(
+        std::move(donorShards),
+        doc.getDemoMode() ? 0 : resharding::gReshardingMinimumOperationDurationMillis.load());
+    recipientOptions.setRelaxed(doc.getRelaxed());
+
+    ShardsvrReshardRecipientInitialize cmd(doc.getReshardingUUID());
+    cmd.setCommonReshardingMetadata(doc.getCommonReshardingMetadata());
+    cmd.setRecipientOptions(std::move(recipientOptions));
+
+    sendReshardingCommand(
+        opCtx,
+        cmd,
+        stepdownToken,
+        executor,
+        resharding::extractShardIdsFromParticipantEntries(doc.getRecipientShards()));
 }
 
 void tellAllDonorsToStartChangeStreamsMonitor(

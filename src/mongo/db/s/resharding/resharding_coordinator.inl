@@ -316,7 +316,7 @@ ExecutorFuture<void> ReshardingCoordinator::_tellAllParticipantsReshardingStarte
                        pauseBeforeTellDonorToRefresh.pauseWhileSet();
                        _initializeAllDonors(executor);
                    })
-                   .then([this, executor] { _establishAllRecipientsAsParticipants(executor); })
+                   .then([this, executor] { _initializeAllRecipients(executor); })
                    .onCompletion([this](Status status) {
                        // Swap back to using operation contexts canceled upon abort until ready to
                        // persist the decision or unrecoverable error.
@@ -1916,17 +1916,23 @@ void ReshardingCoordinator::_initializeAllDonors(
     }
 }
 
-void ReshardingCoordinator::_establishAllRecipientsAsParticipants(
+void ReshardingCoordinator::_initializeAllRecipients(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     invariant(_coordinatorDoc.getState() == CoordinatorStateEnum::kPreparingToDonate);
     auto opCtx = _makeOperationContext();
-
-    _reshardingCoordinatorExternalState->establishAllRecipientsAsParticipants(
-        opCtx.get(),
-        _coordinatorDoc.getTempReshardingNss(),
-        _coordinatorDoc.getRecipientShards(),
-        **executor,
-        _ctHolder->getStepdownToken());
+    if (resharding::gFeatureFlagReshardingInitNoRefresh.isEnabled(
+            VersionContext::getDecoration(opCtx.get()),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        resharding::tellAllRecipientsToInitialize(
+            opCtx.get(), _coordinatorDoc, _ctHolder->getStepdownToken(), executor);
+    } else {
+        _reshardingCoordinatorExternalState->establishAllRecipientsAsParticipants(
+            opCtx.get(),
+            _coordinatorDoc.getTempReshardingNss(),
+            _coordinatorDoc.getRecipientShards(),
+            **executor,
+            _ctHolder->getStepdownToken());
+    }
 }
 
 void ReshardingCoordinator::_tellAllRecipientsToClone(

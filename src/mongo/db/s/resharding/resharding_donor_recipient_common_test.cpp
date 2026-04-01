@@ -1236,5 +1236,17 @@ TEST_F(ReshardingDonorRecipientCommonTest, ProcessDonorFieldsRefreshCreatesEvenW
                            DonorFieldsValidator{});
 }
 
+TEST_F(ReshardingDonorRecipientCommonTest,
+       ProcessRecipientFieldsRefreshCreatesEvenWithInitNoRefresh) {
+    RAIIServerParameterControllerForTest initNoRefreshController(
+        "featureFlagReshardingInitNoRefresh", true);
+
+    testProcessRecipientFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
+                               kThisShard.getShardId() /* primaryShard */,
+                               boost::none /* performVerification */,
+                               true /* expectRecipientStateMachine */,
+                               RecipientFieldsValidator{});
+}
+
 }  // namespace
 }  // namespace mongo
