@@ -888,6 +888,107 @@ TEST_F(ForEachCollectionFromDbTest, ModifyAllCollectionsMatchingHandlesConcurren
                 ->isTemporary());
 }
 
+TEST_F(ForEachCollectionFromDbTest, ForEachCollectionInAllDbsIteratesAllDatabases) {
+    createTestData();
+    auto opCtx = operationContext();
+
+    // forEachCollectionFromAllDbs should visit all 4 user-created collections.
+    std::set<NamespaceString> visited;
+    auto result =
+        catalog::forEachCollectionFromAllDbs(opCtx, MODE_IS, [&](const Collection* collection) {
+            visited.insert(collection->ns());
+            return true;
+        });
+
+    ASSERT_TRUE(visited.contains(NamespaceString::createNamespaceString_forTest("db", "coll1")));
+    ASSERT_TRUE(visited.contains(NamespaceString::createNamespaceString_forTest("db", "coll2")));
+    ASSERT_TRUE(visited.contains(NamespaceString::createNamespaceString_forTest("db", "coll3")));
+    ASSERT_TRUE(visited.contains(NamespaceString::createNamespaceString_forTest("db2", "coll4")));
+    ASSERT_EQ(result, catalog::CollectionCatalogIterationResult::kSomeMatches);
+}
+
+TEST_F(ForEachCollectionFromDbTest, ForEachCollectionInAllDbsWithPredicate) {
+    createTestData();
+    auto opCtx = operationContext();
+
+    // Only the 2 temp collections should be visited when using a predicate.
+    std::set<NamespaceString> visited;
+    auto result = catalog::forEachCollectionFromAllDbs(
+        opCtx,
+        MODE_X,
+        [&](const Collection* collection) {
+            visited.insert(collection->ns());
+            return true;
+        },
+        [&](const Collection* collection) { return collection->getCollectionOptions().temp; });
+
+    std::set<NamespaceString> expected{
+        NamespaceString::createNamespaceString_forTest("db", "coll2"),
+        NamespaceString::createNamespaceString_forTest("db", "coll3"),
+    };
+    ASSERT_EQ(visited, expected);
+    ASSERT_EQ(result, catalog::CollectionCatalogIterationResult::kSomeMatches);
+}
+
+TEST_F(ForEachCollectionFromDbTest, ForEachCollectionInAllDbsPredicateNoMatch) {
+    createTestData();
+    auto opCtx = operationContext();
+
+    // Use a predicate that matches nothing — expect kNoMatches and callback never called.
+    int numCollectionsTraversed = 0;
+    auto result = catalog::forEachCollectionFromAllDbs(
+        opCtx,
+        MODE_IS,
+        [&](const Collection* collection) {
+            numCollectionsTraversed++;
+            return true;
+        },
+        [&](const Collection* collection) {
+            return false;  // never matches
+        });
+
+    ASSERT_EQUALS(numCollectionsTraversed, 0);
+    ASSERT_EQ(result, catalog::CollectionCatalogIterationResult::kNoMatches);
+}
+
+TEST_F(ForEachCollectionFromDbTest, ForEachCollectionInAllDbsStopsWhenCallbackReturnsFalse) {
+    createTestData();
+    auto opCtx = operationContext();
+
+    // Callback returns false after first collection — iteration should stop.
+    int numCollectionsTraversed = 0;
+    catalog::forEachCollectionFromAllDbs(opCtx, MODE_IS, [&](const Collection* collection) {
+        numCollectionsTraversed++;
+        return false;  // stop after first
+    });
+
+    ASSERT_EQUALS(numCollectionsTraversed, 1);
+}
+
+TEST_F(ForEachCollectionFromDbTest, ForEachCollectionInAllDbsLockModes) {
+    createTestData();
+    auto opCtx = operationContext();
+
+    // For each (collLockMode, expected dbLockMode) pair, verify that the DB is locked at the
+    // derived mode (IS for shared modes, IX for intent-exclusive/exclusive modes).
+    const std::vector<std::pair<LockMode, LockMode>> cases = {
+        {MODE_IS, MODE_IS},
+        {MODE_S, MODE_IS},
+        {MODE_IX, MODE_IX},
+        {MODE_X, MODE_IX},
+    };
+
+    for (auto [collMode, expectedDbMode] : cases) {
+        catalog::forEachCollectionFromAllDbs(opCtx, collMode, [&](const Collection* collection) {
+            ASSERT_TRUE(shard_role_details::getLocker(opCtx)->isDbLockedForMode(
+                collection->ns().dbName(), expectedDbMode));
+            ASSERT_TRUE(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
+                collection->ns(), collMode));
+            return true;
+        });
+    }
+}
+
 /**
  * RAII type for operating at a timestamp. Will remove any timestamping when the object destructs.
  */

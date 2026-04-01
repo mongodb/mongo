@@ -51,7 +51,6 @@
 #include "mongo/db/shard_role/shard_catalog/coll_mod.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog_helper.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options_gen.h"
-#include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
@@ -185,22 +184,15 @@ private:
         ON_BLOCK_EXIT([&] { WriteBlockBypass::get(opCtx).set(originalValue); });
         WriteBlockBypass::get(opCtx).set(true);
 
-        for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-            Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
-            catalog::forEachCollectionFromDb(
-                opCtx, dbName, MODE_X, [&](const Collection* collection) {
-                    // Issue a no-op collMod command to each collection to trigger removal of
-                    // deprecated catalog metadata and to correct any invalid value types previously
-                    // allowed in metadata.
-                    BSONObjBuilder responseBuilder;
-                    uassertStatusOK(processCollModCommand(opCtx,
-                                                          collection->ns(),
-                                                          CollMod{collection->ns()},
-                                                          nullptr,
-                                                          &responseBuilder));
-                    return true;
-                });
-        }
+        catalog::forEachCollectionFromAllDbs(opCtx, MODE_X, [&](const Collection* collection) {
+            // Issue a no-op collMod command to each collection to trigger removal of
+            // deprecated catalog metadata and to correct any invalid value types previously
+            // allowed in metadata.
+            BSONObjBuilder responseBuilder;
+            uassertStatusOK(processCollModCommand(
+                opCtx, collection->ns(), CollMod{collection->ns()}, nullptr, &responseBuilder));
+            return true;
+        });
     }
 
     void finalizeUpgrade(OperationContext* opCtx, FCV requestedVersion) final {
@@ -336,13 +328,10 @@ private:
                 .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion);
         if (errorAndLogValidationDisabled || constraintValidationLevelDisabled ||
             storageTierDisabled) {
-            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-                Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
-                catalog::forEachCollectionFromDb(
-                    opCtx, dbName, MODE_IS, [&](const Collection* collection) -> bool {
-                        if (errorAndLogValidationDisabled) {
-                            uassert(
-                                ErrorCodes::CannotDowngrade,
+            catalog::forEachCollectionFromAllDbs(
+                opCtx, MODE_IS, [&](const Collection* collection) -> bool {
+                    if (errorAndLogValidationDisabled) {
+                        uassert(ErrorCodes::CannotDowngrade,
                                 fmt::format(
                                     "Cannot downgrade the cluster when there are collections with "
                                     "'errorAndLog' validation action. Please unset the option or "
@@ -352,11 +341,10 @@ private:
                                     collection->uuid().toString()),
                                 collection->getValidationAction() !=
                                     ValidationActionEnum::errorAndLog);
-                        }
+                    }
 
-                        if (constraintValidationLevelDisabled) {
-                            uassert(
-                                ErrorCodes::CannotDowngrade,
+                    if (constraintValidationLevelDisabled) {
+                        uassert(ErrorCodes::CannotDowngrade,
                                 fmt::format(
                                     "Cannot downgrade the cluster when there are collections with "
                                     "'constraint' validation level. Please unset the option or "
@@ -366,28 +354,26 @@ private:
                                     collection->uuid().toString()),
                                 collection->getValidationLevel() !=
                                     ValidationLevelEnum::constraint);
-                        }
+                    }
 
-                        if (storageTierDisabled) {
-                            auto storageEngine = getGlobalServiceContext()->getStorageEngine();
-                            auto storageTier = storageEngine->getStorageTierFromStorageOptions(
-                                collection->getCollectionOptions().storageEngine);
-                            uassert(ErrorCodes::CannotDowngrade,
-                                    fmt::format(
-                                        "Cannot downgrade the cluster when there are collections "
+                    if (storageTierDisabled) {
+                        auto storageEngine = getGlobalServiceContext()->getStorageEngine();
+                        auto storageTier = storageEngine->getStorageTierFromStorageOptions(
+                            collection->getCollectionOptions().storageEngine);
+                        uassert(
+                            ErrorCodes::CannotDowngrade,
+                            fmt::format("Cannot downgrade the cluster when there are collections "
                                         "with a cold storage tier. Please drop the collection(s) "
                                         "before downgrading. First detected collection: {} "
                                         "(UUID: {}).",
                                         collection->ns().toStringForErrorMsg(),
                                         collection->uuid().toString()),
-                                    !storageTier.has_value() ||
-                                        storageTier.value() !=
-                                            idlSerialize(StorageTierLevelEnum::cold));
-                        }
+                            !storageTier.has_value() ||
+                                storageTier.value() != idlSerialize(StorageTierLevelEnum::cold));
+                    }
 
-                        return true;
-                    });
-            }
+                    return true;
+                });
         }
 
         if (gFeatureFlagQETextSearchPreview.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
@@ -408,11 +394,7 @@ private:
                 }
                 return true;
             };
-            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-                Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
-                catalog::forEachCollectionFromDb(
-                    opCtx, dbName, MODE_IS, checkForStringSearchQueryType);
-            }
+            catalog::forEachCollectionFromAllDbs(opCtx, MODE_IS, checkForStringSearchQueryType);
         }
 
         if (feature_flags::gFeatureFlagEnableReplicasetTransitionToCSRS
@@ -458,42 +440,38 @@ private:
         if (feature_flags::gFeatureFlag2dsphereIndexVersion4
                 .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
             static const std::string kIndexVersionFieldName("2dsphereIndexVersion");
-            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-                Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
-                catalog::forEachCollectionFromDb(
-                    opCtx, dbName, MODE_IS, [&](const Collection* collection) -> bool {
-                        auto indexCatalog = collection->getIndexCatalog();
-                        auto indexIterator = indexCatalog->getIndexIterator(
-                            IndexCatalog::InclusionPolicy::kReady |
-                            IndexCatalog::InclusionPolicy::kUnfinished);
-                        while (indexIterator->more()) {
-                            const IndexCatalogEntry* entry = indexIterator->next();
-                            const IndexDescriptor* descriptor = entry->descriptor();
-                            const BSONObj& infoObj = descriptor->infoObj();
+            catalog::forEachCollectionFromAllDbs(
+                opCtx, MODE_IS, [&](const Collection* collection) -> bool {
+                    auto indexCatalog = collection->getIndexCatalog();
+                    auto indexIterator =
+                        indexCatalog->getIndexIterator(IndexCatalog::InclusionPolicy::kReady |
+                                                       IndexCatalog::InclusionPolicy::kUnfinished);
+                    while (indexIterator->more()) {
+                        const IndexCatalogEntry* entry = indexIterator->next();
+                        const IndexDescriptor* descriptor = entry->descriptor();
+                        const BSONObj& infoObj = descriptor->infoObj();
 
-                            // Check if this is a 2dsphere index
-                            if (descriptor->getAccessMethodName() == IndexNames::GEO_2DSPHERE ||
-                                descriptor->getAccessMethodName() ==
-                                    IndexNames::GEO_2DSPHERE_BUCKET) {
-                                BSONElement versionElt = infoObj[kIndexVersionFieldName];
-                                if (versionElt.isNumber() && versionElt.numberInt() == 4) {
-                                    uasserted(
-                                        ErrorCodes::CannotDowngrade,
-                                        fmt::format(
-                                            "Cannot downgrade the cluster when there are 2dsphere "
-                                            "indexes with version 4. Version 4 indexes require "
-                                            "FCV 8.3 or higher. Please drop the index(es) before "
-                                            "downgrading. First detected index: {} on collection "
-                                            "{} (UUID: {}).",
-                                            descriptor->indexName(),
-                                            collection->ns().toStringForErrorMsg(),
-                                            collection->uuid().toString()));
-                                }
+                        // Check if this is a 2dsphere index
+                        if (descriptor->getAccessMethodName() == IndexNames::GEO_2DSPHERE ||
+                            descriptor->getAccessMethodName() == IndexNames::GEO_2DSPHERE_BUCKET) {
+                            BSONElement versionElt = infoObj[kIndexVersionFieldName];
+                            if (versionElt.isNumber() && versionElt.numberInt() == 4) {
+                                uasserted(
+                                    ErrorCodes::CannotDowngrade,
+                                    fmt::format(
+                                        "Cannot downgrade the cluster when there are 2dsphere "
+                                        "indexes with version 4. Version 4 indexes require "
+                                        "FCV 8.3 or higher. Please drop the index(es) before "
+                                        "downgrading. First detected index: {} on collection "
+                                        "{} (UUID: {}).",
+                                        descriptor->indexName(),
+                                        collection->ns().toStringForErrorMsg(),
+                                        collection->uuid().toString()));
                             }
                         }
-                        return true;
-                    });
-            }
+                    }
+                    return true;
+                });
         }
     }
 

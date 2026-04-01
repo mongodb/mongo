@@ -37,7 +37,6 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
-#include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/db/shard_role/shard_catalog/durable_catalog.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
@@ -150,6 +149,66 @@ CollectionCatalogIterationResult forEachCollectionFromDb(
     return result;
 }
 
+CollectionCatalogIterationResult forEachCollectionFromAllDbs(
+    OperationContext* opCtx,
+    LockMode collLockMode,
+    CollectionCatalog::CollectionInfoFn callback,
+    CollectionCatalog::CollectionInfoFn predicate) {
+    const LockMode dbLockMode = isSharedLockMode(collLockMode) ? MODE_IS : MODE_IX;
+
+    // Take a catalog snapshot that we'll use to iterate over all collections across all databases.
+    // Using a single snapshot across all databases ensures a collection renamed across databases
+    // between two per-DB iterations cannot dodge the scan entirely.
+    auto catalogForIteration = CollectionCatalog::get(opCtx);
+    auto result = CollectionCatalogIterationResult::kNoMatches;
+
+    // Iterate over all the existing collection uuids using catalogForIteration. For each collection
+    // uuid, find its namespace using a more recent catalog, lock it and check that the UUID still
+    // resolves to the same namespace; if so, run the callback, otherwise, retry the namespace
+    // resolution.
+    for (const auto& dbName : catalogForIteration->getAllDbNames()) {
+        for (const auto& coll : catalogForIteration->range(dbName)) {
+            auto uuid = coll->uuid();
+            if (predicate && !catalogForIteration->checkIfCollectionSatisfiable(uuid, predicate)) {
+                continue;
+            }
+            result = CollectionCatalogIterationResult::kSomeMatches;
+
+            auto catalog = CollectionCatalog::get(opCtx);
+            while (auto nss = catalog->lookupNSSByUUID(opCtx, uuid)) {
+                // Acquire the DB and Collection locks.
+                Lock::DBLock dbLock(opCtx, nss->dbName(), dbLockMode);
+                Lock::CollectionLock collLock(opCtx, *nss, collLockMode);
+
+                // Get a fresh snapshot for each locked collection to see any catalog changes.
+                shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+                catalog = CollectionCatalog::get(opCtx);
+
+                if (catalog->lookupNSSByUUID(opCtx, uuid) != nss) {
+                    // Renamed before we locked it. Retry with the new nss.
+                    continue;
+                }
+
+                // UUID still maps to the same NSS. We have a consistent lock.
+                auto collection = CollectionPtr(catalog->establishConsistentCollection(
+                    opCtx, NamespaceStringOrUUID(nss->dbName(), uuid), boost::none));
+                tassert(11842100, "Expected consistent collection", collection);
+
+                if (!callback(collection.get())) {
+                    return CollectionCatalogIterationResult::kSomeMatches;
+                }
+
+                break;
+            }
+
+            opCtx->checkForInterrupt();
+            hangBeforeGettingNextCollection.pauseWhileSet();
+        }
+    }
+
+    return result;
+}
+
 void modifyAllCollectionsMatching(OperationContext* opCtx,
                                   std::function<void(const Collection* collection)> callback,
                                   CollectionCatalog::CollectionInfoFn predicate) {
@@ -165,16 +224,12 @@ void modifyAllCollectionsMatching(OperationContext* opCtx,
                 "modifyAllCollectionsMatching reached max iterations without convergence",
                 i < kMaxIterations);
 
-        keepIterating = false;
-        for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-            Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
-            // If some collection satisfied the predicate, a concurrent DDL could have cloned it
-            // before we ran the callback, so there could be a new collection satisfying the
-            // predicate that we have missed and we must re-check the catalog to find it.
-            keepIterating |=
-                forEachCollectionFromDb(opCtx, dbName, MODE_X, callbackAndContinue, predicate) ==
-                CollectionCatalogIterationResult::kSomeMatches;
-        }
+        // If some collection satisfied the predicate, a concurrent DDL could have cloned it
+        // before we ran the callback, so there could be a new collection satisfying the
+        // predicate that we have missed and we must re-check the catalog to find it.
+        keepIterating =
+            forEachCollectionFromAllDbs(opCtx, MODE_X, callbackAndContinue, predicate) ==
+            CollectionCatalogIterationResult::kSomeMatches;
     }
 }
 

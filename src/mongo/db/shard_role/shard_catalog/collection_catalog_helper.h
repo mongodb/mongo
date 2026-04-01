@@ -80,6 +80,29 @@ CollectionCatalogIterationResult forEachCollectionFromDb(
 
 
 /**
+ * Like forEachCollectionFromDb but iterates all databases using a single catalog snapshot taken
+ * before any locks are acquired. This prevents a collection renamed across databases from dodging
+ * the scan entirely when the rename happens between two per-DB iterations.
+ *
+ * Unlike forEachCollectionFromDb, this function acquires the database lock internally in addition
+ * to the per-collection lock (at collLockMode). The database lock mode is derived automatically:
+ * MODE_IS when collLockMode is a shared mode, MODE_IX otherwise. Callers must not hold any
+ * database lock when calling this function.
+ *
+ * If a predicate is provided, the callback will only be executed against collections that
+ * satisfy it. The predicate must not block, as an internal collection catalog mutex is held
+ * during its evaluation.
+ *
+ * Iterating through the remaining collections stops when the callback returns false.
+ */
+MONGO_MOD_PUBLIC
+CollectionCatalogIterationResult forEachCollectionFromAllDbs(
+    OperationContext* opCtx,
+    LockMode collLockMode,
+    CollectionCatalog::CollectionInfoFn callback,
+    CollectionCatalog::CollectionInfoFn predicate = nullptr);
+
+/**
  * Iterates through all collections in all databases that satisfy the predicate and runs the
  * callback function on each collectiom, which should modify it to no longer satisfy the predicate.
  *
