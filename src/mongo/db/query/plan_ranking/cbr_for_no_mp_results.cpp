@@ -75,6 +75,8 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
         return mpTrialsStatus;
     }
     auto stats = _multiPlanner->getSpecificStats();
+    bool isExplain = query.getExplain().has_value();
+
     // We're using CBR to pick a plan only if multiplanner did not produce any results during the
     // trials phase and did not exit early either.
     //
@@ -90,7 +92,8 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
         // the multiplanner here.
         return resumeMultiPlannerAndPickBestPlan(
             {.maxNumWorksPerPlan = remainingMultiPlannerWorksPerPlan,
-             .targetNumResults = trialsConfig.targetNumResults});
+             .targetNumResults = trialsConfig.targetNumResults},
+            isExplain);
     }
     tassert(11737001,
             "Expected multi-planner to have produced zero results during trials phase",
@@ -106,7 +109,6 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
     }
 
     if (cbrResult.getValue().solutions.size() == 1) {
-        // TODO SERVER-117373. Only if explain is needed.
         auto resultValue = std::move(cbrResult.getValue());
 
         // Stop collecting MP metrics because at this point CBR has already chosen the winning plan.
@@ -150,11 +152,12 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
     };
     _multiPlanner->abandonTrialsExceptHashes(computeCBRSolutionHashes());
 
-    // move solutions from cbrResult into maybeExplainData.rejectedPlansWithStages
-    for (size_t i = 0; i < cbrResult.getValue().solutions.size(); i++) {
-        // TODO SERVER-117373. Only if explain is needed.
-        cbrResult.getValue().maybeExplainData->rejectedPlansWithStages.push_back(
-            {std::move(cbrResult.getValue().solutions[i]), nullptr});
+    if (isExplain) {
+        // Move solutions from cbrResult into maybeExplainData.rejectedPlansWithStages.
+        for (size_t i = 0; i < cbrResult.getValue().solutions.size(); i++) {
+            cbrResult.getValue().maybeExplainData->rejectedPlansWithStages.push_back(
+                {std::move(cbrResult.getValue().solutions[i]), nullptr});
+        }
     }
 
     // Resume trials on the remainder of the plans.
@@ -164,17 +167,18 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
     // multiplanner here.
     auto result =
         resumeMultiPlannerAndPickBestPlan({.maxNumWorksPerPlan = remainingMultiPlannerWorksPerPlan,
-                                           .targetNumResults = trialsConfig.targetNumResults});
+                                           .targetNumResults = trialsConfig.targetNumResults},
+                                          isExplain);
     if (!result.isOK()) {
         return result;
     }
-    // TODO SERVER-117373. Only if explain is needed.
+
     result.getValue().maybeExplainData << std::move(cbrResult.getValue().maybeExplainData);
     return std::move(result.getValue());
 }
 
 StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::resumeMultiPlannerAndPickBestPlan(
-    const trial_period::TrialPhaseConfig& trialsConfig) {
+    const trial_period::TrialPhaseConfig& trialsConfig, bool isExplain) {
     auto stats = _multiPlanner->getSpecificStats();
 
     if (!stats->earlyExit) {
@@ -193,8 +197,9 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::resumeMultiPlannerAndPi
     tassert(
         11540202, "Expected multi-planner to have returned a solution!", !result.solutions.empty());
 
-    // TODO SERVER-117373. Only if explain is needed.
-    result.maybeExplainData.emplace(_multiPlanner->extractExplainData());
+    if (isExplain) {
+        result.maybeExplainData.emplace(_multiPlanner->extractExplainData());
+    }
     result.execState = std::move(*_multiPlanner).extractExecState();
     return std::move(result);
 }

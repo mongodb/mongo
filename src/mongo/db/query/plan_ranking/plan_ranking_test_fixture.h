@@ -57,7 +57,6 @@ protected:
         BSONObj findFilter,
         std::function<void(FindCommandRequest&)> modifyFindCmd = [](FindCommandRequest&) {});
 
-
     MultipleCollectionAccessor getCollsAccessor();
 
     std::unique_ptr<DBDirectClient> client;

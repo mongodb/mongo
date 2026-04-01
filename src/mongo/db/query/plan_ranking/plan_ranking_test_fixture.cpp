@@ -136,7 +136,7 @@ PlanRankingTestFixture::createCQAndPlannerData(
     auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
         .expCtx = expCtx,
         .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand)}});
-
+    cq->getExpCtx()->setExplain(ExplainOptions::Verbosity::kQueryPlanner);
 
     PlannerData plannerData{
         operationContext(),

@@ -284,7 +284,8 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
                 QueryPlanner::planWithCostBasedRanking(plannerParams,
                                                        samplingEstimator.get(),
                                                        exactCardinality.get(),
-                                                       std::move(branchResult->solutions));
+                                                       std::move(branchResult->solutions),
+                                                       _query->getExplain().has_value());
             if (!statusWithCBRSolns.isOK()) {
                 str::stream ss;
                 ss << "Can't plan for subchild " << branchResult->canonicalQuery->toString() << " "

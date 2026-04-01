@@ -1767,7 +1767,8 @@ StatusWith<PlanRankingResult> QueryPlanner::planWithCostBasedRanking(
     const QueryPlannerParams& params,
     ce::SamplingEstimator* samplingEstimator,
     const ce::ExactCardinalityEstimator* exactCardinality,
-    StatusWith<std::vector<std::unique_ptr<QuerySolution>>> statusWithMultiPlanSolns) {
+    StatusWith<std::vector<std::unique_ptr<QuerySolution>>> statusWithMultiPlanSolns,
+    bool isExplain) {
     using namespace cost_based_ranker;
     auto cbrMode = params.planRankerMode;
     EstimateMap estimates;
@@ -1836,24 +1837,29 @@ StatusWith<PlanRankingResult> QueryPlanner::planWithCostBasedRanking(
             "Some plan has fallen into the gray zone between accepted and rejected QSNs.",
             acceptedSoln.size() + rejectedSoln.size() == allSoln.size());
 
-    std::vector<SolutionWithPlanStage> rejectedSolnWithStages;
-    for (auto&& soln : rejectedSoln) {
-        rejectedSolnWithStages.push_back(
-            SolutionWithPlanStage{std::move(soln), nullptr /* rootStage */});
-    }
-
     // If only the best plan is in the accepted solutions, CBR successfully chose a winner.
     bool successfullyChoseWinner = acceptedSoln.size() == 1;
     if (successfullyChoseWinner) {
         cbrChoseWinningPlan.increment();
     }
 
-    return PlanRankingResult{
-        .solutions = std::move(acceptedSoln),
-        .maybeExplainData =
-            PlanExplainerData{.rejectedPlansWithStages = std::move(rejectedSolnWithStages),
-                              .estimates = std::move(estimates)},
-        .needsWorksMeasuredForPlanCache = successfullyChoseWinner};
+    auto planRankingResult =
+        PlanRankingResult{.solutions = std::move(acceptedSoln),
+                          .maybeExplainData = PlanExplainerData{.estimates = std::move(estimates)},
+                          .needsWorksMeasuredForPlanCache = successfullyChoseWinner};
+    if (isExplain) {
+        std::vector<SolutionWithPlanStage> rejectedSolnWithStages;
+        rejectedSolnWithStages.reserve(rejectedSoln.size());
+        std::transform(std::make_move_iterator(rejectedSoln.begin()),
+                       std::make_move_iterator(rejectedSoln.end()),
+                       std::back_inserter(rejectedSolnWithStages),
+                       [](auto soln) {
+                           return SolutionWithPlanStage{std::move(soln), nullptr /* rootStage */};
+                       });
+        planRankingResult.maybeExplainData->rejectedPlansWithStages =
+            std::move(rejectedSolnWithStages);
+    }
+    return std::move(planRankingResult);
 }
 
 /**

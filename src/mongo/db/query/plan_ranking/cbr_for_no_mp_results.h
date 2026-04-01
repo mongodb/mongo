@@ -54,9 +54,10 @@ private:
     /**
      * Resumes the multi-planner and picks the best plan from it.
      * @param trialsConfig The trials configuration to use when resuming the multi-planner.
+     * @param isExplain If true extract explain data from the multiplanner.
      */
     StatusWith<PlanRankingResult> resumeMultiPlannerAndPickBestPlan(
-        const trial_period::TrialPhaseConfig& trialsConfig);
+        const trial_period::TrialPhaseConfig& trialsConfig, bool isExplain);
 };
 }  // namespace plan_ranking
 }  // namespace mongo

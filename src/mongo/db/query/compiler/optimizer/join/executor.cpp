@@ -313,7 +313,8 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     // Select access plans for each table in the join.
     auto yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
     SamplingEstimatorMap samplingEstimators = makeSamplingEstimators(mca, model.graph, yieldPolicy);
-    auto swAccessPlans = singleTableAccessPlans(opCtx, mca, model.graph, samplingEstimators);
+    auto swAccessPlans = singleTableAccessPlans(
+        opCtx, mca, model.graph, samplingEstimators, expCtx->getExplain().has_value());
     if (!swAccessPlans.isOK()) {
         return swAccessPlans.getStatus();
     }

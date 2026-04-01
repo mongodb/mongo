@@ -210,7 +210,8 @@ StatusWith<PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
         QueryPlanner::planWithCostBasedRanking(plannerParams,
                                                samplingEstimator.get(),
                                                exactCardinality.get(),
-                                               std::move(statusWithMultiPlanSolns));
+                                               std::move(statusWithMultiPlanSolns),
+                                               query.getExplain().has_value());
 
     // Calculate duration for server status metrics
     auto durationMicros = tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startTicks);

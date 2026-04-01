@@ -129,12 +129,14 @@ public:
      * estimation (CE) and costing modules. The return value contains a list of plans that were
      * rejected on the basis of cost, as well as any non-rejected plans from which the caller can
      * select a winner.
+     * If isExplain is true, collect and return planExplainerData as part of the PlanRankingResult.
      */
     static StatusWith<PlanRankingResult> planWithCostBasedRanking(
         const QueryPlannerParams& params,
         ce::SamplingEstimator* samplingEstimator,
         const ce::ExactCardinalityEstimator* exactCardinality,
-        StatusWith<std::vector<std::unique_ptr<QuerySolution>>> statusWithMultiPlanSolns);
+        StatusWith<std::vector<std::unique_ptr<QuerySolution>>> statusWithMultiPlanSolns,
+        bool isExplain);
 
     /**
      * Generates and returns a query solution, given data retrieved from the plan cache.

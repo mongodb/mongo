@@ -82,7 +82,8 @@ StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
     const JoinGraph& graph,
-    const SamplingEstimatorMap& samplingEstimators) {
+    const SamplingEstimatorMap& samplingEstimators,
+    bool isExplain) {
     QuerySolutionMap solns;
     cost_based_ranker::EstimateMap estimates;
 
@@ -133,7 +134,8 @@ StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
         auto swCbrResult = QueryPlanner::planWithCostBasedRanking(params,
                                                                   samplingEstimators.at(nss).get(),
                                                                   nullptr /*exactCardinality*/,
-                                                                  std::move(swSolns.getValue()));
+                                                                  std::move(swSolns.getValue()),
+                                                                  isExplain);
         // Return bad status if CBR is unable to produce a plan
         if (!swCbrResult.isOK()) {
             return swCbrResult.getStatus();
