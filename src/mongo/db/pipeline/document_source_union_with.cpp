@@ -218,7 +218,12 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
             // We do not need to use the result of 'makePipeline', since this is simply to raise
             // 'CommandOnShardedViewNotSupportedOnMongod', but we do, anyway, for future proofing
             // and to make static analysis tools happy.
-            auto shared_pipeline = pipeline_factory::makePipeline(pipeline, expCtx, {});
+            auto shared_pipeline = pipeline_factory::makePipeline(
+                pipeline,
+                expCtx,
+                expCtx->getMongoProcessInterface()->isExpectedToExecuteQueries()
+                    ? pipeline_factory::MakePipelineOptions{}
+                    : pipeline_factory::kOptionsMinimal);
             _sharedState = std::make_shared<UnionWithSharedState>(
                 std::move(shared_pipeline),
                 nullptr,
