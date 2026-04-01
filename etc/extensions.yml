@@ -3,8 +3,6 @@
 # Artifact URI is {base_url}{name}-{version}-{variant}.tgz
 #
 # Example: for artifacts at
-#  - https://mongot-extension.s3.amazonaws.com/release/mongot-extension-0.0.0-amazon2-x86_64.tgz
-#  - https://mongot-extension.s3.amazonaws.com/release/mongot-extension-0.0.0-amazon2-aarch64.tgz
 #  - https://mongot-extension.s3.amazonaws.com/release/mongot-extension-0.0.0-amazon2023-x86_64.tgz
 #  - https://mongot-extension.s3.amazonaws.com/release/mongot-extension-0.0.0-amazon2023-aarch64.tgz
 #
@@ -12,8 +10,6 @@
 #    name: mongot-extension
 #    version: 0.0.0
 #    variants:
-#      amazon2-x86_64: checksum1
-#      amazon2-aarch64: checksum2
 #      amazon2023-x86_64: checksum3
 #      amazon2023-aarch64: checksum4
 
@@ -23,8 +19,6 @@ extensions:
     name: mongot-extension
     version: 1.0.2
     variants:
-      amazon2-x86_64: f3adacd3cb567341f9bf7d92377058e9ec4b828f7bb1460fa928f49a89b605d2
-      amazon2-aarch64: 75c1932ac0c9ac1804e4c4bf5941ba505f74bf7093881b095c6d50d9724bc86f
       amazon2023-x86_64: b58754484e0550f92285e8d8672fe732327ea547b22b868658a90568330db0da
       amazon2023-aarch64: 376926c56702f7bf8bd425f3afa3f1a71599def589243fade5e7e058bc2af0a0
   rerank_extension:
@@ -32,7 +26,5 @@ extensions:
     name: rerank-extension
     version: 1.0.2
     variants:
-      amazon2-x86_64: 8e24d2373c7712c16f6e3d06009fe7f0b0abbc4fd06214550c1895c57b2c2ef4
-      amazon2-aarch64: 8091747bae581f39e68a03674ab1faab08c3e671f2790b49d0a02d22efc9f23a
       amazon2023-x86_64: de1cbb24ff45256aaca1366a7660653d1b478ff45937f2b973dac677ca0bc25a
       amazon2023-aarch64: aa99aef8959d3b4f50c216b938cf21c7cffc778240fea9ade75e218e26b5caf6
