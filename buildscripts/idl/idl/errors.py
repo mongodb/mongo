@@ -141,7 +141,6 @@ ERROR_ID_FEATURE_FLAG_WITHOUT_DEFAULT_VALUE = "ID0107"
 ERROR_ID_IFR_FLAG_WITH_VERSION = "ID108"
 ERROR_ID_BAD_VISIBILITY = "ID109"
 ERROR_ID_FEATURE_FLAG_ENABLED_ON_TRANSITIONAL_FCV_MISSING_SAFETY_EXPLANATION = "ID110"
-ERROR_ID_SERIALIZE_ON_OUTGOING_REQUESTS_ON_NON_IFR_FLAG = "ID111"
 
 
 class IDLError(Exception):
@@ -1145,18 +1144,6 @@ class ParserContext(object):
             (
                 "A feature flag in any phase other than the default ('not_for_incremental_rollout') "
                 "must not also set a 'version' value."
-            ),
-        )
-
-    def add_serialize_on_outgoing_requests_on_non_ifr_flag(self, location):
-        # type: (common.SourceLocation) -> None
-        """Add an error about serialize_on_outgoing_requests being used on a non-IFR flag."""
-        self._add_error(
-            location,
-            ERROR_ID_SERIALIZE_ON_OUTGOING_REQUESTS_ON_NON_IFR_FLAG,
-            (
-                "The 'serialize_on_outgoing_requests' attribute is only allowed on Incremental "
-                "Feature Rollout (IFR) flags (those with an 'incremental_rollout_phase' specified)."
             ),
         )
 

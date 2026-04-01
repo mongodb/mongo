@@ -105,9 +105,11 @@ void addQuerySettingsToRequest(AggregateCommandRequest& request,
                                const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 /**
- * Adds IFR flags from ifrContext to request. Serializes the current flag value for all IFR
- * flags that have 'serialize_on_outgoing_requests' set to true, so shards use the same value as the
- * router/sender.
+ * Adds IFR flags from ifrContext to request. Always serializes the current flag value when
+ * dispatching to shards, so they use the same value as the router/sender.
+ *
+ * For now, we only serialize featureFlagVectorSearchExtension.
+ * TODO SERVER-116219: Expand IFR flag serialization beyond $vectorSearch.
  */
 void addIfrFlagsToRequest(AggregateCommandRequest& request,
                           std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext);

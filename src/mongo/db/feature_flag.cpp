@@ -266,17 +266,6 @@ IncrementalRolloutFeatureFlag* IncrementalRolloutFeatureFlag::findByName(StringD
     return nullptr;
 }
 
-std::vector<IncrementalRolloutFeatureFlag*>
-IncrementalRolloutFeatureFlag::getFlagsForOutgoingRequests() {
-    std::vector<IncrementalRolloutFeatureFlag*> flagsToSerialize;
-    for (auto* flag : getMutableAllIncrementalRolloutFeatureFlags()) {
-        if (flag->shouldSerializeOnOutgoingRequests()) {
-            flagsToSerialize.push_back(flag);
-        }
-    }
-    return flagsToSerialize;
-}
-
 bool IncrementalRolloutFeatureFlag::checkEnabled() {
     auto checkResult = _value.load();
     (checkResult ? _numTrueChecks : _numFalseChecks).addAndFetch(1);
@@ -327,9 +316,6 @@ void IncrementalRolloutFeatureFlag::appendFlagDetails(BSONObjBuilder& detailsBui
         MONGO_UNREACHABLE_TASSERT(101023);
     }();
     detailsBuilder.append("incrementalFeatureRolloutPhase", phaseName);
-    if (_serializeOnOutgoingRequests) {
-        detailsBuilder.append("serializeOnOutgoingRequests", true);
-    }
 }
 
 bool IncrementalRolloutFeatureFlag::checkWithContext(const VersionContext& vCtx,

@@ -1611,7 +1611,7 @@ class TestGenerator(testcase.IDLTestcase):
             source,
             [
                 "mongo::IncrementalRolloutFeatureFlag gToaster{"
-                + '"featureFlagToaster"_sd, RolloutPhase::inDevelopment, false, false};',
+                + '"featureFlagToaster"_sd, RolloutPhase::inDevelopment, false};',
                 '<FeatureFlagServerParameter>("featureFlagToaster", &gToaster);',
             ],
         )
@@ -1638,7 +1638,7 @@ class TestGenerator(testcase.IDLTestcase):
             source,
             [
                 "mongo::IncrementalRolloutFeatureFlag gToaster{"
-                + '"featureFlagToaster"_sd, RolloutPhase::rollout, true, false};',
+                + '"featureFlagToaster"_sd, RolloutPhase::rollout, true};',
                 '<FeatureFlagServerParameter>("featureFlagToaster", &gToaster);',
             ],
         )
@@ -1665,35 +1665,7 @@ class TestGenerator(testcase.IDLTestcase):
             source,
             [
                 "mongo::IncrementalRolloutFeatureFlag gToaster{"
-                + '"featureFlagToaster"_sd, RolloutPhase::released, true, false};',
-                '<FeatureFlagServerParameter>("featureFlagToaster", &gToaster);',
-            ],
-        )
-
-    def test_ifr_flag_with_serialize_on_outgoing_requests(self) -> None:
-        """Test generation of an IFR flag with serialize_on_outgoing_requests"""
-        header, source = self.assert_generate_with_basic_types(
-            dedent(
-                """
-            feature_flags:
-                featureFlagToaster:
-                    description: "Make toast"
-                    cpp_varname: gToaster
-                    incremental_rollout_phase: in_development
-                    fcv_gated: false
-                    serialize_on_outgoing_requests: true
-            """
-            )
-        )
-        self.assertStringsInFile(
-            header,
-            ["mongo::IncrementalRolloutFeatureFlag gToaster;"],
-        )
-        self.assertStringsInFile(
-            source,
-            [
-                "mongo::IncrementalRolloutFeatureFlag gToaster{"
-                + '"featureFlagToaster"_sd, RolloutPhase::inDevelopment, false, true};',
+                + '"featureFlagToaster"_sd, RolloutPhase::released, true};',
                 '<FeatureFlagServerParameter>("featureFlagToaster", &gToaster);',
             ],
         )

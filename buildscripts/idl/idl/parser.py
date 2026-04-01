@@ -983,7 +983,6 @@ def _parse_feature_flag(ctxt, spec, name, node):
             ),
             "enable_on_transitional_fcv_UNSAFE": _RuleDesc("bool_scalar"),
             "incremental_rollout_phase": _RuleDesc("scalar"),
-            "serialize_on_outgoing_requests": _RuleDesc("bool_scalar"),
             "check_against_fcv": _RuleDesc("scalar"),
         },
     )
