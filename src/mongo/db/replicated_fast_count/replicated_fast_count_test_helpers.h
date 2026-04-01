@@ -32,6 +32,7 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
 #include "mongo/db/replicated_fast_count/size_count_store.h"
+#include "mongo/db/replicated_fast_count/size_count_timestamp_store.h"
 #include "mongo/db/rss/stub_persistence_provider.h"
 #include "mongo/util/uuid.h"
 
@@ -340,4 +341,12 @@ void insertSizeCountEntry(OperationContext* opCtx,
                           SizeCountStore& store,
                           UUID uuid,
                           const SizeCountStore::Entry& entry);
+
+/**
+ * Inserts a timestamp into `store`.
+ */
+// TODO(SERVER-122992): Assert return value is false.
+void insertSizeCountTimestamp(OperationContext* opCtx,
+                              SizeCountTimestampStore& store,
+                              Timestamp timestamp);
 }  // namespace mongo::replicated_fast_count::test_helpers

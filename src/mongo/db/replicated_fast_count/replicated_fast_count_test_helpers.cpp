@@ -529,4 +529,12 @@ void insertSizeCountEntry(OperationContext* opCtx,
     store.write(opCtx, uuid, entry);
     wuow.commit();
 }
+
+void insertSizeCountTimestamp(OperationContext* opCtx,
+                              SizeCountTimestampStore& store,
+                              Timestamp timestamp) {
+    WriteUnitOfWork wuow(opCtx);
+    store.write(opCtx, timestamp);
+    wuow.commit();
+}
 }  // namespace mongo::replicated_fast_count::test_helpers
