@@ -211,6 +211,11 @@ public:
             "StubPersistenceProvider::shouldTimestampTableCreations() method not implemented");
     }
 
+    uint64_t getSchemaEpochForTimestamp(Timestamp ts) const override {
+        uasserted(mongo::ErrorCodes::NotImplemented,
+                  "StubPersistenceProvider::getSchemaEpochForTimestamp() not implemented");
+    }
+
     int getMinSnapshotHistoryWindowInSeconds() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
                   "StubPersistenceProvider::getMinSnapshotHistoryWindowInSeconds() method not "

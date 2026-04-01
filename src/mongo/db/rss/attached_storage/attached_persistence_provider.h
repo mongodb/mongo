@@ -186,6 +186,11 @@ public:
     bool shouldTimestampTableCreations() const override;
 
     /**
+     * Attached storage does not use schema epochs; always returns 0.
+     */
+    uint64_t getSchemaEpochForTimestamp(Timestamp ts) const override;
+
+    /**
      * The minimum number of seconds of snapshot history to maintain.
      */
     int getMinSnapshotHistoryWindowInSeconds() const override;

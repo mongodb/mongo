@@ -195,6 +195,10 @@ bool AttachedPersistenceProvider::shouldTimestampTableCreations() const {
     return false;
 }
 
+uint64_t AttachedPersistenceProvider::getSchemaEpochForTimestamp(Timestamp) const {
+    return 0;
+}
+
 int AttachedPersistenceProvider::getMinSnapshotHistoryWindowInSeconds() const {
     return minSnapshotHistoryWindowInSeconds.load();
 }

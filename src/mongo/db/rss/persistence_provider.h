@@ -223,6 +223,12 @@ public:
     virtual bool shouldTimestampTableCreations() const = 0;
 
     /**
+     * Returns the schema epoch to use when passing a schema-related operation at the given
+     * timestamp to WiredTiger. Returns 0 for backends that do not use schema epochs.
+     */
+    virtual uint64_t getSchemaEpochForTimestamp(Timestamp ts) const = 0;
+
+    /**
      * The minimum number of seconds of snapshot history to maintain.
      */
     virtual int getMinSnapshotHistoryWindowInSeconds() const = 0;

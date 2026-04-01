@@ -2089,6 +2089,7 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
     // in-progress transaction.
     WiredTigerSession session(_connection.get());
 
+    // TODO: SERVER-122163 pass drop schema epoch to WT.
     Status status = _drop(session, uri.c_str(), "checkpoint_wait=false");
     LOGV2_DEBUG(22338, 1, "WT drop", "uri"_attr = uri, "status"_attr = status);
 
@@ -2697,8 +2698,11 @@ void WiredTigerKVEngine::unpinAllDurableTimestamp(uint64_t ts) {
 void WiredTigerKVEngine::publishIdent(WiredTigerRecoveryUnit& ru,
                                       StringData ident,
                                       Timestamp publishTimestamp) {
-    // TODO: SERVER-122163: Call WT session->publish(uri, ts) when the API is available.
-    LOGV2_DEBUG(11928700, 1, "publishIdent", "ident"_attr = ident, "ts"_attr = publishTimestamp);
+    const uint64_t schemaEpoch = _provider.getSchemaEpochForTimestamp(publishTimestamp);
+    // TODO: SERVER-122163: Call WT session->publish_at_schema_epoch(uri, schemaEpoch) when the API
+    // is available.
+    LOGV2_DEBUG(
+        11928700, 1, "publishIdent", "ident"_attr = ident, "schemaEpoch"_attr = schemaEpoch);
 }
 
 boost::optional<Timestamp> WiredTigerKVEngine::getRecoveryTimestamp() const {
