@@ -201,10 +201,16 @@ filters:
   - "concurrency_sharded_with_config_shard.yml":
     approvers:
       - 10gen/server-cluster-scalability
+  - "sharding_jscore_passthrough_with_balancer.yml":
+    approvers:
+      - 10gen/server-cluster-scalability
   - "sharding_jscore_passthrough_with_config_shard.yml":
     approvers:
       - 10gen/server-cluster-scalability
   - "sharded_collections_jscore_passthrough_with_config_shard.yml":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "unsplittable_collections_created_on_any_shard_jscore_passthrough.yml":
     approvers:
       - 10gen/server-cluster-scalability
   - "concurrency_simultaneous_replication.yml":
@@ -232,6 +238,9 @@ filters:
     approvers:
       - 10gen/server-cluster-scalability
   - "sharding_uninitialized_fcv_jscore_passthrough.yml":
+    approvers:
+      - 10gen/server-replication-reviewers
+  - "sharded_collections_uninitialized_fcv_jscore_passthrough.yml":
     approvers:
       - 10gen/server-replication-reviewers
   - "sharding_api_version_jscore_passthrough.yml":
