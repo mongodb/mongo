@@ -112,6 +112,21 @@ public:
                                  << false));
     }
 
+    /**
+     * Returns the current establishmentRateLimit section from serverStatus, or an empty BSONObj
+     * if not present.
+     */
+    BSONObj getRateLimiterStats() {
+        auto serverStatus = runSetupCommandSync(DatabaseName::kAdmin, BSON("serverStatus" << 1));
+        if (serverStatus.hasField("connections")) {
+            auto connections = serverStatus["connections"].Obj();
+            if (connections.hasField("establishmentRateLimit")) {
+                return connections["establishmentRateLimit"].Obj().getOwned();
+            }
+        }
+        return BSONObj();
+    }
+
     void waitForRateLimiterStat(std::function<bool(const BSONObj&)> pred, StringData description) {
         const auto deadline = Date_t::now() + Seconds{30};
         int pollIterations = 0;
@@ -367,13 +382,17 @@ TEST_F(EgressPoolRateLimiterResilienceTest, RejectionWithEstablishedConnection) 
     SKIP_ON_GRPC_RATE_LIMITER();
 
     withEstablishedConnection([&] {
+        auto baseline = getRateLimiterStats();
+        auto baselineRejected = baseline.isEmpty() ? 0 : baseline["rejected"].numberLong();
+
         enableRateLimiter(/*maxQueueDepth=*/1);
         auto hangFP = configureFailPoint("hangInRateLimiter", BSONObj());
 
         auto futures = sendPings(6, Minutes{10});
 
-        waitForRateLimiterStat([](const BSONObj& rl) { return rl["rejected"].numberLong() >= 1; },
-                               "rejected >= 1");
+        waitForRateLimiterStat(
+            [&](const BSONObj& rl) { return rl["rejected"].numberLong() > baselineRejected; },
+            "rejected increased from baseline");
         assertPoolHasEstablishedConnection(
             "Pool should still have >= 1 established connection after rejections");
 
@@ -391,16 +410,20 @@ TEST_F(EgressPoolRateLimiterResilienceTest, TimeoutWithEstablishedConnection) {
     SKIP_ON_NON_LINUX();
 
     withEstablishedConnection([&] {
+        auto baseline = getRateLimiterStats();
+        auto baselineInterrupted =
+            baseline.isEmpty() ? 0 : baseline["interruptedDueToClientDisconnect"].numberLong();
+
         enableRateLimiter(/*maxQueueDepth=*/10);
         auto hangFP = configureFailPoint("hangInRateLimiter", BSONObj());
 
         auto futures = sendPings(3, Minutes{10});
 
         waitForRateLimiterStat(
-            [](const BSONObj& rl) {
-                return rl["interruptedDueToClientDisconnect"].numberLong() >= 1;
+            [&](const BSONObj& rl) {
+                return rl["interruptedDueToClientDisconnect"].numberLong() > baselineInterrupted;
             },
-            "interruptedDueToClientDisconnect >= 1");
+            "interruptedDueToClientDisconnect increased from baseline");
         assertPoolHasEstablishedConnection(
             "Pool should still have >= 1 established connection after queue timeouts");
 
@@ -416,13 +439,17 @@ TEST_F(EgressPoolRateLimiterResilienceTest, TimeoutWithEstablishedConnection) {
 TEST_F(EgressPoolRateLimiterResilienceTest, RejectionWithNoEstablishedConnection) {
     SKIP_ON_GRPC_RATE_LIMITER();
 
+    auto baseline = getRateLimiterStats();
+    auto baselineRejected = baseline.isEmpty() ? 0 : baseline["rejected"].numberLong();
+
     enableRateLimiter(/*maxQueueDepth=*/1);
     auto hangFP = configureFailPoint("hangInRateLimiter", BSONObj());
 
     auto futures = sendPings(6, Seconds{30});
 
-    waitForRateLimiterStat([](const BSONObj& rl) { return rl["rejected"].numberLong() >= 1; },
-                           "rejected >= 1");
+    waitForRateLimiterStat(
+        [&](const BSONObj& rl) { return rl["rejected"].numberLong() > baselineRejected; },
+        "rejected increased from baseline");
 
     hangFP.disable();
     disableRateLimiter();
@@ -436,14 +463,20 @@ TEST_F(EgressPoolRateLimiterResilienceTest, TimeoutWithNoEstablishedConnection) 
     SKIP_ON_GRPC_RATE_LIMITER();
     SKIP_ON_NON_LINUX();
 
+    auto baseline = getRateLimiterStats();
+    auto baselineInterrupted =
+        baseline.isEmpty() ? 0 : baseline["interruptedDueToClientDisconnect"].numberLong();
+
     enableRateLimiter(/*maxQueueDepth=*/10);
     auto hangFP = configureFailPoint("hangInRateLimiter", BSONObj());
 
     auto futures = sendPings(3, Seconds{30});
 
     waitForRateLimiterStat(
-        [](const BSONObj& rl) { return rl["interruptedDueToClientDisconnect"].numberLong() >= 1; },
-        "interruptedDueToClientDisconnect >= 1");
+        [&](const BSONObj& rl) {
+            return rl["interruptedDueToClientDisconnect"].numberLong() > baselineInterrupted;
+        },
+        "interruptedDueToClientDisconnect increased from baseline");
 
     hangFP.disable();
     disableRateLimiter();
