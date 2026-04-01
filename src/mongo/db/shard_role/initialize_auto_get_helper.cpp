@@ -37,7 +37,8 @@ std::vector<ScopedSetShardRole> createScopedShardRoles(
     OperationContext* opCtx,
     const stdx::unordered_map<NamespaceString, CollectionRoutingInfo>& criMap,
     const std::vector<NamespaceString>& nssList,
-    const boost::optional<LogicalTime>& placementConflictTime) {
+    const boost::optional<LogicalTime>& placementConflictTime,
+    const NamespaceString& mainNss) {
     std::vector<ScopedSetShardRole> scopedShardRoles;
     scopedShardRoles.reserve(nssList.size());
     const auto myShardId = ShardingState::get(opCtx)->shardId();
@@ -92,6 +93,24 @@ std::vector<ScopedSetShardRole> createScopedShardRoles(
             scopedDss->checkDbVersionOrThrow(opCtx);
             scopedDss->checkDbVersionOrThrow(opCtx, *dbVersion);
             MONGO_UNREACHABLE_TASSERT(10825600);
+        } catch (const ExceptionFor<ErrorCodes::IllegalChangeToExpectedShardVersion>&) {
+            // During FCV transitions, a timeseries collection can concurrently be upgraded to
+            // viewless. If the command handler set the shard version for the buckets namespace and
+            // the CRI now shows a different version (because a concurrent FCV upgrade switched the
+            // tracked namespace from the buckets namespace to the collection namespace), convert to
+            // a retryable error. If not, throw the original error.
+            // TODO SERVER-117477 remove this logic once 9.0 becomes last LTS and all timeseries
+            // collection are viewless.
+            // (Ignore FCV check): This code is backward compatible.
+            if (gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledAndIgnoreFCVUnsafe() &&
+                mainNss.isTimeseriesBucketsCollection()) {
+                uasserted(ErrorCodes::InterruptedDueToTimeseriesUpgradeDowngrade,
+                          fmt::format(
+                              "Operation on collection '{}' was interrupted due to a time-series "
+                              "metadata change during aggregation resolution. Retry the operation.",
+                              nss.toStringForErrorMsg()));
+            }
+            throw;
         }
     }
     return scopedShardRoles;

@@ -23,20 +23,14 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 // Runs `func` and retries if it is interrupted with a transient timeseries upgrade/downgrade error.
 function withRetryOnTimeseriesUpgradeDowngradeError(func) {
-    const acceptableErrors = [ErrorCodes.InterruptedDueToTimeseriesUpgradeDowngrade, ErrorCodes.CollectionBecameView];
-
-    // TODO SERVER-121542 remove special handling of causal consistency suites.
-    if (TestData.runningWithCausalConsistency) {
-        acceptableErrors.push(ErrorCodes.QueryPlanKilled);
-    }
-
     let result;
+    // TODO SERVER-109819 remove 'InterruptedDueToTimeseriesUpgradeDowngrade' once 9.0 becomes last LTS.
     assert.soonRetryOnAcceptableErrors(
         () => {
             result = func();
             return true;
         },
-        acceptableErrors,
+        [ErrorCodes.InterruptedDueToTimeseriesUpgradeDowngrade, ErrorCodes.CollectionBecameView],
         "Timed out waiting for timeseries operation to succeed without upgrade/downgrade error",
     );
     return result;
@@ -75,9 +69,8 @@ export const $config = (function () {
         },
 
         lookup: function (db, collName) {
-            // TODO SERVER-121542 allow coll and otherColl to be the same value once the sharding bug is fixed.
             const collIndex = Random.randInt(numCollections);
-            const otherCollIndex = (collIndex + 1 + Random.randInt(numCollections - 1)) % numCollections;
+            const otherCollIndex = Random.randInt(numCollections);
             const coll = getCollection(db, collIndex);
             const otherColl = getCollection(db, otherCollIndex);
             const result = withRetryOnTimeseriesUpgradeDowngradeError(() =>
@@ -99,9 +92,8 @@ export const $config = (function () {
         },
 
         graphLookup: function (db, collName) {
-            // TODO SERVER-121542 allow coll and otherColl to be the same value once the sharding bug is fixed.
             const collIndex = Random.randInt(numCollections);
-            const otherCollIndex = (collIndex + 1 + Random.randInt(numCollections - 1)) % numCollections;
+            const otherCollIndex = Random.randInt(numCollections);
             const coll = getCollection(db, collIndex);
             const otherColl = getCollection(db, otherCollIndex);
             const result = withRetryOnTimeseriesUpgradeDowngradeError(() =>
@@ -125,9 +117,8 @@ export const $config = (function () {
         },
 
         unionWith: function (db, collName) {
-            // TODO SERVER-121542 allow coll and otherColl to be the same value once the sharding bug is fixed.
             const collIndex = Random.randInt(numCollections);
-            const otherCollIndex = (collIndex + 1 + Random.randInt(numCollections - 1)) % numCollections;
+            const otherCollIndex = Random.randInt(numCollections);
             const coll = getCollection(db, collIndex);
             const otherColl = getCollection(db, otherCollIndex);
             const result = withRetryOnTimeseriesUpgradeDowngradeError(() =>

@@ -48,7 +48,8 @@ std::vector<ScopedSetShardRole> createScopedShardRoles(
     OperationContext* opCtx,
     const stdx::unordered_map<NamespaceString, CollectionRoutingInfo>& criMap,
     const std::vector<NamespaceString>& nssList,
-    const boost::optional<LogicalTime>& placementConflictTime);
+    const boost::optional<LogicalTime>& placementConflictTime,
+    const NamespaceString& mainNss);
 
 /**
  * Helper that constructs a ShardRole CollectionAcquisition using 'initAutoGetFn'.
@@ -100,7 +101,7 @@ MONGO_MOD_PUBLIC bool initializeAutoGet(
 
                 shard_role_loop::withStaleShardRetry(opCtx, [&]() {
                     auto scopedShardRoles = createScopedShardRoles(
-                        opCtx, criMap, secondaryExecNssListJustNss, placementConflictTime);
+                        opCtx, criMap, secondaryExecNssListJustNss, placementConflictTime, nss);
                     initAutoGetFn();
                 });
             });
