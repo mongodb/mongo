@@ -273,6 +273,13 @@ bool AsyncResultsMerger::_remotesExhausted(WithLock) const {
     });
 }
 
+bool AsyncResultsMerger::isEOF() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return std::all_of(_remotes.begin(), _remotes.end(), [](const auto& remote) {
+        return remote->exhausted() && !remote->hasNext() && !remote->invalidated;
+    });
+}
+
 Status AsyncResultsMerger::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
     if (_tailableMode != TailableModeEnum::kTailableAndAwaitData) {
         return Status(ErrorCodes::BadValue,

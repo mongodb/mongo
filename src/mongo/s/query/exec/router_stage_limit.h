@@ -49,6 +49,10 @@ public:
 
     StatusWith<ClusterQueryResult> next() final;
 
+    bool isEOF() const final {
+        return _returnedSoFar >= _limit || getChildStage()->isEOF();
+    }
+
 private:
     long long _limit;
 

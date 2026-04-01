@@ -162,6 +162,12 @@ public:
     bool remotesExhausted() const;
 
     /**
+     * Returns true if there are no more results to return: all remote cursors have cursor ID 0
+     * and all per-remote document buffers are empty. This is a non-destructive check.
+     */
+    bool isEOF() const;
+
+    /**
      * Sets the maxTimeMS value that the ARM should forward with any internally issued getMore
      * requests.
      * The effectively used value of maxTimeMS is capped to 1000ms for tailable, awaitData queries

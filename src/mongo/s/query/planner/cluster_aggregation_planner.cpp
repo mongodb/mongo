@@ -595,6 +595,13 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
         responseBuilder.setPostBatchResumeToken(ccc->getPostBatchResumeToken());
     }
 
+    // Check if the cursor is at EOF after filling the batch. This avoids registering a cursor
+    // that would immediately return no results on the next getMore.
+    if (cursorState == ClusterCursorManager::CursorState::NotExhausted && !ccc->isTailable() &&
+        ccc->isEOF()) {
+        cursorState = ClusterCursorManager::CursorState::Exhausted;
+    }
+
     bool exhausted = cursorState != ClusterCursorManager::CursorState::NotExhausted;
     int nShards = ccc->getNumRemotes();
 

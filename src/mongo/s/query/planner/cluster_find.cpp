@@ -473,6 +473,13 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         cursorState = ClusterCursorManager::CursorState::Exhausted;
     }
 
+    // Check if the cursor is at EOF after filling the batch. This avoids registering a cursor
+    // that would immediately return no results on the next getMore.
+    if (cursorState == ClusterCursorManager::CursorState::NotExhausted && !ccc->isTailable() &&
+        ccc->isEOF()) {
+        cursorState = ClusterCursorManager::CursorState::Exhausted;
+    }
+
     auto&& opDebug = CurOp::get(opCtx)->debug();
     // Fill out query exec properties.
     opDebug.nShards = ccc->getNumRemotes();
@@ -1181,6 +1188,13 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
 
         // Update the postBatchResumeToken. For non-$changeStream aggregations, this will be empty.
         postBatchResumeToken = pinnedCursor.getValue()->getPostBatchResumeToken();
+    }
+
+    // Check if the cursor is at EOF after filling the batch. This avoids keeping a cursor
+    // that would immediately return no results on the next getMore.
+    if (cursorState == ClusterCursorManager::CursorState::NotExhausted &&
+        !pinnedCursor.getValue()->isTailable() && pinnedCursor.getValue()->isEOF()) {
+        cursorState = ClusterCursorManager::CursorState::Exhausted;
     }
 
     // If the cursor has been exhausted, we will communicate this by returning a CursorId of zero.

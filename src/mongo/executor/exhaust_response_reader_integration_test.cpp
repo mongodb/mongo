@@ -286,6 +286,7 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, CommandSucceeds) {
         nullptr,
         getReactor());
 
+    bool lastBatchHadMoreToCome = true;
     for (size_t i = 0; i < documents.size(); i++) {
         auto& expected = documents[i];
 
@@ -295,15 +296,23 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, CommandSucceeds) {
         ASSERT_EQ(batch.size(), 1);
         ASSERT_BSONOBJ_EQ(batch[0], expected);
 
-        ASSERT(resp.moreToCome);
+        if (i + 1 < documents.size()) {
+            ASSERT(resp.moreToCome);
+        } else {
+            // Depending on configuration, a query may eagerly check for EOF and close the cursor
+            // immediately after returning the last document.
+            lastBatchHadMoreToCome = resp.moreToCome;
+        }
     }
 
-    // We should have exhausted all documents and received a final empty batch.
-    auto last = assertReadOK(*rdr);
-    auto parsed = CursorGetMoreReply::parse(last.data, IDLParserContext("CursorGetMoreReply"));
-    auto batch = parsed.getCursor().getNextBatch();
-    ASSERT_EQ(batch.size(), 0);
-    ASSERT_FALSE(last.moreToCome);
+    if (lastBatchHadMoreToCome) {
+        // We should receive a final empty batch confirming the cursor is exhausted.
+        auto last = assertReadOK(*rdr);
+        auto parsed = CursorGetMoreReply::parse(last.data, IDLParserContext("CursorGetMoreReply"));
+        auto batch = parsed.getCursor().getNextBatch();
+        ASSERT_EQ(batch.size(), 0);
+        ASSERT_FALSE(last.moreToCome);
+    }
 
     auto after = rdr->next().get();
     ASSERT_EQ(after.status, ErrorCodes::ExhaustCommandFinished);

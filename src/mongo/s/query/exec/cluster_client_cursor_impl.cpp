@@ -240,6 +240,10 @@ bool ClusterClientCursorImpl::remotesExhausted() const {
     return _root->remotesExhausted();
 }
 
+bool ClusterClientCursorImpl::isEOF() const {
+    return _stash.empty() && _root->isEOF();
+}
+
 bool ClusterClientCursorImpl::hasBeenKilled() const {
     return _hasBeenKilled;
 }

@@ -74,6 +74,10 @@ public:
         return _resultsMerger.remotesExhausted();
     }
 
+    bool isEOF() const final {
+        return _resultsMerger.isEOF();
+    }
+
     bool partialResultsReturned() const final {
         return _resultsMerger.partialResultsReturned();
     }

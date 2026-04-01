@@ -163,8 +163,17 @@ public:
 
     /**
      * Returns whether or not all the remote cursors underlying this cursor have been exhausted.
+     * Documents that are buffered in the cursor locally does not affect the return value of this
+     * function.
      */
     virtual bool remotesExhausted() const = 0;
+
+    /**
+     * Returns true if the cursor has no more results to return. This is a non-destructive check
+     * that does not block or consume results. It returns true when both the internal result stash
+     * is empty and all remote cursors are exhausted.
+     */
+    virtual bool isEOF() const = 0;
 
     /**
      * Returns whether or not the cursor has been killed. Repeated calls to kill() can occur in

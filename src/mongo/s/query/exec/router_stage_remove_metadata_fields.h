@@ -50,6 +50,10 @@ public:
 
     StatusWith<ClusterQueryResult> next() final;
 
+    bool isEOF() const final {
+        return getChildStage()->isEOF();
+    }
+
 private:
     // Use a StringMap so we can look up by StringData - avoiding a string allocation on each field
     // in each object. The value here is meaningless.
