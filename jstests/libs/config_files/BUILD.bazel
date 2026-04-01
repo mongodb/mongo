@@ -17,3 +17,16 @@ exports_files(
         "*.ini",
     ]),
 )
+
+filegroup(
+    name = "timezone_info",
+    srcs = [
+        "//jstests/libs/config_files/bad_timezone_info:InvalidVersion",
+        "//jstests/libs/config_files/good_timezone_info_fat:GMT",
+        "//jstests/libs/config_files/good_timezone_info_fat/America:New_York",
+        "//jstests/libs/config_files/good_timezone_info_fat/America:Sao_Paulo",
+        "//jstests/libs/config_files/good_timezone_info_slim:GMT",
+        "//jstests/libs/config_files/good_timezone_info_slim/America:New_York",
+        "//jstests/libs/config_files/good_timezone_info_slim/America:Sao_Paulo",
+    ],
+)

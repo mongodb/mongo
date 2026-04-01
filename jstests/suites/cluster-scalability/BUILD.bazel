@@ -1,0 +1,138 @@
+load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
+load(":common.bzl", "SHARDING_DATA")
+load("//jstests/suites/query-execution:common.bzl", "CORE_DATA")
+
+resmoke_suite_test(
+    name = "sharded_collections_jscore_passthrough_base",
+    config = "//buildscripts/resmokeconfig:suites/sharded_collections_jscore_passthrough_base.yml",
+    data = [],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharded_collections_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharded_collections_jscore_passthrough.yml",
+    data = [
+        "//buildscripts/resmokeconfig:matrix_suites/mappings/sharded_collections_jscore_passthrough.yml",
+        "//buildscripts/resmokeconfig:matrix_suites/overrides/check_system_buckets_hook.yml",
+        "//buildscripts/resmokeconfig:suites/sharded_collections_jscore_passthrough_base.yml",
+        "//jstests/sharding/analyze_shard_key/libs:all_subpackage_javascript_files",
+        "//jstests/sharding/libs:all_subpackage_javascript_files",
+    ] + CORE_DATA,
+    shard_count = 20,
+    tags = [
+        "ci-release-critical",
+        "jscore",
+        "sharding",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding",
+    config = "//buildscripts/resmokeconfig:suites/sharding.yml",
+    data = [
+        "//jstests/concurrency/fsm_libs:shard_fixture.js",
+        "//jstests/noPassthrough/rs_endpoint/lib:all_subpackage_javascript_files",
+        "//jstests/sharding/libs:all_subpackage_javascript_files",
+        "//jstests/sharding/libs:proxy_protocol_server",
+    ] + SHARDING_DATA,
+    shard_count = 50,
+    tags = [
+        "ci-release-critical",
+        "common",
+        "incompatible_with_bazel_remote_test",  # TODO(SERVER-122831) proxy_protocol_connect.js fails with "Unable to start program ss: No such file or directory" in remote execution
+        "sharding",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+        "//src/mongo/tools/mongobridge_tool:mongobridge",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_csrs_continuous_config_stepdown",
+    config = "//buildscripts/resmokeconfig:suites/sharding_csrs_continuous_config_stepdown.yml",
+    data = [
+        "//jstests/concurrency/fsm_libs:shard_fixture.js",
+        "//jstests/noPassthrough/rs_endpoint/lib:all_subpackage_javascript_files",
+        "//jstests/sharding/libs:all_subpackage_javascript_files",
+        "//jstests/sharding/libs:proxy_protocol_server",
+    ] + SHARDING_DATA,
+    shard_count = 50,
+    tags = [
+        "ci-release-critical",
+        "common",
+        "csrs",
+        "incompatible_with_bazel_remote_test",  # TODO(SERVER-122831) proxy_protocol_connect.js fails with "Unable to start program ss: No such file or directory" in remote execution
+        "non_live_record",
+        "sharding",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+        "//src/mongo/tools/mongobridge_tool:mongobridge",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_jscore_passthrough_base",
+    config = "//buildscripts/resmokeconfig:suites/sharding_jscore_passthrough_base.yml",
+    data = [],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_jscore_passthrough.yml",
+    data = [
+        "//buildscripts/resmokeconfig:matrix_suites/mappings/sharding_jscore_passthrough.yml",
+        "//buildscripts/resmokeconfig:matrix_suites/overrides/check_system_buckets_hook.yml",
+        "//buildscripts/resmokeconfig:suites/sharding_jscore_passthrough_base.yml",
+        "//jstests/sharding/libs:all_subpackage_javascript_files",
+    ] + CORE_DATA,
+    shard_count = 20,
+    tags = [
+        "ci-release-critical",
+        "common",
+        "jscore",
+        "sharding",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
