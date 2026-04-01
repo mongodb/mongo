@@ -29,40 +29,20 @@
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
 
-#include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
+#include "mongo/db/replicated_fast_count/size_count_store.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
-#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
-#include "mongo/db/storage/write_unit_of_work.h"
 
 namespace mongo::replicated_fast_count {
 namespace {
-
-/**
- * Inserts a document directly into the replicated fast count collection with the given UUID,
- * size, and count.
- */
-void insertSizeCountDocument(OperationContext* opCtx, UUID uuid, int64_t size, int64_t count) {
-    AutoGetCollection fastCountColl(
-        opCtx,
-        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore),
-        LockMode::MODE_IX);
-    ASSERT(fastCountColl);
-
-    const Timestamp timestamp(1, 1);
-    WriteUnitOfWork wuow{opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations};
-    ASSERT_OK(Helpers::insert(opCtx,
-                              *fastCountColl,
-                              BSON("_id" << uuid << kValidAsOfKey << timestamp << kMetadataKey
-                                         << BSON(kCountKey << count << kSizeKey << size))));
-    wuow.commit();
-}
 
 class ReadAndIncrementSizeCountsTest : public CatalogTestFixture {};
 
 TEST_F(ReadAndIncrementSizeCountsTest, IncrementZeros) {
     ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
+    SizeCountStore store;
 
     const UUID uuid = UUID::gen();
     absl::flat_hash_map<UUID, CollectionSizeCount> deltas;
@@ -75,7 +55,8 @@ TEST_F(ReadAndIncrementSizeCountsTest, IncrementZeros) {
     EXPECT_EQ(deltas[uuid].size, 0);
     EXPECT_EQ(deltas[uuid].count, 0);
 
-    insertSizeCountDocument(operationContext(), uuid, 0, 0);
+    test_helpers::insertSizeCountEntry(
+        operationContext(), store, uuid, {.timestamp = Timestamp(1, 1), .size = 0, .count = 0});
 
     // Read after (0,0) document exists.
     readAndIncrementSizeCounts(operationContext(), deltas);
@@ -87,9 +68,11 @@ TEST_F(ReadAndIncrementSizeCountsTest, IncrementZeros) {
 
 TEST_F(ReadAndIncrementSizeCountsTest, NegativeResult) {
     ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
+    SizeCountStore store;
 
     const UUID uuid = UUID::gen();
-    insertSizeCountDocument(operationContext(), uuid, 200, 10);
+    test_helpers::insertSizeCountEntry(
+        operationContext(), store, uuid, {.timestamp = Timestamp(1, 1), .size = 200, .count = 10});
 
     absl::flat_hash_map<UUID, CollectionSizeCount> deltas;
     deltas[uuid] = CollectionSizeCount{-400, -20};
@@ -108,12 +91,15 @@ TEST_F(ReadAndIncrementSizeCountsTest, NegativeResult) {
  */
 TEST_F(ReadAndIncrementSizeCountsTest, ReadEmptySet) {
     ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
+    SizeCountStore store;
 
     const UUID uuid1 = UUID::gen();
-    insertSizeCountDocument(operationContext(), uuid1, 200, 10);
+    test_helpers::insertSizeCountEntry(
+        operationContext(), store, uuid1, {.timestamp = Timestamp(1, 1), .size = 200, .count = 10});
 
     const UUID uuid2 = UUID::gen();
-    insertSizeCountDocument(operationContext(), uuid2, 100, 5);
+    test_helpers::insertSizeCountEntry(
+        operationContext(), store, uuid2, {.timestamp = Timestamp(1, 1), .size = 100, .count = 5});
 
     absl::flat_hash_map<UUID, CollectionSizeCount> deltas;
 
@@ -129,12 +115,15 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadEmptySet) {
  */
 TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentEqualSet) {
     ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
+    SizeCountStore store;
 
     const UUID uuid1 = UUID::gen();
-    insertSizeCountDocument(operationContext(), uuid1, 200, 10);
+    test_helpers::insertSizeCountEntry(
+        operationContext(), store, uuid1, {.timestamp = Timestamp(1, 1), .size = 200, .count = 10});
 
     const UUID uuid2 = UUID::gen();
-    insertSizeCountDocument(operationContext(), uuid2, 100, 5);
+    test_helpers::insertSizeCountEntry(
+        operationContext(), store, uuid2, {.timestamp = Timestamp(1, 1), .size = 100, .count = 5});
 
     absl::flat_hash_map<UUID, CollectionSizeCount> deltas;
     deltas[uuid1] = CollectionSizeCount{5, 1};
@@ -156,12 +145,15 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentEqualSet) {
  */
 TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentSubset) {
     ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
+    SizeCountStore store;
 
     const UUID uuid1 = UUID::gen();
-    insertSizeCountDocument(operationContext(), uuid1, 200, 10);
+    test_helpers::insertSizeCountEntry(
+        operationContext(), store, uuid1, {.timestamp = Timestamp(1, 1), .size = 200, .count = 10});
 
     const UUID uuid2 = UUID::gen();
-    insertSizeCountDocument(operationContext(), uuid2, 100, 5);
+    test_helpers::insertSizeCountEntry(
+        operationContext(), store, uuid2, {.timestamp = Timestamp(1, 1), .size = 100, .count = 5});
 
     absl::flat_hash_map<UUID, CollectionSizeCount> deltas;
     deltas[uuid1] = CollectionSizeCount{5, 1};
@@ -180,9 +172,11 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentSubset) {
  */
 TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentSuperset) {
     ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
+    SizeCountStore store;
 
     const UUID uuid1 = UUID::gen();
-    insertSizeCountDocument(operationContext(), uuid1, 200, 10);
+    test_helpers::insertSizeCountEntry(
+        operationContext(), store, uuid1, {.timestamp = Timestamp(1, 1), .size = 200, .count = 10});
 
     const UUID uuid2 = UUID::gen();
     absl::flat_hash_map<UUID, CollectionSizeCount> deltas;
@@ -205,12 +199,15 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentSuperset) {
  */
 TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentsDisjointSet) {
     ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
+    SizeCountStore store;
 
     const UUID uuid1 = UUID::gen();
-    insertSizeCountDocument(operationContext(), uuid1, 200, 10);
+    test_helpers::insertSizeCountEntry(
+        operationContext(), store, uuid1, {.timestamp = Timestamp(1, 1), .size = 200, .count = 10});
 
     const UUID uuid2 = UUID::gen();
-    insertSizeCountDocument(operationContext(), uuid2, 100, 5);
+    test_helpers::insertSizeCountEntry(
+        operationContext(), store, uuid2, {.timestamp = Timestamp(1, 1), .size = 100, .count = 5});
 
     const UUID uuid3 = UUID::gen();
     absl::flat_hash_map<UUID, CollectionSizeCount> deltas;

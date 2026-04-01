@@ -40,6 +40,7 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_uncommitted_changes.h"
+#include "mongo/db/replicated_fast_count/size_count_store.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/unittest/unittest.h"
@@ -520,4 +521,12 @@ void writeToOplog(OperationContext* opCtx, const repl::OplogEntry& oplogEntry) {
     wuow.commit();
 }
 
+void insertSizeCountEntry(OperationContext* opCtx,
+                          SizeCountStore& store,
+                          UUID uuid,
+                          const SizeCountStore::Entry& entry) {
+    WriteUnitOfWork wuow(opCtx);
+    store.write(opCtx, uuid, entry);
+    wuow.commit();
+}
 }  // namespace mongo::replicated_fast_count::test_helpers
