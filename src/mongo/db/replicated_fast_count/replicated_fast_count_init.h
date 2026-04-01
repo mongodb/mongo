@@ -47,5 +47,12 @@ namespace replicated_fast_count {
  */
 Status createReplicatedFastCountCollection(repl::StorageInterface* storageInterface,
                                            OperationContext* opCtx);
+
+/**
+ * Creates the replicated fast count timestamp collection using the global namespace string
+ * kReplicatedFastCountStoreTimestamps.
+ */
+Status createReplicatedFastCountTimestampCollection(repl::StorageInterface* storageInterface,
+                                                    OperationContext* opCtx);
 }  // namespace replicated_fast_count
 }  // namespace mongo

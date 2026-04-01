@@ -83,7 +83,8 @@ void _createInternalFastCountCollections(repl::StorageInterface* storageInterfac
 
     const auto timestampsNss = NamespaceString::makeGlobalConfigCollection(
         NamespaceString::kReplicatedFastCountStoreTimestamps);
-    _handleStatus(_createInternalFastCountCollection(storageInterface, opCtx, timestampsNss),
+    _handleStatus(replicated_fast_count::createReplicatedFastCountTimestampCollection(
+                      storageInterface, opCtx),
                   "replicated fast count metadata store timestamps",
                   timestampsNss);
 }
@@ -103,6 +104,15 @@ Status createReplicatedFastCountCollection(repl::StorageInterface* storageInterf
         storageInterface,
         opCtx,
         NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore));
+}
+
+Status createReplicatedFastCountTimestampCollection(repl::StorageInterface* storageInterface,
+                                                    OperationContext* opCtx) {
+    return _createInternalFastCountCollection(
+        storageInterface,
+        opCtx,
+        NamespaceString::makeGlobalConfigCollection(
+            NamespaceString::kReplicatedFastCountStoreTimestamps));
 }
 }  // namespace replicated_fast_count
 }  // namespace mongo

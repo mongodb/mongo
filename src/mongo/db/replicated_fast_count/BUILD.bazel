@@ -160,6 +160,7 @@ mongo_cc_unit_test(
         "server-collection-write-path",
     ],
     deps = [
+        "replicated_fast_count_init",
         "size_count_timestamp_store",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
     ],

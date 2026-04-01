@@ -30,19 +30,11 @@
 #include "mongo/db/replicated_fast_count/size_count_timestamp_store.h"
 
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
-#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 
 namespace mongo::replicated_fast_count {
 namespace {
-
-void createTimestampCollection(repl::StorageInterface* storageInterface, OperationContext* opCtx) {
-    ASSERT_OK(storageInterface->createCollection(
-        opCtx,
-        NamespaceString::makeGlobalConfigCollection(
-            NamespaceString::kReplicatedFastCountStoreTimestamps),
-        CollectionOptions{.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex()}));
-}
 
 void write(OperationContext* opCtx, Timestamp timestamp, SizeCountTimestampStore& store) {
     WriteUnitOfWork wuow(opCtx);
@@ -53,21 +45,21 @@ void write(OperationContext* opCtx, Timestamp timestamp, SizeCountTimestampStore
 class SizeCountTimestampStoreTest : public CatalogTestFixture {};
 
 TEST_F(SizeCountTimestampStoreTest, WriteMassertsWithoutWriteUnitOfWork) {
-    createTimestampCollection(storageInterface(), operationContext());
+    ASSERT_OK(createReplicatedFastCountTimestampCollection(storageInterface(), operationContext()));
     SizeCountTimestampStore store;
 
     ASSERT_THROWS_CODE(store.write(operationContext(), Timestamp(10, 1)), DBException, 12280400);
 }
 
 TEST_F(SizeCountTimestampStoreTest, ReadReturnsNoneWhenDocumentDoesNotExist) {
-    createTimestampCollection(storageInterface(), operationContext());
+    ASSERT_OK(createReplicatedFastCountTimestampCollection(storageInterface(), operationContext()));
     const SizeCountTimestampStore store;
 
     EXPECT_FALSE(store.read(operationContext()).has_value());
 }
 
 TEST_F(SizeCountTimestampStoreTest, ReadWriteRoundTripNewEntry) {
-    createTimestampCollection(storageInterface(), operationContext());
+    ASSERT_OK(createReplicatedFastCountTimestampCollection(storageInterface(), operationContext()));
     SizeCountTimestampStore store;
 
     write(operationContext(), Timestamp(10, 1), store);
@@ -78,7 +70,7 @@ TEST_F(SizeCountTimestampStoreTest, ReadWriteRoundTripNewEntry) {
 }
 
 TEST_F(SizeCountTimestampStoreTest, WriteUpdatesExistingDocument) {
-    createTimestampCollection(storageInterface(), operationContext());
+    ASSERT_OK(createReplicatedFastCountTimestampCollection(storageInterface(), operationContext()));
     SizeCountTimestampStore store;
     write(operationContext(), Timestamp(10, 1), store);
 
@@ -90,7 +82,7 @@ TEST_F(SizeCountTimestampStoreTest, WriteUpdatesExistingDocument) {
 }
 
 TEST_F(SizeCountTimestampStoreTest, WriteWithSameTimestampIsIdempotent) {
-    createTimestampCollection(storageInterface(), operationContext());
+    ASSERT_OK(createReplicatedFastCountTimestampCollection(storageInterface(), operationContext()));
     SizeCountTimestampStore store;
 
     write(operationContext(), Timestamp(10, 1), store);
