@@ -737,6 +737,8 @@ typedef struct MongoExtensionAggStageAstNodeVTable {
                                             const MongoExtensionViewInfo* viewInfo);
 } MongoExtensionAggStageAstNodeVTable;
 
+struct MongoExtensionQueryExecutionContext;
+
 /**
  * A MongoExtensionLogicalAggStage describes a stage that has been parsed and bound to
  * instance specific context -- the stage definition and other context data from the pipeline.
@@ -775,8 +777,12 @@ typedef struct MongoExtensionLogicalAggStageVTable {
      *
      * Note that this method will be called for all three verbosity levels, but will only populate
      * the query plan portion of explain.
+     *
+     * Explain execution must adhere to query deadlines much like get_next(). The query's deadline
+     * timestamp is propagated to the extension via the execCtx.
      */
     MongoExtensionStatus* (*explain)(const MongoExtensionLogicalAggStage* logicalStage,
+                                     MongoExtensionQueryExecutionContext* execCtx,
                                      MongoExtensionExplainVerbosity verbosity,
                                      MongoExtensionByteBuf** output);
 
@@ -890,9 +896,6 @@ typedef struct MongoExtensionExecAggStage {
     const struct MongoExtensionExecAggStageVTable* const vtable;
 } MongoExtensionExecAggStage;
 
-// Forward delcare.
-struct MongoExtensionQueryExecutionContext;
-
 /**
  * Virtual function table for MongoExtensionExecAggStage.
  */
@@ -971,6 +974,7 @@ typedef struct MongoExtensionExecAggStageVTable {
      * populate the execution metrics portion of the explain output.
      */
     MongoExtensionStatus* (*explain)(const MongoExtensionExecAggStage* execAggStage,
+                                     MongoExtensionQueryExecutionContext* execCtx,
                                      MongoExtensionExplainVerbosity verbosity,
                                      MongoExtensionByteBuf** output);
 } MongoExtensionExecAggStageVTable;

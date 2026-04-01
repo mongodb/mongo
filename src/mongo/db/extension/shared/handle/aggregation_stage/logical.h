@@ -62,7 +62,8 @@ public:
     /**
      * Collects explain output at the specified verbosity from this logical stage.
      */
-    BSONObj explain(ExplainOptions::Verbosity verbosity) const;
+    BSONObj explain(MongoExtensionQueryExecutionContext& execCtx,
+                    ExplainOptions::Verbosity verbosity) const;
 
     /**
      * Compiles a logical stage into an execution stage.

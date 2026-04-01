@@ -122,7 +122,8 @@ public:
 
     void close() override {}
 
-    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+    BSONObj explain(const sdk::QueryExecutionContextHandle&,
+                    ::MongoExtensionExplainVerbosity verbosity) const override {
         return BSON("latestStart" << _latestStart);
     }
 
@@ -149,7 +150,8 @@ public:
         return BSON(kMetricsStageName << BSON("metric" << _algorithm));
     }
 
-    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+    BSONObj explain(const sdk::QueryExecutionContextHandle&,
+                    ::MongoExtensionExplainVerbosity verbosity) const override {
         return BSON(kMetricsStageName << BSON("algorithm" << _algorithm));
     }
 

@@ -52,7 +52,8 @@ public:
     void open() override {}
     void reopen() override {}
     void close() override {}
-    mongo::BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+    mongo::BSONObj explain(const QueryExecutionContextHandle&,
+                           ::MongoExtensionExplainVerbosity verbosity) const override {
         return BSONObj();
     }
 
@@ -72,7 +73,8 @@ public:
     mongo::BSONObj serialize() const override {
         return BSON(_name << _arguments);
     }
-    mongo::BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+    mongo::BSONObj explain(const QueryExecutionContextHandle&,
+                           ::MongoExtensionExplainVerbosity verbosity) const override {
         return BSON(_name << _arguments);
     }
     std::unique_ptr<sdk::ExecAggStageBase> compile() const override {

@@ -106,6 +106,7 @@ private:
     }
 
     static ::MongoExtensionStatus* _hostExplain(const ::MongoExtensionLogicalAggStage* logicalStage,
+                                                ::MongoExtensionQueryExecutionContext* execCtxPtr,
                                                 ::MongoExtensionExplainVerbosity verbosity,
                                                 ::MongoExtensionByteBuf** output) noexcept {
         return wrapCXXAndConvertExceptionToStatus([]() {

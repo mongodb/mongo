@@ -27,7 +27,10 @@
  *    it in the license file.
  */
 
+#include "mongo/db/extension/host/query_execution_context.h"
 #include "mongo/db/extension/host_connector/adapter/logical_agg_stage_adapter.h"
+#include "mongo/db/extension/host_connector/adapter/query_execution_context_adapter.h"
+#include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/distributed_plan_logic.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/logical.h"
 #include "mongo/db/pipeline/document_source_mock.h"
@@ -66,7 +69,10 @@ DEATH_TEST(HostLogicalAggStageAdapterDeathTest, SerializeOnHostAllocatedStageTas
 DEATH_TEST(HostLogicalAggStageAdapterDeathTest, ExplainOnHostAllocatedStageTasserts, "12303701") {
     auto [mock, adapter] = makeAdapterWithMock();
     LogicalAggStageAPI api(adapter.get());
-    [[maybe_unused]] auto result = api.explain(ExplainOptions::Verbosity::kQueryPlanner);
+    host_connector::QueryExecutionContextAdapter ctxAdapter(
+        std::make_unique<sdk::shared_test_stages::MockQueryExecutionContext>());
+    [[maybe_unused]] auto result =
+        api.explain(ctxAdapter, ExplainOptions::Verbosity::kQueryPlanner);
 }
 
 DEATH_TEST(HostLogicalAggStageAdapterDeathTest, CompileOnHostAllocatedStageTasserts, "12303702") {

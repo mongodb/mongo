@@ -98,7 +98,8 @@ public:
 
     void close() override {}
 
-    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+    BSONObj explain(const QueryExecutionContextHandle&,
+                    ::MongoExtensionExplainVerbosity verbosity) const override {
         return BSON("execField" << "execMetric" << "verbosity" << verbosity);
     }
 

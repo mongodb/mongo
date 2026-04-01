@@ -73,7 +73,8 @@ public:
     }
 
     virtual BSONObj serialize() const = 0;
-    virtual BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const = 0;
+    virtual BSONObj explain(const QueryExecutionContextHandle& execCtx,
+                            ::MongoExtensionExplainVerbosity verbosity) const = 0;
     virtual std::unique_ptr<ExecAggStageBase> compile() const = 0;
     virtual boost::optional<DistributedPlanLogic> getDistributedPlanLogic() const = 0;
     virtual std::unique_ptr<LogicalAggStage> clone() const = 0;
@@ -182,6 +183,7 @@ private:
 
     static ::MongoExtensionStatus* _extExplain(
         const ::MongoExtensionLogicalAggStage* extLogicalStage,
+        ::MongoExtensionQueryExecutionContext* execCtxPtr,
         ::MongoExtensionExplainVerbosity verbosity,
         ::MongoExtensionByteBuf** output) noexcept {
         return wrapCXXAndConvertExceptionToStatus([&]() {
@@ -190,8 +192,9 @@ private:
             const auto& impl =
                 static_cast<const ExtensionLogicalAggStageAdapter*>(extLogicalStage)->getImpl();
 
+            QueryExecutionContextHandle execCtx{execCtxPtr};
             // Allocate a buffer on the heap. Ownership is transferred to the caller.
-            *output = new ByteBuf(impl.explain(verbosity));
+            *output = new ByteBuf(impl.explain(execCtx, verbosity));
         });
     };
 
@@ -736,7 +739,8 @@ public:
 
     virtual void close() = 0;
 
-    virtual BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const = 0;
+    virtual BSONObj explain(const QueryExecutionContextHandle& execCtx,
+                            ::MongoExtensionExplainVerbosity verbosity) const = 0;
 
 protected:
     ExecAggStageBase(std::string_view name) : _name(name) {}
@@ -896,6 +900,7 @@ private:
     }
 
     static ::MongoExtensionStatus* _extExplain(const ::MongoExtensionExecAggStage* execAggStage,
+                                               ::MongoExtensionQueryExecutionContext* execCtxPtr,
                                                ::MongoExtensionExplainVerbosity verbosity,
                                                ::MongoExtensionByteBuf** output) noexcept {
         return wrapCXXAndConvertExceptionToStatus([&]() {
@@ -904,8 +909,9 @@ private:
             const auto& impl =
                 static_cast<const ExtensionExecAggStageAdapter*>(execAggStage)->getImpl();
 
+            QueryExecutionContextHandle execCtx{execCtxPtr};
             // Allocate a buffer on the heap. Ownership is transferred to the caller.
-            *output = new ByteBuf(impl.explain(verbosity));
+            *output = new ByteBuf(impl.explain(execCtx, verbosity));
         });
     };
 

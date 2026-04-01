@@ -83,7 +83,8 @@ public:
     void reopen() override {}
     void close() override {}
 
-    mongo::BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+    mongo::BSONObj explain(const sdk::QueryExecutionContextHandle&,
+                           ::MongoExtensionExplainVerbosity verbosity) const override {
         mongo::BSONObjBuilder bob;
         bob.append("viewName", _viewName);
         return bob.obj();
@@ -120,7 +121,8 @@ public:
         return bob.obj();
     }
 
-    mongo::BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+    mongo::BSONObj explain(const sdk::QueryExecutionContextHandle&,
+                           ::MongoExtensionExplainVerbosity verbosity) const override {
         mongo::BSONObjBuilder bob;
         bob.append(_name, _arguments);
         return bob.obj();

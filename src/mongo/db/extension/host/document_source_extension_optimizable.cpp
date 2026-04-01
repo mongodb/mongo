@@ -32,7 +32,9 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/extension/host/document_source_extension_for_query_shape.h"
 #include "mongo/db/extension/host/extension_vector_search_server_status.h"
+#include "mongo/db/extension/host/query_execution_context.h"
 #include "mongo/db/extension/host_connector/adapter/pipeline_rewrite_context_adapter.h"
+#include "mongo/db/extension/host_connector/adapter/query_execution_context_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/view_info_adapter.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
@@ -303,7 +305,9 @@ Value DocumentSourceExtensionOptimizable::serialize(const SerializationOptions& 
             opts.isKeepingLiteralsUnchanged());
 
     if (opts.isSerializingForExplain()) {
-        return Value(_logicalStage->explain(*opts.verbosity));
+        auto wrappedCtx = std::make_unique<QueryExecutionContext>(getExpCtx().get());
+        host_connector::QueryExecutionContextAdapter ctxAdapter(std::move(wrappedCtx));
+        return Value(_logicalStage->explain(ctxAdapter, *opts.verbosity));
     }
 
     // Serialize the stage for query execution.

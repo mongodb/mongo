@@ -81,7 +81,8 @@ public:
         return BSON(_name << spec.obj());
     }
 
-    mongo::BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+    mongo::BSONObj explain(const sdk::QueryExecutionContextHandle&,
+                           ::MongoExtensionExplainVerbosity verbosity) const override {
         return serialize();
     }
 

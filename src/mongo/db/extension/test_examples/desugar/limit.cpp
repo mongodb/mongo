@@ -77,7 +77,8 @@ public:
         return _stageBson;
     }
 
-    mongo::BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+    mongo::BSONObj explain(const sdk::QueryExecutionContextHandle&,
+                           ::MongoExtensionExplainVerbosity verbosity) const override {
         // Need to override otherwise the default implementation would return an inaccurate object
         // like so: {$extensionLimit: {$extensionLimit: 3}}.
         return _stageBson;

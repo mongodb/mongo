@@ -81,7 +81,8 @@ public:
 
     void close() override {}
 
-    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+    BSONObj explain(const QueryExecutionContextHandle&,
+                    ::MongoExtensionExplainVerbosity verbosity) const override {
         return BSONObj();
     }
 
@@ -308,7 +309,8 @@ public:
 
     void close() override {}
 
-    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+    BSONObj explain(const QueryExecutionContextHandle&,
+                    ::MongoExtensionExplainVerbosity verbosity) const override {
         return BSONObj();
     }
 

@@ -44,7 +44,8 @@ public:
     ExplainExecStage(std::string_view stageName, const mongo::BSONObj& arguments)
         : sdk::TestExecStage(stageName, arguments) {}
 
-    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+    BSONObj explain(const sdk::QueryExecutionContextHandle&,
+                    ::MongoExtensionExplainVerbosity verbosity) const override {
         return BSON("execMetricField" << "execMetricValue");
     }
 };
@@ -54,7 +55,8 @@ public:
     ExplainLogicalStage(std::string_view stageName, const mongo::BSONObj& spec)
         : TestLogicalStage(stageName, spec) {}
 
-    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+    BSONObj explain(const sdk::QueryExecutionContextHandle&,
+                    ::MongoExtensionExplainVerbosity verbosity) const override {
         BSONObjBuilder builder;
 
         {

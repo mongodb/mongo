@@ -44,6 +44,7 @@
 #include "mongo/db/extension/sdk/tests/fruits_test_stage.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 #include "mongo/db/namespace_string_util.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_documents.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
@@ -54,6 +55,7 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/serialization_context.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo::extension {
 
@@ -925,7 +927,8 @@ public:
     UnownedExecAggStageHandle& _getSource() override {
         return sdk::ExecAggStageSource::_getSource();
     }
-    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+    BSONObj explain(const sdk::QueryExecutionContextHandle&,
+                    ::MongoExtensionExplainVerbosity verbosity) const override {
         return BSONObj();
     }
     void open() override {}
@@ -2790,5 +2793,103 @@ DEATH_TEST_REGEX_F(StageRulesDeathTest, RegisterStageRulesTassertsOnDuplicateSta
     host::DocumentSourceExtensionOptimizable::registerStageRules(kStageName, kBothRules);
 }
 
+// A minimal logical stage that checks for interrupts and reports the operation deadline in its
+// explain() output. Used to verify that DocumentSourceExtensionOptimizable correctly forwards
+// the QueryExecutionContext to the logical stage's explain() method.
+constexpr std::string_view kExplainWithExecutionContextStageName = "$explainWithExecutionContext";
+
+class ExplainWithExecutionContextLogicalStage : public sdk::LogicalAggStage {
+public:
+    ExplainWithExecutionContextLogicalStage(std::string_view stageName,
+                                            const mongo::BSONObj& arguments)
+        : sdk::LogicalAggStage(stageName) {}
+
+    mongo::BSONObj serialize() const override {
+        return BSON(_name << BSONObj());
+    }
+
+    mongo::BSONObj explain(const sdk::QueryExecutionContextHandle& execCtx,
+                           ::MongoExtensionExplainVerbosity) const override {
+        auto interruptStatus = execCtx->checkForInterrupt();
+        if (interruptStatus.getCode() != 0) {
+            sdk_uasserted(interruptStatus.getCode(), std::string(interruptStatus.getReason()));
+        }
+        return BSON(_name << BSON("deadlineMs" << execCtx->getDeadlineTimestampMs()));
+    }
+
+    std::unique_ptr<sdk::ExecAggStageBase> compile() const override {
+        return std::make_unique<sdk::TestExecStage>(_name, BSONObj());
+    }
+
+    boost::optional<sdk::DistributedPlanLogic> getDistributedPlanLogic() const override {
+        return boost::none;
+    }
+
+    std::unique_ptr<sdk::LogicalAggStage> clone() const override {
+        return std::make_unique<ExplainWithExecutionContextLogicalStage>(_name, BSONObj());
+    }
+};
+
+DEFAULT_AST_NODE(ExplainWithExecutionContext);
+
+auto makeExplainContextOptimizable(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(
+        std::make_unique<ExplainWithExecutionContextAstNode>(kExplainWithExecutionContextStageName,
+                                                             BSONObj()));
+    return host::DocumentSourceExtensionOptimizable::create(expCtx, AggStageAstNodeHandle(astNode));
+}
+
+// With maxTimeMS set, the deadline reported by explain() should be approximately now + maxTimeMS.
+TEST_F(DocumentSourceExtensionOptimizableTest, ExplainPropagatesDeadlineToLogicalStage) {
+    auto optimizable = makeExplainContextOptimizable(getExpCtx());
+
+    const Milliseconds maxTimeMs{60000};
+    const auto beforeMs = Date_t::now().toMillisSinceEpoch();
+    getOpCtx()->setDeadlineAfterNowBy(maxTimeMs, ErrorCodes::MaxTimeMSExpired);
+
+    SerializationOptions opts;
+    opts.verbosity = ExplainOptions::Verbosity::kQueryPlanner;
+    const auto result = optimizable->serialize(opts);
+    const auto afterMs = Date_t::now().toMillisSinceEpoch();
+
+    auto stageOutput = result.getDocument()
+                           .toBson()[std::string(kExplainWithExecutionContextStageName)]
+                           .embeddedObject();
+    const auto deadlineMs = stageOutput["deadlineMs"].safeNumberLong();
+
+    ASSERT_GTE(deadlineMs, beforeMs + maxTimeMs.count());
+    // setDeadlineAfterNowBy() adds the clock's precision to the deadline, which in the case of
+    // mongod/mongos is a 10ms precision. Here, we add 2 times that precision as a buffer to account
+    // for the case that beforeMs and afterMs are the same (i.e serialize runs within 1ms).
+    ASSERT_LTE(deadlineMs, afterMs + maxTimeMs.count() + 20LL);
+}
+
+// Without maxTimeMS, the deadline should be Date_t::max() (INT64_MAX ms).
+TEST_F(DocumentSourceExtensionOptimizableTest, ExplainWithNoDeadlineReportsMaxDeadline) {
+    auto optimizable = makeExplainContextOptimizable(getExpCtx());
+
+    SerializationOptions opts;
+    opts.verbosity = ExplainOptions::Verbosity::kQueryPlanner;
+    const auto result = optimizable->serialize(opts);
+
+    auto stageOutput = result.getDocument()
+                           .toBson()[std::string(kExplainWithExecutionContextStageName)]
+                           .embeddedObject();
+    const auto deadlineMs = stageOutput["deadlineMs"].safeNumberLong();
+
+    ASSERT_EQ(deadlineMs, std::numeric_limits<int64_t>::max());
+}
+
+// A killed OperationContext causes checkForInterrupt() to return non-zero, and explain() should
+// propagate that as a DBException with the interrupt code.
+TEST_F(DocumentSourceExtensionOptimizableTest, ExplainDetectsInterrupt) {
+    auto optimizable = makeExplainContextOptimizable(getExpCtx());
+
+    getOpCtx()->markKilled(ErrorCodes::Interrupted);
+
+    SerializationOptions opts;
+    opts.verbosity = ExplainOptions::Verbosity::kQueryPlanner;
+    ASSERT_THROWS_CODE(optimizable->serialize(opts), DBException, ErrorCodes::Interrupted);
+}
 }  // namespace
 }  // namespace mongo::extension

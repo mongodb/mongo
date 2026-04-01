@@ -71,7 +71,8 @@ public:
     /**
      * Collects explain output at the specified verbosity from this executable stage.
      */
-    BSONObj explain(ExplainOptions::Verbosity verbosity) const;
+    BSONObj explain(MongoExtensionQueryExecutionContext& execCtx,
+                    ExplainOptions::Verbosity verbosity) const;
 
     static void assertVTableConstraints(const VTable_t& vtable) {
         tassert(10956800, "ExecAggStage 'get_next' is null", vtable.get_next != nullptr);

@@ -153,7 +153,10 @@ GetNextResult ExtensionStage::doGetNext() {
 Document ExtensionStage::getExplainOutput(const SerializationOptions& opts) const {
     MutableDocument output(Stage::getExplainOutput(opts));
 
-    BSONObj explainSerialization = _execAggStageHandle->explain(*opts.verbosity);
+    std::unique_ptr<extension::host::QueryExecutionContext> wrappedCtx =
+        std::make_unique<extension::host::QueryExecutionContext>(pExpCtx.get());
+    extension::host_connector::QueryExecutionContextAdapter ctxAdapter(std::move(wrappedCtx));
+    BSONObj explainSerialization = _execAggStageHandle->explain(ctxAdapter, *opts.verbosity);
     for (auto elem : explainSerialization) {
         output.addField(elem.fieldName(), Value(elem));
     }

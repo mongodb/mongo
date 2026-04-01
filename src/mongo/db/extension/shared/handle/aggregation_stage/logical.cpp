@@ -56,10 +56,12 @@ BSONObj LogicalAggStageAPI::serialize() const {
     return bsonObjFromByteView(ownedBuf->getByteView()).getOwned();
 }
 
-BSONObj LogicalAggStageAPI::explain(mongo::ExplainOptions::Verbosity verbosity) const {
+BSONObj LogicalAggStageAPI::explain(MongoExtensionQueryExecutionContext& execCtx,
+                                    mongo::ExplainOptions::Verbosity verbosity) const {
     ::MongoExtensionByteBuf* buf{nullptr};
     invokeCAndConvertStatusToException([&]() {
-        return _vtable().explain(get(), convertHostVerbosityToExtVerbosity(verbosity), &buf);
+        return _vtable().explain(
+            get(), &execCtx, convertHostVerbosityToExtVerbosity(verbosity), &buf);
     });
 
     tassert(11239400, "buffer returned from explain must not be null", buf);

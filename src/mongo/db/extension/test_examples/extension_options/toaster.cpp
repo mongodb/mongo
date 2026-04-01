@@ -76,7 +76,8 @@ public:
     void open() override {}
     void reopen() override {}
     void close() override {}
-    mongo::BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+    mongo::BSONObj explain(const sdk::QueryExecutionContextHandle&,
+                           ::MongoExtensionExplainVerbosity verbosity) const override {
         return mongo::BSONObj();
     }
 

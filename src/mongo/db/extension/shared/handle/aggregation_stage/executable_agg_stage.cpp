@@ -71,10 +71,12 @@ void ExecAggStageAPI::close() {
     invokeCAndConvertStatusToException([&]() { return _vtable().close(get()); });
 }
 
-BSONObj ExecAggStageAPI::explain(mongo::ExplainOptions::Verbosity verbosity) const {
+BSONObj ExecAggStageAPI::explain(MongoExtensionQueryExecutionContext& execCtx,
+                                 mongo::ExplainOptions::Verbosity verbosity) const {
     ::MongoExtensionByteBuf* buf{nullptr};
     invokeCAndConvertStatusToException([&]() {
-        return _vtable().explain(get(), convertHostVerbosityToExtVerbosity(verbosity), &buf);
+        return _vtable().explain(
+            get(), &execCtx, convertHostVerbosityToExtVerbosity(verbosity), &buf);
     });
 
     tassert(11239500, "buffer returned from explain must not be null", buf);

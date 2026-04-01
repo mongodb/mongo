@@ -466,7 +466,8 @@ public:
         return BSON(kStageName << kStageSpec);
     }
 
-    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+    BSONObj explain(const QueryExecutionContextHandle&,
+                    ::MongoExtensionExplainVerbosity verbosity) const override {
         return BSON(kStageName << verbosity);
     }
 
@@ -494,25 +495,27 @@ TEST(AggregationStageTest, ExplainQueryPlanner) {
     auto logicalStage = new extension::sdk::ExtensionLogicalAggStageAdapter(
         SimpleSerializationLogicalStage::make());
     auto handle = extension::LogicalAggStageHandle{logicalStage};
+    host_connector::QueryExecutionContextAdapter ctxAdapter(
+        std::make_unique<shared_test_stages::MockQueryExecutionContext>());
 
     // Test that different verbosity levels can be passed through to the extension implementation
     // correctly.
     {
-        auto output = handle->explain(ExplainOptions::Verbosity::kQueryPlanner);
+        auto output = handle->explain(ctxAdapter, ExplainOptions::Verbosity::kQueryPlanner);
         ASSERT_BSONOBJ_EQ(BSON(SimpleSerializationLogicalStage::kStageName
                                << ::MongoExtensionExplainVerbosity::kQueryPlanner),
                           output);
     }
 
     {
-        auto output = handle->explain(ExplainOptions::Verbosity::kExecStats);
+        auto output = handle->explain(ctxAdapter, ExplainOptions::Verbosity::kExecStats);
         ASSERT_BSONOBJ_EQ(BSON(SimpleSerializationLogicalStage::kStageName
                                << ::MongoExtensionExplainVerbosity::kExecStats),
                           output);
     }
 
     {
-        auto output = handle->explain(ExplainOptions::Verbosity::kExecAllPlans);
+        auto output = handle->explain(ctxAdapter, ExplainOptions::Verbosity::kExecAllPlans);
         ASSERT_BSONOBJ_EQ(BSON(SimpleSerializationLogicalStage::kStageName
                                << ::MongoExtensionExplainVerbosity::kExecAllPlans),
                           output);
@@ -524,25 +527,27 @@ TEST(AggregationStageTest, ExplainExecutionStats) {
     auto validExecAggStage = new extension::sdk::ExtensionExecAggStageAdapter(
         shared_test_stages::ValidExtensionExecAggStage::make());
     auto handle = extension::ExecAggStageHandle{validExecAggStage};
+    host_connector::QueryExecutionContextAdapter ctxAdapter(
+        std::make_unique<shared_test_stages::MockQueryExecutionContext>());
 
     // Test that different verbosity levels can be passed through to the extension implementation
     // correctly.
     {
-        auto output = handle->explain(ExplainOptions::Verbosity::kQueryPlanner);
+        auto output = handle->explain(ctxAdapter, ExplainOptions::Verbosity::kQueryPlanner);
         ASSERT_BSONOBJ_EQ(BSON("execField" << "execMetric" << "verbosity"
                                            << ::MongoExtensionExplainVerbosity::kQueryPlanner),
                           output);
     }
 
     {
-        auto output = handle->explain(ExplainOptions::Verbosity::kExecStats);
+        auto output = handle->explain(ctxAdapter, ExplainOptions::Verbosity::kExecStats);
         ASSERT_BSONOBJ_EQ(BSON("execField" << "execMetric" << "verbosity"
                                            << ::MongoExtensionExplainVerbosity::kExecStats),
                           output);
     }
 
     {
-        auto output = handle->explain(ExplainOptions::Verbosity::kExecAllPlans);
+        auto output = handle->explain(ctxAdapter, ExplainOptions::Verbosity::kExecAllPlans);
         ASSERT_BSONOBJ_EQ(BSON("execField" << "execMetric" << "verbosity"
                                            << ::MongoExtensionExplainVerbosity::kExecAllPlans),
                           output);
@@ -922,7 +927,8 @@ public:
         return _initialized;
     }
 
-    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+    BSONObj explain(const QueryExecutionContextHandle&,
+                    ::MongoExtensionExplainVerbosity verbosity) const override {
         return BSONObj();
     }
 
@@ -1028,7 +1034,8 @@ public:
 
     void close() override {}
 
-    BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+    BSONObj explain(const QueryExecutionContextHandle&,
+                    ::MongoExtensionExplainVerbosity verbosity) const override {
         return BSONObj();
     }
 
