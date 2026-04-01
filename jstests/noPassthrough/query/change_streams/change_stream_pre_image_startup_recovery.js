@@ -41,7 +41,9 @@ describe("change stream pre-image truncation persists across crash + recovery", 
 
     before(function () {
         rst = new ReplSetTest({
-            nodes: 2,
+            // Set priority 1 on both nodes to prevent priority 0 from being auto-assigned to the
+            // standby in disagg testing.
+            nodes: [{rsConfig: {priority: 1}}, {rsConfig: {priority: 1}}],
             nodeOptions: {
                 setParameter: {
                     expiredChangeStreamPreImageRemovalJobSleepSecs: 1,
