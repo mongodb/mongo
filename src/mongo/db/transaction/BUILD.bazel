@@ -126,6 +126,7 @@ mongo_cc_unit_test(
         "transaction_api_test.cpp",
         "transaction_history_iterator_test.cpp",
         "transaction_operations_test.cpp",
+        "transaction_participant_details_test.cpp",
         "transaction_participant_retryable_writes_test.cpp",
         "transaction_participant_test.cpp",
     ],

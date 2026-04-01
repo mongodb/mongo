@@ -8210,7 +8210,6 @@ protected:
         ASSERT_EQ(shard_role_details::getRecoveryUnit(opCtx())->getPrepareTimestamp(),
                   expectedState.prepareOpTime.getTimestamp());
         ASSERT_EQ(txnParticipant.affectedNamespaces().size(), 3);
-        ASSERT_EQ(txnParticipant.getTransactionOperationsCount(), 0);
         ASSERT(txnParticipant.getPrepareOpTimeForRecovery().isNull());
         ASSERT(txnParticipant.reportStashedState(opCtx()).isEmpty());
         ASSERT(txnParticipant.transactionIsPrepared());

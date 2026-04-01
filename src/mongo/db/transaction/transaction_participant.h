@@ -60,6 +60,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction/transaction_metrics_observer.h"
 #include "mongo/db/transaction/transaction_operations.h"
+#include "mongo/db/transaction/transaction_participant_details.h"
 #include "mongo/db/transaction/transaction_runtime_context_gen.h"
 #include "mongo/idl/mutable_observer_registry.h"
 #include "mongo/logv2/attribute_storage.h"
@@ -860,15 +861,15 @@ public:
         }
 
         std::vector<repl::ReplOperation> getTransactionOperationsForTest() const {
-            return p().transactionOperations.getOperationsForTest();
+            return p().transactionOperations.getExpectAvailable().getOperationsForTest();
         }
 
         size_t getTransactionOperationsCount() const {
-            return p().transactionOperations.getOperationsCount();
+            return p().transactionOperations.getExpectAvailable().getOperationsCount();
         }
 
         size_t getNumberOfPrePostImagesToWriteForTest() const {
-            return p().transactionOperations.getNumberOfPrePostImagesToWrite();
+            return p().transactionOperations.getExpectAvailable().getNumberOfPrePostImagesToWrite();
         }
 
         const Locker* getTxnResourceStashLockerForTest() const {
@@ -1364,8 +1365,10 @@ private:
         Status overwrittenStatus{Status::OK()};
 
         // Holds oplog data for operations which have been applied in the current multi-document
-        // transaction.
-        TransactionOperations transactionOperations;
+        // transaction. Not reconstructed when a prepared transaction is recovered from a precise
+        // checkpoint.
+        transaction_participant_details::NonRecoverableField<TransactionOperations>
+            transactionOperations;
 
         // The autocommit setting of this transaction. Should always be false for multi-statement
         // transaction. Currently only needed for diagnostics reporting.
@@ -1377,8 +1380,10 @@ private:
 
         // For the active txn, tracks which statement ids have been committed and at which oplog
         // opTime. Used for fast retryability check and retrieving the previous write's data without
-        // having to scan through the oplog.
-        CommittedStatementTimestampMap activeTxnCommittedStatements;
+        // having to scan through the oplog. Not reconstructed when a prepared transaction is
+        // recovered from a precise checkpoint.
+        transaction_participant_details::NonRecoverableField<CommittedStatementTimestampMap>
+            activeTxnCommittedStatements;
 
         // Set to true if the transaction was recovered from a precise checkpoint. In this case,
         // we don't track which statement IDs have been committed or which transaction operations
