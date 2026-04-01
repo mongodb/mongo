@@ -28,16 +28,15 @@
  */
 
 #include <absl/container/node_hash_map.h>
+#include <algorithm>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "cxxabi.h"
-#include <algorithm>
 #include <cstring>
+#include <fmt/format.h>
 #include <memory>
 #include <mutex>
 #include <set>
@@ -62,6 +61,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/startup_recovery.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/key_format.h"
@@ -96,6 +96,16 @@
 
 namespace mongo {
 namespace {
+// Abort the two-phase index build since it hangs in vote submission, because we are not running
+// a full featured mongodb replica set.
+void abortIndexBuild(OperationContext* opCtx, const UUID& buildUUID) {
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+    // Pretend initial sync mode, otherwise abort is not allowed as a Secondary.
+    ASSERT_OK(
+        repl::ReplicationCoordinator::get(opCtx)->setFollowerMode(repl::MemberState::RS_STARTUP2));
+    ASSERT_TRUE(IndexBuildsCoordinator::get(opCtx)->abortIndexBuildByBuildUUID(
+        opCtx, buildUUID, IndexBuildAction::kInitialSyncAbort, "Shutdown"));
+}
 
 TEST_F(StorageEngineTest, ReconcileIdentsTest) {
     auto opCtx = cc().makeOperationContext();
@@ -820,6 +830,90 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
     StorageEngineTest::_storageEngine = getServiceContext()->getStorageEngine();
     ASSERT_TRUE(collectionExists(opCtx.get(), coll1Ns));
     ASSERT_FALSE(collectionExists(opCtx.get(), coll2Ns));
+}
+
+TEST_F(StorageEngineTest, IdentMissingForNonReadyIndex) {
+    repl::StorageInterface::set(getServiceContext(),
+                                std::make_unique<repl::StorageInterfaceImpl>());
+    auto opCtx = cc().makeOperationContext();
+
+    Lock::GlobalLock lk(&*opCtx, MODE_X);
+
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("db.coll1");
+    const std::string indexName("a_1");
+
+    auto coll = createCollection(opCtx.get(), ns);
+    ASSERT_OK(coll);
+
+    const bool isBackgroundSecondaryBuild = false;
+    auto buildUUID = UUID::gen();
+    {
+        WriteUnitOfWork wuow(opCtx.get());
+        ASSERT_OK(
+            startIndexBuild(opCtx.get(), ns, indexName, isBackgroundSecondaryBuild, buildUUID));
+        wuow.commit();
+    }
+    // The index build will never finish due to commit quorum so we need to unconditionally abort it
+    ScopeGuard abortIndexOnExit([&] { abortIndexBuild(opCtx.get(), buildUUID); });
+
+    // Drop the index ident, but leave it in the catalog. This can happen if the process is killed
+    // while we're restarting an index build (as we drop and recreate the ident).
+    const auto indexIdent = _storageEngine->getCatalog()->getIndexIdent(
+        opCtx.get(), coll.getValue().catalogId, indexName);
+    ASSERT_OK(dropIdent(shard_role_details::getRecoveryUnit(opCtx.get()), indexIdent));
+    ASSERT_FALSE(identExists(opCtx.get(), indexIdent));
+
+    // Since the index build never completed, startup repair should treat a missing ident
+    // identically to an incomplete index and restart it.
+    startup_recovery::repairAndRecoverDatabases(opCtx.get(),
+                                                StorageEngine::LastShutdownState::kUnclean);
+
+    // The ident should have been recreated
+    ASSERT(identExists(opCtx.get(), indexIdent));
+
+    auto collection =
+        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), ns);
+    ASSERT(collection);
+    auto indexDesc = collection->getIndexCatalog()->findIndexByName(
+        opCtx.get(), indexName, IndexCatalog::InclusionPolicy::kUnfinished);
+    ASSERT(indexDesc);
+    auto indexEntry = indexDesc->getEntry();
+    ASSERT(indexEntry);
+    // Even though the index was rebuilt it's not ready due to that it's waiting for commit quorum
+    ASSERT_FALSE(indexEntry->isReady());
+
+    // Creating the IndexAccessMethod initially failed due to the ident not existing, but needs to
+    // have been created at some point later or anything which tries to use the recovered index
+    // would be broken
+    ASSERT(indexEntry->accessMethod());
+}
+
+TEST_F(StorageEngineTest, IdentMissingForReadyIndex) {
+    repl::StorageInterface::set(getServiceContext(),
+                                std::make_unique<repl::StorageInterfaceImpl>());
+    auto opCtx = cc().makeOperationContext();
+    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("db.coll1");
+    const std::string indexName("a_1");
+    const bool isBackgroundSecondaryBuild = false;
+
+    Lock::GlobalLock lk(opCtx.get(), MODE_X);
+
+    ASSERT_OK(createCollection(opCtx.get(), ns));
+
+    // Create a ready index, and then drop the ident without removing it from the catalog
+    {
+        WriteUnitOfWork wuow(opCtx.get());
+        ASSERT_OK(createIndex(opCtx.get(), ns, indexName, isBackgroundSecondaryBuild));
+        wuow.commit();
+    }
+    ASSERT_OK(dropIndexTable(opCtx.get(), ns, indexName));
+
+    // Startup recovery currently does not handle this invalid state, but throws an appropriate
+    // exception rather than segfaulting or otherwise crashing uncleanly
+    ASSERT_THROWS_CODE(startup_recovery::repairAndRecoverDatabases(
+                           opCtx.get(), StorageEngine::LastShutdownState::kUnclean),
+                       DBException,
+                       ErrorCodes::NoSuchKey);
 }
 
 }  // namespace

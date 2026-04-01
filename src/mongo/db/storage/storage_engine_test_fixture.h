@@ -154,7 +154,7 @@ public:
                        std::string key,
                        bool isBackgroundSecondaryBuild) {
         auto buildUUID = UUID::gen();
-        auto ret = startIndexBuild(opCtx, collNs, key, isBackgroundSecondaryBuild, buildUUID);
+        auto ret = startIndexBuild(opCtx, collNs, key, isBackgroundSecondaryBuild, buildUUID, true);
         if (!ret.isOK()) {
             return ret;
         }
@@ -167,21 +167,21 @@ public:
                            NamespaceString collNs,
                            std::string key,
                            bool isBackgroundSecondaryBuild,
-                           boost::optional<UUID> buildUUID) {
+                           boost::optional<UUID> buildUUID,
+                           bool createEntry = false) {
         BSONObjBuilder builder;
-        {
-            BSONObjBuilder keyObj;
-            builder.append("key", keyObj.append(key, 1).done());
-        }
-        BSONObj spec = builder.append("name", key).append("v", 2).done();
+        BSONObj spec = BSON("v" << 2 << "key" << BSON(key << 1) << "name" << key);
 
         Collection* collection =
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(opCtx,
                                                                                        collNs);
-        auto descriptor = std::make_unique<IndexDescriptor>(IndexNames::findPluginName(spec), spec);
-
+        IndexDescriptor descriptor(IndexNames::BTREE, spec);
         auto ret = collection->prepareForIndexBuild(
-            opCtx, descriptor.get(), buildUUID, isBackgroundSecondaryBuild);
+            opCtx, &descriptor, buildUUID, isBackgroundSecondaryBuild);
+        if (ret.isOK() && createEntry) {
+            collection->getIndexCatalog()->createIndexEntry(
+                opCtx, collection, std::move(descriptor), CreateIndexEntryFlags::kNone);
+        }
         return ret;
     }
 
@@ -193,6 +193,7 @@ public:
             opCtx,
             key,
             IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
+        ASSERT(writableEntry);
         collection->indexBuildSuccess(opCtx, writableEntry);
     }
 

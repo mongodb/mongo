@@ -695,7 +695,7 @@ key_string::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
                                                         bool isLogged) {
     auto version = WiredTigerUtil::checkApplicationMetadataFormatVersion(
         *WiredTigerRecoveryUnit::get(ctx), uri, kMinimumIndexVersion, kMaximumIndexVersion);
-    if (!version.isOK()) {
+    if (version == ErrorCodes::UnsupportedFormat || version == ErrorCodes::FailedToParse) {
         auto collectionNamespace = desc->getEntry()->getNSSFromCatalog(ctx);
         Status versionStatus = version.getStatus();
         Status indexVersionStatus(
@@ -705,6 +705,7 @@ key_string::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
                           << "} - version either too old or too new for this mongod.");
         fassertFailedWithStatus(28579, indexVersionStatus);
     }
+    uassertStatusOK(version);
     _dataFormatVersion = version.getValue();
 
     _repairDataFormatVersion(ctx, uri, ident, desc);

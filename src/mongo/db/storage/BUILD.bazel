@@ -488,6 +488,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db:shard_role",
+        "//src/mongo/db:startup_recovery",
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/catalog:catalog_impl",
         "//src/mongo/db/catalog:catalog_test_fixture",
