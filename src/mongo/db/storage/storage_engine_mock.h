@@ -140,7 +140,9 @@ public:
         _lastSetMaterializedLsn = lsn;
     }
 
-    void setRecoveryCheckpointMetadata(StringData checkpointMetadata) final {}
+    void setRecoveryCheckpointMetadata(StringData checkpointMetadata) final {
+        _operations.push_back("setRecoveryCheckpointMetadata");
+    }
 
     void promoteToLeader() final {}
 
@@ -154,7 +156,11 @@ public:
     Timestamp getInitialDataTimestamp() const override {
         return Timestamp();
     }
-    void setOldestTimestamp(Timestamp timestamp, bool force) final {}
+    void setOldestTimestamp(Timestamp timestamp, bool force) final {
+        _lastSetOldestTimestamp = timestamp;
+        _lastSetOldestTimestampForce = force;
+        _operations.push_back("setOldestTimestamp");
+    }
     Timestamp getOldestTimestamp() const final {
         return {};
     };
@@ -319,9 +325,24 @@ public:
         return _lastSetMaterializedLsn;
     }
 
+    Timestamp getLastSetOldestTimestamp() const {
+        return _lastSetOldestTimestamp;
+    }
+
+    bool getLastSetOldestTimestampForce() const {
+        return _lastSetOldestTimestampForce;
+    }
+
+    const std::vector<std::string>& getOperations() const {
+        return _operations;
+    }
+
 private:
     uint64_t _lastSetMaterializedLsn;
     std::vector<std::string> _droppedSpillIdents;
+    Timestamp _lastSetOldestTimestamp;
+    bool _lastSetOldestTimestampForce = false;
+    std::vector<std::string> _operations;
 };
 
 }  // namespace mongo

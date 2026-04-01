@@ -2503,12 +2503,14 @@ void WiredTigerKVEngine::setOldestTimestamp(Timestamp newOldestTimestamp, bool f
                     "oldest_timestamp and durable_timestamp force set to {newOldestTimestamp}",
                     "newOldestTimestamp"_attr = newOldestTimestamp);
     } else {
+        // ignore backwards or equal moves when 'force' is not set
+        if (newOldestTimestamp.asULL() <= currOldestTimestamp.asULL()) {
+            return;
+        }
         auto oldestTSConfigString =
             fmt::format("oldest_timestamp={:x}", newOldestTimestamp.asULL());
         invariantWTOK(_conn->set_timestamp(_conn, oldestTSConfigString.c_str()), nullptr);
-        // set_timestamp above ignores backwards in time if 'force' is not set.
-        if (_oldestTimestamp.load() < newOldestTimestamp.asULL())
-            _oldestTimestamp.store(newOldestTimestamp.asULL());
+        _oldestTimestamp.store(newOldestTimestamp.asULL());
         LOGV2_DEBUG(22343,
                     2,
                     "oldest_timestamp set to {newOldestTimestamp}",

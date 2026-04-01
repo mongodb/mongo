@@ -660,6 +660,30 @@ TEST_F(WiredTigerKVEngineTest, TestPinOldestTimestampErrors) {
 }
 
 /**
+ * Test that setOldestTimestamp with force=false silently ignores backwards moves without crashing.
+ * This is needed by the DSC checkpoint install path (SERVER-118879) where a checkpoint's
+ * oldest_timestamp may be behind the standby's current oldest due to concurrent advancement.
+ */
+TEST_F(WiredTigerKVEngineTest, SetOldestTimestampBackwardsWithoutForceIsNoop) {
+    const Timestamp initTs = Timestamp(10, 0);
+
+    _helper->getWiredTigerKVEngine()->setOldestTimestamp(initTs, false);
+    ASSERT_EQ(initTs, _helper->getWiredTigerKVEngine()->getOldestTimestamp());
+
+    // Moving backwards with force=false should be no-op.
+    _helper->getWiredTigerKVEngine()->setOldestTimestamp(initTs - 1, false);
+    ASSERT_EQ(initTs, _helper->getWiredTigerKVEngine()->getOldestTimestamp());
+
+    // Moving to the same value with force=false should also be no-op.
+    _helper->getWiredTigerKVEngine()->setOldestTimestamp(initTs, false);
+    ASSERT_EQ(initTs, _helper->getWiredTigerKVEngine()->getOldestTimestamp());
+
+    // Moving forwards with force=false should advance the timestamp.
+    _helper->getWiredTigerKVEngine()->setOldestTimestamp(initTs + 1, false);
+    ASSERT_EQ(initTs + 1, _helper->getWiredTigerKVEngine()->getOldestTimestamp());
+}
+
+/**
  * Test the various cases for the relationship between oldestTimestamp and stableTimestamp at the
  * end of startup recovery.
  */
