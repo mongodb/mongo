@@ -56,6 +56,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/s/resharding/document_source_resharding_add_resume_id.h"
 #include "mongo/db/s/resharding/document_source_resharding_iterate_transaction.h"
 #include "mongo/db/s/resharding/resharding_noop_o2_field_gen.h"
@@ -726,9 +727,14 @@ Milliseconds getMajorityReplicationLag(OperationContext* opCtx) {
     const auto& replCoord = repl::ReplicationCoordinator::get(opCtx);
     const auto lastAppliedWallTime = replCoord->getMyLastAppliedOpTimeAndWallTime().wallTime;
     const auto lastCommittedWallTime = replCoord->getLastCommittedOpTimeAndWallTime().wallTime;
-    // TODO SERVER-113571 Remove this if block and adjust the replication lag calculation (if
-    // needed).
-    if (lastCommittedWallTime == Date_t()) {
+    // In DSC, return 0 if the committed wall time is not yet initialized (e.g., after a restart
+    // before the first committed op has been recorded with a known wall time). In steady-state
+    // operation lastCommittedWallTime will be a real value.
+    // TODO: SERVER-123121 Reevaluate lastCommittedWallTime calculation in DSC.
+    if (!rss::ReplicatedStorageService::get(opCtx)
+             .getPersistenceProvider()
+             .supportsLocalCollections() &&
+        lastCommittedWallTime == Date_t()) {
         return Milliseconds(0);
     }
 
