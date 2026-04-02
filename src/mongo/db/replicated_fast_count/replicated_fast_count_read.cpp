@@ -33,11 +33,11 @@
 
 namespace mongo::replicated_fast_count {
 
-CollectionSizeCount readExact(OperationContext* opCtx,
-                              const SizeCountStore& sizeCountStore,
-                              const SizeCountTimestampStore& timestampStore,
-                              SeekableRecordCursor& cursor,
-                              UUID uuid) {
+CollectionSizeCount readLatest(OperationContext* opCtx,
+                               const SizeCountStore& sizeCountStore,
+                               const SizeCountTimestampStore& timestampStore,
+                               SeekableRecordCursor& cursor,
+                               UUID uuid) {
     const auto entry = sizeCountStore.read(opCtx, uuid);
     massert(12092100,
             fmt::format("Expected the size/count store to contain an entry for UUID={}",
@@ -61,5 +61,16 @@ CollectionSizeCount readExact(OperationContext* opCtx,
 
     return CollectionSizeCount{.size = entry->size + deltas.at(uuid).size,
                                .count = entry->count + deltas.at(uuid).count};
+}
+
+[[nodiscard]] CollectionSizeCount readPersisted(OperationContext* opCtx,
+                                                const SizeCountStore& sizeCountStore,
+                                                UUID uuid) {
+    const auto entry = sizeCountStore.read(opCtx, uuid);
+    massert(12282000,
+            fmt::format("Expected the size/count store to contain an entry for UUID={}",
+                        uuid.toString()),
+            entry.has_value());
+    return CollectionSizeCount{.size = entry->size, .count = entry->count};
 }
 }  // namespace mongo::replicated_fast_count

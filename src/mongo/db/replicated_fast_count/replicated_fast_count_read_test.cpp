@@ -111,7 +111,7 @@ private:
     std::list<std::pair<RecordId, BSONObj>>::const_iterator _it;
 };
 
-class ReadExactTest : public CatalogTestFixture {
+class ReadLatestTest : public CatalogTestFixture {
 protected:
     void setUp() override {
         CatalogTestFixture::setUp();
@@ -128,18 +128,18 @@ protected:
         .uuid = UUID::gen()};
 };
 
-TEST_F(ReadExactTest, UuidNotFoundInSizeCountStore) {
+TEST_F(ReadLatestTest, UuidNotFoundInSizeCountStore) {
     const SizeCountStore sizeCountStore;
     const SizeCountTimestampStore timestampStore;
     OplogCursorMock cursor(std::list<repl::OplogEntry>{});
     const UUID uuid = UUID::gen();
 
     EXPECT_THROW(std::ignore =
-                     readExact(operationContext(), sizeCountStore, timestampStore, cursor, uuid),
+                     readLatest(operationContext(), sizeCountStore, timestampStore, cursor, uuid),
                  DBException);
 }
 
-TEST_F(ReadExactTest, UuidNotFoundInSizeCountTimestampStore) {
+TEST_F(ReadLatestTest, UuidNotFoundInSizeCountTimestampStore) {
     SizeCountStore sizeCountStore;
     const SizeCountTimestampStore timestampStore;
     OplogCursorMock cursor(std::list<repl::OplogEntry>{});
@@ -153,11 +153,11 @@ TEST_F(ReadExactTest, UuidNotFoundInSizeCountTimestampStore) {
                                            .size = 1,
                                            .count = 10,
                                        });
-    EXPECT_EQ(readExact(operationContext(), sizeCountStore, timestampStore, cursor, uuid),
+    EXPECT_EQ(readLatest(operationContext(), sizeCountStore, timestampStore, cursor, uuid),
               CollectionSizeCount({.size = 1, .count = 10}));
 }
 
-TEST_F(ReadExactTest, EmptyOplog) {
+TEST_F(ReadLatestTest, EmptyOplog) {
     SizeCountStore sizeCountStore;
     const SizeCountTimestampStore timestampStore;
     OplogCursorMock cursor(std::list<repl::OplogEntry>{});
@@ -167,11 +167,11 @@ TEST_F(ReadExactTest, EmptyOplog) {
                                        sizeCountStore,
                                        uuid,
                                        {.timestamp = Timestamp::min(), .size = 5, .count = 1});
-    EXPECT_EQ(readExact(operationContext(), sizeCountStore, timestampStore, cursor, uuid),
+    EXPECT_EQ(readLatest(operationContext(), sizeCountStore, timestampStore, cursor, uuid),
               CollectionSizeCount({.size = 5, .count = 1}));
 }
 
-TEST_F(ReadExactTest, UuidNotFoundInNonEmptyOplog) {
+TEST_F(ReadLatestTest, UuidNotFoundInNonEmptyOplog) {
     SizeCountStore sizeCountStore;
     const SizeCountTimestampStore timestampStore;
 
@@ -188,11 +188,11 @@ TEST_F(ReadExactTest, UuidNotFoundInNonEmptyOplog) {
                                        uuid,
                                        {.timestamp = Timestamp::min(), .size = 5, .count = 1});
 
-    EXPECT_EQ(readExact(operationContext(), sizeCountStore, timestampStore, cursor, uuid),
+    EXPECT_EQ(readLatest(operationContext(), sizeCountStore, timestampStore, cursor, uuid),
               CollectionSizeCount({.size = 5, .count = 1}));
 }
 
-TEST_F(ReadExactTest, TimestampNotFoundInNonEmptyOplog) {
+TEST_F(ReadLatestTest, TimestampNotFoundInNonEmptyOplog) {
     SizeCountStore sizeCountStore;
     SizeCountTimestampStore timestampStore;
 
@@ -210,11 +210,11 @@ TEST_F(ReadExactTest, TimestampNotFoundInNonEmptyOplog) {
     // Timestamp >= (1, 1) should skip all oplog entries since oplog traversal begins *after* the
     // timestamp store timestamp.
     test_helpers::insertSizeCountTimestamp(operationContext(), timestampStore, Timestamp(1, 1));
-    EXPECT_EQ(readExact(operationContext(), sizeCountStore, timestampStore, cursor, collA.uuid),
+    EXPECT_EQ(readLatest(operationContext(), sizeCountStore, timestampStore, cursor, collA.uuid),
               CollectionSizeCount({.size = 5, .count = 1}));
 }
 
-TEST_F(ReadExactTest, UuidFoundInOplog) {
+TEST_F(ReadLatestTest, UuidFoundInOplog) {
     SizeCountStore sizeCountStore;
     SizeCountTimestampStore timestampStore;
 
@@ -234,11 +234,11 @@ TEST_F(ReadExactTest, UuidFoundInOplog) {
                                        {.timestamp = Timestamp::min(), .size = 5, .count = 1});
     test_helpers::insertSizeCountTimestamp(operationContext(), timestampStore, Timestamp::min());
 
-    EXPECT_EQ(readExact(operationContext(), sizeCountStore, timestampStore, cursor, collA.uuid),
+    EXPECT_EQ(readLatest(operationContext(), sizeCountStore, timestampStore, cursor, collA.uuid),
               CollectionSizeCount({.size = 5 + 10 + 100 - 50, .count = 1 + 1 + 0 - 1}));
 }
 
-TEST_F(ReadExactTest, UuidFoundInOplogAfterSizeCountStoreTimestamp) {
+TEST_F(ReadLatestTest, UuidFoundInOplogAfterSizeCountStoreTimestamp) {
     SizeCountStore sizeCountStore;
     SizeCountTimestampStore timestampStore;
 
@@ -256,11 +256,11 @@ TEST_F(ReadExactTest, UuidFoundInOplogAfterSizeCountStoreTimestamp) {
                                        {.timestamp = Timestamp(1, 1), .size = 5, .count = 1});
     test_helpers::insertSizeCountTimestamp(operationContext(), timestampStore, Timestamp::min());
 
-    EXPECT_EQ(readExact(operationContext(), sizeCountStore, timestampStore, cursor, collA.uuid),
+    EXPECT_EQ(readLatest(operationContext(), sizeCountStore, timestampStore, cursor, collA.uuid),
               CollectionSizeCount({.size = 5 + 100, .count = 1}));
 }
 
-TEST_F(ReadExactTest, UuidFoundInOplogAfterTimestampStoreTimestamp) {
+TEST_F(ReadLatestTest, UuidFoundInOplogAfterTimestampStoreTimestamp) {
     SizeCountStore sizeCountStore;
     SizeCountTimestampStore timestampStore;
 
@@ -278,11 +278,11 @@ TEST_F(ReadExactTest, UuidFoundInOplogAfterTimestampStoreTimestamp) {
                                        {.timestamp = Timestamp::min(), .size = 5, .count = 1});
     test_helpers::insertSizeCountTimestamp(operationContext(), timestampStore, Timestamp(1, 1));
 
-    EXPECT_EQ(readExact(operationContext(), sizeCountStore, timestampStore, cursor, collA.uuid),
+    EXPECT_EQ(readLatest(operationContext(), sizeCountStore, timestampStore, cursor, collA.uuid),
               CollectionSizeCount({.size = 5 + 100, .count = 1}));
 }
 
-TEST_F(ReadExactTest, UuidFoundInOplogWithInterleavedEntries) {
+TEST_F(ReadLatestTest, UuidFoundInOplogWithInterleavedEntries) {
     SizeCountStore sizeCountStore;
     SizeCountTimestampStore timestampStore;
 
@@ -307,11 +307,11 @@ TEST_F(ReadExactTest, UuidFoundInOplogWithInterleavedEntries) {
     test_helpers::insertSizeCountTimestamp(operationContext(), timestampStore, Timestamp::min());
 
     // Only collA's deltas should be aggregated.
-    EXPECT_EQ(readExact(operationContext(), sizeCountStore, timestampStore, cursor, collA.uuid),
+    EXPECT_EQ(readLatest(operationContext(), sizeCountStore, timestampStore, cursor, collA.uuid),
               CollectionSizeCount({.size = 5 + 10 + 100 - 30, .count = 1 + 1 + 0 - 1}));
 }
 
-TEST_F(ReadExactTest, OnlyUpdateOpsResultInZeroCountDelta) {
+TEST_F(ReadLatestTest, OnlyUpdateOpsResultInZeroCountDelta) {
     SizeCountStore sizeCountStore;
     SizeCountTimestampStore timestampStore;
 
@@ -332,8 +332,44 @@ TEST_F(ReadExactTest, OnlyUpdateOpsResultInZeroCountDelta) {
     test_helpers::insertSizeCountTimestamp(operationContext(), timestampStore, Timestamp::min());
 
     // Updates contribute size deltas but zero count delta, so count stays the same.
-    EXPECT_EQ(readExact(operationContext(), sizeCountStore, timestampStore, cursor, collA.uuid),
+    EXPECT_EQ(readLatest(operationContext(), sizeCountStore, timestampStore, cursor, collA.uuid),
               CollectionSizeCount({.size = 100 + 10 + 20 - 5, .count = 5}));
 }
+
+class ReadPersistedTest : public CatalogTestFixture {
+protected:
+    void setUp() override {
+        CatalogTestFixture::setUp();
+        ASSERT_OK(createReplicatedFastCountCollection(storageInterface(), operationContext()));
+    }
+
+    const test_helpers::NsAndUUID collA = {
+        .nss = NamespaceString::createNamespaceString_forTest("read_approx", "collA"),
+        .uuid = UUID::gen()};
+    const test_helpers::NsAndUUID collB = {
+        .nss = NamespaceString::createNamespaceString_forTest("read_approx", "collB"),
+        .uuid = UUID::gen()};
+};
+
+TEST_F(ReadPersistedTest, UuidNotFoundInSizeCountStore) {
+    const SizeCountStore sizeCountStore;
+    EXPECT_THROW(std::ignore = readPersisted(operationContext(), sizeCountStore, UUID::gen()),
+                 DBException);
+}
+
+TEST_F(ReadPersistedTest, UuidFoundInSizeCountStore) {
+    SizeCountStore sizeCountStore;
+    test_helpers::insertSizeCountEntry(operationContext(),
+                                       sizeCountStore,
+                                       collA.uuid,
+                                       {.timestamp = Timestamp(1, 1), .size = 5, .count = 1});
+    test_helpers::insertSizeCountEntry(operationContext(),
+                                       sizeCountStore,
+                                       collB.uuid,
+                                       {.timestamp = Timestamp(1, 1), .size = 10, .count = 2});
+    EXPECT_EQ(readPersisted(operationContext(), sizeCountStore, collA.uuid),
+              CollectionSizeCount({.size = 5, .count = 1}));
+}
+
 }  // namespace
 }  // namespace mongo::replicated_fast_count

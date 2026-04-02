@@ -38,19 +38,32 @@
 namespace mongo::replicated_fast_count {
 
 /**
- * Returns the exact number of records (count) and data size for the collection with `uuid`.
+ * Returns the latest number of records (count) and data size for the collection with `uuid`.
  *
- * readExact() combines the persisted size and count entry from `sizeCountStore` with deltas
+ * readLatest() combines the persisted size and count entry from `sizeCountStore` with deltas
  * aggregated from oplog entries in `cursor` that reference UUID `uuid`. `sizeCountStore` and
  * `timestampStore` are used to determine where to begin traversing `cursor`.
  *
  * `cursor` must be positioned on an oplog collection.
  *
- * If `uuid` is not contained in `sizeCountStore`, readExact() throws an assertion error.
+ * If `uuid` is not contained in `sizeCountStore`, readLatest() throws an assertion error.
  */
-[[nodiscard]] CollectionSizeCount readExact(OperationContext* opCtx,
-                                            const SizeCountStore& sizeCountStore,
-                                            const SizeCountTimestampStore& timestampStore,
-                                            SeekableRecordCursor& cursor,
-                                            UUID uuid);
+[[nodiscard]] CollectionSizeCount readLatest(OperationContext* opCtx,
+                                             const SizeCountStore& sizeCountStore,
+                                             const SizeCountTimestampStore& timestampStore,
+                                             SeekableRecordCursor& cursor,
+                                             UUID uuid);
+
+/**
+ * Returns the persisted number of records (count) and data size for the collection with `uuid`.
+ *
+ * readPersisted() returns the persisted size and count entry from `sizeCountStore` for the
+ * provided `uuid`. This return value does not include any inserts, updates, or deletes since the
+ * least checkpoint.
+ *
+ * If `uuid` is not contained in `sizeCountStore`, readPersisted() throws an assertion error.
+ */
+[[nodiscard]] CollectionSizeCount readPersisted(OperationContext* opCtx,
+                                                const SizeCountStore& sizeCountStore,
+                                                UUID uuid);
 }  // namespace mongo::replicated_fast_count
