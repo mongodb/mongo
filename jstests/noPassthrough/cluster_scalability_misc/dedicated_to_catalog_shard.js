@@ -44,9 +44,11 @@ const st = new ShardingTest({
     st.configRS.awaitReplication();
 
     // Restart works. Restart all nodes to verify they don't rely on a majority of nodes being up.
+    // On Windows, restart sequentially to avoid port binding races due to TCP TIME_WAIT (BF-42230).
     const configNodes = st.configRS.nodes;
+    const waitForConnect = _isWindows();
     configNodes.forEach((node) => {
-        st.configRS.restart(node, undefined, undefined, false /* wait */);
+        st.configRS.restart(node, undefined, undefined, waitForConnect);
     });
     st.configRS.getPrimary(); // Waits for a stable primary.
 
