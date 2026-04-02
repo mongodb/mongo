@@ -298,6 +298,8 @@ public:
 
     void appendSecondaryInfoData(BSONObjBuilder* result) override;
 
+    ThreadPool* getDbWorkThreadPool() const noexcept override;
+
     ReplSetConfig getConfig() const override;
     ReplSetConfig getConfig(WithLock) const;
 

@@ -254,6 +254,8 @@ public:
 
     void appendConnectionStats(executor::ConnectionPoolStats* stats) const override;
 
+    ThreadPool* getDbWorkThreadPool() const noexcept override;
+
     ReplSetConfig getConfig() const override;
 
     ConnectionString getConfigConnectionString() const override;

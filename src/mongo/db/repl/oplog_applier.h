@@ -37,7 +37,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_applier_batcher.h"
@@ -47,7 +46,6 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
@@ -263,15 +261,11 @@ public:
 extern NoopOplogApplierObserver noopOplogApplierObserver;
 
 /**
- * Creates the default thread pool for writer tasks.
+ * Creates the thread pool for writer tasks.
  */
 std::unique_ptr<ThreadPool> makeReplWorkerPool();
-std::unique_ptr<ThreadPool> makeReplWorkerPool(int threadCount);
-
-/**
- * Creates a thread pool suitable for writer tasks, with the specified name
- */
-std::unique_ptr<ThreadPool> makeReplWorkerPool(int threadCount,
+std::unique_ptr<ThreadPool> makeReplWorkerPool(size_t threadCount);
+std::unique_ptr<ThreadPool> makeReplWorkerPool(size_t threadCount,
                                                StringData name,
                                                bool isKillableByStepdown = false);
 

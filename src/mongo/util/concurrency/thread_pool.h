@@ -175,6 +175,20 @@ public:
      */
     Stats getStats() const;
 
+    /**
+     * Set the minimum number of threads for this ThreadPool.
+     * Calling this method will spin up new threads if the new minimum is greater than the current
+     * number of threads.
+     */
+    void setMinThreads(size_t minThreads);
+
+    /**
+     * Set the maximum number of threads for this ThreadPool.
+     * Calling this method will cause threads to be reaped once they finish their tasks if more than
+     * the maximum are running.
+     */
+    void setMaxThreads(size_t maxThreads);
+
 private:
     class Impl;
     std::unique_ptr<Impl> _impl;

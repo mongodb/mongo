@@ -313,6 +313,10 @@ void ReplicationCoordinatorNoOp::appendSecondaryInfoData(BSONObjBuilder*) {
     MONGO_UNREACHABLE;
 }
 
+ThreadPool* ReplicationCoordinatorNoOp::getDbWorkThreadPool() const noexcept {
+    MONGO_UNREACHABLE;
+}
+
 ReplSetConfig ReplicationCoordinatorNoOp::getConfig() const {
     MONGO_UNREACHABLE;
 }

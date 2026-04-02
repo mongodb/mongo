@@ -68,6 +68,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/topology_version_gen.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/interruptible.h"
@@ -692,6 +693,13 @@ public:
      * last known optimes.
      */
     virtual void appendSecondaryInfoData(BSONObjBuilder* result) = 0;
+
+    /**
+     * Returns the ThreadPool used by replication to apply the sync source's operations in parallel
+     * (in OplogApplier) and to clone the databases and collections during initial sync.
+     * Note: the returned pointer can be null if called before the replication logic was started.
+     */
+    virtual ThreadPool* getDbWorkThreadPool() const = 0;
 
     /**
      * Returns a copy of the current ReplSetConfig.

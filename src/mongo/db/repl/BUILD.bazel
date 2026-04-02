@@ -641,7 +641,7 @@ mongo_cc_library(
         "//src/mongo/db/repl:oplog_applier_batcher.cpp",
     ],
     deps = [
-        ":repl_server_parameters_idl",
+        ":repl_writer_thread_pool_server_parameters",
         "//src/mongo/db:server_base",
         "//src/mongo/db/admission:execution_admission_context",
         "//src/mongo/db/auth:authorization_manager_global",
@@ -1234,6 +1234,30 @@ mongo_cc_library(
         "//src/mongo/db/repl:repl_sync_shared_data",
         "//src/mongo/db/repl:replication_consistency_markers_impl",
         "//src/mongo/util:fail_point",
+    ],
+)
+
+mongo_idl_library(
+    name = "repl_writer_thread_pool_server_parameters_idl",
+    src = "repl_writer_thread_pool_server_parameters.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
+    ],
+)
+
+mongo_cc_library(
+    name = "repl_writer_thread_pool_server_parameters",
+    srcs = [
+        "repl_worker_pool_thread_count.cpp",
+    ],
+    deps = [
+        ":repl_coordinator_interface",
+        ":repl_writer_thread_pool_server_parameters_idl",
+        "//src/mongo/util:processinfo",
+        "//src/mongo/util/concurrency:thread_pool",
     ],
 )
 
@@ -1968,6 +1992,7 @@ mongo_cc_benchmark(
     tags = ["repl_bm"],
     deps = [
         ":repl_server_parameters_idl",
+        ":repl_writer_thread_pool_server_parameters",
         "//src/mongo/db:index_builds_coordinator_mongod",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context_d",
@@ -2029,6 +2054,20 @@ mongo_cc_library(
         "//src/mongo/db/catalog:collection_validation",
         "//src/mongo/db/repl:oplog_applier_impl_test_fixture",
         "//src/mongo/db/repl:oplog_entry_test_helpers",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "db_repl_worker_pool_thread_count_test",
+    srcs = [
+        "repl_worker_pool_thread_count_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":repl_writer_thread_pool_server_parameters",
+        "//src/mongo/stdx",
+        "//src/mongo/unittest",
+        "//src/mongo/util:processinfo",
     ],
 )
 
@@ -2262,6 +2301,7 @@ mongo_idl_library(
         "//src/mongo/db:basic_types_idl_gen",
     ],
     deps = [
+        "//src/mongo/client:read_preference",
         "//src/mongo/db:basic_types_idl",
     ],
 )
