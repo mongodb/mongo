@@ -200,6 +200,7 @@ mongo_cc_library(
     }),
     target_compatible_with = select({
         "//bazel/config:js_engine_mozjs": [],
+        "//bazel/config:js_engine_wasm": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [
@@ -213,6 +214,7 @@ mongo_cc_library(
         "//src/mongo/db:query_expressions",
         "//src/mongo/db/query/compiler/parsers/matcher/schema:json_schema_parser",
         "//src/mongo/scripting",
+        "//src/mongo/scripting/mozjs/common:mozjs_common",
         "//src/mongo/shell:shell_options_register",
         "//src/third_party/mozjs",
     ],
@@ -367,6 +369,7 @@ mongo_cc_library(
     ],
     target_compatible_with = select({
         "//bazel/config:js_engine_mozjs": [],
+        "//bazel/config:js_engine_wasm": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [
@@ -436,6 +439,7 @@ mongo_cc_library(
     ],
     target_compatible_with = select({
         "//bazel/config:js_engine_mozjs": [],
+        "//bazel/config:js_engine_wasm": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [

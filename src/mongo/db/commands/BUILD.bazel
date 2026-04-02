@@ -1114,6 +1114,7 @@ mongo_cc_unit_test(
     ],
     srcs_select = [{
         "//bazel/config:js_engine_none": [],
+        "//bazel/config:js_engine_wasm": [],
         "//bazel/config:js_engine_mozjs": [
             "//src/mongo/db/commands/query_cmd:mr_test.cpp",
         ],

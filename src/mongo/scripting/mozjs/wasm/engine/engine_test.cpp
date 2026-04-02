@@ -1565,20 +1565,17 @@ TEST_F(WasmMozJSTest, RuntimeErrorFromTypeError) {
     ASSERT_FALSE(error->msg.empty());
 }
 
-TEST_F(WasmMozJSTest, TypeErrorFromNonFunctionSource) {
+TEST_F(WasmMozJSTest, ExpressionSourceWrappedAsFunction) {
     ASSERT_TRUE(initEngine());
 
-    // "42" evaluates to a number, not a function
-    auto createFunc = getFunc("create-function");
-    ASSERT_TRUE(createFunc.has_value());
+    // "42" is an expression, not a function declaration. __parseJSFunctionOrExpression wraps it
+    // as "function() { return 42; }" so createFunction succeeds and produces a callable handle.
+    uint64_t handle = createFunction("42");
+    ASSERT_NE(handle, 0u) << "expected expression source to be wrapped and succeed";
 
-    wc::Val srcArg(makeListU8("42"));
-    wc::Val result(wc::WitResult::ok(std::nullopt));
-    callFunc(*createFunc, ctx(), &result, 1, std::move(srcArg));
-
-    auto error = extractError(result);
-    ASSERT_TRUE(error.has_value());
-    ASSERT_EQ(error->code, "e-type");
+    ASSERT_TRUE(invokeFunction(handle, BSONObj()));
+    BSONObj result = getReturnValueBson();
+    ASSERT_EQ(result["__returnValue"].numberInt(), 42);
 }
 
 TEST_F(WasmMozJSTest, InvalidUtf8InCreateFunction) {

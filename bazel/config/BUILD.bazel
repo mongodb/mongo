@@ -2648,6 +2648,13 @@ config_setting(
     },
 )
 
+config_setting(
+    name = "js_engine_wasm",
+    flag_values = {
+        "//bazel/config:js_engine": "wasm",
+    },
+)
+
 # --------------------------------------
 # enterprise_features options
 # --------------------------------------

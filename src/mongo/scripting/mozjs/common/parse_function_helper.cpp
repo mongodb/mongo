@@ -27,13 +27,32 @@
  *    it in the license file.
  */
 
-// This file has JavaScript functions that should be attached to the MongoHelpers object
+#include "mongo/scripting/mozjs/common/parse_function_helper.h"
 
-// The contents of exportToMongoHelpers will be copied into the MongoHelpers object and
-// this dictionary will be removed from the global scope.
-globalThis.exportToMongoHelpers = {
-    // This function accepts an expression or function body and returns a function definition
-    "functionExpressionParser": function functionExpressionParser(fnSrc) {
+#include "mongo/scripting/mozjs/common/valuereader.h"
+#include "mongo/scripting/mozjs/common/valuewriter.h"
+
+#include <cstring>
+
+#include <jsapi.h>
+
+#include <js/CompilationAndEvaluation.h>
+#include <js/SourceText.h>
+#include <js/Value.h>
+#include <js/ValueArray.h>
+#include <mozilla/Utf8.h>
+
+namespace mongo {
+namespace mozjs {
+
+namespace {
+
+// Parses a JS function or expression using Reflect.parse(). Wrapped in an IIFE that captures
+// Reflect in a closure so it remains available even if Reflect is later removed from the global.
+static const char kParseHelperSrc[] = R"js(
+(function() {
+    const _Reflect = Reflect;
+    globalThis.__parseJSFunctionOrExpression = function(fnSrc) {
         // Ensure that a provided expression or function body is not terminated with a ';'.
         // This ensures we interpret the input as a single expression, rather than a sequence
         // of expressions, and can wrap it in parentheses.
@@ -43,7 +62,7 @@ globalThis.exportToMongoHelpers = {
 
         let parseTree;
         try {
-            parseTree = this.Reflect.parse(fnSrc);
+            parseTree = _Reflect.parse(fnSrc);
         } catch (e) {
             if (e == "SyntaxError: function statement requires a name") {
                 return fnSrc;
@@ -90,7 +109,7 @@ globalThis.exportToMongoHelpers = {
                 lines[loc.line - 1] = modLine;
                 fnSrc = "{ " + lines.join("\n") + " }";
                 try {
-                    tmpTree = this.Reflect.parse("function x() " + fnSrc);
+                    tmpTree = _Reflect.parse("function x() " + fnSrc);
                 } catch (e) {
                     col -= 1;
                     continue;
@@ -104,8 +123,45 @@ globalThis.exportToMongoHelpers = {
         } else {
             return "function() { " + fnSrc + " }";
         }
-    },
-};
+    };
+})();
+)js";
 
-// WARNING: Anything outside the exportToMongoHelpers dictionary will be available in the
-// global scope and visible to users!
+}  // namespace
+
+bool installParseJSFunctionHelper(JSContext* cx, JS::HandleObject global) {
+    if (!JS_InitReflectParse(cx, global))
+        return false;
+
+    JS::CompileOptions opts(cx);
+    opts.setFileAndLine("common:parseHelper", 1);
+
+    JS::SourceText<mozilla::Utf8Unit> src;
+    if (!src.init(cx, kParseHelperSrc, std::strlen(kParseHelperSrc), JS::SourceOwnership::Borrowed))
+        return false;
+
+    JS::RootedValue result(cx);
+    return JS::Evaluate(cx, opts, src, &result);
+}
+
+bool parseJSFunctionOrExpression(JSContext* cx,
+                                 JS::HandleObject global,
+                                 StringData input,
+                                 std::string* out) {
+    JS::RootedValue helperVal(cx);
+    if (!JS_GetProperty(cx, global, "__parseJSFunctionOrExpression", &helperVal))
+        return false;
+
+    JS::RootedValue inputVal(cx);
+    ValueReader(cx, &inputVal).fromStringData(input);
+
+    JS::RootedValue result(cx);
+    if (!JS::Call(cx, global, helperVal, JS::HandleValueArray(inputVal), &result))
+        return false;
+
+    *out = ValueWriter(cx, result).toString();
+    return true;
+}
+
+}  // namespace mozjs
+}  // namespace mongo

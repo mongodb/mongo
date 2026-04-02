@@ -1,5 +1,4 @@
 load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
-load("//bazel/config:render_template.bzl", "render_template")
 load("//bazel:mongo_js_rules.bzl", "mongo_js_library")
 
 package(default_visibility = ["//visibility:public"])
@@ -17,29 +16,11 @@ exports_files(
 )
 
 idl_generator(
-    name = "engine_gen",
-    src = "engine.idl",
-)
-
-idl_generator(
     name = "scripting_util_gen",
     src = "scripting_util.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
     ],
-)
-
-render_template(
-    name = "mongohelpers_js_cpp",
-    srcs = [
-        "mongohelpers.js",
-    ],
-    cmd = [
-        "$(location mongohelpers_js.cpp)",
-        "$(location mongohelpers.js)",
-    ],
-    output = "mongohelpers_js.cpp",
-    python_file = "//buildscripts:jstoh.py",
 )
 
 mongo_js_library(
@@ -59,9 +40,8 @@ mongo_cc_library(
             "module_loader_test.cpp",
         ],
     ) + [
-        ":engine_gen",
-        ":mongohelpers_js_cpp",
         ":scripting_util_gen",
+        "//src/mongo/scripting:config_engine_gen",
     ],
     copts = select({
         "@platforms//os:windows": [

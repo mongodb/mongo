@@ -40,6 +40,7 @@
 
 #include "mongo/scripting/mozjs/wasm/bridge/bridge.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -814,7 +815,8 @@ TEST_F(WasmMozJSBridgeTest, Throw) {
     BSONObj emptyArgs;
 
     auto h1 = createFunction("function() { throw new Error(\"Throwing error!\"); }");
-    ASSERT_THROWS_CODE(invokeFunction(h1, emptyArgs), AssertionException, 11542314);
+    ASSERT_THROWS_CODE(
+        invokeFunction(h1, emptyArgs), AssertionException, ErrorCodes::JSInterpreterFailure);
 }
 
 TEST_F(WasmMozJSBridgeTest, CreateMultipleFunctions) {
@@ -842,13 +844,15 @@ TEST_F(WasmMozJSBridgeTest, CreateMultipleFunctions) {
 
 TEST_F(WasmMozJSBridgeTest, InvokeWithInvalidHandleFails) {
     // Handle 0 is always invalid; the bridge throws via uassert.
-    ASSERT_THROWS_CODE(invokeFunction(0, BSONObj()), AssertionException, 11542314);
+    ASSERT_THROWS_CODE(
+        invokeFunction(0, BSONObj()), AssertionException, ErrorCodes::JSInterpreterFailure);
 }
 
 TEST_F(WasmMozJSBridgeTest, CreateFunctionWithInvalidSourceFails) {
     // Invalid JavaScript - not a function expression; the bridge throws via uassert.
-    ASSERT_THROWS_CODE(
-        createFunction("this is not valid javascript {{{"), AssertionException, 11542311);
+    ASSERT_THROWS_CODE(createFunction("this is not valid javascript {{{"),
+                       AssertionException,
+                       ErrorCodes::JSInterpreterFailure);
 }
 
 TEST_F(WasmMozJSBridgeTest, ShutdownAndReinitialize) {

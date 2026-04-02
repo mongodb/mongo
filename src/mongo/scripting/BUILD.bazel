@@ -25,6 +25,11 @@ idl_generator(
 )
 
 idl_generator(
+    name = "config_engine_gen",
+    src = "config_engine.idl",
+)
+
+idl_generator(
     name = "deadline_monitor_gen",
     src = "deadline_monitor.idl",
 )
@@ -40,6 +45,9 @@ mongo_cc_library(
         "utils.cpp",
         ":config_gen",
         ":deadline_monitor_gen",
+    ],
+    hdrs = [
+        ":config_gen",
     ],
     deps = [
         ":bson_template_evaluator",
@@ -80,6 +88,7 @@ mongo_cc_library(
             "scripting_none.cpp",
         ],
         "//bazel/config:js_engine_mozjs": [],
+        "//bazel/config:js_engine_wasm": [],
     }],
     deps = [
         ":scripting_common",
@@ -97,6 +106,9 @@ mongo_cc_library(
             "//src/mongo/util/concurrency:spin_lock",
             "//src/third_party/mozjs",
         ],
+        "//bazel/config:js_engine_wasm": [
+            ":scripting_wasm",
+        ],
     }),
 )
 
@@ -107,6 +119,14 @@ mongo_cc_library(
     ],
     deps = [
         ":scripting_common",
+    ],
+)
+
+mongo_cc_library(
+    name = "scripting_wasm",
+    deps = [
+        ":scripting_common",
+        "//src/mongo/scripting/mozjs/wasm:wasmtime_engine",
     ],
 )
 
@@ -164,12 +184,6 @@ mongo_cc_unit_test(
 
 mongo_cc_unit_test(
     name = "scripting_mozjs_test",
-    srcs = [
-        "//src/mongo/scripting/mozjs:jscustomallocator_test.cpp",
-        "//src/mongo/scripting/mozjs/shell:asan_handles_test.cpp",
-        "//src/mongo/scripting/mozjs/shell:implscope_test.cpp",
-        "//src/mongo/scripting/mozjs/shell:module_loader_test.cpp",
-    ],
     copts = select({
         "@platforms//os:windows": [
             # See the /Zc:preprocessor comment in third_party/mozjs/BUILD.bazel
@@ -183,9 +197,23 @@ mongo_cc_unit_test(
         "//bazel/config:spider_monkey_dbg_enabled": ["MONGO_SPIDERMONKEY_DBG"],
         "//conditions:default": [],
     }),
+    srcs_select = [{
+        "//bazel/config:js_engine_mozjs": [
+            "//src/mongo/scripting/mozjs:jscustomallocator_test.cpp",
+            "//src/mongo/scripting/mozjs/shell:asan_handles_test.cpp",
+            "//src/mongo/scripting/mozjs/shell:implscope_test.cpp",
+            "//src/mongo/scripting/mozjs/shell:module_loader_test.cpp",
+        ],
+        "//bazel/config:js_engine_wasm": [
+            "//src/mongo/scripting/mozjs/wasm/scope:scope_test.cpp",
+        ],
+    }],
     tags = ["mongo_unittest_eighth_group"],
     target_compatible_with = select({
         "//bazel/config:js_engine_mozjs": [],
+
+        # TODO (SERVER-123109): Add s390x and PPC wasm toolchain
+        "//bazel/config:js_engine_wasm": [":not_s390x_or_ppc"],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [

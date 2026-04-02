@@ -200,6 +200,16 @@ private:
     WrapType<TimestampInfo> _timestampProto;
 };
 
+/**
+ * The SpiderMonkey JavaScript engine, compiled into the WASM module (mozjs_wasm_api.wasm). Runs
+ * inside the Wasmtime sandbox on mongod. Exposes a C ABI (see wasm/engine/api.cpp and the
+ * WIT-generated bindings) that the host-side WasmtimeScriptEngine (see wasm/wasmtime_engine.h)
+ * calls through the bridge to compile and invoke JavaScript functions, get/set globals, and handle
+ * map/reduce emit.
+ *
+ * This class runs entirely inside the WASM module. For the counterpart that runs on the host, see
+ * wasm/wasmtime_engine.h.
+ */
 class MozJSScriptEngine : private MozJSCommonRuntimeInterface {
 public:
     MozJSScriptEngine() = default;
@@ -287,6 +297,11 @@ public:
 private:
     FunctionSlot* resolveHandle(uint64_t handle, wasm_mozjs_error_t* err);
     static bool interruptCallback(JSContext* cx);
+
+    // Call __parseJSFunctionOrExpression (installed during init) with `raw` and write the
+    // properly-wrapped function source into `*out`.  Must be called inside a JSAutoRealm.
+    // Returns false and populates `err` (if non-null) on failure; a JS exception is left pending.
+    bool _parseFunctionSource(StringData raw, std::string* out, wasm_mozjs_error_t* err);
 
     bool _initialized = false;
 

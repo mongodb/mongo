@@ -85,7 +85,8 @@ std::shared_ptr<WasmEngineContext> WasmEngineContext::createFromPrecompiled(cons
         new WasmEngineContext(std::move(engine), result.ok()));
 }
 
-MozJSWasmBridge::MozJSWasmBridge(std::shared_ptr<WasmEngineContext> ctx) : _ctx(std::move(ctx)) {
+MozJSWasmBridge::MozJSWasmBridge(std::shared_ptr<WasmEngineContext> ctx, Options opts)
+    : _ctx(std::move(ctx)) {
     _store = wt::Store(_ctx->_engine);
     auto storeCtx = _store->context();
 
@@ -114,15 +115,19 @@ MozJSWasmBridge::MozJSWasmBridge(std::shared_ptr<WasmEngineContext> ctx) : _ctx(
     _invokeMapFunc = _getFunc(kInvokeMap);
     _drainEmitBufferFunc = _getFunc(kDrainEmitBuffer);
     _getGlobalFunc = _getFunc(kGetGlobal);
+    _getReturnValueBsonFunc = _getFunc(kGetReturnValueBson);
 }
 
 bool MozJSWasmBridge::initialize() {
+    // TODO(SERVER-116056): Once the WIT interface exposes heap/memory limit configuration, apply
+    // _options.jsHeapLimitBytes and _options.linearMemoryLimitBytes here before
+    // calling initialize-engine (or via a dedicated configure-engine WIT function).
     wc::Val result(wc::WitResult::ok(std::nullopt));
     LOGV2_DEBUG(11542332, 2, "Wasm Bridge Initializing", "ok"_attr = _engineInitialized);
     wasm_helpers::callFuncNoArgs(*_initEngineFunc, getContext(), &result, 1);
     _engineInitialized = wasm_helpers::isResultOk(result);
     if (!_engineInitialized) {
-        LOGV2_DEBUG(11542351,
+        LOGV2_DEBUG(11542356,
                     1,
                     "Wasm Bridge failed initializaiton",
                     "error"_attr =
@@ -155,7 +160,7 @@ uint64_t MozJSWasmBridge::createFunction(std::string_view source) {
         11542310,
         str::stream() << "Failed to call to create JS function " << std::string(source),
         wasm_helpers::callFunc(*_createFunctionFunc, getContext(), &result, 1, std::move(srcArg)));
-    uassert(11542311,
+    uassert(ErrorCodes::JSInterpreterFailure,
             str::stream() << "Failed to create JS function "
                           << wasm_helpers::translateMozJSError(*result.get_result().payload())
                           << " :: source = " << std::string(source),
@@ -170,7 +175,9 @@ uint64_t MozJSWasmBridge::createFunction(std::string_view source) {
     return payload->get_u64();
 }
 
-StatusWith<BSONObj> MozJSWasmBridge::invokeFunction(uint64_t handle, const BSONObj& args) {
+StatusWith<BSONObj> MozJSWasmBridge::invokeFunction(uint64_t handle,
+                                                    const BSONObj& args,
+                                                    bool ignoreReturn) {
     wc::Val arg0(handle);
     wc::Val arg1(wasm_helpers::makeListU8(args));
     wc::Val result(wc::WitResult::ok(std::nullopt));
@@ -180,11 +187,13 @@ StatusWith<BSONObj> MozJSWasmBridge::invokeFunction(uint64_t handle, const BSONO
                       str::stream() << "Failed to call to invoke JS function number " << handle};
     }
     if (!wasm_helpers::isResultOk(result))
-        return Status{ErrorCodes::Error{11542314},
+        return Status{ErrorCodes::JSInterpreterFailure,
                       str::stream()
                           << "Failed to invoke JS function "
                           << wasm_helpers::translateMozJSError(*result.get_result().payload())
                           << " :: function id = " << handle};
+    if (ignoreReturn)
+        return BSONObj();
     return _getReturnValueBson();
 }
 
@@ -336,7 +345,27 @@ BSONObj MozJSWasmBridge::_extractBSON(const wc::Val& result) {
 }
 
 BSONObj MozJSWasmBridge::_getReturnValueBson() {
-    return getGlobal(kReturnValue);
+    // Uses getGlobal which does not preserve JS array types (arrays become BSON objects with
+    // numeric keys). Use getReturnValueWrapped() when array type preservation matters.
+    // getGlobal also fails when the return value is undefined (e.g., a function with no return
+    // statement). Return an empty object in that case to match MozJS behavior.
+    try {
+        return getGlobal(kReturnValue);
+    } catch (const DBException&) {
+        return BSONObj();
+    }
+}
+
+BSONObj MozJSWasmBridge::getReturnValueWrapped() {
+    wc::Val result(wc::WitResult::ok(std::nullopt));
+    uassert(11542350,
+            "Failed to call get-return-value-bson",
+            wasm_helpers::callFuncNoArgs(*_getReturnValueBsonFunc, getContext(), &result, 1));
+    uassert(11542351,
+            str::stream() << "Failed to get return value BSON "
+                          << wasm_helpers::translateMozJSError(*result.get_result().payload()),
+            wasm_helpers::isResultOk(result));
+    return _extractBSON(result);
 }
 
 }  // namespace mongo::mozjs::wasm

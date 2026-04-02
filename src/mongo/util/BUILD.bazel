@@ -679,6 +679,7 @@ generate_config_header(
         "GIT_COMMIT_HASH": "$(GIT_COMMIT_HASH)",
     } | select({
         "//bazel/config:js_engine_mozjs": {"js_engine_ver": "mozjs"},
+        "//bazel/config:js_engine_wasm": {"js_engine_ver": "wasm"},
         "//conditions:default": {"js_engine_ver": "none"},
     }) | select({
         "//bazel/config:tcmalloc_google_enabled": {"MONGO_ALLOCATOR": "tcmalloc-google"},
@@ -705,6 +706,7 @@ generate_config_header(
         "GIT_COMMIT_HASH": "$(GIT_COMMIT_HASH)",
     } | select({
         "//bazel/config:js_engine_mozjs": {"js_engine_ver": "mozjs"},
+        "//bazel/config:js_engine_wasm": {"js_engine_ver": "wasm"},
         "//conditions:default": {"js_engine_ver": "none"},
     }) | select({
         "//bazel/config:tcmalloc_google_enabled": {"MONGO_ALLOCATOR": "tcmalloc-google"},

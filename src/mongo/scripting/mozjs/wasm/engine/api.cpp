@@ -167,7 +167,7 @@ static size_t g_function_count = 0;
 extern "C" bool exports_mongo_mozjs_mozjs_initialize_engine(
     exports_mongo_mozjs_mozjs_ok_t* ret, exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
     mongo::mozjs::wasm::wasm_mozjs_error_t e{};
-    // TODO SERVER-116051: Make wasm_mozjs_startup_options_t an argument.
+    // TODO (SERVER-123134): Make wasm_mozjs_startup_options_t an argument.
     mongo::mozjs::wasm::wasm_mozjs_startup_options_t opt{};
     opt.opTimeout = opt.opTimeout > 0 ? opt.opTimeout : kDefaultOpTimeoutMicros;
     opt.heapSize = opt.heapSize > 0 ? opt.heapSize : kDefaultHeapSizeMB;

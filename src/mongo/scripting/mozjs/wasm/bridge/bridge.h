@@ -67,7 +67,7 @@ public:
         size_t timeoutLimitMs;
     };
 
-    explicit MozJSWasmBridge(std::shared_ptr<WasmEngineContext> ctx);
+    explicit MozJSWasmBridge(std::shared_ptr<WasmEngineContext> ctx, Options opts = {});
 
     bool initialize();
     void shutdown();
@@ -75,7 +75,9 @@ public:
     void interruptCurrentOp();
 
     uint64_t createFunction(std::string_view source);
-    StatusWith<BSONObj> invokeFunction(uint64_t handle, const BSONObj& args);
+    StatusWith<BSONObj> invokeFunction(uint64_t handle,
+                                       const BSONObj& args,
+                                       bool ignoreReturn = false);
 
     void setGlobal(std::string_view name, const BSONObj& value);
     BSONObj getGlobal(std::string_view name);
@@ -91,6 +93,9 @@ public:
     bool isInitialized() const {
         return _engineInitialized;
     }
+
+    // Returns the last JS function return value as {"__returnValue": val}, preserving array types.
+    BSONObj getReturnValueWrapped();
 
 private:
     BSONObj _getReturnValueBson();
@@ -129,6 +134,7 @@ private:
     boost::optional<wc::Func> _invokeMapFunc = boost::none;
     boost::optional<wc::Func> _drainEmitBufferFunc = boost::none;
     boost::optional<wc::Func> _getGlobalFunc = boost::none;
+    boost::optional<wc::Func> _getReturnValueBsonFunc = boost::none;
 };
 
 }  // namespace mongo::mozjs::wasm

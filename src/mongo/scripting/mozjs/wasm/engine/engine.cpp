@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/scripting/mozjs/common/error.h"
+#include "mongo/scripting/mozjs/common/parse_function_helper.h"
 #include "mongo/scripting/mozjs/common/runtime.h"
 #include "mongo/scripting/mozjs/common/types/bindata.h"
 #include "mongo/scripting/mozjs/common/types/bson.h"
@@ -221,6 +222,11 @@ err_code_t MozJSScriptEngine::init(const wasm_mozjs_startup_options_t* opt,
         JSAutoRealm ar(_cx, _global);
         _internedStrings = std::make_unique<InternedStringTable>(_cx);
         _prototypeInstaller->installTypes(_global);
+
+        if (!chk.ok(installParseJSFunctionHelper(_cx, _global), SM_E_INTERNAL)) {
+            shutdown(nullptr);
+            return err ? err->code : SM_E_INTERNAL;
+        }
     }
 
     _initialized = true;
@@ -269,6 +275,18 @@ err_code_t MozJSScriptEngine::interrupt(wasm_mozjs_error_t* err) {
     return SM_OK;
 }
 
+bool MozJSScriptEngine::_parseFunctionSource(StringData raw,
+                                             std::string* out,
+                                             wasm_mozjs_error_t* err) {
+    ExecutionCheck chk(_cx, err);
+    if (!chk.ok(parseJSFunctionOrExpression(_cx, _global, raw, out), SM_E_COMPILE)) {
+        if (err && err->code == SM_E_PENDING_EXCEPTION)
+            err->code = SM_E_COMPILE;
+        return false;
+    }
+    return true;
+}
+
 err_code_t MozJSScriptEngine::createFunction(const uint8_t* src,
                                              size_t len,
                                              uint64_t* out_handle,
@@ -283,10 +301,26 @@ err_code_t MozJSScriptEngine::createFunction(const uint8_t* src,
 
     ExecutionCheck chk(_cx, err);
 
+    // Pre-validate UTF-8 before _parseFunctionSource, which converts to a JS string
+    // (silently accepting invalid bytes via SpiderMonkey's internal encoding).
+    // JS::SourceText::init does NOT validate at init time; validation happens during
+    // JS::Evaluate, but by then the source is already a JS string.
+    if (!mozilla::IsUtf8(mozilla::Span(reinterpret_cast<const char*>(src), len))) {
+        if (err) {
+            err->code = SM_E_ENCODING;
+            set_string(&err->msg, &err->msg_len, "createFunction: source is not valid UTF-8");
+        }
+        return SM_E_ENCODING;
+    }
+
+    std::string parsed;
+    if (!_parseFunctionSource(StringData(reinterpret_cast<const char*>(src), len), &parsed, err))
+        return err ? err->code : SM_E_COMPILE;
+
     std::string code_str;
-    code_str.reserve(len + 2);
+    code_str.reserve(parsed.size() + 2);
     code_str += '(';
-    code_str.append(reinterpret_cast<const char*>(src), len);
+    code_str += parsed;
     code_str += ')';
 
     JS::CompileOptions opts(_cx);
@@ -896,11 +930,15 @@ bool MozJSScriptEngine::requiresOwnedObjects() const {
 }
 
 void MozJSScriptEngine::newFunction(StringData raw, JS::MutableHandleValue out) {
-    // Compile the code string as a function expression, same as createFunction().
+    JS::RootedObject global(_cx, JS::CurrentGlobalOrNull(_cx));
+    std::string parsed;
+    if (!parseJSFunctionOrExpression(_cx, global, raw, &parsed))
+        return;  // JS exception is pending
+
     std::string wrapped;
-    wrapped.reserve(raw.size() + 2);
+    wrapped.reserve(parsed.size() + 2);
     wrapped += '(';
-    wrapped.append(raw.data(), raw.size());
+    wrapped += parsed;
     wrapped += ')';
 
     JS::CompileOptions opts(_cx);

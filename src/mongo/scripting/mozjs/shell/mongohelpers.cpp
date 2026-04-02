@@ -30,71 +30,59 @@
 #include "mongo/scripting/mozjs/shell/mongohelpers.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/common/objectwrapper.h"
-#include "mongo/scripting/mozjs/common/valuereader.h"
-#include "mongo/scripting/mozjs/common/valuewriter.h"
+#include "mongo/scripting/mozjs/common/parse_function_helper.h"
 #include "mongo/scripting/mozjs/common/wraptype.h"
 #include "mongo/scripting/mozjs/shell/implscope.h"
 #include "mongo/util/assert_util.h"
 
 #include <jsapi.h>
 
+#include <js/GlobalObject.h>
 #include <js/RootingAPI.h>
 #include <js/TypeDecls.h>
-#include <js/ValueArray.h>
 
 namespace mongo {
-namespace JSFiles {
-extern const JSFile mongohelpers;
-}  // namespace JSFiles
-
 namespace mozjs {
 
 const char* const MongoHelpersInfo::className = "MongoHelpers";
 
 namespace {
-const char kExportsObjectName[] = "exportToMongoHelpers";
+const char kParseHelperName[] = "__parseJSFunctionOrExpression";
 const char kReflectName[] = "Reflect";
 }  // namespace
 
 std::string parseJSFunctionOrExpression(JSContext* cx, const StringData input) {
-    JS::RootedValue jsStrOut(cx);
-    JS::RootedValue jsStrIn(cx);
-
-    ValueReader(cx, &jsStrIn).fromStringData(input);
-    ObjectWrapper helpersWrapper(cx, getScope(cx)->getProto<MongoHelpersInfo>().getProto());
-
-    helpersWrapper.callMethod("functionExpressionParser", JS::HandleValueArray(jsStrIn), &jsStrOut);
-
-    return ValueWriter(cx, jsStrOut).toString();
+    JS::RootedObject proto(cx, getScope(cx)->getProto<MongoHelpersInfo>().getProto());
+    std::string out;
+    uassert(ErrorCodes::JSInterpreterFailure,
+            "Error running javascript function parser",
+            mozjs::parseJSFunctionOrExpression(cx, proto, input, &out));
+    return out;
 }
 
 void MongoHelpersInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto) {
     ObjectWrapper protoWrapper(cx, proto);
     ObjectWrapper globalWrapper(cx, global);
 
-    // Initialize the reflection API and move it under the MongoHelpers object
+    // Install the shared parse helper (which also initializes Reflect on the global).
     uassert(ErrorCodes::JSInterpreterFailure,
-            "Error initializing javascript reflection API",
-            JS_InitReflectParse(cx, global));
+            "Error installing javascript function parser helper",
+            installParseJSFunctionHelper(cx, global));
+
+    // Move Reflect from the global to the MongoHelpers prototype so it is hidden from users
+    // but still accessible internally (captured in the parse helper closure).
     JS::RootedValue reflectValue(cx);
     globalWrapper.getValue(kReflectName, &reflectValue);
     globalWrapper.deleteProperty(kReflectName);
     protoWrapper.setValue(kReflectName, reflectValue);
 
-    JS::RootedValue exports(cx);
-    getScope(cx)->execSetup(JSFiles::mongohelpers);
-    globalWrapper.getValue(kExportsObjectName, &exports);
-    globalWrapper.deleteProperty(kExportsObjectName);
-
-    ObjectWrapper exportsWrapper(cx, exports);
-    JS::RootedValue copyExport(cx);
-    exportsWrapper.enumerate([&](JS::HandleId _id) {
-        exportsWrapper.getValue(_id, &copyExport);
-        protoWrapper.setValue(_id, copyExport);
-        return true;
-    });
+    // Move __parseJSFunctionOrExpression from global to proto so it is not user-visible.
+    // The C++ parseJSFunctionOrExpression reads it from proto, not global.
+    JS::RootedValue parseHelperValue(cx);
+    globalWrapper.getValue(kParseHelperName, &parseHelperValue);
+    globalWrapper.deleteProperty(kParseHelperName);
+    protoWrapper.setValue(kParseHelperName, parseHelperValue);
 }
 
 }  // namespace mozjs

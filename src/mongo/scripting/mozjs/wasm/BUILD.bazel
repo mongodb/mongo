@@ -3,10 +3,14 @@ load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 load("//bazel/wasm_rules:embed_binary.bzl", "embed_binary_obj", "embed_binary_rc")
 load("//bazel/wasm_rules:wasm_aot_compile.bzl", "aot_compile_wasm")
 
-exports_files([
-    "embedded_wasm_resource.h",
-    "status.cpp",
-])
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
 
 # Build SpiderMonkey tarball from source (manual, for re-uploading to S3).
 genrule(
@@ -41,7 +45,10 @@ mongo_cc_library(
     name = "mozjs_wasm_lib",
     srcs = glob(
         ["*.cpp"],
-        exclude = ["status.cpp"],
+        exclude = [
+            "status.cpp",  # Included in wasi_sources filegroup
+            "wasmtime_engine.cpp",
+        ],
     ) + [
         "//src/mongo/scripting/mozjs/wasm/engine:api.cpp",
         "//src/mongo/scripting/mozjs/wasm/engine:engine.cpp",
@@ -94,6 +101,11 @@ wasm_cc_binary(
         ":mozjs_wasm_lib",
     ],
 )
+
+exports_files([
+    "wasmtime_engine.cpp",
+    "wasmtime_engine.h",
+])
 
 mongo_cc_library(
     name = "bridge",
@@ -185,4 +197,27 @@ embed_binary_rc(
     out = "embedded_mozjs_wasm.res",
     resource_name = "MOZJS_WASM_CWASM",
     target_compatible_with = ["@platforms//os:windows"],
+)
+
+mongo_cc_library(
+    name = "wasmtime_engine",
+    srcs = [
+        "wasmtime_engine.cpp",
+        "//src/mongo/scripting:config_engine_gen",
+        "//src/mongo/scripting/mozjs/wasm/scope:scope.cpp",
+    ],
+    hdrs = [
+        "wasmtime_engine.h",
+        "//src/mongo/scripting/mozjs/wasm/scope:scope.h",
+    ],
+    deps = [
+        ":bridge",
+        ":embed_mozjs_wasm_obj",
+        "//src/mongo:base",
+        "//src/mongo/db:server_options",
+        "//src/mongo/db:service_context",
+        "//src/mongo/scripting:scripting_common",
+        "//src/mongo/util/concurrency:spin_lock",
+        "@crates//:wasmtime_c",
+    ],
 )
