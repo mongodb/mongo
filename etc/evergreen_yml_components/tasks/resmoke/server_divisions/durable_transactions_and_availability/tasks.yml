@@ -285,6 +285,23 @@ tasks:
       - func: "run tests"
 
   - <<: *gen_task_template
+    name: disagg_causally_consistent_jscore_txns_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_repl",
+        "default",
+        "large",
+        "clustered_collections",
+        "causally_consistent",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: disagg_causally_consistent_jscore_txns_passthrough
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
     name: causally_consistent_read_concern_snapshot_passthrough_gen
     tags:
       [
