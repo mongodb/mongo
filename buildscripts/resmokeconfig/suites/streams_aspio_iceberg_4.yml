@@ -1,0 +1,21 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_duplicate_rows.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_snapshot_lineage.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_stats.js
+  exclude_files:
+    # TODO(SERVER-117494): Re-enable once flakiness is resolved.
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/gwproxy/iceberg_gwproxy.js
+
+executor:
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      bind_ip_all: ""
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagStreams: true
+        diagnosticDataCollectionEnabled: false
+    num_nodes: 1

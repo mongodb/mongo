@@ -523,6 +523,19 @@ py_binary(
 )
 
 py_binary(
+    name = "streams_suite_coverage_linter",
+    srcs = ["streams_suite_coverage_linter.py"],
+    main = "streams_suite_coverage_linter.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+py_binary(
     name = "yamllinters",
     srcs = ["yamllinters.py"],
     main = "yamllinters.py",

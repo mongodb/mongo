@@ -492,6 +492,21 @@ tasks:
           resmoke_jobs_max: 4
 
   - <<: *task_template_streams
+    name: streams_aspio_iceberg_4
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "experimental",
+        "streams_release_test",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "do setup for streams"
+      - func: "run streams tests"
+        vars:
+          resmoke_jobs_max: 4
+
+  - <<: *task_template_streams
     name: streams_aspio_iceberg_large
     tags:
       [

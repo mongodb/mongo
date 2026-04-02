@@ -602,6 +602,12 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
         lr.run_bazel("//buildscripts:yamllinters")
         print("No errors found in evergreen yaml")
 
+    if lint_all or any(
+        "jstests/streams" in file or "resmokeconfig/suites/streams" in file
+        for file in files_to_lint
+    ):
+        lr.run_bazel("//buildscripts:streams_suite_coverage_linter")
+
     if lint_all or any(file.endswith(".md") for file in files_to_lint):
         lr.run_bazel("//buildscripts:markdown_link_linter", ["--root=src/mongo", "--verbose"])
 
