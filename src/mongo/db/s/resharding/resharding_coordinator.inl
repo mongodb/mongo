@@ -1616,6 +1616,12 @@ ReshardingCoordinatorDocument ReshardingCoordinator::_verifyFinalCollection(
         return coordinatorDocChangedOnDisk;
     }
 
+    if (_coordinatorDoc.getState() > CoordinatorStateEnum::kBlockingWrites) {
+        // If in recovery, there is no need to re-verify the final collection, just return the
+        // existing _stateDoc.
+        return coordinatorDocChangedOnDisk;
+    }
+
     auto opCtx = _makeOperationContext();
     _persistDocumentsDelta(opCtx.get(), _deltaFuture->get(opCtx.get()));
 
