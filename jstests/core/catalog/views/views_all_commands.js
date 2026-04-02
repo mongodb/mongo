@@ -96,7 +96,6 @@ let viewsCommandTests = {
     _configsvrBalancerStop: {skip: isAnInternalCommand},
     _configsvrCheckClusterMetadataConsistency: {skip: isAnInternalCommand},
     _configsvrCheckMetadataConsistency: {skip: isAnInternalCommand},
-    _configsvrCleanupReshardCollection: {skip: isAnInternalCommand},
     _configsvrCollMod: {skip: isAnInternalCommand},
     _configsvrClearJumboFlag: {skip: isAnInternalCommand},
     _configsvrCommitChunksMerge: {skip: isAnInternalCommand},
@@ -173,7 +172,6 @@ let viewsCommandTests = {
     _shardsvrDropIndexesParticipant: {skip: isAnInternalCommand},
     _shardsvrEndMigrationBlockingOperation: {skip: isAnInternalCommand},
     _shardsvrJoinDDLCoordinators: {skip: isAnInternalCommand},
-    _shardsvrCleanupReshardCollection: {skip: isAnInternalCommand},
     _shardsvrCommitCreateDatabaseMetadata: {skip: isAnInternalCommand},
     _shardsvrCommitDropDatabaseMetadata: {skip: isAnInternalCommand},
     _shardsvrCommitReshardCollection: {skip: isAnInternalCommand},
@@ -296,7 +294,6 @@ let viewsCommandTests = {
     cleanupOrphaned: {
         skip: "Tested in views/views_sharded.js",
     },
-    cleanupReshardCollection: {skip: isUnrelated},
     cleanupStructuredEncryptionData: {skip: isUnrelated},
     clearJumboFlag: {
         command: {clearJumboFlag: "test.view"},

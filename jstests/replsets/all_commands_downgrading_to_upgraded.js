@@ -43,7 +43,6 @@ const allCommands = {
     _configsvrBalancerStop: {skip: isAnInternalCommand},
     _configsvrCheckClusterMetadataConsistency: {skip: isAnInternalCommand},
     _configsvrCheckMetadataConsistency: {skip: isAnInternalCommand},
-    _configsvrCleanupReshardCollection: {skip: isAnInternalCommand},
     _configsvrCollMod: {skip: isAnInternalCommand},
     _configsvrClearJumboFlag: {skip: isAnInternalCommand},
     _configsvrCommitChunksMerge: {skip: isAnInternalCommand},
@@ -104,7 +103,6 @@ const allCommands = {
     _shardsvrBeginMigrationBlockingOperation: {skip: isAnInternalCommand},
     _shardsvrChangePrimary: {skip: isAnInternalCommand},
     _shardsvrCleanupStructuredEncryptionData: {skip: isAnInternalCommand},
-    _shardsvrCleanupReshardCollection: {skip: isAnInternalCommand},
     _shardsvrCloneAuthoritativeMetadata: {skip: isAnInternalCommand},
     _shardsvrCloneCatalogData: {skip: isAnInternalCommand},
     _shardsvrCompactStructuredEncryptionData: {skip: isAnInternalCommand},
@@ -414,11 +412,6 @@ const allCommands = {
         teardown: function (conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         },
-    },
-    cleanupReshardCollection: {
-        // Skipping command because it requires additional setup through a failed resharding
-        // operation.
-        skip: "requires additional setup through a failed resharding operation",
     },
     cleanupStructuredEncryptionData: {skip: "requires additional encrypted collection setup"},
     clearJumboFlag: {

@@ -7,6 +7,7 @@ export const commandsRemovedFromMongosSinceLastLTS = [
     "_getAuditConfigGeneration", // Removed in 8.1
     "startRecordingTraffic",
     "stopRecordingTraffic",
+    "cleanupReshardCollection",
 ];
 
 // These commands were added in mongos since the last LTS version, so will not appear in the

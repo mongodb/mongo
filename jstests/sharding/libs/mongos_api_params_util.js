@@ -224,24 +224,6 @@ export let MongosAPIParametersUtil = (function () {
                 command: () => ({checkMetadataConsistency: 1}),
             },
         },
-        {
-            commandName: "cleanupReshardCollection",
-            run: {
-                inAPIVersion1: false,
-                configServerCommandName: "_configsvrCleanupReshardCollection",
-                // _shardsvrCleanupReshardCollection exists in the code but is not sent to the shard
-                // server
-                // TODO(SERVER-108802) shardCommandName: "_shardsvrCleanupReshardCollection",
-                runsAgainstAdminDb: true,
-                permittedInTxn: false,
-                permittedOnShardedCollection: true,
-                setUp: () => {
-                    assert.commandWorked(st.s.adminCommand({enableSharding: "db", primaryShard: st.shard0.shardName}));
-                    assert.commandWorked(st.s.adminCommand({shardCollection: "db.collection", key: {_id: 1}}));
-                },
-                command: () => ({cleanupReshardCollection: "db.collection"}),
-            },
-        },
         {commandName: "cleanupStructuredEncryptionData", skip: "TODO(SERVER-108802)"},
         {
             commandName: "commitReshardCollection",

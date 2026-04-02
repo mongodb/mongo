@@ -85,7 +85,6 @@ mongo_cc_library(
         "cluster_abort_transaction_cmd_s.cpp",
         "cluster_auto_split_vector_cmd.cpp",
         "cluster_build_info.cpp",
-        "cluster_cleanup_reshard_collection_cmd.cpp",
         "cluster_commit_transaction_cmd_s.cpp",
         "cluster_compact_cmd.cpp",
         "cluster_coordinate_commit_txn.cpp",

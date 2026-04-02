@@ -126,10 +126,6 @@ const internalCommandsMap = {
             _configsvrBalancerCollectionStatus: "x.y",
         },
     },
-    _configsvrCleanupReshardCollection: {
-        testname: "_configsvrCleanupReshardCollection",
-        command: {_configsvrCleanupReshardCollection: "test.x"},
-    },
     _configsvrClearJumboFlag: {
         testname: "_configsvrClearJumboFlag",
         command: {_configsvrClearJumboFlag: "x.y", epoch: ObjectId(), minKey: {x: 0}, maxKey: {x: 10}},
@@ -469,10 +465,6 @@ const internalCommandsMap = {
     _shardsvrCleanupStructuredEncryptionData: {
         testname: "_shardsvrCleanupStructuredEncryptionData",
         command: {_shardsvrCleanupStructuredEncryptionData: "test", cleanupTokens: {}},
-    },
-    _shardsvrCleanupReshardCollection: {
-        testname: "_shardsvrCleanupReshardCollection",
-        command: {_shardsvrCleanupReshardCollection: "test.x", reshardingUUID: UUID()},
     },
     _shardsvrCloneAuthoritativeMetadata: {
         testname: "_shardsvrCloneAuthoritativeMetadata",

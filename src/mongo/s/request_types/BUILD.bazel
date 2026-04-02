@@ -38,15 +38,6 @@ idl_generator(
 )
 
 idl_generator(
-    name = "cleanup_reshard_collection_gen",
-    src = "cleanup_reshard_collection.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-    ],
-)
-
-idl_generator(
     name = "cleanup_orphaned_gen",
     src = "cleanup_orphaned.idl",
     deps = [
