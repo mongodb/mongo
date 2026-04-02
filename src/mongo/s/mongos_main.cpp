@@ -716,6 +716,8 @@ Status initializeSharding(
         LOGV2_WARNING(6203601, "Failed to warmup routing information", "error"_attr = redact(ex));
     }
 
+    // Pre-warm the connection pool may fail. Since this is just an optimization, any failure must
+    // not prevent mongos from starting.
     {
         auto scopedTimer =
             createTimeElapsedBuilderScopedTimer(opCtx->getServiceContext()->getFastClockSource(),
@@ -723,7 +725,8 @@ Status initializeSharding(
                                                 startupTimeElapsedBuilder);
         Status status = preWarmConnectionPool(opCtx);
         if (!status.isOK()) {
-            return status;
+            LOGV2_WARNING(
+                104223, "Failed to warmup the collection pool", "error"_attr = status.reason());
         }
     }
 
