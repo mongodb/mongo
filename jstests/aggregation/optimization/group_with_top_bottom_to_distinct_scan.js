@@ -15,6 +15,8 @@
  *   does_not_support_causal_consistency,
  *   requires_fcv_80,
  *   not_allowed_with_signed_security_token,
+ *   # This test makes assertions on explain which become flaky when FCV changes.
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 
