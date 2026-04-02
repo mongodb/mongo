@@ -449,3 +449,9 @@ feature_flags:
         cpp_varname: gFeatureFlagExtensionsOptimizations
         default: false
         fcv_gated: false
+
+    featureFlagPqsQueryKnobs:
+        description: "Feature flag to enable per-query-shape overrides of internal query parameters (query knobs) via Persistent Query Settings."
+        cpp_varname: gFeatureFlagPqsQueryKnobs
+        default: false
+        fcv_gated: true
