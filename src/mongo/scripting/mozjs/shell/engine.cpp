@@ -63,25 +63,35 @@ void DisableExtraThreads();
 
 namespace mongo {
 
-bool isExternalScriptingEnabled() {
-    return gEnableExternalScripting;
-}
-
 namespace {
 auto operationMozJSShellRuntimeInterfaceDecoration =
     OperationContext::declareDecoration<mozjs::MozJSImplScope*>();
-}
+
+/**
+ * A stable proxy that delegates kill-op notifications to whatever the current global script engine
+ * is. This avoids dangling pointer issues when the global engine is swapped (e.g., from MozJS to
+ * ExternalJS) since registerKillOpListener has no corresponding unregister and the listener pointer
+ * must remain valid for the lifetime of the ServiceContext.
+ */
+class ScriptEngineKillOpProxy : public KillOpListenerInterface {
+public:
+    void interrupt(ClientLock& lk, OperationContext* opCtx) override {
+        if (auto engine = getGlobalScriptEngine()) {
+            engine->interrupt(lk, opCtx);
+        }
+    }
+    void interruptAll(ServiceContextLock& svcCtxLock) override {
+        if (auto engine = getGlobalScriptEngine()) {
+            engine->interruptAll(svcCtxLock);
+        }
+    }
+};
+
+static ScriptEngineKillOpProxy killOpProxy;
+}  // namespace
 
 void ScriptEngine::setup(ExecutionEnvironment environment) {
     if (getGlobalScriptEngine()) {
-        return;
-    }
-
-    // If gEnableExternalScripting is true, don't set up the MozJS engine.
-    if (isExternalScriptingEnabled()) {
-        if (!serverGlobalParams.quiet.load()) {
-            LOGV2_INFO(8972601, "External scripting is enabled. Not setting up MozJS engine.");
-        }
         return;
     }
 
@@ -92,8 +102,12 @@ void ScriptEngine::setup(ExecutionEnvironment environment) {
     setGlobalScriptEngine(new mozjs::MozJSScriptEngine(environment));
 
     if (hasGlobalServiceContext()) {
-        getGlobalServiceContext()->registerKillOpListener(getGlobalScriptEngine());
+        registerScriptEngineKillOpProxy(getGlobalServiceContext());
     }
+}
+
+void registerScriptEngineKillOpProxy(ServiceContext* svcCtx) {
+    svcCtx->registerKillOpListener(&killOpProxy);
 }
 
 namespace mozjs {

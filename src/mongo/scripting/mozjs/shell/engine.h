@@ -99,4 +99,12 @@ private:
 };
 
 }  // namespace mozjs
+
+/**
+ * Registers a stable kill-op proxy with the given ServiceContext. The proxy delegates interrupt
+ * calls to whatever getGlobalScriptEngine() returns at call time, avoiding dangling pointer issues
+ * when the global engine is swapped via setGlobalScriptEngine.
+ */
+void registerScriptEngineKillOpProxy(ServiceContext* svcCtx);
+
 }  // namespace mongo
