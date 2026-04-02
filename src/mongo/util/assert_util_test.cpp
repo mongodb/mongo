@@ -802,5 +802,20 @@ TEST(AssertUtils, FailuresAreNotConstexpr) {
     }()));
 }
 
+TEST(ScopedDebugInfoStack, Enabled) {
+    ASSERT(getScopedDebugInfoStackEnabled());
+    ASSERT_EQ(error_details::scopedDebugInfoStack().size(), 0);
+    ScopedDebugInfo scopedInfo("test", "hello");
+    ASSERT_EQ(error_details::scopedDebugInfoStack().size(), 1);
+}
+
+TEST(ScopedDebugInfoStack, Disabled) {
+    RAIIServerParameterControllerForTest knobController("enableDiagnosticLogging", false);
+    ASSERT(!getScopedDebugInfoStackEnabled());
+    ASSERT_EQ(error_details::scopedDebugInfoStack().size(), 0);
+    ScopedDebugInfo scopedInfo("test", "hello");
+    ASSERT_EQ(error_details::scopedDebugInfoStack().size(), 0);
+}
+
 }  // namespace
 }  // namespace mongo
