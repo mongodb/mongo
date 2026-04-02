@@ -273,6 +273,30 @@ public:
         return _geo2dsphereIndexVersions.has_value();
     }
 
+    bool assumeNoMixedSchemaData() const {
+        return _assumeNoMixedSchemaData;
+    }
+
+    void setAssumeNoMixedSchemaData(bool val) {
+        _assumeNoMixedSchemaData = val;
+    }
+
+    bool fixedBuckets() const {
+        return _fixedBuckets;
+    }
+
+    void setFixedBuckets(bool val) {
+        _fixedBuckets = val;
+    }
+
+    bool usesExtendedRange() const {
+        return _usesExtendedRange;
+    }
+
+    void setUsesExtendedRange(bool val) {
+        _usesExtendedRange = val;
+    }
+
     void setIncludeMaxTimeAsMetadata() {
         _sharedState->_bucketUnpacker.setIncludeMaxTimeAsMetadata();
     }

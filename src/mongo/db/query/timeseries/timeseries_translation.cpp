@@ -248,11 +248,12 @@ void translateIndexHintIfRequiredImpl(const boost::intrusive_ptr<ExpressionConte
         request.setHint(rewrittenHintWithStatus.getValue());
     }
 }
+
 // Walks 'pipeline' looking for $_internalUnpackBucket stages that were deserialized without
-// collection-derived parameters (e.g. a pipeline received from a router that lacked index info),
-// and fills them in from the already-acquired 'collPtr'. This is the mechanism by which
-// shard-side executions obtain parameters that can only be derived from the actual collection
-// (currently: the 2dsphere index version map).
+// collection-derived parameters (e.g. a pipeline received from a router that lacked index info,
+// or a view-based timeseries subpipeline whose unpack BSON lacked catalog metadata), and fills
+// them in from the already-acquired 'collPtr'. This is the mechanism by which shard-side
+// executions obtain parameters that can only be derived from the actual collection.
 void populateUnpackBucketStagesFromCollection(Pipeline& pipeline, const CollectionPtr& collPtr) {
     if (!collPtr) {
         return;
@@ -262,12 +263,29 @@ void populateUnpackBucketStagesFromCollection(Pipeline& pipeline, const Collecti
         if (!unpack) {
             continue;
         }
-        if (unpack->has2dsphereIndexVersions()) {
-            continue;
+
+        if (!unpack->has2dsphereIndexVersions()) {
+            boost::optional<StringMap<int>> versions =
+                timeseries::build2dsphereIndexVersionMap(*collPtr.get());
+            unpack->set2dsphereIndexVersions(versions);
         }
-        boost::optional<StringMap<int>> versions =
-            timeseries::build2dsphereIndexVersionMap(*collPtr.get());
-        unpack->set2dsphereIndexVersions(versions);
+
+        if (collPtr->getTimeseriesOptions().has_value()) {
+            if (!unpack->assumeNoMixedSchemaData()) {
+                bool mustConsider = collPtr->getTimeseriesMixedSchemaBucketsState()
+                                        .mustConsiderMixedSchemaBucketsInReads();
+                unpack->setAssumeNoMixedSchemaData(!mustConsider);
+            }
+
+            if (!unpack->fixedBuckets()) {
+                unpack->setFixedBuckets(collPtr->areTimeseriesBucketsFixed());
+            }
+
+            if (!unpack->usesExtendedRange()) {
+                unpack->setUsesExtendedRange(collPtr->getRequiresTimeseriesExtendedRangeSupport());
+            }
+        }
+
         break;
     }
 }
