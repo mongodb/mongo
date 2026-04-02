@@ -422,7 +422,7 @@ fuzztest::Domain<BSONBinDataOwned> ArbitraryColumn() {
  *
  * Example:
  *  FUZZ_TEST(TestSuite, FuzzerTest)
- *      .WithDomains(ArbitraryMD5Type())
+ *      .WithDomains(ArbitrarySensitive())
  *      .WithSeeds({
  *          {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16}
  *      });
@@ -445,7 +445,7 @@ fuzztest::Domain<BSONBinDataOwned> ArbitrarySensitive() {
  *
  * Example:
  *  FUZZ_TEST(TestSuite, FuzzerTest)
- *      .WithDomains(ArbitraryMD5Type())
+ *      .WithDomains(ArbitraryVector())
  *      .WithSeeds({
  *          {1,2,3,4,5},
  *          {6,7,8,9,0},
@@ -469,7 +469,7 @@ fuzztest::Domain<BSONBinDataOwned> ArbitraryVector() {
  *
  * Example:
  *  FUZZ_TEST(TestSuite, FuzzerTest)
- *      .WithDomains(ArbitraryMD5Type())
+ *      .WithDomains(ArbitraryUserData())
  *      .WithSeeds({
  *          {{1,2,3,4,5}, 128},
  *          {{5,4,3,2,1}, 200},

@@ -48,3 +48,6 @@ filters:
   - "priority_port.md":
     approvers:
       - 10gen/server-networking-and-observability
+  - "fuzztest.md":
+    approvers:
+      - 10gen/platsec-server

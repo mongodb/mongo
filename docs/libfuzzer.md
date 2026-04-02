@@ -2,6 +2,8 @@
 title: LibFuzzer
 ---
 
+> **!!NOTE!!**: LibFuzzer is deprecated and should not be used for new fuzz tests. See [FuzzTest](fuzztest.md) for new fuzzing implementations
+
 LibFuzzer is a tool for performing coverage guided fuzzing of C/C++
 code. LibFuzzer will try to trigger AUBSAN failures in a function you
 provide, by repeatedly calling it with a carefully crafted byte array as
@@ -11,6 +13,8 @@ mutate high scoring inputs in order to gradually cover more and more
 possible behavior.
 
 # When to use LibFuzzer
+
+> **!!NOTE!!**: LibFuzzer is deprecated and should not be used for new fuzz tests. See [FuzzTest](fuzztest.md) for new fuzzing implementations
 
 LibFuzzer is great for testing functions which accept a opaque blob of
 untrusted user-provided data.
