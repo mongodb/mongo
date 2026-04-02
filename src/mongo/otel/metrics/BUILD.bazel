@@ -117,6 +117,32 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_library(
+    name = "otel_metric_name_validation",
+    srcs = ["otel_metric_name_validation.cpp"],
+    deps = ["//src/mongo:base"],
+)
+
+mongo_cc_library(
+    name = "server_status_metric_name_validation",
+    srcs = ["server_status_metric_name_validation.cpp"],
+    deps = ["//src/mongo:base"],
+)
+
+mongo_cc_unit_test(
+    name = "otel_metric_name_validation_test",
+    srcs = ["otel_metric_name_validation_test.cpp"],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [":otel_metric_name_validation"],
+)
+
+mongo_cc_unit_test(
+    name = "server_status_metric_name_validation_test",
+    srcs = ["server_status_metric_name_validation_test.cpp"],
+    tags = ["mongo_unittest_first_group"],
+    deps = [":server_status_metric_name_validation"],
+)
+
+mongo_cc_library(
     name = "metric_unit",
     srcs = ["metric_unit.cpp"],
     deps = ["//src/mongo:base"],
@@ -344,5 +370,7 @@ test_suite(
         ":metrics_service_test",
         ":metrics_test_util_test",
         ":metrics_updown_counter_test",
+        ":otel_metric_name_validation_test",
+        ":server_status_metric_name_validation_test",
     ],
 )
