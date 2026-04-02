@@ -3,7 +3,7 @@
  * not get blocked as long as the coordinator is not engaging the critical section.
  *
  * @tags: [
- *   requires_fcv_83,
+ *   requires_fcv_90,
  *   featureFlagReshardingSkipCloningAndApplyingIfApplicable,
  * ]
  */
@@ -49,9 +49,7 @@ const failpoints = [
     "pauseBeforeTellDonorToRefresh",
     "pauseAfterInsertCoordinatorDoc",
     "pauseBeforeCTHolderInitialization",
-    // TODO (SERVER-104494, SERVER-104258): Test this failpoint when enabling
-    // featureFlagReshardingCloneNoRefresh.
-    // "reshardingPauseBeforeTellingRecipientsToClone",
+    "reshardingPauseBeforeTellingRecipientsToClone",
 ];
 const waitForFailPointTimeout = kDefaultWaitForFailPointTimeout * (isSlowBuild(configPrimary) + 1);
 

@@ -1,13 +1,6 @@
 /**
  * Tests that _flushReshardingStateChange command retries sharding metadata refresh on transient
  * errors until there is a failover.
- * @tags: [
- *   # The future-git-tag variant runs dist-test/bin/mongod with a fictional FCV=100.0,
- *   # causing the FCV-gated featureFlagReshardingCloneNoRefresh to appear disabled
- *   # even when set via setParameter.
- *   # TODO (SERVER-118488): Remove once the feature flag has an explicit version.
- *   future_git_tag_incompatible,
- * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
@@ -150,6 +143,12 @@ function testRetryOnTransientError(st, {enableCloneNoRefresh}) {
 
     fp0.off();
     fp1.off();
+
+    try {
+        testColl.drop();
+    } catch (e) {
+        /* best-effort cleanup */
+    }
 }
 
 function testStopRetryingOnFailover(st, {enableCloneNoRefresh}) {
@@ -214,6 +213,12 @@ function testStopRetryingOnFailover(st, {enableCloneNoRefresh}) {
 
     fp0.off();
     fp1.off();
+
+    try {
+        testColl.drop();
+    } catch (e) {
+        /* best-effort cleanup */
+    }
 }
 
 function runTests({enableCloneNoRefresh}) {

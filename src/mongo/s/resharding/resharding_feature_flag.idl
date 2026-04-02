@@ -128,7 +128,8 @@ feature_flags:
         mod_visibility: public
         description: "Feature flag to enable not using shard version refresh for resharding's clone phase."
         cpp_varname: gFeatureFlagReshardingCloneNoRefresh
-        default: false
+        default: true
+        version: 9.0
         fcv_gated: true
         check_against_fcv: legacy_fcv_snapshot_only
     featureFlagReshardingInitNoRefresh:

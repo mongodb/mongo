@@ -1449,8 +1449,9 @@ protected:
 
     void setupFeatureFlags(const TestOptions& testOptions) {
         _cloneNoRefreshController.reset();
-        if (testOptions.driveCloneNoRefresh) {
-            _cloneNoRefreshController.emplace("featureFlagReshardingCloneNoRefresh", true);
+        if (!testOptions.driveCloneNoRefresh) {
+            _cloneNoRefreshController.emplace("featureFlagReshardingCloneNoRefresh",
+                                              /* enabled */ false);
         }
     }
 

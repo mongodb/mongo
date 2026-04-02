@@ -1215,9 +1215,6 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest, ClearReshardingFilteringMeta
 }
 
 TEST_F(ReshardingDonorRecipientCommonTest, ProcessRecipientFieldsForCloningNoRefresh) {
-    RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
-        "featureFlagReshardingCloneNoRefresh", true);
-
     testProcessRecipientFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
                                kThisShard.getShardId() /* primaryShard */,
                                boost::none /* performVerification */,
@@ -1226,9 +1223,6 @@ TEST_F(ReshardingDonorRecipientCommonTest, ProcessRecipientFieldsForCloningNoRef
 }
 
 TEST_F(ReshardingDonorRecipientCommonTest, ProcessDonorFieldsRefreshCreatesEvenWithInitNoRefresh) {
-    RAIIServerParameterControllerForTest initNoRefreshController(
-        "featureFlagReshardingInitNoRefresh", true);
-
     testProcessDonorFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
                            kOtherShard.getShardId() /* primaryShard */,
                            boost::none /* performVerification */,

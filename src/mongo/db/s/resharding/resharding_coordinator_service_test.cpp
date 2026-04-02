@@ -1983,13 +1983,11 @@ TEST_F(ReshardingCoordinatorServiceTest, CoordinatorHonorsCriticalSectionTimeout
                        ErrorCodes::ReshardingCriticalSectionTimeout);
 }
 
-TEST_F(ReshardingCoordinatorServiceTest, FeatureFlagReshardingCloneNoRefreshSendsCloneCmd) {
+TEST_F(ReshardingCoordinatorServiceTest, ReshardingSendsCloneCmdNotRefresh) {
     const std::vector<CoordinatorStateEnum> states = {
         CoordinatorStateEnum::kPreparingToDonate,
     };
 
-    RAIIServerParameterControllerForTest noRefreshFeatureFlagController(
-        "featureFlagReshardingCloneNoRefresh", true);
     auto pauseBeforeTellingRecipientsToClone =
         globalFailPointRegistry().find("reshardingPauseBeforeTellingRecipientsToClone");
     auto timesEnteredFailPoint =
