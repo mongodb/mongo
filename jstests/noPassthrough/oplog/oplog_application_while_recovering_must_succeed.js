@@ -29,6 +29,11 @@ function runTest(op, result) {
     rst.initiate();
     let conn = rst.getPrimary();
 
+    // On Windows builds, triggering a failure will result in writing a minidump, disable this.
+    for (const replicaConnection of [rst.getPrimary(), ...rst.getSecondaries()]) {
+        replicaConnection.getDB("test").adminCommand({setParameter: 1, win32MinidumpEnabled: false});
+    }
+
     // Construct a valid oplog entry.
     function constructOplogEntry(oplog) {
         const lastOplogEntry = oplog.find().sort({ts: -1}).limit(1).toArray()[0];

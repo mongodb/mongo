@@ -28,6 +28,8 @@
 
 global:
     cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/util/exception_filter_win32.h"
     configs:
         section: "Windows Service Control Manager options"
         source: [yaml, cli, ini]
@@ -72,3 +74,14 @@ configs:
         short_name: servicePassword
         arg_vartype: String
         redact: true
+
+server_parameters:
+    win32MinidumpEnabled:
+        description: "Enables or disables Windows minidump generation. This should be used to disable minidumps for testing recovery behavior."
+        set_at: ["startup", "runtime"]
+        cpp_vartype: Atomic<bool>
+        cpp_varname: gWin32MinidumpEnabled
+        default: true
+        test_only: true
+        redact: false
+        on_update: onUpdateWin32MinidumpEnabled

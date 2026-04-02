@@ -70,6 +70,9 @@ IndexBuildTest.assertIndexBuildCurrentOpContents(secondaryDB, opId, (op) => {
 // "Index build: completed successfully"
 checkLog.containsJson(primary, 20663);
 
+// On Windows builds, triggering a failure will result in writing a minidump, disable this.
+secondaryDB.adminCommand({setParameter: 1, win32MinidumpEnabled: false});
+
 // Kill the index build.
 assert.commandWorked(secondaryDB.killOp(opId));
 

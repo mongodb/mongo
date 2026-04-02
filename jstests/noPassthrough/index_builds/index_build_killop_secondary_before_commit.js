@@ -53,6 +53,11 @@ function killopIndexBuildOnSecondaryOnFailpoint(rst, failpointName, shouldSuccee
     // Resume index build to the desired failpoint, and kill it.
     IndexBuildTest.resumeIndexBuilds(secondary);
     fp.wait();
+
+    // On Windows builds, triggering a failure will result in writing a minidump, disable this.
+    secondaryDB.adminCommand({setParameter: 1, win32MinidumpEnabled: false});
+
+    // Kill it
     assert.commandWorked(secondaryDB.killOp(opId));
 
     if (shouldSucceed) {

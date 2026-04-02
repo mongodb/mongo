@@ -39,6 +39,7 @@
 
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
@@ -51,15 +52,34 @@
 
 namespace mongo {
 
-HMODULE hDbgHelp{};
+namespace {
+AtomicWord<bool> win32MinidumpEnabled{true};
+}  // namespace
+
+void setWin32MinidumpEnabled(bool enabled) {
+    win32MinidumpEnabled.store(enabled);
+}
+
+static HMODULE hDbgHelp{};
 
 namespace {
 /* create a process dump.
     To use, load up windbg.  Set your symbol and source path.
     Open the crash dump file.  To see the crashing context, use .ecxr in windbg
-    TODO: consider using WER local dumps in the future
+    Consider using WER local dumps in the future
     */
 void doMinidumpWithException(struct _EXCEPTION_POINTERS* exceptionInfo) {
+
+    // Writing to the minidump may require loading symbols from additional libraries. There is a
+    // risk that this process can lead to DLL "loader lock" where the process will not terminate
+    // immediately upon failing to write the minidump to file. For automated testing that
+    // intentionally triggers server termination, this fail point can prevent the process from
+    // hanging by bypassing the normal dump creation.
+    if (MONGO_unlikely(!win32MinidumpEnabled.load())) {
+        LOGV2(12230000, "*** minidump creation is disabled");
+        return;
+    }
+
     WCHAR moduleFileName[MAX_PATH];
 
     DWORD ret = GetModuleFileNameW(nullptr, &moduleFileName[0], ARRAYSIZE(moduleFileName));
@@ -198,12 +218,23 @@ void setWindowsUnhandledExceptionFilter() {
     filtLast = SetUnhandledExceptionFilter(exceptionFilter);
 }
 
+Status onUpdateWin32MinidumpEnabled(bool newValue) {
+    setWin32MinidumpEnabled(newValue);
+    return Status::OK();
+}
+
 }  // namespace mongo
 
 #else
 
+#include "mongo/base/status.h"
+
 namespace mongo {
 void setWindowsUnhandledExceptionFilter() {}
+void setWin32MinidumpEnabled(bool) {}
+Status onUpdateWin32MinidumpEnabled(bool) {
+    return Status::OK();
+}
 }  // namespace mongo
 
 #endif  // _WIN32

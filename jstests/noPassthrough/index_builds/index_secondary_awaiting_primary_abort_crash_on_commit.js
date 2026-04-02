@@ -82,6 +82,9 @@ const failpointHangBeforeSignalingAbort = configureFailPoint(
 // Unblock index builds, causing the failIndexBuildWithError failpoint to throw an error.
 failpointHangAfterInit.off();
 
+// On Windows builds, triggering a failure will result in writing a minidump, disable this.
+secondaryDB.adminCommand({setParameter: 1, win32MinidumpEnabled: false});
+
 // Unblock primary commit.
 failpointHangBeforeCommitPrimary.off();
 

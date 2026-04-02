@@ -53,6 +53,11 @@ const rollbackNode = primary;
 const syncSource = rst.getSecondaries()[0];
 let resyncNode = rst.getSecondaries()[1];
 
+// On Windows builds, triggering a failure will result in writing a minidump, disable this.
+for (const replicaConnection of [rst.getPrimary(), ...rst.getSecondaries()]) {
+    replicaConnection.getDB(dbName).adminCommand({setParameter: 1, win32MinidumpEnabled: false});
+}
+
 // Disable replication on node 2 so that only nodes 1 and 3 have the next write.
 stopServerReplication(syncSource);
 
