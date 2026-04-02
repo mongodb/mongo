@@ -202,4 +202,33 @@ function assertMigrationComplete(dbName, ns, coll, shard0DB, expectedCount) {
     st.s.getDB(dbName).coll.drop();
 }
 
+// Test 8: Recipient pre-cloning check detects MaxKey orphans with wider-than-shard-key index.
+// checkForExistingDocumentsInRange must extend bounds to the index width so that a MaxKey
+// document already present on the recipient is detected even when the index is wider than
+// the shard key.
+{
+    const {dbName, ns, coll, shard0DB} = setupCollection("recipient_wider_idx", {x: 1});
+    assert.commandWorked(coll.createIndex({x: 1, y: 1}));
+    assert.commandWorked(coll.dropIndex({x: 1}));
+
+    assert.commandWorked(coll.insert({_id: "normal", x: 5}));
+
+    // Directly insert a MaxKey orphan on shard1 (bypassing mongos to simulate an orphan from
+    // a prior buggy migration that left it behind). The wider index {x:1, y:1} means the scan
+    // must use extendRangeBound to pad bounds to match the index width.
+    assert.commandWorked(st.shard1.getDB(dbName).coll.insert({_id: "orphan_maxkey", x: MaxKey(), y: 42}));
+
+    // Migrate the chunk [MinKey, MaxKey) from shard0 to shard1. The recipient's pre-cloning
+    // check should detect the orphaned MaxKey document and abort the migration. Without the
+    // extendRangeBound fix, the wider index scan would use {x: MaxKey, y: MinKey} as the
+    // upper bound, missing the orphan at {x: MaxKey, y: 42}.
+    const result = st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true});
+
+    assert.commandFailed(result);
+
+    // Clean up the orphan directly on shard1.
+    assert.commandWorked(st.shard1.getDB(dbName).coll.remove({_id: "orphan_maxkey"}));
+    coll.drop();
+}
+
 st.stop();

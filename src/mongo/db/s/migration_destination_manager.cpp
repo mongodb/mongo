@@ -232,7 +232,7 @@ std::string stateToString(MigrationDestinationManager::State state) {
  * Checks if an upsert of a remote document will override a local document with the same _id but in
  * a different range on this shard. Must be in WriteContext to avoid races and DBHelper errors.
  *
- * TODO: Could optimize this check out if sharding on _id.
+ * TODO SERVER-123300: Could optimize this check out if sharding on _id.
  */
 bool willOverrideLocalId(OperationContext* opCtx,
                          const NamespaceString& nss,
@@ -2234,13 +2234,22 @@ boost::optional<BSONObj> MigrationDestinationManager::checkForExistingDocumentsI
                           << " on collection " << nss.toStringForErrorMsg(),
             shardKeyIdx);
 
-    // Use InternalPlanner to scan the shard key index within the range.
+    // Extend bounds to match the index width and strip field names for the index scan.
+    // When the range max is the global max (all fields MaxKey), use makeUpperInclusive=true
+    // so trailing fields are padded with MaxKey instead of MinKey, and use inclusive upper
+    // bound so the scan detects documents whose shard key is exactly MaxKey. See SERVER-121533.
+    const KeyPattern kp(shardKeyIdx->keyPattern());
+    const bool isMaxGlobal = kp.isGlobalMax(max);
+    const auto extendedMin = Helpers::toKeyFormat(kp.extendRangeBound(min, false));
+    const auto extendedMax = Helpers::toKeyFormat(kp.extendRangeBound(max, isMaxGlobal));
+    const auto boundInclusion = isMaxGlobal ? BoundInclusion::kIncludeBothStartAndEndKeys
+                                            : BoundInclusion::kIncludeStartKeyOnly;
     auto exec = InternalPlanner::shardKeyIndexScan(opCtx,
                                                    collection,
                                                    *shardKeyIdx,
-                                                   min,
-                                                   max,
-                                                   BoundInclusion::kIncludeStartKeyOnly,
+                                                   extendedMin,
+                                                   extendedMax,
+                                                   boundInclusion,
                                                    PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                    InternalPlanner::FORWARD);
 
