@@ -705,6 +705,7 @@ mongo_cc_library(
         # please add that library as a private libdep of
         # mongos_initializers.
         "mongos_options_idl",
+        "//src/mongo/db:startup_check_rseq",
         "//src/mongo/client:remote_command_targeter",
         "//src/mongo/db/admission:queues_server_status_section",
         "//src/mongo/db:audit",

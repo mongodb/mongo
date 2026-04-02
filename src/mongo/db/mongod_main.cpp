@@ -211,6 +211,7 @@
 #include "mongo/db/session/session_killer.h"
 #include "mongo/db/session_manager_mongod.h"
 #include "mongo/db/set_change_stream_state_coordinator.h"
+#include "mongo/db/startup_check_rseq.h"
 #include "mongo/db/startup_recovery.h"
 #include "mongo/db/startup_warnings_mongod.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
@@ -2156,6 +2157,8 @@ int mongod_main(int argc, char* argv[]) {
     waitForDebugger();
 
     setupSignalHandlers();
+
+    validateRseqKernelCompat();
 
     srand(static_cast<unsigned>(curTimeMicros64()));  // NOLINT
 
