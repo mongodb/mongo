@@ -784,7 +784,14 @@ std::set<std::string> ChangeStreamViewDefinitionEventTransformation::getFieldNam
 Document ChangeStreamViewDefinitionEventTransformation::applyTransformation(
     const Document& input) const {
     Value ts = input[repl::OplogEntry::kTimestampFieldName];
-    auto opType = getOplogOpType(input);
+    const auto opType = [&]() -> repl::OpTypeEnum {
+        try {
+            return getOplogOpType(input);
+        } catch (const DBException& ex) {
+            // If parsing the oplog entry type failed, bail out.
+            throwUnsupportedOplogEntryType(input, ex.toString());
+        }
+    }();
 
     StringData operationType;
     // Used to populate the 'operationDescription' output field and also to build the resumeToken

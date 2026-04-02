@@ -178,7 +178,7 @@ private:
     std::unique_ptr<ChangeStreamDefaultEventTransformation> _defaultEventBuilder;
     std::unique_ptr<ChangeStreamViewDefinitionEventTransformation> _viewNsEventBuilder;
 
-    bool _isSingleCollStream;
+    const bool _isSingleCollStream;
 };
 
 }  // namespace mongo

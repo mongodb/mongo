@@ -559,6 +559,32 @@ DEATH_TEST_REGEX(ChangeStreamEventTransformDeathTest,
     ASSERT_THROWS_CODE(transformer.applyTransformation(oplogDoc), AssertionException, 11352603);
 }
 
+DEATH_TEST_REGEX(ChangeStreamEventTransformDeathTest,
+                 TestUnsupportedOplogEntryTypeForViewTransformer,
+                 "Tripwire assertion.*11352603.*Unsupported oplog entry type") {
+    // Need to create an invalid oplog 'document' here, as 'repl::OplogEntry' validates its invalid
+    // and cannot be created with an invalid "op" type.
+    const NamespaceString viewNss = NamespaceString::makeSystemDotViewsNamespace(
+        DatabaseName::createDatabaseName_forTest(boost::none, "test"));
+    auto oplogDoc = Document{{"op", "unexpected"_sd}, {"ns", viewNss.toString_forTest()}};
+
+    // Cannot simply call 'applyTransformation()' here, because it expects a 'repl::OplogEntry'
+    // parameter. Thus create the transformer manually here in order to execute it with an invalid
+    // input 'Document'.
+    DocumentSourceChangeStreamSpec spec;
+    spec.setStartAtOperationTime(kDefaultTs);
+
+    // It is required that we have a non-collection change stream for the view event transformer to
+    // get involved.
+    const NamespaceString streamNss = NamespaceString::makeCollectionlessAggregateNSS(
+        DatabaseName::createDatabaseName_forTest(boost::none, "testDB"));
+    ChangeStreamEventTransformer transformer(make_intrusive<ExpressionContextForTest>(streamNss),
+                                             spec);
+
+    // Applying the transform on unsupported "applyOps" oplog entry should throw a TAssert.
+    ASSERT_THROWS_CODE(transformer.applyTransformation(oplogDoc), AssertionException, 11352603);
+}
+
 TEST(
     ChangeStreamEventTransformTest,
     Given_UpgradeDowngradeViewlessTimeseriesOplogEntry_When_Transforming_Then_RenameCollectionEventWithRegularCollectionNameIsProduced) {
