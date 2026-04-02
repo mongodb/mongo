@@ -39,7 +39,8 @@ boost::optional<SharedSemiFuture<void>> runWithSessionCheckedOutIfStatementNotEx
     LogicalSessionId lsid,
     TxnNumber txnNumber,
     boost::optional<StmtId> stmtId,
-    unique_function<void()> callable) {
+    unique_function<void()> callable,
+    bool ignoreIncompleteHistory) {
     {
         auto lk = stdx::lock_guard(*opCtx->getClient());
         opCtx->setLogicalSessionId(std::move(lsid));
@@ -57,10 +58,6 @@ boost::optional<SharedSemiFuture<void>> runWithSessionCheckedOutIfStatementNotEx
                                        boost::none /* autocommit */,
                                        TransactionParticipant::TransactionActions::kNone);
 
-        if (stmtId && txnParticipant.checkStatementExecuted(opCtx, *stmtId)) {
-            // Skip the incoming statement because it has already been logged locally.
-            return boost::none;
-        }
     } catch (const ExceptionFor<ErrorCodes::TransactionTooOld>&) {
         // txnNumber < txnParticipant.o().activeTxnNumber
         return boost::none;
@@ -83,6 +80,24 @@ boost::optional<SharedSemiFuture<void>> runWithSessionCheckedOutIfStatementNotEx
         // This is a retryable write that was executed using an internal transaction and there is
         // a retry in progress.
         return txnParticipant.onConflictingInternalTransactionCompletion(opCtx);
+    }
+
+    if (stmtId) {
+        try {
+            if (txnParticipant.checkStatementExecuted(opCtx, *stmtId)) {
+                // Skip the incoming statement because it has already been logged locally.
+                return boost::none;
+            }
+        } catch (const ExceptionFor<ErrorCodes::IncompleteTransactionHistory>&) {
+            // This indicates that the stmtId is absent from the activeTxnCommittedStatments &
+            // hasIncompleteHistory set to true.
+            // For post-fetch timestamp writes (already executed on the donor but processed by the
+            // ReshardingOplogSessionApplication component on the recipient), a noop including the
+            // executed statement must be inserted by the callable to preserve retryability during
+            // resharding.
+            if (ignoreIncompleteHistory)
+                return boost::none;
+        }
     }
 
     callable();

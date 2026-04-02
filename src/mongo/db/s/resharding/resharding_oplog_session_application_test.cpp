@@ -59,7 +59,9 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
+#include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_oplog_session_application.h"
+#include "mongo/db/s/session_catalog_migration_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
@@ -157,6 +159,26 @@ public:
     void insertOp(OperationContext* opCtx, const BSONObj& oplogBson) {
         DBDirectClient client(opCtx);
         client.insert(_oplogBufferNss, oplogBson);
+    }
+
+    // Writes a dead-end sentinel for (lsid, txnNumber) — exactly what ReshardingTxnCloner does
+    // when it processes a session that had a pre-fetchTimestamp write.  After this call,
+    // fetchActiveTransactionHistory() will return hasIncompleteHistory=true for the session.
+    void insertDeadEndSentinel(OperationContext* opCtx,
+                               LogicalSessionId lsid,
+                               TxnNumber txnNumber) {
+        session_catalog_migration_util::runWithSessionCheckedOutIfStatementNotExecuted(
+            opCtx, std::move(lsid), txnNumber, boost::none /* stmtId */, [opCtx] {
+                if (!TransactionParticipant::get(opCtx).hasIncompleteHistory()) {
+                    resharding::data_copy::updateSessionRecord(
+                        opCtx,
+                        TransactionParticipant::kDeadEndSentinel,
+                        {kIncompleteHistoryStmtId},
+                        boost::none /* preImageOpTime */,
+                        boost::none /* postImageOpTime */,
+                        {} /* sourceNss */);
+                }
+            });
     }
 
     void makeInProgressTxn(OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNumber) {
@@ -1365,6 +1387,66 @@ TEST_F(ReshardingOplogSessionApplicationTest, IgnoreIncomingNonRetryableInternal
 
         auto sessionTxnRecord = findSessionRecord(opCtx.get(), lsid);
         ASSERT_FALSE(bool(sessionTxnRecord));
+    }
+}
+
+// Using a DeadEndSentinel in the recipient oplog to mimic oplog truncation for the purpose of this
+// test. In case the oplog is truncated on the recipient, ensure ReshardingOplogSessionApplication
+// applies the noop through the callable thereby preserving retryability.
+TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteWithDeadEndSentinel) {
+    auto lsid = makeLogicalSessionIdForTest();
+    TxnNumber txnNumber = 100;
+    StmtId postFetchStmtId = 5;
+
+    // Step 1: Simulate TxnCloner writing the dead-end sentinel for (lsid, txnNumber).
+    // This models the recipient state after TxnCloner processes a session that had a
+    // pre-fetchTimestamp write: hasIncompleteHistory=true for every future
+    // fetchActiveTransactionHistory() call on this (lsid, txnNumber).
+    repl::OpTime sentinelOpTime;
+    {
+        auto opCtx = makeOperationContext();
+        insertDeadEndSentinel(opCtx.get(), lsid, txnNumber);
+
+        auto sentinelRecord = findSessionRecord(opCtx.get(), lsid);
+        ASSERT_TRUE(bool(sentinelRecord)) << "Sentinel was not written to config.transactions";
+        sentinelOpTime = sentinelRecord->getLastWriteOpTime();
+    }
+
+    // Step 2: Create an oplog entry representing the post-fetchTimestamp retryable write.
+    auto oplogEntry = makeUpdateOp(BSON("_id" << 1), lsid, txnNumber, {postFetchStmtId});
+    {
+        auto opCtx = makeOperationContext();
+        insertOp(opCtx.get(), oplogEntry.getEntry().toBSON());
+    }
+
+    // Step 3: Apply the post-fetchTimestamp oplog entry via ReshardingOplogSessionApplication.
+    {
+        auto opCtx = makeOperationContext();
+        ReshardingOplogSessionApplication applier{oplogBufferNss()};
+        auto conflictingTxnCompletionFuture = applier.tryApplyOperation(opCtx.get(), oplogEntry);
+        ASSERT_FALSE(bool(conflictingTxnCompletionFuture));
+    }
+
+    // Step 4: Verify a noop was written for postFetchStmtId — not just the sentinel.
+    {
+        auto opCtx = makeOperationContext();
+        auto foundOps = findOplogEntriesNewerThan(opCtx.get(), sentinelOpTime.getTimestamp());
+        ASSERT_EQ(foundOps.size(), 1U)
+            << "Expected exactly one noop for stmtId=" << postFetchStmtId
+            << " (ReshardingOplogSessionApplication must write a noop even when "
+               "hasIncompleteHistory=true due to a pre-fetchTimestamp dead-end sentinel)";
+        checkGeneratedNoop(foundOps[0], lsid, txnNumber, {postFetchStmtId});
+
+        auto sessionTxnRecord = findSessionRecord(opCtx.get(), lsid);
+        ASSERT_TRUE(bool(sessionTxnRecord));
+        checkSessionTxnRecord(*sessionTxnRecord, foundOps[0]);
+    }
+
+    // Step 5: Verify the stmtId is now recognised as "already executed" — the retry is
+    // idempotent.
+    {
+        auto opCtx = makeOperationContext();
+        checkStatementExecutedAndFetchOplogEntry(opCtx.get(), lsid, txnNumber, postFetchStmtId);
     }
 }
 

@@ -181,14 +181,19 @@ boost::optional<SharedSemiFuture<void>> ReshardingOplogSessionApplication::tryAp
     }
 
     return session_catalog_migration_util::runWithSessionCheckedOutIfStatementNotExecuted(
-        opCtx, lsid, txnNumber, stmtIds.front(), [&] {
+        opCtx,
+        lsid,
+        txnNumber,
+        stmtIds.front(),
+        [&] {
             resharding::data_copy::updateSessionRecord(opCtx,
                                                        std::move(o2Field),
                                                        std::move(stmtIds),
                                                        std::move(preImageOpTime),
                                                        std::move(postImageOpTime),
                                                        std::move(sourceNss));
-        });
+        },
+        false /*ignoreIncompleteHistory*/);
 }
 
 }  // namespace mongo

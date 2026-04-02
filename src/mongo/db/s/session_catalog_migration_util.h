@@ -59,7 +59,8 @@ boost::optional<SharedSemiFuture<void>> runWithSessionCheckedOutIfStatementNotEx
     LogicalSessionId lsid,
     TxnNumber txnNumber,
     boost::optional<StmtId> stmtId,
-    unique_function<void()> callable);
+    unique_function<void()> callable,
+    bool ignoreIncompleteHistory = true);
 
 }  // namespace session_catalog_migration_util
 }  // namespace mongo
