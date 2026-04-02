@@ -1548,4 +1548,138 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
     absl::flat_hash_set<FieldPath> exprPaths;
     samplingEstimator.estimateNDV({{.path = "b.c"}});
 }
+
+// Test that estimateCardinality uses the fast path for AND-of-same-path equalities ($all
+// semantics), and that it produces the same result as the generic matcher path.
+TEST_F(SamplingEstimatorTest, EstimateCardinalityAndOfEqualitiesFastPath) {
+    // Build a collection where:
+    //   docs 0..49: f0 = [1, 2, 3]  -> matches $all:[1,2] and $all:[1,2,3] but not $all:[1,2,4]
+    //   docs 50..74: f0 = [1, 3, 5] -> matches $all:[1] and $all:[1,3] but not $all:[1,2]
+    //   docs 75..99: f0 = [2, 4, 6] -> matches $all:[2] but not $all:[1,2]
+    const size_t card = 100;
+    std::vector<BSONObj> docs;
+    for (int i = 0; i < 50; ++i) {
+        docs.push_back(BSON("_id" << i << "f0" << BSON_ARRAY(1 << 2 << 3)));
+    }
+    for (int i = 50; i < 75; ++i) {
+        docs.push_back(BSON("_id" << i << "f0" << BSON_ARRAY(1 << 3 << 5)));
+    }
+    for (int i = 75; i < 100; ++i) {
+        docs.push_back(BSON("_id" << i << "f0" << BSON_ARRAY(2 << 4 << 6)));
+    }
+
+    insertDocuments(kTestNss, docs);
+
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal*/);
+
+    // Use the whole collection as the sample to get deterministic results.
+    SamplingEstimatorForTesting samplingEstimator(operationContext(),
+                                                  colls,
+                                                  kTestNss,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  card,
+                                                  SamplingCEMethodEnum::kRandom,
+                                                  numChunks,
+                                                  makeCardinalityEstimate(card));
+    samplingEstimator.generateSample(ce::NoProjection{});
+
+    // Helper: build AND(EQ(path, v0), EQ(path, v1), ...) and return the CE.
+    // We keep the operand BSONObjs alive for the duration of the estimate call.
+    auto estimateAll = [&](StringData path, std::vector<int> vals) -> double {
+        std::vector<BSONObj> operands;
+        std::vector<std::unique_ptr<EqualityMatchExpression>> eqs;
+        std::vector<std::unique_ptr<MatchExpression>> children;
+        for (int v : vals) {
+            operands.push_back(BSON("x" << v));
+            auto eq = std::make_unique<EqualityMatchExpression>(path, operands.back()["x"]);
+            children.push_back(std::move(eq));
+        }
+        AndMatchExpression andExpr(std::move(children));
+        return samplingEstimator.estimateCardinality(&andExpr).cardinality().v();
+    };
+
+    // $all:[1,2] -> only docs 0..49 match (50 docs).
+    ASSERT_EQ(estimateAll("f0"_sd, {1, 2}), 50.0);
+
+    // $all:[1,2,3] -> only docs 0..49 match (50 docs).
+    ASSERT_EQ(estimateAll("f0"_sd, {1, 2, 3}), 50.0);
+
+    // $all:[1,3] -> docs 0..74 match (75 docs: both [1,2,3] and [1,3,5] contain 1 and 3).
+    ASSERT_EQ(estimateAll("f0"_sd, {1, 3}), 75.0);
+
+    // $all:[2] -> docs 0..49 and 75..99 match (75 docs: [1,2,3] and [2,4,6] contain 2).
+    ASSERT_EQ(estimateAll("f0"_sd, {2}), 75.0);
+
+    // $all:[1,2,4] -> no docs match (0 docs).
+    ASSERT_EQ(estimateAll("f0"_sd, {1, 2, 4}), 0.0);
+}
+
+TEST_F(SamplingEstimatorTest, EstimateRIDsWithAllFastPath) {
+    const size_t card = 4000;
+    insertDocuments(kTestNss, createDocuments(card));
+    const size_t sampleSize = 400;
+
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+
+    SamplingEstimatorForTesting samplingEstimator(operationContext(),
+                                                  colls,
+                                                  kTestNss,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  sampleSize,
+                                                  SamplingCEMethodEnum::kRandom,
+                                                  numChunks,
+                                                  makeCardinalityEstimate(card));
+    samplingEstimator.generateSample(ce::NoProjection{});
+
+    // Each document has arr: [10, 20, 30, 40, 50]. A $all query is canonically represented as an
+    // AndMatchExpression of EqualityMatchExpressions on the same path, which exercises the fast
+    // path in estimateRIDs.
+
+    // {arr: {$all: [10, 20]}}: all documents have both values, so selectivity is 100%.
+    {
+        auto op1 = BSON("$eq" << 10);
+        auto op2 = BSON("$eq" << 20);
+        auto eq1 = std::make_unique<EqualityMatchExpression>("arr"_sd, op1["$eq"]);
+        auto eq2 = std::make_unique<EqualityMatchExpression>("arr"_sd, op2["$eq"]);
+        AndMatchExpression andExpr;
+        andExpr.add(std::move(eq1));
+        andExpr.add(std::move(eq2));
+
+        // Index bounds on arr covering the leading $all value (10); all documents are in bounds
+        // because every document's arr array contains 10.
+        OrderedIntervalList oil("arr");
+        oil.intervals.push_back(IndexBoundsBuilder::makePointInterval(BSON("" << 10)));
+        IndexBounds bounds;
+        bounds.fields.push_back(oil);
+
+        auto ce = samplingEstimator.estimateRIDs(bounds, &andExpr);
+        samplingEstimator.assertEstimateInConfidenceInterval(ce, 1.0 * card);
+    }
+
+    // {arr: {$all: [10, 60]}}: no document has 60 in arr, so no documents match.
+    {
+        auto op1 = BSON("$eq" << 10);
+        auto op2 = BSON("$eq" << 60);
+        auto eq1 = std::make_unique<EqualityMatchExpression>("arr"_sd, op1["$eq"]);
+        auto eq2 = std::make_unique<EqualityMatchExpression>("arr"_sd, op2["$eq"]);
+        AndMatchExpression andExpr;
+        andExpr.add(std::move(eq1));
+        andExpr.add(std::move(eq2));
+
+        // Index bounds on arr covering 10; all documents are in bounds, but none satisfy the
+        // $all predicate because 60 is absent from every document's arr array.
+        OrderedIntervalList oil("arr");
+        oil.intervals.push_back(IndexBoundsBuilder::makePointInterval(BSON("" << 10)));
+        IndexBounds bounds;
+        bounds.fields.push_back(oil);
+
+        auto ce = samplingEstimator.estimateRIDs(bounds, &andExpr);
+        ASSERT_EQ(ce.toDouble(), 0.0);
+    }
+}
+
 }  // namespace mongo::ce

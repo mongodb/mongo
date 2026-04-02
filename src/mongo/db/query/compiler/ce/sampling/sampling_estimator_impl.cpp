@@ -31,6 +31,8 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelement_comparator.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/stages/generic_scan.h"
@@ -40,12 +42,15 @@
 #include "mongo/db/exec/sbe/stages/random_scan.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/ce/ce_common.h"
 #include "mongo/db/query/compiler/ce/sampling/math.h"
 #include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
+#include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
@@ -579,6 +584,111 @@ void SamplingEstimatorImpl::generateSampleBySeqScanningForTesting() {
     return;
 }
 
+namespace {
+
+/**
+ * If 'expr' is an AndMatchExpression whose children are all EqualityMatchExpressions on the same
+ * field path without a collator, returns {path, values}. Otherwise returns boost::none.
+ *
+ * This is the common shape produced when parsing $all
+ */
+boost::optional<std::pair<StringData, std::vector<BSONElement>>> tryExtractAllEqualities(
+    const MatchExpression* expr) {
+    if (expr->matchType() != MatchExpression::AND || expr->numChildren() == 0) {
+        return boost::none;
+    }
+
+    // Because the CanonicalQuery normalizer sorts $and children by match type (contiguously) and
+    // then by path within the same type, we can use the first and last children to check for some
+    // early return conditions:
+    //   - If not all children are EQ, then either/both of these children will not be EQ.
+    //   - If not all children share the same path, then the first and last children will have
+    //   different paths.
+    //   - This optimization won't work if the common path is a dotted path.
+    // Either mismatch means this $and cannot be the all-equalities fast path.
+    const auto* first = expr->getChild(0);
+    const auto* last = expr->getChild(expr->numChildren() - 1);
+    if (first->matchType() != MatchExpression::EQ || last->matchType() != MatchExpression::EQ) {
+        return boost::none;
+    }
+    if (first->path() != last->path()) {
+        return boost::none;
+    }
+    if (first->path().find('.') != std::string::npos) {
+        return boost::none;
+    }
+
+    // All children share the same path (verified by the check above).
+    // We still need to scan every child for collation and null/undefined rejections.
+    StringData commonPath = static_cast<const EqualityMatchExpression*>(first)->path();
+    std::vector<BSONElement> values;
+    values.reserve(expr->numChildren());
+
+    for (size_t i = 0; i < expr->numChildren(); ++i) {
+        const auto* child = expr->getChild(i);
+
+        if constexpr (kDebugBuild) {
+            tassert(11293000,
+                    "Expected MatchExpression::EQ",
+                    child->matchType() == MatchExpression::EQ);
+        }
+
+        const auto* eq = static_cast<const EqualityMatchExpression*>(child);
+        // Reject collation-sensitive equalities: collator affects comparison semantics.
+        if (eq->getCollator() != nullptr) {
+            return boost::none;
+        }
+        // Reject null/undefined equalities: EqualityMatchExpression has special "null ==
+        // missing" semantics for these types that our simple value comparison doesn't replicate.
+        const BSONElement& rhs = eq->getData();
+        if (rhs.isNull() || rhs.type() == BSONType::undefined) {
+            return boost::none;
+        }
+        values.push_back(rhs);
+    }
+
+    return std::make_pair(commonPath, std::move(values));
+}
+
+/**
+ * Returns true if 'doc' has a field at 'path' that contains ALL values in 'sortedRequiredValues'
+ * (which must already be sorted by BSONElementCmpWithoutField order. Note that deduplication is not
+ * necessary because $all queries are deduplicated during boolean simplification).
+ *
+ * For array-valued fields, uses a merge-scan to check all values are contained in the field,
+ * iterating through each vector once.
+ */
+bool documentMatchesAllEqualities(const BSONObj& doc,
+                                  StringData path,
+                                  const std::vector<BSONElement>& sortedRequiredValues) {
+    BSONElementCmpWithoutField cmp;
+
+    BSONElement fieldElem = doc.getField(path);
+    if (fieldElem.eoo()) {
+        return false;
+    }
+
+    // Collect the document field's values into a sorted vector for merge-scan.
+    std::vector<BSONElement> docValues;
+    if (fieldElem.type() == BSONType::array) {
+        BSONObjIterator iter(fieldElem.embeddedObject());
+        while (iter.more()) {
+            docValues.push_back(iter.next());
+        }
+    } else {
+        docValues.push_back(fieldElem);
+    }
+    std::sort(docValues.begin(), docValues.end(), cmp);
+
+    return std::includes(docValues.begin(),
+                         docValues.end(),
+                         sortedRequiredValues.begin(),
+                         sortedRequiredValues.end(),
+                         cmp);
+}
+
+}  // namespace
+
 CardinalityEstimate SamplingEstimatorImpl::estimateCardinality(const MatchExpression* expr) const {
     tassert(10981500,
             "Sample must be generated before calling estimateCardinality()",
@@ -593,17 +703,36 @@ CardinalityEstimate SamplingEstimatorImpl::estimateCardinality(const MatchExpres
 
     size_t cnt = 0;
     size_t errorCount = 0;
-    for (const auto& doc : _sample) {
-        auto result = tryMatchesBSON(expr, doc);
-        if (!result) {
-            errorCount++;
-            continue;
+
+    // Fast path for AND of equalities on the same field path (the common shape produced by $all).
+    // The generic matcher evaluates each equality by scanning the array independently: O(N *
+    // array_length) per sample document. This fast path sorts the required values once and uses a
+    // merge-scan per document.
+    if (auto allEqInfo = tryExtractAllEqualities(expr)) {
+        auto& [path, requiredValues] = *allEqInfo;
+        BSONElementCmpWithoutField cmp;
+        // Sort required values
+        std::sort(requiredValues.begin(), requiredValues.end(), cmp);
+        for (const auto& doc : _sample) {
+            if (documentMatchesAllEqualities(doc, path, requiredValues)) {
+                ++cnt;
+            }
         }
-        if (*result) {
-            cnt++;
+    } else {
+        for (const auto& doc : _sample) {
+            auto result = tryMatchesBSON(expr, doc);
+            if (!result) {
+                errorCount++;
+                continue;
+            }
+            if (*result) {
+                cnt++;
+            }
         }
     }
+
     CardinalityEstimate estimate = makeScaledEstimate(cnt, errorCount, _sampleSize, getCollCard());
+
     LOGV2_DEBUG(9756604,
                 5,
                 "SamplingCE cardinality (# docs) for MatchExpression",
@@ -707,6 +836,18 @@ CardinalityEstimate SamplingEstimatorImpl::estimateRIDs(const IndexBounds& bound
         checkSampleContainsMatchExpressionFields(_topLevelSampleFieldNames, expr);
         checkSampleContainsIndexBoundsFields(_topLevelSampleFieldNames, bounds);
     }
+    // Precompute the fast-path info for AND-of-same-path-equalities outside the bounds loop.
+    boost::optional<std::pair<StringData, std::vector<BSONElement>>> allEqInfo;
+    std::vector<BSONElement> sortedRequiredValues;
+    if (expr) {
+        allEqInfo = tryExtractAllEqualities(expr);
+        if (allEqInfo) {
+            BSONElementCmpWithoutField cmp;
+            sortedRequiredValues = allEqInfo->second;
+            std::sort(sortedRequiredValues.begin(), sortedRequiredValues.end(), cmp);
+        }
+    }
+
     size_t count = 0;
     size_t errorCount = 0;
     forDocumentsMatchingBounds(bounds, _sample, [&](const BSONObj& document) {
@@ -714,16 +855,22 @@ CardinalityEstimate SamplingEstimatorImpl::estimateRIDs(const IndexBounds& bound
         if (expr == nullptr) {
             count++;
             return true;
-        }
-        auto result = tryMatchesBSON(expr, document);
-        if (!result) {
-            errorCount++;
+        } else if (allEqInfo) {
+            if (documentMatchesAllEqualities(document, allEqInfo->first, sortedRequiredValues)) {
+                count++;
+            }
+            return true;
+        } else {
+            auto result = tryMatchesBSON(expr, document);
+            if (!result) {
+                errorCount++;
+                return true;
+            }
+            if (*result) {
+                count++;
+            }
             return true;
         }
-        if (*result) {
-            count++;
-        }
-        return true;
     });
     CardinalityEstimate estimate =
         makeScaledEstimate(count, errorCount, _sampleSize, getCollCard());
