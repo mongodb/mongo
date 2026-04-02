@@ -103,27 +103,6 @@ tasks:
             --runAllFeatureFlagTests
 
   - <<: *antithesis_task_template
-    name: antithesis_jstestfuzz_sharded_with_config_transitions
-    tags:
-      [
-        "assigned_to_jira_team_devprod_correctness",
-        "experimental",
-        "antithesis",
-      ]
-    commands:
-      - func: "do setup"
-      - func: "do setup for antithesis"
-      - func: "set up remote credentials"
-        vars:
-          aws_key_remote: ${aws_key}
-          aws_secret_remote: ${aws_secret}
-      - func: "antithesis image build and push"
-        vars:
-          suite: jstestfuzz_sharded_with_config_transitions
-          resmoke_args: >-
-            --runAllFeatureFlagTests
-
-  - <<: *antithesis_task_template
     name: antithesis_concurrency_sharded_multi_stmt_txn_stepdown_terminate_kill_primary
     tags:
       [
@@ -207,55 +186,7 @@ tasks:
           resmoke_args: >-
             --runAllFeatureFlagTests
 
-  - <<: *antithesis_task_template
-    name: antithesis_concurrency_sharded_stepdown_terminate_kill_primary_with_balancer_config_shard
-    tags:
-      [
-        "assigned_to_jira_team_devprod_correctness",
-        "experimental",
-        "antithesis",
-      ]
-    commands:
-      - func: "do setup"
-      - func: "do setup for antithesis"
-      - func: "set up remote credentials"
-        vars:
-          aws_key_remote: ${aws_key}
-          aws_secret_remote: ${aws_secret}
-      - func: "antithesis image build and push"
-        vars:
-          suite: concurrency_sharded_stepdown_terminate_kill_primary_with_balancer
-          resmoke_args: >-
-            --configShard=0
-            --numShards=2
-            --excludeWithAnyTags=config_shard_incompatible
-            --runAllFeatureFlagTests
-
-  - <<: *antithesis_task_template
-    name: antithesis_config_fuzzer_concurrency_sharded_replication
-    tags:
-      [
-        "assigned_to_jira_team_devprod_correctness",
-        "experimental",
-        "antithesis",
-      ]
-    commands:
-      - func: "do setup"
-      - func: "do setup for antithesis"
-      - func: "set up remote credentials"
-        vars:
-          aws_key_remote: ${aws_key}
-          aws_secret_remote: ${aws_secret}
-      - func: "antithesis image build and push"
-        vars:
-          suite: concurrency_sharded_replication
-          resmoke_args: >-
-            --fuzzMongodConfigs=normal
-            --fuzzMongosConfigs=normal
-            --fuzzRuntimeParams
-            --excludeWithAnyTags=does_not_support_config_fuzzer
-            --runAllFeatureFlagTests
-
+  # This task is disabled in the daily "MongoDB Core Server" antithesis runs
   - <<: *antithesis_task_template
     name: antithesis_core
     tags:
@@ -302,27 +233,6 @@ tasks:
             --disableFeatureFlags=featureFlagBlockDirectSystemBucketsAccess
 
   - <<: *antithesis_task_template
-    name: antithesis_jstestfuzz_sharded
-    tags:
-      [
-        "assigned_to_jira_team_devprod_correctness",
-        "experimental",
-        "antithesis",
-      ]
-    commands:
-      - func: "do setup"
-      - func: "do setup for antithesis"
-      - func: "set up remote credentials"
-        vars:
-          aws_key_remote: ${aws_key}
-          aws_secret_remote: ${aws_secret}
-      - func: "antithesis image build and push"
-        vars:
-          suite: jstestfuzz_sharded
-          resmoke_args: >-
-            --runAllFeatureFlagTests
-
-  - <<: *antithesis_task_template
     name: antithesis_jstestfuzz_replication_continuous_stepdown
     tags:
       [
@@ -364,6 +274,7 @@ tasks:
           resmoke_args: >-
             --runAllFeatureFlagTests
 
+  # TODO(SERVER-123169): Fix test composer and re-enable this task
   - <<: *antithesis_task_template
     name: antithesis_replica_sets_basic_js_commands
     tags:
@@ -386,6 +297,7 @@ tasks:
             --runAllFeatureFlagTests
           antithesis_test_composer_dir: basic_js_commands
 
+  # TODO(SERVER-123169): Fix test composer and re-enable this task
   - <<: *antithesis_task_template
     name: antithesis_sharding_basic_js_commands
     tags:
