@@ -55,10 +55,23 @@ server_parameters:
         cpp_vartype: std::string
         redact: false
         default: none
+    openTelemetryPrometheusMetricsPath:
+        description: >-
+            Enable OpenTelemetry with metrics exported in prometheus format to the provided file
+            path. If both openTelemetryPrometheusMetricsPath and
+            openTelemetryPrometheusMetricsDirectory are set, this parameter takes precedence. Note 
+            that sometimes there will be temporary files created with a ".tmp" extension alongside 
+            the metrics file, but unlike the metrics file these are only transiently present.
+        set_at: startup
+        cpp_varname: gOpenTelemetryPrometheusMetricsPath
+        cpp_vartype: std::string
+        redact: false
     openTelemetryPrometheusMetricsDirectory:
         description: >-
             Enable OpenTelemetry with metrics exported in prometheus format to a file in the
-            provided directory. The file will have the pattern "mongodb-prometheus-metrics.txt".
+            provided directory. The file will have the name "mongodb-prometheus-metrics.txt".
+            Prefer openTelemetryPrometheusMetricsPath, which accepts the full file path directly;
+            if both are set, openTelemetryPrometheusMetricsPath takes precedence.
             Note that sometimes there will be temporary files created with a ".tmp" extension, but
             unlike the metrics file these are only transiently present.
         set_at: startup

@@ -161,17 +161,14 @@ Status initializeFile(const std::string& directory) {
     return Status::OK();
 }
 
-Status initializePrometheusFileExporter(const std::string& directory,
-                                        const int maxConsecutiveFailures) {
+Status initializePrometheusFileExporter(const std::string& path, const int maxConsecutiveFailures) {
     LOGV2(11730000,
           "Initializing OpenTelemetry metrics using Prometheus file exporter",
-          "directory"_attr = directory,
+          "path"_attr = path,
           "maxConsecutiveFailures"_attr = maxConsecutiveFailures);
 
     StatusWith<std::unique_ptr<metrics_sdk::PushMetricExporter>> prometheusFileExporter =
-        createPrometheusFileExporter(
-            /*filename=*/fmt::format("{}/mongodb-prometheus-metrics.txt", directory),
-            {.maxConsecutiveFailures = maxConsecutiveFailures});
+        createPrometheusFileExporter(path, {.maxConsecutiveFailures = maxConsecutiveFailures});
     if (!prometheusFileExporter.isOK()) {
         return prometheusFileExporter.getStatus();
     }
@@ -199,14 +196,17 @@ void validateOptions() {
             gFeatureFlagOtelMetrics.isEnabled() ||
                 (gOpenTelemetryMetricsHttpEndpoint.empty() &&
                  gOpenTelemetryMetricsDirectory.empty() &&
+                 gOpenTelemetryPrometheusMetricsPath.empty() &&
                  gOpenTelemetryPrometheusMetricsDirectory.empty()));
 
     uassert(ErrorCodes::InvalidOptions,
             "At most one of openTelemetryMetricsHttpEndpoint, openTelemetryMetricsDirectory, and "
-            "gOpenTelemetryPrometheusMetricsDirectory may be set",
+            "(openTelemetryPrometheusMetricsPath or openTelemetryPrometheusMetricsDirectory) may "
+            "be set",
             absl::c_count(std::vector<bool>{!gOpenTelemetryMetricsHttpEndpoint.empty(),
                                             !gOpenTelemetryMetricsDirectory.empty(),
-                                            !gOpenTelemetryPrometheusMetricsDirectory.empty()},
+                                            !gOpenTelemetryPrometheusMetricsPath.empty() ||
+                                                !gOpenTelemetryPrometheusMetricsDirectory.empty()},
                           true) <= 1);
 
     uassert(ErrorCodes::InvalidOptions,
@@ -237,7 +237,7 @@ Status initialize() {
 
         const bool httpEndpointParameterSet = !gOpenTelemetryMetricsHttpEndpoint.empty();
         const bool directoryParameterSet = !gOpenTelemetryMetricsDirectory.empty();
-        const bool prometheusExporterParamaterSet =
+        const bool prometheusExporterParamaterSet = !gOpenTelemetryPrometheusMetricsPath.empty() ||
             !gOpenTelemetryPrometheusMetricsDirectory.empty();
 
         if (!httpEndpointParameterSet && !directoryParameterSet &&
@@ -251,9 +251,19 @@ Status initialize() {
                 return initializeHttp(gOpenTelemetryMetricsHttpEndpoint,
                                       gOpenTelemetryMetricsCompression);
             } else if (prometheusExporterParamaterSet) {
+                if (!gOpenTelemetryPrometheusMetricsDirectory.empty() &&
+                    !gOpenTelemetryPrometheusMetricsPath.empty()) {
+                    LOGV2(12291200,
+                          "Both openTelemetryPrometheusMetricsPath and "
+                          "openTelemetryPrometheusMetricsDirectory are set, so "
+                          "openTelemetryPrometheusMetricsPath takes precedence.");
+                }
+                const std::string prometheusPath = !gOpenTelemetryPrometheusMetricsPath.empty()
+                    ? gOpenTelemetryPrometheusMetricsPath
+                    : fmt::format("{}/mongodb-prometheus-metrics.txt",
+                                  gOpenTelemetryPrometheusMetricsDirectory);
                 return initializePrometheusFileExporter(
-                    gOpenTelemetryPrometheusMetricsDirectory,
-                    gOpenTelemetryPrometheusFileExportMaxConsecutiveFailures);
+                    prometheusPath, gOpenTelemetryPrometheusFileExportMaxConsecutiveFailures);
             }
             return initializeFile(gOpenTelemetryMetricsDirectory);
         }();
