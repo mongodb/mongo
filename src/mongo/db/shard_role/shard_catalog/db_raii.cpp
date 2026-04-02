@@ -111,9 +111,6 @@ bool haveAcquiredConsistentCatalogAndSnapshot(
     // inconsistent state), permit the read (ex: FTDC thread).
     bool canKillOperationInStepdown = opCtx->getClient()->canKillOperationInStepdown();
 
-    // Confirm this thread has not been interrupted already.
-    opCtx->checkForInterrupt();
-
     return catalogEqual && replTermEqual &&
         (noStateTransition || isStateTransitionThread || !canKillOperationInStepdown);
 }
