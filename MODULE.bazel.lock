@@ -249,7 +249,7 @@
   "moduleExtensions": {
     "//bazel:bzlmod.bzl%bazel_features_deps": {
       "general": {
-        "bzlTransitiveDigest": "Yzq+2OTgVNEOXdAUgB6rEQOTzZf4IceAvW4FzohMemU=",
+        "bzlTransitiveDigest": "b1B2bIzXlPvl8SJTBFZQ5y9fsy329NT9VfGxeT+0kIs=",
         "usagesDigest": "c91kQ0HotoA1cfwWU4KaqCoQU7lT6pGi6XPGIiMGkb0=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -356,7 +356,7 @@
     },
     "//bazel:bzlmod.bzl%setup_mongo_python_toolchains": {
       "general": {
-        "bzlTransitiveDigest": "Yzq+2OTgVNEOXdAUgB6rEQOTzZf4IceAvW4FzohMemU=",
+        "bzlTransitiveDigest": "b1B2bIzXlPvl8SJTBFZQ5y9fsy329NT9VfGxeT+0kIs=",
         "usagesDigest": "bUxjq9n+hj2YwYT/lcSP4lHyQ2GVy5JpFgSmddUqUZg=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -469,7 +469,7 @@
     },
     "//bazel/toolchains/cc/mongo_apple:mongo_apple_toolchain.bzl%setup_mongo_apple_toolchain_extension": {
       "general": {
-        "bzlTransitiveDigest": "ASO5jHTQAZWxY2QuGXUdOSq8baWqRswAucSy6R+RUiM=",
+        "bzlTransitiveDigest": "prC/JJsAXBG1G496p5kkWHsc/N9DlmJkOn0sluvxsWQ=",
         "usagesDigest": "5jcfs/9THcpOV6/hUDotupzJpZQonmplpSQs1TbLgaU=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -2002,7 +2002,7 @@
     },
     "@@rules_rust~//crate_universe/private:internal_extensions.bzl%cu_nr": {
       "general": {
-        "bzlTransitiveDigest": "oj71N3YUzUnTad1+abu2Or4iicrpqSz//uW1Wt7TDss=",
+        "bzlTransitiveDigest": "O/B6V91E8A6mlyh6/5gWjHkpB4k9DnbIaz1NSXXpkes=",
         "usagesDigest": "t9RsYFKNxo9gStVX1j5ojkf0uAuLQJGxkv4ItCvnQ+4=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},

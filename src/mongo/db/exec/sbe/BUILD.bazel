@@ -341,7 +341,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/sbe/vm:code_fragment_test.cpp",
     ],
     copts = select({
-        "@platforms//cpu:ppc": ["-Wno-uninitialized"],
+        "@platforms//cpu:ppc64le": ["-Wno-uninitialized"],
         "//conditions:default": [],
     }),
     data = [

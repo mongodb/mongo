@@ -1,5 +1,5 @@
 {
-  "checksum": "95bde56a98991ddcd851234754f0f75d9e29aa5f163ceb6d1f44c9765b56c0c1",
+  "checksum": "3f9f6df1cb06f48e680aaee2104babb36932f1d9d5d333d28d197a2709725a6d",
   "crates": {
     "addr2line 0.25.1": {
       "name": "addr2line",
@@ -1777,13 +1777,25 @@
                 "target": "libc"
               }
             ],
-            "x86_64-unknown-linux-gnu": [
+            "powerpc64le-unknown-linux-gnu": [
               {
                 "id": "libc 0.2.183",
                 "target": "libc"
               }
             ],
-            "x86_64-unknown-nixos-gnu": [
+            "s390x-unknown-linux-gnu": [
+              {
+                "id": "libc 0.2.183",
+                "target": "libc"
+              }
+            ],
+            "x86_64-apple-darwin": [
+              {
+                "id": "libc 0.2.183",
+                "target": "libc"
+              }
+            ],
+            "x86_64-unknown-linux-gnu": [
               {
                 "id": "libc 0.2.183",
                 "target": "libc"
@@ -4561,10 +4573,16 @@
             "aarch64-unknown-linux-gnu": [
               "default"
             ],
-            "x86_64-unknown-linux-gnu": [
+            "powerpc64le-unknown-linux-gnu": [
               "default"
             ],
-            "x86_64-unknown-nixos-gnu": [
+            "s390x-unknown-linux-gnu": [
+              "default"
+            ],
+            "x86_64-apple-darwin": [
+              "default"
+            ],
+            "x86_64-unknown-linux-gnu": [
               "default"
             ]
           }
@@ -8697,14 +8715,6 @@
         "compile_data_glob": [
           "**"
         ],
-        "crate_features": {
-          "common": [
-            "default",
-            "std",
-            "unsafe-eval"
-          ],
-          "selects": {}
-        },
         "deps": {
           "common": [
             {
@@ -8960,10 +8970,13 @@
             "aarch64-apple-darwin": [
               "extra_traits"
             ],
-            "wasm32-unknown-unknown": [
+            "powerpc64le-unknown-linux-gnu": [
               "extra_traits"
             ],
-            "wasm32-wasip1": [
+            "s390x-unknown-linux-gnu": [
+              "extra_traits"
+            ],
+            "x86_64-apple-darwin": [
               "extra_traits"
             ]
           }
@@ -9199,8 +9212,6 @@
         ],
         "crate_features": {
           "common": [
-            "elf",
-            "errno",
             "general",
             "if_ether",
             "ioctl",
@@ -9209,7 +9220,16 @@
             "no_std",
             "xdp"
           ],
-          "selects": {}
+          "selects": {
+            "aarch64-unknown-linux-gnu": [
+              "elf",
+              "errno"
+            ],
+            "x86_64-unknown-linux-gnu": [
+              "elf",
+              "errno"
+            ]
+          }
         },
         "edition": "2021",
         "version": "0.4.15"
@@ -9252,9 +9272,6 @@
         ],
         "crate_features": {
           "common": [
-            "auxvec",
-            "elf",
-            "errno",
             "general",
             "if_ether",
             "ioctl",
@@ -9264,7 +9281,18 @@
             "prctl",
             "xdp"
           ],
-          "selects": {}
+          "selects": {
+            "aarch64-unknown-linux-gnu": [
+              "auxvec",
+              "elf",
+              "errno"
+            ],
+            "x86_64-unknown-linux-gnu": [
+              "auxvec",
+              "elf",
+              "errno"
+            ]
+          }
         },
         "edition": "2021",
         "version": "0.12.1"
@@ -11545,13 +11573,25 @@
                 "target": "libc"
               }
             ],
-            "x86_64-unknown-linux-gnu": [
+            "powerpc64le-unknown-linux-gnu": [
               {
                 "id": "libc 0.2.183",
                 "target": "libc"
               }
             ],
-            "x86_64-unknown-nixos-gnu": [
+            "s390x-unknown-linux-gnu": [
+              {
+                "id": "libc 0.2.183",
+                "target": "libc"
+              }
+            ],
+            "x86_64-apple-darwin": [
+              {
+                "id": "libc 0.2.183",
+                "target": "libc"
+              }
+            ],
+            "x86_64-unknown-linux-gnu": [
               {
                 "id": "libc 0.2.183",
                 "target": "libc"
@@ -12031,25 +12071,10 @@
             "perf-inline",
             "perf-literal",
             "perf-onepass",
-            "std"
+            "std",
+            "unicode-perl"
           ],
-          "selects": {
-            "aarch64-apple-darwin": [
-              "unicode-perl"
-            ],
-            "aarch64-unknown-linux-gnu": [
-              "unicode-perl"
-            ],
-            "x86_64-pc-windows-msvc": [
-              "unicode-perl"
-            ],
-            "x86_64-unknown-linux-gnu": [
-              "unicode-perl"
-            ],
-            "x86_64-unknown-nixos-gnu": [
-              "unicode-perl"
-            ]
-          }
+          "selects": {}
         },
         "deps": {
           "common": [
@@ -12127,30 +12152,11 @@
             "perf-literal-multisubstring",
             "perf-literal-substring",
             "std",
-            "syntax"
+            "syntax",
+            "unicode-perl",
+            "unicode-word-boundary"
           ],
-          "selects": {
-            "aarch64-apple-darwin": [
-              "unicode-perl",
-              "unicode-word-boundary"
-            ],
-            "aarch64-unknown-linux-gnu": [
-              "unicode-perl",
-              "unicode-word-boundary"
-            ],
-            "x86_64-pc-windows-msvc": [
-              "unicode-perl",
-              "unicode-word-boundary"
-            ],
-            "x86_64-unknown-linux-gnu": [
-              "unicode-perl",
-              "unicode-word-boundary"
-            ],
-            "x86_64-unknown-nixos-gnu": [
-              "unicode-perl",
-              "unicode-word-boundary"
-            ]
-          }
+          "selects": {}
         },
         "deps": {
           "common": [
@@ -12210,65 +12216,18 @@
         ],
         "crate_features": {
           "common": [
-            "std"
+            "default",
+            "std",
+            "unicode",
+            "unicode-age",
+            "unicode-bool",
+            "unicode-case",
+            "unicode-gencat",
+            "unicode-perl",
+            "unicode-script",
+            "unicode-segment"
           ],
-          "selects": {
-            "aarch64-apple-darwin": [
-              "default",
-              "unicode",
-              "unicode-age",
-              "unicode-bool",
-              "unicode-case",
-              "unicode-gencat",
-              "unicode-perl",
-              "unicode-script",
-              "unicode-segment"
-            ],
-            "aarch64-unknown-linux-gnu": [
-              "default",
-              "unicode",
-              "unicode-age",
-              "unicode-bool",
-              "unicode-case",
-              "unicode-gencat",
-              "unicode-perl",
-              "unicode-script",
-              "unicode-segment"
-            ],
-            "x86_64-pc-windows-msvc": [
-              "default",
-              "unicode",
-              "unicode-age",
-              "unicode-bool",
-              "unicode-case",
-              "unicode-gencat",
-              "unicode-perl",
-              "unicode-script",
-              "unicode-segment"
-            ],
-            "x86_64-unknown-linux-gnu": [
-              "default",
-              "unicode",
-              "unicode-age",
-              "unicode-bool",
-              "unicode-case",
-              "unicode-gencat",
-              "unicode-perl",
-              "unicode-script",
-              "unicode-segment"
-            ],
-            "x86_64-unknown-nixos-gnu": [
-              "default",
-              "unicode",
-              "unicode-age",
-              "unicode-bool",
-              "unicode-case",
-              "unicode-gencat",
-              "unicode-perl",
-              "unicode-script",
-              "unicode-segment"
-            ]
-          }
+          "selects": {}
         },
         "edition": "2021",
         "version": "0.8.10"
@@ -12595,7 +12554,7 @@
                 "target": "windows_sys"
               }
             ],
-            "wasm32-unknown-unknown": [
+            "powerpc64le-unknown-linux-gnu": [
               {
                 "id": "errno 0.3.14",
                 "target": "errno",
@@ -12606,7 +12565,18 @@
                 "target": "libc"
               }
             ],
-            "wasm32-wasip1": [
+            "s390x-unknown-linux-gnu": [
+              {
+                "id": "errno 0.3.14",
+                "target": "errno",
+                "alias": "libc_errno"
+              },
+              {
+                "id": "libc 0.2.183",
+                "target": "libc"
+              }
+            ],
+            "x86_64-apple-darwin": [
               {
                 "id": "errno 0.3.14",
                 "target": "errno",
@@ -12685,12 +12655,12 @@
           "common": [
             "alloc",
             "default",
+            "event",
             "net",
             "std"
           ],
           "selects": {
             "aarch64-apple-darwin": [
-              "event",
               "fs",
               "mm",
               "param",
@@ -12700,7 +12670,6 @@
               "time"
             ],
             "aarch64-unknown-linux-gnu": [
-              "event",
               "fs",
               "mm",
               "param",
@@ -12709,33 +12678,34 @@
               "thread",
               "time"
             ],
-            "wasm32-unknown-unknown": [
+            "powerpc64le-unknown-linux-gnu": [
               "fs",
+              "mm",
+              "param",
               "process",
               "termios",
+              "thread",
               "time"
             ],
-            "wasm32-wasip1": [
+            "s390x-unknown-linux-gnu": [
               "fs",
+              "mm",
+              "param",
               "process",
               "termios",
+              "thread",
               "time"
             ],
-            "x86_64-pc-windows-msvc": [
-              "event"
+            "x86_64-apple-darwin": [
+              "fs",
+              "mm",
+              "param",
+              "process",
+              "termios",
+              "thread",
+              "time"
             ],
             "x86_64-unknown-linux-gnu": [
-              "event",
-              "fs",
-              "mm",
-              "param",
-              "process",
-              "termios",
-              "thread",
-              "time"
-            ],
-            "x86_64-unknown-nixos-gnu": [
-              "event",
               "fs",
               "mm",
               "param",
@@ -12803,7 +12773,7 @@
                 "target": "windows_sys"
               }
             ],
-            "wasm32-unknown-unknown": [
+            "powerpc64le-unknown-linux-gnu": [
               {
                 "id": "errno 0.3.14",
                 "target": "errno",
@@ -12814,7 +12784,18 @@
                 "target": "libc"
               }
             ],
-            "wasm32-wasip1": [
+            "s390x-unknown-linux-gnu": [
+              {
+                "id": "errno 0.3.14",
+                "target": "errno",
+                "alias": "libc_errno"
+              },
+              {
+                "id": "libc 0.2.183",
+                "target": "libc"
+              }
+            ],
+            "x86_64-apple-darwin": [
               {
                 "id": "errno 0.3.14",
                 "target": "errno",
@@ -14719,23 +14700,15 @@
               "target": "fastrand"
             },
             {
+              "id": "getrandom 0.4.2",
+              "target": "getrandom"
+            },
+            {
               "id": "once_cell 1.21.4",
               "target": "once_cell"
             }
           ],
           "selects": {
-            "aarch64-apple-darwin": [
-              {
-                "id": "getrandom 0.4.2",
-                "target": "getrandom"
-              }
-            ],
-            "aarch64-unknown-linux-gnu": [
-              {
-                "id": "getrandom 0.4.2",
-                "target": "getrandom"
-              }
-            ],
             "cfg(any(unix, target_os = \"wasi\"))": [
               {
                 "id": "rustix 1.1.4",
@@ -14746,30 +14719,6 @@
               {
                 "id": "windows-sys 0.61.2",
                 "target": "windows_sys"
-              }
-            ],
-            "wasm32-wasip1": [
-              {
-                "id": "getrandom 0.4.2",
-                "target": "getrandom"
-              }
-            ],
-            "x86_64-pc-windows-msvc": [
-              {
-                "id": "getrandom 0.4.2",
-                "target": "getrandom"
-              }
-            ],
-            "x86_64-unknown-linux-gnu": [
-              {
-                "id": "getrandom 0.4.2",
-                "target": "getrandom"
-              }
-            ],
-            "x86_64-unknown-nixos-gnu": [
-              {
-                "id": "getrandom 0.4.2",
-                "target": "getrandom"
               }
             ]
           }
@@ -15291,6 +15240,10 @@
             {
               "id": "pin-project-lite 0.2.17",
               "target": "pin_project_lite"
+            },
+            {
+              "id": "socket2 0.6.3",
+              "target": "socket2"
             }
           ],
           "selects": {
@@ -15302,10 +15255,6 @@
               {
                 "id": "signal-hook-registry 1.4.8",
                 "target": "signal_hook_registry"
-              },
-              {
-                "id": "socket2 0.6.3",
-                "target": "socket2"
               }
             ],
             "aarch64-unknown-linux-gnu": [
@@ -15316,17 +15265,39 @@
               {
                 "id": "signal-hook-registry 1.4.8",
                 "target": "signal_hook_registry"
+              }
+            ],
+            "powerpc64le-unknown-linux-gnu": [
+              {
+                "id": "libc 0.2.183",
+                "target": "libc"
               },
               {
-                "id": "socket2 0.6.3",
-                "target": "socket2"
+                "id": "signal-hook-registry 1.4.8",
+                "target": "signal_hook_registry"
+              }
+            ],
+            "s390x-unknown-linux-gnu": [
+              {
+                "id": "libc 0.2.183",
+                "target": "libc"
+              },
+              {
+                "id": "signal-hook-registry 1.4.8",
+                "target": "signal_hook_registry"
+              }
+            ],
+            "x86_64-apple-darwin": [
+              {
+                "id": "libc 0.2.183",
+                "target": "libc"
+              },
+              {
+                "id": "signal-hook-registry 1.4.8",
+                "target": "signal_hook_registry"
               }
             ],
             "x86_64-pc-windows-msvc": [
-              {
-                "id": "socket2 0.6.3",
-                "target": "socket2"
-              },
               {
                 "id": "windows-sys 0.61.2",
                 "target": "windows_sys"
@@ -15340,24 +15311,6 @@
               {
                 "id": "signal-hook-registry 1.4.8",
                 "target": "signal_hook_registry"
-              },
-              {
-                "id": "socket2 0.6.3",
-                "target": "socket2"
-              }
-            ],
-            "x86_64-unknown-nixos-gnu": [
-              {
-                "id": "libc 0.2.183",
-                "target": "libc"
-              },
-              {
-                "id": "signal-hook-registry 1.4.8",
-                "target": "signal_hook_registry"
-              },
-              {
-                "id": "socket2 0.6.3",
-                "target": "socket2"
               }
             ]
           }
@@ -16899,13 +16852,6 @@
         "compile_data_glob": [
           "**"
         ],
-        "crate_features": {
-          "common": [
-            "default",
-            "std"
-          ],
-          "selects": {}
-        },
         "edition": "2018",
         "version": "0.11.1+wasi-snapshot-preview1"
       },
@@ -17201,13 +17147,6 @@
         "compile_data_glob": [
           "**"
         ],
-        "crate_features": {
-          "common": [
-            "default",
-            "std"
-          ],
-          "selects": {}
-        },
         "deps": {
           "common": [
             {
@@ -18457,6 +18396,40 @@
                 "target": "rustix"
               }
             ],
+            "powerpc64le-unknown-linux-gnu": [
+              {
+                "id": "memfd 0.6.5",
+                "target": "memfd"
+              },
+              {
+                "id": "rustix 1.1.4",
+                "target": "rustix"
+              }
+            ],
+            "s390x-unknown-linux-gnu": [
+              {
+                "id": "memfd 0.6.5",
+                "target": "memfd"
+              },
+              {
+                "id": "rustix 1.1.4",
+                "target": "rustix"
+              }
+            ],
+            "x86_64-apple-darwin": [
+              {
+                "id": "ittapi 0.4.0",
+                "target": "ittapi"
+              },
+              {
+                "id": "mach2 0.4.3",
+                "target": "mach2"
+              },
+              {
+                "id": "rustix 1.1.4",
+                "target": "rustix"
+              }
+            ],
             "x86_64-pc-windows-msvc": [
               {
                 "id": "ittapi 0.4.0",
@@ -18468,20 +18441,6 @@
               }
             ],
             "x86_64-unknown-linux-gnu": [
-              {
-                "id": "ittapi 0.4.0",
-                "target": "ittapi"
-              },
-              {
-                "id": "memfd 0.6.5",
-                "target": "memfd"
-              },
-              {
-                "id": "rustix 1.1.4",
-                "target": "rustix"
-              }
-            ],
-            "x86_64-unknown-nixos-gnu": [
               {
                 "id": "ittapi 0.4.0",
                 "target": "ittapi"
@@ -19868,13 +19827,19 @@
                 "target": "rustix"
               }
             ],
-            "x86_64-unknown-linux-gnu": [
+            "powerpc64le-unknown-linux-gnu": [
               {
                 "id": "rustix 1.1.4",
                 "target": "rustix"
               }
             ],
-            "x86_64-unknown-nixos-gnu": [
+            "s390x-unknown-linux-gnu": [
+              {
+                "id": "rustix 1.1.4",
+                "target": "rustix"
+              }
+            ],
+            "x86_64-unknown-linux-gnu": [
               {
                 "id": "rustix 1.1.4",
                 "target": "rustix"
@@ -20917,6 +20882,10 @@
               "target": "anyhow"
             },
             {
+              "id": "openvino 0.9.1",
+              "target": "openvino"
+            },
+            {
               "id": "thiserror 2.0.18",
               "target": "thiserror"
             },
@@ -20938,38 +20907,10 @@
             }
           ],
           "selects": {
-            "aarch64-apple-darwin": [
-              {
-                "id": "openvino 0.9.1",
-                "target": "openvino"
-              }
-            ],
-            "aarch64-unknown-linux-gnu": [
-              {
-                "id": "openvino 0.9.1",
-                "target": "openvino"
-              }
-            ],
             "x86_64-pc-windows-msvc": [
-              {
-                "id": "openvino 0.9.1",
-                "target": "openvino"
-              },
               {
                 "id": "windows 0.52.0",
                 "target": "windows"
-              }
-            ],
-            "x86_64-unknown-linux-gnu": [
-              {
-                "id": "openvino 0.9.1",
-                "target": "openvino"
-              }
-            ],
-            "x86_64-unknown-nixos-gnu": [
-              {
-                "id": "openvino 0.9.1",
-                "target": "openvino"
               }
             ]
           }
@@ -25515,9 +25456,6 @@
             "aarch64-unknown-linux-gnu": [
               "@@mongo_toolchain_v5//:libclang"
             ],
-            "powerpc-unknown-linux-gnu": [
-              "@@mongo_toolchain_v5//:libclang"
-            ],
             "s390x-unknown-linux-gnu": [
               "@@mongo_toolchain_v5//:libclang"
             ],
@@ -25553,10 +25491,6 @@
           "common": {},
           "selects": {
             "aarch64-unknown-linux-gnu": {
-              "BINDGEN_EXTRA_CLANG_ARGS": "-isystem$${pwd}/external/mongo_toolchain_v5/stow/llvm-v5/lib/clang/19/include",
-              "LIBCLANG_PATH": "$(execpath @@mongo_toolchain_v5//:libclang)"
-            },
-            "powerpc-unknown-linux-gnu": {
               "BINDGEN_EXTRA_CLANG_ARGS": "-isystem$${pwd}/external/mongo_toolchain_v5/stow/llvm-v5/lib/clang/19/include",
               "LIBCLANG_PATH": "$(execpath @@mongo_toolchain_v5//:libclang)"
             },
@@ -25608,32 +25542,39 @@
     "cfg(all(any(target_arch = \"x86_64\", target_arch = \"arm64ec\"), target_env = \"msvc\", not(windows_raw_dylib)))": [
       "x86_64-pc-windows-msvc"
     ],
-    "cfg(all(any(target_os = \"android\", target_os = \"linux\"), any(rustix_use_libc, miri, not(all(target_os = \"linux\", any(target_endian = \"little\", target_arch = \"s390x\"), any(target_arch = \"arm\", all(target_arch = \"aarch64\", target_pointer_width = \"64\"), target_arch = \"riscv64\", all(rustix_use_experimental_asm, target_arch = \"powerpc64\"), all(rustix_use_experimental_asm, target_arch = \"s390x\"), all(rustix_use_experimental_asm, target_arch = \"mips\"), all(rustix_use_experimental_asm, target_arch = \"mips32r6\"), all(rustix_use_experimental_asm, target_arch = \"mips64\"), all(rustix_use_experimental_asm, target_arch = \"mips64r6\"), target_arch = \"x86\", all(target_arch = \"x86_64\", target_pointer_width = \"64\")))))))": [],
-    "cfg(all(any(target_os = \"linux\", target_os = \"android\"), any(rustix_use_libc, miri, not(all(target_os = \"linux\", any(target_endian = \"little\", any(target_arch = \"s390x\", target_arch = \"powerpc\")), any(target_arch = \"arm\", all(target_arch = \"aarch64\", target_pointer_width = \"64\"), target_arch = \"riscv64\", all(rustix_use_experimental_asm, target_arch = \"powerpc\"), all(rustix_use_experimental_asm, target_arch = \"powerpc64\"), all(rustix_use_experimental_asm, target_arch = \"s390x\"), all(rustix_use_experimental_asm, target_arch = \"mips\"), all(rustix_use_experimental_asm, target_arch = \"mips32r6\"), all(rustix_use_experimental_asm, target_arch = \"mips64\"), all(rustix_use_experimental_asm, target_arch = \"mips64r6\"), target_arch = \"x86\", all(target_arch = \"x86_64\", target_pointer_width = \"64\")))))))": [],
+    "cfg(all(any(target_os = \"android\", target_os = \"linux\"), any(rustix_use_libc, miri, not(all(target_os = \"linux\", any(target_endian = \"little\", target_arch = \"s390x\"), any(target_arch = \"arm\", all(target_arch = \"aarch64\", target_pointer_width = \"64\"), target_arch = \"riscv64\", all(rustix_use_experimental_asm, target_arch = \"powerpc64\"), all(rustix_use_experimental_asm, target_arch = \"s390x\"), all(rustix_use_experimental_asm, target_arch = \"mips\"), all(rustix_use_experimental_asm, target_arch = \"mips32r6\"), all(rustix_use_experimental_asm, target_arch = \"mips64\"), all(rustix_use_experimental_asm, target_arch = \"mips64r6\"), target_arch = \"x86\", all(target_arch = \"x86_64\", target_pointer_width = \"64\")))))))": [
+      "powerpc64le-unknown-linux-gnu",
+      "s390x-unknown-linux-gnu"
+    ],
+    "cfg(all(any(target_os = \"linux\", target_os = \"android\"), any(rustix_use_libc, miri, not(all(target_os = \"linux\", any(target_endian = \"little\", any(target_arch = \"s390x\", target_arch = \"powerpc\")), any(target_arch = \"arm\", all(target_arch = \"aarch64\", target_pointer_width = \"64\"), target_arch = \"riscv64\", all(rustix_use_experimental_asm, target_arch = \"powerpc\"), all(rustix_use_experimental_asm, target_arch = \"powerpc64\"), all(rustix_use_experimental_asm, target_arch = \"s390x\"), all(rustix_use_experimental_asm, target_arch = \"mips\"), all(rustix_use_experimental_asm, target_arch = \"mips32r6\"), all(rustix_use_experimental_asm, target_arch = \"mips64\"), all(rustix_use_experimental_asm, target_arch = \"mips64r6\"), target_arch = \"x86\", all(target_arch = \"x86_64\", target_pointer_width = \"64\")))))))": [
+      "powerpc64le-unknown-linux-gnu",
+      "s390x-unknown-linux-gnu"
+    ],
     "cfg(all(any(target_os = \"linux\", target_os = \"android\"), not(any(all(target_os = \"linux\", target_env = \"\"), getrandom_backend = \"custom\", getrandom_backend = \"linux_raw\", getrandom_backend = \"rdrand\", getrandom_backend = \"rndr\"))))": [
       "aarch64-unknown-linux-gnu",
-      "x86_64-unknown-linux-gnu",
-      "x86_64-unknown-nixos-gnu"
+      "powerpc64le-unknown-linux-gnu",
+      "s390x-unknown-linux-gnu",
+      "x86_64-unknown-linux-gnu"
     ],
     "cfg(all(not(rustix_use_libc), not(miri), target_os = \"linux\", any(target_endian = \"little\", any(target_arch = \"s390x\", target_arch = \"powerpc\")), any(target_arch = \"arm\", all(target_arch = \"aarch64\", target_pointer_width = \"64\"), target_arch = \"riscv64\", all(rustix_use_experimental_asm, target_arch = \"powerpc\"), all(rustix_use_experimental_asm, target_arch = \"powerpc64\"), all(rustix_use_experimental_asm, target_arch = \"s390x\"), all(rustix_use_experimental_asm, target_arch = \"mips\"), all(rustix_use_experimental_asm, target_arch = \"mips32r6\"), all(rustix_use_experimental_asm, target_arch = \"mips64\"), all(rustix_use_experimental_asm, target_arch = \"mips64r6\"), target_arch = \"x86\", all(target_arch = \"x86_64\", target_pointer_width = \"64\"))))": [
       "aarch64-unknown-linux-gnu",
-      "x86_64-unknown-linux-gnu",
-      "x86_64-unknown-nixos-gnu"
+      "x86_64-unknown-linux-gnu"
     ],
     "cfg(all(not(rustix_use_libc), not(miri), target_os = \"linux\", any(target_endian = \"little\", target_arch = \"s390x\"), any(target_arch = \"arm\", all(target_arch = \"aarch64\", target_pointer_width = \"64\"), target_arch = \"riscv64\", all(rustix_use_experimental_asm, target_arch = \"powerpc64\"), all(rustix_use_experimental_asm, target_arch = \"s390x\"), all(rustix_use_experimental_asm, target_arch = \"mips\"), all(rustix_use_experimental_asm, target_arch = \"mips32r6\"), all(rustix_use_experimental_asm, target_arch = \"mips64\"), all(rustix_use_experimental_asm, target_arch = \"mips64r6\"), target_arch = \"x86\", all(target_arch = \"x86_64\", target_pointer_width = \"64\"))))": [
       "aarch64-unknown-linux-gnu",
-      "x86_64-unknown-linux-gnu",
-      "x86_64-unknown-nixos-gnu"
+      "x86_64-unknown-linux-gnu"
     ],
     "cfg(all(not(windows), any(rustix_use_libc, miri, not(all(target_os = \"linux\", any(target_endian = \"little\", any(target_arch = \"s390x\", target_arch = \"powerpc\")), any(target_arch = \"arm\", all(target_arch = \"aarch64\", target_pointer_width = \"64\"), target_arch = \"riscv64\", all(rustix_use_experimental_asm, target_arch = \"powerpc\"), all(rustix_use_experimental_asm, target_arch = \"powerpc64\"), all(rustix_use_experimental_asm, target_arch = \"s390x\"), all(rustix_use_experimental_asm, target_arch = \"mips\"), all(rustix_use_experimental_asm, target_arch = \"mips32r6\"), all(rustix_use_experimental_asm, target_arch = \"mips64\"), all(rustix_use_experimental_asm, target_arch = \"mips64r6\"), target_arch = \"x86\", all(target_arch = \"x86_64\", target_pointer_width = \"64\")))))))": [
       "aarch64-apple-darwin",
-      "wasm32-unknown-unknown",
-      "wasm32-wasip1"
+      "powerpc64le-unknown-linux-gnu",
+      "s390x-unknown-linux-gnu",
+      "x86_64-apple-darwin"
     ],
     "cfg(all(not(windows), any(rustix_use_libc, miri, not(all(target_os = \"linux\", any(target_endian = \"little\", target_arch = \"s390x\"), any(target_arch = \"arm\", all(target_arch = \"aarch64\", target_pointer_width = \"64\"), target_arch = \"riscv64\", all(rustix_use_experimental_asm, target_arch = \"powerpc64\"), all(rustix_use_experimental_asm, target_arch = \"s390x\"), all(rustix_use_experimental_asm, target_arch = \"mips\"), all(rustix_use_experimental_asm, target_arch = \"mips32r6\"), all(rustix_use_experimental_asm, target_arch = \"mips64\"), all(rustix_use_experimental_asm, target_arch = \"mips64r6\"), target_arch = \"x86\", all(target_arch = \"x86_64\", target_pointer_width = \"64\")))))))": [
       "aarch64-apple-darwin",
-      "wasm32-unknown-unknown",
-      "wasm32-wasip1"
+      "powerpc64le-unknown-linux-gnu",
+      "s390x-unknown-linux-gnu",
+      "x86_64-apple-darwin"
     ],
     "cfg(all(target_arch = \"aarch64\", target_env = \"msvc\", not(windows_raw_dylib)))": [],
     "cfg(all(target_arch = \"aarch64\", target_os = \"linux\"))": [
@@ -25643,30 +25584,28 @@
       "aarch64-apple-darwin"
     ],
     "cfg(all(target_arch = \"loongarch64\", target_os = \"linux\"))": [],
-    "cfg(all(target_arch = \"wasm32\", target_os = \"unknown\"))": [
-      "wasm32-unknown-unknown"
-    ],
+    "cfg(all(target_arch = \"wasm32\", target_os = \"unknown\"))": [],
     "cfg(all(target_arch = \"wasm32\", target_os = \"wasi\", target_env = \"p2\"))": [],
     "cfg(all(target_arch = \"wasm32\", target_os = \"wasi\", target_env = \"p3\"))": [],
     "cfg(all(target_arch = \"x86\", target_env = \"gnu\", not(target_abi = \"llvm\"), not(windows_raw_dylib)))": [],
     "cfg(all(target_arch = \"x86\", target_env = \"msvc\", not(windows_raw_dylib)))": [],
     "cfg(all(target_arch = \"x86_64\", target_env = \"gnu\", not(target_abi = \"llvm\"), not(windows_raw_dylib)))": [
-      "x86_64-unknown-linux-gnu",
-      "x86_64-unknown-nixos-gnu"
+      "x86_64-unknown-linux-gnu"
     ],
     "cfg(all(target_os = \"uefi\", getrandom_backend = \"efi_rng\"))": [],
     "cfg(any())": [],
     "cfg(any(target_arch = \"aarch64\", target_arch = \"x86_64\", target_arch = \"x86\"))": [
       "aarch64-apple-darwin",
       "aarch64-unknown-linux-gnu",
+      "x86_64-apple-darwin",
       "x86_64-pc-windows-msvc",
-      "x86_64-unknown-linux-gnu",
-      "x86_64-unknown-nixos-gnu"
+      "x86_64-unknown-linux-gnu"
     ],
     "cfg(any(target_os = \"android\", target_os = \"linux\"))": [
       "aarch64-unknown-linux-gnu",
-      "x86_64-unknown-linux-gnu",
-      "x86_64-unknown-nixos-gnu"
+      "powerpc64le-unknown-linux-gnu",
+      "s390x-unknown-linux-gnu",
+      "x86_64-unknown-linux-gnu"
     ],
     "cfg(any(target_os = \"dragonfly\", target_os = \"freebsd\", target_os = \"hurd\", target_os = \"illumos\", target_os = \"cygwin\", all(target_os = \"horizon\", target_arch = \"arm\")))": [],
     "cfg(any(target_os = \"haiku\", target_os = \"redox\", target_os = \"nto\", target_os = \"aix\"))": [],
@@ -25674,38 +25613,43 @@
     "cfg(any(target_os = \"linux\", target_vendor = \"apple\", target_os = \"freebsd\", target_os = \"android\"))": [
       "aarch64-apple-darwin",
       "aarch64-unknown-linux-gnu",
-      "x86_64-unknown-linux-gnu",
-      "x86_64-unknown-nixos-gnu"
+      "powerpc64le-unknown-linux-gnu",
+      "s390x-unknown-linux-gnu",
+      "x86_64-apple-darwin",
+      "x86_64-unknown-linux-gnu"
     ],
     "cfg(any(target_os = \"macos\", target_os = \"ios\"))": [
-      "aarch64-apple-darwin"
+      "aarch64-apple-darwin",
+      "x86_64-apple-darwin"
     ],
     "cfg(any(target_os = \"macos\", target_os = \"openbsd\", target_os = \"vita\", target_os = \"emscripten\"))": [
-      "aarch64-apple-darwin"
+      "aarch64-apple-darwin",
+      "x86_64-apple-darwin"
     ],
     "cfg(any(unix, target_os = \"wasi\"))": [
       "aarch64-apple-darwin",
       "aarch64-unknown-linux-gnu",
-      "wasm32-wasip1",
-      "x86_64-unknown-linux-gnu",
-      "x86_64-unknown-nixos-gnu"
+      "powerpc64le-unknown-linux-gnu",
+      "s390x-unknown-linux-gnu",
+      "x86_64-apple-darwin",
+      "x86_64-unknown-linux-gnu"
     ],
     "cfg(not(target_has_atomic = \"ptr\"))": [],
     "cfg(not(target_os = \"windows\"))": [
       "aarch64-apple-darwin",
       "aarch64-unknown-linux-gnu",
-      "wasm32-unknown-unknown",
-      "wasm32-wasip1",
-      "x86_64-unknown-linux-gnu",
-      "x86_64-unknown-nixos-gnu"
+      "powerpc64le-unknown-linux-gnu",
+      "s390x-unknown-linux-gnu",
+      "x86_64-apple-darwin",
+      "x86_64-unknown-linux-gnu"
     ],
     "cfg(not(windows))": [
       "aarch64-apple-darwin",
       "aarch64-unknown-linux-gnu",
-      "wasm32-unknown-unknown",
-      "wasm32-wasip1",
-      "x86_64-unknown-linux-gnu",
-      "x86_64-unknown-nixos-gnu"
+      "powerpc64le-unknown-linux-gnu",
+      "s390x-unknown-linux-gnu",
+      "x86_64-apple-darwin",
+      "x86_64-unknown-linux-gnu"
     ],
     "cfg(target_arch = \"riscv64\")": [],
     "cfg(target_os = \"android\")": [],
@@ -25715,31 +25659,35 @@
     "cfg(target_os = \"redox\")": [],
     "cfg(target_os = \"solaris\")": [],
     "cfg(target_os = \"vxworks\")": [],
-    "cfg(target_os = \"wasi\")": [
-      "wasm32-wasip1"
-    ],
+    "cfg(target_os = \"wasi\")": [],
     "cfg(target_os = \"windows\")": [
       "x86_64-pc-windows-msvc"
     ],
     "cfg(target_vendor = \"apple\")": [
-      "aarch64-apple-darwin"
+      "aarch64-apple-darwin",
+      "x86_64-apple-darwin"
     ],
     "cfg(unix)": [
       "aarch64-apple-darwin",
       "aarch64-unknown-linux-gnu",
-      "x86_64-unknown-linux-gnu",
-      "x86_64-unknown-nixos-gnu"
+      "powerpc64le-unknown-linux-gnu",
+      "s390x-unknown-linux-gnu",
+      "x86_64-apple-darwin",
+      "x86_64-unknown-linux-gnu"
     ],
     "cfg(windows)": [
       "x86_64-pc-windows-msvc"
     ],
     "i686-pc-windows-gnu": [],
     "i686-pc-windows-gnullvm": [],
-    "wasm32-unknown-unknown": [
-      "wasm32-unknown-unknown"
+    "powerpc64le-unknown-linux-gnu": [
+      "powerpc64le-unknown-linux-gnu"
     ],
-    "wasm32-wasip1": [
-      "wasm32-wasip1"
+    "s390x-unknown-linux-gnu": [
+      "s390x-unknown-linux-gnu"
+    ],
+    "x86_64-apple-darwin": [
+      "x86_64-apple-darwin"
     ],
     "x86_64-pc-windows-gnu": [],
     "x86_64-pc-windows-gnullvm": [],
@@ -25747,11 +25695,7 @@
       "x86_64-pc-windows-msvc"
     ],
     "x86_64-unknown-linux-gnu": [
-      "x86_64-unknown-linux-gnu",
-      "x86_64-unknown-nixos-gnu"
-    ],
-    "x86_64-unknown-nixos-gnu": [
-      "x86_64-unknown-nixos-gnu"
+      "x86_64-unknown-linux-gnu"
     ]
   },
   "direct_deps": [

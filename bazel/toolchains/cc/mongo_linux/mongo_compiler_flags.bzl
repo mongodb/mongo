@@ -55,7 +55,7 @@ RUNNING_THROUGH_BAZELISK_CHECK = select({
     "//bazel/config:wasm32": [],
     "//bazel/config:running_through_bazelisk_x86_64_or_arm64": [],
     "@platforms//cpu:s390x": [],
-    "@platforms//cpu:ppc": [],
+    "@platforms//cpu:ppc64le": [],
 }, no_match_error = BAZELISK_CHECK_ERROR_MESSAGE)
 
 MONGO_GLOBAL_INCLUDE_DIRECTORIES = [

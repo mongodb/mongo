@@ -93,8 +93,7 @@ wasm_cc_binary(
         "-Wl,--export=cabi_realloc",
     ],
     target_compatible_with = select({
-        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
-        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
     deps = [
@@ -118,8 +117,7 @@ mongo_cc_library(
         "//src/mongo/scripting/mozjs/wasm/bridge:wasm_helpers.h",
     ],
     target_compatible_with = select({
-        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
-        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
     deps = [
@@ -146,8 +144,7 @@ mongo_cc_unit_test(
         "mozjs_wasm_tests",
     ],
     target_compatible_with = select({
-        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
-        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
     deps = [
@@ -178,7 +175,7 @@ aot_compile_wasm(
     src = ":mozjs_wasm_api",
     out = "mozjs_wasm_api.cwasm",
     target_compatible_with = select({
-        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),
 )

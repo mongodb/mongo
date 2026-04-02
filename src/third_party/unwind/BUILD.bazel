@@ -116,7 +116,7 @@ mongo_cc_library(
             "dist/src/x86_64/regname.c",
             "dist/src/x86_64/setcontext.S",
         ],
-        "@platforms//cpu:ppc": [
+        "@platforms//cpu:ppc64le": [
             "dist/src/ppc/Lget_proc_info.c",
             "dist/src/ppc/Lget_save_loc.c",
             "dist/src/ppc/Linit_local.c",
@@ -158,7 +158,7 @@ mongo_cc_library(
     hdrs = select({
         "@platforms//cpu:aarch64": glob(["platform/linux_aarch64/install/include/**"]),
         "@platforms//cpu:x86_64": glob(["platform/linux_x86_64/install/include/**"]),
-        "@platforms//cpu:ppc": glob(["platform/linux_ppc64le/install/include/**"]),
+        "@platforms//cpu:ppc64le": glob(["platform/linux_ppc64le/install/include/**"]),
         "@platforms//cpu:s390x": glob(["platform/linux_s390x/install/include/**"]),
         "//conditions:default": glob([]),
     }),
@@ -185,7 +185,7 @@ mongo_cc_library(
             "-Isrc/third_party/unwind/platform/linux_x86_64/build/include",
             "-Isrc/third_party/unwind/dist/include/tdep-x86_64",
         ],
-        "@platforms//cpu:ppc": [
+        "@platforms//cpu:ppc64le": [
             "-Isrc/third_party/unwind/platform/linux_ppc64le/build/include",
             "-Isrc/third_party/unwind/dist/include/tdep-ppc64",
         ],
@@ -218,7 +218,7 @@ mongo_cc_library(
     includes = select({
         "@platforms//cpu:aarch64": ["platform/linux_aarch64/install/include"],
         "@platforms//cpu:x86_64": ["platform/linux_x86_64/install/include"],
-        "@platforms//cpu:ppc": ["platform/linux_ppc64le/install/include"],
+        "@platforms//cpu:ppc64le": ["platform/linux_ppc64le/install/include"],
         "@platforms//cpu:s390x": ["platform/linux_s390x/install/include"],
         "//conditions:default": [],
     }),

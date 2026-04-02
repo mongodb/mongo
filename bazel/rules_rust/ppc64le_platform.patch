@@ -1,0 +1,24 @@
+diff --git rust/platform/platform.bzl rust/platform/platform.bzl
+index 5187993..4f4d3c8 100644
+--- rust/platform/platform.bzl
++++ rust/platform/platform.bzl
+@@ -15,6 +15,7 @@ _SUPPORTED_CPU_ARCH = [
+     "armv7",
+     "i686",
+     "powerpc",
++    "powerpc64le",
+     "s390x",
+     "x86_64",
+     "riscv32",
+diff --git rust/platform/triple_mappings.bzl rust/platform/triple_mappings.bzl
+index 6070591..5d94e73 100644
+--- rust/platform/triple_mappings.bzl
++++ rust/platform/triple_mappings.bzl
+@@ -54,6 +54,7 @@ SUPPORTED_T2_PLATFORM_TRIPLES = {
+     "i686-linux-android": _support(std = True, host_tools = False),
+     "i686-unknown-freebsd": _support(std = True, host_tools = False),
+     "powerpc-unknown-linux-gnu": _support(std = True, host_tools = True),
++    "powerpc64le-unknown-linux-gnu": _support(std = True, host_tools = True),
+     "riscv32imc-unknown-none-elf": _support(std = True, host_tools = False),
+     "riscv64gc-unknown-linux-gnu": _support(std = True, host_tools = False),
+     "riscv64gc-unknown-none-elf": _support(std = True, host_tools = False),

@@ -1,0 +1,720 @@
+diff --git cargo/3rdparty/crates/BUILD.autocfg-1.5.0.bazel cargo/3rdparty/crates/BUILD.autocfg-1.5.0.bazel
+index 25e93c3..9cb6c3d 100644
+--- cargo/3rdparty/crates/BUILD.autocfg-1.5.0.bazel
++++ cargo/3rdparty/crates/BUILD.autocfg-1.5.0.bazel
+@@ -60,6 +60,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.cargo-util-schemas-0.3.1.bazel cargo/3rdparty/crates/BUILD.cargo-util-schemas-0.3.1.bazel
+index 27ddaa7..d95c87f 100644
+--- cargo/3rdparty/crates/BUILD.cargo-util-schemas-0.3.1.bazel
++++ cargo/3rdparty/crates/BUILD.cargo-util-schemas-0.3.1.bazel
+@@ -60,6 +60,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.cargo_toml-0.20.5.bazel cargo/3rdparty/crates/BUILD.cargo_toml-0.20.5.bazel
+index 461418e..2f2fa7e 100644
+--- cargo/3rdparty/crates/BUILD.cargo_toml-0.20.5.bazel
++++ cargo/3rdparty/crates/BUILD.cargo_toml-0.20.5.bazel
+@@ -60,6 +60,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.displaydoc-0.2.5.bazel cargo/3rdparty/crates/BUILD.displaydoc-0.2.5.bazel
+index 9e39356..d9fdbc3 100644
+--- cargo/3rdparty/crates/BUILD.displaydoc-0.2.5.bazel
++++ cargo/3rdparty/crates/BUILD.displaydoc-0.2.5.bazel
+@@ -60,6 +60,7 @@ rust_proc_macro(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.equivalent-1.0.1.bazel cargo/3rdparty/crates/BUILD.equivalent-1.0.1.bazel
+index 46a5a75..b41e050 100644
+--- cargo/3rdparty/crates/BUILD.equivalent-1.0.1.bazel
++++ cargo/3rdparty/crates/BUILD.equivalent-1.0.1.bazel
+@@ -60,6 +60,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.erased-serde-0.4.5.bazel cargo/3rdparty/crates/BUILD.erased-serde-0.4.5.bazel
+index 3136713..c27b57e 100644
+--- cargo/3rdparty/crates/BUILD.erased-serde-0.4.5.bazel
++++ cargo/3rdparty/crates/BUILD.erased-serde-0.4.5.bazel
+@@ -63,6 +63,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.form_urlencoded-1.2.1.bazel cargo/3rdparty/crates/BUILD.form_urlencoded-1.2.1.bazel
+index 4156f09..9aabc8f 100644
+--- cargo/3rdparty/crates/BUILD.form_urlencoded-1.2.1.bazel
++++ cargo/3rdparty/crates/BUILD.form_urlencoded-1.2.1.bazel
+@@ -64,6 +64,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.hashbrown-0.15.2.bazel cargo/3rdparty/crates/BUILD.hashbrown-0.15.2.bazel
+index 9b5335b..c0f4ebf 100644
+--- cargo/3rdparty/crates/BUILD.hashbrown-0.15.2.bazel
++++ cargo/3rdparty/crates/BUILD.hashbrown-0.15.2.bazel
+@@ -60,6 +60,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.icu_collections-1.5.0.bazel cargo/3rdparty/crates/BUILD.icu_collections-1.5.0.bazel
+index c708936..b475cac 100644
+--- cargo/3rdparty/crates/BUILD.icu_collections-1.5.0.bazel
++++ cargo/3rdparty/crates/BUILD.icu_collections-1.5.0.bazel
+@@ -63,6 +63,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.icu_locid-1.5.0.bazel cargo/3rdparty/crates/BUILD.icu_locid-1.5.0.bazel
+index 90f1e9f..1055998 100644
+--- cargo/3rdparty/crates/BUILD.icu_locid-1.5.0.bazel
++++ cargo/3rdparty/crates/BUILD.icu_locid-1.5.0.bazel
+@@ -66,6 +66,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.icu_locid_transform-1.5.0.bazel cargo/3rdparty/crates/BUILD.icu_locid_transform-1.5.0.bazel
+index 2d8212f..074f298 100644
+--- cargo/3rdparty/crates/BUILD.icu_locid_transform-1.5.0.bazel
++++ cargo/3rdparty/crates/BUILD.icu_locid_transform-1.5.0.bazel
+@@ -66,6 +66,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.icu_locid_transform_data-1.5.0.bazel cargo/3rdparty/crates/BUILD.icu_locid_transform_data-1.5.0.bazel
+index 27bfebc..727bb2f 100644
+--- cargo/3rdparty/crates/BUILD.icu_locid_transform_data-1.5.0.bazel
++++ cargo/3rdparty/crates/BUILD.icu_locid_transform_data-1.5.0.bazel
+@@ -60,6 +60,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.icu_normalizer-1.5.0.bazel cargo/3rdparty/crates/BUILD.icu_normalizer-1.5.0.bazel
+index 16fe5c5..09dc458 100644
+--- cargo/3rdparty/crates/BUILD.icu_normalizer-1.5.0.bazel
++++ cargo/3rdparty/crates/BUILD.icu_normalizer-1.5.0.bazel
+@@ -67,6 +67,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.icu_normalizer_data-1.5.0.bazel cargo/3rdparty/crates/BUILD.icu_normalizer_data-1.5.0.bazel
+index ba00686..25847ca 100644
+--- cargo/3rdparty/crates/BUILD.icu_normalizer_data-1.5.0.bazel
++++ cargo/3rdparty/crates/BUILD.icu_normalizer_data-1.5.0.bazel
+@@ -60,6 +60,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.icu_properties-1.5.1.bazel cargo/3rdparty/crates/BUILD.icu_properties-1.5.1.bazel
+index 2e09299..9415a1f 100644
+--- cargo/3rdparty/crates/BUILD.icu_properties-1.5.1.bazel
++++ cargo/3rdparty/crates/BUILD.icu_properties-1.5.1.bazel
+@@ -67,6 +67,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.icu_properties_data-1.5.0.bazel cargo/3rdparty/crates/BUILD.icu_properties_data-1.5.0.bazel
+index 0795252..2513f0f 100644
+--- cargo/3rdparty/crates/BUILD.icu_properties_data-1.5.0.bazel
++++ cargo/3rdparty/crates/BUILD.icu_properties_data-1.5.0.bazel
+@@ -60,6 +60,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.icu_provider-1.5.0.bazel cargo/3rdparty/crates/BUILD.icu_provider-1.5.0.bazel
+index fd215d8..4d60c5b 100644
+--- cargo/3rdparty/crates/BUILD.icu_provider-1.5.0.bazel
++++ cargo/3rdparty/crates/BUILD.icu_provider-1.5.0.bazel
+@@ -67,6 +67,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.icu_provider_macros-1.5.0.bazel cargo/3rdparty/crates/BUILD.icu_provider_macros-1.5.0.bazel
+index 4645a2f..d3e8cb6 100644
+--- cargo/3rdparty/crates/BUILD.icu_provider_macros-1.5.0.bazel
++++ cargo/3rdparty/crates/BUILD.icu_provider_macros-1.5.0.bazel
+@@ -60,6 +60,7 @@ rust_proc_macro(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.idna-1.0.3.bazel cargo/3rdparty/crates/BUILD.idna-1.0.3.bazel
+index 21c7d45..f8718d8 100644
+--- cargo/3rdparty/crates/BUILD.idna-1.0.3.bazel
++++ cargo/3rdparty/crates/BUILD.idna-1.0.3.bazel
+@@ -65,6 +65,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.idna_adapter-1.2.0.bazel cargo/3rdparty/crates/BUILD.idna_adapter-1.2.0.bazel
+index 17ec870..39f8da5 100644
+--- cargo/3rdparty/crates/BUILD.idna_adapter-1.2.0.bazel
++++ cargo/3rdparty/crates/BUILD.idna_adapter-1.2.0.bazel
+@@ -63,6 +63,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.indexmap-2.7.1.bazel cargo/3rdparty/crates/BUILD.indexmap-2.7.1.bazel
+index 2ef3321..2932db8 100644
+--- cargo/3rdparty/crates/BUILD.indexmap-2.7.1.bazel
++++ cargo/3rdparty/crates/BUILD.indexmap-2.7.1.bazel
+@@ -64,6 +64,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.litemap-0.7.4.bazel cargo/3rdparty/crates/BUILD.litemap-0.7.4.bazel
+index 06ddcc1..61c1e74 100644
+--- cargo/3rdparty/crates/BUILD.litemap-0.7.4.bazel
++++ cargo/3rdparty/crates/BUILD.litemap-0.7.4.bazel
+@@ -63,6 +63,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.memchr-2.7.4.bazel cargo/3rdparty/crates/BUILD.memchr-2.7.4.bazel
+index 1ed4ec9..afd4932 100644
+--- cargo/3rdparty/crates/BUILD.memchr-2.7.4.bazel
++++ cargo/3rdparty/crates/BUILD.memchr-2.7.4.bazel
+@@ -60,6 +60,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.num-traits-0.2.19.bazel cargo/3rdparty/crates/BUILD.num-traits-0.2.19.bazel
+index d930311..26fc6a2 100644
+--- cargo/3rdparty/crates/BUILD.num-traits-0.2.19.bazel
++++ cargo/3rdparty/crates/BUILD.num-traits-0.2.19.bazel
+@@ -64,6 +64,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.ordered-float-2.10.1.bazel cargo/3rdparty/crates/BUILD.ordered-float-2.10.1.bazel
+index 4bab34c..17d74b5 100644
+--- cargo/3rdparty/crates/BUILD.ordered-float-2.10.1.bazel
++++ cargo/3rdparty/crates/BUILD.ordered-float-2.10.1.bazel
+@@ -64,6 +64,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.pathdiff-0.1.0.bazel cargo/3rdparty/crates/BUILD.pathdiff-0.1.0.bazel
+index ababb72..3ca1019 100644
+--- cargo/3rdparty/crates/BUILD.pathdiff-0.1.0.bazel
++++ cargo/3rdparty/crates/BUILD.pathdiff-0.1.0.bazel
+@@ -60,6 +60,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.percent-encoding-2.3.1.bazel cargo/3rdparty/crates/BUILD.percent-encoding-2.3.1.bazel
+index 4ad005c..6701c89 100644
+--- cargo/3rdparty/crates/BUILD.percent-encoding-2.3.1.bazel
++++ cargo/3rdparty/crates/BUILD.percent-encoding-2.3.1.bazel
+@@ -64,6 +64,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.proc-macro2-1.0.93.bazel cargo/3rdparty/crates/BUILD.proc-macro2-1.0.93.bazel
+index ca88fc3..fc38350 100644
+--- cargo/3rdparty/crates/BUILD.proc-macro2-1.0.93.bazel
++++ cargo/3rdparty/crates/BUILD.proc-macro2-1.0.93.bazel
+@@ -65,6 +65,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.quote-1.0.38.bazel cargo/3rdparty/crates/BUILD.quote-1.0.38.bazel
+index b15e956..0e9bf49 100644
+--- cargo/3rdparty/crates/BUILD.quote-1.0.38.bazel
++++ cargo/3rdparty/crates/BUILD.quote-1.0.38.bazel
+@@ -64,6 +64,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.semver-1.0.25.bazel cargo/3rdparty/crates/BUILD.semver-1.0.25.bazel
+index 5c5ec92..edd3c8f 100644
+--- cargo/3rdparty/crates/BUILD.semver-1.0.25.bazel
++++ cargo/3rdparty/crates/BUILD.semver-1.0.25.bazel
+@@ -66,6 +66,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.serde-1.0.217.bazel cargo/3rdparty/crates/BUILD.serde-1.0.217.bazel
+index cb5d92d..76310eb 100644
+--- cargo/3rdparty/crates/BUILD.serde-1.0.217.bazel
++++ cargo/3rdparty/crates/BUILD.serde-1.0.217.bazel
+@@ -71,6 +71,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.serde-untagged-0.1.6.bazel cargo/3rdparty/crates/BUILD.serde-untagged-0.1.6.bazel
+index cf2263f..98d57c8 100644
+--- cargo/3rdparty/crates/BUILD.serde-untagged-0.1.6.bazel
++++ cargo/3rdparty/crates/BUILD.serde-untagged-0.1.6.bazel
+@@ -60,6 +60,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.serde-value-0.7.0.bazel cargo/3rdparty/crates/BUILD.serde-value-0.7.0.bazel
+index 102a633..9b7a760 100644
+--- cargo/3rdparty/crates/BUILD.serde-value-0.7.0.bazel
++++ cargo/3rdparty/crates/BUILD.serde-value-0.7.0.bazel
+@@ -60,6 +60,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.serde_derive-1.0.217.bazel cargo/3rdparty/crates/BUILD.serde_derive-1.0.217.bazel
+index fd624d5..90291ec 100644
+--- cargo/3rdparty/crates/BUILD.serde_derive-1.0.217.bazel
++++ cargo/3rdparty/crates/BUILD.serde_derive-1.0.217.bazel
+@@ -63,6 +63,7 @@ rust_proc_macro(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.serde_spanned-0.6.8.bazel cargo/3rdparty/crates/BUILD.serde_spanned-0.6.8.bazel
+index ef4eda6..b997c48 100644
+--- cargo/3rdparty/crates/BUILD.serde_spanned-0.6.8.bazel
++++ cargo/3rdparty/crates/BUILD.serde_spanned-0.6.8.bazel
+@@ -63,6 +63,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.smallvec-1.13.2.bazel cargo/3rdparty/crates/BUILD.smallvec-1.13.2.bazel
+index 12862be..23f0ec4 100644
+--- cargo/3rdparty/crates/BUILD.smallvec-1.13.2.bazel
++++ cargo/3rdparty/crates/BUILD.smallvec-1.13.2.bazel
+@@ -63,6 +63,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.stable_deref_trait-1.2.0.bazel cargo/3rdparty/crates/BUILD.stable_deref_trait-1.2.0.bazel
+index eabf623..e23254f 100644
+--- cargo/3rdparty/crates/BUILD.stable_deref_trait-1.2.0.bazel
++++ cargo/3rdparty/crates/BUILD.stable_deref_trait-1.2.0.bazel
+@@ -63,6 +63,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.syn-2.0.98.bazel cargo/3rdparty/crates/BUILD.syn-2.0.98.bazel
+index fbbbb7a..5da8c45 100644
+--- cargo/3rdparty/crates/BUILD.syn-2.0.98.bazel
++++ cargo/3rdparty/crates/BUILD.syn-2.0.98.bazel
+@@ -71,6 +71,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.synstructure-0.13.1.bazel cargo/3rdparty/crates/BUILD.synstructure-0.13.1.bazel
+index 6f8a370..e729fd1 100644
+--- cargo/3rdparty/crates/BUILD.synstructure-0.13.1.bazel
++++ cargo/3rdparty/crates/BUILD.synstructure-0.13.1.bazel
+@@ -64,6 +64,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.thiserror-1.0.69.bazel cargo/3rdparty/crates/BUILD.thiserror-1.0.69.bazel
+index 440b1b5..c893db5 100644
+--- cargo/3rdparty/crates/BUILD.thiserror-1.0.69.bazel
++++ cargo/3rdparty/crates/BUILD.thiserror-1.0.69.bazel
+@@ -64,6 +64,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.thiserror-impl-1.0.69.bazel cargo/3rdparty/crates/BUILD.thiserror-impl-1.0.69.bazel
+index 8117484..31a0dbf 100644
+--- cargo/3rdparty/crates/BUILD.thiserror-impl-1.0.69.bazel
++++ cargo/3rdparty/crates/BUILD.thiserror-impl-1.0.69.bazel
+@@ -60,6 +60,7 @@ rust_proc_macro(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.tinystr-0.7.6.bazel cargo/3rdparty/crates/BUILD.tinystr-0.7.6.bazel
+index 0f72a3d..5dd88d7 100644
+--- cargo/3rdparty/crates/BUILD.tinystr-0.7.6.bazel
++++ cargo/3rdparty/crates/BUILD.tinystr-0.7.6.bazel
+@@ -67,6 +67,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.toml-0.8.20.bazel cargo/3rdparty/crates/BUILD.toml-0.8.20.bazel
+index 8cdd74a..7144a53 100644
+--- cargo/3rdparty/crates/BUILD.toml-0.8.20.bazel
++++ cargo/3rdparty/crates/BUILD.toml-0.8.20.bazel
+@@ -65,6 +65,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.toml_datetime-0.6.8.bazel cargo/3rdparty/crates/BUILD.toml_datetime-0.6.8.bazel
+index 39fd682..4bcdb57 100644
+--- cargo/3rdparty/crates/BUILD.toml_datetime-0.6.8.bazel
++++ cargo/3rdparty/crates/BUILD.toml_datetime-0.6.8.bazel
+@@ -63,6 +63,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.toml_edit-0.22.24.bazel cargo/3rdparty/crates/BUILD.toml_edit-0.22.24.bazel
+index fb89a22..e887349 100644
+--- cargo/3rdparty/crates/BUILD.toml_edit-0.22.24.bazel
++++ cargo/3rdparty/crates/BUILD.toml_edit-0.22.24.bazel
+@@ -65,6 +65,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.typeid-1.0.2.bazel cargo/3rdparty/crates/BUILD.typeid-1.0.2.bazel
+index bfa69da..c05d66e 100644
+--- cargo/3rdparty/crates/BUILD.typeid-1.0.2.bazel
++++ cargo/3rdparty/crates/BUILD.typeid-1.0.2.bazel
+@@ -61,6 +61,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.unicode-ident-1.0.16.bazel cargo/3rdparty/crates/BUILD.unicode-ident-1.0.16.bazel
+index ef56aa0..f0eb4c9 100644
+--- cargo/3rdparty/crates/BUILD.unicode-ident-1.0.16.bazel
++++ cargo/3rdparty/crates/BUILD.unicode-ident-1.0.16.bazel
+@@ -60,6 +60,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.unicode-xid-0.2.6.bazel cargo/3rdparty/crates/BUILD.unicode-xid-0.2.6.bazel
+index d4ca11c..e70ce04 100644
+--- cargo/3rdparty/crates/BUILD.unicode-xid-0.2.6.bazel
++++ cargo/3rdparty/crates/BUILD.unicode-xid-0.2.6.bazel
+@@ -63,6 +63,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.url-2.5.4.bazel cargo/3rdparty/crates/BUILD.url-2.5.4.bazel
+index cae037e..4b5f77c 100644
+--- cargo/3rdparty/crates/BUILD.url-2.5.4.bazel
++++ cargo/3rdparty/crates/BUILD.url-2.5.4.bazel
+@@ -64,6 +64,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.utf16_iter-1.0.5.bazel cargo/3rdparty/crates/BUILD.utf16_iter-1.0.5.bazel
+index 34d1701..b0ce89f 100644
+--- cargo/3rdparty/crates/BUILD.utf16_iter-1.0.5.bazel
++++ cargo/3rdparty/crates/BUILD.utf16_iter-1.0.5.bazel
+@@ -60,6 +60,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.utf8_iter-1.0.4.bazel cargo/3rdparty/crates/BUILD.utf8_iter-1.0.4.bazel
+index 09b7da2..4991845 100644
+--- cargo/3rdparty/crates/BUILD.utf8_iter-1.0.4.bazel
++++ cargo/3rdparty/crates/BUILD.utf8_iter-1.0.4.bazel
+@@ -60,6 +60,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.winnow-0.7.2.bazel cargo/3rdparty/crates/BUILD.winnow-0.7.2.bazel
+index 9dc74ec..22a6eb4 100644
+--- cargo/3rdparty/crates/BUILD.winnow-0.7.2.bazel
++++ cargo/3rdparty/crates/BUILD.winnow-0.7.2.bazel
+@@ -65,6 +65,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.write16-1.0.0.bazel cargo/3rdparty/crates/BUILD.write16-1.0.0.bazel
+index 1343f52..96dd973 100644
+--- cargo/3rdparty/crates/BUILD.write16-1.0.0.bazel
++++ cargo/3rdparty/crates/BUILD.write16-1.0.0.bazel
+@@ -63,6 +63,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.writeable-0.5.5.bazel cargo/3rdparty/crates/BUILD.writeable-0.5.5.bazel
+index 3fe46a7..05367ae 100644
+--- cargo/3rdparty/crates/BUILD.writeable-0.5.5.bazel
++++ cargo/3rdparty/crates/BUILD.writeable-0.5.5.bazel
+@@ -60,6 +60,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.yoke-0.7.5.bazel cargo/3rdparty/crates/BUILD.yoke-0.7.5.bazel
+index 6d7245c..60d3d05 100644
+--- cargo/3rdparty/crates/BUILD.yoke-0.7.5.bazel
++++ cargo/3rdparty/crates/BUILD.yoke-0.7.5.bazel
+@@ -69,6 +69,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.yoke-derive-0.7.5.bazel cargo/3rdparty/crates/BUILD.yoke-derive-0.7.5.bazel
+index d38cf3d..12045d3 100644
+--- cargo/3rdparty/crates/BUILD.yoke-derive-0.7.5.bazel
++++ cargo/3rdparty/crates/BUILD.yoke-derive-0.7.5.bazel
+@@ -60,6 +60,7 @@ rust_proc_macro(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.zerofrom-0.1.5.bazel cargo/3rdparty/crates/BUILD.zerofrom-0.1.5.bazel
+index 6304196..98d4f3a 100644
+--- cargo/3rdparty/crates/BUILD.zerofrom-0.1.5.bazel
++++ cargo/3rdparty/crates/BUILD.zerofrom-0.1.5.bazel
+@@ -67,6 +67,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.zerofrom-derive-0.1.5.bazel cargo/3rdparty/crates/BUILD.zerofrom-derive-0.1.5.bazel
+index deef5e7..c80476a 100644
+--- cargo/3rdparty/crates/BUILD.zerofrom-derive-0.1.5.bazel
++++ cargo/3rdparty/crates/BUILD.zerofrom-derive-0.1.5.bazel
+@@ -60,6 +60,7 @@ rust_proc_macro(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.zerovec-0.10.4.bazel cargo/3rdparty/crates/BUILD.zerovec-0.10.4.bazel
+index 2a3cc85..65d2992 100644
+--- cargo/3rdparty/crates/BUILD.zerovec-0.10.4.bazel
++++ cargo/3rdparty/crates/BUILD.zerovec-0.10.4.bazel
+@@ -67,6 +67,7 @@ rust_library(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],
+diff --git cargo/3rdparty/crates/BUILD.zerovec-derive-0.10.3.bazel cargo/3rdparty/crates/BUILD.zerovec-derive-0.10.3.bazel
+index 09613c8..8254956 100644
+--- cargo/3rdparty/crates/BUILD.zerovec-derive-0.10.3.bazel
++++ cargo/3rdparty/crates/BUILD.zerovec-derive-0.10.3.bazel
+@@ -60,6 +60,7 @@ rust_proc_macro(
+         "@rules_rust//rust/platform:i686-unknown-freebsd": [],
+         "@rules_rust//rust/platform:i686-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:powerpc-unknown-linux-gnu": [],
++        "@rules_rust//rust/platform:powerpc64le-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv32imc-unknown-none-elf": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-linux-gnu": [],
+         "@rules_rust//rust/platform:riscv64gc-unknown-none-elf": [],

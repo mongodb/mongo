@@ -116,7 +116,7 @@ resmoke_suite_test(
         "jscore",
     ],
     target_compatible_with = select({
-        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "@platforms//cpu:s390x": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),

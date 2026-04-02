@@ -139,7 +139,7 @@ mongo_apple_brew_llvm_toolchain_config = repository_rule(
 _ARCH_MAP = {
     "aarch64": "@platforms//cpu:arm64",
     "x86_64": "@platforms//cpu:x86_64",
-    "ppc64le": "@platforms//cpu:ppc",
+    "ppc64le": "@platforms//cpu:ppc64le",
     "s390x": "@platforms//cpu:s390x",
 }
 

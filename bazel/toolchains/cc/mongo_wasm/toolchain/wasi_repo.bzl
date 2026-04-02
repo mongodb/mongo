@@ -26,6 +26,16 @@ _WASI_SDK_DIST = {
         "sha256": "e87d6bf9f9ca3482a75f1cbc630f095b4ae8c98d586708bac7adf08c03b327bc",
         "stripPrefix": "wasi-sdk-30.0-x86_64-windows",
     },
+    ("linux", "s390x"): {
+        "url": "https://mdb-build-public.s3.amazonaws.com/wasm-toolchain/418/wasi-sdk-30-s390x-rhel80-3d4ea12.tgz",
+        "sha256": "c31c661cc49b7b99e092b3bb5d7365042f9fbeb5495c9ec34d01b096f011e8f2",
+        "stripPrefix": "",
+    },
+    ("linux", "ppc64le"): {
+        "url": "https://mdb-build-public.s3.amazonaws.com/wasm-toolchain/420/wasi-sdk-30-ppc64le-rhel81-3d4ea12.tgz",
+        "sha256": "a7ee9e3760dc8cafea9557d1d4fbc8fc2a35ed4cf29a13dd47b8025d5004c57a",
+        "stripPrefix": "",
+    },
 }
 
 def _normalize_os(name):

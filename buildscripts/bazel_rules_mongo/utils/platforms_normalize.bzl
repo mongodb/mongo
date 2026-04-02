@@ -20,7 +20,7 @@ ARCH_TO_PLATFORM_MAP = {
     "x86_64": "@platforms//cpu:x86_64",
     "arm64": "@platforms//cpu:arm64",
     "aarch64": "@platforms//cpu:arm64",
-    "ppc64le": "@platforms//cpu:ppc",
+    "ppc64le": "@platforms//cpu:ppc64le",
     "s390x": "@platforms//cpu:s390x",
 }
 

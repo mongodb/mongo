@@ -24,7 +24,7 @@ resmoke_suite_test(
         "resources:cpu:2",
     ],
     target_compatible_with = select({
-        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "@platforms//cpu:s390x": ["@platforms//:incompatible"],
         "@platforms//os:macos": ["@platforms//:incompatible"],
         "//conditions:default": [],

@@ -170,7 +170,7 @@ def get_toolchain_subs(ctx):
     elif arch == "ppc64le":
         substitutions = {
             "{platforms_arch}": "ppc64le",
-            "{bazel_toolchain_cpu}": "ppc",
+            "{bazel_toolchain_cpu}": "ppc64le",
             "{arch}": arch,
             "{version}": version,
             "{distro}": distro,

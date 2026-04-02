@@ -115,7 +115,7 @@ platform(
 platform(
     name = "linux_ppc64le",
     constraint_values = [
-        "@platforms//cpu:ppc",
+        "@platforms//cpu:ppc64le",
         "@platforms//os:linux",
     ],
 )
@@ -131,7 +131,7 @@ platform(
 platform(
     name = "rhel8_ppc64le",
     constraint_values = [
-        "@platforms//cpu:ppc",
+        "@platforms//cpu:ppc64le",
         "@platforms//os:linux",
         ":use_mongo_toolchain",
         ":rhel8",
@@ -141,7 +141,7 @@ platform(
 platform(
     name = "rhel9_ppc64le",
     constraint_values = [
-        "@platforms//cpu:ppc",
+        "@platforms//cpu:ppc64le",
         "@platforms//os:linux",
         ":use_mongo_toolchain",
         ":rhel9",

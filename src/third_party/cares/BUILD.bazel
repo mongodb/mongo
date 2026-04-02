@@ -101,7 +101,7 @@ cc_library(
             "platform/linux_s390x/build/include/*.h",
             "platform/linux_s390x/install/include/*.h",
         ]),
-        "@platforms//cpu:ppc": glob([
+        "@platforms//cpu:ppc64le": glob([
             "platform/linux_ppc64le/build/include/*.h",
             "platform/linux_ppc64le/install/include/*.h",
         ]),
@@ -127,7 +127,7 @@ cc_library(
             "platform/linux_s390x/build/include",
             "platform/linux_s390x/install/include",
         ],
-        "@platforms//cpu:ppc": [
+        "@platforms//cpu:ppc64le": [
             "platform/linux_ppc64le/build/include",
             "platform/linux_ppc64le/install/include",
         ],

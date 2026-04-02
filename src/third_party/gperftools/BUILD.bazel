@@ -120,7 +120,7 @@ mongo_cc_library(
         ],
     }) + select({
         # GCC on PowerPC under C++11 mode does not define __linux which gperftools depends on
-        "@platforms//cpu:ppc": ["__linux"],
+        "@platforms//cpu:ppc64le": ["__linux"],
         "//conditions:default": [],
     }),
     skip_global_deps = [

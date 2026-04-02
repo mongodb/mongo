@@ -327,9 +327,17 @@ register_toolchains("@mongo_windows_toolchain//...")
 
 ###################### RUST DEPS ######################
 bazel_dep(name = "rules_rust", version = "0.68.1")
+
+# Right now we dont build rust on ppc, when we do unsupported_host_skip_crates.patch
+# should be removed
 single_version_override(
     module_name = "rules_rust",
-    patches = ["//bazel/rules_rust:windows_long_path.patch"],
+    patches = [
+        "//bazel/rules_rust:windows_long_path.patch",
+        "//bazel/rules_rust:ppc64le_platform.patch",
+        "//bazel/rules_rust:ppc64le_crates.patch",
+        "//bazel/rules_rust:ppc64le_cargo_bazel_url.patch",
+    ],
     version = "0.68.1",
 )
 
@@ -428,7 +436,6 @@ crate.annotation_select(
     triples = [
         "aarch64-unknown-linux-gnu",
         "x86_64-unknown-linux-gnu",
-        "powerpc-unknown-linux-gnu",
         "s390x-unknown-linux-gnu",
     ],
 )
@@ -450,6 +457,15 @@ crate.annotation_select(
 crate.from_specs(
     cargo_lockfile = "//bazel:crates.toml",
     lockfile = "//bazel:crates.lock",
+    supported_platform_triples = [
+        "aarch64-apple-darwin",
+        "aarch64-unknown-linux-gnu",
+        "x86_64-apple-darwin",
+        "x86_64-unknown-linux-gnu",
+        "x86_64-pc-windows-msvc",
+        "powerpc64le-unknown-linux-gnu",
+        "s390x-unknown-linux-gnu",
+    ],
 )
 use_repo(crate, "crates")
 #################### END RUST DEPS ####################

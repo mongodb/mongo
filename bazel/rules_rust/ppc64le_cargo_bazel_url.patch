@@ -1,0 +1,10 @@
+--- crate_universe/private/urls.bzl
++++ crate_universe/private/urls.bzl
+@@ -15,6 +15,7 @@
+   "aarch64-pc-windows-msvc": "https://github.com/bazelbuild/rules_rust/releases/download/0.68.1/cargo-bazel-aarch64-pc-windows-msvc.exe",
+   "aarch64-unknown-linux-gnu": "https://github.com/bazelbuild/rules_rust/releases/download/0.68.1/cargo-bazel-aarch64-unknown-linux-gnu",
+   "aarch64-unknown-linux-musl": "https://github.com/bazelbuild/rules_rust/releases/download/0.68.1/cargo-bazel-aarch64-unknown-linux-musl",
++  "powerpc64le-unknown-linux-gnu": "https://mdb-build-public.s3.us-east-1.amazonaws.com/rust-toolchain/cargo-bazel-ppc64le",
+   "s390x-unknown-linux-gnu": "https://github.com/bazelbuild/rules_rust/releases/download/0.68.1/cargo-bazel-s390x-unknown-linux-gnu",
+   "x86_64-apple-darwin": "https://github.com/bazelbuild/rules_rust/releases/download/0.68.1/cargo-bazel-x86_64-apple-darwin",
+   "x86_64-pc-windows-gnu": "https://github.com/bazelbuild/rules_rust/releases/download/0.68.1/cargo-bazel-x86_64-pc-windows-gnu.exe",
