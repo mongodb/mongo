@@ -2427,6 +2427,7 @@ tasks:
         "read_write_concern",
         "large",
         "write",
+        "has_bazel_target",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2441,6 +2442,7 @@ tasks:
         "release_critical",
         "incompatible_mac",
         "read_write_concern",
+        "has_bazel_target",
       ]
     commands:
       - func: "generate resmoke tasks"

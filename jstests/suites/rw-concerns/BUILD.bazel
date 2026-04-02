@@ -1,0 +1,92 @@
+load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
+load("//jstests/suites/query-execution:common.bzl", "CORE_DATA")
+
+resmoke_suite_test(
+    name = "cwrwc_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/cwrwc_passthrough.yml",
+    data = CORE_DATA + ["//jstests/fle2/libs:all_subpackage_javascript_files"],
+    shard_count = 20,
+    tags = [
+        "ci-release-critical",
+        "large",
+        "read_write_concern",
+        "write",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "cwrwc_rc_majority_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/cwrwc_rc_majority_passthrough.yml",
+    data = CORE_DATA + [
+        "//src/mongo/db/modules/enterprise/jstests/fle/lib:all_subpackage_javascript_files",
+        "//src/mongo/db/modules/enterprise/jstests/libs:all_subpackage_javascript_files",
+    ],
+    shard_count = 20,
+    tags = [
+        "ci-release-critical",
+        "read_write_concern",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db/modules/enterprise/src/fle:mongocryptd",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "read_concern_linearizable_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/read_concern_linearizable_passthrough.yml",
+    data = CORE_DATA + [
+        "//jstests/fle2/libs:all_subpackage_javascript_files",
+    ],
+    shard_count = 40,
+    tags = [
+        "ci-release-critical",
+        "large",
+        "linearize",
+        "read_write_concern",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "read_concern_majority_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/read_concern_majority_passthrough.yml",
+    data = CORE_DATA + [
+        "//src/mongo/db/modules/enterprise/jstests/fle/lib:all_subpackage_javascript_files",
+        "//src/mongo/db/modules/enterprise/jstests/libs:all_subpackage_javascript_files",
+    ],
+    shard_count = 20,
+    tags = [
+        "ci-release-critical",
+        "read_write_concern",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db/modules/enterprise/src/fle:mongocryptd",
+        "//src/mongo/shell:mongo",
+    ],
+)
