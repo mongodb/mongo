@@ -4,7 +4,7 @@
  * @tags: [
  *  # Uses $where.
  *  requires_scripting,
- *  requires_fcv_83,
+ *  requires_fcv_90,
  *  # Retrieving results using toArray may require a getMore command.
  *  requires_getmore,
  *  # Wildcard indexes are sparse by definition hence cannot be used to provide sorting.
