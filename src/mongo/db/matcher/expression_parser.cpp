@@ -864,6 +864,8 @@ StatusWithMatchExpression parseBitTest(boost::optional<StringData> name,
                           << name << " takes an Array, a number, or a BinData but received: " << e);
     }
 
+    expCtx->setSbeCompatibility(
+        std::min(expCtx->getSbeCompatibility(), SbeCompatibility::requiresTrySbe));
     return {std::move(bitTestMatchExpression)};
 }
 
