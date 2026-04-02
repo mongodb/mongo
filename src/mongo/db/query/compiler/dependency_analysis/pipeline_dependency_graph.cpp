@@ -427,6 +427,11 @@ void updateMetadataFromExpression(FieldMetadata& metadata, const Expression& exp
     metadata.canFieldBeArray = canExpressionEvaluateToArray(expr);
 }
 
+void updateMetadataForMissingValue(FieldMetadata& metadata) {
+    metadata.canFieldBeArray = false;
+    metadata.knownToBeMissing = true;
+}
+
 /**
  * Extracts the remaining suffix from a dotted path string after skipping 'count' path components.
  */
@@ -940,8 +945,7 @@ private:
                     declareScope(stage, scopeId /*exhaustiveScope*/, ScopeId::none());
                     if (op.isEmpty()) {
                         auto& missingField = _fields[_scopes[scopeId].missingField];
-                        missingField.metadata.knownToBeMissing = true;
-                        missingField.metadata.canFieldBeArray = false;
+                        updateMetadataForMissingValue(missingField.metadata);
                     }
                     tassert(
                         11996201, "Did not expect ReplaceRoot in this position", !hasDeclaredScope);
@@ -957,7 +961,9 @@ private:
                     auto parsedPath = internPath(p.getPath());
                     FieldDependencies deps{};
                     FieldMetadata metadata{};
-                    if (auto expr = p.getExpression()) {
+                    if (p.isRemoved()) {
+                        updateMetadataForMissingValue(metadata);
+                    } else if (auto expr = p.getExpression()) {
                         updateMetadataFromExpression(metadata, *expr);
                         deps = processExpressionDependencies(*expr, parentScope);
                     } else {

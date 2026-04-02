@@ -81,6 +81,10 @@ output: {
                 "b:2": "b:2",
                 "c:5": {
                     "declaringScope": "scope:1",
+                    "metadata": {
+                        "array": false,
+                        "missing": true
+                    },
                     "dependencies": []
                 }
             }
@@ -98,10 +102,18 @@ output: {
                 "a:1": "a:1",
                 "b:7": {
                     "declaringScope": "scope:2",
+                    "metadata": {
+                        "array": false,
+                        "missing": true
+                    },
                     "dependencies": []
                 },
                 "c:8": {
                     "declaringScope": "scope:2",
+                    "metadata": {
+                        "array": false,
+                        "missing": true
+                    },
                     "dependencies": []
                 }
             }
