@@ -39,6 +39,7 @@
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/future.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/tick_source_mock.h"
 
 namespace mongo {
 namespace {
@@ -207,5 +208,17 @@ TEST_F(ReclaimedPreparedTxnTrackerTest,
     ASSERT_TRUE(allResolvedFuture.isReady());
     allResolvedFuture.get(opCtx());
 }
+
+TEST_F(ReclaimedPreparedTxnTrackerTest, RecoveryDurationMicrosRecordedCorrectly) {
+    TickSourceMock<Microseconds> mockTickSource;
+    ReclaimedPreparedTxnTracker tracker(&mockTickSource);
+
+    tracker.beginDiscovery(0);
+    mockTickSource.advance(Microseconds{5000});
+    tracker.discoveryComplete();
+
+    ASSERT_EQ(tracker.getRecoveryDurationMicros(), 5000);
+}
+
 }  // namespace
 }  // namespace mongo

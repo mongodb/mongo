@@ -164,6 +164,14 @@ struct MONGO_MOD_NEEDS_REPLACEMENT ShardingStatistics {
     // TODO (SERVER-112793) Remove once v9.0 branches out.
     AtomicWord<long long> countHitsOfCompoundWildcardIndexesWithShardKeyPrefix{0};
 
+    // Cumulative, always-increasing counter of how many chunk migrations had to wait for
+    // reclaimed prepared transactions from precise checkpoint recovery to resolve before cloning.
+    AtomicWord<long long> chunkMigrationWaitedOnReclaimedPreparedTxns{0};
+
+    // Cumulative, always-increasing counter of total time (ms) chunk migrations spent waiting for
+    // reclaimed prepared transactions from precise checkpoint recovery to resolve.
+    AtomicWord<long long> chunkMigrationWaitForReclaimedPreparedTxnsMillis{0};
+
     CriticalSectionStatistics<DatabaseName> databaseCriticalSectionStatistics;
     CriticalSectionStatistics<NamespaceString> collectionCriticalSectionStatistics;
 

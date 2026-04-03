@@ -97,6 +97,7 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 
 #include <string>
 #include <tuple>
@@ -441,6 +442,13 @@ void MigrationSourceManager::startClone() {
             const auto deadline = _opCtx->fastClockSource().now() +
                 Milliseconds(chunkMigrationWaitForReclaimedPreparedTxnsMaxWaitMS.load());
             const auto guard = _opCtx->makeDeadlineGuard(deadline, ErrorCodes::ExceededTimeLimit);
+
+            _stats.chunkMigrationWaitedOnReclaimedPreparedTxns.addAndFetch(1);
+            Timer waitTimer;
+            ScopeGuard recordWaitTime([&] {
+                _stats.chunkMigrationWaitForReclaimedPreparedTxnsMillis.addAndFetch(
+                    waitTimer.millis());
+            });
 
             // We need to wait because prepared transactions reclaimed from a precise checkpoint as
             // part of startup recovery can not set up an onCommit handler to send transaction

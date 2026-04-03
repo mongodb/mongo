@@ -130,6 +130,10 @@ void TransactionMetricsObserver::onCommit(OperationContext* opCtx,
         serverTransactionsMetrics->decrementCurrentPrepared();
     }
 
+    if (_singleTransactionStats.isRecoveredFromPreciseCheckpoint()) {
+        serverTransactionsMetrics->incrementReclaimedPreparedTxnsCommitted();
+    }
+
     serverTransactionsMetrics->updateLastTransaction(
         operationCount,
         oplogOperationBytes,
@@ -240,6 +244,10 @@ void TransactionMetricsObserver::_onAbort(OperationContext* opCtx,
     if (_singleTransactionStats.isPrepared()) {
         serverTransactionsMetrics->incrementTotalPreparedThenAborted();
         serverTransactionsMetrics->decrementCurrentPrepared();
+    }
+
+    if (_singleTransactionStats.isRecoveredFromPreciseCheckpoint()) {
+        serverTransactionsMetrics->incrementReclaimedPreparedTxnsAborted();
     }
 
     auto latency = _singleTransactionStats.getDuration(tickSource, curTick);

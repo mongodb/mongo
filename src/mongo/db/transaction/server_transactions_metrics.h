@@ -95,6 +95,12 @@ public:
                                size_t oplogOperationBytes,
                                BSONObj writeConcern);
 
+    void incrementReclaimedPreparedTxnsCommitted();
+    long long getReclaimedPreparedTxnsCommitted() const;
+
+    void incrementReclaimedPreparedTxnsAborted();
+    long long getReclaimedPreparedTxnsAborted() const;
+
     /**
      * Appends the accumulated stats to a transactions stats object.
      * Include the 'lastCommittedTransactions' field if 'includeLastCommitted' is true.
@@ -131,6 +137,9 @@ private:
 
     // The current number of transactions in the prepared state.
     AtomicWord<unsigned long long> _currentPrepared{0};
+
+    AtomicWord<long long> _reclaimedPreparedTxnsCommitted{0};
+    AtomicWord<long long> _reclaimedPreparedTxnsAborted{0};
 
     // Protects member variables below.
     mutable stdx::mutex _mutex;

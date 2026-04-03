@@ -242,6 +242,14 @@ public:
         _queueStats.add(newOpQueueStat);
     }
 
+    void setRecoveredFromPreciseCheckpoint(bool recovered) {
+        _recoveredFromPreciseCheckpoint = recovered;
+    }
+
+    bool isRecoveredFromPreciseCheckpoint() const {
+        return _recoveredFromPreciseCheckpoint;
+    }
+
     /**
      * Set the autoCommit field.  If this field is unset, this is not a transaction but a
      * retryable write and other values will not be meaningful.
@@ -345,6 +353,8 @@ private:
     // Tracks and aggregates statistics for admission and execution control queueing across all
     // operations within a transaction.
     TicketHolderQueueStats _queueStats;
+
+    bool _recoveredFromPreciseCheckpoint{false};
 };
 
 }  // namespace MONGO_MOD_PUB mongo

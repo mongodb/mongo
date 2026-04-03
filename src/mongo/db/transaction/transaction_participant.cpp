@@ -2133,6 +2133,10 @@ void TransactionParticipant::Participant::restorePreparedTxnFromPreciseCheckpoin
         p().transactionOperations.markAsUnavailable();
         p().activeTxnCommittedStatements.markAsUnavailable();
 
+        o(lg)
+            .transactionMetricsObserver.getSingleTransactionStats()
+            .setRecoveredFromPreciseCheckpoint(true);
+
         // This should be called after checking out the session without refresh, which already sets
         // isValid.
         invariant(o().isValid);
@@ -2567,6 +2571,7 @@ void TransactionParticipant::Participant::_finishCommitTransaction(
                                                                 curop->getOperationStorageMetrics(),
                                                                 o().txnState.isPrepared());
     }
+
     // We must clear the recovery unit and locker so any post-transaction writes can run without
     // transactional settings such as a read timestamp.
     _cleanUpTxnResourceOnOpCtx(opCtx, TerminationCause::kCommitted);
@@ -3226,6 +3231,10 @@ void TransactionParticipant::Participant::_transactionInfoForLog(
     }
 
     attrs.add("queues", singleTransactionStats.getQueueStats().toBson());
+
+    if (p().recoveredFromPreciseCheckpointRequiresOplogScan) {
+        attrs.add("recoveredFromPreciseCheckpoint", true);
+    }
 
     // Total duration of the transaction.
     attrs.add("duration",

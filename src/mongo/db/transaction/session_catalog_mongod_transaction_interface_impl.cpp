@@ -74,6 +74,12 @@ void MongoDSessionCatalogTransactionInterfaceImpl::invalidateTransactionOnCheckI
     OperationContext* opCtx) {
     auto txnParticipant = TransactionParticipant::get(opCtx);
     if (txnParticipant && txnParticipant.shouldInvalidateBeforeCheckIn()) {
+        LOGV2_DEBUG(11374004,
+                    2,
+                    "Invalidating retryable internal transaction recovered from precise checkpoint "
+                    "on check-in to force oplog scan on next access",
+                    "lsid"_attr = opCtx->getLogicalSessionId(),
+                    "txnNumber"_attr = opCtx->getTxnNumber());
         txnParticipant.invalidate(opCtx);
     }
 }

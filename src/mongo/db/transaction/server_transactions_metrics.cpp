@@ -34,6 +34,7 @@
 #include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/transaction/reclaimed_prepared_txn_tracker.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
 #include "mongo/db/transaction/transactions_stats_gen.h"
 #include "mongo/util/decorable.h"
@@ -153,6 +154,22 @@ void ServerTransactionsMetrics::decrementCurrentPrepared() {
     _currentPrepared.fetchAndSubtractRelaxed(1);
 }
 
+void ServerTransactionsMetrics::incrementReclaimedPreparedTxnsCommitted() {
+    _reclaimedPreparedTxnsCommitted.fetchAndAddRelaxed(1);
+}
+
+long long ServerTransactionsMetrics::getReclaimedPreparedTxnsCommitted() const {
+    return _reclaimedPreparedTxnsCommitted.loadRelaxed();
+}
+
+void ServerTransactionsMetrics::incrementReclaimedPreparedTxnsAborted() {
+    _reclaimedPreparedTxnsAborted.fetchAndAddRelaxed(1);
+}
+
+long long ServerTransactionsMetrics::getReclaimedPreparedTxnsAborted() const {
+    return _reclaimedPreparedTxnsAborted.loadRelaxed();
+}
+
 void ServerTransactionsMetrics::updateLastTransaction(size_t operationCount,
                                                       size_t oplogOperationBytes,
                                                       BSONObj writeConcern) {
@@ -208,7 +225,23 @@ public:
         // lifecycle within a session. Both are assigned transaction numbers, and so both are often
         // referred to as “transactions”.
         RetryableWritesStats::get(opCtx)->updateStats(&stats);
-        ServerTransactionsMetrics::get(opCtx)->updateStats(&stats, includeLastCommitted);
+        auto* serverTxnMetrics = ServerTransactionsMetrics::get(opCtx);
+        serverTxnMetrics->updateStats(&stats, includeLastCommitted);
+
+        auto* tracker = ReclaimedPreparedTxnTracker::get(opCtx);
+        auto committed = serverTxnMetrics->getReclaimedPreparedTxnsCommitted();
+        auto aborted = serverTxnMetrics->getReclaimedPreparedTxnsAborted();
+        auto remaining = tracker->getNumReclaimedPreparedTxnsRemaining();
+        if (committed + aborted + remaining > 0) {
+            PreciseCheckpointRecoveryStats recoveryStats;
+            recoveryStats.setNumReclaimedPreparedTxnsExitedPrepare(committed + aborted);
+            recoveryStats.setNumReclaimedPreparedTxnsCommitted(committed);
+            recoveryStats.setNumReclaimedPreparedTxnsAborted(aborted);
+            recoveryStats.setNumReclaimedPreparedTxnsRemaining(remaining);
+            recoveryStats.setRecoveryDurationMicros(tracker->getRecoveryDurationMicros());
+            stats.setPreciseCheckpointRecovery(recoveryStats);
+        }
+
         return stats.toBSON();
     }
 };

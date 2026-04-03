@@ -909,6 +909,15 @@ void _recoverPreparedTransactionFromPreciseCheckpoint(
     auto checkedOutSession = mongoDSessionCatalog->checkOutSessionWithoutRefresh(opCtx);
 
     try {
+        const auto lsid = txnRecord.getSessionId();
+        LOGV2_DEBUG(11374002,
+                    2,
+                    "Recovering prepared transaction from precise checkpoint",
+                    "lsid"_attr = lsid,
+                    "txnNumber"_attr = txnRecord.getTxnNum(),
+                    "prepareTimestamp"_attr = txnRecord.getPrepareTimestamp(),
+                    "affectedNamespaces"_attr = txnRecord.getAffectedNamespaces());
+
         auto txnParticipant = TransactionParticipant::get(opCtx);
 
         // Set the preparedId then unstash the participant, which will open the storage transaction
@@ -933,8 +942,6 @@ void _recoverPreparedTransactionFromPreciseCheckpoint(
                 MODE_IX);
         }
 
-        const auto lsid = txnRecord.getSessionId();
-
         // Reload transaction participant state based on the transaction record.
         txnParticipant.restorePreparedTxnFromPreciseCheckpoint(opCtx, std::move(txnRecord));
 
@@ -952,6 +959,7 @@ void _recoverPreparedTransactionFromPreciseCheckpoint(
         // Stash the transaction so it yields its resources and can be resumed by future user
         // operations.
         txnParticipant.stashTransactionResources(opCtx);
+
     } catch (const DBException& ex) {
         // An exception here will trigger an invariant in the destructor for
         // MongoDOperationContextSessionWithoutRefresh, so catch and log the error before rethrowing

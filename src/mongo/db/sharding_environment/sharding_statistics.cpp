@@ -99,6 +99,10 @@ void ShardingStatistics::report(BSONObjBuilder* builder) const {
                     countFlushReshardingStateChangeFailedShardingMetadataRefreshes.loadRelaxed());
     builder->append("countHitsOfCompoundWildcardIndexesWithShardKeyPrefix",
                     countHitsOfCompoundWildcardIndexesWithShardKeyPrefix.loadRelaxed());
+    builder->append("chunkMigrationWaitedOnReclaimedPreparedTxns",
+                    chunkMigrationWaitedOnReclaimedPreparedTxns.loadRelaxed());
+    builder->append("chunkMigrationWaitForReclaimedPreparedTxnsMillis",
+                    chunkMigrationWaitForReclaimedPreparedTxnsMillis.loadRelaxed());
 
     {
         BSONObjBuilder databaseCriticalSectionBuilder{

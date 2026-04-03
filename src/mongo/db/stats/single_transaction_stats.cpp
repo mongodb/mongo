@@ -155,6 +155,10 @@ void SingleTransactionStats::report(BSONObjBuilder* builder,
     if (_expireDate != Date_t::max()) {
         builder->append("expiryTime", dateToISOStringLocal(_expireDate));
     }
+
+    if (_recoveredFromPreciseCheckpoint) {
+        builder->append("recoveredFromPreciseCheckpoint", true);
+    }
 }
 
 }  // namespace mongo

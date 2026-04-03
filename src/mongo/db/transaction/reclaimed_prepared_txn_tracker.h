@@ -35,6 +35,7 @@
 #include "mongo/util/future_impl.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 /**
@@ -55,6 +56,7 @@ class MONGO_MOD_OPEN ReclaimedPreparedTxnTracker {
 
 public:
     ReclaimedPreparedTxnTracker() = default;
+    ReclaimedPreparedTxnTracker(TickSource* tickSource);
     ~ReclaimedPreparedTxnTracker() = default;
 
     static ReclaimedPreparedTxnTracker* get(ServiceContext* serviceContext);
@@ -68,6 +70,8 @@ public:
 
     void trackPrepareExit(SharedSemiFuture<void> onExitPrepareFuture);
 
+    long long getNumReclaimedPreparedTxnsRemaining() const;
+    long long getRecoveryDurationMicros() const;
 
 private:
     struct State {
@@ -82,6 +86,8 @@ private:
     bool _discoveryStarted = false;
     bool _discoveryComplete = false;
     long long _remainingToTrack = 0;
+    long long _recoveryDurationMicros = 0;
+    Timer _recoveryTimer;
 };
 
 }  // namespace mongo

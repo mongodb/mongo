@@ -37,6 +37,9 @@ const auto reclaimedPreparedTxnTracker =
     ServiceContext::declareDecoration<ReclaimedPreparedTxnTracker>();
 }
 
+ReclaimedPreparedTxnTracker::ReclaimedPreparedTxnTracker(TickSource* tickSource)
+    : _recoveryTimer(tickSource) {}
+
 ReclaimedPreparedTxnTracker* ReclaimedPreparedTxnTracker::get(ServiceContext* serviceContext) {
     return &reclaimedPreparedTxnTracker(serviceContext);
 }
@@ -84,6 +87,7 @@ void ReclaimedPreparedTxnTracker::beginDiscovery(long long expectedCount) {
     _state = std::make_shared<State>();
     _state->unresolvedPreparedTxnsCount.store(expectedCount);
     _remainingToTrack = expectedCount;
+    _recoveryTimer.reset();
     if (expectedCount == 0) {
         _state->allPreparedTxnsResolved.emplaceValue();
     }
@@ -98,6 +102,20 @@ void ReclaimedPreparedTxnTracker::discoveryComplete() {
     invariant(_remainingToTrack == 0,
               "Did not track the expected number of reclaimed prepared txns");
     _discoveryComplete = true;
+    _recoveryDurationMicros = _recoveryTimer.micros();
+}
+
+long long ReclaimedPreparedTxnTracker::getNumReclaimedPreparedTxnsRemaining() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    if (!_state) {
+        return 0;
+    }
+    return _state->unresolvedPreparedTxnsCount.load();
+}
+
+long long ReclaimedPreparedTxnTracker::getRecoveryDurationMicros() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _recoveryDurationMicros;
 }
 
 }  // namespace mongo

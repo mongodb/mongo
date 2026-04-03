@@ -53,6 +53,28 @@ structs:
             writeConcern:
                 type: object
 
+    PreciseCheckpointRecoveryStats:
+        description:
+            "Stats related to prepared transaction recovery from precise
+            checkpoints during startup"
+        strict: true
+        fields:
+            numReclaimedPreparedTxnsExitedPrepare:
+                type: long
+                default: 0
+            numReclaimedPreparedTxnsCommitted:
+                type: long
+                default: 0
+            numReclaimedPreparedTxnsAborted:
+                type: long
+                default: 0
+            numReclaimedPreparedTxnsRemaining:
+                type: long
+                default: 0
+            recoveryDurationMicros:
+                type: long
+                default: 0
+
     TransactionsStats:
         description: "A struct representing the section of the server status
             command with information about transactions"
@@ -99,4 +121,7 @@ structs:
                 default: 0
             lastCommittedTransaction:
                 type: LastCommittedTransaction
+                optional: true
+            preciseCheckpointRecovery:
+                type: PreciseCheckpointRecoveryStats
                 optional: true
