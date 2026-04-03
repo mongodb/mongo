@@ -211,7 +211,7 @@ let viewsCommandTests = {
     _shardsvrReshardDonorInitialize: {skip: isAnInternalCommand},
     _shardsvrReshardRecipientInitialize: {skip: isAnInternalCommand},
     _shardsvrReshardRecipientClone: {skip: isAnInternalCommand},
-    _shardsvrReshardingRecipientCriticalSectionStarted: {skip: isAnInternalCommand},
+    _shardsvrReshardRecipientCriticalSectionStarted: {skip: isAnInternalCommand},
     _shardsvrSetAllowMigrations: {skip: isAnInternalCommand},
     _shardsvrResolveView: {skip: isAnInternalCommand},
     _shardsvrRunSearchIndexCommand: {skip: isAnInternalCommand},

@@ -135,7 +135,7 @@ const allCommands = {
     _shardsvrReshardDonorInitialize: {skip: isPrimaryOnly},
     _shardsvrReshardRecipientInitialize: {skip: isPrimaryOnly},
     _shardsvrReshardRecipientClone: {skip: isPrimaryOnly},
-    _shardsvrReshardingRecipientCriticalSectionStarted: {skip: isPrimaryOnly},
+    _shardsvrReshardRecipientCriticalSectionStarted: {skip: isPrimaryOnly},
     _shardsvrRefineCollectionShardKey: {skip: isPrimaryOnly},
     _shardsvrCommitRefineCollectionShardKey: {skip: isPrimaryOnly},
     _shardsvrSetAllowMigrations: {skip: isPrimaryOnly},

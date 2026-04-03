@@ -139,7 +139,7 @@ const cmdsToBlock = [
         numSkips: 0,
     },
     {
-        cmdName: "_shardsvrReshardingRecipientCriticalSectionStarted",
+        cmdName: "_shardsvrReshardRecipientCriticalSectionStarted",
         // No skipping.
         numSkips: 0,
     },

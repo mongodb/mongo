@@ -65,10 +65,10 @@
 namespace mongo {
 namespace {
 
-class ShardsvrReshardingRecipientCriticalSectionStartedCommand final
-    : public TypedCommand<ShardsvrReshardingRecipientCriticalSectionStartedCommand> {
+class ShardsvrReshardRecipientCriticalSectionStartedCommand final
+    : public TypedCommand<ShardsvrReshardRecipientCriticalSectionStartedCommand> {
 public:
-    using Request = ShardsvrReshardingRecipientCriticalSectionStarted;
+    using Request = ShardsvrReshardRecipientCriticalSectionStarted;
 
     class Invocation final : public InvocationBase {
     public:
@@ -77,10 +77,10 @@ public:
         void typedRun(OperationContext* opCtx) {
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-            uassert(ErrorCodes::IllegalOperation,
-                    "_shardsvrReshardingRecipientCriticalSectionStarted can only be run on shard "
-                    "servers",
-                    serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
+            uassert(
+                ErrorCodes::IllegalOperation,
+                "_shardsvrReshardRecipientCriticalSectionStarted can only be run on shard servers",
+                serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 
             if (auto machine = resharding::tryGetReshardingStateMachineAndThrowIfShuttingDown<
                     ReshardingRecipientService,
@@ -148,7 +148,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 };
-MONGO_REGISTER_COMMAND(ShardsvrReshardingRecipientCriticalSectionStartedCommand).forShard();
+MONGO_REGISTER_COMMAND(ShardsvrReshardRecipientCriticalSectionStartedCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

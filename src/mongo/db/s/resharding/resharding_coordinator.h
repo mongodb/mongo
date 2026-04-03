@@ -524,7 +524,7 @@ private:
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
-     * Sends '_shardsvrReshardingRecipientCriticalSectionStarted' to all recipient shards.
+     * Sends '_shardsvrReshardRecipientCriticalSectionStarted' to all recipient shards.
      */
     void _tellAllRecipientsCriticalSectionStarted(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
