@@ -72,6 +72,7 @@ mongo_cc_library(
     name = "otel_metrics_service",
     srcs = [
         "metrics_service.cpp",
+        "otel_metric_server_status_adapter.cpp",
     ],
     deps = [
         ":metric_unit",
@@ -79,6 +80,7 @@ mongo_cc_library(
         ":otel_metric_name_validation",
         ":server_status_metric_name_validation",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/commands/server_status:server_status_metric",
     ] + select(
         {
             "@//bazel/config:build_otel_enabled": [
@@ -142,6 +144,24 @@ mongo_cc_unit_test(
     srcs = ["server_status_metric_name_validation_test.cpp"],
     tags = ["mongo_unittest_first_group"],
     deps = [":server_status_metric_name_validation"],
+)
+
+mongo_cc_unit_test(
+    name = "otel_metric_server_status_adapter_test",
+    srcs = ["otel_metric_server_status_adapter_test.cpp"],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":metrics_histogram",
+        ":otel_metrics_service",
+        "//src/mongo/db/commands/server_status:server_status_metric",
+    ] + select(
+        {
+            "@//bazel/config:build_otel_enabled": [
+                "//src/third_party/opentelemetry-cpp/api",
+            ],
+            "//conditions:default": [],
+        },
+    ),
 )
 
 mongo_cc_library(
@@ -373,6 +393,7 @@ test_suite(
         ":metrics_test_util_test",
         ":metrics_updown_counter_test",
         ":otel_metric_name_validation_test",
+        ":otel_metric_server_status_adapter_test",
         ":server_status_metric_name_validation_test",
     ],
 )
