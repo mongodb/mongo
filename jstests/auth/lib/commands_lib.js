@@ -8546,8 +8546,9 @@ export const authCommandsLib = {
             },
             testcases: testcases_transformationOnly,
             skipTest: (conn) => {
-                // Can't run on mongos.
-                return !isStandalone(conn);
+                // Can't run on mongos. Also, $_internalJoinHint requires join optimization which
+                // is unavailable when the classic engine is forced.
+                return !isStandalone(conn) || isForceClassicEngine(conn);
             },
             setup: function (db) {
                 // Only works with join optimization enabled.
@@ -9698,6 +9699,16 @@ function isFeatureEnabled(conn, ...features) {
         adminDb.logout();
     }
     return features.every((key) => res[key]?.value);
+}
+
+function isForceClassicEngine(conn) {
+    const adminDb = conn.getDB(adminDbName);
+    const authed = adminDb.auth("admin", "password");
+    const res = adminDb.runCommand({getParameter: 1, internalQueryFrameworkControl: 1});
+    if (authed) {
+        adminDb.logout();
+    }
+    return res.ok && res.internalQueryFrameworkControl === "forceClassicEngine";
 }
 
 /**
