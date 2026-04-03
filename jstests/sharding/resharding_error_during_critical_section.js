@@ -3,7 +3,7 @@
  * for responses for commands against donors or recipients in the critical section.
  *
  * @tags: [
- *   requires_fcv_83,
+ *   requires_fcv_90,
  *   featureFlagReshardingVerification,
  *   featureFlagReshardingSkipCloningAndApplyingIfApplicable,
  * ]

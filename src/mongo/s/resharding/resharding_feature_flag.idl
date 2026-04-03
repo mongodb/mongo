@@ -75,7 +75,7 @@ feature_flags:
             for it). Currently, only the primary shard can be such a recipient shard."
         cpp_varname: gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable
         default: true
-        version: 8.3
+        version: 9.0
         fcv_gated: true
     featureFlagReshardingSkipCloningIfApplicable:
         mod_visibility: public
