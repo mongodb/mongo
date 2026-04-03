@@ -152,11 +152,11 @@ if can_use_systemd_user; then
     fi
 else
     echo "[WARN] systemd-run not available (common in containers). Running clangd without systemd limits." >&2
+fi
 
-    # Optional: still be “polite”
-    if command -v ionice >/dev/null 2>&1; then
-        exec ionice -c3 nice -n 19 "$CLANGD" "${FINAL_ARGS[@]}"
-    else
-        exec nice -n 19 "$CLANGD" "${FINAL_ARGS[@]}"
-    fi
+# Fallback: run clangd directly (used when systemd-run is unavailable or fails at runtime)
+if command -v ionice >/dev/null 2>&1; then
+    exec ionice -c3 nice -n 19 "$CLANGD" "${FINAL_ARGS[@]}"
+else
+    exec nice -n 19 "$CLANGD" "${FINAL_ARGS[@]}"
 fi
