@@ -67,10 +67,7 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
         # as otherwise TSAN variants occasionally run out of memory
         # Non-TSAN variants don't need this adjustment as they have a reasonable free memory margin
         {"task": r"fcv_upgrade_downgrade_sharded_collections_jscore_passthrough.*", "factor": 0.27},
-        {"task": r"sharding_kill_stepdown_terminate_jscore_passthrough.*", "factor": 0.125},
         {"task": r"bulk_write_targeted_override.*", "factor": 0.25},
-        {"task": r"sharding_stepdown_fcv_upgrade_downgrade_jscore_passthrough.*", "factor": 0.125},
-        {"task": "sharding_jscore_passthrough_priority_ports", "factor": 0.25},
     ],
     "enterprise-rhel8-debug-tsan-all-feature-flags": [
         # Lower the default resmoke_jobs_factor for TSAN to reduce memory pressure for this suite,
@@ -82,6 +79,11 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
             "factor": 0.125,
         },
         {"task": r"fcv_upgrade_downgrade_replica_sets_jscore_passthrough.*", "factor": 0.27},
+    ],
+    r"enterprise-rhel8-debug-tsan.*": [
+        # Lower the default resmoke_jobs_factor for TSAN to reduce memory pressure for this suite,
+        # as otherwise TSAN variants occasionally run out of memory
+        # Non-TSAN variants don't need this adjustment as they have a reasonable free memory margin
         {"task": r"sharding_kill_stepdown_terminate_jscore_passthrough.*", "factor": 0.125},
         {"task": r"sharding_stepdown_fcv_upgrade_downgrade_jscore_passthrough.*", "factor": 0.125},
         {"task": "sharding_jscore_passthrough_priority_ports", "factor": 0.25},
@@ -221,9 +223,11 @@ def global_task_factor(task_name, overrides, factor):
 
 def get_task_factor(task_name, overrides, override_type, factor):
     """Check for task override and return factor."""
-    for task_override in overrides.get(override_type, []):
-        if re.compile(task_override["task"]).search(task_name):
-            return task_override["factor"]
+    for override_key, task_overrides in overrides.items():
+        if re.fullmatch(override_key, override_type):
+            for task_override in task_overrides:
+                if re.compile(task_override["task"]).search(task_name):
+                    return task_override["factor"]
     return factor
 
 
