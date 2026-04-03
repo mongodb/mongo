@@ -8816,27 +8816,25 @@ bool BaseCompiler::emitArrayFill() {
     freePtr(RegPtr(PreBarrierReg));
   }
 
-  // Perform an initialization loop using `numElements` as the loop variable,
-  // starting at `numElements` and counting down to zero.
+  // Perform the fill loop using `numElements` as the loop variable, counting
+  // down to zero.
   Label done;
   Label loop;
-  // Skip initialization if numElements = 0
   masm.branch32(Assembler::Equal, numElements, Imm32(0), &done);
-  masm.bind(&loop);
 
-  // Move to the next element
+  masm.bind(&loop);
   masm.sub32(Imm32(1), numElements);
 
   // Assign value to rdata[numElements]. All registers are preserved.
   if (!emitGcArraySet(rp, rdata, numElements, arrayType, value,
-                      PreBarrierKind::None)) {
+                      PreBarrierKind::Normal)) {
     return false;
   }
 
-  // Loop back if there are still elements to initialize
   masm.branch32(Assembler::NotEqual, numElements, Imm32(0), &loop);
   masm.bind(&done);
 
+  // Clean up
   freePtr(rdata);
   freeRef(rp);
   freeI32(numElements);

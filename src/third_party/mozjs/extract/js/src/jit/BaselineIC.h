@@ -299,7 +299,9 @@ class ICCacheIRStub final : public ICStub {
   void trace(JSTracer* trc);
   bool traceWeak(JSTracer* trc);
 
-  ICCacheIRStub* clone(JSRuntime* rt, ICStubSpace& newSpace);
+  enum class ICScriptHandling { MarkActive, AssertActive };
+  ICCacheIRStub* clone(JSRuntime* rt, ICStubSpace& newSpace,
+                       ICScriptHandling icScriptHandling);
 
   // Returns true if this stub can call JS or VM code that can trigger a GC.
   bool makesGCCalls() const;

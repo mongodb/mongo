@@ -78,23 +78,23 @@ inline bool ValidFD(T fd) {
   return !!fd;
 }
 
-#  define MMAP_FAULT_HANDLER_BEGIN_HANDLE(fd)                  \
-    {                                                          \
-      void* mmapScopeBuf = nullptr;                            \
-      nsCString mmapScopeFilename;                             \
-      uint32_t mmapScopeBufLen = 0;                            \
-      if (ValidFD(fd) && fd->mMap) {                           \
-        mmapScopeBuf = (void*)fd->mFileStart;                  \
-        mmapScopeBufLen = fd->mTotalLen;                       \
-      }                                                        \
-      if (ValidFD(fd) && fd->mFile) {                          \
-        nsCOMPtr<nsIFile> file = fd->mFile.GetBaseFile();      \
-        if (file) {                                            \
-          file->GetNativeLeafName(mmapScopeFilename);          \
-        }                                                      \
-      }                                                        \
-      MmapAccessScope mmapScope(mmapScopeBuf, mmapScopeBufLen, \
-                                mmapScopeFilename.get());      \
+#  define MMAP_FAULT_HANDLER_BEGIN_HANDLE(fd)                   \
+    {                                                           \
+      void* mmapScopeBuf = nullptr;                             \
+      nsCString mmapScopeFilename;                              \
+      uint32_t mmapScopeBufLen = 0;                             \
+      if (ValidFD(fd) && fd->mFileStart && fd->mTotalLen > 0) { \
+        mmapScopeBuf = (void*)fd->mFileStart;                   \
+        mmapScopeBufLen = fd->mTotalLen;                        \
+      }                                                         \
+      if (ValidFD(fd) && fd->mFile) {                           \
+        nsCOMPtr<nsIFile> file = fd->mFile.GetBaseFile();       \
+        if (file) {                                             \
+          file->GetNativeLeafName(mmapScopeFilename);           \
+        }                                                       \
+      }                                                         \
+      MmapAccessScope mmapScope(mmapScopeBuf, mmapScopeBufLen,  \
+                                mmapScopeFilename.get());       \
       if (sigsetjmp(mmapScope.mJmpBuf, 0) == 0) {
 #  define MMAP_FAULT_HANDLER_BEGIN_BUFFER(buf, bufLen)   \
     {                                                    \

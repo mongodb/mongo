@@ -1745,6 +1745,7 @@ bool SnapshotIterator::allocationReadable(const RValueAllocation& alloc,
     case RValueAllocation::INT64_REG:
       return hasRegister(alloc.reg());
     case RValueAllocation::INT64_STACK:
+    case RValueAllocation::INT64_INT32_STACK:
       return hasStack(alloc.stackOffset());
 #endif
 
@@ -1855,6 +1856,7 @@ Value SnapshotIterator::allocationValue(const RValueAllocation& alloc,
 #elif defined(JS_PUNBOX64)
     case RValueAllocation::INT64_REG:
     case RValueAllocation::INT64_STACK:
+    case RValueAllocation::INT64_INT32_STACK:
 #endif
       MOZ_CRASH("Can't read Int64 as Value");
 
@@ -1911,6 +1913,7 @@ bool SnapshotIterator::readMaybeUnpackedBigInt(JSContext* cx,
 #elif defined(JS_PUNBOX64)
     case RValueAllocation::INT64_REG:
     case RValueAllocation::INT64_STACK:
+    case RValueAllocation::INT64_INT32_STACK:
 #endif
     {
       auto* bigInt = JS::BigInt::createFromInt64(cx, allocationInt64(alloc));
@@ -1977,6 +1980,9 @@ int64_t SnapshotIterator::allocationInt64(const RValueAllocation& alloc) {
     }
     case RValueAllocation::INT64_STACK: {
       return static_cast<int64_t>(fromStack(alloc.stackOffset()));
+    }
+    case RValueAllocation::INT64_INT32_STACK: {
+      return static_cast<int64_t>(ReadFrameInt32Slot(fp_, alloc.stackOffset()));
     }
 #endif
     default:
@@ -2051,6 +2057,7 @@ void SnapshotIterator::writeAllocationValuePayload(
 #elif defined(JS_PUNBOX64)
     case RValueAllocation::INT64_REG:
     case RValueAllocation::INT64_STACK:
+    case RValueAllocation::INT64_INT32_STACK:
 #endif
       MOZ_CRASH("Not a GC thing: Unexpected write");
       break;
