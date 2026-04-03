@@ -8,6 +8,7 @@ import {
     assertDropAndRecreateCollection,
     assertDropCollection,
 } from "jstests/libs/collection_drop_recreate.js";
+import {getClusterTime} from "jstests/libs/query/change_stream_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {runWithRetries} from "jstests/libs/run_with_retries.js";
 
@@ -22,7 +23,7 @@ const isResumableError = (e) => {
 
 // Function which generates a write workload on the specified collection, including all events that
 // a change stream may consume. Assumes that the specified collection does not already exist.
-export function generateChangeStreamWriteWorkload(db, collName, numDocs, includInvalidatingEvents = true) {
+export function generateChangeStreamWriteWorkload(db, collName, numDocs, includeInvalidatingEvents = true) {
     // If this is a sharded passthrough, make sure we shard on something other than _id so that a
     // non-id field appears in the documentKey. This will generate 'create' and 'shardCollection'.
     if (FixtureHelpers.isMongos(db)) {
@@ -100,7 +101,7 @@ export function generateChangeStreamWriteWorkload(db, collName, numDocs, includI
     assertDropCollection(db, "view");
 
     // If the caller is prepared to handle potential invalidations, include the following events.
-    if (includInvalidatingEvents) {
+    if (includeInvalidatingEvents) {
         // Rename the collection.
         const collNameAfterRename = `${testColl.getName()}_renamed`;
         assert.commandWorked(testColl.renameCollection(collNameAfterRename));
@@ -120,26 +121,45 @@ export function generateChangeStreamWriteWorkload(db, collName, numDocs, includI
 }
 
 // Helper function to fully exhaust a change stream from the specified point and return all events.
-// Assumes that all relevant events can fit into a single 16MB batch.
-export function getAllChangeStreamEvents(db, extraPipelineStages = [], csOptions = {}, resumeToken) {
+export function getAllChangeStreamEvents(db, extraPipelineStages = [], csOptions = {}, startTime, endTime) {
+    // Retrieve current cluster time. We need to read all change events from the specified start
+    // time until this end time is reached over exceeded.
+    if (!endTime) {
+        endTime = getClusterTime(db);
+    }
+
     // Open a whole-cluster stream based on the supplied arguments.
     const csCursor = db
         .getMongo()
-        .watch(extraPipelineStages, Object.assign({resumeAfter: resumeToken, maxAwaitTimeMS: 1}, csOptions));
+        .watch(extraPipelineStages, Object.assign({startAtOperationTime: startTime, maxAwaitTimeMS: 1}, csOptions));
 
     // Run getMore until the post-batch resume token advances. In a sharded passthrough, this will
-    // guarantee that all shards have returned results, and we expect all results to fit into a
-    // single batch, so we know we have exhausted the stream.
-    while (bsonWoCompare(csCursor._postBatchResumeToken, resumeToken) == 0) {
-        csCursor.hasNext(); // runs a getMore
+    // guarantee that all shards have returned results.
+    let iterations = 0;
+    let result = [];
+    while (true) {
+        assert(!csCursor.isClosed(), "change stream cursor was closed unexpectedly");
+
+        while (csCursor.hasNext()) {
+            result.push(csCursor.next());
+        }
+        const cursorTime = decodeResumeToken(csCursor.getResumeToken()).clusterTime;
+        if (bsonWoCompare(cursorTime, endTime) >= 0) {
+            // Change stream cursor has advanced to or beyond the end point.
+            break;
+        }
+
+        // Add a little delay after the initial getMore requests, so that we do not pound that
+        // server with requests in a tight loop.
+        if (iterations++ > 3) {
+            sleep(10);
+        }
     }
 
     // Close the cursor since we have already retrieved all results.
     csCursor.close();
 
-    // Extract all events from the streams. Since the cursor is closed, it will not attempt to
-    // retrieve any more batches from the server.
-    return csCursor.toArray();
+    return result;
 }
 
 // Helper function to check whether this value is a plain old javascript object.

@@ -13,9 +13,6 @@ selector:
     # TODO: SERVER-114511 re-enable this test.
     - jstests/change_streams/migrate_last_chunk_from_shard_event.js
 
-    # TODO: SERVER-121056 Investigate and fix failures in this test.
-    - jstests/change_streams/oplog_rewrite/change_stream_null_existence_eq_rewrite_test.js
-
   exclude_with_any_tags:
     # These tests would fail with "Cowardly refusing to override write concern of command: ..."
     - assumes_write_concern_unchanged

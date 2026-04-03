@@ -8,13 +8,13 @@ import {
     getAllChangeStreamEvents,
     isPlainObject,
 } from "jstests/libs/query/change_stream_rewrite_util.js";
+import {getClusterTime} from "jstests/libs/query/change_stream_util.js";
 
 const dbName = jsTestName();
 const collName = "coll1";
 
 // Establish a resume token at a point before anything actually happens in the test.
-const startPoint = db.getMongo().watch().getResumeToken();
-
+const startPoint = getClusterTime(db);
 const testDB = db.getSiblingDB(dbName);
 const numDocs = 8;
 
@@ -23,6 +23,7 @@ generateChangeStreamWriteWorkload(testDB, collName, numDocs);
 
 // Obtain a list of all events that occurred during the write workload.
 const fullEvents = getAllChangeStreamEvents(testDB, [], {showExpandedEvents: true}, startPoint);
+assert.gt(fullEvents.length, 0, "expecting fullEvents to be non-empty");
 
 // Traverse each of the events and build up a projection which empties objects and arrays, and
 // changes the type of all scalar fields. Be sure to retain the _id field unmodified.
