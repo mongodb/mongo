@@ -68,11 +68,10 @@ ExecutorStats::Task ExecutorStats::wrapTask(ExecutorStats::Task&& task) {
         const auto waitTime = _tickSource->ticksTo<Microseconds>(startedAt - scheduledAt);
         _averageWaitTimeMicros.addSample(waitTime.count());
         _waiting.increment(waitTime);
-        const Milliseconds waitTimeThreshold{
-            serverGlobalParams.slowTaskExecutorWaitTimeProfilingMs.loadRelaxed()};
-        if (waitTime > waitTimeThreshold) {
+        const Milliseconds waitTimeThreshold{serverGlobalParams.slowWaitMs.loadRelaxed()};
+        if (waitTime >= waitTimeThreshold) {
             LOGV2_DEBUG(9757000,
-                        severitySuppressor().toInt(),
+                        _severitySuppressorSlowWait().toInt(),
                         "Task exceeded the slow wait time threshold",
                         "slowWaitTimeThreshold"_attr = waitTimeThreshold,
                         "duration"_attr = waitTime);
@@ -83,6 +82,14 @@ ExecutorStats::Task ExecutorStats::wrapTask(ExecutorStats::Task&& task) {
             _tickSource->ticksTo<Microseconds>(_tickSource->getTicks() - startedAt);
         _averageRunTimeMicros.addSample(runTime.count());
         _running.increment(runTime);
+        const Milliseconds runTimeThreshold{serverGlobalParams.slowRunMs.loadRelaxed()};
+        if (runTime >= runTimeThreshold) {
+            LOGV2_DEBUG(10602200,
+                        _severitySuppressorSlowRun().toInt(),
+                        "Task exceeded the slow execution time threshold",
+                        "slowRunTimeThreshold"_attr = runTimeThreshold,
+                        "duration"_attr = runTime);
+        }
         _executed.increment(1);
     };
 }

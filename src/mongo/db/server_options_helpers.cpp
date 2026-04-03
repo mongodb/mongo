@@ -497,10 +497,6 @@ Status storeBaseOptions(const moe::Environment& params) {
         serverGlobalParams.sampleRate.store(
             params["operationProfiling.slowOpSampleRate"].as<double>());
     }
-    if (params.count("taskExecutorProfiling.slowTaskWaitTimeProfilingMs")) {
-        serverGlobalParams.slowTaskExecutorWaitTimeProfilingMs.store(
-            params["taskExecutorProfiling.slowTaskWaitTimeProfilingMs"].as<int>());
-    }
 
     if (params.count("operationProfiling.filter")) {
         try {
@@ -512,6 +508,13 @@ Status storeBaseOptions(const moe::Environment& params) {
                       str::stream()
                           << "Failed to parse option operationProfiling.filter: " << e.reason());
         }
+    }
+
+    if (params.count("taskExecutorProfiling.slowRunMs")) {
+        serverGlobalParams.slowRunMs.store(params["taskExecutorProfiling.slowRunMs"].as<int>());
+    }
+    if (params.count("taskExecutorProfiling.slowWaitMs")) {
+        serverGlobalParams.slowWaitMs.store(params["taskExecutorProfiling.slowWaitMs"].as<int>());
     }
 
     if (params.count("processManagement.loadExtensions")) {

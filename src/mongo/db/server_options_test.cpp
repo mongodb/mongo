@@ -934,17 +934,14 @@ TEST(SetupOptions, NonNumericSampleRateYAMLConfigOptionFailsToParse) {
     ASSERT_NOT_OK(parser.run(options, argv, &environment));
 }
 
-TEST(SetupOptions, SlowTaskExecutorWaitTimeProfilingMsCommandLineParamParsesSuccessfully) {
+TEST(SetupOptions, SlowRunMsCommandLineParamParsesSuccessfully) {
     OptionsParserTester parser;
     moe::Environment environment;
     moe::OptionSection options;
 
     ASSERT_OK(addNonGeneralServerOptions(&options));
 
-    std::vector<std::string> argv;
-    argv.push_back("binaryname");
-    argv.push_back("--slowTaskWaitTimeProfilingMs");
-    argv.push_back("200");
+    std::vector<std::string> argv{"binaryname", "--slowRunMs", "200"};
 
     ASSERT_OK(parser.run(options, argv, &environment));
 
@@ -953,11 +950,10 @@ TEST(SetupOptions, SlowTaskExecutorWaitTimeProfilingMsCommandLineParamParsesSucc
     ASSERT_OK(setupServerOptions(argv));
     ASSERT_OK(storeServerOptions(environment));
 
-    ASSERT_EQ(serverGlobalParams.slowTaskExecutorWaitTimeProfilingMs.load(), 200);
+    ASSERT_EQ(serverGlobalParams.slowRunMs.load(), 200);
 }
 
-TEST(SetupOptions,
-     SlowTaskExecutorWaitTimeProfilingMsParamInitializedSuccessfullyFromINIConfigFile) {
+TEST(SetupOptions, SlowRunMsParamInitializedSuccessfullyFromINIConfigFile) {
     OptionsParserTester parser;
     moe::Environment environment;
     moe::OptionSection options;
@@ -965,12 +961,9 @@ TEST(SetupOptions,
     ASSERT_OK(addGeneralServerOptions(&options));
     ASSERT_OK(addNonGeneralServerOptions(&options));
 
-    std::vector<std::string> argv;
-    argv.push_back("binaryname");
-    argv.push_back("--config");
-    argv.push_back("config.ini");
+    std::vector<std::string> argv{"binaryname", "--config", "config.ini"};
 
-    parser.setConfig("config.ini", "slowTaskWaitTimeProfilingMs=200");
+    parser.setConfig("config.ini", "slowRunMs=200");
 
     ASSERT_OK(parser.run(options, argv, &environment));
 
@@ -979,11 +972,10 @@ TEST(SetupOptions,
     ASSERT_OK(setupServerOptions(argv));
     ASSERT_OK(storeServerOptions(environment));
 
-    ASSERT_EQ(serverGlobalParams.slowTaskExecutorWaitTimeProfilingMs.load(), 200);
+    ASSERT_EQ(serverGlobalParams.slowRunMs.load(), 200);
 }
 
-TEST(SetupOptions,
-     SlowTaskExecutorWaitTimeProfilingMsParamInitializedSuccessfullyFromYAMLConfigFile) {
+TEST(SetupOptions, SlowRunMsParamInitializedSuccessfullyFromYAMLConfigFile) {
     OptionsParserTester parser;
     moe::Environment environment;
     moe::OptionSection options;
@@ -991,14 +983,11 @@ TEST(SetupOptions,
     ASSERT_OK(addGeneralServerOptions(&options));
     ASSERT_OK(addNonGeneralServerOptions(&options));
 
-    std::vector<std::string> argv;
-    argv.push_back("binaryname");
-    argv.push_back("--config");
-    argv.push_back("config.yaml");
+    std::vector<std::string> argv{"binaryname", "--config", "config.yaml"};
 
     parser.setConfig("config.yaml",
                      "taskExecutorProfiling:\n"
-                     "    slowTaskWaitTimeProfilingMs: 200\n");
+                     "    slowRunMs: 200\n");
 
     ASSERT_OK(parser.run(options, argv, &environment));
 
@@ -1007,39 +996,126 @@ TEST(SetupOptions,
     ASSERT_OK(setupServerOptions(argv));
     ASSERT_OK(storeServerOptions(environment));
 
-    ASSERT_EQ(serverGlobalParams.slowTaskExecutorWaitTimeProfilingMs.load(), 200);
+    ASSERT_EQ(serverGlobalParams.slowRunMs.load(), 200);
 }
 
-TEST(SetupOptions, NonNumericSlowTaskExecutorWaitTimeProfilingMsCommandLineOptionFailsToParse) {
+TEST(SetupOptions, NonNumericSlowRunMsCommandLineOptionFailsToParse) {
     OptionsParserTester parser;
     moe::Environment environment;
     moe::OptionSection options;
 
     ASSERT_OK(addNonGeneralServerOptions(&options));
 
-    std::vector<std::string> argv;
-    argv.push_back("binaryname");
-    argv.push_back("--slowTaskWaitTimeProfilingMs");
-    argv.push_back("invalid");
+    std::vector<std::string> argv{"binaryname", "--slowRunMs", "invalid"};
 
     ASSERT_NOT_OK(parser.run(options, argv, &environment));
 }
 
-TEST(SetupOptions, NonNumericlowTaskExecutorWaitTimeProfilingMsYAMLConfigOptionFailsToParse) {
+TEST(SetupOptions, NonNumericSlowRunMsYAMLConfigOptionFailsToParse) {
     OptionsParserTester parser;
     moe::Environment environment;
     moe::OptionSection options;
 
     ASSERT_OK(addNonGeneralServerOptions(&options));
 
-    std::vector<std::string> argv;
-    argv.push_back("binaryname");
-    argv.push_back("--config");
-    argv.push_back("config.yaml");
+    std::vector<std::string> argv{"binaryname", "--config", "config.yaml"};
 
     parser.setConfig("config.yaml",
                      "taskExecutorProfiling:\n"
-                     "    slowTaskWaitTimeProfilingMs: invalid\n");
+                     "    slowRunMs: invalid\n");
+
+    ASSERT_NOT_OK(parser.run(options, argv, &environment));
+}
+
+TEST(SetupOptions, SlowWaitMsCommandLineParamParsesSuccessfully) {
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection options;
+
+    ASSERT_OK(addNonGeneralServerOptions(&options));
+
+    std::vector<std::string> argv{"binaryname", "--slowWaitMs", "200"};
+
+    ASSERT_OK(parser.run(options, argv, &environment));
+
+    ASSERT_OK(validateServerOptions(environment));
+    ASSERT_OK(canonicalizeServerOptions(&environment));
+    ASSERT_OK(setupServerOptions(argv));
+    ASSERT_OK(storeServerOptions(environment));
+
+    ASSERT_EQ(serverGlobalParams.slowWaitMs.load(), 200);
+}
+
+TEST(SetupOptions, SlowWaitMsParamInitializedSuccessfullyFromINIConfigFile) {
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection options;
+
+    ASSERT_OK(addGeneralServerOptions(&options));
+    ASSERT_OK(addNonGeneralServerOptions(&options));
+
+    std::vector<std::string> argv{"binaryname", "--config", "config.ini"};
+
+    parser.setConfig("config.ini", "slowWaitMs=200");
+
+    ASSERT_OK(parser.run(options, argv, &environment));
+
+    ASSERT_OK(validateServerOptions(environment));
+    ASSERT_OK(canonicalizeServerOptions(&environment));
+    ASSERT_OK(setupServerOptions(argv));
+    ASSERT_OK(storeServerOptions(environment));
+
+    ASSERT_EQ(serverGlobalParams.slowWaitMs.load(), 200);
+}
+
+TEST(SetupOptions, SlowWaitMsParamInitializedSuccessfullyFromYAMLConfigFile) {
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection options;
+
+    ASSERT_OK(addGeneralServerOptions(&options));
+    ASSERT_OK(addNonGeneralServerOptions(&options));
+
+    std::vector<std::string> argv{"binaryname", "--config", "config.yaml"};
+
+    parser.setConfig("config.yaml",
+                     "taskExecutorProfiling:\n"
+                     "    slowWaitMs: 200\n");
+
+    ASSERT_OK(parser.run(options, argv, &environment));
+
+    ASSERT_OK(validateServerOptions(environment));
+    ASSERT_OK(canonicalizeServerOptions(&environment));
+    ASSERT_OK(setupServerOptions(argv));
+    ASSERT_OK(storeServerOptions(environment));
+
+    ASSERT_EQ(serverGlobalParams.slowWaitMs.load(), 200);
+}
+
+TEST(SetupOptions, NonNumericSlowWaitMsCommandLineOptionFailsToParse) {
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection options;
+
+    ASSERT_OK(addNonGeneralServerOptions(&options));
+
+    std::vector<std::string> argv{"binaryname", "--slowWaitMs", "invalid"};
+
+    ASSERT_NOT_OK(parser.run(options, argv, &environment));
+}
+
+TEST(SetupOptions, NonNumericSlowWaitMsYAMLConfigOptionFailsToParse) {
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection options;
+
+    ASSERT_OK(addNonGeneralServerOptions(&options));
+
+    std::vector<std::string> argv{"binaryname", "--config", "config.yaml"};
+
+    parser.setConfig("config.yaml",
+                     "taskExecutorProfiling:\n"
+                     "    slowWaitMs: invalid\n");
 
     ASSERT_NOT_OK(parser.run(options, argv, &environment));
 }

@@ -247,9 +247,10 @@ TEST_F(ExecutorStatsTest, RunTime) {
     runTimingTests(getRunning(), test);
 }
 
-TEST_F(ExecutorStatsTest, SlowTaskExecutorWaitTimeProfilingLog) {
-    // Make the tasks wait time 51 Millis exceed the default slow wait time threshold of 50 Millis
-    Milliseconds delay = Milliseconds{51};
+TEST_F(ExecutorStatsTest, SlowWaitMsLog) {
+    // Make the task's wait time 50 Millis to meet the default slow wait time threshold of 50
+    // Millis.
+    Milliseconds delay = Milliseconds{50};
     unittest::LogCaptureGuard logs;
 
     auto task = wrapTask([](Status) {});
@@ -257,8 +258,19 @@ TEST_F(ExecutorStatsTest, SlowTaskExecutorWaitTimeProfilingLog) {
     task(Status::OK());
 
     logs.stop();
-    // Check for the slow wait time log message
-    ASSERT_EQUALS(1, logs.countTextContaining("Task exceeded the slow wait time threshold"));
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 9757000)), 1);
+}
+
+TEST_F(ExecutorStatsTest, SlowRunMsLog) {
+    // Make the task's run time 10 Millis to meet the default slow run time threshold of 10 Millis.
+    Milliseconds delay = Milliseconds{10};
+    unittest::LogCaptureGuard logs;
+
+    auto task = wrapTask([this, delay](Status) { advanceTime(delay); });
+    task(Status::OK());
+
+    logs.stop();
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 10602200)), 1);
 }
 
 TEST_F(ExecutorStatsTest, MovingAverageZeroWithNoTasks) {

@@ -118,10 +118,10 @@ struct MONGO_MOD_PUB ServerGlobalParams {
     Atomic<double> sampleRate{1.0};  // --samplerate rate at which to sample slow queries
     int defaultLocalThresholdMillis = 15;  // --localThreshold in ms to consider a node local
 
-    Atomic<int> slowTaskExecutorWaitTimeProfilingMs{
-        50};                    // --time in ms that is "slow" for a task to begin execution
-    bool noUnixSocket = false;  // --nounixsocket
-    bool doFork = false;        // --fork
+    Atomic<int> slowRunMs{10};  // --slowRunMs is the slow task execution time threshold for logging
+    Atomic<int> slowWaitMs{50};  // --slowWaitMs is the slow wait time threshold for logging
+    bool noUnixSocket = false;   // --nounixsocket
+    bool doFork = false;         // --fork
     bool isMongoBridge = false;
 
     std::string proxySocketPrefix;  // Proxy UNIX domain socket directory

@@ -84,7 +84,9 @@ private:
     Histogram<Microseconds> _running;
 
     TickSource* const _tickSource;
-    logv2::SeveritySuppressor severitySuppressor{
+    logv2::SeveritySuppressor _severitySuppressorSlowWait{
+        Seconds{10}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
+    logv2::SeveritySuppressor _severitySuppressorSlowRun{
         Seconds{10}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
 };
 

@@ -81,11 +81,6 @@ configs:
         short_name: defaultSlowInProgMS
         arg_vartype: Int
         default: 5000
-    "taskExecutorProfiling.slowTaskWaitTimeProfilingMs":
-        description: "Value of slow wait time for tasks"
-        short_name: slowTaskWaitTimeProfilingMs
-        arg_vartype: Int
-        default: 50
     "operationProfiling.slowOpSampleRate":
         description: "Fraction of slow ops to include in the profile and console log"
         short_name: slowOpSampleRate
@@ -95,3 +90,13 @@ configs:
         description: "Query predicate to control which operations are logged and profiled"
         short_name: profileFilter
         arg_vartype: String
+    "taskExecutorProfiling.slowRunMs":
+        description: "Slow task execution threshold for logging"
+        short_name: slowRunMs
+        arg_vartype: Int
+        default: 10
+    "taskExecutorProfiling.slowWaitMs":
+        description: "Slow task wait time threshold for logging"
+        short_name: slowWaitMs
+        arg_vartype: Int
+        default: 50
