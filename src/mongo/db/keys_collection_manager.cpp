@@ -429,6 +429,7 @@ void KeysCollectionManager::PeriodicRunner::start(ServiceContext* service,
 }
 
 void KeysCollectionManager::PeriodicRunner::stop() {
+    stdx::thread threadToJoin;
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         if (!_backgroundThread.joinable()) {
@@ -437,9 +438,10 @@ void KeysCollectionManager::PeriodicRunner::stop() {
 
         _inShutdown = true;
         _refreshNeededCV.notify_all();
+        threadToJoin = std::move(_backgroundThread);
     }
 
-    _backgroundThread.join();
+    threadToJoin.join();
 }
 
 bool KeysCollectionManager::PeriodicRunner::hasSeenKeys() const {
