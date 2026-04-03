@@ -2,4 +2,4 @@ set -o errexit
 
 cd src
 # Move binaries to CWD as Jepsen expects that.
-mv dist-test/bin/* .
+mv dist-test/bin/mongo{,d,s,bridge} .
