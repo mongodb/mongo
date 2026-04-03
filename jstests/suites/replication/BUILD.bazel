@@ -35,7 +35,7 @@ resmoke_suite_test(
         "repl",
     ],
     target_compatible_with = select({
-        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "@platforms//cpu:s390x": ["@platforms//:incompatible"],
         "@platforms//os:macos": ["@platforms//:incompatible"],
         "//conditions:default": [],
@@ -61,7 +61,7 @@ resmoke_suite_test(
         "repl",
     ],
     target_compatible_with = select({
-        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "@platforms//cpu:s390x": ["@platforms//:incompatible"],
         "@platforms//os:macos": ["@platforms//:incompatible"],
         "//conditions:default": [],
@@ -87,7 +87,7 @@ resmoke_suite_test(
         "repl",
     ],
     target_compatible_with = select({
-        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "@platforms//cpu:s390x": ["@platforms//:incompatible"],
         "@platforms//os:macos": ["@platforms//:incompatible"],
         "//conditions:default": [],
@@ -116,7 +116,7 @@ resmoke_suite_test(
         "sharded",
     ],
     target_compatible_with = select({
-        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "@platforms//cpu:s390x": ["@platforms//:incompatible"],
         "@platforms//os:macos": ["@platforms//:incompatible"],
         "//conditions:default": [],
@@ -357,7 +357,7 @@ resmoke_suite_test(
         "repl",
     ],
     target_compatible_with = select({
-        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
         "@platforms//cpu:s390x": ["@platforms//:incompatible"],
         "@platforms//os:macos": ["@platforms//:incompatible"],
         "//conditions:default": [],
