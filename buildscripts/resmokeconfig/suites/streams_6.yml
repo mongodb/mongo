@@ -1,0 +1,20 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - src/mongo/db/modules/*/jstests/streams/checkpoint.js
+    - src/mongo/db/modules/*/jstests/streams/memory_limit.js
+    - src/mongo/db/modules/*/jstests/streams/connection_errors3_replset.js
+    - src/mongo/db/modules/*/jstests/streams/merge_2_expr.js
+    - src/mongo/db/modules/*/jstests/streams/lookup.js
+
+executor:
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      bind_ip_all: ""
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagStreams: true
+        diagnosticDataCollectionEnabled: false
+    num_nodes: 1

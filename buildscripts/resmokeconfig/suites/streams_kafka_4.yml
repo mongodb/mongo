@@ -2,9 +2,9 @@ test_kind: js_test
 
 selector:
   roots:
-    - src/mongo/db/modules/*/jstests/streams_kafka/*.js
-  exclude_files:
-    - src/mongo/db/modules/enterprise/jstests/streams_kafka/kafka_utils.js
+    - src/mongo/db/modules/*/jstests/streams_kafka/kafka5_rebalancing.js
+    - src/mongo/db/modules/*/jstests/streams_kafka/kafka5_watermarks.js
+    - src/mongo/db/modules/*/jstests/streams_kafka/kafka_topic_deleted.js
 
 executor:
   fixture:

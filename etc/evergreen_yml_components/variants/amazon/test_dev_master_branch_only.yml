@@ -152,9 +152,6 @@ buildvariants:
         --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,incompatible_with_atlas_environment,m8g_incompatible
     tasks:
-      - name: streams_build_and_push
-        distros:
-          - amazon2023-arm64-latest-m8g-4xlarge
       - name: .development_critical !.requires_extra_system_deps !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
       - name: .development_critical !.requires_extra_system_deps .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
         distros:
@@ -168,9 +165,7 @@ buildvariants:
         distros:
           - amazon2023-arm64-atlas-latest-m8g-2xlarge
       - name: .fuzzer_deterministic
-      - name: .streams_release_test !.requires_extra_system_deps !streams_kafka_gen !streams_kafka_benchmark !streams_kafka_gwproxy !streams_kinesis
-        depends_on:
-          - name: streams_build_and_push
+      - name: .streams_sanitizer_all
 
   - <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
     name: enterprise-amazon-linux2023-arm64-all-feature-flags-extra-system-deps
@@ -189,6 +184,18 @@ buildvariants:
         --runAllFeatureFlagTests
         --additionalFeatureFlags=featureFlagStreams
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source
+    display_tasks:
+      - name: streams_aspio_tests
+        execution_tasks:
+          - streams_aspio
+          - streams_aspio_iceberg_0
+          - streams_aspio_iceberg_1
+          - streams_aspio_iceberg_2
+          - streams_aspio_iceberg_3
+          - streams_aspio_iceberg_large
+          - streams_aspio_iceberg_5
+          - streams_aspio_utilities
+          - streams_aspio_pubsub
     tasks:
       - name: .requires_extra_system_deps .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
       - name: .requires_extra_system_deps .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only

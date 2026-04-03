@@ -1,0 +1,28 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - src/mongo/db/modules/*/jstests/streams/replication.js
+    - src/mongo/db/modules/*/jstests/streams/window_modify.js
+    - src/mongo/db/modules/*/jstests/streams/change_stream_source_initial_sync_validity.js
+    - src/mongo/db/modules/*/jstests/streams/merge_dynamic.js
+    - src/mongo/db/modules/*/jstests/streams/merge.js
+    - src/mongo/db/modules/*/jstests/streams/cached_lookup_benchmark.js
+    - src/mongo/db/modules/*/jstests/streams/change_stream_history_lost.js
+    - src/mongo/db/modules/*/jstests/streams/large_accumulator.js
+    - src/mongo/db/modules/*/jstests/streams/checkpoint_skip.js
+    - src/mongo/db/modules/*/jstests/streams/modify.js
+    - src/mongo/db/modules/*/jstests/streams/change_stream_source_initial_sync_2.js
+    - src/mongo/db/modules/*/jstests/streams/modify_2_initial_sync.js
+    - src/mongo/db/modules/*/jstests/streams/simple_merge_benchmark.js
+
+executor:
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      bind_ip_all: ""
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagStreams: true
+        diagnosticDataCollectionEnabled: false
+    num_nodes: 1

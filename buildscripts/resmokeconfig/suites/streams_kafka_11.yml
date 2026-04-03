@@ -1,0 +1,21 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - src/mongo/db/modules/*/jstests/streams_kafka/kafka5_tombstone.js
+    - src/mongo/db/modules/*/jstests/streams_kafka/kafka1_modify.js
+    - src/mongo/db/modules/*/jstests/streams_kafka/kafka3.js
+    - src/mongo/db/modules/*/jstests/streams_kafka/kafka_throttle.js
+    - src/mongo/db/modules/*/jstests/streams_kafka/kafka5.js
+    - src/mongo/db/modules/*/jstests/streams_kafka/kafka_new_partition_connection_deadline.js
+
+executor:
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      bind_ip_all: ""
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagStreams: true
+        diagnosticDataCollectionEnabled: false
+    num_nodes: 1

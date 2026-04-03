@@ -9,6 +9,19 @@ buildvariants:
       - amazon2023.3-arm64-m8g-4xlarge
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     stepback: false
+    display_tasks:
+      - name: streams_sanitizer_tests
+        execution_tasks:
+          - streams_sanitizer_0
+          - streams_sanitizer_1
+          - streams_sanitizer_2
+          - streams_sanitizer_3
+          - streams_sanitizer_4
+          - streams_sanitizer_5
+          - streams_sanitizer_6
+          - streams_sanitizer_7
+          - streams_sanitizer_8
+          - streams_sanitizer_9
     expansions:
       test_flags: --excludeWithAnyTags=resource_intensive,incompatible_with_gcov
       bazel_compile_flags: >-
@@ -53,8 +66,7 @@ buildvariants:
       - name: aggregation_sharded_collections_passthrough
       - name: change_streams_mongos_sessions_passthrough
       - name: fle2_sharding
-      # Streams sanitizer tasks use archive_dist_test binaries (compatible with coverage-instrumented builds)
-      - name: streams_sanitizer_gen
+      - name: .streams_sanitizer_all
       - name: streams_https_sanitizer
       - name: streams_lambda_sanitizer
       - name: streams_kinesis_sanitizer

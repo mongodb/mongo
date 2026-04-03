@@ -51,6 +51,9 @@ if [ "$DISTRO" != "amazon2023" ]; then
     mkdir -p ./dist-test/bin
     cp -L ./bazel-bin/src/mongo/db/mongod ./dist-test/bin/mongod
     cp -L ./bazel-bin/src/mongo/shell/mongo ./dist-test/bin/mongo
+    cp -L ./bazel-bin/src/mongo/s/mongos ./dist-test/bin/mongos
+    mkdir -p ./dist-test/bin/x509
+    cp -L ./bazel-bin/x509/*.pem ./dist-test/bin/x509/
     tar -czvf streams-binaries.tgz dist-test/
     exit 0
 fi
@@ -117,6 +120,9 @@ wait_for_job $VENV_PID "Full venv setup" "$LOGS_DIR/venv.log"
 mkdir -p ./dist-test/bin
 cp -L ./bazel-bin/src/mongo/db/mongod ./dist-test/bin/mongod
 cp -L ./bazel-bin/src/mongo/shell/mongo ./dist-test/bin/mongo
+cp -L ./bazel-bin/src/mongo/s/mongos ./dist-test/bin/mongos
+mkdir -p ./dist-test/bin/x509
+cp -L ./bazel-bin/x509/*.pem ./dist-test/bin/x509/
 
 attempts=0
 max_attempts=4

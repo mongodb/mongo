@@ -1,0 +1,94 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - src/mongo/db/modules/*/jstests/streams/long_lookup.js
+    - src/mongo/db/modules/*/jstests/streams/window_modify_2.js
+    - src/mongo/db/modules/*/jstests/streams/merge_large.js
+    - src/mongo/db/modules/*/jstests/streams/userlogs/userlogs.js
+    - src/mongo/db/modules/*/jstests/streams/changestream_kafka_correctness.js
+    - src/mongo/db/modules/*/jstests/streams/window.js
+    - src/mongo/db/modules/*/jstests/streams/stats.js
+    - src/mongo/db/modules/*/jstests/streams/session_window_2.js
+    - src/mongo/db/modules/*/jstests/streams/stream_meta_v2.js
+    - src/mongo/db/modules/*/jstests/streams/checkpoint_large_tumbling_window.js
+    - src/mongo/db/modules/*/jstests/streams/lookup_pipeline.js
+    - src/mongo/db/modules/*/jstests/streams/session_window.js
+    - src/mongo/db/modules/*/jstests/streams/merge_requires_unique_index.js
+    - src/mongo/db/modules/*/jstests/streams/timefield_parse_test.js
+    - src/mongo/db/modules/*/jstests/streams/start.js
+    - src/mongo/db/modules/*/jstests/streams/change_stream_source_readpref.js
+    - src/mongo/db/modules/*/jstests/streams/stats_modify_restart.js
+    - src/mongo/db/modules/*/jstests/streams/correctness_1.js
+    - src/mongo/db/modules/*/jstests/streams/change_stream_source_initial_sync_sharded.js
+    - src/mongo/db/modules/*/jstests/streams/replication_big.js
+    - src/mongo/db/modules/*/jstests/streams/multiple_sp_window_tests.js
+    - src/mongo/db/modules/*/jstests/streams/window_group_multithreading.js
+    - src/mongo/db/modules/*/jstests/streams/example_materialize_filter.js
+    - src/mongo/db/modules/*/jstests/streams/change_stream_source_long_oplog.js
+    - src/mongo/db/modules/*/jstests/streams/project.js
+    - src/mongo/db/modules/*/jstests/streams/window_checkpoint_hopping.js
+    - src/mongo/db/modules/*/jstests/streams/window_checkpoint_tumbling.js
+    - src/mongo/db/modules/*/jstests/streams/timeseries_largedocument_emit.js
+    - src/mongo/db/modules/*/jstests/streams/cached_lookup.js
+    - src/mongo/db/modules/*/jstests/streams/change_stream_internal_db_filter.js
+    - src/mongo/db/modules/*/jstests/streams/example_materialize_vwap.js
+    - src/mongo/db/modules/*/jstests/streams/feature_flag.js
+    - src/mongo/db/modules/*/jstests/streams/checkpoint_large_hopping_window.js
+    - src/mongo/db/modules/*/jstests/streams/checkpoint_large_group_accumulator.js
+    - src/mongo/db/modules/*/jstests/streams/late_events.js
+    - src/mongo/db/modules/*/jstests/streams/set_stream_meta.js
+    - src/mongo/db/modules/*/jstests/streams/changestream_start_at_operation_time.js
+    - src/mongo/db/modules/*/jstests/streams/match.js
+    - src/mongo/db/modules/*/jstests/streams/change_stream_source_initial_sync_error_messages.js
+    - src/mongo/db/modules/*/jstests/streams/dlq.js
+    - src/mongo/db/modules/*/jstests/streams/geospatial.js
+    - src/mongo/db/modules/*/jstests/streams/stream_meta.js
+    - src/mongo/db/modules/*/jstests/streams/sigterm.js
+    - src/mongo/db/modules/*/jstests/streams/window_group.js
+    - src/mongo/db/modules/*/jstests/streams/merge_pipeline.js
+    - src/mongo/db/modules/*/jstests/streams/merge_queue_size_limit.js
+    - src/mongo/db/modules/*/jstests/streams/group_dlq.js
+    - src/mongo/db/modules/*/jstests/streams/start_list.js
+    - src/mongo/db/modules/*/jstests/streams/sample_data_source.js
+    - src/mongo/db/modules/*/jstests/streams/unwind.js
+    - src/mongo/db/modules/*/jstests/streams/unset.js
+    - src/mongo/db/modules/*/jstests/streams/replace_with.js
+    - src/mongo/db/modules/*/jstests/streams/redact.js
+    - src/mongo/db/modules/*/jstests/streams/set.js
+    - src/mongo/db/modules/*/jstests/streams/stop_reason.js
+    - src/mongo/db/modules/*/jstests/streams/replace_root.js
+    - src/mongo/db/modules/*/jstests/streams/set_stream_meta_error.js
+    - src/mongo/db/modules/*/jstests/streams/sample_ephemeral_shutdown.js
+    - src/mongo/db/modules/*/jstests/streams/simple_merge.js
+    - src/mongo/db/modules/*/jstests/streams/checkpoint_backwards_compat.js
+    - src/mongo/db/modules/*/jstests/streams/duplicate_fields.js
+    - src/mongo/db/modules/*/jstests/streams/merge_error_handling.js
+    - src/mongo/db/modules/*/jstests/streams/dlq_failure.js
+    - src/mongo/db/modules/*/jstests/streams/function_expression.js
+    - src/mongo/db/modules/*/jstests/streams/change_stream_source_standalone.js
+    - src/mongo/db/modules/*/jstests/streams/metrics.js
+    - src/mongo/db/modules/*/jstests/streams/sample_dlq.js
+    - src/mongo/db/modules/*/jstests/streams/sample.js
+    - src/mongo/db/modules/*/jstests/streams/example_modify.js
+    - src/mongo/db/modules/*/jstests/streams/documents_data_source.js
+    - src/mongo/db/modules/*/jstests/streams/documents.js
+    - src/mongo/db/modules/*/jstests/streams/validate.js
+    - src/mongo/db/modules/*/jstests/streams/parse_only.js
+    - src/mongo/db/modules/*/jstests/streams/infinite_loop.js
+    - src/mongo/db/modules/*/jstests/streams/accumulator_expression.js
+    - src/mongo/db/modules/*/jstests/streams/example_window.js
+    - src/mongo/db/modules/*/jstests/streams/stack_trace.js
+    - src/mongo/db/modules/*/jstests/streams/bad_source.js
+    - src/mongo/db/modules/*/jstests/streams/operator_parallelism_feature_flags.js
+
+executor:
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      bind_ip_all: ""
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagStreams: true
+        diagnosticDataCollectionEnabled: false
+    num_nodes: 1

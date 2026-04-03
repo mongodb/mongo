@@ -1,0 +1,23 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - src/mongo/db/modules/*/jstests/streams/connection_errors3.js
+    - src/mongo/db/modules/*/jstests/streams/change_stream_source.js
+    - src/mongo/db/modules/*/jstests/streams/connection_errors_2.js
+    - src/mongo/db/modules/*/jstests/streams/change_stream_source_initial_sync_checkpoint.js
+    - src/mongo/db/modules/*/jstests/streams/timeseries_emit_parallel.js
+    - src/mongo/db/modules/*/jstests/streams/smoketest.js
+    - src/mongo/db/modules/*/jstests/streams/connection_errors.js
+    - src/mongo/db/modules/*/jstests/streams/change_stream_source_initial_sync_1_types.js
+
+executor:
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      bind_ip_all: ""
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagStreams: true
+        diagnosticDataCollectionEnabled: false
+    num_nodes: 1

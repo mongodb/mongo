@@ -72,7 +72,7 @@ resmoke_suite_test(
         # failed 34:12572 times, success p90 => 9.179s, score => 3.704
         "//src/mongo/db/modules/enterprise/jstests/streams:lookup_pipeline.js",
     ],
-    config = "//buildscripts/resmokeconfig:suites/streams.yml",
+    config = "//buildscripts/resmokeconfig:suites/streams_smoke.yml",
     data = [
         "//jstests/query_golden/libs:all_javascript_files",
         "//src/mongo/db/modules/enterprise/jstests/streams:common_test.js",

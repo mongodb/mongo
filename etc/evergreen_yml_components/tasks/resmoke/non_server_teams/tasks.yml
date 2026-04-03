@@ -79,19 +79,6 @@ variables:
           resmoke_jobs_max: 1
           suite: benchmark_suite
 
-  - &gen_task_template_streams
-    name: gen_task_template_streams
-    depends_on:
-      - name: version_gen
-        variant: generate-tasks-for-version
-        omit_generated_tasks: true
-      - name: archive_dist_test
-      - name: streams_build_and_push
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          resmoke_args: --help
-
   - &task_template_streams
     name: template_streams
     depends_on:
@@ -270,42 +257,15 @@ tasks:
           exec_timeout_secs: 18000 # 5 hour timeout.
           resmoke_jobs_max: 1
 
-  - <<: *gen_task_template_streams
-    name: streams_gen
-    tags:
-      ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          num_tasks: 10
-          fallback_num_sub_suites: 2
-
-  # Sanitizer variant of streams_gen - uses archive_dist_test binaries instead of streams_build_and_push
-  - <<: *gen_task_template
-    name: streams_sanitizer_gen
-    tags: ["assigned_to_jira_team_streams", "experimental"]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          suite: streams
-          num_tasks: 10
-          fallback_num_sub_suites: 2
-
-  - <<: *gen_task_template_streams
-    name: streams_kafka_gen
-    tags:
-      ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          num_tasks: 10
-          fallback_num_sub_suites: 2
-          resmoke_jobs_max: 1
-
   - <<: *task_template_streams
     name: streams_kafka_gwproxy
     tags:
-      ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
+      [
+        "assigned_to_jira_team_streams",
+        "experimental",
+        "streams_release_test",
+        "streams_kafka_all",
+      ]
     commands:
       - command: ec2.assume_role
         params:
@@ -316,7 +276,12 @@ tasks:
   - <<: *task_template_streams
     name: streams_kafka_benchmark
     tags:
-      ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
+      [
+        "assigned_to_jira_team_streams",
+        "experimental",
+        "streams_release_test",
+        "streams_kafka_all",
+      ]
     commands:
       - func: "do setup for streams"
       - func: "run tests"
@@ -338,6 +303,106 @@ tasks:
       - func: "run tests"
         vars:
           suite: streams_https
+
+  - <<: *task_template
+    name: streams_sanitizer_0
+    tags:
+      ["assigned_to_jira_team_streams", "experimental", "streams_sanitizer_all"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: streams_0
+
+  - <<: *task_template
+    name: streams_sanitizer_1
+    tags:
+      ["assigned_to_jira_team_streams", "experimental", "streams_sanitizer_all"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: streams_1
+
+  - <<: *task_template
+    name: streams_sanitizer_2
+    tags:
+      ["assigned_to_jira_team_streams", "experimental", "streams_sanitizer_all"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: streams_2
+
+  - <<: *task_template
+    name: streams_sanitizer_3
+    tags:
+      ["assigned_to_jira_team_streams", "experimental", "streams_sanitizer_all"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: streams_3
+
+  - <<: *task_template
+    name: streams_sanitizer_4
+    tags:
+      ["assigned_to_jira_team_streams", "experimental", "streams_sanitizer_all"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: streams_4
+
+  - <<: *task_template
+    name: streams_sanitizer_5
+    tags:
+      ["assigned_to_jira_team_streams", "experimental", "streams_sanitizer_all"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: streams_5
+
+  - <<: *task_template
+    name: streams_sanitizer_6
+    tags:
+      ["assigned_to_jira_team_streams", "experimental", "streams_sanitizer_all"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: streams_6
+
+  - <<: *task_template
+    name: streams_sanitizer_7
+    tags:
+      ["assigned_to_jira_team_streams", "experimental", "streams_sanitizer_all"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: streams_7
+
+  - <<: *task_template
+    name: streams_sanitizer_8
+    tags:
+      ["assigned_to_jira_team_streams", "experimental", "streams_sanitizer_all"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: streams_8
+
+  - <<: *task_template
+    name: streams_sanitizer_9
+    tags:
+      ["assigned_to_jira_team_streams", "experimental", "streams_sanitizer_all"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: streams_9
 
   # Sanitizer variant of streams_lambda - uses archive_dist_test binaries instead of streams_build_and_push
   - <<: *task_template
@@ -425,6 +490,7 @@ tasks:
         "experimental",
         "streams_release_test",
         "requires_extra_system_deps",
+        "streams_aspio_all",
       ]
     commands:
       - func: "do setup for streams"
@@ -440,6 +506,7 @@ tasks:
         "experimental",
         "streams_release_test",
         "requires_extra_system_deps",
+        "streams_aspio_all",
       ]
     commands:
       - func: "do setup for streams"
@@ -455,6 +522,7 @@ tasks:
         "experimental",
         "streams_release_test",
         "requires_extra_system_deps",
+        "streams_aspio_all",
       ]
     commands:
       - func: "do setup for streams"
@@ -470,6 +538,7 @@ tasks:
         "experimental",
         "streams_release_test",
         "requires_extra_system_deps",
+        "streams_aspio_all",
       ]
     commands:
       - func: "do setup for streams"
@@ -485,6 +554,7 @@ tasks:
         "experimental",
         "streams_release_test",
         "requires_extra_system_deps",
+        "streams_aspio_all",
       ]
     commands:
       - func: "do setup for streams"
@@ -515,6 +585,7 @@ tasks:
         "experimental",
         "streams_release_test",
         "requires_extra_system_deps",
+        "streams_aspio_all",
       ]
     commands:
       - func: "do setup for streams"
@@ -530,6 +601,7 @@ tasks:
         "experimental",
         "streams_release_test",
         "requires_extra_system_deps",
+        "streams_aspio_all",
       ]
     commands:
       - func: "do setup for streams"
@@ -545,6 +617,7 @@ tasks:
         "experimental",
         "streams_release_test",
         "requires_extra_system_deps",
+        "streams_aspio_all",
       ]
     commands:
       - func: "do setup for streams"
@@ -576,6 +649,7 @@ tasks:
         "experimental",
         "streams_release_test",
         "requires_extra_system_deps",
+        "streams_aspio_all",
       ]
     commands:
       - func: "do setup for streams"
@@ -605,6 +679,334 @@ tasks:
     commands:
       - func: "streams build debug"
       - func: "upload streams debugsymbols"
+
+  - name: streams_suite_coverage_linter
+    tags: ["assigned_to_jira_team_streams", "auxiliary"]
+    exec_timeout_secs: 120 # 2 minute timeout
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          args:
+            - "-c"
+            - "cd src && python3 buildscripts/streams_suite_coverage_linter.py"
+
+  - <<: *task_template_streams
+    name: streams_0
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "experimental",
+        "streams_release_test",
+        "streams_all",
+      ]
+    commands:
+      - func: "do setup for streams"
+      - func: "run streams tests"
+
+  - <<: *task_template_streams
+    name: streams_1
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "experimental",
+        "streams_release_test",
+        "streams_all",
+      ]
+    commands:
+      - func: "do setup for streams"
+      - func: "run streams tests"
+
+  - <<: *task_template_streams
+    name: streams_2
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "experimental",
+        "streams_release_test",
+        "streams_all",
+      ]
+    commands:
+      - func: "do setup for streams"
+      - func: "run streams tests"
+
+  - <<: *task_template_streams
+    name: streams_3
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "experimental",
+        "streams_release_test",
+        "streams_all",
+      ]
+    commands:
+      - func: "do setup for streams"
+      - func: "run streams tests"
+
+  - <<: *task_template_streams
+    name: streams_4
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "experimental",
+        "streams_release_test",
+        "streams_all",
+      ]
+    commands:
+      - func: "do setup for streams"
+      - func: "run streams tests"
+
+  - <<: *task_template_streams
+    name: streams_5
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "experimental",
+        "streams_release_test",
+        "streams_all",
+      ]
+    commands:
+      - func: "do setup for streams"
+      - func: "run streams tests"
+
+  - <<: *task_template_streams
+    name: streams_6
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "experimental",
+        "streams_release_test",
+        "streams_all",
+      ]
+    commands:
+      - func: "do setup for streams"
+      - func: "run streams tests"
+
+  - <<: *task_template_streams
+    name: streams_7
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "experimental",
+        "streams_release_test",
+        "streams_all",
+      ]
+    commands:
+      - func: "do setup for streams"
+      - func: "run streams tests"
+
+  - <<: *task_template_streams
+    name: streams_8
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "experimental",
+        "streams_release_test",
+        "streams_all",
+      ]
+    commands:
+      - func: "do setup for streams"
+      - func: "run streams tests"
+
+  - <<: *task_template_streams
+    name: streams_9
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "experimental",
+        "streams_release_test",
+        "streams_all",
+      ]
+    commands:
+      - func: "do setup for streams"
+      - func: "run streams tests"
+
+  - <<: *task_template_streams
+    name: streams_kafka_0
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "experimental",
+        "streams_release_test",
+        "streams_kafka_all",
+      ]
+    commands:
+      - func: "do setup for streams"
+      - func: "run streams tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template_streams
+    name: streams_kafka_1
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "experimental",
+        "streams_release_test",
+        "streams_kafka_all",
+      ]
+    commands:
+      - func: "do setup for streams"
+      - func: "run streams tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template_streams
+    name: streams_kafka_2
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "experimental",
+        "streams_release_test",
+        "streams_kafka_all",
+      ]
+    commands:
+      - func: "do setup for streams"
+      - func: "run streams tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template_streams
+    name: streams_kafka_3
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "experimental",
+        "streams_release_test",
+        "streams_kafka_all",
+      ]
+    commands:
+      - func: "do setup for streams"
+      - func: "run streams tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template_streams
+    name: streams_kafka_4
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "experimental",
+        "streams_release_test",
+        "streams_kafka_all",
+      ]
+    commands:
+      - func: "do setup for streams"
+      - func: "run streams tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template_streams
+    name: streams_kafka_5
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "experimental",
+        "streams_release_test",
+        "streams_kafka_all",
+      ]
+    commands:
+      - func: "do setup for streams"
+      - func: "run streams tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template_streams
+    name: streams_kafka_6
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "experimental",
+        "streams_release_test",
+        "streams_kafka_all",
+      ]
+    commands:
+      - func: "do setup for streams"
+      - func: "run streams tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template_streams
+    name: streams_kafka_7
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "experimental",
+        "streams_release_test",
+        "streams_kafka_all",
+      ]
+    commands:
+      - func: "do setup for streams"
+      - func: "run streams tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template_streams
+    name: streams_kafka_8
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "experimental",
+        "streams_release_test",
+        "streams_kafka_all",
+      ]
+    commands:
+      - func: "do setup for streams"
+      - func: "run streams tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template_streams
+    name: streams_kafka_9
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "experimental",
+        "streams_release_test",
+        "streams_kafka_all",
+      ]
+    commands:
+      - func: "do setup for streams"
+      - func: "run streams tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template_streams
+    name: streams_kafka_10
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "experimental",
+        "streams_release_test",
+        "streams_kafka_all",
+      ]
+    commands:
+      - func: "do setup for streams"
+      - func: "run streams tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template_streams
+    name: streams_kafka_11
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "experimental",
+        "streams_release_test",
+        "streams_kafka_all",
+      ]
+    commands:
+      - func: "do setup for streams"
+      - func: "run streams tests"
+        vars:
+          resmoke_jobs_max: 1
 
   - name: bazel_result_tasks_gen
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]

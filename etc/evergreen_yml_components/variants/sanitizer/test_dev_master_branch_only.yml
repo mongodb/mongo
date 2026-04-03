@@ -228,9 +228,6 @@ buildvariants:
       - name: .release_critical .requires_large_host_debug_mode !.incompatible_development_variant !.incompatible_debug_mode !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
           - *enterprise-rhel-8-64-bit-dynamic-debug-mode-large-distro-name
-      - name: streams_build_and_push
-        distros:
-          - *enterprise-rhel-8-64-bit-dynamic-debug-mode-large-distro-name
       - name: .default !.requires_large_host !.requires_large_host_debug_mode !.requires_extra_system_deps !.incompatible_development_variant !.incompatible_debug_mode !.incompatible_system_allocator !.requires_all_feature_flags
       - name: .default .requires_large_host !.requires_extra_system_deps !.incompatible_development_variant !.incompatible_debug_mode !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
@@ -518,6 +515,19 @@ buildvariants:
     cron: "0 2 1-31/2 * *" # For cost reasons, we run this variant every other day
     run_on:
       - rhel8.8-large
+    display_tasks:
+      - name: streams_sanitizer_tests
+        execution_tasks:
+          - streams_sanitizer_0
+          - streams_sanitizer_1
+          - streams_sanitizer_2
+          - streams_sanitizer_3
+          - streams_sanitizer_4
+          - streams_sanitizer_5
+          - streams_sanitizer_6
+          - streams_sanitizer_7
+          - streams_sanitizer_8
+          - streams_sanitizer_9
     expansions:
       <<: *aubsan-lite-required-expansions
       # To force disable feature flags even on the all feature flags variant, please use this file:
@@ -561,7 +571,7 @@ buildvariants:
       - name: .non_deterministic .requires_large_host_aubsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.incompatible_all_feature_flags
         distros:
           - rhel8.8-xlarge
-      - name: streams_sanitizer_gen
+      - name: .streams_sanitizer_all
       - name: streams_https_sanitizer
       - name: streams_lambda_sanitizer
       - name: streams_kinesis_sanitizer
@@ -679,6 +689,19 @@ buildvariants:
     run_on:
       - rhel8.8-large
     stepback: false
+    display_tasks:
+      - name: streams_sanitizer_tests
+        execution_tasks:
+          - streams_sanitizer_0
+          - streams_sanitizer_1
+          - streams_sanitizer_2
+          - streams_sanitizer_3
+          - streams_sanitizer_4
+          - streams_sanitizer_5
+          - streams_sanitizer_6
+          - streams_sanitizer_7
+          - streams_sanitizer_8
+          - streams_sanitizer_9
     expansions:
       <<: *enterprise-rhel8-debug-tsan-expansions-template
       # The '{maxRoundsWithoutProgressParameter: 20}' is needed here to work around failures in
@@ -719,7 +742,7 @@ buildvariants:
       - name: .non_deterministic .requires_large_host_tsan !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.incompatible_all_feature_flags
         distros:
           - *enterprise-rhel8-debug-tsan-large-distro-name
-      - name: streams_sanitizer_gen
+      - name: .streams_sanitizer_all
       - name: streams_https_sanitizer
       - name: streams_lambda_sanitizer
       - name: streams_kinesis_sanitizer

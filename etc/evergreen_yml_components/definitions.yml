@@ -3798,7 +3798,7 @@ functions:
       params:
         updates:
           - key: targets
-            value: "//src/mongo/db:mongod //src/mongo/shell:mongo"
+            value: "//src/mongo/db:mongod //src/mongo/shell:mongo //src/mongo/s:mongos //x509:generate_main_certificates"
           - key: bazel_args
             value: "--config=evg --config=opt_profiled --features=strip_debug --separate_debug=False --simple_build_id=True --streams_release_build=True"
     - *f_expansions_write
