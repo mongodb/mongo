@@ -64,6 +64,12 @@ namespace MONGO_MOD_PUB mongo {
  */
 MONGO_MOD_PRIVATE void setDiagnosticLoggingInAssertUtil(bool newVal);
 
+/**
+ * Whether ScopedDebugInfoStack is ever accessed by ScopedDebugInfo.
+ */
+MONGO_MOD_PRIVATE void setScopedDebugInfoStackEnabled(bool newVal);
+MONGO_MOD_PRIVATE bool getScopedDebugInfoStackEnabled();
+
 class MONGO_MOD_NEEDS_REPLACEMENT AssertionCount {
 public:
     AssertionCount();
@@ -142,7 +148,6 @@ public:
         return _status.extraInfo<ErrorDetail>();
     }
 
-    // TODO(modularity): We should provide a way for modules to own their options parsers.
     MONGO_MOD_NEEDS_REPLACEMENT static inline AtomicWord<bool> traceExceptions{false};
 
     /**
@@ -876,11 +881,34 @@ public:
         virtual StringData label() const = 0;
     };
 
-    void push(const Rec* rec) {
-        _stack.push_back(rec);
+    ScopedDebugInfoStack() {
+        _stack.reserve(64);
     }
-    void pop() {
+
+    ~ScopedDebugInfoStack() {
+        _checkConsistentSize();
+        invariant(_stack.empty());
+    }
+
+    void push(const Rec* rec) {
+        invariant(_loggingDepth == 0);
+        _checkConsistentSize();
+        _stack.push_back(rec);
+        ++_pushes;
+    }
+
+    const Rec* pop() {
+        invariant(_loggingDepth == 0);
+        _checkConsistentSize();
+        invariant(!_stack.empty());
+        const Rec* popped = std::exchange(_stack.back(), {});
         _stack.pop_back();
+        ++_pops;
+        return popped;
+    }
+
+    size_t size() const {
+        return _stack.size();
     }
 
     /**
@@ -893,8 +921,16 @@ public:
     std::vector<std::string> getAll();
 
 private:
+    void _checkConsistentSize() const {
+        auto sz = _stack.size();
+        invariant(_pushes == sz + _pops,
+                  fmt::format("pushes={}, pops={}, size={}", _pushes, _pops, sz));
+    }
+
     std::vector<const Rec*> _stack;
     int _loggingDepth = 0;
+    size_t _pushes = 0;
+    size_t _pops = 0;
 };
 
 /** Each thread has its own stack of scoped debug info. */
@@ -930,18 +966,25 @@ inline ScopedDebugInfoStack& scopedDebugInfoStack() {
 template <typename T>
 class ScopedDebugInfo {
 public:
-    ScopedDebugInfo(
-        StringData label,
-        T v,
-        error_details::ScopedDebugInfoStack* stack = &error_details::scopedDebugInfoStack())
+    ScopedDebugInfo(StringData label, T v)
+        : ScopedDebugInfo{label, std::move(v), _defaultStack()} {}
+
+    ScopedDebugInfo(StringData label, T v, error_details::ScopedDebugInfoStack* stack)
         : label(label), v(std::move(v)), stack(stack) {
-        stack->push(&rec);
+        if (stack) {
+            stack->push(&rec);
+        }
     }
+
     ~ScopedDebugInfo() {
-        stack->pop();
+        if (stack) {
+            auto popped = stack->pop();
+            invariant(popped == &rec);
+        }
     }
-    ScopedDebugInfo(const ScopedDebugInfo&) noexcept = delete;
-    ScopedDebugInfo& operator=(const ScopedDebugInfo&) noexcept = delete;
+
+    ScopedDebugInfo(const ScopedDebugInfo&) = delete;
+    ScopedDebugInfo& operator=(const ScopedDebugInfo&) = delete;
 
 private:
     struct ThisRec : error_details::ScopedDebugInfoStack::Rec {
@@ -954,6 +997,12 @@ private:
         }
         const ScopedDebugInfo* owner;
     };
+
+    static error_details::ScopedDebugInfoStack* _defaultStack() {
+        if (!getScopedDebugInfoStackEnabled())
+            return {};
+        return &error_details::scopedDebugInfoStack();
+    }
 
     StringData label;
     T v;

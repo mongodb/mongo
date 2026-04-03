@@ -41,11 +41,13 @@ MONGO_INITIALIZER(SetUpDiagnosticLoggingStatus)(InitializerContext*) {
     bool signalHandlerLoggingVal = signalHandlerUsesDiagnosticLogging.load();
     setDiagnosticLoggingInSignalHandlers(startUpVal && signalHandlerLoggingVal);
     setDiagnosticLoggingInAssertUtil(startUpVal);
+    setScopedDebugInfoStackEnabled(startUpVal);
 }
 
 Status onUpdateEnableDiagnosticLogging(bool newValue) {
     setDiagnosticLoggingInSignalHandlers(newValue);
     setDiagnosticLoggingInAssertUtil(newValue);
+    setScopedDebugInfoStackEnabled(newValue);
     return Status::OK();
 }
 

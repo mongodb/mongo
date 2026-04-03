@@ -57,10 +57,9 @@ namespace mongo {
 // Used by `logScopedDebugInfo` below to determine if we should log anything.
 Atomic<bool> shouldLogScopedDebugInfoInAssertUtil{true};
 
-void setDiagnosticLoggingInAssertUtil(bool newVal) {
-    shouldLogScopedDebugInfoInAssertUtil.store(newVal);
-}
 namespace {
+Atomic<bool> gScopedDebugInfoStackEnabled{true};
+
 void logScopedDebugInfo() {
     if (!shouldLogScopedDebugInfoInAssertUtil.load()) {
         return;
@@ -96,6 +95,18 @@ MONGO_COMPILER_NORETURN void callAbort() {
     MONGO_COMPILER_UNREACHABLE;
 }
 }  // namespace
+
+void setDiagnosticLoggingInAssertUtil(bool newVal) {
+    shouldLogScopedDebugInfoInAssertUtil.store(newVal);
+}
+
+void setScopedDebugInfoStackEnabled(bool newVal) {
+    gScopedDebugInfoStackEnabled.store(newVal);
+}
+
+bool getScopedDebugInfoStackEnabled() {
+    return gScopedDebugInfoStackEnabled.loadRelaxed();
+}
 
 AssertionCount assertionCount;
 
@@ -367,6 +378,8 @@ std::vector<std::string> ScopedDebugInfoStack::getAll() {
 
     std::vector<std::string> r;
     r.reserve(_stack.size());
+    const auto initialData = _stack.data();
+    const auto initialSize = _stack.size();
     for (const auto& e : _stack) {
         try {
             r.push_back(e->toString());
@@ -376,6 +389,8 @@ std::vector<std::string> ScopedDebugInfoStack::getAll() {
                   "label"_attr = e->label(),
                   "error"_attr = describeActiveException());
         }
+        invariant(_stack.data() == initialData);
+        invariant(_stack.size() == initialSize);
     }
 
     return r;
