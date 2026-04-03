@@ -342,6 +342,7 @@ mongo_cc_unit_test(
     ],
     copts = select({
         "@platforms//cpu:ppc64le": ["-Wno-uninitialized"],
+        "@platforms//cpu:s390x": ["-Wno-uninitialized"],
         "//conditions:default": [],
     }),
     data = [

@@ -172,6 +172,11 @@ mongo_cc_unit_test(
         "database_cloner_test.cpp",
         "initial_sync_shared_data_test.cpp",
     ],
+    copts = select({
+        "@platforms//cpu:ppc": ["-Wno-array-bounds"],
+        "@platforms//cpu:s390x": ["-Wno-array-bounds"],
+        "//conditions:default": [],
+    }),
     tags = [
         "mongo_unittest_fifth_group",
     ],
