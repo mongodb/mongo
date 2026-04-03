@@ -3041,6 +3041,133 @@ TEST_F(ConnectionPoolTest, MultipleConsecutiveSetupFailuresDoNotBlockNewConnecti
               static_cast<int>(ConnectionPoolState::kHealthy));
 }
 
+/**
+ * A controller that behaves like LimitController but always returns canShutdown = false.
+ * This simulates the ShardingTaskExecutorPoolController behavior where other members of a replica
+ * set are still healthy, preventing an expired pool from being shut down.
+ */
+class NeverShutdownLimitController final : public ConnectionPool::ControllerInterface {
+public:
+    void addHost(PoolId id, const HostAndPort& host) override {
+        stdx::lock_guard lk(_mutex);
+        _poolData[id] = {host, 0};
+    }
+
+    HostGroupState updateHost(PoolId id, const PoolMetrics& stats) override {
+        stdx::lock_guard lk(_mutex);
+        auto& data = _poolData[id];
+        auto opts = getPoolOptions();
+
+        data.target = stats.requests + stats.active + stats.leased;
+        if (data.target < opts.minConnections) {
+            data.target = opts.minConnections;
+        } else if (data.target > opts.maxConnections) {
+            data.target = opts.maxConnections;
+        }
+
+        return {{data.host}, false};
+    }
+
+    void removeHost(PoolId id) override {
+        stdx::lock_guard lk(_mutex);
+        _poolData.erase(id);
+    }
+
+    ConnectionControls getControls(PoolId id) override {
+        stdx::lock_guard lk(_mutex);
+        return {getPoolOptions().maxConnecting, _poolData[id].target};
+    }
+
+    Milliseconds hostTimeout() const override {
+        return getPoolOptions().hostTimeout;
+    }
+    Milliseconds pendingTimeout() const override {
+        return getPoolOptions().refreshTimeout;
+    }
+    Milliseconds toRefreshTimeout() const override {
+        return getPoolOptions().refreshRequirement;
+    }
+    size_t connectionRequestsMaxQueueDepth() const override {
+        return getPoolOptions().connectionRequestsMaxQueueDepth;
+    }
+    size_t maxConnections() const override {
+        return getPoolOptions().maxConnections;
+    }
+    StringData name() const override {
+        return "NeverShutdownLimitController"_sd;
+    }
+    void updateConnectionPoolStats(ConnectionPoolStats*) const override {}
+
+private:
+    struct PoolData {
+        HostAndPort host;
+        size_t target = 0;
+    };
+    stdx::mutex _mutex;
+    stdx::unordered_map<PoolId, PoolData> _poolData;
+};
+
+// Reproduces a bug where a SpecificPool whose host has timed out bypasses the kHostRetryTimeout
+// backoff after a connection failure. The sequence is:
+//   1. processFailure() sets _state = kFailed
+//   2. updateHealth() sees the pool is idle past hostTimeout and overwrites kFailed with kExpired
+//   3. The controller returns canShutdown = false (other RS members are healthy)
+//   4. spawnConnections() does not check for kExpired, so it spawns a new connection immediately
+//   5. That connection fails → repeat from (1), creating a tight retry loop
+TEST_F(ConnectionPoolTest, FailedExpiredPoolDoesNotRetryWithoutBackoff) {
+    unittest::MinimumLoggedSeverityGuard logSeverityGuardNetwork{
+        logv2::LogComponent::kConnectionPool, logv2::LogSeverity::Debug(5)};
+
+    ConnectionPool::Options options;
+    options.hostTimeout = Milliseconds(1);
+    options.refreshRequirement = Milliseconds(5);
+    options.refreshTimeout = Seconds(20);
+    options.minConnections = 1;
+    options.maxConnections = 1;
+    options.maxConnecting = 1;
+    options.controllerFactory = []() -> std::shared_ptr<ConnectionPool::ControllerInterface> {
+        return std::make_shared<NeverShutdownLimitController>();
+    };
+    auto pool = makePool(std::move(options));
+
+    auto now = Date_t::now();
+    PoolImpl::setNow(now);
+
+    // Establish a connection successfully.
+    boost::optional<StatusWith<ConnectionPool::ConnectionHandle>> conn;
+    ConnectionImpl::pushSetup(Status::OK());
+    pool->get_forTest(HostAndPort(), Seconds(10), [&](auto swConn) { conn = std::move(swConn); });
+    ASSERT(conn);
+    ASSERT(conn->isOK());
+
+    // Return the connection, making the pool idle. _lastActiveTime is set to now.
+    doneWith(conn->getValue());
+    ASSERT_EQ(1u, getStats(pool).totalCreated);
+
+    // Advance time past both hostTimeout (1ms) and refreshRequirement (5ms). This fires the
+    // connection's refresh timer (putting it in the processing pool for refresh) and ensures
+    // _hostExpiration <= now so the pool is eligible for the kExpired transition.
+    PoolImpl::setNow(now + Milliseconds(6));
+
+    // Fail the refresh. This calls processFailure() which should set the pool to kFailed.
+    // The kFailed state must prevent spawnConnections() from immediately retrying.
+    ConnectionImpl::pushRefresh(Status(ErrorCodes::ShutdownInProgress, "in quiesce mode"));
+
+    // Correct behavior: no new connection is spawned immediately because the pool should remain
+    // in kFailed, and spawnConnections() bails out for kFailed pools.
+    ASSERT_EQ(0u, ConnectionImpl::setupQueueDepth());
+
+    auto stats = getStats(pool);
+    auto hostStats = stats.statsByHost.at(HostAndPort());
+    ASSERT_EQ(static_cast<int>(hostStats.poolState),
+              static_cast<int>(ConnectionPoolState::kFailed));
+
+    // After kHostRetryTimeout, the event timer fires and transitions the pool back to kHealthy,
+    // allowing spawnConnections() to spawn a new connection.
+    PoolImpl::setNow(now + Milliseconds(6) + ConnectionPool::kHostRetryTimeout);
+    ASSERT_EQ(1u, ConnectionImpl::setupQueueDepth());
+}
+
 }  // namespace connection_pool_test_details
 }  // namespace executor
 }  // namespace mongo

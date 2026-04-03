@@ -204,6 +204,7 @@ public:
      */
     struct PoolMetrics {
         ConnectionPoolState state = ConnectionPoolState::kHealthy;
+        bool isExpired = false;
         size_t requests = 0;
         size_t pending = 0;
         size_t ready = 0;

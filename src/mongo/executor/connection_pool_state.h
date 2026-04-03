@@ -42,14 +42,6 @@ enum class ConnectionPoolState {
      */
     kHealthy,
     /**
-     * The pool is expired and can be shutdown by updateController.
-     * It is set when there have been no connection requests or in use connections for
-     * ControllerInterface::hostTimeout().
-     *
-     * The host health will go back to `kHealthy` as soon as a connection is requested.
-     */
-    kExpired,
-    /**
      * The pool has processed a failure and will not spawn new connections until requested.
      * It is set by processFailure() unless a shutdown has been triggered.
      *

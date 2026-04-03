@@ -166,15 +166,29 @@ std::string ConnectionPool::ConnectionControls::toString() const {
         "{{ maxPending: {}, target: {}, }}", maxPendingConnections, targetConnections);
 }
 
+std::string toString(ConnectionPoolState state) {
+    switch (state) {
+        case ConnectionPoolState::kHealthy:
+            return "healthy";
+        case ConnectionPoolState::kFailed:
+            return "failed";
+        case ConnectionPoolState::kShutdown:
+            return "shutdown";
+    }
+    MONGO_UNREACHABLE;
+}
+
 std::string ConnectionPool::PoolMetrics::toString() const {
     return fmt::format(
-        "{{ requests: {}, ready: {}, pending: {}, active: {}, leased: {}, isExpired: {} }}",
+        "{{ requests: {}, ready: {}, pending: {}, active: {}, leased: {}, state: {}, isExpired: {} "
+        "}}",
         requests,
         ready,
         pending,
         active,
         leased,
-        state == ConnectionPoolState::kExpired);
+        executor::toString(state),
+        isExpired);
 }
 
 /**
@@ -209,7 +223,7 @@ public:
             data.target = maxConns;
         }
 
-        return {{data.host}, stats.state == ConnectionPoolState::kExpired};
+        return {{data.host}, stats.isExpired};
     }
     void removeHost(PoolId id) override {
         stdx::lock_guard lk(_mutex);
@@ -649,6 +663,7 @@ private:
     bool _keepOpen = true;
 
     ConnectionPoolState _state = ConnectionPoolState::kHealthy;
+    bool _isExpired = false;
 
     std::uint64_t _nextRequestId{0};
 
@@ -1661,12 +1676,8 @@ void ConnectionPool::SpecificPool::updateHealth() {
     }
 
     // We're expired if we have no sign of connection use and are past our expiry.
-    if (_requests.empty() && _checkedOutPool.empty() && _leasedPool.empty() &&
-        (_hostExpiration <= now)) {
-        _state = ConnectionPoolState::kExpired;
-    } else if (_state == ConnectionPoolState::kExpired) {
-        _state = ConnectionPoolState::kHealthy;
-    }
+    _isExpired = _requests.empty() && _checkedOutPool.empty() && _leasedPool.empty() &&
+        (_hostExpiration <= now);
 }
 
 void ConnectionPool::SpecificPool::updateEventTimer() {
@@ -1746,6 +1757,7 @@ void ConnectionPool::SpecificPool::updateController(
     // Update our own state
     PoolMetrics state{
         _state,
+        _isExpired,
         requestsPending(lk),
         refreshingConnections(lk),
         availableConnections(lk),
@@ -1769,7 +1781,7 @@ void ConnectionPool::SpecificPool::updateController(
             }
 
             auto& pool = it->second;
-            if (pool->_state != ConnectionPoolState::kExpired) {
+            if (!pool->_isExpired) {
                 // Just because a HostGroup "canShutdown" doesn't mean that a SpecificPool should
                 // shutdown. For example, it is always inappropriate to shutdown a SpecificPool with
                 // connections in use or requests outstanding unless its parent ConnectionPool is
@@ -1782,7 +1794,7 @@ void ConnectionPool::SpecificPool::updateController(
             }
 
             // At the moment, controllers will never mark for shutdown a pool with active
-            // connections or pending requests. _state is never kExpired if these invariants are
+            // connections or pending requests. _isExpired is never true if these invariants are
             // false. That's not to say that it's a terrible idea, but if this happens then we
             // should review what it means to be expired.
 
