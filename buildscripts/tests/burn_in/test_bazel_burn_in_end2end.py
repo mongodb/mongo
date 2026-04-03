@@ -8,6 +8,8 @@ import sys
 import tempfile
 import unittest
 
+import buildscripts.bazel_burn_in as under_test
+
 
 @unittest.skipUnless(
     platform.system() == "Linux" and platform.machine().lower() not in {"ppc64le", "s390x"},
@@ -149,6 +151,49 @@ class TestBazelBurnInEnd2End(unittest.TestCase):
         finally:
             if os.path.exists(outfile):
                 os.remove(outfile)
+
+    def test_generate_targets(self):
+        mock_changed_files = "jstests/core/js/jssymbol.js"
+
+        # Snapshot BUILD.bazel files that generate-targets will modify so we
+        # can restore them afterward without clobbering unrelated user changes.
+        targets = under_test.query_targets_to_burn_in("abc", mock_changed_files)
+        affected_files = set()
+        for target in targets:
+            build_file, _ = under_test.parse_bazel_target(target.original_target)
+            affected_files.add(build_file)
+
+        originals = {}
+        for path in affected_files:
+            if os.path.exists(path):
+                with open(path, "r") as f:
+                    originals[path] = f.read()
+
+        try:
+            print("Running generate-targets...")
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "buildscripts/bazel_burn_in.py",
+                    "generate-targets",
+                    "abc",
+                    "--test-changed-files",
+                    mock_changed_files,
+                ],
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertEqual(
+                0,
+                result.returncode,
+                f"generate-targets failed with stderr: {result.stderr}",
+            )
+        finally:
+            # Restore only the files we touched.
+            for path, content in originals.items():
+                with open(path, "w") as f:
+                    f.write(content)
 
 
 if __name__ == "__main__":

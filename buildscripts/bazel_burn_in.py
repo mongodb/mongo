@@ -99,15 +99,15 @@ def create_burn_in_target(target_original: str, target_burn_in: str, test: str):
     with open(build_file, "a") as f:
         f.write(rule_new)
 
-    # Set the suite to only run the burn-in test, with only one shard.
-    # All existing 'srcs' are kept as 'data', since it is common for jstests
-    # to import each other.
-    buildozer.bd_move([target_burn_in], "srcs", "data")
+    # Try to remove the test label and move existing srcs to data to avoid duplicate
+    # uses of the same label. buildozer fails if srcs/data do not exist, which is fine.
+    # If the attribute is present, and buildozer fails for another reason, the build
+    # of the burn-in target produces a clear message why it fails.
     try:
-        # Try to remove the test label from data if it exists to avoid duplicate
-        # uses of the same label. buildozer fails if it does not exist, which is fine.
-        # If the label is present, and buildozer fails for another reason, the build
-        # of the burn-in target produces a clear message that it is duplicated.
+        buildozer.bd_move([target_burn_in], "srcs", "data")
+    except:
+        pass
+    try:
         buildozer.bd_remove([target_burn_in], "data", [test_label])
     except:
         pass
@@ -386,7 +386,7 @@ def generate_tasks(
             # Set an explicitly depends_on in the task group's reference to override it. Remove with SERVER-119809.
             if task["name"] in result_tasks:
                 task["depends_on"] = {
-                    "name": f"resmoke_tests_burn_in_{variant["name"]}",
+                    "name": f"resmoke_tests_burn_in_{variant['name']}",
                 }
             else:
                 task["depends_on"] = {
