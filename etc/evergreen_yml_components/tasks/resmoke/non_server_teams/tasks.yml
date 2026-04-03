@@ -434,15 +434,35 @@ tasks:
           suite: streams_s3
           resmoke_jobs_max: 1
 
-  # Sanitizer variant of streams_azure_blob - uses archive_dist_test binaries instead of streams_build_and_push
+  # Sanitizer variants of streams_azure_blob - uses archive_dist_test binaries instead of streams_build_and_push
   - <<: *task_template
-    name: streams_azure_blob_sanitizer
+    name: streams_azure_blob_single_sanitizer
     tags: ["assigned_to_jira_team_streams", "experimental"]
     commands:
       - func: "do setup"
       - func: "run tests"
         vars:
-          suite: streams_azure_blob
+          suite: streams_azure_blob_single
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: streams_azure_blob_parallel_sanitizer
+    tags: ["assigned_to_jira_team_streams", "experimental"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: streams_azure_blob_parallel
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: streams_azure_blob_parallel_heavy_sanitizer
+    tags: ["assigned_to_jira_team_streams", "experimental"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: streams_azure_blob_parallel_heavy
           resmoke_jobs_max: 1
 
   - <<: *task_template_streams
@@ -464,7 +484,27 @@ tasks:
           resmoke_jobs_max: 1
 
   - <<: *task_template_streams
-    name: streams_azure_blob
+    name: streams_azure_blob_single
+    tags:
+      ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
+    commands:
+      - func: "do setup for streams"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template_streams
+    name: streams_azure_blob_parallel
+    tags:
+      ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
+    commands:
+      - func: "do setup for streams"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template_streams
+    name: streams_azure_blob_parallel_heavy
     tags:
       ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
     commands:

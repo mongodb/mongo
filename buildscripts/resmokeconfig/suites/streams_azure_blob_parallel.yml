@@ -2,9 +2,7 @@ test_kind: js_test
 
 selector:
   roots:
-    - src/mongo/db/modules/*/jstests/streams/azure_blob_local/azure_single.js
     - src/mongo/db/modules/*/jstests/streams/azure_blob_local/azure_parallel.js
-    - src/mongo/db/modules/*/jstests/streams/azure_blob_local/azure_parallel_heavy.js
 
 executor:
   fixture:

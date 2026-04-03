@@ -84,6 +84,11 @@ buildvariants:
           - streams_aspio_iceberg_5
           - streams_aspio_utilities
           - streams_aspio_pubsub
+      - name: streams_azure_blob_tests
+        execution_tasks:
+          - streams_azure_blob_single
+          - streams_azure_blob_parallel
+          - streams_azure_blob_parallel_heavy
     tasks:
       - name: compile_and_archive_dist_test_TG
         distros:
@@ -180,6 +185,11 @@ buildvariants:
           - streams_aspio_iceberg_5
           - streams_aspio_utilities
           - streams_aspio_pubsub
+      - name: streams_azure_blob_tests
+        execution_tasks:
+          - streams_azure_blob_single
+          - streams_azure_blob_parallel
+          - streams_azure_blob_parallel_heavy
     tasks:
       - name: compile_and_archive_dist_test_TG
         distros:
