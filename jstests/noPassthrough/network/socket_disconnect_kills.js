@@ -12,7 +12,6 @@
 // due to client disconnect, and the number of completed operations that couldn't return data
 // due to client disconnect.
 //
-// TODO: SERVER-95600 reenable this test with gRPC.
 // @tags: [requires_sharding, requires_scripting, grpc_incompatible]
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
