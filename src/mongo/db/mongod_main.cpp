@@ -706,16 +706,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
         FeatureCompatibilityVersion::afterStartupActions(startupOpCtx.get());
     }
 
-    // Start up the replicated fast count manager thread on startup only if we are a standalone
-    // node. In replica sets, we start this up as part of step-up. Supported primarily for testing
-    // purposes. We do not want to start this thread when we are running this binary in modal
-    // validate mode.
-    // TODO SERVER-120855: Revisit running the thread in standalone mode.
-    if (isReplicatedFastCountEnabled(startupOpCtx.get()) && isStandalone &&
-        !storageGlobalParams.validate) {
-        setUpReplicatedFastCount(startupOpCtx.get());
-    }
-
     if (gFlowControlEnabled.load()) {
         LOGV2(20536, "Flow Control is enabled on this deployment");
     }
@@ -1925,17 +1915,6 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     auto& checker = PeriodicReplicaSetConfigShardMaintenanceModeChecker::get(serviceContext);
     if (checker) {
         checker->stop();
-    }
-
-    // Shutdown the thread managing fast size and count information. This is only called for
-    // standalone nodes because replicated nodes call shutdown() during stepdown instead. We do not
-    // try to shut the thread down when this node is running in modal validate mode, as the thread
-    // is not started in that case.
-    // TODO SERVER-120855: Revisit running the thread in standalone mode.
-    const bool isStandalone =
-        !repl::ReplicationCoordinator::get(serviceContext)->getSettings().isReplSet();
-    if (isReplicatedFastCountEnabled(opCtx) && isStandalone && !storageGlobalParams.validate) {
-        ReplicatedFastCountManager::get(serviceContext).shutdown(opCtx);
     }
 
     // We should always be able to acquire the global lock at shutdown.

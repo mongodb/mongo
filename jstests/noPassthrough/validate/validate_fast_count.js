@@ -5,21 +5,21 @@
 
 import {afterEach, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const collName = jsTestName() + "_coll";
 
-function initializeMongod(ctx) {
-    ctx.conn = MongoRunner.runMongod({});
-    ctx.db = ctx.conn.getDB("test");
-    ctx.configDb = ctx.conn.getDB("config");
-
-    assert.commandWorked(ctx.db.createCollection(collName));
-    assert.commandWorked(ctx.db[collName].insert({x: 1}));
-}
-
 describe("FastCount validation", function () {
     beforeEach(function () {
-        initializeMongod(this);
+        this.rst = new ReplSetTest({nodes: 1});
+        this.rst.startSet();
+        this.rst.initiate();
+        this.conn = this.rst.getPrimary();
+        this.db = this.conn.getDB("test");
+        this.configDb = this.conn.getDB("config");
+
+        assert.commandWorked(this.db.createCollection(collName));
+        assert.commandWorked(this.db[collName].insert({x: 1}));
     });
 
     it("detects correct FastCountType", function () {
@@ -57,6 +57,6 @@ describe("FastCount validation", function () {
     // behavior is not tested here.
 
     afterEach(function () {
-        MongoRunner.stopMongod(this.conn);
+        this.rst.stopSet();
     });
 });

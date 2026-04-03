@@ -23,7 +23,7 @@ function runTestOnFixtures(runQueriesAndCompareResults) {
         rst.startSet({noCleanData: true});
         rst.initiate();
         const replTestDb = rst.getPrimary().getDB("test");
-        assert.eq(replTestDb.c.count(), 1);
+        assert.eq(replTestDb.c.find().itcount(), 1);
         const explainResult = replTestDb.c.explain().remove({});
         const stage = explainResult.queryPlanner.winningPlan.stage;
         assert(stage === "BATCHED_DELETE");

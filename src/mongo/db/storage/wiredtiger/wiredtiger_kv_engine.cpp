@@ -797,8 +797,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         _provider.setMinSnapshotHistoryWindowInSeconds(0);
     }
 
-    // The WT size storer table is only used if the replicated fastcount collection is disabled.
-    // When the replicated fastcount collection is enabled, _sizeStorer should be null.
+    // Disable the size storer when the storage provider should use replicated fast count.
     if (!provider.shouldUseReplicatedFastCount()) {
         std::string sizeStorerUri = WiredTigerUtil::buildTableUri(ident::kSizeStorer);
         WiredTigerSession session(_connection.get());

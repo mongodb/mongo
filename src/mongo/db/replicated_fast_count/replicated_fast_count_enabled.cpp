@@ -38,12 +38,13 @@
 namespace mongo {
 bool isReplicatedFastCountEnabled(OperationContext* opCtx) {
     // TODO(SERVER-117326): Remove feature flag check.
-    return rss::ReplicatedStorageService::get(opCtx)
-               .getPersistenceProvider()
-               .shouldUseReplicatedFastCount() ||
-        gFeatureFlagReplicatedFastCount.isEnabledUseLatestFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    return (rss::ReplicatedStorageService::get(opCtx)
+                .getPersistenceProvider()
+                .shouldUseReplicatedFastCount() ||
+            gFeatureFlagReplicatedFastCount.isEnabledUseLatestFCVWhenUninitialized(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) &&
+        repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet();
 }
 
 bool isReplicatedFastCountEligible(NamespaceString nss) {
