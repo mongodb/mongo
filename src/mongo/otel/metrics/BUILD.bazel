@@ -76,6 +76,8 @@ mongo_cc_library(
     deps = [
         ":metric_unit",
         ":metrics_counter",
+        ":otel_metric_name_validation",
+        ":server_status_metric_name_validation",
         "//src/mongo/db:server_base",
     ] + select(
         {

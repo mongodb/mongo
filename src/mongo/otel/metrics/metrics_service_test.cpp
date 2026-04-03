@@ -29,9 +29,13 @@
 
 #include "mongo/otel/metrics/metrics_service.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/topology/cluster_role.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/unittest.h"
+
+#include <boost/optional.hpp>
 
 #ifdef MONGO_CONFIG_OTEL
 #include <opentelemetry/metrics/provider.h>
@@ -41,6 +45,7 @@
 #endif  // MONGO_CONFIG_OTEL
 
 namespace mongo::otel::metrics {
+
 namespace {
 
 class MetricsServiceTest : public testing::Test {
@@ -52,9 +57,21 @@ public:
     std::unique_ptr<MetricsService> metricsService;
 };
 
-struct MetricCreatorOptions {
-    bool inServerStatus = false;
+/**
+ * Maps a concrete instrument type to the `MetricsService::create*` options type.
+ */
+template <typename InstrumentT>
+struct MetricOptionsFor {
+    using type = ScalarMetricOptions;
 };
+
+template <typename T>
+struct MetricOptionsFor<Histogram<T>> {
+    using type = HistogramOptions;
+};
+
+template <typename InstrumentT>
+using MetricOptions = typename MetricOptionsFor<InstrumentT>::type;
 
 /**
  * Type traits for creating different metric types via MetricsService.
@@ -70,9 +87,8 @@ struct MetricCreator<Counter<int64_t>> {
                                     MetricName name,
                                     std::string desc,
                                     MetricUnit unit,
-                                    MetricCreatorOptions options = {}) {
-        return svc->createInt64Counter(
-            name, std::move(desc), unit, {.inServerStatus = options.inServerStatus});
+                                    const MetricOptions<Counter<int64_t>>& options = {}) {
+        return svc->createInt64Counter(name, std::move(desc), unit, options);
     }
 };
 
@@ -82,21 +98,20 @@ struct MetricCreator<Counter<double>> {
                                    MetricName name,
                                    std::string desc,
                                    MetricUnit unit,
-                                   MetricCreatorOptions options = {}) {
-        return svc->createDoubleCounter(
-            name, std::move(desc), unit, {.inServerStatus = options.inServerStatus});
+                                   const MetricOptions<Counter<double>>& options = {}) {
+        return svc->createDoubleCounter(name, std::move(desc), unit, options);
     }
 };
 
 template <>
 struct MetricCreator<UpDownCounter<int64_t>> {
-    static UpDownCounter<int64_t>& create(MetricsService* svc,
-                                          MetricName name,
-                                          std::string desc,
-                                          MetricUnit unit,
-                                          MetricCreatorOptions options = {}) {
-        return svc->createInt64UpDownCounter(
-            name, std::move(desc), unit, {.inServerStatus = options.inServerStatus});
+    static UpDownCounter<int64_t>& create(
+        MetricsService* svc,
+        MetricName name,
+        std::string desc,
+        MetricUnit unit,
+        const MetricOptions<UpDownCounter<int64_t>>& options = {}) {
+        return svc->createInt64UpDownCounter(name, std::move(desc), unit, options);
     }
 };
 
@@ -106,9 +121,8 @@ struct MetricCreator<UpDownCounter<double>> {
                                          MetricName name,
                                          std::string desc,
                                          MetricUnit unit,
-                                         MetricCreatorOptions options = {}) {
-        return svc->createDoubleUpDownCounter(
-            name, std::move(desc), unit, {.inServerStatus = options.inServerStatus});
+                                         const MetricOptions<UpDownCounter<double>>& options = {}) {
+        return svc->createDoubleUpDownCounter(name, std::move(desc), unit, options);
     }
 };
 
@@ -118,9 +132,8 @@ struct MetricCreator<Gauge<int64_t>> {
                                   MetricName name,
                                   std::string desc,
                                   MetricUnit unit,
-                                  MetricCreatorOptions options = {}) {
-        return svc->createInt64Gauge(
-            name, std::move(desc), unit, {.inServerStatus = options.inServerStatus});
+                                  const MetricOptions<Gauge<int64_t>>& options = {}) {
+        return svc->createInt64Gauge(name, std::move(desc), unit, options);
     }
 };
 
@@ -130,9 +143,8 @@ struct MetricCreator<Gauge<double>> {
                                  MetricName name,
                                  std::string desc,
                                  MetricUnit unit,
-                                 MetricCreatorOptions options = {}) {
-        return svc->createDoubleGauge(
-            name, std::move(desc), unit, {.inServerStatus = options.inServerStatus});
+                                 const MetricOptions<Gauge<double>>& options = {}) {
+        return svc->createDoubleGauge(name, std::move(desc), unit, options);
     }
 };
 
@@ -142,9 +154,8 @@ struct MetricCreator<Histogram<int64_t>> {
                                       MetricName name,
                                       std::string desc,
                                       MetricUnit unit,
-                                      MetricCreatorOptions options = {}) {
-        return svc->createInt64Histogram(
-            name, std::move(desc), unit, {.inServerStatus = options.inServerStatus});
+                                      const MetricOptions<Histogram<int64_t>>& options = {}) {
+        return svc->createInt64Histogram(name, std::move(desc), unit, options);
     }
 };
 
@@ -154,9 +165,8 @@ struct MetricCreator<Histogram<double>> {
                                      MetricName name,
                                      std::string desc,
                                      MetricUnit unit,
-                                     MetricCreatorOptions options = {}) {
-        return svc->createDoubleHistogram(
-            name, std::move(desc), unit, {.inServerStatus = options.inServerStatus});
+                                     const MetricOptions<Histogram<double>>& options = {}) {
+        return svc->createDoubleHistogram(name, std::move(desc), unit, options);
     }
 };
 
@@ -219,6 +229,30 @@ using MetricTypes = testing::Types<Counter<int64_t>,
                                    Histogram<double>>;
 TYPED_TEST_SUITE(MetricCreationTest, MetricTypes);
 
+TYPED_TEST(MetricCreationTest, CreateRejectsInvalidOtelMetricName) {
+    ASSERT_THROWS_CODE(MetricCreator<TypeParam>::create(this->metricsService.get(),
+                                                        MetricNames::kTestInvalid,
+                                                        "description",
+                                                        MetricUnit::kSeconds),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+}
+
+TYPED_TEST(MetricCreationTest, CreateRejectsInvalidServerStatusPath) {
+    // Invalid serverStatus segment (snake case).
+    MetricOptions<TypeParam> options{.serverStatusOptions = ServerStatusOptions{
+                                         .dottedPath = "network.open_connections",
+                                         .role = ClusterRole{},
+                                     }};
+    ASSERT_THROWS_CODE(MetricCreator<TypeParam>::create(this->metricsService.get(),
+                                                        MetricNames::kTest1,
+                                                        "description",
+                                                        MetricUnit::kSeconds,
+                                                        options),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+}
+
 TYPED_TEST(MetricCreationTest, SameMetricReturnedOnSameCreate) {
     auto& metric1 = MetricCreator<TypeParam>::create(
         this->metricsService.get(), MetricNames::kTest1, "description", MetricUnit::kSeconds);
@@ -231,6 +265,45 @@ TYPED_TEST(MetricCreationTest, SameMetricReturnedOnSameCreate) {
         this->metricsService.get(), MetricNames::kTest1, "description", MetricUnit::kSeconds);
     EXPECT_EQ(&metric1, &metric2);
     EXPECT_EQ(&metric2, &metric3);
+}
+
+TYPED_TEST(MetricCreationTest, SameMetricReturnedWhenCreateWithIdenticalServerStatusOptions) {
+    MetricOptions<TypeParam> options{.serverStatusOptions = ServerStatusOptions{
+                                         .dottedPath = "network.openConnections",
+                                         .role = ClusterRole{},
+                                     }};
+    auto& m1 = MetricCreator<TypeParam>::create(this->metricsService.get(),
+                                                MetricNames::kTest1,
+                                                "description",
+                                                MetricUnit::kSeconds,
+                                                options);
+    auto& m2 = MetricCreator<TypeParam>::create(this->metricsService.get(),
+                                                MetricNames::kTest1,
+                                                "description",
+                                                MetricUnit::kSeconds,
+                                                options);
+    OtelMetricsCapturer metricsCapturer(*this->metricsService);
+    auto& m3 = MetricCreator<TypeParam>::create(this->metricsService.get(),
+                                                MetricNames::kTest1,
+                                                "description",
+                                                MetricUnit::kSeconds,
+                                                options);
+    EXPECT_EQ(&m1, &m2);
+    EXPECT_EQ(&m2, &m3);
+}
+
+TYPED_TEST(MetricCreationTest, ExceptionWhenInServerStatusAndServerStatusOptionsBothSet) {
+    MetricOptions<TypeParam> options{
+        .serverStatusOptions = ServerStatusOptions{.dottedPath = "network.openConnections"},
+        .inServerStatus = true,
+    };
+    ASSERT_THROWS_CODE(MetricCreator<TypeParam>::create(this->metricsService.get(),
+                                                        MetricNames::kTest1,
+                                                        "description",
+                                                        MetricUnit::kSeconds,
+                                                        options),
+                       DBException,
+                       12323501);
 }
 
 TYPED_TEST(MetricCreationTest, ExceptionWhenSameNameButDifferentParameters) {
@@ -268,6 +341,67 @@ TYPED_TEST(MetricCreationTest, ExceptionWhenSameNameButDifferentParameters) {
                                                         "description",
                                                         MetricUnit::kSeconds,
                                                         {.inServerStatus = true}),
+                       DBException,
+                       ErrorCodes::ObjectAlreadyExists);
+}
+
+TYPED_TEST(MetricCreationTest, ExceptionWhenSameNameButDifferentServerStatusOptionsNoneVsSet) {
+    MetricCreator<TypeParam>::create(
+        this->metricsService.get(), MetricNames::kTest1, "description", MetricUnit::kSeconds);
+
+    MetricOptions<TypeParam> options{.serverStatusOptions = ServerStatusOptions{
+                                         .dottedPath = "network.openConnections",
+                                         .role = ClusterRole{},
+                                     }};
+    ASSERT_THROWS_CODE(MetricCreator<TypeParam>::create(this->metricsService.get(),
+                                                        MetricNames::kTest1,
+                                                        "description",
+                                                        MetricUnit::kSeconds,
+                                                        options),
+                       DBException,
+                       ErrorCodes::ObjectAlreadyExists);
+}
+
+TYPED_TEST(MetricCreationTest, ExceptionWhenSameNameButDifferentServerStatusOptionsDifferentPaths) {
+    MetricOptions<TypeParam> optionsA{
+        .serverStatusOptions = ServerStatusOptions{.dottedPath = "network.openConnections"}};
+    MetricCreator<TypeParam>::create(this->metricsService.get(),
+                                     MetricNames::kTest1,
+                                     "description",
+                                     MetricUnit::kSeconds,
+                                     optionsA);
+
+    MetricOptions<TypeParam> optionsB{
+        .serverStatusOptions = ServerStatusOptions{.dottedPath = "ingress.openConnections"}};
+    ASSERT_THROWS_CODE(MetricCreator<TypeParam>::create(this->metricsService.get(),
+                                                        MetricNames::kTest1,
+                                                        "description",
+                                                        MetricUnit::kSeconds,
+                                                        optionsB),
+                       DBException,
+                       ErrorCodes::ObjectAlreadyExists);
+}
+
+TYPED_TEST(MetricCreationTest, ExceptionWhenSameNameButDifferentServerStatusOptionsDifferentRole) {
+    MetricOptions<TypeParam> optionsRoleNone{.serverStatusOptions = ServerStatusOptions{
+                                                 .dottedPath = "network.openConnections",
+                                                 .role = ClusterRole{ClusterRole::None},
+                                             }};
+    MetricCreator<TypeParam>::create(this->metricsService.get(),
+                                     MetricNames::kTest1,
+                                     "description",
+                                     MetricUnit::kSeconds,
+                                     optionsRoleNone);
+
+    MetricOptions<TypeParam> optionsShardRole{.serverStatusOptions = ServerStatusOptions{
+                                                  .dottedPath = "network.openConnections",
+                                                  .role = ClusterRole{ClusterRole::ShardServer},
+                                              }};
+    ASSERT_THROWS_CODE(MetricCreator<TypeParam>::create(this->metricsService.get(),
+                                                        MetricNames::kTest1,
+                                                        "description",
+                                                        MetricUnit::kSeconds,
+                                                        optionsShardRole),
                        DBException,
                        ErrorCodes::ObjectAlreadyExists);
 }

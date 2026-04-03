@@ -30,6 +30,9 @@
 #include "mongo/otel/metrics/metrics_service.h"
 
 #include "mongo/otel/metrics/metrics_initialization.h"
+#include "mongo/otel/metrics/metrics_metric.h"
+#include "mongo/otel/metrics/otel_metric_name_validation.h"
+#include "mongo/otel/metrics/server_status_metric_name_validation.h"
 #include "mongo/util/assert_util.h"
 
 #include <fmt/format.h>
@@ -347,38 +350,76 @@ T* MetricsService::getDuplicateMetric(WithLock,
     return nullptr;
 }
 
+template <typename InstrumentT, typename Options>
+InstrumentT& MetricsService::_createMetric(MetricName name,
+                                           const Options& options,
+                                           MetricIdentifier identifier,
+                                           MakeInstrumentRef<InstrumentT> makeInstrument,
+                                           AddObservableRef<InstrumentT> addObservable) {
+    // Validate otel and serverStatus metric names.
+    uassertStatusOK(validateOtelMetricName(name.getName()));
+    massert(12323501,
+            "inServerStatus and serverStatusOptions cannot both be set",
+            !(options.inServerStatus && options.serverStatusOptions.has_value()));
+    if (options.serverStatusOptions) {
+        uassertStatusOK(validateServerStatusMetricPath(options.serverStatusOptions->dottedPath));
+    }
+
+    const std::string nameStr(name.getName());
+
+    stdx::lock_guard lock(_mutex);
+
+    // Check for duplicate.
+    if (auto* duplicate = getDuplicateMetric<InstrumentT>(lock, nameStr, identifier)) {
+        return *duplicate;
+    }
+
+    // Register.
+    auto impl = makeInstrument(lock, nameStr);
+    InstrumentT* const ptr = impl.get();
+
+    auto owned = OwnedMetric{std::unique_ptr<InstrumentT>(std::move(impl))};
+    _metrics[nameStr] = {.identifier = std::move(identifier), .metric = std::move(owned)};
+#ifdef MONGO_CONFIG_OTEL
+    addObservable(lock, nameStr, ptr);
+#endif  // MONGO_CONFIG_OTEL
+    return *ptr;
+}
+
 template <typename T>
 Counter<T>& MetricsService::createCounter(MetricName name,
                                           std::string description,
                                           MetricUnit unit,
                                           const CounterOptions& options) {
-    const std::string nameStr(name.getName());
-    MetricIdentifier identifier{
-        .description = description, .unit = unit, .inServerStatus = options.inServerStatus};
-    stdx::lock_guard lock(_mutex);
-    auto duplicate = getDuplicateMetric<Counter<T>>(lock, nameStr, identifier);
-    if (duplicate) {
-        return *duplicate;
-    }
-
-    // Make the raw counter.
-    auto counter = std::make_unique<CounterImpl<T>>();
-    Counter<T>* const counter_ptr = counter.get();
-    _metrics[nameStr] = {.identifier = std::move(identifier), .metric = std::move(counter)};
-
+    MetricIdentifier identifier{.description = description,
+                                .unit = unit,
+                                .inServerStatus = options.inServerStatus,
+                                .serverStatusOptions = options.serverStatusOptions,
+                                .histogramBucketBoundaries = boost::none};
+    return _createMetric<Counter<T>, CounterOptions>(
+        name,
+        options,
+        std::move(identifier),
+        /* makeInstrument= */
+        [](WithLock, const std::string&) { return std::make_unique<CounterImpl<T>>(); },
 #ifdef MONGO_CONFIG_OTEL
-    // Observe the raw counter.
-    auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
-    std::shared_ptr<opentelemetry::metrics::ObservableInstrument> observableCounter =
-        makeObservableInstrument<Counter<T>>(*provider, nameStr, description, unit);
-    tassert(ErrorCodes::InternalError,
-            fmt::format("Could not create observable counter for metric: {}", nameStr),
-            observableCounter != nullptr);
-    observableCounter->AddCallback(observableCounterCallback<T>, counter_ptr);
-    _observableInstruments.push_back(std::move(observableCounter));
-#endif  // MONGO_CONFIG_OTEL
-
-    return *counter_ptr;
+        /* addObservable= */
+        [this, description, unit](
+            WithLock lock, const std::string& nameStr, Counter<T>* counter_ptr) {
+            (void)lock;
+            auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
+            std::shared_ptr<opentelemetry::metrics::ObservableInstrument> observableCounter =
+                makeObservableInstrument<Counter<T>>(*provider, nameStr, description, unit);
+            tassert(ErrorCodes::InternalError,
+                    fmt::format("Could not create observable counter for metric: {}", nameStr),
+                    observableCounter != nullptr);
+            observableCounter->AddCallback(observableCounterCallback<T>, counter_ptr);
+            _observableInstruments.push_back(std::move(observableCounter));
+        }
+#else
+        [](WithLock, const std::string&, Counter<T>*) {}
+#endif
+    );
 }
 
 Counter<int64_t>& MetricsService::createInt64Counter(MetricName name,
@@ -400,31 +441,37 @@ UpDownCounter<T>& MetricsService::createUpDownCounter(MetricName name,
                                                       std::string description,
                                                       MetricUnit unit,
                                                       const UpDownCounterOptions& options) {
-    const std::string nameStr(name.getName());
-    MetricIdentifier identifier{
-        .description = description, .unit = unit, .inServerStatus = options.inServerStatus};
-    stdx::lock_guard lock(_mutex);
-    auto duplicate = getDuplicateMetric<UpDownCounter<T>>(lock, nameStr, identifier);
-    if (duplicate) {
-        return *duplicate;
-    }
-
-    auto upDownCounter = std::make_unique<UpDownCounterImpl<T>>();
-    UpDownCounter<T>* const upDownCounter_ptr = upDownCounter.get();
-    _metrics[nameStr] = {.identifier = std::move(identifier), .metric = std::move(upDownCounter)};
-
+    MetricIdentifier identifier{.description = description,
+                                .unit = unit,
+                                .inServerStatus = options.inServerStatus,
+                                .serverStatusOptions = options.serverStatusOptions,
+                                .histogramBucketBoundaries = boost::none};
+    return _createMetric<UpDownCounter<T>, UpDownCounterOptions>(
+        name,
+        options,
+        std::move(identifier),
+        /* makeInstrument= */
+        [](WithLock, const std::string&) { return std::make_unique<UpDownCounterImpl<T>>(); },
 #ifdef MONGO_CONFIG_OTEL
-    auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
-    std::shared_ptr<opentelemetry::metrics::ObservableInstrument> observableUpDownCounter =
-        makeObservableInstrument<UpDownCounter<T>>(*provider, nameStr, description, unit);
-    tassert(ErrorCodes::InternalError,
-            fmt::format("Could not create observable up-down counter for metric: {}", nameStr),
-            observableUpDownCounter != nullptr);
-    observableUpDownCounter->AddCallback(observableUpDownCounterCallback<T>, upDownCounter_ptr);
-    _observableInstruments.push_back(std::move(observableUpDownCounter));
-#endif  // MONGO_CONFIG_OTEL
-
-    return *upDownCounter_ptr;
+        /* addObservable= */
+        [this, description, unit](
+            WithLock lock, const std::string& nameStr, UpDownCounter<T>* upDownCounter_ptr) {
+            (void)lock;
+            auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
+            std::shared_ptr<opentelemetry::metrics::ObservableInstrument> observableUpDownCounter =
+                makeObservableInstrument<UpDownCounter<T>>(*provider, nameStr, description, unit);
+            tassert(
+                ErrorCodes::InternalError,
+                fmt::format("Could not create observable up-down counter for metric: {}", nameStr),
+                observableUpDownCounter != nullptr);
+            observableUpDownCounter->AddCallback(observableUpDownCounterCallback<T>,
+                                                 upDownCounter_ptr);
+            _observableInstruments.push_back(std::move(observableUpDownCounter));
+        }
+#else
+        [](WithLock, const std::string&, UpDownCounter<T>*) {}
+#endif
+    );
 }
 
 UpDownCounter<int64_t>& MetricsService::createInt64UpDownCounter(
@@ -448,33 +495,34 @@ Gauge<T>& MetricsService::createGauge(MetricName name,
                                       std::string description,
                                       MetricUnit unit,
                                       const GaugeOptions& options) {
-    std::string nameStr(name.getName());
-    MetricIdentifier identifier{
-        .description = description, .unit = unit, .inServerStatus = options.inServerStatus};
-    stdx::lock_guard lock(_mutex);
-    auto duplicate = getDuplicateMetric<Gauge<T>>(lock, nameStr, identifier);
-    if (duplicate) {
-        return *duplicate;
-    }
-
-    // Make the raw gauge.
-    auto gauge = std::make_unique<GaugeImpl<T>>();
-    Gauge<T>* const gauge_ptr = gauge.get();
-    _metrics[nameStr] = {.identifier = std::move(identifier), .metric = std::move(gauge)};
-
+    MetricIdentifier identifier{.description = description,
+                                .unit = unit,
+                                .inServerStatus = options.inServerStatus,
+                                .serverStatusOptions = options.serverStatusOptions,
+                                .histogramBucketBoundaries = boost::none};
+    return _createMetric<Gauge<T>, GaugeOptions>(
+        name,
+        options,
+        std::move(identifier),
+        /* makeInstrument= */
+        [](WithLock, const std::string&) { return std::make_unique<GaugeImpl<T>>(); },
 #ifdef MONGO_CONFIG_OTEL
-    // Observe the raw gauge.
-    auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
-    std::shared_ptr<opentelemetry::metrics::ObservableInstrument> observableGauge =
-        makeObservableInstrument<Gauge<T>>(*provider, nameStr, description, unit);
-    tassert(ErrorCodes::InternalError,
-            fmt::format("Could not create observable gauge for metric: {}", nameStr),
-            observableGauge != nullptr);
-    observableGauge->AddCallback(observableGaugeCallback<T>, gauge_ptr);
-    _observableInstruments.push_back(std::move(observableGauge));
-#endif  // MONGO_CONFIG_OTEL
-
-    return *gauge_ptr;
+        /* addObservable= */
+        [this, description, unit](WithLock lock, const std::string& nameStr, Gauge<T>* gauge_ptr) {
+            (void)lock;
+            auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
+            std::shared_ptr<opentelemetry::metrics::ObservableInstrument> observableGauge =
+                makeObservableInstrument<Gauge<T>>(*provider, nameStr, description, unit);
+            tassert(ErrorCodes::InternalError,
+                    fmt::format("Could not create observable gauge for metric: {}", nameStr),
+                    observableGauge != nullptr);
+            observableGauge->AddCallback(observableGaugeCallback<T>, gauge_ptr);
+            _observableInstruments.push_back(std::move(observableGauge));
+        }
+#else
+        [](WithLock, const std::string&, Gauge<T>*) {}
+#endif
+    );
 }
 
 Gauge<int64_t>& MetricsService::createInt64Gauge(MetricName name,
@@ -491,69 +539,50 @@ Gauge<double>& MetricsService::createDoubleGauge(MetricName name,
     return createGauge<double>(name, description, unit, options);
 }
 
+template <typename T>
+Histogram<T>& MetricsService::createHistogram(MetricName name,
+                                              std::string description,
+                                              MetricUnit unit,
+                                              const HistogramOptions& options) {
+    const std::string unitStr = static_cast<std::string>(toString(unit));
+    MetricIdentifier identifier{.description = description,
+                                .unit = unit,
+                                .inServerStatus = options.inServerStatus,
+                                .serverStatusOptions = options.serverStatusOptions,
+                                .histogramBucketBoundaries = options.explicitBucketBoundaries};
+    return _createMetric<Histogram<T>, HistogramOptions>(
+        name,
+        options,
+        std::move(identifier),
+        /* makeInstrument= */
+        [&](WithLock lock, const std::string& nameStr) -> std::unique_ptr<Histogram<T>> {
+#ifdef MONGO_CONFIG_OTEL
+            return makeHistogram<HistogramImpl<T>>(
+                lock,
+                *opentelemetry::metrics::Provider::GetMeterProvider(),
+                nameStr,
+                description,
+                unitStr,
+                options.explicitBucketBoundaries);
+#else
+            return std::make_unique<HistogramImpl<T>>();
+#endif  // MONGO_CONFIG_OTEL
+        },
+        /* addObservable= */ [](WithLock, const std::string&, Histogram<T>*) {});
+}
+
 Histogram<double>& MetricsService::createDoubleHistogram(MetricName name,
                                                          std::string description,
                                                          MetricUnit unit,
                                                          const HistogramOptions& options) {
-    std::string nameStr(name.getName());
-    MetricIdentifier identifier{.description = description,
-                                .unit = unit,
-                                .inServerStatus = options.inServerStatus,
-                                .histogramBucketBoundaries = options.explicitBucketBoundaries};
-    stdx::lock_guard lock(_mutex);
-    auto duplicate = getDuplicateMetric<Histogram<double>>(lock, nameStr, identifier);
-    if (duplicate) {
-        return *duplicate;
-    }
-
-#ifdef MONGO_CONFIG_OTEL
-    auto histogram =
-        makeHistogram<HistogramImpl<double>>(lock,
-                                             *opentelemetry::metrics::Provider::GetMeterProvider(),
-                                             nameStr,
-                                             description,
-                                             std::string(toString(unit)),
-                                             options.explicitBucketBoundaries);
-#else
-    auto histogram = std::make_unique<HistogramImpl<double>>();
-#endif  // MONGO_CONFIG_OTEL
-    auto* histogram_ptr = histogram.get();
-    _metrics[nameStr] = {.identifier = std::move(identifier), .metric = std::move(histogram)};
-
-    return *histogram_ptr;
+    return createHistogram<double>(name, description, unit, options);
 }
 
 Histogram<int64_t>& MetricsService::createInt64Histogram(MetricName name,
                                                          std::string description,
                                                          MetricUnit unit,
                                                          const HistogramOptions& options) {
-    const std::string nameStr(name.getName());
-    MetricIdentifier identifier{.description = description,
-                                .unit = unit,
-                                .inServerStatus = options.inServerStatus,
-                                .histogramBucketBoundaries = options.explicitBucketBoundaries};
-    stdx::lock_guard lock(_mutex);
-    auto duplicate = getDuplicateMetric<Histogram<int64_t>>(lock, nameStr, identifier);
-    if (duplicate) {
-        return *duplicate;
-    }
-
-    const std::string unitStr(toString(unit));
-#ifdef MONGO_CONFIG_OTEL
-    auto histogram =
-        makeHistogram<HistogramImpl<int64_t>>(lock,
-                                              *opentelemetry::metrics::Provider::GetMeterProvider(),
-                                              nameStr,
-                                              description,
-                                              std::string(toString(unit)),
-                                              options.explicitBucketBoundaries);
-#else
-    auto histogram = std::make_unique<HistogramImpl<int64_t>>();
-#endif  // MONGO_CONFIG_OTEL
-    auto* histogram_ptr = histogram.get();
-    _metrics[nameStr] = {.identifier = std::move(identifier), .metric = std::move(histogram)};
-
-    return *histogram_ptr;
+    return createHistogram<int64_t>(name, description, unit, options);
 }
 
 void MetricsService::appendMetricsForServerStatus(BSONObjBuilder& bsonBuilder) const {

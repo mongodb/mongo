@@ -36,11 +36,19 @@
 #include "mongo/otel/metrics/metrics_counter.h"
 #include "mongo/otel/metrics/metrics_gauge.h"
 #include "mongo/otel/metrics/metrics_histogram.h"
+#include "mongo/otel/metrics/metrics_metric.h"
 #include "mongo/otel/metrics/metrics_updown_counter.h"
+#include "mongo/otel/metrics/server_status_options.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/modules.h"
 
+#include <functional>
+#include <memory>
+#include <vector>
+
 #include <absl/container/btree_map.h>
+#include <boost/optional.hpp>
 
 #ifdef MONGO_CONFIG_OTEL
 #include <opentelemetry/metrics/meter.h>
@@ -51,6 +59,7 @@ MONGO_MOD_PUBLIC;
 namespace mongo::otel::metrics {
 
 struct ScalarMetricOptions {
+    boost::optional<ServerStatusOptions> serverStatusOptions = boost::none;
     // If true, this metric will also be added to server status in the "otelMetrics" section.
     bool inServerStatus = false;
 };
@@ -59,6 +68,7 @@ using UpDownCounterOptions = ScalarMetricOptions;
 using GaugeOptions = ScalarMetricOptions;
 
 struct HistogramOptions {
+    boost::optional<ServerStatusOptions> serverStatusOptions = boost::none;
     // If true, this metric will also be added to server status in the "otelMetrics" section.
     bool inServerStatus = false;
     /**
@@ -222,11 +232,20 @@ private:
         std::string description;
         MetricUnit unit;
         // If false, this metric will be skipped when exporting to server status.
-        bool inServerStatus;
+        bool inServerStatus;  // TODO (SERVER-123242): Remove.
+        boost::optional<ServerStatusOptions> serverStatusOptions = boost::none;
         boost::optional<std::vector<double>> histogramBucketBoundaries = boost::none;
 
         auto operator<=>(const MetricIdentifier& other) const = default;
     };
+
+    template <typename InstrumentT>
+    using MakeInstrumentRef =
+        function_ref<std::unique_ptr<InstrumentT>(WithLock, const std::string& nameStr)>;
+
+    template <typename InstrumentT>
+    using AddObservableRef =
+        function_ref<void(WithLock, const std::string& nameStr, InstrumentT* instrumentPtr)>;
 
     /**
      * Retrieves an existing metric if one with the same name, identifier, and type T exists.
@@ -258,6 +277,24 @@ private:
                           std::string description,
                           MetricUnit unit,
                           const GaugeOptions& options);
+
+    template <typename T>
+    Histogram<T>& createHistogram(MetricName name,
+                                  std::string description,
+                                  MetricUnit unit,
+                                  const HistogramOptions& options);
+
+    /**
+     * Validates the given options. Then, either returns an existing matching metric or creates
+     * one with `makeInstrument` and stores it. Then, optionally runs `addObservable` if OTEL is
+     * enabled.
+     */
+    template <typename InstrumentT, typename Options>
+    InstrumentT& _createMetric(MetricName name,
+                               const Options& options,
+                               MetricIdentifier identifier,
+                               MakeInstrumentRef<InstrumentT> makeInstrument,
+                               AddObservableRef<InstrumentT> addObservable);
 
     using OwnedMetric = std::variant<std::unique_ptr<Counter<int64_t>>,
                                      std::unique_ptr<Counter<double>>,

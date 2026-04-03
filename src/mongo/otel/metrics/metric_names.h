@@ -152,6 +152,8 @@ public:
     static constexpr MetricName kTest4 = {"test_only.metric4"};
     static constexpr MetricName kTest5 = {"test_only.metric5"};
     static constexpr MetricName kTest6 = {"test_only.metric6"};
+    // camelCase is not allowed.
+    static constexpr MetricName kTestInvalid = {"test_only.Metric"};
 };
 
 }  // namespace otel::metrics
