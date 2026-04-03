@@ -107,8 +107,7 @@ def _resolve_suite_srcs(config):
     """Resolve srcs for a suite from the auto-generated selector data.
 
     Extracts the config label's target path and looks it up in SUITE_SELECTORS.
-    Returns the list of srcs labels (possibly empty for no-roots test kinds),
-    or None if the config was not found in SUITE_SELECTORS at all.
+    Returns the list of srcs labels, or an empty list if not found.
     """
     config_str = str(config)
 
@@ -123,7 +122,7 @@ def _resolve_suite_srcs(config):
         if label_str in SUITE_SELECTORS:
             return SUITE_SELECTORS[label_str]
 
-    return None
+    return []
 
 def resmoke_suite_test(
         name,
@@ -162,11 +161,10 @@ def resmoke_suite_test(
     # Auto-derive srcs from the suite YAML if not explicitly provided.
     passthrough = not srcs
     if not srcs:
-        resolved = _resolve_suite_srcs(config)
-        if resolved == None:
-            fail("resmoke_suite_test '%s': no srcs provided and config '%s' not found in SUITE_SELECTORS. " +
-                 "Either provide explicit srcs or ensure the suite YAML has selector.roots." % (name, config))
-        srcs = resolved
+        srcs = _resolve_suite_srcs(config)
+    if not srcs:
+        fail("resmoke_suite_test '%s': no srcs provided and config '%s' not found in SUITE_SELECTORS. " +
+             "Either provide explicit srcs or ensure the suite YAML has selector.roots." % (name, config))
 
     generated_config = name + "_config"
     resmoke_config(

@@ -21,27 +21,9 @@ except ImportError:
 
 # Matches the top-level "selector:" block and its indented body.
 _SELECTOR_RE = re.compile(r"^selector:\s*\n((?:[ \t]+.*\n)*)", re.MULTILINE)
-# Matches the top-level "test_kind:" value.
-_TEST_KIND_RE = re.compile(r"^test_kind:\s*(\S+)", re.MULTILINE)
 
 OUTPUT_FILE = Path("bazel/resmoke/.resmoke_suites_derived.bzl")
 RESMOKE_MODULES_FILE = Path("buildscripts/resmokeconfig/resmoke_modules.yml")
-
-# Test kinds that don't enumerate individual source files via selector.roots.
-# These test binaries directly (mongos --test, dbtest, etc.) so an empty srcs
-# list is intentional — not a derive error.
-_NO_ROOTS_TEST_KINDS = frozenset(
-    [
-        "benchmark_test",
-        "cpp_integration_test",
-        "cpp_libfuzzer_test",
-        "cpp_unit_test",
-        "db_test",
-        "mongos_test",
-        "pretty_printer_test",
-        "sleep_test",
-    ]
-)
 
 # Fixed suite directories (relative to repo root).
 # Each entry is (suite_dir, bazel_package, target_prefix) where:
@@ -251,13 +233,6 @@ def gen_suite_selectors(repo_root: Path) -> dict[str, object]:
 
                 roots = selector.get("roots")
                 if not roots or not isinstance(roots, list):
-                    # For known no-roots test kinds, emit an empty entry so
-                    # resmoke_suite_test can proceed in passthrough mode.
-                    m_kind = _TEST_KIND_RE.search(text)
-                    test_kind = m_kind.group(1) if m_kind else None
-                    if test_kind in _NO_ROOTS_TEST_KINDS:
-                        key = f"//{bazel_package}:{target_prefix}/{yml_path.name}"
-                        selectors[key] = []
                     continue
 
                 # Map each root glob to Bazel labels
