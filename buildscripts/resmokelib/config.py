@@ -398,7 +398,7 @@ CONFIG_SHARD = None
 MODULES_CONFIG_PATH = None
 
 # list of enabled modules
-MODULES = None
+MODULES = []
 
 # list of dirs from enabled modules to get suites from
 MODULE_SUITE_DIRS = []
