@@ -22,6 +22,7 @@
  */
 import {TimeseriesAggTests} from "jstests/core/timeseries/libs/timeseries_agg_helpers.js";
 import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const numHosts = 10;
@@ -297,6 +298,35 @@ function timeseriesDefaultIndex() {
 
     inColl.aggregate(timeseriesPipeline);
     assert.eq(300, destDB[outColl.getName()].find().itcount());
+})();
+
+(function testTimeseriesOutWithNonExistingDatabaseCreatesDefaultIndex() {
+    // Test when $out targets a non-existent database, the default
+    // timeseries index ({metaField, timeField}) must still be created on the output collection.
+    dropOutCollections();
+
+    const destDB = testDB.getSiblingDB("outDifferentDBWithMeta");
+    assert.commandWorked(destDB.dropDatabase());
+
+    const tsOptions = {timeField: "time", metaField: "tags"};
+    inColl.aggregate([{$out: {db: destDB.getName(), coll: outColl.getName(), timeseries: tsOptions}}]);
+
+    assert.eq(300, destDB[outColl.getName()].find().itcount());
+
+    // Use rawData to get indexes in buckets-internal format for both viewless and viewful:
+    // - viewless: listIndexes on the main collection with {rawData: true}
+    // - viewful:  listIndexes on system.buckets.* (rawData is a no-op there)
+    // Both paths return the same raw format, so no mode-specific branching is needed.
+    const rawColl = getTimeseriesCollForRawOps(destDB, outColl.getName());
+    const rawSpec = getRawOperationSpec(destDB);
+    const indexes = assert.commandWorked(destDB.runCommand({listIndexes: rawColl, ...rawSpec})).cursor.firstBatch;
+    const hasDefaultIndex = indexes.some(
+        (idx) => idx.key["meta"] !== undefined && idx.key["control.min.time"] !== undefined,
+    );
+    assert(
+        hasDefaultIndex,
+        "Default timeseries index not found on $out collection in non-existent DB: " + tojson(indexes),
+    );
 })();
 
 (function testCannotCreateTimeseriesCollFromNonTimeseriesColl() {

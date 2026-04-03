@@ -16,6 +16,7 @@ import {
     getTimeseriesCollForDDLOps,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 const numHosts = 10;
 const splitPoint = numHosts / 2;
@@ -114,20 +115,23 @@ function runOutAndCompareResults({
             .toArray().length;
 
         if (checkForDefaultIndex) {
-            let containsDefaultIndex = false;
-            for (const index of outColl.getIndexes()) {
-                if (
-                    index == timeseriesDefaultIndex() ||
-                    bsonUnorderedFieldsCompare(index, timeseriesDefaultIndex()) == 0
-                ) {
-                    containsDefaultIndex = true;
-                    break;
-                }
-            }
+            // Use rawData to get indexes in buckets-internal format for both viewless and viewful:
+            // - viewless: listIndexes on the main collection with {rawData: true}
+            // - viewful:  listIndexes on system.buckets.* (rawData is a no-op there)
+            // Both paths return the same format, keyed by the same index name.
+            const rawColl = getTimeseriesCollForRawOps(outputDB, outColl.getName());
+            const rawSpec = getRawOperationSpec(outputDB);
+            const indexes = assert.commandWorked(outputDB.runCommand({listIndexes: rawColl, ...rawSpec})).cursor
+                .firstBatch;
+            const expectedName = timeseriesDefaultIndex().name;
+            const containsDefaultIndex = indexes.some((idx) => idx.name === expectedName);
 
             assert(
                 containsDefaultIndex,
-                "Output collection does not contain default timeseries index: " + tojson(timeseriesDefaultIndex()),
+                "Output collection does not contain default timeseries index '" +
+                    expectedName +
+                    "': " +
+                    tojson(indexes),
             );
         }
 
@@ -325,19 +329,18 @@ function timeseriesDefaultIndex() {
     const destDB = testDB.getSiblingDB("outDifferentDB");
     assert.commandWorked(destDB.dropDatabase());
 
-    const tsOptions = {timeField: "time"};
+    const tsOptions = timeseriesOptions();
 
     const timeseriesPipeline = [{$out: {db: destDB.getName(), coll: outColl.getName(), timeseries: tsOptions}}];
 
     const observerPipeline = [{$out: {db: destDB.getName(), coll: observerOutColl.getName()}}];
 
-    // TODO SERVER-111869: Test should pass with checkForDefaultIndex set to true once bug is fixed.
     runOutAndCompareResults({
         observer: observerPipeline,
         timeseries: timeseriesPipeline,
         options: tsOptions,
         outputDB: destDB,
-        checkForDefaultIndex: false,
+        checkForDefaultIndex: true,
     });
 })();
 
