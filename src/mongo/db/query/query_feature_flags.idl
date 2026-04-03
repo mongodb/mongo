@@ -301,7 +301,8 @@ feature_flags:
     featureFlagQueryStatsUpdateCommand:
         description: "Feature flag to enable query stats for the write commands."
         cpp_varname: gFeatureFlagQueryStatsUpdateCommand
-        default: false
+        default: true
+        version: 9.0
         fcv_gated: true
 
     featureFlagQueryStatsCBRMetrics:

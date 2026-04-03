@@ -3,7 +3,7 @@
  * update modification is specified as a replacement document or pipeline) are correct when
  * inserting a new query stats store entry.
  *
- * @tags: [featureFlagQueryStatsUpdateCommand]
+ * @tags: [requires_fcv_90]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";

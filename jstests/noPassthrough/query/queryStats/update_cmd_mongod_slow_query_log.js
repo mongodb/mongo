@@ -2,7 +2,7 @@
  * Test to confirm queryShapeHash is outputted on mongod slow query logs for sharded cluster update
  * commands.
  *
- * @tags: [featureFlagQueryStatsUpdateCommand]
+ * @tags: [requires_fcv_90]
  */
 
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";

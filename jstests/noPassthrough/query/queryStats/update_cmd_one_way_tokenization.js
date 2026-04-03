@@ -2,7 +2,7 @@
  * Test that $queryStats properly tokenizes update (where the update modification is specified
  * as replacement document or pipeline) commands on mongod.
  *
- * @tags: [featureFlagQueryStatsUpdateCommand]
+ * @tags: [requires_fcv_90]
  */
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {getQueryStatsUpdateCmd, resetQueryStatsStore} from "jstests/libs/query/query_stats_utils.js";

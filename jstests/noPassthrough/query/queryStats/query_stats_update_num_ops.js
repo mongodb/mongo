@@ -2,7 +2,7 @@
  * This test confirms that the nUpdateOps metric (tracking the number of update operation entries
  * in a single update command) is correctly recorded in query stats for each update op entry.
  *
- * @tags: [featureFlagQueryStatsUpdateCommand]
+ * @tags: [requires_fcv_90]
  */
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {

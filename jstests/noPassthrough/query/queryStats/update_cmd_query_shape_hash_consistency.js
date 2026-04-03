@@ -2,7 +2,7 @@
  * Test to confirm queryShapeHash from $queryStats on mongos matches queryShapeHash from mongod
  * slow query logs for update commands.
  *
- * @tags: [featureFlagQueryStatsUpdateCommand]
+ * @tags: [requires_fcv_90]
  */
 
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";

@@ -4,7 +4,7 @@
  * factors like whether the shard key is present in the query filter, whether the write is retryable,
  * and whether the collection is sharded.
  *
- * @tags: [featureFlagQueryStatsUpdateCommand]
+ * @tags: [requires_fcv_90]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
@@ -447,6 +447,16 @@ describe("query stats update command metrics (mongos)", function () {
 
         it("should record query stats once despite StaleConfig retry", function () {
             resetQueryStatsStore(st.shard0, "1MB");
+
+            // Wait for any pending range deletions on shard0 to complete before activating the
+            // failpoint. The alwaysThrowStaleConfigInfo failpoint fires for all namespaces, so a
+            // background range deletion task could consume the {times: 1} activation before the
+            // intended update command does, leaving the range deletion stuck in "processing" state
+            // and causing st.stop() to time out waiting for config.rangeDeletions to drain.
+            assert.soon(
+                () => shard0Primary.getDB("config").rangeDeletions.find().itcount() === 0,
+                "Timed out waiting for range deletions on shard0 to complete",
+            );
 
             // Force shard0 to return StaleConfig on the next metadata check, which triggers a
             // mongos-level retry. The failpoint expires after one activation, so the retry

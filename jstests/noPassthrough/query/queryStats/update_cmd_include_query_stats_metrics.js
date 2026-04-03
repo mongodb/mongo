@@ -2,7 +2,7 @@
  * This test confirms that includeQueryStatsMetricsForOpIndex field is properly processed for update
  * command and the query stats metrics are included in the command response when requested.
  *
- * @tags: [featureFlagQueryStatsUpdateCommand]
+ * @tags: [requires_fcv_90]
  */
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {

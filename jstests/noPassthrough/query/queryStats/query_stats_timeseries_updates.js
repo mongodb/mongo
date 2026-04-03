@@ -4,7 +4,7 @@
  * 2. Explicit updates on time-series collections should be properly recorded in query stats.
  *
  * @tags: [
- *   featureFlagQueryStatsUpdateCommand,
+ *   requires_fcv_90,
  * ]
  */
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";

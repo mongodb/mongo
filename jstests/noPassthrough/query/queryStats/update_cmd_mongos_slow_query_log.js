@@ -5,7 +5,7 @@
  *   - Single update: queryShapeHash is present in slow query logs on mongos.
  *   - Batched update: queryShapeHash is not present in slow query logs on mongos.
  *
- * @tags: [featureFlagQueryStatsUpdateCommand]
+ * @tags: [requires_fcv_90]
  */
 
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";

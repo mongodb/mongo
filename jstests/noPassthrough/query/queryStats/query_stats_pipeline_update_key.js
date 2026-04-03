@@ -2,7 +2,7 @@
  * This test confirms that query stats store key fields for pipeline update commands
  * are properly nested and none are missing.
  *
- * @tags: [featureFlagQueryStatsUpdateCommand]
+ * @tags: [requires_fcv_90]
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {
