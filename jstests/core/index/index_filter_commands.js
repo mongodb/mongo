@@ -63,8 +63,6 @@ import {sbePlanCacheEnabled, checkSbeRestrictedOrFullyEnabled} from "jstests/lib
 // Flag indicating if index filter commands are running through the query settings interface.
 let isIndexFiltersToQuerySettings = TestData.isIndexFiltersToQuerySettings || false;
 
-// This test changes the settings for the collection, we must ensure we don't conflict when this
-// test is run in parallel mode.
 const coll = db[jsTestName()];
 coll.drop();
 
@@ -427,10 +425,10 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
 
     // The test could be running in a sharded environment where either the pipeline is split, or the
     // foreign collection is not co-located; in these cases we won't push down to SBE.
-    if (getEngine(explain) == "sbe") {
-        explain = getSingleNodeExplain(explain);
+    if (!explain.splitPipeline && getEngine(explain) == "sbe") {
+        let singleNodeExplain = getSingleNodeExplain(explain);
 
-        let lookupStage = getPlanStage(explain, "EQ_LOOKUP");
+        let lookupStage = getPlanStage(singleNodeExplain, "EQ_LOOKUP");
         assert.neq(null, lookupStage, explain);
         assert.eq(lookupStage.strategy, "IndexedLoopJoin", explain);
         assert.eq(getLookupStageIndexStrategy(lookupStage).indexName, "foreign_a_1", lookupStage);
@@ -470,14 +468,14 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
         // outer side honoured the index filter.
         explain = coll.explain().aggregate(pipeline);
         assert.commandWorked(explain);
-        explain = getSingleNodeExplain(explain);
-        lookupStage = getPlanStage(explain, "EQ_LOOKUP");
+        singleNodeExplain = getSingleNodeExplain(explain);
+        lookupStage = getPlanStage(singleNodeExplain, "EQ_LOOKUP");
         assert.neq(null, lookupStage, explain);
         assert.eq(lookupStage.strategy, "IndexedLoopJoin", explain);
         assert.eq(getLookupStageIndexStrategy(lookupStage).indexName, "foreign_a_1", lookupStage);
 
         let ixscanStage = getPlanStage(
-            lookupStage.hasOwnProperty("indexName") ? explain : lookupStage.inputStages[0],
+            lookupStage.hasOwnProperty("indexName") ? singleNodeExplain : lookupStage.inputStages[0],
             "IXSCAN",
         );
         assert.neq(null, ixscanStage, explain);
