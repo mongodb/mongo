@@ -749,7 +749,7 @@ mongo_cc_unit_test(
         "validated_tenancy_scope_test.cpp",
     ],
     data = [
-        "//jstests/libs:test_pem_files",
+        "//jstests/libs/server_security:test_pem_files",
     ],
     srcs_select = [{
         "//bazel/config:ssl_enabled": ["sasl_x509_test.cpp"],

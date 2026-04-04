@@ -61,7 +61,7 @@ namespace fs = boost::filesystem;
 namespace mongo {
 namespace {
 
-#define TEST_CERTS_DIR "jstests/libs/"
+#define TEST_CERTS_DIR "jstests/libs/server_security/"
 // certs & CRLs rooted in ca.pem
 constexpr const char* caFile = TEST_CERTS_DIR "ca.pem";
 constexpr const char* serverKeyFile = TEST_CERTS_DIR "server.pem";
@@ -706,9 +706,9 @@ TEST(SSLManager, RotateCertificatesFromFile) {
     SSLParams params;
     params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
     // Server is required to have the sslPEMKeyFile.
-    params.sslPEMKeyFile = "jstests/libs/server.pem";
-    params.sslCAFile = "jstests/libs/ca.pem";
-    params.sslClusterFile = "jstests/libs/client.pem";
+    params.sslPEMKeyFile = "jstests/libs/server_security/server.pem";
+    params.sslCAFile = "jstests/libs/server_security/ca.pem";
+    params.sslClusterFile = "jstests/libs/server_security/client.pem";
 
     std::shared_ptr<SSLManagerInterface> manager =
         SSLManagerInterface::create(params, true /* isSSLServer */);
@@ -728,8 +728,8 @@ TEST(SSLManager, InitContextFromFileShouldFail) {
     params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
     // Server is required to have the sslPEMKeyFile.
     // We force the initialization to fail by omitting this param.
-    params.sslCAFile = "jstests/libs/ca.pem";
-    params.sslClusterFile = "jstests/libs/client.pem";
+    params.sslCAFile = "jstests/libs/server_security/ca.pem";
+    params.sslClusterFile = "jstests/libs/server_security/client.pem";
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
     ASSERT_THROWS_CODE(
         [&params] {
@@ -744,8 +744,8 @@ TEST(SSLManager, RotateClusterCertificatesFromFile) {
     SSLParams params;
     params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
     // Client doesn't need params.sslPEMKeyFile.
-    params.sslCAFile = "jstests/libs/ca.pem";
-    params.sslClusterFile = "jstests/libs/client.pem";
+    params.sslCAFile = "jstests/libs/server_security/ca.pem";
+    params.sslClusterFile = "jstests/libs/server_security/client.pem";
 
     std::shared_ptr<SSLManagerInterface> manager =
         SSLManagerInterface::create(params, false /* isSSLServer */);
@@ -766,7 +766,7 @@ TEST(SSLManager, InitContextFromFile) {
     SSLParams params;
     params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
     // Client doesn't need params.sslPEMKeyFile.
-    params.sslClusterFile = "jstests/libs/client.pem";
+    params.sslClusterFile = "jstests/libs/server_security/client.pem";
 
     std::shared_ptr<SSLManagerInterface> manager =
         SSLManagerInterface::create(params, false /* isSSLServer */);
@@ -779,11 +779,11 @@ TEST(SSLManager, InitContextFromFile) {
 TEST(SSLManager, InitContextFromMemory) {
     SSLParams params;
     params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
-    params.sslCAFile = "jstests/libs/ca.pem";
+    params.sslCAFile = "jstests/libs/server_security/ca.pem";
 
     ClusterConnection clusterConnection;
     clusterConnection.targetedClusterConnectionString = ConnectionString::forLocal();
-    clusterConnection.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
+    clusterConnection.sslClusterPEMPayload = loadFile("jstests/libs/server_security/client.pem");
 
     TransientSSLParams transientParams(clusterConnection);
 
@@ -799,12 +799,12 @@ TEST(SSLManager, InitContextFromMemory) {
 TEST(SSLManager, IgnoreInitServerSideContextFromMemory) {
     SSLParams params;
     params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
-    params.sslPEMKeyFile = "jstests/libs/server.pem";
-    params.sslCAFile = "jstests/libs/ca.pem";
+    params.sslPEMKeyFile = "jstests/libs/server_security/server.pem";
+    params.sslCAFile = "jstests/libs/server_security/ca.pem";
 
     ClusterConnection clusterConnection;
     clusterConnection.targetedClusterConnectionString = ConnectionString::forLocal();
-    clusterConnection.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
+    clusterConnection.sslClusterPEMPayload = loadFile("jstests/libs/server_security/client.pem");
 
     TransientSSLParams transientParams(clusterConnection);
 
@@ -819,8 +819,8 @@ TEST(SSLManager, IgnoreInitServerSideContextFromMemory) {
 TEST(SSLManager, TransientSSLParams) {
     SSLParams params;
     params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
-    params.sslCAFile = "jstests/libs/ca.pem";
-    params.sslClusterFile = "jstests/libs/client.pem";
+    params.sslCAFile = "jstests/libs/server_security/ca.pem";
+    params.sslClusterFile = "jstests/libs/server_security/client.pem";
 
     auto options = [] {
         ServerGlobalParams params;
@@ -832,7 +832,7 @@ TEST(SSLManager, TransientSSLParams) {
 
     ClusterConnection clusterConnection;
     clusterConnection.targetedClusterConnectionString = ConnectionString::forLocal();
-    clusterConnection.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
+    clusterConnection.sslClusterPEMPayload = loadFile("jstests/libs/server_security/client.pem");
 
     TransientSSLParams transientSSLParams(clusterConnection);
 
@@ -854,7 +854,7 @@ TEST(SSLManager, TransientSSLParamsStressTestWithTransport) {
     static constexpr int kThreads = 10;
     SSLParams params;
     params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
-    params.sslCAFile = "jstests/libs/ca.pem";
+    params.sslCAFile = "jstests/libs/server_security/ca.pem";
 
     auto options = [] {
         ServerGlobalParams params;
@@ -866,7 +866,7 @@ TEST(SSLManager, TransientSSLParamsStressTestWithTransport) {
 
     ClusterConnection clusterConnection;
     clusterConnection.targetedClusterConnectionString = ConnectionString::forLocal();
-    clusterConnection.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
+    clusterConnection.sslClusterPEMPayload = loadFile("jstests/libs/server_security/client.pem");
 
     TransientSSLParams transientSSLParams(clusterConnection);
 
@@ -908,12 +908,12 @@ TEST(SSLManager, TransientSSLParamsStressTestWithManager) {
     static constexpr int kThreads = 10;
     SSLParams params;
     params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
-    params.sslPEMKeyFile = "jstests/libs/server.pem";
-    params.sslCAFile = "jstests/libs/ca.pem";
+    params.sslPEMKeyFile = "jstests/libs/server_security/server.pem";
+    params.sslCAFile = "jstests/libs/server_security/ca.pem";
 
     ClusterConnection clusterConnection;
     clusterConnection.targetedClusterConnectionString = ConnectionString::forLocal();
-    clusterConnection.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
+    clusterConnection.sslClusterPEMPayload = loadFile("jstests/libs/server_security/client.pem");
 
     TransientSSLParams transientParams(clusterConnection);
 
@@ -968,8 +968,8 @@ TEST(SSLManager, CheckCertificateInTransientManager) {
 
     SSLParams params;
     params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
-    params.sslCAFile = "jstests/libs/ca.pem";
-    params.sslPEMKeyFile = "jstests/libs/client.pem";
+    params.sslCAFile = "jstests/libs/server_security/ca.pem";
+    params.sslPEMKeyFile = "jstests/libs/server_security/client.pem";
 
     std::shared_ptr<SSLManagerInterface> manager;
     ASSERT_DOES_NOT_THROW(
@@ -985,8 +985,8 @@ TEST(SSLManager, CheckCertificateInTransientManager) {
 
     // Now create manager with new transient connection
     TLSCredentials tlsCredentials;
-    tlsCredentials.tlsPEMKeyFile = "jstests/libs/trusted-client.pem";
-    tlsCredentials.tlsCAFile = "jstests/libs/trusted-ca.pem";
+    tlsCredentials.tlsPEMKeyFile = "jstests/libs/server_security/trusted-client.pem";
+    tlsCredentials.tlsCAFile = "jstests/libs/server_security/trusted-ca.pem";
 
     TransientSSLParams transientParams(tlsCredentials);
 
@@ -1002,8 +1002,8 @@ TEST(SSLManager, CheckCertificateInTransientManager) {
 TEST(SSLManager, TransientSSLParamsNewConnection) {
     SSLParams params;
     params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
-    params.sslCAFile = "jstests/libs/ca.pem";
-    params.sslClusterFile = "jstests/libs/client.pem";
+    params.sslCAFile = "jstests/libs/server_security/ca.pem";
+    params.sslClusterFile = "jstests/libs/server_security/client.pem";
 
     auto options = [] {
         ServerGlobalParams params;
@@ -1041,8 +1041,8 @@ static bool isSanWarningWritten(const std::vector<std::string>& logLines) {
 TEST(SSLManager, InitContextSanWarning) {
     SSLParams params;
     params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
-    params.sslCAFile = "jstests/libs/ca.pem";
-    params.sslPEMKeyFile = "jstests/libs/server_no_SAN.pem";
+    params.sslCAFile = "jstests/libs/server_security/ca.pem";
+    params.sslPEMKeyFile = "jstests/libs/server_security/server_no_SAN.pem";
 
     unittest::LogCaptureGuard logs;
     auto manager = SSLManagerInterface::create(params, true);
@@ -1059,8 +1059,8 @@ TEST(SSLManager, InitContextSanWarning) {
 TEST(SSLManager, InitContextNoSanWarning) {
     SSLParams params;
     params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
-    params.sslCAFile = "jstests/libs/ca.pem";
-    params.sslPEMKeyFile = "jstests/libs/server.pem";
+    params.sslCAFile = "jstests/libs/server_security/ca.pem";
+    params.sslPEMKeyFile = "jstests/libs/server_security/server.pem";
 
     unittest::LogCaptureGuard logs;
     auto manager = SSLManagerInterface::create(params, true);

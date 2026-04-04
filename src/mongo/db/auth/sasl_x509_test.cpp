@@ -119,9 +119,9 @@ protected:
 
         SSLParams params;
         params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
-        params.sslPEMKeyFile = "jstests/libs/server.pem";
-        params.sslCAFile = "jstests/libs/ca.pem";
-        params.sslClusterFile = "jstests/libs/server.pem";
+        params.sslPEMKeyFile = "jstests/libs/server_security/server.pem";
+        params.sslCAFile = "jstests/libs/server_security/ca.pem";
+        params.sslClusterFile = "jstests/libs/server_security/server.pem";
         params.clusterAuthX509ExtensionValue = std::string{kX509Subject};
         sslGlobalParams.clusterAuthX509ExtensionValue = std::string{kX509Subject};
         auto manager = SSLManagerInterface::create(params, true);

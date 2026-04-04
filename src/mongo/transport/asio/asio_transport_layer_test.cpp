@@ -1272,7 +1272,7 @@ TEST_F(AsioTransportLayerWithServiceContextTest, ShutdownDuringSSLHandshake) {
 
     ClusterConnection clusterConnection;
     clusterConnection.targetedClusterConnectionString = ConnectionString::forLocal();
-    clusterConnection.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
+    clusterConnection.sslClusterPEMPayload = loadFile("jstests/libs/server_security/client.pem");
 
     TransientSSLParams transientParams(clusterConnection);
 
@@ -1287,9 +1287,9 @@ TEST_F(AsioTransportLayerWithServiceContextTest, ShutdownDuringSSLHandshake) {
 class AsioTransportLayerTLSHandshakeTest : public AsioTransportLayerWithServiceContextTest {
 public:
     void setUp() override {
-        const std::string kCAFile = "jstests/libs/ca.pem";
-        const std::string kServerCertificateKeyFile = "jstests/libs/server_SAN.pem";
-        const std::string kClientCertificateKeyFile = "jstests/libs/client.pem";
+        const std::string kCAFile = "jstests/libs/server_security/ca.pem";
+        const std::string kServerCertificateKeyFile = "jstests/libs/server_security/server_SAN.pem";
+        const std::string kClientCertificateKeyFile = "jstests/libs/server_security/client.pem";
         _tempDir = test::copyCertsToTempDir(
             kCAFile, kServerCertificateKeyFile, kClientCertificateKeyFile, "rpc");
 

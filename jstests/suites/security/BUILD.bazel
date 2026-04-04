@@ -58,7 +58,7 @@ resmoke_suite_test(
     data = [
         "//jstests/libs:8k-prime.dhparam",
         "//jstests/libs:key1",
-        "//jstests/libs:test_pem_files",
+        "//jstests/libs/server_security:test_pem_files",
         "//jstests/sharding/libs:all_subpackage_javascript_files",
         "//jstests/ssl:tls_enumerator",
         "//jstests/ssl/libs",

@@ -21,8 +21,8 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {checkLog} from "src/mongo/shell/check_log.js";
 import {describe, it, before, after} from "jstests/libs/mochalite.js";
 
-const pemKeyFile = "jstests/libs/server.pem";
-const caFile = "jstests/libs/ca.pem";
+const pemKeyFile = getX509Path("server.pem");
+const caFile = getX509Path("ca.pem");
 
 const internalHostnames = ["local.10gen.cc", "lvh.me", "localtest.me"];
 const numNodes = internalHostnames.length;

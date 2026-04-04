@@ -151,10 +151,10 @@ TEST_F(ServerTest, MaxThreads) {
 }
 
 TEST_F(ServerTest, ECDSACertificates) {
-    const std::string kECDSACAFile = "jstests/libs/ecdsa-ca.pem";
+    const std::string kECDSACAFile = "jstests/libs/server_security/ecdsa-ca.pem";
 
     auto options = CommandServiceTestFixtures::makeServerOptions();
-    options.tlsCertificateKeyFile = "jstests/libs/ecdsa-server.pem";
+    options.tlsCertificateKeyFile = "jstests/libs/server_security/ecdsa-server.pem";
     options.tlsCAFile = kECDSACAFile;
 
     CommandServiceTestFixtures::runWithServer(
@@ -162,7 +162,7 @@ TEST_F(ServerTest, ECDSACertificates) {
         [&](auto& s, auto&) {
             auto stubOptions = CommandServiceTestFixtures::Stub::Options{};
             stubOptions.tlsCAFile = kECDSACAFile;
-            stubOptions.tlsCertificateKeyFile = "jstests/libs/ecdsa-client.pem";
+            stubOptions.tlsCertificateKeyFile = "jstests/libs/server_security/ecdsa-client.pem";
 
             auto stub =
                 CommandServiceTestFixtures::makeStub(s.getListeningAddresses().at(0), stubOptions);
@@ -173,7 +173,7 @@ TEST_F(ServerTest, ECDSACertificates) {
 
 TEST_F(ServerTest, IntermediateCA) {
     auto options = CommandServiceTestFixtures::makeServerOptions();
-    options.tlsCertificateKeyFile = "jstests/libs/server-intermediate-ca.pem";
+    options.tlsCertificateKeyFile = "jstests/libs/server_security/server-intermediate-ca.pem";
 
     CommandServiceTestFixtures::runWithServer(
         [](auto) {},

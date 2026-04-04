@@ -338,7 +338,7 @@ mongo_cc_unit_test(
         "//src/mongo/transport/asio:asio_transport_layer_test.cpp",
         "//src/mongo/transport/asio:asio_utils_test.cpp",
     ],
-    data = ["//jstests/libs:test_pem_files"],
+    data = ["//jstests/libs/server_security:test_pem_files"],
     srcs_select = [{
         "@platforms//os:linux": ["session_manager_common_test.cpp"],
         "//conditions:default": [],

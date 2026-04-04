@@ -3,7 +3,7 @@ set -e
 
 # This script uses the openssl command line tool to create CRLs.
 
-OUTPUT_PATH="jstests/libs/"
+OUTPUT_PATH="jstests/libs/server_security/"
 CA_PEM_PATH="${OUTPUT_PATH}/ca.pem"
 TRUSTED_CA_PEM_PATH="${OUTPUT_PATH}/trusted-ca.pem"
 
@@ -46,7 +46,7 @@ crl() {
 
 crl $CA_PEM_PATH crl.pem empty
 crl $CA_PEM_PATH crl_expired.pem expired
-crl $CA_PEM_PATH crl_client_revoked.pem revoked "jstests/libs/client_revoked.pem"
-crl $CA_PEM_PATH crl_intermediate_ca_B_revoked.pem revoked "jstests/libs/intermediate-ca-B.pem"
+crl $CA_PEM_PATH crl_client_revoked.pem revoked "jstests/libs/server_security/client_revoked.pem"
+crl $CA_PEM_PATH crl_intermediate_ca_B_revoked.pem revoked "jstests/libs/server_security/intermediate-ca-B.pem"
 crl $TRUSTED_CA_PEM_PATH crl_from_trusted_ca.pem empty
-crl "jstests/libs/intermediate-ca-B.pem" crl_from_intermediate_ca_B.pem empty
+crl "jstests/libs/server_security/intermediate-ca-B.pem" crl_from_intermediate_ca_B.pem empty

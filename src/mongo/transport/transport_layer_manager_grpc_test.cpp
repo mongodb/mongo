@@ -435,9 +435,9 @@ private:
 TEST_F(RotateCertificatesTransportLayerManagerTest, RotateCertificatesSucceeds) {
     runTest([&](auto&) {
         // Ceritificates that we wil rotate to.
-        const std::string kEcdsaCAFile = "jstests/libs/ecdsa-ca.pem";
-        const std::string kEcdsaPEMFile = "jstests/libs/ecdsa-server.pem";
-        const std::string kEcdsaClientFile = "jstests/libs/ecdsa-client.pem";
+        const std::string kEcdsaCAFile = "jstests/libs/server_security/ecdsa-ca.pem";
+        const std::string kEcdsaPEMFile = "jstests/libs/server_security/ecdsa-server.pem";
+        const std::string kEcdsaClientFile = "jstests/libs/server_security/ecdsa-client.pem";
 
         auto initialGoodStub = grpc::CommandServiceTestFixtures::makeStubWithCerts(
             getGRPCListenAddress(),
@@ -495,7 +495,7 @@ TEST_F(RotateCertificatesTransportLayerManagerTest,
 
 TEST_F(RotateCertificatesTransportLayerManagerTest, RotateCertificatesUsesOldCertsWithNewBadCerts) {
     runTest([&](auto&) {
-        const std::string kInvalidPEMFile = "jstests/libs/expired.pem";
+        const std::string kInvalidPEMFile = "jstests/libs/server_security/expired.pem";
 
         // Connect using the existing certs.
         auto stub = grpc::CommandServiceTestFixtures::makeStubWithCerts(

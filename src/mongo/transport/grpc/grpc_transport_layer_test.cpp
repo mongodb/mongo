@@ -807,9 +807,9 @@ private:
 
 TEST_F(RotateCertificatesGRPCTransportLayerTest, RotateCertificatesSucceeds) {
     // Ceritificates that we wil rotate to.
-    const std::string kTrustedCAFile = "jstests/libs/trusted-ca.pem";
-    const std::string kTrustedPEMFile = "jstests/libs/trusted-server.pem";
-    const std::string kTrustedClientFile = "jstests/libs/trusted-client.pem";
+    const std::string kTrustedCAFile = "jstests/libs/server_security/trusted-ca.pem";
+    const std::string kTrustedPEMFile = "jstests/libs/server_security/trusted-server.pem";
+    const std::string kTrustedClientFile = "jstests/libs/server_security/trusted-client.pem";
 
     runWithTL(
         makeNoopRPCHandler(),
@@ -953,9 +953,9 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest,
 
 TEST_F(RotateCertificatesGRPCTransportLayerTest, ClientUsesOldCertsUntilRotate) {
     // Ceritificates that we wil rotate to.
-    const std::string kTrustedCAFile = "jstests/libs/trusted-ca.pem";
-    const std::string kTrustedPEMFile = "jstests/libs/trusted-server.pem";
-    const std::string kTrustedClientPEMFile = "jstests/libs/trusted-client.pem";
+    const std::string kTrustedCAFile = "jstests/libs/server_security/trusted-ca.pem";
+    const std::string kTrustedPEMFile = "jstests/libs/server_security/trusted-server.pem";
+    const std::string kTrustedClientPEMFile = "jstests/libs/server_security/trusted-client.pem";
 
     runWithTL(
         makeNoopRPCHandler(),

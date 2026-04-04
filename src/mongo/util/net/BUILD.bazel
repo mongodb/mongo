@@ -392,7 +392,7 @@ mongo_cc_unit_test(
         "ssl_options_test.cpp",
     ],
     data = [
-        "//jstests/libs:test_pem_files",
+        "//jstests/libs/server_security:test_pem_files",
     ],
     tags = ["mongo_unittest_second_group"],
     target_compatible_with = select({
