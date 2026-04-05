@@ -1218,6 +1218,7 @@ tasks:
       - func: "generate resmoke tasks"
         vars:
           suite: disagg_analyze_shard_key_jscore_passthrough
+          use_large_distro: "true"
           resmoke_jobs_max: 1
 
   - <<: *benchmark_template
@@ -3259,6 +3260,7 @@ tasks:
         vars:
           suite: disagg_sharding_jscore_passthrough
           use_large_distro: "true"
+          resmoke_jobs_max: 4
 
   - <<: *gen_task_template
     name: no_passthrough_disagg_override_gen
@@ -3324,7 +3326,7 @@ tasks:
         vars:
           suite: disagg_sharded_colls_jscore_passthrough
           use_large_distro: "true"
-          resmoke_jobs_max: 10
+          resmoke_jobs_max: 5
 
   # TODO (SERVER-123074): Re-enable balancer related disagg suites
   #  - <<: *gen_task_template
@@ -3365,6 +3367,7 @@ tasks:
         vars:
           suite: disagg_concurrency_sharded_replication
           use_large_distro: "true"
+          resmoke_jobs_max: 2
 
   # TODO (SERVER-123074): Re-enable balancer related disagg suites
   #  - <<: *gen_task_template
@@ -3412,6 +3415,7 @@ tasks:
         vars:
           suite: disagg_concurrency_sharded_causal_consistency
           use_large_distro: "true"
+          resmoke_jobs_max: 2
 
   # TODO (SERVER-123074): Re-enable balancer related disagg suites
   #  - <<: *gen_task_template

@@ -2531,6 +2531,7 @@ tasks:
         vars:
           suite: disagg_repl_jscore_passthrough
           use_large_distro: "true"
+          resmoke_jobs_max: 4
 
   - <<: *gen_task_template
     name: disagg_two_nodes_repl_jscore_passthrough_gen
@@ -2549,6 +2550,7 @@ tasks:
           use_large_distro: "true"
           # Secondaries need extra WT cache on disagg to avoid filling up the cache in between checkpoints.
           resmoke_args: --storageEngineCacheSizeGB=5
+          resmoke_jobs_max: 4
 
   - <<: *gen_task_template
     name: disagg_repl_jscore_passthrough_secondary_reads_gen
@@ -2566,6 +2568,7 @@ tasks:
           use_large_distro: "true"
           # Secondaries need extra WT cache on disagg to avoid filling up the cache in between checkpoints.
           resmoke_args: --storageEngineCacheSizeGB=5
+          resmoke_jobs_max: 4
 
   - <<: *gen_task_template
     name: disagg_repl_force_checkpoint_gen
@@ -2618,6 +2621,7 @@ tasks:
         vars:
           suite: disagg_retryable_writes_jscore_passthrough
           use_large_distro: "true"
+          resmoke_jobs_max: 4
 
   - <<: *gen_task_template
     name: disagg_concurrency_replication_gen
@@ -2639,6 +2643,7 @@ tasks:
       - func: "generate resmoke tasks"
         vars:
           resmoke_jobs_max: 1
+          use_large_distro: "true"
 
   - <<: *gen_task_template
     name: disagg_concurrency_replication_multi_stmt_txn_gen
@@ -2687,6 +2692,7 @@ tasks:
         vars:
           suite: disagg_concurrency_sharded_multi_stmt_txn
           use_large_distro: "true"
+          resmoke_jobs_max: 1
 
   # TODO (SERVER-123074): Re-enable balancer related disagg suites
   #  - <<: *gen_task_template
