@@ -264,8 +264,10 @@ class HistoryDict(MutableMapping, Historic):
         history_dict = HistoryDict()
         history_dict._global_time = self._global_time
         history_dict._history_store = copy.deepcopy(self._history_store)
-        for key, value in self.items():
-            history_dict[key] = make_historic(value)
+        for key, value in self._value_store.items():
+            history_dict._value_store[key] = value
+            if isinstance(value, HistoryDict):
+                value.subscribe(history_dict, key)
         return history_dict
 
     def __getitem__(self, key):

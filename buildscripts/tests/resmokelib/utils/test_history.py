@@ -1,5 +1,6 @@
 """Unit tests for buildscripts/resmokelib/utils/history.py."""
 
+import sys
 import unittest
 
 from buildscripts.resmokelib.utils.history import HistoryDict, make_historic
@@ -199,3 +200,53 @@ History:
         # Reads aren't counted
         _ = second_dict["foo"]
         self.assertTrue(test_dict.write_equals(second_dict))
+
+    def test_copy_does_not_record_writes(self):
+        """copy() should not record writes — verify the history is unchanged."""
+        parent = HistoryDict()
+        parent["key"] = "value"
+        parent["nested"] = make_historic({"inner": 1})
+        expected_history = parent.dump_history()
+
+        copied = parent.copy()
+
+        # The copy must have identical history — no extra entries from the copy operation itself.
+        self.assertEqual(expected_history, copied.dump_history())
+        self.assertEqual(copied["key"], "value")
+        self.assertEqual(copied["nested"]["inner"], 1)
+
+    def test_copy_does_not_fire_notify_during_construction(self):
+        """copy() using __setitem__ fires notify_subscriber_write() on the partially-constructed
+        copy for every key assigned. In the real fixture stack this can lead to re-entrancy:
+        __setitem__  -> notify -> accept_write -> (subscriber calls copy() again).
+        Verify that copy() produces zero notify calls on the new dict."""
+        parent = HistoryDict()
+        parent["a"] = 1
+        parent["b"] = make_historic({"c": 2})
+
+        notify_calls = []
+        original_notify = HistoryDict.notify_subscriber_write
+
+        def tracking_notify(self_inner):
+            # Walk the call stack to detect if we're anywhere inside copy()
+            frame = sys._getframe(1)
+            while frame is not None:
+                if frame.f_code.co_name == "copy" and frame.f_code.co_filename.endswith(
+                    "history.py"
+                ):
+                    notify_calls.append("notified during copy")
+                    break
+                frame = frame.f_back
+            return original_notify(self_inner)
+
+        try:
+            HistoryDict.notify_subscriber_write = tracking_notify
+            parent.copy()
+        finally:
+            HistoryDict.notify_subscriber_write = original_notify
+
+        self.assertEqual(
+            [],
+            notify_calls,
+            "copy() must not call notify_subscriber_write() during construction",
+        )
