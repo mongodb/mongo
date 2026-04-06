@@ -1405,6 +1405,8 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedCloning(
         .thenRunOn(**executor)
         .then([this, executor](ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
             if (_metadata.getPerformVerification()) {
+                _metrics->setStartFor(ReshardingMetrics::TimedPhase::kVerificationPreApplying,
+                                      resharding::getCurrentTime());
                 auto opCtx = _makeOperationContext();
                 // Fetch the coordinator doc from disk since the 'coordinatorDocChangedOnDisk' above
                 // came from the OpObserver and may not reflect the latest version coordinator doc
@@ -1418,6 +1420,8 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedCloning(
                     **executor,
                     _ctHolder->getAbortToken(),
                     coordinatorDocChangedOnDisk);
+                _metrics->setEndFor(ReshardingMetrics::TimedPhase::kVerificationPreApplying,
+                                    resharding::getCurrentTime());
             }
         })
         .then([this] {
@@ -1633,6 +1637,8 @@ ReshardingCoordinatorDocument ReshardingCoordinator::_verifyFinalCollection(
     coordinatorDocChangedOnDisk =
         resharding::getCoordinatorDoc(opCtx.get(), coordinatorDocChangedOnDisk.getReshardingUUID());
 
+    _metrics->setStartFor(ReshardingMetrics::TimedPhase::kVerificationPreCommit,
+                          resharding::getCurrentTime());
     try {
         _reshardingCoordinatorExternalState->verifyFinalCollection(opCtx.get(),
                                                                    coordinatorDocChangedOnDisk);
@@ -1642,6 +1648,8 @@ ReshardingCoordinatorDocument ReshardingCoordinator::_verifyFinalCollection(
                       "strict consistency",
                       "error"_attr = redact(ex.toString()));
     }
+    _metrics->setEndFor(ReshardingMetrics::TimedPhase::kVerificationPreCommit,
+                        resharding::getCurrentTime());
 
     return coordinatorDocChangedOnDisk;
 }

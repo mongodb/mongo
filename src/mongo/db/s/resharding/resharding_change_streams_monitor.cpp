@@ -504,4 +504,12 @@ BSONObj ReshardingChangeStreamsMonitor::EventBatch::getResumeToken() const {
     return _resumeToken;
 }
 
+boost::optional<uint32_t>
+ReshardingChangeStreamsMonitor::EventBatch::getResumeTokenClusterTimeSecs() const {
+    if (_resumeToken.isEmpty()) {
+        return boost::none;
+    }
+    return ResumeToken::parse(_resumeToken).getClusterTime().getSecs();
+}
+
 }  // namespace mongo

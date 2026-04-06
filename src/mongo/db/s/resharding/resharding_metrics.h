@@ -62,8 +62,17 @@ namespace mongo {
 
 namespace resharding_metrics {
 
-enum TimedPhase { kCloning, kApplying, kCriticalSection, kBuildingIndex };
-constexpr auto kNumTimedPhase = 4;
+enum TimedPhase {
+    kCloning,
+    kApplying,
+    kCriticalSection,
+    kBuildingIndex,
+    kVerificationPreApplying,
+    kVerificationPreCommit,
+    kChangeStreamMonitor,
+    kStrictConsistency,
+};
+constexpr auto kNumTimedPhase = 8;
 using PhaseDurationTracker = PhaseDurationTracker<TimedPhase, kNumTimedPhase>;
 
 }  // namespace resharding_metrics
@@ -321,6 +330,12 @@ public:
         return _phaseDurations.getElapsed<TimeUnit>(phase, clock);
     }
 
+    template <typename TimeUnit>
+    boost::optional<TimeUnit> getCrossPhaseElapsed(TimedPhase startPhase,
+                                                   TimedPhase endPhase) const {
+        return _phaseDurations.getCrossPhaseElapsed<TimeUnit>(startPhase, endPhase);
+    }
+
     template <typename StateOrStateVariant>
     static bool mustRestoreExternallyTrackedRecipientFields(StateOrStateVariant stateOrVariant) {
         if constexpr (std::is_same_v<StateOrStateVariant, State>) {
@@ -351,9 +366,17 @@ public:
     void setIndexesToBuild(int64_t numIndexes);
     void setIndexesBuilt(int64_t numIndexes);
 
+    /**
+     * Records the clusterTime from the latest postBatchResumeToken received by the change stream
+     * monitor. This is used to compute the monitor lag in currentOp/serverStatus output.
+     */
+    void setChangeStreamMonitorLastClusterTime(Timestamp clusterTime);
+
 private:
     static constexpr auto kNoDate = Date_t::min();
     using UniqueScopedObserver = ReshardingCumulativeMetrics::UniqueScopedObserver;
+
+    void appendChangeStreamMonitorLagMetrics(BSONObjBuilder& bob) const;
 
     template <typename T>
     T getElapsed(const AtomicWord<Date_t>& startTime,
@@ -522,6 +545,11 @@ private:
     AtomicWord<bool> _isSameKeyResharding;
     AtomicWord<int64_t> _indexesToBuild;
     AtomicWord<int64_t> _indexesBuilt;
+
+    // Change stream monitor metrics (donors and recipients only).
+    // The clusterTime from the latest postBatchResumeToken received from the change stream,
+    // stored as seconds since epoch (Timestamp::getSecs()). Zero means "not yet set".
+    AtomicWord<uint32_t> _changeStreamMonitorLastClusterTimeSecs{0};
 
     UniqueScopedObserver _scopedObserver;
     const ReshardingProvenanceEnum _provenance;

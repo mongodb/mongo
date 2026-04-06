@@ -77,6 +77,20 @@ public:
         return _durations[toIndex(phase)].template getElapsed<TimeUnit>(clock);
     }
 
+    /**
+     * Returns the elapsed time between the start of 'startPhase' and the end of 'endPhase'.
+     * Returns boost::none if either timestamp is absent or if end precedes start.
+     */
+    template <typename TimeUnit>
+    boost::optional<TimeUnit> getCrossPhaseElapsed(PhaseEnum startPhase, PhaseEnum endPhase) const {
+        auto start = getStartFor(startPhase);
+        auto end = getEndFor(endPhase);
+        if (!start || !end || *end < *start) {
+            return boost::none;
+        }
+        return duration_cast<TimeUnit>(*end - *start);
+    }
+
     template <typename TimeUnit>
     void reportDurationsForAllPhases(const TimedPhaseNameMap& names,
                                      ClockSource* clock,

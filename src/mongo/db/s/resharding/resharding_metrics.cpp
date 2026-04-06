@@ -69,7 +69,10 @@ const auto kTimedPhaseNamesMap = [] {
         {TimedPhase::kCloning, "totalCopyTimeElapsedSecs"},
         {TimedPhase::kApplying, "totalApplyTimeElapsedSecs"},
         {TimedPhase::kCriticalSection, "totalCriticalSectionTimeElapsedSecs"},
-        {TimedPhase::kBuildingIndex, "totalIndexBuildTimeElapsedSecs"}};
+        {TimedPhase::kBuildingIndex, "totalIndexBuildTimeElapsedSecs"},
+        {TimedPhase::kVerificationPreApplying, "verificationPreApplyingTimeElapsedSecs"},
+        {TimedPhase::kVerificationPreCommit, "verificationPreCommitTimeElapsedSecs"},
+        {TimedPhase::kChangeStreamMonitor, "changeStreamMonitorTotalTimeElapsedSecs"}};
 }();
 
 boost::optional<Milliseconds> readCoordinatorEstimate(const AtomicWord<Milliseconds>& field) {
@@ -659,6 +662,23 @@ StringData ReshardingMetrics::getStateString() const {
                  getState());
 }
 
+void ReshardingMetrics::appendChangeStreamMonitorLagMetrics(BSONObjBuilder& bob) const {
+    using namespace resharding_metrics::field_names;
+
+    // Only report lag while the monitor is still running. Once it completes, the last
+    // clusterTime is frozen and lag would grow indefinitely against clock->now().
+    auto monitorEnd = getEndFor(TimedPhase::kChangeStreamMonitor);
+    auto lastClusterTimeSecs = _changeStreamMonitorLastClusterTimeSecs.load();
+    if (lastClusterTimeSecs != 0 && !monitorEnd) {
+        auto lastClusterTimeDate =
+            Date_t::fromMillisSinceEpoch(static_cast<long long>(lastClusterTimeSecs) * 1000);
+        auto lagSecs =
+            duration_cast<Seconds>(getClockSource()->now() - lastClusterTimeDate).count();
+        // Clamp to zero in case of minor clock skew or rounding.
+        bob.append(kChangeStreamMonitorLagSecs, std::max<long long>(0, lagSecs));
+    }
+}
+
 BSONObj ReshardingMetrics::reportForCurrentOp() const {
     using namespace resharding_metrics::field_names;
 
@@ -672,7 +692,7 @@ BSONObj ReshardingMetrics::reportForCurrentOp() const {
     builder.append(kOpTimeElapsed, getOperationRunningTimeSecs().count());
     builder.appendElements(BSON("provenance" << idl::serialize(_provenance)));
     switch (_role) {
-        case Role::kCoordinator:
+        case Role::kCoordinator: {
             appendOptionalMillisecondsFieldAs<Seconds>(
                 builder,
                 kAllShardsHighestRemainingOperationTimeEstimatedSecs,
@@ -685,12 +705,21 @@ BSONObj ReshardingMetrics::reportForCurrentOp() const {
             builder.append(resharding_metrics::field_names::kIsSameKeyResharding,
                            _isSameKeyResharding.load());
             break;
-        case Role::kDonor:
+        }
+        case Role::kDonor: {
             builder.append(kDonorState, getStateString());
             builder.append(kCountWritesDuringCriticalSection, _writesDuringCriticalSection.load());
             builder.append(kCountReadsDuringCriticalSection, _readsDuringCriticalSection.load());
+
+            appendChangeStreamMonitorLagMetrics(builder);
+
+            if (auto secs = getCrossPhaseElapsed<Seconds>(TimedPhase::kCriticalSection,
+                                                          TimedPhase::kChangeStreamMonitor)) {
+                builder.append(kBlockingWritesToMonitorCompletionSecs, secs->count());
+            }
             break;
-        case Role::kRecipient:
+        }
+        case Role::kRecipient: {
             builder.append(kRecipientState, getStateString());
             appendOptionalMillisecondsFieldAs<Seconds>(
                 builder, kRemainingOpTimeEstimated, getHighEstimateRemainingTimeMillis());
@@ -706,7 +735,15 @@ BSONObj ReshardingMetrics::reportForCurrentOp() const {
             builder.append(kInsertsApplied, getInsertsApplied());
             builder.append(kUpdatesApplied, getUpdatesApplied());
             builder.append(kDeletesApplied, getDeletesApplied());
+
+            appendChangeStreamMonitorLagMetrics(builder);
+
+            if (auto secs = getCrossPhaseElapsed<Seconds>(TimedPhase::kStrictConsistency,
+                                                          TimedPhase::kChangeStreamMonitor)) {
+                builder.append(kStrictConsistencyToMonitorCompletionSecs, secs->count());
+            }
             break;
+        }
         default:
             MONGO_UNREACHABLE;
     }
@@ -836,6 +873,10 @@ void ReshardingMetrics::setIndexesToBuild(int64_t numIndexes) {
 
 void ReshardingMetrics::setIndexesBuilt(int64_t numIndexes) {
     _indexesBuilt.store(numIndexes);
+}
+
+void ReshardingMetrics::setChangeStreamMonitorLastClusterTime(Timestamp clusterTime) {
+    _changeStreamMonitorLastClusterTimeSecs.store(clusterTime.getSecs());
 }
 
 ReshardingMetrics::OplogLatencyMetrics::OplogLatencyMetrics(ShardId donorShardId)

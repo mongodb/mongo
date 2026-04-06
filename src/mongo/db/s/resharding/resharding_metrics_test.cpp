@@ -1650,5 +1650,225 @@ TEST_F(ReshardingMetricsTest, TestSetEndForIdempotency) {
     ASSERT_EQ(start, now);
 }
 
+TEST_F(ReshardingMetricsTest, DonorChangeStreamMonitorMetricsReported) {
+    auto clock = getClockSource();
+    auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kDonor);
+
+    // Before start time is set, elapsed should be the default (0).
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("changeStreamMonitorTotalTimeElapsedSecs"), 0);
+
+    metrics->setStartFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor, clock->now());
+
+    clock->advance(Seconds(30));
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("changeStreamMonitorTotalTimeElapsedSecs"), 30);
+
+    // After end time is set, duration is fixed.
+    metrics->setEndFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor, clock->now());
+    clock->advance(Seconds(100));
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("changeStreamMonitorTotalTimeElapsedSecs"), 30);
+}
+
+TEST_F(ReshardingMetricsTest, DonorChangeStreamMonitorLagReported) {
+    auto clock = getClockSource();
+    auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kDonor);
+
+    // Before cluster time is set, lag field should not appear.
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_FALSE(report.hasField("changeStreamMonitorLagSecs"));
+
+    // Simulate the monitor being 20 seconds behind.
+    auto clusterTimeSecs = durationCount<Seconds>(clock->now().toDurationSinceEpoch()) - 20;
+    metrics->setChangeStreamMonitorLastClusterTime(Timestamp(clusterTimeSecs, 0));
+
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("changeStreamMonitorLagSecs"), 20);
+}
+
+TEST_F(ReshardingMetricsTest, RecipientChangeStreamMonitorLagReported) {
+    auto clock = getClockSource();
+    auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kRecipient);
+
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_FALSE(report.hasField("changeStreamMonitorLagSecs"));
+
+    auto clusterTimeSecs = durationCount<Seconds>(clock->now().toDurationSinceEpoch()) - 10;
+    metrics->setChangeStreamMonitorLastClusterTime(Timestamp(clusterTimeSecs, 0));
+
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("changeStreamMonitorLagSecs"), 10);
+}
+
+TEST_F(ReshardingMetricsTest, ChangeStreamMonitorLagClampedToZero) {
+    auto clock = getClockSource();
+    auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kDonor);
+
+    // Set clusterTime slightly ahead of wall clock to simulate minor clock skew.
+    auto clusterTimeSecs = durationCount<Seconds>(clock->now().toDurationSinceEpoch()) + 5;
+    metrics->setChangeStreamMonitorLastClusterTime(Timestamp(clusterTimeSecs, 0));
+
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("changeStreamMonitorLagSecs"), 0);
+}
+
+TEST_F(ReshardingMetricsTest, DonorBlockingWritesToMonitorCompletionReported) {
+    auto clock = getClockSource();
+    auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kDonor);
+
+    // Field should not appear until both critical section start and monitor end are set.
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_FALSE(report.hasField("blockingWritesToMonitorCompletionSecs"));
+
+    auto critSecStart = clock->now();
+    metrics->setStartFor(ReshardingMetrics::TimedPhase::kCriticalSection, critSecStart);
+
+    // Still not present without monitor end time.
+    report = metrics->reportForCurrentOp();
+    ASSERT_FALSE(report.hasField("blockingWritesToMonitorCompletionSecs"));
+
+    clock->advance(Seconds(45));
+    metrics->setEndFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor, clock->now());
+
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("blockingWritesToMonitorCompletionSecs"), 45);
+}
+
+TEST_F(ReshardingMetricsTest, RecipientChangeStreamMonitorMetricsReported) {
+    auto clock = getClockSource();
+    auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kRecipient);
+
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("changeStreamMonitorTotalTimeElapsedSecs"), 0);
+
+    metrics->setStartFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor, clock->now());
+    clock->advance(Seconds(15));
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("changeStreamMonitorTotalTimeElapsedSecs"), 15);
+}
+
+TEST_F(ReshardingMetricsTest, RecipientStrictConsistencyToMonitorCompletionReported) {
+    auto clock = getClockSource();
+    auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kRecipient);
+
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_FALSE(report.hasField("strictConsistencyToMonitorCompletionSecs"));
+
+    metrics->setStartFor(ReshardingMetrics::TimedPhase::kStrictConsistency, clock->now());
+
+    // Still not present without monitor end time.
+    report = metrics->reportForCurrentOp();
+    ASSERT_FALSE(report.hasField("strictConsistencyToMonitorCompletionSecs"));
+
+    clock->advance(Seconds(60));
+    metrics->setEndFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor, clock->now());
+
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("strictConsistencyToMonitorCompletionSecs"), 60);
+}
+
+TEST_F(ReshardingMetricsTest, CoordinatorVerificationPreApplyingTimeReported) {
+    auto clock = getClockSource();
+    auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kCoordinator);
+
+    // Before start, elapsed should be the default (0).
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("verificationPreApplyingTimeElapsedSecs"), 0);
+
+    metrics->setStartFor(ReshardingMetrics::TimedPhase::kVerificationPreApplying, clock->now());
+    clock->advance(Seconds(10));
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("verificationPreApplyingTimeElapsedSecs"), 10);
+
+    // After end time is set, duration is fixed.
+    metrics->setEndFor(ReshardingMetrics::TimedPhase::kVerificationPreApplying, clock->now());
+    clock->advance(Seconds(100));
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("verificationPreApplyingTimeElapsedSecs"), 10);
+}
+
+TEST_F(ReshardingMetricsTest, CoordinatorVerificationPreCommitTimeReported) {
+    auto clock = getClockSource();
+    auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kCoordinator);
+
+    // Before start, elapsed should be the default (0).
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("verificationPreCommitTimeElapsedSecs"), 0);
+
+    metrics->setStartFor(ReshardingMetrics::TimedPhase::kVerificationPreCommit, clock->now());
+    clock->advance(Seconds(25));
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("verificationPreCommitTimeElapsedSecs"), 25);
+
+    // After end time is set, duration is fixed.
+    metrics->setEndFor(ReshardingMetrics::TimedPhase::kVerificationPreCommit, clock->now());
+    clock->advance(Seconds(100));
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("verificationPreCommitTimeElapsedSecs"), 25);
+}
+
+TEST_F(ReshardingMetricsTest, CoordinatorDoesNotReportChangeStreamMonitorLagOrCrossPhase) {
+    auto clock = getClockSource();
+    auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kCoordinator);
+
+    // Set all change stream monitor fields — lag and cross-phase should not appear for the
+    // coordinator. Elapsed time is reported via reportDurationsForAllPhases for all roles.
+    metrics->setStartFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor, clock->now());
+    metrics->setChangeStreamMonitorLastClusterTime(Timestamp(1000, 0));
+    clock->advance(Seconds(10));
+    metrics->setEndFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor, clock->now());
+
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_FALSE(report.hasField("changeStreamMonitorLagSecs"));
+    ASSERT_FALSE(report.hasField("blockingWritesToMonitorCompletionSecs"));
+    ASSERT_FALSE(report.hasField("strictConsistencyToMonitorCompletionSecs"));
+}
+
+TEST_F(ReshardingMetricsTest, DonorDoesNotReportRecipientCrossPhaseMetrics) {
+    auto clock = getClockSource();
+    auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kDonor);
+
+    // Set strict-consistency and monitor end — the recipient-specific cross-phase metric
+    // should not appear for a donor.
+    metrics->setStartFor(ReshardingMetrics::TimedPhase::kStrictConsistency, clock->now());
+    clock->advance(Seconds(10));
+    metrics->setEndFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor, clock->now());
+
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_FALSE(report.hasField("strictConsistencyToMonitorCompletionSecs"));
+}
+
+TEST_F(ReshardingMetricsTest, RecipientDoesNotReportDonorCrossPhaseMetrics) {
+    auto clock = getClockSource();
+    auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kRecipient);
+
+    // Set critical section and monitor end — the donor-specific cross-phase metric
+    // should not appear for a recipient.
+    metrics->setStartFor(ReshardingMetrics::TimedPhase::kCriticalSection, clock->now());
+    clock->advance(Seconds(10));
+    metrics->setEndFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor, clock->now());
+
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_FALSE(report.hasField("blockingWritesToMonitorCompletionSecs"));
+}
+
+TEST_F(ReshardingMetricsTest, SettersAreIdempotent) {
+    auto clock = getClockSource();
+    auto metrics = createInstanceMetrics(clock, UUID::gen(), Role::kDonor);
+
+    metrics->setStartFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor, clock->now());
+    clock->advance(Seconds(10));
+
+    // Second call should be a no-op — the start time should remain the original value.
+    metrics->setStartFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor, clock->now());
+    metrics->setEndFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor, clock->now());
+
+    auto report = metrics->reportForCurrentOp();
+    // Elapsed should be 10s (from original start to end), not 0s (if second setStartFor took
+    // effect).
+    ASSERT_EQ(report.getIntField("changeStreamMonitorTotalTimeElapsedSecs"), 10);
+}
+
 }  // namespace
 }  // namespace mongo

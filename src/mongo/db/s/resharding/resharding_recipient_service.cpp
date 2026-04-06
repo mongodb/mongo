@@ -268,6 +268,7 @@ void setMeticsAfterWrite(ReshardingMetrics* metrics,
             return;
         case RecipientStateEnum::kStrictConsistency:
             metrics->setEndFor(ReshardingMetrics::TimedPhase::kApplying, timestamp);
+            metrics->setStartFor(ReshardingMetrics::TimedPhase::kStrictConsistency, timestamp);
             return;
         default:
             return;
@@ -1053,6 +1054,10 @@ void ReshardingRecipientService::RecipientStateMachine::_createAndStartChangeStr
               "documentsDelta"_attr = batch.getDocumentsDelta(),
               "completed"_attr = batch.containsFinalEvent());
 
+        if (auto clusterTimeSecs = batch.getResumeTokenClusterTimeSecs()) {
+            _metrics->setChangeStreamMonitorLastClusterTime(Timestamp(*clusterTimeSecs, 0));
+        }
+
         invariant(_changeStreamsMonitorCtx);
         auto newChangeStreamsCtx = *_changeStreamsMonitorCtx;
         newChangeStreamsCtx.setResumeToken(batch.getResumeToken().getOwned());
@@ -1080,6 +1085,8 @@ void ReshardingRecipientService::RecipientStateMachine::_createAndStartChangeStr
                               _cancelState->getAbortOrStepdownToken(),
                               factory)
             .share();
+    _metrics->setStartFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor,
+                          resharding::getCurrentTime());
     _changeStreamsMonitorStarted.emplaceValue();
 }
 
@@ -1105,6 +1112,8 @@ ReshardingRecipientService::RecipientStateMachine::_awaitChangeStreamsMonitorCom
                   "status"_attr = status);
 
             if (status.isOK()) {
+                _metrics->setEndFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor,
+                                    resharding::getCurrentTime());
                 ensureFulfilledPromise(lk,
                                        _changeStreamsMonitorCompleted,
                                        _changeStreamsMonitorCtx->getDocumentsDelta());

@@ -1148,6 +1148,10 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_createAndStartC
                       "documentsDelta"_attr = batch.getDocumentsDelta(),
                       "completed"_attr = batch.containsFinalEvent());
 
+                if (auto clusterTimeSecs = batch.getResumeTokenClusterTimeSecs()) {
+                    _metrics->setChangeStreamMonitorLastClusterTime(Timestamp(*clusterTimeSecs, 0));
+                }
+
                 auto changeStreamsMonitorCtx = _changeStreamsMonitorCtx.get();
                 changeStreamsMonitorCtx.setResumeToken(batch.getResumeToken().getOwned());
                 changeStreamsMonitorCtx.setDocumentsDelta(
@@ -1182,6 +1186,8 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_createAndStartC
                                       _cancelState->getAbortOrStepdownToken(),
                                       factory)
                     .share();
+            _metrics->setStartFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor,
+                                  resharding::getCurrentTime());
             _changeStreamsMonitorStarted.emplaceValue();
         });
 }
@@ -1205,6 +1211,8 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_awaitChangeStre
 
             stdx::lock_guard<stdx::mutex> lk(_mutex);
             if (status.isOK()) {
+                _metrics->setEndFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor,
+                                    resharding::getCurrentTime());
                 ensureFulfilledPromise(lk,
                                        _changeStreamsMonitorCompleted,
                                        _changeStreamsMonitorCtx->getDocumentsDelta());

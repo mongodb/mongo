@@ -91,6 +91,12 @@ public:
         int64_t getDocumentsDelta() const;
         BSONObj getResumeToken() const;
 
+        /**
+         * Returns the clusterTime (seconds component) from the postBatchResumeToken, or
+         * boost::none if the resume token has not been set yet.
+         */
+        boost::optional<uint32_t> getResumeTokenClusterTimeSecs() const;
+
     private:
         const Role _role;
         // The timestamp at which the batch started.

@@ -106,6 +106,16 @@ constexpr auto kOplogApplyingTotalLocalBatchApplyTimeMillis =
     "oplogApplyingTotalLocalBatchApplyTimeMillis";
 constexpr auto kOplogApplyingTotalLocalBatchesApplied = "oplogApplyingTotalLocalBatchesApplied";
 
+// Change stream monitor metrics (donors and recipients).
+constexpr auto kChangeStreamMonitorLagSecs = "changeStreamMonitorLagSecs";
+// Donor-specific: time from when the donor entered "blocking-writes" until the change stream
+// monitor completed.
+constexpr auto kBlockingWritesToMonitorCompletionSecs = "blockingWritesToMonitorCompletionSecs";
+// Recipient-specific: time from when the recipient entered "strict-consistency" until the change
+// stream monitor completed.
+constexpr auto kStrictConsistencyToMonitorCompletionSecs =
+    "strictConsistencyToMonitorCompletionSecs";
+
 }  // namespace field_names
 }  // namespace resharding_metrics
 }  // namespace mongo
