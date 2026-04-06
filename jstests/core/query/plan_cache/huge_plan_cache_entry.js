@@ -7,6 +7,10 @@
  *   query_intensive_pbt,
  *   do_not_wrap_aggregations_in_facets,
  *   assumes_against_mongod_not_mongos,
+ *   # This test first creates a plan cache entry via find() and then looks it up via $planCacheStats.
+ *   # In secondary-read passthrough suites, those two operations may run on different secondaries,
+ *   # so the plan cache entry would not be visible where we assert on it.
+ *   assumes_read_preference_unchanged,
  * ]
  */
 
