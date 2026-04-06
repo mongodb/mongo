@@ -645,6 +645,10 @@ Future<void> deleteCoordinatorDoc(txn::AsyncWorkScheduler& scheduler,
         [&scheduler, lsid, txnNumberAndRetryCounter] {
             return scheduler.scheduleWork(
                 [lsid, txnNumberAndRetryCounter](OperationContext* opCtx) {
+                    // Skip ticket acquisition to avoid a bottleneck on deleting the coordinator doc
+                    // in cases of high transaction concurrency.
+                    ScopedAdmissionPriorityForLock skipTicketAcquisition(
+                        opCtx->lockState(), AdmissionContext::Priority::kImmediate);
                     getTransactionCoordinatorWorkerCurOpRepository()->set(
                         opCtx,
                         lsid,

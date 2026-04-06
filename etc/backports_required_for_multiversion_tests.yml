@@ -653,6 +653,8 @@ last-continuous:
     ticket: SERVER-93154
   - test_file: jstests/sharding/migration_fails_with_spurious_documents.js
     ticket: SERVER-110953
+  - test_file: jstests/sharding/coordinate_txn_commit_with_tickets_exhausted.js
+    ticket: SERVER-115594
   - test_file: jstests/sharding/query/javascript_heap_limit.js
     ticket: SERVER-109200
   - test_file: jstests/replsets/election_term_over_int_max.js
@@ -1368,6 +1370,8 @@ last-lts:
     ticket: SERVER-93154
   - test_file: jstests/sharding/migration_fails_with_spurious_documents.js
     ticket: SERVER-110953
+  - test_file: jstests/sharding/coordinate_txn_commit_with_tickets_exhausted.js
+    ticket: SERVER-115594
   - test_file: jstests/sharding/query/javascript_heap_limit.js
     ticket: SERVER-109200
   - test_file: jstests/replsets/election_term_over_int_max.js

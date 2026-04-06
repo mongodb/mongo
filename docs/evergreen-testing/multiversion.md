@@ -162,13 +162,13 @@ the `last-lts` versions in a 3-node replica set where the 1st node is the `lates
   * `last-continuous new-new-old`
   * `last-continuous new-old-new`
   * `last-continuous old-new-new`
-  * Ex: [change_streams](https://github.com/10gen/mongo/blob/88d59bfe9d5ee2c9938ae251f7a77a8bf1250a6b/buildscripts/resmokeconfig/suites/change_streams.yml) uses a [`ReplicaSetFixture`](https://github.com/10gen/mongo/blob/88d59bfe9d5ee2c9938ae251f7a77a8bf1250a6b/buildscripts/resmokeconfig/suites/change_streams.yml#L50) so the corresponding multiversion suites are
-    * [`change_streams_last_continuous_new_new_old`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_last_continuous_new_new_old.yml)
-    * [`change_streams_last_continuous_new_old_new`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_last_continuous_new_old_new.yml)
-    * [`change_streams_last_continuous_old_new_new`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_last_continuous_old_new_new.yml)
-    * [`change_streams_last_lts_new_new_old`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_last_lts_new_new_old.yml)
-    * [`change_streams_last_lts_new_old_new`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_last_lts_new_old_new.yml)
-    * [`change_streams_last_lts_old_new_new`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_last_lts_old_new_new.yml)
+  * Ex: [change_streams](https://github.com/mongodb/mongo/blob/88d59bfe9d5ee2c9938ae251f7a77a8bf1250a6b/buildscripts/resmokeconfig/suites/change_streams.yml) uses a [`ReplicaSetFixture`](https://github.com/mongodb/mongo/blob/88d59bfe9d5ee2c9938ae251f7a77a8bf1250a6b/buildscripts/resmokeconfig/suites/change_streams.yml#L50) so the corresponding multiversion suites are
+    * [`change_streams_last_continuous_new_new_old`](https://github.com/mongodb/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_last_continuous_new_new_old.yml)
+    * [`change_streams_last_continuous_new_old_new`](https://github.com/mongodb/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_last_continuous_new_old_new.yml)
+    * [`change_streams_last_continuous_old_new_new`](https://github.com/mongodb/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_last_continuous_old_new_new.yml)
+    * [`change_streams_last_lts_new_new_old`](https://github.com/mongodb/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_last_lts_new_new_old.yml)
+    * [`change_streams_last_lts_new_old_new`](https://github.com/mongodb/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_last_lts_new_old_new.yml)
+    * [`change_streams_last_lts_old_new_new`](https://github.com/mongodb/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_last_lts_old_new_new.yml)
 
 * Sharded cluster fixture combinations:
   * `last-lts new-old-old-new` (i.e. suite runs the sharded cluster fixture that spins up the
@@ -176,17 +176,17 @@ the `last-lts` versions in a 3-node replica set where the 1st node is the `lates
 replica sets per shard where the 1st node of the 1st shard is the `latest`, 2nd node of 1st
 shard - `last-lts`, 1st node of 2nd shard - `last-lts`, 2nd node of 2nd shard - `latest`, etc.)
   * `last-continuous new-old-old-new`
-  * Ex: [change_streams_downgrade](https://github.com/10gen/mongo/blob/a96b83b2fa7010a5823fefac2469b4a06a697cf1/buildscripts/resmokeconfig/suites/change_streams_downgrade.yml) uses a [`ShardedClusterFixture`](https://github.com/10gen/mongo/blob/a96b83b2fa7010a5823fefac2469b4a06a697cf1/buildscripts/resmokeconfig/suites/change_streams_downgrade.yml#L408) so the corresponding multiversion suites are
-    * [`change_streams_downgrade_last_continuous_new_old_old_new`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_downgrade_last_continuous_new_old_old_new.yml)
-    * [`change_streams_downgrade_last_lts_new_old_old_new`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_downgrade_last_lts_new_old_old_new.yml)
+  * Ex: [change_streams_downgrade](https://github.com/mongodb/mongo/blob/a96b83b2fa7010a5823fefac2469b4a06a697cf1/buildscripts/resmokeconfig/suites/change_streams_downgrade.yml) uses a [`ShardedClusterFixture`](https://github.com/mongodb/mongo/blob/a96b83b2fa7010a5823fefac2469b4a06a697cf1/buildscripts/resmokeconfig/suites/change_streams_downgrade.yml#L408) so the corresponding multiversion suites are
+    * [`change_streams_downgrade_last_continuous_new_old_old_new`](https://github.com/mongodb/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_downgrade_last_continuous_new_old_old_new.yml)
+    * [`change_streams_downgrade_last_lts_new_old_old_new`](https://github.com/mongodb/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_downgrade_last_lts_new_old_old_new.yml)
 
 * Shell fixture combinations:
   * `last-lts` (i.e. suite runs the shell fixture that spins up `last-lts` as the `old` versions,
 etc.)
   * `last-continuous`
-  * Ex: [initial_sync_fuzzer](https://github.com/10gen/mongo/blob/908625ffdec050a71aa2ce47c35788739f629c60/buildscripts/resmokeconfig/suites/initial_sync_fuzzer.yml) uses a Shell Fixture, so the corresponding multiversion suites are
-    * [`initial_sync_fuzzer_last_lts`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/initial_sync_fuzzer_last_lts.yml)
-    * [`initial_sync_fuzzer_last_continuous`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/initial_sync_fuzzer_last_continuous.yml)
+  * Ex: [initial_sync_fuzzer](https://github.com/mongodb/mongo/blob/908625ffdec050a71aa2ce47c35788739f629c60/buildscripts/resmokeconfig/suites/initial_sync_fuzzer.yml) uses a Shell Fixture, so the corresponding multiversion suites are
+    * [`initial_sync_fuzzer_last_lts`](https://github.com/mongodb/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/initial_sync_fuzzer_last_lts.yml)
+    * [`initial_sync_fuzzer_last_continuous`](https://github.com/mongodb/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/initial_sync_fuzzer_last_continuous.yml)
 
 
 If `last-lts` and `last-continuous` versions happen to be the same, we skip `last-continuous` and
