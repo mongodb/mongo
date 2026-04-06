@@ -311,6 +311,9 @@ teams:
     slack_tags:
       - "<@U0294T002>" # james.wahlin@mongodb.com - Director
       - "<!subteam^S080PEJEYUW>" # @leads-staff-query-integration - Leads + Staff
+    thresholds:
+      hot: 3
+      cold: 5
 
   # Release Quality teams
   - name: "Build Baron"
