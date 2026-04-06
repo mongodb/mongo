@@ -51,4 +51,12 @@ bool isReplicatedFastCountEligible(NamespaceString nss) {
     // TODO(SERVER-120741): Allow if the local DB is the oplog.
     return !nss.isLocalDB();
 }
+
+bool isInternalFastCountNss(NamespaceString nss) {
+    return nss ==
+        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore) ||
+        nss ==
+        NamespaceString::makeGlobalConfigCollection(
+            NamespaceString::kReplicatedFastCountStoreTimestamps);
+}
 }  // namespace mongo

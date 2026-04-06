@@ -263,6 +263,18 @@ void readAndIncrementSizeCounts(OperationContext* opCtx,
         }
     }
 }
+
+RecordId getFastCountStoreKey(const UUID& uuid) {
+    auto key =
+        record_id_helpers::keyForDoc(BSON("_id" << uuid),
+                                     clustered_util::makeDefaultClusteredIdIndex().getIndexSpec(),
+                                     /*collator=*/nullptr);
+    return key.getValue();
+}
+
+UUID UUIDFromFastCountStoreKey(const RecordId key) {
+    return UUID::parse(record_id_helpers::toBSONAs(key, "").firstElement()).getValue();
+}
 }  // namespace replicated_fast_count
 
 

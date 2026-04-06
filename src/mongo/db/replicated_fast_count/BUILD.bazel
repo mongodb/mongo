@@ -171,6 +171,22 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "replicated_fast_count_op_observer",
+    srcs = [
+        "replicated_fast_count_op_observer.cpp",
+    ],
+    deps = [
+        "replicated_fast_count_delta_utils",
+        "replicated_fast_count_enabled",
+        "size_count_store",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/auth",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/shard_role",
+    ],
+)
+
+mongo_cc_library(
     name = "replicated_fast_count_read",
     srcs = [
         "replicated_fast_count_read.cpp",
@@ -255,6 +271,7 @@ mongo_cc_unit_test(
     name = "replicated_fast_count_test",
     srcs = [
         "replicated_fast_count_init_test.cpp",
+        "replicated_fast_count_op_observer_test.cpp",
         "replicated_fast_count_test.cpp",
         "replicated_fast_count_txn_test.cpp",
     ],
@@ -265,10 +282,12 @@ mongo_cc_unit_test(
     deps = [
         "replicated_fast_count_delta_utils",
         "replicated_fast_count_init",
+        "replicated_fast_count_op_observer",
         "replicated_fast_count_test_helpers",
         "replicated_fast_count_uncommitted_changes",
         "//src/mongo/db/op_observer:operation_logger_impl",
         "//src/mongo/db/repl:mock_repl_coord_server_fixture",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_helpers",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
         "//src/mongo/db/storage:recovery_unit_base",
     ],

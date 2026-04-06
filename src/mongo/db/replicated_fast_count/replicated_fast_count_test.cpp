@@ -35,14 +35,17 @@
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_interface_local.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_op_observer.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
+#include "mongo/db/shard_role/shard_catalog/drop_collection.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -63,6 +66,11 @@ protected:
         CatalogTestFixture::setUp();
         _opCtx = operationContext();
 
+        auto* replCoord = dynamic_cast<repl::ReplicationCoordinatorMock*>(
+            repl::ReplicationCoordinator::get(getServiceContext()));
+        ASSERT(replCoord);
+        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+
         auto* registry = dynamic_cast<OpObserverRegistry*>(getServiceContext()->getOpObserver());
         ASSERT(registry);
         registry->addObserver(
@@ -75,6 +83,10 @@ protected:
         _fastCountManager->disablePeriodicWrites_ForTest();
 
         setUpReplicatedFastCount(_opCtx);
+
+        // Add the observer after we've created the internal fast count collections.
+        registry->addObserver(
+            std::make_unique<replicated_fast_count::ReplicatedFastCountOpObserver>());
 
         ASSERT_OK(createCollection(_opCtx, _nss1.dbName(), BSON("create" << _nss1.coll())));
         ASSERT_OK(createCollection(_opCtx, _nss2.dbName(), BSON("create" << _nss2.coll())));
@@ -227,17 +239,17 @@ TEST_F(ReplicatedFastCountTest, DirtyMetadataWrittenToInternalCollection) {
 
 
     // Verify that the committed changes have not been written to the internal fast count collection
-    // yet.
+    // yet. Both collections should have entries with size and count 0.
     replicated_fast_count_test_helpers::checkFastCountMetadataInInternalCollection(
         _opCtx,
         _uuid1,
-        /*expectPersisted=*/false,
+        /*expectPersisted=*/true,
         /*expectedCount=*/0,
         /*expectedSize=*/0);
     replicated_fast_count_test_helpers::checkFastCountMetadataInInternalCollection(
         _opCtx,
         _uuid2,
-        /*expectPersisted=*/false,
+        /*expectPersisted=*/true,
         /*expectedCount=*/0,
         /*expectedSize=*/0);
 
@@ -295,11 +307,11 @@ TEST_F(ReplicatedFastCountTest, DirtyMetadataWrittenAsSingleApplyOpsEntry) {
         replicatedFastCountStoreNss,
         {
             {_uuid1,
-             replicated_fast_count_test_helpers::FastCountOpType::kInsert,
+             replicated_fast_count_test_helpers::FastCountOpType::kUpdate,
              numDocsColl1,
              numDocsColl1 * sampleDocForInsert.objsize()},
             {_uuid2,
-             replicated_fast_count_test_helpers::FastCountOpType::kInsert,
+             replicated_fast_count_test_helpers::FastCountOpType::kUpdate,
              numDocsColl2,
              numDocsColl2 * sampleDocForInsert.objsize()},
         });
@@ -393,7 +405,7 @@ TEST_F(ReplicatedFastCountTest, UpdatesWrittenToApplyOpsCorrectly) {
         });
 }
 
-TEST_F(ReplicatedFastCountTest, MixedUpdatesAndInsertInApplyOps) {
+TEST_F(ReplicatedFastCountTest, UpdateSizeAndCountAndOnlySize) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
 
     const int numDocsColl1 = 25;
@@ -409,7 +421,8 @@ TEST_F(ReplicatedFastCountTest, MixedUpdatesAndInsertInApplyOps) {
                                                    sampleDocForInsert);
 
     _fastCountManager->flushSync(_opCtx);
-
+    // This insert should update both the size and count fields of the fast count entry for this
+    // collection.
     replicated_fast_count_test_helpers::insertDocs(_opCtx,
                                                    _fastCountManager,
                                                    _nss2,
@@ -422,7 +435,7 @@ TEST_F(ReplicatedFastCountTest, MixedUpdatesAndInsertInApplyOps) {
     const int startIdxColl = 2;
     const int endIdxColl = 8;
     const int totalUpdatesColl1 = endIdxColl - startIdxColl + 1;
-
+    // This insert should update only the size field of the fast count entry for this collection.
     replicated_fast_count_test_helpers::updateDocs(_opCtx,
                                                    _fastCountManager,
                                                    _nss1,
@@ -453,7 +466,7 @@ TEST_F(ReplicatedFastCountTest, MixedUpdatesAndInsertInApplyOps) {
              /*expectedCount=*/boost::none,
              /*expectedSize=*/newExpectedSizeColl1},
             {_uuid2,
-             replicated_fast_count_test_helpers::FastCountOpType::kInsert,
+             replicated_fast_count_test_helpers::FastCountOpType::kUpdate,
              /*expectedCount=*/numDocsColl2,
              /*expectedSize=*/numDocsColl2 * sampleDocForInsert.objsize()},
         });

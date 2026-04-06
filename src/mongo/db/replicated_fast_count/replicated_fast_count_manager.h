@@ -236,13 +236,6 @@ private:
                             const CollectionSizeCount& sizeCount,
                             const Timestamp& validAsOfTS) const;
 
-    /**
-     * Generates a key (RecordId) into the fastcount collection given a user
-     * collection uuid.
-     */
-    RecordId _keyForUUID(const UUID& uuid) const;
-    UUID _UUIDForKey(RecordId key) const;
-
     // Metrics for the ReplicatedFastCountManager reported via both serverStatus and OTel.
     //
     // Metrics are shared between ReplicatedFastCountManager instances. We assume there is exactly

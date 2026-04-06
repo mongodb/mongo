@@ -46,4 +46,10 @@ MONGO_MOD_PUBLIC bool isReplicatedFastCountEnabled(OperationContext* opCtx);
  * collection.
  */
 MONGO_MOD_PUBLIC bool isReplicatedFastCountEligible(NamespaceString nss);
+
+/**
+ * Returns whether the provided namespace string is the namespace of one of the internal fast count
+ * collections.
+ */
+MONGO_MOD_PUBLIC bool isInternalFastCountNss(NamespaceString nss);
 }  // namespace mongo
