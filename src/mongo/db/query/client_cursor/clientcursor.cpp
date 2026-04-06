@@ -61,21 +61,24 @@ auto& gCursorStats = *new CursorStats{};
 
 namespace ChangeStreamMetrics {
 
+// The total number of change stream cursors opened since the start of the process. This counter
+// corresponds to the OTEL metric "change_streams.cursor.total_opened".
 auto& gCursorsTotalOpened = otel::metrics::MetricsService::instance().createInt64Counter(
     otel::metrics::MetricNames::kChangeStreamCursorsTotalOpened,
     "Total number of change stream cursors opened (on router or shard).",
     otel::metrics::MetricUnit::kCursors,
     {.inServerStatus = true});
 
-// Histogram provide accurate and thread-safe average for every bucket. This is achieved by locking,
+// The change stream lifespan histogram is updated after a change stream cursor is closed. A
+// histogram provides accurate and thread-safe average for every bucket. This is achieved by locks,
 // so there might be some overhead.
 auto& gLifespan = otel::metrics::MetricsService::instance().createInt64Histogram(
     otel::metrics::MetricNames::kChangeStreamCursorsLifespan,
     "Lifespan of closed change stream cursors in microseconds.",
     otel::metrics::MetricUnit::kMicroseconds,
     {.inServerStatus = true,
-     // Using the same histogram buckets as 'metrics.cursor.lifespan'. For change stream cursors we
-     // expect that most of the cursors will land in (10min, +inf) bucket.
+     // For change stream cursors we expect that most of the cursors will land in the last bucket (>
+     // 1 week).
      .explicitBucketBoundaries = std::vector<double>({
          1 * 1e6,   // lifespan <= 1 second will probably capture one-fetch or no-fetch cursors,
                     // unless the query is slow for some reason
@@ -90,6 +93,21 @@ auto& gLifespan = otel::metrics::MetricsService::instance().createInt64Histogram
          7 * 24 * 60 * 60 * 1e6  // lifetime <= 1 week will probably capture some weekly patterns
      })});
 
+// The number of currently open change stream cursors (idle or pinned). This counter corresponds to
+// the OTEL metric "change_streams.cursor.open.total".
+auto& gCursorsOpenTotal = otel::metrics::MetricsService::instance().createInt64UpDownCounter(
+    otel::metrics::MetricNames::kChangeStreamCursorsOpenTotal,
+    "Current number of open change stream cursors.",
+    otel::metrics::MetricUnit::kCursors,
+    {.inServerStatus = true});
+
+// The number of currently pinned (active) change stream cursors. This counter corresponds to the
+// OTEL metric "change_streams.cursor.open.pinned".
+auto& gCursorsOpenPinned = otel::metrics::MetricsService::instance().createInt64UpDownCounter(
+    otel::metrics::MetricNames::kChangeStreamCursorsOpenPinned,
+    "Current number of pinned (active) change stream cursors.",
+    otel::metrics::MetricUnit::kCursors,
+    {.inServerStatus = true});
 }  // namespace ChangeStreamMetrics
 }  // namespace
 
@@ -171,6 +189,7 @@ ClientCursor::ClientCursor(ClientCursorParams params,
 
     if (_isChangeStreamQuery) {
         ChangeStreamMetrics::gCursorsTotalOpened.add(1);
+        ChangeStreamMetrics::gCursorsOpenTotal.add(1);
     }
 
     if (isNoTimeout()) {
@@ -209,6 +228,9 @@ void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now)
     }
 
     cursorStats().open.decrement();
+    if (_isChangeStreamQuery) {
+        ChangeStreamMetrics::gCursorsOpenTotal.add(-1);
+    }
     if (isNoTimeout()) {
         cursorStats().openNoTimeout.decrement();
     }
@@ -281,6 +303,9 @@ ClientCursorPin::ClientCursorPin(OperationContext* opCtx,
     // transferred to another pin object via move construction or move assignment, but in this case
     // it is still considered pinned.
     cursorStats().openPinned.increment();
+    if (_cursor->_isChangeStreamQuery) {
+        ChangeStreamMetrics::gCursorsOpenPinned.add(1);
+    }
     OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx,
                                                         std::move(_cursor->_memoryUsageTracker));
 }
@@ -343,11 +368,15 @@ void ClientCursorPin::release() {
 
     _cursor->_memoryUsageTracker =
         OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(_cursor->_operationUsingCursor);
+    const bool isChangeStream = _cursor->_isChangeStreamQuery;
 
     // Unpin the cursor. This must be done by calling into the cursor manager, since the cursor
     // manager must acquire the appropriate mutex in order to safely perform the unpin operation.
     _cursorManager->unpin(_opCtx, std::unique_ptr<ClientCursor, ClientCursor::Deleter>(_cursor));
     cursorStats().openPinned.decrement();
+    if (isChangeStream) {
+        ChangeStreamMetrics::gCursorsOpenPinned.add(-1);
+    }
 
     _cursor = nullptr;
 }
@@ -357,11 +386,15 @@ void ClientCursorPin::deleteUnderlying() {
     invariant(_cursor->_operationUsingCursor);
     invariant(_cursorManager);
 
+    const bool isChangeStreamQuery = _cursor->_isChangeStreamQuery;
     std::unique_ptr<ClientCursor, ClientCursor::Deleter> ownedCursor(_cursor);
     _cursor = nullptr;
     _cursorManager->deregisterAndDestroyCursor(_opCtx, std::move(ownedCursor));
 
     cursorStats().openPinned.decrement();
+    if (isChangeStreamQuery) {
+        ChangeStreamMetrics::gCursorsOpenPinned.add(-1);
+    }
 }
 
 ClientCursor* ClientCursorPin::getCursor() const {

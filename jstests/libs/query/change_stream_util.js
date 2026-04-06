@@ -310,7 +310,7 @@ export function ChangeStreamTest(_db, options) {
                 doNotModifyInPassthroughs: doNotModifyInPassthroughs,
             });
             updateResumeToken(res.cursor, res.cursor.firstBatch);
-            _allCursors.add(new DBCommandCursor(_db, res));
+            _allCursors.push(new DBCommandCursor(_db, res));
             return {...res.cursor, _changeStreamVersion: res._changeStreamVersion};
         });
     };
@@ -1152,9 +1152,13 @@ export class CursorList {
     }
 
     // Adds one or more cursors to the list and returns the first cursor.
-    add(firstCursor, ...additionalCursors) {
+    push(firstCursor, ...additionalCursors) {
         this._cursors.push(firstCursor, ...additionalCursors);
         return firstCursor;
+    }
+
+    pop() {
+        return this._cursors.pop();
     }
 
     length() {

@@ -100,6 +100,10 @@ public:
     static constexpr MetricName kChangeStreamCursorsTotalOpened = {
         "change_streams.cursor.total_opened"};
     static constexpr MetricName kChangeStreamCursorsLifespan = {"change_streams.cursor.lifespan"};
+    static constexpr MetricName kChangeStreamCursorsOpenTotal = {
+        "change_streams.cursor.open.total"};
+    static constexpr MetricName kChangeStreamCursorsOpenPinned = {
+        "change_streams.cursor.open.pinned"};
 
     // Storage Execution Team Metrics
     static constexpr MetricName kIndexBuildSideWritesInserted = {

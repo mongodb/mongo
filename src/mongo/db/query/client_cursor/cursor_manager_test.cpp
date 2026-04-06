@@ -985,6 +985,10 @@ TEST_F(CursorManagerTest, RegularCursorDoesNotAffectChangeStreamMetrics) {
     CurOp::get(_opCtx.get())->debug().isChangeStreamQuery = false;
     auto pin = makeCursor(_opCtx.get());
     CursorId cursorId = pin.getCursor()->cursorid();
+
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsOpenTotal), 0);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsOpenPinned), 0);
+
     pin.release();
 
     useClock()->advance(Milliseconds{100});
@@ -994,6 +998,39 @@ TEST_F(CursorManagerTest, RegularCursorDoesNotAffectChangeStreamMetrics) {
     // No change stream cursor was disposed, so the lifespan histogram has no data.
     ASSERT_THROWS(capturer.readInt64Histogram(MetricNames::kChangeStreamCursorsLifespan),
                   DBException);
+}
+
+TEST_F(CursorManagerTest, ChangeStreamCursorMetricsTrackCursorOpenAndPin) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    using otel::metrics::MetricNames;
+
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    // No cursors yet — both metrics start at 0.
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsOpenTotal), 0);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsOpenPinned), 0);
+
+    // Registering a cursor increments both the total and pinned metrics.
+    CurOp::get(_opCtx.get())->debug().isChangeStreamQuery = true;
+    auto pin = makeCursor(_opCtx.get());
+    CursorId cursorId = pin.getCursor()->cursorid();
+
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsOpenTotal), 1);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsOpenPinned), 1);
+
+    // Releasing the pin unpins the cursor.
+    pin.release();
+
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsOpenTotal), 1);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsOpenPinned), 0);
+
+    // Killing the cursor removes it entirely: total drops to 0.
+    ASSERT_OK(_cursorManager.killCursor(_opCtx.get(), cursorId));
+
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsOpenTotal), 0);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsOpenPinned), 0);
 }
 
 }  // namespace
