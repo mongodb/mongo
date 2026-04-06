@@ -30,8 +30,8 @@ class TestGenerateExcludeYaml(unittest.TestCase):
         Helper to patch and run the test.
         """
         mock_multiversion_methods = {
-            'get_backports_required_hash_for_shell_version': MagicMock(),
-            'get_old_yaml': MagicMock(return_value=old)
+            "get_backports_required_hash": MagicMock(),
+            "get_old_yaml": MagicMock(return_value=old),
         }
 
         with patch.multiple('buildscripts.resmokelib.run.generate_multiversion_exclude_tags',
@@ -48,9 +48,8 @@ class TestGenerateExcludeYaml(unittest.TestCase):
                 )
 
                 mock_read_yaml.assert_called_once()
-                mock_multiversion_methods[
-                    'get_backports_required_hash_for_shell_version'].assert_called_once()
-                mock_multiversion_methods['get_old_yaml'].assert_called_once()
+                mock_multiversion_methods["get_backports_required_hash"].assert_called_once()
+                mock_multiversion_methods["get_old_yaml"].assert_called_once()
 
     def test_create_yaml_suite1(self):
         latest_yaml = {
