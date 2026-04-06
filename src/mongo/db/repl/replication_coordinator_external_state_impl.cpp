@@ -940,7 +940,6 @@ bool ReplicationCoordinatorExternalStateImpl::oplogExists(OperationContext* opCt
 
 StatusWith<OpTimeAndWallTime> ReplicationCoordinatorExternalStateImpl::loadLastOpTimeAndWallTime(
     OperationContext* opCtx) {
-    // TODO: handle WriteConflictExceptions below
     try {
         // If we are doing an initial sync do not read from the oplog.
         if (_replicationProcess->getConsistencyMarkers()->getInitialSyncFlag(opCtx)) {
