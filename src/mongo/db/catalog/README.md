@@ -2041,7 +2041,7 @@ A new truncate marker is created when either:
 CollectionTruncateMarkers support collections that meet the following requirements:
 
 - Insert and truncate only. No updates or individual document deletes.
-- [Clustered](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/catalog/README.md#clustered-collections) with no secondary indexes.
+- [Clustered](https://github.com/mongodb/mongo/blob/r7.1.0-rc3/src/mongo/db/catalog/README.md#clustered-collections) with no secondary indexes.
 - RecordId's in Timestamp order.
 - Deletion of content follows RecordId ordering.
     - This is a general property of clustered capped collections.
@@ -2075,7 +2075,7 @@ Change stream collections which use CollectionTruncateMarkers
 - change collection: `<tenantId>_config.system.change_collection`, exclusive to serverless environments.
 - pre-images: `<tenantId>_config.system.preimages` in serverless, `config.system.preimages` in dedicated environments.
 
-Both change stream collections have a periodic remover thread ([ChangeStreamExpiredPreImagesRemover](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/pipeline/change_stream_expired_pre_image_remover.cpp#L71), [ChangeCollectionExpiredDocumentsRemover](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/change_collection_expired_documents_remover.cpp)).
+Both change stream collections have a periodic remover thread ([ChangeStreamExpiredPreImagesRemover](https://github.com/mongodb/mongo/blob/r7.1.0-rc3/src/mongo/db/pipeline/change_stream_expired_pre_image_remover.cpp#L71), [ChangeCollectionExpiredDocumentsRemover](https://github.com/mongodb/mongo/blob/r7.1.0-rc3/src/mongo/db/change_collection_expired_documents_remover.cpp)).
 Each remover thread:
 
 1. Creates the tenant's initial CollectionTruncateMarkers for the tenant if they do not yet exist
@@ -2096,7 +2096,7 @@ Each tenant has a set 'expireAfterSeconds' parameter. An entry is expired if its
 
 Each tenant has 1 pre-images collection. Each pre-images collection contains pre-images across all the tenant's pre-image enabled collections.
 
-A pre-images collection is clustered by [ChangeStreamPreImageId](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/pipeline/change_stream_preimage.idl#L69), which implicitly orders pre-images first by their `'nsUUID'` (the UUID of the collection the pre-image is from), their `'ts'` (the timestamp associated with the pre-images oplog entry), and then by their `'applyOpsIndex'` (the index into the applyOps oplog entry which generated the pre-image, 0 if the pre-image isn't from an applyOps oplog entry).
+A pre-images collection is clustered by [ChangeStreamPreImageId](https://github.com/mongodb/mongo/blob/r7.1.0-rc3/src/mongo/db/pipeline/change_stream_preimage.idl#L69), which implicitly orders pre-images first by their `'nsUUID'` (the UUID of the collection the pre-image is from), their `'ts'` (the timestamp associated with the pre-images oplog entry), and then by their `'applyOpsIndex'` (the index into the applyOps oplog entry which generated the pre-image, 0 if the pre-image isn't from an applyOps oplog entry).
 
 There is a set of CollectionTruncateMarkers for each 'nsUUD' within a tenant's pre-images collection, `PreImagesTruncateMarkersPerNsUUID`.
 
@@ -2110,13 +2110,13 @@ For each tenant, `ChangeStreamExpiredPreImagesRemover` iterates over each set of
 
 - [The CollectionTruncateMarkers class](https://github.com/mongodb/mongo/blob/r7.1.0-rc3/src/mongo/db/storage/collection_truncate_markers.h#L78)
     - The main api for CollectionTruncateMarkers.
-- [The OplogTruncateMarkers class](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/storage/wiredtiger/wiredtiger_record_store_oplog_truncate_markers.h)
+- [The OplogTruncateMarkers class](https://github.com/mongodb/mongo/blob/r7.1.0-rc3/src/mongo/db/storage/wiredtiger/wiredtiger_record_store_oplog_truncate_markers.h)
     - Oplog specific truncate markers.
-- [The ChangeCollectionTruncateMarkers class](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/change_collection_truncate_markers.h#L47)
+- [The ChangeCollectionTruncateMarkers class](https://github.com/mongodb/mongo/blob/r7.1.0-rc3/src/mongo/db/change_collection_truncate_markers.h#L47)
     - Change stream change collection specific truncate markers.
-- [The PreImagesTruncateMarkersPerNsUUID class](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h#L62)
+- [The PreImagesTruncateMarkersPerNsUUID class](https://github.com/mongodb/mongo/blob/r7.1.0-rc3/src/mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h#L62)
     - Truncate markers for a given nsUUID captured within a pre-images collection.
-- [The PreImagesTruncateManager class](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/change_stream_pre_images_truncate_manager.h#L70)
+- [The PreImagesTruncateManager class](https://github.com/mongodb/mongo/blob/r7.1.0-rc3/src/mongo/db/change_stream_pre_images_truncate_manager.h#L70)
     - Manages pre image truncate markers for each tenant.
 
 # Oplog Collection

@@ -288,13 +288,13 @@ Otherwise, the secondary found a sync source! At that point `BackgroundSync` sta
 
 ### Oplog Entry Persistence
 
-There is a dedicated thread called [`OplogWriter`](https://github.com/10gen/mongo/blob/r8.0.0-rc2/src/mongo/db/repl/oplog_writer.h)
+There is a dedicated thread called [`OplogWriter`](https://github.com/mongodb/mongo/blob/r8.0.0-rc2/src/mongo/db/repl/oplog_writer.h)
 to write the fetched oplog entries into `rs.oplog` collection and trigger journal flush to persist
 those oplog entries.
 
 The `OplogWriter` runs in an endless loop doing the followings:
 
-1. Get a batch from the writer batcher, which is encapsulated in the [`OplogWriterBatcher`](https://github.com/10gen/mongo/blob/r8.0.0-rc2/src/mongo/db/repl/oplog_writer_batcher.cpp#L59).
+1. Get a batch from the writer batcher, which is encapsulated in the [`OplogWriterBatcher`](https://github.com/mongodb/mongo/blob/r8.0.0-rc2/src/mongo/db/repl/oplog_writer_batcher.cpp#L59).
 2. Write the batch of oplog entries into the oplog.
 3. Update [**oplog visibility**](../catalog/README.md#oplog-visibility) by notifying the storage
    engine of the new oplog entries.
@@ -339,8 +339,8 @@ endless loop doing the following:
 - [SyncSourceResolver chooses a sync source to sync from](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/sync_source_resolver.cpp#L545)
 - [OplogBuffer currently uses a BlockingQueue as underlying data structure](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/oplog_buffer_blocking_queue.h#L41)
 - [OplogFetcher queries from sync source and put fetched oplogs in OplogApplier::\_oplogBuffer](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/oplog_fetcher.cpp#L209)
-- [OplogWriterBatcher merges oplog entries from the oplog writer buffer to create a batch to write](https://github.com/10gen/mongo/blob/r8.0.0-rc2/src/mongo/db/repl/oplog_writer_batcher.cpp#L79)
-- [OplogWriter writes down the oplog entries batched by OplogWriterBatcher](https://github.com/10gen/mongo/blob/r8.0.0-rc2/src/mongo/db/repl/oplog_writer_impl.cpp#L231)
+- [OplogWriterBatcher merges oplog entries from the oplog writer buffer to create a batch to write](https://github.com/mongodb/mongo/blob/r8.0.0-rc2/src/mongo/db/repl/oplog_writer_batcher.cpp#L79)
+- [OplogWriter writes down the oplog entries batched by OplogWriterBatcher](https://github.com/mongodb/mongo/blob/r8.0.0-rc2/src/mongo/db/repl/oplog_writer_impl.cpp#L231)
 - [OplogApplierBatcher polls oplogs from OplogApplier::\_oplogBuffer and creates an OplogBatch to apply](https://github.com/mongodb/mongo/blob/r8.0.0-rc2/src/mongo/db/repl/oplog_applier_batcher.cpp#L337)
 - [OplogApplier gets batches of oplog entries from the OplogApplierBatcher and applies entries in parallel](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/oplog_applier_impl.cpp#L297)
 - [SyncSourceFeedback keeps checking if there are new oplogs applied on this instance and issues `UpdatePositionCmd` to sync source](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/sync_source_feedback.cpp#L157)
@@ -757,7 +757,7 @@ receiving the command. If it doesn't match, the operation will fail with one of 
 mentioned below.
 
 Commands can define whether or not they can run on a secondary by overriding the
-`[secondaryAllowed](https://github.com/10gen/mongo/blob/r7.1.0/src/mongo/db/commands.h#L502-L509)`
+`[secondaryAllowed](https://github.com/mongodb/mongo/blob/r7.1.0/src/mongo/db/commands.h#L502-L509)`
 function. If a secondary node receives an operation it cannot service, it will either fail with a
 `NotWritablePrimary` error if the command is designated as primary-only, or a `NotPrimaryNoSecondaryOk`
 error if the command can be serviced by a secondary but the operation’s`$readPreference` specifies
@@ -965,7 +965,7 @@ command, on each shard participating in the transaction.
 
 Each participating shard must majority commit the `prepareTransaction` command (thus making sure
 that the prepare operation cannot be rolled back) before the `TransactionCoordinator` will [send out
-the `commitTransaction` command](https://github.com/10gen/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/s/transaction_coordinator.cpp#L396-L402). This will help ensure that once a node prepares a transaction, it
+the `commitTransaction` command](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/s/transaction_coordinator.cpp#L396-L402). This will help ensure that once a node prepares a transaction, it
 will remain in the prepared state until the transaction is committed or aborted by the
 `TransactionCoordinator`. If one of the shards fails to prepare the transaction, the
 `TransactionCoordinator` will [tell all participating shards to abort the transaction](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/s/transaction_coordinator.cpp#L405-L410) via the
@@ -989,7 +989,7 @@ oplog entry(s) cannot fall off the back of the oplog.
 ### Preparing a Transaction on the Primary
 
 When a primary receives a `prepareTransaction` command, it will [transition the associated
-transaction's `txnState` to `kPrepared`](https://github.com/10gen/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L1727). Next it will [reserve an **oplog slot**](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L1739-L1754) (which is a unique
+transaction's `txnState` to `kPrepared`](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L1727). Next it will [reserve an **oplog slot**](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L1739-L1754) (which is a unique
 `OpTime`) for the `prepareTransaction` oplog entry. The `prepareTransaction` oplog entry will
 contain all the operations from the transaction, which means that if the transaction is larger than
 16MB (and thus requires multiple oplog entries), the node will reserve multiple oplog slots. The
@@ -1069,7 +1069,7 @@ difference is that before aborting a prepared transaction, the node must [re-acq
 the abort is in progress. Non-prepared transactions don't have to do this because the node will
 still have the RSTL at this point. We then [reserve an oplog slot](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L2290-L2293),
 [abort the storage transaction](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L2303),
-and [write the abortTransaction oplog entry](https://github.com/10gen/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L2312).
+and [write the abortTransaction oplog entry](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L2312).
 
 ## State Transitions and Failovers with Transactions
 
@@ -1798,7 +1798,7 @@ Before the data clone phase begins, the node will do the following:
    node restarts while this flag is set, it will restart initial sync even though it may already
    have data because it means that initial sync didn't complete. We also check this flag to prevent
    reading from the oplog while initial sync is in progress.
-2. [Reset the in-memory FCV to `kUnsetDefaultLastLTSBehavior`.](https://github.com/10gen/mongo/blob/b718dc1aa3ffb3e6df4f61a30d54cda578cf2830/src/mongo/db/repl/initial_syncer.cpp#L689). This is to ensure compatibility between the sync source and sync
+2. [Reset the in-memory FCV to `kUnsetDefaultLastLTSBehavior`.](https://github.com/mongodb/mongo/blob/b718dc1aa3ffb3e6df4f61a30d54cda578cf2830/src/mongo/db/repl/initial_syncer.cpp#L689). This is to ensure compatibility between the sync source and sync
    target. If the sync source is actually in a different feature compatibility version, we will find
    out when we clone from the sync source.
 3. Find a sync source.
@@ -1818,7 +1818,7 @@ Before the data clone phase begins, the node will do the following:
    or the timestamp that it begins applying oplog entries at once it has completed the data clone
    phase. If there was no active transaction on the sync source, the `beginFetchingTimestamp` will
    be the same as the `beginApplyingTimestamp`.
-9. [Set the in-memory FCV to the sync source's FCV.](https://github.com/10gen/mongo/blob/b718dc1aa3ffb3e6df4f61a30d54cda578cf2830/src/mongo/db/repl/initial_syncer.cpp#L1153). This is because during the cloning phase, we do expect to clone the sync source's "admin.system.version" collection eventually (which contains the FCV document), but we can't guarantee that we will clone "admin.system.version" first. Setting the in-memory FCV value to the sync source's FCV first will ensure that we clone collections using the same FCV as the sync source. However, we won't persist the FCV to disk nor will we update our minWireVersion until we clone the actual document.
+9. [Set the in-memory FCV to the sync source's FCV.](https://github.com/mongodb/mongo/blob/b718dc1aa3ffb3e6df4f61a30d54cda578cf2830/src/mongo/db/repl/initial_syncer.cpp#L1153). This is because during the cloning phase, we do expect to clone the sync source's "admin.system.version" collection eventually (which contains the FCV document), but we can't guarantee that we will clone "admin.system.version" first. Setting the in-memory FCV value to the sync source's FCV first will ensure that we clone collections using the same FCV as the sync source. However, we won't persist the FCV to disk nor will we update our minWireVersion until we clone the actual document.
 10. Create an `OplogFetcher` and start fetching and buffering oplog entries from the sync source
     to be applied later. Operations are buffered to a collection so that they are not limited by the
     amount of memory available.
@@ -1888,7 +1888,7 @@ and if their timestamp is after the `beginApplyingTimestamp`, applies them to th
 Oplog entries continue to be fetched and added to the buffer while this is occurring. One thing to
 note is that the oplog writes are not performed by the `OplogWriter` thread like [steady state
 replication](#oplog-entry-persistence) but the initial sync thread pool, so it still needs to set
-the [`oplogTruncateAfterPoint`](#replication-timestamp-glossary) to the node's [last written optime](https://github.com/10gen/mongo/blob/r8.0.0-rc2/src/mongo/db/repl/oplog_writer_impl.cpp#L274)
+the [`oplogTruncateAfterPoint`](#replication-timestamp-glossary) to the node's [last written optime](https://github.com/mongodb/mongo/blob/r8.0.0-rc2/src/mongo/db/repl/oplog_writer_impl.cpp#L274)
 (before this batch) to aid in [startup recovery](#startup-recovery) if the node shuts down in the
 middle of writing entries to the oplog. After writing the batch, it will reset the
 `oplogTruncateAfterPoint` to null.
@@ -2116,7 +2116,7 @@ even after a shutdown.
 
 The `oplogTruncateAfterPoint` can be set in two scenarios. The first is during
 [oplog batch application](#oplog-entry-application). Before writing a batch of oplog entries to the
-oplog, the node will [set the `oplogTruncateAfterPoint` to the `lastWritten` timestamp](https://github.com/10gen/mongo/blob/r8.0.0-rc2/src/mongo/db/repl/oplog_writer_impl.cpp#L274).
+oplog, the node will [set the `oplogTruncateAfterPoint` to the `lastWritten` timestamp](https://github.com/mongodb/mongo/blob/r8.0.0-rc2/src/mongo/db/repl/oplog_writer_impl.cpp#L274).
 If the node shuts down before it finishes writing the batch, then during startup recovery the node will truncate
 the oplog back to the point saved before the batch application began. If the node successfully
 finishes writing the batch to the oplog, it will
