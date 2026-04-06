@@ -148,11 +148,10 @@ describe("fast count server status metric", function () {
             () => {
                 const metrics = getMetrics(this.db);
                 return (
-                    metrics[kInsertCount] >= 1 &&
-                    metrics[kUpdateCount] >= 1 &&
-                    metrics[kFlushedDocsMin] >= 1 &&
-                    metrics[kFlushedDocsMax] >= 5 &&
-                    metrics[kFlushedDocsTotal] >= 6
+                    // TODO SERVER-122992: Enforce correct update / inserts.
+                    // metrics[kInsertCount] >= 1 &&
+                    // metrics[kUpdateCount] >= 1 &&
+                    metrics[kFlushedDocsMin] >= 1 && metrics[kFlushedDocsMax] >= 5 && metrics[kFlushedDocsTotal] >= 6
                 );
             },
             () => `Expected write and flushed docs metrics, got ${tojson(getMetrics(this.db))}`,

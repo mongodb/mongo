@@ -288,25 +288,31 @@ TEST_F(ReplicatedFastCountManagerMetricsTest, FlushFailureCounterIncrementsDurin
               1);
 }
 
-TEST_F(ReplicatedFastCountManagerMetricsTest, InsertAndUpdateCountersIncrementViaFlush) {
-    const UUID uuid = UUID::gen();
-    boost::container::flat_map<UUID, CollectionSizeCount> changes;
-    changes[uuid] = {/*count=*/1, /*size=*/100};
-    _fastCountManager->commit(changes, /*commitTime=*/boost::none);
-    _fastCountManager->flushSync(operationContext());
-
-    // After flushing, at least the above change should be inserted.
-    EXPECT_GE(
-        _capturer.readInt64Counter(otel::metrics::MetricNames::kReplicatedFastCountInsertCount), 1);
-
-    changes[uuid] = {/*count=*/1, /*size=*/50};
-    _fastCountManager->commit(changes, /*commitTime=*/boost::none);
-    _fastCountManager->flushSync(operationContext());
-
-    // The above change should update the existing document.
-    EXPECT_GE(
-        _capturer.readInt64Counter(otel::metrics::MetricNames::kReplicatedFastCountUpdateCount), 1);
-}
+// TODO SERVER-122992: Re-enable once the number of entries inserted versus updated are
+// communicated.
+// TEST_F(ReplicatedFastCountManagerMetricsTest,
+// InsertAndUpdateCountersIncrementViaFlush) {
+//     const UUID uuid = UUID::gen();
+//     boost::container::flat_map<UUID, CollectionSizeCount> changes;
+//     changes[uuid] = {/*count=*/1, /*size=*/100};
+//     _fastCountManager->commit(changes, /*commitTime=*/boost::none);
+//     _fastCountManager->flushSync(operationContext());
+//
+//     // After flushing, at least the above change should be inserted.
+//     EXPECT_GE(
+//         _capturer.readInt64Counter(otel::metrics::MetricNames::kReplicatedFastCountInsertCount),
+//         1);
+//
+//     changes[uuid] = {/*count=*/1, /*size=*/50};
+//     _fastCountManager->commit(changes, /*commitTime=*/boost::none);
+//     _fastCountManager->flushSync(operationContext());
+//
+//     // The above change should update the existing document.
+//     EXPECT_GE(
+//         _capturer.readInt64Counter(otel::metrics::MetricNames::kReplicatedFastCountUpdateCount),
+//         1);
+// }
+//
 
 TEST_F(ReplicatedFastCountManagerMetricsTest, WriteTimeMsTotalIncrementsAfterFlush) {
     const UUID uuid = UUID::gen();

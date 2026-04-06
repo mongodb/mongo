@@ -30,6 +30,7 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 
 #include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_advance_checkpoint.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
@@ -213,7 +214,7 @@ void ReplicatedFastCountManager::flushSync(OperationContext* opCtx) {
         hangAfterReplicatedFastCountSnapshot.pauseWhileSet();
     }
 
-    _acquireAndFlush(opCtx, dirtyMetadata);
+    _doFlush(opCtx, dirtyMetadata);
 }
 
 void ReplicatedFastCountManager::disablePeriodicWrites_ForTest() {
@@ -226,29 +227,41 @@ bool ReplicatedFastCountManager::isRunning_ForTest() {
     return _backgroundThread.joinable();
 }
 
-void ReplicatedFastCountManager::_acquireAndFlush(OperationContext* opCtx,
-                                                  const FastSizeCountMap& dirtyMetadata) {
-    // Flushing the logical size and metadata checkpoint is an internal maintenance operation that
-    // should not be blocked by admission control. Metadata checkpoint persistence must not fall
-    // behind to prevent compounding lag from impacting accurate and speedy reading and writing of
-    // collection sizes and counts.
+void ReplicatedFastCountManager::_doFlush(OperationContext* opCtx,
+                                          const FastSizeCountMap& dirtyMetadata) {
+    // Flushing the logical size and count metadata checkpoint is an internal maintenance operation
+    // that should not be blocked by admission control. Metadata checkpoint persistence requires
+    // traversing the oplog since the last metadata checkpoint and must not fall behind to prevent
+    // compounding lag.
     ScopedAdmissionPriority<ExecutionAdmissionContext> skipTicketAcquisition(
         opCtx, AdmissionContext::Priority::kExempt);
-
-    auto acquisition = replicated_fast_count::acquireFastCountCollectionForWrite(opCtx);
-    massert(ErrorCodes::NamespaceNotFound, "Expected fastcount collection to exist", acquisition);
-
-    const CollectionPtr& fastCountColl = acquisition->getCollectionPtr();
-    invariant(fastCountColl,
-              str::stream()
-                  << "Expected to acquire fastcount store as a collection, not a view. isView : "
-                  << acquisition->isView());
-
     try {
-        _doFlush(opCtx, fastCountColl, dirtyMetadata);
+        const Date_t startTime = Date_t::now();
+
+        if (MONGO_unlikely(failDuringFlush.shouldFail())) {
+            uasserted(12311500, "Injected failure in _doFlush for testing");
+        }
+
+        if (_useLegacyFlush) {
+            _flushDirtyMetadata(opCtx, dirtyMetadata);
+        } else {
+            replicated_fast_count::advanceCheckpoint(opCtx, _sizeCountStore, _timestampStore);
+        }
+        _metrics.addWriteTimeMsTotal((Date_t::now() - startTime).count());
+
     } catch (const DBException& ex) {
+        if (ex.code() == ErrorCodes::InterruptedDueToReplStateChange ||
+            ex.code() == ErrorCodes::NotWritablePrimary) {
+            LOGV2_DEBUG(11905701,
+                        2,
+                        "ReplicatedFastCountManager iteration interrupted due to "
+                        "replication state",
+                        "error"_attr = ex.toStatus());
+            return;
+        }
+
         _metrics.incrementFlushFailureCount();
-        LOGV2_WARNING(7397500,
+        LOGV2_WARNING(12311501,
                       "Failed to persist collection sizeCount metadata",
                       "error"_attr = ex.toStatus());
     }
@@ -268,25 +281,27 @@ ReplicatedFastCountManager::_getAndClearSnapshotOfDirtyMetadata(WithLock metadat
     return dirtyMetadata;
 }
 
-void ReplicatedFastCountManager::_doFlush(OperationContext* opCtx,
-                                          const CollectionPtr& coll,
-                                          const FastSizeCountMap& dirtyMetadata) {
-    if (MONGO_unlikely(failDuringFlush.shouldFail())) {
-        uasserted(11550800, "Injected failure in _doFlush() for testing");
-    }
+void ReplicatedFastCountManager::_flushDirtyMetadata(OperationContext* opCtx,
+                                                     const FastSizeCountMap& dirtyMetadata) {
+    auto acquisition = replicated_fast_count::acquireFastCountCollectionForWrite(opCtx);
+    massert(ErrorCodes::NamespaceNotFound, "Expected fastcount collection to exist", acquisition);
 
-    const Date_t startTime = Date_t::now();
+    const CollectionPtr& fastCountColl = acquisition->getCollectionPtr();
+    invariant(fastCountColl,
+              str::stream()
+                  << "Expected to acquire fastcount store as a collection, not a view. isView : "
+                  << acquisition->isView());
+
     WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
     for (auto&& [metadataKey, metadataVal] : dirtyMetadata) {
         _writeOneMetadata(opCtx,
-                          coll,
+                          fastCountColl,
                           metadataKey,
                           metadataVal.sizeCount,
                           metadataVal.validAsOf,
                           replicated_fast_count::getFastCountStoreKey(metadataKey));
     }
     wuow.commit();
-    _metrics.addWriteTimeMsTotal((Date_t::now() - startTime).count());
 }
 
 void ReplicatedFastCountManager::_startBackgroundThread(ServiceContext* svcCtx) {
@@ -321,21 +336,8 @@ void ReplicatedFastCountManager::_flushPeriodicallyOnSignal() {
         }
 
         const Date_t flushStartTime = Date_t::now();
-        try {
-            auto opCtx = cc().makeOperationContext();
-            _acquireAndFlush(opCtx.get(), dirtyMetadata);
-        } catch (const DBException& ex) {
-            if (ex.code() == ErrorCodes::InterruptedDueToReplStateChange) {
-                // Stepdown attempt interrupted us. We can continue here - if the stepdown did not
-                // succeed we will run the next iteration, otherwise we will break out of the loop.
-                LOGV2_DEBUG(11905701,
-                            2,
-                            "ReplicatedFastCountManager iteration interrupted due to "
-                            "replication state change; will retry",
-                            "error"_attr = ex.toStatus());
-                continue;
-            }
-        }
+        auto opCtx = cc().makeOperationContext();
+        _doFlush(opCtx.get(), dirtyMetadata);
 
         // Failpoint used in testing for:
         // 1. indicating a flush has completed

@@ -292,9 +292,22 @@ void assertFastCountApplyOpsMatches(const repl::OplogEntry& applyOpsEntry,
         applyOpsEntry, applyOpsEntry.getEntry().toBSON(), &innerOperations);
     int seenFastCountOps = 0;
 
+    const auto timestampStoreNss = NamespaceString::makeGlobalConfigCollection(
+        NamespaceString::kReplicatedFastCountStoreTimestamps);
+
     for (const auto& innerEntry : innerOperations) {
+        if (innerEntry.getNss() == timestampStoreNss) {
+            // TODO SERVER-123384: Add explicit validation for the timestamp store writes.
+            //
+            // Timestamp-store ops are written alongside metadata ops in the same applyOps; skip
+            // them here since they aren't part of the per-collection metadata being validated.
+            continue;
+        }
+
         EXPECT_EQ(internalNss, innerEntry.getNss())
-            << "Found unexpected non-fast-count operation in applyOps payload";
+            << "Found unexpected non-fast-count operation in applyOps payload. "
+            << applyOpsEntry.toStringForLogging() << " Inner operation "
+            << innerEntry.toStringForLogging();
 
         EXPECT_EQ(repl::OplogEntry::CommandType::kNotCommand, innerEntry.getCommandType());
 
