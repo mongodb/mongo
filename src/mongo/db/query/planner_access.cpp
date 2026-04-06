@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/planner_access.h"
 
-#include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -684,18 +683,8 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
         csn->minRecord = recordRange.getMin();
         csn->maxRecord = recordRange.getMax();
 
-        switch (csn->direction) {
-            case CollectionScanParams::Direction::FORWARD:
-                csn->boundInclusion = CollectionScanParams::makeInclusion(
-                    recordRange.isMinInclusive(), recordRange.isMaxInclusive());
-                break;
-            case CollectionScanParams::Direction::BACKWARD:
-                csn->boundInclusion = CollectionScanParams::makeInclusion(
-                    recordRange.isMaxInclusive(), recordRange.isMinInclusive());
-                break;
-            default:
-                MONGO_UNREACHABLE;
-        }
+        csn->boundInclusion = CollectionScanParams::makeInclusion(recordRange.isMinInclusive(),
+                                                                  recordRange.isMaxInclusive());
     }
 
     if (canSimplifyFilter) {
@@ -2462,7 +2451,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::scanWholeIndex(
  *
  * The optimization is currently skipped for timeseries collections, hashed indexes, and
  * multikey indexes. Only certain filter types (leaf, AND, NOT) are considered for optimization.
- * Future work (see TODOs) will expand support to OR and NOR expressions.
+ * Future work (see To-Do lines) will expand support to OR and NOR expressions.
  *
  * @param filter
  *      The root of the filter expression tree to be analyzed and potentially pushed down.
