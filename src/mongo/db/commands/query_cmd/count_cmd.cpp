@@ -383,6 +383,8 @@ public:
                 opCtx, expCtx, curOp, *collOrViewAcquisition, request(), *parsedFind, ns);
 
             if (collOrViewAcquisition) {
+                curOp->debug().collectionType = collOrViewAcquisition->getCollectionType();
+
                 if (collOrViewAcquisition->isView() ||
                     timeseries::requiresViewlessTimeseriesTranslation(opCtx,
                                                                       *collOrViewAcquisition)) {

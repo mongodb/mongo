@@ -459,6 +459,8 @@ public:
                 "ExpCtxDiagnostics",
                 diagnostic_printers::ExpressionContextPrinter{canonicalQuery->getExpCtx()});
 
+            CurOp::get(opCtx)->debug().collectionType = collectionOrView->getCollectionType();
+
             if (collectionOrView->isView() ||
                 timeseries::requiresViewlessTimeseriesTranslation(opCtx, *collectionOrView)) {
                 // Relinquish locks. The aggregation command will re-acquire them.

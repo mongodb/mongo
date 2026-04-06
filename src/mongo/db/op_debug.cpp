@@ -212,7 +212,17 @@ void OpDebug::report(OperationContext* opCtx,
                     client && client->session() && client->session()->isConnectedToPriorityPort());
     }
     pAttrs->addDeepCopy("ns", toStringForLogging(curop.getNSS()));
-    pAttrs->addDeepCopy("collectionType", getCollectionTypeFromNamespaceString(curop.getNSS()));
+
+    // Only include collectionType when it has been set at the command layer if this is a read
+    // command. This is because we can't reliably know if we have view information attached to this
+    // OpDebug without an indicator from the command layer. Non-read commands handle views
+    // differently (i.e. they don't resolve them in the same way), and should be logged
+    // unconditionally.
+    // TODO SERVER-122926 Determine whether it is always correct to bypass setting/using
+    // collectionType for non-read commands and document accordingly.
+    if (collectionType || curop.getReadWriteType() != Command::ReadWriteType::kRead) {
+        pAttrs->addDeepCopy("collectionType", getCollectionTypeFromNamespaceString(curop.getNSS()));
+    }
 
     if (client) {
         if (auto clientMetadata = ClientMetadata::get(client)) {
@@ -1461,6 +1471,14 @@ std::string OpDebug::getCollectionTypeFromNamespaceString(const NamespaceString&
         return "none";
     }
 
+    // Use the stored collectionType field when it unambiguously identifies the type.
+    if (auto ct = collectionType; ct && *ct == query_shape::CollectionType::kView) {
+        return "view";
+    }
+
+    // TODO SERVER-122866 Remove this block and use 'collectionType' value for both views and
+    // timeseries. We can't do this currently because 'collectionType' is incorrectly reported as
+    // "timeseries" for queries on a view over a timeseries collection.
     if (!resolvedViews.empty()) {
         auto dependencyItr = resolvedViews.find(nss);
         // 'resolvedViews' might be populated if any other collection as a part of the query is on a

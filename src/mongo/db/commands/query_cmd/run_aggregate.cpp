@@ -919,16 +919,17 @@ void computeShapeAndRegisterQueryStats(const AggExState& aggExState,
         expCtx, queryShapeHash, aggExState.getOriginalNss(), userRequest.getQuerySettings());
     expCtx->setQuerySettingsIfNotPresent(std::move(querySettings));
 
+    // If this is a query over a resolved view, we want to register query stats with the
+    // original user-given request and pipeline, rather than the new request generated when
+    // resolving the view.
+    auto collectionType = aggCatalogState.determineCollectionType();
+    CurOp::get(aggExState.getOpCtx())->debug().collectionType = collectionType;
+
     // Exclude queries with encrypted fields as indicated by the inclusion of encryptionInformation
     // in the request. We still collect query stats on collection-less aggregations.
     if (aggExState.getRequest().getEncryptionInformation()) {
         return;
     }
-
-    // If this is a query over a resolved view, we want to register query stats with the
-    // original user-given request and pipeline, rather than the new request generated when
-    // resolving the view.
-    auto collectionType = aggCatalogState.determineCollectionType();
     NamespaceStringSet pipelineInvolvedNamespaces(aggExState.getInvolvedNamespaces());
 
     // Register query stats with the pre-optimized pipeline.

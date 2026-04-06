@@ -858,6 +858,8 @@ public:
                     "CanonicalQuery namespace should match catalog namespace",
                     cq->nss() == nss);
 
+            CurOp::get(opCtx)->debug().collectionType = collectionOrView->getCollectionType();
+
             // If we are running a query against a view or a timeseries collection, redirect this
             // query through the aggregation system.
             if (collectionOrView->isView() ||

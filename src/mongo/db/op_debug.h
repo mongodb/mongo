@@ -331,22 +331,10 @@ public:
     MONGO_MOD_PRIVATE BSONObj makeMongotDebugStatsObject() const;
 
     /**
-     * Gets the type of the namespace on which the current operation operates.
-     */
-    MONGO_MOD_PRIVATE std::string getCollectionTypeFromNamespaceString(
-        const NamespaceString& nss) const;
-
-    /**
      * Accumulate resolved views.
      */
     MONGO_MOD_PRIVATE void addResolvedViews(const std::vector<NamespaceString>& namespaces,
                                             const std::vector<BSONObj>& pipeline);
-
-    /**
-     * Get or append the array with resolved views' info.
-     */
-    MONGO_MOD_PRIVATE BSONArray getResolvedViewsInfo() const;
-    MONGO_MOD_PRIVATE void appendResolvedViewsInfo(BSONObjBuilder& builder) const;
 
     /**
      * Get a snapshot of the cursor metrics suitable for inclusion in a command response.
@@ -681,6 +669,9 @@ public:
     // Whether this is an oplog getMore operation for replication oplog fetching.
     bool isReplOplogGetMore{false};
 
+    // The type of collection on which the operation operates.
+    boost::optional<query_shape::CollectionType> collectionType;
+
     // Maps namespace of a resolved view to its dependency chain and the fully unrolled pipeline. To
     // make log line deterministic and easier to test, use ordered map. As we don't expect many
     // resolved views per query, a hash map would unlikely provide any benefits.
@@ -693,6 +684,17 @@ public:
     extension::host::OperationMetricsRegistry extensionMetrics;
 
 private:
+    /**
+     * Gets the type of the namespace on which the current operation operates.
+     */
+    std::string getCollectionTypeFromNamespaceString(const NamespaceString& nss) const;
+
+    /**
+     * Get or append the array with resolved views' info.
+     */
+    BSONArray getResolvedViewsInfo() const;
+    void appendResolvedViewsInfo(BSONObjBuilder& builder) const;
+
     /**
      * Accessor helper that avoids having to repeat logic for both const and non-const "this."
      *

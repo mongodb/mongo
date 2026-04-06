@@ -97,14 +97,14 @@ function cursorIdToString(cursorId) {
 logLine = priorityPortFFEnabled
     ? [
           '"msg":"Slow query"',
-          '"attr":{"type":"command","isFromUserConnection":true,"isFromPriorityPortConnection":false,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell"',
+          '"attr":{"type":"command","isFromUserConnection":true,"isFromPriorityPortConnection":false,"ns":"log_getmore.test","appName":"MongoDB Shell"',
           `"command":{"getMore":${cursorIdToString(cursorid)},"collection":"test","batchSize":5,`,
           '"originatingCommand":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"batchSize":5,"limit":10,"singleBatch":false,"sort":{"a":1},"hint":{"a":1}',
           '"planCacheShapeHash":',
       ]
     : [
           '"msg":"Slow query"',
-          '"attr":{"type":"command","isFromUserConnection":true,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell"',
+          '"attr":{"type":"command","isFromUserConnection":true,"ns":"log_getmore.test","appName":"MongoDB Shell"',
           `"command":{"getMore":${cursorIdToString(cursorid)},"collection":"test","batchSize":5,`,
           '"originatingCommand":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"batchSize":5,"limit":10,"singleBatch":false,"sort":{"a":1},"hint":{"a":1}',
           '"planCacheShapeHash":',
@@ -121,13 +121,13 @@ assert.eq(cursor.itcount(), 10);
 logLine = priorityPortFFEnabled
     ? [
           '"msg":"Slow query"',
-          '"attr":{"type":"command","isFromUserConnection":true,"isFromPriorityPortConnection":false,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell",',
+          '"attr":{"type":"command","isFromUserConnection":true,"isFromPriorityPortConnection":false,"ns":"log_getmore.test","appName":"MongoDB Shell",',
           `"command":{"getMore":${cursorIdToString(cursorid)},"collection":"test"`,
           '"originatingCommand":{"aggregate":"test","pipeline":[{"$match":{"a":{"$gt":0}}}],"cursor":{"batchSize":0},"hint":{"a":1}',
       ]
     : [
           '"msg":"Slow query"',
-          '"attr":{"type":"command","isFromUserConnection":true,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell",',
+          '"attr":{"type":"command","isFromUserConnection":true,"ns":"log_getmore.test","appName":"MongoDB Shell",',
           `"command":{"getMore":${cursorIdToString(cursorid)},"collection":"test"`,
           '"originatingCommand":{"aggregate":"test","pipeline":[{"$match":{"a":{"$gt":0}}}],"cursor":{"batchSize":0},"hint":{"a":1}',
       ];
