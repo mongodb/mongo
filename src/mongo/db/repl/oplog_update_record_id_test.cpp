@@ -537,36 +537,12 @@ TEST_F(ApplyOpsUpdateTest, ApplyOpsUpdateWithUpsertSucceeds) {
 }
 
 using ApplyOpsUpdateDeathTest = ApplyOpsUpdateTest;
-DEATH_TEST_F(ApplyOpsUpdateDeathTest, ApplyOpsUpdateWithUpsertAndRecordIdFails, "7834905") {
-    RAIIServerParameterControllerForTest _featureFlagReplRidController{
-        "featureFlagRecordIdsReplicated", true};
-    // Insert a document at a known recordId.
-    const RecordId rid(1);
-    const BSONObj doc = BSON("_id" << 1 << "x" << 100);
-    insertDocumentAtRecordId(_opCtx.get(), _nss, doc, rid);
 
-    // Verify the document exists.
-    ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
-
-    // Create an update oplog entry with both upsert:true AND a recordId.
-    // This should fail with error 7834905 because oplog entries with upsert:true
-    // are not allowed to also contain a RecordId.
-    auto op = makeUpdateOplogEntryWithUpsertAndRecordId(
-        nextOpTime(), _nss, BSON("_id" << 1), BSON("$set" << BSON("x" << 700)), rid);
-    std::ignore = runOpApplyOpsCmd(op);
-}
-
-DEATH_TEST_F(ApplyOpsUpdateDeathTest, ApplyOpsUpdateByNullRecordId, "7835000") {
-    RAIIServerParameterControllerForTest _featureFlagReplRidController{
-        "featureFlagRecordIdsReplicated", true};
-    // Insert a document at a known recordId.
+DEATH_TEST_F(ApplyOpsUpdateDeathTest, UpdateWithRidInApplyOpsCmdModeFails, "12336000") {
     const RecordId rid(1);
     insertDocumentAtRecordId(_opCtx.get(), _nss, BSON("_id" << 1 << "x" << 100), rid);
-
-    // Try to update a document by null RecordId in applyOps mode.
-    // This should trigger a tassert because updateObjectByRid doesn't support null recordId.
     auto op = makeUpdateOplogEntryWithRecordId(
-        nextOpTime(), _nss, BSON("_id" << 1), BSON("$set" << BSON("x" << 200)), RecordId());
+        nextOpTime(), _nss, BSON("_id" << 1), BSON("$set" << BSON("x" << 500)), rid);
     std::ignore = runOpApplyOpsCmd(op);
 }
 

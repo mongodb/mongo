@@ -2078,30 +2078,19 @@ Status applyOperation_inlock(OperationContext* opCtx,
         "Unexpected recordId value for collection with ns: '{}', uuid: '{}', recordIdsReplicated: "
         "'{}' when applying oplog entry: '{}'";
     boost::optional<RecordId> opRid = op.getDurableReplOperation().getRecordId();
-    bool skipUsingRid = false;
     if (collection &&
         (opType == OpTypeEnum::kInsert || opType == OpTypeEnum::kUpdate ||
          opType == OpTypeEnum::kDelete)) {
-        // In some migration cases, the oplog entries may contain the 'rid' field introduced when
-        // the feature flag is enabled, but they need to be applied to a server with the feature
-        // flag disabled. We will ignore the 'rid' field then.
-        skipUsingRid = !gFeatureFlagRecordIdsReplicated.isEnabled(
-                           VersionContext::getDecoration(opCtx),
-                           serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-            mode == repl::OplogApplication::Mode::kApplyOpsCmd;
-        if (skipUsingRid) {
-            opRid = boost::none;
-        }
         if (mode == repl::OplogApplication::Mode::kApplyOpsCmd) {
-            // Only disallow applying an operation with 'rid' field on a collection not using
-            // replicated record ids.
-            tassert(11454700,
-                    fmt::format(ridErrMsg,
-                                collection->ns().toStringForErrorMsg(),
-                                collection->uuid().toString(),
-                                collection->areRecordIdsReplicated(),
-                                redact(opOrGroupedInserts.toBSON()).toString()),
-                    !opRid.has_value() || collection->areRecordIdsReplicated());
+            // We don't expect user applyOps with record Ids
+            tassert(
+                12336000,
+                fmt::format(
+                    "Received applyOps cmd with rid for ns: '{}', uuid: '{}', oplog entry: '{}'",
+                    collection->ns().toStringForErrorMsg(),
+                    collection->uuid().toString(),
+                    redact(opOrGroupedInserts.toBSON()).toString()),
+                !opRid.has_value());
         } else {
             // Check that the operation's 'rid' field is consistent with whether the collection is
             // using replicated record ids.
@@ -2206,21 +2195,17 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 // applyOps, this has the effect of preserving recordIds when applyOps is run,
                 // which is intentional.
                 for (size_t i = 0; i < insertObjs.size(); i++) {
-                    boost::optional<RecordId> optRid;
-                    if (!skipUsingRid) {
-                        optRid = insertOps[i]->getDurableReplOperation().getRecordId();
-                    }
+                    auto optRid = insertOps[i]->getDurableReplOperation().getRecordId();
+
                     if (mode == repl::OplogApplication::Mode::kApplyOpsCmd) {
-                        // Only disallow applying an operation with 'rid' field on a collection not
-                        // using replicated record ids.
-                        tassert(11454702,
-                                fmt::format(ridErrMsg,
+                        // We don't expect user applyOps with record Ids
+                        tassert(12336001,
+                                fmt::format("Received applyOps cmd with rid for ns: '{}', uuid: "
+                                            "'{}', oplog entry: '{}'",
                                             collection->ns().toStringForErrorMsg(),
                                             collection->uuid().toString(),
-                                            collection->areRecordIdsReplicated(),
-                                            redact(insertOps[i]->getDurableReplOperation().toBSON())
-                                                .toString()),
-                                !optRid.has_value() || collection->areRecordIdsReplicated());
+                                            redact(opOrGroupedInserts.toBSON()).toString()),
+                                !optRid.has_value());
                     } else {
                         // Check that the operation's 'rid' field is consistent with whether the
                         // collection is using replicated record ids.
@@ -2304,7 +2289,6 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 //     steady-state replication and existing users of applyOps.
 
                 const bool inTxn = opCtx->inMultiDocumentTransaction();
-                bool isApplyOpsCmd = (mode == OplogApplication::Mode::kApplyOpsCmd);
                 bool needToDoUpsert = haveWrappingWriteUnitOfWork && !inTxn;
 
                 Timestamp timestamp;
@@ -2390,7 +2374,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                             return Status::OK();
                         }
 
-                        if (opRid.has_value() && !isApplyOpsCmd) {
+                        if (opRid.has_value()) {
                             // For collections with replicated recordIds we are taking the hard
                             // stance in steady state that getting a DuplicatedKey error while
                             // applying an insert oplog entry is a constraint violation.
@@ -2431,37 +2415,11 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
                 // Now see if we need to do an upsert.
                 if (needToDoUpsert) {
-                    auto oplogIdField = o.getField("_id");
-
-                    if (opRid.has_value()) {
-                        Snapshotted<BSONObj> doc;
-                        // If it is an applyOps cmd with recordId, and a document exists at the
-                        // oplog recordId, the _id of that document must match the _id in the oplog.
-                        // We don't need to check for non-applyOps commands as it would have failed
-                        // above due to DuplicateKey error on the recordId.
-                        if (collection->findDoc(opCtx, *opRid, &doc) &&
-                            !oplogIdField.binaryEqual(doc.value()["_id"])) {
-                            const auto& opObj = redact(op.toBSONForLogging());
-                            uasserted(
-                                8830901,
-                                fmt::format("While applying an applyOps insert oplog entry : '{}' "
-                                            "with 'rid' {}, the "
-                                            "corresponding record '{}' "
-                                            "had a different _id than the oplog.",
-                                            opObj.toString(),
-                                            opRid->toStringHumanReadable(),
-                                            redact(doc.value()).toString()));
-                        }
-                        // Here we have the record Id, we could optimize the upsert based on that
-                        // however it is not worth the effort given that we are here only on
-                        // uncommon applyOps usages.
-                    }
-
                     // Do update on DuplicateKey errors.
                     // This will only be on the _id field in replication,
                     // since we disable non-_id unique constraint violations.
                     BSONObjBuilder b;
-                    b.append(oplogIdField);
+                    b.append(o.getField("_id"));
 
                     auto request = UpdateRequest();
                     request.setNamespaceString(requestNss);

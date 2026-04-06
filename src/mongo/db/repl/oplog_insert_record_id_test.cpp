@@ -318,119 +318,25 @@ TEST_F(ApplyOpsInsertEnabledSteadyStateConstraintsTest, InsertById_ExistentId_Up
     ASSERT_BSONOBJ_EQ(doc, storage.findById(_opCtx.get(), _nss, doc["_id"]).getValue());
 }
 
-TEST_F(ApplyOpsInsertEnabledSteadyStateConstraintsTest,
-       InsertByRecordId_NonExistentDocumentAtRecordId_NewId_Inserts) {
-    // Insert multiple documents.
-    const RecordId rid1(1);
-    const RecordId rid2(2);
-    const RecordId rid3(3);
-    insertDocumentAtRecordId(_opCtx.get(), _nss, BSON("_id" << 1 << "x" << 100), rid1);
-    insertDocumentAtRecordId(_opCtx.get(), _nss, BSON("_id" << 2 << "x" << 200), rid2);
-    insertDocumentAtRecordId(_opCtx.get(), _nss, BSON("_id" << 3 << "x" << 300), rid3);
+using ApplyOpsInsertDeathTest = ApplyOpsInsertTest;
 
-    // Insert a document at a non-existent recordId but with an _id that does exists.
-    const RecordId rid(4);
-    const BSONObj doc = BSON("_id" << 4 << "x" << 100);
-
-    // Verify no document exists at recordId.
-    ASSERT_FALSE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
-
-    // Verify the _id does not exists.
-    StorageInterfaceImpl storage;
-    ASSERT_NOT_OK(storage.findById(_opCtx.get(), _nss, doc["_id"]).getStatus());
-
-    // Create and apply a insert oplog entry WITH recordId in applyOps mode.
-    auto op = makeInsertOplogEntryWithRecordId(nextOpTime(), _nss, _uuid, doc, rid);
-    ASSERT_OK(runOpApplyOpsCmd(op));
-
-    // Verify the document was inserted.
-    ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
-    ASSERT_BSONOBJ_EQ(doc, *documentAtRecordId(_opCtx.get(), _nss, rid));
-}
-
-TEST_F(ApplyOpsInsertEnabledSteadyStateConstraintsTest,
-       InsertByRecordId_ExistsDocumentAtRecordId_MatchingId_Upserts) {
-    // Insert multiple documents.
-    const RecordId rid1(1);
-    const RecordId rid2(2);
-    const RecordId rid3(3);
-    insertDocumentAtRecordId(_opCtx.get(), _nss, BSON("_id" << 1 << "x" << 100), rid1);
-    insertDocumentAtRecordId(_opCtx.get(), _nss, BSON("_id" << 2 << "x" << 200), rid2);
-    insertDocumentAtRecordId(_opCtx.get(), _nss, BSON("_id" << 3 << "x" << 300), rid3);
-
-    // Insert a document at a recordId that exists and same _id value.
-    const RecordId rid(1);
-    const BSONObj doc = BSON("_id" << 1 << "x" << 200 << "y" << 100);
-
-    // Verify a document exists at the recordId.
-    ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
-    //
-    // Verify the _id is the same
-    ASSERT_BSONELT_EQ(doc["_id"], (*documentAtRecordId(_opCtx.get(), _nss, rid))["_id"]);
-
-    // Create and apply a insert oplog entry WITH recordId in applyOps mode.
-    auto op = makeInsertOplogEntryWithRecordId(nextOpTime(), _nss, _uuid, doc, rid);
-    ASSERT_OK(runOpApplyOpsCmd(op));
-
-    // Verify the operation resulted in upsert.
-    ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
-    ASSERT_BSONOBJ_EQ(doc, *documentAtRecordId(_opCtx.get(), _nss, rid));
-}
-
-DEATH_TEST_F(ApplyOpsInsertEnabledSteadyStateConstraintsDeathTest,
-             InsertByRecordId_ExistsDocumentAtRecordId_NonMatchingId_Fails,
-             "8830901") {
-    RAIIServerParameterControllerForTest _featureFlagReplRidController{
-        "featureFlagRecordIdsReplicated", true};
-    // Insert multiple documents.
-    const RecordId rid1(1);
-    const RecordId rid2(2);
-    const RecordId rid3(3);
-    insertDocumentAtRecordId(_opCtx.get(), _nss, BSON("_id" << 1 << "x" << 100), rid1);
-    insertDocumentAtRecordId(_opCtx.get(), _nss, BSON("_id" << 2 << "x" << 200), rid2);
-    insertDocumentAtRecordId(_opCtx.get(), _nss, BSON("_id" << 3 << "x" << 300), rid3);
-
-    // Insert a document at a recordId that exists but with different _id value.
-    const RecordId rid(1);
-    const BSONObj doc = BSON("_id" << 4 << "x" << 200 << "y" << 100);
-
-    // Verify the document exists.
-    ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
-
-    // Verify the _id are different
-    ASSERT_BSONELT_NE(doc["_id"], (*documentAtRecordId(_opCtx.get(), _nss, rid))["_id"]);
-
-    // Create and apply a insert oplog entry WITH recordId in applyOps mode.
-    auto op = makeInsertOplogEntryWithRecordId(nextOpTime(), _nss, _uuid, doc, rid);
+DEATH_TEST_F(ApplyOpsInsertDeathTest, InsertWithRidInApplyOpsCmdModeFails, "12336000") {
+    auto op =
+        makeInsertOplogEntryWithRecordId(nextOpTime(), _nss, _uuid, BSON("_id" << 1), RecordId(1));
     std::ignore = runOpApplyOpsCmd(op);
 }
 
-DEATH_TEST_F(ApplyOpsInsertDisabledSteadyStateConstraintsDeathTest,
-             InsertByRecordId_ExistsDocumentAtRecordId_NonMatchingId_Fails,
-             "8830901") {
-    RAIIServerParameterControllerForTest _featureFlagReplRidController{
-        "featureFlagRecordIdsReplicated", true};
-    // Insert multiple documents.
-    const RecordId rid1(1);
-    const RecordId rid2(2);
-    const RecordId rid3(3);
-    insertDocumentAtRecordId(_opCtx.get(), _nss, BSON("_id" << 1 << "x" << 100), rid1);
-    insertDocumentAtRecordId(_opCtx.get(), _nss, BSON("_id" << 2 << "x" << 200), rid2);
-    insertDocumentAtRecordId(_opCtx.get(), _nss, BSON("_id" << 3 << "x" << 300), rid3);
-
-    // Insert a document at a recordId that exists but with different _id value.
-    const RecordId rid(1);
-    const BSONObj doc = BSON("_id" << 4 << "x" << 200 << "y" << 100);
-
-    // Verify the document exists.
-    ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
-
-    // Verify the _id are different
-    ASSERT_BSONELT_NE(doc["_id"], (*documentAtRecordId(_opCtx.get(), _nss, rid))["_id"]);
-
-    // Create and apply a insert oplog entry WITH recordId in applyOps mode.
-    auto op = makeInsertOplogEntryWithRecordId(nextOpTime(), _nss, _uuid, doc, rid);
-    std::ignore = runOpApplyOpsCmd(op);
+DEATH_TEST_F(ApplyOpsInsertDeathTest, GroupedInsertsWithRidInApplyOpsCmdModeFails, "12336001") {
+    // op1 has no rid so tassert 12336000 (which checks only the first op) passes.
+    // op2 has a rid, triggering tassert 12336001 in the grouped inserts loop.
+    auto op1 = makeInsertOplogEntry(nextOpTime(), _nss, _uuid, BSON("_id" << 1));
+    auto op2 =
+        makeInsertOplogEntryWithRecordId(nextOpTime(), _nss, _uuid, BSON("_id" << 2), RecordId(2));
+    std::vector<ApplierOperation> ops = {ApplierOperation{&op1}, ApplierOperation{&op2}};
+    std::ignore =
+        _applyOplogEntryOrGroupedInsertsWrapper(_opCtx.get(),
+                                                OplogEntryOrGroupedInserts(ops.begin(), ops.end()),
+                                                OplogApplication::Mode::kApplyOpsCmd);
 }
 
 }  // namespace

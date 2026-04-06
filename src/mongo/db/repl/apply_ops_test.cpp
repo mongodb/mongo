@@ -610,25 +610,6 @@ TEST_F(ApplyOpsTest, ApplyOpsNoRidOnRridCollection) {
     ASSERT_OK(applyOps(opCtx.get(), nss.dbName(), applyOpsCmdObj, mode, &resultBuilder));
 }
 
-TEST_F(ApplyOpsTest, ApplyOpsRidOnNonRridCollectionRridDisabled) {
-    auto opCtx = cc().makeOperationContext();
-    auto mode = OplogApplication::Mode::kApplyOpsCmd;
-
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-        "test.ApplyOpsRidOnNonRridCollectionRridDisabled");
-    ASSERT_OK(_storage->createCollection(opCtx.get(), nss, {}));
-
-    auto insertOpWithRid =
-        BSON("op" << "i"
-                  << "ns" << nss.ns_forTest() << "o" << BSON("_id" << 1) << "rid" << 0);
-
-    auto applyOpsCmdObj = BSON("applyOps" << BSON_ARRAY(insertOpWithRid));
-    BSONObjBuilder resultBuilder;
-    RAIIServerParameterControllerForTest _featureFlagReplRidController{
-        "featureFlagRecordIdsReplicated", false};
-    ASSERT_OK(applyOps(opCtx.get(), nss.dbName(), applyOpsCmdObj, mode, &resultBuilder));
-}
-
 TEST_F(ApplyOpsTest, ApplyOpsCreateWithRecordIdsReplicatedRridDisabled) {
     auto opCtx = cc().makeOperationContext();
     auto mode = OplogApplication::Mode::kApplyOpsCmd;
@@ -786,25 +767,6 @@ TEST_F(ApplyOpsTest, ApplyOpsCreateWithRecordIdsFalseReplicatedRridEnabled) {
 }
 
 using ApplyOpsDeathTest = ApplyOpsTest;
-DEATH_TEST_F(ApplyOpsDeathTest, ApplyOpsRidOnNonRridCollectionRridEnabled, "11454700") {
-    auto opCtx = cc().makeOperationContext();
-    auto mode = OplogApplication::Mode::kApplyOpsCmd;
-
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-        "test.ApplyOpsRidOnNonRridCollectionRridEnabled");
-    ASSERT_OK(_storage->createCollection(opCtx.get(), nss, {}));
-
-    auto insertOpWithRid =
-        BSON("op" << "i"
-                  << "ns" << nss.ns_forTest() << "o" << BSON("_id" << 1) << "rid" << 0);
-
-    auto applyOpsCmdObj = BSON("applyOps" << BSON_ARRAY(insertOpWithRid));
-    BSONObjBuilder resultBuilder;
-    RAIIServerParameterControllerForTest _featureFlagReplRidController{
-        "featureFlagRecordIdsReplicated", true};
-    (void)applyOps(opCtx.get(), nss.dbName(), applyOpsCmdObj, mode, &resultBuilder);
-}
-
 DEATH_TEST_F(ApplyOpsDeathTest, SteadyStateNoRidOnRridCollection, "11454701") {
     auto opCtx = cc().makeOperationContext();
     auto mode = OplogApplication::Mode::kSecondary;
