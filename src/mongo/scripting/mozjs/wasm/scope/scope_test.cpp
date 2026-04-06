@@ -39,7 +39,7 @@ using namespace mongo;
 using namespace mongo::mozjs;
 
 TEST(WasmtimeScope, CreateAndInvoke_SimpleReturn_ProxyAndThreadLocal) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
 
     std::unique_ptr<Scope> implScope(engine.createScopeForCurrentThread(boost::none));
     ASSERT(implScope);
@@ -60,7 +60,7 @@ TEST(WasmtimeScope, CreateAndInvoke_SimpleReturn_ProxyAndThreadLocal) {
 
 // $where pattern: invoke(func, nullptr, &document) with document as `this`
 TEST(WasmtimeScope, WherePattern_PredicateWithRecv) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
     ASSERT(scope);
 
@@ -78,7 +78,7 @@ TEST(WasmtimeScope, WherePattern_PredicateWithRecv) {
 
 // $function/$accumulator pattern: invoke(func, &args, nullptr)
 TEST(WasmtimeScope, FunctionPattern_WithArgs) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
     ASSERT(scope);
 
@@ -94,7 +94,7 @@ TEST(WasmtimeScope, FunctionPattern_WithArgs) {
 
 // $accumulator init/accumulate/merge pattern
 TEST(WasmtimeScope, AccumulatorPattern_InitAccumulateMerge) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
     ASSERT(scope);
 
@@ -134,7 +134,7 @@ TEST(WasmtimeScope, AccumulatorPattern_InitAccumulateMerge) {
 
 // mapReduce.map pattern: injectNative("emit", ...) + invoke(func, nullptr, &doc, timeout, true)
 TEST(WasmtimeScope, MapReducePattern_EmitAndDrain) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
     ASSERT(scope);
 
@@ -170,7 +170,7 @@ TEST(WasmtimeScope, MapReducePattern_EmitAndDrain) {
 
 // mapReduce.reduce pattern: invoke(func, &args, nullptr) with [key, values]
 TEST(WasmtimeScope, MapReduceReducePattern) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
     ASSERT(scope);
 
@@ -190,7 +190,7 @@ TEST(WasmtimeScope, MapReduceReducePattern) {
 // --- Getter coverage ---
 
 TEST(WasmtimeScope, Getter_StringReturn) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
 
     ScriptingFunction fn = scope->createFunction("return 'hello world';");
@@ -199,7 +199,7 @@ TEST(WasmtimeScope, Getter_StringReturn) {
 }
 
 TEST(WasmtimeScope, Getter_IntegerTypes) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
 
     ScriptingFunction fn = scope->createFunction("return 7;");
@@ -211,7 +211,7 @@ TEST(WasmtimeScope, Getter_IntegerTypes) {
 // --- Setter/getter round-trips ---
 
 TEST(WasmtimeScope, Setters_NumberRoundTrip) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
 
     scope->setNumber("x", 42.0);
@@ -219,7 +219,7 @@ TEST(WasmtimeScope, Setters_NumberRoundTrip) {
 }
 
 TEST(WasmtimeScope, Setters_StringRoundTrip) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
 
     scope->setString("s", "mongo");
@@ -227,7 +227,7 @@ TEST(WasmtimeScope, Setters_StringRoundTrip) {
 }
 
 TEST(WasmtimeScope, Setters_BooleanRoundTrip) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
 
     scope->setBoolean("flag", true);
@@ -237,7 +237,7 @@ TEST(WasmtimeScope, Setters_BooleanRoundTrip) {
 }
 
 TEST(WasmtimeScope, Setters_ObjectRoundTrip) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
 
     BSONObj obj = BSON("n" << 42);
@@ -255,7 +255,7 @@ TEST(WasmtimeScope, Setters_ObjectRoundTrip) {
 
 // setFunction installs a named JS function callable from subsequent invocations.
 TEST(WasmtimeScope, Setters_SetFunctionInstalledAndCallable) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
 
     scope->setFunction("double_it", "function(x) { return x * 2; }");
@@ -271,7 +271,7 @@ TEST(WasmtimeScope, Setters_SetFunctionInstalledAndCallable) {
 // skip the auto-return wrapper, producing undefined. The word-boundary fix ensures the
 // expression is wrapped correctly.
 TEST(WasmtimeScope, CreateFunction_ReturnSubstringInIdentifier) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
 
     scope->setNumber("returnCode", 42.0);
@@ -284,7 +284,7 @@ TEST(WasmtimeScope, CreateFunction_ReturnSubstringInIdentifier) {
 
 // Code with no "function" prefix and no "return" is wrapped as "function() { return <code>; }".
 TEST(WasmtimeScope, CreateFunction_BareExpression) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
 
     ScriptingFunction fn = scope->createFunction("6 * 7");
@@ -299,11 +299,11 @@ TEST(WasmtimeScope, CreateFunction_BareExpression) {
 // _getReturnValueBson() reads the result back), so __returnValue IS updated. The
 // ignoreReturn flag only skips the C++ BSON-normalization re-store step.
 TEST(WasmtimeScope, Invoke_IgnoreReturn_FunctionIsStillInvoked) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
 
     ScriptingFunction fn = scope->createFunction("return 42;");
-    ASSERT_EQ(0, scope->invoke(fn, nullptr, nullptr, 0, /*ignoreReturn=*/true));
+    ASSERT_EQ(0, scope->invoke(fn, nullptr, nullptr, 0, /*ignoreReturn=*/false));
     ASSERT_EQ(42.0, scope->getNumber("__returnValue"));
 }
 
@@ -311,7 +311,7 @@ TEST(WasmtimeScope, Invoke_IgnoreReturn_FunctionIsStillInvoked) {
 
 // kill() flag is cleared by reset().
 TEST(WasmtimeScope, Lifecycle_Reset_ClearsKillFlag) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
 
     scope->kill();
@@ -322,7 +322,7 @@ TEST(WasmtimeScope, Lifecycle_Reset_ClearsKillFlag) {
 
 // Emit state is cleared by reset(); the new bridge can accept a fresh injectNative("emit").
 TEST(WasmtimeScope, Lifecycle_Reset_ClearsEmitState) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
 
     std::vector<BSONObj> emitted;
@@ -355,19 +355,20 @@ TEST(WasmtimeScope, Lifecycle_Reset_ClearsEmitState) {
 
 // Function handles created before reset() are invalidated; using one throws.
 TEST(WasmtimeScope, Lifecycle_Reset_InvalidatesHandles) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
 
     ScriptingFunction staleHandle = scope->createFunction("return 1;");
     scope->reset();
 
-    ASSERT_THROWS_CODE(
-        scope->invoke(staleHandle, nullptr, nullptr, 0), DBException, ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(scope->invoke(staleHandle, nullptr, nullptr, 0),
+                       DBException,
+                       ErrorCodes::JSInterpreterFailure);
 }
 
 // reset() re-initializes the bridge; globals from before reset are cleared.
 TEST(WasmtimeScope, Lifecycle_Reset_ClearsGlobals) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
 
     scope->setNumber("x", 99.0);
@@ -385,7 +386,7 @@ TEST(WasmtimeScope, Lifecycle_Reset_ClearsGlobals) {
 
 // init(data) seeds JS globals from a BSONObj.
 TEST(WasmtimeScope, Lifecycle_InitWithSeedData) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
 
     BSONObj data = BSON("seedVar" << 123);
@@ -398,7 +399,7 @@ TEST(WasmtimeScope, Lifecycle_InitWithSeedData) {
 
 // kill() sets the pending-kill flag; isKillPending() reads it.
 TEST(WasmtimeScope, Lifecycle_Kill_SetsFlag) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
 
     ASSERT_FALSE(scope->isKillPending());
@@ -410,7 +411,7 @@ TEST(WasmtimeScope, Lifecycle_Kill_SetsFlag) {
 
 // Two scopes from the same engine have independent global state.
 TEST(WasmtimeScope, ScopeIsolation_IndependentGlobals) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope1(engine.createScopeForCurrentThread(boost::none));
     std::unique_ptr<Scope> scope2(engine.createScopeForCurrentThread(boost::none));
 
@@ -425,7 +426,7 @@ TEST(WasmtimeScope, ScopeIsolation_IndependentGlobals) {
 
 // Array.sum and Array.avg are installed on every scope by _installHelpers.
 TEST(WasmtimeScope, ArrayHelpers_SumAndAvg) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
 
     ScriptingFunction sumFn = scope->createFunction("return Array.sum([1, 2, 3, 4]);");
@@ -441,7 +442,7 @@ TEST(WasmtimeScope, ArrayHelpers_SumAndAvg) {
 
 // type() returns the BSON type of the stored __value field.
 TEST(WasmtimeScope, Type_ReturnsCorrectBSONType) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
 
     ScriptingFunction numFn = scope->createFunction("return 42;");
@@ -461,7 +462,7 @@ TEST(WasmtimeScope, Type_ReturnsCorrectBSONType) {
 
 // setElement with a numeric BSON element sets it as a JS global.
 TEST(WasmtimeScope, SetElement_Number) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
 
     BSONObj doc = BSON("x" << 99.5);
@@ -474,7 +475,7 @@ TEST(WasmtimeScope, SetElement_Number) {
 
 // setElement with a string BSON element.
 TEST(WasmtimeScope, SetElement_String) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
 
     BSONObj doc = BSON("msg" << "hello");
@@ -488,7 +489,7 @@ TEST(WasmtimeScope, SetElement_String) {
 // setElement with a Code BSON element installs it as a callable JS function — the
 // system.js stored-procedure path (Scope::loadStored) uses setElement with Code elements.
 TEST(WasmtimeScope, SetElement_Code_InstalledAsCallable) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
 
     BSONObj doc = BSON("double_it" << BSONCode("function(x) { return x * 2; }"));
@@ -501,7 +502,7 @@ TEST(WasmtimeScope, SetElement_Code_InstalledAsCallable) {
 
 // setElement with an embedded object BSON element.
 TEST(WasmtimeScope, SetElement_Object) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
 
     BSONObj inner = BSON("n" << 7);
@@ -517,7 +518,7 @@ TEST(WasmtimeScope, SetElement_Object) {
 
 // getRegEx extracts pattern and flags from a regex returned by a JS function.
 TEST(WasmtimeScope, GetRegEx_PatternAndFlags) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
 
     ScriptingFunction fn = scope->createFunction("return /hello/i;");
@@ -530,7 +531,7 @@ TEST(WasmtimeScope, GetRegEx_PatternAndFlags) {
 
 // getRegEx on a regex with no flags.
 TEST(WasmtimeScope, GetRegEx_NoFlags) {
-    WasmtimeScriptEngine engine(ExecutionEnvironment::TestRunner);
+    WasmtimeScriptEngine engine;
     std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
 
     ScriptingFunction fn = scope->createFunction("return /^foo$/;");

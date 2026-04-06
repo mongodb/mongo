@@ -98,3 +98,12 @@ bazel build //src/mongo/scripting/mozjs/wasm:embed_mozjs_wasm_obj
 # Build just the AOT compile tool
 bazel build //src/mongo/scripting/mozjs/wasm:wasm_aot_compile_tool
 ```
+
+## Testing
+
+```bash
+# Bridge Tests
+bazel run +wasm_mozjs_test
+# Scope Tests
+bazel run //src/mongo/scripting:scripting_mozjs_test --//bazel/config:js_engine=wasm
+```
