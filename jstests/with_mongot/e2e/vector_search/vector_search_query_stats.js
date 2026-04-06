@@ -112,7 +112,7 @@ describe("$vectorSearch query stats", function () {
         assert.docEq({$vectorSearch: {index: "index_3"}}, entry.key.queryShape.pipeline[0], entry);
         assert.eq(entry.metrics.execCount, 1, entry);
 
-        // TODO (SERVER-118628): Uncomment this once extension vectorSearch stage supplemental metrics are supported.
+        // TODO (SERVER-121044): Uncomment this once extension vectorSearch stage supplemental metrics are supported.
         // const vectorSearchMetrics = getValueAtPath(entry.metrics, "supplementalMetrics.vectorSearch");
         // assert.docEq({sum: 1, min: 1, max: 1, sumOfSquares: 1}, vectorSearchMetrics.limit, entry);
         // assert.docEq({sum: 1, min: 1, max: 1, sumOfSquares: 1}, vectorSearchMetrics.numCandidatesLimitRatio, entry);
@@ -128,7 +128,7 @@ describe("$vectorSearch query stats", function () {
         );
         assert.eq(entry.metrics.execCount, 2, entry);
 
-        // TODO (SERVER-118628): Uncomment this once extension vectorSearch stage supplemental metrics are supported.
+        // TODO (SERVER-121044): Uncomment this once extension vectorSearch stage supplemental metrics are supported.
         // const vectorSearchMetrics = getValueAtPath(entry.metrics, "supplementalMetrics.vectorSearch");
         // assert.docEq({sum: 15, min: 5, max: 10, sumOfSquares: 125}, vectorSearchMetrics.limit, entry);
         // assert.docEq({sum: 3, min: 1, max: 2, sumOfSquares: 5}, vectorSearchMetrics.numCandidatesLimitRatio, entry);
@@ -143,7 +143,7 @@ describe("$vectorSearch query stats", function () {
         );
         assert.eq(entry.metrics.execCount, 1, entry);
 
-        // TODO (SERVER-118628): Uncomment this once extension vectorSearch stage supplemental metrics are supported.
+        // TODO (SERVER-121044): Uncomment this once extension vectorSearch stage supplemental metrics are supported.
         //     const vectorSearchMetrics = getValueAtPath(entry.metrics, "supplementalMetrics.vectorSearch");
         //     assert.docEq({sum: 4, min: 4, max: 4, sumOfSquares: 16}, vectorSearchMetrics.limit, entry);
         //     assert.docEq(
