@@ -192,10 +192,10 @@ TEST(SetupOptions, tlsModeRequired) {
     ASSERT_OK(::mongo::addGeneralServerOptions(&moe::startupOptions));
     ASSERT_OK(addSSLServerOptions());
 
-    std::string sslPEMKeyFile = "jstests/libs/server_security/server.pem";
-    std::string sslCAFFile = "jstests/libs/server_security/ca.pem";
-    std::string sslCRLFile = "jstests/libs/server_security/crl.pem";
-    std::string sslClusterFile = "jstests/libs/server_security/cluster_cert.pem";
+    std::string sslPEMKeyFile = "jstests/libs/server.pem";
+    std::string sslCAFFile = "jstests/libs/ca.pem";
+    std::string sslCRLFile = "jstests/libs/crl.pem";
+    std::string sslClusterFile = "jstests/libs/cluster_cert.pem";
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");
@@ -256,10 +256,10 @@ TEST(SetupOptions, sslModeRequired) {
     ASSERT_OK(::mongo::addGeneralServerOptions(&moe::startupOptions));
     ASSERT_OK(addSSLServerOptions());
 
-    std::string sslPEMKeyFile = "jstests/libs/server_security/server.pem";
-    std::string sslCAFFile = "jstests/libs/server_security/ca.pem";
-    std::string sslCRLFile = "jstests/libs/server_security/crl.pem";
-    std::string sslClusterFile = "jstests/libs/server_security/cluster_cert.pem";
+    std::string sslPEMKeyFile = "jstests/libs/server.pem";
+    std::string sslCAFFile = "jstests/libs/ca.pem";
+    std::string sslCRLFile = "jstests/libs/crl.pem";
+    std::string sslClusterFile = "jstests/libs/cluster_cert.pem";
 
     std::vector<std::string> argv;
     argv.push_back("binaryname");

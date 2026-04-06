@@ -15,8 +15,9 @@ TestData.skipCheckShardFilteringMetadata = true;
 TestData.skipCheckMetadataConsistency = true;
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
-let pemKeyFile = getX509Path("server.pem");
-let caFile = getX509Path("ca.pem");
+let path = "jstests/libs/";
+let pemKeyFile = path + "server.pem";
+let caFile = path + "ca.pem";
 let testURL = "local.10gen.cc";
 let testIP = "127.0.0.1";
 

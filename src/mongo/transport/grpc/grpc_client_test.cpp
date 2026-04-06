@@ -127,8 +127,8 @@ public:
                 []() {
                     auto options = CommandServiceTestFixtures::makeServerOptions();
                     // The client uses jstests/libs/ca.pem by default.
-                    options.tlsCAFile = "jstests/libs/server_security/ecdsa-ca.pem";
-                    options.tlsCertificateKeyFile = "jstests/libs/server_security/ecdsa-server.pem";
+                    options.tlsCAFile = "jstests/libs/ecdsa-ca.pem";
+                    options.tlsCertificateKeyFile = "jstests/libs/ecdsa-server.pem";
                     return options;
                 }(),
                 differentCAServerCertSucceeds,

@@ -191,7 +191,7 @@ mongo_cc_unit_test(
     ],
     data = [
         "//jstests/libs:test_crt_files",
-        "//jstests/libs/server_security:test_pem_files",
+        "//jstests/libs:test_pem_files",
     ],
     tags = [
         "incompatible_with_bazel_remote_test",

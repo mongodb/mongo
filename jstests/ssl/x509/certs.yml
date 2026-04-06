@@ -5,7 +5,7 @@
 global:
   # All subject names will have these elements automatically,
   # unless `explicit_subject: true` is specified.
-  output_path: "jstests/libs/server_security/"
+  output_path: "jstests/libs/"
   Subject:
     C: "US"
     ST: "New York"

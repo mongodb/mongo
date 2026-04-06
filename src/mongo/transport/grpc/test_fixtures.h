@@ -179,11 +179,11 @@ class CommandServiceTestFixtures : public ServiceContextTest {
 public:
     static constexpr auto kBindAddress = "localhost";
     static constexpr auto kMaxThreads = 100;
-    static constexpr auto kServerCertificateKeyFile = "jstests/libs/server_security/server_SAN.pem";
-    static constexpr auto kClientCertificateKeyFile = "jstests/libs/server_security/client.pem";
+    static constexpr auto kServerCertificateKeyFile = "jstests/libs/server_SAN.pem";
+    static constexpr auto kClientCertificateKeyFile = "jstests/libs/client.pem";
     static constexpr auto kClientSelfSignedCertificateKeyFile =
-        "jstests/libs/server_security/client-self-signed.pem";
-    static constexpr auto kCAFile = "jstests/libs/server_security/ca.pem";
+        "jstests/libs/client-self-signed.pem";
+    static constexpr auto kCAFile = "jstests/libs/ca.pem";
     static constexpr auto kMockedClientAddr = "client-def:123";
     static constexpr auto kDefaultConnectTimeout = Milliseconds(5000);
 

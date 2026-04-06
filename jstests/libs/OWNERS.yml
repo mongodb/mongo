@@ -78,6 +78,18 @@ filters:
   - "feature_compatibility_version.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "*.pem":
+    approvers:
+      - 10gen/server-security
+  - "*.sha1":
+    approvers:
+      - 10gen/server-security
+  - "*.sha256":
+    approvers:
+      - 10gen/server-security
+  - "*.pfx":
+    approvers:
+      - 10gen/server-security
   - "fixture_helpers.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
