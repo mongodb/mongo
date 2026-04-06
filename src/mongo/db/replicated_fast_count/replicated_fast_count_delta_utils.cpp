@@ -81,6 +81,36 @@ void recordCollectionSizeCountDelta(
     }
 }
 
+// Returns true if all operations within the provided oplog entry are on the internal fast count
+// collections.
+bool operationsOnFastCountCollections(const NamespaceString& nss,
+                                      const repl::OplogEntry& oplogEntry) {
+    const auto fastCountStoreNss =
+        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
+    const auto fastCountTimestampNss = NamespaceString::makeGlobalConfigCollection(
+        NamespaceString::kReplicatedFastCountStoreTimestamps);
+
+    if (nss == fastCountStoreNss || nss == fastCountTimestampNss) {
+        return true;
+    }
+
+    if (oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
+        std::vector<repl::OplogEntry> innerEntries;
+        repl::ApplyOps::extractOperationsTo(
+            oplogEntry, oplogEntry.getEntry().toBSON(), &innerEntries);
+
+        for (const auto& op : innerEntries) {
+            const auto& nss = op.getNss();
+            if (nss != fastCountStoreNss && nss != fastCountTimestampNss) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    return false;
+}
+
 }  // namespace
 
 boost::optional<CollectionSizeCount> extractSizeCountDeltaForOp(
@@ -154,9 +184,17 @@ OplogScanResult aggregateSizeCountDeltasInOplog(SeekableRecordCursor& oplogCurso
     OplogScanResult result;
     RecordId seekRid =
         massertStatusOK(record_id_helpers::keyForOptime(seekAfterTS, KeyFormat::Long));
+
     for (auto rec = oplogCursor.seek(seekRid, SeekableRecordCursor::BoundInclusion::kExclude); rec;
          rec = oplogCursor.next()) {
         const auto entry = massertStatusOK(repl::OplogEntry::parse(rec->data.toBson()));
+        const auto& nss = entry.getNss();
+        // Do not advance lastTimestamp for writes to the fast count store collections themselves.
+        // Otherwise, we create a feedback loop where we'd advance the timestamp in response to
+        // seeing oplog entries for advancing the timestamp.
+        if (operationsOnFastCountCollections(nss, entry)) {
+            continue;
+        }
         result.lastTimestamp = entry.getTimestamp();
         if (entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
             extractSizeCountDeltasForApplyOps(entry, uuidFilter, result.deltas);

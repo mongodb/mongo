@@ -295,6 +295,105 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
     ASSERT_EQ(Timestamp(1, 3), *tsStoreRes);
 }
 
+TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
+       CheckpointIsNoOpWhenOplogOnlyContainsTimestampStoreEntries) {
+    const test_helpers::NsAndUUID timestampStoreNsAndUUID{
+        .nss = NamespaceString::makeGlobalConfigCollection(
+            NamespaceString::kReplicatedFastCountStoreTimestamps),
+        .uuid = UUID::gen()};
+    test_helpers::writeToOplog(opCtx,
+                               test_helpers::makeOplogEntry(Timestamp(1, 1),
+                                                            timestampStoreNsAndUUID,
+                                                            repl::OpTypeEnum::kUpdate));
+
+    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+
+    EXPECT_FALSE(timestampStore.read(opCtx).has_value());
+}
+
+TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
+       CheckpointIsNoOpWhenOplogOnlyContainsFastCountStoreEntries) {
+    const test_helpers::NsAndUUID fastCountStoreNsAndUUID{
+        .nss =
+            NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore),
+        .uuid = UUID::gen()};
+    test_helpers::writeToOplog(opCtx,
+                               test_helpers::makeOplogEntry(Timestamp(1, 1),
+                                                            fastCountStoreNsAndUUID,
+                                                            repl::OpTypeEnum::kUpdate));
+
+    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+
+    EXPECT_FALSE(timestampStore.read(opCtx).has_value());
+}
+
+TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
+       ValidAsOfAdvancesToLastUserEntryIgnoresInternalEntries) {
+    const Timestamp userWriteTs{1, 1};
+    const Timestamp internalEntryTs{1, 2};
+
+    test_helpers::writeToOplog(
+        opCtx, test_helpers::makeOplogEntry(userWriteTs, collA, repl::OpTypeEnum::kInsert, 10));
+    const test_helpers::NsAndUUID timestampStoreNsAndUUID{
+        .nss = NamespaceString::makeGlobalConfigCollection(
+            NamespaceString::kReplicatedFastCountStoreTimestamps),
+        .uuid = UUID::gen()};
+    test_helpers::writeToOplog(opCtx,
+                               test_helpers::makeOplogEntry(internalEntryTs,
+                                                            timestampStoreNsAndUUID,
+                                                            repl::OpTypeEnum::kUpdate));
+
+    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+
+    const auto tsAfterFirstAdvance = timestampStore.read(opCtx);
+    ASSERT_TRUE(tsAfterFirstAdvance.has_value());
+    ASSERT_EQ(userWriteTs, *tsAfterFirstAdvance);
+}
+
+TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
+       DoNotAdvanceTimestampForFastCountInternalApplyOps) {
+    const Timestamp userWriteTs{1, 1};
+    const Timestamp applyOpsTs{1, 2};
+
+    test_helpers::writeToOplog(
+        opCtx, test_helpers::makeOplogEntry(userWriteTs, collA, repl::OpTypeEnum::kInsert, 10));
+    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+
+    const auto tsAfterFirstAdvance = timestampStore.read(opCtx);
+    ASSERT_TRUE(tsAfterFirstAdvance.has_value());
+    ASSERT_EQ(userWriteTs, *tsAfterFirstAdvance);
+
+    const auto fastCountStoreNss =
+        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
+    const auto fastCountTimestampNss = NamespaceString::makeGlobalConfigCollection(
+        NamespaceString::kReplicatedFastCountStoreTimestamps);
+
+    BSONArrayBuilder innerOpsBuilder;
+    innerOpsBuilder.append(BSON("op" << "u"
+                                     << "ns" << fastCountStoreNss.ns_forTest() << "ui"
+                                     << UUID::gen() << "o" << BSON("$set" << BSON("count" << 1))
+                                     << "o2" << BSON("_id" << 1)));
+    innerOpsBuilder.append(
+        BSON("op" << "u"
+                  << "ns" << fastCountTimestampNss.ns_forTest() << "ui" << UUID::gen() << "o"
+                  << BSON("$set" << BSON("ts" << userWriteTs)) << "o2" << BSON("_id" << 1)));
+
+    const repl::OplogEntry applyOpsEntry = repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(applyOpsTs, 1),
+        .opType = repl::OpTypeEnum::kCommand,
+        .nss = NamespaceString::createNamespaceString_forTest("admin", "$cmd"),
+        .oField = BSON("applyOps" << innerOpsBuilder.arr()),
+        .wallClockTime = Date_t::now(),
+    }};
+    test_helpers::writeToOplog(opCtx, applyOpsEntry);
+
+    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+
+    const auto tsAfterSecondAdvance = timestampStore.read(opCtx);
+    ASSERT_TRUE(tsAfterSecondAdvance.has_value());
+    ASSERT_EQ(userWriteTs, *tsAfterSecondAdvance);
+}
+
 
 }  // namespace
 }  // namespace mongo::replicated_fast_count

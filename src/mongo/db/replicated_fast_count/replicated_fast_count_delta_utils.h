@@ -77,8 +77,9 @@ void extractSizeCountDeltasForApplyOps(
  * `deltas` contains an entry for each `uuid` which has replicated size count information within the
  * scanned oplog range. May include entries where size count deltas sum to 0.
  *
- * `lastTimestamp` is the timestamp of the final oplog entry visited during the scan, or boost::none
- * if no entries were scanned (i.e. the seek landed past the end of the oplog).
+ * `lastTimestamp` is the timestamp of the final oplog entry visited during the scan that is NOT
+ * from an internal fast count store collection, or boost::none if no such entries were scanned
+ * (i.e. the seek landed past the end of the oplog).
  */
 struct OplogScanResult {
     absl::flat_hash_map<UUID, CollectionSizeCount> deltas;
