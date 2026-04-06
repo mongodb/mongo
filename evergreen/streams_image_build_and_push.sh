@@ -162,6 +162,11 @@ tar -tzvf streams-binaries.tgz
 if [ "$1" == "--push" ]; then
     docker push "$FULL_IMAGE_TAG"
 
+    # Only the amd64 build creates the multi-arch manifest
+    if [ "$ARCH" != "amd64" ] || [ -n "${streams_variant_tag:-}" ]; then
+        exit 0
+    fi
+
     # Create and push a docker manifest so the image can be pulled without
     # specifying the architecture tag explicitly.
     MANIFEST_SUFFIX=""
