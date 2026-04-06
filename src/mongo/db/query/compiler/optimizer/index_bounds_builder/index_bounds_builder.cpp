@@ -766,7 +766,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
             }
         }
     } else if (MatchExpression::EXPRESSION == expr->matchType()) {
-        const auto* node = dynamic_cast<const ExprMatchExpression*>(expr);
+        const auto* node = static_cast<const ExprMatchExpression*>(expr);
         auto dataElem = node->getData();
         // To extract index bounds from $expr we need:
         // - the expression to be an equality to a not-null constant, in which case getData()
