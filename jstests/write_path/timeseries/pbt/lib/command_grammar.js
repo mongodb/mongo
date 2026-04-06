@@ -83,7 +83,11 @@ export class InsertCommand {
             }
         });
 
-        assert.docEq(resTs, resCtrl);
+        assert.docEq(resTs, resCtrl, "Failed to insert single timeseries measurement", {
+            resTs,
+            resCtrl,
+            doc: this.doc,
+        });
     }
 }
 
@@ -126,7 +130,12 @@ export class BatchInsertCommand {
                 return e;
             }
         });
-        assert.docEq(resTs, resCtrl);
+        assert.docEq(resTs, resCtrl, "Failed to insert batch of timeseries measurements", {
+            resTs,
+            resCtrl,
+            docCount: this.docs.length,
+            docs: this.docs,
+        });
     }
 }
 

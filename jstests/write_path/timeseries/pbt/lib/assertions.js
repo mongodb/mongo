@@ -52,3 +52,25 @@ export function assertCollectionsMatch(tsColl, ctrlColl, query = {}) {
         });
     }
 }
+
+export function assertBelowBsonSizeLimit(tsColl) {
+    let cursor = getTimeseriesCollForRawOps(tsColl.getDB(), tsColl);
+    const bucketDocSizes = cursor
+        .aggregate([
+            {
+                $project: {
+                    _id: 1,
+                    bsonSize: {$bsonSize: "$$ROOT"},
+                },
+            },
+            {
+                $sort: {bsonSize: -1},
+            },
+        ])
+        .toArray();
+
+    const bsonMaxSizeLimit = 16 * 1024 * 1024;
+    for (let i = 0; i < bucketDocSizes.length; ++i) {
+        assert.lte(bucketDocSizes[i].bsonSize, bsonMaxSizeLimit);
+    }
+}

@@ -1,7 +1,10 @@
 test_kind: js_test
 selector:
   roots:
-    - jstests/write_path/timeseries/pbt/*.js
+    - jstests/write_path/timeseries/pbt/**/*_pbt.js
+  # TODO (SERVER-122997) Re-enable when this fix is made
+  exclude_files:
+    - jstests/write_path/timeseries/pbt/large_measurements/timeseries_measurement_limit_pbt.js
 
 executor:
   config:

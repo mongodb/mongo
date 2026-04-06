@@ -324,6 +324,7 @@ export function makeTimeseriesCommandArb(
  * @param {number} [maxDocs=500]
  * @param {Object} [options]
  * @param {Object} [options.explicitArbitraries] Object mapping field names to specific arbitrary factories to inject into the test suite
+ * @param {Array<string>} [options.types] // types of metrics to include, leave undefined/null for all
  * @param {{intRange?: Range, dateRange?: Range}} [options.ranges]
  * @param {fc.Arbitrary<string>} [fieldNameArb=fc.string({minLength:1,maxLength:8})]
  *

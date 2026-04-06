@@ -33,9 +33,10 @@ import {
  * @param {*} [metaValue]         // optional
  * @param {number} [minFields=1]  // min # of extra metric fields
  * @param {number} [maxFields=5]  // max # of extra metric fields
- * @param {Object} [options]
- * @param {Object} [options.explicitArbitraries]
- * @param {Object} [options.ranges]
+ * @param {object} [options]
+ * @param {object} [options.explicitArbitraries]
+ * @param {object} [options.ranges]
+ * @param {Array<string>} [options.types]
  * @param {Range} [options.ranges.intRange]
  * @param {Range} [options.ranges.dateRange]
  * @param {fc.Arbitrary<string>} [options.ranges.fieldNameArb]
@@ -77,7 +78,7 @@ export function makeMeasurementDocArb(
     const timeArb = fc.date({min: dateMin, max: dateMax});
 
     // Parent metric arb used for meta (when not fixed) and for extra fields
-    const parentMetricArb = makeMetricArb(undefined, {
+    const parentMetricArb = makeMetricArb(options.types, {
         intRange,
         doubleRange,
         longRange,
@@ -151,6 +152,7 @@ export function makeMeasurementDocArb(
  * @param {number} [options.ranges.maxFields=5]
  * @param {number} [options.ranges.minDocs=0]
  * @param {number} [options.ranges.maxDocs=20]
+ * @param {Array<string>} [options.types] // types of metrics to include, leave undefined/null for all
  * @param {number} [options.mixedSchemaChance=0.0]  // chance that a given field will have a mixed schema across the stream
  * @param {fc.Arbitrary<string>} [options.ranges.fieldNameArb]
  *
@@ -203,7 +205,7 @@ export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaVa
     const docCountArb = fc.integer({min: minDocs, max: maxDocs});
 
     // Parent metric arb for meta (when not fixed) and extra fields
-    const parentMetricArb = makeMetricArb(undefined, {
+    const parentMetricArb = makeMetricArb(options.types, {
         intRange,
         doubleRange,
         longRange,
@@ -242,6 +244,10 @@ export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaVa
             decimalRange,
             dateRange: {min: dateMin, max: dateMax},
         };
+        const extraFieldOptions = {
+            ranges: extraFieldRanges,
+            types: options.types,
+        };
 
         // Runny overrides mixed type, this should be fine for our use cases
         for (const fieldName of fieldNames) {
@@ -249,8 +255,8 @@ export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaVa
                 .double({min: 0, max: 1, noNaN: true})
                 .chain((selector) =>
                     selector < mixedSchemaChance
-                        ? makeMixedTypeMetricStreamArb(docCount, docCount, extraFieldRanges)
-                        : makeMetricStreamArb(docCount, docCount, extraFieldRanges),
+                        ? makeMixedTypeMetricStreamArb(docCount, docCount, extraFieldOptions)
+                        : makeMetricStreamArb(docCount, docCount, extraFieldOptions),
                 );
             const runnyArb = makeRunnyMetricStreamArb(parentMetricArb, {minLength: docCount, maxLength: docCount});
             extraFieldStreamArbs[fieldName] = useRunnyMetricsArb.chain((useRunny) => (useRunny ? runnyArb : plainArb));

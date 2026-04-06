@@ -4,6 +4,9 @@
 
 import {fc} from "jstests/third_party/fast_check/fc-4.6.0.js";
 
+export const defaultDateMin = new Date("1970-01-01T00:00:00.000Z");
+export const defaultDateMax = new Date("2038-01-19T03:14:07.000Z");
+
 export const allBsonMetricTypes = Object.freeze([
     // basic
     "double",
@@ -42,8 +45,6 @@ function hexa() {
 }
 
 function _defaultDateRange(dateRange) {
-    const defaultDateMin = new Date("1970-01-01T00:00:00.000Z");
-    const defaultDateMax = new Date("2038-01-19T03:14:07.000Z");
     return {
         min: dateRange?.min ?? defaultDateMin,
         max: dateRange?.max ?? defaultDateMax,
@@ -361,16 +362,16 @@ export function makeMetricTypeStreamArb(type, minLength = 0, maxLength = 20, ran
  *
  * Callers can override which implementations to oneof between via `streamFactories`.
  */
-export function makeMetricStreamArb(minLength = 0, maxLength = 20, ranges = {}, streamFactories) {
+export function makeMetricStreamArb(minLength = 0, maxLength = 20, options = {}, streamFactories) {
     if (Array.isArray(streamFactories) && streamFactories.length > 0) {
-        const streamArbs = streamFactories.map((fn) => fn(minLength, maxLength, ranges));
+        const streamArbs = streamFactories.map((fn) => fn(minLength, maxLength, options.ranges));
         return fc.oneof(...streamArbs);
     }
 
     // Default: build a stream arb per type.
     const arbs = [];
-    for (const t of allBsonMetricTypes) {
-        arbs.push(makeMetricTypeStreamArb(t, minLength, maxLength, ranges));
+    for (const t of options.types ?? allBsonMetricTypes) {
+        arbs.push(makeMetricTypeStreamArb(t, minLength, maxLength, options.ranges));
     }
     return fc.oneof(...arbs);
 }
@@ -586,14 +587,15 @@ export function makeRunnyMetricStreamArb(metricArb, opts = {}) {
  * It chooses two distinct BSON metric types, generates one stream of each type,
  * and then intermixes the resulting values position-by-position.
  */
-export function makeMixedTypeMetricStreamArb(minLength = 0, maxLength = 20, ranges = {}) {
+export function makeMixedTypeMetricStreamArb(minLength = 0, maxLength = 20, options = {}) {
+    const metricTypes = options.types ?? allBsonMetricTypes;
     const distinctTypePairArb = fc
-        .tuple(fc.constantFrom(...allBsonMetricTypes), fc.constantFrom(...allBsonMetricTypes))
+        .tuple(fc.constantFrom(...metricTypes), fc.constantFrom(...metricTypes))
         .filter(([lhsType, rhsType]) => lhsType !== rhsType);
 
     return distinctTypePairArb.chain(([lhsType, rhsType]) => {
-        const lhsStreamArb = makeMetricTypeStreamArb(lhsType, minLength, maxLength, ranges);
-        const rhsStreamArb = makeMetricTypeStreamArb(rhsType, minLength, maxLength, ranges);
+        const lhsStreamArb = makeMetricTypeStreamArb(lhsType, minLength, maxLength, options.ranges);
+        const rhsStreamArb = makeMetricTypeStreamArb(rhsType, minLength, maxLength, options.ranges);
 
         return fc.tuple(lhsStreamArb, rhsStreamArb).chain(([lhsStream, rhsStream]) => {
             const streamLength = lhsStream.length < rhsStream.length ? lhsStream.length : rhsStream.length;
