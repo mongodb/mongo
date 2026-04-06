@@ -63,7 +63,7 @@ function runDbTest() {
     assert.eq(2, secondResult.nIndexes);
     clearRawMongoProgramOutput();
 
-    // Error if collection is non-existant
+    // Error if collection is non-existent
     assert.neq(
         MongoRunner.EXIT_CLEAN,
         runMongoProgram(
@@ -77,6 +77,80 @@ function runDbTest() {
             "validateDbName=test",
             "--setParameter",
             "validateCollectionName=lettuce",
+        ),
+    );
+
+    // Validate can be run with repair:false but not repair:true when running modal validation.
+    assert.eq(
+        MongoRunner.EXIT_CLEAN,
+        runMongoProgram(
+            "mongod",
+            "--validate",
+            "--port",
+            port,
+            "--dbpath",
+            dbpath,
+            "--setParameter",
+            "validateDbName=test",
+            "--setParameter",
+            "validateCollectionName=ham",
+            "--setParameter",
+            `collectionValidateOptions={options: {repair: false}}`,
+        ),
+    );
+
+    assert.neq(
+        MongoRunner.EXIT_CLEAN,
+        runMongoProgram(
+            "mongod",
+            "--validate",
+            "--port",
+            port,
+            "--dbpath",
+            dbpath,
+            "--setParameter",
+            "validateDbName=test",
+            "--setParameter",
+            "validateCollectionName=ham",
+            "--setParameter",
+            `collectionValidateOptions={options: {repair: true}}`,
+        ),
+    );
+
+    // The same as above, but for fixMultikey.
+    assert.eq(
+        MongoRunner.EXIT_CLEAN,
+        runMongoProgram(
+            "mongod",
+            "--validate",
+            "--port",
+            port,
+            "--dbpath",
+            dbpath,
+            "--setParameter",
+            "validateDbName=test",
+            "--setParameter",
+            "validateCollectionName=ham",
+            "--setParameter",
+            `collectionValidateOptions={options: {fixMultikey: false}}`,
+        ),
+    );
+
+    assert.neq(
+        MongoRunner.EXIT_CLEAN,
+        runMongoProgram(
+            "mongod",
+            "--validate",
+            "--port",
+            port,
+            "--dbpath",
+            dbpath,
+            "--setParameter",
+            "validateDbName=test",
+            "--setParameter",
+            "validateCollectionName=ham",
+            "--setParameter",
+            `collectionValidateOptions={options: {fixMultikey: true}}`,
         ),
     );
 }

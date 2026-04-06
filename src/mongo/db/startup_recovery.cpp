@@ -762,6 +762,10 @@ StatusWith<bool> offlineValidateCollection(OperationContext* opCtx,
               CollectionValidation::ValidateMode::kForegroundFull,
               CollectionValidation::RepairMode::kNone,
               /*logDiagnostics=*/false);
+    if (parsedOptions.getRepairMode() != CollectionValidation::RepairMode::kNone) {
+        return Status{ErrorCodes::InvalidOptions,
+                      "Repair is not allowed in offline validation mode"};
+    }
     ValidateResults validateResults;
     try {
         Status status = CollectionValidation::validate(opCtx, nss, parsedOptions, &validateResults);
