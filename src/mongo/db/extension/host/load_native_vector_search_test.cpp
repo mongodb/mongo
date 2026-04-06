@@ -148,6 +148,8 @@ private:
     RAIIServerParameterControllerForTest _extensionsAPIController{"featureFlagExtensionsAPI", true};
     RAIIServerParameterControllerForTest _vecSimilarityExprController{
         "featureFlagVectorSimilarityExpressions", true};
+    RAIIServerParameterControllerForTest _signatureValidationController{
+        "featureFlagExtensionsApiSignatureValidation", true};
 };
 
 // Tests successful desugar extension loading and verifies stage registration works in pipelines.

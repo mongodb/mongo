@@ -62,4 +62,10 @@ inline ExtensionConfig makeEmptyExtensionConfig(const std::string& extensionFile
                            .extOptions = YAML::Node(YAML::NodeType::Map)};
 }
 
+inline const std::string& getPublicKeyPath() {
+    static std::string kPublicKeyPath = getExtensionDirectory() / "test_extensions_signing_keys" /
+        "test_extensions_signing_public_key.asc";
+    return kPublicKeyPath;
+}
+
 }  // namespace mongo::extension::host::test_util

@@ -29,24 +29,20 @@
 
 #pragma once
 
+#include "mongo/db/extension/host/rnp/rnp.h"
 #include "mongo/util/modules.h"
 
 #include <string>
 
 namespace mongo::extension::host {
-
 /**
- * SignatureValidator is responsible for validating an extension's signature file against a public
- * key.
+ * SignatureValidator is responsible for validating an extension's signature file against a
+ * public key.
  *
- * This class respects the compile-time pre-processor flag MONGO_CONFIG_EXT_SIG_SECURE and server
- * options (i.e extensionsSignaturePublicKeyPath) when determining which validation public key to
- * use for signature verification. Note, this class is always safe to instantiate, even if signature
- * verification is disabled (i.e extensionsSignaturePublicKeyPath is empty).
- *
- * Note: SignatureValidator is currently always disabled for the time being.
- * TODO SERVER-115289: Update comment with implementation specific details regarding signature
- * verification library.
+ * This class respects the compile-time pre-processor flag MONGO_CONFIG_EXT_SIG_SECURE and
+ * server options (i.e extensionsSignaturePublicKeyPath) when determining which validation
+ * public key to use for signature verification. Note, this class is always safe to instantiate,
+ * even if signature verification is disabled (i.e extensionsSignaturePublicKeyPath is empty).
  */
 class SignatureValidator {
 public:
@@ -54,17 +50,50 @@ public:
     SignatureValidator(const SignatureValidator&) = delete;
     SignatureValidator& operator=(const SignatureValidator&) = delete;
 
-    ~SignatureValidator();
+    virtual ~SignatureValidator();
     /**
      * Validates the extension's detached signature file against the validation public key.
      * Note, extensionPath must be guaranteed to exist prior to calling this method. If the
-     * signature is not validated succesfully, an exception is thrown.
+     * signature is not validated succesfully, an exception is thrown. extensionName must be the
+     * extension's file name including the '.so' suffix.
      */
     void validateExtensionSignature(const std::string& extensionName,
                                     const std::string& extensionPath) const;
 
-private:
+protected:
+    /**
+     * The value of secure mode is determined by the MONGO_CONFIG_EXT_SIG_SECURE macro. However,
+     * for unit testing, we want to be able to control being in secure mode or not directly in test
+     * logic, so this protected constructor is provided to accomodate that. In unit testing,
+     * SignatureValidator is constructed directly using this constructor. Alternatively, the server
+     * logic uses the argument-less constructor, which delegates to this constructor, using the
+     * value of MONGO_CONFIG_EXT_SIG_SECURE to determine the secureMode argument value.
+     */
+    SignatureValidator(bool secureMode);
+
+
+    /**
+     * This method is made protected in order to allow us to unit test that the secure mode public
+     * key is used to generate the RnpInput correctly.
+     */
+    rnp::RnpInput _getValidationPublicKeyAsRnpInput() const;
+
+    /**
+     * Both _secureMode and _skipValidation are deliberately made const, and should not be made
+     * mutable in the future unless SignatureValidator undergoes significant behavioural changes.
+     *
+     * With the exception of unit tests, _secureMode is determined at compilation time by the
+     * MONGO_CONFIG_EXT_SIG_SECURE macro and should never change at runtime.
+     * _skipValidation is derived from _secureMode at instantiation time, and should not be changed
+     * during the object's lifetime. This is because the RnpContext (i.e keyring) is conditionally
+     * initialized at instantiation time based on the value of _skipValidation, so any changes to
+     * the value of _skipValidation would leave the SignatureValidator in an inconsistent state.
+     */
+    const bool _secureMode;
     const bool _skipValidation;
+
+private:
+    rnp::RnpContext _rnpCtx;
 };
 
 }  // namespace mongo::extension::host

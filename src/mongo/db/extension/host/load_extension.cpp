@@ -50,7 +50,7 @@
 #include <stdexcept>
 #include <string>
 
-#ifdef MONGO_HOST_RNP_SIG_VALIDATION_COMPATIBLE
+#ifdef MONGO_HOST_EXTENSIONS_COMPATIBLE
 #include "mongo/db/extension/host/signature_validator.h"
 #endif
 
@@ -125,7 +125,7 @@ host_connector::ExtensionHandle getMongoExtension(SharedLibrary& extensionLib,
 stdx::unordered_map<std::string, LoadedExtension> ExtensionLoader::loadedExtensions;
 
 bool loadExtensions(const std::vector<std::string>& extensionNames) {
-#ifdef MONGO_HOST_RNP_SIG_VALIDATION_COMPATIBLE
+#ifdef MONGO_HOST_EXTENSIONS_COMPATIBLE
     if (!feature_flags::gFeatureFlagExtensionsAPI.isEnabled()) {
         if (!extensionNames.empty()) {
             LOGV2_ERROR(10668500,
@@ -206,7 +206,7 @@ ExtensionConfig ExtensionLoader::loadExtensionConfig(const std::string& extensio
 }
 
 void ExtensionLoader::load(const std::string& name, const ExtensionConfig& config) {
-#ifdef MONGO_HOST_RNP_SIG_VALIDATION_COMPATIBLE
+#ifdef MONGO_HOST_EXTENSIONS_COMPATIBLE
     SignatureValidator signatureValidator;
     return ExtensionLoader::load(name, config, signatureValidator);
 #else
@@ -214,7 +214,7 @@ void ExtensionLoader::load(const std::string& name, const ExtensionConfig& confi
 #endif
 }
 
-#ifdef MONGO_HOST_RNP_SIG_VALIDATION_COMPATIBLE
+#ifdef MONGO_HOST_EXTENSIONS_COMPATIBLE
 void ExtensionLoader::load(const std::string& name,
                            const ExtensionConfig& config,
                            const SignatureValidator& signatureValidator) {

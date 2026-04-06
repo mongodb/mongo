@@ -82,7 +82,7 @@ public:
      * compatibility, and calls the extension initialization function.
      */
     static void load(const std::string& name, const ExtensionConfig& config);
-#ifdef MONGO_HOST_RNP_SIG_VALIDATION_COMPATIBLE
+#ifdef MONGO_HOST_EXTENSIONS_COMPATIBLE
     static void load(const std::string& name,
                      const ExtensionConfig& config,
                      const class SignatureValidator& signatureValidator);

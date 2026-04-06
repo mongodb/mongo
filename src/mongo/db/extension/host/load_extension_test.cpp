@@ -60,14 +60,6 @@ extern "C" int __lsan_is_turned_off() {
 
 namespace mongo::extension::host {
 
-namespace {
-const std::string& getPublicKeyPath() {
-    static std::string kPublicKeyPath = mongo::extension::host::test_util::getExtensionDirectory() /
-        "test_extensions_signing_keys" / "test_extensions_signing_public_key.asc";
-    return kPublicKeyPath;
-}
-}  // namespace
-
 class LoadExtensionsTest : public unittest::Test {
 protected:
     LoadExtensionsTest() : expCtx(make_intrusive<ExpressionContextForTest>()) {}
@@ -84,7 +76,8 @@ protected:
     void setUp() override {
         _previousExtensionsSignaturePublicKeyPath =
             serverGlobalParams.extensionsSignaturePublicKeyPath;
-        serverGlobalParams.extensionsSignaturePublicKeyPath = getPublicKeyPath();
+        serverGlobalParams.extensionsSignaturePublicKeyPath =
+            mongo::extension::host::test_util::getPublicKeyPath();
     }
     void tearDown() override {
         if (!_previousExtensionsSignaturePublicKeyPath.empty()) {
@@ -118,7 +111,10 @@ protected:
         NamespaceString::createNamespaceString_forTest(boost::none, "load_extension_test");
 
 private:
-    RAIIServerParameterControllerForTest _featureFlag{"featureFlagExtensionsAPI", true};
+    RAIIServerParameterControllerForTest _featureFlagExtensionsAPI{"featureFlagExtensionsAPI",
+                                                                   true};
+    RAIIServerParameterControllerForTest _featureFlagExtensionsApiSignatureValidation{
+        "featureFlagExtensionsApiSignatureValidation", true};
     std::string _previousExtensionsSignaturePublicKeyPath{""};
 };
 

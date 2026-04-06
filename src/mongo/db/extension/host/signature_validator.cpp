@@ -31,10 +31,13 @@
 #include "mongo/db/extension/host/signature_validator.h"
 
 #include "mongo/db/extension/host/mongot_extension_signing_key.h"
+#include "mongo/db/extension/host/rnp/rnp.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
 
+#include <filesystem>
 #include <fstream>
 
 #include <fmt/format.h>
@@ -43,50 +46,41 @@
 
 namespace mongo::extension::host {
 
-namespace {
-
-// Note, this function should only be called if we are not skipping validation, since we expect a
-// non-empty extensionValidationPublicKeyPath.
-// TODO SERVER-115289: Revisit public key management depending on library implementation.
-const std::string& getValidationPublicKey() {
-#ifndef MONGO_CONFIG_EXT_SIG_SECURE
-    static const std::string kPublicKey = []() {
-        const auto& extensionValidationPublicKeyPath =
-            serverGlobalParams.extensionsSignaturePublicKeyPath;
-        tassert(11528801,
-                "extensionsSignaturePublicKeyPath was empty!",
-                !extensionValidationPublicKeyPath.empty());
-        LOGV2_DEBUG(11528803,
-                    4,
-                    "SignatureValidator using public key path",
-                    "extensionValidationPublicKeyPath"_attr = extensionValidationPublicKeyPath);
-        std::ifstream in(extensionValidationPublicKeyPath);
-        tassert(11528802,
-                fmt::format("Failed to open signature file: {}", extensionValidationPublicKeyPath),
-                in);
-        std::string contents((std::istreambuf_iterator<char>(in)),
-                             std::istreambuf_iterator<char>());
-        return contents;
-    }();
-#else
-    static const std::string kPublicKey(kMongoExtensionSigningPublicKey);
-#endif
-    return kPublicKey;
-}
-}  // namespace
-
 SignatureValidator::SignatureValidator()
-    : _skipValidation([]() {
-// TODO SERVER-115289: Remove ENABLE_SIGNATURE_VALIDATOR guard for skipValidation.
-#ifdef ENABLE_SIGNATURE_VALIDATOR
-#ifndef MONGO_CONFIG_EXT_SIG_SECURE
-          return serverGlobalParams.extensionsSignaturePublicKeyPath.empty();
+    : SignatureValidator([]() {
+#ifdef MONGO_CONFIG_EXT_SIG_SECURE
+          return true;
 #else
           return false;
 #endif
-#else
-          return true;
-#endif
+      }()) {
+}
+
+SignatureValidator::SignatureValidator(bool secureMode)
+    : _secureMode(secureMode), _skipValidation([&]() {
+          /**
+           * featureFlagExtensionsApiSignatureValidation is only configurable at start-up, and can
+           * never be modified at runtime. This feature flag is in place to allow us to disable
+           * signature verification if an issue is found during the Atlas roll-out of 9.0. If an
+           * issue is found during roll-out, we'll continue loading extensions on Atlas, but we'll
+           * flip this feature flag off to skip signature verification. Instead, we'll continue to
+           * rely on the automation agent to verify the authenticity of the binaries as we did in
+           * the 8.3 release.
+           *
+           * Once the signature verification feature is full verified by Atlas roll-out, we'll
+           * remove this feature flag so signature verification is always mandatory in on-premise
+           * deployments.
+           */
+          if (!feature_flags::gFeatureFlagExtensionsApiSignatureValidation.isEnabled()) {
+              LOGV2_DEBUG(11528919,
+                          4,
+                          "featureFlagExtensionsApiSignatureValidation is disabled, skipping "
+                          "signature validation");
+              return true;
+          }
+          // When running in insecure mode, signature validation should be skipped if
+          // extensionSignaturePublicKeyPath has not been provided to the server.
+          return secureMode ? false : serverGlobalParams.extensionsSignaturePublicKeyPath.empty();
       }()) {
     LOGV2_DEBUG(11528804, 4, "Initializing SignatureValidator");
 
@@ -94,14 +88,12 @@ SignatureValidator::SignatureValidator()
         LOGV2_DEBUG(11528805, 4, "Skipping signature validation");
         return;
     }
-    // TODO SERVER-115289: Initialize implementation specific context and import key into keyring.
+    /* initialize Rnp context and import validation public key into the keyring (i.e rnpCtx) */
+    _rnpCtx.initialize();
+    _rnpCtx.importKey(_getValidationPublicKeyAsRnpInput());
 }
 
-SignatureValidator::~SignatureValidator() {
-    if (_skipValidation) {
-        return;
-    }
-}
+SignatureValidator::~SignatureValidator() {}
 
 void SignatureValidator::validateExtensionSignature(const std::string& extensionName,
                                                     const std::string& extensionPath) const {
@@ -109,6 +101,57 @@ void SignatureValidator::validateExtensionSignature(const std::string& extension
         LOGV2_DEBUG(11528806, 4, "Skipping signature validation");
         return;
     }
-    // TODO SERVER-115289: Implement signature validation.
+
+    LOGV2_DEBUG(11528830,
+                4,
+                "Verifying signature for extension",
+                "extensionName"_attr = extensionName,
+                "path"_attr = extensionPath);
+
+    const std::string extensionSignaturePath = extensionPath + ".sig";
+    uassert(11528810,
+            fmt::format("Failed to verify extension signature for extension: {}. Extension path "
+                        "did not end with .so, got: '{}'",
+                        extensionName,
+                        extensionPath),
+            extensionPath.ends_with(".so"));
+    uassert(11528923,
+            fmt::format("Failed to verify extension signature for extension: {}. Extension "
+                        "signature path '{}' did not exist",
+                        extensionName,
+                        extensionSignaturePath),
+            std::filesystem::exists(extensionSignaturePath));
+    try {
+        _rnpCtx.verifyDetachedSignature(extensionPath, extensionSignaturePath);
+    } catch (DBException& exc) {
+        uasserted(11528920,
+                  fmt::format("Failed to verify extension signature for extension: {}, with "
+                              "signature: {}. Reason: {}",
+                              extensionName,
+                              extensionSignaturePath,
+                              exc.what()));
+    }
+}
+
+/**
+ * This function should only be called if we aren't skipping validation (i.e_skipValidation=false),
+ * since we expect a non-empty extensionValidationPublicKeyPath in insecure mode.
+ */
+rnp::RnpInput SignatureValidator::_getValidationPublicKeyAsRnpInput() const {
+    if (_secureMode) {
+        static const std::string kPublicKey(kMongoExtensionSigningPublicKey);
+        return rnp::RnpInput::createFromMemory(kPublicKey, false);
+    }
+
+    const auto& extensionValidationPublicKeyPath =
+        serverGlobalParams.extensionsSignaturePublicKeyPath;
+    tassert(11528904,
+            "extensionsSignaturePublicKeyPath was empty!",
+            !extensionValidationPublicKeyPath.empty());
+    LOGV2_DEBUG(11528905,
+                4,
+                "SignatureValidator using public key path",
+                "extensionValidationPublicKeyPath"_attr = extensionValidationPublicKeyPath);
+    return rnp::RnpInput::createFromPath(extensionValidationPublicKeyPath);
 }
 }  // namespace mongo::extension::host
