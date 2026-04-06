@@ -228,6 +228,13 @@ bool ReplicatedFastCountManager::isRunning_ForTest() {
 
 void ReplicatedFastCountManager::_acquireAndFlush(OperationContext* opCtx,
                                                   const FastSizeCountMap& dirtyMetadata) {
+    // Flushing the logical size and metadata checkpoint is an internal maintenance operation that
+    // should not be blocked by admission control. Metadata checkpoint persistence must not fall
+    // behind to prevent compounding lag from impacting accurate and speedy reading and writing of
+    // collection sizes and counts.
+    ScopedAdmissionPriority<ExecutionAdmissionContext> skipTicketAcquisition(
+        opCtx, AdmissionContext::Priority::kExempt);
+
     auto acquisition = replicated_fast_count::acquireFastCountCollectionForWrite(opCtx);
     massert(ErrorCodes::NamespaceNotFound, "Expected fastcount collection to exist", acquisition);
 
