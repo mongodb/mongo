@@ -16,7 +16,7 @@ _WASI_SDK_DIST = {
         "sha256": "2c2ed99296857e60fd14c3f40fe226231f296409502491094704089c31a16740",
         "stripPrefix": "wasi-sdk-30.0-arm64-macos",
     },
-    ("macos", "amd64"): {
+    ("macos", "x86_64"): {
         "url": "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-30/wasi-sdk-30.0-x86_64-macos.tar.gz",
         "sha256": "1594a0791309781bf0d0224431c3556ec4a2326b205687b659f6550d08d8b13e",
         "stripPrefix": "wasi-sdk-30.0-x86_64-macos",

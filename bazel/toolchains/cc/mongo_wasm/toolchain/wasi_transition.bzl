@@ -3,6 +3,7 @@ def _impl(settings, attr):
     return {
         "//command_line_option:extra_toolchains": "//bazel/toolchains/cc/mongo_wasm/toolchain:wasi_cc_toolchain_wasip2",
         "//command_line_option:platforms": "//bazel/platforms:wasm32",
+        "//bazel/config:compiler_type": "clang",
         "//bazel/config:libunwind": "off",
         "//bazel/config:allocator": "system",
         "//bazel/config:ssl": False,
@@ -13,6 +14,8 @@ def _impl(settings, attr):
         "//bazel/config:msan": False,
         "//bazel/config:tsan": False,
         "//bazel/config:ubsan": False,
+        "//bazel/config:gcov": False,
+        "//bazel/config:coverage": False,
     }
 
 wasi_transition = transition(
@@ -21,6 +24,7 @@ wasi_transition = transition(
     outputs = [
         "//command_line_option:extra_toolchains",
         "//command_line_option:platforms",
+        "//bazel/config:compiler_type",
         "//bazel/config:libunwind",
         "//bazel/config:allocator",
         "//bazel/config:linkstatic",
@@ -31,5 +35,7 @@ wasi_transition = transition(
         "//bazel/config:tsan",
         "//bazel/config:ubsan",
         "//bazel/config:ssl",
+        "//bazel/config:gcov",
+        "//bazel/config:coverage",
     ],
 )

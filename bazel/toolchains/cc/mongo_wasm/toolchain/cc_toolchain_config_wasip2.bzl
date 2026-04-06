@@ -98,6 +98,30 @@ def _wasi_cc_toolchain_config_wasip2_impl(ctx):
 
                 # WASI platform lacks syslog support
                 "-DBOOST_LOG_WITHOUT_SYSLOG",
+                "-Wall",
+                "-Werror",
+
+                # Warnings that are also disabled in our
+                # C++ compilations
+                "-Wno-unused-function",
+                "-Wno-defaulted-function-deleted",
+                "-Wno-unknown-pragmas",
+                "-Wno-builtin-macro-redefined",
+                "-Wno-unused-local-typedefs",
+                "-Wno-unused-lambda-capture",
+                "-Wno-deprecated-declarations",
+                "-Wno-unused-const-variable",
+                "-Wno-deprecated-this-capture",
+                "-Wno-undefined-var-template",
+                "-Wno-unused-private-field",
+                "-Wno-potentially-evaluated-expression",
+                "-Wno-missing-braces",
+                "-Wno-tautological-constant-out-of-range-compare",
+                "-Wno-tautological-constant-compare",
+                "-Wno-tautological-unsigned-zero-compare",
+                "-Wno-tautological-unsigned-enum-zero-compare",
+                "-Wno-inconsistent-missing-override",
+                "-Wno-instantiation-after-specialization",
             ])],
         )],
     )
@@ -111,6 +135,7 @@ def _wasi_cc_toolchain_config_wasip2_impl(ctx):
             flag_groups = [flag_group(flags = [
                 "-std=c++20",
                 "-fexceptions",
+                "-Wno-non-virtual-dtor",
 
                 # Include headers for declarations needed by third-party code
                 "-include",
@@ -226,6 +251,13 @@ def _wasi_cc_toolchain_config_wasip2_impl(ctx):
             external_include_paths_feature,
             feature(name = "archive_param_file", enabled = True),
             feature(name = "supports_dynamic_linker", enabled = False),
+            # Override Bazel's built-in coverage feature with a no-op.
+            # The WASI SDK does not ship libclang_rt.profile.a, so coverage
+            # instrumentation cannot work on wasm32 targets.  Without this
+            # explicit (empty) feature, `bazel coverage` injects the default
+            # -fprofile-instr-generate/-fcoverage-mapping flags, which cause
+            # a link failure.
+            feature(name = "coverage"),
         ],
     )]
 
