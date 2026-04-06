@@ -17,11 +17,14 @@ def _basename_no_git(url):
 def _spidermonkey_repository_impl(rctx):
     repo_url = _strip(rctx.read(rctx.attr.repository_file))
     version = _strip(rctx.read(rctx.attr.version_file))
+    sha256 = _strip(rctx.read(rctx.attr.sha256_file))
 
     if not repo_url:
         fail("spidermonkey_repository: repository_file was empty")
     if not version:
         fail("spidermonkey_repository: version_file was empty")
+    if not sha256:
+        fail("spidermonkey_repository: sha256_file was empty")
 
     # Normalize.
     if repo_url.endswith("/"):
@@ -36,13 +39,9 @@ def _spidermonkey_repository_impl(rctx):
     archive_url = "{}/archive/refs/tags/{}.tar.gz".format(repo_url, version)
     strip_prefix = "{}-{}".format(repo_name, version)
 
-    if not rctx.attr.sha256:
-        # buildifier: disable=print
-        print("WARNING: spidermonkey_repository: sha256 not set for %s; download integrity will not be verified." % archive_url)
-
     rctx.download_and_extract(
         url = archive_url,
-        sha256 = rctx.attr.sha256,
+        sha256 = sha256,
         stripPrefix = strip_prefix,
     )
 
@@ -73,8 +72,7 @@ spidermonkey_repository = repository_rule(
         # Labels in the main workspace that contain the repo URL and tag/version.
         "repository_file": attr.label(mandatory = True, allow_single_file = True),
         "version_file": attr.label(mandatory = True, allow_single_file = True),
-        # Optional, but recommended for hermeticity. If empty, Bazel will not verify.
-        "sha256": attr.string(default = ""),
+        "sha256_file": attr.label(mandatory = True, allow_single_file = True),
     },
     doc = "Downloads SpiderMonkey/Firefox source from a repo+tag stored in files, and exposes `:mach` and `:srcs`.",
 )

@@ -135,3 +135,20 @@ buildvariants:
     stepback: false
     tasks:
       - name: upload_sbom_via_silkbomb_if_changed
+
+  # This variant is used to create a new spidermonkey-wasip2-release.tar.gz file
+  # Its not included as part of the regular build due to its size, complexity and
+  # non-hermeticity.
+  - name: spidermonkey-wasm-compile
+    display_name: "SpiderMonkey WASM Compile & Upload"
+    tags: ["assigned_to_jira_team_server_query_integration"]
+    patch_only: true
+    run_on:
+      - amazon2023-arm64-latest-large
+    expansions:
+      compile_variant: spidermonkey-wasm-compile
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    tasks:
+      - name: build_and_upload_spidermonkey_wasm_TG

@@ -53,7 +53,15 @@ if [ -z "$REAL_HOME" ]; then
     fi
 fi
 export HOME="$REAL_HOME"
+export PATH="$HOME/.cargo/bin:$PATH"
 export MOZ_FETCHES_DIR="$HOME/.mozbuild"
+
+# Install rustup + cargo if not available (e.g. fresh CI hosts).
+if ! command -v cargo >/dev/null 2>&1; then
+    echo "cargo not found; installing rustup..." >&2
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+    export PATH="$HOME/.cargo/bin:$PATH"
+fi
 
 # --- Locate WASI SDK ---
 if [ -z "${WASI_SDK_PATH:-}" ]; then
@@ -114,8 +122,22 @@ export CC="$WASI_SDK_PATH/bin/wasm32-wasip2-clang"
 export CXX="$WASI_SDK_PATH/bin/wasm32-wasip2-clang++"
 export AR="$WASI_SDK_PATH/bin/llvm-ar"
 export RANLIB="$WASI_SDK_PATH/bin/llvm-ranlib"
-export HOST_CC="$(command -v clang)"
-export HOST_CXX="$(command -v clang++)"
+# HOST_CC is passed in from the Bazel genrule via $(CC). It may be a relative
+# path under Bazel's execroot, so resolve it to an absolute path.
+if [ -z "${HOST_CC:-}" ]; then
+    echo "ERROR: HOST_CC not set; expected from Bazel \$(CC) toolchain variable." >&2
+    exit 1
+fi
+case "$HOST_CC" in
+/*) ;; # already absolute
+*) HOST_CC="$EXECROOT/$HOST_CC" ;;
+esac
+case "$HOST_CC" in
+*gcc) export HOST_CXX="${HOST_CC/%gcc/g++}" ;;
+*clang) export HOST_CXX="${HOST_CC}++" ;;
+*cc) export HOST_CXX="${HOST_CC/%cc/c++}" ;;
+*) export HOST_CXX="${HOST_CC}++" ;;
+esac
 
 # Enable per-function/data sections so the linker's --gc-sections can remove
 # unused code.  Also hide internal symbols to aid dead-code elimination.
@@ -128,13 +150,22 @@ export RUST_TARGET=wasm32-wasip2
 
 # Configure expects a Rust stdlib for wasm32-wasip2 to be installed.
 # This is a local (non-hermetic) build step by design (tags = local/no-sandbox).
-if [ -x "$HOME/.cargo/bin/rustup" ]; then
-    "$HOME/.cargo/bin/rustup" target add wasm32-wasip2 || true
-elif command -v rustup >/dev/null 2>&1; then
+if command -v rustup >/dev/null 2>&1; then
     rustup target add wasm32-wasip2 || true
 fi
 
 export MOZCONFIG="$MOZCONFIG"
+
+# cbindgen is required by SpiderMonkey's configure step.
+if ! command -v cbindgen >/dev/null 2>&1; then
+    echo "cbindgen not found; installing via cargo..." >&2
+    if ! command -v cargo >/dev/null 2>&1; then
+        echo "ERROR: cargo not found; cannot install cbindgen" >&2
+        exit 1
+    fi
+    cargo install cbindgen
+fi
+
 cd "$SRC_ROOT_REAL"
 python3 "./mach" -v --no-interactive build
 

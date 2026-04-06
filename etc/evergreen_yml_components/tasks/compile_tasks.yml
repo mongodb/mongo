@@ -1387,6 +1387,44 @@ tasks:
             - "https://mdb-build-public.s3.us-east-1.amazonaws.com/profiling_data/pgo/mongod_${revision}_${build_arch}_gcc_lto_pgo_${version}.tgz"
             - "${branch_name}"
             - "SERVER-110427-${revision}"
+
+  - name: build_and_upload_spidermonkey_wasm
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: //src/mongo/scripting/mozjs/wasm:spidermonkey_wasip2_dist_release_from_source
+          bazel_args: >-
+            --config=evg
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - "-c"
+            - |
+              cd src
+              sm_version=$(cat src/mongo/scripting/mozjs/wasm/spider-monkey/spider-monkey-version | tr -d '[:space:]')
+              echo "spidermonkey_version: $sm_version" > spidermonkey_expansions.yml
+      - command: expansions.update
+        params:
+          file: src/spidermonkey_expansions.yml
+      - func: "f_expansions_write"
+      - command: s3.put
+        params:
+          aws_key: ${aws_key_build}
+          aws_secret: ${aws_secret_build}
+          local_file: src/bazel-bin/src/mongo/scripting/mozjs/wasm/spidermonkey-wasip2-release.tar.gz
+          remote_file: spidermonkey-wasm/${spidermonkey_version}/spidermonkey-wasip2-release.tar.gz
+          bucket: mdb-build-public
+          permissions: public-read
+          # Do not remove this, it is not safe to overwrite identical versions as they might not be hash perfect
+          skip_existing: true
+          content_type: application/gzip
+          display_name: SpiderMonkey WASI P2 Release
+
   - name: publish_crypt_packages
     run_on: rhel8.7-small
     tags: [
@@ -1493,6 +1531,11 @@ task_groups:
     name: rseq_kernel_compatibility_check_TG
     tasks:
       - rseq_kernel_compatibility_check_jstest
+
+  - <<: *compile_bazel_task_group_template
+    name: build_and_upload_spidermonkey_wasm_TG
+    tasks:
+      - build_and_upload_spidermonkey_wasm
 
   # We want to run these sequentially to put less load on the cluster
   - <<: *compile_task_group_template

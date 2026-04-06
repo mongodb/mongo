@@ -64,9 +64,9 @@ spidermonkey_wasi_repo = use_repo_rule(
 
 spidermonkey_wasi_repo(
     name = "spidermonkey_wasi",
-    sha256 = "f528e5730721559781aef47d355079da63185588bb14ebb6bf5266d4aa5e3eb0",
+    sha256 = "e89f9a9959555bb08444412600e6a4594125e15d68145f97c6d88e6395be1d6b",
     urls = [
-        "https://mdb-build-public.s3.us-east-1.amazonaws.com/wasm_scratch/spidermonkey-wasip2-release.tar.gz",
+        "https://mdb-build-public.s3.amazonaws.com/spidermonkey-wasm/FIREFOX_140_6_0esr_RELEASE/69d013e89378880007aaa010/spidermonkey-wasip2-release.tar.gz",
     ] * 5,
 )
 
@@ -485,5 +485,6 @@ spidermonkey_repo = use_repo_rule(
 spidermonkey_repo(
     name = "spidermonkey",
     repository_file = "//src/mongo/scripting/mozjs/wasm/spider-monkey:spider-monkey-repository",
+    sha256_file = "//src/mongo/scripting/mozjs/wasm/spider-monkey:spider-monkey-sha256sum",
     version_file = "//src/mongo/scripting/mozjs/wasm/spider-monkey:spider-monkey-version",
 )

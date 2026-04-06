@@ -13,6 +13,8 @@ exports_files(
 )
 
 # Build SpiderMonkey tarball from source (manual, for re-uploading to S3).
+# If you want to try it locally replace spidermonkey_wasi module url with
+# file://<local_path>
 genrule(
     name = "spidermonkey_wasip2_dist_release_from_source",
     srcs = [
@@ -28,6 +30,7 @@ genrule(
       export SPIDER_MACH_PATH="$(location @spidermonkey//:mach)"
       export RUST_SHIMS_LIB_RS="$(location support/rust_shims/src/lib.rs)"
       export CARGO_TEMPLATE_PATH="$(location support/rust_shims/Cargo.toml.template)"
+      export HOST_CC="$(CC)"
       export OUTPUT="$@"
       bash $(location scripts/build_spidermonkey_wasip2.sh)
     """,
@@ -36,6 +39,7 @@ genrule(
         "manual",
         "no-sandbox",
     ],
+    toolchains = ["@bazel_tools//tools/cpp:current_cc_toolchain"],
     tools = [
         "@wasi_sdk//:bin",
     ],
