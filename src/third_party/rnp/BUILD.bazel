@@ -212,7 +212,10 @@ cc_library(
     }),
     local_defines = [
         "HAVE_CONFIG_H",
-    ],
+    ] + select({
+        "//bazel/config:any_sanitizer_required_setting": ["SHA1DC_FORCE_ALIGNED_ACCESS"],
+        "//conditions:default": [],
+    }),
     target_compatible_with = _RNP_PLATFORM,
     deps = [
         ":rnp_common",
