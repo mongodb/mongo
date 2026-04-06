@@ -67,11 +67,11 @@ using test::ContainerTraits;
 using test::FileTraits;
 
 template <typename Traits>
-void skipContainerBasedTestInDebugBuild() {
+constexpr bool shouldSkipContainerBasedTestInDebugBuild() {
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
-    if constexpr (std::is_same_v<Traits, ContainerTraits>) {
-        GTEST_SKIP() << "Skipping container based instantiation due to being a debug build";
-    }
+    return std::is_same_v<Traits, ContainerTraits>;
+#else
+    return false;
 #endif
 }
 
@@ -736,7 +736,9 @@ TYPED_TEST(SorterTypedTest, LimitExtremes) {
 }
 
 TYPED_TEST(SorterTypedTest, AggressiveSpilling) {
-    skipContainerBasedTestInDebugBuild<TypeParam>();
+    if constexpr (shouldSkipContainerBasedTestInDebugBuild<TypeParam>()) {
+        GTEST_SKIP() << "Skipping container based instantiation due to being a debug build";
+    }
 
     for (auto shuffleMode : {ShuffleMode::kNoShuffle, ShuffleMode::kShuffle}) {
         this->resetFixtureSpillDir();
@@ -754,7 +756,9 @@ TYPED_TEST(SorterTypedTest, AggressiveSpilling) {
 }
 
 TYPED_TEST(SorterTypedTest, LotsOfDataWithLimit) {
-    skipContainerBasedTestInDebugBuild<TypeParam>();
+    if constexpr (shouldSkipContainerBasedTestInDebugBuild<TypeParam>()) {
+        GTEST_SKIP() << "Skipping container based instantiation due to being a debug build";
+    }
 
     constexpr auto limits = std::array{1ull, 100ull, 5000ull};
 
