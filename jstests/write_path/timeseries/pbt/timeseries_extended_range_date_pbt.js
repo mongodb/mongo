@@ -17,7 +17,7 @@ import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 import {makeEmptyModel} from "jstests/write_path/timeseries/pbt/lib/command_grammar.js";
 import {makeTimeseriesCommandSequenceArb} from "jstests/write_path/timeseries/pbt/lib/command_arbitraries.js";
-import {assertCollectionsMatch} from "jstests/write_path/timeseries/pbt/lib/assertions.js";
+import {assertCollectionValid, assertCollectionsMatch} from "jstests/write_path/timeseries/pbt/lib/assertions.js";
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {getFcParams, getFcAssertArgs} from "jstests/write_path/timeseries/pbt/lib/fast_check_params.js";
 const fcParams = getFcParams();
@@ -211,6 +211,8 @@ describe("Basic comparative PBT for timeseries inserts", () => {
                         const model = makeEmptyModel(ctrlColl, bucketColl);
                         fc.modelRun(() => ({model: model, real: {tsColl, ctrlColl}}), cmds);
                         assertCollectionsMatch(tsColl, ctrlColl);
+                        // TODO (SERVER-118945): Re-enable collection validation after fixing the found bug(s)
+                        // assertCollectionValid(tsColl);
                         stats = cmds.commands.reduce(commandMeasurementStatsReducer, stats);
                         stats = tsColl.find().toArray().reduce(measurementsQueryStatsReducer, stats);
                         stats = getTimeseriesCollForRawOps(tsColl.getDB(), tsColl)

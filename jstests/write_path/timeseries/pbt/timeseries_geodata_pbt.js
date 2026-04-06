@@ -21,7 +21,7 @@ import {
     makeGeoPointArb,
     makeGeospatialQueryArb,
 } from "jstests/write_path/timeseries/pbt/lib/geodata_arbitraries.js";
-import {assertCollectionsMatch} from "jstests/write_path/timeseries/pbt/lib/assertions.js";
+import {assertCollectionValid, assertCollectionsMatch} from "jstests/write_path/timeseries/pbt/lib/assertions.js";
 import {getFcParams, getFcAssertArgs} from "jstests/write_path/timeseries/pbt/lib/fast_check_params.js";
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
@@ -80,6 +80,7 @@ describe("Geospatial Query Comparative Test for Timeseries", () => {
                     const model = makeEmptyModel(ctrlColl, bucketColl);
                     fc.modelRun(() => ({model: model, real: {tsColl, ctrlColl}}), cmds);
                     assertCollectionsMatch(tsColl, ctrlColl);
+                    assertCollectionValid(tsColl);
                 })
                 .beforeEach(beforeHook),
             fcAssertArgs,
@@ -115,6 +116,7 @@ describe("Geospatial Query Comparative Test for Timeseries", () => {
                         for (const query of queries) {
                             assertCollectionsMatch(tsColl, ctrlColl, query);
                         }
+                        assertCollectionValid(tsColl);
                     },
                 )
                 .beforeEach(beforeHook),

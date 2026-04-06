@@ -5,6 +5,17 @@
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 /**
+ * Assert that the timeseries collection passes MongoDB's validate() check.
+ *
+ * @param {DBCollection} tsColl timeseries collection to validate
+ */
+export function assertCollectionValid(tsColl) {
+    const result = tsColl.validate();
+    assert(result.valid, () => ({message: "tsColl failed validation", result: result}));
+    assert.eq(result.warnings.length, 0, () => ({message: "tsColl validation produced warnings", result: result}));
+}
+
+/**
  * Compare the results of a query against a timeseries collection and standard collection which should be identical.
  *
  * @param {DBCollection} tsColl timeseries collection representing "actual" state

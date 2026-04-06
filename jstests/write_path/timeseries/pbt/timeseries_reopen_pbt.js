@@ -23,7 +23,7 @@ import {
     makeBatchInsertCommandArb,
     makeInsertOldBucketCommandArb,
 } from "jstests/write_path/timeseries/pbt/lib/command_arbitraries.js";
-import {assertCollectionsMatch} from "jstests/write_path/timeseries/pbt/lib/assertions.js";
+import {assertCollectionValid, assertCollectionsMatch} from "jstests/write_path/timeseries/pbt/lib/assertions.js";
 import {getFcParams, getFcAssertArgs} from "jstests/write_path/timeseries/pbt/lib/fast_check_params.js";
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
@@ -92,6 +92,7 @@ describe("PBT exercising bucket reopening via InsertOldBucketCommand", () => {
                     const model = makeEmptyModel(ctrlColl, bucketColl);
                     fc.modelRun(() => ({model, real: {tsColl, ctrlColl}}), cmds);
                     assertCollectionsMatch(tsColl, ctrlColl);
+                    assertCollectionValid(tsColl);
 
                     // Accumulate command type counts.
                     for (const cmd of cmds.commands) {

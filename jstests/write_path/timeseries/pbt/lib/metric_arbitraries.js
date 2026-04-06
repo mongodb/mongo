@@ -81,6 +81,33 @@ function _defaultDecimalRange(decimalRange) {
         scale: decimalRange?.scale ?? 6,
     };
 }
+
+// Simple Uint8Array to base64 encoder (works in mongo shell / plain JS)
+const base64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+function uint8ToBase64(bytes) {
+    let out = "";
+    let i = 0;
+
+    while (i < bytes.length) {
+        const b0 = bytes[i++] || 0;
+        const b1 = i < bytes.length ? bytes[i++] : NaN;
+        const b2 = i < bytes.length ? bytes[i++] : NaN;
+
+        const c0 = b0 >> 2;
+        const c1 = ((b0 & 0x03) << 4) | (isNaN(b1) ? 0 : b1 >> 4);
+        const c2 = isNaN(b1) ? 64 : ((b1 & 0x0f) << 2) | (isNaN(b2) ? 0 : b2 >> 6);
+        const c3 = isNaN(b2) ? 64 : b2 & 0x3f;
+
+        out += base64Chars[c0];
+        out += base64Chars[c1];
+        out += c2 === 64 ? "=" : base64Chars[c2];
+        out += c3 === 64 ? "=" : base64Chars[c3];
+    }
+
+    return out;
+}
+
 /**
  * Make a "single metric" arbitrary. Currently supports most BSON primitive types,
  * still does not support arrays, sub-objects, or regex.
@@ -171,10 +198,40 @@ export function makeMetricArb(types, ranges = {}) {
     }
     if (typeList.includes("binData")) {
         // Keep sizes small and hex-based.
+        //
+        // Subtypes 2, 3, 12, 14, and 15 are deprecated and excluded from generation.
+        //
+        // Subtype 7 (Compressed BSON column) is a MongoDB-internal format used for timeseries bucket
+        // payloads; it is not a user-facing type and should not appear as a measurement field value,
+        // so we exclude it entirely.
+        //
+        // Subtype 6 (Encrypted BSON Value) is a legitimate user-facing type (FLE-encrypted fields can
+        // be stored in timeseries collections), so we keep it in coverage but generate structurally
+        // valid payloads via encryptedBinDataArb. MongoDB's validate() inspects byte 0 of a subtype-6
+        // payload as the FLE algorithm type and rejects any value other than 1 (deterministic) or 2
+        // (random) with a non-conformant BSON warning, causing assertCollectionValid() to fail. We
+        // therefore fix byte 0 to one of the two valid algorithm types and fill the remaining 11 bytes
+        // with random hex data.
+        const _excludedSubtypes = new Set([2, 3, 6, 7, 12, 14, 15]);
+        const _genericSubtypes = Array.from({length: 256}, (_, i) => i).filter((n) => !_excludedSubtypes.has(n));
+        const subtypeArb = fc.constantFrom(..._genericSubtypes);
+        const genericBinDataArb = fc
+            .tuple(subtypeArb, fc.base64String({minLength: 24, maxLength: 2048}))
+            .map(([subtype, data]) => BinData(subtype, data));
+        const encryptedBinDataArb = fc
+            .tuple(fc.constantFrom(1, 2), fc.uint8Array({minLength: 23, maxLength: 1023}))
+            .map(([algType, rest]) => {
+                const buf = new Uint8Array(1 + rest.length);
+                buf[0] = algType; // fix byte 0 to valid algorithm type
+                buf.set(rest, 1);
+                const base64 = uint8ToBase64(buf);
+                return BinData(6, base64); // subtype 6 = Encrypt
+            });
         bsonPrimitiveMetricTypes.push(
-            fc
-                .tuple(fc.integer({min: 0, max: 255}), fc.string({minLength: 24, maxLength: 24, unit: hexa()}))
-                .map(([subtype, hex]) => HexData(subtype, hex)),
+            fc.oneof(
+                {arbitrary: genericBinDataArb, weight: _genericSubtypes.length},
+                {arbitrary: encryptedBinDataArb, weight: 1},
+            ),
         );
     }
     if (typeList.includes("javascript")) {
