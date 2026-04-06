@@ -3,9 +3,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "serialNumber": "urn:uuid:2d7fbf85-c8b6-4f90-9966-70da88224a36",
-  "version": 1,
+  "version": 2,
   "metadata": {
-    "timestamp": "2026-04-01T06:50:23Z",
+    "timestamp": "2026-04-03T06:07:25Z",
     "lifecycles": [
       {
         "phase": "pre-build"
@@ -63,7 +63,7 @@
       "services": [
         {
           "name": "Endor Labs Inc",
-          "version": "v1.7.870"
+          "version": "v1.7.912"
         }
       ]
     }
