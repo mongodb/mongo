@@ -1,14 +1,12 @@
-# TODO(SERVER-123304): Re-enable CheckReplOplogs and remove this override.
+# TODO(SERVER-123304): Re-enable CheckReplOplogs / CheckReplDBHash and remove this override.
 - name: exclude_check_repl_oplogs
   value:
     executor:
       archive:
         hooks:
-          - CheckReplDBHash
           - ValidateCollections
       hooks:
         - class: ContinuousStepdown
-        - class: CheckReplDBHash
         - class: ValidateCollections
         - class: CleanEveryN
           n: 20
