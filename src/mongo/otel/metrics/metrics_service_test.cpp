@@ -30,6 +30,8 @@
 #include "mongo/otel/metrics/metrics_service.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/bson/bson_matcher.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
@@ -51,6 +53,7 @@ namespace {
 class MetricsServiceTest : public testing::Test {
 public:
     void SetUp() override {
+        clearGlobalMetricTreeSetForTests();
         metricsService = std::make_unique<MetricsService>();
     }
 
@@ -217,8 +220,16 @@ struct AlternativeScalarWidthMetricType<Histogram<double>> {
 template <typename T>
 class MetricCreationTest : public MetricsServiceTest {};
 
+using testing::_;
+using testing::Contains;
 using testing::ElementsAre;
 using testing::ElementsAreArray;
+using testing::Matcher;
+using testing::UnorderedElementsAre;
+using unittest::match::BSONElementEQ;
+using unittest::match::BSONObjElements;
+using unittest::match::BSONObjEQ;
+using unittest::match::IsBSONElement;
 using MetricTypes = testing::Types<Counter<int64_t>,
                                    Counter<double>,
                                    UpDownCounter<int64_t>,
@@ -383,8 +394,10 @@ TYPED_TEST(MetricCreationTest, ExceptionWhenSameNameButDifferentServerStatusOpti
 }
 
 TYPED_TEST(MetricCreationTest, ExceptionWhenSameNameButDifferentServerStatusOptionsDifferentRole) {
+    const std::string sharedPath = "network.openConnections";
+
     MetricOptions<TypeParam> optionsRoleNone{.serverStatusOptions = ServerStatusOptions{
-                                                 .dottedPath = "network.openConnections",
+                                                 .dottedPath = sharedPath,
                                                  .role = ClusterRole{ClusterRole::None},
                                              }};
     MetricCreator<TypeParam>::create(this->metricsService.get(),
@@ -394,7 +407,7 @@ TYPED_TEST(MetricCreationTest, ExceptionWhenSameNameButDifferentServerStatusOpti
                                      optionsRoleNone);
 
     MetricOptions<TypeParam> optionsShardRole{.serverStatusOptions = ServerStatusOptions{
-                                                  .dottedPath = "network.openConnections",
+                                                  .dottedPath = sharedPath,
                                                   .role = ClusterRole{ClusterRole::ShardServer},
                                               }};
     ASSERT_THROWS_CODE(MetricCreator<TypeParam>::create(this->metricsService.get(),
@@ -569,9 +582,9 @@ TEST_F(MetricsServiceTest, NoOpMeterProviderBeforeInit) {
 }
 #endif  // MONGO_CONFIG_OTEL
 
-using SerializeMetricsTest = MetricsServiceTest;
+using SerializeMetricsFlatTest = MetricsServiceTest;
 
-TEST_F(SerializeMetricsTest, SerializesMetrics) {
+TEST_F(SerializeMetricsFlatTest, IncludeMetricsInServerStatus) {
     auto& int64Histogram = metricsService->createInt64Histogram(
         MetricNames::kTest1, "description", MetricUnit::kSeconds, {.inServerStatus = true});
     auto& doubleHistogram = metricsService->createDoubleHistogram(
@@ -607,7 +620,7 @@ TEST_F(SerializeMetricsTest, SerializesMetrics) {
     ASSERT_BSONOBJ_EQ(builder.obj(), expectedBson.obj());
 }
 
-TEST_F(SerializeMetricsTest, ExcludesMetricsNotInServerStatus) {
+TEST_F(SerializeMetricsFlatTest, ExcludesMetricsNotInServerStatus) {
     auto& int64Histogram = metricsService->createInt64Histogram(
         MetricNames::kTest1, "description", MetricUnit::kSeconds, {.inServerStatus = false});
     // Only doubleHistogram is in the constructed object.
@@ -629,6 +642,188 @@ TEST_F(SerializeMetricsTest, ExcludesMetricsNotInServerStatus) {
     BSONObjBuilder builder;
     metricsService->appendMetricsForServerStatus(builder);
     ASSERT_BSONOBJ_EQ(builder.obj(), expectedBson.obj());
+}
+
+using SerializeMetricsTreeTest = MetricsServiceTest;
+
+TEST_F(SerializeMetricsTreeTest, Counter) {
+    CounterOptions options{.serverStatusOptions = ServerStatusOptions{
+                               .dottedPath = "ingress.openConnections",
+                               .role = ClusterRole{ClusterRole::None},
+                           }};
+    auto& counter = metricsService->createInt64Counter(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds, options);
+    counter.add(42);
+
+    BSONObjBuilder builder;
+    mongo::globalMetricTreeSet()[ClusterRole::None].appendTo(builder);
+    const BSONObj obj = builder.obj();
+    ASSERT_EQ(obj["metrics"]["ingress"]["openConnections"].Long(), 42);
+}
+
+TEST_F(SerializeMetricsTreeTest, Histogram) {
+    HistogramOptions options{.serverStatusOptions = ServerStatusOptions{
+                                 .dottedPath = "ops.latencyHistogram",
+                                 .role = ClusterRole{ClusterRole::None},
+                             }};
+    auto& histogram = metricsService->createDoubleHistogram(
+        MetricNames::kTest2, "description", MetricUnit::kSeconds, options);
+    histogram.record(3.0);
+
+    BSONObjBuilder builder;
+    mongo::globalMetricTreeSet()[ClusterRole::None].appendTo(builder);
+    const BSONObj obj = builder.obj();
+    ASSERT_BSONOBJ_EQ(obj["metrics"]["ops"]["latencyHistogram"].Obj(),
+                      BSON("average" << 3.0 << "count" << 1));
+}
+
+TEST_F(SerializeMetricsTreeTest, RoleShard) {
+    CounterOptions options{.serverStatusOptions = ServerStatusOptions{
+                               .dottedPath = "ingress.openConnections",
+                               .role = ClusterRole{ClusterRole::ShardServer},
+                           }};
+    auto& counter = metricsService->createInt64Counter(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds, options);
+    counter.add(11);
+
+    BSONObjBuilder shardBuilder;
+    mongo::globalMetricTreeSet()[ClusterRole::ShardServer].appendTo(shardBuilder);
+    const BSONObj shardObj = shardBuilder.obj();
+    ASSERT_EQ(shardObj["metrics"]["ingress"]["openConnections"].Long(), 11);
+
+    BSONObjBuilder noneBuilder;
+    mongo::globalMetricTreeSet()[ClusterRole::None].appendTo(noneBuilder);
+    ASSERT_TRUE(noneBuilder.obj().isEmpty());
+
+    BSONObjBuilder routerBuilder;
+    mongo::globalMetricTreeSet()[ClusterRole::RouterServer].appendTo(routerBuilder);
+    ASSERT_TRUE(routerBuilder.obj().isEmpty());
+}
+
+TEST_F(SerializeMetricsTreeTest, RoleRouter) {
+    CounterOptions options{.serverStatusOptions = ServerStatusOptions{
+                               .dottedPath = "ingress.openConnections",
+                               .role = ClusterRole{ClusterRole::RouterServer},
+                           }};
+    auto& counter = metricsService->createInt64Counter(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds, options);
+    counter.add(22);
+
+    BSONObjBuilder routerBuilder;
+    mongo::globalMetricTreeSet()[ClusterRole::RouterServer].appendTo(routerBuilder);
+    const BSONObj routerObj = routerBuilder.obj();
+    ASSERT_EQ(routerObj["metrics"]["ingress"]["openConnections"].Long(), 22);
+
+    BSONObjBuilder noneBuilder;
+    mongo::globalMetricTreeSet()[ClusterRole::None].appendTo(noneBuilder);
+    ASSERT_TRUE(noneBuilder.obj().isEmpty());
+
+    BSONObjBuilder shardBuilder;
+    mongo::globalMetricTreeSet()[ClusterRole::ShardServer].appendTo(shardBuilder);
+    ASSERT_TRUE(shardBuilder.obj().isEmpty());
+}
+
+TEST_F(SerializeMetricsTreeTest, RoleNone) {
+    CounterOptions options{.serverStatusOptions = ServerStatusOptions{
+                               .dottedPath = "ingress.openConnections",
+                               .role = ClusterRole{ClusterRole::None},
+                           }};
+    auto& counter = metricsService->createInt64Counter(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds, options);
+    counter.add(33);
+
+    BSONObjBuilder noneBuilder;
+    mongo::globalMetricTreeSet()[ClusterRole::None].appendTo(noneBuilder);
+    ASSERT_EQ(noneBuilder.obj()["metrics"]["ingress"]["openConnections"].Long(), 33);
+
+    BSONObjBuilder shardBuilder;
+    mongo::globalMetricTreeSet()[ClusterRole::ShardServer].appendTo(shardBuilder);
+    ASSERT_TRUE(shardBuilder.obj().isEmpty());
+
+    BSONObjBuilder routerBuilder;
+    mongo::globalMetricTreeSet()[ClusterRole::RouterServer].appendTo(routerBuilder);
+    ASSERT_TRUE(routerBuilder.obj().isEmpty());
+}
+
+TEST_F(SerializeMetricsTreeTest, SamePathDifferentMetricNamesDifferentRoles) {
+    const std::string dottedPath = "counter";
+
+    CounterOptions shardOptions{
+        .serverStatusOptions = ServerStatusOptions{.dottedPath = dottedPath,
+                                                   .role = ClusterRole{ClusterRole::ShardServer}}};
+    auto& shardCounter = metricsService->createInt64Counter(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds, shardOptions);
+    shardCounter.add(7);
+
+    CounterOptions routerOptions{
+        .serverStatusOptions = ServerStatusOptions{.dottedPath = dottedPath,
+                                                   .role = ClusterRole{ClusterRole::RouterServer}}};
+    auto& routerCounter = metricsService->createInt64Counter(
+        MetricNames::kTest2, "description", MetricUnit::kSeconds, routerOptions);
+    routerCounter.add(9);
+
+    BSONObjBuilder shardBuilder;
+    mongo::globalMetricTreeSet()[ClusterRole::ShardServer].appendTo(shardBuilder);
+    ASSERT_EQ(shardBuilder.obj()["metrics"]["counter"].Long(), 7);
+
+    BSONObjBuilder routerBuilder;
+    mongo::globalMetricTreeSet()[ClusterRole::RouterServer].appendTo(routerBuilder);
+    ASSERT_EQ(routerBuilder.obj()["metrics"]["counter"].Long(), 9);
+}
+
+TEST_F(SerializeMetricsTreeTest, SharedPrefixSiblingLeaves) {
+    CounterOptions optionsA{.serverStatusOptions = ServerStatusOptions{
+                                .dottedPath = "common.metricA",
+                                .role = ClusterRole{ClusterRole::None},
+                            }};
+    auto& counterA = metricsService->createInt64Counter(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds, optionsA);
+    counterA.add(10);
+
+    CounterOptions optionsB{.serverStatusOptions = ServerStatusOptions{
+                                .dottedPath = "common.metricB",
+                                .role = ClusterRole{ClusterRole::None},
+                            }};
+    auto& counterB = metricsService->createInt64Counter(
+        MetricNames::kTest2, "description", MetricUnit::kSeconds, optionsB);
+    counterB.add(20);
+
+    BSONObjBuilder builder;
+    mongo::globalMetricTreeSet()[ClusterRole::None].appendTo(builder);
+    const BSONObj serverStatusObj = builder.obj();
+    const BSONObj commonObj = serverStatusObj["metrics"]["common"].Obj();
+    ASSERT_THAT(
+        commonObj,
+        BSONObjElements(UnorderedElementsAre(IsBSONElement("metricA", _, Matcher<long long>(10)),
+                                             IsBSONElement("metricB", _, Matcher<long long>(20)))));
+}
+
+TEST_F(SerializeMetricsTreeTest, SharedPrefixShallowAndDeep) {
+    CounterOptions shallowOptions{.serverStatusOptions = ServerStatusOptions{
+                                      .dottedPath = "common.shallowMetric",
+                                      .role = ClusterRole{ClusterRole::None},
+                                  }};
+    auto& shallowCounter = metricsService->createInt64Counter(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds, shallowOptions);
+    shallowCounter.add(7);
+
+    CounterOptions deepOptions{.serverStatusOptions = ServerStatusOptions{
+                                   .dottedPath = "common.nested.deepMetric",
+                                   .role = ClusterRole{ClusterRole::None},
+                               }};
+    auto& deepCounter = metricsService->createInt64Counter(
+        MetricNames::kTest2, "description", MetricUnit::kSeconds, deepOptions);
+    deepCounter.add(8);
+
+    BSONObjBuilder builder;
+    mongo::globalMetricTreeSet()[ClusterRole::None].appendTo(builder);
+    const BSONObj serverStatusObj = builder.obj();
+    const BSONObj commonObj = serverStatusObj["metrics"]["common"].Obj();
+    ASSERT_THAT(
+        commonObj,
+        BSONObjElements(UnorderedElementsAre(
+            IsBSONElement("shallowMetric", _, Matcher<long long>(7)),
+            IsBSONElement("nested", _, Matcher<BSONObj>(BSONObjEQ(BSON("deepMetric" << 8)))))));
 }
 
 using CreateInt64CounterTest = MetricsServiceTest;

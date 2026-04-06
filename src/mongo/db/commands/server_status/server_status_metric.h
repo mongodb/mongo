@@ -194,6 +194,8 @@ public:
         return _children;
     }
 
+    void clearForTests();
+
 private:
     void _add(StringData path, std::unique_ptr<ServerStatusMetric> metric);
 
@@ -215,6 +217,15 @@ private:
 };
 
 MetricTreeSet& globalMetricTreeSet();
+
+/**
+ * Used in unit tests only. Removes all metrics from globalMetricTreeSet() for every ClusterRole.
+ *
+ * MetricsService may register OtelMetricServerStatusAdapter entries that hold raw Metric* pointers.
+ * After a test destroys its MetricsService, those pointers are no longer be valid so they must be
+ * removed from the tree set before a subsequent test runs.
+ */
+void clearGlobalMetricTreeSetForTests();
 
 /**
  * Write a merger of the `trees` to `b`, under field `name`. `excludePaths` is a

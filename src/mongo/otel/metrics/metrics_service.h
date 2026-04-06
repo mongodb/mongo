@@ -285,9 +285,20 @@ private:
                                   const HistogramOptions& options);
 
     /**
+     * If `serverStatusOptions` is specified, registers the given metric onto one of the
+     * serverStatus metric trees based on the specified dotted path and role. Currently, the
+     * registration is not thread-safe at runtime as the metric trees are not guarded by a mutex.
+     * Therefore, `serverStatusOptions` must not be specified when creating a metric at runtime.
+     * TODO (SERVER-123241): Make this thread-safe.
+     */
+    void _registerServerStatusTree(WithLock,
+                                   Metric* metricPtr,
+                                   const boost::optional<ServerStatusOptions>& serverStatusOptions);
+
+    /**
      * Validates the given options. Then, either returns an existing matching metric or creates
-     * one with `makeInstrument` and stores it. Then, optionally runs `addObservable` if OTEL is
-     * enabled.
+     * one with `makeInstrument` and stores it. Then, registers the serverStatus tree if requested
+     * and optionally runs `addObservable` if OTEL is enabled.
      */
     template <typename InstrumentT, typename Options>
     InstrumentT& _createMetric(MetricName name,

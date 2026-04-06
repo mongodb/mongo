@@ -331,6 +331,10 @@ void MetricTree::_add(StringData path, std::unique_ptr<ServerStatusMetric> metri
     }
 }
 
+void MetricTree::clearForTests() {
+    _children.clear();
+}
+
 void appendMergedTrees(std::vector<const MetricTree*> trees,
                        BSONObjBuilder& b,
                        const BSONObj& excludePaths) {
@@ -355,4 +359,12 @@ MetricTreeSet& globalMetricTreeSet() {
     static StaticImmortal<MetricTreeSet> obj;
     return *obj;
 }
+
+void clearGlobalMetricTreeSetForTests() {
+    for (const auto role :
+         {ClusterRole::None, ClusterRole::ShardServer, ClusterRole::RouterServer}) {
+        globalMetricTreeSet()[role].clearForTests();
+    }
+}
+
 }  // namespace mongo

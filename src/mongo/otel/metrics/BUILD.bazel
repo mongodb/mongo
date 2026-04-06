@@ -103,6 +103,7 @@ mongo_cc_unit_test(
         ":metrics_test_util",
         ":otel_metrics_service",
         "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/commands/server_status:server_status_metric",
     ] + select(
         {
             "@//bazel/config:build_otel_enabled": [

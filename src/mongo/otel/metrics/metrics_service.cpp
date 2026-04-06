@@ -29,9 +29,11 @@
 
 #include "mongo/otel/metrics/metrics_service.h"
 
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/otel/metrics/metrics_initialization.h"
 #include "mongo/otel/metrics/metrics_metric.h"
 #include "mongo/otel/metrics/otel_metric_name_validation.h"
+#include "mongo/otel/metrics/otel_metric_server_status_adapter.h"
 #include "mongo/otel/metrics/server_status_metric_name_validation.h"
 #include "mongo/util/assert_util.h"
 
@@ -350,6 +352,16 @@ T* MetricsService::getDuplicateMetric(WithLock,
     return nullptr;
 }
 
+void MetricsService::_registerServerStatusTree(
+    WithLock, Metric* metricPtr, const boost::optional<ServerStatusOptions>& serverStatusOptions) {
+    if (!serverStatusOptions.has_value()) {
+        return;
+    }
+    globalMetricTreeSet()[serverStatusOptions->role].add(
+        serverStatusOptions->dottedPath,
+        std::make_unique<OtelMetricServerStatusAdapter>(metricPtr));
+}
+
 template <typename InstrumentT, typename Options>
 InstrumentT& MetricsService::_createMetric(MetricName name,
                                            const Options& options,
@@ -380,6 +392,7 @@ InstrumentT& MetricsService::_createMetric(MetricName name,
 
     auto owned = OwnedMetric{std::unique_ptr<InstrumentT>(std::move(impl))};
     _metrics[nameStr] = {.identifier = std::move(identifier), .metric = std::move(owned)};
+    _registerServerStatusTree(lock, static_cast<Metric*>(ptr), options.serverStatusOptions);
 #ifdef MONGO_CONFIG_OTEL
     addObservable(lock, nameStr, ptr);
 #endif  // MONGO_CONFIG_OTEL
