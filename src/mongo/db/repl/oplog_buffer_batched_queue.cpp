@@ -29,6 +29,10 @@
 
 #include "mongo/db/repl/oplog_buffer_batched_queue.h"
 
+#include "mongo/logv2/log.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
+
 namespace mongo {
 namespace repl {
 
@@ -89,6 +93,16 @@ void OplogBufferBatchedQueue::push(OperationContext*,
         _curSize += size;
         _curCount += count;
 
+        if (size > _maxSize) {
+            LOGV2_DEBUG(
+                12153601,
+                1,
+                "Pushed a batch whose size exceeds _maxSize onto oplog buffer batched queue",
+                "_curSize"_attr = _curSize,
+                "size"_attr = size,
+                "_maxSize"_attr = _maxSize);
+        }
+
         if (startedEmpty) {
             _notEmptyCV.notify_one();
         }
@@ -145,8 +159,9 @@ bool OplogBufferBatchedQueue::tryPopBatch(OperationContext* opCtx, OplogBatch<Va
         _curSize -= batch->byteSize();
         _curCount -= batch->count();
 
-        // Only notify producer if there is a waiting producer and enough space available.
-        if (_waitSize > 0 && _curSize + _waitSize <= _maxSize) {
+        // Notify the producer if there is a waiting producer and enough space is available, or if
+        // the queue is now empty (needed when a single entry exceeds _maxSize).
+        if (_waitSize > 0 && (_curSize + _waitSize <= _maxSize || _queue.empty())) {
             _notFullCV.notify_one();
         }
     }
@@ -193,7 +208,11 @@ void OplogBufferBatchedQueue::_waitForSpace(stdx::unique_lock<stdx::mutex>& lk, 
     invariant(size > 0);
     invariant(!_waitSize);
 
-    while (_curSize + size > _maxSize && !_isShutdown) {
+    // When the buffer is empty and the incoming batch exceeds _maxSize (e.g. a single entry larger
+    // than the buffer capacity), we must not wait forever: the consumer can never drain enough to
+    // satisfy _curSize + size <= _maxSize when size > _maxSize on an empty queue.  Allow the
+    // oversized push to proceed immediately once the queue is empty.
+    while (_curSize + size > _maxSize && !_queue.empty() && !_isShutdown) {
         // We only support one concurrent producer.
         _waitSize = size;
         _notFullCV.wait(lk);

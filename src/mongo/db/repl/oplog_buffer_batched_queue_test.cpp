@@ -399,5 +399,50 @@ TEST_F(OplogBufferBatchedQueueTest, drainModeUnblocksWaitForData) {
     ASSERT(doneWait);
 }
 
+TEST_F(OplogBufferBatchedQueueTest, pushOversizedBatchOnEmptyQueue) {
+    // maxSize=100, but the batch declares size=200. With an empty queue the producer must not block
+    // forever — the _waitForSpace guard allows the push through immediately.
+    OplogBufferBatchedQueue buffer(100);
+    buffer.startup(opCtx());
+
+    std::vector<BSONObj> ops;
+    ops.push_back(makeNoopOplogEntry(1));
+    OplogBuffer::Cost cost{200, ops.size()};
+    buffer.push(opCtx(), ops.begin(), ops.end(), cost);
+
+    OplogBatch<BSONObj> batch;
+    ASSERT(buffer.tryPopBatch(opCtx(), &batch));
+    ASSERT_EQ(1u, batch.count());
+    ASSERT(buffer.isEmpty());
+}
+
+TEST_F(OplogBufferBatchedQueueTest, oversizedBatchUnblockedWhenQueueDrains) {
+    // maxSize=100. Push 60 bytes so the buffer is non-empty, then try to push 200 bytes
+    // (oversized). The pushThread blocks because the queue is non-empty and 60+200 > 100. Popping
+    // the first batch empties the queue; tryPopBatch will then notify the pushThread
+    OplogBufferBatchedQueue buffer(100);
+    buffer.startup(opCtx());
+
+    std::vector<BSONObj> ops1;
+    ops1.push_back(makeNoopOplogEntry(1));
+    OplogBuffer::Cost cost1{60, ops1.size()};
+    buffer.push(opCtx(), ops1.begin(), ops1.end(), cost1);
+
+    std::vector<BSONObj> ops2;
+    ops2.push_back(makeNoopOplogEntry(2));
+    OplogBuffer::Cost cost2{200, ops2.size()};
+    stdx::thread pushThread([&, this] { buffer.push(opCtx(), ops2.begin(), ops2.end(), cost2); });
+
+    // Pop the first batch — queue becomes empty → tryPopBatch notifies → pushThread unblocks.
+    OplogBatch<BSONObj> firstBatch;
+    ASSERT(buffer.tryPopBatch(opCtx(), &firstBatch));
+    pushThread.join();
+
+    OplogBatch<BSONObj> secondBatch;
+    ASSERT(buffer.tryPopBatch(opCtx(), &secondBatch));
+    ASSERT_EQ(1u, secondBatch.count());
+    ASSERT(buffer.isEmpty());
+}
+
 }  // namespace repl
 }  // namespace mongo
