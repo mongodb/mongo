@@ -228,10 +228,12 @@ private:
         FetchDefaultsFn _fetchDefaultsFn;
     };
 
-    Cache _defaults;
-
-    // Thread pool on which to perform loading of the cached RWC defaults
+    // Thread pool on which to perform loading of the cached RWC defaults.
+    // Must be declared before '_defaults' so it is initialized first and destroyed last,
+    // since '_defaults' holds a reference to '_threadPool'.
     ThreadPool _threadPool;
+
+    Cache _defaults;
 
     // Indicate whether implicit default write concern should be majority or not.
     AtomicWord<bool> _implicitDefaultWriteConcernMajority;

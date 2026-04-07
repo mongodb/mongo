@@ -173,6 +173,7 @@ private:
     X(createInternalCollections)                \
     X(updateShardingMetadata)                   \
     X(upsertAutomationCredentials)              \
+    X(shutDownAndJoinReadWriteConcernDefaults)  \
     /* */
 
 enum class TimedSectionId {
