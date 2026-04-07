@@ -36,8 +36,6 @@ type array_owned = unknown[];
 
 type date = Date;
 
-type millisEpoch = number; // ms since epoch
-type unixEpoch = number; // s since epoch
 type NamespaceString = string;
 
 type Base64String = string;

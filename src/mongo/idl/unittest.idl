@@ -258,8 +258,6 @@ structs:
             field19: objectid
             field20: object_owned
             field21: date
-            field22: millisEpoch
-            field23: unixEpoch
             field24: milliseconds
             field25: seconds
             field26: logicalTime
@@ -1140,18 +1138,6 @@ structs:
             millis:
                 type: milliseconds
                 optional: true
-
-    ##################################################################################################
-    #
-    # Date types
-    #
-    ##################################################################################################
-
-    struct_with_epochs:
-        description: A struct expecting a unix epoch and a millis epoch.
-        fields:
-            unix: unixEpoch
-            ecma: millisEpoch
 
     ##################################################################################################
     #

@@ -33,9 +33,10 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
-namespace mongo {
+namespace mongo::crypto {
 
 /**
  * BSON deserialization support.
@@ -43,24 +44,19 @@ namespace mongo {
  * e.g. parseDateFromDurationSinceEpoch<Seconds> will parse a Unix Epoch value.
  *      parseDateFromDurationSinceEpoch<Milliseconds> will parse an ECMAScript epoch value.
  */
-template <typename Duration>
-Date_t parseDateFromDurationSinceEpoch(const BSONElement& elem) {
+inline Date_t parseUnixEpoch(const BSONElement& elem) {
     uassert(ErrorCodes::BadValue,
             str::stream() << "Epoch value must be numeric, got: " << typeName(elem.type()),
             elem.isNumber());
-
-    return Date_t::fromDurationSinceEpoch(Duration{elem.exactNumberLong()});
+    return Date_t::fromDurationSinceEpoch(Seconds{elem.exactNumberLong()});
 }
 
 /**
  * BSON serialization support.
  * Serializes a Date_t to a BSON int32/int64 since the unix epoch.
  */
-template <typename Duration>
-void serializeDateToDurationSinceEpoch(const Date_t& date,
-                                       StringData fieldName,
-                                       BSONObjBuilder* builder) {
-    builder->append(fieldName, durationCount<Duration>(date.toDurationSinceEpoch()));
+inline void serializeUnixEpoch(const Date_t& date, StringData fieldName, BSONObjBuilder* builder) {
+    builder->append(fieldName, durationCount<Seconds>(date.toDurationSinceEpoch()));
 }
 
-}  // namespace mongo
+}  // namespace mongo::crypto

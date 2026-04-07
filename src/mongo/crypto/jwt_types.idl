@@ -29,10 +29,20 @@ global:
     cpp_namespace: "mongo::crypto"
     cpp_includes:
         - "mongo/util/base64.h"
+        - "mongo/crypto/unix_epoch.h"
     mod_visibility: pub
 
 imports:
     - "mongo/db/basic_types.idl"
+
+types:
+    unixEpoch:
+        bson_serialization_type: any
+        description: "A unix epoch datetime (Seconds since the Epoch)"
+        cpp_type: "mongo::Date_t"
+        deserializer: "::mongo::crypto::parseUnixEpoch"
+        serializer: "::mongo::crypto::serializeUnixEpoch"
+        is_view: false
 
 structs:
     JWK:

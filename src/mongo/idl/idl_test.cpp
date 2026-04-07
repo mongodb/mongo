@@ -534,61 +534,6 @@ TEST(IDLStructTests, DurationSerialize) {
     ASSERT_EQ(intervalElem.numberLong(), 86400);
 }
 
-TEST(IDLStructTests, EpochsParse) {
-    auto sameTimeDoc = BSON("unix" << 1234567890LL << "ecma" << 1234567890000LL);
-    auto sameTime = Struct_with_epochs::parse(sameTimeDoc);
-    ASSERT_EQ(sameTime.getUnix(), sameTime.getEcma());
-    ASSERT_EQ(sameTime.getUnix().toDurationSinceEpoch(), Seconds{1234567890});
-    ASSERT_EQ(sameTime.getEcma().toDurationSinceEpoch(), Seconds{1234567890});
-
-    auto floatTimeDoc = BSON("unix" << 123.0 << "ecma" << 234000.0);
-    auto floatTime = Struct_with_epochs::parse(floatTimeDoc);
-    ASSERT_EQ(floatTime.getUnix().toDurationSinceEpoch(), Seconds{123});
-    ASSERT_EQ(floatTime.getEcma().toDurationSinceEpoch(), Seconds{234});
-
-    auto halfTimeDoc = BSON("unix" << 345.6 << "ecma" << 0);
-    ASSERT_THROWS_CODE_AND_WHAT(Struct_with_epochs::parse(halfTimeDoc),
-                                AssertionException,
-                                ErrorCodes::FailedToParse,
-                                "Expected an integer: unix: 345.6");
-
-    auto invalidTimeDoc = BSON("unix" << "bob"
-                                      << "ecma" << 1234567890000LL);
-    ASSERT_THROWS_CODE_AND_WHAT(Struct_with_epochs::parse(invalidTimeDoc),
-                                AssertionException,
-                                ErrorCodes::BadValue,
-                                "Epoch value must be numeric, got: string");
-
-    auto notATimeDoc = BSON("unix" << 0 << "ecma" << NAN);
-    ASSERT_THROWS_CODE_AND_WHAT(
-        Struct_with_epochs::parse(notATimeDoc),
-        AssertionException,
-        ErrorCodes::FailedToParse,
-        fmt::format("Expected an integer, but found NaN in: ecma: {}", kNANRepr));
-
-    auto endOfTimeDoc = BSON("unix" << std::numeric_limits<double>::infinity() << "ecma" << 0);
-    ASSERT_THROWS_CODE_AND_WHAT(Struct_with_epochs::parse(endOfTimeDoc),
-                                AssertionException,
-                                ErrorCodes::FailedToParse,
-                                "Cannot represent as a 64-bit integer: unix: inf");
-}
-
-TEST(IDLStructTests, EpochSerialize) {
-    Struct_with_epochs writeVal;
-    writeVal.setUnix(Date_t::fromDurationSinceEpoch(Days{1}));
-    writeVal.setEcma(Date_t::fromDurationSinceEpoch(Days{2}));
-    BSONObjBuilder builder;
-    writeVal.serialize(&builder);
-    auto obj = builder.obj();
-
-    auto unixElem = obj["unix"];
-    auto ecmaElem = obj["ecma"];
-    ASSERT_EQ(unixElem.type(), BSONType::numberLong);
-    ASSERT_EQ(unixElem.numberLong(), 86400);
-    ASSERT_EQ(ecmaElem.type(), BSONType::numberLong);
-    ASSERT_EQ(ecmaElem.numberLong(), 2 * 86400 * 1000);
-}
-
 // Postive: Test any type
 TEST(IDLOneTypeTests, TestAnyType) {
     // Positive: string field
@@ -5244,8 +5189,6 @@ TEST(IDLOwnershipTests, NonViewStructParseAssumesOwnership) {
         bob.append("field19", testOID);
         bob.append("field20", ownedBSON);
         bob.append("field21", testDate);
-        bob.append("field22", 22);
-        bob.append("field23", 23);
         bob.append("field24", 25);
         bob.append("field25", 26);
         bob.append("field26", testTimestamp);
@@ -5290,8 +5233,6 @@ TEST(IDLOwnershipTests, NonViewStructParseAssumesOwnership) {
     idlStruct.getField19();
     idlStruct.getField20();
     idlStruct.getField21();
-    idlStruct.getField22();
-    idlStruct.getField23();
     idlStruct.getField24();
     idlStruct.getField25();
     idlStruct.getField26();

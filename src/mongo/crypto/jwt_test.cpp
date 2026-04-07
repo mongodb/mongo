@@ -29,6 +29,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/crypto/jwk_manager_test_framework.h"
+#include "mongo/crypto/unix_epoch.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -281,6 +282,36 @@ TEST_F(JWKManagerTest, parseJWKSetUnsupportedProtocol) {
     ASSERT_OK(st);
     ASSERT_OK(jwkManager()->getValidator("ec-prime256v1"_sd));
     ASSERT_NOT_OK(jwkManager()->getValidator("hs256"_sd));
+}
+
+TEST(UnixEpochTest, UnixEpochParse) {
+    auto doParse = [](const auto& val) {
+        return parseUnixEpoch(BSON("unix" << val).firstElement()).toDurationSinceEpoch();
+    };
+
+    ASSERT_EQ(doParse(1234567890LL), Seconds{1234567890});
+    ASSERT_EQ(doParse(123.0), Seconds{123});
+    ASSERT_THROWS_CODE_AND_WHAT(doParse(345.6),
+                                AssertionException,
+                                ErrorCodes::FailedToParse,
+                                "Expected an integer: unix: 345.6");
+    ASSERT_THROWS_CODE_AND_WHAT(doParse("bob"),
+                                AssertionException,
+                                ErrorCodes::BadValue,
+                                "Epoch value must be numeric, got: string");
+    ASSERT_THROWS_CODE_AND_WHAT(doParse(std::numeric_limits<double>::infinity()),
+                                AssertionException,
+                                ErrorCodes::FailedToParse,
+                                "Cannot represent as a 64-bit integer: unix: inf");
+}
+
+TEST(UnixEpochTest, EpochsSerialize) {
+    BSONObjBuilder bob;
+    serializeUnixEpoch(Date_t::fromDurationSinceEpoch(Days{1}), "unix", &bob);
+    auto obj = bob.obj();
+    auto unixElem = obj["unix"];
+    ASSERT_EQ(unixElem.type(), BSONType::numberLong);
+    ASSERT_EQ(unixElem.numberLong(), durationCount<Seconds>(Days{1}));
 }
 
 }  // namespace

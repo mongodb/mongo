@@ -38,7 +38,6 @@ global:
         - "mongo/db/logical_time.h"
         - "mongo/db/tenant_id.h"
         - "mongo/bson/bson_duration.h"
-        - "mongo/bson/bson_time_support.h"
         - "mongo/util/uuid.h"
         - "mongo/idl/command_generic_argument.h"
         - "mongo/idl/basic_types_serialization.h"
@@ -254,22 +253,6 @@ types:
         description: "A BSON UTC DateTime"
         cpp_type: "mongo::Date_t"
         deserializer: "mongo::BSONElement::date"
-        is_view: false
-
-    millisEpoch:
-        bson_serialization_type: any
-        description: "Milliseconds since the epoch, such as used by ecmascript"
-        cpp_type: "mongo::Date_t"
-        deserializer: "mongo::parseDateFromDurationSinceEpoch<Milliseconds>"
-        serializer: "::mongo::serializeDateToDurationSinceEpoch<Milliseconds>"
-        is_view: false
-
-    unixEpoch:
-        bson_serialization_type: any
-        description: "A unix epoch datetime (Seconds since the Epoch)"
-        cpp_type: "mongo::Date_t"
-        deserializer: "mongo::parseDateFromDurationSinceEpoch<Seconds>"
-        serializer: "::mongo::serializeDateToDurationSinceEpoch<Seconds>"
         is_view: false
 
     milliseconds:
