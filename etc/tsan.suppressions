@@ -77,6 +77,10 @@ race:__rustc
 race:core::ptr
 race:core::mem
 
+# All fields read in newRecoveryUnit are set once at startup. TSAN races are test-only, as some
+# tests mutate globals after startup.
+race:newRecoveryUnit
+
 # OpenSSL 1.1.x: lazy-init of shared buffer in SSL_CTX
 # during handshake; harmless. See SERVER-120820.
 race:ASN1_STRING_cmp
