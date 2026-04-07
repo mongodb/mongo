@@ -2,6 +2,8 @@
  * Tests that a $** index can provide a DISTINCT_SCAN or indexed solution where appropriate.
  * @tags: [
  *   assumes_read_concern_local,
+ *   # Chunk-migrations may cause spurious failures in assertions on explain if a shard happens to not contain multikey data.
+ *   assumes_balancer_off,
  *   does_not_support_stepdowns,
  *   no_selinux,
  * ]
