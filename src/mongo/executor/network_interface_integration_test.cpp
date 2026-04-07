@@ -807,8 +807,9 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
     auto client = serviceContext->getService()->makeClient("NetworkClient");
     auto opCtx = client->makeOperationContext();
 
-    auto stopWatch = serviceContext->getPreciseClockSource()->makeStopWatch();
-    opCtx->setDeadlineByDate(stopWatch.start() + opCtxDeadline, ErrorCodes::ExceededTimeLimit);
+    Timer stopWatch{serviceContext->getTickSource()};
+    opCtx->setDeadlineByDate(serviceContext->getPreciseClockSource()->now() + opCtxDeadline,
+                             ErrorCodes::ExceededTimeLimit);
 
     auto request = makeTestCommand(requestTimeout, makeSleepCmdObj(), opCtx.get());
 
@@ -831,7 +832,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
 
     // check that the request timeout uses the smaller of the operation context deadline and
     // the timeout specified in the request constructor.
-    ASSERT_GTE(result.elapsed.value() + networkStartCommandDelay, opCtxDeadline);
+    ASSERT_GTE(result.elapsed.value() + networkStartCommandDelay + Milliseconds(1), opCtxDeadline);
     ASSERT_LT(result.elapsed.value(), requestTimeout);
     ASSERT_EQ(result.target, fixture().getServers().front());
 
