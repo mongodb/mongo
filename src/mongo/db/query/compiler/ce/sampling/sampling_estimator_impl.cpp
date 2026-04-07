@@ -627,10 +627,10 @@ boost::optional<std::pair<StringData, std::vector<BSONElement>>> tryExtractAllEq
     for (size_t i = 0; i < expr->numChildren(); ++i) {
         const auto* child = expr->getChild(i);
 
-        if constexpr (kDebugBuild) {
-            tassert(11293000,
-                    "Expected MatchExpression::EQ",
-                    child->matchType() == MatchExpression::EQ);
+        // Not all MatchExpressions are normalized, so we still have to double check that the
+        // expression is an EQ with the same common path.
+        if (child->matchType() != MatchExpression::EQ || child->path() != commonPath) {
+            return boost::none;
         }
 
         const auto* eq = static_cast<const EqualityMatchExpression*>(child);

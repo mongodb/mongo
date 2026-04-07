@@ -1682,4 +1682,100 @@ TEST_F(SamplingEstimatorTest, EstimateRIDsWithAllFastPath) {
     }
 }
 
+// Test that the $all fast path bails out and falls back to the generic matcher when the AND
+// contains a non-EQ child (e.g. GT) in an unsorted position between two EQ nodes on the same path.
+//
+// Without the per-child type check in the loop, the fast path would cast the GT node to
+// EqualityMatchExpression* and include its operand (0) in the required-value list, producing a
+// wrong CE of 0 instead of 50. With the fix it bails out and the generic matcher gives 50.
+TEST_F(SamplingEstimatorTest, FastPathBailsOutWithNonEqChildInMiddle) {
+    // docs 0..9:   f0 = [1, 2, 3], other = 5   (match $all:[1,2] on f0 AND other == 5)
+    // docs 10..14: f0 = [1, 3, 5]              (no "other" field)
+    // docs 15..19: f0 = [2, 4, 6]              (no "other" field)
+    const size_t card = 100;
+    std::vector<BSONObj> docs;
+    for (int i = 0; i < 10; ++i) {
+        docs.push_back(BSON("_id" << i << "f0" << BSON_ARRAY(1 << 2 << 3) << "other" << 5));
+    }
+    for (int i = 10; i < 15; ++i) {
+        docs.push_back(BSON("_id" << i << "f0" << BSON_ARRAY(1 << 3 << 5)));
+    }
+    for (int i = 15; i < 20; ++i) {
+        docs.push_back(BSON("_id" << i << "f0" << BSON_ARRAY(2 << 4 << 6)));
+    }
+    insertDocuments(kTestNss, docs);
+
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(coll, {}, false);
+    SamplingEstimatorForTesting samplingEstimator(operationContext(),
+                                                  colls,
+                                                  kTestNss,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  card,
+                                                  SamplingCEMethodEnum::kRandom,
+                                                  numChunks,
+                                                  makeCardinalityEstimate(card));
+    samplingEstimator.generateSample(ce::NoProjection{});
+
+    auto opEq1 = BSON("x" << 1);
+    auto opGt = BSON("x" << 0);
+    auto opEq2 = BSON("x" << 2);
+    AndMatchExpression andExpr;
+    andExpr.add(std::make_unique<EqualityMatchExpression>("f0"_sd, opEq1["x"]));
+    andExpr.add(std::make_unique<GTMatchExpression>("f0"_sd, opGt["x"]));
+    andExpr.add(std::make_unique<EqualityMatchExpression>("f0"_sd, opEq2["x"]));
+
+    // Expected: 50 docs (f0=[1,2,3] satisfies both equalities and the GT predicate).
+    auto ce = samplingEstimator.estimateCardinality(&andExpr).cardinality().v();
+    ASSERT_EQ(ce, 50.0);
+}
+
+// Test that the fast path bails out and falls back to the generic matcher when the AND contains an
+// EQ node on a different path in an unsorted position between two EQ nodes on the common path.
+//
+// Without the per-child path check in the loop, the fast path would include the foreign EQ's
+// value (5) in the required-value list for "f0", producing a wrong CE of 0. With the fix it bails
+// out and the generic matcher gives 50.
+TEST_F(SamplingEstimatorTest, FastPathBailsOutWithDifferentPathEqChildInMiddle) {
+    // docs 0..9:   f0 = [1, 2, 3], other = 5   (match $all:[1,2] on f0 AND other == 5)
+    // docs 10..14: f0 = [1, 3, 5]              (no "other" field)
+    // docs 15..19: f0 = [2, 4, 6]              (no "other" field)
+    const size_t card = 100;
+    std::vector<BSONObj> docs;
+    for (int i = 0; i < 10; ++i) {
+        docs.push_back(BSON("_id" << i << "f0" << BSON_ARRAY(1 << 2 << 3) << "other" << 5));
+    }
+    for (int i = 10; i < 15; ++i) {
+        docs.push_back(BSON("_id" << i << "f0" << BSON_ARRAY(1 << 3 << 5)));
+    }
+    for (int i = 15; i < 20; ++i) {
+        docs.push_back(BSON("_id" << i << "f0" << BSON_ARRAY(2 << 4 << 6)));
+    }
+    insertDocuments(kTestNss, docs);
+
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(coll, {}, false);
+    SamplingEstimatorForTesting samplingEstimator(operationContext(),
+                                                  colls,
+                                                  kTestNss,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  card,
+                                                  SamplingCEMethodEnum::kRandom,
+                                                  numChunks,
+                                                  makeCardinalityEstimate(card));
+    samplingEstimator.generateSample(ce::NoProjection{});
+
+    auto opEq1 = BSON("x" << 1);
+    auto opOther = BSON("x" << 5);
+    auto opEq2 = BSON("x" << 2);
+    AndMatchExpression andExpr;
+    andExpr.add(std::make_unique<EqualityMatchExpression>("f0"_sd, opEq1["x"]));
+    andExpr.add(std::make_unique<EqualityMatchExpression>("other"_sd, opOther["x"]));
+    andExpr.add(std::make_unique<EqualityMatchExpression>("f0"_sd, opEq2["x"]));
+
+    // Expected: 50 docs (f0=[1,2,3] and other=5 for docs 0..49).
+    auto ce = samplingEstimator.estimateCardinality(&andExpr).cardinality().v();
+    ASSERT_EQ(ce, 50.0);
+}
+
 }  // namespace mongo::ce
