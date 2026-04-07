@@ -995,8 +995,6 @@ tasks:
     commands:
       - func: "do setup"
       - func: "run tests"
-        vars:
-          resmoke_jobs_max: 2
 
   - <<: *task_template
     name: disagg_change_streams_mongos_sessions_passthrough_v2
@@ -1010,8 +1008,6 @@ tasks:
     commands:
       - func: "do setup"
       - func: "run tests"
-        vars:
-          resmoke_jobs_max: 2
 
   - <<: *task_template
     name: disagg_change_streams_multi_stmt_txn_mongos_passthrough
@@ -1025,8 +1021,6 @@ tasks:
     commands:
       - func: "do setup"
       - func: "run tests"
-        vars:
-          resmoke_jobs_max: 2
 
   - <<: *task_template
     name: disagg_change_streams_multi_stmt_txn_mongos_passthrough_v2
@@ -1040,8 +1034,6 @@ tasks:
     commands:
       - func: "do setup"
       - func: "run tests"
-        vars:
-          resmoke_jobs_max: 2
 
   - <<: *task_template
     name: disagg_change_streams_multi_stmt_txn_sharded_collections_passthrough
@@ -1055,8 +1047,6 @@ tasks:
     commands:
       - func: "do setup"
       - func: "run tests"
-        vars:
-          resmoke_jobs_max: 2
 
   - <<: *task_template
     name: disagg_change_streams_multi_stmt_txn_sharded_collections_passthrough_v2
@@ -1070,8 +1060,6 @@ tasks:
     commands:
       - func: "do setup"
       - func: "run tests"
-        vars:
-          resmoke_jobs_max: 2
 
   - <<: *task_template
     name: disagg_change_streams_per_shard_cursor_passthrough
@@ -3178,7 +3166,7 @@ tasks:
         vars:
           suite: disagg_aggregation_sharded_collections_passthrough
           use_large_distro: "true"
-          resmoke_jobs_max: 4
+          resmoke_jobs_max: 10
 
   - <<: *task_template
     name: query_stats_mongos_passthrough
