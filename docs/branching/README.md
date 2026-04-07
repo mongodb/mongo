@@ -14,7 +14,7 @@ This document describes branching task regarding file updates in `10gen/mongo` r
 
 ### GitHub App credentials
 
-Add GitHub app credentials (app id and key) in the new project settings, eg. https://spruce-beta.corp.mongodb.com/project/mongodb-mongo-v8.3/settings/github-app-settings (additional MANA permissions may be required, else coordinate with Release team contacts).
+Add GitHub app credentials (app id and key) in the new project settings, eg. https://spruce.corp.mongodb.com/project/mongodb-mongo-v8.3/settings/github-app-settings (additional MANA permissions may be required, else coordinate with Release team contacts).
 
 ## 2. Create working branch
 
@@ -47,7 +47,8 @@ VERSION=8.3
 Run the following automation and verify results:
 
 ```sh
-sed -i "s/master/v$VERSION/g" copy.bara.sky buildscripts/sync_repo_with_copybara.py
+sed -i "s/master/v$VERSION/g" copy.bara.sky
+sed -i 's/branch = "master"/branch = "v'"$VERSION"'"/' buildscripts/sync_repo_with_copybara.py
 ```
 
 For each file [`copy.bara.sky`](../../copy.bara.sky) and [`sync_repo_with_copybara.py`](../../buildscripts/sync_repo_with_copybara.py), the "master" branch references should be replaced with the new branch name.
@@ -171,7 +172,7 @@ In the file [`etc/coverity.yml`](../../etc/coverity.yml), the "stream" should be
 #### Finally: format and lint
 
 ```sh
-bazel run lint format
+bazel run format && bazel run lint --fix
 ```
 
 Run linters and formatters and fix anything that couldn't be autofixed.
@@ -190,4 +191,4 @@ If patch results reveal that some steps are missing or outdated in this file, ma
 
 ## 4. Merge changes
 
-Open a Github PR to merge to branch `vX.Y`.
+Open a Github PR to merge to branch `vX.Y-staging`.

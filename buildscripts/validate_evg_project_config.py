@@ -88,6 +88,8 @@ def main(
             DEFAULT_EVG_NIGHTLY_PROJECT_NAME: DEFAULT_EVG_NIGHTLY_PROJECT_CONFIG,
         }
 
+    evergreen_bin = find_evergreen_binary("evergreen")
+
     if RELEASE_BRANCH:
         for _, project_config in evg_project_config_map.items():
             cmd = [
@@ -110,7 +112,6 @@ def main(
 
     exit_code = 0
     num_of_projects = len(evg_project_config_map)
-    evergreen_bin = find_evergreen_binary("evergreen")
     for project, project_config in evg_project_config_map.items():
         cmd = [
             evergreen_bin,
