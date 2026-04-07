@@ -49,8 +49,10 @@ describe("listDatabases after shard topology changes", function () {
         testCollectionDB.dropDatabase();
         testChunkDB.dropDatabase();
     });
-
-    it("should list the database after movePrimary", function () {
+    // The movePrimary case is not reliable under continuous stepdowns.
+    const itWithMovePrimary =
+        TestData?.runningWithShardStepdowns || TestData?.runningWithConfigStepdowns ? it.skip : it;
+    itWithMovePrimary("should list the database after movePrimary", function () {
         const originalPrimary = enableShardingWithRetry(db, testPrimaryDB.getName());
 
         assert.commandWorked(testPrimaryDB.getCollection("coll1").insertOne({x: 1}));
