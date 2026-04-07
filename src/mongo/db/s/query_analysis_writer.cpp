@@ -554,11 +554,11 @@ void QueryAnalysisWriter::onStepUpComplete(OperationContext* opCtx, long long te
 ExecutorFuture<void> QueryAnalysisWriter::createTTLIndexes(OperationContext* opCtx) {
     invariant(_executor);
 
-    static unsigned int tryCount = 0;
+    static AtomicWord<unsigned int> tryCount{0};
 
     auto future =
         AsyncTry([this] {
-            ++tryCount;
+            tryCount.addAndFetch(1);
 
             auto opCtxHolder = cc().makeOperationContext();
             auto opCtx = opCtxHolder.get();
@@ -566,14 +566,14 @@ ExecutorFuture<void> QueryAnalysisWriter::createTTLIndexes(OperationContext* opC
             for (const auto& [nss, indexSpec] : kTTLIndexes) {
                 auto status = getStatusFromCommandResult(createIndex(opCtx, nss, indexSpec));
                 if (!status.isOK() && status != ErrorCodes::IndexAlreadyExists) {
-                    if (tryCount % 100 == 0) {
+                    if (tryCount.load() % 100 == 0) {
                         LOGV2_WARNING(7078402,
                                       "Still retrying to create TTL index; "
                                       "please create an index on {namespace} with specification "
                                       "{specification}.",
                                       logAttrs(nss),
                                       "specification"_attr = indexSpec,
-                                      "tries"_attr = tryCount,
+                                      "tries"_attr = tryCount.load(),
                                       "isPrimary"_attr = _isPrimary.load());
                     }
                     return status;
