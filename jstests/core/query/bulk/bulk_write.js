@@ -21,7 +21,7 @@ coll1.drop();
 
 // Make sure a properly formed request has successful result
 assert.commandWorked(
-    db.adminCommand({bulkWrite: 1, ops: [{insert: 0, document: {skey: "MongoDB"}}], nsInfo: [{ns: collName}]}),
+    db.adminCommand({bulkWrite: 1, ops: [{insert: 0, document: {_id: 0, skey: "MongoDB"}}], nsInfo: [{ns: collName}]}),
 );
 
 assert.eq(coll.find().itcount(), 1);
@@ -31,7 +31,7 @@ assert(coll.drop());
 // Make sure optional fields are accepted
 let res = db.adminCommand({
     bulkWrite: 1,
-    ops: [{insert: 0, document: {skey: "MongoDB"}}],
+    ops: [{insert: 0, document: {_id: 1, skey: "MongoDB"}}],
     nsInfo: [{ns: collName}],
     cursor: {batchSize: 1024},
     bypassDocumentValidation: true,
@@ -49,9 +49,9 @@ assert(coll.drop());
 res = db.adminCommand({
     bulkWrite: 1,
     ops: [
-        {insert: 1, document: {skey: "MongoDB"}},
-        {insert: 0, document: {skey: "MongoDB"}},
-        {insert: 1, document: {_id: 1}},
+        {insert: 1, document: {_id: 2, skey: "MongoDB"}},
+        {insert: 0, document: {_id: 3, skey: "MongoDB"}},
+        {insert: 1, document: {_id: 4}},
     ],
     nsInfo: [{ns: collName}, {ns: coll1Name}],
 });
@@ -68,8 +68,8 @@ assert(coll1.drop());
 res = db.adminCommand({
     bulkWrite: 1,
     ops: [
-        {insert: 0, document: {skey: "MongoDB"}},
-        {insert: 0, document: {skey: "MongoDB"}},
+        {insert: 0, document: {_id: 5, skey: "MongoDB"}},
+        {insert: 0, document: {_id: 6, skey: "MongoDB"}},
     ],
     nsInfo: [{ns: collName}],
 });
