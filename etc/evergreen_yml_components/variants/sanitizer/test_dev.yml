@@ -880,7 +880,7 @@ buildvariants:
       - name: .auth !.requires_extra_system_deps
       - name: audit
       - name: .causally_consistent !.requires_extra_system_deps !.wo_snapshot
-      - name: .change_streams
+      - name: .change_streams !.requires_extra_system_deps
       # - name: disk_wiredtiger
       - name: .misc_js !.requires_extra_system_deps
       - name: .concurrency !.requires_extra_system_deps !.no_txns !.kill_terminate !.compute_mode !.feature_flag_guarded
