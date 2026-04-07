@@ -6,6 +6,7 @@ import {
     queryPlannerAlwaysFails,
     runWithFailpoint,
 } from "jstests/libs/query/command_diagnostic_utils.js";
+import {isDeferredGetExecutorEnabled} from "jstests/libs/query/sbe_util.js";
 
 const hasEnterpriseModule = getBuildInfo().modules.includes("enterprise");
 
@@ -40,7 +41,14 @@ function setup(conn) {
  * expectedDiagnosticInfo -  List of strings that are expected to be in the diagnostic log.
  * expectedSecondaryDiagnosticInfo - List of diagnostics relating to secondary collections
  */
-function runTest({description, command, redact, expectedDiagnosticInfo, expectedSecondaryDiagnosticInfo}) {
+function runTest({
+    description,
+    command,
+    redact,
+    expectedDiagnosticInfo,
+    expectedSecondaryDiagnosticInfo,
+    skipIfDeferredGetExecutor,
+}) {
     // Can't run cases that depend on log redaction without the enterprise module.
     if (!hasEnterpriseModule && redact) {
         return;
@@ -49,6 +57,11 @@ function runTest({description, command, redact, expectedDiagnosticInfo, expected
     // Each test case needs to start a new mongod to clear the previous logs.
     const conn = MongoRunner.runMongod({useLogFiles: true});
     const db = setup(conn);
+
+    if (skipIfDeferredGetExecutor && isDeferredGetExecutorEnabled(db)) {
+        MongoRunner.stopMongod(conn);
+        return;
+    }
 
     if (hasEnterpriseModule) {
         assert.commandWorked(db.adminCommand({setParameter: 1, redactClientLogData: redact}));
@@ -127,6 +140,7 @@ runTest({
         otherCollName,
         "{ c: 1.0 } unique",
     ],
+    skipIfDeferredGetExecutor: true,
 });
 
 // Test the count command.
