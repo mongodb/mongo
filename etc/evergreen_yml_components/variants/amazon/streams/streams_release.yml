@@ -13,7 +13,7 @@ buildvariants:
     cron: "0 3 * * *" # From the ${project_nightly_cron} parameter.
     modules: ["asp-js-engine"]
     run_on:
-      - amazon2023-latest-small
+      - release-amazon2023-latest-m6i-xlarge
     expansions:
       streams_ecr_repo: mongo/mongostream
       skip_debug_link: true
