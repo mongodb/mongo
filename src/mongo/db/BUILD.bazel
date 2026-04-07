@@ -2704,7 +2704,6 @@ mongo_cc_library(
         "//src/mongo/util:periodic_runner_factory",
         "//src/mongo/util:signal_handlers",
         "//src/mongo/db/replicated_fast_count:replicated_fast_count_init",
-        "//src/mongo/db/replicated_fast_count:replicated_fast_count_op_observer",
         "//src/mongo/watchdog:watchdog_mongod",
         "//src/mongo/db/admission/execution_control:ticketing_system",
         "//src/mongo/db/admission:flow_control",

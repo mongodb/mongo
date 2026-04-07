@@ -89,19 +89,5 @@ TEST(ReplicatedFastCountEligibleNsTest, InternalNonLocalCollectionNotEligible) {
     EXPECT_TRUE(isReplicatedFastCountEligible(adminNss));
 }
 
-TEST(ReplicatedFastCountInternalNsTest, DetectsInternalFastCountNss) {
-    const NamespaceString fastCountStoreNss =
-        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
-    EXPECT_TRUE(isInternalFastCountNss(fastCountStoreNss));
-
-    const NamespaceString fastCountStoreTimestampsNss = NamespaceString::makeGlobalConfigCollection(
-        NamespaceString::kReplicatedFastCountStoreTimestamps);
-    EXPECT_TRUE(isInternalFastCountNss(fastCountStoreTimestampsNss));
-
-    const NamespaceString normalCollNss =
-        NamespaceString::createNamespaceString_forTest("test", "coll");
-    EXPECT_FALSE(isInternalFastCountNss(normalCollNss));
-}
-
 }  // namespace
 }  // namespace mongo

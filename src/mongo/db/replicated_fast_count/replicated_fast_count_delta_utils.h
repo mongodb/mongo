@@ -117,15 +117,6 @@ boost::optional<CollectionOrViewAcquisition> acquireFastCountCollectionForWrite(
  */
 void readAndIncrementSizeCounts(OperationContext* opCtx,
                                 absl::flat_hash_map<UUID, CollectionSizeCount>& deltas);
-
-/**
- * Generates a key (RecordId) into the fastcount collection given a user
- * collection uuid.
- * TODO SERVER-123232: Reconsider exposing this function insert/delete API is defined.
- */
-RecordId getFastCountStoreKey(const UUID& uuid);
-
-UUID UUIDFromFastCountStoreKey(RecordId key);
 }  // namespace replicated_fast_count
 
 
