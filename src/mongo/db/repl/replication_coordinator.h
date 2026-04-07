@@ -468,6 +468,16 @@ public:
      */
     virtual OpTime getMyLastAppliedOpTime() const = 0;
 
+    /**
+     * Returns the timestamp of the last applied optime using a relaxed atomic read,
+     * avoiding the ReplicationCoordinator mutex. Suitable for informational use cases
+     * (e.g., computing operationTime in command responses) where slight staleness is
+     * acceptable. Default implementation falls back to getMyLastAppliedOpTime().
+     */
+    virtual Timestamp getMyLastAppliedTimestamp() const {
+        return getMyLastAppliedOpTime().getTimestamp();
+    }
+
     /*
      * Returns the same as getMyLastAppliedOpTime() and additionally returns the wall clock time
      * corresponding to that OpTime.
@@ -541,7 +551,6 @@ public:
     /**
      * Retrieves and returns the current election id, which is a unique id that is local to
      * this node and changes every time we become primary.
-     * TODO(spencer): Use term instead.
      */
     MONGO_MOD_USE_REPLACEMENT(ReplicationCoordinator::getTerm) virtual OID getElectionId() = 0;
 

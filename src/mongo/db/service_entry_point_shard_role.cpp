@@ -323,7 +323,9 @@ LogicalTime computeOperationTime(OperationContext* opCtx, LogicalTime startOpera
             operationTime =
                 LogicalTime(replCoord->getCurrentCommittedSnapshotOpTime().getTimestamp());
         } else {
-            operationTime = LogicalTime(replCoord->getMyLastAppliedOpTime().getTimestamp());
+            // Use the lockfree atomic shadow to avoid acquiring the ReplicationCoordinator
+            // mutex on every response. Slight staleness is acceptable for operationTime.
+            operationTime = LogicalTime(replCoord->getMyLastAppliedTimestamp());
         }
     }
 

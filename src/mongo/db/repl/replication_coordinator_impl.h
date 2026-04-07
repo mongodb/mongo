@@ -294,6 +294,8 @@ public:
     OpTime getMyLastAppliedOpTime() const override;
     OpTimeAndWallTime getMyLastAppliedOpTimeAndWallTime() const override;
 
+    Timestamp getMyLastAppliedTimestamp() const override;
+
     OpTime getMyLastDurableOpTime() const override;
     OpTimeAndWallTime getMyLastDurableOpTimeAndWallTime() const override;
 
@@ -1882,6 +1884,10 @@ private:
     // The term of the last election that resulted in this node becoming primary.  "Shadow" because
     // this follows the authoritative value in the topology coordinatory.
     AtomicWord<long long> _electionIdTermShadow;  // (S)
+
+    // Shadow of the lastAppliedOpTime timestamp for lock-free reads in computeOperationTime.
+    // Written under _mutex when lastAppliedOpTime changes, readable without _mutex.
+    AtomicWord<unsigned long long> _lastAppliedTimestampShadow;  // (I)
 
     // Used to signal threads waiting for changes to _memberState.
     stdx::condition_variable _memberStateChange;  // (M)

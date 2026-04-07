@@ -412,6 +412,9 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTimeAndWallTime(
     _topCoord->setMyLastAppliedOpTimeAndWallTime(
         opTimeAndWallTime, _replExecutor->now(), isRollbackAllowed);
 
+    // Update the atomic shadow so lockfree readers see the new timestamp.
+    _lastAppliedTimestampShadow.store(opTime.getTimestamp().asULL());
+
     // No need to wake up replication waiters because there should not be any replication waiters
     // waiting on our own lastApplied.
 
