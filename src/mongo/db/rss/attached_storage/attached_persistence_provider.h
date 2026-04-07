@@ -181,9 +181,9 @@ public:
     bool supportsClassicMagicRestore() const override;
 
     /**
-     * Table creation won't be timestamped.
+     * Does not use schema epochs for table creation.
      */
-    bool shouldTimestampTableCreations() const override;
+    bool usesSchemaEpochs() const override;
 
     /**
      * Attached storage does not use schema epochs; always returns 0.

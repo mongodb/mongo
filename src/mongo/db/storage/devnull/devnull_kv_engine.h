@@ -120,7 +120,7 @@ public:
                      StringData ident,
                      bool identHasSizeInfo,
                      const StorageEngine::DropIdentCallback& onDrop,
-                     boost::optional<Timestamp> _) override {
+                     boost::optional<uint64_t> schemaEpoch) override {
         return Status::OK();
     }
 

@@ -191,7 +191,7 @@ bool AttachedPersistenceProvider::supportsClassicMagicRestore() const {
     return true;
 }
 
-bool AttachedPersistenceProvider::shouldTimestampTableCreations() const {
+bool AttachedPersistenceProvider::usesSchemaEpochs() const {
     return false;
 }
 

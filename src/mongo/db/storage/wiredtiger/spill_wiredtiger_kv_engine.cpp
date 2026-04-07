@@ -191,7 +191,7 @@ Status SpillWiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
                                           StringData ident,
                                           bool identHasSizeInfo,
                                           const StorageEngine::DropIdentCallback& onDrop,
-                                          boost::optional<Timestamp> _) {
+                                          boost::optional<uint64_t> schemaEpoch) {
     std::string uri = WiredTigerUtil::buildTableUri(ident);
 
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);

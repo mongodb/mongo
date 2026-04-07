@@ -206,12 +206,11 @@ size_t KVDropPendingIdentReaper::getNumIdents() const {
 };
 
 void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, const Timestamp& ts) {
-    const bool shouldTimestampIdentDrops = rss::ReplicatedStorageService::get(opCtx)
-                                               .getPersistenceProvider()
-                                               .shouldTimestampTableCreations();
+    const bool usesSchemaEpochs =
+        rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider().usesSchemaEpochs();
     boost::optional<rss::consensus::IntentGuard> writeIntentGuard;
 
-    if (shouldTimestampIdentDrops) {
+    if (usesSchemaEpochs) {
         // Replicated drop mode: only primary can proceed.
         try {
             writeIntentGuard.emplace(rss::consensus::IntentRegistry::Intent::Write, opCtx);
@@ -237,8 +236,7 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
             // reference by which to access the collection/index data.
             if (info->isExpired(_engine, ts)) {
                 const bool isTimestampedDrop = info->dropTime > Timestamp::min();
-                const bool shouldTimestampThisIdentDrop =
-                    isTimestampedDrop && shouldTimestampIdentDrops;
+                const bool shouldTimestampThisIdentDrop = isTimestampedDrop && usesSchemaEpochs;
                 if (shouldTimestampThisIdentDrop && !writeIntentGuard) {
                     // Skip because only the primary can initiate timestamp ident drops.
                     continue;
@@ -421,48 +419,52 @@ Status KVDropPendingIdentReaper::_tryToDrop(WithLock,
                     "ident"_attr = identInfo.identName,
                     "dropTimestamp"_attr = identInfo.dropTime);
 
-    auto status =
-        std::visit(OverloadedVisitor{
-                       [&](const DropAsReplicatedPrimary&) -> Status {
-                           try {
-                               Lock::GlobalLock gl(opCtx, MODE_IX);
-                               WriteUnitOfWork wuow(opCtx);
-                               repl::OpTime reservedIdentDropTimestamp;
+    const auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
 
-                               // Call opObserver so that it generates an oplog entry.
-                               opCtx->getServiceContext()->getOpObserver()->onReplicatedIdentDrop(
-                                   opCtx, identInfo.identName, reservedIdentDropTimestamp);
-                               invariant(!reservedIdentDropTimestamp.isNull());
+    auto status = std::visit(
+        OverloadedVisitor{
+            [&](const DropAsReplicatedPrimary&) -> Status {
+                try {
+                    Lock::GlobalLock gl(opCtx, MODE_IX);
+                    WriteUnitOfWork wuow(opCtx);
+                    repl::OpTime reservedIdentDropTimestamp;
 
-                               auto s =
-                                   _engine->dropIdent(*shard_role_details::getRecoveryUnit(opCtx),
-                                                      identInfo.identName,
-                                                      ident::isCollectionIdent(identInfo.identName),
-                                                      identInfo.onDrop,
-                                                      reservedIdentDropTimestamp.getTimestamp());
-                               if (s.isOK()) {
-                                   wuow.commit();
-                               }
-                               return s;
-                           } catch (const DBException& ex) {
-                               return ex.toStatus();
-                           }
-                       },
-                       [&](const DropAsReplicatedApply& mode) -> Status {
-                           return _engine->dropIdent(*shard_role_details::getRecoveryUnit(opCtx),
-                                                     identInfo.identName,
-                                                     ident::isCollectionIdent(identInfo.identName),
-                                                     identInfo.onDrop,
-                                                     mode.timestamp);
-                       },
-                       [&](const DropUnreplicated&) -> Status {
-                           return _engine->dropIdent(*shard_role_details::getRecoveryUnit(opCtx),
-                                                     identInfo.identName,
-                                                     ident::isCollectionIdent(identInfo.identName),
-                                                     identInfo.onDrop,
-                                                     boost::none);
-                       }},
-                   dropExecution);
+                    // Call opObserver so that it generates an oplog entry.
+                    opCtx->getServiceContext()->getOpObserver()->onReplicatedIdentDrop(
+                        opCtx, identInfo.identName, reservedIdentDropTimestamp);
+                    invariant(!reservedIdentDropTimestamp.isNull());
+
+                    const uint64_t schemaEpoch = provider.getSchemaEpochForTimestamp(
+                        reservedIdentDropTimestamp.getTimestamp());
+                    auto s = _engine->dropIdent(*shard_role_details::getRecoveryUnit(opCtx),
+                                                identInfo.identName,
+                                                ident::isCollectionIdent(identInfo.identName),
+                                                identInfo.onDrop,
+                                                schemaEpoch);
+                    if (s.isOK()) {
+                        wuow.commit();
+                    }
+                    return s;
+                } catch (const DBException& ex) {
+                    return ex.toStatus();
+                }
+            },
+            [&](const DropAsReplicatedApply& mode) -> Status {
+                const uint64_t schemaEpoch = provider.getSchemaEpochForTimestamp(mode.timestamp);
+                return _engine->dropIdent(*shard_role_details::getRecoveryUnit(opCtx),
+                                          identInfo.identName,
+                                          ident::isCollectionIdent(identInfo.identName),
+                                          identInfo.onDrop,
+                                          schemaEpoch);
+            },
+            [&](const DropUnreplicated&) -> Status {
+                return _engine->dropIdent(*shard_role_details::getRecoveryUnit(opCtx),
+                                          identInfo.identName,
+                                          ident::isCollectionIdent(identInfo.identName),
+                                          identInfo.onDrop,
+                                          boost::none);
+            }},
+        dropExecution);
 
     if (!status.isOK()) {
         stdx::lock_guard lock(_mutex);

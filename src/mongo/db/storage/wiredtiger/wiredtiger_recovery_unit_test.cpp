@@ -37,6 +37,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/transaction_resources.h"
@@ -1192,33 +1193,46 @@ DEATH_TEST_F(WiredTigerRecoveryUnitTestFixtureDeathTest,
 }
 
 /**
- * A WiredTigerKVEngine subclass that allows overriding shouldTimestampTableCreations() and
- * mocking publishIdent() for testing the recovery unit's commit/abort behavior.
+ * A WiredTigerKVEngine subclass that allows overriding usesSchemaEpochs() and mocking
+ * publishIdent() for testing the recovery unit's commit/abort behavior.
  */
 class MockWiredTigerKVEngine : public WiredTigerKVEngine {
 public:
     using WiredTigerKVEngine::WiredTigerKVEngine;
 
-    bool shouldTimestampTableCreations() const override {
-        return _shouldTimestampTableCreations;
+    bool usesSchemaEpochs() const override {
+        return _usesSchemaEpochs;
     }
 
     MOCK_METHOD(void,
                 publishIdent,
-                (WiredTigerRecoveryUnit & ru, StringData ident, Timestamp publishTimestamp),
+                (WiredTigerRecoveryUnit & ru, StringData ident, uint64_t schemaEpoch),
                 (override));
 
     MOCK_METHOD(void, pinAllDurableTimestamp, (uint64_t ts), (override));
     MOCK_METHOD(void, unpinAllDurableTimestamp, (uint64_t ts), (override));
 
-    bool _shouldTimestampTableCreations = false;
+    bool _usesSchemaEpochs = false;
 };
 
 class WiredTigerRecoveryUnitPublishTableCreationTest : public WiredTigerRecoveryUnitTestFixture {
 public:
+    class MockPersistenceProvider : public rss::AttachedPersistenceProvider {
+    public:
+        bool usesSchemaEpochs() const override {
+            return true;
+        }
+
+        MOCK_METHOD(uint64_t, getSchemaEpochForTimestamp, (Timestamp ts), (const, override));
+    };
+
     void setUp() override {
         harnessHelper =
             std::make_unique<WiredTigerRecoveryUnitHarnessHelperT<MockWiredTigerKVEngine>>();
+        auto provider = std::make_unique<MockPersistenceProvider>();
+        mockProvider = provider.get();
+        rss::ReplicatedStorageService::get(harnessHelper->serviceContext())
+            .setPersistenceProvider(std::move(provider));
 
         clientAndCtx1 = makeClientAndOpCtx(harnessHelper.get(), "test");
         ru1 = checked_cast<WiredTigerRecoveryUnit*>(
@@ -1231,14 +1245,18 @@ public:
                    harnessHelper.get())
             ->getEngine();
     }
+
+    MockPersistenceProvider* mockProvider = nullptr;
 };
 
 TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest, PrimaryPathPublishesWithPinning) {
-    mockEngine()->_shouldTimestampTableCreations = true;
+    mockEngine()->_usesSchemaEpochs = true;
 
     {
         // Primary path (no _commitTimestamp set): should pin all_durable around commit+publish.
-        EXPECT_CALL(*mockEngine(), publishIdent(testing::_, testing::_, Timestamp(2, 0))).Times(1);
+        EXPECT_CALL(*mockProvider, getSchemaEpochForTimestamp(Timestamp(2, 0)))
+            .WillOnce(testing::Return(42ULL));
+        EXPECT_CALL(*mockEngine(), publishIdent(testing::_, testing::_, 42ULL)).Times(1);
         EXPECT_CALL(*mockEngine(), pinAllDurableTimestamp(testing::_)).Times(1);
         EXPECT_CALL(*mockEngine(), unpinAllDurableTimestamp(testing::_)).Times(1);
 
@@ -1259,7 +1277,7 @@ TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest, PrimaryPathPublishesWithP
 }
 
 TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest, AbortDoesNotCallPublish) {
-    mockEngine()->_shouldTimestampTableCreations = true;
+    mockEngine()->_usesSchemaEpochs = true;
 
     EXPECT_CALL(*mockEngine(), publishIdent(testing::_, testing::_, testing::_)).Times(0);
 
@@ -1278,8 +1296,8 @@ TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest, AbortDoesNotCallPublish) 
 }
 
 TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest,
-       CommitDoesNotCallPublishWhenTimestampTableCreationsDisabled) {
-    mockEngine()->_shouldTimestampTableCreations = false;
+       CommitDoesNotCallPublishWhenSchemaEpochsDisabled) {
+    mockEngine()->_usesSchemaEpochs = false;
 
     EXPECT_CALL(*mockEngine(), publishIdent(testing::_, testing::_, testing::_)).Times(0);
 
@@ -1291,12 +1309,14 @@ TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest,
 
 TEST_F(WiredTigerRecoveryUnitPublishTableCreationTest,
        SecondaryPathPublishesWithCapturedTimestampWithoutPinning) {
-    mockEngine()->_shouldTimestampTableCreations = true;
+    mockEngine()->_usesSchemaEpochs = true;
 
-    // Simulate the secondary (non-MDT) path: TimestampBlock sets _commitTimestamp before the
-    // WUOW begins. Tables should be published at the captured per-table timestamp without pinning
+    // Simulate the secondary (non-MDT) path: TimestampBlock sets _commitTimestamp before the WUOW
+    // begins. Tables should be published at the captured per-table schema epoch without pinning
     // all_durable.
-    EXPECT_CALL(*mockEngine(), publishIdent(testing::_, testing::_, Timestamp(5, 0))).Times(1);
+    EXPECT_CALL(*mockProvider, getSchemaEpochForTimestamp(Timestamp(5, 0)))
+        .WillOnce(testing::Return(42ULL));
+    EXPECT_CALL(*mockEngine(), publishIdent(testing::_, testing::_, 42ULL)).Times(1);
     EXPECT_CALL(*mockEngine(), pinAllDurableTimestamp(testing::_)).Times(0);
     EXPECT_CALL(*mockEngine(), unpinAllDurableTimestamp(testing::_)).Times(0);
 

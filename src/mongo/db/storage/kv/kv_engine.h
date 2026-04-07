@@ -246,15 +246,15 @@ public:
      * Removes any knowledge of the ident from the storage engines metadata which includes removing
      * the underlying files belonging to the ident. If the storage engine is unable to process the
      * removal immediately, we enqueue it to be removed at a later time. If a callback is specified,
-     * it will be run upon the drop if this function returns an OK status. If a 'timestamp' is
-     * specified, it indicates the timestamp at which the ident drop should become visible in
+     * it will be run upon the drop if this function returns an OK status. If a 'schemaEpoch' is
+     * specified, it indicates the schema epoch at which the ident drop should become visible in
      * checkpoints.
      */
     virtual Status dropIdent(RecoveryUnit& ru,
                              StringData ident,
                              bool identHasSizeInfo,
                              const StorageEngine::DropIdentCallback& onDrop = nullptr,
-                             boost::optional<Timestamp> timestamp = boost::none) = 0;
+                             boost::optional<uint64_t> schemaEpoch = boost::none) = 0;
 
     /**
      * Removes any knowledge of the ident from the storage engines metadata without removing the

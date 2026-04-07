@@ -135,7 +135,7 @@ class ReplicatedFastCountTestPersistenceProvider : public rss::StubPersistencePr
         return false;
     }
 
-    bool shouldTimestampTableCreations() const override {
+    bool usesSchemaEpochs() const override {
         return false;
     }
 

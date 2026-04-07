@@ -76,7 +76,7 @@ public:
                      StringData ident,
                      bool identHasSizeInfo,
                      const StorageEngine::DropIdentCallback& onDrop = nullptr,
-                     boost::optional<Timestamp> timestamp = boost::none) override;
+                     boost::optional<uint64_t> schemaEpoch = boost::none) override;
 
     std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,
                                                 const NamespaceString& nss,
@@ -208,7 +208,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    bool shouldTimestampTableCreations() const override {
+    bool usesSchemaEpochs() const override {
         return false;
     }
 
@@ -224,9 +224,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void publishIdent(WiredTigerRecoveryUnit& ru,
-                      StringData ident,
-                      Timestamp publishTimestamp) override {
+    void publishIdent(WiredTigerRecoveryUnit& ru, StringData ident, uint64_t schemaEpoch) override {
         MONGO_UNREACHABLE;
     }
 

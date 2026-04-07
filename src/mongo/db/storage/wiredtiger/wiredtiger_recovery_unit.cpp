@@ -33,6 +33,7 @@
 #include "mongo/base/parse_number.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/exceptions.h"
@@ -164,9 +165,13 @@ void WiredTigerRecoveryUnit::_commitAndPublishTables(WiredTigerKVEngineBase* kvE
         _txnClose(true);
 
         // After a successful commit, publish all tables created in this transaction so that
-        // they will be included in checkpoints at or after the commit timestamp.
+        // they will be included in checkpoints at or after the commit schema epoch.
+        invariant(_opCtx);
+        const uint64_t schemaEpoch = rss::ReplicatedStorageService::get(_opCtx)
+                                         .getPersistenceProvider()
+                                         .getSchemaEpochForTimestamp(commitTime);
         for (const auto& table : _createdTables) {
-            kvEngine->publishIdent(*this, table, commitTime);
+            kvEngine->publishIdent(*this, table, schemaEpoch);
         }
     }
 
@@ -189,7 +194,7 @@ void WiredTigerRecoveryUnit::_commit() {
     if (_session && _isActive()) {
         auto* kvEngine = _connection->getKVEngine();
         if (!_createdTables.empty() && commitTime && !commitTime->isNull() &&
-            kvEngine->shouldTimestampTableCreations()) {
+            kvEngine->usesSchemaEpochs()) {
             // In disaggregated storage mode, if this transaction created tables and has a
             // timestamp, pin all_durable before committing to prevent stable from advancing past
             // our commit timestamp before we can publish the tables.

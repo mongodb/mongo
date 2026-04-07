@@ -218,9 +218,9 @@ public:
     virtual bool supportsClassicMagicRestore() const = 0;
 
     /**
-     * If true, this persistence provider expects collection/index table creation to be timestamped.
+     * If true, this persistence provider uses schema epochs for table creation/drop.
      */
-    virtual bool shouldTimestampTableCreations() const = 0;
+    virtual bool usesSchemaEpochs() const = 0;
 
     /**
      * Returns the schema epoch to use when passing a schema-related operation at the given

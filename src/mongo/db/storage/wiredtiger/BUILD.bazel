@@ -177,6 +177,7 @@ mongo_cc_unit_test(
         ":storage_wiredtiger_core",
         ":wiredtiger_record_store_test_harness",
         "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/rss/attached_storage:attached_persistence_provider",
         "//src/mongo/db/storage:checkpointer",
         "//src/mongo/db/storage:recovery_unit_test_harness",
         "//src/mongo/db/storage:storage_engine_common",

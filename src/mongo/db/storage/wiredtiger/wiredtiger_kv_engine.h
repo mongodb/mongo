@@ -332,10 +332,10 @@ public:
     getUnclaimedPreparedTransactionsForStartupRecovery(OperationContext* opCtx) const override;
 
     /**
-     * Returns whether table creations should be published with a timestamp after commit.
+     * Returns whether this engine uses schema epochs for table DDL.
      * Only true for disaggregated storage (DSC) mode.
      */
-    virtual bool shouldTimestampTableCreations() const = 0;
+    virtual bool usesSchemaEpochs() const = 0;
 
     /**
      * Returns the raw all_durable timestamp from WiredTiger without considering pins.
@@ -354,14 +354,13 @@ public:
     virtual void unpinAllDurableTimestamp(uint64_t ts) = 0;
 
     /**
-     * Publishes a table to the shared metadata at the given timestamp. In disaggregated
-     * storage mode, this ensures the table will be included in the next checkpoint with a
-     * timestamp >= publishTimestamp. Currently a no-op stub until the WiredTiger
-     * session->publish() API is implemented.
+     * Publishes a table to the shared metadata at the given schema epoch. In disaggregated storage
+     * mode, this ensures the table will be included in the next checkpoint whose schema epoch >=
+     * schemaEpoch.
      */
     virtual void publishIdent(WiredTigerRecoveryUnit& ru,
                               StringData ident,
-                              Timestamp publishTimestamp) = 0;
+                              uint64_t schemaEpoch) = 0;
 
 protected:
     /**
@@ -523,7 +522,7 @@ public:
                      StringData ident,
                      bool identHasSizeInfo,
                      const StorageEngine::DropIdentCallback& onDrop = nullptr,
-                     boost::optional<Timestamp> timestamp = boost::none) override;
+                     boost::optional<uint64_t> schemaEpoch = boost::none) override;
 
     void dropIdentForImport(Interruptible&, RecoveryUnit&, StringData ident) override;
 
@@ -619,12 +618,10 @@ public:
     uint64_t getRawAllDurableTimestamp() const override;
     void pinAllDurableTimestamp(uint64_t ts) override;
     void unpinAllDurableTimestamp(uint64_t ts) override;
-    void publishIdent(WiredTigerRecoveryUnit& ru,
-                      StringData ident,
-                      Timestamp publishTimestamp) override;
+    void publishIdent(WiredTigerRecoveryUnit& ru, StringData ident, uint64_t schemaEpoch) override;
 
-    bool shouldTimestampTableCreations() const override {
-        return _shouldTimestampTableCreations;
+    bool usesSchemaEpochs() const override {
+        return _usesSchemaEpochs;
     }
 
     bool supportsReadConcernSnapshot() const final;
@@ -988,7 +985,7 @@ private:
     Atomic<bool> _inStandaloneMode;
 
     const bool _supportsTableLogging;
-    const bool _shouldTimestampTableCreations;
+    const bool _usesSchemaEpochs;
 
     // Protects _pinnedAllDurableTimestamps. Only acquired by pin/unpin writers.
     // Readers use _minPinnedTimestamp instead, which writers publish atomically

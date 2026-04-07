@@ -673,7 +673,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
       _shouldRecoverFromOplogAsStandalone(shouldRecoverFromOplogAsStandalone),
       _inStandaloneMode(inStandaloneMode),
       _supportsTableLogging(provider.supportsTableLogging()),
-      _shouldTimestampTableCreations(provider.shouldTimestampTableCreations()),
+      _usesSchemaEpochs(provider.usesSchemaEpochs()),
       _provider(provider) {
     _pinnedOplogTimestamp.store(Timestamp::max().asULL());
     boost::filesystem::path journalPath = path;
@@ -2078,7 +2078,7 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
                                      StringData ident,
                                      bool identHasSizeInfo,
                                      const StorageEngine::DropIdentCallback& onDrop,
-                                     boost::optional<Timestamp> timestamp) {
+                                     boost::optional<uint64_t> schemaEpoch) {
     string uri = WiredTigerUtil::buildTableUri(ident);
 
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
@@ -2698,8 +2698,7 @@ void WiredTigerKVEngine::unpinAllDurableTimestamp(uint64_t ts) {
 
 void WiredTigerKVEngine::publishIdent(WiredTigerRecoveryUnit& ru,
                                       StringData ident,
-                                      Timestamp publishTimestamp) {
-    const uint64_t schemaEpoch = _provider.getSchemaEpochForTimestamp(publishTimestamp);
+                                      uint64_t schemaEpoch) {
     // TODO: SERVER-122163: Call WT session->publish_at_schema_epoch(uri, schemaEpoch) when the API
     // is available.
     LOGV2_DEBUG(

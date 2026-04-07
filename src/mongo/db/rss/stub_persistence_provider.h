@@ -205,10 +205,9 @@ public:
                   "StubPersistenceProvider::supportsClassicMagicRestore() method not implemented");
     }
 
-    bool shouldTimestampTableCreations() const override {
-        uasserted(
-            mongo::ErrorCodes::NotImplemented,
-            "StubPersistenceProvider::shouldTimestampTableCreations() method not implemented");
+    bool usesSchemaEpochs() const override {
+        uasserted(mongo::ErrorCodes::NotImplemented,
+                  "StubPersistenceProvider::usesSchemaEpochs() method not implemented");
     }
 
     uint64_t getSchemaEpochForTimestamp(Timestamp ts) const override {

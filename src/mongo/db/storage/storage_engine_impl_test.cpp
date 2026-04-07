@@ -29,6 +29,8 @@
 
 #include "mongo/db/storage/storage_engine_impl.h"
 
+#include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_helper.h"
 #include "mongo/db/shard_role/transaction_resources.h"
@@ -238,14 +240,24 @@ public:
                  StringData ident,
                  bool identHasSizeInfo,
                  const StorageEngine::DropIdentCallback& onDrop,
-                 boost::optional<Timestamp> timestamp),
+                 boost::optional<uint64_t> schemaEpoch),
                 (override));
+};
+
+class MockPersistenceProvider : public rss::AttachedPersistenceProvider {
+public:
+    MOCK_METHOD(uint64_t, getSchemaEpochForTimestamp, (Timestamp ts), (const, override));
 };
 
 class StorageEngineImplTest : public ServiceContextTest {
 public:
     void setUp() override {
         ServiceContextTest::setUp();
+
+        auto provider = std::make_unique<testing::NiceMock<MockPersistenceProvider>>();
+        _mockProvider = provider.get();
+        rss::ReplicatedStorageService::get(getServiceContext())
+            .setPersistenceProvider(std::move(provider));
 
         auto opCtx = makeOperationContext();
 
@@ -267,6 +279,7 @@ public:
 
     std::unique_ptr<StorageEngine> _storageEngine;
     MockKVEngine* _mockKVEngine;
+    MockPersistenceProvider* _mockProvider = nullptr;
 };
 }  // namespace
 
@@ -277,7 +290,11 @@ TEST_F(StorageEngineImplTest, DropIdentTimestampedPassesTimestampToKVEngine) {
     Timestamp dropIdentTs(10, 20);
     Timestamp dropCollectionTs(5, 0);
 
-    // Assert that the replicated ident drop timestamp is passed to the KVEngine.
+    // Assert that the replicated ident drop schema epoch is passed to the KVEngine.
+    const uint64_t expectedSchemaEpoch = 42;
+    ON_CALL(*_mockProvider, getSchemaEpochForTimestamp(dropIdentTs))
+        .WillByDefault(testing::Return(expectedSchemaEpoch));
+
     _storageEngine->addDropPendingIdent(dropCollectionTs, std::make_shared<Ident>(ident));
 
     EXPECT_CALL(*_mockKVEngine, dropIdent)
@@ -285,12 +302,11 @@ TEST_F(StorageEngineImplTest, DropIdentTimestampedPassesTimestampToKVEngine) {
                       StringData calledIdent,
                       bool identHasSizeInfo,
                       const StorageEngine::DropIdentCallback& onDrop,
-                      boost::optional<Timestamp> timestamp) {
+                      boost::optional<uint64_t> schemaEpoch) {
             ASSERT_EQ(calledIdent, StringData{ident});
             ASSERT_EQ(identHasSizeInfo, ident::isCollectionIdent(calledIdent));
             ASSERT_FALSE(static_cast<bool>(onDrop));
-            ASSERT(timestamp);
-            ASSERT_EQ(*timestamp, dropIdentTs);
+            ASSERT_EQ(schemaEpoch, expectedSchemaEpoch);
             return Status::OK();
         });
 
@@ -303,12 +319,11 @@ TEST_F(StorageEngineImplTest, DropIdentTimestampedPassesTimestampToKVEngine) {
                       StringData calledIdent,
                       bool identHasSizeInfo,
                       const StorageEngine::DropIdentCallback& onDrop,
-                      boost::optional<Timestamp> timestamp) {
+                      boost::optional<uint64_t> schemaEpoch) {
             ASSERT_EQ(calledIdent, StringData{ident});
             ASSERT_EQ(identHasSizeInfo, ident::isCollectionIdent(calledIdent));
             ASSERT_FALSE(static_cast<bool>(onDrop));
-            ASSERT(timestamp);
-            ASSERT_EQ(*timestamp, dropIdentTs);
+            ASSERT_EQ(schemaEpoch, expectedSchemaEpoch);
             return Status(ErrorCodes::OperationFailed, "Mock KV engine dropIdent failed.");
         });
 
