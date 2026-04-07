@@ -145,6 +145,7 @@ typedef struct __wt_disagg_metadata {
     size_t checkpoint_len;         /* Length of checkpoint metadata string */
     uint64_t checkpoint_timestamp; /* Checkpoint timestamp */
     uint64_t oldest_timestamp;     /* Oldest timestamp */
+    uint32_t largest_file_id;      /* High water mark of allocated file IDs */
 
     const char *key_provider; /* Key provider metadata string */
     size_t key_provider_len;  /* Length of key provider metadata string */

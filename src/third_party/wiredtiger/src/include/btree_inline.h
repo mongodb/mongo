@@ -294,6 +294,10 @@ __wt_btree_shared(WT_SESSION_IMPL *session, const char *uri, const char **bt_cfg
     WT_RET(__wt_config_gets(session, bt_cfg, "block_manager", &cval));
     *shared = (WT_SUFFIX_MATCH(uri, ".wt_stable") || WT_CONFIG_LIT_MATCH("disagg", cval));
 
+    /* Ingest btrees must never be shared. */
+    WT_ASSERT_ALWAYS(session, !(*shared && WT_SUFFIX_MATCH(uri, ".wt_ingest")),
+      "Ingest btree incorrectly created as shared.");
+
     return (0);
 }
 

@@ -69,15 +69,23 @@ class test_layered71(wttest.WiredTigerTestCase):
         # Create an empty table
         session2 = self.conn.open_session('')
         session2.create(self.uri, self.create_session_config)
+
+        # Take the sweep baseline after all initial sweeps has been settled. Any future sweeps is
+        # exclusively from the test table.
+        time.sleep(2)
+        stat_cursor = self.session.open_cursor('statistics:', None, None)
+        sweep_closes_before = stat_cursor[wiredtiger.stat.conn.dh_sweep_dead_close][2]
+        stat_cursor.close()
+
         session2.close()
 
         # Wait until the sweep has closed any idle handles
         while True:
             stat_cursor = self.session.open_cursor('statistics:', None, None)
-            sweep_closes = stat_cursor[wiredtiger.stat.conn.dh_sweep_dead_close][2]
+            sweep_closes_after = stat_cursor[wiredtiger.stat.conn.dh_sweep_dead_close][2]
             stat_cursor.close()
-            if sweep_closes > 0:
-                self.pr(f"Dhandles closed by sweep: {sweep_closes}")
+            if sweep_closes_after - sweep_closes_before > 0:
+                self.pr(f"Dhandles closed by sweep: {sweep_closes_after - sweep_closes_before}")
                 break
             time.sleep(0.5)
 

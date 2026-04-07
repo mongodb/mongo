@@ -28,7 +28,7 @@ __wti_layered_table_manager_init(WT_SESSION_IMPL *session)
     WT_RET(__wt_spin_init(session, &manager->layered_table_lock, "layered table manager"));
 
     /* Allow for up to 1000 files to be allocated at start. */
-    manager->open_layered_table_count = conn->next_file_id + 1000;
+    WT_WITH_SCHEMA_LOCK(session, manager->open_layered_table_count = conn->next_file_id + 1000);
     WT_ERR(__wt_calloc(session, sizeof(WT_LAYERED_TABLE_MANAGER_ENTRY *),
       manager->open_layered_table_count, &manager->entries));
     manager->entries_allocated_bytes =

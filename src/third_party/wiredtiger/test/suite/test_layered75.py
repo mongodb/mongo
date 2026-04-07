@@ -28,6 +28,7 @@
 
 import re
 import wttest
+from metadata_helper import extract_id
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
@@ -42,7 +43,15 @@ TEST_NAMESPACE_BITS = 3
 @disagg_test_class
 class test_layered75(wttest.WiredTigerTestCase):
     disagg_storages = gen_disagg_storages('test_layered75', disagg_only = True)
-    scenarios = make_scenarios(disagg_storages)
+    creation_formats = [
+        ('layered-bare',       dict(prefix='layered:', extra_config='')),
+        ('layered-disagg',     dict(prefix='layered:', extra_config='block_manager=disagg')),
+        ('table-type-layered', dict(prefix='table:',   extra_config='block_manager=disagg,type=layered')),
+    ]
+    scenarios = make_scenarios(disagg_storages, creation_formats)
+
+    prefix = 'layered:'
+    extra_config = ''
 
     conn_config = 'disaggregated=(role="leader")'
     conn_config_follower = 'disaggregated=(role="follower")'
@@ -54,15 +63,6 @@ class test_layered75(wttest.WiredTigerTestCase):
         self.conn_follow = self.wiredtiger_open('follower', self.extensionsConfig() + ',create,' +
                                                 self.conn_config_follower)
         self.session_follow = self.conn_follow.open_session('')
-
-    def find_id(self, metadata_value):
-        """
-        Parse the file ID from the configuration string.
-        """
-
-        match = re.search(r',id=(\d+)', metadata_value)
-        self.assertTrue(match, "All `file:` or `metadata:` prefixed metadata entries are expected to have IDs")
-        return int(match.group(1))
 
     def check_prohibited_ids(self, file_id):
         """
@@ -110,7 +110,7 @@ class test_layered75(wttest.WiredTigerTestCase):
             if not key.startswith('file:') and not key == 'metadata:':
                 continue
 
-            file_id = self.find_id(value)
+            file_id = extract_id(value)
             self.check_prohibited_ids(file_id)
 
             self.assertTrue(key not in found_files, f"Duplicated table {key}")
@@ -159,8 +159,13 @@ class test_layered75(wttest.WiredTigerTestCase):
         # Check the follower
         self.check_metadata_ids(self.session_follow)
 
+    def make_create_config(self, base='key_format=S,value_format=S'):
+        if self.extra_config:
+            return base + ',' + self.extra_config
+        return base
+
     def test_populate_table_on_leader(self):
-        self.session.create("layered:test_layered75", 'key_format=S,value_format=S')
+        self.session.create(f"{self.prefix}test_layered75", self.make_create_config())
         # Check the leader
         expected_files = {"file:test_layered75.wt_stable": TEST_NAMESPACE_SHARED,
                           "file:test_layered75.wt_ingest": TEST_NAMESPACE_LOCAL}
@@ -174,7 +179,7 @@ class test_layered75(wttest.WiredTigerTestCase):
         expected_files = {"file:test_layered75.wt_stable": TEST_NAMESPACE_SHARED,
                           "file:test_layered75.wt_ingest": TEST_NAMESPACE_LOCAL}
 
-        self.session.create("layered:test_layered75", 'key_format=S,value_format=S')
+        self.session.create(f"{self.prefix}test_layered75", self.make_create_config())
         # Check the leader
         self.check_metadata_ids(self.session, expected_files)
 
@@ -189,7 +194,7 @@ class test_layered75(wttest.WiredTigerTestCase):
 
         for i in range(10):
             table_name = f"test_layered75_{i}"
-            self.session.create(f"layered:{table_name}", 'key_format=S,value_format=S')
+            self.session.create(f"{self.prefix}{table_name}", self.make_create_config())
             expected_files[f"file:{table_name}.wt_stable"] = TEST_NAMESPACE_SHARED
             expected_files[f"file:{table_name}.wt_ingest"] = TEST_NAMESPACE_LOCAL
 
@@ -200,4 +205,30 @@ class test_layered75(wttest.WiredTigerTestCase):
         self.session.checkpoint()
         self.disagg_advance_checkpoint(self.conn_follow)
         # Check the follower
+        self.check_metadata_ids(self.session_follow, expected_files)
+
+    def test_populate_10_tables_on_leader_and_follower(self):
+        # Verify that ingest btrees created on a follower always land in the
+        # local namespace, regardless of how the layered table was created.
+        expected_files = {}
+
+        for i in range(10):
+            table_name = f"test_layered75_{i}"
+            self.session.create(f"{self.prefix}{table_name}", self.make_create_config())
+            expected_files[f"file:{table_name}.wt_stable"] = TEST_NAMESPACE_SHARED
+            expected_files[f"file:{table_name}.wt_ingest"] = TEST_NAMESPACE_LOCAL
+        self.session.checkpoint()
+
+        # Open a follower and advance its view to pick up the shared metadata.
+        self.create_follower()
+        self.disagg_advance_checkpoint(self.conn_follow)
+
+        # Create the same tables on the follower. It should reuse the existing
+        # .wt_stable (shared namespace) and allocate a new .wt_ingest in the
+        # local namespace.
+        for i in range(10):
+            table_name = f"test_layered75_{i}"
+            self.session.create(f"{self.prefix}{table_name}", self.make_create_config())
+
+        # Confirm the follower's ingest table received a local namespace ID.
         self.check_metadata_ids(self.session_follow, expected_files)

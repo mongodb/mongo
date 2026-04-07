@@ -964,7 +964,8 @@ __recovery_file_scan(WT_RECOVERY *r)
      * other annoyances, but they're all solvable problems. We can revisit this decision after using
      * the tracked namespace file IDs for a while.
      */
-    S2C(r->session)->next_file_id = WT_BTREE_ID_UNNAMESPACED(r->max_fileid);
+    uint32_t new_max = WT_BTREE_ID_UNNAMESPACED(r->max_fileid);
+    WT_WITH_SCHEMA_LOCK(r->session, S2C(r->session)->next_file_id = new_max);
 
     __wt_verbose_level_multi(r->session, WT_VERB_RECOVERY_ALL, WT_VERBOSE_INFO,
       "largest file ID found in the metadata %u", r->max_fileid);
