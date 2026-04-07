@@ -42,18 +42,19 @@ struct SizeCountCheckpoint {
 };
 
 SizeCountCheckpoint computeNextCheckpoint(OperationContext* opCtx, Timestamp seekAfterTimestamp) {
-    AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
-    const auto& oplogColl = oplogRead.getCollection();
-    massert(12088200, "oplog collection not found", oplogColl);
-
-    // By utilizing a forward cursor, the cursor should respect oplog visibility rules and only read
-    // up until the no holes point.
-    auto oplogCursor =
-        oplogColl->getRecordStore()->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
-
     // Scan the oplog from `seekAfterTimestamp` and accumulate size and count deltas for every UUID
     // that has written since the last checkpoint.
-    auto scanResult = aggregateSizeCountDeltasInOplog(*oplogCursor, seekAfterTimestamp);
+    auto scanResult = [&]() -> OplogScanResult {
+        AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
+        const auto& oplogColl = oplogRead.getCollection();
+        massert(12088200, "oplog collection not found", oplogColl);
+
+        // By utilizing a forward cursor, the cursor should respect oplog visibility rules and only
+        // read up until the no holes point.
+        auto oplogCursor = oplogColl->getRecordStore()->getCursor(
+            opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+        return aggregateSizeCountDeltasInOplog(*oplogCursor, seekAfterTimestamp);
+    }();
 
     // Combine the oplog deltas with the currently persisted totals to produce the absolute values
     // ready to persist.
