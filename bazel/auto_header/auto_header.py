@@ -34,7 +34,7 @@ PROTO_GEN_SUFFIXES = (".grpc.pb.h", ".pb.h")  # order matters only for readabili
 
 SRC_ROOT_POSIX = SRC_ROOT.as_posix()
 AUTO_HEADER_PREFIX = f"//{SRC_ROOT_POSIX}/"
-VERSION_SALT = "autoheader-v7"  # bump to force regen
+VERSION_SALT = "autoheader-v8"  # bump to force regen
 MANIFEST_PATH = SRC_ROOT / AUTO_DIR / "last_run.json"
 
 # -------- single-pass file lister (cache) --------
@@ -45,6 +45,7 @@ _FILE_LIST_CACHE: list[str] | None = None
 # Val: absolute Bazel label of the generator target to depend on.
 GEN_HEADER_REMAP = {
     "mongo/config.h": f"//{SRC_ROOT_POSIX}/mongo:mongo_config_header",
+    "mongo/scripting/mozjs/wasm/api.h": f"//{SRC_ROOT_POSIX}/mongo/scripting/mozjs/wasm:api.h",
 }
 
 EXCLUDE_HEADERS = {

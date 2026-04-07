@@ -347,6 +347,14 @@ rust.toolchain(
     versions = ["nightly/2025-12-11"],
 )
 
+rust_host = use_extension("@rules_rust//rust:extensions.bzl", "rust_host_tools")
+rust_host.host_tools(
+    name = "rust_host_tools_nightly",
+    edition = "2024",
+    version = "nightly/2025-12-11",
+)
+use_repo(rust_host, "rust_host_tools_nightly")
+
 crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
 crate.spec(
     package = "wasmtime",
@@ -454,8 +462,10 @@ crate.annotation_select(
 )
 
 # Update the lock file using "CARGO_BAZEL_REPIN=1 bazel sync --only=crates"
+# You may need to delete the contents of crates.lock first
 crate.from_specs(
     cargo_lockfile = "//bazel:crates.toml",
+    host_tools = "@rust_host_tools_nightly",
     lockfile = "//bazel:crates.lock",
     supported_platform_triples = [
         "aarch64-apple-darwin",
@@ -468,6 +478,38 @@ crate.from_specs(
     ],
 )
 use_repo(crate, "crates")
+
+# wit-bindgen-cli must live in a separate crate extension because
+# artifact="bin" changes how crate_universe configures exec-platform
+# toolchain resolution for the entire extension, which breaks Windows
+# exec builds of other binary targets (e.g. wasmtime-cli). Any other artifact="bin"
+# should live here.
+cargo_bindeps = use_extension("@rules_rust//crate_universe:extension.bzl", "crate")
+cargo_bindeps.spec(
+    artifact = "bin",
+    package = "wit-bindgen-cli",
+    version = "=0.51.0",
+)
+cargo_bindeps.annotation(
+    crate = "wit-bindgen-cli",
+    gen_all_binaries = True,
+)
+cargo_bindeps.from_specs(
+    name = "cargo_bindeps",
+    cargo_lockfile = "//bazel:cargo_bindeps.toml",
+    host_tools = "@rust_host_tools_nightly",
+    lockfile = "//bazel:cargo_bindeps.lock",
+    supported_platform_triples = [
+        "aarch64-apple-darwin",
+        "aarch64-unknown-linux-gnu",
+        "x86_64-apple-darwin",
+        "x86_64-unknown-linux-gnu",
+        "x86_64-pc-windows-msvc",
+        "powerpc64le-unknown-linux-gnu",
+        "s390x-unknown-linux-gnu",
+    ],
+)
+use_repo(cargo_bindeps, "cargo_bindeps")
 #################### END RUST DEPS ####################
 
 wasi_deps = use_repo_rule(

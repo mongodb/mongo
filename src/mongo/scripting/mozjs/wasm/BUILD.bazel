@@ -2,6 +2,7 @@ load("//bazel/wasm_rules:wasm_cc_binary.bzl", "wasm_cc_binary")
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 load("//bazel/wasm_rules:embed_binary.bzl", "embed_binary_obj", "embed_binary_rc")
 load("//bazel/wasm_rules:wasm_aot_compile.bzl", "aot_compile_wasm")
+load("//bazel/wasm_rules:wit_bindgen_c.bzl", "wit_bindgen_c")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -10,6 +11,14 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+wit_bindgen_c(
+    name = "wit_bindgen_api",
+    out_c = "api.c",
+    out_component_type = "api_component_type.o",
+    out_h = "api.h",
+    wit = "//src/mongo/scripting/mozjs/wasm/wit:mozjs.wit",
 )
 
 # Build SpiderMonkey tarball from source (manual, for re-uploading to S3).
@@ -54,18 +63,19 @@ mongo_cc_library(
             "wasmtime_engine.cpp",
         ],
     ) + [
+        ":api.c",
         "//src/mongo/scripting/mozjs/wasm/engine:api.cpp",
         "//src/mongo/scripting/mozjs/wasm/engine:engine.cpp",
         "//src/mongo/scripting/mozjs/wasm/engine:error.cpp",
         "//src/mongo/scripting/mozjs/wasm/engine:exception_stubs.cpp",
-        "//src/mongo/scripting/mozjs/wasm/wit_gen/generated:api.c",
     ],
     hdrs = [
+        ":api.h",
         "//src/mongo/scripting/mozjs/wasm/engine:engine.h",
         "//src/mongo/scripting/mozjs/wasm/engine:error.h",
         "//src/mongo/scripting/mozjs/wasm/engine:utils.h",
-        "//src/mongo/scripting/mozjs/wasm/wit_gen/generated:api.h",
     ],
+    auto_header = False,
     copts = [
         "-include",
         "js-confdefs.h",
@@ -87,7 +97,7 @@ wasm_cc_binary(
     name = "mozjs_wasm_api",
     out = "mozjs_wasm_api.wasm",
     additional_linker_inputs = [
-        "//src/mongo/scripting/mozjs/wasm/wit_gen/generated:api_component_type.o",
+        ":api_component_type.o",
     ],
     linkopts = [
         "-mexec-model=reactor",

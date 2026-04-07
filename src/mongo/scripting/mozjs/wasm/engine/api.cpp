@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/scripting/mozjs/wasm/wit_gen/generated/api.h"
+#include "mongo/scripting/mozjs/wasm/api.h"
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
