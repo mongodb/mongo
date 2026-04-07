@@ -31,6 +31,7 @@
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/extension/host/document_source_extension_for_query_shape.h"
+#include "mongo/db/extension/host/extension_search_server_status.h"
 #include "mongo/db/extension/host/extension_vector_search_server_status.h"
 #include "mongo/db/extension/host/query_execution_context.h"
 #include "mongo/db/extension/host_connector/adapter/pipeline_rewrite_context_adapter.h"
@@ -227,20 +228,24 @@ DocumentSourceExtensionOptimizable::LiteParsedExpanded::getFirstStageViewApplica
 void DocumentSourceExtensionOptimizable::LiteParsedExpanded::bindViewInfo(
     const ViewInfo& viewInfo, const ResolvedNamespaceMap& resolvedNamespaces) {
     if (!feature_flags::gFeatureFlagExtensionViewsAndUnionWith.isEnabled()) {
-        // If this is not a $vectorSearch stage, views are banned entirely with the feature flag
-        // disabled.
+        // Only $vectorSearch and $search/$searchMeta support IFR kickback on views.
+        // All other extension stages are banned on views when the feature flag is disabled.
         uassert(ErrorCodes::NotImplemented,
                 str::stream() << "Extension stages are not allowed to run on a view namespace.",
-                hasExtensionVectorSearchStage());
+                hasExtensionVectorSearchStage() || hasExtensionSearchStage());
 
-        // If this is a $vectorSearch stage, we perform the IFR flag retry kickback to use legacy
-        // $vectorSearch instead. We pass 'true' here because the uassert above already guarantees
-        // we only reach this point when hasExtensionVectorSearchStage() is true.
+        // Throw an IFR retry error for extension $vectorSearch on a view.
         search_helpers::throwIfrKickbackIfNecessary(
-            true /*kickbackCondition*/,
+            hasExtensionVectorSearchStage(),
             feature_flags::gFeatureFlagVectorSearchExtension,
             vector_search_metrics::onViewKickbackRetryCount,
             "$vectorSearch-as-an-extension is not allowed against views.");
+        // Throw an IFR retry error for extension $search/$searchMeta on a view.
+        search_helpers::throwIfrKickbackIfNecessary(
+            hasExtensionSearchStage(),
+            feature_flags::gFeatureFlagSearchExtension,
+            search_metrics::onViewKickbackRetryCount,
+            "$search/$searchMeta-as-an-extension are not allowed against views.");
     }
 
     auto viewInfoAdapter = host_connector::ViewInfoAdapter::fromViewInfo(viewInfo);

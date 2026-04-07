@@ -1496,14 +1496,20 @@ Status ClusterAggregate::runAggregate(
             state.resolvedView =
                 chainViews(std::move(state.resolvedView), *ex.extraInfo<ResolvedView>());
 
-            // Pre-disable vector search extension for views. This is an optimization,
-            // because we know that the vector search extension is not eligible to run on
-            // views. If we do not implement this optimization, we will eventually throw the
-            // IFR flag kickback retry and end up restarting ClusterAggregate again.
-            if (ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagVectorSearchExtension) &&
-                !feature_flags::gFeatureFlagExtensionViewsAndUnionWith.isEnabled()) {
-                state.ifrFlagsToDisableOnRetries.insert(
-                    &feature_flags::gFeatureFlagVectorSearchExtension);
+            // Pre-disable mongot extensions for views. This is an optimization, because we know
+            // these extensions are not eligible to run on views. If we do not implement this
+            // optimization, we will eventually throw the IFR flag kickback retry and end up
+            // restarting ClusterAggregate again.
+            if (!feature_flags::gFeatureFlagExtensionViewsAndUnionWith.isEnabled()) {
+                if (ifrContext->getSavedFlagValue(
+                        feature_flags::gFeatureFlagVectorSearchExtension)) {
+                    state.ifrFlagsToDisableOnRetries.insert(
+                        &feature_flags::gFeatureFlagVectorSearchExtension);
+                }
+                if (ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagSearchExtension)) {
+                    state.ifrFlagsToDisableOnRetries.insert(
+                        &feature_flags::gFeatureFlagSearchExtension);
+                }
             }
 
             result->resetToEmpty();
