@@ -207,7 +207,8 @@ def query_targets_to_burn_in(
 @cache
 def get_targets_with_tag(tag: str) -> list[str]:
     try:
-        query = f"attr(tags, '\\b{tag}(?![a-zA-Z0-9_-])', //...)"
+        excluded = "attr(tags, '\\bincompatible_with_bazel_remote_test(?![a-zA-Z0-9_-])', //...)"
+        query = f"attr(tags, '\\b{tag}(?![a-zA-Z0-9_-])', //...) - {excluded}"
         result = subprocess.run(
             ["bazel", "query", query],
             capture_output=True,

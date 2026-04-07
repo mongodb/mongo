@@ -238,5 +238,26 @@ class TestCreateBurnInTarget(unittest.TestCase):
         mock_bd_set.assert_any_call([target_burn_in], "shard_count", "1")
 
 
+class TestGetTargetsWithTag(unittest.TestCase):
+    """Tests for get_targets_with_tag function."""
+
+    def setUp(self):
+        # Clear the @cache of get_targets_with_tag between tests
+        under_test.get_targets_with_tag.cache_clear()
+
+    @patch(ns("subprocess.run"))
+    def test_query_excludes_incompatible_with_bazel_remote_test(self, mock_run):
+        """Test that the bazel query subtracts incompatible_with_bazel_remote_test targets."""
+        mock_run.return_value.stdout = "//jstests/suites/foo:bar\n"
+
+        under_test.get_targets_with_tag("ci-release-critical")
+
+        query_arg = mock_run.call_args[0][0]
+        query_str = " ".join(query_arg)
+        # The query passed to bazel should contain a set difference excluding
+        # targets tagged with incompatible_with_bazel_remote_test
+        self.assertIn("incompatible_with_bazel_remote_test", query_str)
+
+
 if __name__ == "__main__":
     unittest.main()
