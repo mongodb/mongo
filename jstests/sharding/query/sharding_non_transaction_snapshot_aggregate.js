@@ -10,12 +10,15 @@
 
 import {SnapshotReadsTest} from "jstests/libs/global_snapshot_reads_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 import {flushRoutersAndRefreshShardMetadata} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const nodeOptions = {
-    // Set a large snapshot window of 10 minutes for the test.
-    setParameter: {minSnapshotHistoryWindowInSeconds: 600},
+    setParameter: {
+        // Set a large snapshot window of 10 minutes for the test.
+        minSnapshotHistoryWindowInSeconds: 600,
+    },
 };
 
 const dbName = "test";
@@ -42,6 +45,25 @@ const st = new ShardingTest({
     config: TestData.configShard ? undefined : 1,
     other: {configOptions: nodeOptions, rsOptions: nodeOptions},
 });
+
+// TODO SERVER-122748: This should be integrated with the setParameter option passed above, however we need
+// to handle multiversion testing.
+function disableDurableRecovery(conn) {
+    const nodes = FixtureHelpers.getAllNodes(conn.getDB("admin"));
+    for (const node of nodes) {
+        const res = node.adminCommand({getParameter: 1, durableRecoveryForCollectionCatalogEntryChance: 1});
+        if (res.ok) {
+            assert.commandWorked(
+                node.adminCommand({setParameter: 1, durableRecoveryForCollectionCatalogEntryChance: 0}),
+            );
+        }
+    }
+}
+
+// Disable collection catalog forced recovery since it will conflict with this test due to aggregations failing
+// whenever they reacquire the collection after an internal yield since the collections are "different".
+disableDurableRecovery(st.s);
+
 // Config sharded collections.
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: st.s.getDB(dbName)[singleShardedColl1] + "", key: {_id: 1}}));

@@ -410,6 +410,13 @@ Status commitTimeseriesBucketsAtomically(OperationContext* opCtx,
         const CollatorInterface* collator = nullptr;
 
         try {
+            // TODO SERVER-122139: This code has a race condition with concurrent collection catalog
+            // operations. The returned collection may be an opened collection since it's taken with
+            // a MODE_IS locking mode, therefore it ends up becoming a lock-free operation. This can
+            // result in a use-after-free error. We temporarily exclude this in order to make
+            // testing happy, but it should nonetheless be fixed.
+            ExcludeTestOnlyCollectionInstantiation exclusion(opCtx);
+
             // The associated collection must be acquired before we check for the presence of
             // buckets collection. This ensures that a potential ShardVersion mismatch can be
             // detected, before checking for other errors. Moreover, since e.g. 'prepareCommit()'
@@ -647,6 +654,13 @@ bucket_catalog::TimeseriesWriteBatches stageOrderedWritesToBucketCatalog(
     TimeseriesOptions timeseriesOptions;
 
     try {
+        // TODO SERVER-122139: This code has a race condition with concurrent collection catalog
+        // operations. The returned collection may be an opened collection since it's taken with a
+        // MODE_IS locking mode, therefore it ends up becoming a lock-free operation. This can
+        // result in a use-after-free error. We temporarily exclude this in order to make evergreen
+        // happy, but it should nonetheless be fixed.
+        ExcludeTestOnlyCollectionInstantiation exclusion(opCtx);
+
         // It must be ensured that the CollectionShardingState remains consistent while rebuilding
         // the timeseriesOptions. However, the associated collection must be acquired before
         // we check for the presence of buckets collection. This ensures that a potential
@@ -1145,6 +1159,13 @@ commit_result::Result commitTimeseriesBucketForBatch(
     NamespaceString nss;
 
     try {
+        // TODO SERVER-122139: This code has a race condition with concurrent collection catalog
+        // operations. The returned collection may be an opened collection since it's taken with a
+        // MODE_IS locking mode, therefore it ends up becoming a lock-free operation. This can
+        // result in a use-after-free error. We temporarily exclude this in order to make evergreen
+        // happy, but it should nonetheless be fixed.
+        ExcludeTestOnlyCollectionInstantiation exclusion(opCtx);
+
         // The associated collection must be acquired before we check for the presence of
         // buckets collection. This ensures that a potential ShardVersion mismatch can be
         // detected, before checking for other errors. Moreover, since e.g. 'prepareCommit()' might
@@ -1384,6 +1405,13 @@ bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalog(
     TimeseriesOptions timeseriesOptions;
 
     try {
+        // TODO SERVER-122139: This code has a race condition with concurrent collection catalog
+        // operations. The returned collection may be an opened collection since it's taken with a
+        // MODE_IS locking mode, therefore it ends up becoming a lock-free operation. This can
+        // result in a use-after-free error. We temporarily exclude this in order to make evergreen
+        // happy, but it should nonetheless be fixed.
+        ExcludeTestOnlyCollectionInstantiation exclusion(opCtx);
+
         // It must be ensured that the CollectionShardingState remains consistent while rebuilding
         // the timeseriesOptions. However, the associated collection must be acquired before
         // we check for the presence of buckets collection. This ensures that a potential
@@ -1497,6 +1525,13 @@ bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalogUnopti
     TimeseriesOptions timeseriesOptions;
 
     try {
+        // TODO SERVER-122139: This code has a race condition with concurrent collection catalog
+        // operations. The returned collection may be an opened collection since it's taken with a
+        // MODE_IS locking mode, therefore it ends up becoming a lock-free operation. This can
+        // result in a use-after-free error. We temporarily exclude this in order to make evergreen
+        // happy, but it should nonetheless be fixed.
+        ExcludeTestOnlyCollectionInstantiation exclusion(opCtx);
+
         // It must be ensured that the CollectionShardingState remains consistent while rebuilding
         // the timeseriesOptions. However, the associated collection must be acquired before
         // we check for the presence of buckets collection. This ensures that a potential

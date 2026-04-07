@@ -814,7 +814,10 @@ private:
     boost::optional<durable_catalog::CatalogEntry> _fetchPITCatalogEntry(
         OperationContext* opCtx,
         const NamespaceStringOrUUID& nssOrUUID,
-        boost::optional<Timestamp> readTimestamp) const;
+        boost::optional<Timestamp> readTimestamp,
+        // TODO SERVER-121286: This argument shouldn't exist as we only keep this here to avoid
+        // hitting an invariant.
+        bool writeIntoCatalogIdTracker = true) const;
 
     /**
      * Tries to create a Collection instance using existing shared collection state. Returns nullptr
@@ -890,6 +893,16 @@ private:
                               boost::optional<Timestamp> readTimestamp) const;
 
     /**
+     * A helper method that forces creation of collections from durable storage during testing.
+     *
+     * Returns a nullptr if no instantiation could be made.
+     */
+    const Collection* _instantiateCollectionIfTesting(
+        OperationContext* opCtx,
+        const NamespaceStringOrUUID& nssOrUUID,
+        boost::optional<Timestamp> readTimestamp) const;
+
+    /**
      * Returns the collection pointer representative of 'nssOrUUID' at the provided read timestamp.
      * If no timestamp is provided, returns instance of the latest collection. The returned
      * collection instance is only valid while the storage snapshot is open and becomes invalidated
@@ -957,6 +970,24 @@ private:
 
     // Tracks usage of collection usage features (e.g. capped).
     Stats _stats;
+};
+
+/**
+ * This class is an unfortunate necessity in cases we need to temporarily disable forceful
+ * collection loading from durable storage. Note that this is only a test-only feature and the mere
+ * usage of this implies that production code is susceptible to a use-after-free condition.
+ *
+ * Any usage of this class should be documented with a SERVER-XXXXXX ticket explaining why it's
+ * there and why we had to temporarily disable this. The owning team's task should be to therefore
+ * fix the code in order to remove the exception.
+ */
+class MONGO_MOD_PUBLIC ExcludeTestOnlyCollectionInstantiation {
+public:
+    ExcludeTestOnlyCollectionInstantiation(OperationContext* opCtx);
+    ~ExcludeTestOnlyCollectionInstantiation();
+
+private:
+    OperationContext* _opCtx;
 };
 
 }  // namespace mongo

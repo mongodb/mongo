@@ -8,6 +8,7 @@
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -65,7 +66,29 @@ function setUpShardedCollectionAndView(st, session, primaryShard) {
     return shardedView;
 }
 
-const st = new ShardingTest({shards: 2, mongos: 1});
+const st = new ShardingTest({
+    shards: 2,
+    mongos: 1,
+});
+
+// TODO SERVER-122748: This should be integrated with the setParameter option passed above, however we need
+// to handle multiversion testing.
+function disableDurableRecovery(conn) {
+    const nodes = FixtureHelpers.getAllNodes(conn.getDB("admin"));
+    for (const node of nodes) {
+        const res = node.adminCommand({getParameter: 1, durableRecoveryForCollectionCatalogEntryChance: 1});
+        if (res.ok) {
+            assert.commandWorked(
+                node.adminCommand({setParameter: 1, durableRecoveryForCollectionCatalogEntryChance: 0}),
+            );
+        }
+    }
+}
+
+// Disable collection catalog forced recovery since it will conflict with this test due to aggregations failing
+// whenever they reacquire the collection after an internal yield since the collections are "different".
+disableDurableRecovery(st.s);
+
 const session = st.s.startSession();
 
 // Set up an unsharded collection on shard0.

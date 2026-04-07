@@ -172,6 +172,10 @@ public:
             options.clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
         }
 
+        // We advance the timestamp to whatever was last set for the stable timestamp.
+        auto stableTimestamp = _opCtx.getServiceContext()->getStorageEngine()->getStableTimestamp();
+        timestampToUse = std::max(stableTimestamp, timestampToUse);
+
         _opCtx.getServiceContext()->getStorageEngine()->setInitialDataTimestamp(timestampToUse);
 
         const bool createIdIndex = !clustered;
@@ -4191,6 +4195,9 @@ public:
 
             // Validate in repair mode can only be used in standalone mode, so ignore timestamp
             // assertions.
+            // We abandon the snapshot because the acquisition may have opened a snapshot due to the
+            // sanitizer/test-only forceful collection instantiation.
+            shard_role_details::getRecoveryUnit(&_opCtx)->abandonSnapshot();
             shard_role_details::getRecoveryUnit(&_opCtx)->allowAllUntimestampedWrites();
             ASSERT_OK(CollectionValidation::validate(
                 &_opCtx,

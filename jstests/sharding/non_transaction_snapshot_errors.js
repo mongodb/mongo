@@ -15,6 +15,7 @@
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 import {
     kSnapshotErrors,
@@ -96,9 +97,31 @@ const st = new ShardingTest({
     mongos: 1,
     config: 1,
     other: {
-        rsOptions: {setParameter: {minSnapshotHistoryWindowInSeconds: kMinSnapshotHistoryWindowInSeconds}},
+        rsOptions: {
+            setParameter: {
+                minSnapshotHistoryWindowInSeconds: kMinSnapshotHistoryWindowInSeconds,
+            },
+        },
     },
 });
+
+// TODO SERVER-122748: This should be integrated with the setParameter option passed above, however we need
+// to handle multiversion testing.
+function disableDurableRecovery(conn) {
+    const nodes = FixtureHelpers.getAllNodes(conn.getDB("admin"));
+    for (const node of nodes) {
+        const res = node.adminCommand({getParameter: 1, durableRecoveryForCollectionCatalogEntryChance: 1});
+        if (res.ok) {
+            assert.commandWorked(
+                node.adminCommand({setParameter: 1, durableRecoveryForCollectionCatalogEntryChance: 0}),
+            );
+        }
+    }
+}
+
+// Disable collection catalog forced recovery since it will conflict with this test due to aggregations failing
+// whenever they reacquire the collection after an internal yield since the collections are "different".
+disableDurableRecovery(st.s);
 
 jsTestLog("Unsharded snapshot read");
 
