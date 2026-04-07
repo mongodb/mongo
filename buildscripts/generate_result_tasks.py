@@ -47,6 +47,10 @@ NIGHTLY_PROJECT_CONFIG = "etc/evergreen_nightly.yml"
 app = typer.Typer(pretty_exceptions_show_locals=False)
 
 
+def _bazel_binary() -> str:
+    return os.environ.get("BAZEL_BINARY", "bazel")
+
+
 def make_results_task(target: str) -> Task:
     commands = [
         FunctionCall("fetch remote test results", {"test_label": target}),
@@ -352,7 +356,7 @@ def query_targets(
         query = f"({' + '.join(tag_queries)}) - {excluded}"
 
     cmd = (
-        ["bazel", "cquery"]
+        [_bazel_binary(), "cquery"]
         + flags_list
         + [
             query,

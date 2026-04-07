@@ -10,6 +10,7 @@
 # Needed for evergreen scripts that use evergreen expansions and utility methods.
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
+. "$DIR/bazel_evergreen_shutils.sh"
 
 cd src
 
@@ -19,9 +20,8 @@ set -o verbose
 # Use `eval` to force evaluation of the environment variables in the echo statement:
 eval echo "Execution environment: Args: ${args} Target: ${target}"
 
-# We only support explicitly limited arch for code coverage, so there
-# are fewer conditionals here than elsewhere in more general utilities.
-BAZEL_BINARY=bazel
+BAZEL_BINARY="$(bazel_evergreen_shutils::bazel_get_binary_path)"
+export BAZEL_BINARY
 
 # Print command being run to file that can be uploaded
 echo "python buildscripts/install_bazel.py" >bazel-invocation.txt

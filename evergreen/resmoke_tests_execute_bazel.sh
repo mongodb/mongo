@@ -16,6 +16,7 @@ set -o verbose
 bazel_evergreen_shutils::activate_and_cd_src
 
 BAZEL_BINARY=$(bazel_evergreen_shutils::bazel_get_binary_path)
+export BAZEL_BINARY
 
 ci_flags="--//bazel/resmoke:in_evergreen"
 

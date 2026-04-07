@@ -1,6 +1,7 @@
 #!/bin/env bash
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
+. "$DIR/bazel_evergreen_shutils.sh"
 
 cd src
 
@@ -15,6 +16,8 @@ fi
 
 activate_venv
 export MONGO_WRAPPER_OUTPUT_ALL=1
+BAZEL_BINARY="$(bazel_evergreen_shutils::bazel_get_binary_path)"
+export BAZEL_BINARY
 # number of parallel jobs to use for build.
 # Even with scale=0 (the default), bc command adds decimal digits in case of multiplication. Division by 1 gives us a whole number with scale=0
 coverity_config_dir="$workdir/coverity/config"
@@ -29,7 +32,7 @@ trap 'rm -f "$compiledb_target_pattern_file" "$query_stderr_file"' EXIT
 echo "Generating compile_commands.json for Coverity capture"
 echo "Resolving mongo_compiledb targets under //:install-core"
 query_command=(
-    bazel
+    "$BAZEL_BINARY"
     $bazel_cache
     cquery
     $build_config
@@ -53,7 +56,7 @@ if [ ! -s "$compiledb_target_pattern_file" ]; then
 fi
 
 build_compiledb_command=(
-    bazel
+    "$BAZEL_BINARY"
     $bazel_cache
     build
     $build_config
@@ -65,9 +68,9 @@ echo
 "${build_compiledb_command[@]}"
 
 echo "Setting up clang-tidy IDE files"
-bazel $bazel_cache run $build_config //:setup_clang_tidy
+"$BAZEL_BINARY" $bazel_cache run $build_config //:setup_clang_tidy
 
-compiledb_output_base="$(bazel $bazel_cache info output_base)"
+compiledb_output_base="$("$BAZEL_BINARY" $bazel_cache info output_base)"
 repo_python=""
 python_candidates=(
     "$compiledb_output_base/external/_main~setup_mongo_python_toolchains~py_host/dist/bin/python3"
