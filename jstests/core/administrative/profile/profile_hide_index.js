@@ -104,6 +104,12 @@ testDb.system.profile.drop();
 assert.commandWorked(testDb.setProfilingLevel(
     1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
 
+// Increase this deadline in order to prevent flakiness in this test.
+assert.commandWorked(
+    testDb.getSiblingDB("admin").runCommand(
+        {setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 1000}),
+);
+
 assert.commandWorked(coll.createIndex({b: 1}, {hidden: true}));
 profilerHasSingleMatchingEntryOrThrow({
     profileDB: testDb,
