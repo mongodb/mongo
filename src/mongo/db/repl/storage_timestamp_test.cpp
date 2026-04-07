@@ -2186,7 +2186,6 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuilds) {
                                                                  collUUID,
                                                                  {indexBuildInfo1, indexBuildInfo2},
                                                                  buildUUID,
-                                                                 IndexBuildProtocol::kTwoPhase,
                                                                  options));
         ASSERT_OK(IndexBuildsCoordinator::get(_opCtx)->voteCommitIndexBuild(
             _opCtx, buildUUID, repl::ReplicationCoordinator::get(_opCtx)->getMyHostAndPort()));
@@ -2297,7 +2296,6 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuildsDuringRename) {
                                                                  collUUID,
                                                                  {indexBuildInfo1, indexBuildInfo2},
                                                                  buildUUID,
-                                                                 IndexBuildProtocol::kTwoPhase,
                                                                  options));
         ASSERT_OK(IndexBuildsCoordinator::get(_opCtx)->voteCommitIndexBuild(
             _opCtx, buildUUID, repl::ReplicationCoordinator::get(_opCtx)->getMyHostAndPort()));
@@ -2427,14 +2425,8 @@ TEST_F(StorageTimestampTest, TimestampAbortIndexBuild) {
         auto buildUUID = UUID::gen();
         const IndexBuildsCoordinator::IndexBuildOptions options = {.commitQuorum =
                                                                        CommitQuorumOptions(1)};
-        auto fut = unittest::assertGet(
-            IndexBuildsCoordinator::get(_opCtx)->startIndexBuild(_opCtx,
-                                                                 nss.dbName(),
-                                                                 collUUID,
-                                                                 {indexBuildInfo1},
-                                                                 buildUUID,
-                                                                 IndexBuildProtocol::kTwoPhase,
-                                                                 options));
+        auto fut = unittest::assertGet(IndexBuildsCoordinator::get(_opCtx)->startIndexBuild(
+            _opCtx, nss.dbName(), collUUID, {indexBuildInfo1}, buildUUID, options));
         ASSERT_OK(IndexBuildsCoordinator::get(_opCtx)->voteCommitIndexBuild(
             _opCtx, buildUUID, repl::ReplicationCoordinator::get(_opCtx)->getMyHostAndPort()));
         ASSERT_EQUALS(ErrorCodes::DuplicateKey, fut.getNoThrow().getStatus().code());
@@ -3120,7 +3112,6 @@ TEST_F(StorageTimestampTest, MultipleTimestampsForMultikeyWrites) {
                                                                  collUUID,
                                                                  {indexBuildInfo1, indexBuildInfo2},
                                                                  buildUUID,
-                                                                 IndexBuildProtocol::kTwoPhase,
                                                                  options));
         ASSERT_OK(IndexBuildsCoordinator::get(_opCtx)->voteCommitIndexBuild(
             _opCtx, buildUUID, repl::ReplicationCoordinator::get(_opCtx)->getMyHostAndPort()));

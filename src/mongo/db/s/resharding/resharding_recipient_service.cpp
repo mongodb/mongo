@@ -1290,10 +1290,13 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                                feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
                                    VersionContext::getDecoration(opCtx.get()), fcvSnapshot);
                            IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions{
+                               // TODO(SERVER-109664): Set this to IndexBuildMethodEnum::kHybrid
                                .indexBuildMethod =
                                    (isPrimaryDrivenIndexBuild ? IndexBuildMethodEnum::kPrimaryDriven
                                                               : IndexBuildMethodEnum::kHybrid),
-
+                               .indexBuildProtocol =
+                                   (isPrimaryDrivenIndexBuild ? IndexBuildProtocol::kPrimaryDriven
+                                                              : IndexBuildProtocol::kTwoPhase),
                                .commitQuorum =
                                    (isPrimaryDrivenIndexBuild
                                         ? CommitQuorumOptions(CommitQuorumOptions::kPrimarySelfVote)
@@ -1317,7 +1320,6 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                                _metadata.getReshardingUUID(),
                                indexes,
                                buildUUID,
-                               IndexBuildProtocol::kTwoPhase,
                                indexBuildOptions);
                            if (indexBuildFuture.isOK()) {
                                return indexBuildFuture.getValue();

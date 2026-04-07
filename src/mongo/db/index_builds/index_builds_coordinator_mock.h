@@ -44,7 +44,6 @@ public:
         const UUID& collectionUUID,
         const std::vector<IndexBuildInfo>& indexes,
         const UUID& buildUUID,
-        IndexBuildProtocol protocol,
         IndexBuildOptions indexBuildOptions) override;
 
     StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>> resumeIndexBuild(

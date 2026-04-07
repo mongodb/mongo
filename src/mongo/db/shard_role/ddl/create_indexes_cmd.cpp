@@ -58,6 +58,7 @@
 #include "mongo/db/index_key_validate.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/write_ops/insert.h"
@@ -497,9 +498,12 @@ bool isCreatingInternalConfigTxnsPartialIndex(const CreateIndexesCommand& cmd) {
 }
 
 IndexBuildProtocol determineProtocol(OperationContext* opCtx, const NamespaceString& ns) {
-    return !repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns)
-        ? IndexBuildProtocol::kTwoPhase
-        : IndexBuildProtocol::kSinglePhase;
+    if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns)) {
+        return IndexBuildProtocol::kSinglePhase;
+    } else if (isPrimaryDrivenIndexBuildEnabled(VersionContext::getDecoration(opCtx))) {
+        return IndexBuildProtocol::kPrimaryDriven;
+    }
+    return IndexBuildProtocol::kTwoPhase;
 }
 
 boost::optional<CreateIndexesCommand> translateCommandForTimeseries(
@@ -688,11 +692,13 @@ CreateIndexesReply runCreateIndexesWithCoordinator(
     ReplIndexBuildState::IndexCatalogStats stats;
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {
+        // TODO(SERVER-109664): Set this to IndexBuildMethodEnum::kHybrid
         .indexBuildMethod = ((fcvSnapshot.isVersionInitialized() &&
                               feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
                                   VersionContext::getDecoration(opCtx), fcvSnapshot))
                                  ? IndexBuildMethodEnum::kPrimaryDriven
                                  : IndexBuildMethodEnum::kHybrid),
+        .indexBuildProtocol = protocol,
         .commitQuorum = commitQuorum};
 
     LOGV2(20438,
@@ -714,14 +720,8 @@ CreateIndexesReply runCreateIndexesWithCoordinator(
 
     bool shouldContinueInBackground = false;
     try {
-        auto buildIndexFuture =
-            uassertStatusOK(indexBuildsCoord->startIndexBuild(opCtx,
-                                                              cmd.getDbName(),
-                                                              *collectionUUID,
-                                                              indexes,
-                                                              buildUUID,
-                                                              protocol,
-                                                              indexBuildOptions));
+        auto buildIndexFuture = uassertStatusOK(indexBuildsCoord->startIndexBuild(
+            opCtx, cmd.getDbName(), *collectionUUID, indexes, buildUUID, indexBuildOptions));
 
         // Explicitly release the scoped DDL object since we have finished initializing the index
         // build coordinator. Not holding the object for the entire index build avoids blocking

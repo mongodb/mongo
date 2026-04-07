@@ -278,16 +278,9 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
                                               const UUID& collectionUUID,
                                               const std::vector<IndexBuildInfo>& indexes,
                                               const UUID& buildUUID,
-                                              IndexBuildProtocol protocol,
                                               IndexBuildOptions indexBuildOptions) {
-    return _startIndexBuild(opCtx,
-                            dbName,
-                            collectionUUID,
-                            indexes,
-                            buildUUID,
-                            protocol,
-                            indexBuildOptions,
-                            boost::none);
+    return _startIndexBuild(
+        opCtx, dbName, collectionUUID, indexes, buildUUID, indexBuildOptions, boost::none);
 }
 
 StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
@@ -299,14 +292,8 @@ IndexBuildsCoordinatorMongod::resumeIndexBuild(OperationContext* opCtx,
                                                const ResumeIndexInfo& resumeInfo) {
     IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
     indexBuildOptions.applicationMode = ApplicationMode::kStartupRepair;
-    return _startIndexBuild(opCtx,
-                            dbName,
-                            collectionUUID,
-                            indexes,
-                            buildUUID,
-                            IndexBuildProtocol::kTwoPhase,
-                            indexBuildOptions,
-                            resumeInfo);
+    return _startIndexBuild(
+        opCtx, dbName, collectionUUID, indexes, buildUUID, indexBuildOptions, resumeInfo);
 }
 
 StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
@@ -315,7 +302,6 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                                                const UUID& collectionUUID,
                                                const std::vector<IndexBuildInfo>& indexes,
                                                const UUID& buildUUID,
-                                               IndexBuildProtocol protocol,
                                                IndexBuildOptions indexBuildOptions,
                                                const boost::optional<ResumeIndexInfo>& resumeInfo) {
     const NamespaceStringOrUUID nssOrUuid{dbName, collectionUUID};
@@ -324,21 +310,12 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
 
     invariant(!shard_role_details::getLocker(opCtx)->isRSTLExclusive(), buildUUID.toString());
 
-    const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    const auto& vCtx = VersionContext::getDecoration(opCtx);
-    const bool usingPrimaryDrivenIndexBuilds = fcv.isVersionInitialized() &&
-        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(vCtx, fcv);
-
     auto& rss = rss::ReplicatedStorageService::get(opCtx->getServiceContext());
     // TODO (SERVER-109664): uassert on build protocol rather than feature flag.
     if (rss.getPersistenceProvider().mustUsePrimaryDrivenIndexBuilds()) {
         uassert(11332800,
                 "Primary-driven index builds are required with the current persistence provider",
-                usingPrimaryDrivenIndexBuilds);
-    }
-
-    if (protocol == IndexBuildProtocol::kTwoPhase && usingPrimaryDrivenIndexBuilds) {
-        invariant(indexBuildOptions.indexBuildMethod == IndexBuildMethodEnum::kPrimaryDriven);
+                indexBuildOptions.indexBuildProtocol == IndexBuildProtocol::kPrimaryDriven);
     }
 
     const auto nss = CollectionCatalog::get(opCtx)->resolveNamespaceStringOrUUID(opCtx, nssOrUuid);
@@ -424,7 +401,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
     if (indexBuildOptions.applicationMode == ApplicationMode::kStartupRepair) {
         // Two phase index build recovery goes through a different set-up procedure because we will
         // either resume the index build or the original index will be dropped first.
-        invariant(protocol == IndexBuildProtocol::kTwoPhase);
+        invariant(indexBuildOptions.indexBuildProtocol == IndexBuildProtocol::kTwoPhase);
         auto status = Status::OK();
         if (resumeInfo) {
             status = _setUpResumeIndexBuild(
@@ -437,8 +414,13 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
             return status;
         }
     } else {
-        auto statusWithOptionalResult = _filterSpecsAndRegisterBuild(
-            opCtx, dbName, collectionUUID, indexes, buildUUID, protocol);
+        auto statusWithOptionalResult =
+            _filterSpecsAndRegisterBuild(opCtx,
+                                         dbName,
+                                         collectionUUID,
+                                         indexes,
+                                         buildUUID,
+                                         indexBuildOptions.indexBuildProtocol);
         if (!statusWithOptionalResult.isOK()) {
             return statusWithOptionalResult.getStatus();
         }
@@ -496,7 +478,8 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
     // build thread is done running.
     onScopeExitGuard.dismiss();
     unregisterUnscheduledIndexBuild.dismiss();
-    auto& pool = _ensureThreadPool(usingPrimaryDrivenIndexBuilds);
+    auto& pool = _ensureThreadPool(indexBuildOptions.indexBuildProtocol ==
+                                   IndexBuildProtocol::kPrimaryDriven);
     pool.schedule([this,
                    buildUUID,
                    dbName,
@@ -1095,6 +1078,13 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
         return status;
     }
 
+    // Primary-driven index builds do not write to config.system.indexBuilds, so skip reading it.
+    if (replState->protocol == IndexBuildProtocol::kPrimaryDriven) {
+        LOGV2_WARNING(11302401,
+                      "Setting commitQuorum is not supported for primary-driven index builds.");
+        return Status::OK();
+    }
+
     // Read the index builds entry from config.system.indexBuilds collection.
     auto swOnDiskCommitQuorum =
         indexbuildentryhelpers::getCommitQuorum(opCtx, replState->buildUUID);
@@ -1107,15 +1097,6 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
     }
 
     auto currentCommitQuorum = invariantStatusOK(swOnDiskCommitQuorum);
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    if (fcvSnapshot.isVersionInitialized() &&
-        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
-            VersionContext::getDecoration(opCtx), fcvSnapshot)) {
-        invariant(currentCommitQuorum.numNodes == CommitQuorumOptions::kPrimarySelfVote);
-        LOGV2_WARNING(11302401,
-                      "Setting commitQuorum is not supported for primary-driven index builds.");
-        return Status::OK();
-    }
 
     invariant(shard_role_details::getLocker(opCtx)->isRSTLLocked() ||
               gFeatureFlagIntentRegistration.isEnabled());

@@ -96,6 +96,7 @@ public:
      */
     struct IndexBuildOptions {
         IndexBuildMethodEnum indexBuildMethod{IndexBuildMethodEnum::kHybrid};
+        IndexBuildProtocol indexBuildProtocol{IndexBuildProtocol::kTwoPhase};
         boost::optional<CommitQuorumOptions> commitQuorum;
         ApplicationMode applicationMode = ApplicationMode::kNormal;
         boost::optional<repl::OpTime> startIndexBuildOpTime;
@@ -171,7 +172,6 @@ public:
         const UUID& collectionUUID,
         const std::vector<IndexBuildInfo>& indexes,
         const UUID& buildUUID,
-        IndexBuildProtocol protocol,
         IndexBuildOptions indexBuildOptions) = 0;
 
     /**

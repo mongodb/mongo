@@ -442,13 +442,8 @@ TEST_F(IndexBuildsCoordinatorTest, StartIndexBuildOnEmptyCollectionReplicatesAsC
 
     {
         auto indexBuildsCoord = IndexBuildsCoordinator::get(operationContext());
-        auto status = indexBuildsCoord->startIndexBuild(operationContext(),
-                                                        nss.dbName(),
-                                                        collectionUUID,
-                                                        indexes,
-                                                        UUID::gen(),
-                                                        IndexBuildProtocol::kTwoPhase,
-                                                        {});
+        auto status = indexBuildsCoord->startIndexBuild(
+            operationContext(), nss.dbName(), collectionUUID, indexes, UUID::gen(), {});
         ASSERT_OK(status);
         status.getValue().wait();
     }
@@ -505,7 +500,6 @@ TEST_F(IndexBuildsCoordinatorTest, StartIndexBuildOnNonEmptyCollectionReplicates
             collUUID,
             indexes,
             buildUUID,
-            IndexBuildProtocol::kTwoPhase,
             IndexBuildsCoordinator::IndexBuildOptions{.commitQuorum = CommitQuorumOptions(1)}));
         ASSERT_OK(indexBuildsCoord->voteCommitIndexBuild(
             operationContext(), buildUUID, HostAndPort("test1", 1234)));
@@ -527,8 +521,8 @@ TEST_F(IndexBuildsCoordinatorTest, StartIndexBuildOnNonEmptyCollectionReplicates
         operationContext(), opObserver->startIndexBuildIdents[1]));
 }
 
-// Creates a single and two-phase index build and checks that 'abortAllTwoPhaseIndexBuildsForStepUp'
-// aborts only the two phase index build.
+// Creates a single phase and  primary-driven index build and checks that
+// 'abortAllTwoPhaseIndexBuildsForStepUp' aborts the index build.
 TEST_F(IndexBuildsCoordinatorTest, StepUpPrimaryDrivenAbortsOnlyTwoPhaseBuilds) {
     // TODO (SERVER-116165): Remove.
     RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
@@ -581,19 +575,13 @@ TEST_F(IndexBuildsCoordinatorTest, StepUpPrimaryDrivenAbortsOnlyTwoPhaseBuilds) 
     indexBuildsCoord->sleepIndexBuilds_forTestOnly(true);
 
     IndexBuildsCoordinator::IndexBuildOptions twoPhaseOptions;
-    twoPhaseOptions.indexBuildMethod = IndexBuildMethodEnum::kPrimaryDriven;
+    twoPhaseOptions.indexBuildProtocol = IndexBuildProtocol::kPrimaryDriven;
     twoPhaseOptions.commitQuorum = CommitQuorumOptions(1);
-    auto twoPhaseFuture =
-        unittest::assertGet(indexBuildsCoord->startIndexBuild(opCtx,
-                                                              twoPhaseNss.dbName(),
-                                                              twoPhaseUUID,
-                                                              twoPhaseIndexes,
-                                                              UUID::gen(),
-                                                              IndexBuildProtocol::kTwoPhase,
-                                                              twoPhaseOptions));
+    auto twoPhaseFuture = unittest::assertGet(indexBuildsCoord->startIndexBuild(
+        opCtx, twoPhaseNss.dbName(), twoPhaseUUID, twoPhaseIndexes, UUID::gen(), twoPhaseOptions));
 
     IndexBuildsCoordinator::IndexBuildOptions singlePhaseOptions;
-    singlePhaseOptions.indexBuildMethod = IndexBuildMethodEnum::kPrimaryDriven;
+    singlePhaseOptions.indexBuildProtocol = IndexBuildProtocol::kSinglePhase;
     singlePhaseOptions.commitQuorum = CommitQuorumOptions(1);
     auto singlePhaseFuture =
         unittest::assertGet(indexBuildsCoord->startIndexBuild(opCtx,
@@ -601,19 +589,21 @@ TEST_F(IndexBuildsCoordinatorTest, StepUpPrimaryDrivenAbortsOnlyTwoPhaseBuilds) 
                                                               singlePhaseUUID,
                                                               singlePhaseIndexes,
                                                               UUID::gen(),
-                                                              IndexBuildProtocol::kSinglePhase,
                                                               singlePhaseOptions));
 
-    ASSERT_TRUE(indexBuildsCoord->inProgForCollection(twoPhaseUUID, IndexBuildProtocol::kTwoPhase));
+    ASSERT_TRUE(
+        indexBuildsCoord->inProgForCollection(twoPhaseUUID, IndexBuildProtocol::kPrimaryDriven));
     ASSERT_TRUE(
         indexBuildsCoord->inProgForCollection(singlePhaseUUID, IndexBuildProtocol::kSinglePhase));
 
     indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
+
     indexBuildsCoord->abortAllTwoPhaseIndexBuildsForStepUp(
         opCtx,
         Status{ErrorCodes::InterruptedDueToReplStateChange, "aborting all two-phase index builds"});
 
     twoPhaseFuture.wait();
+
     ASSERT_THROWS_CODE(
         twoPhaseFuture.get(), DBException, ErrorCodes::InterruptedDueToReplStateChange);
 

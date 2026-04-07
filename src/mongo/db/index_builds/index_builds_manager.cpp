@@ -114,7 +114,8 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
                             << nss.toStringForErrorMsg() << " is not locked in exclusive mode.");
 
     auto builder = invariant(_getBuilder(buildUUID));
-    if (options.protocol == IndexBuildProtocol::kTwoPhase) {
+    if (options.protocol == IndexBuildProtocol::kTwoPhase ||
+        options.protocol == IndexBuildProtocol::kPrimaryDriven) {
         builder->setTwoPhaseBuildUUID(buildUUID);
     }
 

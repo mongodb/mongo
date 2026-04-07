@@ -161,7 +161,6 @@ TEST_F(IndexBuildsCoordinatorMongodTest, AttemptBuildSameIndexFails) {
                                                      _testFooUUID,
                                                      makeSpecs({"a", "b"}, {1, 2}),
                                                      buildUUID,
-                                                     IndexBuildProtocol::kTwoPhase,
                                                      _indexBuildOptions));
 
     // Attempt and fail to register an index build on _testFooNss with the same index name, while
@@ -171,7 +170,6 @@ TEST_F(IndexBuildsCoordinatorMongodTest, AttemptBuildSameIndexFails) {
                                                  _testFooUUID,
                                                  makeSpecs({"b"}, {3}),
                                                  UUID::gen(),
-                                                 IndexBuildProtocol::kTwoPhase,
                                                  _indexBuildOptions),
               ErrorCodes::IndexBuildAlreadyInProgress);
 
@@ -199,7 +197,6 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
                                                      _testFooUUID,
                                                      makeSpecs({"a", "b"}, {1, 2}),
                                                      testFoo1BuildUUID,
-                                                     IndexBuildProtocol::kTwoPhase,
                                                      _indexBuildOptions));
 
     ASSERT_EQ(_indexBuildsCoord->numInProgForDb(_testFooNss.dbName()), 1);
@@ -222,7 +219,6 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
                                                      _testFooUUID,
                                                      makeSpecs({"c", "d"}, {3, 4}),
                                                      testFoo2BuildUUID,
-                                                     IndexBuildProtocol::kTwoPhase,
                                                      _indexBuildOptions));
 
     ASSERT_EQ(_indexBuildsCoord->numInProgForDb(_testFooNss.dbName()), 2);
@@ -242,7 +238,6 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
                                                                       _testBarUUID,
                                                                       makeSpecs({"x", "y"}, {5, 6}),
                                                                       testBarBuildUUID,
-                                                                      IndexBuildProtocol::kTwoPhase,
                                                                       _indexBuildOptions));
 
     ASSERT_EQ(_indexBuildsCoord->numInProgForDb(_testBarNss.dbName()), 3);
@@ -263,7 +258,6 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
                                                      _othertestFooUUID,
                                                      makeSpecs({"r", "s"}, {7, 8}),
                                                      othertestFooBuildUUID,
-                                                     IndexBuildProtocol::kTwoPhase,
                                                      _indexBuildOptions));
 
     ASSERT_EQ(_indexBuildsCoord->numInProgForDb(_othertestFooNss.dbName()), 1);
@@ -356,7 +350,6 @@ TEST_F(IndexBuildsCoordinatorMongodTest, SetCommitQuorumWithBadArguments) {
                                                      _testFooUUID,
                                                      makeSpecs({"a", "b"}, {1, 2}),
                                                      testFoo1BuildUUID,
-                                                     IndexBuildProtocol::kTwoPhase,
                                                      _indexBuildOptions));
 
     // No index with the name "c" is being built.

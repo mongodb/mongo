@@ -42,7 +42,6 @@ IndexBuildsCoordinatorMock::startIndexBuild(OperationContext* opCtx,
                                             const UUID& collectionUUID,
                                             const std::vector<IndexBuildInfo>& indexes,
                                             const UUID& buildUUID,
-                                            IndexBuildProtocol protocol,
                                             IndexBuildOptions indexBuildOptions) {
     ReplIndexBuildState::IndexCatalogStats stats;
     return Future<ReplIndexBuildState::IndexCatalogStats>::makeReady(stats);

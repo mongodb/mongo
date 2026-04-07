@@ -349,7 +349,8 @@ void onCommitIndexBuild(OperationContext* opCtx,
         return;
     }
 
-    invariant(IndexBuildProtocol::kTwoPhase == replState->protocol,
+    invariant(IndexBuildProtocol::kTwoPhase == replState->protocol ||
+                  IndexBuildProtocol::kPrimaryDriven == replState->protocol,
               str::stream() << "onCommitIndexBuild: " << buildUUID);
     invariant(shard_role_details::getLocker(opCtx)->isWriteLocked(),
               str::stream() << "onCommitIndexBuild: " << buildUUID);
@@ -403,7 +404,8 @@ void onAbortIndexBuild(OperationContext* opCtx,
                        const NamespaceString& nss,
                        ReplIndexBuildState& replState,
                        bool isTimeseries) {
-    if (IndexBuildProtocol::kTwoPhase != replState.protocol) {
+    if (IndexBuildProtocol::kTwoPhase != replState.protocol &&
+        IndexBuildProtocol::kPrimaryDriven != replState.protocol) {
         return;
     }
 
@@ -1202,9 +1204,15 @@ void IndexBuildsCoordinator::applyStartIndexBuild(OperationContext* opCtx,
     const auto collUUID = oplogEntry.collUUID;
     const auto nss = getNsFromUUID(opCtx, collUUID);
 
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
     indexBuildOptions.indexBuildMethod = oplogEntry.indexBuildMethod;
     indexBuildOptions.applicationMode = applicationMode;
+    indexBuildOptions.indexBuildProtocol =
+        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx), fcvSnapshot)
+        ? IndexBuildProtocol::kPrimaryDriven
+        : IndexBuildProtocol::kTwoPhase;
     if (repl::feature_flags::gReduceMajorityWriteLatency.isEnabled()) {
         // When gReduceMajorityWriteLatency is enabled, the oplog can be written far ahead of oplog
         // application. In this case, top of oplog will include this applyIndexBuild oplog itself so
@@ -1257,17 +1265,14 @@ void IndexBuildsCoordinator::applyStartIndexBuild(OperationContext* opCtx,
     }
 
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
-    uassertStatusOK(
-        indexBuildsCoord
-            ->startIndexBuild(opCtx,
-                              nss.dbName(),
-                              collUUID,
-                              oplogEntry.indexes,
-                              oplogEntry.buildUUID,
-                              /* This oplog entry is only replicated for two-phase index builds */
-                              IndexBuildProtocol::kTwoPhase,
-                              indexBuildOptions)
-            .getStatus());
+    uassertStatusOK(indexBuildsCoord
+                        ->startIndexBuild(opCtx,
+                                          nss.dbName(),
+                                          collUUID,
+                                          oplogEntry.indexes,
+                                          oplogEntry.buildUUID,
+                                          indexBuildOptions)
+                        .getStatus());
 }
 
 void IndexBuildsCoordinator::applyCommitIndexBuild(OperationContext* opCtx,
@@ -1604,11 +1609,12 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
 
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
 
-        // We take a Write intent on primary aborts of two-phase aborts because these
-        // must write to non-local tables.
+        // We take a Write intent on primary aborts of two-phase and primary-driven aborts because
+        // these must write to non-local tables.
         // On single-phase builds we take only LocalWrite to avoid deadlocks with prepare conflicts
         // and state transitions caused by taking a strong collection lock. See SERVER-42621.
-        auto desiredIntent = IndexBuildProtocol::kTwoPhase == replState->protocol &&
+        auto desiredIntent = (IndexBuildProtocol::kTwoPhase == replState->protocol ||
+                              IndexBuildProtocol::kPrimaryDriven == replState->protocol) &&
                 signalAction == IndexBuildAction::kPrimaryAbort
             ? rss::consensus::IntentRegistry::Intent::Write
             : rss::consensus::IntentRegistry::Intent::LocalWrite;
@@ -2186,17 +2192,24 @@ void IndexBuildsCoordinator::_restartIndexBuild(OperationContext* opCtx,
     // kDisabled here.
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {
-        .indexBuildMethod = ((fcvSnapshot.isVersionInitialized() &&
-                              feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
-                                  VersionContext::getDecoration(opCtx), fcvSnapshot))
-                                 ? IndexBuildMethodEnum::kPrimaryDriven
-                                 : IndexBuildMethodEnum::kHybrid)};
+        // TODO(SERVER-109664): Set this to IndexBuildMethodEnum::kHybrid
+        .indexBuildMethod = feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds
+                                .isEnabledUseLastLTSFCVWhenUninitialized(
+                                    VersionContext::getDecoration(opCtx), fcvSnapshot)
+            ? IndexBuildMethodEnum::kPrimaryDriven
+            : IndexBuildMethodEnum::kHybrid,
+        .indexBuildProtocol = feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds
+                                  .isEnabledUseLastLTSFCVWhenUninitialized(
+                                      VersionContext::getDecoration(opCtx), fcvSnapshot)
+            ? IndexBuildProtocol::kPrimaryDriven
+            : IndexBuildProtocol::kTwoPhase};
     LOGV2(20660,
           "Index build: restarting",
           "buildUUID"_attr = buildUUID,
           "collectionUUID"_attr = collUUID,
           logAttrs(nss.value()),
-          "method"_attr = idl::serialize(indexBuildOptions.indexBuildMethod));
+          "method"_attr = idl::serialize(indexBuildOptions.indexBuildMethod),
+          "protocol"_attr = indexBuildProtocolToString(indexBuildOptions.indexBuildProtocol));
 
     // Indicate that the initialization should not generate oplog entries or timestamps for the
     // first catalog write, and that the original durable catalog entries should be dropped and
@@ -2205,13 +2218,8 @@ void IndexBuildsCoordinator::_restartIndexBuild(OperationContext* opCtx,
 
     // This spawns a new thread and returns immediately. These index builds will start and wait
     // for a commit or abort to be replicated.
-    [[maybe_unused]] auto fut = uassertStatusOK(startIndexBuild(opCtx,
-                                                                nss->dbName(),
-                                                                collUUID,
-                                                                indexes,
-                                                                buildUUID,
-                                                                IndexBuildProtocol::kTwoPhase,
-                                                                indexBuildOptions));
+    [[maybe_unused]] auto fut = uassertStatusOK(
+        startIndexBuild(opCtx, nss->dbName(), collUUID, indexes, buildUUID, indexBuildOptions));
 }
 
 void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
@@ -2800,7 +2808,8 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
     }
 
     MultiIndexBlock::OnInitFn onInitFn;
-    if (IndexBuildProtocol::kTwoPhase == replState->protocol) {
+    if (IndexBuildProtocol::kTwoPhase == replState->protocol ||
+        IndexBuildProtocol::kPrimaryDriven == replState->protocol) {
         // Change the startIndexBuild Oplog entry.
         // Two-phase index builds write a different oplog entry than the default behavior which
         // writes a no-op just to generate an optime.
@@ -2815,21 +2824,20 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
                 return;
             }
 
-            // Two phase index builds should have commit quorum set.
-            invariant(indexBuildOptions.commitQuorum,
-                      str::stream()
-                          << "Commit quorum required for two phase index build, buildUUID: "
-                          << replState->buildUUID
-                          << " collectionUUID: " << replState->collectionUUID);
+            if (indexBuildOptions.indexBuildProtocol != IndexBuildProtocol::kPrimaryDriven) {
+                // Two phase index builds should have commit quorum set.
+                invariant(indexBuildOptions.commitQuorum,
+                          str::stream()
+                              << "Commit quorum required for two phase index build, buildUUID: "
+                              << replState->buildUUID
+                              << " collectionUUID: " << replState->collectionUUID);
 
-            // Persist the commit quorum value in the config.system.indexBuilds collection.
-            IndexBuildEntry indexBuildEntry(replState->buildUUID,
-                                            replState->collectionUUID,
-                                            indexBuildOptions.commitQuorum.value(),
-                                            toIndexNames(replState->getIndexes()));
+                // Persist the commit quorum value in the config.system.indexBuilds collection.
+                IndexBuildEntry indexBuildEntry(replState->buildUUID,
+                                                replState->collectionUUID,
+                                                indexBuildOptions.commitQuorum.value(),
+                                                toIndexNames(replState->getIndexes()));
 
-            // TODO SERVER-109664: check against protocol
-            if (indexBuildOptions.indexBuildMethod != IndexBuildMethodEnum::kPrimaryDriven) {
                 try {
                     uassertStatusOK(
                         indexbuildentryhelpers::addIndexBuildEntry(opCtx, indexBuildEntry));
@@ -3782,7 +3790,8 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         if (replState->getGenerateTableWrites()) {
             indexBuildsSSS.processConstraintsViolationTableOnCommit.addAndFetch(1);
             bool twoPhaseAndNotInitialSyncing =
-                IndexBuildProtocol::kTwoPhase == replState->protocol &&
+                (IndexBuildProtocol::kTwoPhase == replState->protocol ||
+                 IndexBuildProtocol::kPrimaryDriven == replState->protocol) &&
                 !replCoord->getMemberState().startup2();
             if (IndexBuildProtocol::kSinglePhase == replState->protocol ||
                 twoPhaseAndNotInitialSyncing) {
@@ -3814,13 +3823,16 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         auto onCreateEachFn = [&](const BSONObj& spec,
                                   IndexCatalogEntry& entry,
                                   boost::optional<MultikeyPaths>&& multikey) {
-            if (IndexBuildProtocol::kTwoPhase == replState->protocol) {
-                // TODO (SERVER-109664): Check build protocol rather than feature flag.
-                auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-                if (!fcvSnapshot.isVersionInitialized() ||
-                    !feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
-                        VersionContext::getDecoration(opCtx), fcvSnapshot)) {
-                    return;
+            if (IndexBuildProtocol::kTwoPhase == replState->protocol ||
+                IndexBuildProtocol::kPrimaryDriven == replState->protocol) {
+                if (IndexBuildProtocol::kTwoPhase == replState->protocol) {
+                    // TODO (SERVER-109664): Check build protocol rather than feature flag.
+                    auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+                    if (!fcvSnapshot.isVersionInitialized() ||
+                        !feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+                            VersionContext::getDecoration(opCtx), fcvSnapshot)) {
+                        return;
+                    }
                 }
 
                 if (IndexBuildAction::kOplogCommit == action) {
