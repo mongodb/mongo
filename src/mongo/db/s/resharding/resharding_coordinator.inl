@@ -1765,12 +1765,12 @@ void ReshardingCoordinator::_generateCommitNotificationForChangeStreams(
 
     // In case the recipient is running a legacy binary, swallow the error.
     try {
-        generic_argument_util::setMajorityWriteConcern(request, &resharding::kMajorityWriteConcern);
-        const auto opts =
-            std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrNotifyShardingEventRequest>>(
-                **executor, _ctHolder->getStepdownToken(), request);
-        opts->cmd.setDbName(DatabaseName::kAdmin);
-        resharding::sendCommandToShards(opCtx, opts, {notifierShard});
+        resharding::sendReshardingCommand(opCtx,
+                                          _getNewSession(opCtx),
+                                          std::move(request),
+                                          _ctHolder->getStepdownToken(),
+                                          executor,
+                                          {notifierShard});
     } catch (const ExceptionFor<ErrorCodes::UnsupportedShardingEventNotification>& e) {
         LOGV2_WARNING(7403100,
                       "Unable to generate op entry on reshardCollection commit",
@@ -1796,12 +1796,12 @@ void ReshardingCoordinator::_generatePlacementChangeNotificationForChangeStreams
 
     // In case the recipient is running a legacy binary, swallow the error.
     try {
-        generic_argument_util::setMajorityWriteConcern(request, &resharding::kMajorityWriteConcern);
-        const auto opts =
-            std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrNotifyShardingEventRequest>>(
-                **executor, _ctHolder->getStepdownToken(), request);
-        opts->cmd.setDbName(DatabaseName::kAdmin);
-        resharding::sendCommandToShards(opCtx, opts, {notifierShard});
+        resharding::sendReshardingCommand(opCtx,
+                                          _getNewSession(opCtx),
+                                          std::move(request),
+                                          _ctHolder->getStepdownToken(),
+                                          executor,
+                                          {notifierShard});
     } catch (const ExceptionFor<ErrorCodes::UnsupportedShardingEventNotification>& e) {
         tasserted(
             10674000,
@@ -1842,12 +1842,12 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllParticipantShardsDone(
                 auto cmd = ShardsvrDropCollectionIfUUIDNotMatchingWithWriteConcernRequest(
                     nss, notMatchingThisUUID);
 
-                generic_argument_util::setMajorityWriteConcern(cmd,
-                                                               &resharding::kMajorityWriteConcern);
-                auto opts = std::make_shared<async_rpc::AsyncRPCOptions<
-                    ShardsvrDropCollectionIfUUIDNotMatchingWithWriteConcernRequest>>(
-                    **executor, _ctHolder->getStepdownToken(), cmd);
-                resharding::sendCommandToShards(opCtx.get(), opts, allShardIds);
+                resharding::sendReshardingCommand(opCtx.get(),
+                                                  _getNewSession(opCtx.get()),
+                                                  cmd,
+                                                  _ctHolder->getStepdownToken(),
+                                                  executor,
+                                                  allShardIds);
             }
 
             reshardingPauseCoordinatorBeforeRemovingStateDoc.pauseWhileSetAndNotCanceled(
@@ -1918,8 +1918,11 @@ void ReshardingCoordinator::_initializeAllDonors(
     if (resharding::gFeatureFlagReshardingInitNoRefresh.isEnabled(
             VersionContext::getDecoration(opCtx.get()),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        resharding::tellAllDonorsToInitialize(
-            opCtx.get(), _coordinatorDoc, _ctHolder->getStepdownToken(), executor);
+        resharding::tellAllDonorsToInitialize(opCtx.get(),
+                                              _getNewSession(opCtx.get()),
+                                              _coordinatorDoc,
+                                              _ctHolder->getStepdownToken(),
+                                              executor);
     } else {
         _reshardingCoordinatorExternalState->establishAllDonorsAsParticipants(
             opCtx.get(),
@@ -1937,8 +1940,11 @@ void ReshardingCoordinator::_initializeAllRecipients(
     if (resharding::gFeatureFlagReshardingInitNoRefresh.isEnabled(
             VersionContext::getDecoration(opCtx.get()),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        resharding::tellAllRecipientsToInitialize(
-            opCtx.get(), _coordinatorDoc, _ctHolder->getStepdownToken(), executor);
+        resharding::tellAllRecipientsToInitialize(opCtx.get(),
+                                                  _getNewSession(opCtx.get()),
+                                                  _coordinatorDoc,
+                                                  _ctHolder->getStepdownToken(),
+                                                  executor);
     } else {
         _reshardingCoordinatorExternalState->establishAllRecipientsAsParticipants(
             opCtx.get(),
@@ -1956,8 +1962,11 @@ void ReshardingCoordinator::_tellAllRecipientsToClone(
     reshardingPauseBeforeTellingRecipientsToClone.pauseWhileSetAndNotCanceled(
         opCtx.get(), _ctHolder->getAbortToken());
 
-    resharding::tellAllRecipientsToClone(
-        opCtx.get(), _coordinatorDoc, _ctHolder->getStepdownToken(), executor);
+    resharding::tellAllRecipientsToClone(opCtx.get(),
+                                         _getNewSession(opCtx.get()),
+                                         _coordinatorDoc,
+                                         _ctHolder->getStepdownToken(),
+                                         executor);
 }
 
 void ReshardingCoordinator::_tellAllRecipientsToRefresh(
@@ -2001,15 +2010,21 @@ void ReshardingCoordinator::_tellAllDonorsToStartChangeStreamsMonitor(
     }
 
     auto opCtx = _makeOperationContext();
-    resharding::tellAllDonorsToStartChangeStreamsMonitor(
-        opCtx.get(), _coordinatorDoc, _ctHolder->getStepdownToken(), executor);
+    resharding::tellAllDonorsToStartChangeStreamsMonitor(opCtx.get(),
+                                                         _getNewSession(opCtx.get()),
+                                                         _coordinatorDoc,
+                                                         _ctHolder->getStepdownToken(),
+                                                         executor);
 }
 
 void ReshardingCoordinator::_tellAllRecipientsCriticalSectionStarted(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     auto opCtx = _makeOperationContext();
-    resharding::tellAllRecipientsCriticalSectionStarted(
-        opCtx.get(), _coordinatorDoc, _ctHolder->getAbortToken(), executor);
+    resharding::tellAllRecipientsCriticalSectionStarted(opCtx.get(),
+                                                        _getNewSession(opCtx.get()),
+                                                        _coordinatorDoc,
+                                                        _ctHolder->getAbortToken(),
+                                                        executor);
 }
 
 void ReshardingCoordinator::_tellAllParticipantsToCommit(
@@ -2018,15 +2033,22 @@ void ReshardingCoordinator::_tellAllParticipantsToCommit(
     reshardingPauseBeforeTellingParticipantsToCommit.pauseWhileSetAndNotCanceled(
         opCtx.get(), _ctHolder->getAbortToken());
 
-    resharding::tellAllParticipantsToCommit(
-        opCtx.get(), _coordinatorDoc, _ctHolder->getStepdownToken(), executor);
+    resharding::tellAllParticipantsToCommit(opCtx.get(),
+                                            _getNewSession(opCtx.get()),
+                                            _coordinatorDoc,
+                                            _ctHolder->getStepdownToken(),
+                                            executor);
 }
 
 void ReshardingCoordinator::_tellAllParticipantsToAbort(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor, bool isUserAborted) {
     auto opCtx = _makeOperationContext();
-    resharding::tellAllParticipantsToAbort(
-        opCtx.get(), _coordinatorDoc, _ctHolder->getStepdownToken(), executor, isUserAborted);
+    resharding::tellAllParticipantsToAbort(opCtx.get(),
+                                           _getNewSession(opCtx.get()),
+                                           _coordinatorDoc,
+                                           _ctHolder->getStepdownToken(),
+                                           executor,
+                                           isUserAborted);
 }
 
 void ReshardingCoordinator::_launchDonorPostCloningDeltaCollector(

@@ -66,6 +66,10 @@ public:
         return Command::AllowedOnSecondary::kNever;
     }
 
+    bool supportsRetryableWrite() const final {
+        return true;
+    }
+
     std::string help() const override {
         return "Internal command aimed to remove stale entries from the local collection catalog.";
     }

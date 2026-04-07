@@ -61,6 +61,10 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
+    bool supportsRetryableWrite() const final {
+        return true;
+    }
+
     bool adminOnly() const override {
         return true;
     }

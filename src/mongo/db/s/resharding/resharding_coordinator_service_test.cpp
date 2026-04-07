@@ -70,6 +70,7 @@
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/resharding/resharding_coordinator_service_conflicting_op_in_progress_info.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/unittest.h"
@@ -77,6 +78,7 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
 
 #include <functional>
@@ -326,6 +328,62 @@ private:
     std::shared_ptr<ExternalStateForTest> _externalState;
 };
 
+/**
+ * Wraps a delegate AsyncRPCRunner and asserts that every command sent by the
+ * ReshardingCoordinator carries both `lsid` and `txnNumber` (i.e. OperationSessionInfo),
+ * which are required for replay protection.
+ */
+class OsiCheckingAsyncRPCRunner : public async_rpc::detail::AsyncRPCRunner {
+public:
+    explicit OsiCheckingAsyncRPCRunner(std::unique_ptr<async_rpc::detail::AsyncRPCRunner> inner)
+        : _inner(std::move(inner)) {}
+
+    ExecutorFuture<async_rpc::detail::AsyncRPCInternalResponse> _sendCommand(
+        std::shared_ptr<executor::TaskExecutor> exec,
+        CancellationToken token,
+        OperationContext* opCtx,
+        async_rpc::Targeter* targeter,
+        const TargetingMetadata& targetingMetadata,
+        const DatabaseName& dbName,
+        BSONObj cmdBSON,
+        BatonHandle baton,
+        boost::optional<UUID> clientOperationKey) final {
+        auto cmdName = cmdBSON.firstElementFieldNameStringData();
+        if (!kOsiExemptCommands.count(cmdName) &&
+            resharding::gFeatureFlagReshardingInitNoRefresh.isEnabled(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            ASSERT(cmdBSON.hasField("lsid"))
+                << "ReshardingCoordinator RPC '" << cmdName << "' missing lsid (OSI)";
+            ASSERT(cmdBSON.hasField("txnNumber"))
+                << "ReshardingCoordinator RPC '" << cmdName << "' missing txnNumber (OSI)";
+        }
+        return _inner->_sendCommand(std::move(exec),
+                                    std::move(token),
+                                    opCtx,
+                                    targeter,
+                                    targetingMetadata,
+                                    dbName,
+                                    std::move(cmdBSON),
+                                    std::move(baton),
+                                    clientOperationKey);
+    }
+
+private:
+    // Commands sent by the coordinator that are exempt from carrying OSI.
+    // _flushReshardingStateChange is idempotent, so OSI-based deduplication is unnecessary.
+    // One instance is also sent post-commit on a best-effort basis, after the coordinator
+    // document and its associated session have already been removed, making it impossible
+    // to include OSI. This command is expected to be removed once reshardingFields are no
+    // longer written to config.collections, when shards authoritatively manage their own
+    // filtering metadata.
+    static inline const StringSet kOsiExemptCommands{
+        "_flushReshardingStateChange",
+    };
+
+    std::unique_ptr<async_rpc::detail::AsyncRPCRunner> _inner;
+};
+
 class ReshardingCoordinatorServiceTestBase : service_context_test::WithSetupTransportLayer,
                                              public ConfigServerTestFixture {
 public:
@@ -392,7 +450,8 @@ public:
 
         repl::createOplog(opCtx);
 
-        auto asyncRPCMock = std::make_unique<async_rpc::NoopMockAsyncRPCRunner>();
+        auto asyncRPCMock = std::make_unique<OsiCheckingAsyncRPCRunner>(
+            std::make_unique<async_rpc::NoopMockAsyncRPCRunner>());
         async_rpc::detail::AsyncRPCRunner::set(getServiceContext(), std::move(asyncRPCMock));
 
         _opObserverRegistry =

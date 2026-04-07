@@ -31,6 +31,7 @@
 
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/s/resharding/resharding_coordinator_dao.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role/shard_catalog/flush_routing_table_cache_updates_gen.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/executor/async_rpc.h"

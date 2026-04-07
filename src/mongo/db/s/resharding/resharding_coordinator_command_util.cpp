@@ -29,9 +29,9 @@
 
 #include "mongo/db/s/resharding/resharding_coordinator_command_util.h"
 
-#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/shardsvr_resharding_commands_gen.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/s/request_types/abort_reshard_collection_gen.h"
 #include "mongo/s/request_types/commit_reshard_collection_gen.h"
 
@@ -46,47 +46,35 @@ std::vector<ShardId> getAllParticipantShardIds(const ReshardingCoordinatorDocume
     shardIds.insert(recipientShardIds.begin(), recipientShardIds.end());
     return {shardIds.begin(), shardIds.end()};
 }
-
-template <typename Cmd>
-void sendReshardingCommand(OperationContext* opCtx,
-                           Cmd cmd,
-                           CancellationToken token,
-                           const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-                           const std::vector<ShardId>& shardIds,
-                           bool setWriteConcern = true) {
-    cmd.setDbName(DatabaseName::kAdmin);
-    if (setWriteConcern) {
-        generic_argument_util::setMajorityWriteConcern(cmd, &resharding::kMajorityWriteConcern);
-    }
-
-    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<Cmd>>(**executor, token, cmd);
-    resharding::sendCommandToShards(opCtx, opts, shardIds);
-}
 }  // namespace
 
 namespace resharding {
 
 void tellAllParticipantsToCommit(OperationContext* opCtx,
+                                 const OperationSessionInfo& osi,
                                  const ReshardingCoordinatorDocument& doc,
                                  CancellationToken stepdownToken,
                                  const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     ShardsvrCommitReshardCollection cmd(doc.getSourceNss());
     cmd.setReshardingUUID(doc.getReshardingUUID());
 
-    sendReshardingCommand(opCtx, cmd, stepdownToken, executor, getAllParticipantShardIds(doc));
+    sendReshardingCommand(opCtx, osi, cmd, stepdownToken, executor, getAllParticipantShardIds(doc));
 }
 
 void tellAllParticipantsToAbort(OperationContext* opCtx,
+                                const OperationSessionInfo& osi,
                                 const ReshardingCoordinatorDocument& doc,
                                 CancellationToken stepdownToken,
                                 const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
                                 bool isUserAborted) {
     ShardsvrAbortReshardCollection abortCmd(doc.getReshardingUUID(), isUserAborted);
 
-    sendReshardingCommand(opCtx, abortCmd, stepdownToken, executor, getAllParticipantShardIds(doc));
+    sendReshardingCommand(
+        opCtx, osi, abortCmd, stepdownToken, executor, getAllParticipantShardIds(doc));
 }
 
 void tellAllDonorsToInitialize(OperationContext* opCtx,
+                               const OperationSessionInfo& osi,
                                const ReshardingCoordinatorDocument& doc,
                                CancellationToken stepdownToken,
                                const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
@@ -96,6 +84,7 @@ void tellAllDonorsToInitialize(OperationContext* opCtx,
         resharding::extractShardIdsFromParticipantEntries(doc.getRecipientShards()));
 
     sendReshardingCommand(opCtx,
+                          osi,
                           cmd,
                           stepdownToken,
                           executor,
@@ -103,6 +92,7 @@ void tellAllDonorsToInitialize(OperationContext* opCtx,
 }
 
 void tellAllRecipientsToInitialize(OperationContext* opCtx,
+                                   const OperationSessionInfo& osi,
                                    const ReshardingCoordinatorDocument& doc,
                                    CancellationToken stepdownToken,
                                    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
@@ -123,6 +113,7 @@ void tellAllRecipientsToInitialize(OperationContext* opCtx,
 
     sendReshardingCommand(
         opCtx,
+        osi,
         cmd,
         stepdownToken,
         executor,
@@ -131,6 +122,7 @@ void tellAllRecipientsToInitialize(OperationContext* opCtx,
 
 void tellAllDonorsToStartChangeStreamsMonitor(
     OperationContext* opCtx,
+    const OperationSessionInfo& osi,
     const ReshardingCoordinatorDocument& doc,
     CancellationToken stepdownToken,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
@@ -141,6 +133,7 @@ void tellAllDonorsToStartChangeStreamsMonitor(
     // The donors ensure the change streams monitor start time is majority committed in their
     // state document before returning, so no write concern is needed.
     sendReshardingCommand(opCtx,
+                          osi,
                           cmd,
                           stepdownToken,
                           executor,
@@ -149,6 +142,7 @@ void tellAllDonorsToStartChangeStreamsMonitor(
 }
 
 void tellAllRecipientsToClone(OperationContext* opCtx,
+                              const OperationSessionInfo& osi,
                               const ReshardingCoordinatorDocument& doc,
                               CancellationToken stepdownToken,
                               const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
@@ -162,6 +156,7 @@ void tellAllRecipientsToClone(OperationContext* opCtx,
     cmd.setApproxCopySize(recipientFields.getReshardingApproxCopySizeStruct());
 
     sendReshardingCommand(opCtx,
+                          osi,
                           cmd,
                           stepdownToken,
                           executor,
@@ -174,6 +169,7 @@ void tellAllRecipientsToClone(OperationContext* opCtx,
         cmd.setApproxCopySize(approxCopySize);
 
         sendReshardingCommand(opCtx,
+                              osi,
                               cmd,
                               stepdownToken,
                               executor,
@@ -183,6 +179,7 @@ void tellAllRecipientsToClone(OperationContext* opCtx,
 
 void tellAllRecipientsCriticalSectionStarted(
     OperationContext* opCtx,
+    const OperationSessionInfo& osi,
     const ReshardingCoordinatorDocument& doc,
     CancellationToken abortToken,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
@@ -190,6 +187,7 @@ void tellAllRecipientsCriticalSectionStarted(
 
     sendReshardingCommand(
         opCtx,
+        osi,
         cmd,
         abortToken,
         executor,
