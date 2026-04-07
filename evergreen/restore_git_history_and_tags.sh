@@ -31,12 +31,13 @@ if [ -f .git/shallow ]; then
     # break later git commands.
     no_commit_graph="-c gc.writeCommitGraph=false -c fetch.writeCommitGraph=false"
     if [ "$(printf '%s\n' "$required_version" "$git_version" | sort -V | head -n1)" = "$required_version" ]; then
-        $retry_git $no_commit_graph fetch origin --filter=tree:0 --unshallow --tags
+        $retry_git $no_commit_graph fetch origin --filter=tree:0 --unshallow --tags --quiet
     else
-        $retry_git $no_commit_graph fetch origin --filter=blob:none --unshallow --tags
+        $retry_git $no_commit_graph fetch origin --filter=blob:none --unshallow --tags --quiet
     fi
 
     # If describing the commit still fails after restoring history, refetch tags.
+    # Don't use `quiet` here to show more because it's our last fallback.
     git describe 2>/dev/null || $retry_git fetch origin --tags
 else
     # Sometimes the tags necessary to describe a commit don't
