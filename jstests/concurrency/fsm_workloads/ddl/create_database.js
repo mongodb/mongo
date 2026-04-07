@@ -97,7 +97,12 @@ export const $config = (function () {
             for (let database of db.adminCommand({listDatabases: 1}).databases) {
                 let res = db.getSiblingDB(database.name).runCommand({listCollections: 1});
                 assert.commandWorked(res);
-                assert.neq(database.name, this.myDB.toString(), "this DB shouldn't exist");
+
+                if (!TestData.runningWithBalancer) {
+                    // When the balancer is running in the background, concurrent moveCollection operations
+                    // can cause this thread's database to be recreated unexpectedly. Therefore, skip this assertion.
+                    assert.neq(database.name, this.myDB.toString(), "this DB shouldn't exist");
+                }
             }
         },
 
@@ -105,7 +110,11 @@ export const $config = (function () {
             for (let database of db.adminCommand({listDatabases: 1, nameOnly: 1}).databases) {
                 let res = db.getSiblingDB(database.name).runCommand({listCollections: 1});
                 assert.commandWorked(res);
-                assert.neq(database.name, this.myDB.toString(), "this DB shouldn't exist");
+                if (!TestData.runningWithBalancer) {
+                    // When the balancer is running in the background, concurrent moveCollection operations
+                    // can cause this thread's database to be recreated unexpectedly. Therefore, skip this assertion.
+                    assert.neq(database.name, this.myDB.toString(), "this DB shouldn't exist");
+                }
             }
         },
     };
