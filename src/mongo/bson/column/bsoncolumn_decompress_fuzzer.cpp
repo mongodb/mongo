@@ -32,6 +32,7 @@
 #include "mongo/bson/column/bson_element_storage.h"
 #include "mongo/bson/column/bsoncolumn.h"
 #include "mongo/bson/column/bsoncolumn_expressions.h"
+#include "mongo/bson/column/bsoncolumn_test_util.h"
 #include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/util/base64.h"
 
@@ -115,6 +116,32 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
 
     if (iteratorError.empty()) {
         invariant(bsoncolumn::count(Data, Size) == iteratorElems.size());
+
+        // Compute expected min/max from iterator elements.
+        auto [expectedMin, expectedMax] = bsoncolumn::expectedMinMax(iteratorElems);
+
+        auto minElem = bsoncolumn::min<bsoncolumn::BSONElementMaterializer>(Data, Size, allocator);
+        invariant(minElem.binaryEqualValues(expectedMin),
+                  str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
+                                << ". min() returned: " << minElem.toString()
+                                << " but expected: " << expectedMin.toString());
+
+        auto maxElem = bsoncolumn::max<bsoncolumn::BSONElementMaterializer>(Data, Size, allocator);
+        invariant(maxElem.binaryEqualValues(expectedMax),
+                  str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
+                                << ". max() returned: " << maxElem.toString()
+                                << " but expected: " << expectedMax.toString());
+
+        auto [minmaxMin, minmaxMax] =
+            bsoncolumn::minmax<bsoncolumn::BSONElementMaterializer>(Data, Size, allocator);
+        invariant(minmaxMin.binaryEqualValues(expectedMin),
+                  str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
+                                << ". minmax().first returned: " << minmaxMin.toString()
+                                << " but expected: " << expectedMin.toString());
+        invariant(minmaxMax.binaryEqualValues(expectedMax),
+                  str::stream() << "For the input: " << base64::encode(StringData(Data, Size))
+                                << ". minmax().second returned: " << minmaxMax.toString()
+                                << " but expected: " << expectedMax.toString());
     }
     return 0;
 }

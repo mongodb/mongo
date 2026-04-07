@@ -32,9 +32,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/column/bson_element_storage.h"
 #include "mongo/bson/column/bsoncolumn.h"
 #include "mongo/bson/column/bsoncolumn_expressions.h"
 #include "mongo/bson/column/bsoncolumn_fuzzer_util.h"
+#include "mongo/bson/column/bsoncolumn_test_util.h"
 #include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/bson/column/simple8b_helpers.h"
 #include "mongo/bson/column/simple8b_type_util.h"
@@ -104,6 +106,38 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
 
     // Verify bsoncolumn::count
     invariant(bsoncolumn::count(diff.data(), diff.size()) == generatedElements.size());
+
+    // Verify bsoncolumn::min, max, minmax
+    {
+        auto [expectedMin, expectedMax] = bsoncolumn::expectedMinMax(generatedElements);
+
+        boost::intrusive_ptr allocator{new BSONElementStorage()};
+
+        auto minElem = bsoncolumn::min<bsoncolumn::BSONElementMaterializer>(
+            diff.data(), diff.size(), allocator);
+        invariant(minElem.binaryEqualValues(expectedMin),
+                  str::stream() << "min() returned: " << minElem.toString()
+                                << " but expected: " << expectedMin.toString()
+                                << ". Column: " << base64::encode(diff.data(), diff.size()));
+
+        auto maxElem = bsoncolumn::max<bsoncolumn::BSONElementMaterializer>(
+            diff.data(), diff.size(), allocator);
+        invariant(maxElem.binaryEqualValues(expectedMax),
+                  str::stream() << "max() returned: " << maxElem.toString()
+                                << " but expected: " << expectedMax.toString()
+                                << ". Column: " << base64::encode(diff.data(), diff.size()));
+
+        auto [minmaxMin, minmaxMax] = bsoncolumn::minmax<bsoncolumn::BSONElementMaterializer>(
+            diff.data(), diff.size(), allocator);
+        invariant(minmaxMin.binaryEqualValues(expectedMin),
+                  str::stream() << "minmax().first returned: " << minmaxMin.toString()
+                                << " but expected: " << expectedMin.toString()
+                                << ". Column: " << base64::encode(diff.data(), diff.size()));
+        invariant(minmaxMax.binaryEqualValues(expectedMax),
+                  str::stream() << "minmax().second returned: " << minmaxMax.toString()
+                                << " but expected: " << expectedMax.toString()
+                                << ". Column: " << base64::encode(diff.data(), diff.size()));
+    }
 
     // Verify binary reopen gives identical state as intermediate
     BSONColumnBuilder reopen(diff.data(), diff.size());
