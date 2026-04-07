@@ -1182,7 +1182,6 @@ TEST_F(ReplicatedFastCountDeltaUtilsTest, ExtractSizeCountDeltaOnUnsupportedOpTy
 
     // Size metadata is only supported for 'insert', 'delete', and 'update' operations. All other
     // operations are incompatible with a top-level 'm' field.
-    // TODO SERVER-121175: Include truncates in accepted opTypes comment.
     ASSERT_THROWS_CODE(
         replicated_fast_count::extractSizeCountDeltaForOp(oplogEntry), DBException, 12115900);
 }
@@ -1844,6 +1843,123 @@ TEST_F(AggregateSizeCountFromOplogTest, ForwardCursorRespectsOplogVisibilityTime
     EXPECT_EQ(result.deltas.at(collA.uuid).count, 1);
     ASSERT_TRUE(result.lastTimestamp.has_value());
     EXPECT_EQ(result.lastTimestamp.value(), ts1);
+}
+
+TEST_F(AggregateSizeCountFromOplogTest, AggregateTruncateRangeInsideApplyOps) {
+    const Timestamp ts1{1, 1};
+    const int64_t bytesDeleted = 120;
+    const int64_t docsDeleted = 3;
+
+    // Build an applyOps entry with a truncateRange inner op. The 'o' field is taken from the
+    // truncateRange entry produced by the test helper.
+    const auto truncateEntry =
+        test_helpers::makeTruncateRangeOplogEntry(ts1, collA, bytesDeleted, docsDeleted);
+    const NamespaceString adminCmdNss =
+        NamespaceString::createNamespaceString_forTest("admin", "$cmd");
+    BSONObj truncateInnerOp = BSON("op" << "c"
+                                        << "ns" << collA.nss.getCommandNS().ns_forTest() << "ui"
+                                        << collA.uuid << "o" << truncateEntry.getObject());
+
+    std::list<repl::OplogEntry> entries{
+        repl::OplogEntry{repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+            .opTime = repl::OpTime(ts1, 1),
+            .opType = repl::OpTypeEnum::kCommand,
+            .nss = adminCmdNss,
+            .oField = BSON("applyOps" << BSON_ARRAY(truncateInnerOp)),
+            .wallClockTime = Date_t::now(),
+        }}},
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    assertExpectedAggregateDelta(
+        {.delta = CollectionSizeCount{.size = -bytesDeleted, .count = -docsDeleted},
+         .lastTimestamp = ts1},
+        collA.uuid,
+        Timestamp::min(),
+        oplogCursor);
+}
+
+TEST_F(AggregateSizeCountFromOplogTest, AggregateTruncateRangeInsideNestedApplyOps) {
+    const Timestamp ts1{1, 1};
+    const int64_t bytesDeleted = 80;
+    const int64_t docsDeleted = 2;
+
+    const auto truncateEntry =
+        test_helpers::makeTruncateRangeOplogEntry(ts1, collA, bytesDeleted, docsDeleted);
+    const NamespaceString adminCmdNss =
+        NamespaceString::createNamespaceString_forTest("admin", "$cmd");
+    BSONObj truncateInnerOp = BSON("op" << "c"
+                                        << "ns" << collA.nss.getCommandNS().ns_forTest() << "ui"
+                                        << collA.uuid << "o" << truncateEntry.getObject());
+
+    // Wrap the truncateRange in an inner applyOps, then in an outer applyOps.
+    BSONObj innerApplyOpsOp = BSON("op" << "c" << "ns" << adminCmdNss.ns_forTest() << "o"
+                                        << BSON("applyOps" << BSON_ARRAY(truncateInnerOp)));
+
+    std::list<repl::OplogEntry> entries{
+        repl::OplogEntry{repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+            .opTime = repl::OpTime(ts1, 1),
+            .opType = repl::OpTypeEnum::kCommand,
+            .nss = adminCmdNss,
+            .oField = BSON("applyOps" << BSON_ARRAY(innerApplyOpsOp)),
+            .wallClockTime = Date_t::now(),
+        }}},
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    assertExpectedAggregateDelta(
+        {.delta = CollectionSizeCount{.size = -bytesDeleted, .count = -docsDeleted},
+         .lastTimestamp = ts1},
+        collA.uuid,
+        Timestamp::min(),
+        oplogCursor);
+}
+
+TEST_F(AggregateSizeCountFromOplogTest, AggregateSingleTruncateRange) {
+    const Timestamp ts1{1, 1};
+    const int64_t bytesDeleted = 150;
+    const int64_t docsDeleted = 3;
+
+    std::list<repl::OplogEntry> entries{
+        test_helpers::makeTruncateRangeOplogEntry(ts1, collA, bytesDeleted, docsDeleted),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    assertExpectedAggregateDelta(
+        {.delta = CollectionSizeCount{.size = -bytesDeleted, .count = -docsDeleted},
+         .lastTimestamp = ts1},
+        collA.uuid,
+        Timestamp::min(),
+        oplogCursor);
+}
+
+TEST_F(AggregateSizeCountFromOplogTest, AggregateTruncateRangeMixedWithCRUD) {
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const Timestamp ts3{1, 3};
+    const Timestamp ts4{1, 4};
+    const Timestamp ts5{1, 5};
+    const Timestamp ts6{1, 6};
+
+    // 3 inserts (+270 bytes, +3 docs), 1 update (-10 bytes, 0 docs), 1 delete (-90 bytes, -1 doc),
+    // 1 truncateRange (-80 bytes, -1 doc).
+    std::list<repl::OplogEntry> entries{
+        test_helpers::makeOplogEntry(ts1, collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/100),
+        test_helpers::makeOplogEntry(ts2, collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/90),
+        test_helpers::makeOplogEntry(ts3, collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/80),
+        test_helpers::makeOplogEntry(ts4, collA, repl::OpTypeEnum::kUpdate, /*sizeDelta=*/-10),
+        test_helpers::makeOplogEntry(ts5, collA, repl::OpTypeEnum::kDelete, /*sizeDelta=*/-90),
+        test_helpers::makeTruncateRangeOplogEntry(
+            ts6, collA, /*bytesDeleted=*/80, /*docsDeleted=*/1),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    // Net: size = 100+90+80-10-90-80 = 90, count = 1+1+1+0-1-1 = 1.
+    assertExpectedAggregateDelta(
+        {.delta = CollectionSizeCount{.size = 90, .count = 1}, .lastTimestamp = ts6},
+        collA.uuid,
+        Timestamp::min(),
+        oplogCursor);
 }
 
 }  // namespace

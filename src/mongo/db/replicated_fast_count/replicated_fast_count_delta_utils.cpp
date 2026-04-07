@@ -32,6 +32,7 @@
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/truncate_range_oplog_entry_gen.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/storage/snapshot.h"
@@ -67,6 +68,20 @@ int32_t computeCountDeltaForOp(repl::OpTypeEnum opType) {
         default:
             MONGO_UNREACHABLE;
     }
+}
+
+// Extracts the size and count delta from a truncateRange oplog entry.
+CollectionSizeCount extractSizeCountDeltaForTruncateRange(const repl::OplogEntry& entry) {
+    invariant(entry.getCommandType() == repl::OplogEntry::CommandType::kTruncateRange);
+
+    massert(12117500,
+            str::stream() << "Unexpected input: Missing 'ui' field for truncateRange operation '"
+                          << redact(entry.toBSONForLogging()),
+            entry.getUuid().has_value());
+
+    const auto truncateRangeEntry = TruncateRangeOplogEntry::parse(entry.getObject());
+    return CollectionSizeCount{.size = -truncateRangeEntry.getBytesDeleted(),
+                               .count = -truncateRangeEntry.getDocsDeleted()};
 }
 
 // Updates the 'sizeCountDeltasOut' to track the new 'sizeCountDelta' for 'uuid'.
@@ -109,6 +124,29 @@ bool operationsOnFastCountCollections(const NamespaceString& nss,
     }
 
     return false;
+}
+
+// Processes a single oplog entry and accumulates its size/count contribution into
+// 'sizeCountDeltasOut'. Handles applyOps (including nested), truncateRange, and CRUD operations.
+void processOplogEntry(const repl::OplogEntry& entry,
+                       const boost::optional<UUID>& uuidFilter,
+                       absl::flat_hash_map<UUID, CollectionSizeCount>& sizeCountDeltasOut) {
+    if (entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
+        extractSizeCountDeltasForApplyOps(entry, uuidFilter, sizeCountDeltasOut);
+        return;
+    }
+    const auto& entryUuid = entry.getUuid();
+    if (uuidFilter && entryUuid != uuidFilter) {
+        return;
+    }
+    if (entry.getCommandType() == repl::OplogEntry::CommandType::kTruncateRange) {
+        const auto delta = extractSizeCountDeltaForTruncateRange(entry);
+        recordCollectionSizeCountDelta(*entryUuid, delta, sizeCountDeltasOut);
+        return;
+    }
+    if (auto delta = extractSizeCountDeltaForOp(entry); delta.has_value()) {
+        recordCollectionSizeCountDelta(*entryUuid, *delta, sizeCountDeltasOut);
+    }
 }
 
 }  // namespace
@@ -164,17 +202,7 @@ void extractSizeCountDeltasForApplyOps(
         applyOpsEntry, applyOpsEntry.getEntry().toBSON(), &innerEntries);
 
     for (const auto& op : innerEntries) {
-        if (op.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
-            extractSizeCountDeltasForApplyOps(op, uuidFilter, sizeCountDeltasOut);
-            continue;
-        }
-        const auto& opUuid = op.getUuid();
-        if (uuidFilter && opUuid != uuidFilter) {
-            continue;
-        }
-        if (auto sizeCountDelta = extractSizeCountDeltaForOp(op); sizeCountDelta.has_value()) {
-            recordCollectionSizeCountDelta(*opUuid, *sizeCountDelta, sizeCountDeltasOut);
-        }
+        processOplogEntry(op, uuidFilter, sizeCountDeltasOut);
     }
 }
 
@@ -196,16 +224,7 @@ OplogScanResult aggregateSizeCountDeltasInOplog(SeekableRecordCursor& oplogCurso
             continue;
         }
         result.lastTimestamp = entry.getTimestamp();
-        if (entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
-            extractSizeCountDeltasForApplyOps(entry, uuidFilter, result.deltas);
-            continue;
-        }
-        if (uuidFilter && entry.getUuid() != uuidFilter) {
-            continue;
-        }
-        if (auto delta = extractSizeCountDeltaForOp(entry); delta.has_value()) {
-            recordCollectionSizeCountDelta(*entry.getUuid(), *delta, result.deltas);
-        }
+        processOplogEntry(entry, uuidFilter, result.deltas);
     }
     return result;
 }

@@ -36,6 +36,7 @@
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_interface_local.h"
+#include "mongo/db/repl/truncate_range_oplog_entry_gen.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
@@ -518,6 +519,22 @@ repl::OplogEntry makeOplogEntry(const Timestamp ts, NsAndUUID userColl, repl::Op
         .nss = userColl.nss,
         .uuid = userColl.uuid,
         .oField = BSONObj(),
+        .wallClockTime = Date_t::now(),
+    }};
+}
+
+repl::OplogEntry makeTruncateRangeOplogEntry(Timestamp ts,
+                                             NsAndUUID userColl,
+                                             int64_t bytesDeleted,
+                                             int64_t docsDeleted) {
+    TruncateRangeOplogEntry objectEntry(
+        userColl.nss, RecordId(), RecordId(), bytesDeleted, docsDeleted);
+    return repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(ts, 1),
+        .opType = repl::OpTypeEnum::kCommand,
+        .nss = userColl.nss.getCommandNS(),
+        .uuid = userColl.uuid,
+        .oField = objectEntry.toBSON(),
         .wallClockTime = Date_t::now(),
     }};
 }

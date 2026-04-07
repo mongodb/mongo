@@ -333,6 +333,15 @@ repl::OplogEntry makeOplogEntry(Timestamp ts,
 repl::OplogEntry makeOplogEntry(Timestamp ts, NsAndUUID userColl, repl::OpTypeEnum opType);
 
 /**
+ * Generates a truncateRange command oplog entry for the given collection UUID with the specified
+ * bytesDeleted and docsDeleted values.
+ */
+repl::OplogEntry makeTruncateRangeOplogEntry(Timestamp ts,
+                                             NsAndUUID userColl,
+                                             int64_t bytesDeleted,
+                                             int64_t docsDeleted);
+
+/**
  * Inserts `oplogEntry` into the oplog collection.
  */
 void writeToOplog(OperationContext* opCtx, const repl::OplogEntry& oplogEntry);

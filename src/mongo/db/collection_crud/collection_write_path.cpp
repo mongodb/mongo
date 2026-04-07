@@ -1009,7 +1009,8 @@ repl::OpTime truncateRange(OperationContext* opCtx,
 
     uassert(ErrorCodes::IllegalOperation,
             "Cannot perform ranged truncate in collections other than clustered collections as "
-            "RecordIds must be equal across nodes",
+            "we cannot have secondary indexes and all non-clustered collections at least have the "
+            "_id index",
             collection->isClustered() || nss.isOplog());
     uassert(ErrorCodes::IllegalOperation,
             "Cannot perform ranged truncate in collections with preimages enabled",
@@ -1046,7 +1047,6 @@ repl::OpTime truncateRange(OperationContext* opCtx,
                                                     -docsDeleted);
     uassertStatusOK(status);
 
-    // TODO SERVER-121175: Add size delta to onTruncateRange oplog entries.
     opCtx->getServiceContext()->getOpObserver()->onTruncateRange(
         opCtx, collection, minRecordId, maxRecordId, bytesDeleted, docsDeleted, opTime);
     if (isReplicatedFastCountEnabled(opCtx)) {

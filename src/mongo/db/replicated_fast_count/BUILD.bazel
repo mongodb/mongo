@@ -108,6 +108,7 @@ mongo_cc_library(
         "//src/mongo/db:record_id_helpers",
         "//src/mongo/db/repl:apply_ops_command_info",
         "//src/mongo/db/repl:oplog_entry",
+        "//src/mongo/db/repl:truncate_range_oplog_entry_idl",
         "//src/mongo/db/shard_role",
         "//src/mongo/db/shard_role/shard_catalog:collection_options",
     ],
@@ -250,6 +251,7 @@ mongo_cc_library(
         "//src/mongo/db/op_observer:operation_logger_impl",
         "//src/mongo/db/repl:oplog_entry",
         "//src/mongo/db/repl:oplog_interface_local",
+        "//src/mongo/db/repl:truncate_range_oplog_entry_idl",
         "//src/mongo/unittest",
     ],
 )

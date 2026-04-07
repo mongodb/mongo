@@ -395,5 +395,199 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
 }
 
 
+// Test: A truncateRange oplog entry correctly applies negative size/count deltas.
+TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TruncateRangeAppliesNegativeDelta) {
+    // Setup collection size count tracking: `collA` with 5 documents and 200 bytes.
+    {
+        WriteUnitOfWork wuow(opCtx);
+        sizeCountStore.write(
+            opCtx, collA.uuid, {.timestamp = Timestamp(1, 1), .size = 200, .count = 5});
+        timestampStore.write(opCtx, Timestamp(1, 1));
+        wuow.commit();
+    }
+
+    // Simulate a truncateRange that removes 3 documents worth 120 bytes.
+    test_helpers::writeToOplog(
+        opCtx,
+        test_helpers::makeTruncateRangeOplogEntry(
+            Timestamp(1, 2), collA, /*bytesDeleted=*/120, /*docsDeleted=*/3));
+
+    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+
+    const SizeCountStore::Entry expectedEntry{
+        .timestamp = Timestamp(1, 2), .size = 200 - 120, .count = 5 - 3};
+    const auto entry = sizeCountStore.read(opCtx, collA.uuid);
+    ASSERT_TRUE(entry.has_value());
+    EXPECT_EQ(expectedEntry, *entry);
+
+    const auto tsStoreRes = timestampStore.read(opCtx);
+    ASSERT_TRUE(tsStoreRes.has_value());
+    ASSERT_EQ(Timestamp(1, 2), *tsStoreRes);
+}
+
+// Test: Inserts followed by a truncateRange for the same collection accumulate correctly.
+TEST_F(ReplicatedFastCountAdvanceCheckpointTest, InsertThenTruncateRangeAccumulates) {
+    test_helpers::writeToOplog(
+        opCtx,
+        test_helpers::makeOplogEntry(
+            Timestamp(1, 1), collA, repl::OpTypeEnum::kInsert, 50 /*sizeDelta=*/));
+    test_helpers::writeToOplog(
+        opCtx,
+        test_helpers::makeOplogEntry(
+            Timestamp(1, 2), collA, repl::OpTypeEnum::kInsert, 50 /*sizeDelta=*/));
+    test_helpers::writeToOplog(opCtx,
+                               test_helpers::makeTruncateRangeOplogEntry(
+                                   Timestamp(1, 3), collA, /*bytesDeleted=*/30, /*docsDeleted=*/1));
+
+    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+
+    // Net: size = 50+50-30 = 70, count = 1+1-1 = 1.
+    const SizeCountStore::Entry expectedEntry{.timestamp = Timestamp(1, 3), .size = 70, .count = 1};
+    const auto entry = sizeCountStore.read(opCtx, collA.uuid);
+    ASSERT_TRUE(entry.has_value());
+    EXPECT_EQ(expectedEntry, *entry);
+}
+
+// Test: A truncateRange for collB does not affect collA's tracked size/count.
+TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TruncateRangeOnlyAffectsTargetCollection) {
+    {
+        WriteUnitOfWork wuow(opCtx);
+        sizeCountStore.write(
+            opCtx, collA.uuid, {.timestamp = Timestamp(1, 1), .size = 100, .count = 4});
+        timestampStore.write(opCtx, Timestamp(1, 1));
+        wuow.commit();
+    }
+
+    test_helpers::writeToOplog(opCtx,
+                               test_helpers::makeTruncateRangeOplogEntry(
+                                   Timestamp(1, 2), collB, /*bytesDeleted=*/80, /*docsDeleted=*/2));
+
+    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+
+    // collA's entry is unchanged.
+    const SizeCountStore::Entry expectedCollAEntry{
+        .timestamp = Timestamp(1, 1), .size = 100, .count = 4};
+    const auto collAEntry = sizeCountStore.read(opCtx, collA.uuid);
+    ASSERT_TRUE(collAEntry.has_value());
+    EXPECT_EQ(expectedCollAEntry, *collAEntry);
+
+    // collB gets a new entry from the truncateRange.
+    const SizeCountStore::Entry expectedCollBEntry{
+        .timestamp = Timestamp(1, 2), .size = -80, .count = -2};
+    const auto collBEntry = sizeCountStore.read(opCtx, collB.uuid);
+    ASSERT_TRUE(collBEntry.has_value());
+    EXPECT_EQ(expectedCollBEntry, *collBEntry);
+}
+
+// Test: A mix of inserts, updates, deletes, and a truncateRange for the same collection all
+// accumulate into the correct net size and count delta.
+TEST_F(ReplicatedFastCountAdvanceCheckpointTest, MixedOpsWithTruncateRangeAccumulates) {
+    // 3 inserts: +150 bytes, +3 docs
+    test_helpers::writeToOplog(
+        opCtx,
+        test_helpers::makeOplogEntry(
+            Timestamp(1, 1), collA, repl::OpTypeEnum::kInsert, 40 /*sizeDelta=*/));
+    test_helpers::writeToOplog(
+        opCtx,
+        test_helpers::makeOplogEntry(
+            Timestamp(1, 2), collA, repl::OpTypeEnum::kInsert, 60 /*sizeDelta=*/));
+    test_helpers::writeToOplog(
+        opCtx,
+        test_helpers::makeOplogEntry(
+            Timestamp(1, 3), collA, repl::OpTypeEnum::kInsert, 50 /*sizeDelta=*/));
+    // 1 update: -10 bytes (doc shrank), 0 docs
+    test_helpers::writeToOplog(
+        opCtx,
+        test_helpers::makeOplogEntry(
+            Timestamp(1, 4), collA, repl::OpTypeEnum::kUpdate, -10 /*sizeDelta=*/));
+    // 1 delete: -40 bytes, -1 doc
+    test_helpers::writeToOplog(
+        opCtx,
+        test_helpers::makeOplogEntry(
+            Timestamp(1, 5), collA, repl::OpTypeEnum::kDelete, -40 /*sizeDelta=*/));
+    // 1 truncateRange: -60 bytes, -2 docs
+    test_helpers::writeToOplog(opCtx,
+                               test_helpers::makeTruncateRangeOplogEntry(
+                                   Timestamp(1, 6), collA, /*bytesDeleted=*/60, /*docsDeleted=*/2));
+
+    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+
+    // Net: size = 40+60+50-10-40-60 = 40, count = 1+1+1+0-1-2 = 0
+    const SizeCountStore::Entry expectedEntry{.timestamp = Timestamp(1, 6), .size = 40, .count = 0};
+    const auto entry = sizeCountStore.read(opCtx, collA.uuid);
+    ASSERT_TRUE(entry.has_value());
+    EXPECT_EQ(expectedEntry, *entry);
+}
+
+// Test: A truncateRange inside an applyOps entry applies the correct negative delta.
+TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TruncateRangeInsideApplyOps) {
+    const Timestamp ts1{1, 2};
+    const int64_t bytesDeleted = 90;
+    const int64_t docsDeleted = 2;
+
+    const auto truncateEntry =
+        test_helpers::makeTruncateRangeOplogEntry(ts1, collA, bytesDeleted, docsDeleted);
+    const NamespaceString adminCmdNss =
+        NamespaceString::createNamespaceString_forTest("admin", "$cmd");
+    BSONObj truncateInnerOp = BSON("op" << "c"
+                                        << "ns" << collA.nss.getCommandNS().ns_forTest() << "ui"
+                                        << collA.uuid << "o" << truncateEntry.getObject());
+
+    test_helpers::writeToOplog(
+        opCtx,
+        repl::OplogEntry{repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+            .opTime = repl::OpTime(ts1, 1),
+            .opType = repl::OpTypeEnum::kCommand,
+            .nss = adminCmdNss,
+            .oField = BSON("applyOps" << BSON_ARRAY(truncateInnerOp)),
+            .wallClockTime = Date_t::now(),
+        }}});
+
+    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+
+    const SizeCountStore::Entry expectedEntry{
+        .timestamp = ts1, .size = -bytesDeleted, .count = -docsDeleted};
+    const auto entry = sizeCountStore.read(opCtx, collA.uuid);
+    ASSERT_TRUE(entry.has_value());
+    EXPECT_EQ(expectedEntry, *entry);
+}
+
+// Test: A truncateRange nested inside a nested applyOps applies the correct negative delta.
+TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TruncateRangeInsideNestedApplyOps) {
+    const Timestamp ts1{1, 2};
+    const int64_t bytesDeleted = 60;
+    const int64_t docsDeleted = 1;
+
+    const auto truncateEntry =
+        test_helpers::makeTruncateRangeOplogEntry(ts1, collA, bytesDeleted, docsDeleted);
+    const NamespaceString adminCmdNss =
+        NamespaceString::createNamespaceString_forTest("admin", "$cmd");
+    BSONObj truncateInnerOp = BSON("op" << "c"
+                                        << "ns" << collA.nss.getCommandNS().ns_forTest() << "ui"
+                                        << collA.uuid << "o" << truncateEntry.getObject());
+
+    // Wrap the truncateRange in an inner applyOps, then in an outer applyOps.
+    BSONObj innerApplyOpsOp = BSON("op" << "c" << "ns" << adminCmdNss.ns_forTest() << "o"
+                                        << BSON("applyOps" << BSON_ARRAY(truncateInnerOp)));
+
+    test_helpers::writeToOplog(
+        opCtx,
+        repl::OplogEntry{repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+            .opTime = repl::OpTime(ts1, 1),
+            .opType = repl::OpTypeEnum::kCommand,
+            .nss = adminCmdNss,
+            .oField = BSON("applyOps" << BSON_ARRAY(innerApplyOpsOp)),
+            .wallClockTime = Date_t::now(),
+        }}});
+
+    advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
+
+    const SizeCountStore::Entry expectedEntry{
+        .timestamp = ts1, .size = -bytesDeleted, .count = -docsDeleted};
+    const auto entry = sizeCountStore.read(opCtx, collA.uuid);
+    ASSERT_TRUE(entry.has_value());
+    EXPECT_EQ(expectedEntry, *entry);
+}
+
 }  // namespace
 }  // namespace mongo::replicated_fast_count
