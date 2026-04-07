@@ -101,10 +101,14 @@ protected:
             .semi();
     }
 
-    void doneWith(ConnectionPool::ConnectionHandle& conn) {
+    ExecutorFuture<void> doneWithAsync(ConnectionPool::ConnectionHandle& conn) {
         dynamic_cast<ConnectionImpl*>(conn.get())->indicateSuccess();
 
-        ExecutorFuture(_executor).getAsync([conn = std::move(conn)](auto) {});
+        return ExecutorFuture(_executor).then([conn = std::move(conn)]() {});
+    }
+
+    void doneWith(ConnectionPool::ConnectionHandle& conn) {
+        doneWithAsync(conn).getAsync([](auto) {});
     }
 
     void doneWithError(ConnectionPool::ConnectionHandle& conn, Status error) {
@@ -261,6 +265,8 @@ protected:
 private:
     std::shared_ptr<OutOfLineExecutor> _executor = InlineQueuedCountingExecutor::make();
     std::shared_ptr<ConnectionPool> _pool;
+    unittest::MinimumLoggedSeverityGuard logSeverityGuardNetwork{
+        logv2::LogComponent::kConnectionPool, logv2::LogSeverity::Debug(5)};
 };
 
 TEST_F(ConnectionPoolTest, CheckRejectedConnectionRequest) {
@@ -2586,10 +2592,6 @@ TEST_F(ConnectionPoolTest, DismissBeforeCancelGet) {
 }
 
 TEST_F(ConnectionPoolTest, EnsureReasonIsLogged) {
-    // Bumping up the log severity for this unit test to catch all logs.
-    unittest::MinimumLoggedSeverityGuard logSeverityGuardNetwork{
-        logv2::LogComponent::kConnectionPool, logv2::LogSeverity::Debug(5)};
-
     ConnectionPool::Options options;
     options.minConnections = 0;
     auto pool = makePool(options);
@@ -2620,33 +2622,29 @@ TEST_F(ConnectionPoolTest, EnsureReasonIsLogged) {
     ASSERT_EQ(1ul, msgCounter);
 }
 
-TEST_F(ConnectionPoolTest, SetupTimeoutsShouldNotDropOpenConnections) {
-
-    boost::optional<StatusWith<ConnectionPool::ConnectionHandle>> connToTriggerSetup;
+TEST_F(ConnectionPoolTest, SetupFailuresShouldNotDropOpenConnections) {
+    // None of these errors should drop available connections. The pool spawns replacement
+    // connections for each failure.
+    std::vector<ErrorCodes::Error> setupFailures = {
+        ErrorCodes::HostUnreachable, ErrorCodes::SocketException, ErrorCodes::NetworkTimeout};
 
     auto [pool, inUseConnections] = setupConnectionPool(
         1,
         1,
-        3,
+        setupFailures.size(),
         [&](ConnectionPool::Options& options) { options.refreshTimeout = Seconds(100); },
-        [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
-            connToTriggerSetup = std::move(swConn);
-        });
+        [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {});
 
     ON_BLOCK_EXIT([&]() {
         for (auto& conn : inUseConnections) {
             doneWith(conn);
         }
-
-        if (connToTriggerSetup && connToTriggerSetup->isOK()) {
-            doneWith(connToTriggerSetup->getValue());
-        }
     });
 
-    // Setup connections fail with 'HostUnreachable' and 'SocketException'. None of these errors
-    // should drop available connections. The pool spawns replacement connections for each failure.
-    ConnectionImpl::pushSetup(Status(ErrorCodes::HostUnreachable, ""));
-    ConnectionImpl::pushSetup(Status(ErrorCodes::SocketException, ""));
+
+    for (auto ec : setupFailures) {
+        ConnectionImpl::pushSetup(Status(ec, ""));
+    }
 
     // Verify that there is still one available connection and the pool maintains the target
     // number of refreshing connections.
@@ -2654,7 +2652,19 @@ TEST_F(ConnectionPoolTest, SetupTimeoutsShouldNotDropOpenConnections) {
         const auto connStats = getStats(pool);
         ASSERT_EQ(1, connStats.totalInUse);
         ASSERT_EQ(1, connStats.totalAvailable);
-        ASSERT_EQ(3, connStats.totalRefreshing);
+        ASSERT_EQ(setupFailures.size(), connStats.totalRefreshing);
+    }
+
+    // Return the in-use connection, which should not be refreshed.
+    {
+        auto conn = std::move(inUseConnections.back());
+        inUseConnections.pop_back();
+        doneWithAsync(conn).get();
+
+        const auto connStats = getStats(pool);
+        ASSERT_EQ(0, connStats.totalInUse);
+        ASSERT_EQ(setupFailures.size(), connStats.totalRefreshing);
+        ASSERT_EQ(2, connStats.totalAvailable);
     }
 
     // Contrarily, when a setup connection fails with another error, the available connection gets
@@ -2662,65 +2672,9 @@ TEST_F(ConnectionPoolTest, SetupTimeoutsShouldNotDropOpenConnections) {
     ConnectionImpl::pushSetup(Status(ErrorCodes::NetworkInterfaceExceededTimeLimit, ""));
     {
         const auto connStats = getStats(pool);
-        ASSERT_EQ(1, connStats.totalInUse);
+        ASSERT_EQ(0, connStats.totalInUse);
         ASSERT_EQ(0, connStats.totalRefreshing);
         ASSERT_EQ(0, connStats.totalAvailable);
-    }
-}
-
-TEST_F(ConnectionPoolTest, ForceAnImmediateRefreshWhenSetupTimesout) {
-    boost::optional<StatusWith<ConnectionPool::ConnectionHandle>> connToTriggerSetup;
-    auto [pool, inUseConnections] = setupConnectionPool(
-        1,
-        1,
-        1,
-        [&](ConnectionPool::Options& options) { options.refreshTimeout = Seconds(100); },
-        [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
-            connToTriggerSetup = std::move(swConn);
-        });
-
-    ON_BLOCK_EXIT([&]() {
-        for (auto& conn : inUseConnections) {
-            doneWith(conn);
-        }
-
-        if (connToTriggerSetup && connToTriggerSetup->isOK()) {
-            doneWith(connToTriggerSetup->getValue());
-        }
-    });
-
-    {
-        const auto connStats = getStats(pool);
-        ASSERT_EQ(1, connStats.totalInUse);
-        ASSERT_EQ(1, connStats.totalAvailable);
-        ASSERT_EQ(1, connStats.totalRefreshing);
-    }
-
-    // Fail the refresh of the second connection with HostUnreachable, which will force a refresh on
-    // the next returned connection eventhough the refresh timeout hasn't been reached.
-    ConnectionImpl::pushSetup(Status(ErrorCodes::HostUnreachable, ""));
-    {
-        const auto connStats = getStats(pool);
-        ASSERT_EQ(1, connStats.totalInUse);
-        ASSERT_EQ(1, connStats.totalAvailable);
-        ASSERT_EQ(1, connStats.totalRefreshing);
-    }
-
-    // Return one connection
-    ASSERT(!inUseConnections.empty());
-    {
-        auto conn = std::move(inUseConnections.back());
-        inUseConnections.pop_back();
-        doneWith(conn);
-    }
-
-    // Verify the returned connection gets immediatly refreshed by seeing an increment in
-    // 'totalRefreshing'
-    {
-        const auto connStats = getStats(pool);
-        ASSERT_EQ(0, connStats.totalInUse);
-        ASSERT_EQ(1, connStats.totalAvailable);
-        ASSERT_EQ(2, connStats.totalRefreshing);
     }
 }
 
@@ -3115,9 +3069,6 @@ private:
 //   4. spawnConnections() does not check for kExpired, so it spawns a new connection immediately
 //   5. That connection fails → repeat from (1), creating a tight retry loop
 TEST_F(ConnectionPoolTest, FailedExpiredPoolDoesNotRetryWithoutBackoff) {
-    unittest::MinimumLoggedSeverityGuard logSeverityGuardNetwork{
-        logv2::LogComponent::kConnectionPool, logv2::LogSeverity::Debug(5)};
-
     ConnectionPool::Options options;
     options.hostTimeout = Milliseconds(1);
     options.refreshRequirement = Milliseconds(5);
