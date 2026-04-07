@@ -12,8 +12,15 @@ import {
 } from "jstests/sharding/analyze_shard_key/libs/cardinality_and_frequency_common.js";
 import {getNonPrimaryShardName, getPrimaryShardNameForDB} from "jstests/sharding/libs/sharding_util.js";
 
-function awaitReplicationIfNeeded(db) {
+function awaitReplicationIfNeeded(db, coll) {
     if (!FixtureHelpers.isStandalone(db)) {
+        // Transaction passthrough suites set coordinateCommitReturnImmediatelyAfterPersistingDecision
+        // to true, so commit returns before participants have applied the writes. These suites also
+        // enable causalConsistency, so the txn override attaches afterClusterTime (from the
+        // session's operationTime) to reads. countDocuments fans out to all shards with
+        // afterClusterTime >= the commit's operationTime, forcing each shard to wait until the
+        // commit is applied before reading.
+        coll.countDocuments({});
         FixtureHelpers.awaitReplication(db);
     }
 }
@@ -208,7 +215,7 @@ function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKe
     assert.commandWorked(coll.insert(docs0, {writeConcern}));
 
     jsTest.log("Testing metrics with non-unique index, numDistinctValues = numMostCommonValues - 1");
-    awaitReplicationIfNeeded(db);
+    awaitReplicationIfNeeded(db, coll);
     const res0 = conn.adminCommand({
         analyzeShardKey: ns,
         key: testCase.shardKey,
@@ -233,7 +240,7 @@ function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKe
     assert.commandWorked(coll.insert(docs1, {writeConcern}));
 
     jsTest.log("Testing metrics with non-unique index, numDistinctValues = numMostCommonValues");
-    awaitReplicationIfNeeded(db);
+    awaitReplicationIfNeeded(db, coll);
     const res1 = conn.adminCommand({
         analyzeShardKey: ns,
         key: testCase.shardKey,
@@ -255,7 +262,8 @@ function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKe
     assert.commandWorked(coll.insert(docs2, {writeConcern}));
 
     jsTest.log("Testing metrics with non-unique index, numDistinctValues = numMostCommonValues * 25");
-    awaitReplicationIfNeeded(db);
+    awaitReplicationIfNeeded(db, coll);
+
     const res2 = conn.adminCommand({
         analyzeShardKey: ns,
         key: testCase.shardKey,
@@ -322,7 +330,7 @@ function testAnalyzeShardKeyUniqueIndex(conn, dbName, collName, currentShardKey,
     assert.commandWorked(coll.insert(docs0, {writeConcern}));
 
     jsTest.log("Testing metrics with non-unique index, numDistinctValues = numMostCommonValues - 1");
-    awaitReplicationIfNeeded(db);
+    awaitReplicationIfNeeded(db, coll);
     const res0 = assert.commandWorked(
         conn.adminCommand({
             analyzeShardKey: ns,
@@ -342,7 +350,7 @@ function testAnalyzeShardKeyUniqueIndex(conn, dbName, collName, currentShardKey,
     assert.commandWorked(coll.insert(docs1, {writeConcern}));
 
     jsTest.log("Testing metrics with non-unique index, numDistinctValues = numMostCommonValues");
-    awaitReplicationIfNeeded(db);
+    awaitReplicationIfNeeded(db, coll);
     const res1 = assert.commandWorked(
         conn.adminCommand({
             analyzeShardKey: ns,
@@ -362,7 +370,7 @@ function testAnalyzeShardKeyUniqueIndex(conn, dbName, collName, currentShardKey,
     assert.commandWorked(coll.insert(docs2, {writeConcern}));
 
     jsTest.log("Testing metrics with non-unique index, numDistinctValues = numMostCommonValues * 25");
-    awaitReplicationIfNeeded(db);
+    awaitReplicationIfNeeded(db, coll);
     const res2 = assert.commandWorked(
         conn.adminCommand({
             analyzeShardKey: ns,
