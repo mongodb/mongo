@@ -1305,6 +1305,46 @@ CollectionCatalog::_openViewAtPointInTimeIfUpgradedToViewlessTimeseries(
     return viewDefinition;
 }
 
+bool CollectionCatalog::_hideViewAtPointInTimeIfDowngradedToViewfulTimeseries(
+    OperationContext* opCtx, const NamespaceString& nss) const {
+    // Only relevant for point-in-time reads. Non-PIT reads should see the latest view state.
+    auto readTimestamp = shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
+    if (!readTimestamp) {
+        return false;
+    }
+
+    // Verify that there has been a timeseries downgrade from viewless to viewful format, i.e.:
+    // (1) The namespace 'at latest' is a timeseries view (viewful format).
+    //     We already know this because the caller found a timeseries view on 'nss'.
+    // (2) The same namespace at the point-in-time was a viewless timeseries collection.
+    //     We check this by looking for a collection at 'nss' at the PIT timestamp.
+
+    // Calling establishConsistentCollection may open a new storage snapshot, which existing callers
+    // may not expect, so abandon that snapshot to avoid breaking their expectations.
+    bool ruWasActive = shard_role_details::getRecoveryUnit(opCtx)->isActive();
+    ON_BLOCK_EXIT([&] {
+        if (!ruWasActive && shard_role_details::getRecoveryUnit(opCtx)->isActive()) {
+            shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+        }
+    });
+
+    ConsistentCollection collAtPIT = establishConsistentCollection(opCtx, nss, readTimestamp);
+    if (!collAtPIT || !collAtPIT->isNewTimeseriesWithoutView()) {
+        return false;
+    }
+
+    // Verify UUID match: the viewless timeseries at PIT should have the same UUID as the
+    // viewful backing collection (system.buckets.nss) at latest, confirming it's the same
+    // logical collection that was renamed during the downgrade.
+    std::shared_ptr<Collection> bucketsAtLatest =
+        _lookupCollectionByNamespaceNoFindInstantiated(nss.makeTimeseriesBucketsNamespace());
+    if (!bucketsAtLatest || bucketsAtLatest->uuid() != collAtPIT->uuid()) {
+        return false;
+    }
+
+    return true;
+}
+
 bool CollectionCatalog::_needsOpenCollection(OperationContext* opCtx,
                                              const NamespaceStringOrUUID& nsOrUUID,
                                              boost::optional<Timestamp> readTimestamp) const {
@@ -2119,6 +2159,11 @@ std::shared_ptr<const ViewDefinition> CollectionCatalog::lookupView(
         }
 
         if (auto view = viewsForDb->lookup(ns)) {
+            // TODO(SERVER-114573): Remove once 9.0 is last LTS.
+            if (view->timeseries() &&
+                _hideViewAtPointInTimeIfDowngradedToViewfulTimeseries(opCtx, ns)) {
+                return nullptr;
+            }
             return view;
         }
     }
@@ -2134,6 +2179,11 @@ std::shared_ptr<const ViewDefinition> CollectionCatalog::lookupViewWithoutValida
     OperationContext* opCtx, const NamespaceString& ns) const {
     if (auto viewsForDb = _getViewsForDatabase(opCtx, ns.dbName())) {
         if (auto view = viewsForDb->lookup(ns)) {
+            // TODO(SERVER-114573): Remove once 9.0 is last LTS.
+            if (view->timeseries() &&
+                _hideViewAtPointInTimeIfDowngradedToViewfulTimeseries(opCtx, ns)) {
+                return nullptr;
+            }
             return view;
         }
     }

@@ -743,6 +743,21 @@ private:
         OperationContext* opCtx, const NamespaceString& nss) const;
 
     /**
+     * If reading at a point-in-time, and the given namespace currently has a timeseries view
+     * (viewful format) at latest but at the point-in-time it was a viewless timeseries collection,
+     * then return true to indicate the view should be hidden.
+     *
+     * This is the symmetric counterpart to _openViewAtPointInTimeIfUpgradedToViewlessTimeseries:
+     * after a downgrade from viewless to viewful format, point-in-time reads at a timestamp
+     * before the downgrade should not see the newly created timeseries view, since at that
+     * point the namespace was a viewless timeseries collection.
+     *
+     * TODO(SERVER-114573): Remove once 9.0 is last LTS.
+     */
+    bool _hideViewAtPointInTimeIfDowngradedToViewfulTimeseries(OperationContext* opCtx,
+                                                               const NamespaceString& nss) const;
+
+    /**
      * Gets Collections by UUID/Namespace.
      */
     std::shared_ptr<const Collection> _getCollectionByNamespace(OperationContext* opCtx,

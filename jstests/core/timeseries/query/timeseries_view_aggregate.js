@@ -7,23 +7,6 @@
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {isStableFCVSuite} from "jstests/libs/feature_compatibility_version.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-
-// TODO SERVER-122397: Remove this skip once views over timeseries work properly on replicasets
-// when executed concurrently with FCV upgrade/downgrade and the viewless timeseries feature flag.
-if (
-    !isStableFCVSuite() &&
-    !FixtureHelpers.isMongos(db) &&
-    FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections", true /* ignoreFCV */)
-) {
-    jsTest.log.info(
-        "Skipping test because it is incompatible with replicaset FCV upgrade/downgrade " +
-            "suite when viewless timeseries feature flag is enabled.",
-    );
-    quit();
-}
 
 const timeFieldName = "time";
 const metaFieldName = "status";
