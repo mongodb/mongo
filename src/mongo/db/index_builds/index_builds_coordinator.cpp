@@ -1770,7 +1770,8 @@ void IndexBuildsCoordinator::_completeAbort(OperationContext* opCtx,
         }
         // Deletes the index from the durable catalog.
         case IndexBuildAction::kInitialSyncAbort: {
-            invariant(replState->protocol == IndexBuildProtocol::kTwoPhase);
+            invariant(replState->protocol == IndexBuildProtocol::kTwoPhase ||
+                      replState->protocol == IndexBuildProtocol::kPrimaryDriven);
             invariant(replCoord->getMemberState().startup2());
 
             bool isPrimary = replCoord->canAcceptWritesFor(opCtx, nss);
@@ -1788,14 +1789,16 @@ void IndexBuildsCoordinator::_completeAbort(OperationContext* opCtx,
         }
         // Deletes the index from the durable catalog.
         case IndexBuildAction::kOplogAbort: {
-            invariant(IndexBuildProtocol::kTwoPhase == replState->protocol);
+            invariant(IndexBuildProtocol::kTwoPhase == replState->protocol ||
+                      IndexBuildProtocol::kPrimaryDriven == replState->protocol);
             replState->onOplogAbort(opCtx, nss);
             _indexBuildsManager.abortIndexBuild(
                 opCtx, coll, replState->buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
             break;
         }
         case IndexBuildAction::kRollbackAbort: {
-            invariant(replState->protocol == IndexBuildProtocol::kTwoPhase);
+            invariant(replState->protocol == IndexBuildProtocol::kTwoPhase ||
+                      replState->protocol == IndexBuildProtocol::kPrimaryDriven);
             // File copy based initial sync does a rollback-like operation, so we allow STARTUP2
             // to abort as well as rollback.
             invariant(replCoord->getMemberState().rollback() ||
