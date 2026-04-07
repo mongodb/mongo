@@ -274,7 +274,6 @@ tasks:
           resmoke_args: >-
             --runAllFeatureFlagTests
 
-  # TODO(SERVER-123169): Fix test composer and re-enable this task
   - <<: *antithesis_task_template
     name: antithesis_replica_sets_basic_js_commands
     tags:
@@ -297,7 +296,6 @@ tasks:
             --runAllFeatureFlagTests
           antithesis_test_composer_dir: basic_js_commands
 
-  # TODO(SERVER-123169): Fix test composer and re-enable this task
   - <<: *antithesis_task_template
     name: antithesis_sharding_basic_js_commands
     tags:

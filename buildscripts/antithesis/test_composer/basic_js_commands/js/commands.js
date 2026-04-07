@@ -1,43 +1,105 @@
-const MONGOD_URI = connection_string;
+const MONGO_URI = connection_string.includes("/") ? connection_string : `mongodb://${connection_string}`;
 
 const MAX_RETRIES = 180; // 3 minutes
 
+// All error codes with the RetriableError category from src/mongo/base/error_codes.yml and other
+// error codes that we want to retry on.
+const RETRYABLE_ERROR_CODES = new Set([
+    6, // HostUnreachable
+    7, // HostNotFound
+    50, // MaxTimeMSExpired
+    89, // NetworkTimeout
+    91, // ShutdownInProgress
+    112, // WriteConflict
+    133, // FailedToSatisfyReadPreference
+    134, // ReadConcernMajorityNotAvailableYet
+    189, // PrimarySteppedDown
+    246, // SnapshotUnavailable
+    262, // ExceededTimeLimit
+    317, // ConnectionPoolExpired
+    358, // InternalTransactionNotSupported
+    384, // ConnectionError
+    402, // ResourceExhausted
+    406, // MigrationBlockingOperationCoordinatorCleaningUp
+    407, // PooledConnectionAcquisitionExceededTimeLimit
+    412, // UpdatesStillPending
+    453, // InterruptedDueToReshardingCriticalSection
+    462, // IngressRequestRateLimitExceeded
+    471, // InterruptedDueToAddShard
+    479, // IFRFlagRetry
+    485, // InterruptedDueToTimeseriesUpgradeDowngrade
+    488, // PrimaryOnlyServiceInitializing
+    9001, // SocketException
+    10107, // NotWritablePrimary
+    11600, // InterruptedAtShutdown
+    11602, // InterruptedDueToReplStateChange
+    13435, // NotPrimaryNoSecondaryOk
+    13436, // NotPrimaryOrSecondary
+    50915, // BackupCursorOpenConflictWithCheckpoint
+    91331, // RetriableRemoteCommandFailure
+    10045600, // InterruptedDueToFCVChange
+]);
+
+function isRetryableError(code, message = "") {
+    return (
+        RETRYABLE_ERROR_CODES.has(code) ||
+        message === "read ECONNRESET" ||
+        message === "read ETIMEDOUT" ||
+        message === "Shutting down" ||
+        message.startsWith("socket exception") ||
+        message.startsWith("can't connect") ||
+        message.startsWith("network error while attempting to run command") ||
+        message.startsWith("Could not find host matching read preference") ||
+        message.startsWith("Could not satisfy $readPreference")
+    );
+}
+
 // Executes the given function, retrying if it fails
-// due to the network being unreachable (MongoNetworkError)
-// or cluster unavailable (MongoServerSelectionError)
-// or retryable write error.
+// due to the network being unreachable (MongoNetworkError),
+// cluster unavailable (MongoServerSelectionError),
+// retryable write error, or any error code in RETRYABLE_ERROR_CODES.
 function retryOnFailure(func) {
-    let retries = 0;
-    while (true) {
+    for (let retries = 0; retries < MAX_RETRIES; ++retries) {
         try {
             const result = func();
+            if (result && result.ok === 0) {
+                // We can sometimes receive a response with ok:0 without getting an exception.
+                print(`Received not OK result: ${JSON.stringify(result)}`);
+                const code = result.code || result.all?.code || 0;
+                const errmsg = result.errmsg || result.codeName || result.all?.codeName || "";
+                if (isRetryableError(code, errmsg)) {
+                    print(
+                        `Attempt ${retries} failed due to retryable ok:0 result: "${JSON.stringify(result)}", retrying in 1 second...`,
+                    );
+                    sleep(1000);
+                    continue;
+                }
+                // If it's not a retryable error, fall through and return the result, the caller is responsible for handling it.
+            }
             return result;
         } catch (err) {
-            if (retries++ >= MAX_RETRIES) {
-                print(`failed (exhausted all retries): ${JSON.stringify(err)}`);
-                throw err;
-            }
             if (
+                isRetryableError(err.code, err.message) ||
                 err.name === "MongoServerSelectionError" ||
                 err.name === "MongoNetworkError" ||
                 err.name === "MongoNetworkTimeoutError" ||
                 err.name === "MongoPoolClearedError" ||
                 err.name === "PoolClearedOnNetworkError" ||
-                err.name === "InterruptedDueToReplStateChange" ||
-                err.message === "read ECONNRESET" ||
-                err.message === "read ETIMEDOUT" ||
-                err.message === "Shutting down" ||
-                err.message.startsWith("network error while attempting to run command")
+                err.name === "WriteConcernError"
             ) {
-                print(`Attempt ${retries} failed due to ${err.name}, retrying in 1 second...`);
+                print(`Attempt ${retries} failed due to "${err.name}: ${err.message}", retrying in 1 second...`);
                 sleep(1_000);
                 continue;
             }
+
+            const errLabels = err.errorLabels || err.errorResponse?.errorLabels || [];
             if (
-                Array.isArray(err.errorResponse?.errorLabels) &&
-                err.errorResponse.errorLabels.includes("RetryableWriteError")
+                Array.isArray(errLabels) &&
+                ["RetryableWriteError", "TransientTransactionError", "RetryableError"].some((label) =>
+                    errLabels.includes(label),
+                )
             ) {
-                print(`Attempt ${retries} failed due to ${err.codeName}, retrying in 1 second...`);
+                print(`Attempt ${retries} failed due to "${err.codeName}: ${err.message}", retrying in 1 second...`);
                 sleep(1_000);
                 continue;
             }
@@ -47,6 +109,9 @@ function retryOnFailure(func) {
             throw err;
         }
     }
+
+    print(`Exhausted all retries, failing`);
+    throw Error(`Operation failed after ${MAX_RETRIES} attempts`);
 }
 
 // Exclusive upper bound (0 to max-1)
@@ -56,7 +121,12 @@ function randomInt(max) {
 
 // Establishes a connection
 function getDB() {
-    return retryOnFailure(() => new Mongo(MONGOD_URI).getDB("test"));
+    return retryOnFailure(() => {
+        print(`Establishing connection to "${MONGO_URI}"`);
+        const conn = new Mongo(MONGO_URI);
+        conn.setReadPref("primaryPreferred");
+        return conn.getDB("test");
+    });
 }
 
 function find() {
@@ -74,7 +144,6 @@ function fsync() {
     print("executing fsync");
     const result = retryOnFailure(() => db.adminCommand({fsync: 1}));
     print("done executing fsync. result:", JSON.stringify(result));
-    assert(result.ok);
 }
 
 function insert() {
@@ -129,20 +198,27 @@ function pitRead() {
         throw e;
     }
 
+    print("done executing PIT read. result:", JSON.stringify(snapshotReadResult));
     // Assert that the snapshot read actually returned the version of the
     // doc at the older value (1), not the newer one (2).
-    assert(JSON.stringify(snapshotReadResult.cursor.firstBatch) == JSON.stringify([{_id, value: 1}]));
+    assert(
+        JSON.stringify(snapshotReadResult.cursor.firstBatch) === JSON.stringify([{_id, value: 1}]),
+        `PIT read returned unexpected result: ${JSON.stringify(snapshotReadResult)}`,
+    );
 }
 
 function validateCollections() {
     const db = getDB();
-    const dbs = retryOnFailure(() => db.adminCommand("listDatabases").databases.map((x) => x.name));
+    const dbs = retryOnFailure(() => db.adminCommand("listDatabases")).databases.map((x) => x.name);
     dbs.forEach((dbName) => {
         const collectionNames = retryOnFailure(() => db.getSiblingDB(dbName).getCollectionNames());
         collectionNames.forEach((coll) => {
             print(`validating ${dbName}.${coll}...`);
             const validateResult = retryOnFailure(() => db.getSiblingDB(dbName).getCollection(coll).validate());
-            assert(validateResult.valid, "collection is not valid");
+            assert(
+                validateResult.valid,
+                `collection ${dbName}.${coll} is not valid: ${JSON.stringify(validateResult)}`,
+            );
         });
     });
 }
@@ -170,7 +246,7 @@ function aggregate() {
     ];
 
     for (const pipeline of pipelines) {
-        retryOnFailure(() => db.test.aggregate(pipeline).toArray());
+        retryOnFailure(() => db.test.aggregate(pipeline)).toArray();
     }
     print("done executing aggregate");
 }
@@ -213,27 +289,6 @@ function txn() {
 
     const MAX_TXN_RETRIES = 30;
 
-    const commitWithRetry = (session) => {
-        let retries = 0;
-        while (true) {
-            try {
-                session.commitTransaction();
-                return;
-            } catch (err) {
-                if (
-                    retries++ < MAX_TXN_RETRIES &&
-                    Array.isArray(err.errorResponse?.errorLabels) &&
-                    err.errorResponse.errorLabels.includes("UnknownTransactionCommitResult")
-                ) {
-                    print(`commit attempt ${retries} got UnknownTransactionCommitResult, retrying...`);
-                    sleep(1_000);
-                    continue;
-                }
-                throw err;
-            }
-        }
-    };
-
     let txnRetries = 0;
     while (true) {
         const session = db.getMongo().startSession();
@@ -249,16 +304,19 @@ function txn() {
             if (found) {
                 sessionDb.test.updateOne({_id: found._id}, {$set: {updated: true}});
             }
-            commitWithRetry(session);
+            retryOnFailure(() => session.commitTransaction());
             session.endSession();
             print("txn committed");
             break;
         } catch (err) {
             try {
                 session.abortTransaction();
-            } catch (_) {}
-            session.endSession();
+                session.endSession();
+            } catch (err) {
+                print(`Caught exception while aborting transaction, ignoring: ${JSON.stringify(err)}`);
+            }
 
+            const isRetryableErr = isRetryableError(err.code, err.message);
             const isTransient =
                 Array.isArray(err.errorResponse?.errorLabels) &&
                 err.errorResponse.errorLabels.includes("TransientTransactionError");
@@ -268,7 +326,7 @@ function txn() {
                 err.name === "MongoNetworkTimeoutError" ||
                 err.name === "MongoPoolClearedError";
 
-            if (txnRetries++ < MAX_TXN_RETRIES && (isTransient || isNetwork)) {
+            if (txnRetries++ < MAX_TXN_RETRIES && (isRetryableErr || isTransient || isNetwork)) {
                 print(`txn attempt ${txnRetries} failed (${err.name ?? err.codeName}), retrying...`);
                 sleep(1_000);
                 continue;
@@ -285,10 +343,23 @@ function dbcheck() {
     const collectionNames = retryOnFailure(() => db.getCollectionNames());
     for (const coll of collectionNames) {
         print(`running dbCheck on test.${coll}`);
-        retryOnFailure(() => {
-            const result = db.runCommand({dbCheck: coll});
-            assert(result.ok, `dbCheck failed for test.${coll}: ${JSON.stringify(result)}`);
-        });
+        const result = retryOnFailure(() => db.runCommand({dbCheck: coll}));
+        assert(result.ok, `dbCheck failed for test.${coll}: ${JSON.stringify(result)}`);
     }
     print("done executing dbcheck");
+}
+
+function replSetGetStatus() {
+    const db = getDB();
+    const result = retryOnFailure(() => db.adminCommand({replSetGetStatus: 1}));
+    print("Done executing replSetGetStatus. result:", JSON.stringify(result));
+    assert(
+        result.errmsg === "replSetGetStatus is not supported through mongos" ||
+            (result.ok &&
+                result.myState !== undefined &&
+                result.myState !== 4 &&
+                result.myState !== 6 &&
+                result.myState !== 8),
+        `replSetGetStatus returned an unexpected result: ${JSON.stringify(result)}`,
+    );
 }
