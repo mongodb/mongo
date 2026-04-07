@@ -314,6 +314,8 @@ tasks:
           include:
             - "./venv/**"
             - "./venv_readme.txt"
+          exclude:
+            - "tmp/**"
 
       - command: s3.put
         params:

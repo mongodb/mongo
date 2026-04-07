@@ -1234,6 +1234,8 @@ functions:
         source_dir: "./"
         include:
           - "powercycle_tasks.json"
+        exclude:
+          - "tmp/**"
 
     - command: s3.put
       display_name: "upload powercycle_tasks_config.tgz"
@@ -2531,6 +2533,8 @@ functions:
         source_dir: "${workdir}/"
         include:
           - "_logs/*"
+        exclude:
+          - "tmp/**"
     - command: s3.put
       params:
         aws_key: ${aws_key}
@@ -3312,6 +3316,8 @@ functions:
       include:
         - "./mongo-diskstats*"
         - "./mongo-diskstats*.csv"
+      exclude:
+        - "tmp/**"
 
   "archive disk statistics": &archive_disk_statistics
     command: s3.put
@@ -3844,6 +3850,8 @@ functions:
       params:
         target: "venv.tgz"
         source_dir: "./"
+        exclude:
+          - "tmp/**"
         include:
           - "./venv/**"
           - "./venv_readme.txt"
