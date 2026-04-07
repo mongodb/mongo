@@ -25,7 +25,10 @@ def main():
         check_bazel_command_type,
         test_runner_interface,
     )
+    from bazel.wrapper_hook.remove_auto_header_dirs import clean_up_auto_header_dirs
     from bazel.wrapper_hook.set_mongo_variables import write_mongo_variables_bazelrc
+
+    clean_up_auto_header_dirs(REPO_ROOT)
 
     # This is used to autogenerate a BUILD.bazel that creates
     # Filegroups for select tags - used to group targets for installing
