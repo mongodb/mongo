@@ -138,6 +138,10 @@ class ReplicatedFastCountTestPersistenceProvider : public rss::StubPersistencePr
     bool shouldTimestampTableCreations() const override {
         return false;
     }
+
+    bool supportsPreservingPreparedTxnInPreciseCheckpoints() const override {
+        return false;
+    }
 };
 
 /**

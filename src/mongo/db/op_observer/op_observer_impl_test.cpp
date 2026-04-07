@@ -77,6 +77,8 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/truncate_range_oplog_entry_gen.h"
+#include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_d_test_fixture.h"
@@ -2349,9 +2351,19 @@ TEST_F(OpObserverTransactionTest, PreparingTransactionWritesToTransactionTable) 
 }
 
 TEST_F(OpObserverTransactionTest,
-       PreparingTransactionWritesToTransactionTablePreciseCheckpointsFlagOn) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagPreparedTransactionsPreciseCheckpoints", true);
+       PreparingTransactionWritesToTransactionTablePreciseCheckpointsSupported) {
+    // The default AttachedPersistenceProvider returns false for
+    // supportsPreservingPreparedTxnInPreciseCheckpoints(), so the extra precise checkpoint fields
+    // won't be written to config.transactions. Override it here to test that we write those extra
+    // fields when we support preserving prepared transactions in precise checkpoints.
+    class PreciseCheckpointPersistenceProvider : public rss::AttachedPersistenceProvider {
+    public:
+        bool supportsPreservingPreparedTxnInPreciseCheckpoints() const override {
+            return true;
+        }
+    };
+    rss::ReplicatedStorageService::get(opCtx()).setPersistenceProvider(
+        std::make_unique<PreciseCheckpointPersistenceProvider>());
 
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");

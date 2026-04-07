@@ -230,7 +230,6 @@ feature_flags:
         description: "Enables logic necessary to recover prepared transactions with precise checkpoints"
         cpp_varname: gFeatureFlagPreparedTransactionsPreciseCheckpoints
         default: false
-        # TODO SERVER-113736 Set this to true and correctly gate any checks on FCV
         fcv_gated: false
     featureFlagKillOpErrorCodeOverride:
         description: "Feature flag to enable specifying custom error codes when killing operations"

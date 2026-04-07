@@ -426,8 +426,7 @@ void MigrationSourceManager::startClone() {
     auto supportsPreservingPreparedTxnInPreciseCheckpoints =
         rss::ReplicatedStorageService::get(_opCtx->getServiceContext())
             .getPersistenceProvider()
-            .supportsPreservingPreparedTxnInPreciseCheckpoints() &&
-        gFeatureFlagPreparedTransactionsPreciseCheckpoints.isEnabled();
+            .supportsPreservingPreparedTxnInPreciseCheckpoints();
 
     if (supportsPreservingPreparedTxnInPreciseCheckpoints) {
         auto preparedTxnResolved =

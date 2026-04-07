@@ -1,15 +1,16 @@
 /**
- * Helper to test different prepare-transaction oplog formats and verify that the config.transactions
- * table entries match between the primary and secondary.
+ * Helper to test different prepare-transaction oplog formats and verify that the
+ * config.transactions table entries match between the primary and secondary.
  *
  */
 
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 import {getOplogEntriesForTxnOnNode} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
-// TODO (SERVER-115115): Remove this function once stopReplicaSet includes built-in consistency checks.
+// TODO (SERVER-115115): Remove this function once stopReplicaSet includes built-in consistency
+// checks.
 function checkCollectionDataConsistency(primary, secondary, dbs, colls) {
     jsTest.log.info("Checking collection data consistency between primary and secondary");
 
@@ -62,7 +63,14 @@ export function checkPrepareTxnTableUpdate(primary, secondary, commitOrAbort, ch
         assert.eq(primaryTxnEntry["state"], "prepared");
         assert.eq(primaryTxnEntry["lastWriteOpTime"]["ts"], preparedTs);
 
-        if (FeatureFlagUtil.isPresentAndEnabled(primary, "PreparedTransactionsPreciseCheckpoints") && !isMultiversion) {
+        if (
+            PersistenceProviderUtil.allNodesHavePropertyWithValue(
+                primary,
+                "supportsPreservingPreparedTxnInPreciseCheckpoints",
+                true,
+            ) &&
+            !isMultiversion
+        ) {
             assert.eq(primaryTxnEntry["affectedNamespaces"], expectedAffectedNamespaces);
         }
     };

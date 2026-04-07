@@ -577,8 +577,8 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
         if (firstOpTimeInBatch <= lastAppliedOpTimeAtStartOfBatch) {
             auto& entry = ops.front();
             auto obj = entry.getRaw();
-            // TODO: Temporary logging to output as much information as possible before segfault
-            // (see SERVER-108464 and AF-3761).
+            // TODO (SERVER-108464): Temporary logging to output as much information as possible
+            // before segfault (see SERVER-108464 and AF-3761).
             LOGV2(10846400,
                   "Oplog entry less than our last applied OpTime detected, outputting diagnostic "
                   "information",
@@ -929,9 +929,11 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
             // we must first parse the prepared oplog to obtain all individual operations to be able
             // to parse each one.
             auto affectedNamespaces = NamespaceHashSet();
-            auto affectedNamespacesPtr =
-                gFeatureFlagPreparedTransactionsPreciseCheckpoints.isEnabled() ? &affectedNamespaces
-                                                                               : nullptr;
+            auto affectedNamespacesPtr = rss::ReplicatedStorageService::get(opCtx)
+                                             .getPersistenceProvider()
+                                             .supportsPreservingPreparedTxnInPreciseCheckpoints()
+                ? &affectedNamespaces
+                : nullptr;
             auto* partialTxnList = getPartialTxnList(op);
             _addOplogChainOpsToWriterVectors(opCtx,
                                              &op,

@@ -2083,8 +2083,10 @@ repl::OpTime logApplyOps(OperationContext* opCtx,
                 sessionTxnRecord.setTxnRetryCounter(*txnRetryCounter);
             }
 
-            if (gFeatureFlagPreparedTransactionsPreciseCheckpoints.isEnabled() && txnState &&
-                *txnState == DurableTxnStateEnum::kPrepared) {
+            if (rss::ReplicatedStorageService::get(opCtx)
+                    .getPersistenceProvider()
+                    .supportsPreservingPreparedTxnInPreciseCheckpoints() &&
+                txnState && *txnState == DurableTxnStateEnum::kPrepared) {
                 // TODO SERVER-113730: Decide if kInProgress needs to include these fields too.
                 auto txnParticipant = TransactionParticipant::get(opCtx);
                 tassert(11372300,
