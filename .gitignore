@@ -357,3 +357,8 @@ src/mongo/shell/*_gen.d.ts
 
 # devcontainer uses pnpm which results in a large amount of environment files that aren't intended for git commits
 .pnpm-store
+
+# Claude Code local files
+.claude/settings.local.json
+.claude/agent-memory-local/
+CLAUDE.local.md
