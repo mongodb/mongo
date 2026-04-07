@@ -744,15 +744,19 @@ Value evaluate(const ExpressionSetUnion& expr, const Document& root, Variables* 
 }
 
 namespace {
+
 /*
- * Convert a Value to an array. Accepts both arrays and binData vectors.
+ * Converts a Value to an array reference. Accepts both arrays and binData vectors.
+ * For arrays, borrows directly from the Value (zero-copy). For binData vectors,
+ * converts into 'buf' and returns a reference to it.
  */
-std::vector<Value> toArray(const Value& val, const std::string& opName) {
+const std::vector<Value>& toArray(const Value& val, std::vector<Value>& buf, StringData opName) {
     if (val.isArray()) {
         return val.getArray();
     }
     if (val.getType() == BSONType::binData && val.getBinData().type == BinDataType::Vector) {
-        return convert_utils::convertBinDataVectorToArray(val);
+        buf = convert_utils::convertBinDataVectorToArray(val);
+        return buf;
     }
     uasserted(10413200,
               str::stream() << "Arguments to " << opName
@@ -764,12 +768,9 @@ std::vector<Value> toArray(const Value& val, const std::string& opName) {
  * Ensure both arguments to a vector similarity algorithm are arrays or binData vectors
  * of numeric or boolean values of the same size.
  */
-std::pair<std::vector<Value>, std::vector<Value>> validate(const Value& val1,
-                                                           const Value& val2,
-                                                           const std::string& opName) {
-    auto array1 = toArray(val1, opName);
-    auto array2 = toArray(val2, opName);
-
+void validate(const std::vector<Value>& array1,
+              const std::vector<Value>& array2,
+              StringData opName) {
     uassert(10413202,
             str::stream() << "Arguments to " << opName
                           << " must be the same size, but the first is of size "
@@ -792,8 +793,6 @@ std::pair<std::vector<Value>, std::vector<Value>> validate(const Value& val1,
             str::stream() << "All elements in the second argument to " << opName
                           << " must be numeric or boolean",
             numericOrBoolean(array2));
-
-    return {std::move(array1), std::move(array2)};
 }
 
 /*
@@ -873,7 +872,11 @@ Value evaluateSimilarity(
         return Value(BSONNULL);
     }
 
-    const auto& [array1, array2] = validate(arrayVal1, arrayVal2, expr.getOpName());
+    std::vector<Value> buf1, buf2;
+    const auto opName = expr.getOpName();
+    const std::vector<Value>& array1 = toArray(arrayVal1, buf1, opName);
+    const std::vector<Value>& array2 = toArray(arrayVal2, buf2, opName);
+    validate(array1, array2, opName);
     const auto similarity = calculateSimilarity(array1, array2);
 
     return Value(expr.isScore() ? normalize(similarity) : similarity);

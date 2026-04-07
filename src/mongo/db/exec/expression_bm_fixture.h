@@ -348,6 +348,14 @@ public:
     void benchmarkMQLConvertStringToObject(size_t fields, size_t depth, benchmark::State& state);
     void benchmarkJSConvertStringToObject(size_t fields, size_t depth, benchmark::State& state);
 
+    void benchmarkSimilarityDotProduct(benchmark::State& state, int dims);
+    void benchmarkSimilarityCosine(benchmark::State& state, int dims);
+    void benchmarkSimilarityEuclidean(benchmark::State& state, int dims);
+
+    void benchmarkSimilarityDotProductBinData(benchmark::State& state, int dims);
+    void benchmarkSimilarityCosineBinData(benchmark::State& state, int dims);
+    void benchmarkSimilarityEuclideanBinData(benchmark::State& state, int dims);
+
 private:
     void testDateDiffExpression(long long startDate,
                                 long long endDate,
@@ -1321,6 +1329,84 @@ private:
     }                                                                                           \
     BENCHMARK_F(Fixture, JSConvertStringToObject50FieldsDepth10)(benchmark::State & state) {    \
         benchmarkJSConvertStringToObject(50, 10, state);                                        \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, SimilarityDotProduct128)(benchmark::State & state) {                   \
+        benchmarkSimilarityDotProduct(state, 128);                                              \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, SimilarityDotProduct512)(benchmark::State & state) {                   \
+        benchmarkSimilarityDotProduct(state, 512);                                              \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, SimilarityDotProduct1536)(benchmark::State & state) {                  \
+        benchmarkSimilarityDotProduct(state, 1536);                                             \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, SimilarityDotProduct4096)(benchmark::State & state) {                  \
+        benchmarkSimilarityDotProduct(state, 4096);                                             \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, SimilarityCosine128)(benchmark::State & state) {                       \
+        benchmarkSimilarityCosine(state, 128);                                                  \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, SimilarityCosine512)(benchmark::State & state) {                       \
+        benchmarkSimilarityCosine(state, 512);                                                  \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, SimilarityCosine1536)(benchmark::State & state) {                      \
+        benchmarkSimilarityCosine(state, 1536);                                                 \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, SimilarityCosine4096)(benchmark::State & state) {                      \
+        benchmarkSimilarityCosine(state, 4096);                                                 \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, SimilarityEuclidean128)(benchmark::State & state) {                    \
+        benchmarkSimilarityEuclidean(state, 128);                                               \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, SimilarityEuclidean512)(benchmark::State & state) {                    \
+        benchmarkSimilarityEuclidean(state, 512);                                               \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, SimilarityEuclidean1536)(benchmark::State & state) {                   \
+        benchmarkSimilarityEuclidean(state, 1536);                                              \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, SimilarityEuclidean4096)(benchmark::State & state) {                   \
+        benchmarkSimilarityEuclidean(state, 4096);                                              \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, SimilarityDotProductBinData128)(benchmark::State & state) {            \
+        benchmarkSimilarityDotProductBinData(state, 128);                                       \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, SimilarityDotProductBinData512)(benchmark::State & state) {            \
+        benchmarkSimilarityDotProductBinData(state, 512);                                       \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, SimilarityDotProductBinData1536)(benchmark::State & state) {           \
+        benchmarkSimilarityDotProductBinData(state, 1536);                                      \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, SimilarityDotProductBinData4096)(benchmark::State & state) {           \
+        benchmarkSimilarityDotProductBinData(state, 4096);                                      \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, SimilarityCosineBinData128)(benchmark::State & state) {                \
+        benchmarkSimilarityCosineBinData(state, 128);                                           \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, SimilarityCosineBinData512)(benchmark::State & state) {                \
+        benchmarkSimilarityCosineBinData(state, 512);                                           \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, SimilarityCosineBinData1536)(benchmark::State & state) {               \
+        benchmarkSimilarityCosineBinData(state, 1536);                                          \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, SimilarityCosineBinData4096)(benchmark::State & state) {               \
+        benchmarkSimilarityCosineBinData(state, 4096);                                          \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, SimilarityEuclideanBinData128)(benchmark::State & state) {             \
+        benchmarkSimilarityEuclideanBinData(state, 128);                                        \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, SimilarityEuclideanBinData512)(benchmark::State & state) {             \
+        benchmarkSimilarityEuclideanBinData(state, 512);                                        \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, SimilarityEuclideanBinData1536)(benchmark::State & state) {            \
+        benchmarkSimilarityEuclideanBinData(state, 1536);                                       \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, SimilarityEuclideanBinData4096)(benchmark::State & state) {            \
+        benchmarkSimilarityEuclideanBinData(state, 4096);                                       \
     }
 
 
