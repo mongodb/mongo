@@ -6,8 +6,6 @@
 base_suite: retryable_writes_jscore_stepdown_passthrough
 overrides:
   - "primary_driven_index_builds.enable_primary_driven_index_builds_feature_flag_mongod"
-  # TODO(SERVER-123304): Remove exclusion of CheckReplOplogs hook.
-  - "retryable_writes_jscore_stepdown_passthrough_primary_driven_index_builds.exclude_check_repl_oplogs"
 
 excludes:
   - "primary_driven_index_builds.exclude_primary_driven_index_builds_incompatible_tag"

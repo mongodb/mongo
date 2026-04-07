@@ -9,6 +9,8 @@
 executor:
   archive:
     hooks:
+      - CheckReplDBHash
+      - CheckReplOplogs
       - ValidateCollections
   config:
     shell_options:
@@ -49,6 +51,8 @@ executor:
         catchUpTimeoutMillis: 0
   hooks:
     - class: ContinuousStepdown
+    - class: CheckReplOplogs
+    - class: CheckReplDBHash
     - class: ValidateCollections
     - class: CleanEveryN
       n: 20

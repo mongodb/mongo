@@ -3201,7 +3201,7 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
                 // are made interruptible by replica set state transitions, both primary stepdown
                 // and secondary stepup can reach here, in addition to other index build failures
                 // encountered by the primary during the index build.
-                auto allowSecondaryToFailInPrimaryDriven = [replState, status]() {
+                auto allowSecondaryToFailInPrimaryDriven = [this, replState, status]() {
                     LOGV2(11785200,
                           "Index build: skipping self-abort after stepdown for primary-driven "
                           "index build",
@@ -3215,6 +3215,9 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
                     // Reset the promise and wait for the new primary to coordinate the index build
                     // and send the new signal/action.
                     replState->resetNextActionPromise();
+                    // Unregister the build here since primary-driven index builds should not be
+                    // registered on secondaries.
+                    activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
                 };
                 try {
                     // Take RSTL to observe and prevent replication state from changing.
