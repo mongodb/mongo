@@ -12,6 +12,8 @@
  *   requires_fastcount,
  *   requires_fsync,
  *   uses_parallel_shell,
+ *   # TODO (SERVER-123573): See if this test can be re-enabled.
+ *   featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 function waitUntilOpCountIs(opFilter, num) {
