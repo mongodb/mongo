@@ -1974,6 +1974,7 @@ tasks:
         "common",
         "requires_replicated_fast_count_recovery",
         "requires_large_host_aubsan",
+        "has_bazel_target",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2171,6 +2172,7 @@ tasks:
         "read_concern_maj",
         "large",
         "sharded",
+        "has_bazel_target",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2357,6 +2359,7 @@ tasks:
         "sharding",
         "jscore",
         "common",
+        "has_bazel_target",
       ]
     commands:
       - func: "generate resmoke tasks"

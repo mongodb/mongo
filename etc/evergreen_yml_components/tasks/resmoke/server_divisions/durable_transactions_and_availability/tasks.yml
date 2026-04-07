@@ -1279,6 +1279,7 @@ tasks:
         "common",
         "san",
         "large",
+        "has_bazel_target",
       ]
     commands:
       - func: "generate resmoke tasks"

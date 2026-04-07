@@ -1,0 +1,102 @@
+load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
+load("//jstests/suites/query-execution:common.bzl", "CONCURRENCY_DATA", "CORE_DATA")
+
+resmoke_suite_test(
+    name = "concurrency_sharded_replication_with_balancer",
+    config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_replication_with_balancer.yml",
+    data = ["//jstests/concurrency/reshard_collection_util:all_javascript_files"] + CONCURRENCY_DATA,
+    shard_count = 20,
+    tags = [
+        "ci-release-critical",
+        "common",
+        "concurrency",
+        "large",
+        "read_concern_maj",
+        "resources:cpu:2",
+        "sharded",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_jscore_passthrough_with_balancer",
+    config = "//buildscripts/resmokeconfig:suites/sharding_jscore_passthrough_with_balancer.yml",
+    data = [
+        "//jstests/sharding/analyze_shard_key/libs:all_subpackage_javascript_files",
+        "//jstests/sharding/libs:all_subpackage_javascript_files",
+    ] + CORE_DATA,
+    shard_count = 20,
+    tags = [
+        "ci-release-critical",
+        "common",
+        "jscore",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_stepdown_fcv_upgrade_downgrade_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_stepdown_fcv_upgrade_downgrade_jscore_passthrough.yml",
+    data = [
+        "//buildscripts/resmokeconfig:matrix_suites/mappings/sharding_stepdown_fcv_upgrade_downgrade_jscore_passthrough.yml",
+        "//buildscripts/resmokeconfig:matrix_suites/overrides/fcv_upgrade_downgrade_primary_step_down_overrides.yml",
+        "//buildscripts/resmokeconfig:matrix_suites/overrides/replica_sets_stepdown_selector.yml",
+        "//buildscripts/resmokeconfig:suites/sharding_jscore_passthrough_base.yml",
+    ] + CORE_DATA,
+    shard_count = 20,
+    tags = [
+        "ci-release-critical",
+        "common",
+        "jscore",
+        "requires_large_host_aubsan",
+        "requires_replicated_fast_count_recovery",
+        "sharding",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],  # TODO SERVER-122597: Remove once the underlying election timeout issue is fixed.
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "transitioning_replica_sets_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/transitioning_replica_sets_jscore_passthrough.yml",
+    data = [
+        "//buildscripts/resmokeconfig:matrix_suites/mappings/transitioning_replica_sets_jscore_passthrough.yml",
+        "//buildscripts/resmokeconfig:matrix_suites/overrides/replica_sets.yml",
+        "//buildscripts/resmokeconfig:suites/replica_sets_jscore_passthrough_base.yml",
+    ] + CORE_DATA,
+    shard_count = 20,
+    tags = [
+        "ci-release-critical",
+        "common",
+        "large",
+        "replica_sets",
+        "san",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
