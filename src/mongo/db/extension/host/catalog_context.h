@@ -34,6 +34,7 @@
 #include "mongo/db/extension/shared/explain_utils.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
+#include "mongo/db/topology/sharding_state.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
@@ -54,11 +55,19 @@ public:
           _uuid(expCtx.getUUID().has_value() ? expCtx.getUUID()->toString() : ""),
           _inRouter(expCtx.getInRouter()),
           _verbosity(expCtx.getExplain()),
+          _shardId([&]() -> std::string {
+              auto* opCtx = expCtx.getOperationContext();
+              auto* shardingState =
+                  opCtx ? ShardingState::get(opCtx->getServiceContext()) : nullptr;
+              return shardingState && shardingState->enabled() ? shardingState->shardId().toString()
+                                                               : std::string{};
+          }()),
           _api(::MongoExtensionNamespaceString(stringDataAsByteView(StringData(_dbName)),
                                                stringDataAsByteView(StringData(_collName))),
                stringDataAsByteView(StringData(_uuid)),
                _inRouter,
-               convertHostVerbosityToExtVerbosity(_verbosity)) {}
+               convertHostVerbosityToExtVerbosity(_verbosity),
+               stringDataAsByteView(StringData(_shardId))) {}
 
     ~CatalogContext() = default;
 
@@ -72,6 +81,7 @@ private:
     const std::string _uuid;
     const bool _inRouter;
     const boost::optional<ExplainOptions::Verbosity> _verbosity;
+    const std::string _shardId;
     const ::MongoExtensionCatalogContext _api;
 };
 };  // namespace mongo::extension::host

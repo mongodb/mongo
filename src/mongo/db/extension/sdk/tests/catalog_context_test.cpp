@@ -29,9 +29,14 @@
 
 #include "mongo/db/extension/host/catalog_context.h"
 
+#include "mongo/bson/oid.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_test_service_context.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/topology/sharding_state.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/uuid.h"
 
 #include <string>
@@ -72,6 +77,7 @@ TEST(CatalogContextTest, CatalogContextWithValidFields) {
     ASSERT_EQUALS(extensionCatalogContext.inRouter, 1);
     ASSERT_EQUALS(extensionCatalogContext.verbosity,
                   ::MongoExtensionExplainVerbosity::kExecAllPlans);
+    ASSERT_EQUALS(extensionCatalogContext.shardId.len, 0);
 }
 
 TEST(CatalogContextTest, CatalogContextWithEmptyFields) {
@@ -93,6 +99,34 @@ TEST(CatalogContextTest, CatalogContextWithEmptyFields) {
     ASSERT_EQUALS(extensionCatalogContext.uuidString.len, 0);
     ASSERT_EQUALS(extensionCatalogContext.inRouter, 0);
     ASSERT_EQUALS(extensionCatalogContext.verbosity, ::MongoExtensionExplainVerbosity::kNotExplain);
+    ASSERT_EQUALS(extensionCatalogContext.shardId.len, 0);
+}
+
+TEST(CatalogContextTest, CatalogContextWithShardId) {
+    QueryTestServiceContext testCtx;
+    auto opCtx = testCtx.makeOperationContext();
+
+    // Set up ShardingState with a known shard ID.
+    const std::string expectedShardId = "myShard0";
+    ShardingState::get(testCtx.getServiceContext())
+        ->setRecoveryCompleted({OID::gen(),
+                                ClusterRole::ShardServer,
+                                ConnectionString(HostAndPort("localhost", 27017)),
+                                ShardId(expectedShardId)});
+
+    const auto dbNameSd = "test"_sd;
+    const auto collNameSd = "namespace"_sd;
+
+    auto expCtx = make_intrusive<ExpressionContextForTest>(
+        opCtx.get(),
+        NamespaceString::createNamespaceString_forTest(dbNameSd, collNameSd),
+        SerializationContext());
+
+    const auto catalogContext = mongo::extension::host::CatalogContext(*expCtx);
+    const auto& extensionCatalogContext = catalogContext.getAsBoundaryType();
+
+    ASSERT_EQUALS(byteViewAsStringView(extensionCatalogContext.shardId),
+                  std::string_view(expectedShardId));
 }
 }  // namespace
 }  // namespace mongo::extension

@@ -78,6 +78,7 @@ mongo_cc_library(
         ":extension_operation_metrics_registry",
         "//src/mongo:base",
         "//src/mongo/db:commands",
+        "//src/mongo/db:shard_role_api",
         "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/extension/host/aggregation_stage",
         "//src/mongo/db/extension/host_connector/adapter:host_adapters",

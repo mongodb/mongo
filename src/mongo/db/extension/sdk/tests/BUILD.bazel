@@ -23,6 +23,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_second_group"],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/db:shard_role_api",
         "//src/mongo/db/extension/host:extension_host",
         "//src/mongo/db/extension/host_connector/adapter:host_adapters",
         "//src/mongo/db/extension/host_connector/adapter:host_services_adapter",

@@ -437,17 +437,21 @@ typedef struct MongoExtensionViewInfo {
 
 /**
  * MongoExtensionCatalogContext contains a collection's catalog context information (i.e
- * MongoExtensionNamespaceString, uuidString), which is generally available when an AstNode binds
- * into a LogicalStage. Note that the members of this struct are provided as views, meaning the
- * values' underlying data is not owned by this struct. When a callee receives a
+ * MongoExtensionNamespaceString, uuidString, shardId), which is generally available when an AstNode
+ * binds into a LogicalStage. Note that the members of this struct are provided as views, meaning
+ * the values' underlying data is not owned by this struct. When a callee receives a
  * MongoExtensionCatalogContext as a parameter, the callee is responsible for immediately copying
  * the values into an owned copy if they must persist beyond the scope of the callee function.
+ *
+ * shardId is populated with the shard identifier when running on a shard server. When running on
+ * a router or a standalone deployment, shardId is empty.
  */
 typedef struct MongoExtensionCatalogContext {
     const ::MongoExtensionNamespaceString namespaceString;
     const MongoExtensionByteView uuidString;
     const uint8_t inRouter;
     const MongoExtensionExplainVerbosity verbosity;
+    const MongoExtensionByteView shardId;
 } MongoExtensionCatalogContext;
 
 ////////////////////////////////////////////////////////////////
