@@ -8,8 +8,7 @@ Extensions are dynamically loaded shared objects (`.so` files) that provide addi
 
 1. Discovering extension `.so` files in build directories
 2. Generating `.conf` configuration files for extensions
-3. Downloading external extensions (e.g. `mongot-extension`) from S3.
-4. Cleaning up configuration files after tests
+3. Cleaning up configuration files after tests
 
 ## Configuration File Generation in Tests
 
@@ -45,54 +44,3 @@ The `find_and_generate_extension_configs.py` module combines discovery and gener
    - **Local:** `bazel-bin/install-dist-test/lib/` or `bazel-bin/install-extensions/lib/`
 2. Generates `.conf` files with a unique UUID suffix to avoid collisions
 3. Adds the `loadExtensions` parameter to mongod/mongos options
-
-## `mongot-extension` Setup
-
-The `setup_mongot_extension.py` script downloads and configures the Rust `mongot-extension` binary for extension $vectorSearch testing.
-All `vector_search_extension_*` test suites use this framework to run server Extensions code with the Rust `mongot-extension.so`.
-
-### How It Works
-
-1. Builds the download URL from the **pinned release version** (see `MONGOT_EXTENSION_VERSION` in `setup_mongot_extension.py`).
-   We use the **release/** path (e.g. `release/mongot-extension-1.0.0-{platform}-{arch}.tgz`), not **latest/**, so normal mongot-extension pushes do not overwrite the artifact.
-   Only **sign-and-publish-release** will change the content when run.
-2. Downloads the tarball from S3 and verifies it using the hardcoded SHA256 checksums in `buildscripts/s3_binary/hashes.py`.
-3. Extracts the `.so` file and creates a configuration file
-
-### Updating Checksums
-
-The `mongot-extension` binaries are stored in S3 and verified using hardcoded SHA256 checksums in `buildscripts/s3_binary/hashes.py`.
-When a new version is released (by running `sign-and-publish-release`), update `MONGOT_EXTENSION_VERSION` in `setup_mongot_extension.py` and the hashes in `hashes.py`.
-This ensures every change is explicitly documented in the commit history and no component changes without an auditable commit.
-
-This cross-repo test infrastructure is temporary for the initial rollout of extension `$vectorSearch`. Long-term, all extension testing will live outside the server repository.
-
-**To update the checksums:**
-
-1. Run the following to download each tarball and print its SHA256 so Evergreen and other developers have the correct hashes.
-
-```bash
-VERSION=1.0.0  # replace with the new version
-BASE="https://mongot-extension.s3.amazonaws.com/release/mongot-extension-${VERSION}"
-
-curl -sL "${BASE}-amazon2023-x86_64.tgz" | sha256sum | awk '{print $1}'
-curl -sL "${BASE}-amazon2023-aarch64.tgz" | sha256sum | awk '{print $1}'
-```
-
-2. In `buildscripts/s3_binary/hashes.py`, replace the mongot-extension **hash values** with the printed hashes in the same order:
-
-- `amazon2023-x86_64`
-- `amazon2023-aarch64`
-
-3. Commit the updated `hashes.py` so Evergreen and others use the new checksums.
-
-### Using a Custom Extension Binary
-
-For local development or testing with a custom-built `mongot-extension`, you can set the `MONGOT_EXTENSION_PATH` environment variable:
-
-```bash
-export MONGOT_EXTENSION_PATH=/path/to/your/mongot-extension.so
-buildscripts/resmoke.py run --suites=vector_search_extension_* ...
-```
-
-This bypasses the S3 download and instead uses your local binary when generating `mongot-extension.conf`.

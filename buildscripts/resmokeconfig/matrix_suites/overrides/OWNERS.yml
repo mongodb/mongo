@@ -61,9 +61,6 @@ filters:
   - "priority_ports.yml":
     approvers:
       - 10gen/server-replication-reviewers
-  - "vector_search_extension.yml":
-    approvers:
-      - 10gen/query-integration-extensions-api
   - "retryable_writes.yml":
     approvers:
       - 10gen/server-transactions

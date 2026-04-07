@@ -109,9 +109,6 @@ filters:
   - "sharding*stepdown*":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "vector_search_extension*":
-    approvers:
-      - 10gen/query-integration-extensions-api
   - "sharding_jscore_passthrough.yml":
     approvers:
       - 10gen/server-cluster-scalability

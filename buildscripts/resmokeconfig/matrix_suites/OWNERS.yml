@@ -58,9 +58,6 @@ filters:
   - "generated_suites/sharding*stepdown*":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "generated_suites/vector_search_extension*":
-    approvers:
-      - 10gen/query-integration-extensions-api
   - "generated_suites/replica_sets_jscore_passthrough.yml":
     approvers:
       - 10gen/server-jstest-infra
