@@ -78,9 +78,16 @@ SignatureValidator::SignatureValidator(bool secureMode)
                           "signature validation");
               return true;
           }
-          // When running in insecure mode, signature validation should be skipped if
+          // In secure build mode, signature validation is always required.
+          if (secureMode) {
+              return false;
+          }
+#ifndef MONGO_CONFIG_EXT_SIG_SECURE
+          // In insecure build mode, signature validation should be skipped if
           // extensionSignaturePublicKeyPath has not been provided to the server.
           return secureMode ? false : serverGlobalParams.extensionsSignaturePublicKeyPath.empty();
+#endif
+          return false;
       }()) {
     LOGV2_DEBUG(11528804, 4, "Initializing SignatureValidator");
 
@@ -142,9 +149,14 @@ rnp::RnpInput SignatureValidator::_getValidationPublicKeyAsRnpInput() const {
         static const std::string kPublicKey(kMongoExtensionSigningPublicKey);
         return rnp::RnpInput::createFromMemory(kPublicKey, false);
     }
-
+    // Note, extensionsSignaturePublicKeyPath only exists when MONGO_CONFIG_EXT_SIG_SECURE is not
+    // defined. When built in secure mode, this code is unreachable.
+#ifndef MONGO_CONFIG_EXT_SIG_SECURE
     const auto& extensionValidationPublicKeyPath =
         serverGlobalParams.extensionsSignaturePublicKeyPath;
+#else
+    const auto& extensionValidationPublicKeyPath = std::string("");
+#endif
     tassert(11528904,
             "extensionsSignaturePublicKeyPath was empty!",
             !extensionValidationPublicKeyPath.empty());

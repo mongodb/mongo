@@ -61,17 +61,21 @@ public:
     SignatureValidatorTest() {}
 
     void setUp() override {
+#ifndef MONGO_CONFIG_EXT_SIG_SECURE
         _previousExtensionsSignaturePublicKeyPath =
             serverGlobalParams.extensionsSignaturePublicKeyPath;
         serverGlobalParams.extensionsSignaturePublicKeyPath =
             mongo::extension::host::test_util::getPublicKeyPath();
+#endif
     }
 
     void tearDown() override {
+#ifndef MONGO_CONFIG_EXT_SIG_SECURE
         if (!_previousExtensionsSignaturePublicKeyPath.empty()) {
             serverGlobalParams.extensionsSignaturePublicKeyPath =
                 _previousExtensionsSignaturePublicKeyPath;
         }
+#endif
     }
 
     void disableFeatureFlag() {
@@ -149,7 +153,9 @@ TEST_F(SignatureValidatorTest, SecureModeValidatingTestExtensionAgainstMongotExt
 }
 
 // Insecure mode tests.
-
+// Note, any insecure mode tests are disabled when built in insecure mode, since SignatureValidator
+// internally uses this macro to guard access to the extensionsSignaturePublicKeyPath.
+#ifndef MONGO_CONFIG_EXT_SIG_SECURE
 /**
  * InsecureModeEmptyPublicKeySkipsValidation: tests that initializing a SignatureValidator in
  * insecure mode, without providing an extensionsSignaturePublicKeyPath in the serverGlobalParams
@@ -220,6 +226,7 @@ TEST_F(SignatureValidatorTest,
     signatureValidator.validateExtensionSignature(
         kTestFooLibExtensionName, test_util::getExtensionPath(kTestMongotHostLibExtensionName));
 }
+#endif
 
 /**
  * ValidatingExtensionWithInvalidNameFails: tests that validating a signature with an extension name
@@ -228,6 +235,7 @@ TEST_F(SignatureValidatorTest,
 TEST_F(SignatureValidatorTest, ValidatingExtensionWithInvalidNameFails) {
     const std::string extensionName = "foo";
     const std::filesystem::path extensionPath = getTempDirPath() / extensionName;
+#ifndef MONGO_CONFIG_EXT_SIG_SECURE
     {
         SignatureValidatorForTest signatureValidator(false);
         ASSERT_THROWS_CODE(
@@ -235,7 +243,7 @@ TEST_F(SignatureValidatorTest, ValidatingExtensionWithInvalidNameFails) {
             AssertionException,
             11528810);
     }
-
+#endif
     {
         SignatureValidatorForTest signatureValidator(true);
         ASSERT_THROWS_CODE(
@@ -253,7 +261,7 @@ TEST_F(SignatureValidatorTest, ValidatingExtensionWithInvalidNameFails) {
 TEST_F(SignatureValidatorTest, ValidatingNonExistentExtensionPathFails) {
     const std::string extensionName = "foo.so";
     const std::filesystem::path extensionPath = getTempDirPath() / extensionName;
-
+#ifndef MONGO_CONFIG_EXT_SIG_SECURE
     {
         SignatureValidatorForTest signatureValidator(false);
         ASSERT_THROWS_CODE(
@@ -261,7 +269,7 @@ TEST_F(SignatureValidatorTest, ValidatingNonExistentExtensionPathFails) {
             AssertionException,
             11528923);
     }
-
+#endif
     {
         SignatureValidatorForTest signatureValidator(true);
         ASSERT_THROWS_CODE(
@@ -271,6 +279,8 @@ TEST_F(SignatureValidatorTest, ValidatingNonExistentExtensionPathFails) {
     }
 }
 
+
+#ifndef MONGO_CONFIG_EXT_SIG_SECURE
 /**
  * InsecureModeValidatingFooExtensionWithMongotHostSignatureFails: tests that validating the foo
  * extension with the mongot signing key fails. This is expected, since the test foo extension is
@@ -344,5 +354,6 @@ TEST_F(SignatureValidatorTest, InsecureModeValidatingFooExtensionWithInvalidKeyF
         AssertionException,
         11528906);
 }
+#endif
 }  // namespace
 }  // namespace mongo::extension::host
