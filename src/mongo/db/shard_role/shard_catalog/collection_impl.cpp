@@ -1097,6 +1097,13 @@ long long CollectionImpl::dataSize(OperationContext* opCtx) const {
         : _shared->_recordStore->dataSize();
 }
 
+CollectionSizeCount CollectionImpl::persistedSizeCount(OperationContext* opCtx) const {
+    return (isReplicatedFastCountEnabled(opCtx) && isReplicatedFastCountEligible(_ns))
+        ? ReplicatedFastCountManager::get(opCtx->getServiceContext()).findPersisted(opCtx, uuid())
+        : CollectionSizeCount{_shared->_recordStore->dataSize(),
+                              _shared->_recordStore->numRecords()};
+}
+
 int64_t CollectionImpl::sizeOnDisk(OperationContext* opCtx,
                                    const StorageEngine& storageEngine) const {
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);

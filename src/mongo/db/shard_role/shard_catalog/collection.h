@@ -47,6 +47,7 @@
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_options_gen.h"
@@ -677,6 +678,14 @@ public:
     virtual long long getCappedMaxSize() const = 0;
 
     virtual long long numRecords(OperationContext* opCtx) const = 0;
+
+    /**
+     * Returns the last persisted uncompressed collection data size and number of records.
+     *
+     * This function is useful for retrieving the approximate size and count of the collection
+     * quickly, e.g., during FTDC collection.
+     */
+    virtual CollectionSizeCount persistedSizeCount(OperationContext* opCtx) const = 0;
 
     /**
      * Return uncompressed collection data size in bytes

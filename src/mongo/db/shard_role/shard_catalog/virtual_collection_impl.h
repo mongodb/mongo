@@ -491,6 +491,11 @@ public:
         return _shared->_recordStore->dataSize();
     }
 
+    CollectionSizeCount persistedSizeCount(OperationContext* opCtx) const final {
+        return CollectionSizeCount{_shared->_recordStore->dataSize(),
+                                   _shared->_recordStore->numRecords()};
+    }
+
     int64_t sizeOnDisk(OperationContext* opCtx, const StorageEngine& storageEngine) const final {
         return 0;
     }

@@ -32,7 +32,7 @@
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_advance_checkpoint.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
-#include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_read.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
@@ -195,6 +195,11 @@ CollectionSizeCount ReplicatedFastCountManager::find(const UUID& uuid) const {
         return it->second.sizeCount;
     }
     return {};
+}
+
+CollectionSizeCount ReplicatedFastCountManager::findPersisted(OperationContext* opCtx,
+                                                              const UUID& uuid) const {
+    return replicated_fast_count::readPersisted(opCtx, _sizeCountStore, uuid);
 }
 
 void ReplicatedFastCountManager::flushAsync() {

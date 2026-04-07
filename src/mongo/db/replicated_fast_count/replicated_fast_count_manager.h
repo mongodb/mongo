@@ -142,6 +142,11 @@ public:
     CollectionSizeCount find(const UUID& uuid) const;
 
     /**
+     * Returns the persisted number of records (count) and data size for the collection with `uuid`.
+     */
+    CollectionSizeCount findPersisted(OperationContext* opCtx, const UUID& uuid) const;
+
+    /**
      * Signals the background thread to perform a flush.
      *
      * This flush involves snapshotting and writing dirty in-memory SizeCounts to the internal
