@@ -55,66 +55,6 @@ namespace {
 
 class TimeseriesWriteOpsTest : public timeseries::TimeseriesTestFixture {};
 
-TEST_F(TimeseriesWriteOpsTest, PerformAtomicTimeseriesWritesWithTransform) {
-    // We're going to insert a compressed bucket and ensure we can successfully decompress it via a
-    // transform update using performAtomicTimeseriesWrites.
-    const BSONObj bucketDoc = ::mongo::fromjson(
-        R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
-            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
-                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3}},
-            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
-                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
-                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
-                    "a":{"0":1,"1":2,"2":3},
-                    "b":{"0":1,"1":2,"2":3}}})");
-    OID bucketId = OID::createFromString("629e1e680958e279dc29a517"_sd);
-    auto compressionResult = timeseries::compressBucket(bucketDoc, "time", _nsNoMeta, false);
-    ASSERT_TRUE(compressionResult.compressedBucket.has_value());
-    const BSONObj compressedBucket = compressionResult.compressedBucket.value();
-
-    // Insert the compressed bucket.
-    AutoGetCollection bucketsColl(
-        _opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
-    {
-        WriteUnitOfWork wunit{_opCtx};
-        ASSERT_OK(Helpers::insert(_opCtx, *bucketsColl, compressedBucket));
-        wunit.commit();
-    }
-
-    // Decompress via transform.
-    {
-        auto bucketDecompressionFunc = [&](const BSONObj& bucketDoc) -> boost::optional<BSONObj> {
-            return timeseries::decompressBucket(bucketDoc);
-        };
-
-
-        write_ops::UpdateModification u(std::move(bucketDecompressionFunc));
-        write_ops::UpdateOpEntry update(BSON("_id" << bucketId), std::move(u));
-        write_ops::UpdateCommandRequest op(_nsNoMeta.makeTimeseriesBucketsNamespace(), {update});
-
-        write_ops::WriteCommandRequestBase base;
-        base.setBypassDocumentValidation(true);
-        base.setStmtIds(std::vector<StmtId>{kUninitializedStmtId});
-
-        op.setWriteCommandRequestBase(std::move(base));
-        op.setCollectionUUID(bucketsColl->uuid());
-
-        auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
-            _opCtx, _nsNoMeta, /*expectedUUID=*/boost::none);
-        ASSERT_OK(timeseries::write_ops::internal::performAtomicTimeseriesWrites(
-            _opCtx, preConditions, {}, {op}));
-    }
-
-    // Check the document is actually decompressed on disk.
-    {
-        auto recordId = record_id_helpers::keyForOID(bucketId);
-        auto retrievedBucket = bucketsColl->docFor(_opCtx, recordId);
-
-        UnorderedFieldsBSONObjComparator comparator;
-        ASSERT_EQ(0, comparator.compare(retrievedBucket.value(), bucketDoc));
-    }
-}
-
 TEST_F(TimeseriesWriteOpsTest, OrderedTimeseriesWritesMismatchedUUID) {
     auto insertCommandReq =
         write_ops::InsertCommandRequest(_nsNoMeta.makeTimeseriesBucketsNamespace());

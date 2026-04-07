@@ -1069,14 +1069,6 @@ Status performAtomicTimeseriesWrites(
                                           update.getU().verifierFunction);
             diffOnIndexes = &diffFromUpdate;
             args.update = update_oplog_entry::makeDeltaOplogEntry(diffFromUpdate);
-        } else if (update.getU().type() == mongo::write_ops::UpdateModification::Type::kTransform) {
-            const auto& transform = update.getU().getTransform();
-            auto transformed = transform(original.value());
-            tassert(7050400,
-                    "Could not apply transformation to time series bucket document",
-                    transformed.has_value());
-            updated = std::move(transformed.value());
-            args.update = update_oplog_entry::makeReplacementOplogEntry(updated);
         } else {
             invariant(false, "Unexpected update type");
         }

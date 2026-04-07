@@ -646,39 +646,4 @@ mongo::write_ops::UpdateOpEntry makeTimeseriesCompressedDiffEntry(
     return update;
 }
 
-mongo::write_ops::UpdateCommandRequest makeTimeseriesTransformationOp(
-    OperationContext* opCtx,
-    const OID& bucketId,
-    mongo::write_ops::UpdateModification::TransformFunc transformationFunc,
-    const mongo::write_ops::InsertCommandRequest& request) {
-    mongo::write_ops::UpdateCommandRequest op(
-        makeTimeseriesBucketsNamespace(request.getNamespace()),
-        {makeTimeseriesTransformationOpEntry(opCtx, bucketId, std::move(transformationFunc))});
-
-    mongo::write_ops::WriteCommandRequestBase base;
-
-    base.setBypassEmptyTsReplacement(request.getBypassEmptyTsReplacement());
-
-    // Timeseries compression operation is not a user operation and should not use a
-    // statement id from any user op. Set to Uninitialized to bypass.
-    base.setStmtIds(std::vector<StmtId>{kUninitializedStmtId});
-
-    op.setWriteCommandRequestBase(std::move(base));
-
-    // TODO SERVER-122404: Remove this unreachable code path.
-    MONGO_UNREACHABLE;
-    return op;
-}
-
-mongo::write_ops::UpdateOpEntry makeTimeseriesTransformationOpEntry(
-    OperationContext* opCtx,
-    const OID& bucketId,
-    mongo::write_ops::UpdateModification::TransformFunc transformationFunc) {
-    mongo::write_ops::UpdateModification u(std::move(transformationFunc));
-    mongo::write_ops::UpdateOpEntry update(BSON("_id" << bucketId), std::move(u));
-    invariant(!update.getMulti(), bucketId.toString());
-    invariant(!update.getUpsert(), bucketId.toString());
-    return update;
-}
-
 }  // namespace mongo::timeseries::write_ops_utils

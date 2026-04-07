@@ -278,7 +278,7 @@ Status UpdateDriver::update(OperationContext* opCtx,
                             BSONObj* logOpRec,
                             bool* docWasModified,
                             FieldRefSetWithStorage* modifiedPaths) {
-    // TODO: assert that update() is called at most once in a !_multi case.
+    // TODO SERVER-123161: assert that update() is called at most once in a !_multi case.
 
     _logDoc.reset();
 

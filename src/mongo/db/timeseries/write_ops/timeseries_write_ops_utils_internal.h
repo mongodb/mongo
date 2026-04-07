@@ -148,20 +148,6 @@ mongo::write_ops::UpdateOpEntry makeTimeseriesCompressedDiffEntry(
     std::shared_ptr<bucket_catalog::WriteBatch> batch,
     bool changedToUnsorted);
 
-mongo::write_ops::UpdateCommandRequest makeTimeseriesTransformationOp(
-    OperationContext* opCtx,
-    const OID& bucketId,
-    mongo::write_ops::UpdateModification::TransformFunc transformationFunc,
-    const mongo::write_ops::InsertCommandRequest& request);
-
-/**
- * Builds the transform update oplog entry with a transform function.
- */
-mongo::write_ops::UpdateOpEntry makeTimeseriesTransformationOpEntry(
-    OperationContext* opCtx,
-    const OID& bucketId,
-    mongo::write_ops::UpdateModification::TransformFunc transformationFunc);
-
 /**
  * Builds the insert and update requests, as above, but expects StmtId's in WriteBatch.
  */

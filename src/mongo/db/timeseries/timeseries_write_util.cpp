@@ -117,14 +117,6 @@ void updateTimeseriesDocument(OperationContext* opCtx,
             original.value(), diffFromUpdate, false, update.getU().verifierFunction);
         diffOnIndexes = &diffFromUpdate;
         args.update = update_oplog_entry::makeDeltaOplogEntry(diffFromUpdate);
-    } else if (update.getU().type() == write_ops::UpdateModification::Type::kTransform) {
-        const auto& transform = update.getU().getTransform();
-        auto transformed = transform(original.value());
-        tassert(7667900,
-                "Could not apply transformation to time series bucket document",
-                transformed.has_value());
-        updated = std::move(transformed.value());
-        args.update = update_oplog_entry::makeReplacementOplogEntry(updated);
     } else if (update.getU().type() == write_ops::UpdateModification::Type::kReplacement) {
         updated = update.getU().getUpdateReplacement();
         args.update = update_oplog_entry::makeReplacementOplogEntry(updated);
