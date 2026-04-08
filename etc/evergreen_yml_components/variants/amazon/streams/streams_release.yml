@@ -85,6 +85,11 @@ buildvariants:
           - streams_aspio_iceberg_5
           - streams_aspio_utilities
           - streams_aspio_pubsub
+      - name: streams_s3_tests
+        execution_tasks:
+          - streams_s3_single
+          - streams_s3_parallel
+          - streams_s3_parallel_heavy
       - name: streams_azure_blob_tests
         execution_tasks:
           - streams_azure_blob_single
@@ -184,6 +189,11 @@ buildvariants:
           - streams_aspio_iceberg_5
           - streams_aspio_utilities
           - streams_aspio_pubsub
+      - name: streams_s3_tests
+        execution_tasks:
+          - streams_s3_single
+          - streams_s3_parallel
+          - streams_s3_parallel_heavy
       - name: streams_azure_blob_tests
         execution_tasks:
           - streams_azure_blob_single

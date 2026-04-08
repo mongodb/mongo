@@ -423,15 +423,35 @@ tasks:
         vars:
           suite: streams_kinesis
 
-  # Sanitizer variant of streams_s3 - uses archive_dist_test binaries instead of streams_build_and_push
+  # Sanitizer variants of streams_s3 - uses archive_dist_test binaries instead of streams_build_and_push
   - <<: *task_template
-    name: streams_s3_sanitizer
+    name: streams_s3_single_sanitizer
     tags: ["assigned_to_jira_team_streams", "experimental"]
     commands:
       - func: "do setup"
       - func: "run tests"
         vars:
-          suite: streams_s3
+          suite: streams_s3_single
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: streams_s3_parallel_sanitizer
+    tags: ["assigned_to_jira_team_streams", "experimental"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: streams_s3_parallel
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: streams_s3_parallel_heavy_sanitizer
+    tags: ["assigned_to_jira_team_streams", "experimental"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: streams_s3_parallel_heavy
           resmoke_jobs_max: 1
 
   # Sanitizer variants of streams_azure_blob - uses archive_dist_test binaries instead of streams_build_and_push
@@ -474,7 +494,27 @@ tasks:
       - func: "run tests"
 
   - <<: *task_template_streams
-    name: streams_s3
+    name: streams_s3_single
+    tags:
+      ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
+    commands:
+      - func: "do setup for streams"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template_streams
+    name: streams_s3_parallel
+    tags:
+      ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
+    commands:
+      - func: "do setup for streams"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
+
+  - <<: *task_template_streams
+    name: streams_s3_parallel_heavy
     tags:
       ["assigned_to_jira_team_streams", "experimental", "streams_release_test"]
     commands:

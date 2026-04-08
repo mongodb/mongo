@@ -72,6 +72,11 @@ buildvariants:
           - streams_aspio_iceberg_5
           - streams_aspio_utilities
           - streams_aspio_pubsub
+      - name: streams_s3_tests
+        execution_tasks:
+          - streams_s3_single
+          - streams_s3_parallel
+          - streams_s3_parallel_heavy
       - name: streams_azure_blob_tests
         execution_tasks:
           - streams_azure_blob_single
@@ -152,6 +157,11 @@ buildvariants:
           - streams_aspio_iceberg_5
           - streams_aspio_utilities
           - streams_aspio_pubsub
+      - name: streams_s3_tests
+        execution_tasks:
+          - streams_s3_single
+          - streams_s3_parallel
+          - streams_s3_parallel_heavy
       - name: streams_azure_blob_tests
         execution_tasks:
           - streams_azure_blob_single
@@ -346,7 +356,9 @@ buildvariants:
       - name: streams_https_sanitizer
       - name: streams_lambda_sanitizer
       - name: streams_kinesis_sanitizer
-      - name: streams_s3_sanitizer
+      - name: streams_s3_single_sanitizer
+      - name: streams_s3_parallel_sanitizer
+      - name: streams_s3_parallel_heavy_sanitizer
       - name: generate_buildid_to_debug_symbols_mapping
 
   # DSI perf harness variant
