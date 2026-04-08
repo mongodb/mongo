@@ -544,12 +544,15 @@ protected:
         size_t minSize = oldLen + by + oldReserved;
 
         // Going beyond the maximum buffer size is not likely.
-        if (MONGO_unlikely(minSize > BufferMaxSize)) {
-            std::stringstream ss;
-            ss << "BufBuilder attempted to grow() to " << minSize << " bytes, past the "
-               << (BufferMaxSize / (1024 * 1024)) << "MB limit.";
-            msgasserted(13548, ss.str().c_str());
-        }
+        massert(13548,
+                fmt::format("BufBuilder attempted to grow() to {} bytes, past the {}MB limit. "
+                            "Current size: {} bytes. Reserved: {} bytes. Requested: {} bytes.",
+                            minSize,
+                            (BufferMaxSize / (1024 * 1024)),
+                            oldLen,
+                            oldReserved,
+                            by),
+                minSize <= BufferMaxSize);
 
         // We add 'BufferAllocator::kBuffHolderSize' to the requested reallocation size, as it will
         // be required later in '_buf.realloc'.

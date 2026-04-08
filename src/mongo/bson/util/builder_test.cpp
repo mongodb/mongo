@@ -78,6 +78,17 @@ TEST(Builder, StringNulByteHandling) {
     }
 }
 
+TEST(Builder, GrowBeyondBufferMaxSize) {
+    BufBuilder bb;
+    bb.grow(BufferMaxSize);
+    ASSERT_THROWS_WITH_CHECK(bb.grow(1), AssertionException, [](const AssertionException& exception) {
+        ASSERT_EQ(exception.code(), 13548);
+        ASSERT_STRING_SEARCH_REGEX(
+            exception.reason(),
+            R"(BufBuilder attempted to grow.*to \d+ bytes, past the \d+MB limit. Current size: \d+ bytes.*Reserved: \d+ bytes.*Requested: \d+ bytes.)");
+    });
+}
+
 TEST(Builder, StringBuilderAddress) {
     const void* longPtr = reinterpret_cast<const void*>(-1);
     const void* shortPtr = reinterpret_cast<const void*>(static_cast<uintptr_t>(0xDEADBEEF));
