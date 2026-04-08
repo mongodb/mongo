@@ -465,6 +465,12 @@ void DocumentStorage::loadLazyMetadata() const {
         return;
     }
 
+    // Skip metadata loading for BSON that does not contain system-injected metadata.
+    if (!_bsonHasMetadata) {
+        _haveLazyLoadedMetadata = true;
+        return;
+    }
+
     bool oldModified = _metadataFields.isModified();
 
     BSONObjIterator it(_bson);
