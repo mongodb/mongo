@@ -59,6 +59,10 @@ SubPlanner::SubPlanner(PlannerData plannerData)
                                        ws(),
                                        cq(),
                                        std::move(callbacks));
+    auto trialPeriodYieldPolicy = makeClassicYieldPolicy(
+        opCtx(), cq()->nss(), static_cast<PlanStage*>(_subPlanStage.get()), yieldPolicy());
+    uassertStatusOK(_subPlanStage->pickBestPlan(*plannerParams(), trialPeriodYieldPolicy.get()));
+    incrementClassicSubplannerChoseWinningPlan();
 }
 
 PlanRankingResult SubPlanner::extractPlanRankingResult() {
@@ -66,11 +70,6 @@ PlanRankingResult SubPlanner::extractPlanRankingResult() {
             "Expected `extractPlanRankingResult` to only be called with get executor deferred "
             "feature flag enabled.",
             feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.isEnabled());
-
-    auto trialPeriodYieldPolicy = makeClassicYieldPolicy(
-        opCtx(), cq()->nss(), static_cast<PlanStage*>(_subPlanStage.get()), yieldPolicy());
-    uassertStatusOK(_subPlanStage->pickBestPlan(*plannerParams(), trialPeriodYieldPolicy.get()));
-    incrementClassicSubplannerChoseWinningPlan();
     auto querySolution = _subPlanStage->extractBestWholeQuerySolution();
 
     return PlanRankingResult{.solutions = makeQsnResult(std::move(querySolution)),
