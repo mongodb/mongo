@@ -254,7 +254,7 @@ void SessionCatalogMigrationDestination::start(ServiceContext* service) {
             _retrieveSessionStateFromSource(service);
         } catch (const DBException& ex) {
             if (ex.code() == ErrorCodes::CommandNotFound) {
-                // TODO: remove this after v3.7
+                // TODO SERVER-123503: remove this after v3.7
                 //
                 // This means that the donor shard is running at an older version so it is safe to
                 // just end this because there is no session information to transfer.
@@ -455,7 +455,7 @@ SessionCatalogMigrationDestination::_processSessionOplog(const BSONObj& oplogBSO
                     !lastResult.isPrePostImage);
         }
     } else {
-        oplogEntry.setObject2(oplogBSON);  // TODO: strip redundant info?
+        oplogEntry.setObject2(oplogBSON);  // TODO SERVER-123504: strip redundant info?
     }
 
     const auto stmtIds = oplogEntry.getStatementIds();
@@ -499,6 +499,7 @@ SessionCatalogMigrationDestination::_processSessionOplog(const BSONObj& oplogBSO
                     oplogEntry.setFromMigrate(true);
                     // Reset OpTime so logOp() can assign a new one.
                     oplogEntry.setOpTime(OplogSlot());
+                    oplogEntry.setWallClockTime(opCtx->fastClockSource().now());
 
                     writeConflictRetry(
                         opCtx,

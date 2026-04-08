@@ -836,7 +836,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithDifferentSession)
     }
 
     {
-        // XXX TODO USE A DIFFERENT OPERATION CONTEXT!
         auto client2 = getServiceContext()->getService()->makeClient("client2");
         AlternativeClientRegion acr(client2);
         auto opCtx2 = cc().makeOperationContext();
@@ -2458,6 +2457,41 @@ TEST_F(SessionCatalogMigrationDestinationTest,
                            DBException,
                            ErrorCodes::NoSuchTransaction);
     }
+}
+
+TEST_F(SessionCatalogMigrationDestinationTest, MigratedOplogEntryUsesCurrentWallClockTime) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+
+    SessionCatalogMigrationDestination sessionMigration(
+        kNs, kFromShard, migrationSessionId(), migrationId(), _cancellationSource.token());
+    sessionMigration.start(getServiceContext());
+
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(sessionId);
+    sessionInfo.setTxnNumber(2);
+
+    const auto donorWallClockTime = Date_t::fromMillisSinceEpoch(1000);
+    auto oplog1 = makeOplogEntry(OpTime(Timestamp(100, 2), 1),  // optime
+                                 OpTypeEnum::kInsert,           // op type
+                                 BSON("x" << 100),              // o
+                                 boost::none,                   // o2
+                                 sessionInfo,                   // session info
+                                 donorWallClockTime,            // wall clock time
+                                 {23});                         // statement ids
+
+    const auto testStartTime = Date_t::now();
+    ASSERT_GT(testStartTime, donorWallClockTime);
+    returnOplog({oplog1});
+    finishSessionExpectSuccess(&sessionMigration);
+
+    auto opCtx = operationContext();
+    setUpRetryableWrite(opCtx, sessionId, 2);
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+    auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+
+    auto migratedOplog = getOplog(opCtx, txnParticipant.getLastWriteOpTime());
+    ASSERT_GTE(migratedOplog.getWallClockTime(), testStartTime);
 }
 
 }  // namespace
