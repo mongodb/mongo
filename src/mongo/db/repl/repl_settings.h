@@ -45,6 +45,7 @@ public:
      * Getters
      */
     long long getOplogSizeBytes() const;
+    bool isOplogSizeInitializedUsingDefault() const;
     std::string getReplSetString() const;
     bool shouldAutoInitiate() const;
 
@@ -62,11 +63,13 @@ public:
      * Setters
      */
     void setOplogSizeBytes(long long oplogSizeBytes);
+    void setOplogSizeInitializedUsingDefault(bool value);
     void setReplSetString(std::string replSetString);
     void setShouldAutoInitiate();
 
 private:
-    long long _oplogSizeBytes = 0;  // --oplogSize
+    long long _oplogSizeBytes = 0;                  // --oplogSize
+    bool _oplogSizeInitializedUsingDefault = true;  // true when --oplogSize was not set
     bool _shouldAutoInitiate = false;
     std::string _replSetString;  // --replSet[/<seedlist>]
 };

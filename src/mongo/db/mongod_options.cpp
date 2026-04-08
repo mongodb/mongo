@@ -166,6 +166,7 @@ StatusWith<repl::ReplSettings> populateReplSettings(const moe::Environment& para
             return Status(ErrorCodes::BadValue, sb.str());
         }
         replSettings.setOplogSizeBytes(x * 1024 * 1024);
+        replSettings.setOplogSizeInitializedUsingDefault(false);
         invariant(replSettings.getOplogSizeBytes() > 0);
     }
 

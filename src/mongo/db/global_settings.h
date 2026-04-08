@@ -38,7 +38,7 @@
 
 namespace mongo {
 
-// TODO move to access_control module where the only impl is.
+// TODO(Ignore linting) move to access_control module where the only impl is.
 class MONGO_MOD_UNFORTUNATELY_OPEN ClusterNetworkRestrictionManager {
 public:
     virtual ~ClusterNetworkRestrictionManager() = default;
@@ -56,8 +56,8 @@ struct MONGO_MOD_NEEDS_REPLACEMENT MongodGlobalParams {
 
 MONGO_MOD_NEEDS_REPLACEMENT extern MongodGlobalParams mongodGlobalParams;
 
-// TODO: move these to a replication module.
-void setGlobalReplSettings(const repl::ReplSettings& settings);
+// TODO(SERVER-113439) move these to a replication module.
+MONGO_MOD_NEEDS_REPLACEMENT void setGlobalReplSettings(const repl::ReplSettings& settings);
 MONGO_MOD_NEEDS_REPLACEMENT const repl::ReplSettings& getGlobalReplSettings();
 
 }  // namespace mongo

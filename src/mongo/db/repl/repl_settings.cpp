@@ -62,6 +62,10 @@ long long ReplSettings::getOplogSizeBytes() const {
     return _oplogSizeBytes;
 }
 
+bool ReplSettings::isOplogSizeInitializedUsingDefault() const {
+    return _oplogSizeInitializedUsingDefault;
+}
+
 std::string ReplSettings::getReplSetString() const {
     return _replSetString;
 }
@@ -84,6 +88,10 @@ bool ReplSettings::shouldAutoInitiate() const {
 
 void ReplSettings::setOplogSizeBytes(long long oplogSizeBytes) {
     _oplogSizeBytes = oplogSizeBytes;
+}
+
+void ReplSettings::setOplogSizeInitializedUsingDefault(bool value) {
+    _oplogSizeInitializedUsingDefault = value;
 }
 
 void ReplSettings::setReplSetString(std::string replSetString) {

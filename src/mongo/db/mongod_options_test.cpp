@@ -29,6 +29,7 @@
 
 #include "mongo/db/mongod_options.h"
 
+#include "mongo/db/global_settings.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/unittest/unittest.h"
@@ -65,6 +66,11 @@ public:
 
         auto& setOplogMinRetentionHours(double hours) {
             _set("storage.oplogMinRetentionHours", hours);
+            return *this;
+        }
+
+        auto& setOplogSizeMB(int sizeMB) {
+            _set("replication.oplogSizeMB", sizeMB);
             return *this;
         }
 
@@ -156,6 +162,27 @@ TEST_F(MongodOptionsTest, OplogMinRetentionNegativeInvalid) {
     ASSERT_EQ(status.code(), ErrorCodes::BadValue);
     ASSERT_STRING_CONTAINS(status.reason(),
                            "bad --oplogMinRetentionHours, argument must be greater or equal to 0");
+}
+
+TEST_F(MongodOptionsTest, OplogSizeValid) {
+    env.setOplogSizeMB(1000);
+    ASSERT_OK(storeMongodOptions(env));
+    ASSERT_EQ(getGlobalReplSettings().getOplogSizeBytes(), 1000LL * 1024 * 1024);
+    ASSERT_FALSE(getGlobalReplSettings().isOplogSizeInitializedUsingDefault());
+}
+
+TEST_F(MongodOptionsTest, OplogSizeZeroInvalid) {
+    env.setOplogSizeMB(0);
+    auto status = storeMongodOptions(env);
+    ASSERT_EQ(status.code(), ErrorCodes::BadValue);
+    ASSERT_STRING_CONTAINS(status.reason(), "bad --oplogSize");
+}
+
+TEST_F(MongodOptionsTest, OplogSizeNegativeInvalid) {
+    env.setOplogSizeMB(-1);
+    auto status = storeMongodOptions(env);
+    ASSERT_EQ(status.code(), ErrorCodes::BadValue);
+    ASSERT_STRING_CONTAINS(status.reason(), "bad --oplogSize");
 }
 
 }  // namespace
