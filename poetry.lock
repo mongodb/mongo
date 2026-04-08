@@ -773,7 +773,7 @@ description = "A library to handle automated deprecations"
 optional = false
 python-versions = "*"
 groups = ["powercycle-incompatible"]
-markers = "(platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\") and platform_system != \"Windows\""
+markers = "(platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\") and python_version == \"3.13\""
 files = [
     {file = "deprecation-2.1.0-py2.py3-none-any.whl", hash = "sha256:a10811591210e1fb0e768a8c25517cabeabcba6f0bf96564f8ff45189f90b14a"},
     {file = "deprecation-2.1.0.tar.gz", hash = "sha256:72b3bde64e5d778694b0cf68178aed03d15e15477116add3fb773e581f9518ff"},
@@ -3895,23 +3895,30 @@ all = ["numpy"]
 
 [[package]]
 name = "rapidyaml"
-version = "0.0.post1671"
+version = "0.9.0.post0"
 description = "Rapid YAML - a library to parse and emit YAML, and do it fast"
 optional = false
 python-versions = ">=3.6"
 groups = ["powercycle-incompatible"]
-markers = "(platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\") and platform_system != \"Windows\""
-files = []
-develop = false
+markers = "(platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\") and python_version == \"3.13\""
+files = [
+    {file = "rapidyaml-0.9.0.post0-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:5276ca91c401d5a8c0a2a97b3a63d7d42af7ed79be0aaa223ab73cdeb1ec35f1"},
+    {file = "rapidyaml-0.9.0.post0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:6c0136ae1e3f06e9e5e123cbb8b3646507259c0292ed76ac152c302c40856cd6"},
+    {file = "rapidyaml-0.9.0.post0-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:8334c27797f118770224a161578c8213575b209a5f25e730f489be6731033969"},
+    {file = "rapidyaml-0.9.0.post0-cp313-cp313-manylinux2014_ppc64le.manylinux_2_17_ppc64le.whl", hash = "sha256:f92c2c5ac8657d8a448cefc2ec1817ad938696aacb0521d12323118179b97ce2"},
+    {file = "rapidyaml-0.9.0.post0-cp313-cp313-manylinux2014_s390x.manylinux_2_17_s390x.whl", hash = "sha256:e13c0dbf866f67dc496cef709e08fd844fb9ed34d16eff59ada8ef960981dc08"},
+    {file = "rapidyaml-0.9.0.post0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:87bef46509479e2f54f5177bd25579012244a2b67aa294963bf7ce08c2f67798"},
+    {file = "rapidyaml-0.9.0.post0-cp313-cp313-win_amd64.whl", hash = "sha256:d03a9ea4d600a96277e2fc9d49aa0caf58ae93d063ba267cf5c97a0d11b75331"},
+    {file = "rapidyaml-0.9.0.post0.tar.gz", hash = "sha256:4335e7036b31e5bc55c992f96af373e429e886c2e8f447e00a7da5563d5f8fbc"},
+]
 
 [package.dependencies]
 deprecation = "*"
 
 [package.source]
-type = "git"
-url = "https://github.com/mongodb-forks/rapidyaml.git"
-reference = "a5d485fd44719e1c03e059177fc1f695fc462b66"
-resolved_reference = "a5d485fd44719e1c03e059177fc1f695fc462b66"
+type = "legacy"
+url = "https://mdb-build-public.s3.amazonaws.com/rapidyaml_wheels/simple"
+reference = "mdb-build-public"
 
 [[package]]
 name = "referencing"
@@ -5820,4 +5827,4 @@ libdeps = ["cxxfilt", "eventlet", "flask", "flask-cors", "gevent", "lxml", "prog
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13,<4.0"
-content-hash = "9bbe30cd9b6800652ce9fc61a7af198d335ea9ef1f8d44cd6dcadd8f2ebcffcf"
+content-hash = "dcacf326ad3ce557fba66779efea9015eb7e09ec54987f7ff2f1919a16161da4"
