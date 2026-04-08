@@ -86,7 +86,7 @@ const indexSpecs = [
     },
     {
         key: {[metaFieldName]: 1},
-        options: {name: "time_partial", partialFilterExpression: {x: {$gt: 5}}},
+        options: {name: "meta_partial", partialFilterExpression: {x: {$gt: 5}}},
         shouldHaveOriginalSpec: true,
     },
     {
