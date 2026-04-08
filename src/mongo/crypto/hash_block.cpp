@@ -53,8 +53,9 @@ int HmacContext::hmacCtxInitFn(const EVP_MD* md, const uint8_t* key, size_t keyL
     int ret;
     if (getReuseKey() && useCount() >= 1) {
         ret = HMAC_Init_ex(get(), nullptr, 0, md, nullptr);
+    } else {
+        ret = HMAC_Init_ex(get(), key, keyLen, md, nullptr);
     }
-    ret = HMAC_Init_ex(get(), key, keyLen, md, nullptr);
     if (getReuseKey()) {
         use++;
     }
