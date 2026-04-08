@@ -455,6 +455,12 @@ function testConfigurableAutoMergerIntervalSecs(st, testDB) {
 }
 
 function testMaxTimeProcessingChunksMSParameter(st, testDB) {
+    // Skip this test if running in a suite with stepdowns
+    if (TestData.runningWithConfigStepdowns) {
+        jsTest.log(`Skipping testMaxTimeProcessingChunksMSParameter`);
+        return;
+    }
+
     jsTestLog("Testing the `maxTimeProcessingChunksMS` parameter.");
 
     const configDB = st.s.getDB("config");

@@ -15,6 +15,12 @@ filters:
   - "*chunk_migration*":
     approvers:
       - 10gen/server-cluster-scalability
+  - "merge_all_chunks_on_shard.js":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "merge_chunk*":
+    approvers:
+      - 10gen/server-cluster-scalability
   - "*migration_coordinator*":
     approvers:
       - 10gen/server-cluster-scalability
