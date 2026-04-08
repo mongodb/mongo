@@ -204,7 +204,6 @@ const runTest = function (sameNodeStepsUpAfterFailover) {
                 st.s.getDB(dbName).runCommand({
                     find: collName,
                     readConcern: {level: "majority", afterClusterTime: commitTimestamp},
-                    maxTimeMS: 10000,
                 }),
             );
             assert.eq(3, res.cursor.firstBatch.length);
