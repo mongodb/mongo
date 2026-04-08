@@ -257,4 +257,10 @@ private:
 
 BatchedCommandRequest::BatchType convertOpType(BulkWriteCRUDOp::OpType opType);
 
+/**
+ * Validates that the 'isTimeseriesNamespace' internal parameter is not set. This parameter is
+ * used for communication between mongos and mongod and should not be set by external clients.
+ */
+void checkIsTimeseriesNamespace(const write_ops::WriteCommandRequestBase& wcb);
+
 }  // namespace MONGO_MOD_PUBLIC mongo

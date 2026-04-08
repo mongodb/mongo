@@ -435,7 +435,7 @@ public:
                 }
             }();
 
-            ClusterWriteCmd::executeWriteOpExplain(
+            cluster_write_cmd::executeWriteOpExplain(
                 opCtx, batchedRequest, batchedRequest.toBSON(), verbosity, result);
         }
     };

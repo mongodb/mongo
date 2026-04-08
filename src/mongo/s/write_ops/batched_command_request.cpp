@@ -50,13 +50,7 @@ namespace {
 template <class T>
 BatchedCommandRequest constructBatchedCommandRequest(const OpMsgRequest& request) {
     auto batchRequest = BatchedCommandRequest{T::parse(request)};
-
-    // The 'isTimeseriesNamespace' is an internal parameter used for communication between mongos
-    // and mongod.
-    uassert(5916401,
-            "the 'isTimeseriesNamespace' parameter cannot be used on mongos",
-            !batchRequest.getWriteCommandRequestBase().getIsTimeseriesNamespace().value_or(false));
-
+    checkIsTimeseriesNamespace(batchRequest.getWriteCommandRequestBase());
     return batchRequest;
 }
 
@@ -94,6 +88,12 @@ BatchedCommandRequest BatchedCommandRequest::parseUpdate(const OpMsgRequest& req
 
 BatchedCommandRequest BatchedCommandRequest::parseDelete(const OpMsgRequest& request) {
     return constructBatchedCommandRequest<DeleteOp>(request);
+}
+
+void checkIsTimeseriesNamespace(const write_ops::WriteCommandRequestBase& wcb) {
+    uassert(5916401,
+            "the 'isTimeseriesNamespace' parameter cannot be used on mongos",
+            !wcb.getIsTimeseriesNamespace().value_or(false));
 }
 
 bool BatchedCommandRequest::getOrdered() const {

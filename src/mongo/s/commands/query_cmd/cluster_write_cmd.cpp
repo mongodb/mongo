@@ -352,11 +352,11 @@ UpdateShardKeyResult handleWouldChangeOwningShardErrorTransaction(
 
 }  // namespace
 
-bool ClusterWriteCmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
-                                                        BatchedCommandRequest* request,
-                                                        const NamespaceString& nss,
-                                                        BatchedCommandResponse* response,
-                                                        BatchWriteExecStats stats) {
+bool cluster_write_cmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
+                                                          BatchedCommandRequest* request,
+                                                          const NamespaceString& nss,
+                                                          BatchedCommandResponse* response,
+                                                          BatchWriteExecStats stats) {
     auto txnRouter = TransactionRouter::get(opCtx);
     bool isRetryableWrite = opCtx->getTxnNumber() && !txnRouter;
 
@@ -453,12 +453,12 @@ bool ClusterWriteCmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
     return updatedShardKey;
 }
 
-void ClusterWriteCmd::commandOpWrite(OperationContext* opCtx,
-                                     const NamespaceString& nss,
-                                     const BSONObj& command,
-                                     BatchItemRef targetingBatchItem,
-                                     const CollectionRoutingInfoTargeter& targeter,
-                                     std::vector<AsyncRequestsSender::Response>* results) {
+void cluster_write_cmd::commandOpWrite(OperationContext* opCtx,
+                                       const NamespaceString& nss,
+                                       const BSONObj& command,
+                                       BatchItemRef targetingBatchItem,
+                                       const CollectionRoutingInfoTargeter& targeter,
+                                       std::vector<AsyncRequestsSender::Response>* results) {
     auto endpoints = [&] {
         // Note that this implementation will not handle targeting retries and does not
         // completely emulate write behavior.
@@ -520,11 +520,11 @@ void ClusterWriteCmd::commandOpWrite(OperationContext* opCtx,
         });
 }
 
-bool ClusterWriteCmd::runExplainWithoutShardKey(OperationContext* opCtx,
-                                                const BatchedCommandRequest& req,
-                                                const NamespaceString& originalNss,
-                                                ExplainOptions::Verbosity verbosity,
-                                                BSONObjBuilder* result) {
+bool cluster_write_cmd::runExplainWithoutShardKey(OperationContext* opCtx,
+                                                  const BatchedCommandRequest& req,
+                                                  const NamespaceString& originalNss,
+                                                  ExplainOptions::Verbosity verbosity,
+                                                  BSONObjBuilder* result) {
     if (req.getBatchType() != BatchedCommandRequest::BatchType_Delete &&
         req.getBatchType() != BatchedCommandRequest::BatchType_Update) {
         return false;
@@ -623,11 +623,11 @@ bool ClusterWriteCmd::runExplainWithoutShardKey(OperationContext* opCtx,
         });
 }
 
-void ClusterWriteCmd::executeWriteOpExplain(OperationContext* opCtx,
-                                            const BatchedCommandRequest& batchedRequest,
-                                            const BSONObj& requestObj,
-                                            ExplainOptions::Verbosity verbosity,
-                                            rpc::ReplyBuilderInterface* result) {
+void cluster_write_cmd::executeWriteOpExplain(OperationContext* opCtx,
+                                              const BatchedCommandRequest& batchedRequest,
+                                              const BSONObj& requestObj,
+                                              ExplainOptions::Verbosity verbosity,
+                                              rpc::ReplyBuilderInterface* result) {
     std::unique_ptr<BatchedCommandRequest> req;
     if (batchedRequest.hasEncryptionInformation() &&
         (batchedRequest.getBatchType() == BatchedCommandRequest::BatchType_Delete ||
@@ -685,10 +685,10 @@ void ClusterWriteCmd::executeWriteOpExplain(OperationContext* opCtx,
         });
 }
 
-bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,
-                                              const OpMsgRequest& request,
-                                              BatchedCommandRequest& batchedRequest,
-                                              BSONObjBuilder& result) const {
+bool cluster_write_cmd::runImpl(OperationContext* opCtx,
+                                BatchedCommandRequest& batchedRequest,
+                                UpdateMetrics* updateMetrics,
+                                BSONObjBuilder& result) {
     BatchWriteExecStats stats;
     BatchedCommandResponse response;
 
@@ -702,7 +702,7 @@ bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,
     cluster::write(opCtx, batchedRequest, &nss, &stats, &response);
 
     bool updatedShardKey = false;
-    if (_batchedRequest.getBatchType() == BatchedCommandRequest::BatchType_Update) {
+    if (batchedRequest.getBatchType() == BatchedCommandRequest::BatchType_Update) {
         updatedShardKey =
             handleWouldChangeOwningShardError(opCtx, &batchedRequest, nss, &response, stats);
     }
@@ -722,9 +722,8 @@ bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,
         numAttempts = batchedRequest.sizeWriteOps();
     }
 
-    // TODO: increase opcounters by more than one
     auto& debug = CurOp::get(opCtx)->debug();
-    switch (_batchedRequest.getBatchType()) {
+    switch (batchedRequest.getBatchType()) {
         case BatchedCommandRequest::BatchType_Insert:
             for (size_t i = 0; i < numAttempts; ++i) {
                 globalOpCounters().gotInsert();
@@ -746,12 +745,12 @@ bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,
             }
             debug.getAdditiveMetrics().nModified = response.getNModified();
             debug.getAdditiveMetrics().nUpdateOps =
-                _batchedRequest.getUpdateRequest().getUpdates().size();
+                batchedRequest.getUpdateRequest().getUpdates().size();
 
-            for (auto&& update : _batchedRequest.getUpdateRequest().getUpdates()) {
+            for (auto&& update : batchedRequest.getUpdateRequest().getUpdates()) {
                 incrementUpdateMetrics(update.getU(),
-                                       _batchedRequest.getNS(),
-                                       *const_cast<ClusterWriteCmd*>(command())->getUpdateMetrics(),
+                                       batchedRequest.getNS(),
+                                       *updateMetrics,
                                        update.getArrayFilters());
             }
             break;
@@ -777,7 +776,7 @@ bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,
 
         if (stats.getNumShardsOwningChunks().has_value()) {
             updateHostsTargetedMetrics(opCtx,
-                                       _batchedRequest.getBatchType(),
+                                       batchedRequest.getBatchType(),
                                        stats.getNumShardsOwningChunks().value(),
                                        nShards,
                                        stats.hasTargetedShardedCollection());
@@ -793,28 +792,6 @@ bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,
 
     result.appendElements(response.toBSON());
     return response.getOk();
-}
-
-void ClusterWriteCmd::InvocationBase::run(OperationContext* opCtx,
-                                          rpc::ReplyBuilderInterface* result) {
-    preRunImplHook(opCtx);
-
-    BSONObjBuilder bob = result->getBodyBuilder();
-    bool ok = runImpl(opCtx, *_request, _batchedRequest, bob);
-    if (!ok)
-        CommandHelpers::appendSimpleCommandStatus(bob, ok);
-}
-
-void ClusterWriteCmd::InvocationBase::explain(OperationContext* opCtx,
-                                              ExplainOptions::Verbosity verbosity,
-                                              rpc::ReplyBuilderInterface* result) {
-    preExplainImplHook(opCtx);
-
-    uassert(ErrorCodes::InvalidLength,
-            "explained write batches must be of size 1",
-            _batchedRequest.sizeWriteOps() == 1U);
-
-    executeWriteOpExplain(opCtx, _batchedRequest, _request->body, verbosity, result);
 }
 
 }  // namespace mongo
