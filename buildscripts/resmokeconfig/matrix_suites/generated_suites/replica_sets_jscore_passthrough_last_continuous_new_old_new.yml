@@ -27,9 +27,16 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        internalQueryStatsErrorsAreCommandFatal: true
+        internalQueryStatsRateLimit: -1
+        internalQueryStatsWriteCmdSampleRate: 1.0
     num_nodes: 3
     old_bin_version: last_continuous
   hooks:
+    - class: RunQueryStats
+      skip_tags:
+        - inspects_command_opcounters
+        - known_query_shape_computation_problem
     - class: RunDBCheckInBackground
     - class: CheckReplDBHashInBackground
     - class: ValidateCollectionsInBackground

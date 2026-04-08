@@ -62,6 +62,13 @@ executor:
     shell_options:
       eval: "globalThis.testingReplication = true;"
   hooks:
+    # Be sure to run the hooks which depend on the fixture being alive before the CleanEveryN hook.
+    # That way the fixture restart can't cause any trouble for the other hooks.
+    - class: RunQueryStats
+      skip_tags:
+        # Running $queryStats will increment these counters which can screw up some test assertions.
+        - inspects_command_opcounters
+        - known_query_shape_computation_problem
     - class: RunDBCheckInBackground
     # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
     # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
@@ -78,4 +85,7 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        internalQueryStatsRateLimit: -1
+        internalQueryStatsWriteCmdSampleRate: 1.0
+        internalQueryStatsErrorsAreCommandFatal: true
     num_nodes: 2

@@ -78,9 +78,6 @@ filters:
   - "json_schema.yml":
     approvers:
       - 10gen/query-execution
-  - "query_stats*":
-    approvers:
-      - 10gen/query-integration-observability
   - "query_tester_self_test.yml":
     approvers:
       - 10gen/query-optimization

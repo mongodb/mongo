@@ -48,6 +48,9 @@ executor:
         allowEmptyOplogBatchesToPropagateCommitPoint: false
         enableElectionHandoff: 0
         enableTestCommands: 1
+        internalQueryStatsErrorsAreCommandFatal: true
+        internalQueryStatsRateLimit: -1
+        internalQueryStatsWriteCmdSampleRate: 1.0
         logComponentVerbosity:
           replication:
             heartbeats: 2

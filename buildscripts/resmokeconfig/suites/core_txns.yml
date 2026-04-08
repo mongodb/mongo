@@ -21,6 +21,9 @@ executor:
     shell_options:
       eval: "globalThis.testingReplication = true;"
   hooks:
+    # Be sure to run the hooks which depend on the fixture being alive before the CleanEveryN hook.
+    # That way the fixture restart can't cause any trouble for the other hooks.
+    - class: RunQueryStats
     # We don't execute dbHash or oplog consistency checks since there is only a single replica set
     # node.
     - class: ValidateCollections
@@ -31,5 +34,8 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        internalQueryStatsRateLimit: -1
+        internalQueryStatsWriteCmdSampleRate: 1.0
+        internalQueryStatsErrorsAreCommandFatal: true
     # Use a 1-node replica set.
     num_nodes: 1

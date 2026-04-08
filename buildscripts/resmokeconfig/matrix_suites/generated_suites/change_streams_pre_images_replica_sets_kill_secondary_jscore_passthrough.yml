@@ -22,6 +22,9 @@ executor:
         expiredChangeStreamPreImageRemovalJobSleepSecs: 1
         failpoint.preImagesEnabledOnAllCollectionsByDefault: "{mode: 'alwaysOn'}"
         failpoint.preImagesTruncateOnlyOnSecondaries: "{mode: 'alwaysOn'}"
+        internalQueryStatsErrorsAreCommandFatal: true
+        internalQueryStatsRateLimit: -1
+        internalQueryStatsWriteCmdSampleRate: 1.0
         logComponentVerbosity:
           replication:
             heartbeats: 2

@@ -24,8 +24,15 @@ executor:
       set_parameters:
         enableTestCommands: 1
         executionControlDeprioritizationGate: true
+        internalQueryStatsErrorsAreCommandFatal: true
+        internalQueryStatsRateLimit: -1
+        internalQueryStatsWriteCmdSampleRate: 1.0
     num_nodes: 2
   hooks:
+    - class: RunQueryStats
+      skip_tags:
+        - inspects_command_opcounters
+        - known_query_shape_computation_problem
     - class: RunDBCheckInBackground
     - class: CheckReplDBHashInBackground
     - class: ValidateCollectionsInBackground

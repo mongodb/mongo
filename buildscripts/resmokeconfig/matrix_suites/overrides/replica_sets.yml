@@ -27,6 +27,11 @@
       hooks:
         # CheckSystemBucketsMetrics must run before ValidateCollections
         - class: CheckSystemBucketsMetrics
+        - class: RunQueryStats
+          skip_tags:
+            # Running $queryStats will increment these counters which can screw up some test assertions.
+            - inspects_command_opcounters
+            - known_query_shape_computation_problem
         - class: RunDBCheckInBackground
         - class: CheckReplDBHashInBackground
         - class: ValidateCollectionsInBackground

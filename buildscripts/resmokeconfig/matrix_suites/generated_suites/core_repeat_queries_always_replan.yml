@@ -24,7 +24,14 @@ executor:
         enableTestCommands: 1
         failpoint.planCacheAlwaysReplanClassic: "{mode: 'alwaysOn'}"
         failpoint.planCacheAlwaysReplanSBE: "{mode: 'alwaysOn'}"
+        internalQueryStatsErrorsAreCommandFatal: true
+        internalQueryStatsRateLimit: -1
+        internalQueryStatsWriteCmdSampleRate: 1.0
   hooks:
+    - class: RunQueryStats
+      skip_tags:
+        - inspects_command_opcounters
+        - known_query_shape_computation_problem
     - class: ValidateCollections
       shell_options:
         global_vars:

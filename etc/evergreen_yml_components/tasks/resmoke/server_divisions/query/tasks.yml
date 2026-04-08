@@ -3169,20 +3169,6 @@ tasks:
           resmoke_jobs_max: 10
 
   - <<: *task_template
-    name: query_stats_mongos_passthrough
-    tags: ["assigned_to_jira_team_server_query_integration", "default"]
-    commands:
-      - func: "do setup"
-      - func: "run tests"
-
-  - <<: *task_template
-    name: query_stats_passthrough
-    tags: ["assigned_to_jira_team_server_query_integration", "default"]
-    commands:
-      - func: "do setup"
-      - func: "run tests"
-
-  - <<: *task_template
     name: vector_search
     tags:
       [

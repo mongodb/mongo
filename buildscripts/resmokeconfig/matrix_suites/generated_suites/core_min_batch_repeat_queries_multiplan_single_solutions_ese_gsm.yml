@@ -32,7 +32,14 @@ executor:
       set_parameters:
         enableTestCommands: 1
         internalQueryFindCommandBatchSize: 2
+        internalQueryStatsErrorsAreCommandFatal: true
+        internalQueryStatsRateLimit: -1
+        internalQueryStatsWriteCmdSampleRate: 1.0
   hooks:
+    - class: RunQueryStats
+      skip_tags:
+        - inspects_command_opcounters
+        - known_query_shape_computation_problem
     - class: ValidateCollections
       shell_options:
         global_vars:

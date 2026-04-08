@@ -49,6 +49,9 @@ executor:
         enableElectionHandoff: 0
         enableTestCommands: 1
         failpoint.overrideRecordIdsReplicatedFalse: "{mode: 'alwaysOn'}"
+        internalQueryStatsErrorsAreCommandFatal: true
+        internalQueryStatsRateLimit: -1
+        internalQueryStatsWriteCmdSampleRate: 1.0
         logComponentVerbosity:
           replication:
             heartbeats: 2

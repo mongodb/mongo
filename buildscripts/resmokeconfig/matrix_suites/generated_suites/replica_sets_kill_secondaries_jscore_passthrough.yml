@@ -20,6 +20,9 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        internalQueryStatsErrorsAreCommandFatal: true
+        internalQueryStatsRateLimit: -1
+        internalQueryStatsWriteCmdSampleRate: 1.0
         logComponentVerbosity:
           replication:
             heartbeats: 2
