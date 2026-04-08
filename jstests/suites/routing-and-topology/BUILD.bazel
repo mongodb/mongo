@@ -14,6 +14,7 @@ resmoke_suite_test(
     tags = [
         "ci-release-critical",
         "common",
+        "incompatible_with_bazel_remote_test",
         "jscore",
         "sharding",
     ],
