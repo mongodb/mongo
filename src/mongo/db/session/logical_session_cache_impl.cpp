@@ -80,12 +80,6 @@ void clearShardingOperationFailedStatus(OperationContext* opCtx) {
     OperationShardingState::get(opCtx).resetShardingOperationFailedStatus();
 }
 
-// Per-thread cache of last vivified session to skip redundant mutex + hash lookup.
-// Safe because the synchronous service executor uses one thread per client connection.
-thread_local boost::optional<LogicalSessionId> tl_lastVivifiedLsid;
-thread_local Date_t tl_lastVivifiedTime{};
-constexpr auto kVivifyThrottleInterval = Seconds(5);
-
 }  // namespace
 
 LogicalSessionCacheImpl::LogicalSessionCacheImpl(std::unique_ptr<ServiceLiaison> service,
@@ -145,34 +139,15 @@ Status LogicalSessionCacheImpl::startSession(OperationContext* opCtx,
 
 Status LogicalSessionCacheImpl::vivify(OperationContext* opCtx, const LogicalSessionId& lsid) {
     auto parentLsid = getParentSessionId(lsid);
-    const auto& effectiveLsid = parentLsid ? *parentLsid : lsid;
 
-    // Fast path: if this thread just vivified the same session recently, skip the
-    // mutex-guarded hash map lookup. The session timeout is 30 minutes and cache refresh
-    // is every 5 minutes, so a few seconds of staleness in lastUse is harmless.
-    auto now = _service->now();
-    if (tl_lastVivifiedLsid && *tl_lastVivifiedLsid == effectiveLsid &&
-        now - tl_lastVivifiedTime < kVivifyThrottleInterval) {
-        return Status::OK();
-    }
     stdx::lock_guard lg(_mutex);
 
-    auto it = _activeSessions.find(effectiveLsid);
-    if (it == _activeSessions.end()) {
-        auto status = _addToCacheIfNotFull(lg, makeLogicalSessionRecord(opCtx, lsid, now));
-        if (status.isOK()) {
-            tl_lastVivifiedLsid = effectiveLsid;
-            tl_lastVivifiedTime = now;
-        }
-        return status;
-    }
+    auto it = _activeSessions.find(parentLsid ? *parentLsid : lsid);
+    if (it == _activeSessions.end())
+        return _addToCacheIfNotFull(lg, makeLogicalSessionRecord(opCtx, lsid, _service->now()));
 
     auto& cacheEntry = it->second;
-    cacheEntry.setLastUse(now);
-
-    // Update thread-local cache so subsequent ops on this connection skip the lock.
-    tl_lastVivifiedLsid = effectiveLsid;
-    tl_lastVivifiedTime = now;
+    cacheEntry.setLastUse(_service->now());
 
     return Status::OK();
 }
