@@ -42,6 +42,7 @@
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/timeseries/timeseries_collmod.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/timeseries/timeseries_test_util.h"
 
 namespace mongo {
 namespace {
@@ -80,12 +81,9 @@ protected:
     /* Test time-series namespaces */
     const std::string dbName = "db";
     const std::string collName = "coll";
-    const std::string bucketCollName = "system.buckets." + collName;
 
     const NamespaceString nss =
         NamespaceString::createNamespaceString_forTest(dbName + "." + collName);
-    const NamespaceString bucketNss =
-        NamespaceString::createNamespaceString_forTest(dbName + "." + bucketCollName);
 
 private:
     ServiceContext::UniqueOperationContext _makeOpCtx() {
@@ -132,7 +130,9 @@ TEST_F(BackwardsCompatibleCollOptionsTest, CollModOplogEntryLoggedInBackwardsCom
     BSONObj oplogEntry;
     Helpers::getLast(opCtx, NamespaceString::kRsOplogNamespace, oplogEntry);
     ASSERT_BSONOBJ_NE(oplogEntry, BSONObj());
-    ASSERT_BSONOBJ_EQ(oplogEntry.getObjectField("o"), BSON(kCollMod << bucketCollName));
+    auto resolvedNss = timeseries::test_util::resolveTimeseriesNss(nss);
+    ASSERT_BSONOBJ_EQ(oplogEntry.getObjectField("o"),
+                      BSON(kCollMod << std::string{resolvedNss.coll()}));
     ASSERT_BSONOBJ_EQ(oplogEntry.getObjectField("o2").getObjectField(
                           backwards_compatible_collection_options::additionalCollModO2Field),
                       BSON("timeseriesBucketsMayHaveMixedSchemaData" << true));

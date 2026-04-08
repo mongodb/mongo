@@ -62,23 +62,24 @@ const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("tes
 class BucketCatalogHelpersTest : public TimeseriesTestFixture {
 protected:
     void _insertIntoBucketColl(const NamespaceString& ns, const BSONObj& bucketDoc);
-    BSONObj _findSuitableBucket(const NamespaceString& bucketNss,
+    BSONObj _findSuitableBucket(const NamespaceString& timeseriesNss,
                                 const TimeseriesOptions& options,
                                 const BSONObj& measurementDoc);
 };
 
 void BucketCatalogHelpersTest::_insertIntoBucketColl(const NamespaceString& ns,
                                                      const BSONObj& bucketDoc) {
-    AutoGetCollection autoColl(_opCtx, ns.makeTimeseriesBucketsNamespace(), MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(ns), MODE_IX);
 
     WriteUnitOfWork wuow(_opCtx);
     ASSERT_OK(Helpers::insert(_opCtx, *autoColl, bucketDoc));
     wuow.commit();
 }
 
-BSONObj BucketCatalogHelpersTest::_findSuitableBucket(const NamespaceString& bucketNss,
+BSONObj BucketCatalogHelpersTest::_findSuitableBucket(const NamespaceString& timeseriesNss,
                                                       const TimeseriesOptions& options,
                                                       const BSONObj& measurementDoc) {
+    const auto resolvedNss = _resolveTimeseriesNss(timeseriesNss);
     uassert(ErrorCodes::InvalidOptions,
             "Missing bucketMaxSpanSeconds option.",
             options.getBucketMaxSpanSeconds());
@@ -117,7 +118,10 @@ BSONObj BucketCatalogHelpersTest::_findSuitableBucket(const NamespaceString& buc
         maxDataTimeFieldPath,
         *options.getBucketMaxSpanSeconds(),
         /* numberOfActiveBuckets */ gTimeseriesBucketMaxCount);
-    AggregateCommandRequest aggRequest(bucketNss, aggregationPipeline);
+    AggregateCommandRequest aggRequest(resolvedNss, aggregationPipeline);
+    // For viewless timeseries, the aggregation must operate on raw bucket data
+    // since there is no view to translate through.
+    aggRequest.setRawData(true);
 
     // Run an aggregation to find a suitable bucket to reopen.
     DBDirectClient client(_opCtx);
@@ -131,7 +135,7 @@ BSONObj BucketCatalogHelpersTest::_findSuitableBucket(const NamespaceString& buc
 }
 
 TEST_F(BucketCatalogHelpersTest, GenerateMinMaxBadBucketDocumentsTest) {
-    AutoGetCollection autoColl(_opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_nsNoMeta), MODE_IS);
     const CollatorInterface* collator = autoColl->getDefaultCollator();
 
     std::vector<BSONObj> docs = {::mongo::fromjson(R"({})"),
@@ -151,7 +155,7 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxBadBucketDocumentsTest) {
 }
 
 TEST_F(BucketCatalogHelpersTest, GenerateMinMaxTest) {
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IS);
     const CollatorInterface* collator = autoColl->getDefaultCollator();
 
     std::vector<BSONObj> docs = {
@@ -186,7 +190,7 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxWithLowerCaseFirstCollationTest) 
                                                               << "caseFirst"
                                                               << "lower"))));
 
-    AutoGetCollection autoColl(_opCtx, kNss.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(kNss), MODE_IS);
     const CollatorInterface* collator = autoColl->getDefaultCollator();
 
     // Lowercase compares less than uppercase with a {caseFirst: "lower"} collator.
@@ -212,7 +216,7 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxWithUpperCaseFirstCollationTest) 
                                                               << "caseFirst"
                                                               << "upper"))));
 
-    AutoGetCollection autoColl(_opCtx, kNss.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(kNss), MODE_IS);
     const CollatorInterface* collator = autoColl->getDefaultCollator();
 
     // Uppercase compares less than lowercase with a {caseFirst: "upper"} collator.
@@ -230,7 +234,7 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxWithUpperCaseFirstCollationTest) 
 }
 
 TEST_F(BucketCatalogHelpersTest, GenerateMinMaxSucceedsWithMixedSchemaBucketDocumentTest) {
-    AutoGetCollection autoColl(_opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_nsNoMeta), MODE_IS);
     const CollatorInterface* collator = autoColl->getDefaultCollator();
 
     std::vector<BSONObj> docs = {::mongo::fromjson(R"({control:{min: {a: 1}, max: {a: {}}}})"),
@@ -246,7 +250,7 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxSucceedsWithMixedSchemaBucketDocu
 }
 
 TEST_F(BucketCatalogHelpersTest, GenerateSchemaFailsWithMixedSchemaBucketDocumentTest) {
-    AutoGetCollection autoColl(_opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_nsNoMeta), MODE_IS);
     const CollatorInterface* collator = autoColl->getDefaultCollator();
 
     std::vector<BSONObj> docs = {::mongo::fromjson(R"({control:{min: {a: 1}, max: {a: {}}}})"),
@@ -262,7 +266,7 @@ TEST_F(BucketCatalogHelpersTest, GenerateSchemaFailsWithMixedSchemaBucketDocumen
 }
 
 TEST_F(BucketCatalogHelpersTest, GenerateSchemaWithInvalidMeasurementsTest) {
-    AutoGetCollection autoColl(_opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_nsNoMeta), MODE_IS);
     const CollatorInterface* collator = autoColl->getDefaultCollator();
 
     // First item: Bucket document to generate the schema representation of.
@@ -303,7 +307,7 @@ TEST_F(BucketCatalogHelpersTest, GenerateSchemaWithInvalidMeasurementsTest) {
 }
 
 TEST_F(BucketCatalogHelpersTest, GenerateSchemaWithValidMeasurementsTest) {
-    AutoGetCollection autoColl(_opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_nsNoMeta), MODE_IS);
     const CollatorInterface* collator = autoColl->getDefaultCollator();
 
     // First item: Bucket document to generate the schema representation of.
@@ -334,7 +338,7 @@ TEST_F(BucketCatalogHelpersTest, GenerateSchemaWithValidMeasurementsTest) {
 }
 
 TEST_F(BucketCatalogHelpersTest, FindSuitableBucketForMeasurements) {
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IX);
     ASSERT(autoColl->getTimeseriesOptions() && autoColl->getTimeseriesOptions()->getMetaField());
 
     auto tsOptions = *autoColl->getTimeseriesOptions();
@@ -394,7 +398,7 @@ TEST_F(BucketCatalogHelpersTest, FindSuitableBucketForMeasurements) {
     // insert into.
     for (size_t i = 0; i < docsWithSuitableBuckets.size(); ++i) {
         const auto& doc = docsWithSuitableBuckets[i];
-        auto result = _findSuitableBucket(_ns1.makeTimeseriesBucketsNamespace(), tsOptions, doc);
+        auto result = _findSuitableBucket(_ns1, tsOptions, doc);
         ASSERT_FALSE(result.isEmpty());
         ASSERT_EQ(bucketDocs[i]["_id"].OID(), result["_id"].OID());
     }
@@ -409,8 +413,7 @@ TEST_F(BucketCatalogHelpersTest, FindSuitableBucketForMeasurements) {
 
         for (size_t i = 0; i < docsWithOutMeta.size(); ++i) {
             const auto& doc = docsWithOutMeta[i];
-            auto result =
-                _findSuitableBucket(_ns1.makeTimeseriesBucketsNamespace(), tsOptions, doc);
+            auto result = _findSuitableBucket(_ns1, tsOptions, doc);
             ASSERT(result.isEmpty());
         }
 
@@ -430,8 +433,7 @@ TEST_F(BucketCatalogHelpersTest, FindSuitableBucketForMeasurements) {
                      "_id": {"0":10,"1":11,"2":12}}})");
         _insertIntoBucketColl(_ns1, metalessBucket);
 
-        auto result =
-            _findSuitableBucket(_ns1.makeTimeseriesBucketsNamespace(), tsOptions, metalessDoc);
+        auto result = _findSuitableBucket(_ns1, tsOptions, metalessDoc);
         ASSERT_FALSE(result.isEmpty());
         ASSERT_EQ(metalessBucket["_id"].OID(), result["_id"].OID());
     }
@@ -447,13 +449,13 @@ TEST_F(BucketCatalogHelpersTest, FindSuitableBucketForMeasurements) {
     for (const auto& doc : docsWithoutSuitableBuckets) {
         BSONObj measurementMeta =
             (doc.hasField(metaFieldName)) ? doc.getField(metaFieldName).wrap() : BSONObj();
-        auto result = _findSuitableBucket(_ns1.makeTimeseriesBucketsNamespace(), tsOptions, doc);
+        auto result = _findSuitableBucket(_ns1, tsOptions, doc);
         ASSERT(result.isEmpty());
     }
 }
 
 TEST_F(BucketCatalogHelpersTest, FindDocumentFromOID) {
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IX);
     ASSERT(autoColl->getTimeseriesOptions() && autoColl->getTimeseriesOptions()->getMetaField());
 
     std::vector<BSONObj> bucketDocs = {mongo::fromjson(R"({
@@ -522,7 +524,7 @@ TEST_F(BucketCatalogHelpersTest, FindDocumentFromOID) {
 }
 
 TEST_F(BucketCatalogHelpersTest, FindSuitableCompressedBucketForMeasurement) {
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IX);
     ASSERT(autoColl->getTimeseriesOptions() && autoColl->getTimeseriesOptions()->getMetaField());
     auto tsOptions = *autoColl->getTimeseriesOptions();
     BSONObj bucketDoc = mongo::fromjson(R"({"_id":{"$oid":"61068cc0de4e031499bc4049"},
@@ -541,8 +543,7 @@ TEST_F(BucketCatalogHelpersTest, FindSuitableCompressedBucketForMeasurement) {
         BSON("_id" << 1 << _timeField << time.getValue() << _metaField << 0);
 
     // Verify that we can find a suitable bucket to insert into.
-    auto result = _findSuitableBucket(
-        _ns1.makeTimeseriesBucketsNamespace(), tsOptions, docWithSuitableBucket);
+    auto result = _findSuitableBucket(_ns1, tsOptions, docWithSuitableBucket);
     ASSERT_FALSE(result.isEmpty());
     ASSERT_EQ(bucketDoc["_id"].OID(), result["_id"].OID());
 }

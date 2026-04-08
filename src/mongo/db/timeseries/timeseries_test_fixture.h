@@ -201,6 +201,12 @@ protected:
     std::vector<BSONObj> _generateMeasurementsWithRolloverReason(
         const MeasurementsWithRolloverReasonOptions& options);
 
+    // Returns the namespace where the timeseries collection actually lives.
+    // For viewless timeseries, this is the main namespace.
+    // For legacy timeseries, this is the system.buckets namespace.
+    // TODO SERVER-123350: Remove this once 9.0 is last LTS.
+    NamespaceString _resolveTimeseriesNss(const NamespaceString& ns) const;
+
     uint64_t _getStorageCacheSizeBytes() const;
 
     long long _getExecutionStat(const UUID& uuid, StringData stat);

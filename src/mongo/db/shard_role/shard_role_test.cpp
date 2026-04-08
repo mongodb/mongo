@@ -1950,8 +1950,11 @@ TimeseriesOptions createTimeseriesOptions() {
     return tsOpts;
 }
 
+// TODO SERVER-123350: Remove this test once 9.0 is last LTS.
 void ShardRoleTest::testRestoreFailsIfCollectionBecomesCreatedTimeseries(
     AcquisitionPrerequisites::OperationType operationType) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
     NamespaceString nss(NamespaceString::createNamespaceString_forTest(
         dbNameTestDb, "NonExistentCollectionWhichWillBeCreatedAsTimeseries"));
 

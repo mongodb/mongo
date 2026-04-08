@@ -200,8 +200,12 @@ TEST_F(TimeseriesCatalogHelperTest, acquireLegacyTimeseriesThroughBucketsNss) {
     ASSERT_FALSE(wasTranslated);
 }
 
+// TODO SERVER-123350: Remove this test once 9.0 is last LTS.
 TEST_F(TimeseriesCatalogHelperTest, acquireBucketsCollWithoutViewThroughMainNss) {
     auto opCtx = operationContext();
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
 
     // Create timeseries buckets collection only (no associated view).
     CreateCommand cmd(_bucketsNss);
@@ -221,8 +225,12 @@ TEST_F(TimeseriesCatalogHelperTest, acquireBucketsCollWithoutViewThroughMainNss)
     ASSERT_TRUE(wasTranslated);
 }
 
+// TODO SERVER-123350: Remove this test once 9.0 is last LTS.
 TEST_F(TimeseriesCatalogHelperTest, acquireBucketsCollWithoutViewThroughBucketsNss) {
     auto opCtx = operationContext();
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
 
     // Create timeseries buckets collection only (no associated view).
     CreateCommand cmd(_bucketsNss);

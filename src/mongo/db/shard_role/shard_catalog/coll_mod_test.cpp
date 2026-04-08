@@ -54,6 +54,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_collmod.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/timeseries/timeseries_test_util.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/idl/server_parameter_test_controller.h"
@@ -182,8 +183,6 @@ TEST_F(CollModTest, CollModTimeseriesWithFixedBucket) {
         "featureFlagTSBucketingParametersUnchanged", true);
 
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
-    auto bucketsColl =
-        NamespaceString::createNamespaceString_forTest("test.system.buckets.curColl");
 
     auto opCtx = makeOpCtx();
     auto tsOptions = TimeseriesOptions("t");
@@ -192,6 +191,7 @@ TEST_F(CollModTest, CollModTimeseriesWithFixedBucket) {
     CreateCommand cmd = CreateCommand(curNss);
     cmd.getCreateCollectionRequest().setTimeseries(std::move(tsOptions));
     uassertStatusOK(createCollection(opCtx.get(), cmd));
+    auto tsNss = timeseries::test_util::resolveTimeseriesNss(curNss);
 
     // Run collMod without changing the bucket span and validate that the
     // timeseriesBucketingParametersHaveChanged() returns false.
@@ -204,10 +204,9 @@ TEST_F(CollModTest, CollModTimeseriesWithFixedBucket) {
     uassertStatusOK(timeseries::processCollModCommandWithTimeSeriesTranslation(
         opCtx.get(), curNss, collModCmd, true, &result));
     {
-        const auto bucketsCollForRead = acquireCollForRead(opCtx.get(), bucketsColl);
+        const auto tsCollForRead = acquireCollForRead(opCtx.get(), tsNss);
         // TODO(SERVER-101611): Set *timeseriesBucketingParametersHaveChanged to false on create
-        ASSERT_FALSE(
-            bucketsCollForRead.getCollectionPtr()->timeseriesBucketingParametersHaveChanged());
+        ASSERT_FALSE(tsCollForRead.getCollectionPtr()->timeseriesBucketingParametersHaveChanged());
     }
 
     // Run collMod which changes the bucket span and validate that the
@@ -220,16 +219,14 @@ TEST_F(CollModTest, CollModTimeseriesWithFixedBucket) {
     uassertStatusOK(timeseries::processCollModCommandWithTimeSeriesTranslation(
         opCtx.get(), curNss, collModCmd, true, &result));
     {
-        const auto bucketsCollForRead = acquireCollForRead(opCtx.get(), bucketsColl);
-        ASSERT_TRUE(
-            bucketsCollForRead.getCollectionPtr()->timeseriesBucketingParametersHaveChanged());
-        ASSERT_TRUE(
-            *bucketsCollForRead.getCollectionPtr()->timeseriesBucketingParametersHaveChanged());
+        const auto tsCollForRead = acquireCollForRead(opCtx.get(), tsNss);
+        ASSERT_TRUE(tsCollForRead.getCollectionPtr()->timeseriesBucketingParametersHaveChanged());
+        ASSERT_TRUE(*tsCollForRead.getCollectionPtr()->timeseriesBucketingParametersHaveChanged());
     }
 
     // Test that the backwards compatible option has been properly set
     auto coll =
-        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), bucketsColl);
+        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), tsNss);
     auto catalogEntry = durable_catalog::getParsedCatalogEntry(
         opCtx.get(), coll->getCatalogId(), MDBCatalog::get(opCtx.get()));
     auto metadata = catalogEntry->metadata;
@@ -246,8 +243,6 @@ TEST_F(CollModTest, TimeseriesBucketingParameterChanged) {
         "featureFlagTSBucketingParametersUnchanged", true);
 
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
-    auto bucketsColl =
-        NamespaceString::createNamespaceString_forTest("test.system.buckets.curColl");
 
     auto opCtx = makeOpCtx();
     auto tsOptions = TimeseriesOptions("t");
@@ -256,12 +251,13 @@ TEST_F(CollModTest, TimeseriesBucketingParameterChanged) {
     CreateCommand cmd = CreateCommand(curNss);
     cmd.getCreateCollectionRequest().setTimeseries(std::move(tsOptions));
     uassertStatusOK(createCollection(opCtx.get(), cmd));
+    auto tsNss = timeseries::test_util::resolveTimeseriesNss(curNss);
 
-    uassertStatusOK(writeConflictRetry(
-        opCtx.get(), "unitTestTimeseriesBucketingParameterChanged", bucketsColl, [&] {
+    uassertStatusOK(
+        writeConflictRetry(opCtx.get(), "unitTestTimeseriesBucketingParameterChanged", tsNss, [&] {
             WriteUnitOfWork wunit(opCtx.get());
 
-            AutoGetCollection collection(opCtx.get(), bucketsColl, MODE_X);
+            AutoGetCollection collection(opCtx.get(), tsNss, MODE_X);
             CollectionWriter writer{opCtx.get(), collection};
             auto writableColl = writer.getWritableCollection(opCtx.get());
             writableColl->setTimeseriesBucketingParametersChanged(opCtx.get(), boost::none);
@@ -270,22 +266,21 @@ TEST_F(CollModTest, TimeseriesBucketingParameterChanged) {
             return Status::OK();
         }));
 
-    const auto bucketsCollForRead = acquireCollForRead(opCtx.get(), bucketsColl);
-    ASSERT_FALSE(bucketsCollForRead.getCollectionPtr()->timeseriesBucketingParametersHaveChanged());
+    const auto tsCollForRead = acquireCollForRead(opCtx.get(), tsNss);
+    ASSERT_FALSE(tsCollForRead.getCollectionPtr()->timeseriesBucketingParametersHaveChanged());
 }
 
 TEST_F(CollModTest, TimeseriesLegacyBucketingParameterChangedRemoval) {
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
-    auto bucketsColl =
-        NamespaceString::createNamespaceString_forTest("test.system.buckets.curColl");
 
     auto opCtx = makeOpCtx();
     CreateCommand cmd = CreateCommand(curNss);
     cmd.setTimeseries(TimeseriesOptions("t"));
     uassertStatusOK(createCollection(opCtx.get(), cmd));
+    auto tsNss = timeseries::test_util::resolveTimeseriesNss(curNss);
 
     auto catalogId = CollectionCatalog::get(opCtx.get())
-                         ->lookupCollectionByNamespace(opCtx.get(), bucketsColl)
+                         ->lookupCollectionByNamespace(opCtx.get(), tsNss)
                          ->getCatalogId();
     auto mdbCatalog = MDBCatalog::get(opCtx.get());
 
@@ -302,10 +297,10 @@ TEST_F(CollModTest, TimeseriesLegacyBucketingParameterChangedRemoval) {
 
     // The command must be sent to the buckets collection directly (no time-series translation).
     // This is acceptable since this is an internal parameter.
-    CollMod collModCmd(bucketsColl);
+    CollMod collModCmd(tsNss);
     collModCmd.set_removeLegacyTimeseriesBucketingParametersHaveChanged(true);
     BSONObjBuilder result;
-    uassertStatusOK(processCollModCommand(opCtx.get(), bucketsColl, collModCmd, nullptr, &result));
+    uassertStatusOK(processCollModCommand(opCtx.get(), tsNss, collModCmd, nullptr, &result));
 
     {
         auto catalogEntry =
@@ -316,14 +311,13 @@ TEST_F(CollModTest, TimeseriesLegacyBucketingParameterChangedRemoval) {
 
 TEST_F(CollModTest, CollModTimeseriesMixedSchemaData) {
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
-    auto bucketsColl =
-        NamespaceString::createNamespaceString_forTest("test.system.buckets.curColl");
 
     auto opCtx = makeOpCtx();
     auto tsOptions = TimeseriesOptions("t");
     CreateCommand cmd = CreateCommand(curNss);
     cmd.getCreateCollectionRequest().setTimeseries(std::move(tsOptions));
     uassertStatusOK(createCollection(opCtx.get(), cmd));
+    auto tsNss = timeseries::test_util::resolveTimeseriesNss(curNss);
 
     CollMod collModCmd(curNss);
     CollModRequest collModRequest;
@@ -333,9 +327,9 @@ TEST_F(CollModTest, CollModTimeseriesMixedSchemaData) {
     uassertStatusOK(timeseries::processCollModCommandWithTimeSeriesTranslation(
         opCtx.get(), curNss, collModCmd, true, &result));
     {
-        const auto bucketsCollForRead = acquireCollForRead(opCtx.get(), bucketsColl);
+        const auto tsCollForRead = acquireCollForRead(opCtx.get(), tsNss);
         auto mixedSchemaState =
-            bucketsCollForRead.getCollectionPtr()->getTimeseriesMixedSchemaBucketsState();
+            tsCollForRead.getCollectionPtr()->getTimeseriesMixedSchemaBucketsState();
         ASSERT_TRUE(mixedSchemaState.isValid());
         ASSERT_TRUE(mixedSchemaState.mustConsiderMixedSchemaBucketsInReads());
         ASSERT_TRUE(mixedSchemaState.canStoreMixedSchemaBucketsSafely());
@@ -343,7 +337,7 @@ TEST_F(CollModTest, CollModTimeseriesMixedSchemaData) {
 
     // Test that both backwards compatibles option and legacy parameter have been properly set
     auto coll =
-        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), bucketsColl);
+        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), tsNss);
     auto catalogEntry = durable_catalog::getParsedCatalogEntry(
         opCtx.get(), coll->getCatalogId(), MDBCatalog::get(opCtx.get()));
     auto metadata = catalogEntry->metadata;
@@ -370,14 +364,13 @@ TEST_F(CollModTimestampedTest, CollModTimeseriesMixedSchemaFlagPointInTimeLookup
         "featureFlagTSBucketingParametersUnchanged", true);
 
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
-    auto bucketsColl =
-        NamespaceString::createNamespaceString_forTest("test.system.buckets.curColl");
 
     auto opCtx = makeOpCtx();
 
     CreateCommand cmd = CreateCommand(curNss);
     cmd.getCreateCollectionRequest().setTimeseries(TimeseriesOptions("t"));
     uassertStatusOK(createCollection(opCtx.get(), cmd));
+    auto tsNss = timeseries::test_util::resolveTimeseriesNss(curNss);
 
     auto collModTime = VectorClockMutable::get(opCtx.get())->tickClusterTime(1).asTimestamp();
     shard_role_details::getRecoveryUnit(opCtx.get())->setCommitTimestamp(collModTime);
@@ -396,7 +389,7 @@ TEST_F(CollModTimestampedTest, CollModTimeseriesMixedSchemaFlagPointInTimeLookup
     {
         ReadSourceScope scope(opCtx.get(), RecoveryUnit::ReadSource::kProvided, collModTime);
         auto collAfter = CollectionCatalog::get(opCtx.get())
-                             ->establishConsistentCollection(opCtx.get(), bucketsColl, collModTime);
+                             ->establishConsistentCollection(opCtx.get(), tsNss, collModTime);
         ASSERT_TRUE(collAfter->getTimeseriesMixedSchemaBucketsState()
                         .mustConsiderMixedSchemaBucketsInReads());
         ASSERT_TRUE(
@@ -407,9 +400,8 @@ TEST_F(CollModTimestampedTest, CollModTimeseriesMixedSchemaFlagPointInTimeLookup
     // Check the collection at a timestamp before the collMod
     {
         ReadSourceScope scope(opCtx.get(), RecoveryUnit::ReadSource::kProvided, collModTime - 1);
-        auto collBefore =
-            CollectionCatalog::get(opCtx.get())
-                ->establishConsistentCollection(opCtx.get(), bucketsColl, collModTime - 1);
+        auto collBefore = CollectionCatalog::get(opCtx.get())
+                              ->establishConsistentCollection(opCtx.get(), tsNss, collModTime - 1);
         ASSERT_FALSE(collBefore->getTimeseriesMixedSchemaBucketsState()
                          .mustConsiderMixedSchemaBucketsInReads());
         ASSERT_FALSE(

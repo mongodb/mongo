@@ -62,6 +62,7 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/timeseries/timeseries_test_util.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/stdx/utility.h"
 #include "mongo/unittest/unittest.h"
@@ -336,7 +337,12 @@ TEST_F(CreateCollectionTest,
  * After initial sync, TS1 is applied and renames UUID1 away due to name conflict.
  * Renaming needs to respect the system.buckets collection prefix when collections are listed.
  */
+// TODO SERVER-123350: Remove this test once 9.0 is last LTS.
 TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsRespectsTimeseriesBucketsCollectionPrefix) {
+    // This test validates system.buckets.* prefix handling during applyOps rename,
+    // which only applies to legacy timeseries collections.
+    RAIIServerParameterControllerForTest viewlessController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
     auto bucketsColl =
         NamespaceString::createNamespaceString_forTest("test.system.buckets.curColl");
@@ -401,17 +407,16 @@ TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagNotSetIfFea
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagTSBucketingParametersUnchanged", false);
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
-    auto bucketsColl =
-        NamespaceString::createNamespaceString_forTest("test.system.buckets.curColl");
 
     auto opCtx = makeOpCtx();
     auto tsOptions = TimeseriesOptions("t");
     CreateCommand cmd = CreateCommand(curNss);
     cmd.getCreateCollectionRequest().setTimeseries(std::move(tsOptions));
     uassertStatusOK(createCollection(opCtx.get(), cmd));
+    auto tsNss = timeseries::test_util::resolveTimeseriesNss(curNss);
 
-    ASSERT_TRUE(collectionExists(opCtx.get(), bucketsColl));
-    const auto collForRead = acquireCollForRead(opCtx.get(), bucketsColl);
+    ASSERT_TRUE(collectionExists(opCtx.get(), tsNss));
+    const auto collForRead = acquireCollForRead(opCtx.get(), tsNss);
     ASSERT_FALSE(collForRead.getCollectionPtr()->timeseriesBucketingParametersHaveChanged());
 }
 
@@ -434,19 +439,18 @@ TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagTrue) {
         "featureFlagTSBucketingParametersUnchanged", true);
 
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
-    auto bucketsColl =
-        NamespaceString::createNamespaceString_forTest("test.system.buckets.curColl");
 
     auto opCtx = makeOpCtx();
     auto tsOptions = TimeseriesOptions("t");
     CreateCommand cmd = CreateCommand(curNss);
     cmd.getCreateCollectionRequest().setTimeseries(std::move(tsOptions));
     uassertStatusOK(createCollection(opCtx.get(), cmd));
+    auto tsNss = timeseries::test_util::resolveTimeseriesNss(curNss);
 
-    ASSERT_TRUE(collectionExists(opCtx.get(), bucketsColl));
-    const auto bucketsCollForRead = acquireCollForRead(opCtx.get(), bucketsColl);
+    ASSERT_TRUE(collectionExists(opCtx.get(), tsNss));
+    const auto tsCollForRead = acquireCollForRead(opCtx.get(), tsNss);
     // TODO(SERVER-101611): Set *timeseriesBucketingParametersHaveChanged to false on create
-    ASSERT_FALSE(bucketsCollForRead.getCollectionPtr()->timeseriesBucketingParametersHaveChanged());
+    ASSERT_FALSE(tsCollForRead.getCollectionPtr()->timeseriesBucketingParametersHaveChanged());
 }
 
 TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagFalse) {

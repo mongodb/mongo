@@ -360,7 +360,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOpFromBatch) {
         })");
 
     auto request = write_ops_utils::makeTimeseriesCompressedDiffUpdateOpFromBatch(
-        _opCtx, batch, _nsNoMeta.makeTimeseriesBucketsNamespace());
+        _opCtx, batch, _resolveTimeseriesNss(_nsNoMeta));
     auto& updates = request.getUpdates();
 
     ASSERT_EQ(updates.size(), 1);
@@ -427,7 +427,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOpFromBatchWit
         })");
 
     auto request = write_ops_utils::makeTimeseriesCompressedDiffUpdateOpFromBatch(
-        _opCtx, batch, _nsNoMeta.makeTimeseriesBucketsNamespace());
+        _opCtx, batch, _resolveTimeseriesNss(_nsNoMeta));
     auto& updates = request.getUpdates();
 
     ASSERT_EQ(updates.size(), 1);
@@ -452,19 +452,17 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicDelete) {
     OID bucketId = OID::createFromString("629e1e680958e279dc29a517"_sd);
     auto recordId = record_id_helpers::keyForOID(bucketId);
 
-    AutoGetCollection bucketsColl(
-        _opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_nsNoMeta), LockMode::MODE_IX);
     {
         WriteUnitOfWork wunit{_opCtx};
-        ASSERT_OK(Helpers::insert(_opCtx, *bucketsColl, bucketDoc));
+        ASSERT_OK(Helpers::insert(_opCtx, *autoColl, bucketDoc));
         wunit.commit();
     }
 
     // Deletes the bucket document.
     {
         mongo::write_ops::DeleteOpEntry deleteEntry(BSON("_id" << bucketId), false);
-        mongo::write_ops::DeleteCommandRequest op(_nsNoMeta.makeTimeseriesBucketsNamespace(),
-                                                  {deleteEntry});
+        mongo::write_ops::DeleteCommandRequest op(_resolveTimeseriesNss(_nsNoMeta), {deleteEntry});
 
         mongo::write_ops::WriteCommandRequestBase base;
         base.setBypassDocumentValidation(true);
@@ -474,7 +472,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicDelete) {
 
         ASSERT_DOES_NOT_THROW(
             performAtomicWrites(_opCtx,
-                                *bucketsColl,
+                                *autoColl,
                                 recordId,
                                 std::variant<mongo::write_ops::UpdateCommandRequest,
                                              mongo::write_ops::DeleteCommandRequest>{op},
@@ -487,7 +485,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicDelete) {
     // Checks the document is removed.
     {
         Snapshotted<BSONObj> doc;
-        bool found = bucketsColl->findDoc(_opCtx, recordId, &doc);
+        bool found = autoColl->findDoc(_opCtx, recordId, &doc);
         ASSERT_FALSE(found);
     }
 }
@@ -506,11 +504,10 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdate) {
     OID bucketId = OID::createFromString("629e1e680958e279dc29a517"_sd);
     auto recordId = record_id_helpers::keyForOID(bucketId);
 
-    AutoGetCollection bucketsColl(
-        _opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_nsNoMeta), LockMode::MODE_IX);
     {
         WriteUnitOfWork wunit{_opCtx};
-        ASSERT_OK(Helpers::insert(_opCtx, *bucketsColl, bucketDoc));
+        ASSERT_OK(Helpers::insert(_opCtx, *autoColl, bucketDoc));
         wunit.commit();
     }
 
@@ -526,8 +523,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdate) {
     {
         mongo::write_ops::UpdateModification u(replaceDoc);
         mongo::write_ops::UpdateOpEntry update(BSON("_id" << bucketId), std::move(u));
-        mongo::write_ops::UpdateCommandRequest op(_nsNoMeta.makeTimeseriesBucketsNamespace(),
-                                                  {update});
+        mongo::write_ops::UpdateCommandRequest op(_resolveTimeseriesNss(_nsNoMeta), {update});
 
         mongo::write_ops::WriteCommandRequestBase base;
         base.setBypassDocumentValidation(true);
@@ -537,7 +533,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdate) {
 
         ASSERT_DOES_NOT_THROW(
             performAtomicWrites(_opCtx,
-                                *bucketsColl,
+                                *autoColl,
                                 recordId,
                                 std::variant<mongo::write_ops::UpdateCommandRequest,
                                              mongo::write_ops::DeleteCommandRequest>{op},
@@ -550,7 +546,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdate) {
     // Checks the document is updated.
     {
         Snapshotted<BSONObj> doc;
-        bool found = bucketsColl->findDoc(_opCtx, recordId, &doc);
+        bool found = autoColl->findDoc(_opCtx, recordId, &doc);
 
         ASSERT_TRUE(found);
         UnorderedFieldsBSONObjComparator comparator;
@@ -572,11 +568,10 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicDeleteAndInsert) {
     OID bucketId1 = bucketDoc1["_id"].OID();
     auto recordId1 = record_id_helpers::keyForOID(bucketId1);
 
-    AutoGetCollection bucketsColl(
-        _opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_nsNoMeta), LockMode::MODE_IX);
     {
         WriteUnitOfWork wunit{_opCtx};
-        ASSERT_OK(Helpers::insert(_opCtx, *bucketsColl, bucketDoc1));
+        ASSERT_OK(Helpers::insert(_opCtx, *autoColl, bucketDoc1));
         wunit.commit();
     }
 
@@ -598,20 +593,20 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicDeleteAndInsert) {
     auto recordId2 = record_id_helpers::keyForOID(bucketId2);
     {
         mongo::write_ops::DeleteOpEntry deleteEntry(BSON("_id" << bucketId1), false);
-        mongo::write_ops::DeleteCommandRequest deleteOp(_nsNoMeta.makeTimeseriesBucketsNamespace(),
+        mongo::write_ops::DeleteCommandRequest deleteOp(_resolveTimeseriesNss(_nsNoMeta),
                                                         {deleteEntry});
         mongo::write_ops::WriteCommandRequestBase base;
         base.setBypassDocumentValidation(true);
         base.setStmtIds(std::vector<StmtId>{kUninitializedStmtId});
         deleteOp.setWriteCommandRequestBase(base);
 
-        mongo::write_ops::InsertCommandRequest insertOp(_nsNoMeta.makeTimeseriesBucketsNamespace(),
+        mongo::write_ops::InsertCommandRequest insertOp(_resolveTimeseriesNss(_nsNoMeta),
                                                         {bucketDoc2});
         insertOp.setWriteCommandRequestBase(base);
 
         ASSERT_DOES_NOT_THROW(
             performAtomicWrites(_opCtx,
-                                *bucketsColl,
+                                *autoColl,
                                 recordId1,
                                 std::variant<mongo::write_ops::UpdateCommandRequest,
                                              mongo::write_ops::DeleteCommandRequest>{deleteOp},
@@ -624,10 +619,10 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicDeleteAndInsert) {
     // Checks document1 is removed and document2 is added.
     {
         Snapshotted<BSONObj> doc;
-        bool found = bucketsColl->findDoc(_opCtx, recordId1, &doc);
+        bool found = autoColl->findDoc(_opCtx, recordId1, &doc);
         ASSERT_FALSE(found);
 
-        found = bucketsColl->findDoc(_opCtx, recordId2, &doc);
+        found = autoColl->findDoc(_opCtx, recordId2, &doc);
         ASSERT_TRUE(found);
         UnorderedFieldsBSONObjComparator comparator;
         ASSERT_EQ(0, comparator.compare(doc.value(), bucketDoc2));
@@ -649,11 +644,10 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdateAndInserts) {
     OID bucketId1 = bucketDoc1["_id"].OID();
     auto recordId1 = record_id_helpers::keyForOID(bucketId1);
 
-    AutoGetCollection bucketsColl(
-        _opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_nsNoMeta), LockMode::MODE_IX);
     {
         WriteUnitOfWork wunit{_opCtx};
-        ASSERT_OK(Helpers::insert(_opCtx, *bucketsColl, bucketDoc1));
+        ASSERT_OK(Helpers::insert(_opCtx, *autoColl, bucketDoc1));
         wunit.commit();
     }
 
@@ -697,23 +691,22 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdateAndInserts) {
     {
         mongo::write_ops::UpdateModification u(replaceDoc);
         mongo::write_ops::UpdateOpEntry update(BSON("_id" << bucketId1), std::move(u));
-        mongo::write_ops::UpdateCommandRequest updateOp(_nsNoMeta.makeTimeseriesBucketsNamespace(),
-                                                        {update});
+        mongo::write_ops::UpdateCommandRequest updateOp(_resolveTimeseriesNss(_nsNoMeta), {update});
         mongo::write_ops::WriteCommandRequestBase base;
         base.setBypassDocumentValidation(true);
         base.setStmtIds(std::vector<StmtId>{kUninitializedStmtId});
         updateOp.setWriteCommandRequestBase(base);
 
-        mongo::write_ops::InsertCommandRequest insertOp1(_nsNoMeta.makeTimeseriesBucketsNamespace(),
+        mongo::write_ops::InsertCommandRequest insertOp1(_resolveTimeseriesNss(_nsNoMeta),
                                                          {bucketDoc2});
         insertOp1.setWriteCommandRequestBase(base);
-        mongo::write_ops::InsertCommandRequest insertOp2(_nsNoMeta.makeTimeseriesBucketsNamespace(),
+        mongo::write_ops::InsertCommandRequest insertOp2(_resolveTimeseriesNss(_nsNoMeta),
                                                          {bucketDoc3});
         insertOp2.setWriteCommandRequestBase(base);
 
         ASSERT_DOES_NOT_THROW(
             performAtomicWrites(_opCtx,
-                                *bucketsColl,
+                                *autoColl,
                                 recordId1,
                                 std::variant<mongo::write_ops::UpdateCommandRequest,
                                              mongo::write_ops::DeleteCommandRequest>{updateOp},
@@ -726,16 +719,16 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdateAndInserts) {
     // Checks document1 is updated and document2 and document3 are added.
     {
         Snapshotted<BSONObj> doc;
-        bool found = bucketsColl->findDoc(_opCtx, recordId1, &doc);
+        bool found = autoColl->findDoc(_opCtx, recordId1, &doc);
         ASSERT_TRUE(found);
         UnorderedFieldsBSONObjComparator comparator;
         ASSERT_EQ(0, comparator.compare(doc.value(), replaceDoc));
 
-        found = bucketsColl->findDoc(_opCtx, recordId2, &doc);
+        found = autoColl->findDoc(_opCtx, recordId2, &doc);
         ASSERT_TRUE(found);
         ASSERT_EQ(0, comparator.compare(doc.value(), bucketDoc2));
 
-        found = bucketsColl->findDoc(_opCtx, recordId3, &doc);
+        found = autoColl->findDoc(_opCtx, recordId3, &doc);
         ASSERT_TRUE(found);
         ASSERT_EQ(0, comparator.compare(doc.value(), bucketDoc3));
     }
@@ -766,11 +759,10 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserDelete) {
     OID bucketId = bucketDoc["_id"].OID();
     auto recordId = record_id_helpers::keyForOID(bucketId);
 
-    AutoGetCollection bucketsColl(
-        _opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_nsNoMeta), LockMode::MODE_IX);
     {
         WriteUnitOfWork wunit{_opCtx};
-        ASSERT_OK(Helpers::insert(_opCtx, *bucketsColl, bucketDoc));
+        ASSERT_OK(Helpers::insert(_opCtx, *autoColl, bucketDoc));
         wunit.commit();
     }
 
@@ -779,7 +771,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserDelete) {
     {
         ASSERT_DOES_NOT_THROW(performAtomicWritesForDelete(
             _opCtx,
-            *bucketsColl,
+            *autoColl,
             recordId,
             {::mongo::fromjson(R"({"time":{"$date":"2024-09-11T17:53:18.428Z"},"a":3,"b":3})")},
             /*fromMigrate=*/false,
@@ -822,7 +814,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserDelete) {
         const BSONObj& replaceDoc = compressionResult.compressedBucket.value();
 
         Snapshotted<BSONObj> doc;
-        bool found = bucketsColl->findDoc(_opCtx, recordId, &doc);
+        bool found = autoColl->findDoc(_opCtx, recordId, &doc);
 
         ASSERT_TRUE(found);
         UnorderedFieldsBSONObjComparator comparator;
@@ -832,7 +824,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserDelete) {
     // Deletes the last measurement from the bucket.
     {
         ASSERT_DOES_NOT_THROW(performAtomicWritesForDelete(_opCtx,
-                                                           *bucketsColl,
+                                                           *autoColl,
                                                            recordId,
                                                            {},
                                                            /*fromMigrate=*/false,
@@ -843,7 +835,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserDelete) {
     // Checks the document is removed.
     {
         Snapshotted<BSONObj> doc;
-        bool found = bucketsColl->findDoc(_opCtx, recordId, &doc);
+        bool found = autoColl->findDoc(_opCtx, recordId, &doc);
         ASSERT_FALSE(found);
     }
 }
@@ -863,11 +855,10 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserUpdate) {
     auto minTime =
         bucketDoc.getObjectField("control").getObjectField("min").getField("time").Date();
 
-    AutoGetCollection bucketsColl(
-        _opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_nsNoMeta), LockMode::MODE_IX);
     {
         WriteUnitOfWork wunit{_opCtx};
-        ASSERT_OK(Helpers::insert(_opCtx, *bucketsColl, bucketDoc));
+        ASSERT_OK(Helpers::insert(_opCtx, *autoColl, bucketDoc));
         wunit.commit();
     }
 
@@ -880,7 +871,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserUpdate) {
             1, getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes};
         ASSERT_DOES_NOT_THROW(performAtomicWritesForUpdate(
             _opCtx,
-            *bucketsColl,
+            *autoColl,
             recordId,
             unchangedMeasurements,
             {::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":10,"b":10})"),
@@ -904,13 +895,13 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserUpdate) {
                     "a":{"$binary":"EAACAAAAAA==","$type":"07"},
                     "b":{"$binary":"EAACAAAAAA==","$type":"07"}}})");
         Snapshotted<BSONObj> doc;
-        bool found = bucketsColl->findDoc(_opCtx, recordId, &doc);
+        bool found = autoColl->findDoc(_opCtx, recordId, &doc);
 
         ASSERT_TRUE(found);
         UnorderedFieldsBSONObjComparator comparator;
         ASSERT_EQ(0, comparator.compare(doc.value(), replaceDoc));
 
-        ASSERT_EQ(2, bucketsColl->numRecords(_opCtx));
+        ASSERT_EQ(2, autoColl->numRecords(_opCtx));
     }
 }
 
@@ -930,11 +921,10 @@ TEST_F(TimeseriesWriteUtilTest, TrackInsertedBuckets) {
     auto minTime =
         bucketDoc.getObjectField("control").getObjectField("min").getField("time").Date();
 
-    AutoGetCollection bucketsColl(
-        _opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_nsNoMeta), LockMode::MODE_IX);
     {
         WriteUnitOfWork wunit{_opCtx};
-        ASSERT_OK(Helpers::insert(_opCtx, *bucketsColl, bucketDoc));
+        ASSERT_OK(Helpers::insert(_opCtx, *autoColl, bucketDoc));
         wunit.commit();
     }
 
@@ -950,7 +940,7 @@ TEST_F(TimeseriesWriteUtilTest, TrackInsertedBuckets) {
 
         ASSERT_DOES_NOT_THROW(performAtomicWritesForUpdate(
             _opCtx,
-            *bucketsColl,
+            *autoColl,
             recordId,
             unchangedMeasurements,
             {::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":10,"b":10})")},
@@ -969,7 +959,7 @@ TEST_F(TimeseriesWriteUtilTest, TrackInsertedBuckets) {
 
         ASSERT_DOES_NOT_THROW(performAtomicWritesForUpdate(
             _opCtx,
-            *bucketsColl,
+            *autoColl,
             recordId,
             unchangedMeasurements,
             {::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":20,"b":20})")},
@@ -987,7 +977,7 @@ TEST_F(TimeseriesWriteUtilTest, TrackInsertedBuckets) {
 
         ASSERT_DOES_NOT_THROW(performAtomicWritesForUpdate(
             _opCtx,
-            *bucketsColl,
+            *autoColl,
             recordId,
             unchangedMeasurements,
             {::mongo::fromjson(

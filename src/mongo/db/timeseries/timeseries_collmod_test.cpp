@@ -209,12 +209,11 @@ TEST_F(TimeseriesCollmodTest, ProcessCollModCommandWithTimeseriesTranslation) {
 
     ASSERT_OK(status);
     // Editing timeseries options sets a flag in the collection that we can check.
-    auto bucketsColl =
-        NamespaceString::createNamespaceString_forTest("test.system.buckets.curColl");
+    auto resolvedNss = _resolveTimeseriesNss(testNss);
     {
         const auto collectionAcquisition = acquireCollection(
             _opCtx,
-            CollectionAcquisitionRequest(bucketsColl,
+            CollectionAcquisitionRequest(resolvedNss,
                                          PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                          repl::ReadConcernArgs::get(_opCtx),
                                          AcquisitionPrerequisites::kRead),
@@ -228,9 +227,12 @@ TEST_F(TimeseriesCollmodTest, ProcessCollModCommandWithTimeseriesTranslation) {
 }
 
 // If timeseries translation and view translation are both required, both should be executed.
+// TODO SERVER-123350: Remove this test once 9.0 is last LTS.
 TEST_F(TimeseriesCollmodTest, ProcessCollModCommandWithTimeseriesTranslationAndView) {
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagTSBucketingParametersUnchanged", true);
+    RAIIServerParameterControllerForTest viewlessController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
 
     auto collModTimeseries = CollModTimeseries();
     // Create a command that requires timeseries translation.

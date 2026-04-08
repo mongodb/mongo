@@ -49,6 +49,7 @@
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 #include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/db/timeseries/timeseries_test_util.h"
 #include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops.h"
 #include "mongo/db/validate/collection_validation.h"
@@ -62,6 +63,12 @@
 #include <vector>
 
 namespace mongo::timeseries {
+
+// TODO SERVER-123350: Remove this once 9.0 is last LTS.
+NamespaceString TimeseriesTestFixture::_resolveTimeseriesNss(const NamespaceString& ns) const {
+    return test_util::resolveTimeseriesNss(ns);
+}
+
 void TimeseriesTestFixture::setUpCollectionsHelper(
     std::initializer_list<std::pair<NamespaceString*, UUID*>> collectionMetadata,
     std::function<BSONObj()> makeTimeseriesOptionsForCreateFn) {
@@ -70,7 +77,7 @@ void TimeseriesTestFixture::setUpCollectionsHelper(
             _opCtx,
             ns->dbName(),
             BSON("create" << ns->coll() << "timeseries" << makeTimeseriesOptionsForCreateFn())));
-        AutoGetCollection autoColl(_opCtx, ns->makeTimeseriesBucketsNamespace(), MODE_IS);
+        AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(*ns), MODE_IS);
         *uuid = autoColl->uuid();
     }
 }
@@ -188,12 +195,12 @@ BSONObj TimeseriesTestFixture::_makeTimeseriesOptionsForCreateNoMetaField() cons
 }
 
 TimeseriesOptions TimeseriesTestFixture::_getTimeseriesOptions(const NamespaceString& ns) const {
-    AutoGetCollection autoColl(_opCtx, ns.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(ns), MODE_IS);
     return *autoColl->getTimeseriesOptions();
 }
 
 const CollatorInterface* TimeseriesTestFixture::_getCollator(const NamespaceString& ns) const {
-    AutoGetCollection autoColl(_opCtx, ns.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(ns), MODE_IS);
     return autoColl->getDefaultCollator();
 }
 
@@ -487,7 +494,7 @@ void TimeseriesTestFixture::_stageInsertOneBatchIntoEligibleBucketHelper(
     bucket_catalog::BatchedInsertContext& batch,
     bucket_catalog::Bucket* bucket) {
     auto options = _getTimeseriesOptions(ns);
-    AutoGetCollection autoColl(_opCtx, ns.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(ns), MODE_IS);
     const auto& bucketsColl = autoColl;
     // Ensure that we don't rollover before staging an insert into the bucket.
     _assertBatchDoesNotRollover(options, batch, bucket);

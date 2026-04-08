@@ -65,7 +65,11 @@ TEST_F(TimeseriesCollectionPreConditionsUtilTest, NonTimeseriesCollection) {
     ASSERT(!preConditions.isViewlessTimeseriesCollection());
 }
 
+// TODO SERVER-123350: Remove this test once 9.0 is last LTS.
 TEST_F(TimeseriesCollectionPreConditionsUtilTest, LegacyTimeseriesCollection) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
+
     CreateCommand cmd = CreateCommand(viewfulTsNss);
     auto timeseriesOptions = TimeseriesOptions(std::string{_timeField});
     cmd.getCreateCollectionRequest().setTimeseries(std::move(timeseriesOptions));

@@ -161,7 +161,7 @@ void TimeseriesWriteOpsInternalTest::_testStageUnorderedWritesUnoptimized(
 TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatch) {
     auto tsOptions = _getTimeseriesOptions(_nsNoMeta);
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
-    AutoGetCollection autoCollBucket(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoCollBucket(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IS);
 
     std::vector<BSONObj> originalUserBatch{
         BSON(_timeField << Date_t::fromMillisSinceEpoch(3)),
@@ -216,7 +216,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatchWithStm
 
     auto tsOptions = _getTimeseriesOptions(_nsNoMeta);
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IS);
     const auto& bucketsColl = *autoColl;
 
     std::vector<BSONObj> originalUserBatch{
@@ -273,7 +273,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatchWithSin
 
     auto tsOptions = _getTimeseriesOptions(_nsNoMeta);
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IS);
     const auto& bucketsColl = *autoColl;
 
     std::vector<BSONObj> originalUserBatch{
@@ -325,7 +325,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatchWithSin
 TEST_F(TimeseriesWriteOpsInternalTest, TestProcessErrorsForSubsetOfBatchWithErrors) {
     auto tsOptions = _getTimeseriesOptions(_nsNoMeta);
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IS);
     const auto& bucketsColl = *autoColl;
 
     std::vector<BSONObj> originalUserBatch{

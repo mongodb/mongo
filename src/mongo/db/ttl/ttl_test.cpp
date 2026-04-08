@@ -55,6 +55,7 @@
 #include "mongo/db/shard_role/shard_catalog/durable_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/storage/mdb_catalog.h"
+#include "mongo/db/timeseries/timeseries_test_util.h"
 #include "mongo/db/ttl/ttl_monitor.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/stdx/thread.h"
@@ -271,8 +272,9 @@ public:
     }
 
     void setTimeseriesExtendedRange(const NamespaceString& nss) {
+        auto resolvedNss = timeseries::test_util::resolveTimeseriesNss(nss);
         CollectionCatalog::get(_opCtx)
-            ->lookupCollectionByNamespace(_opCtx, nss.makeTimeseriesBucketsNamespace())
+            ->lookupCollectionByNamespace(_opCtx, resolvedNss)
             ->setRequiresTimeseriesExtendedRangeSupport(_opCtx);
     }
 

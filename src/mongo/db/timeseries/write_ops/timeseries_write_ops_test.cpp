@@ -56,15 +56,13 @@ namespace {
 class TimeseriesWriteOpsTest : public timeseries::TimeseriesTestFixture {};
 
 TEST_F(TimeseriesWriteOpsTest, OrderedTimeseriesWritesMismatchedUUID) {
-    auto insertCommandReq =
-        write_ops::InsertCommandRequest(_nsNoMeta.makeTimeseriesBucketsNamespace());
+    auto insertCommandReq = write_ops::InsertCommandRequest(_resolveTimeseriesNss(_nsNoMeta));
     insertCommandReq.setCollectionUUID(UUID::gen());
-    auto preConditions =
-        timeseries::CollectionPreConditions(UUID::gen(),
-                                            true,  // isTimeseries
-                                            true,  // isViewlessTimeseries
-                                            _nsNoMeta.makeTimeseriesBucketsNamespace(),
-                                            boost::none);  // expectedUUID
+    auto preConditions = timeseries::CollectionPreConditions(UUID::gen(),
+                                                             true,  // isTimeseries
+                                                             true,  // isViewlessTimeseries
+                                                             _resolveTimeseriesNss(_nsNoMeta),
+                                                             boost::none);  // expectedUUID
     ASSERT_THROWS_CODE(
         uassertStatusOK(timeseries::write_ops::internal::performAtomicTimeseriesWrites(
             _opCtx,
@@ -79,12 +77,11 @@ TEST_F(TimeseriesWriteOpsTest, UnorderedTimeseriesWritesMismatchedUUID) {
     auto insertStatements = std::vector<InsertStatement>{InsertStatement{fromjson("{_id: 0}")}};
     auto fixer = write_ops_exec::LastOpFixer(_opCtx);
     write_ops_exec::WriteResult result;
-    auto preConditions =
-        timeseries::CollectionPreConditions(UUID::gen(),
-                                            true,  // isTimeseries
-                                            true,  // isViewlessTimeseries
-                                            _nsNoMeta.makeTimeseriesBucketsNamespace(),
-                                            boost::none);  // expectedUUID
+    auto preConditions = timeseries::CollectionPreConditions(UUID::gen(),
+                                                             true,  // isTimeseries
+                                                             true,  // isViewlessTimeseries
+                                                             _resolveTimeseriesNss(_nsNoMeta),
+                                                             boost::none);  // expectedUUID
 
     ASSERT_THROWS_CODE(
         [&] {
@@ -209,7 +206,7 @@ public:
             CollectionGeneration{OID::gen(), Timestamp(5, 0)}, CollectionPlacement(10, 1)));
         _incorrectShardVersion = ShardVersionFactory::make(ChunkVersion(
             CollectionGeneration{OID::gen(), Timestamp(12, 0)}, CollectionPlacement(10, 1)));
-        _nss = _nsNoMeta.makeTimeseriesBucketsNamespace();
+        _nss = _resolveTimeseriesNss(_nsNoMeta);
         _dbName = _nss.dbName();
 
         const auto untrackedCollectionMetadata = CollectionMetadata::UNTRACKED();

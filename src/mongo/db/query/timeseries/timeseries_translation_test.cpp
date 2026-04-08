@@ -43,6 +43,7 @@
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
+#include "mongo/db/timeseries/timeseries_test_util.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 
@@ -429,7 +430,7 @@ public:
                      << "loc_2dsphere"
                      << "2dsphereIndexVersion" << 3);
         ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
-            opCtx, _measurementsNss.makeTimeseriesBucketsNamespace(), {indexSpec}));
+            opCtx, timeseries::test_util::resolveTimeseriesNss(_measurementsNss), {indexSpec}));
     }
 
     boost::intrusive_ptr<ExpressionContextForTest> getExpCtx() {
@@ -437,13 +438,14 @@ public:
     }
 
     CollectionOrViewAcquisition getCollAcquisition() {
-        return acquireCollectionOrView(operationContext(),
-                                       CollectionOrViewAcquisitionRequest(
-                                           _measurementsNss.makeTimeseriesBucketsNamespace(),
-                                           PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
-                                           repl::ReadConcernArgs::get(operationContext()),
-                                           AcquisitionPrerequisites::kRead),
-                                       MODE_IS);
+        return acquireCollectionOrView(
+            operationContext(),
+            CollectionOrViewAcquisitionRequest(
+                timeseries::test_util::resolveTimeseriesNss(_measurementsNss),
+                PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
+                repl::ReadConcernArgs::get(operationContext()),
+                AcquisitionPrerequisites::kRead),
+            MODE_IS);
     }
 
     const NamespaceString _measurementsNss =

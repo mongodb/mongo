@@ -46,6 +46,7 @@
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state_mock.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/db/timeseries/timeseries_test_util.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
@@ -495,7 +496,8 @@ TEST_F(MetadataConsistencyTest, TimeseriesOptionsMismatchBetweenLocalAndSharding
             }
             createTestCollection(opCtx, nss, cmd.toBSON());
 
-            const auto& actualNss = (localTimeseries ? nss.makeTimeseriesBucketsNamespace() : nss);
+            auto actualNss =
+                localTimeseries ? timeseries::test_util::resolveTimeseriesNss(nss) : nss;
 
             const auto [localCatalogSnapshot, localCatalogCollections] =
                 getLocalCatalog(opCtx, actualNss);

@@ -481,7 +481,6 @@ BSONObj BucketCatalogTest::_getMetadata(BucketCatalog& catalog, const BucketId& 
 
 StatusWith<tracking::unique_ptr<Bucket>> BucketCatalogTest::_testRehydrateBucket(
     const CollectionPtr& coll, const BSONObj& bucketDoc) {
-    const NamespaceString ns = coll->ns().getTimeseriesViewNamespace();
     const UUID uuid = coll->uuid();
     const boost::optional<TimeseriesOptions> options = coll->getTimeseriesOptions();
 
@@ -518,7 +517,9 @@ Status BucketCatalogTest::_reopenBucket(
     const boost::optional<unsigned long>& loadBucketIntoCatalogEra,
     const boost::optional<BucketKey>& bucketKey,
     const boost::optional<internal::BucketDocumentValidator>& documentValidator) {
-    const NamespaceString ns = coll->ns().getTimeseriesViewNamespace();
+    const NamespaceString ns = coll->ns().isTimeseriesBucketsCollection()
+        ? coll->ns().getTimeseriesViewNamespace()
+        : coll->ns();
     const UUID uuid = coll->uuid();
     const boost::optional<TimeseriesOptions> options = coll->getTimeseriesOptions();
     invariant(options,
@@ -607,7 +608,7 @@ void BucketCatalogTest::_testBuildBatchedInsertContextWithMetaField(
     stdx::unordered_map<bucket_catalog::BucketMetadata, std::vector<size_t>>&
         metaFieldMetadataToCorrectIndexOrderMap,
     stdx::unordered_set<size_t>& expectedIndicesWithErrors) const {
-    AutoGetCollection bucketsColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), LockMode::MODE_IX);
     tracking::Context trackingContext;
     timeseries::bucket_catalog::ExecutionStatsController stats;
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
@@ -615,7 +616,7 @@ void BucketCatalogTest::_testBuildBatchedInsertContextWithMetaField(
 
     auto batchedInsertContextVector = bucket_catalog::buildBatchedInsertContextsWithMetaField(
         *_bucketCatalog,
-        bucketsColl->uuid(),
+        autoColl->uuid(),
         tsOptions,
         userMeasurementsBatch,
         /*startIndex=*/0,
@@ -718,7 +719,7 @@ void BucketCatalogTest::_testBuildBatchedInsertContextWithoutMetaField(
     const std::vector<BSONObj>& userMeasurementsBatch,
     const std::vector<size_t>& correctIndexOrder,
     stdx::unordered_set<size_t>& expectedIndicesWithErrors) const {
-    AutoGetCollection autoColl(_opCtx, ns.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(ns), MODE_IS);
     const auto& bucketsColl = *autoColl;
     tracking::Context trackingContext;
     timeseries::bucket_catalog::ExecutionStatsController stats;
@@ -889,7 +890,7 @@ void BucketCatalogTest::_testStageInsertBatch(const NamespaceString& ns,
                                               const UUID& collectionUUID,
                                               const std::vector<BSONObj>& batchOfMeasurements,
                                               const std::vector<size_t>& numWriteBatches) const {
-    AutoGetCollection autoColl(_opCtx, ns.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(ns), MODE_IS);
     const auto& bucketsColl = *autoColl;
     auto timeseriesOptions = _getTimeseriesOptions(ns);
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
@@ -1020,7 +1021,7 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucket(
     // These size values are equivalent to the total number of buckets that should be written to
     // from the input measurements.
     ASSERT(curBatchedInsertContextsIndex.size() == numMeasurementsInWriteBatch.size());
-    AutoGetCollection autoColl(_opCtx, ns.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(ns), MODE_IS);
     const auto& bucketsColl = *autoColl;
 
     auto timeseriesOptions = _getTimeseriesOptions(ns);
@@ -1810,7 +1811,7 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
     BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IX);
     ASSERT_OK(_reopenBucket(*autoColl, compressedBucketDoc));
     auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
 
@@ -1940,7 +1941,7 @@ TEST_F(BucketCatalogTest, ReopenMixedSchemaDataBucket) {
                             "2":{"$date":"2022-08-26T19:19:30Z"}},
                     "x":{"0":1,"1":{"y":"z"},"2":"abc"}}})");
 
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IX);
     BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
     ASSERT_NOT_OK(_reopenBucket(*autoColl, compressedBucketDoc));
 
@@ -1949,7 +1950,7 @@ TEST_F(BucketCatalogTest, ReopenMixedSchemaDataBucket) {
 }
 
 TEST_F(BucketCatalogTest, ReopenClosedBuckets) {
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IX);
 
     {
         // control.closed: true
@@ -1974,7 +1975,7 @@ TEST_F(BucketCatalogTest, ReopenClosedBuckets) {
 }
 
 TEST_F(BucketCatalogTest, ReopenNotClosedBuckets) {
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IX);
     {
         // control.closed: false
         BSONObj openBucket = ::mongo::fromjson(
@@ -2027,7 +2028,7 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) 
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
     BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IX);
     auto memUsageBefore = getMemoryUsage(*_bucketCatalog);
     Status status = _reopenBucket(*autoColl, compressedBucketDoc);
     auto memUsageAfter = getMemoryUsage(*_bucketCatalog);
@@ -2073,7 +2074,7 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
     BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IX);
     auto memUsageBefore = getMemoryUsage(*_bucketCatalog);
     Status status = _reopenBucket(*autoColl, compressedBucketDoc);
     auto memUsageAfter = getMemoryUsage(*_bucketCatalog);
@@ -2112,7 +2113,7 @@ TEST_F(BucketCatalogTest, RehydrateMalformedBucket) {
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
     BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IX);
 
     ASSERT_OK(_testRehydrateBucket(*autoColl, compressedBucketDoc));
 
@@ -2208,7 +2209,7 @@ TEST_F(BucketCatalogTest, RehydrateMixedSchemaDataBucket) {
                             "2":{"$date":"2022-08-26T19:19:30Z"}},
                     "x":{"0":1,"1":{"y":"z"},"2":"abc"}}})");
 
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IX);
     BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
     ASSERT_NOT_OK(_testRehydrateBucket(*autoColl, compressedBucketDoc));
 
@@ -2217,7 +2218,7 @@ TEST_F(BucketCatalogTest, RehydrateMixedSchemaDataBucket) {
 }
 
 TEST_F(BucketCatalogTest, RehydrateClosedBuckets) {
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IX);
 
     {
         // control.closed: true
@@ -2240,7 +2241,7 @@ TEST_F(BucketCatalogTest, RehydrateClosedBuckets) {
 }
 
 TEST_F(BucketCatalogTest, RehydrateNotClosedBuckets) {
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IX);
 
     {
         // control.closed: false
@@ -2284,7 +2285,7 @@ TEST_F(BucketCatalogTest, ReopenBucketWithIncorrectEra) {
                             "2":{"$date":"2022-06-06T15:34:30.000Z"}},
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IX);
     BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
 
     _bucketCatalog->bucketStateRegistry.currentEra = 1ul;
@@ -2297,7 +2298,7 @@ TEST_F(BucketCatalogTest, ReopenBucketWithIncorrectEra) {
 }
 
 TEST_F(BucketCatalogTest, ReopeningFailedDueToHashCollision) {
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IX);
     BSONObj bucketDoc = ::mongo::fromjson(
         R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
             "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
@@ -2334,7 +2335,7 @@ TEST_F(BucketCatalogTest, ReopeningFailedDueToMarkedFrozen) {
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
     BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IX);
     ASSERT_OK(_reopenBucket(*autoColl, compressedBucketDoc));
     auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
 
@@ -2357,7 +2358,7 @@ TEST_F(BucketCatalogTest, ReopeningFailedDueToMinMaxCalculation) {
                             "2":{"$date":"2022-06-06T15:34:30.000Z"}},
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IX);
     BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
 
     const auto alwaysPassValidator =
@@ -2385,7 +2386,7 @@ DEATH_TEST_F(BucketCatalogTestDeathTest, ReopeningFailedDueToCompression, "invar
             "data":{"time":{"$binary":"CQBwO6c5gQEAAIANAAAAAAAAAAA=","$type":"07"},
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"$binary":"AQAAAAAAAADwP5AtAAAACAAAAAA=","$type":"07"}}})");
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IX);
     BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
 
     std::ignore = _reopenBucket(*autoColl, bucketDoc);
@@ -3405,7 +3406,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsOrder) {
 }
 
 TEST_F(BucketCatalogTest, GetEligibleBucketAllocateBucket) {
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IS);
     const auto& bucketsColl = *autoColl;
     auto measurement = BSON(_timeField << Date_t::now() << _metaField << _metaValue);
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
@@ -3456,7 +3457,7 @@ TEST_F(BucketCatalogTest, GetEligibleBucketAllocateBucket) {
 }
 
 TEST_F(BucketCatalogTest, GetEligibleBucketOpenBucket) {
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IS);
     const auto& bucketsColl = *autoColl;
     auto measurement = BSON(_timeField << Date_t::now() << _metaField << _metaValue);
     auto timeseriesOptions = _getTimeseriesOptions(_ns1);
@@ -5367,7 +5368,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsSimpleOneFullBucket) {
 
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
 
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IS);
     const auto& bucketsColl = *autoColl;
 
     auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
@@ -5407,7 +5408,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsMultipleBucketsOneMeta) {
     }
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
 
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IS);
     const auto& bucketsColl = *autoColl;
 
     auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
@@ -5450,7 +5451,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsMultipleBucketsMultipleMetas) {
     }
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
 
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IS);
     const auto& bucketsColl = *autoColl;
 
     auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
@@ -5491,7 +5492,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsMultipleBucketsMultipleMetasInt
     }
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
 
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IS);
     const auto& bucketsColl = *autoColl;
 
     auto swWriteBatches = prepareInsertsToBuckets(_opCtx,
@@ -5526,7 +5527,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsMultipleBucketsMultipleMetasInt
 TEST_F(BucketCatalogTest, PrepareInsertsBadMeasurementsAll) {
     auto tsOptions = _getTimeseriesOptions(_ns1);
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IS);
     const auto& bucketsColl = *autoColl;
 
     std::vector<BSONObj> userMeasurementsBatch{
@@ -5557,7 +5558,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsBadMeasurementsAll) {
 TEST_F(BucketCatalogTest, PrepareInsertsBadMeasurementsSome) {
     auto tsOptions = _getTimeseriesOptions(_ns1);
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IS);
     const auto& bucketsColl = *autoColl;
 
     std::vector<BSONObj> userMeasurementsBatch{
@@ -5597,7 +5598,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsBadMeasurementsSome) {
 TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsStartIndexNoMeta) {
     auto tsOptions = _getTimeseriesOptions(_nsNoMeta);
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IS);
     const auto& bucketsColl = *autoColl;
 
     std::vector<BSONObj> originalUserBatch{
@@ -5643,7 +5644,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsStartIndexNoMeta) {
 TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsStartIndexWithMeta) {
     auto tsOptions = _getTimeseriesOptions(_ns1);
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IS);
     const auto& bucketsColl = *autoColl;
 
     std::vector<BSONObj> originalUserBatch{
@@ -5692,7 +5693,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsStartIndexWithMeta) {
 TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsDocsToRetryNoMeta) {
     auto tsOptions = _getTimeseriesOptions(_nsNoMeta);
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IS);
     const auto& bucketsColl = *autoColl;
 
     std::vector<BSONObj> originalUserBatch{
@@ -5741,7 +5742,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsDocsToRetryNoMeta) {
 TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsDocsToRetryWithMeta) {
     auto tsOptions = _getTimeseriesOptions(_ns1);
     std::vector<bucket_catalog::WriteStageErrorAndIndex> errorsAndIndices;
-    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IS);
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IS);
     const auto& bucketsColl = *autoColl;
 
     std::vector<BSONObj> originalUserBatch{

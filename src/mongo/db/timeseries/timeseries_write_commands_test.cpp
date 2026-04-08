@@ -57,16 +57,16 @@ protected:
         {
             Lock::GlobalWrite lk(_opCtx);
 
+            const auto timeseriesNss = _resolveTimeseriesNss(_nsNoMeta);
             auto catalogId = CollectionCatalog::get(_opCtx)
-                                 ->lookupCollectionByNamespace(
-                                     _opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace())
+                                 ->lookupCollectionByNamespace(_opCtx, timeseriesNss)
                                  ->getCatalogId();
             auto metadata =
                 durable_catalog::getParsedCatalogEntry(_opCtx, catalogId, MDBCatalog::get(_opCtx))
                     ->metadata;
             makeInvalidMetadataFn(metadata);
 
-            CollectionWriter writer{_opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace()};
+            CollectionWriter writer{_opCtx, timeseriesNss};
             WriteUnitOfWork wuow(_opCtx);
             auto collection = writer.getWritableCollection(_opCtx);
             collection->replaceMetadata(_opCtx, std::move(metadata));
