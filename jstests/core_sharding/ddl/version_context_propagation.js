@@ -13,6 +13,9 @@
  * ]
  */
 
+// TODO: SERVER-60746 enable multi-router once $currentOp is supported on multi-router.
+TestData.pinToSingleMongos = true;
+
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
