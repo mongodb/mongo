@@ -119,13 +119,14 @@ void WiredTigerSession::_openCursor(WT_SESSION* session,
     } else if (ret == ENOENT) {
         uasserted(ErrorCodes::CursorNotFound,
                   str::stream() << "Failed to open a WiredTiger cursor. Reason: " << status
-                                << ", uri: " << uri << ", config: " << config);
+                                << ", uri: " << uri
+                                << ", config: " << stringDataDefaultIfNull(config));
     }
 
     LOGV2_FATAL_NOTRACE(50882,
                         "Failed to open WiredTiger cursor. This may be due to data corruption",
                         "uri"_attr = uri,
-                        "config"_attr = config,
+                        "config"_attr = stringDataDefaultIfNull(config),
                         "error"_attr = status,
                         "message"_attr = kWTRepairMsg);
 }
