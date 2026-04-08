@@ -132,6 +132,12 @@ std::vector<BSONObj> pipelineToBSON(const std::unique_ptr<Pipeline>& pipeline) {
     }
 }
 
+bool isUnwindEligible(const DocumentSourceUnwind& unwind) {
+    // If 'preserveNullAndEmptyArrays' is set to true, this is an outer join, which is currently
+    // ineligible for join-opt. Similarly, we don't support $unwinds that set the array index.
+    return !unwind.preserveNullAndEmptyArrays() && !unwind.indexPath();
+}
+
 bool isLookupEligible(const DocumentSourceLookUp& lookup) {
 
     if (lookup.getExpCtx()->getSubPipelineDepth() != 0) {
@@ -139,7 +145,7 @@ bool isLookupEligible(const DocumentSourceLookUp& lookup) {
         return false;
     }
 
-    if (!lookup.hasUnwindSrc()) {
+    if (!lookup.hasUnwindSrc() || !isUnwindEligible(*lookup.getUnwindSource())) {
         return false;
     }
 

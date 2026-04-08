@@ -11,9 +11,6 @@ selector:
     - jstests/query_golden/plan_stability2.js
     # Those tests set internalEnableJoinOptimization internally
     - jstests/query_golden/join_opt/**/*.js
-    # TODO SERVER-114566: Re-enable these tests when
-    # preserveNullAndEmptyArrays = true is handled appropriately.
-    - jstests/query_golden/lookup_unwind_md.js
     # No joins in those tests
     - jstests/query_golden/expr_eq_optimization_md.js
 executor:

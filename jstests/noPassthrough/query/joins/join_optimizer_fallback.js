@@ -316,4 +316,37 @@ runTestCaseEligiblePipeline({
     expectedCount: 1,
 });
 
+// Eligible prefix followed by ineligible $unwind with preserveNullAndEmptyArrays.
+runTestCaseIneligibleSuffix({
+    pipeline: [
+        {$lookup: {from: coll12.getName(), as: "coll12", localField: "a", foreignField: "a"}},
+        {$unwind: "$coll12"},
+        {$lookup: {from: coll13.getName(), as: "coll13", localField: "b", foreignField: "b"}},
+        {$unwind: {path: "$coll13", preserveNullAndEmptyArrays: true}},
+    ],
+    expectedCount: 1,
+    expectedJoinNodesInPrefix: 1,
+});
+
+// Eligible prefix followed by ineligible $unwind with includeArrayIndex.
+runTestCaseIneligibleSuffix({
+    pipeline: [
+        {$lookup: {from: coll12.getName(), as: "coll12", localField: "a", foreignField: "a"}},
+        {$unwind: "$coll12"},
+        {$lookup: {from: coll13.getName(), as: "coll13", localField: "b", foreignField: "b"}},
+        {$unwind: {path: "$coll13", includeArrayIndex: "idx"}},
+    ],
+    expectedCount: 1,
+    expectedJoinNodesInPrefix: 1,
+});
+
+// Fallback when $unwind has both preserveNullAndEmptyArrays and includeArrayIndex.
+runTestCaseIneligiblePipeline({
+    pipeline: [
+        {$lookup: {from: coll12.getName(), as: "x", localField: "a", foreignField: "a"}},
+        {$unwind: {path: "$x", preserveNullAndEmptyArrays: true, includeArrayIndex: "idx"}},
+    ],
+    expectedCount: 1,
+});
+
 MongoRunner.stopMongod(conn);
