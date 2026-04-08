@@ -33,7 +33,9 @@ describe("Authentication commands are non-deprioritizable", function () {
 
         this.login(this.testUser);
 
-        const nonDeprioCount = getTotalMarkedNonDeprioritizableCount(this.rst.getPrimary());
-        assert.eq(nonDeprioCount, initialNonDeprioritizableCount + 1);
+        assert.soon(() => {
+            const nonDeprioCount = getTotalMarkedNonDeprioritizableCount(this.rst.getPrimary());
+            return nonDeprioCount.toNumber() === initialNonDeprioritizableCount.toNumber() + 1;
+        });
     });
 });
