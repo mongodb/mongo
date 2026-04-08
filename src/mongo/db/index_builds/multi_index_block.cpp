@@ -301,6 +301,8 @@ void MultiIndexBlock::abortIndexBuild(OperationContext* opCtx,
 
             wunit.commit();
             _buildIsCleanedUp = true;
+            // TODO (SERVER-122275) Use a valid non min timestamp ensure replication of the drop
+            // event.
             auto timestamp = Timestamp::min();
             if (_resumeStateTempRecordStore) {
                 _resumeStateTempRecordStore->drop(opCtx, timestamp);
@@ -1390,7 +1392,9 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [this](OperationContext* opCtx, boost::optional<Timestamp> ts) {
             _buildIsCleanedUp = true;
-            auto timestamp = ts.value_or(Timestamp::min());
+            // TODO (SERVER-122275) Use a valid non min timestamp ensure replication of the drop
+            // event.
+            auto timestamp = Timestamp::min();
             if (_resumeStateTempRecordStore) {
                 _resumeStateTempRecordStore->drop(opCtx, timestamp);
             }
