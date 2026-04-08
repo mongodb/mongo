@@ -28,6 +28,8 @@
  */
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
@@ -167,6 +169,10 @@ int clang_optnone main(int argc, char** argv) {
 
     boost::optional<IntWrapper> wrappedOptTypeNone;
     boost::optional<IntWrapper> wrappedOptTypeValue{IntWrapper{1}};
+
+    auto obj = BSON("x" << "1" << "sub" << BSON("y" << "1"));
+
+    auto unownedObj = mongo::BSONObj(obj.objdata());
 
     mongo::breakpoint();
 

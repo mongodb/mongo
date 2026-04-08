@@ -83,6 +83,17 @@ def test_boost_optional():
     assert optional["_i"] == 1, f"wrappedOptTypeValue was {optional}"
 
 
+def test_bsonobj():
+    search(
+        r'owned BSONObj.*\{\[x\] = "1", \[sub\] = \{"y": "1"\}\}',
+        gdb.execute("print obj", to_string=True),
+    )
+    search(
+        r'unowned BSONObj.*\{\[x\] = "1", \[sub\] = \{"y": "1"\}\}',
+        gdb.execute("print unownedObj", to_string=True),
+    )
+
+
 if __name__ == "__main__":
     try:
         gdb.execute("run")
@@ -91,6 +102,7 @@ if __name__ == "__main__":
         test_dbname_nss()
         test_string_map()
         test_boost_optional()
+        test_bsonobj()
         gdb.write("TEST PASSED\n")
     except Exception as err:
         gdb.write("TEST FAILED -- {!s}\n".format(err))

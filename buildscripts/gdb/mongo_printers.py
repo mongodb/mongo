@@ -204,7 +204,11 @@ class BSONObjPrinter(object):
         if self.size == -1:
             return "BSONObj @ %s - optimized out" % (self.ptr)
 
-        ownership = "owned" if self.val["_ownedBuffer"]["_buffer"]["_holder"]["px"] else "unowned"
+        ownership = (
+            "owned"
+            if self.val["_ownedBuffer"]["_buffer"]["_holderAndAllocator"]["holder"]["px"]
+            else "unowned"
+        )
 
         size = self.size
         # Print an invalid BSONObj size in hex.
