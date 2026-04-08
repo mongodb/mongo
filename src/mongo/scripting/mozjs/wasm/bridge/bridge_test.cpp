@@ -48,6 +48,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/scripting/deadline_monitor.h"
 #include "mongo/scripting/mozjs/wasm/embedded_wasm_resource.h"
 #include "mongo/unittest/unittest.h"
 
@@ -85,7 +86,7 @@ protected:
     }
 
     bool initEngine() {
-        return _bridge->initialize();
+        return _bridge->initialize({100});
     }
 
     uint64_t createFunction(std::string_view source) {
@@ -106,6 +107,12 @@ protected:
         _bridge->setGlobalValue(name, value);
     }
 
+    void setFunction(std::string_view name, std::string_view code) {
+        BSONObjBuilder b;
+        b.appendCode("val", std::string(code));
+        return setGlobalValue(name, b.obj());
+    }
+
     void setupEmit(boost::optional<int64_t> byteLimit) {
         _bridge->setupEmit(byteLimit);
     }
@@ -124,6 +131,13 @@ protected:
 
     BSONObj getGlobal(std::string_view name) {
         return _bridge->getGlobal(name);
+    }
+
+    auto getContainsCheck(ErrorCodes::Error e, std::string query) {
+        return [=](auto&& ex) {
+            ASSERT_EQUALS(ex.code(), e);
+            ASSERT_STRING_CONTAINS(ex.reason(), query);
+        };
     }
 
     std::unique_ptr<MozJSWasmBridge> _bridge;
@@ -855,6 +869,96 @@ TEST_F(WasmMozJSBridgeTest, CreateFunctionWithInvalidSourceFails) {
                        ErrorCodes::JSInterpreterFailure);
 }
 
+TEST_F(WasmMozJSBridgeTest, EngineInitializeOOM) {
+    ASSERT_TRUE(_bridge->isInitialized());
+    _bridge->shutdown();
+    ASSERT_FALSE(_bridge->isInitialized());
+    _bridge->initialize({1});
+
+    auto handle = createFunction(
+        "function() {"
+        "  var x = [];"
+        "  var i = 0;"
+        "  while(i < 1.1 * 2 * 1024 * 1024) {"
+        "    x.push(new Array(1024)); "
+        "    i = i + 1;"
+        "  } "
+        "  return 3;"
+        "}");
+    ASSERT_THROWS_WITH_CHECK(invokeFunction(handle, BSONObj()),
+                             AssertionException,
+                             getContainsCheck(ErrorCodes::JSInterpreterFailure, "out of memory"));
+}
+
+// This will OOM the host if run with TSAN.
+#if !__has_feature(thread_sanitizer)
+TEST_F(WasmMozJSBridgeTest, EngineJSHeapOOMRecovery) {
+    ASSERT_TRUE(_bridge->isInitialized());
+    _bridge->shutdown();
+    ASSERT_FALSE(_bridge->isInitialized());
+    _bridge->initialize({1});
+    ASSERT_TRUE(_bridge->isInitialized());
+
+    auto definition =
+        "function() {"
+        "  var x = [];"
+        "  var i = 0;"
+        "  while(i < 100 * 1024 ) {"
+        "    x.push(new Array(1024)); "
+        "    i = i + 1;"
+        "  } "
+        "  return 3;"
+        "}";
+
+    auto handle = createFunction(definition);
+    ASSERT_THROWS_WITH_CHECK(invokeFunction(handle, BSONObj()),
+                             AssertionException,
+                             getContainsCheck(ErrorCodes::JSInterpreterFailure, "out of memory"));
+    _bridge->shutdown();
+
+    _bridge->initialize({20});
+    ASSERT_TRUE(_bridge->isInitialized());
+
+    handle = createFunction(definition);
+    ASSERT_DOES_NOT_THROW(invokeFunction(handle, BSONObj()));
+}
+#endif  // !__has_feature(thread_sanitizer)
+
+TEST_F(WasmMozJSBridgeTest, EngineTimeoutSleep) {
+    ASSERT_TRUE(_bridge->isInitialized());
+
+    auto handle = createFunction("function() { sleep(10000); return 3; }");
+
+    // DeadlineMonitor calls kill() -> signalInterrupt() -> increment_epoch().
+    // sleep() is sliced into 1ms intervals so control returns to WASM between
+    // slices, allowing the epoch trap to fire.
+    DeadlineMonitor<MozJSWasmBridge> monitor;
+    monitor.startDeadline(_bridge.get(), 10);
+    ASSERT_THROWS_WITH_CHECK(
+        invokeFunction(handle, BSONObj()),
+        AssertionException,
+        getContainsCheck(ErrorCodes::duplicateCodeForTest(11542340), "interrupt"));
+    monitor.stopDeadline(_bridge.get());
+    // After an epoch trap the component instance is poisoned — drop it so tearDown
+    // doesn't try to call shutdown on it.
+    _bridge.reset();
+}
+
+TEST_F(WasmMozJSBridgeTest, EngineTimeoutWhile) {
+    ASSERT_TRUE(_bridge->isInitialized());
+
+    auto handle = createFunction("function() { while(true) {} }");
+
+    DeadlineMonitor<MozJSWasmBridge> monitor;
+    monitor.startDeadline(_bridge.get(), 10);
+    ASSERT_THROWS_WITH_CHECK(
+        invokeFunction(handle, BSONObj()),
+        AssertionException,
+        getContainsCheck(ErrorCodes::duplicateCodeForTest(11542340), "interrupt"));
+    monitor.stopDeadline(_bridge.get());
+    _bridge.reset();
+}
+
 TEST_F(WasmMozJSBridgeTest, ShutdownAndReinitialize) {
     createFunction("function() { return 'first'; }");
 
@@ -1463,6 +1567,929 @@ TEST_F(WasmMozJSBridgeTest, NumberIntValueOfEnablesArithmetic) {
     ASSERT_EQ(inner.getIntField("sum"), 42);
     ASSERT_EQ(inner.getIntField("product"), 320);
     ASSERT_EQ(inner.getIntField("valueOf"), 10);
+}
+
+
+// ---------------------------------------------------------------------------
+// Error extraction and failure scenario tests
+//
+// These tests exercise failure paths and verify that the wasm-mozjs-error
+// record returned by WIT contains the correct error code, message, filename,
+// and line/column information for various failure modes.
+// ---------------------------------------------------------------------------
+
+TEST_F(WasmMozJSBridgeTest, CompileErrorHasCorrectErrorCode) {
+    ASSERT_THROWS_WITH_CHECK(createFunction("this is not valid javascript {{{"),
+                             AssertionException,
+                             getContainsCheck(ErrorCodes::JSInterpreterFailure, "e-compile"));
+}
+
+TEST_F(WasmMozJSBridgeTest, CompileErrorContainsMessage) {
+    ASSERT_THROWS_WITH_CHECK(createFunction("function( { invalid syntax"),
+                             AssertionException,
+                             getContainsCheck(ErrorCodes::JSInterpreterFailure, "e-compile"));
+}
+
+TEST_F(WasmMozJSBridgeTest, CompileErrorHasFileAndLineInfo) {
+    ASSERT_THROWS_WITH_CHECK(createFunction("function() { var x = ; }"),
+                             AssertionException,
+                             getContainsCheck(ErrorCodes::JSInterpreterFailure, "e-compile"));
+}
+
+TEST_F(WasmMozJSBridgeTest, RuntimeErrorHasCorrectErrorCode) {
+    auto handle = createFunction("function() { throw new Error('boom'); }");
+    ASSERT_THROWS_WITH_CHECK(invokeFunction(handle, BSONObj()),
+                             AssertionException,
+                             getContainsCheck(ErrorCodes::JSInterpreterFailure, "e-runtime"));
+}
+
+TEST_F(WasmMozJSBridgeTest, RuntimeErrorContainsMessage) {
+    auto handle = createFunction("function() { throw new Error('specific error text'); }");
+    auto doubleCheck = [&](auto&& ex) {
+        getContainsCheck(ErrorCodes::JSInterpreterFailure, "specific error text")(ex);
+        getContainsCheck(ErrorCodes::JSInterpreterFailure, "e-runtime")(ex);
+    };
+    ASSERT_THROWS_WITH_CHECK(invokeFunction(handle, BSONObj()), AssertionException, doubleCheck);
+}
+
+TEST_F(WasmMozJSBridgeTest, RuntimeErrorFromUndefinedVariable) {
+    auto handle = createFunction("function() { return nonexistentVariable.property; }");
+
+
+    auto doubleCheck = [&](auto&& ex) {
+        getContainsCheck(ErrorCodes::JSInterpreterFailure, "nonexistentVariable")(ex);
+        getContainsCheck(ErrorCodes::JSInterpreterFailure, "e-runtime")(ex);
+    };
+    ASSERT_THROWS_WITH_CHECK(invokeFunction(handle, BSONObj()), AssertionException, doubleCheck);
+}
+
+TEST_F(WasmMozJSBridgeTest, RuntimeErrorFromTypeError) {
+    // Calling a non-function triggers a TypeError at runtime
+    auto handle = createFunction("function() { var x = 42; return x(); }");
+    ASSERT_THROWS_WITH_CHECK(invokeFunction(handle, BSONObj()),
+                             AssertionException,
+                             getContainsCheck(ErrorCodes::JSInterpreterFailure, "e-runtime"));
+}
+
+TEST_F(WasmMozJSBridgeTest, ExpressionSourceWrappedAsFunction) {
+    // "42" is an expression, not a function declaration but our semantics say this implies a
+    // constant function. __parseJSFunctionOrExpression wraps it as "function() { return 42; }" so
+    // createFunction succeeds and produces a callable handle.
+    auto handle = createFunction("42");
+    auto result = invokeFunction(handle, BSONObj());
+
+    ASSERT_EQ(result["__value"].Number(), 42);
+}
+
+TEST_F(WasmMozJSBridgeTest, StaleHandleAfterShutdownHasCorrectErrorCode) {
+
+    auto handle = createFunction("function() { return 1; }");
+
+    // Shutdown and re-initialize
+    _bridge->shutdown();
+
+    ASSERT_TRUE(initEngine());
+
+    ASSERT_THROWS_WITH_CHECK(invokeFunction(handle, BSONObj()),
+                             AssertionException,
+                             getContainsCheck(ErrorCodes::JSInterpreterFailure, "e-invalid-arg"));
+}
+
+// ---------------------------------------------------------------------------
+// Stored procedure tests
+// ---------------------------------------------------------------------------
+
+TEST_F(WasmMozJSBridgeTest, StoredProcedureViaSetGlobalCode) {
+    // Install a stored procedure as a global via BSON Code type.
+    BSONObjBuilder bob;
+    bob.appendCode("multiply", "function(a, b) { return a * b; }");
+    setGlobal("procs", bob.obj());
+
+    auto handle = createFunction(
+        "function(x, y) {"
+        "  return { result: procs.multiply(x, y) };"
+        "}");
+
+    BSONObjBuilder args;
+    args.append("x", 6);
+    args.append("y", 7);
+    BSONObj result = invokeFunction(handle, args.obj());
+
+    ASSERT_EQ(result.getIntField("result"), 42);
+}
+
+TEST_F(WasmMozJSBridgeTest, StoredProcedureMultiple) {
+    // Install multiple stored procedures at once.
+    BSONObjBuilder bob;
+    bob.appendCode("add", "function(a, b) { return a + b; }");
+    bob.appendCode("square", "function(x) { return x * x; }");
+    bob.appendCode("negate", "function(x) { return -x; }");
+    setGlobal("math", bob.obj());
+
+    auto handle = createFunction(
+        "function(a, b) {"
+        "  var sum = math.add(a, b);"
+        "  var sq = math.square(sum);"
+        "  return { result: math.negate(sq) };"
+        "}");
+
+    BSONObjBuilder args;
+    args.append("a", 3);
+    args.append("b", 4);
+    auto result = invokeFunction(handle, args.obj());
+
+    // negate(square(add(3, 4))) = negate(square(7)) = negate(49) = -49
+    ASSERT_EQ(result.getIntField("result"), -49);
+}
+
+TEST_F(WasmMozJSBridgeTest, StoredProcedureChaining) {
+    // Install procedures that call each other.
+    BSONObjBuilder bob;
+    bob.appendCode("double_", "function(x) { return x * 2; }");
+    bob.appendCode("doubleAndAdd", "function(a, b) { return utils.double_(a) + b; }");
+    setGlobal("utils", bob.obj());
+
+    auto handle = createFunction(
+        "function(n) {"
+        "  return { result: utils.doubleAndAdd(n, 10) };"
+        "}");
+
+    BSONObjBuilder args;
+    args.append("n", 5);
+    auto result = invokeFunction(handle, args.obj());
+
+    // doubleAndAdd(5, 10) = double_(5) + 10 = 10 + 10 = 20
+    ASSERT_EQ(result.getIntField("result"), 20);
+}
+
+TEST_F(WasmMozJSBridgeTest, StoredProcedureCalledFromMultipleFunctions) {
+    ASSERT_TRUE(initEngine());
+
+    BSONObjBuilder bob;
+    bob.appendCode("transform", "function(x) { return x * x + 1; }");
+    setGlobal("sp", bob.obj());
+
+    // Two different functions both use the same stored procedure.
+    auto h1 = createFunction("function(n) { return { result: sp.transform(n) }; }");
+
+    auto h2 =
+        createFunction("function(a, b) { return { result: sp.transform(a) + sp.transform(b) }; }");
+
+    {
+        BSONObjBuilder a;
+        a.append("n", 3);
+        auto r = invokeFunction(h1, a.obj());
+        // transform(3) = 3*3 + 1 = 10
+        ASSERT_EQ(r.getIntField("result"), 10);
+    }
+
+    {
+        BSONObjBuilder a;
+        a.append("a", 2);
+        a.append("b", 4);
+        auto r = invokeFunction(h2, a.obj());
+
+        // transform(2) + transform(4) = (4+1) + (16+1) = 5 + 17 = 22
+        ASSERT_EQ(r.getIntField("result"), 22);
+    }
+}
+
+TEST_F(WasmMozJSBridgeTest, StoredProcedureWithCodeWScope) {
+
+    // CodeWScope is also evaluated as a function (scope is ignored per SpiderMonkey behavior).
+    BSONObjBuilder bob;
+    bob.appendCodeWScope("greet", "function(name) { return 'Hello, ' + name; }", BSONObj());
+    setGlobal("funcs", bob.obj());
+
+    auto handle = createFunction("function() { return { msg: funcs.greet('World') }; }");
+    ASSERT_NE(handle, 0u);
+
+    auto result = invokeFunction(handle, BSONObj());
+    ASSERT_EQ(result.getStringField("msg"), "Hello, World");
+}
+
+
+TEST_F(WasmMozJSBridgeTest, MQLFunctionPattern) {
+    // Simulates: { $function: { body: <body>, args: ["$name"], lang: "js" } }
+    // JsExecution::callFunction(func, params, thisObj={})
+    // → Scope::invoke(func, &params, &{}, timeout, false)
+    auto handle = createFunction(
+        "function(name, factor) {"
+        "  return { upper: name.toUpperCase(), doubled: factor * 2 };"
+        "}");
+
+    // Params are built as: { "arg0": <value>, "arg1": <value>, ... }
+    BSONObjBuilder params;
+    params.append("arg0", "hello");
+    params.append("arg1", 21);
+    auto result = invokeFunction(handle, params.obj());
+
+    ASSERT_EQ(result.getStringField("upper"), "HELLO");
+    ASSERT_EQ(result.getIntField("doubled"), 42);
+}
+
+TEST_F(WasmMozJSBridgeTest, MQLFunctionPatternWithDocumentArg) {
+    // $function receives evaluated expressions as args; a common pattern is
+    // passing the entire document as an argument.
+    auto handle = createFunction(
+        "function(doc) {"
+        "  return doc.price * doc.qty;"
+        "}");
+
+    BSONObjBuilder params;
+    {
+        BSONObjBuilder doc(params.subobjStart("arg0"));
+        doc.append("price", 15);
+        doc.append("qty", 3);
+    }
+    auto result = invokeFunction(handle, params.obj());
+
+    ASSERT_EQ(result.getField("__value").numberInt(), 45);
+}
+
+TEST_F(WasmMozJSBridgeTest, MQLAccumulatorFullLifecycle) {
+    // Simulates the $accumulator lifecycle:
+    //   init() → state
+    //   accumulate(state, val) → state  (per document)
+    //   merge(s1, s2) → state           (across shards)
+    //   finalize(state) → result
+    auto initFn = createFunction("function() { return { count: 0, sum: 0 }; }");
+    auto accFn = createFunction(
+        "function(state, val) {"
+        "  return { count: state.count + 1, sum: state.sum + val };"
+        "}");
+    auto mergeFn = createFunction(
+        "function(s1, s2) {"
+        "  return { count: s1.count + s2.count, sum: s1.sum + s2.sum };"
+        "}");
+    auto finalizeFn = createFunction(
+        "function(state) {"
+        "  return state.count > 0 ? state.sum / state.count : 0;"
+        "}");
+
+    // Shard 1: init → accumulate [10, 20, 30]
+    auto state1 = invokeFunction(initFn, BSONObj()).getOwned();
+    for (int val : {10, 20, 30}) {
+        BSONObjBuilder a;
+        a.append("state", state1);
+        a.append("val", val);
+        state1 = invokeFunction(accFn, a.obj()).getOwned();
+    }
+    ASSERT_EQ(state1.getIntField("count"), 3);
+    ASSERT_EQ(state1.getIntField("sum"), 60);
+
+    // Shard 2: init → accumulate [40]
+    auto state2 = invokeFunction(initFn, BSONObj()).getOwned();
+    {
+        BSONObjBuilder a;
+        a.append("state", state2);
+        a.append("val", 40);
+        state2 = invokeFunction(accFn, a.obj()).getOwned();
+    }
+    ASSERT_EQ(state2.getIntField("count"), 1);
+    ASSERT_EQ(state2.getIntField("sum"), 40);
+
+    // Merge shard states
+    {
+        BSONObjBuilder a;
+        a.append("s1", state1);
+        a.append("s2", state2);
+        state1 = invokeFunction(mergeFn, a.obj()).getOwned();
+    }
+    ASSERT_EQ(state1.getIntField("count"), 4);
+    ASSERT_EQ(state1.getIntField("sum"), 100);
+
+    // Finalize: average = 100/4 = 25
+    {
+        BSONObjBuilder a;
+        a.append("state", state1);
+        auto result = invokeFunction(finalizeFn, a.obj()).getOwned();
+        ASSERT_APPROX_EQUAL(result.getField("__value").Number(), 25.0, 1e-10);
+    }
+}
+
+TEST_F(WasmMozJSBridgeTest, MQLAccumulatorPattern) {
+    // Mirrors real $accumulator: setFunction("__accumulate", code) installs a JS
+    // function as a directly-callable global via set-global-value with BSONType::Code.
+    // A wrapper then calls __accumulate(state, val) in a loop.
+    setFunction("__accumulate",
+                "function(state, val) {"
+                "  return { count: state.count + 1, sum: state.sum + val };"
+                "}");
+    setFunction("__merge",
+                "function(s1, s2) {"
+                "  return { count: s1.count + s2.count, sum: s1.sum + s2.sum };"
+                "}");
+    auto wrapper = createFunction(
+        "function(state, pendingCalls) {"
+        "  for (var i = 0; i < pendingCalls.length; i++) {"
+        "    state = __accumulate(state, pendingCalls[i]);"
+        "  }"
+        "  return state;"
+        "}");
+
+    BSONObjBuilder args;
+    {
+        BSONObjBuilder state(args.subobjStart("state"));
+        state.append("count", 0);
+        state.append("sum", 0);
+    }
+    {
+        BSONArrayBuilder pending(args.subarrayStart("pendingCalls"));
+        pending.append(10);
+        pending.append(20);
+        pending.append(30);
+    }
+    auto result = invokeFunction(wrapper, args.obj());
+
+    ASSERT_EQ(result.getIntField("count"), 3);
+    ASSERT_EQ(result.getIntField("sum"), 60);
+
+    auto mergeWrapper = createFunction(
+        "function(state, pendingMerges) {"
+        "  for (var i = 0; i < pendingMerges.length; i++) {"
+        "    state = __merge(state, pendingMerges[i]);"
+        "  }"
+        "  return state;"
+        "}");
+    ASSERT_NE(mergeWrapper, 0u);
+
+    BSONObjBuilder mergeArgs;
+    mergeArgs.append("state", result);
+    {
+        BSONArrayBuilder pending(mergeArgs.subarrayStart("pendingMerges"));
+        {
+            BSONObjBuilder s(pending.subobjStart());
+            s.append("count", 2);
+            s.append("sum", 70);
+        }
+    }
+    auto merged = invokeFunction(mergeWrapper, mergeArgs.obj()).getOwned();
+    ASSERT_EQ(merged.getIntField("count"), 5);
+    ASSERT_EQ(merged.getIntField("sum"), 130);
+}
+
+TEST_F(WasmMozJSBridgeTest, MQLWherePattern) {
+    // $where calls: invoke(func, nullptr, &document, timeout)
+    // where document becomes 'this'. invoke-predicate handles this directly.
+    auto handle = createFunction(
+        "function() {"
+        "  return this.x > this.y;"
+        "}");
+
+    // Document that passes filter
+    ASSERT_TRUE(invokePredicate(handle, BSON("x" << 10 << "y" << 5)));
+
+    // Document that fails filter
+    ASSERT_FALSE(invokePredicate(handle, BSON("x" << 3 << "y" << 7)));
+}
+
+TEST_F(WasmMozJSBridgeTest, MQLMapReduceReducePattern) {
+    // mapReduce.reduce calls: invoke(reduceFunc, &{key, values}, &{}, timeout)
+    // 'this' is an empty object. invoke-function (no this binding) works.
+    auto reduceFn = createFunction(
+        "function(key, values) {"
+        "  var total = 0;"
+        "  for (var i = 0; i < values.length; i++) {"
+        "    total += values[i];"
+        "  }"
+        "  return total;"
+        "}");
+    ASSERT_NE(reduceFn, 0u);
+
+    BSONObjBuilder args;
+    args.append("key", "electronics");
+    {
+        BSONArrayBuilder values(args.subarrayStart("values"));
+        values.append(100);
+        values.append(250);
+        values.append(75);
+        values.append(300);
+    }
+    auto result = invokeFunction(reduceFn, args.obj());
+
+    ASSERT_EQ(result.getField("__value").numberInt(), 725);
+}
+
+TEST_F(WasmMozJSBridgeTest, MQLMapReduceFinalizePattern) {
+    // mapReduce.finalize uses $function pattern:
+    // invoke(finalizeFunc, &{key, reducedValue}, &{}, timeout)
+    auto finalizeFn = createFunction(
+        "function(key, reducedValue) {"
+        "  return { category: key, total: reducedValue, formatted: key + ': $' + reducedValue };"
+        "}");
+    ASSERT_NE(finalizeFn, 0u);
+
+    BSONObjBuilder args;
+    args.append("key", "electronics");
+    args.append("reducedValue", 725);
+    auto result = invokeFunction(finalizeFn, args.obj());
+
+    ASSERT_EQ(result.getStringField("category"), "electronics");
+    ASSERT_EQ(result.getIntField("total"), 725);
+    ASSERT_EQ(result.getStringField("formatted"), "electronics: $725");
+}
+
+TEST_F(WasmMozJSBridgeTest, MQLMapReduceMapPattern) {
+    // mapReduce.map calls: invoke(mapFunc, nullptr, &document, timeout)
+    // where document becomes 'this' and the function calls emit(key, value).
+    // invoke-map handles this: document as `this`, emits buffered.
+    setupEmit(boost::none);
+
+    auto mapFn = createFunction(
+        "function() {"
+        "  emit(this.category, this.price);"
+        "}");
+
+    invokeMap(mapFn, BSON("category" << "electronics" << "price" << 100));
+    invokeMap(mapFn, BSON("category" << "books" << "price" << 25));
+    invokeMap(mapFn, BSON("category" << "electronics" << "price" << 250));
+
+    BSONObj emitDoc = drainEmitBuffer();
+    auto emitsArr = emitDoc["emits"].Array();
+    ASSERT_EQ(emitsArr.size(), 3u);
+    ASSERT_EQ(emitsArr[0].Obj()["k"].str(), "electronics");
+    ASSERT_EQ(emitsArr[0].Obj()["v"].numberInt(), 100);
+    ASSERT_EQ(emitsArr[1].Obj()["k"].str(), "books");
+    ASSERT_EQ(emitsArr[1].Obj()["v"].numberInt(), 25);
+    ASSERT_EQ(emitsArr[2].Obj()["k"].str(), "electronics");
+    ASSERT_EQ(emitsArr[2].Obj()["v"].numberInt(), 250);
+}
+
+TEST_F(WasmMozJSBridgeTest, MQLFunctionReusedAcrossDocuments) {
+    // $function/$accumulator create the function once
+    // and invoke it per-document. This tests handle reuse across many calls.
+    auto handle = createFunction(
+        "function(price, qty) {"
+        "  return price * qty;"
+        "}");
+
+    struct TestCase {
+        int price;
+        int qty;
+        int expected;
+    };
+    TestCase cases[] = {
+        {10, 5, 50},
+        {25, 2, 50},
+        {3, 100, 300},
+        {0, 42, 0},
+        {7, 7, 49},
+    };
+
+    for (const auto& tc : cases) {
+        BSONObjBuilder args;
+        args.append("price", tc.price);
+        args.append("qty", tc.qty);
+        auto result = invokeFunction(handle, args.obj());
+        ASSERT_EQ(result.getField("__value").numberInt(), tc.expected);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// set-global-value tests
+// ---------------------------------------------------------------------------
+
+TEST_F(WasmMozJSBridgeTest, SetGlobalValueBoolean) {
+    BSONObj boolDoc = BSON("val" << true);
+    setGlobalValue("fullObject", boolDoc);
+
+    // Verify: fullObject should be boolean true, not an object
+    auto handle = createFunction("function() { return fullObject === true; }");
+    auto ret = invokeFunction(handle, BSONObj());
+    ASSERT_TRUE(ret["__value"].boolean());
+}
+
+TEST_F(WasmMozJSBridgeTest, SetGlobalValueNumber) {
+    BSONObj numDoc = BSON("val" << 3.14);
+    setGlobalValue("pi", numDoc);
+
+    auto handle = createFunction("function() { return pi; }");
+    auto ret = invokeFunction(handle, BSONObj());
+    ASSERT_APPROX_EQUAL(ret["__value"].numberDouble(), 3.14, 0.001);
+}
+
+TEST_F(WasmMozJSBridgeTest, SetGlobalValueString) {
+    BSONObj strDoc = BSON("val" << "world");
+    setGlobalValue("greeting", strDoc);
+
+    auto handle = createFunction("function() { return greeting; }");
+    auto ret = invokeFunction(handle, BSONObj());
+    ASSERT_EQ(ret["__value"].str(), "world");
+}
+
+TEST_F(WasmMozJSBridgeTest, SetGlobalValueCodeFunction) {
+    // Use BSONType::Code to set a callable function as a global value
+    BSONObjBuilder b;
+    b.appendCode("val", "function(x) { return x * 2; }");
+    BSONObj codeDoc = b.obj();
+
+    setGlobalValue("doubler", codeDoc);
+
+    // doubler should now be a callable function
+    auto handle = createFunction("function(n) { return doubler(n); }");
+    auto ret = invokeFunction(handle, BSON("0" << 21));
+    ASSERT_EQ(ret["__value"].numberInt(), 42);
+}
+
+TEST_F(WasmMozJSBridgeTest, SetGlobalValueObject) {
+    // Setting an object via set-global-value should set it as-is
+    BSONObj objDoc = BSON("val" << BSON("a" << 1 << "b" << 2));
+    setGlobalValue("config", objDoc);
+
+    auto handle = createFunction("function() { return config.a + config.b; }");
+    auto ret = invokeFunction(handle, BSONObj());
+    ASSERT_EQ(ret["__value"].numberInt(), 3);
+}
+
+// ---------------------------------------------------------------------------
+// `emit` in-WASM boundary
+// ---------------------------------------------------------------------------
+
+TEST_F(WasmMozJSBridgeTest, SetupEmitAndDrain) {
+    setupEmit(boost::none);
+
+    auto handle = createFunction("function(doc) { emit(doc.key, doc.val);}");
+    invokeFunction(handle, BSON("0" << BSON("key" << "a" << "val" << 1)));
+    invokeFunction(handle, BSON("0" << BSON("key" << "b" << "val" << 2)));
+
+    BSONObj emitDoc = drainEmitBuffer();
+    auto emitsArr = emitDoc["emits"].Array();
+    ASSERT_EQ(emitsArr.size(), 2u);
+    ASSERT_EQ(emitsArr[0].Obj()["k"].str(), "a");
+    ASSERT_EQ(emitsArr[0].Obj()["v"].numberInt(), 1);
+    ASSERT_EQ(emitsArr[1].Obj()["k"].str(), "b");
+    ASSERT_EQ(emitsArr[1].Obj()["v"].numberInt(), 2);
+}
+
+TEST_F(WasmMozJSBridgeTest, EmitDrainClearsBetweenCalls) {
+    setupEmit(boost::none);
+
+    auto handle = createFunction("function() { emit('x', 10); }");
+    invokeFunction(handle, BSONObj());
+
+    BSONObj d1 = drainEmitBuffer();
+    ASSERT_EQ(d1["emits"].Array().size(), 1u);
+
+    invokeFunction(handle, BSONObj());
+    invokeFunction(handle, BSONObj());
+
+    BSONObj d2 = drainEmitBuffer();
+    ASSERT_EQ(d2["emits"].Array().size(), 2u);
+}
+
+TEST_F(WasmMozJSBridgeTest, EmitDrainEmptyBuffer) {
+    setupEmit(boost::none);
+
+    BSONObj doc = drainEmitBuffer();
+    ASSERT_EQ(doc["emits"].Array().size(), 0u);
+    ASSERT_EQ(doc["bytesUsed"].numberLong(), 0);
+}
+
+TEST_F(WasmMozJSBridgeTest, EmitWithUndefinedKey) {
+    setupEmit(boost::none);
+
+    auto handle = createFunction("function() { emit(undefined, 42); }");
+    invokeFunction(handle, BSONObj());
+
+    BSONObj doc = drainEmitBuffer();
+    auto emits = doc["emits"].Array();
+    ASSERT_EQ(emits.size(), 1u);
+    ASSERT_TRUE(emits[0].Obj()["k"].isNull());
+    ASSERT_EQ(emits[0].Obj()["v"].numberInt(), 42);
+}
+
+// ---------------------------------------------------------------------------
+// invoke-predicate tests ($where pattern)
+// ---------------------------------------------------------------------------
+
+TEST_F(WasmMozJSBridgeTest, InvokePredicateReturnsTrueForMatch) {
+    auto handle = createFunction("function() { return this.x > this.y; }");
+
+    ASSERT_TRUE(invokePredicate(handle, BSON("x" << 10 << "y" << 5)));
+}
+
+TEST_F(WasmMozJSBridgeTest, InvokePredicateReturnsFalseForNonMatch) {
+    auto handle = createFunction("function() { return this.x > this.y; }");
+
+    ASSERT_FALSE(invokePredicate(handle, BSON("x" << 3 << "y" << 7)));
+}
+
+TEST_F(WasmMozJSBridgeTest, InvokePredicateFieldAccess) {
+    auto handle = createFunction("function() { return this.name === 'hello'; }");
+
+    ASSERT_TRUE(invokePredicate(handle, BSON("name" << "hello")));
+    ASSERT_FALSE(invokePredicate(handle, BSON("name" << "world")));
+}
+
+TEST_F(WasmMozJSBridgeTest, InvokePredicateMultipleDocuments) {
+    auto handle = createFunction("function() { return this.age >= 18; }");
+
+    ASSERT_TRUE(invokePredicate(handle, BSON("age" << 25)));
+    ASSERT_FALSE(invokePredicate(handle, BSON("age" << 10)));
+    ASSERT_TRUE(invokePredicate(handle, BSON("age" << 18)));
+    ASSERT_FALSE(invokePredicate(handle, BSON("age" << 17)));
+}
+
+TEST_F(WasmMozJSBridgeTest, InvokePredicateRuntimeError) {
+    auto handle = createFunction("function() { throw new Error('pred error'); }");
+
+    ASSERT_THROWS_WITH_CHECK(invokePredicate(handle, BSON("x" << 1)),
+                             AssertionException,
+                             getContainsCheck(ErrorCodes::JSInterpreterFailure, "e-runtime"));
+}
+
+// ---------------------------------------------------------------------------
+// invoke-map tests
+// ---------------------------------------------------------------------------
+
+TEST_F(WasmMozJSBridgeTest, InvokeMapEmitsDocuments) {
+    setupEmit(boost::none);
+
+    auto handle = createFunction("function() { emit(this.category, this.price); }");
+
+    invokeMap(handle, BSON("category" << "A" << "price" << 10));
+    invokeMap(handle, BSON("category" << "B" << "price" << 20));
+    invokeMap(handle, BSON("category" << "A" << "price" << 30));
+
+    BSONObj emitDoc = drainEmitBuffer();
+    auto emitsArr = emitDoc["emits"].Array();
+    ASSERT_EQ(emitsArr.size(), 3u);
+    ASSERT_EQ(emitsArr[0].Obj()["k"].str(), "A");
+    ASSERT_EQ(emitsArr[0].Obj()["v"].numberInt(), 10);
+    ASSERT_EQ(emitsArr[1].Obj()["k"].str(), "B");
+    ASSERT_EQ(emitsArr[1].Obj()["v"].numberInt(), 20);
+    ASSERT_EQ(emitsArr[2].Obj()["k"].str(), "A");
+    ASSERT_EQ(emitsArr[2].Obj()["v"].numberInt(), 30);
+}
+
+TEST_F(WasmMozJSBridgeTest, InvokeMapRuntimeError) {
+    auto handle = createFunction("function() { throw new Error('map error'); }");
+
+    ASSERT_THROWS_WITH_CHECK(invokeMap(handle, BSONObj()),
+                             AssertionException,
+                             getContainsCheck(ErrorCodes::JSInterpreterFailure, "e-runtime"));
+}
+
+TEST_F(WasmMozJSBridgeTest, InvokeFunctionNoThisBinding) {
+    auto handle = createFunction("function() { return typeof this; }");
+
+    auto result = invokeFunction(handle, BSONObj());
+    ASSERT_EQ(result["__value"].str(), "object");
+}
+
+// ---------------------------------------------------------------------------
+// OOM tests
+// ---------------------------------------------------------------------------
+
+TEST_F(WasmMozJSBridgeTest, EmitByteLimitEnforced) {
+    setupEmit(256);
+
+    auto handle = createFunction(
+        "function() {"
+        "  for (var i = 0; i < 100; i++) {"
+        "    emit('key_' + i, 'value_' + i);"
+        "  }"
+        "}");
+
+    auto doubleCheck = [&](auto&& ex) {
+        getContainsCheck(ErrorCodes::JSInterpreterFailure, "e-runtime")(ex);
+        getContainsCheck(ErrorCodes::JSInterpreterFailure, "emit() exceeded memory limit")(ex);
+    };
+
+    ASSERT_THROWS_WITH_CHECK(invokeMap(handle, BSONObj()), AssertionException, doubleCheck);
+}
+
+TEST_F(WasmMozJSBridgeTest, EmitByteLimitEnforcedInMapReduce) {
+    initEngine();
+    // Each emitted {k: <string>, v: <int>} BSON doc is ~30 bytes.
+    // A 64-byte limit allows ~2 emits before the 3rd exceeds.
+    setupEmit(64);
+
+    auto handle = createFunction(
+        "function() {"
+        "  emit(this.category, this.price);"
+        "}");
+
+    invokeMap(handle, BSON("category" << "A" << "price" << 10));
+    invokeMap(handle, BSON("category" << "B" << "price" << 20));
+
+    auto doubleCheck = [&](auto&& ex) {
+        getContainsCheck(ErrorCodes::JSInterpreterFailure, "e-runtime")(ex);
+        getContainsCheck(ErrorCodes::JSInterpreterFailure, "emit() exceeded memory limit")(ex);
+    };
+
+    ASSERT_THROWS_WITH_CHECK(invokeMap(handle, BSON("category" << "C" << "price" << 30)),
+                             AssertionException,
+                             doubleCheck);
+}
+
+TEST_F(WasmMozJSBridgeTest, EmitByteLimitResetOnSetupEmit) {
+    setupEmit(128);
+
+    auto handle = createFunction("function() { emit('k', 'v'); }");
+
+    // Emit a few times, approaching the limit.
+    invokeFunction(handle, BSONObj());
+    invokeFunction(handle, BSONObj());
+    invokeFunction(handle, BSONObj());
+
+    // Re-setup resets the buffer and byte counter.
+    setupEmit(128);
+
+    invokeFunction(handle, BSONObj());
+    invokeFunction(handle, BSONObj());
+    invokeFunction(handle, BSONObj());
+
+    BSONObj doc = drainEmitBuffer();
+    ASSERT_EQ(doc["emits"].Array().size(), 3u);
+}
+
+TEST_F(WasmMozJSBridgeTest, JsHeapOOMFromLargeArrayAllocation) {
+    // Keep multiple large strings alive simultaneously.  Doubling creates a
+    // series of strings: 1 MB, 2 MB, 4 MB ... all pushed into an array so GC
+    // cannot collect any of them.  Total live ≈ 2^(n+1) - 1 MB.
+    auto handle = createFunction(
+        "function() {"
+        "  var arr = [];"
+        "  var s = new Array(1024 * 1024 + 1).join('a');"
+        "  for (var i = 0; i < 10; i++) {"
+        "    arr.push(s);"
+        "    s = s + s;"
+        "  }"
+        "  return arr.length;"
+        "}");
+
+    auto doubleCheck = [&](auto&& ex) {
+        getContainsCheck(ErrorCodes::JSInterpreterFailure, "e-runtime")(ex);
+        getContainsCheck(ErrorCodes::JSInterpreterFailure, "allocation size overflow")(ex);
+    };
+    ASSERT_THROWS_WITH_CHECK(invokeMap(handle, BSONObj()), AssertionException, doubleCheck);
+}
+
+TEST_F(WasmMozJSBridgeTest, JsHeapOOMFromStringConcatenation) {
+    initEngine();
+
+    auto handle = createFunction(
+        "function() {"
+        "  var s = new Array(1024 * 1024 + 1).join('x');"
+        "  for (var i = 0; i < 10; i++) {"
+        "    s = s + s;"
+        "  }"
+        "  return s.length;"
+        "}");
+
+    auto doubleCheck = [&](auto&& ex) {
+        getContainsCheck(ErrorCodes::JSInterpreterFailure, "e-runtime")(ex);
+        getContainsCheck(ErrorCodes::JSInterpreterFailure, "allocation size overflow")(ex);
+    };
+    ASSERT_THROWS_WITH_CHECK(invokeMap(handle, BSONObj()), AssertionException, doubleCheck);
+}
+
+TEST_F(WasmMozJSBridgeTest, JsHeapOomFromDeeplyNestedObject) {
+    // Build a chain of objects where each node holds an exponentially growing
+    // string, preventing GC from collecting anything in the chain.
+    auto handle = createFunction(
+        "function() {"
+        "  var s = new Array(1024 * 1024 + 1).join('b');"
+        "  var obj = {val: s};"
+        "  for (var i = 0; i < 10; i++) {"
+        "    s = s + s;"
+        "    obj = {inner: obj, val: s};"
+        "  }"
+        "  return obj.val.length;"
+        "}");
+
+    auto doubleCheck = [&](auto&& ex) {
+        getContainsCheck(ErrorCodes::JSInterpreterFailure, "e-runtime")(ex);
+        getContainsCheck(ErrorCodes::JSInterpreterFailure, "allocation size overflow")(ex);
+    };
+    ASSERT_THROWS_WITH_CHECK(invokeMap(handle, BSONObj()), AssertionException, doubleCheck);
+}
+
+TEST_F(WasmMozJSBridgeTest, MapReduceHighVolumeEmitHitsLimit) {
+    // Use a moderate byte limit (64 KB) and hammer it with many map invocations.
+    setupEmit(64 * 1024);
+
+    auto mapFn = createFunction(
+        "function() {"
+        "  emit(this._id, this.payload);"
+        "}");
+    ASSERT_NE(mapFn, 0u);
+
+    int emitted = 0;
+    for (; emitted < 10000; emitted++) {
+        std::string payload(100, 'A' + (emitted % 26));
+        try {
+            invokeMap(mapFn, BSON("_id" << emitted << "payload" << payload));
+        } catch (AssertionException& ex) {
+            getContainsCheck(ErrorCodes::JSInterpreterFailure, "e-runtime")(ex);
+            getContainsCheck(ErrorCodes::JSInterpreterFailure, "emit() exceeded memory limit")(ex);
+            break;
+        }
+    }
+    ASSERT_GT(emitted, 0);
+    ASSERT_LT(emitted, 10000);
+
+    // The limit is still exceeded, so the next call also fails with the same error.
+    auto doubleCheck = [&](auto&& ex) {
+        getContainsCheck(ErrorCodes::JSInterpreterFailure, "e-runtime")(ex);
+        getContainsCheck(ErrorCodes::JSInterpreterFailure, "emit() exceeded memory limit")(ex);
+    };
+    ASSERT_THROWS_WITH_CHECK(invokeMap(mapFn, BSON("_id" << 99999 << "payload" << "x")),
+                             AssertionException,
+                             doubleCheck);
+}
+
+TEST_F(WasmMozJSBridgeTest, MapReduceEmitLargeValues) {
+    setupEmit(32 * 1024);
+
+    // Each emit produces a large value (~10 KB). A few calls should exceed 32 KB.
+    auto mapFn = createFunction(
+        "function() {"
+        "  var big = new Array(10001).join('z');"
+        "  emit(this.key, big);"
+        "}");
+
+    invokeMap(mapFn, BSON("key" << 1));
+    invokeMap(mapFn, BSON("key" << 2));
+    invokeMap(mapFn, BSON("key" << 3));
+
+    auto doubleCheck = [&](auto&& ex) {
+        getContainsCheck(ErrorCodes::JSInterpreterFailure, "e-runtime")(ex);
+        getContainsCheck(ErrorCodes::JSInterpreterFailure, "emit() exceeded memory limit")(ex);
+    };
+    ASSERT_THROWS_WITH_CHECK(invokeMap(mapFn, BSON("key" << 4)), AssertionException, doubleCheck);
+}
+
+TEST_F(WasmMozJSBridgeTest, JsHeapOOMFromFunctionAllocatingManyObjects) {
+    // Exponential string doubling inside a function (same pattern as
+    // StringConcatenation but using a separate code path: invoke-function).
+    auto handle = createFunction(
+        "function() {"
+        "  var s = new Array(1024 * 1024 + 1).join('z');"
+        "  for (var i = 0; i < 10; i++) {"
+        "    s = s + s;"
+        "  }"
+        "  return s.length;"
+        "}");
+    auto doubleCheck = [&](auto&& ex) {
+        getContainsCheck(ErrorCodes::JSInterpreterFailure, "e-runtime")(ex);
+        getContainsCheck(ErrorCodes::JSInterpreterFailure, "allocation size overflow")(ex);
+    };
+    ASSERT_THROWS_WITH_CHECK(invokeMap(handle, BSONObj()), AssertionException, doubleCheck);
+}
+
+TEST_F(WasmMozJSBridgeTest, MapReduceOomRecoveryAfterDrain) {
+    // Use a small limit so we can observe recovery after drain.
+    setupEmit(512);
+
+    auto mapFn = createFunction(
+        "function() {"
+        "  emit(this.key, this.value);"
+        "}");
+
+    // Emit until limit is hit.
+    int emitted = 0;
+    try {
+        while (true) {
+            invokeMap(mapFn, BSON("key" << emitted << "value" << "data"));
+            emitted++;
+            if (emitted > 100)
+                break;
+        }
+    } catch (AssertionException& ex) {
+        ASSERT_LT(emitted, 100);
+        ASSERT_GT(emitted, 0);
+        auto doubleCheck = [&](auto&& ex) {
+            getContainsCheck(ErrorCodes::JSInterpreterFailure, "e-runtime")(ex);
+            getContainsCheck(ErrorCodes::JSInterpreterFailure, "emit() exceeded memory limit")(ex);
+        };
+        doubleCheck(ex);
+        ASSERT_THROWS_WITH_CHECK(invokeMap(mapFn, BSON("key" << 999 << "value" << "x")),
+                                 AssertionException,
+                                 doubleCheck);
+    }
+
+    // Drain and re-setup resets the counter, allowing more emits.
+    drainEmitBuffer();
+    setupEmit(512);
+
+    int emitted2 = 0;
+    try {
+        while (true) {
+            invokeMap(mapFn, BSON("key" << emitted2 << "value" << "data"));
+            emitted2++;
+            if (emitted2 > 100)
+                break;
+        }
+    } catch (AssertionException& ex) {
+        getContainsCheck(ErrorCodes::JSInterpreterFailure, "e-runtime")(ex);
+        getContainsCheck(ErrorCodes::JSInterpreterFailure, "emit() exceeded memory limit")(ex);
+        ASSERT_LT(emitted2, 100);
+        ASSERT_GT(emitted2, 0);
+        ASSERT_EQ(emitted, emitted2);
+    }
 }
 
 }  // namespace

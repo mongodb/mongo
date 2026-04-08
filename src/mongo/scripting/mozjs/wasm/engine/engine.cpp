@@ -203,18 +203,8 @@ err_code_t MozJSScriptEngine::init(const wasm_mozjs_startup_options_t* opt,
         return err ? err->code : SM_E_INTERNAL;
     }
 
-    // Stash pointer for interrupt callback (after global is set up)
+    // Stash pointer so native callbacks can reach the engine instance.
     JS_SetContextPrivate(_cx, static_cast<MozJSCommonRuntimeInterface*>(this));
-
-    // Set up interrupt callback for timeouts/cancel/interrupt
-    if (!JS_AddInterruptCallback(_cx, &MozJSScriptEngine::interruptCallback)) {
-        if (err) {
-            err->code = SM_E_INTERNAL;
-            set_string(&err->msg, &err->msg_len, "JS_AddInterruptCallback failed");
-        }
-        shutdown(nullptr);
-        return SM_E_INTERNAL;
-    }
 
     _prototypeInstaller = std::make_unique<MozJSPrototypeInstaller>(_cx);
 
@@ -266,9 +256,7 @@ err_code_t MozJSScriptEngine::interrupt(wasm_mozjs_error_t* err) {
         return SM_E_BAD_STATE;
 
     ExecutionCheck chk(_cx, err);
-    // Request interrupt callback - host side manages interrupt state
     JS_RequestInterruptCallback(_cx);
-    // JS_RequestInterruptCallback doesn't return a value, but we check for exceptions
     if (!chk.ok(!JS_IsExceptionPending(_cx), SM_E_INTERNAL)) {
         return err ? err->code : SM_E_INTERNAL;
     }
@@ -774,15 +762,6 @@ err_code_t MozJSScriptEngine::drainEmitBuffer(mongo::BSONObj* out, wasm_mozjs_er
     return SM_OK;
 }
 
-bool MozJSScriptEngine::interruptCallback(JSContext* cx) {
-    // Interrupt callback is called by MozJS when JS_RequestInterruptCallback is invoked.
-    // The host side manages interrupt/cancel state and termination logic.
-    // This callback just allows the interrupt to be processed - the host side
-    // should check return codes and exceptions to determine if execution was terminated.
-    (void)cx;
-    return true;
-}
-
 void MozJSScriptEngine::gc() {
     if (!_initialized || !_cx) {
         return;
@@ -791,13 +770,20 @@ void MozJSScriptEngine::gc() {
 }
 
 void MozJSScriptEngine::sleep(Milliseconds ms) {
-    auto count = ms.count();
-    if (count <= 0)
-        return;
-    struct timespec ts;
-    ts.tv_sec = static_cast<time_t>(count / 1000);
-    ts.tv_nsec = static_cast<long>((count % 1000) * 1000000L);
-    nanosleep(&ts, nullptr);
+    // Sleep in 1ms slices so that Wasmtime epoch interruption can fire between
+    // slices. nanosleep is a blocking host call — the WASM epoch check only
+    // triggers when control returns to WASM code. Slicing keeps sleep
+    // interruptible by the DeadlineMonitor on the host side.
+    auto remaining = ms;
+    constexpr Milliseconds kSlice{1};
+    while (remaining > Milliseconds{0}) {
+        auto slice = std::min(remaining, kSlice);
+        struct timespec ts;
+        ts.tv_sec = 0;
+        ts.tv_nsec = static_cast<long>(slice.count() * 1'000'000L);
+        nanosleep(&ts, nullptr);
+        remaining -= slice;
+    }
 }
 
 std::size_t MozJSScriptEngine::getGeneration() const {

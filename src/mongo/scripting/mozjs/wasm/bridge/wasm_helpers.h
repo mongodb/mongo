@@ -51,6 +51,8 @@ std::vector<uint8_t> readWasmFile(const std::string& path);
 // Translates errors coming from the wasmtime runtime.
 void translateWasmError(const wt::Error& error);
 
+const wc::Val* findField(std::string_view name, const wc::Record& record);
+
 // Translates errors coming from the MozJS interpreter.
 std::string translateMozJSError(const wc::Val& mozJSError);
 

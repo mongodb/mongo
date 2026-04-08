@@ -122,7 +122,6 @@ private:
     BSONElement _resolveGlobalToElement(const char* field) const;
     NativeFunction _emitCallback = nullptr;
     void* _emitCallbackData = nullptr;
-    mongo::Atomic<bool> _killPending{false};
     OperationContext* _opCtx = nullptr;
 
     // Cached return value from the last invoke call.  Avoids a WASM bridge round-trip in

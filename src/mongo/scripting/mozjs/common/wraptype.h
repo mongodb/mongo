@@ -101,6 +101,10 @@ bool wrapFunction(JSContext* cx, unsigned argc, JS::Value* vp) {
     try {
         JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
         T::call(cx, args);
+        // A native function may set a pending JS exception (e.g. via JS_ReportErrorASCII)
+        // without throwing a C++ exception. Check for it and propagate to SpiderMonkey.
+        if (JS_IsExceptionPending(cx))
+            return false;
         return true;
     } catch (...) {
         mongoToJSException(cx);

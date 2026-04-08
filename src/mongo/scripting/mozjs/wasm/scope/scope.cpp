@@ -59,7 +59,6 @@ void WasmtimeImplScope::reset() {
     _cachedFunctions.clear();
 
     init(nullptr);
-    _killPending.store(false);
     _emitCallback = nullptr;
     _emitCallbackData = nullptr;
     _lastReturnValue = BSONObj();
@@ -71,10 +70,10 @@ void WasmtimeImplScope::init(const BSONObj* data) {
     }
     wasm::MozJSWasmBridge::Options opts{};
     if (_jsHeapLimitMB) {
-        opts.jsHeapLimitBytes = static_cast<uint32_t>(*_jsHeapLimitMB) * 1024u * 1024u;
+        opts.heapSizeMB = static_cast<uint32_t>(*_jsHeapLimitMB);
     }
     _bridge = std::make_unique<wasm::MozJSWasmBridge>(_wasmEngineCtx, opts);
-    bool initialized = _bridge->initialize();
+    bool initialized = _bridge->initialize(opts);
     uassert(ErrorCodes::BadValue, "MozJS WASM bridge failed to initialize", initialized);
 
     _installHelpers();
@@ -306,10 +305,10 @@ void WasmtimeImplScope::unregisterOperation() {
     }
 }
 void WasmtimeImplScope::kill() {
-    _killPending.store(true);
+    _bridge->kill();
 }
 bool WasmtimeImplScope::isKillPending() const {
-    return _killPending.load();
+    return _bridge->isKillPending();
 }
 
 // TODO (SERVER-116056): Add memory tracking functionality

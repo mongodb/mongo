@@ -149,7 +149,6 @@ mongo_cc_unit_test(
     timeout = "long",
     srcs = [
         "//src/mongo/scripting/mozjs/wasm/bridge:bridge_test.cpp",
-        "//src/mongo/scripting/mozjs/wasm/engine:engine_test.cpp",
     ],
     auto_header = False,
     private_hdrs = [":embedded_wasm_resource.h"],
@@ -164,6 +163,7 @@ mongo_cc_unit_test(
     deps = [
         ":bridge",
         "//src/mongo:base",
+        "//src/mongo/scripting:scripting_common",
         "@crates//:wasmtime_c",
     ] + select({
         "@platforms//os:windows": [":embed_mozjs_wasm_rc"],

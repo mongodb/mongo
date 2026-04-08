@@ -31,6 +31,8 @@
 
 #include "mongo/scripting/mozjs/wasm/bridge/wasm_helpers.h"
 
+#include <atomic>
+
 namespace mongo::mozjs::wasm {
 
 
@@ -40,7 +42,6 @@ struct WasmEngineContext {
     WasmEngineContext(WasmEngineContext&&) = delete;
     WasmEngineContext& operator=(WasmEngineContext&&) = delete;
 
-    static std::shared_ptr<WasmEngineContext> create(const std::vector<uint8_t>& bytes);
     static std::shared_ptr<WasmEngineContext> createFromPrecompiled(const uint8_t* data,
                                                                     size_t size);
 
@@ -62,17 +63,20 @@ public:
     MozJSWasmBridge& operator=(const MozJSWasmBridge&) = delete;
 
     struct Options {
-        uint32_t jsHeapLimitBytes;
-        size_t linearMemoryLimitBytes;
-        size_t timeoutLimitMs;
+        uint32_t heapSizeMB;
     };
 
     explicit MozJSWasmBridge(std::shared_ptr<WasmEngineContext> ctx, Options opts = {});
 
-    bool initialize();
+    bool initialize(const Options& options);
     void shutdown();
 
-    void interruptCurrentOp();
+    // Signal that execution should be interrupted via Wasmtime epoch increment.
+    // Safe to call from any thread. kill() provides a DeadlineMonitor-compatible interface.
+    void kill();
+    // Triggers an epoch increment to interrupt WASM execution.
+    void signalInterrupt();
+    bool isKillPending() const;
 
     uint64_t createFunction(std::string_view source);
     StatusWith<BSONObj> invokeFunction(uint64_t handle,
@@ -80,7 +84,7 @@ public:
                                        bool ignoreReturn = false);
 
     void setGlobal(std::string_view name, const BSONObj& value);
-    BSONObj getGlobal(std::string_view name);
+    BSONObj getGlobal(std::string_view name, bool implicitNull = false);
 
     void setGlobalValue(std::string_view name, const BSONObj& value);
 
@@ -106,6 +110,8 @@ private:
         return _store->context();
     }
 
+    mongo::Atomic<bool> _killPending{false};
+
     bool _engineInitialized = false;
 
     // The engine and compiled component are shared across bridge instances.
@@ -124,7 +130,6 @@ private:
     // std::optional because wc::Func has no default constructor.
     boost::optional<wc::Func> _initEngineFunc = boost::none;
     boost::optional<wc::Func> _shutdownEngineFunc = boost::none;
-    boost::optional<wc::Func> _interruptCurrentOpFunc = boost::none;
     boost::optional<wc::Func> _createFunctionFunc = boost::none;
     boost::optional<wc::Func> _invokeFunctionFunc = boost::none;
     boost::optional<wc::Func> _invokePredicateFunc = boost::none;

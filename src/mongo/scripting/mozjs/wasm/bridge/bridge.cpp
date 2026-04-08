@@ -29,6 +29,7 @@
 
 #include "mongo/scripting/mozjs/wasm/bridge/bridge.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -38,7 +39,6 @@ namespace mongo::mozjs::wasm {
 constexpr std::string_view kMozjsWitInterface = "mongo:mozjs/mozjs";
 constexpr std::string_view kInitEngine = "initialize-engine";
 constexpr std::string_view kShutdownEngine = "shutdown-engine";
-constexpr std::string_view kInterruptCurrentOp = "interrupt-current-op";
 constexpr std::string_view kCreateFunction = "create-function";
 constexpr std::string_view kInvokeFunction = "invoke-function";
 constexpr std::string_view kSetGlobal = "set-global";
@@ -51,29 +51,11 @@ constexpr std::string_view kGetGlobal = "get-global";
 constexpr std::string_view kGetReturnValueBson = "get-return-value-bson";
 constexpr std::string_view kReturnValue = "__returnValue";
 
-std::shared_ptr<WasmEngineContext> WasmEngineContext::create(const std::vector<uint8_t>& bytes) {
-    wt::Config config;
-    config.wasm_component_model(true);
-
-    // TODO(SERVER-121743): Implement timeouts
-    // See https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.epoch_interruption
-    // config.epoch_interruption(true);
-
-    wt::Engine engine(std::move(config));
-
-    wt::Span<uint8_t> span(const_cast<uint8_t*>(bytes.data()), bytes.size());
-    auto result = wc::Component::compile(engine, span);
-    invariant(result);
-
-    // TODO(SERVER-121743): Make use of options.
-    return std::shared_ptr<WasmEngineContext>(
-        new WasmEngineContext(std::move(engine), result.ok()));
-}
-
 std::shared_ptr<WasmEngineContext> WasmEngineContext::createFromPrecompiled(const uint8_t* data,
                                                                             size_t size) {
     wt::Config config;
     config.wasm_component_model(true);
+    config.epoch_interruption(true);
 
     wt::Engine engine(std::move(config));
 
@@ -90,6 +72,9 @@ MozJSWasmBridge::MozJSWasmBridge(std::shared_ptr<WasmEngineContext> ctx, Options
     _store = wt::Store(_ctx->_engine);
     auto storeCtx = _store->context();
 
+    // This is used to signal process killing.
+    storeCtx.set_epoch_deadline(1);
+
     wt::WasiConfig wasiConfig;
     wasiConfig.inherit_stdout();
     wasiConfig.inherit_stderr();
@@ -105,7 +90,6 @@ MozJSWasmBridge::MozJSWasmBridge(std::shared_ptr<WasmEngineContext> ctx, Options
 
     _initEngineFunc = _getFunc(kInitEngine);
     _shutdownEngineFunc = _getFunc(kShutdownEngine);
-    _interruptCurrentOpFunc = _getFunc(kInterruptCurrentOp);
     _createFunctionFunc = _getFunc(kCreateFunction);
     _invokeFunctionFunc = _getFunc(kInvokeFunction);
     _setGlobalFunc = _getFunc(kSetGlobal);
@@ -118,13 +102,15 @@ MozJSWasmBridge::MozJSWasmBridge(std::shared_ptr<WasmEngineContext> ctx, Options
     _getReturnValueBsonFunc = _getFunc(kGetReturnValueBson);
 }
 
-bool MozJSWasmBridge::initialize() {
-    // TODO(SERVER-116056): Once the WIT interface exposes heap/memory limit configuration, apply
-    // _options.jsHeapLimitBytes and _options.linearMemoryLimitBytes here before
-    // calling initialize-engine (or via a dedicated configure-engine WIT function).
+bool MozJSWasmBridge::initialize(const Options& options) {
     wc::Val result(wc::WitResult::ok(std::nullopt));
     LOGV2_DEBUG(11542332, 2, "Wasm Bridge Initializing", "ok"_attr = _engineInitialized);
-    wasm_helpers::callFuncNoArgs(*_initEngineFunc, getContext(), &result, 1);
+    wc::Record record({
+        {"heap-size-mb", wc::Val(uint32_t(options.heapSizeMB))},
+    });
+
+    wc::Val optArg = record;
+    wasm_helpers::callFunc(*_initEngineFunc, getContext(), &result, 1, std::move(optArg));
     _engineInitialized = wasm_helpers::isResultOk(result);
     if (!_engineInitialized) {
         LOGV2_DEBUG(11542356,
@@ -260,7 +246,7 @@ void MozJSWasmBridge::invokeMap(uint64_t handle, const BSONObj& args) {
             str::stream() << "Failed to call to invoke JS function number " << handle,
             wasm_helpers::callFunc(
                 *_invokeMapFunc, getContext(), &result, 1, std::move(arg0), std::move(arg1)));
-    uassert(11542318,
+    uassert(ErrorCodes::JSInterpreterFailure,
             str::stream() << "Failed to invoke JS function "
                           << wasm_helpers::translateMozJSError(*result.get_result().payload())
                           << " :: function id = " << handle,
@@ -275,7 +261,7 @@ bool MozJSWasmBridge::invokePredicate(uint64_t handle, const BSONObj& args) {
             str::stream() << "Failed to call to invoke JS function number " << handle,
             wasm_helpers::callFunc(
                 *_invokePredicateFunc, getContext(), &result, 1, std::move(arg0), std::move(arg1)));
-    uassert(11542338,
+    uassert(ErrorCodes::JSInterpreterFailure,
             str::stream() << "Failed to invoke JS function "
                           << wasm_helpers::translateMozJSError(*result.get_result().payload())
                           << " :: function id = " << handle,
@@ -285,17 +271,17 @@ bool MozJSWasmBridge::invokePredicate(uint64_t handle, const BSONObj& args) {
     return payload->get_bool();
 }
 
-void MozJSWasmBridge::interruptCurrentOp() {
-    wc::Val result(wc::WitResult::ok(std::nullopt));
-    wasm_helpers::callFuncNoArgs(*_interruptCurrentOpFunc, getContext(), &result, 1);
-    if (!wasm_helpers::isResultOk(result)) {
-        LOGV2_DEBUG(11542354,
-                    1,
-                    "Wasm Bridge failed to interrupt current op",
-                    "error"_attr =
-                        wasm_helpers::translateMozJSError(*result.get_result().payload()));
-    }
-    invariant(wasm_helpers::isResultOk(result));
+void MozJSWasmBridge::kill() {
+    signalInterrupt();
+}
+
+void MozJSWasmBridge::signalInterrupt() {
+    _killPending.store(true);
+    _ctx->_engine.increment_epoch();
+}
+
+bool MozJSWasmBridge::isKillPending() const {
+    return _killPending.load();
 }
 
 BSONObj MozJSWasmBridge::drainEmitBuffer() {
@@ -312,12 +298,27 @@ BSONObj MozJSWasmBridge::drainEmitBuffer() {
     return _extractBSON(result);
 }
 
-BSONObj MozJSWasmBridge::getGlobal(std::string_view name) {
+BSONObj MozJSWasmBridge::getGlobal(std::string_view name, bool implicitNull) {
     wc::Val nameArg = wasm_helpers::makeString(name);
     wc::Val result(wc::WitResult::ok(std::nullopt));
     uassert(11542304,
             str::stream() << "Failed to call to get global JS variable " << std::string(name),
             wasm_helpers::callFunc(*_getGlobalFunc, getContext(), &result, 1, std::move(nameArg)));
+
+    auto isInvalidArg = [](const wc::Val& result) -> bool {
+        if (wasm_helpers::isResultOk(result) || !result.get_result().payload())
+            return false;
+
+        return wasm_helpers::findField("code", result.get_result().payload()->get_record())
+                   ->get_enum() == "e-invalid-arg";
+    };
+
+    // Implicitly return null if return value is unset
+    if (implicitNull && isInvalidArg(result)) {
+        BSONObjBuilder b;
+        b.appendNull("__value");
+        return b.obj();
+    }
     uassert(11542301,
             str::stream() << "Failed to get global JS variable "
                           << wasm_helpers::translateMozJSError(*result.get_result().payload())
@@ -350,7 +351,7 @@ BSONObj MozJSWasmBridge::_getReturnValueBson() {
     // getGlobal also fails when the return value is undefined (e.g., a function with no return
     // statement). Return an empty object in that case to match MozJS behavior.
     try {
-        return getGlobal(kReturnValue);
+        return getGlobal(kReturnValue, true);
     } catch (const DBException&) {
         return BSONObj();
     }

@@ -29,6 +29,8 @@
 
 #include "mongo/scripting/mozjs/wasm/bridge/wasm_helpers.h"
 
+#include "mongo/base/error_codes.h"
+
 namespace mongo::mozjs::wasm::wasm_helpers {
 
 std::vector<uint8_t> readWasmFile(const std::string& path) {
@@ -53,20 +55,20 @@ void translateWasmError(const wt::Error& error) {
     uasserted(11542340, error.message());
 }
 
+const wc::Val* findField(std::string_view name, const wc::Record& record) {
+    for (auto it = record.begin(); it != record.end(); ++it) {
+        if (it->name() == name)
+            return &it->value();
+    }
+    return nullptr;
+}
+
 std::string translateMozJSError(const wc::Val& mozJSError) {
     if (!mozJSError.is_record()) {
         return "unknown error (not a record)";
     }
 
     const auto& record = mozJSError.get_record();
-
-    auto findField = [&](std::string_view name) -> const wc::Val* {
-        for (auto it = record.begin(); it != record.end(); ++it) {
-            if (it->name() == name)
-                return &it->value();
-        }
-        return nullptr;
-    };
 
     auto optStr = [](const wc::Val* v) -> std::string {
         if (!v || !v->is_option())
@@ -76,13 +78,14 @@ std::string translateMozJSError(const wc::Val& mozJSError) {
     };
 
     std::stringstream ss;
-    ss << "message : '" << optStr(findField("msg")) << "', ";
-    ss << "file : '" << optStr(findField("filename")) << "', ";
-    ss << "stack : '" << optStr(findField("stack")) << "', ";
-    if (auto* line = findField("line"); line && line->is_u32()) {
+    ss << "code : '" << findField("code", record)->get_enum() << "', ";
+    ss << "message : '" << optStr(findField("msg", record)) << "', ";
+    ss << "file : '" << optStr(findField("filename", record)) << "', ";
+    ss << "stack : '" << optStr(findField("stack", record)) << "', ";
+    if (auto* line = findField("line", record); line && line->is_u32()) {
         ss << "line : " << line->get_u32() << ", ";
     }
-    if (auto* col = findField("column"); col && col->is_u32()) {
+    if (auto* col = findField("column", record); col && col->is_u32()) {
         ss << "column : " << col->get_u32();
     }
     return ss.str();

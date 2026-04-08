@@ -296,7 +296,6 @@ public:
 
 private:
     FunctionSlot* resolveHandle(uint64_t handle, wasm_mozjs_error_t* err);
-    static bool interruptCallback(JSContext* cx);
 
     // Call __parseJSFunctionOrExpression (installed during init) with `raw` and write the
     // properly-wrapped function source into `*out`.  Must be called inside a JSAutoRealm.

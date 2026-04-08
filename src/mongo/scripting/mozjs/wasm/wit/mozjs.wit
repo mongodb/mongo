@@ -45,8 +45,13 @@ interface mozjs {
   /// Opaque function handle.
   type function-handle = u64;
 
+  /// Startup options for the WASM engine.
+  record wasm-mozjs-startup-options {
+    heap-size-mb: u32,
+  }
+
   /// Initialize/shutdown/interrupt
-  initialize-engine: func() -> result<ok, wasm-mozjs-error>;
+  initialize-engine: func(options: wasm-mozjs-startup-options) -> result<ok, wasm-mozjs-error>;
   shutdown-engine: func() -> result<ok, wasm-mozjs-error>;
   interrupt-current-op: func() -> result<ok, wasm-mozjs-error>;
 
@@ -55,14 +60,17 @@ interface mozjs {
 
   /// Invoke a function with BSON args (no `this.` binding).
   /// Used by $function, $accumulator, mapReduce.reduce, mapReduce.finalize.
+  /// Timeouts are enforced by Wasmtime epoch interruption on the host side.
   invoke-function: func(handle: function-handle, bson: list<u8>) -> result<ok, wasm-mozjs-error>;
 
   /// Invoke a predicate with the document as `this`, returns bool directly.
   /// Used by $where: function() { return this.age > 18; }
+  /// Timeouts are enforced by Wasmtime epoch interruption on the host side.
   invoke-predicate: func(handle: function-handle, document: list<u8>) -> result<bool, wasm-mozjs-error>;
 
   /// Invoke a map function with the document as `this`; emits buffered internally.
   /// Used by mapReduce.map: function() { emit(this.key, this.value); }
+  /// Timeouts are enforced by Wasmtime epoch interruption on the host side.
   invoke-map: func(handle: function-handle, document: list<u8>) -> result<ok, wasm-mozjs-error>;
 
   /// Get last return value as BSON bytes.

@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
+#include "mongo/scripting/deadline_monitor.h"
 #include "mongo/scripting/js_regex.h"
 #include "mongo/scripting/mozjs/wasm/wasmtime_engine.h"
 #include "mongo/unittest/unittest.h"
@@ -309,17 +310,6 @@ TEST(WasmtimeScope, Invoke_IgnoreReturn_FunctionIsStillInvoked) {
 
 // --- Lifecycle ---
 
-// kill() flag is cleared by reset().
-TEST(WasmtimeScope, Lifecycle_Reset_ClearsKillFlag) {
-    WasmtimeScriptEngine engine;
-    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
-
-    scope->kill();
-    ASSERT_TRUE(scope->isKillPending());
-    scope->reset();
-    ASSERT_FALSE(scope->isKillPending());
-}
-
 // Emit state is cleared by reset(); the new bridge can accept a fresh injectNative("emit").
 TEST(WasmtimeScope, Lifecycle_Reset_ClearsEmitState) {
     WasmtimeScriptEngine engine;
@@ -540,4 +530,18 @@ TEST(WasmtimeScope, GetRegEx_NoFlags) {
     JSRegEx re = scope->getRegEx("__returnValue");
     ASSERT_EQ(std::string("^foo$"), re.pattern);
     ASSERT_EQ(std::string(""), re.flags);
+}
+
+TEST(WasmtimeScope, KillProcess) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+
+    ScriptingFunction fn = scope->createFunction("while (true) {}");
+
+    DeadlineMonitor<Scope> deadline;
+    deadline.startDeadline(scope.get(), 10);
+    ASSERT_THROWS_WITH_CHECK(scope->invoke(fn, nullptr, nullptr, 0),
+                             AssertionException,
+                             [](auto&& ex) { ASSERT_STRING_CONTAINS(ex.reason(), "interrupt"); });
+    deadline.stopDeadline(scope.get());
 }

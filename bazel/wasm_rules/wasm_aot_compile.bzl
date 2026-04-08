@@ -31,6 +31,11 @@ def _aot_compile_wasm_impl(ctx):
             output_file.path,
             "-C",
             "cache=no",
+            # -W sets wasmtime runtime options.
+            # Thes options must match the options we pass at
+            # startup or else starting the module will throw.
+            "-W",
+            "epoch-interruption=y",
         ],
         mnemonic = "WasmAotCompile",
         progress_message = "AOT compiling %s" % input_file.short_path,

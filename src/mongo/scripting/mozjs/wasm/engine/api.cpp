@@ -52,10 +52,6 @@ constexpr size_t kMaxBsonSize = 16 * 1024 * 1024;
 // Maximum number of functions that can be created
 constexpr size_t kMaxFunctions = 10000;
 
-// Default operation timeout in microseconds (30 seconds)
-// This prevents infinite loops in JavaScript code.
-constexpr size_t kDefaultOpTimeoutMicros = 30 * 1000 * 1000;
-
 // Default JS heap size in MB for the WASM engine.
 constexpr uint32_t kDefaultHeapSizeMB = 100;
 
@@ -165,12 +161,13 @@ static size_t g_function_count = 0;
 // Exported Functions from `mongo:mozjs/mozjs`
 
 extern "C" bool exports_mongo_mozjs_mozjs_initialize_engine(
-    exports_mongo_mozjs_mozjs_ok_t* ret, exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
+    exports_mongo_mozjs_mozjs_wasm_mozjs_startup_options_t* options,
+    exports_mongo_mozjs_mozjs_ok_t* ret,
+    exports_mongo_mozjs_mozjs_wasm_mozjs_error_t* err) {
     mongo::mozjs::wasm::wasm_mozjs_error_t e{};
-    // TODO (SERVER-123134): Make wasm_mozjs_startup_options_t an argument.
     mongo::mozjs::wasm::wasm_mozjs_startup_options_t opt{};
-    opt.opTimeout = opt.opTimeout > 0 ? opt.opTimeout : kDefaultOpTimeoutMicros;
-    opt.heapSize = opt.heapSize > 0 ? opt.heapSize : kDefaultHeapSizeMB;
+    opt.heapSize = options->heap_size_mb > 0 ? options->heap_size_mb : kDefaultHeapSizeMB;
+
     int64_t rc = mongo::mozjs::wasm::g_engine.init(&opt, &e);
 
     if (rc == mongo::mozjs::wasm::SM_OK) {
