@@ -7,3 +7,5 @@ base_suite: sharding
 overrides:
   - "legacy_timeseries.all_sharding_timeseries_tests_selector"
   - "legacy_timeseries.do_not_use_rawdata_for_legacy_timeseries"
+  - "legacy_timeseries.pin_fcv_to_last_continuous"
+  - "legacy_timeseries.exclude_fcv_incompatible_tests"

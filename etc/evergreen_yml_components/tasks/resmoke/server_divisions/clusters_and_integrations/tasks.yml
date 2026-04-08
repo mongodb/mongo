@@ -2536,11 +2536,6 @@ tasks:
       ["assigned_to_jira_team_server_catalog_and_routing", "default", "jscore"]
     commands:
       - func: "generate resmoke tasks"
-        vars:
-          # Requires legacy timeseries (system.buckets) even in all feature flags variants
-          resmoke_args: >-
-            --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
-            --disableFeatureFlags=featureFlagBlockDirectSystemBucketsAccess
 
   - <<: *gen_task_template
     name: sharding_jscore_passthrough_with_dynamic_execution_control_gen
@@ -2748,13 +2743,6 @@ tasks:
       - func: "generate resmoke tasks"
         vars:
           use_large_distro: "true"
-          # TODO SERVER-112130 remove timeout override
-          exec_timeout_secs: 4800 # 80min
-          timeout_secs: 4800 # 80min
-          # Requires legacy timeseries (system.buckets) even in all feature flags variants
-          resmoke_args: >-
-            --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
-            --disableFeatureFlags=featureFlagBlockDirectSystemBucketsAccess
 
   # TODO(SERVER-108818): Remove this temporary suite.
   - <<: *gen_task_template

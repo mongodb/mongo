@@ -1,3 +1,4 @@
+# TODO (SERVER-109519): Remove this file.
 - name: do_not_use_rawdata_for_legacy_timeseries
   value:
     executor:
@@ -6,6 +7,31 @@
           global_vars:
             TestData:
               doNotUseRawDataOperations: true
+- name: pin_fcv_to_last_continuous
+  value:
+    executor:
+      config:
+        shell_options:
+          eval: >-
+            await import("jstests/libs/override_methods/pin_fcv_to_last_continuous.js");
+- name: exclude_fcv_incompatible_tests
+  value:
+    selector:
+      exclude_with_any_tags:
+        - featureFlagCreateViewlessTimeseriesCollections
+      exclude_files:
+        # This test calls checkWriteConcernBehaviorForAllCommands() with limitToTimeseriesViews=true,
+        # which internally runs setFeatureCompatibilityVersion to latestFCV. This is incompatible
+        # with suites that pin FCV to a different FCV.
+        - jstests/sharding/mongos_writes_wait_for_write_concern_timeseries.js
+- name: exclude_jscore_passthrough_base_tags
+  value:
+    selector:
+      exclude_with_any_tags:
+        - assumes_standalone_mongod
+        - assumes_against_mongod_not_mongos
+        - requires_profiling
+        - featureFlagCreateViewlessTimeseriesCollections
 - name: all_jscore_timeseries_tests_selector
   value:
     selector:

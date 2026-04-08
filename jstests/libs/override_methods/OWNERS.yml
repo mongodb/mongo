@@ -67,3 +67,6 @@ filters:
   - "sharding_csrs_continuous_config_stepdown.js":
     approvers:
       - 10gen/server-cluster-scalability
+  - "pin_fcv_to_last_continuous.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
