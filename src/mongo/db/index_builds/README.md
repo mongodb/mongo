@@ -235,6 +235,16 @@ for where we persist the relevant information necessary to resume the index buil
 [StorageEngineImpl::\_handleInternalIdents()](https://github.com/mongodb/mongo/blob/0d45dd9d7ba9d3a1557217a998ad31c68a897d47/src/mongo/db/storage/storage_engine_impl.cpp#L329)
 for where we search for and parse the resume information on startup.
 
+## Primary-Driven Index Builds
+
+A primary-driven index build is similar to a two-phase index build in that it replicates a
+`startIndexBuild` oplog entry along with either a `commitIndexBuild` or an `abortIndexBuild` oplog
+entry. However, unlike two-phase index builds, the index is not built independently on each node of
+the replica set. Rather, the index is only built on the primary node and all internal writes for the
+index build are explicitly replicated through the oplog via `ci` and `cd` oplog entries; secondaries
+simply apply oplog to build the index. Thus, the concept of commit quorum does not apply to
+primary-driven index builds.
+
 ## Single-Phase Index Builds
 
 Index builds on empty collections replicate a `createIndexes` oplog entry. This oplog entry was used
