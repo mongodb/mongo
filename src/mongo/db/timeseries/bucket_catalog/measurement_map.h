@@ -76,9 +76,9 @@ public:
     intermediate(int32_t& compressedSizeDelta);
 
     /**
-     * Returns the timestamp of the last measurement in the time column.
+     * Returns the date of the last measurement in the time column.
      */
-    Timestamp timeOfLastMeasurement(StringData timeField) const;
+    Date_t timeOfLastMeasurement(StringData timeField) const;
 
     size_t numFields() const {
         return _builders.size();

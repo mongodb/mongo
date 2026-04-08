@@ -72,16 +72,15 @@ describe("Validation of timeseries collection with extended-range timestamps", f
         assert.eq(res.warnings.length, 0, res);
     });
 
-    // TODO SERVER-118945 re-enable this test case
-    // it("Passes validation with extended range timestamps before and after epoch", function () {
-    //     assert.commandWorked(this.coll.insert({t: new Date("1969-12-31T23:59:58Z"), data: {a: "b"}})); // Pre-epoch
-    //     assert.commandWorked(this.coll.insert({t: new Date("1969-12-31T23:59:59Z"), data: {a: "b"}})); // Pre-epoch
-    //     assert.commandWorked(this.coll.insert({t: new Date("1970-01-01T00:00:00Z"), data: {x: "y"}})); // Post-epoch
-    //     assert.commandWorked(this.coll.insert({t: new Date("1970-01-01T00:00:01Z"), data: {x: "y"}})); // Post-epoch
-    //     const res = assert.commandWorked(this.coll.validate());
-    //     assert(res.valid, res);
-    //     assert.eq(res.warnings.length, 0, res);
-    // });
+    it("Passes validation with extended range timestamps before and after epoch", function () {
+        assert.commandWorked(this.coll.insert({t: new Date("1969-12-31T23:59:58Z"), data: {a: "b"}})); // Pre-epoch
+        assert.commandWorked(this.coll.insert({t: new Date("1969-12-31T23:59:59Z"), data: {a: "b"}})); // Pre-epoch
+        assert.commandWorked(this.coll.insert({t: new Date("1970-01-01T00:00:00Z"), data: {x: "y"}})); // Post-epoch
+        assert.commandWorked(this.coll.insert({t: new Date("1970-01-01T00:00:01Z"), data: {x: "y"}})); // Post-epoch
+        const res = assert.commandWorked(this.coll.validate());
+        assert(res.valid, res);
+        assert.eq(res.warnings.length, 0, res);
+    });
 
     it("Passes validation with extended range timestamps before and after epochalypse", function () {
         assert.commandWorked(this.coll.insert({t: new Date("2038-01-19T03:14:05Z"), data: {a: "b"}})); // Pre-epochalypse

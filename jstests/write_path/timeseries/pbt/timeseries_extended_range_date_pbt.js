@@ -211,8 +211,7 @@ describe("Basic comparative PBT for timeseries inserts", () => {
                         const model = makeEmptyModel(ctrlColl, bucketColl);
                         fc.modelRun(() => ({model: model, real: {tsColl, ctrlColl}}), cmds);
                         assertCollectionsMatch(tsColl, ctrlColl);
-                        // TODO (SERVER-118945): Re-enable collection validation after fixing the found bug(s)
-                        // assertCollectionValid(tsColl);
+                        assertCollectionValid(tsColl);
                         stats = cmds.commands.reduce(commandMeasurementStatsReducer, stats);
                         stats = tsColl.find().toArray().reduce(measurementsQueryStatsReducer, stats);
                         stats = getTimeseriesCollForRawOps(tsColl.getDB(), tsColl)

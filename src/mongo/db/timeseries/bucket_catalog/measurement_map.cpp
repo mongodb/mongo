@@ -144,10 +144,10 @@ void MeasurementMap::insertOne(const BSONObj& measurement, boost::optional<Strin
     }
 }
 
-Timestamp MeasurementMap::timeOfLastMeasurement(StringData key) const {
-    auto it = _builders.find(key);
+Date_t MeasurementMap::timeOfLastMeasurement(StringData key) const {
+    const auto it = _builders.find(key);
     invariant(it != _builders.end());
-    return it->second.builder.last().timestamp();
+    return it->second.builder.last().date();
 }
 
 }  // namespace mongo::timeseries::bucket_catalog

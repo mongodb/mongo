@@ -532,12 +532,11 @@ mongo::write_ops::UpdateCommandRequest makeTimeseriesCompressedDiffUpdateOpFromB
     std::shared_ptr<bucket_catalog::WriteBatch> batch,
     const NamespaceString& bucketsNs) {
     invariant(batch->measurements.size() > 0);
-    auto firstMeasurementTimestamp = batch->measurements[0][batch->timeField].timestamp();
-    bool changedToUnsorted = false;
-    if (batch->bucketIsSortedByTime &&
-        firstMeasurementTimestamp < batch->measurementMap.timeOfLastMeasurement(batch->timeField)) {
+    const auto firstMeasurementTimestamp = batch->measurements[0][batch->timeField].date();
+    const bool changedToUnsorted = batch->bucketIsSortedByTime &&
+        firstMeasurementTimestamp < batch->measurementMap.timeOfLastMeasurement(batch->timeField);
+    if (changedToUnsorted) {
         batch->bucketIsSortedByTime = false;
-        changedToUnsorted = true;
         batch->stats.incNumCompressedBucketsConvertedToUnsorted();
     }
     // Invariant that the measurements are sorted from buildBatchedInsertContexts.
