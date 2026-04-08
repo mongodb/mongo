@@ -154,7 +154,6 @@ export function makeMeasurementDocArb(
  * @param {number} [options.ranges.maxDocs=20]
  * @param {Array<string>} [options.types] // types of metrics to include, leave undefined/null for all
  * @param {number} [options.mixedSchemaChance=0.0]  // chance that a given field will have a mixed schema across the stream
- * @param {number} [options.newFieldFrequency=0.1]   // per-doc probability that a new field is added to the schema going forward
  * @param {fc.Arbitrary<string>} [options.ranges.fieldNameArb]
  *
  * @returns {fc.Arbitrary<Object[]>}
@@ -186,8 +185,6 @@ export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaVa
         timeBucketing = "hours",
     } = options.ranges ?? {};
     const runFrequency = options.runFrequency ?? 0;
-    const extendControlFrequency = options.extendControlFrequency ?? 0.25;
-    const newFieldFrequency = options.newFieldFrequency ?? 0.05;
     const explicitArbitraries = options.explicitArbitraries ?? {};
 
     const defaultDateMin = new Date("1970-01-01T00:00:00.000Z");
@@ -250,8 +247,6 @@ export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaVa
         const extraFieldOptions = {
             ranges: extraFieldRanges,
             types: options.types,
-            streamFactories: undefined,
-            extendControlFrequency: extendControlFrequency,
         };
 
         // Runny overrides mixed type, this should be fine for our use cases
@@ -271,56 +266,23 @@ export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaVa
             extraFieldStreamArbs[fieldName] = fc.array(factory(), {minLength: docCount, maxLength: docCount});
         }
 
-        // Per-doc decisions: each doc has a newFieldFrequency chance of introducing a new field
-        // to the schema for all subsequent docs (including itself).
-        const newFieldDecisionsArb = fc.array(fc.double({min: 0, max: 1, noNaN: true}), {
-            minLength: docCount,
-            maxLength: docCount,
-        });
+        return fc
+            .tuple(timeStreamArb, metaStreamArb, ...Object.values(extraFieldStreamArbs))
+            .map(([timeStream, metaStream, ...extraFieldStream]) => {
+                const docs = [];
 
-        return newFieldDecisionsArb.chain((decisions) => {
-            const insertionIndices = decisions.reduce((acc, d, i) => {
-                if (d < newFieldFrequency) acc.push(i);
-                return acc;
-            }, []);
+                for (let i = 0; i < docCount; ++i) {
+                    const doc = {[timeFieldname]: timeStream[i], [metaFieldname]: metaStream[i]};
 
-            const newFieldNameArb = baseFieldNameArb.filter((name) => !fieldNames.includes(name));
-            const newFieldEventArbs = insertionIndices.map((insertionIdx) =>
-                fc
-                    .tuple(
-                        newFieldNameArb,
-                        makeMetricStreamArb(docCount, docCount, extraFieldRanges, undefined, extendControlFrequency),
-                    )
-                    .map(([fieldName, stream]) => ({fieldName, insertionIdx, stream})),
-            );
-            const newFieldEventsArb = newFieldEventArbs.length > 0 ? fc.tuple(...newFieldEventArbs) : fc.constant([]);
+                    Object.keys(extraFieldStreamArbs).forEach((name, idx) => {
+                        doc[name] = extraFieldStream[idx][i];
+                    });
 
-            return newFieldEventsArb.chain((newFieldEvents) =>
-                fc
-                    .tuple(timeStreamArb, metaStreamArb, ...Object.values(extraFieldStreamArbs))
-                    .map(([timeStream, metaStream, ...extraFieldStream]) => {
-                        const docs = [];
+                    docs.push(doc);
+                }
 
-                        for (let i = 0; i < docCount; ++i) {
-                            const doc = {[timeFieldname]: timeStream[i], [metaFieldname]: metaStream[i]};
-
-                            Object.keys(extraFieldStreamArbs).forEach((name, idx) => {
-                                doc[name] = extraFieldStream[idx][i];
-                            });
-
-                            for (const {fieldName, insertionIdx, stream} of newFieldEvents) {
-                                if (i >= insertionIdx) {
-                                    doc[fieldName] = stream[i];
-                                }
-                            }
-
-                            docs.push(doc);
-                        }
-
-                        return docs;
-                    }),
-            );
-        });
+                return docs;
+            });
     });
 }
 
