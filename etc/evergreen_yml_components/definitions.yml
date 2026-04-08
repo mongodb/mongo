@@ -1021,6 +1021,12 @@ functions:
     - *monitor_process_threads
     - *collect_system_resource_info
     - *collect_ulimit_info
+    - command: expansions.update
+      params:
+        updates:
+          - key: exec_timeout_secs
+            value: "${streams_exec_timeout_secs|0}"
+    - *f_expansions_write
 
   "do integration_tests setup":
     - *f_expansions_write

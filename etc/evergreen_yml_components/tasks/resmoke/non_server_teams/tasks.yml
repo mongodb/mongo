@@ -745,8 +745,6 @@ tasks:
 
   - name: streams_build_debug
     tags: ["assigned_to_jira_team_streams", "auxiliary"]
-    depends_on:
-      - name: streams_build_and_push
     commands:
       - func: "streams build debug"
       - func: "upload streams debugsymbols"
