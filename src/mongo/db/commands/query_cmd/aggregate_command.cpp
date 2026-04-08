@@ -79,11 +79,11 @@
 namespace mongo {
 namespace {
 
-class PipelineCommand final : public TypedCommand<PipelineCommand> {
+class AggregateCommand final : public TypedCommand<AggregateCommand> {
 public:
     using Request = AggregateCommandRequest;
 
-    PipelineCommand() : TypedCommand(Request::kCommandName) {}
+    AggregateCommand() : TypedCommand(Request::kCommandName) {}
 
     const std::set<std::string>& apiVersions() const override {
         return kApiVersions1;
@@ -129,7 +129,7 @@ public:
                       : std::make_shared<IncrementalFeatureRolloutContext>();
               }()),
               _extensionMetrics(
-                  static_cast<const PipelineCommand*>(cmd)->getExtensionMetricsAllocation()),
+                  static_cast<const AggregateCommand*>(cmd)->getExtensionMetricsAllocation()),
               _liteParsedPipeline(request(),
                                   false /* isRunningAgainstView_ForHybridSearch */,
                                   {.ifrContext = _ifrContext,
@@ -404,7 +404,7 @@ protected:
 private:
     boost::optional<ExtensionMetricsAllocation> _extensionMetricsAllocation;
 };
-MONGO_REGISTER_COMMAND(PipelineCommand).forShard();
+MONGO_REGISTER_COMMAND(AggregateCommand).forShard();
 
 }  // namespace
 }  // namespace mongo

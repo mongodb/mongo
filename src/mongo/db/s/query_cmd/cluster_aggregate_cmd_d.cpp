@@ -40,7 +40,7 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/s/commands/query_cmd/cluster_pipeline_cmd.h"
+#include "mongo/s/commands/query_cmd/cluster_aggregate_cmd.h"
 #include "mongo/util/assert_util.h"
 
 #include <set>
@@ -55,7 +55,7 @@ namespace {
 /**
  * Implements the cluster aggregate command on mongod.
  */
-struct ClusterPipelineCommandD {
+struct ClusterAggregateCommandD {
     using Request = AggregateCommandRequest;
     static constexpr StringData kCommandName = "clusterAggregate"_sd;
 
@@ -87,7 +87,7 @@ struct ClusterPipelineCommandD {
                   "Cannot explain a cluster aggregate command on a mongod");
     }
 };
-MONGO_REGISTER_COMMAND(ClusterPipelineCommandBase<ClusterPipelineCommandD>).forShard();
+MONGO_REGISTER_COMMAND(ClusterAggregateCommandBase<ClusterAggregateCommandD>).forShard();
 
 }  // namespace
 }  // namespace mongo

@@ -46,28 +46,28 @@ namespace mongo {
  * Implements the cluster aggregate command on both mongos (router) and shard servers.
  *
  * The 'Impl' template parameter is a small struct that provides the properties that differ between
- * the 'ClusterPipelineCmdD' and 'ClusterPipelineCmdS' variants, such as:
+ * the 'ClusterAggregateCmdD' and 'ClusterAggregateCmdS' variants, such as:
  *  - The command name.
  *  - The stable API version of the command via 'getApiVersions()'.
  *  - Whether the command or its explain can run via 'checkCanRunHere()' and
  * 'checkCanExplainHere()'.
  *
  * The class uses CRTP with 'TypedCommand' where:
- *  - The type ClusterPipelineCommandBase<Impl> is passed as the concrete type for the template
+ *  - The type ClusterAggregateCommandBase<Impl> is passed as the concrete type for the template
  * parameter.
  *  - 'Impl' provides the command-specific behavior.
  *
  * This template class provides the shared functionality between the command variants such as the
  * 'run()' and 'explain()' functions.
  *
- * See 'cluster_pipeline_cmd_s.cpp' and 'cluster_pipeline_cmd_s.cpp' for more details.
+ * See 'cluster_aggregate_cmd_s.cpp' and 'cluster_aggregate_cmd_d.cpp' for more details.
  */
 template <typename Impl>
-class ClusterPipelineCommandBase final : public TypedCommand<ClusterPipelineCommandBase<Impl>> {
+class ClusterAggregateCommandBase final : public TypedCommand<ClusterAggregateCommandBase<Impl>> {
 public:
-    using TC = TypedCommand<ClusterPipelineCommandBase<Impl>>;
+    using TC = TypedCommand<ClusterAggregateCommandBase<Impl>>;
     using Request = typename Impl::Request;
-    ClusterPipelineCommandBase() : TC(Impl::kCommandName) {}
+    ClusterAggregateCommandBase() : TC(Impl::kCommandName) {}
 
     const std::set<std::string>& apiVersions() const override {
         return Impl::getApiVersions();
@@ -81,7 +81,7 @@ public:
     public:
         Invocation(OperationContext* opCtx, Command* cmd, const OpMsgRequest& opMsgRequest)
             : TC::MinimalInvocationBase(opCtx, cmd, opMsgRequest),
-              _extensionMetrics(static_cast<const ClusterPipelineCommandBase*>(cmd)
+              _extensionMetrics(static_cast<const ClusterAggregateCommandBase*>(cmd)
                                     ->getExtensionMetricsAllocation()),
               // Create IFRContext early to ensure consistent flag values throughout the operation,
               // including retries on view errors. Unlike mongod, mongos receives requests directly

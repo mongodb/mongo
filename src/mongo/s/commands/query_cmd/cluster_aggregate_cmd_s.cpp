@@ -36,7 +36,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/s/commands/query_cmd/cluster_pipeline_cmd.h"
+#include "mongo/s/commands/query_cmd/cluster_aggregate_cmd.h"
 #include "mongo/util/assert_util.h"
 
 #include <set>
@@ -51,7 +51,7 @@ namespace {
 /**
  * Implements the cluster aggregate command on mongos.
  */
-struct ClusterPipelineCommandS {
+struct ClusterAggregateCommandS {
     using Request = AggregateCommandRequest;
     static constexpr StringData kCommandName = "aggregate"_sd;
 
@@ -76,7 +76,7 @@ struct ClusterPipelineCommandS {
         // Can always run on a mongos.
     }
 };
-MONGO_REGISTER_COMMAND(ClusterPipelineCommandBase<ClusterPipelineCommandS>).forRouter();
+MONGO_REGISTER_COMMAND(ClusterAggregateCommandBase<ClusterAggregateCommandS>).forRouter();
 
 }  // namespace
 }  // namespace mongo

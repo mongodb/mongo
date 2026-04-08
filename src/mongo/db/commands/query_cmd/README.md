@@ -34,7 +34,7 @@ The QO team maintains the following commands:
 Each command starts in a class that inherits from the [`Command`](https://github.com/mongodb/mongo/blob/5342b2bab6a7ff264f21a44cc8b8310d6fc7bc01/src/mongo/db/commands.h#L436) abstract class. These commands all live in the [`src/mongo/db/commands/`](/src/mongo/db/commands) directory. For example:
 
 - `FindCmd` lives in [find_cmd.cpp](/src/mongo/db/commands/query_cmd/find_cmd.cpp)
-- `aggregate`'s command (`PipelineCommand`) lives in [`pipeline_command.cpp`](/src/mongo/db/commands/query_cmd/pipeline_command.cpp).
+- `aggregate`'s command (`AggregateCommand`) lives in [`aggregate_command.cpp`](/src/mongo/db/commands/query_cmd/aggregate_command.cpp).
 
 First, we piece apart the command into its components. We don't yet try to understand the meaning of the more complex MQL arguments, such as find's `filter`, `projection`, and `sort` arguments, or the individual stages in `aggregate`'s `pipeline` argument.
 
