@@ -23,37 +23,28 @@ const testColl = testDB.getCollection("test");
 
 // Helper object for retrieving change stream metrics from the 'serverStatus' command's output.
 const ServerStatusMetrics = {
-    /**
-     * Returns the current value of the named change stream OTel metric from serverStatus.
-     * 'suffix' is the unit string appended to the metric name (e.g. "cursors", "microseconds").
-     */
-    _getCsMetric: function (name, suffix) {
-        const ss = assert.commandWorked(db.adminCommand({serverStatus: 1, otelMetrics: 1}));
-        return ss?.otelMetrics["change_streams." + name + "_" + suffix];
-    },
-
     getCsCursorTotalOpened: function () {
-        return this._getCsMetric("cursor.total_opened", "cursors");
+        return this.get("changeStreams.cursor.totalOpened");
     },
 
     getCsCursorLifespan: function () {
-        return this._getCsMetric("cursor.lifespan", "microseconds");
+        return this.get("changeStreams.cursor.lifespan");
     },
 
     getCsCursorOpenTotal: function () {
-        return this._getCsMetric("cursor.open.total", "cursors");
+        return this.get("changeStreams.cursor.open.total");
     },
 
     getCsCursorOpenPinned: function () {
-        return this._getCsMetric("cursor.open.pinned", "cursors");
+        return this.get("changeStreams.cursor.open.pinned");
     },
 
     /**
      * Returns the value of the specified dot-separated path within serverStatus.metrics.
      */
     get: function (path) {
-        const ss = assert.commandWorked(db.adminCommand({serverStatus: 1}));
-        return path.split(".").reduce((obj, key) => obj[key], ss?.metrics);
+        const serverStatus = assert.commandWorked(db.adminCommand({serverStatus: 1, metrics: 1}));
+        return path.split(".").reduce((obj, key) => obj[key], serverStatus?.metrics);
     },
 };
 
@@ -80,7 +71,7 @@ describe("change stream cursor metrics in serverStatus", function () {
         testColl.drop();
     });
 
-    it("changeStreams.cursor.total_opened increases as change stream cursors are opened", function () {
+    it("changeStreams.cursor.totalOpened increases as change stream cursors are opened", function () {
         this.cursorList.push(testColl.watch(), testColl.watch(), testColl.watch());
         assert.eq(
             this.totalOpenedBefore + this.cursorList.length(),
@@ -89,7 +80,7 @@ describe("change stream cursor metrics in serverStatus", function () {
         );
     });
 
-    it("changeStreams.cursor.total_opened does not decrease when change stream cursors are closed", function () {
+    it("changeStreams.cursor.totalOpened does not decrease when change stream cursors are closed", function () {
         this.cursorList.push(testColl.watch(), testColl.watch());
         const afterOpen = ServerStatusMetrics.getCsCursorTotalOpened();
 
