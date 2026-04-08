@@ -553,15 +553,21 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceExtensionOptimizable::clone(
 
 DocumentSourceContainer::iterator DocumentSourceExtensionOptimizable::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
-    // Attempt to remove a $sort on metadata if the extension stage is sorted by vector search
-    // score.
-    if (_logicalStage->isSortedByVectorSearchScore()) {
+    // TODO SERVER-123271: Only apply the sort optimization when featureFlagExtensionsOptimizations
+    // is disabled.
+
+    // Attempt to remove a $sort on metadata if the extension stage is sorted by vector
+    // search score.
+    if (_logicalStage->isSortedByVectorSearchScore_deprecated()) {
         if (auto result = search_helpers::applyVectorSearchSortOptimization(itr, container)) {
             return *result;
         }
     }
+
+    // TODO SERVER-122005: Only apply the limit optimization when featureFlagExtensionsOptimizations
+    // is disabled.
     _limit = search_helpers::setVectorSearchLimitForOptimization(itr, container, _limit);
-    _logicalStage->setExtractedLimitVal(_limit);
+    _logicalStage->setExtractedLimitVal_deprecated(_limit);
     return std::next(itr);
 }
 

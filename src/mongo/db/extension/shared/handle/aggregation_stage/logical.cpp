@@ -94,23 +94,24 @@ LogicalAggStageHandle LogicalAggStageAPI::clone() const {
     return LogicalAggStageHandle(logicalAggStage);
 }
 
-bool LogicalAggStageAPI::isSortedByVectorSearchScore() const {
+bool LogicalAggStageAPI::isSortedByVectorSearchScore_deprecated() const {
     bool outIsSortedByVectorSearchScore{false};
     invokeCAndConvertStatusToException([&]() {
-        return _vtable().is_stage_sorted_by_vector_search_score(get(),
-                                                                &outIsSortedByVectorSearchScore);
+        return _vtable().is_stage_sorted_by_vector_search_score_deprecated(
+            get(), &outIsSortedByVectorSearchScore);
     });
 
     return outIsSortedByVectorSearchScore;
 }
 
-void LogicalAggStageAPI::setExtractedLimitVal(boost::optional<long long> extractedLimitVal) {
+void LogicalAggStageAPI::setExtractedLimitVal_deprecated(
+    boost::optional<long long> extractedLimitVal) {
     invokeCAndConvertStatusToException([&]() {
         if (extractedLimitVal.has_value()) {
-            return _vtable().set_vector_search_limit_for_optimization(get(),
-                                                                      &extractedLimitVal.get());
+            return _vtable().set_vector_search_limit_for_optimization_deprecated(
+                get(), &extractedLimitVal.get());
         } else {
-            return _vtable().set_vector_search_limit_for_optimization(get(), nullptr);
+            return _vtable().set_vector_search_limit_for_optimization_deprecated(get(), nullptr);
         }
     });
 }

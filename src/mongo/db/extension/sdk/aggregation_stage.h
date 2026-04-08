@@ -80,7 +80,7 @@ public:
     virtual std::unique_ptr<LogicalAggStage> clone() const = 0;
     // Extension stages (like $vectorSearch) that do sort by vector search score should override
     // this and return true.
-    virtual bool isSortedByVectorSearchScore() const {
+    virtual bool isSortedByVectorSearchScore_deprecated() const {
         return false;
     }
 
@@ -93,7 +93,7 @@ public:
         return BSONObj();
     }
 
-    void setExtractedLimitVal(boost::optional<long long> extractedLimitVal) {
+    void setExtractedLimitVal_deprecated(boost::optional<long long> extractedLimitVal) {
         _limit = extractedLimitVal;
     }
 
@@ -244,7 +244,7 @@ private:
         return wrapCXXAndConvertExceptionToStatus([&]() {
             const auto& impl =
                 static_cast<const ExtensionLogicalAggStageAdapter*>(extLogicalStage)->getImpl();
-            *outIsSortedByVectorSearchScore = impl.isSortedByVectorSearchScore();
+            *outIsSortedByVectorSearchScore = impl.isSortedByVectorSearchScore_deprecated();
         });
     }
 
@@ -252,7 +252,7 @@ private:
         ::MongoExtensionLogicalAggStage* extLogicalStage, long long* extractedLimitVal) {
         return wrapCXXAndConvertExceptionToStatus([&]() {
             auto& impl = static_cast<ExtensionLogicalAggStageAdapter*>(extLogicalStage)->getImpl();
-            impl.setExtractedLimitVal(
+            impl.setExtractedLimitVal_deprecated(
                 extractedLimitVal ? boost::optional<long long>(*extractedLimitVal) : boost::none);
         });
     }
@@ -305,8 +305,9 @@ private:
         .compile = &_extCompile,
         .get_distributed_plan_logic = &_extGetDistributedPlanLogic,
         .clone = &_extClone,
-        .is_stage_sorted_by_vector_search_score = &_extIsStageSortedByVectorSearchScore,
-        .set_vector_search_limit_for_optimization = &_extSetVectorSearchLimitForOptimization,
+        .is_stage_sorted_by_vector_search_score_deprecated = &_extIsStageSortedByVectorSearchScore,
+        .set_vector_search_limit_for_optimization_deprecated =
+            &_extSetVectorSearchLimitForOptimization,
         .evaluate_rule_precondition = &_extEvaluateRulePrecondition,
         .evaluate_rule_transform = &_extEvaluateRuleTransform,
         .get_filter = &_extGetFilter};

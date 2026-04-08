@@ -70,7 +70,7 @@ public:
         return std::make_unique<TestVectorSearchLogicalStage>(_name, _arguments);
     }
 
-    bool isSortedByVectorSearchScore() const override {
+    bool isSortedByVectorSearchScore_deprecated() const override {
         return true;
     }
 

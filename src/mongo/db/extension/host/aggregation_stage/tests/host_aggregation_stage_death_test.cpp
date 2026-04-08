@@ -100,7 +100,7 @@ DEATH_TEST(HostLogicalAggStageAdapterDeathTest,
            "12303705") {
     auto [mock, adapter] = makeAdapterWithMock();
     LogicalAggStageAPI api(adapter.get());
-    [[maybe_unused]] auto result = api.isSortedByVectorSearchScore();
+    [[maybe_unused]] auto result = api.isSortedByVectorSearchScore_deprecated();
 }
 
 DEATH_TEST(HostLogicalAggStageAdapterDeathTest,
@@ -108,7 +108,7 @@ DEATH_TEST(HostLogicalAggStageAdapterDeathTest,
            "12303706") {
     auto [mock, adapter] = makeAdapterWithMock();
     LogicalAggStageAPI api(adapter.get());
-    api.setExtractedLimitVal(5LL);
+    api.setExtractedLimitVal_deprecated(5LL);
 }
 
 DEATH_TEST(HostLogicalAggStageAdapterDeathTest,
