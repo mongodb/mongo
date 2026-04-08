@@ -190,6 +190,10 @@ async function runWorkloads(workloads, {cluster: clusterOptions = {}, execution:
         if (cluster.shouldPerformContinuousStepdowns()) {
             cluster.reestablishConnectionsAfterFailover();
         }
+        // Await replication to ensure all writes are visible on secondaries before reads.
+        if (cluster.isReplication()) {
+            cluster.awaitReplication();
+        }
         // Call each workload's teardown function. After all teardowns have completed check if
         // any of them failed.
         const cleanupResults = cleanup.map((workload) =>
