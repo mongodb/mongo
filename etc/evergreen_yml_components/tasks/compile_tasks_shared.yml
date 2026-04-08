@@ -314,7 +314,7 @@ tasks:
           include:
             - "./venv/**"
             - "./venv_readme.txt"
-          exclude:
+          exclude_files:
             - "tmp/**"
 
       - command: s3.put

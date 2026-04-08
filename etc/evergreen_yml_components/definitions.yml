@@ -1240,7 +1240,7 @@ functions:
         source_dir: "./"
         include:
           - "powercycle_tasks.json"
-        exclude:
+        exclude_files:
           - "tmp/**"
 
     - command: s3.put
@@ -2539,7 +2539,7 @@ functions:
         source_dir: "${workdir}/"
         include:
           - "_logs/*"
-        exclude:
+        exclude_files:
           - "tmp/**"
     - command: s3.put
       params:
@@ -3322,7 +3322,7 @@ functions:
       include:
         - "./mongo-diskstats*"
         - "./mongo-diskstats*.csv"
-      exclude:
+      exclude_files:
         - "tmp/**"
 
   "archive disk statistics": &archive_disk_statistics
@@ -3855,7 +3855,7 @@ functions:
       params:
         target: "venv.tgz"
         source_dir: "./"
-        exclude:
+        exclude_files:
           - "tmp/**"
         include:
           - "./venv/**"
