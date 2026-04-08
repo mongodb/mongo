@@ -321,7 +321,7 @@ feature_flags:
     featureFlagQueryStatsMetricsSubsections:
         description: "Feature flag to enable query stats metrics being reorganized into subsections, rather than a flat structure."
         cpp_varname: gFeatureFlagQueryStatsMetricsSubsections
-        default: false
+        default: true
         fcv_gated: false
 
     featureFlagExtractFieldPathsSbeStage:
