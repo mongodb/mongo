@@ -19,11 +19,17 @@ def main(
     evg_api = evergreen_conn.get_evergreen_api()
 
     # Skip activation if the patch author is the excluded user
-    if expansions.get("author") == skip_for_patch_author or skip_activate_task:
+    if (
+        (skip_for_patch_author is not None) and expansions.get("author") == skip_for_patch_author
+    ) or skip_activate_task:
         return
 
     variant_id = expansions.get("build_id")
     variant = evg_api.build_by_id(variant_id)
+    resolved_build_variant = expansions.get("build_variant") or getattr(
+        variant, "build_variant", None
+    )
+    display_build_variant = resolved_build_variant or variant_id
     found_task = None
     for task in variant.get_tasks():
         if task.display_name == task_name:
@@ -42,12 +48,15 @@ def main(
         # Evergreen patches work differently than other evergreen versions
         # When a task is not scheduled initially it does not exist as an unscheduled task
         # So we need to use a different path in the api to schedule the task
+        if not resolved_build_variant:
+            raise RuntimeError(
+                f"Could not determine the build variant for patch activation from build {variant_id}"
+            )
         patch_id = expansions.get("version_id")
-        build_variant = expansions.get("build_variant")
-        evg_api.configure_patch(patch_id, [{"id": build_variant, "tasks": [task_name]}])
+        evg_api.configure_patch(patch_id, [{"id": resolved_build_variant, "tasks": [task_name]}])
     else:
         raise RuntimeError(
-            f"The {task_name} task could not be found in the {build_variant} variant"
+            f"The {task_name} task could not be found in the {display_build_variant} variant"
         )
 
 
