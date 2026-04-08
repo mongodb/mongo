@@ -589,4 +589,17 @@ void MetricsService::appendMetricsForServerStatus(BSONObjBuilder& bsonBuilder) c
             identifierAndMetric.metric);
     }
 }
+void MetricsService::clearForTests() {
+    stdx::lock_guard lock(_mutex);
+#ifdef MONGO_CONFIG_OTEL
+    _observableInstruments.clear();
+#endif
+    for (auto& [name, identAndMetric] : _metrics) {
+        auto& opts = identAndMetric.identifier.serverStatusOptions;
+        if (opts.has_value()) {
+            globalMetricTreeSet()[opts->role].removeForTests(opts->dottedPath);
+        }
+    }
+    _metrics.clear();
+}
 }  // namespace mongo::otel::metrics

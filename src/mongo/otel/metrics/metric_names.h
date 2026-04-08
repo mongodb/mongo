@@ -156,6 +156,12 @@ public:
     static constexpr MetricName kTest4 = {"test_only.metric4"};
     static constexpr MetricName kTest5 = {"test_only.metric5"};
     static constexpr MetricName kTest6 = {"test_only.metric6"};
+    static constexpr MetricName kTestShardMergeNone = {"test_only.shard_merge_none"};
+    static constexpr MetricName kTestShardMergeShard = {"test_only.shard_merge_shard"};
+    static constexpr MetricName kTestShardMergeRouter = {"test_only.shard_merge_router"};
+    static constexpr MetricName kTestRouterMergeNone = {"test_only.router_merge_none"};
+    static constexpr MetricName kTestRouterMergeShard = {"test_only.router_merge_shard"};
+    static constexpr MetricName kTestRouterMergeRouter = {"test_only.router_merge_router"};
     // camelCase is not allowed.
     static constexpr MetricName kTestInvalid = {"test_only.Metric"};
 };

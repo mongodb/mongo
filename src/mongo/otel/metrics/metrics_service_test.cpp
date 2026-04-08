@@ -53,8 +53,11 @@ namespace {
 class MetricsServiceTest : public testing::Test {
 public:
     void SetUp() override {
-        clearGlobalMetricTreeSetForTests();
         metricsService = std::make_unique<MetricsService>();
+    }
+
+    void TearDown() override {
+        metricsService->clearForTests();
     }
 
     std::unique_ptr<MetricsService> metricsService;
@@ -221,10 +224,12 @@ template <typename T>
 class MetricCreationTest : public MetricsServiceTest {};
 
 using testing::_;
+using testing::AnyOf;
 using testing::Contains;
 using testing::ElementsAre;
 using testing::ElementsAreArray;
 using testing::Matcher;
+using testing::Not;
 using testing::UnorderedElementsAre;
 using unittest::match::BSONElementEQ;
 using unittest::match::BSONObjElements;
@@ -398,7 +403,7 @@ TYPED_TEST(MetricCreationTest, ExceptionWhenSameNameButDifferentServerStatusOpti
 
     MetricOptions<TypeParam> optionsRoleNone{.serverStatusOptions = ServerStatusOptions{
                                                  .dottedPath = sharedPath,
-                                                 .role = ClusterRole{ClusterRole::None},
+                                                 .role = ClusterRole::None,
                                              }};
     MetricCreator<TypeParam>::create(this->metricsService.get(),
                                      MetricNames::kTest1,
@@ -408,7 +413,7 @@ TYPED_TEST(MetricCreationTest, ExceptionWhenSameNameButDifferentServerStatusOpti
 
     MetricOptions<TypeParam> optionsShardRole{.serverStatusOptions = ServerStatusOptions{
                                                   .dottedPath = sharedPath,
-                                                  .role = ClusterRole{ClusterRole::ShardServer},
+                                                  .role = ClusterRole::ShardServer,
                                               }};
     ASSERT_THROWS_CODE(MetricCreator<TypeParam>::create(this->metricsService.get(),
                                                         MetricNames::kTest1,
@@ -649,7 +654,7 @@ using SerializeMetricsTreeTest = MetricsServiceTest;
 TEST_F(SerializeMetricsTreeTest, Counter) {
     CounterOptions options{.serverStatusOptions = ServerStatusOptions{
                                .dottedPath = "ingress.openConnections",
-                               .role = ClusterRole{ClusterRole::None},
+                               .role = ClusterRole::None,
                            }};
     auto& counter = metricsService->createInt64Counter(
         MetricNames::kTest1, "description", MetricUnit::kSeconds, options);
@@ -664,7 +669,7 @@ TEST_F(SerializeMetricsTreeTest, Counter) {
 TEST_F(SerializeMetricsTreeTest, Histogram) {
     HistogramOptions options{.serverStatusOptions = ServerStatusOptions{
                                  .dottedPath = "ops.latencyHistogram",
-                                 .role = ClusterRole{ClusterRole::None},
+                                 .role = ClusterRole::None,
                              }};
     auto& histogram = metricsService->createDoubleHistogram(
         MetricNames::kTest2, "description", MetricUnit::kSeconds, options);
@@ -680,7 +685,7 @@ TEST_F(SerializeMetricsTreeTest, Histogram) {
 TEST_F(SerializeMetricsTreeTest, RoleShard) {
     CounterOptions options{.serverStatusOptions = ServerStatusOptions{
                                .dottedPath = "ingress.openConnections",
-                               .role = ClusterRole{ClusterRole::ShardServer},
+                               .role = ClusterRole::ShardServer,
                            }};
     auto& counter = metricsService->createInt64Counter(
         MetricNames::kTest1, "description", MetricUnit::kSeconds, options);
@@ -693,17 +698,29 @@ TEST_F(SerializeMetricsTreeTest, RoleShard) {
 
     BSONObjBuilder noneBuilder;
     mongo::globalMetricTreeSet()[ClusterRole::None].appendTo(noneBuilder);
-    ASSERT_TRUE(noneBuilder.obj().isEmpty());
+    BSONObj noneObj = noneBuilder.obj();
+    ASSERT_THAT(noneObj["metrics"],
+                AnyOf(IsBSONElement(_, BSONType::eoo, _),
+                      IsBSONElement(_,
+                                    BSONType::object,
+                                    Matcher<BSONObj>(Not(BSONObjElements(
+                                        Contains(IsBSONElement("ingress", _, _))))))));
 
     BSONObjBuilder routerBuilder;
     mongo::globalMetricTreeSet()[ClusterRole::RouterServer].appendTo(routerBuilder);
-    ASSERT_TRUE(routerBuilder.obj().isEmpty());
+    BSONObj routerObj = routerBuilder.obj();
+    ASSERT_THAT(routerObj["metrics"],
+                AnyOf(IsBSONElement(_, BSONType::eoo, _),
+                      IsBSONElement(_,
+                                    BSONType::object,
+                                    Matcher<BSONObj>(Not(BSONObjElements(
+                                        Contains(IsBSONElement("ingress", _, _))))))));
 }
 
 TEST_F(SerializeMetricsTreeTest, RoleRouter) {
     CounterOptions options{.serverStatusOptions = ServerStatusOptions{
                                .dottedPath = "ingress.openConnections",
-                               .role = ClusterRole{ClusterRole::RouterServer},
+                               .role = ClusterRole::RouterServer,
                            }};
     auto& counter = metricsService->createInt64Counter(
         MetricNames::kTest1, "description", MetricUnit::kSeconds, options);
@@ -716,17 +733,29 @@ TEST_F(SerializeMetricsTreeTest, RoleRouter) {
 
     BSONObjBuilder noneBuilder;
     mongo::globalMetricTreeSet()[ClusterRole::None].appendTo(noneBuilder);
-    ASSERT_TRUE(noneBuilder.obj().isEmpty());
+    BSONObj noneObj = noneBuilder.obj();
+    ASSERT_THAT(noneObj["metrics"],
+                AnyOf(IsBSONElement(_, BSONType::eoo, _),
+                      IsBSONElement(_,
+                                    BSONType::object,
+                                    Matcher<BSONObj>(Not(BSONObjElements(
+                                        Contains(IsBSONElement("ingress", _, _))))))));
 
     BSONObjBuilder shardBuilder;
     mongo::globalMetricTreeSet()[ClusterRole::ShardServer].appendTo(shardBuilder);
-    ASSERT_TRUE(shardBuilder.obj().isEmpty());
+    BSONObj shardObj = shardBuilder.obj();
+    ASSERT_THAT(shardObj["metrics"],
+                AnyOf(IsBSONElement(_, BSONType::eoo, _),
+                      IsBSONElement(_,
+                                    BSONType::object,
+                                    Matcher<BSONObj>(Not(BSONObjElements(
+                                        Contains(IsBSONElement("ingress", _, _))))))));
 }
 
 TEST_F(SerializeMetricsTreeTest, RoleNone) {
     CounterOptions options{.serverStatusOptions = ServerStatusOptions{
                                .dottedPath = "ingress.openConnections",
-                               .role = ClusterRole{ClusterRole::None},
+                               .role = ClusterRole::None,
                            }};
     auto& counter = metricsService->createInt64Counter(
         MetricNames::kTest1, "description", MetricUnit::kSeconds, options);
@@ -738,26 +767,36 @@ TEST_F(SerializeMetricsTreeTest, RoleNone) {
 
     BSONObjBuilder shardBuilder;
     mongo::globalMetricTreeSet()[ClusterRole::ShardServer].appendTo(shardBuilder);
-    ASSERT_TRUE(shardBuilder.obj().isEmpty());
+    BSONObj shardObj = shardBuilder.obj();
+    ASSERT_THAT(shardObj["metrics"],
+                AnyOf(IsBSONElement(_, BSONType::eoo, _),
+                      IsBSONElement(_,
+                                    BSONType::object,
+                                    Matcher<BSONObj>(Not(BSONObjElements(
+                                        Contains(IsBSONElement("ingress", _, _))))))));
 
     BSONObjBuilder routerBuilder;
     mongo::globalMetricTreeSet()[ClusterRole::RouterServer].appendTo(routerBuilder);
-    ASSERT_TRUE(routerBuilder.obj().isEmpty());
+    BSONObj routerObj = routerBuilder.obj();
+    ASSERT_THAT(routerObj["metrics"],
+                AnyOf(IsBSONElement(_, BSONType::eoo, _),
+                      IsBSONElement(_,
+                                    BSONType::object,
+                                    Matcher<BSONObj>(Not(BSONObjElements(
+                                        Contains(IsBSONElement("ingress", _, _))))))));
 }
 
 TEST_F(SerializeMetricsTreeTest, SamePathDifferentMetricNamesDifferentRoles) {
     const std::string dottedPath = "counter";
 
-    CounterOptions shardOptions{
-        .serverStatusOptions = ServerStatusOptions{.dottedPath = dottedPath,
-                                                   .role = ClusterRole{ClusterRole::ShardServer}}};
+    CounterOptions shardOptions{.serverStatusOptions = ServerStatusOptions{
+                                    .dottedPath = dottedPath, .role = ClusterRole::ShardServer}};
     auto& shardCounter = metricsService->createInt64Counter(
         MetricNames::kTest1, "description", MetricUnit::kSeconds, shardOptions);
     shardCounter.add(7);
 
-    CounterOptions routerOptions{
-        .serverStatusOptions = ServerStatusOptions{.dottedPath = dottedPath,
-                                                   .role = ClusterRole{ClusterRole::RouterServer}}};
+    CounterOptions routerOptions{.serverStatusOptions = ServerStatusOptions{
+                                     .dottedPath = dottedPath, .role = ClusterRole::RouterServer}};
     auto& routerCounter = metricsService->createInt64Counter(
         MetricNames::kTest2, "description", MetricUnit::kSeconds, routerOptions);
     routerCounter.add(9);
@@ -774,7 +813,7 @@ TEST_F(SerializeMetricsTreeTest, SamePathDifferentMetricNamesDifferentRoles) {
 TEST_F(SerializeMetricsTreeTest, SharedPrefixSiblingLeaves) {
     CounterOptions optionsA{.serverStatusOptions = ServerStatusOptions{
                                 .dottedPath = "common.metricA",
-                                .role = ClusterRole{ClusterRole::None},
+                                .role = ClusterRole::None,
                             }};
     auto& counterA = metricsService->createInt64Counter(
         MetricNames::kTest1, "description", MetricUnit::kSeconds, optionsA);
@@ -782,7 +821,7 @@ TEST_F(SerializeMetricsTreeTest, SharedPrefixSiblingLeaves) {
 
     CounterOptions optionsB{.serverStatusOptions = ServerStatusOptions{
                                 .dottedPath = "common.metricB",
-                                .role = ClusterRole{ClusterRole::None},
+                                .role = ClusterRole::None,
                             }};
     auto& counterB = metricsService->createInt64Counter(
         MetricNames::kTest2, "description", MetricUnit::kSeconds, optionsB);
@@ -801,7 +840,7 @@ TEST_F(SerializeMetricsTreeTest, SharedPrefixSiblingLeaves) {
 TEST_F(SerializeMetricsTreeTest, SharedPrefixShallowAndDeep) {
     CounterOptions shallowOptions{.serverStatusOptions = ServerStatusOptions{
                                       .dottedPath = "common.shallowMetric",
-                                      .role = ClusterRole{ClusterRole::None},
+                                      .role = ClusterRole::None,
                                   }};
     auto& shallowCounter = metricsService->createInt64Counter(
         MetricNames::kTest1, "description", MetricUnit::kSeconds, shallowOptions);
@@ -809,7 +848,7 @@ TEST_F(SerializeMetricsTreeTest, SharedPrefixShallowAndDeep) {
 
     CounterOptions deepOptions{.serverStatusOptions = ServerStatusOptions{
                                    .dottedPath = "common.nested.deepMetric",
-                                   .role = ClusterRole{ClusterRole::None},
+                                   .role = ClusterRole::None,
                                }};
     auto& deepCounter = metricsService->createInt64Counter(
         MetricNames::kTest2, "description", MetricUnit::kSeconds, deepOptions);
@@ -1156,5 +1195,113 @@ TEST_F(CreateHistogramTest, RecordsDoubleValuesExplicitBoundaries) {
         EXPECT_EQ(data2.count, 1);
     }
 }
+using ClearForTestsTest = MetricsServiceTest;
+
+TEST_F(ClearForTestsTest, RemovesFromBothMetricsServiceAndServerStatusTree) {
+    CounterOptions options{.serverStatusOptions = ServerStatusOptions{
+                               .dottedPath = "ingress.openConnections",
+                               .role = ClusterRole::None,
+                           }};
+    auto& counter = metricsService->createInt64Counter(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds, options);
+    counter.add(11);
+
+    metricsService->clearForTests();
+
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+    if (metricsCapturer.canReadMetrics()) {
+        ASSERT_THROWS_CODE(metricsCapturer.readInt64Counter(MetricNames::kTest1),
+                           DBException,
+                           ErrorCodes::KeyNotFound);
+    }
+    {
+        BSONObjBuilder builder;
+        mongo::globalMetricTreeSet()[ClusterRole::None].appendTo(builder);
+        ASSERT_THAT(builder.obj()["metrics"],
+                    AnyOf(IsBSONElement(_, BSONType::eoo, _),
+                          IsBSONElement(_,
+                                        BSONType::object,
+                                        Matcher<BSONObj>(Not(BSONObjElements(
+                                            Contains(IsBSONElement("ingress", _, _))))))));
+    }
+}
+
+TEST_F(ClearForTestsTest, RemovesFromAllServerStatusTrees) {
+    struct RoleAndMetricName {
+        ClusterRole role;
+        const MetricName& name;
+    };
+    for (auto [role, name] : {RoleAndMetricName{ClusterRole::None, MetricNames::kTest1},
+                              RoleAndMetricName{ClusterRole::ShardServer, MetricNames::kTest2},
+                              RoleAndMetricName{ClusterRole::RouterServer, MetricNames::kTest3}}) {
+        CounterOptions options{.serverStatusOptions = ServerStatusOptions{
+                                   .dottedPath = "ingress.openConnections",
+                                   .role = role,
+                               }};
+        auto& counter = metricsService->createInt64Counter(
+            name, "description", MetricUnit::kOperations, options);
+        counter.add(11);
+
+        BSONObjBuilder builder;
+        mongo::globalMetricTreeSet()[ClusterRole(role)].appendTo(builder);
+        ASSERT_EQ(builder.obj()["metrics"]["ingress"]["openConnections"].Long(), 11);
+    }
+
+    metricsService->clearForTests();
+
+    for (auto role : {ClusterRole::None, ClusterRole::ShardServer, ClusterRole::RouterServer}) {
+        BSONObjBuilder builder;
+        mongo::globalMetricTreeSet()[ClusterRole(role)].appendTo(builder);
+        ASSERT_THAT(builder.obj()["metrics"],
+                    AnyOf(IsBSONElement(_, BSONType::eoo, _),
+                          IsBSONElement(_,
+                                        BSONType::object,
+                                        Matcher<BSONObj>(Not(BSONObjElements(
+                                            Contains(IsBSONElement("ingress", _, _))))))));
+    }
+}
+
+TEST_F(ClearForTestsTest, ClearsObservableCallbacks) {
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+    if (!metricsCapturer.canReadMetrics()) {
+        return;
+    }
+    auto& counter = metricsService->createInt64Counter(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    counter.add(11);
+    ASSERT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1), 11);
+
+    metricsService->clearForTests();
+
+    // Re-register the same metric name. If the old observable callback was not cleared, triggering
+    // an export would invoke it with a dangling pointer (crash), or report the stale value 11.
+    metricsService->createInt64Counter(MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    ASSERT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1), 0);
+}
+
+TEST_F(ClearForTestsTest, AllowsReregistrationWithDifferentOptions) {
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+    metricsService->createInt64Counter(MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    metricsService->clearForTests();
+    auto& counter =
+        metricsService->createInt64Counter(MetricNames::kTest1, "description", MetricUnit::kBytes);
+    counter.add(5);
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1), 5);
+    }
+}
+
+TEST_F(ClearForTestsTest, AllowsReregistrationWithDifferentType) {
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+    metricsService->createInt64Counter(MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    metricsService->clearForTests();
+    auto& counter = metricsService->createDoubleCounter(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    counter.add(5.0);
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_DOUBLE_EQ(metricsCapturer.readDoubleCounter(MetricNames::kTest1), 5.0);
+    }
+}
+
 }  // namespace
 }  // namespace mongo::otel::metrics

@@ -331,8 +331,60 @@ void MetricTree::_add(StringData path, std::unique_ptr<ServerStatusMetric> metri
     }
 }
 
-void MetricTree::clearForTests() {
-    _children.clear();
+void MetricTree::removeForTests(StringData path) {
+    if (path.empty()) {
+        return;
+    }
+    if (path.starts_with('.')) {
+        path.remove_prefix(1);
+        if (!path.empty()) {
+            _removeForTests(path);
+        }
+    } else {
+        _removeForTests(fmt::format("metrics.{}", path));
+    }
+}
+
+void MetricTree::_removeForTests(StringData path) {
+    // Walk the path, recording (parent, key) pairs so we can prune empty subtrees afterward.
+    struct Node {
+        MetricTree* parent;
+        std::string key;
+    };
+    std::vector<Node> stack;
+    StringData tail = path;
+    MetricTree* subTree = this;
+
+    while (true) {
+        auto dot = tail.find('.');
+
+        if (dot == std::string::npos) {
+            subTree->_children.erase(std::string{tail});
+            break;
+        }
+
+        StringData part = tail.substr(0, dot);
+        tail = tail.substr(dot + 1);
+        auto iter = subTree->_children.find(part);
+
+        if (iter == subTree->_children.end() || !iter->second.isSubtree()) {
+            return;
+        }
+        stack.push_back({subTree, std::string{part}});
+        subTree = iter->second.getSubtree().get();
+    }
+
+    // Prune empty parent subtrees bottom-up.
+    for (auto it = stack.rbegin(); it != stack.rend(); ++it) {
+        auto childIter = it->parent->_children.find(it->key);
+        if (childIter == it->parent->_children.end() || !childIter->second.isSubtree()) {
+            break;
+        }
+        if (!childIter->second.getSubtree()->_children.empty()) {
+            break;
+        }
+        it->parent->_children.erase(childIter);
+    }
 }
 
 void appendMergedTrees(std::vector<const MetricTree*> trees,
@@ -360,11 +412,5 @@ MetricTreeSet& globalMetricTreeSet() {
     return *obj;
 }
 
-void clearGlobalMetricTreeSetForTests() {
-    for (const auto role :
-         {ClusterRole::None, ClusterRole::ShardServer, ClusterRole::RouterServer}) {
-        globalMetricTreeSet()[role].clearForTests();
-    }
-}
 
 }  // namespace mongo

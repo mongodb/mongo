@@ -29,29 +29,252 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands/db_command_test_fixture.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/service_entry_point_shard_role.h"
+#include "mongo/db/topology/cluster_role.h"
+#include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
+#include "mongo/s/service_entry_point_router_role.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cstdint>
+
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {
-class ServerStatusServersTest : public DBCommandTestFixture {};
 
-TEST_F(ServerStatusServersTest, IncludesOtelMetrics) {
-    otel::metrics::OtelMetricsCapturer capturer;
+class ServerStatusServersTest : public DBCommandTestFixture {
+public:
+    void setUp() override {
+        DBCommandTestFixture::setUp();
+    }
+
+    void tearDown() override {
+        otel::metrics::MetricsService::instance().clearForTests();
+        DBCommandTestFixture::tearDown();
+    }
+};
+
+TEST_F(ServerStatusServersTest, IncludeUnderMetricsSection) {
     auto& metricsService = otel::metrics::MetricsService::instance();
+    otel::metrics::CounterOptions options{
+        .serverStatusOptions = otel::metrics::ServerStatusOptions{.dottedPath = "test.metric1",
+                                                                  .role = ClusterRole::None}};
     auto& counter = metricsService.createInt64Counter(otel::metrics::MetricNames::kTest1,
                                                       "description",
                                                       otel::metrics::MetricUnit::kSeconds,
-                                                      {.inServerStatus = true});
+                                                      options);
     counter.add(11);
 
-    BSONObj result = runCommand(BSON("serverStatus" << 1 << "otelMetrics" << 1));
-    ASSERT_TRUE(result.hasField("otelMetrics"));
+    BSONObj resultObj = runCommand(BSON("serverStatus" << 1 << "metrics" << 1));
+    ASSERT_TRUE(resultObj.hasField("metrics"));
+    BSONObj metricsObj = resultObj.getObjectField("metrics");
+    ASSERT_EQ(metricsObj["test"]["metric1"].Long(), 11);
+}
 
-    BSONObj otelMetrics = result.getObjectField("otelMetrics");
-    ASSERT_TRUE(otelMetrics.hasField("test_only.metric1_seconds"));
-    EXPECT_EQ(otelMetrics.getIntField("test_only.metric1_seconds"), 11);
+TEST_F(ServerStatusServersTest, IncludeUnderOtelMetricsSection) {
+    auto& metricsService = otel::metrics::MetricsService::instance();
+    otel::metrics::CounterOptions options{
+        .inServerStatus = true,
+    };
+    auto& counter = metricsService.createInt64Counter(otel::metrics::MetricNames::kTest1,
+                                                      "description",
+                                                      otel::metrics::MetricUnit::kSeconds,
+                                                      options);
+    counter.add(11);
+
+    BSONObj resultObj = runCommand(BSON("serverStatus" << 1 << "otelMetrics" << 1));
+    ASSERT_TRUE(resultObj.hasField("otelMetrics"));
+    BSONObj otelMetricsObj = resultObj.getObjectField("otelMetrics");
+    ASSERT_EQ(otelMetricsObj["test_only.metric1_seconds"].Long(), 11);
+}
+
+TEST_F(ServerStatusServersTest, IncludeUnderOtelMetricsSectionAndMetricsSection) {
+    auto& metricsService = otel::metrics::MetricsService::instance();
+
+    otel::metrics::CounterOptions flatOptions{
+        .inServerStatus = true,
+    };
+    auto& flatCounter = metricsService.createInt64Counter(otel::metrics::MetricNames::kTest1,
+                                                          "description",
+                                                          otel::metrics::MetricUnit::kSeconds,
+                                                          flatOptions);
+    flatCounter.add(11);
+
+    otel::metrics::CounterOptions nestedOptions{
+        .serverStatusOptions = otel::metrics::ServerStatusOptions{.dottedPath = "test.metric2",
+                                                                  .role = ClusterRole::None},
+    };
+    auto& nestedCounter = metricsService.createInt64Counter(otel::metrics::MetricNames::kTest2,
+                                                            "description",
+                                                            otel::metrics::MetricUnit::kSeconds,
+                                                            nestedOptions);
+    nestedCounter.add(22);
+
+    BSONObj resultObj =
+        runCommand(BSON("serverStatus" << 1 << "otelMetrics" << 1 << "metrics" << 1));
+    ASSERT_TRUE(resultObj.hasField("otelMetrics"));
+    ASSERT_TRUE(resultObj.hasField("metrics"));
+
+    BSONObj otelMetricsObj = resultObj.getObjectField("otelMetrics");
+    ASSERT_EQ(otelMetricsObj["test_only.metric1_seconds"].Long(), 11);
+
+    BSONObj metricsObj = resultObj.getObjectField("metrics");
+    ASSERT_EQ(metricsObj["test"]["metric2"].Long(), 22);
+}
+
+TEST_F(ServerStatusServersTest, ExcludeWhenServerStatusOptionsAndInServerStatusNotset) {
+    auto& metricsService = otel::metrics::MetricsService::instance();
+    otel::metrics::CounterOptions options{};
+    ASSERT_FALSE(options.serverStatusOptions.has_value());
+    ASSERT_FALSE(options.inServerStatus);
+
+    auto& counter = metricsService.createInt64Counter(otel::metrics::MetricNames::kTest1,
+                                                      "description",
+                                                      otel::metrics::MetricUnit::kSeconds,
+                                                      options);
+    counter.add(11);
+
+    BSONObj resultObj =
+        runCommand(BSON("serverStatus" << 1 << "otelMetrics" << 1 << "metrics" << 1));
+    ASSERT_FALSE(resultObj.hasField("otelMetrics"));
+    // The "metrics" section may still exist because of non-otel serverStatus metrics.
+    if (resultObj.hasField("metrics")) {
+        BSONObj metricsObj = resultObj.getObjectField("metrics");
+        ASSERT_FALSE(metricsObj.hasField("test_only")) << metricsObj.toString();
+    }
+}
+
+class ServerStatusServersRoleTestFixture : public ServiceContextTest {
+public:
+    void setUp() override {
+        ServiceContextTest::setUp();
+        ReadWriteConcernDefaults::create(getService(), _lookupMock.getFetchDefaultsFn());
+    }
+
+    void tearDown() override {
+        otel::metrics::MetricsService::instance().clearForTests();
+        ServiceContextTest::tearDown();
+    }
+
+protected:
+    otel::metrics::Counter<int64_t>& createCounter(otel::metrics::MetricsService& metricsService,
+                                                   otel::metrics::MetricName metricName,
+                                                   std::string dottedPath,
+                                                   ClusterRole role) {
+        return metricsService.createInt64Counter(metricName,
+                                                 "description",
+                                                 otel::metrics::MetricUnit::kSeconds,
+                                                 otel::metrics::CounterOptions{
+                                                     .serverStatusOptions =
+                                                         otel::metrics::ServerStatusOptions{
+                                                             .dottedPath = std::move(dottedPath),
+                                                             .role = role,
+                                                         },
+                                                 });
+    }
+
+    BSONObj getMetricsSection(StringData pathPrefix) {
+        Service* const service = getServiceContext()->getService();
+        ServiceContext::UniqueClient client =
+            service->makeClient("ServerStatusServersRoleTestFixture");
+        AlternativeClientRegion acr(client);
+        auto opCtx = cc().makeOperationContext();
+        DBDirectClient dbclient(opCtx.get());
+
+        BSONObj resultObj;
+        // Specify none: 1 to exclude all other sections.
+        dbclient.runCommand(DatabaseName::kAdmin,
+                            BSON("serverStatus" << 1 << "none" << 1 << "metrics" << 1),
+                            resultObj);
+        ASSERT_OK(getStatusFromWriteCommandReply(resultObj));
+
+        ASSERT_TRUE(resultObj.hasField("metrics"));
+        BSONObj metricsObj = resultObj.getObjectField("metrics");
+        return metricsObj.getObjectField(pathPrefix).getOwned();
+    }
+
+private:
+    // Allows for commands to not specify a default read/write concern.
+    ReadWriteConcernDefaultsLookupMock _lookupMock;
+};
+
+class ServerStatusServersRoleShardTest : public virtual service_context_test::ShardRoleOverride,
+                                         public ServerStatusServersRoleTestFixture {
+
+    void setUp() override {
+        ServerStatusServersRoleTestFixture::setUp();
+        // Initialize the serviceEntryPoint so that DBDirectClient can function.
+        getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
+
+        const auto service = getServiceContext();
+        auto replCoord =
+            std::make_unique<repl::ReplicationCoordinatorMock>(service, repl::ReplSettings{});
+        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+        repl::ReplicationCoordinator::set(service, std::move(replCoord));
+    }
+};
+
+TEST_F(ServerStatusServersRoleShardTest, MergesNoneAndShardMetricTreesExcludesRouter) {
+    auto& metricsService = otel::metrics::MetricsService::instance();
+    createCounter(metricsService,
+                  otel::metrics::MetricNames::kTestShardMergeNone,
+                  "test.noneMetric",
+                  ClusterRole::None)
+        .add(11);
+    createCounter(metricsService,
+                  otel::metrics::MetricNames::kTestShardMergeShard,
+                  "test.shardMetric",
+                  ClusterRole::ShardServer)
+        .add(22);
+    createCounter(metricsService,
+                  otel::metrics::MetricNames::kTestShardMergeRouter,
+                  "test.routerMetric",
+                  ClusterRole::RouterServer)
+        .add(33);
+
+    BSONObj section = getMetricsSection("test");
+    EXPECT_EQ(section.getIntField("noneMetric"), 11);
+    EXPECT_EQ(section.getIntField("shardMetric"), 22);
+    ASSERT_FALSE(section.hasField("routerMetric")) << section.toString();
+}
+
+class ServerStatusServersRoleRouterTest : public virtual service_context_test::RouterRoleOverride,
+                                          public ServerStatusServersRoleTestFixture {
+    void setUp() override {
+        ServerStatusServersRoleTestFixture::setUp();
+        // Initialize the serviceEntryPoint so that DBDirectClient can function.
+        getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointRouterRole>());
+    }
+};
+
+TEST_F(ServerStatusServersRoleRouterTest, MergesNoneAndRouterMetricTreesExcludesShard) {
+    auto& metricsService = otel::metrics::MetricsService::instance();
+    createCounter(metricsService,
+                  otel::metrics::MetricNames::kTestRouterMergeNone,
+                  "test.noneMetric",
+                  ClusterRole::None)
+        .add(11);
+    createCounter(metricsService,
+                  otel::metrics::MetricNames::kTestRouterMergeShard,
+                  "test.shardMetric",
+                  ClusterRole::ShardServer)
+        .add(22);
+    createCounter(metricsService,
+                  otel::metrics::MetricNames::kTestRouterMergeRouter,
+                  "test.routerMetric",
+                  ClusterRole::RouterServer)
+        .add(33);
+
+    BSONObj section = getMetricsSection("test");
+    EXPECT_EQ(section.getIntField("noneMetric"), 11);
+    ASSERT_FALSE(section.hasField("shardMetric")) << section.toString();
+    EXPECT_EQ(section.getIntField("routerMetric"), 33);
 }
 
 }  // namespace

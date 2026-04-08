@@ -214,6 +214,12 @@ public:
      */
     void appendMetricsForServerStatus(BSONObjBuilder& bsonBuilder) const;
 
+    /**
+     * Used in unit tests only. Removes all metrics registered by this MetricsService from the
+     * internal map and from the serverStatus metric trees.
+     */
+    void clearForTests();
+
 #ifdef MONGO_CONFIG_OTEL
     /**
      * Initializes the metrics service by registering metrics created before initialization with the
