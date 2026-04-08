@@ -678,6 +678,7 @@ mongo_cc_unit_test(
         "plan_explainer_test.cpp",
         "plan_ranker_index_prefix_test.cpp",
         "plan_ranker_test.cpp",
+        "query_feature_flag_test.cpp",
         "query_request_test.cpp",
         "query_settings_test.cpp",
         "query_utils_test.cpp",
