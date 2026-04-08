@@ -1,7 +1,8 @@
 /**
- * Tests that $search and $searchMeta work on views via the IFR flag kickback mechanism.
+ * Tests that $search and $searchMeta work on views and in $unionWith via the IFR flag kickback
+ * mechanism.
  *
- * With featureFlagSearchExtension=true: the extension stage is used, detects the view,
+ * With featureFlagSearchExtension=true: the extension stage is used, detects kickback condition,
  * kicks back to legacy search, and the query succeeds.
  *
  * With featureFlagSearchExtension=false: legacy search is used from the start and the
@@ -17,8 +18,10 @@ import {
     createTestView,
     getExtensionSearchUsedCount,
     getLegacySearchUsedCount,
+    getSearchInUnionWithKickbackRetryCount,
     getSearchOnViewKickbackRetryCount,
     kSearchQuery,
+    kTestCollName,
     kTestViewName,
     runQueriesAndVerifyMetrics,
     setUpSearchMocks,
@@ -64,11 +67,146 @@ function runSearchViewTest(conn, mongotMock, isSearchMeta, featureFlagValue) {
     });
 }
 
+/**
+ * Runs $search or $searchMeta inside a $unionWith subpipeline on a collection.
+ */
+function runUnionWithSearchStageTests(conn, mongotMock, isSearchMeta, featureFlagValue) {
+    const {testDb, coll} = createTestView(conn);
+
+    setUpSearchMocks(mongotMock, {
+        coll,
+        testDb,
+        query: kSearchQuery,
+        isSearchMeta,
+        startingCursorId: 123,
+    });
+
+    // The inUnionWith kickback fires once per query when flag=true (on the node that creates
+    // the $unionWith subpipeline). With flag=false, legacy runs from the start.
+    const expectedInUnionWithKickbackDelta = featureFlagValue ? 1 : 0;
+
+    const stage = isSearchMeta ? {$searchMeta: kSearchQuery} : {$search: kSearchQuery};
+    const unionWithStage = {
+        $unionWith: {
+            coll: coll.getName(),
+            pipeline: [stage],
+        },
+    };
+
+    runQueriesAndVerifyMetrics({
+        conn,
+        getRetryCountFn: getSearchInUnionWithKickbackRetryCount,
+        retryMetricName: "inUnionWithKickbackRetries",
+        getLegacyCountFn: getLegacySearchUsedCount,
+        getExtensionCountFn: getExtensionSearchUsedCount,
+        featureFlagName: "featureFlagSearchExtension",
+        expectedRetryDelta: expectedInUnionWithKickbackDelta,
+        expectedLegacyDelta: 1,
+        queries: [
+            () => {
+                coll.aggregate([unionWithStage]).toArray();
+            },
+        ],
+    });
+}
+
+/**
+ * Runs $search or $searchMeta inside a $unionWith subpipeline targeting a view.
+ */
+function runUnionWithOnViewSearchTests(conn, mongotMock, isSearchMeta, featureFlagValue) {
+    const {testDb, coll} = createTestView(conn);
+
+    setUpSearchMocks(mongotMock, {
+        coll,
+        testDb,
+        viewName: kTestViewName,
+        query: kSearchQuery,
+        isSearchMeta,
+        startingCursorId: 123,
+    });
+
+    const expectedInUnionWithKickbackDelta = featureFlagValue ? 1 : 0;
+
+    const stage = isSearchMeta ? {$searchMeta: kSearchQuery} : {$search: kSearchQuery};
+    const unionWithStage = {
+        $unionWith: {
+            coll: kTestViewName,
+            pipeline: [stage],
+        },
+    };
+
+    runQueriesAndVerifyMetrics({
+        conn,
+        getRetryCountFn: getSearchInUnionWithKickbackRetryCount,
+        retryMetricName: "inUnionWithKickbackRetries",
+        getLegacyCountFn: getLegacySearchUsedCount,
+        getExtensionCountFn: getExtensionSearchUsedCount,
+        featureFlagName: "featureFlagSearchExtension",
+        expectedRetryDelta: expectedInUnionWithKickbackDelta,
+        expectedLegacyDelta: 1,
+        queries: [
+            () => {
+                coll.aggregate([unionWithStage]).toArray();
+            },
+        ],
+    });
+}
+
+/**
+ * Runs $unionWith targeting a view whose pipeline contains $search or $searchMeta.
+ */
+function runUnionWithOnViewWithSearchInViewDefinitionTests(conn, mongotMock, isSearchMeta, featureFlagValue) {
+    const {testDb, coll} = createTestView(conn);
+
+    const searchStage = isSearchMeta ? {$searchMeta: kSearchQuery} : {$search: kSearchQuery};
+    const searchViewName = kTestViewName + (isSearchMeta ? "_searchMeta" : "_search");
+    const searchViewExists = testDb.getCollectionInfos({name: searchViewName, type: "view"}).length > 0;
+    if (!searchViewExists) {
+        assert.commandWorked(testDb.createView(searchViewName, kTestCollName, [searchStage]));
+    }
+
+    setUpSearchMocks(mongotMock, {
+        coll,
+        testDb,
+        query: kSearchQuery,
+        isSearchMeta,
+        startingCursorId: 123,
+    });
+
+    const expectedInUnionWithKickbackDelta = featureFlagValue ? 1 : 0;
+
+    const unionWithStage = {
+        $unionWith: {
+            coll: searchViewName,
+            pipeline: [],
+        },
+    };
+
+    runQueriesAndVerifyMetrics({
+        conn,
+        getRetryCountFn: getSearchInUnionWithKickbackRetryCount,
+        retryMetricName: "inUnionWithKickbackRetries",
+        getLegacyCountFn: getLegacySearchUsedCount,
+        getExtensionCountFn: getExtensionSearchUsedCount,
+        featureFlagName: "featureFlagSearchExtension",
+        expectedRetryDelta: expectedInUnionWithKickbackDelta,
+        expectedLegacyDelta: 1,
+        queries: [
+            () => {
+                coll.aggregate([unionWithStage]).toArray();
+            },
+        ],
+    });
+}
+
 function runTests(conn, mongotMock) {
     for (const isSearchMeta of [false, true]) {
         for (const featureFlagValue of [true, false]) {
             assert.commandWorked(conn.adminCommand({setParameter: 1, featureFlagSearchExtension: featureFlagValue}));
             runSearchViewTest(conn, mongotMock, isSearchMeta, featureFlagValue);
+            runUnionWithSearchStageTests(conn, mongotMock, isSearchMeta, featureFlagValue);
+            runUnionWithOnViewSearchTests(conn, mongotMock, isSearchMeta, featureFlagValue);
+            runUnionWithOnViewWithSearchInViewDefinitionTests(conn, mongotMock, isSearchMeta, featureFlagValue);
         }
     }
 }
