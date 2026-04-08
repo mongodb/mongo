@@ -433,8 +433,7 @@ TEST_F(TargetedMirrorMaestroTest, UpdateCachedHostsOnUpdatedTag) {
     auto config = setAndVerifyConfig(version, term, kTwoHostsEW, 2);
 
     // Update cached hosts
-    updateCachedHostsForTargetedMirroring_forTest(
-        getServiceContext(), config, false /* tagChanged */);
+    updateCachedHostsForTargetedMirroring_forTest(getServiceContext(), false /* tagChanged */);
 
     // Verify hosts were cached
     auto hosts = getCachedHosts();
@@ -448,8 +447,7 @@ TEST_F(TargetedMirrorMaestroTest, UpdateCachedHostsOnUpdatedTag) {
     _serverParameterController =
         ServerParameterControllerForTest("mirrorReads", updatedServerParam);
 
-    updateCachedHostsForTargetedMirroring_forTest(
-        getServiceContext(), config, true /* tagChanged */);
+    updateCachedHostsForTargetedMirroring_forTest(getServiceContext(), true /* tagChanged */);
 
     // Verify hosts were updated
     hosts = getCachedHosts();
@@ -467,8 +465,7 @@ TEST_F(TargetedMirrorMaestroTest, AssertCachedHostsUpdatedOnServerParameterChang
     auto config = setAndVerifyConfig(version, term, kTwoHostsEW, 2);
 
     // Update cached hosts
-    updateCachedHostsForTargetedMirroring_forTest(
-        getServiceContext(), config, false /* tagChanged */);
+    updateCachedHostsForTargetedMirroring_forTest(getServiceContext(), false /* tagChanged */);
 
     // Verify hosts were cached
     auto hosts = getCachedHosts();
@@ -498,8 +495,7 @@ TEST_F(TargetedMirrorMaestroTest, UpdateCachedHostsOnTopologyVersionChange) {
     auto config = setAndVerifyConfig(version, term, kTwoHostsEW, 2);
 
     // Update cached hosts
-    updateCachedHostsForTargetedMirroring_forTest(
-        getServiceContext(), config, false /* tagChanged */);
+    updateCachedHostsForTargetedMirroring_forTest(getServiceContext(), false /* tagChanged */);
 
     // Verify hosts were cached
     auto hosts = getCachedHosts();
@@ -510,8 +506,7 @@ TEST_F(TargetedMirrorMaestroTest, UpdateCachedHostsOnTopologyVersionChange) {
     version++;
     config = setAndVerifyConfig(version, term, kTwoHostsEE, 2);
 
-    updateCachedHostsForTargetedMirroring_forTest(
-        getServiceContext(), config, false /* tagChanged */);
+    updateCachedHostsForTargetedMirroring_forTest(getServiceContext(), false /* tagChanged */);
 
     // Verify hosts were updated
     hosts = getCachedHosts();
@@ -528,8 +523,7 @@ TEST_F(TargetedMirrorMaestroTest, NoUpdateToCachedHostsIfTopologyVersionUnchange
     auto config = setAndVerifyConfig(version, term, kTwoHostsEW, 2);
 
     // Update cached hosts
-    updateCachedHostsForTargetedMirroring_forTest(
-        getServiceContext(), config, false /* tagChanged */);
+    updateCachedHostsForTargetedMirroring_forTest(getServiceContext(), false /* tagChanged */);
 
     // Verify hosts were cached
     auto hosts = getCachedHosts();
@@ -541,8 +535,7 @@ TEST_F(TargetedMirrorMaestroTest, NoUpdateToCachedHostsIfTopologyVersionUnchange
     // happen in production that tags are changed without a change in version.
     config = setAndVerifyConfig(version, term, kTwoHostsEE, 2);
 
-    updateCachedHostsForTargetedMirroring_forTest(
-        getServiceContext(), config, false /* tagChanged */);
+    updateCachedHostsForTargetedMirroring_forTest(getServiceContext(), false /* tagChanged */);
 
     // Verify hosts were not updated
     hosts = getCachedHosts();
@@ -561,8 +554,7 @@ DEATH_TEST_F(TargetedMirrorMaestroTestDeathTest,
     auto config = setAndVerifyConfig(version, term, kTwoHostsEW, 2);
 
     // Update cached hosts
-    updateCachedHostsForTargetedMirroring_forTest(
-        getServiceContext(), config, false /* tagChanged */);
+    updateCachedHostsForTargetedMirroring_forTest(getServiceContext(), false /* tagChanged */);
 
     // Verify hosts were cached
     auto hosts = getCachedHosts();
@@ -573,8 +565,7 @@ DEATH_TEST_F(TargetedMirrorMaestroTestDeathTest,
     version--;
     config = setAndVerifyConfig(version, term, kTwoHostsWE, 2);
 
-    updateCachedHostsForTargetedMirroring_forTest(
-        getServiceContext(), config, false /* tagChanged */);
+    updateCachedHostsForTargetedMirroring_forTest(getServiceContext(), false /* tagChanged */);
 }
 
 TEST_F(TargetedMirrorMaestroTest, UpdateHostsOnNewTermEvenIfLowerConfigVersion) {
@@ -585,8 +576,7 @@ TEST_F(TargetedMirrorMaestroTest, UpdateHostsOnNewTermEvenIfLowerConfigVersion) 
     auto config = setAndVerifyConfig(version, term, kTwoHostsEW, 2);
 
     // Update cached hosts
-    updateCachedHostsForTargetedMirroring_forTest(
-        getServiceContext(), config, false /* tagChanged */);
+    updateCachedHostsForTargetedMirroring_forTest(getServiceContext(), false /* tagChanged */);
 
     // Verify hosts were cached
     auto hosts = getCachedHosts();
@@ -599,8 +589,7 @@ TEST_F(TargetedMirrorMaestroTest, UpdateHostsOnNewTermEvenIfLowerConfigVersion) 
     term++;
     config = setAndVerifyConfig(version, term, kTwoHostsEE, 2);
 
-    updateCachedHostsForTargetedMirroring_forTest(
-        getServiceContext(), config, false /* tagChanged */);
+    updateCachedHostsForTargetedMirroring_forTest(getServiceContext(), false /* tagChanged */);
 
     // Verify hosts were updated
     hosts = getCachedHosts();
@@ -621,8 +610,7 @@ TEST_F(TargetedMirrorMaestroTest, AssertExpectedHostsTargeted) {
     auto config = setAndVerifyConfig(version, term, kTwoHostsEW, 2);
 
     // Update cached hosts
-    updateCachedHostsForTargetedMirroring_forTest(
-        getServiceContext(), config, false /* tagChanged */);
+    updateCachedHostsForTargetedMirroring_forTest(getServiceContext(), false /* tagChanged */);
 
     // Verify hosts were cached
     auto hosts = getCachedHosts();
@@ -655,7 +643,7 @@ TEST_F(TargetedMirrorMaestroTest, UninitializedConfigDefersHostCompute) {
     _replCoord->setGetConfigReturnValue(config);
 
     // Attempt to update cached hosts and assert host size.
-    updateCachedHostsForTargetedMirroring_forTest(service, config, false /* tagChanged */);
+    updateCachedHostsForTargetedMirroring_forTest(service, false /* tagChanged */);
     ASSERT_EQ(0, getCachedHosts().size());
 
     // Update the config to be initialized.
