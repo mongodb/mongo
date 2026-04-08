@@ -35,6 +35,11 @@
 
 namespace mongo {
 
+struct EngineSelectionResult {
+    EngineChoice engine;
+    const QuerySolutionNode* planPushdownRoot;
+};
+
 /**
  * Returns 'false' for query plans that can not be executed in SBE.
  */
@@ -43,7 +48,7 @@ bool isPlanSbeEligible(const QuerySolution* solution);
 /**
  * Returns the engine of choice for executing the specified query plan.
  */
-EngineChoice engineSelectionForPlan(const QuerySolution* solution);
+EngineSelectionResult engineSelectionForPlan(const QuerySolution* solution);
 
 /**
  * Returns true iff 'keyPattern' has fields A and B where all of the following hold

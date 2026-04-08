@@ -81,7 +81,10 @@ TEST_F(EngineSelectionPlanFixture, LookupUnwind) {
                                                        boost::none);
     auto solution = std::make_unique<QuerySolution>();
     solution->setRoot(std::move(lookupUnwind));
-    ASSERT_TRUE(engineSelectionForPlan(solution.get()) == EngineChoice::kSbe);
+
+    EngineSelectionResult result = engineSelectionForPlan(solution.get());
+    ASSERT_EQ(result.engine, EngineChoice::kSbe);
+    ASSERT_EQ(result.planPushdownRoot, solution->root());
 }
 
 // Test eligibility of DISTINCT_SCAN plans.
@@ -140,7 +143,10 @@ TEST_F(EngineSelectionPlanFixture, FetchIxScanSelection) {
     BSONObj indexFields = fromjson("{a: 1}");
 
     std::unique_ptr<QuerySolution> solution = makeIndexScanFetchPlan(indexFields);
-    ASSERT_EQ(engineSelectionForPlan(solution.get()), EngineChoice::kClassic);
+
+    EngineSelectionResult result = engineSelectionForPlan(solution.get());
+    ASSERT_EQ(result.engine, EngineChoice::kClassic);
+    ASSERT_EQ(result.planPushdownRoot, nullptr);
 }
 
 }  // namespace mongo

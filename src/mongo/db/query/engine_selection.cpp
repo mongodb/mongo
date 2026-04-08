@@ -171,7 +171,7 @@ EngineChoice shouldUseRegularSbeDeferredEngineSelection(
     }
 
     extendSolutionWithPipelineFn();
-    return engineSelectionForPlan(solution);
+    return engineSelectionForPlan(solution).engine;
 }
 
 /**
