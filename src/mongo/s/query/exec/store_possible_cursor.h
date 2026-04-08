@@ -42,6 +42,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
+#include <functional>
 #include <memory>
 
 #include <boost/none.hpp>
@@ -126,5 +127,25 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         OwnedRemoteCursor&& remoteCursor,
                                         PrivilegeVector privileges,
                                         TailableModeEnum tailableMode);
+
+/**
+ * Overload of storePossibleCursor(), but applies 'documentTransform' to every result document, both
+ * in the initial first batch and in all subsequent getMore batches. The transform is injected into
+ * the cursor's execution plan via RouterStageTransform.
+ *
+ * Use this when a command-level response transformation must be applied uniformly across all
+ * cursor batches (e.g., stripping internal fields before sending response to clients).
+ */
+StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
+                                        const ShardId& shardId,
+                                        const HostAndPort& server,
+                                        const BSONObj& cmdResult,
+                                        const NamespaceString& requestedNss,
+                                        std::shared_ptr<executor::TaskExecutor> executor,
+                                        ClusterCursorManager* cursorManager,
+                                        PrivilegeVector privileges,
+                                        std::function<BSONObj(BSONObj)> documentTransform,
+                                        TailableModeEnum tailableMode = TailableModeEnum::kNormal,
+                                        boost::optional<BSONObj> routerSort = boost::none);
 
 }  // namespace MONGO_MOD_PUBLIC mongo

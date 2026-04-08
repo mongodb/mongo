@@ -46,6 +46,16 @@ function removePrimaryField(listOfCollections) {
     return listResult;
 }
 
+function removeRecordIdsReplicatedField(listOfCollections) {
+    return listOfCollections.map((entry) => {
+        const {
+            info: {recordIdsReplicated: _, ...infoWithoutRecordIdsReplicated},
+            ...entryWithoutInfo
+        } = entry;
+        return {info: infoWithoutRecordIdsReplicated, ...entryWithoutInfo};
+    });
+}
+
 // TODO SERVER-120014: Remove once 9.0 becomes last LTS and all timeseries collections are viewless.
 function getBucketCollections(listOfCollections) {
     return listOfCollections.filter((collEntry) => collEntry["ns"].includes(".system.buckets."));
@@ -112,6 +122,12 @@ function compareInternalListCollectionsStageAgainstListCollections(dbTest, expec
         internalStageResponseAgainstDbTest = removeUuidField(internalStageResponseAgainstDbTest);
     }
     internalStageResponseAgainstDbTest = removePrimaryField(internalStageResponseAgainstDbTest);
+    if (FixtureHelpers.isMongos(dbTest)) {
+        // The router scrubs 'recordIdsReplicated' from listCollections responses because it is an
+        // internal field that can be inconsistent across shards. $_internalListCollections returns
+        // it unconditionally, so remove it before comparing.
+        internalStageResponseAgainstDbTest = removeRecordIdsReplicatedField(internalStageResponseAgainstDbTest);
+    }
 
     const internalListCollectionsBuckets = getBucketCollections(internalStageResponseAgainstDbTest);
     internalStageResponseAgainstDbTest = normalizeTimeseriesCollectionFormat(internalStageResponseAgainstDbTest);
@@ -136,12 +152,22 @@ function compareInternalListCollectionsStageAgainstListCollections(dbTest, expec
         stageResponseAgainstAdminDb = removeUuidField(stageResponseAgainstAdminDb);
     }
     stageResponseAgainstAdminDb = removePrimaryField(stageResponseAgainstAdminDb);
+    if (FixtureHelpers.isMongos(dbTest)) {
+        // The router scrubs 'recordIdsReplicated' from listCollections responses because it is an
+        // internal field that can be inconsistent across shards. $_internalListCollections returns
+        // it unconditionally, so remove it before comparing.
+        stageResponseAgainstAdminDb = removeRecordIdsReplicatedField(stageResponseAgainstAdminDb);
+    }
     stageResponseAgainstAdminDb = normalizeTimeseriesCollectionFormat(stageResponseAgainstAdminDb);
 
     listCollectionsResponse.forEach((entry) => {
-        assert.contains(
-            entry,
-            stageResponseAgainstAdminDb,
+        // Use bsonUnorderedFieldsCompare rather than assert.contains so that two semantically
+        // equivalent documents with different field orderings are treated as equal.
+        const found = stageResponseAgainstAdminDb.some(
+            (stageEntry) => bsonUnorderedFieldsCompare(entry, stageEntry) === 0,
+        );
+        assert(
+            found,
             "The listCollections entry " +
                 tojson(entry) +
                 " hasn't been found on the $_internalListCollections output " +

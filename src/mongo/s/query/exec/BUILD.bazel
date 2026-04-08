@@ -75,6 +75,7 @@ mongo_cc_library(
         "router_stage_queued_data.cpp",
         "router_stage_remove_metadata_fields.cpp",
         "router_stage_skip.cpp",
+        "router_stage_transform.cpp",
     ],
     deps = [
         ":async_results_merger",
@@ -155,6 +156,7 @@ mongo_cc_unit_test(
         "router_stage_limit_test.cpp",
         "router_stage_remove_metadata_fields_test.cpp",
         "router_stage_skip_test.cpp",
+        "router_stage_transform_test.cpp",
         "shard_tag_test.cpp",
         "store_possible_cursor_test.cpp",
     ],

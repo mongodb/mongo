@@ -98,6 +98,11 @@ function verify(expectedResult, result) {
         result.shards.sort();
     }
 
+    // The router scrubs 'recordIdsReplicated' from listCollections responses because it is an
+    // internal field that can be inconsistent across shards. $listClusterCatalog returns it
+    // unconditionally (via $_internalListCollections), so remove it before comparing.
+    delete result.info.recordIdsReplicated;
+
     // Ensure the resuls fields matches the expected once.
     assert.eq(expectedResult.options, result.options, "options field mismatch:" + tojson(result));
     assert.eq(expectedResult.info, result.info, "info field mismatch:" + tojson(result));

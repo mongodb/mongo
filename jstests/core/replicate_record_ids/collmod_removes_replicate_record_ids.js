@@ -13,8 +13,14 @@
  *   # TODO (SERVER-118693): Check if this tag can be removed.
  *   # Unsetting 'recordIdsReplicated' option with the collMod command can create a test-only race condition during initial sync.
  *   incompatible_with_initial_sync,
+ *   # hasRecordIdsReplicated uses $_internalListCollections which requires the __system role.
+ *   auth_incompatible,
+ *   # hasRecordIdsReplicated uses $_internalListCollections which only supports local read concern.
+ *   assumes_read_concern_unchanged,
  * ]
  */
+
+import {hasRecordIdsReplicated} from "jstests/libs/collection_write_path/replicated_record_ids_utils.js";
 
 const collName = "replRecIdCollForCollMod";
 const coll = db.getCollection(collName);
@@ -35,7 +41,7 @@ assert(
 );
 jsTestLog("Collection options after creation: " + tojson(collInfo));
 assert(
-    collInfo.info.hasOwnProperty("recordIdsReplicated"),
+    hasRecordIdsReplicated(db, collName),
     "collection options does not contain recordIdsReplicated flag after collection creation",
 );
 
@@ -58,7 +64,7 @@ assert(
 );
 jsTestLog("Collection options after collMod: " + tojson(collInfo));
 assert(
-    !collInfo.info.hasOwnProperty("recordIdsReplicated"),
+    !hasRecordIdsReplicated(db, collName),
     "collMod failed to remove recordIdsReplicated flag from collection options",
 );
 

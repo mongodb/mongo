@@ -38,12 +38,6 @@ let commandObj = {
     collectionOptions: {uuid: optionsArray[0].info.uuid},
 };
 
-const recordIdsReplicatedByDefault = optionsArray[0].options.recordIdsReplicated;
-if (recordIdsReplicatedByDefault) {
-    // RecordIds are replicated by default - make the collectionOptions reflect that.
-    commandObj.collectionOptions.recordIdsReplicated = optionsArray[0].options.recordIdsReplicated;
-}
-
 // Destination has an extra index.
 assert.commandFailedWithCode(adminDB.runCommand(commandObj), ErrorCodes.CommandFailed);
 
@@ -75,8 +69,5 @@ commandObj.collectionOptions = {
     size: 256,
     max: 2,
 };
-if (recordIdsReplicatedByDefault) {
-    commandObj.collectionOptions.recordIdsReplicated = optionsArray[0].options.recordIdsReplicated;
-}
 
 assert.commandWorked(adminDB.runCommand(commandObj));

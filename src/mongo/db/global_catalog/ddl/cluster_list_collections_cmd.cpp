@@ -85,6 +85,27 @@ namespace {
 
 constexpr auto systemBucketsDot = "system.buckets."_sd;
 
+/**
+ * Removes 'recordIdsReplicated' from the 'info' sub-document of a single listCollections result
+ * entry. The field is internal and can be inconsistent across shards, so it must not be exposed
+ * via the router.
+ */
+static BSONObj scrubRecordIdsReplicatedFromCollectionEntry(BSONObj entry) {
+    auto infoElem = entry["info"];
+    if (infoElem.eoo() || infoElem.type() != BSONType::object) {
+        return entry;
+    }
+    BSONObjBuilder entryBuilder;
+    for (auto&& field : entry) {
+        if (field.fieldNameStringData() == "info"_sd) {
+            entryBuilder.append("info"_sd, infoElem.Obj().removeField("recordIdsReplicated"_sd));
+        } else {
+            entryBuilder.append(field);
+        }
+    }
+    return entryBuilder.obj();
+}
+
 BSONObj rewriteCommandForListingOwnCollections(OperationContext* opCtx,
                                                const DatabaseName& dbName,
                                                const BSONObj& cmdObj) {
@@ -278,7 +299,8 @@ public:
                         nss,
                         Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
                         Grid::get(opCtx)->getCursorManager(),
-                        privileges));
+                        privileges,
+                        scrubRecordIdsReplicatedFromCollectionEntry));
 
                     CommandHelpers::filterCommandReplyForPassthrough(transformedResponse, &output);
                     uassertStatusOK(getStatusFromCommandResult(output.asTempObj()));

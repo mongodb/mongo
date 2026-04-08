@@ -59,6 +59,13 @@ function verify(listCollectionEntry, stageEntry, specs) {
             delete listCollectionEntry.info.configDebugDump;
             delete stageEntry.info.configDebugDump;
         }
+
+        // The router scrubs 'recordIdsReplicated' from listCollections responses because it is an
+        // internal field that can be inconsistent across shards. $listClusterCatalog returns it
+        // unconditionally, so remove it from the stage entry before comparing.
+        if (FixtureHelpers.isMongos(db)) {
+            delete stageEntry.info.recordIdsReplicated;
+        }
     }
 
     function errMsgWithListCollectionEntry(reason) {

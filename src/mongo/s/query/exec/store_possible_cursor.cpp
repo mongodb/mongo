@@ -51,10 +51,13 @@
 #include "mongo/s/query/exec/cluster_client_cursor_params.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/s/query/exec/collect_query_stats_mongos.h"
+#include "mongo/s/query/exec/router_stage_merge.h"
+#include "mongo/s/query/exec/router_stage_transform.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/decorable.h"
 
 #include <algorithm>
+#include <functional>
 #include <utility>
 #include <vector>
 
@@ -207,6 +210,124 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                           incomingCursorResponse.releaseBatch(),
                                           incomingCursorResponse.getAtClusterTime(),
                                           incomingCursorResponse.getPostBatchResumeToken());
+    return outgoingCursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
+}
+
+StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
+                                        const ShardId& shardId,
+                                        const HostAndPort& server,
+                                        const BSONObj& cmdResult,
+                                        const NamespaceString& requestedNss,
+                                        std::shared_ptr<executor::TaskExecutor> executor,
+                                        ClusterCursorManager* cursorManager,
+                                        PrivilegeVector privileges,
+                                        std::function<BSONObj(BSONObj)> documentTransform,
+                                        TailableModeEnum tailableMode,
+                                        boost::optional<BSONObj> routerSort) {
+    if (!cmdResult["ok"].trueValue() || !cmdResult.hasField("cursor")) {
+        return cmdResult;
+    }
+
+    auto incomingCursorResponse = CursorResponse::parseFromBSON(cmdResult);
+    if (!incomingCursorResponse.isOK()) {
+        return incomingCursorResponse.getStatus();
+    }
+
+    auto& response = incomingCursorResponse.getValue();
+    if (const auto& cursorMetrics = response.getCursorMetrics()) {
+        CurOp::get(opCtx)->debug().getAdditiveMetrics().aggregateCursorMetrics(*cursorMetrics);
+    }
+
+    auto&& opDebug = CurOp::get(opCtx)->debug();
+    opDebug.getAdditiveMetrics().nBatches = 1;
+    opDebug.nShards = std::max(opDebug.nShards, 1);
+    CurOp::get(opCtx)->setEndOfOpMetrics(response.getBatch().size());
+
+    // Apply the transform to the first batch, which comes directly from the shard response.
+    std::vector<BSONObj> transformedFirstBatch;
+    transformedFirstBatch.reserve(response.getBatch().size());
+    for (const auto& doc : response.getBatch()) {
+        transformedFirstBatch.push_back(documentTransform(doc));
+    }
+
+    if (response.getCursorId() == CursorId(0)) {
+        // Cursor exhausted in the first batch, no proxy cursor is needed.
+        opDebug.cursorExhausted = true;
+        collectQueryStatsMongos(opCtx, std::move(opDebug.getQueryStatsInfo().key));
+        CursorResponse exhaustedResponse(requestedNss,
+                                         CursorId(0),
+                                         std::move(transformedFirstBatch),
+                                         response.getAtClusterTime(),
+                                         response.getPostBatchResumeToken());
+        return exhaustedResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
+    }
+
+    // Build the cursor params pointing at the shard's open cursor.
+    ClusterClientCursorParams params(response.getNSS(),
+                                     APIParameters::get(opCtx),
+                                     boost::none /* ReadPreferenceSetting */,
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     [&] {
+                                         if (!opCtx->getLogicalSessionId())
+                                             return OperationSessionInfoFromClient();
+                                         OperationSessionInfoFromClient osi{
+                                             *opCtx->getLogicalSessionId(), opCtx->getTxnNumber()};
+                                         if (TransactionRouter::get(opCtx)) {
+                                             osi.setAutocommit(false);
+                                         }
+                                         return osi;
+                                     }());
+    params.remotes.emplace_back();
+    auto& remoteCursor = params.remotes.back();
+    remoteCursor.setShardId(shardId.toString());
+    remoteCursor.setHostAndPort(server);
+    remoteCursor.setCursorResponse(CursorResponse(response.getNSS(),
+                                                  response.getCursorId(),
+                                                  {} /* first batch served above */,
+                                                  response.getAtClusterTime(),
+                                                  response.getPostBatchResumeToken()));
+    params.originatingCommandObj = CurOp::get(opCtx)->opDescription().getOwned();
+    params.tailableMode = tailableMode;
+    params.originatingPrivileges = std::move(privileges);
+    if (routerSort) {
+        params.sortToApplyOnRouter = *routerSort;
+    }
+    params.requestQueryStatsFromRemotes = response.getCursorMetrics().has_value();
+
+    // Build the execution plan: RouterStageTransform wraps RouterStageMerge so the
+    // documentTransform is applied to every document in every batch, including getMore batches,
+    // without buffering the full result set in mongos memory.
+    //
+    // extractARMParams() moves 'remotes' out of params. The remaining fields in params are still
+    // needed by ClusterClientCursorImpl for auth, session, and metrics bookkeeping.
+    auto armParams = params.extractARMParams();
+    auto mergeStage = std::make_unique<RouterStageMerge>(opCtx, executor, std::move(armParams));
+    auto transformStage = std::make_unique<RouterStageTransform>(
+        opCtx, std::move(mergeStage), std::move(documentTransform));
+
+    auto ccc = ClusterClientCursorImpl::make(opCtx, std::move(transformStage), std::move(params));
+    collectQueryStatsMongos(opCtx, ccc);
+    ccc->detachFromOperationContext();
+
+    auto authUser = AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName();
+    auto clusterCursorId =
+        cursorManager->registerCursor(opCtx,
+                                      ccc.releaseCursor(),
+                                      requestedNss,
+                                      ClusterCursorManager::CursorType::SingleTarget,
+                                      ClusterCursorManager::CursorLifetime::Mortal,
+                                      authUser);
+    if (!clusterCursorId.isOK()) {
+        return clusterCursorId.getStatus();
+    }
+
+    opDebug.cursorid = clusterCursorId.getValue();
+
+    CursorResponse outgoingCursorResponse(requestedNss,
+                                          clusterCursorId.getValue(),
+                                          std::move(transformedFirstBatch),
+                                          response.getAtClusterTime(),
+                                          response.getPostBatchResumeToken());
     return outgoingCursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
 }
 

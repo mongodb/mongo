@@ -81,6 +81,9 @@ selector:
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
     - assumes_standalone_mongod
+    # Tests tagged auth_incompatible use internal commands (e.g. $_internalListCollections) that
+    # require the __system role, which is not available to the test user in this suite.
+    - auth_incompatible
     ##
     # The next tag corresponds to the special error thrown by the set_read_preference_secondary.js
     # override when it refuses to replace the readPreference of a particular command. Above each tag

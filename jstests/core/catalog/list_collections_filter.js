@@ -10,8 +10,6 @@
  */
 
 import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
-import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const mydb = db.getSiblingDB("list_collections_filter");
@@ -23,20 +21,6 @@ assert.commandWorked(mydb.dropDatabase());
 const defaultCollectionOptionsFilter = ClusteredCollectionUtil.areAllCollectionsClustered(mydb.getMongo())
     ? {"options.clusteredIndex.unique": true}
     : {options: {}};
-
-if (FeatureFlagUtil.isPresentAndEnabled(db, "RecordIdsReplicated")) {
-    // Replicated recordIds are enabled, but may not be the default for user collections. Create a
-    // test collection to check if 'replicatedRecordIds' is set by default.
-    const checkReplRidCollName = "checkReplRidColl";
-    assert.commandWorked(mydb.createCollection(checkReplRidCollName));
-    const collMetadata = mydb
-        .getCollectionInfos()
-        .find((collectionMetadata) => collectionMetadata.name === checkReplRidCollName);
-    if (collMetadata.options.recordIdsReplicated) {
-        defaultCollectionOptionsFilter.options.recordIdsReplicated = true;
-    }
-    assertDropCollection(mydb, checkReplRidCollName);
-}
 
 // Make some collections.
 assert.commandWorked(mydb.createCollection("lists"));

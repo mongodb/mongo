@@ -5,10 +5,15 @@
  *   featureFlagRecordIdsReplicated,
  *   # Replicated record IDs are incompatible with clustered collections.
  *   expects_explicit_underscore_id_index,
+ *   # hasRecordIdsReplicated uses $_internalListCollections which requires the __system role.
+ *   auth_incompatible,
+ *   # hasRecordIdsReplicated uses $_internalListCollections which only supports local read concern.
+ *   assumes_read_concern_unchanged,
  * ]
  */
 
 import {
+    hasRecordIdsReplicated,
     getRidForDoc,
     mapFieldToMatchingDocRid,
 } from "jstests/libs/collection_write_path/replicated_record_ids_utils.js";
@@ -30,8 +35,7 @@ const coll = testDB[collName];
 assert.commandWorked(testDB.adminCommand({enableSharding: dbName, primaryShard: shard0.shardName}));
 assert.commandWorked(testDB.createCollection(collName));
 
-let collInfo = coll.exists();
-assert(collInfo.info.recordIdsReplicated, tojson(collInfo));
+assert(hasRecordIdsReplicated(testDB, collName), "collection should have recordIdsReplicated set");
 
 // Remove some of the initial documents on the collection with replicated record
 // IDs to create gaps in the record IDs.
@@ -106,11 +110,15 @@ assert.eq(
 
 // Ensure that 'recordIdsReplicated` collection option is still present and set to true.
 // Check collection options on shard.
-collInfo = shard1.getCollection(collNS).exists();
-assert(collInfo.info.recordIdsReplicated, tojson(collInfo));
+assert(
+    hasRecordIdsReplicated(shard1.getDB(dbName), collName),
+    "shard should still have recordIdsReplicated set after moveCollection",
+);
 
 // Check collection options through mongos.
-collInfo = mongos.getCollection(collNS).exists();
-assert(collInfo.info.recordIdsReplicated, tojson(collInfo));
+assert(
+    hasRecordIdsReplicated(mongos.getDB(dbName), collName),
+    "mongos should still see recordIdsReplicated set after moveCollection",
+);
 
 st.stop();

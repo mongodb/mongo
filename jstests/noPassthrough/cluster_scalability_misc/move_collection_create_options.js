@@ -48,7 +48,7 @@ function validateCollection(
     dbName,
     collName,
     shardKey,
-    {expectedCollOpts, expectedIndexes, expectNoShardingMetadata, expectedCollInfos} = {},
+    {expectedCollOpts, expectedIndexes, expectNoShardingMetadata} = {},
 ) {
     const db = conn.getDB(dbName);
     const coll = db.getCollection(collName);
@@ -62,15 +62,6 @@ function validateCollection(
         assert.eq(bsonUnorderedFieldsCompare(actual, expected), 0, {fieldName, actual, expected});
     }
     assert.eq(coll.countDocuments({}), maxCount);
-
-    if (expectedCollInfos) {
-        jsTest.log("*** Checking expectedCollInfos " + tojson({listCollectionsDoc, expectedCollInfos}));
-        for (let fieldName in expectedCollInfos) {
-            const actual = getDottedField(listCollectionsDoc.info, fieldName);
-            const expected = expectedCollInfos[fieldName];
-            assert.eq(bsonUnorderedFieldsCompare(actual, expected), 0, {fieldName, actual, expected});
-        }
-    }
 
     if (expectedIndexes) {
         const actualIndexes = coll.getIndexes();
@@ -468,25 +459,6 @@ const testCases = [
                         clustered: true,
                     },
                 ],
-            });
-        },
-    },
-    {
-        name: "recordIdsReplicated",
-        // TODO (SERVER-68173): Enable featureFlagRecordIdsReplicated.
-        shouldSkip: (conn) => !FeatureFlagUtil.isEnabled(conn, "RecordIdsReplicated"),
-        createCollection: (conn, dbName, collName) => {
-            assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
-            return dbName + "." + collName;
-        },
-        insertDocuments: (conn, dbName, collName) => {
-            insertDocuments(conn, dbName, collName);
-        },
-        validateCollection: (conn, dbName, collName, shardKey) => {
-            validateCollection(conn, dbName, collName, shardKey, {
-                expectedCollInfos: {
-                    "recordIdsReplicated": true,
-                },
             });
         },
     },
