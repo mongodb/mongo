@@ -47,8 +47,17 @@ bool isReplicatedFastCountEnabled(OperationContext* opCtx) {
         repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet();
 }
 
-bool isReplicatedFastCountEligible(NamespaceString nss) {
+bool isReplicatedFastCountEligible(const NamespaceString& nss) {
     // TODO(SERVER-120741): Allow if the local DB is the oplog.
-    return !nss.isLocalDB() && !nss.isImplicitlyReplicated();
+    if (nss.isLocalDB() || nss.isImplicitlyReplicated() || nss.isServerConfigurationCollection()) {
+        return false;
+    }
+    // Exclude the fast count store collections themselves to avoid circular tracking.
+    const auto fastCountStoreNss =
+        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
+    const auto fastCountTimestampsNss = NamespaceString::makeGlobalConfigCollection(
+        NamespaceString::kReplicatedFastCountStoreTimestamps);
+    return nss != fastCountStoreNss && nss != fastCountTimestampsNss;
 }
+
 }  // namespace mongo

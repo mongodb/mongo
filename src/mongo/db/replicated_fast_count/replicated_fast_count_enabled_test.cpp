@@ -103,5 +103,19 @@ TEST(ReplicatedFastCountEligibleNsTest, ImplicitlyReplicatedNotEligible) {
     EXPECT_FALSE(isReplicatedFastCountEligible(configImageCollectionNss));
 }
 
+TEST(ReplicatedFastCountEligibleNsTest, SizeCountAndTimestampStoresNoteEligible) {
+    const NamespaceString fastCountStoreNss =
+        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
+    EXPECT_FALSE(isReplicatedFastCountEligible(fastCountStoreNss));
+
+    const NamespaceString fastCountTimestampStoreNss = NamespaceString::makeGlobalConfigCollection(
+        NamespaceString::kReplicatedFastCountStoreTimestamps);
+    EXPECT_FALSE(isReplicatedFastCountEligible(fastCountTimestampStoreNss));
+}
+
+TEST(ReplicatedFastCountEligibleNsTest, AdminSystemVersionNotEligible) {
+    EXPECT_FALSE(isReplicatedFastCountEligible(NamespaceString::kServerConfigurationNamespace));
+}
+
 }  // namespace
 }  // namespace mongo

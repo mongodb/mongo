@@ -37,7 +37,10 @@
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include <absl/container/flat_hash_map.h>
 
@@ -158,6 +161,15 @@ boost::optional<CollectionSizeCount> extractSizeCountDeltaForOp(
         return boost::none;
     }
 
+    if (!isReplicatedFastCountEligible(oplogEntry.getNss())) {
+        LOGV2_DEBUG(12369400,
+                    3,
+                    "Skipping size/count delta for ineligible namespace",
+                    "ns"_attr = oplogEntry.getNss().toStringForErrorMsg(),
+                    "entry"_attr = redact(oplogEntry.toBSONForLogging()));
+        return boost::none;
+    }
+
     // The 'm' field in the oplog entry contains the replicated size delta.  The collection count
     // delta must be inferred from the operation type. Throw if the operation type is not supported
     // for size/count tracking.
@@ -167,13 +179,6 @@ boost::optional<CollectionSizeCount> extractSizeCountDeltaForOp(
                           << "' incompatible with top level 'm' field: "
                           << redact(oplogEntry.toBSONForLogging()),
             isSupportedOpType(opType));
-
-    massert(12115901,
-            str::stream() << "Unexpected input: Namespace '"
-                          << oplogEntry.getNss().toStringForErrorMsg()
-                          << "' is incompatible with top level 'm' field: "
-                          << redact(oplogEntry.toBSONForLogging()),
-            isReplicatedFastCountEligible(oplogEntry.getNss()));
 
     massert(12116001,
             str::stream() << "Unexpected input: Missing 'ui' field for operation '"

@@ -45,5 +45,5 @@ MONGO_MOD_PUBLIC bool isReplicatedFastCountEnabled(OperationContext* opCtx);
  * Returns whether the provided namespace string can be tracked by the replicated fast count
  * collection.
  */
-MONGO_MOD_PUBLIC bool isReplicatedFastCountEligible(NamespaceString nss);
+MONGO_MOD_PUBLIC bool isReplicatedFastCountEligible(const NamespaceString& nss);
 }  // namespace mongo

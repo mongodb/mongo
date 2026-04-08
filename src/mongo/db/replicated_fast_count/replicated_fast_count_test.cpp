@@ -1194,9 +1194,8 @@ TEST_F(ReplicatedFastCountDeltaUtilsTest, ExtractSizeCountDeltaOnNonEligibleNss)
     const auto oplogEntry =
         makeOplogEntryWithSizeMeta(localNss, repl::OpTypeEnum::kNoop, 400 /* sizeDelta */);
 
-    // Local namespaces are not eligible for replicated size count.
-    ASSERT_THROWS_CODE(
-        replicated_fast_count::extractSizeCountDeltaForOp(oplogEntry), DBException, 12115900);
+    // Even though the oplog entry carries size metadata, ineligible namespaces should be skipped.
+    ASSERT_FALSE(replicated_fast_count::extractSizeCountDeltaForOp(oplogEntry).has_value());
 }
 
 TEST_F(ReplicatedFastCountDeltaUtilsTest,
