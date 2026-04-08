@@ -3819,7 +3819,6 @@ functions:
         args:
           - "./src/evergreen/streams_image_build_and_push.sh"
           - ${push_arg|}
-          - ${break_glass_arg|}
     - *upload_pip_requirements
     - command: s3.put
       params:

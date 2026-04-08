@@ -36,13 +36,6 @@ if [ "$PATCH" ]; then
     TAG_SUFFIX="$TAG_SUFFIX-$revision_order_id"
 fi
 
-for arg in "$@"; do
-    if [ "$arg" == "--break-glass" ]; then
-        TAG_SUFFIX="${TAG_SUFFIX}_break_glass"
-        break
-    fi
-done
-
 cd src
 
 if [ "$DISTRO" != "amazon2023" ]; then
@@ -178,13 +171,6 @@ if [ "$1" == "--push" ]; then
     if [ "$PATCH" ]; then
         MANIFEST_SUFFIX="$MANIFEST_SUFFIX-$revision_order_id"
     fi
-
-    for arg in "$@"; do
-        if [ "$arg" == "--break-glass" ]; then
-            MANIFEST_SUFFIX="${MANIFEST_SUFFIX}_break_glass"
-            break
-        fi
-    done
 
     MANIFEST_TAG="$IMAGE:$GITSHA$MANIFEST_SUFFIX"
 

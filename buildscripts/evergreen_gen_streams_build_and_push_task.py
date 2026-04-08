@@ -19,7 +19,6 @@ from buildscripts.util.read_config import read_config_file
 def make_task(
     compile_variant: str,
     push: str,
-    break_glass: str,
 ) -> Task:
     taskPrefix = "streams_build_"
     scriptArgs = ["./src/evergreen/streams_image_build_and_push.sh"]
@@ -29,9 +28,6 @@ def make_task(
     if push == "true":
         taskPrefix += "and_push_"
         scriptArgs.append("--push")
-        if break_glass == "true":
-            taskPrefix += "break_glass_"
-            scriptArgs.append("--break-glass")
 
     commands = [
         BuiltInCommand("manifest.load", {}),
@@ -71,7 +67,6 @@ def main(
     expansions_file: Annotated[str, typer.Argument()] = "expansions.yml",
     output_file: Annotated[str, typer.Option("--output-file")] = "streams_build_and_push.json",
     push: Annotated[str, typer.Option("--push")] = "false",
-    break_glass: Annotated[str, typer.Option("--break-glass")] = "false",
 ):
     expansions = read_config_file(expansions_file)
     build_variant_name = expansions.get("build_variant")
@@ -87,7 +82,6 @@ def main(
             make_task(
                 compile_variant_name,
                 push=push,
-                break_glass=break_glass,
             )
         ],
         distros=[distro],

@@ -104,9 +104,6 @@ buildvariants:
       - name: streams_build_debug
         distros:
           - amazon2023.3-c5-24xlarge
-      - name: streams_build_and_push_break_glass
-        distros:
-          - amazon2023.3-c5-24xlarge
 
   - name: enterprise-amazon2023-streams-arm64
     display_name: "Amazon Linux 2023 enterprise build with streams arm64"
@@ -204,8 +201,5 @@ buildvariants:
         distros:
           - amazon2023.3-arm64-xxxlarge
       - name: streams_build_debug
-        distros:
-          - amazon2023.3-arm64-xxxlarge
-      - name: streams_build_and_push_break_glass
         distros:
           - amazon2023.3-arm64-xxxlarge

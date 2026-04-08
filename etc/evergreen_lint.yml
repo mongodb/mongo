@@ -232,7 +232,6 @@ rules:
             "streams_azure_blob_parallel_heavy_sanitizer",
             "streams_suite_coverage_linter",
             "streams_build_and_push",
-            "streams_build_and_push_break_glass",
             "streams_build_debug",
             # TODO(SERVER-94573): remove these exceptions when resolved
             "selinux_rhel9_enterprise",

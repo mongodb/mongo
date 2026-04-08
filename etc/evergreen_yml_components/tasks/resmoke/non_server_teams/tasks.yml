@@ -703,14 +703,6 @@ tasks:
         vars:
           push_arg: "--push"
 
-  - name: streams_build_and_push_break_glass
-    tags: ["assigned_to_jira_team_streams", "auxiliary"]
-    commands:
-      - func: "streams build and push"
-        vars:
-          push_arg: "--push"
-          break_glass_arg: "--break-glass"
-
   - name: streams_build_debug
     tags: ["assigned_to_jira_team_streams", "auxiliary"]
     depends_on:
