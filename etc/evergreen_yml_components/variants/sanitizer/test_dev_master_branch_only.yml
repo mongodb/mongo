@@ -649,12 +649,12 @@ buildvariants:
         distros:
           - rhel8.8-xlarge
 
-  - name: &rhel8-debug-aubsan-benchmarks rhel8-debug-aubsan-benchmarks
-    display_name: "* {A,UB}SAN Enterprise RHEL 8 DEBUG (Benchmarks)"
+  - name: rhel8-arm64-debug-aubsan-benchmarks
+    display_name: "* {A,UB}SAN Enterprise RHEL 8 ARM64 DEBUG (Benchmarks)"
     tags: ["suggested"]
     cron: "0 2 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - rhel8.8-large
+      - rhel8.8-arm64-m8g-8xlarge
     expansions:
       <<: *generic_linux_compile_expansions
       san_options: *aubsan_options
@@ -662,18 +662,17 @@ buildvariants:
         --config=dbg_aubsan
         --opt=on
         --fission=no
-        --streams_release_build=True
       test_flags: >-
         --benchmarkRepetitions=1
         --excludeWithAnyTags=incompatible_aubsan
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"
         --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"
-      compile_variant: *rhel8-debug-aubsan-benchmarks
+      compile_variant: rhel8-arm64-debug-aubsan-benchmarks
     tasks:
       - name: compile_upload_benchmarks_TG
         distros:
-          - rhel8.8-xlarge
-      - name: .benchmarks
+          - rhel8.8-arm64-m8g-8xlarge
+      - name: .benchmarks !.multiversion
 
   - <<: *enterprise-rhel8-debug-tsan-compile-dependency
     name: enterprise-rhel8-debug-tsan-all-feature-flags
