@@ -30,8 +30,6 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
@@ -42,6 +40,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
@@ -51,7 +50,6 @@
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/commands/document_shard_key_update_util.h"
@@ -67,13 +65,9 @@
 
 namespace mongo {
 
-class FindAndModifyCmd : public BasicCommand {
+class FindAndModifyCmd : public write_ops::FindAndModifyCmdVersion1Gen<FindAndModifyCmd> {
 public:
-    FindAndModifyCmd() : BasicCommand("findAndModify", "findandmodify") {}
-
-    const std::set<std::string>& apiVersions() const override {
-        return kApiVersions1;
-    }
+    using Base = write_ops::FindAndModifyCmdVersion1Gen<FindAndModifyCmd>;
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
@@ -91,32 +85,6 @@ public:
         return true;
     }
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
-    }
-
-    bool supportsRawData() const override {
-        return true;
-    }
-
-    ReadConcernSupportResult supportsReadConcern(const BSONObj& cmdObj,
-                                                 repl::ReadConcernLevel level,
-                                                 bool isImplicitDefault) const override {
-        return {{level != repl::ReadConcernLevel::kLocalReadConcern &&
-                     level != repl::ReadConcernLevel::kSnapshotReadConcern,
-                 {ErrorCodes::InvalidOptions, "read concern not supported"}},
-                {{ErrorCodes::InvalidOptions, "default read concern not permitted"}}};
-    }
-
-    Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName& dbName,
-                                 const BSONObj& cmdObj) const override;
-
-    Status explain(OperationContext* opCtx,
-                   const OpMsgRequest& request,
-                   ExplainOptions::Verbosity verbosity,
-                   rpc::ReplyBuilderInterface* result) const override;
-
     bool allowedInTransactions() const final {
         return true;
     }
@@ -125,10 +93,36 @@ public:
         return true;
     }
 
-    bool run(OperationContext* opCtx,
-             const DatabaseName& dbName,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override;
+    class Invocation final : public Base::MinimalInvocationBase {
+    public:
+        using Base::MinimalInvocationBase::MinimalInvocationBase;
+
+        bool supportsWriteConcern() const final {
+            return true;
+        }
+
+        bool supportsRawData() const final {
+            return true;
+        }
+
+        ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
+                                                     bool isImplicitDefault) const override {
+            return {{level != repl::ReadConcernLevel::kLocalReadConcern &&
+                         level != repl::ReadConcernLevel::kSnapshotReadConcern,
+                     {ErrorCodes::InvalidOptions, "read concern not supported"}},
+                    {{ErrorCodes::InvalidOptions, "default read concern not permitted"}}};
+        }
+
+        NamespaceString ns() const final {
+            return request().getNamespace();
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const final;
+        void explain(OperationContext* opCtx,
+                     ExplainOptions::Verbosity verbosity,
+                     rpc::ReplyBuilderInterface* result) final;
+        void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) final;
+    };
 
     /**
      * Changes the shard key for the document if the response object contains a
@@ -146,7 +140,7 @@ public:
 
 protected:
     void doInitializeClusterRole(ClusterRole role) override {
-        BasicCommand::doInitializeClusterRole(role);
+        Base::doInitializeClusterRole(role);
         _updateMetrics.emplace(getName(), role);
     }
 
@@ -211,7 +205,7 @@ private:
                                                   BSONObjBuilder* result);
 
     // Update related command execution metrics.
-    boost::optional<UpdateMetrics> _updateMetrics;
+    mutable boost::optional<UpdateMetrics> _updateMetrics;
 };
 
 }  // namespace mongo

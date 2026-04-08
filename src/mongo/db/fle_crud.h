@@ -180,9 +180,10 @@ processFLEFindAndModify(OperationContext* opCtx,
                         StatusWith<write_ops::FindAndModifyCommandReply>& swReply,
                         boost::optional<WriteConcernErrorDetail>& wceReply);
 
-MONGO_MOD_PUB FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
-                                                     const BSONObj& cmdObj,
-                                                     BSONObjBuilder& result);
+MONGO_MOD_PUB FLEBatchResult
+processFLEFindAndModify(OperationContext* opCtx,
+                        const write_ops::FindAndModifyCommandRequest& request,
+                        BSONObjBuilder& result);
 
 MONGO_MOD_PUB std::pair<write_ops::FindAndModifyCommandRequest, OpMsgRequest>
 processFLEFindAndModifyExplainMongos(

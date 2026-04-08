@@ -1696,13 +1696,8 @@ FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
 }
 
 FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
-                                       const BSONObj& cmdObj,
+                                       const write_ops::FindAndModifyCommandRequest& request,
                                        BSONObjBuilder& result) {
-    // There is no findAndModify parsing in mongos so we need to first parse to decide if it is for
-    // FLE2
-    auto request =
-        write_ops::FindAndModifyCommandRequest::parse(cmdObj, IDLParserContext("findAndModify"));
-
     StatusWith<write_ops::FindAndModifyCommandReply> swReply(
         write_ops::FindAndModifyCommandReply{});
     boost::optional<WriteConcernErrorDetail> wceReply = boost::none;
