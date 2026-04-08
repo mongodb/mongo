@@ -256,7 +256,7 @@ functions:
         set -o errexit
         set -o verbose
         ${PREPARE_PATH}
-        virtualenv -p python3 venv
+        virtualenv -p python3.13 venv
         source venv/bin/activate
         buildscripts/poetry_sync.sh
 
