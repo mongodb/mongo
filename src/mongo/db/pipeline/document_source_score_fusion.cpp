@@ -31,6 +31,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/extension/host/extension_search_server_status.h"
 #include "mongo/db/extension/host/extension_vector_search_server_status.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
@@ -138,15 +139,23 @@ std::map<std::string, std::unique_ptr<Pipeline>> parseAndValidateScoredSelection
                                false,
                                LiteParserOptions{.ifrContext = pExpCtx->getIfrContext()});
 
-        // If any input pipeline has an extension $vectorSearch stage, we perform the IFR flag
-        // retry kickback to use legacy $vectorSearch instead.
-        // TODO SERVER-117661: Implement support for extension $vectorSearch stages in
-        // scoreFusion pipelines.
-        search_helpers::throwIfrKickbackIfNecessary(
-            liteParsedPipeline.hasExtensionVectorSearchStage(),
-            feature_flags::gFeatureFlagVectorSearchExtension,
-            vector_search_metrics::inHybridSearchKickbackRetryCount,
-            "$vectorSearch-as-an-extension is not allowed in a $scoreFusion pipeline.");
+        // If featureFlagExtensionsInsideHybridSearch is not enabled, perform IFR kickback
+        // for any input pipeline that has an extension $vectorSearch or $search stage.
+        if (!feature_flags::gFeatureFlagExtensionsInsideHybridSearch.checkEnabled()) {
+            // TODO SERVER-117661: Implement support for extension $vectorSearch stages in
+            // scoreFusion pipelines.
+            search_helpers::throwIfrKickbackIfNecessary(
+                liteParsedPipeline.hasExtensionVectorSearchStage(),
+                feature_flags::gFeatureFlagVectorSearchExtension,
+                vector_search_metrics::inHybridSearchKickbackRetryCount,
+                "$vectorSearch-as-an-extension is not allowed in a $scoreFusion pipeline.");
+
+            search_helpers::throwIfrKickbackIfNecessary(
+                liteParsedPipeline.hasExtensionSearchStage(),
+                feature_flags::gFeatureFlagSearchExtension,
+                search_metrics::inHybridSearchKickbackRetryCount,
+                "$search-as-an-extension is not allowed in a $scoreFusion pipeline.");
+        }
 
         auto pipeline = Pipeline::parseFromLiteParsed(liteParsedPipeline, pExpCtx);
 

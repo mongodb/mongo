@@ -3,9 +3,9 @@
  * featureFlagExtensionViewsAndUnionWith is enabled. It tests views, $unionWith on collections,
  * and $unionWith on views.
  *
- * It also tests that $rankFusion and $scoreFusion with $vectorSearch subpipelines always use
- * legacy vector search via the IFR kickback retry mechanism, regardless of the
- * featureFlagExtensionViewsAndUnionWith setting.
+ * It also tests that $rankFusion and $scoreFusion with $vectorSearch subpipelines use
+ * legacy vector search via the IFR kickback retry mechanism when
+ * featureFlagExtensionsInsideHybridSearch is disabled.
  *
  * @tags: [ featureFlagExtensionsAPI, featureFlagExtensionViewsAndUnionWith ]
  */
@@ -226,12 +226,16 @@ function runTests(conn, mongotMock, shardingTest = null) {
     runUnionWithOnViewVectorSearchTests(conn, mongotMock, false, shardingTest);
 
     // Run hybrid search tests ($rankFusion/$scoreFusion with $vectorSearch subpipelines).
-    // These always trigger the IFR kickback retry regardless of featureFlagExtensionViewsAndUnionWith.
+    // These trigger the IFR kickback retry when featureFlagExtensionsInsideHybridSearch is disabled.
     runHybridSearchTests(conn, mongotMock, true, shardingTest);
     runHybridSearchTests(conn, mongotMock, false, shardingTest);
 }
 
 // We don't have to manually enable featureFlagExtensionViewsAndUnionWith since the test will only run if it's enabled.
-withExtensionsAndMongot({"libvector_search_extension.so": {}}, runTests, ["standalone", "sharded"], {
-    shards: kNumShards,
-});
+withExtensionsAndMongot(
+    {"libvector_search_extension.so": {}},
+    runTests,
+    ["standalone", "sharded"],
+    {shards: kNumShards},
+    {setParameter: {featureFlagExtensionsInsideHybridSearch: false}},
+);

@@ -1,6 +1,6 @@
 /**
- * Tests that $search and $searchMeta work on views and in $unionWith via the IFR flag kickback
- * mechanism.
+ * Tests that $search and $searchMeta work on views, in $unionWith, and inside
+ * $rankFusion/$scoreFusion subpipelines via the IFR flag kickback mechanism.
  *
  * With featureFlagSearchExtension=true: the extension stage is used, detects kickback condition,
  * kicks back to legacy search, and the query succeeds.
@@ -18,6 +18,7 @@ import {
     createTestView,
     getExtensionSearchUsedCount,
     getLegacySearchUsedCount,
+    getSearchInHybridSearchKickbackRetryCount,
     getSearchInUnionWithKickbackRetryCount,
     getSearchOnViewKickbackRetryCount,
     kSearchQuery,
@@ -199,6 +200,67 @@ function runUnionWithOnViewWithSearchInViewDefinitionTests(conn, mongotMock, isS
     });
 }
 
+/**
+ * Runs $search inside $rankFusion and $scoreFusion subpipelines and verifies IFR kickback metrics.
+ *
+ * The kickback fires when featureFlagSearchExtension is enabled but
+ * featureFlagExtensionsInsideHybridSearch is not, causing a retry with legacy $search.
+ * When featureFlagSearchExtension is disabled, legacy $search is used from the start.
+ */
+function runSearchHybridSearchTests(conn, mongotMock, isSearchMeta, featureFlagValue) {
+    // Only $search is valid in hybrid search.
+    if (isSearchMeta) {
+        return;
+    }
+    const {testDb, coll} = createTestView(conn);
+
+    // Each $rankFusion/$scoreFusion pipeline with $search triggers one mongot command.
+    // Set up mock responses for both queries (rankFusion + scoreFusion).
+    for (let i = 0; i < 2; i++) {
+        setUpSearchMocks(mongotMock, {
+            coll,
+            testDb,
+            query: kSearchQuery,
+            isSearchMeta: false,
+            startingCursorId: 300 + i * 10,
+        });
+    }
+
+    // One kickback per hybrid search query (rankFusion + scoreFusion).
+    const expectedHybridKickbackRetryDelta = featureFlagValue ? 2 : 0;
+
+    const searchStage = {$search: kSearchQuery};
+    const rankFusionPipeline = [{$rankFusion: {input: {pipelines: {searchPipeline: [searchStage]}}}}];
+    const scoreFusionPipeline = [
+        {$scoreFusion: {input: {pipelines: {searchPipeline: [searchStage]}, normalization: "none"}}},
+    ];
+
+    const expectedLegacyDelta = 2;
+
+    runQueriesAndVerifyMetrics({
+        conn,
+        getRetryCountFn: getSearchInHybridSearchKickbackRetryCount,
+        retryMetricName: "inHybridSearchKickbackRetries",
+        getLegacyCountFn: getLegacySearchUsedCount,
+        getExtensionCountFn: getExtensionSearchUsedCount,
+        featureFlagName: "featureFlagSearchExtension",
+        expectedRetryDelta: expectedHybridKickbackRetryDelta,
+        expectedLegacyDelta,
+        queries: [
+            () => {
+                assert.commandWorked(
+                    testDb.runCommand({aggregate: kTestCollName, pipeline: rankFusionPipeline, cursor: {}}),
+                );
+            },
+            () => {
+                assert.commandWorked(
+                    testDb.runCommand({aggregate: kTestCollName, pipeline: scoreFusionPipeline, cursor: {}}),
+                );
+            },
+        ],
+    });
+}
+
 function runTests(conn, mongotMock) {
     for (const isSearchMeta of [false, true]) {
         for (const featureFlagValue of [true, false]) {
@@ -207,6 +269,7 @@ function runTests(conn, mongotMock) {
             runUnionWithSearchStageTests(conn, mongotMock, isSearchMeta, featureFlagValue);
             runUnionWithOnViewSearchTests(conn, mongotMock, isSearchMeta, featureFlagValue);
             runUnionWithOnViewWithSearchInViewDefinitionTests(conn, mongotMock, isSearchMeta, featureFlagValue);
+            runSearchHybridSearchTests(conn, mongotMock, isSearchMeta, featureFlagValue);
         }
     }
 }
@@ -217,5 +280,5 @@ withExtensionsAndMongot(
     // TODO SERVER-123557: Add sharded topology testing.
     ["standalone"],
     {},
-    {setParameter: {featureFlagExtensionViewsAndUnionWith: false}},
+    {setParameter: {featureFlagExtensionViewsAndUnionWith: false, featureFlagExtensionsInsideHybridSearch: false}},
 );

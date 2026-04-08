@@ -295,7 +295,7 @@ function runTests(conn, mongotMock, shardingTest = null) {
     runUnionWithOnViewWithVectorSearchInViewDefinitionTests(conn, mongotMock, false, shardingTest);
 
     // Run hybrid search tests ($rankFusion/$scoreFusion with $vectorSearch subpipelines).
-    // These always trigger the IFR kickback retry regardless of featureFlagExtensionViewsAndUnionWith.
+    // These trigger the IFR kickback retry when featureFlagExtensionsInsideHybridSearch is disabled.
     runHybridSearchTests(conn, mongotMock, true, shardingTest);
     runHybridSearchTests(conn, mongotMock, false, shardingTest);
 }
@@ -304,10 +304,11 @@ withExtensionsAndMongot(
     {"libvector_search_extension.so": {}},
     runTests,
     ["standalone", "sharded"],
+    {shards: kNumShards},
     {
-        shards: kNumShards,
-    },
-    {
-        setParameter: {featureFlagExtensionViewsAndUnionWith: false},
+        setParameter: {
+            featureFlagExtensionViewsAndUnionWith: false,
+            featureFlagExtensionsInsideHybridSearch: false,
+        },
     },
 );
