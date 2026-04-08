@@ -115,7 +115,7 @@ MongoRunner.validateCollectionsCallback = function (port, options) {
             const cmdObj = multitenancy ? {listDatabasesForAllTenants: 1} : {listDatabases: 1};
             const res = conn.adminCommand(cmdObj);
             if (!res.ok) {
-                assert.commandFailedWithCode(res, ErrorCodes.Unauthorized);
+                assert.commandFailedWithCode(res, [ErrorCodes.Unauthorized, ErrorCodes.NotPrimaryOrSecondary]);
                 return {shouldStop: true, reason: "cannot run listDatabases"};
             }
             assert.commandWorked(res);
