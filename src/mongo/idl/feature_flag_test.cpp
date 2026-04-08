@@ -577,5 +577,28 @@ TEST(IDLFeatureFlag, SerializeFlagValues) {
     ASSERT_TRUE(serializedResult[0]["value"].Bool());
 }
 
+TEST(IDLFeatureFlag, ShouldSerializeOnOutgoingRequestsFalse) {
+    ASSERT_FALSE(
+        feature_flags::gFeatureFlagInDevelopmentForTest.shouldSerializeOnOutgoingRequests());
+}
+
+TEST(IDLFeatureFlag, ShouldSerializeOnOutgoingRequestsTrue) {
+    ASSERT_TRUE(feature_flags::gFeatureFlagSerializeForTest.shouldSerializeOnOutgoingRequests());
+}
+
+TEST(IDLFeatureFlag, GetFlagsForOutgoingRequestsWithLatestFCV) {
+    // (Generic FCV reference): Used for testing.
+    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
+    auto flags = IncrementalRolloutFeatureFlag::getFlagsForOutgoingRequests();
+    // All returned flags must have declared an FCV for serialization.
+    for (auto* flag : flags) {
+        ASSERT_TRUE(flag->shouldSerializeOnOutgoingRequests());
+    }
+    // The test flag with serialize_on_outgoing_requests: kLatest should be present.
+    ASSERT_TRUE(std::any_of(flags.begin(), flags.end(), [](auto* flag) {
+        return flag->getName() == "featureFlagSerializeForTest";
+    }));
+}
+
 }  // namespace
 }  // namespace mongo

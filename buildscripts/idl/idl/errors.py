@@ -138,9 +138,10 @@ ERROR_ID_INCREMENTAL_ROLLOUT_PHASE_INVALID_VALUE = "ID0104"
 ERROR_ID_ILLEGALLY_FCV_GATED_FEATURE_FLAG = "ID0105"
 ERROR_ID_INCREMENTAL_FEATURE_FLAG_DEFAULT_VALUE = "ID0106"
 ERROR_ID_FEATURE_FLAG_WITHOUT_DEFAULT_VALUE = "ID0107"
-ERROR_ID_IFR_FLAG_WITH_VERSION = "ID108"
 ERROR_ID_BAD_VISIBILITY = "ID109"
 ERROR_ID_FEATURE_FLAG_ENABLED_ON_TRANSITIONAL_FCV_MISSING_SAFETY_EXPLANATION = "ID110"
+ERROR_ID_SERIALIZE_ON_OUTGOING_REQUESTS_ON_NON_IFR_FLAG = "ID111"
+ERROR_ID_SERIALIZE_ON_OUTGOING_REQUESTS_MISSING_VERSION = "ID112"
 
 
 class IDLError(Exception):
@@ -1133,17 +1134,27 @@ class ParserContext(object):
             ),
         )
 
-    def add_ifr_flag_with_version(self, location):
-        """
-        Add an error resulting from a feature flag both sets and incremental rollout phase and a
-        version.
-        """
+    def add_serialize_on_outgoing_requests_on_non_ifr_flag(self, location):
+        # type: (common.SourceLocation) -> None
+        """Add an error about serialize_on_outgoing_requests being used on a non-IFR flag."""
         self._add_error(
             location,
-            ERROR_ID_IFR_FLAG_WITH_VERSION,
+            ERROR_ID_SERIALIZE_ON_OUTGOING_REQUESTS_ON_NON_IFR_FLAG,
             (
-                "A feature flag in any phase other than the default ('not_for_incremental_rollout') "
-                "must not also set a 'version' value."
+                "The 'serialize_on_outgoing_requests' attribute is only allowed on Incremental "
+                "Feature Rollout (IFR) flags (those with an 'incremental_rollout_phase' specified)."
+            ),
+        )
+
+    def add_serialize_on_outgoing_requests_missing_version(self, location):
+        # type: (common.SourceLocation) -> None
+        """Add an error about serialize_on_outgoing_requests: true without version."""
+        self._add_error(
+            location,
+            ERROR_ID_SERIALIZE_ON_OUTGOING_REQUESTS_MISSING_VERSION,
+            (
+                "'serialize_on_outgoing_requests: true' requires a 'version' to specify "
+                "the FCV at which serialization begins."
             ),
         )
 

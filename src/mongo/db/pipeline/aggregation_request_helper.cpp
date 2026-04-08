@@ -105,15 +105,9 @@ void addQuerySettingsToRequest(AggregateCommandRequest& request,
 void addIfrFlagsToRequest(AggregateCommandRequest& request,
                           std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
     tassert(11565104, "IFRContext cannot be null", ifrContext);
-
-    // If the featureFlagVectorSearchExtension IFR flag is enabled, all nodes are upgraded and can
-    // parse IFR flags.
-    // TODO SERVER-117721 Remove FCV gate once multiversion testing can handle IFR flags.
-    if (serverGlobalParams.featureCompatibility.acquireFCVSnapshot().isGreaterThanOrEqualTo(
-            multiversion::FeatureCompatibilityVersion::kVersion_8_3)) {  // NOLINT
-        // TODO SERVER-116219 Expand IFR flag serialization beyond $vectorSearch.
-        request.setIfrFlags(
-            ifrContext->serializeFlagValues({&feature_flags::gFeatureFlagVectorSearchExtension}));
+    auto flagsToSerialize = IncrementalRolloutFeatureFlag::getFlagsForOutgoingRequests();
+    if (!flagsToSerialize.empty()) {
+        request.setIfrFlags(ifrContext->serializeFlagValues(flagsToSerialize));
     }
 }
 

@@ -31,11 +31,13 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/version_context.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/util/version/releases.h"
 
 #include <absl/container/flat_hash_map.h>
+#include <boost/optional.hpp>
 
 namespace mongo {
 class IncrementalFeatureRolloutContext;
@@ -355,8 +357,12 @@ class IncrementalRolloutFeatureFlag : public FeatureFlag {
 public:
     static IncrementalRolloutFeatureFlag* findByName(StringData flagName);
 
-    IncrementalRolloutFeatureFlag(StringData flagName, RolloutPhase phase, bool value)
-        : _flagName(std::string{flagName}), _phase(phase), _value(value) {}
+    static std::vector<IncrementalRolloutFeatureFlag*> getFlagsForOutgoingRequests();
+
+    IncrementalRolloutFeatureFlag(StringData flagName,
+                                  RolloutPhase phase,
+                                  bool value,
+                                  StringData serializeOnOutgoingRequestsVersion = ""_sd);
 
     /**
      * Returns true if the feature is currently enabled, false otherwise. Also increments the
@@ -385,6 +391,13 @@ public:
 
     const std::string& getName() const {
         return _flagName;
+    }
+
+    /**
+     * Returns true if this flag has declared an FCV version for outgoing request serialization.
+     */
+    bool shouldSerializeOnOutgoingRequests() const {
+        return _serializeOnOutgoingRequestsVersion.has_value();
     }
 
     bool allowRuntimeToggle() const override {
@@ -428,6 +441,7 @@ private:
     std::string _flagName;
     RolloutPhase _phase;
     Atomic<bool> _value;
+    boost::optional<multiversion::FeatureCompatibilityVersion> _serializeOnOutgoingRequestsVersion;
 
     Atomic<int64_t> _numFalseChecks;
     Atomic<int64_t> _numTrueChecks;

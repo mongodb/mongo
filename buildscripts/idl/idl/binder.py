@@ -1621,10 +1621,13 @@ def _bind_ifr_feature_flag_default(ctxt, param, feature_flag_phase):
         )
         return None
 
+    serialize_version_arg = (
+        f', "{param.version}"_sd' if param.serialize_on_outgoing_requests else ""
+    )
     expr_for_default = syntax.Expression(param.file_name, param.line, param.column)
     expr_for_default.expr = (
         f'"{param.name}"_sd, RolloutPhase::'
-        f"{feature_flag_phase.to_camel_case_string()}, {default_value}"
+        f"{feature_flag_phase.to_camel_case_string()}, {default_value}{serialize_version_arg}"
     )
 
     bound_expr = _bind_expression(expr_for_default)
@@ -1703,9 +1706,9 @@ def _bind_feature_flags(ctxt, param):
         if ast_param.default is None:
             return None
 
-        # An IFR flag must not specify the 'version' field.
-        if param.version:
-            ctxt.add_ifr_flag_with_version(param)
+        # serialize_on_outgoing_requests requires a version.
+        if param.serialize_on_outgoing_requests and not param.version:
+            ctxt.add_serialize_on_outgoing_requests_missing_version(param)
             return None
     elif param.default:
         ast_param.default = _bind_non_ifr_feature_flag_default(ctxt, param)
@@ -1728,6 +1731,11 @@ def _bind_feature_flags(ctxt, param):
             ):
                 ctxt.add_feature_flag_enabled_on_transitional_fcv_missing_safety_explanation(param)
                 return None
+
+            # serialize_on_outgoing_requests is only allowed on IFR flags.
+            if param.serialize_on_outgoing_requests:
+                ctxt.add_serialize_on_outgoing_requests_on_non_ifr_flag(param)
+                return None
         else:
             # Feature flags that should not be FCV gated must not have unsupported options.
             for option_name in (
@@ -1738,6 +1746,11 @@ def _bind_feature_flags(ctxt, param):
                 if getattr(param, option_name):
                     ctxt.add_feature_flag_fcv_gated_false_has_unsupported_option(param, option_name)
                     return None
+
+            # serialize_on_outgoing_requests is only allowed on IFR flags.
+            if param.serialize_on_outgoing_requests:
+                ctxt.add_serialize_on_outgoing_requests_on_non_ifr_flag(param)
+                return None
     else:
         # Non-IFR flags must specify a 'default' value.
         ctxt.add_feature_flag_without_default_value(param)

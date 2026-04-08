@@ -266,6 +266,32 @@ IncrementalRolloutFeatureFlag* IncrementalRolloutFeatureFlag::findByName(StringD
     return nullptr;
 }
 
+IncrementalRolloutFeatureFlag::IncrementalRolloutFeatureFlag(
+    StringData flagName,
+    RolloutPhase phase,
+    bool value,
+    StringData serializeOnOutgoingRequestsVersion)
+    : _flagName(std::string{flagName}), _phase(phase), _value(value) {
+    if (!serializeOnOutgoingRequestsVersion.empty()) {
+        _serializeOnOutgoingRequestsVersion =
+            FeatureCompatibilityVersionParser::parseVersionForFeatureFlags(
+                serializeOnOutgoingRequestsVersion);
+    }
+}
+
+std::vector<IncrementalRolloutFeatureFlag*>
+IncrementalRolloutFeatureFlag::getFlagsForOutgoingRequests() {
+    auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    std::vector<IncrementalRolloutFeatureFlag*> flagsToSerialize;
+    for (auto* flag : getMutableAllIncrementalRolloutFeatureFlags()) {
+        if (flag->_serializeOnOutgoingRequestsVersion &&
+            fcv.isGreaterThanOrEqualTo(*flag->_serializeOnOutgoingRequestsVersion)) {
+            flagsToSerialize.push_back(flag);
+        }
+    }
+    return flagsToSerialize;
+}
+
 bool IncrementalRolloutFeatureFlag::checkEnabled() {
     auto checkResult = _value.load();
     (checkResult ? _numTrueChecks : _numFalseChecks).addAndFetch(1);
@@ -316,6 +342,11 @@ void IncrementalRolloutFeatureFlag::appendFlagDetails(BSONObjBuilder& detailsBui
         MONGO_UNREACHABLE_TASSERT(101023);
     }();
     detailsBuilder.append("incrementalFeatureRolloutPhase", phaseName);
+    if (_serializeOnOutgoingRequestsVersion) {
+        detailsBuilder.append("serializeOnOutgoingRequestsVersion",
+                              FeatureCompatibilityVersionParser::serializeVersionForFeatureFlags(
+                                  *_serializeOnOutgoingRequestsVersion));
+    }
 }
 
 bool IncrementalRolloutFeatureFlag::checkWithContext(const VersionContext& vCtx,

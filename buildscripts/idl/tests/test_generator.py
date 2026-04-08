@@ -1670,6 +1670,35 @@ class TestGenerator(testcase.IDLTestcase):
             ],
         )
 
+    def test_ifr_flag_with_serialize_on_outgoing_requests(self) -> None:
+        """Test generation of an IFR flag with serialize_on_outgoing_requests + version"""
+        header, source = self.assert_generate_with_basic_types(
+            dedent(
+                """
+            feature_flags:
+                featureFlagToaster:
+                    description: "Make toast"
+                    cpp_varname: gToaster
+                    incremental_rollout_phase: in_development
+                    fcv_gated: false
+                    serialize_on_outgoing_requests: true
+                    version: 8.3
+            """
+            )
+        )
+        self.assertStringsInFile(
+            header,
+            ["mongo::IncrementalRolloutFeatureFlag gToaster;"],
+        )
+        self.assertStringsInFile(
+            source,
+            [
+                "mongo::IncrementalRolloutFeatureFlag gToaster{"
+                + '"featureFlagToaster"_sd, RolloutPhase::inDevelopment, false, "8.3"_sd};',
+                '<FeatureFlagServerParameter>("featureFlagToaster", &gToaster);',
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

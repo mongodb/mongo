@@ -94,6 +94,14 @@ feature_flags:
       incremental_rollout_phase: released
       fcv_gated: false
 
+    featureFlagSerializeForTest:
+      description: "IFR flag with serialize_for_fcv for testing"
+      cpp_varname: gFeatureFlagSerializeForTest
+      incremental_rollout_phase: in_development
+      fcv_gated: false
+      serialize_on_outgoing_requests: true
+      version: $ver_str(latest)
+
 server_parameters:
     spTestNeedsFeatureFlagToaster:
       description: "Server Parameter gated on featureFlagToaster"
