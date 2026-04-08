@@ -355,6 +355,8 @@ function containsWithAtLeastCount(connOrFile, msg, expectedCount, timeoutMillis 
     containsWithCount(connOrFile, msg, expectedCount, timeoutMillis, /*exact*/ false);
 }
 
+const kNumberLongRegex = /NumberLong\("?(.+?)"?\)/m;
+
 /*
  * Converts a scalar or object to a string format suitable for matching against log output.
  * Field names are not quoted, and by default strings which are not within an enclosing
@@ -368,7 +370,7 @@ function formatAsLogLine(value, escapeStrings, toDecimal) {
     } else if (typeof value === "number") {
         return Number.isInteger(value) && toDecimal ? value.toFixed(1) : value;
     } else if (value instanceof NumberLong) {
-        return `${value}`.match(/NumberLong..(.*)../m)[1];
+        return `${value}`.match(kNumberLongRegex)[1];
     } else if (typeof value !== "object") {
         return value;
     } else if (Object.keys(value).length === 0) {
@@ -392,7 +394,7 @@ function formatAsJsonLogLine(value, escapeStrings, toDecimal) {
     } else if (typeof value === "number") {
         return Number.isInteger(value) && toDecimal ? value.toFixed(1) : value;
     } else if (value instanceof NumberLong) {
-        return `${value}`.match(/NumberLong..(.*)../m)[1];
+        return `${value}`.match(kNumberLongRegex)[1];
     } else if (typeof value !== "object") {
         return value;
     } else if (Object.keys(value).length === 0) {
