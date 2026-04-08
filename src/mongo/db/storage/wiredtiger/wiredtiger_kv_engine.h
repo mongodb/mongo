@@ -64,6 +64,7 @@
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/string_map.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -373,6 +374,11 @@ protected:
      */
     std::vector<std::string> _wtGetAllIdents(WiredTigerSession& session) const;
 
+    /**
+     * Returns the table id for the given ident, generating one if it hasn't already been assigned.
+     */
+    uint64_t _getTableIdForIdent(StringData ident);
+
     // Configuration parameters to configure the WiredTiger instance.
     WiredTigerConfig _wtConfig;
     // This mutex is needed to prevent concurrent access to the config, only for the parts of the
@@ -393,6 +399,11 @@ protected:
     ClockSource* const _clockSource{nullptr};
 
     std::string _wtOpenConfig;
+
+    // Maintains a stable mapping from ident to cursor cache table ID. Entries are cleaned up
+    // automatically when the ident is dropped.
+    stdx::mutex _identTableIdMutex;
+    StringMap<uint64_t> _identTableIds;
 };
 
 // WiredTigerKVEngineBase implementation for all customer or system tables. Tables created by this

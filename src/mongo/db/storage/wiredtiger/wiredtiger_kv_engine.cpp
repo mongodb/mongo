@@ -494,6 +494,15 @@ void WiredTigerKVEngineBase::setRecordStoreExtraOptions(const std::string& optio
     _rsOptions = options;
 }
 
+uint64_t WiredTigerKVEngineBase::_getTableIdForIdent(StringData ident) {
+    stdx::lock_guard lk(_identTableIdMutex);
+    auto& id = _identTableIds[ident];
+    if (id == 0) {
+        id = WiredTigerUtil::genTableId();
+    }
+    return id;
+}
+
 Status WiredTigerKVEngineBase::insertIntoIdent(RecoveryUnit& ru,
                                                StringData ident,
                                                std::variant<std::span<const char>, int64_t> key,
@@ -501,8 +510,7 @@ Status WiredTigerKVEngineBase::insertIntoIdent(RecoveryUnit& ru,
     invariant(ru.inUnitOfWork());
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
 
-    // TODO (SERVER-109454): `genTableId()` may be replaced with different cache logic.
-    WiredTigerCursor cursor{getWiredTigerCursorParams(wtRu, WiredTigerUtil::genTableId()),
+    WiredTigerCursor cursor{getWiredTigerCursorParams(wtRu, _getTableIdForIdent(ident)),
                             WiredTigerUtil::buildTableUri(ident),
                             *wtRu.getSession()};
     wtRu.assertInActiveTxn();
@@ -523,8 +531,7 @@ Status WiredTigerKVEngineBase::updateInIdent(RecoveryUnit& ru,
     invariant(ru.inUnitOfWork());
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
 
-    // TODO (SERVER-109454): `genTableId()` may be replaced with different cache logic.
-    WiredTigerCursor cursor{getWiredTigerCursorParams(wtRu, WiredTigerUtil::genTableId()),
+    WiredTigerCursor cursor{getWiredTigerCursorParams(wtRu, _getTableIdForIdent(ident)),
                             WiredTigerUtil::buildTableUri(ident),
                             *wtRu.getSession()};
     wtRu.assertInActiveTxn();
@@ -544,8 +551,7 @@ StatusWith<UniqueBuffer> WiredTigerKVEngineBase::getFromIdent(
     RecoveryUnit& ru, StringData ident, std::variant<std::span<const char>, int64_t> key) {
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
 
-    // TODO (SERVER-109454): `genTableId()` may be replaced with different cache logic.
-    WiredTigerCursor cursor{getWiredTigerCursorParams(wtRu, WiredTigerUtil::genTableId()),
+    WiredTigerCursor cursor{getWiredTigerCursorParams(wtRu, _getTableIdForIdent(ident)),
                             WiredTigerUtil::buildTableUri(ident),
                             *wtRu.getSession()};
     WT_CURSOR* c = cursor.get();
@@ -574,8 +580,7 @@ Status WiredTigerKVEngineBase::deleteFromIdent(RecoveryUnit& ru,
     invariant(ru.inUnitOfWork());
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
 
-    // TODO (SERVER-109454): `genTableId()` may be replaced with different cache logic.
-    WiredTigerCursor cursor{getWiredTigerCursorParams(wtRu, WiredTigerUtil::genTableId()),
+    WiredTigerCursor cursor{getWiredTigerCursorParams(wtRu, _getTableIdForIdent(ident)),
                             WiredTigerUtil::buildTableUri(ident),
                             *wtRu.getSession()};
     wtRu.assertInActiveTxn();
@@ -2083,6 +2088,11 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
 
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
     wtRu.getSessionNoTxn()->closeAllCursors(uri);
+
+    {
+        stdx::lock_guard lk(_identTableIdMutex);
+        _identTableIds.erase(ident);
+    }
 
     // Use a separate session to avoid transactional issues, because a drop may impact the
     // in-progress transaction.
