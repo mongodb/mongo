@@ -50,6 +50,10 @@ public:
         return _stageName;
     }
 
+    BSONObj getFilter() const {
+        return _documentSource->hasQuery() ? _documentSource->getQuery() : BSONObj();
+    }
+
     static inline std::unique_ptr<LogicalAggStage> make(DocumentSource* docSrc) {
         return std::unique_ptr<LogicalAggStage>(new LogicalAggStage(docSrc));
     }

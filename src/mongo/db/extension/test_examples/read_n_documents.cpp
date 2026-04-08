@@ -36,15 +36,20 @@
 namespace sdk = mongo::extension::sdk;
 using namespace mongo;
 
+namespace {
+int parseNumDocs(const BSONObj& arguments) {
+    return arguments["numDocs"] && arguments["numDocs"].isNumber()
+        ? arguments["numDocs"].safeNumberInt()
+        : 1;
+}
+}  // namespace
+
 class ProduceIdsExecStage : public sdk::ExecAggStageSource {
 public:
     ProduceIdsExecStage(std::string_view stageName, const BSONObj& arguments)
         : sdk::ExecAggStageSource(stageName),
-          _sortById(arguments["sortById"] && arguments["sortById"].booleanSafe()) {
-        _numDocs = arguments["numDocs"] && arguments["numDocs"].isNumber()
-            ? arguments["numDocs"].safeNumberInt()
-            : 1;
-    }
+          _sortById(arguments["sortById"] && arguments["sortById"].booleanSafe()),
+          _numDocs(parseNumDocs(arguments)) {}
 
     extension::ExtensionGetNextResult getNext(const sdk::QueryExecutionContextHandle& execCtx,
                                               ::MongoExtensionExecAggStage* execStage) override {
@@ -78,7 +83,7 @@ public:
 
 private:
     const bool _sortById;
-    int _numDocs;
+    const int _numDocs;
     int _currentDoc = 0;
 };
 
@@ -109,6 +114,13 @@ public:
         }
 
         return dpl;
+    }
+
+    BSONObj getFilter() const override {
+        // We will generate _ids from [0, numDocs). We can turn this range into a filter that can be
+        // used for shard targeting.
+        auto rangeFilter = BSON("$gte" << 0 << "$lt" << parseNumDocs(_arguments));
+        return BSON("_id" << rangeFilter);
     }
 };
 

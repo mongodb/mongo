@@ -29,6 +29,8 @@
 
 #include "mongo/db/extension/host_connector/adapter/logical_agg_stage_adapter.h"
 
+#include "mongo/db/extension/shared/byte_buf.h"
+
 namespace mongo::extension::host_connector {
 
 ::MongoExtensionByteView HostLogicalAggStageAdapter::_hostGetName(
@@ -37,4 +39,23 @@ namespace mongo::extension::host_connector {
     StringData sd{sv.data(), sv.length()};
     return stringDataAsByteView(sd);
 }
-};  // namespace mongo::extension::host_connector
+
+::MongoExtensionStatus* HostLogicalAggStageAdapter::_hostGetFilter(
+    const ::MongoExtensionLogicalAggStage* logicalStage,
+    ::MongoExtensionByteBuf** output) noexcept {
+    return wrapCXXAndConvertExceptionToStatus([&]() {
+        *output = nullptr;
+
+        auto filter =
+            static_cast<const HostLogicalAggStageAdapter*>(logicalStage)->getImpl().getFilter();
+
+        // Null output indicates no filter - only initialize 'output' when we have a non-empty
+        // filter.
+        if (!filter.isEmpty()) {
+            // Allocate a buffer on the heap. Ownership is transferred to the caller.
+            *output = new ByteBuf(filter);
+        }
+    });
+}
+
+}  // namespace mongo::extension::host_connector

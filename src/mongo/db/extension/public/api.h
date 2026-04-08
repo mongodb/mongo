@@ -858,6 +858,18 @@ typedef struct MongoExtensionLogicalAggStageVTable {
     MongoExtensionStatus* (*evaluate_rule_transform)(MongoExtensionLogicalAggStage* logicalStage,
                                                      MongoExtensionByteView ruleName,
                                                      bool* result);
+
+    /**
+     * Returns the filter predicate that will be applied by the stage, if applicable. If the stage
+     * does not apply a filter, the output buffer is left as nullptr.
+     *
+     * This method is called by the host for determining which shards to target on source stages.
+     *
+     * Ownership of the output buffer is transferred to the caller.
+     */
+    MongoExtensionStatus* (*get_filter)(const MongoExtensionLogicalAggStage* logicalStage,
+                                        MongoExtensionByteBuf** output);
+
 } MongoExtensionLogicalAggStageVTable;
 
 /**

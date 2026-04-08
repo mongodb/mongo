@@ -104,6 +104,12 @@ public:
      */
     bool evaluateRuleTransform(StringData ruleName);
 
+    /**
+     * Returns the filter predicate applied by this stage for shard targeting. Returns an empty
+     * BSONObj if the stage does not apply a filter.
+     */
+    BSONObj getFilter() const;
+
     static void assertVTableConstraints(const VTable_t& vtable) {
         tassert(11420603,
                 "ExtensionLogicalAggStageAdapter 'get_name' is null",
@@ -135,6 +141,7 @@ public:
         tassert(12201403,
                 "LogicalAggStage 'evaluate_rule_transform' is null",
                 vtable.evaluate_rule_transform != nullptr);
+        tassert(12200400, "LogicalAggStage 'get_filter' is null", vtable.get_filter != nullptr);
     }
 };
 

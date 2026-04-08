@@ -2891,5 +2891,63 @@ TEST_F(DocumentSourceExtensionOptimizableTest, ExplainDetectsInterrupt) {
     opts.verbosity = ExplainOptions::Verbosity::kQueryPlanner;
     ASSERT_THROWS_CODE(optimizable->serialize(opts), DBException, ErrorCodes::Interrupted);
 }
+
+namespace {
+/**
+ * A LogicalAggStage that returns a non-empty filter from getFilter().
+ */
+class LogicalStageWithFilter : public sdk::shared_test_stages::TransformLogicalAggStage {
+public:
+    BSONObj getFilter() const override {
+        return kFilter;
+    }
+
+    static const BSONObj kFilter;
+};
+const BSONObj LogicalStageWithFilter::kFilter = BSON("x" << 1);
+}  // namespace
+
+TEST_F(DocumentSourceExtensionOptimizableTest, GetQuery_SourceStageNoFilter) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionsOptimizations", true};
+    auto logicalStage = new sdk::ExtensionLogicalAggStageAdapter(
+        std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>());
+    auto logicalStageHandle = LogicalAggStageHandle(logicalStage);
+    auto properties =
+        MongoExtensionStaticProperties::parse(BSON("requiresInputDocSource" << false));
+    auto optimizable = host::DocumentSourceExtensionOptimizable::create(
+        getExpCtx(), std::move(logicalStageHandle), properties);
+
+    ASSERT_FALSE(optimizable->hasQuery());
+    ASSERT_BSONOBJ_EQ(optimizable->getQuery(), BSONObj());
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest, GetQuery_SourceStageWithFilter) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionsOptimizations", true};
+    auto logicalStage =
+        new sdk::ExtensionLogicalAggStageAdapter(std::make_unique<LogicalStageWithFilter>());
+    auto logicalStageHandle = LogicalAggStageHandle(logicalStage);
+    auto properties =
+        MongoExtensionStaticProperties::parse(BSON("requiresInputDocSource" << false));
+    auto optimizable = host::DocumentSourceExtensionOptimizable::create(
+        getExpCtx(), std::move(logicalStageHandle), properties);
+
+    ASSERT_TRUE(optimizable->hasQuery());
+    ASSERT_BSONOBJ_EQ(optimizable->getQuery(), LogicalStageWithFilter::kFilter);
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest, GetFilter_TransformStageWithFilter) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionsOptimizations", true};
+    auto logicalStage =
+        new sdk::ExtensionLogicalAggStageAdapter(std::make_unique<LogicalStageWithFilter>());
+    auto logicalStageHandle = LogicalAggStageHandle(logicalStage);
+    // Default properties: requiresInputDocSource = true (transform stage).
+    auto optimizable = host::DocumentSourceExtensionOptimizable::create(
+        getExpCtx(), std::move(logicalStageHandle), MongoExtensionStaticProperties{});
+
+    // Transform stages do not currently report a filter even if they have one.
+    ASSERT_FALSE(optimizable->hasQuery());
+    ASSERT_BSONOBJ_EQ(optimizable->getQuery(), BSONObj());
+}
+
 }  // namespace
 }  // namespace mongo::extension

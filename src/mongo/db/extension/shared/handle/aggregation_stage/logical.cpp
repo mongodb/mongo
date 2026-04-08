@@ -133,5 +133,18 @@ bool LogicalAggStageAPI::evaluateRuleTransform(StringData ruleName) {
     return result;
 }
 
+BSONObj LogicalAggStageAPI::getFilter() const {
+    ::MongoExtensionByteBuf* buf{nullptr};
+    invokeCAndConvertStatusToException([&]() { return _vtable().get_filter(get(), &buf); });
 
+    if (!buf) {
+        // 'buf' will be null if the logical stage does not have a filter.
+        return BSONObj();
+    }
+
+    // Take ownership of the returned buffer so that it gets cleaned up, then retrieve an owned
+    // BSONObj to return to the host.
+    ExtensionByteBufHandle ownedBuf{buf};
+    return bsonObjFromByteView(ownedBuf->getByteView()).getOwned();
+}
 }  // namespace mongo::extension

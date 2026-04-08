@@ -533,6 +533,19 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceExtensionOptimizab
     return outExpanded;
 }
 
+BSONObj DocumentSourceExtensionOptimizable::getQuery() const {
+    if (!feature_flags::gFeatureFlagExtensionsOptimizations.isEnabled()) {
+        return BSONObj();
+    }
+
+    // Only expose source stage filters, for shard targeting purposes.
+    return _properties.getRequiresInputDocSource() ? BSONObj() : _logicalStage->getFilter();
+}
+
+bool DocumentSourceExtensionOptimizable::hasQuery() const {
+    return !getQuery().isEmpty();
+}
+
 boost::intrusive_ptr<DocumentSource> DocumentSourceExtensionOptimizable::clone(
     const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const {
     return create(newExpCtx, _logicalStage->clone(), _properties);

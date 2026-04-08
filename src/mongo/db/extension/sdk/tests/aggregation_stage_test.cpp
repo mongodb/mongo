@@ -1862,6 +1862,42 @@ TEST_F(AggStageTest, ToBsonForLogIncludesCustomLogSummary) {
     ASSERT_FALSE(loggedStage.hasField("secret"));
 }
 
+class FilteredLogicalStage
+    : public sdk::TestLogicalStage<sdk::shared_test_stages::TransformExecAggStage> {
+public:
+    static const BSONObj kFilter;
+
+    FilteredLogicalStage()
+        : sdk::TestLogicalStage<sdk::shared_test_stages::TransformExecAggStage>("$filteredStage",
+                                                                                BSONObj()) {}
+
+    BSONObj getFilter() const override {
+        return kFilter;
+    }
+
+    std::unique_ptr<sdk::LogicalAggStage> clone() const override {
+        return std::make_unique<FilteredLogicalStage>();
+    }
+};
+
+const BSONObj FilteredLogicalStage::kFilter = BSON("field" << "value");
+
+TEST(AggregationStageTest, GetFilterReturnsEmptyBSONObjByDefault) {
+    auto logicalStage = new extension::sdk::ExtensionLogicalAggStageAdapter(
+        sdk::shared_test_stages::TransformLogicalAggStage::make());
+    auto handle = extension::LogicalAggStageHandle{logicalStage};
+
+    ASSERT_BSONOBJ_EQ(BSONObj(), handle->getFilter());
+}
+
+TEST(AggregationStageTest, GetFilterReturnsFilterWhenOverridden) {
+    auto logicalStage = new extension::sdk::ExtensionLogicalAggStageAdapter(
+        std::make_unique<FilteredLogicalStage>());
+    auto handle = extension::LogicalAggStageHandle{logicalStage};
+
+    ASSERT_BSONOBJ_EQ(FilteredLogicalStage::kFilter, handle->getFilter());
+}
+
 }  // namespace
 
 }  // namespace mongo::extension::sdk

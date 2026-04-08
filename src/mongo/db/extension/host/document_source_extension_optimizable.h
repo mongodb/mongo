@@ -441,6 +441,10 @@ public:
         return _logicalStage->compile();
     }
 
+    BSONObj getQuery() const override;
+
+    bool hasQuery() const override;
+
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override;
 

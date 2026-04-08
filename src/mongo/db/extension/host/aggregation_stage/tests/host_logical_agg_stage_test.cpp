@@ -31,6 +31,7 @@
 #include "mongo/db/extension/host_connector/adapter/logical_agg_stage_adapter.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/logical.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
@@ -72,6 +73,25 @@ TEST_F(HostLogicalAggStageAdapterTest, GetNameFromExtensionStage) {
     LogicalAggStageAPI api(&adapter);
 
     ASSERT_EQ(api.getName(), sdk::shared_test_stages::kTransformName);
+}
+
+TEST_F(HostLogicalAggStageAdapterTest, GetFilterReturnsEmptyForStageThatHasNoFilter) {
+    auto sortDs = DocumentSourceSort::create(_expCtx, BSON("a" << 1));
+
+    host_connector::HostLogicalAggStageAdapter adapter(host::LogicalAggStage::make(sortDs.get()));
+    LogicalAggStageAPI api(&adapter);
+
+    ASSERT_BSONOBJ_EQ(api.getFilter(), BSONObj());
+}
+
+TEST_F(HostLogicalAggStageAdapterTest, GetFilterReturnsBSONObjForStageThatHasFilter) {
+    auto filterBson = BSON("x" << 42);
+    auto matchDs = DocumentSourceMatch::create(filterBson, _expCtx);
+
+    host_connector::HostLogicalAggStageAdapter adapter(host::LogicalAggStage::make(matchDs.get()));
+    LogicalAggStageAPI api(&adapter);
+
+    ASSERT_BSONOBJ_EQ(api.getFilter(), filterBson);
 }
 
 TEST(HostLogicalAggStageAdapterStaticTest, DeletedCopyAndMoveConstructors) {
