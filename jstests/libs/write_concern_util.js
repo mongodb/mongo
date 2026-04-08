@@ -69,8 +69,7 @@ export function restartServerReplication(conn) {
         return;
     }
 
-    let errMsg = "Failed to disable stopReplProducer failpoint.";
-    assert.commandWorked(conn.getDB("admin").runCommand({configureFailPoint: "stopReplProducer", mode: "off"}), errMsg);
+    configureFailPoint(conn, "stopReplProducer", {}, "off");
 }
 
 // Restarts replication at all nodes in a replicaset.
