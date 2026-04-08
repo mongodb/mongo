@@ -318,6 +318,9 @@ private:
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
+    bool _hasAlreadyWrittenStrictConsistencyOplog(
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
+
     void _writeStrictConsistencyOplog(
         std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 

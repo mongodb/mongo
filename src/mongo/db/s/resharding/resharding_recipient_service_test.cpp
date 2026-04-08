@@ -154,6 +154,20 @@ RecipientStateEnum getRecipientPhaseOnDisk(OperationContext* opCtx) {
     return getPersistedRecipientDocument(opCtx).getMutableState().getState();
 }
 
+repl::OplogEntry findSingleReshardDoneCatchUpOplogEntry(OperationContext* opCtx,
+                                                        const NamespaceString& sourceNss) {
+    DBDirectClient client(opCtx);
+    FindCommandRequest findRequest{NamespaceString::kRsOplogNamespace};
+    findRequest.setFilter(BSON("ns" << sourceNss.toString_forTest() << "o2.reshardDoneCatchUp"
+                                    << BSON("$exists" << true)));
+    auto cursor = client.find(std::move(findRequest));
+    ASSERT_TRUE(cursor->more()) << "ReshardDoneCatchUp oplog entry not found";
+    repl::OplogEntry op(cursor->next());
+    ASSERT_FALSE(cursor->more()) << "Found multiple ReshardDoneCatchUp oplog entries: "
+                                 << op.getEntry() << " and " << cursor->nextSafe();
+    return op;
+}
+
 class DataReplicationForTest : public ReshardingDataReplicationInterface {
 public:
     DataReplicationForTest() {
@@ -2128,20 +2142,9 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryOnReshardDoneCatchUp)
         ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
                   ErrorCodes::InterruptedDueToReplStateChange);
 
-        DBDirectClient client(opCtx.get());
         NamespaceString sourceNss =
             resharding::constructTemporaryReshardingNss(doc.getSourceNss(), doc.getSourceUUID());
-
-        FindCommandRequest findRequest{NamespaceString::kRsOplogNamespace};
-        findRequest.setFilter(BSON("ns" << sourceNss.toString_forTest() << "o2.reshardDoneCatchUp"
-                                        << BSON("$exists" << true)));
-        auto cursor = client.find(std::move(findRequest));
-
-        ASSERT_TRUE(cursor->more()) << "Found no oplog entries for source collection";
-        repl::OplogEntry op(cursor->next());
-        ASSERT_FALSE(cursor->more())
-            << "Found multiple oplog entries for source collection: " << op.getEntry() << " and "
-            << cursor->nextSafe();
+        repl::OplogEntry op = findSingleReshardDoneCatchUpOplogEntry(opCtx.get(), sourceNss);
 
         ReshardDoneCatchUpChangeEventO2Field expectedChangeEvent{sourceNss,
                                                                  doc.getReshardingUUID()};
@@ -2158,6 +2161,109 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryOnReshardDoneCatchUp)
 
         stepUp(opCtx.get());
     }
+}
+
+TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryOnRecoveryInStrictConsistency) {
+    // performVerification=true enables the change streams monitor path where resharding hangs due
+    // to a missing recipient oplog
+    TestOptions testOptions{.isAlsoDonor = false, .performVerification = true};
+    setupFeatureFlags(testOptions);
+
+    // Ensure the ReshardDoneCatchUpChangeEventO2Field entry is absent from the oplog
+    auto skipOplogWriteFp =
+        globalFailPointRegistry().find("reshardingSkipWriteStrictConsistencyOplog");
+    auto timesEnteredFp = skipOplogWriteFp->setMode(FailPoint::alwaysOn);
+
+    auto doc = makeRecipientDocument(testOptions);
+    auto instanceId =
+        BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
+    auto opCtx = makeOperationContext();
+    auto rawOpCtx = opCtx.get();
+
+    RecipientStateMachine::insertStateDocument(rawOpCtx, doc);
+    auto recipient = RecipientStateMachine::getOrCreate(rawOpCtx, _service, doc.toBSON());
+
+    notifyToStartCloning(rawOpCtx, *recipient, doc);
+    awaitChangeStreamsMonitorStarted(opCtx.get(), *recipient, doc);
+    notifyCriticalSectionStarted(opCtx.get(), *recipient, doc);
+
+    // Wait for the failpoint to be entered — this proves kStrictConsistency was persisted
+    // and the oplog write was skipped.
+    skipOplogWriteFp->waitForTimesEntered(timesEnteredFp + 1);
+    stepDown();
+    skipOplogWriteFp->setMode(FailPoint::off);
+    ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
+              ErrorCodes::InterruptedDueToReplStateChange);
+    recipient.reset();
+
+    stepUp(opCtx.get());
+
+    // Look up the recovered instance. On recovery, the oplog is written and the CSM can complete.
+    auto [maybeRecipient, isPausedOrShutdown] =
+        RecipientStateMachine::lookup(opCtx.get(), _service, instanceId);
+    ASSERT_TRUE(maybeRecipient);
+    ASSERT_FALSE(isPausedOrShutdown);
+    recipient = *maybeRecipient;
+
+    awaitChangeStreamsMonitorCompleted(opCtx.get(), *recipient, doc);
+    notifyReshardingCommitting(opCtx.get(), *recipient, doc);
+    ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+
+    // Confirm the noop oplog entry was written during recovery.
+    // This test deterministically tests the recovery workflow so only a single oplog is expected.
+    // _writeStrictConsistencyOplog checks for an existing entry before writing to prevent
+    // duplicates on recovery.
+    NamespaceString sourceNss =
+        resharding::constructTemporaryReshardingNss(doc.getSourceNss(), doc.getSourceUUID());
+    findSingleReshardDoneCatchUpOplogEntry(opCtx.get(), sourceNss);
+}
+
+TEST_F(ReshardingRecipientServiceTest, SkipsDuplicateOplogEntryOnRecoveryInStrictConsistency) {
+    // Verify that if the ReshardDoneCatchUp oplog entry was already written on the normal path,
+    // a recovery in kStrictConsistency does not write a duplicate.
+    TestOptions testOptions{.isAlsoDonor = false, .performVerification = true};
+    setupFeatureFlags(testOptions);
+
+    auto doc = makeRecipientDocument(testOptions);
+    auto instanceId =
+        BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
+    auto opCtx = makeOperationContext();
+    auto rawOpCtx = opCtx.get();
+
+    RecipientStateMachine::insertStateDocument(rawOpCtx, doc);
+    auto recipient = RecipientStateMachine::getOrCreate(rawOpCtx, _service, doc.toBSON());
+
+    notifyToStartCloning(rawOpCtx, *recipient, doc);
+    awaitChangeStreamsMonitorStarted(opCtx.get(), *recipient, doc);
+    notifyCriticalSectionStarted(opCtx.get(), *recipient, doc);
+
+    // Wait for the change streams monitor to complete — this proves the oplog entry was written
+    // on the normal path.
+    awaitChangeStreamsMonitorCompleted(opCtx.get(), *recipient, doc);
+
+    // Step down while still in kStrictConsistency. On step-up, the recovered instance enters
+    // the recovery branch that calls _writeStrictConsistencyOplog.
+    stepDown();
+    ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
+              ErrorCodes::InterruptedDueToReplStateChange);
+    recipient.reset();
+
+    stepUp(opCtx.get());
+
+    auto [maybeRecipient, isPausedOrShutdown] =
+        RecipientStateMachine::lookup(opCtx.get(), _service, instanceId);
+    ASSERT_TRUE(maybeRecipient);
+    ASSERT_FALSE(isPausedOrShutdown);
+    recipient = *maybeRecipient;
+
+    notifyReshardingCommitting(opCtx.get(), *recipient, doc);
+    ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+
+    // Confirm that exactly one oplog entry exists — the recovery path detected the existing
+    // entry and skipped the duplicate write.
+    NamespaceString sourceNss =
+        resharding::constructTemporaryReshardingNss(doc.getSourceNss(), doc.getSourceUUID());
+    findSingleReshardDoneCatchUpOplogEntry(rawOpCtx, sourceNss);
 }
 
 TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryForImplicitShardCollection) {
@@ -2703,26 +2809,36 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUpWithMissingProgr
 }
 
 TEST_F(ReshardingRecipientServiceTest, AbortWhileChangeStreamsMonitorInProgress) {
+    TestOptions testOptions{.isAlsoDonor = false, .performVerification = true};
+    setupFeatureFlags(testOptions);
+
+    // Skip the oplog write so the CSM is genuinely waiting for the finalEvent that
+    // will never arrive — this is the window where abort should interrupt it.
+    auto skipOplogWriteFp =
+        globalFailPointRegistry().find("reshardingSkipWriteStrictConsistencyOplog");
+    auto timesEnteredFp = skipOplogWriteFp->setMode(FailPoint::alwaysOn);
+
+    auto doc = makeRecipientDocument(testOptions);
     auto opCtx = makeOperationContext();
-    auto doc = makeRecipientDocument({.isAlsoDonor = false, .performVerification = true});
+    auto rawOpCtx = opCtx.get();
 
-    auto mutableState = doc.getMutableState();
-    mutableState.setState(RecipientStateEnum::kStrictConsistency);
-    mutableState.setTotalNumDocuments(0);
-    doc.setMutableState(mutableState);
-    doc.setCloneTimestamp(Timestamp{10, 0});
-    doc.setStartConfigTxnCloneTime(Date_t::now());
-    doc.setChangeStreamsMonitor(createChangeStreamsMonitorContext(opCtx.get()));
+    RecipientStateMachine::insertStateDocument(rawOpCtx, doc);
+    auto recipient = RecipientStateMachine::getOrCreate(rawOpCtx, _service, doc.toBSON());
 
-    createTempReshardingCollection(opCtx.get(), doc);
-    RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+    notifyToStartCloning(rawOpCtx, *recipient, doc);
+    awaitChangeStreamsMonitorStarted(opCtx.get(), *recipient, doc);
+    notifyCriticalSectionStarted(opCtx.get(), *recipient, doc);
 
-    auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
-    ASSERT_OK(recipient->awaitChangeStreamsMonitorStartedForTest().getNoThrow());
+    // Wait for the failpoint — kStrictConsistency is persisted and the oplog write was
+    // skipped. The state machine is about to enter _awaitChangeStreamsMonitorCompleted.
+    skipOplogWriteFp->waitForTimesEntered(timesEnteredFp + 1);
+    skipOplogWriteFp->setMode(FailPoint::off);
+
     recipient->abort(false);
 
     auto status = recipient->awaitChangeStreamsMonitorCompletedForTest().getNoThrow();
-    ASSERT((status == ErrorCodes::CallbackCanceled) || (status == ErrorCodes::Interrupted));
+    ASSERT((status == ErrorCodes::CallbackCanceled) || (status == ErrorCodes::Interrupted))
+        << "Expected CSM to be interrupted by abort, got: " << status;
     ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
 }
 
