@@ -269,9 +269,7 @@ jsTest.log("The stage must return the collections from the 'config' database.");
 {
     assert.soon(() => {
         let listCollectionResult = runListCollectionsOnDbs(db, ["config"]);
-        let stageResultAdmin = adminDB
-            .aggregate([{$listClusterCatalog: {}}, {$match: {$and: [{db: "config"}, {ns: {$not: /system.profile/}}]}}])
-            .toArray();
+        let stageResultAdmin = adminDB.aggregate([{$listClusterCatalog: {}}, {$match: {db: "config"}}]).toArray();
         let stageResultConfig = configDB.aggregate([{$listClusterCatalog: {}}]).toArray();
         if (
             listCollectionResult.length != stageResultAdmin.length ||
