@@ -36,6 +36,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/expression_params.h"
+#include "mongo/db/index/s2_common.h"
 #include "mongo/db/index/s2_key_generator.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/record_id.h"
@@ -61,6 +62,46 @@
 
 
 namespace mongo {
+
+namespace {
+
+/**
+ * Generates 2dsphere keys for validation. If 'overrideIndexVersion' is set, it replaces the
+ * version taken from 'indexSpec' after initialize2dsphereParams.
+ */
+KeyStringSet generateS2KeysForValidationImpl(const BSONObj& indexSpec,
+                                             const CollatorInterface* collator,
+                                             const BSONObj& document,
+                                             Ordering ordering,
+                                             const boost::optional<RecordId>& recordId,
+                                             key_string::Version keyStringVersion,
+                                             boost::optional<S2IndexVersion> overrideIndexVersion) {
+    S2IndexingParams params;
+    index2dsphere::initialize2dsphereParams(indexSpec, collator, &params);
+    if (overrideIndexVersion) {
+        params.indexVersion = *overrideIndexVersion;
+    }
+
+    SharedBufferFragmentBuilder pool(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
+    KeyStringSet keys;
+    MultikeyPaths multikeyPaths;
+
+    BSONObj keyPattern = indexSpec.getObjectField("key");
+    index2dsphere::getS2Keys(pool,
+                             document,
+                             keyPattern,
+                             params,
+                             &keys,
+                             &multikeyPaths,
+                             keyStringVersion,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                             ordering,
+                             recordId);
+
+    return keys;
+}
+
+}  // namespace
 
 static const string kIndexVersionFieldName("2dsphereIndexVersion");
 
@@ -194,37 +235,6 @@ StatusWith<BSONObj> S2AccessMethod::fixSpec(const BSONObj& specObj) {
 }
 
 // static
-KeyStringSet S2AccessMethod::generateKeysForValidation(const BSONObj& indexSpec,
-                                                       const CollatorInterface* collator,
-                                                       const BSONObj& document,
-                                                       Ordering ordering,
-                                                       const boost::optional<RecordId>& recordId,
-                                                       key_string::Version keyStringVersion) {
-    S2IndexingParams params;
-    index2dsphere::initialize2dsphereParams(indexSpec, collator, &params);
-    // Force version 4 for validation comparison
-    params.indexVersion = S2_INDEX_VERSION_4;
-
-    SharedBufferFragmentBuilder pool(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
-    KeyStringSet keys;
-    MultikeyPaths multikeyPaths;
-
-    BSONObj keyPattern = indexSpec.getObjectField("key");
-    index2dsphere::getS2Keys(pool,
-                             document,
-                             keyPattern,
-                             params,
-                             &keys,
-                             &multikeyPaths,
-                             keyStringVersion,
-                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
-                             ordering,
-                             recordId);
-
-    return keys;
-}
-
-// static
 bool S2AccessMethod::isVersion3(const BSONObj& indexSpec) {
     BSONElement versionElt = indexSpec["2dsphereIndexVersion"];
     return versionElt.isNumber() && versionElt.numberInt() == S2_INDEX_VERSION_3;
@@ -249,24 +259,45 @@ S2AccessMethod::checkMissingIndexEntryAlternative(OperationContext* opCtx,
     }
 
     try {
-        // Generate version 4 keys for this document.
-        KeyStringSet keysV4 =
-            generateKeysForValidation(entry.descriptor()->infoObj(),
-                                      entry.getCollator(),
-                                      document,
-                                      getSortedDataInterface()->getOrdering(),
-                                      recordId,
-                                      getSortedDataInterface()->getKeyStringVersion());
+        const auto& indexSpec = entry.descriptor()->infoObj();
+        const auto ksVersion = getSortedDataInterface()->getKeyStringVersion();
+        const auto ordering = getSortedDataInterface()->getOrdering();
 
-        // Check if version 4 keys exist in the index. If they do, this indicates the
-        // validation failure was caused by SERVER-84794 and the index should be
-        // upgraded to v4.
+        KeyStringSet keysV3 = generateS2KeysForValidationImpl(
+            indexSpec, entry.getCollator(), document, ordering, recordId, ksVersion, boost::none);
+        KeyStringSet keysV4 =
+            generateS2KeysForValidationImpl(indexSpec,
+                                            entry.getCollator(),
+                                            document,
+                                            ordering,
+                                            recordId,
+                                            ksVersion,
+                                            boost::optional<S2IndexVersion>(S2_INDEX_VERSION_4));
+
+        // The missing key must be one we expect under v3 parsing (current catalog version).
+        if (!keysV3.contains(missingKey)) {
+            return boost::none;
+        }
+
+        // If v4 would still expect this same KeyString, the inconsistency is not the v3-vs-v4
+        // semantic fork (e.g. partial multikey index corruption).
+        if (keysV4.contains(missingKey)) {
+            return boost::none;
+        }
+
+        // Check if a v4-only key (not also produced under v3) exists in the index for this record.
+        // Keys that appear in both sets can still be present for unrelated reasons (e.g. another
+        // geometry that parses the same under v3 and v4); matching those would false-positive after
+        // a partial multikey miss of the forked key only.
         if (!keysV4.empty()) {
             auto sortedDataInterface = getSortedDataInterface();
             auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
             auto cursor = sortedDataInterface->newCursor(opCtx, ru);
             bool foundMatchingKey =
                 std::any_of(keysV4.begin(), keysV4.end(), [&](const auto& keyV4) {
+                    if (keysV3.contains(keyV4)) {
+                        return false;
+                    }
                     // seekForKeyString checks if the key exists in the index and
                     // returns the KeyStringEntry with the RecordId if found.
                     auto ksEntry = cursor->seekForKeyString(ru, keyV4.getView());
@@ -285,7 +316,7 @@ S2AccessMethod::checkMissingIndexEntryAlternative(OperationContext* opCtx,
             }
         }
     } catch (...) {
-        // If key generation fails with version 4, continue with normal error reporting.
+        // If key generation fails, continue with normal error reporting.
     }
 
     return boost::none;

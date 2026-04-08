@@ -80,16 +80,6 @@ public:
     static StatusWith<BSONObj> fixSpec(const BSONObj& specObj);
 
     /**
-     * Public API for generating S2 index keys for validation purposes.
-     */
-    static KeyStringSet generateKeysForValidation(const BSONObj& indexSpec,
-                                                  const CollatorInterface* collator,
-                                                  const BSONObj& document,
-                                                  Ordering ordering,
-                                                  const boost::optional<RecordId>& recordId,
-                                                  key_string::Version keyStringVersion);
-
-    /**
      * Public API for checking if an S2 index is version 3.
      */
     static bool isVersion3(const BSONObj& indexSpec);

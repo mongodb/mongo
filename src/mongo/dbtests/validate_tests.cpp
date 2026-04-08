@@ -4354,6 +4354,115 @@ public:
     }
 };
 
+// Partial multikey 2dsphere (v3): one key removed. Validation should fail with a generic index
+// inconsistency, not the SERVER-84794 / rebuild-as-v4 heuristic.
+class ValidateS2MultikeyPartialMissingDoesNotSuggestV4Upgrade : public ValidateBase {
+public:
+    ValidateS2MultikeyPartialMissingDoesNotSuggestV4Upgrade()
+        : ValidateBase(/*full=*/false, /*background=*/false) {}
+
+    void run() {
+        lockDb(MODE_X);
+
+        {
+            beginTransaction();
+            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
+            _db->createCollection(&_opCtx, _nss);
+            commitTransaction();
+        }
+
+        // GeoJSON MultiPoint yields multiple 2dsphere keys. A BSON array of Point objects is not
+        // valid for a single geo field (the array is interpreted as legacy coordinates).
+        BSONObj doc = fromjson(
+            R"({ _id: 42, geo: { type: "MultiPoint", coordinates: [[1.0, 2.0], [50.0, 51.0]] } })");
+
+        {
+            beginTransaction();
+            insertDocument(doc);
+            commitTransaction();
+        }
+
+        const auto indexName = "geo_2dsphere";
+        auto status = createIndexFromSpec(
+            BSON("name" << indexName << "key" << BSON("geo" << "2dsphere") << "2dsphereIndexVersion"
+                        << S2_INDEX_VERSION_3 << "v" << static_cast<int>(kIndexVersion)));
+        ASSERT_OK(status);
+
+        CollectionWriter writer(&_opCtx, coll()->ns());
+        {
+            beginTransaction();
+            auto writableColl = writer.getWritableCollection(&_opCtx);
+            auto entry = writableColl->getIndexCatalog()->findIndexByName(&_opCtx, indexName);
+            ASSERT(entry);
+            auto iam = entry->accessMethod()->asSortedData();
+            ASSERT(iam);
+
+            auto rs = writableColl->getRecordStore();
+            auto cursor = rs->getCursor(&_opCtx, *shard_role_details::getRecoveryUnit(&_opCtx));
+            auto record = cursor->next();
+            ASSERT(record);
+
+            SharedBufferFragmentBuilder pooledBuilder(
+                key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
+            KeyStringSet keys;
+            iam->getKeys(
+                &_opCtx,
+                writableColl,
+                entry,
+                pooledBuilder,
+                record->data.toBson(),
+                InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered,
+                SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                &keys,
+                nullptr,
+                nullptr,
+                record->id);
+
+            ASSERT_GTE(keys.size(), 2u);
+
+            KeyStringSet toRemove;
+            toRemove.insert(*keys.begin());
+            int64_t numDeleted = 0;
+            ASSERT_OK(iam->removeKeys(&_opCtx,
+                                      *shard_role_details::getRecoveryUnit(&_opCtx),
+                                      writableColl,
+                                      entry,
+                                      std::move(toRemove),
+                                      InsertDeleteOptions{.dupsAllowed = true},
+                                      &numDeleted));
+            ASSERT_EQ(1, numDeleted);
+
+            commitTransaction();
+        }
+
+        releaseDb();
+
+        ValidateResults results;
+        ASSERT_OK(CollectionValidation::validate(
+            &_opCtx,
+            _nss,
+            ValidationOptions{CollectionValidation::ValidateMode::kForeground,
+                              CollectionValidation::RepairMode::kNone,
+                              kLogDiagnostics},
+            &results));
+
+        EXPECT_FALSE(results.isValid());
+
+        auto indexResultsIt = results.getIndexResultsMap().find(indexName);
+        EXPECT_NE(indexResultsIt, results.getIndexResultsMap().end());
+        for (const auto& err : indexResultsIt->second.getErrors()) {
+            EXPECT_EQ(std::string::npos, err.find("version 4"))
+                << "Unexpected v4 upgrade message: " << err;
+            EXPECT_EQ(std::string::npos, err.find("2dsphereIndexVersion 4"))
+                << "Unexpected v4 upgrade message: " << err;
+        }
+        for (const auto& w : results.getWarnings()) {
+            EXPECT_EQ(std::string::npos, w.find("2dsphereIndexVersion 4"))
+                << "Unexpected v4 upgrade warning: " << w;
+        }
+    }
+};
+
 // Test that validates a text index created with legacy key generation (pre-SERVER-76875) on
 // documents with embedded dotted fields gets reported as needing to be rebuilt.
 class ValidateTextIndexLegacyNeedsRebuild : public ValidateBase {
@@ -5165,6 +5274,7 @@ public:
 
         // Test that validates S2 index version upgrade detection.
         add<ValidateS2IndexVersion3NeedsUpgrade>();
+        add<ValidateS2MultikeyPartialMissingDoesNotSuggestV4Upgrade>();
 
         // Test that validates text index legacy key generation detection.
         add<ValidateTextIndexLegacyNeedsRebuild>();

@@ -137,6 +137,7 @@ mongo_cc_unit_test(
         "multikey_paths_test.cpp",
         "s2_bucket_key_generator_test.cpp",
         "s2_key_generator_test.cpp",
+        "s2_validate_missing_entry_heuristic_test.cpp",
         "sort_key_generator_test.cpp",
         "wildcard_key_generator_test.cpp",
         "wildcard_validation_test.cpp",
