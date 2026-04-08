@@ -2217,13 +2217,8 @@ TagForPruningResult tagUnindexedOrIndexUnsafeNodesForPruning(MatchExpression* no
                     "after"_attr = node->debugString());
     });
 
-    // ElemMatchObject requires iterating sub-documents at its own path. An IXSCAN only has
-    // flat key values and cannot perform this evaluation, even if the elemMatch's children
-    // reference indexed fields (e.g. $elemMatch on 'a.b' with index {a.b.x: 1, a.b.y: 1}).
-    // Always mark as prunable so it is pruned off from the IXSCAN filter and will therefore be
-    // processed by the FETCH filter.
-    // TODO SERVER-120791. Add support for elem match objects.
-    if (node->matchType() == MatchExpression::ELEM_MATCH_OBJECT) {
+    // Any array operator must be processed in the Fetch's filter not in the Index Scan's filter.
+    if (node->getCategory() == MatchExpression::MatchCategory::kArrayMatching) {
         node->setTag(new PruneTag(true));
         return TagForPruningResult::kWhollyTagged;
     }
@@ -2313,9 +2308,8 @@ bool negatePruneTagsAndRecomputeContainersTag(MatchExpression* node) {
     bool prunable = true;
     LOGV2_DEBUG(10360110, 5, "Negating prune tag for node: {}", "node"_attr = node->debugString());
 
-    // ElemMatchObject is treated as an atomic leaf for pruning (see
-    // tagUnindexedOrIndexUnsafeNodesForPruning). Just flip its tag.
-    if (node->matchType() == MatchExpression::ELEM_MATCH_OBJECT) {
+    // Flip the flag of the array operators since they cannot be processed in Index Scan.
+    if (node->getCategory() == MatchExpression::MatchCategory::kArrayMatching) {
         tassert(10360115,
                 "Expected PruneTag as tag on node",
                 node->getTag() &&
@@ -2451,7 +2445,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::scanWholeIndex(
  *
  * The optimization is currently skipped for timeseries collections, hashed indexes, and
  * multikey indexes. Only certain filter types (leaf, AND, NOT) are considered for optimization.
- * Future work (see To-Do lines) will expand support to OR and NOR expressions.
+ * Future work will expand support to OR and NOR expressions.
  *
  * @param filter
  *      The root of the filter expression tree to be analyzed and potentially pushed down.
