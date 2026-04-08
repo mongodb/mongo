@@ -6,9 +6,40 @@ import platform
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
+from unittest.mock import call, patch
 
-import buildscripts.bazel_burn_in as under_test
+MAX_BAZEL_BUILD_RETRIES = 3
+INITIAL_BAZEL_BUILD_RETRY_DELAY_SECONDS = 1
+
+
+def _run_bazel_build_with_backoff() -> subprocess.CompletedProcess[str]:
+    build_command = [
+        "bazel",
+        "build",
+        "//...",
+        "--build_tag_filters=resmoke_config",
+        "--config=local",
+    ]
+
+    for attempt in range(MAX_BAZEL_BUILD_RETRIES + 1):
+        build_result = subprocess.run(build_command, capture_output=True, text=True)
+        if build_result.returncode == 0:
+            return build_result
+
+        if attempt == MAX_BAZEL_BUILD_RETRIES:
+            return build_result
+
+        backoff_seconds = INITIAL_BAZEL_BUILD_RETRY_DELAY_SECONDS * (2**attempt)
+        print(
+            "Bazel build failed with exit code "
+            f"{build_result.returncode} (attempt {attempt + 1}/{MAX_BAZEL_BUILD_RETRIES + 1}); "
+            f"retrying in {backoff_seconds}s..."
+        )
+        time.sleep(backoff_seconds)
+
+    raise AssertionError("unreachable")
 
 
 @unittest.skipUnless(
@@ -19,14 +50,11 @@ class TestBazelBurnInEnd2End(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         print("\nBuilding resmoke configs with bazel...")
-        build_result = subprocess.run(
-            ["bazel", "build", "//...", "--build_tag_filters=resmoke_config", "--config=local"],
-            capture_output=True,
-            text=True,
-        )
+        build_result = _run_bazel_build_with_backoff()
         if build_result.returncode != 0:
             raise RuntimeError(
-                f"Failed to build resmoke configs with bazel:\n"
+                "Failed to build resmoke configs with bazel after "
+                f"{MAX_BAZEL_BUILD_RETRIES + 1} attempts:\n"
                 f"stdout: {build_result.stdout}\n"
                 f"stderr: {build_result.stderr}"
             )
@@ -153,6 +181,8 @@ class TestBazelBurnInEnd2End(unittest.TestCase):
                 os.remove(outfile)
 
     def test_generate_targets(self):
+        import buildscripts.bazel_burn_in as under_test
+
         mock_changed_files = "jstests/core/js/jssymbol.js"
 
         # Snapshot BUILD.bazel files that generate-targets will modify so we
@@ -194,6 +224,53 @@ class TestBazelBurnInEnd2End(unittest.TestCase):
             for path, content in originals.items():
                 with open(path, "w") as f:
                     f.write(content)
+
+
+class TestRunBazelBuildWithBackoff(unittest.TestCase):
+    @patch("buildscripts.tests.burn_in.test_bazel_burn_in_end2end.time.sleep")
+    @patch("buildscripts.tests.burn_in.test_bazel_burn_in_end2end.subprocess.run")
+    def test_retries_until_success(self, run_mock, sleep_mock):
+        run_mock.side_effect = [
+            subprocess.CompletedProcess(
+                args=["bazel"], returncode=1, stdout="", stderr="failed once"
+            ),
+            subprocess.CompletedProcess(
+                args=["bazel"], returncode=1, stdout="", stderr="failed twice"
+            ),
+            subprocess.CompletedProcess(args=["bazel"], returncode=0, stdout="success", stderr=""),
+        ]
+
+        result = _run_bazel_build_with_backoff()
+        expected_backoffs = [
+            call(INITIAL_BAZEL_BUILD_RETRY_DELAY_SECONDS * (2**attempt)) for attempt in range(2)
+        ]
+
+        self.assertEqual(0, result.returncode)
+        self.assertEqual(3, run_mock.call_count)
+        self.assertEqual(2, sleep_mock.call_count)
+        sleep_mock.assert_has_calls(expected_backoffs)
+
+    @patch("buildscripts.tests.burn_in.test_bazel_burn_in_end2end.time.sleep")
+    @patch("buildscripts.tests.burn_in.test_bazel_burn_in_end2end.subprocess.run")
+    def test_returns_last_failure_after_max_retries(self, run_mock, sleep_mock):
+        failures = [
+            subprocess.CompletedProcess(
+                args=["bazel"], returncode=1, stdout="", stderr=f"failed {idx}"
+            )
+            for idx in range(MAX_BAZEL_BUILD_RETRIES + 1)
+        ]
+        run_mock.side_effect = failures
+
+        result = _run_bazel_build_with_backoff()
+        expected_backoffs = [
+            call(INITIAL_BAZEL_BUILD_RETRY_DELAY_SECONDS * (2**attempt))
+            for attempt in range(MAX_BAZEL_BUILD_RETRIES)
+        ]
+
+        self.assertEqual(1, result.returncode)
+        self.assertEqual(MAX_BAZEL_BUILD_RETRIES + 1, run_mock.call_count)
+        self.assertEqual(MAX_BAZEL_BUILD_RETRIES, sleep_mock.call_count)
+        sleep_mock.assert_has_calls(expected_backoffs)
 
 
 if __name__ == "__main__":
