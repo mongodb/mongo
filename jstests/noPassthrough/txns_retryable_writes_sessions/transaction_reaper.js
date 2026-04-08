@@ -106,7 +106,7 @@ function Fixture(impl) {
 }
 
 Fixture.prototype.assertOutstandingTransactions = function (count) {
-    assert.eq(count, this.transactionConn.getDB("config").transactions.count());
+    assert.eq(count, this.transactionConn.getDB("config").transactions.find().itcount());
 };
 
 Fixture.prototype.assertOutstandingSessions = function (count) {

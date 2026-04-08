@@ -54,6 +54,7 @@
 #include "mongo/db/repl/optime_base_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_process.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/s/session_catalog_migration.h"
 #include "mongo/db/scoped_read_concern.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -386,8 +387,15 @@ void SessionCatalogMigrationSource::init(OperationContext* opCtx,
     // Session docs contain at least LSID, TxnNumber, Timestamp, and some BSON overhead.
     const int64_t defaultSessionDocSize =
         sizeof(LogicalSessionId) + sizeof(TxnNumber) + sizeof(Timestamp) + 16;
-    _averageSessionDocSize =
-        collection ? collection->averageObjectSize(opCtx) : defaultSessionDocSize;
+    if (rss::ReplicatedStorageService::get(opCtx)
+            .getPersistenceProvider()
+            .shouldUseReplicatedFastCount()) {
+        // Replicated fast count does not track `config.transactions` collection.
+        _averageSessionDocSize = defaultSessionDocSize;
+    } else {
+        _averageSessionDocSize =
+            collection ? collection->averageObjectSize(opCtx) : defaultSessionDocSize;
+    }
 }
 
 bool SessionCatalogMigrationSource::hasMoreOplog() {

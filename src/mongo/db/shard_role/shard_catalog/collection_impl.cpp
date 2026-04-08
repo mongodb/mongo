@@ -80,6 +80,7 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_uncommitted_changes.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -1121,6 +1122,16 @@ bool CollectionImpl::isEmpty(OperationContext* opCtx) const {
     auto cursor = getCursor(opCtx, true /* forward */);
 
     auto cursorEmptyCollRes = (!cursor->next()) ? true : false;
+
+    // Return the cursor result directly for untracked collections when the provider only uses
+    // replicated fast count.
+    if (rss::ReplicatedStorageService::get(opCtx)
+            .getPersistenceProvider()
+            .shouldUseReplicatedFastCount() &&
+        !isReplicatedFastCountEligible(_ns)) {
+        return cursorEmptyCollRes;
+    }
+
     auto fastCount = numRecords(opCtx);
     auto fastCountEmptyCollRes = (fastCount == 0) ? true : false;
 

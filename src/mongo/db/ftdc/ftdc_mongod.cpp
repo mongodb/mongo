@@ -93,10 +93,14 @@ struct CollectionStatsSpec {
 std::vector<CollectionStatsSpec> getCollectionSpecs(ServiceContext* serviceContext) {
     std::vector<CollectionStatsSpec> specs{
         {"local.oplog.rs.stats"_sd, "oplog.rs"_sd, DatabaseName::kLocal},
-        {"config.transactions.stats"_sd, "transactions"_sd, DatabaseName::kConfig},
     };
 
     auto& rss = rss::ReplicatedStorageService::get(serviceContext);
+    if (!rss.getPersistenceProvider().shouldUseReplicatedFastCount()) {
+        specs.emplace_back(
+            "config.transactions.stats"_sd, "transactions"_sd, DatabaseName::kConfig);
+    }
+
     if (rss.getPersistenceProvider().supportsFindAndModifyImageCollection()) {
         specs.emplace_back(
             "config.image_collection.stats"_sd, "image_collection"_sd, DatabaseName::kConfig);

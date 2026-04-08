@@ -89,5 +89,19 @@ TEST(ReplicatedFastCountEligibleNsTest, InternalNonLocalCollectionNotEligible) {
     EXPECT_TRUE(isReplicatedFastCountEligible(adminNss));
 }
 
+TEST(ReplicatedFastCountEligibleNsTest, ImplicitlyReplicatedNotEligible) {
+    const NamespaceString configTransactionsNss =
+        NamespaceString::createNamespaceString_forTest("config", "transactions");
+    EXPECT_FALSE(isReplicatedFastCountEligible(configTransactionsNss));
+
+    const NamespaceString configPreimagesNss =
+        NamespaceString::createNamespaceString_forTest("config", "system.preimages");
+    EXPECT_FALSE(isReplicatedFastCountEligible(configPreimagesNss));
+
+    const NamespaceString configImageCollectionNss =
+        NamespaceString::createNamespaceString_forTest("config", "image_collection");
+    EXPECT_FALSE(isReplicatedFastCountEligible(configImageCollectionNss));
+}
+
 }  // namespace
 }  // namespace mongo
