@@ -203,11 +203,23 @@ TEST_F(ShardsvrProcessInterfaceTest, TestInsert) {
     });
 
     // Mock the response to $out's "aggregate" request to config server, that is a part of
-    // createIndexes.
+    // createIndexes. The CollectionRoutingInfoTargeter refreshes the catalog cache for the temp
+    // collection namespace.
     onCommand([&](const executor::RemoteCommandRequest& request) {
         ASSERT_EQ("aggregate", request.cmdObj.firstElement().fieldNameStringData());
         ASSERT_EQ("collections", request.cmdObj.firstElement().valueStringDataSafe());
         // Response is empty for the unsharded untracked collection.
+        return CursorResponse(kTestAggregateNss, CursorId{0}, {})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
+    // Mock the response to the catalog cache refresh for the system.buckets namespace of the temp
+    // collection. The CollectionRoutingInfoTargeter checks whether the collection is a timeseries
+    // collection by also refreshing the system.buckets namespace.
+    onCommand([&](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQ("aggregate", request.cmdObj.firstElement().fieldNameStringData());
+        ASSERT_EQ("collections", request.cmdObj.firstElement().valueStringDataSafe());
+        // Response is empty - the temp collection is not a timeseries collection.
         return CursorResponse(kTestAggregateNss, CursorId{0}, {})
             .toBSON(CursorResponse::ResponseType::InitialResponse);
     });

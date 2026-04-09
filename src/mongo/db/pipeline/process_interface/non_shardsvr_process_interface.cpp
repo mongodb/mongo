@@ -61,6 +61,7 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops.h"
 #include "mongo/util/str.h"
@@ -266,13 +267,16 @@ void NonShardServerProcessInterface::createIndexesOnEmptyCollection(
     writeConflictRetry(
         opCtx, "CommonMongodProcessInterface::createIndexesOnEmptyCollection", ns, [&] {
             // We use kPretendUnsharded since this is an a non_shardsvr process interface.
-            auto coll =
-                acquireCollection(opCtx,
-                                  CollectionAcquisitionRequest(ns,
-                                                               PlacementConcern::kPretendUnsharded,
-                                                               repl::ReadConcernArgs::get(opCtx),
-                                                               AcquisitionPrerequisites::kWrite),
-                                  MODE_X);
+            // Use acquireCollectionWithBucketsLookup to handle the case where ns is a
+            // timeseries view namespace that needs to be resolved to the underlying
+            // system.buckets collection.
+            auto [coll, _] = timeseries::acquireCollectionWithBucketsLookup(
+                opCtx,
+                CollectionAcquisitionRequest(ns,
+                                             PlacementConcern::kPretendUnsharded,
+                                             repl::ReadConcernArgs::get(opCtx),
+                                             AcquisitionPrerequisites::kWrite),
+                MODE_X);
 
             uassert(ErrorCodes::NamespaceNotFound,
                     str::stream() << "Failed to create indexes for aggregation because collection "

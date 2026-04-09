@@ -48,12 +48,14 @@
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/shard_role/ddl/create_indexes_gen.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_shared_state_cache.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
@@ -525,43 +527,75 @@ void ShardServerProcessInterface::createTempCollection(OperationContext* opCtx,
 
 void ShardServerProcessInterface::createIndexesOnEmptyCollection(
     OperationContext* opCtx, const NamespaceString& ns, const std::vector<BSONObj>& indexSpecs) {
+
+    const auto createIndexCmd = [&] {
+        BSONObjBuilder cmdBuilder;
+        cmdBuilder.append("createIndexes", ns.coll());
+        cmdBuilder.append("indexes", indexSpecs);
+        cmdBuilder.append(WriteConcernOptions::kWriteConcernField,
+                          opCtx->getWriteConcern().toBSON());
+
+        return cmdBuilder.obj();
+    }();
+
     sharding::router::CollectionRouter router(opCtx, ns);
     router.routeWithRoutingContext(
-        fmt::format("copying index for empty collection {}",
+        fmt::format("create index for empty collection {}",
                     NamespaceStringUtil::serialize(ns, SerializationContext::stateDefault())),
-        [&](OperationContext* opCtx, RoutingContext& routingCtx) {
-            BSONObjBuilder cmdBuilder;
-            cmdBuilder.append("createIndexes", ns.coll());
-            cmdBuilder.append("indexes", indexSpecs);
-            cmdBuilder.append(WriteConcernOptions::kWriteConcernField,
-                              opCtx->getWriteConcern().toBSON());
-            auto cmdObj = cmdBuilder.obj();
-            auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
-                opCtx,
-                routingCtx,
-                ns,
-                cmdObj,
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                Shard::RetryPolicy::kStrictlyNotIdempotent,
-                BSONObj() /*query*/,
-                BSONObj() /*collation*/,
-                boost::none /*letParameters*/,
-                boost::none /*runtimeConstants*/);
+        [&](OperationContext* opCtx, RoutingContext& unusedRoutingCtx) {
+            // The CollectionRouter is not capable of implicitly translating the namespace
+            // to a timeseries buckets collection, which is required in this command.
+            // Hence, we'll use the CollectionRouter to handle StaleConfig errors but
+            // will ignore its RoutingContext. Instead, we'll use a
+            // CollectionRoutingInfoTargeter object to properly get the RoutingContext
+            // when the collection is timeseries.
+            // TODO (SERVER-117193) Use the RoutingContext provided by the CollectionRouter
+            // once all timeseries collections become viewless.
+            unusedRoutingCtx.skipValidation();
 
-            for (const auto& response : shardResponses) {
-                uassertStatusOKWithContext(response.swResponse,
-                                           str::stream() << "command was not sent " << cmdObj
-                                                         << " to shard " << response.shardId);
-                const auto& result = response.swResponse.getValue().data;
-                uassertStatusOKWithContext(getStatusFromCommandResult(result),
-                                           str::stream() << "command was sent but failed " << cmdObj
-                                                         << " on shard " << response.shardId);
-                uassertStatusOKWithContext(getWriteConcernStatusFromCommandResult(result),
-                                           str::stream()
-                                               << "command was sent and succeeded, but failed "
-                                                  "waiting for write concern "
-                                               << cmdObj << " on shard " << response.shardId);
+            auto cmdToBeSent = createIndexCmd;
+            auto targeter = CollectionRoutingInfoTargeter(opCtx, ns);
+
+            if (targeter.timeseriesNamespaceNeedsRewrite(ns)) {
+
+                cmdToBeSent = timeseries::makeTimeseriesCommand(
+                    cmdToBeSent,
+                    ns,
+                    CreateIndexesCommand::kCommandName,
+                    CreateIndexesCommand::kIsTimeseriesNamespaceFieldName);
             }
+
+            return routing_context_utils::runAndValidate(
+                targeter.getRoutingCtx(), [&](RoutingContext& routingCtx) {
+                    auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
+                        opCtx,
+                        routingCtx,
+                        targeter.getNS(),
+                        cmdToBeSent,
+                        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                        Shard::RetryPolicy::kStrictlyNotIdempotent,
+                        BSONObj() /*query*/,
+                        BSONObj() /*collation*/,
+                        boost::none /*letParameters*/,
+                        boost::none /*runtimeConstants*/);
+
+                    for (const auto& response : shardResponses) {
+                        uassertStatusOKWithContext(response.swResponse,
+                                                   str::stream()
+                                                       << "command was not sent " << cmdToBeSent
+                                                       << " to shard " << response.shardId);
+                        const auto& result = response.swResponse.getValue().data;
+                        uassertStatusOKWithContext(getStatusFromCommandResult(result),
+                                                   str::stream() << "command was sent but failed "
+                                                                 << cmdToBeSent << " on shard "
+                                                                 << response.shardId);
+                        uassertStatusOKWithContext(
+                            getWriteConcernStatusFromCommandResult(result),
+                            str::stream() << "command was sent and succeeded, but failed "
+                                             "waiting for write concern "
+                                          << cmdToBeSent << " on shard " << response.shardId);
+                    }
+                });
         });
 }
 

@@ -104,6 +104,7 @@ mongo_cc_library(
         "//src/mongo/db/storage:backup_cursor_hooks",
         "//src/mongo/db/storage:feature_document_util",
         "//src/mongo/db/storage:mdb_catalog",
+        "//src/mongo/db/timeseries:catalog_helper",
         "//src/mongo/db/timeseries/write_ops:timeseries_write_ops",
         "//src/mongo/db/transaction",
         "//src/mongo/s:query_analysis_sampler",
@@ -120,6 +121,7 @@ mongo_cc_library(
     deps = [
         ":mongod_process_interfaces",
         "//src/mongo/db:query_exec",
+        "//src/mongo/db/shard_role/ddl:index_commands_idl",
         "//src/mongo/s:sharding_api",
     ],
 )
