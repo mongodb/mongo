@@ -164,7 +164,7 @@ _Aggregate_:
 
 - [`cluster_aggregate::runAggregate()`](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/s/query/planner/cluster_aggregate.cpp#L524)
   - Standard entrypoint for most sharded aggregations.
-  - Called from [`ClusterPipelineCommandBase::_runAggCommand()`](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/s/commands/query_cmd/cluster_pipeline_cmd.h#L146).
+  - Called from [`ClusterAggregateCommandBase::_runAggCommand()`](https://github.com/mongodb/mongo/blob/eab71fdf62f10f0190fe177daa57dccad5341119/src/mongo/s/commands/query_cmd/cluster_aggregate_cmd.h#L127).
   - Processes full aggregation pipelines issued from the cluster.
 - [`MongosProcessInterface::preparePipelineForExecution()`](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/db/pipeline/process_interface/mongos_process_interface.cpp#L159).
   - Handles pipelines issued from a `mongos` router.
