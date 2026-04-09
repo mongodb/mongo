@@ -55,6 +55,7 @@
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/rpc/legacy_reply_builder.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_compressed.h"
 #include "mongo/rpc/op_msg.h"
@@ -74,6 +75,7 @@
 #include "mongo/transport/test_fixtures.h"
 #include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/transport/transport_options_gen.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -1179,5 +1181,38 @@ TEST_F(SessionWorkflowTest, OversizedDecompressedMessage) {
     joinSessions();
 }
 
+/** Builds a minimal opReply (OP_QUERY response) message using LegacyReplyBuilder. */
+Message makeOpReplyMsg() {
+    rpc::LegacyReplyBuilder builder;
+    builder.setRawCommandReply(BSONObjBuilder{}.append("ok", 1).obj());
+    return builder.done();
+}
+
+/** Builds a message with the given opcode by patching the header of an OP_MSG. */
+Message makeMessageWithOpcode(NetworkOp op) {
+    Message msg = makeOpMsg();
+    msg.header().setOperation(op);
+    return msg;
+}
+
+TEST_F(SessionWorkflowTest, ResponseWithOpReplyOpcodeIsAccepted) {
+    startSession();
+    expect<Event::sessionSourceMessage>(makeOpMsg());
+    expect<Event::sepHandleRequest>(makeResponse(makeOpReplyMsg()));
+    expect<Event::sessionSinkMessage>(Status::OK());
+    expect<Event::sessionSourceMessage>(kClosedSessionError);
+    expect<Event::sepEndSession>();
+    joinSessions();
+}
+
+using SessionWorkflowTestDeathTest = SessionWorkflowTest;
+DEATH_TEST_F(SessionWorkflowTestDeathTest,
+             ResponseWithUnsupportedOpcodeTriggersInvariant,
+             "Response uses unsupported opcode") {
+    startSession();
+    expect<Event::sessionSourceMessage>(makeOpMsg());
+    expect<Event::sepHandleRequest>(makeResponse(makeMessageWithOpcode(dbCompressed)));
+    joinSessions();
+}
 }  // namespace
 }  // namespace mongo::transport

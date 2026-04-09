@@ -849,6 +849,11 @@ void SessionWorkflow::Impl::_acceptResponse(DbResponse response) {
             !OpMsg::isFlagSet(work.in(), OpMsg::kMoreToCome));
     invariant(!OpMsg::isFlagSet(toSink, OpMsg::kChecksumPresent));
 
+    // Validate that the response uses a supported server-to-client opcode.
+    const NetworkOp responseOp = toSink.operation();
+    invariant(responseOp == dbMsg || responseOp == opReply,
+              fmt::format("Response uses unsupported opcode: {}", fmt::underlying(responseOp)));
+
     // Update the header for the response message.
     toSink.header().setId(nextMessageId());
     toSink.header().setResponseToMsgId(work.in().header().getId());
