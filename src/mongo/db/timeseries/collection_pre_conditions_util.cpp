@@ -123,8 +123,9 @@ void CollectionPreConditions::checkAcquisitionAgainstPreConditions(
 
     if (!preConditions.exists()) {
         uassert(10685100,
-                "Collection did not exist at the beginning of operation but has "
-                "subsequently been created as a time-series collection",
+                fmt::format("Collection '{}' did not exist at the beginning of operation but has "
+                            "subsequently been created as a time-series collection",
+                            nss.toStringForErrorMsg()),
                 !acquisition.exists() || !acquisition.getCollectionPtr()->isTimeseriesCollection());
     } else {
         if (!acquisition.exists()) {
