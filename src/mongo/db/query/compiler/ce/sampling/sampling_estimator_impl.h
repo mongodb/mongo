@@ -134,10 +134,29 @@ public:
      * Estimates the number of distinct values of tuples of the given field names in the collection,
      * according to the equality semantics specified by each field in 'fields'.
      *
+     * If 'bounds' is provided, only documents matching those bounds contribute to the estimate.
+     * There must be one OrderedIntervalList per field, in the same order as 'fields'.
+     *
      * Note: Does not support estimating NDV over array-valued fields.
      */
     CardinalityEstimate estimateNDV(
-        const std::vector<FieldPathAndEqSemantics>& fields) const override;
+        const std::vector<FieldPathAndEqSemantics>& fields,
+        boost::optional<std::span<const OrderedIntervalList>> bounds) const override;
+    using SamplingEstimator::estimateNDV;
+
+    /**
+     * Estimates the number of distinct values of tuples of the given field names
+     * a multikey index over the provided fields would contain, from the values
+     * present in the sample.
+     *
+     * The sample documents are drawn from the collection; this is not exactly equivalent
+     * to sampling from a multikey index, as each index key is not equally weighted or
+     * drawn independently of "sibling" values in the same document.
+     */
+    CardinalityEstimate estimateNDVMultiKey(
+        const std::vector<FieldPathAndEqSemantics>& fields,
+        boost::optional<std::span<const OrderedIntervalList>> bounds) const override;
+    using SamplingEstimator::estimateNDVMultiKey;
 
     /*
      * Generates a sample using a random cursor. The caller can call this function to draw a sample
@@ -254,8 +273,8 @@ public:
 
 protected:
     /*
-     * This helper creates a CanonicalQuery for the sampling plan. This CanonicalQuery is “empty”
-     * because its sole purpose is to be passed to ‘prepareSlotBasedExecutableTree()’ as part of
+     * This helper creates a CanonicalQuery for the sampling plan. This CanonicalQuery is "empty"
+     * because its sole purpose is to be passed to 'prepareSlotBasedExecutableTree()' as part of
      * preparing the sampling plan for execution in SBE. That function uses the CanonicalQuery to
      * bind input parameters, but this is a no-op for sampling CE.
      */

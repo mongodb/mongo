@@ -29,8 +29,10 @@
 
 #pragma once
 
+#include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
+#include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/stats/value_utils.h"
 #include "mongo/util/modules.h"
 
@@ -100,6 +102,10 @@ struct FieldPathAndEqSemantics {
  * For example, given documents [{a: 1, b: 1}, {a: 1, b: 2}, {a: 2, b: 2}, {a: 2, b: 2}], the NDV of
  * ["a","b"] is 3.
  *
+ * If bounds are provided, the sample will first be filtered to values meeting those bounds. There
+ * must be the same number of bounds as fields, and they must be in the same order. For the above
+ * example, the NDV of ["a", "b"] given bounds [[1,1]], [[1,2]] is 2.
+ *
  * Important notes on what is treated as "distinct":
  * - Null and missing are treated as distinct only for fields marked as isExprEq=true: e.g. given
  *   documents [{a: null}, {}], the NDV of "a" is 2 if it is specified as a $expr field- otherwise,
@@ -113,7 +119,26 @@ struct FieldPathAndEqSemantics {
  * array-valued in 'docs'.
  */
 size_t countNDV(const std::vector<FieldPathAndEqSemantics>& fields,
-                const std::vector<BSONObj>& docs);
+                const std::vector<BSONObj>& docs,
+                boost::optional<std::span<const OrderedIntervalList>> bounds = boost::none);
+
+struct KeyCountResult {
+    // Total number of keys projected from the sample (>= number of documents for multikey fields).
+    size_t totalSampleKeys;
+    // Number of keys that satisfy the filter (e.g. fall within the index bounds).
+    size_t uniqueMatchingKeys;
+    // Number of distinct key tuples among all projected keys (regardless of filter).
+    size_t sampleUniqueKeys;
+};
+
+/**
+ * Version of countNDV which handles array-valued fields by flattening into multiple values, before
+ * determining the count of distinct values.
+ */
+KeyCountResult countNDVMultiKey(
+    const std::vector<FieldPathAndEqSemantics>& fields,
+    const std::vector<BSONObj>& docs,
+    boost::optional<std::span<const OrderedIntervalList>> bounds = boost::none);
 
 /**
  * This helper checks if an element is within the given Interval.
@@ -124,6 +149,5 @@ bool matchesInterval(const Interval& interval, BSONElement val);
  * This helper checks if an element is within any of the list of Interval.
  */
 bool matchesInterval(const OrderedIntervalList& oil, BSONElement val);
-
 
 }  // namespace mongo::ce

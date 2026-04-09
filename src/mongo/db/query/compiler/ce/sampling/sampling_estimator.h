@@ -102,7 +102,30 @@ public:
      * missing) vs. regular equality semantics (null == missing).
      */
     virtual CardinalityEstimate estimateNDV(
-        const std::vector<FieldPathAndEqSemantics>& fields) const = 0;
+        const std::vector<FieldPathAndEqSemantics>& fields,
+        boost::optional<std::span<const OrderedIntervalList>> bounds) const = 0;
+
+    CardinalityEstimate estimateNDV(const std::vector<FieldPathAndEqSemantics>& fields) const {
+        return estimateNDV(fields, boost::none);
+    }
+
+    /**
+     * Estimates the number of distinct values of tuples of the given field names
+     * a multikey index over the provided fields would contain, from the values
+     * present in the sample.
+     *
+     * The sample documents are drawn from the collection; this is not exactly equivalent
+     * to sampling from a multikey index, as each index key is not equally weighted or
+     * drawn independently of "sibling" values in the same document.
+     */
+    virtual CardinalityEstimate estimateNDVMultiKey(
+        const std::vector<FieldPathAndEqSemantics>& fields,
+        boost::optional<std::span<const OrderedIntervalList>> bounds) const = 0;
+
+    CardinalityEstimate estimateNDVMultiKey(
+        const std::vector<FieldPathAndEqSemantics>& fields) const {
+        return estimateNDVMultiKey(fields, boost::none);
+    }
 
     virtual double getCollCard() const = 0;
 

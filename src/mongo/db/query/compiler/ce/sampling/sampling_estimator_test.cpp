@@ -1525,6 +1525,126 @@ TEST_F(SamplingEstimatorTest, EstimateNDVForFieldsSampleSizeTenPercent) {
     makeNDVAssertions(estimator, sampleSize);
 }
 
+// Parameterized test: validate that estimateNDVMultiKey and estimateNDV are consistent when the
+// array-valued field has elements drawn from a fixed set of unique values.
+//
+// For {a: [v]}: each document produces exactly one index key, so countNDVMultiKey sees
+// (totalSampleKeys=sampleSize, uniqueKeys=uniqueValueCount) - identical to countNDV on the scalar
+// equivalent.  Both must produce the same NewtonRaphson estimate (ASSERT_EQ).
+//
+// For {a: [v, v, v, v]}: four identical keys per document inflate totalSampleKeys but not
+// uniqueKeys. The NR call receives a different sampleSize but the same sampleNDV, so the result is
+// no longer numerically equal to the scalar case, but must still converge to ~= uniqueValueCount.
+struct NDVMultiKeyTestParams {
+    size_t card;
+    size_t sampleSize;
+    size_t uniqueValueCount;
+};
+
+class EstimateNDVMultiKeyTest : public SamplingEstimatorTest,
+                                public ::testing::WithParamInterface<NDVMultiKeyTestParams> {};
+
+TEST_P(EstimateNDVMultiKeyTest, ConsistentWithScalarForSameValueArrays) {
+    // Use sequential scan so all estimators draw a deterministic, identically-sized sample.
+    RAIIServerParameterControllerForTest knob("internalQuerySamplingBySequentialScan", true);
+
+    const size_t card = GetParam().card;
+    const size_t sampleSize = GetParam().sampleSize;
+    const size_t uniqueValueCount = GetParam().uniqueValueCount;
+
+    const auto singleElemNss =
+        NamespaceString::createNamespaceString_forTest("TestDB", "SingleElemArray");
+    const auto multiElemNss =
+        NamespaceString::createNamespaceString_forTest("TestDB", "MultiElemArray");
+
+    // Create and populate all collections before acquiring any locks (lock upgrade is disallowed).
+    std::vector<BSONObj> scalarDocs;
+    for (int i = 0; i < static_cast<int>(card); i++) {
+        scalarDocs.push_back(BSON("_id" << i << "a" << static_cast<int>(i % uniqueValueCount)));
+    }
+    insertDocuments(_kTestNss, scalarDocs);
+
+    std::vector<BSONObj> singleElemDocs;
+    for (int i = 0; i < static_cast<int>(card); i++) {
+        int v = static_cast<int>(i % uniqueValueCount);
+        singleElemDocs.push_back(BSON("_id" << i << "a" << BSON_ARRAY(v)));
+    }
+    createCollAndInsertDocuments(operationContext(), singleElemNss, singleElemDocs);
+
+    std::vector<BSONObj> multiElemDocs;
+    for (int i = 0; i < static_cast<int>(card); i++) {
+        int v = static_cast<int>(i % uniqueValueCount);
+        multiElemDocs.push_back(BSON("_id" << i << "a" << BSON_ARRAY(v << v << v << v)));
+    }
+    createCollAndInsertDocuments(operationContext(), multiElemNss, multiElemDocs);
+
+    auto scalarColl = acquireCollection(operationContext(), _kTestNss);
+    auto scalarColls = MultipleCollectionAccessor(
+        scalarColl, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+
+    auto singleElemColl = acquireCollection(operationContext(), singleElemNss);
+    auto singleElemColls = MultipleCollectionAccessor(
+        singleElemColl, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+
+    auto multiElemColl = acquireCollection(operationContext(), multiElemNss);
+    auto multiElemColls = MultipleCollectionAccessor(
+        multiElemColl, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+
+    // Baseline: scalar field {a: i%n} -> estimateNDV and estimateNDVMultiKey must agree.
+    SamplingEstimatorForTesting scalarEstimator(operationContext(),
+                                                scalarColls,
+                                                _kTestNss,
+                                                PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                sampleSize,
+                                                SamplingCEMethodEnum::kRandom,
+                                                numChunks,
+                                                makeCardinalityEstimate(card));
+    scalarEstimator.generateSample(ce::NoProjection{});
+    auto ndvScalar = scalarEstimator.estimateNDV({{.path = "a"}});
+    auto ndvScalarMK = scalarEstimator.estimateNDVMultiKey({{.path = "a"}});
+    ASSERT_EQUALS(ndvScalar, ndvScalarMK);
+    const double n = static_cast<double>(uniqueValueCount);
+    assertBetween(ndvScalar, n * 0.5, n * 2.0 + 1.0);
+
+    // Single-element array {a: [v]}: countNDVMultiKey sees the same (sampleNDV, totalSampleKeys) as
+    // the scalar case, so newtonRaphsonNDV receives identical arguments -> exact equality.
+    SamplingEstimatorForTesting singleElemEstimator(operationContext(),
+                                                    singleElemColls,
+                                                    singleElemNss,
+                                                    PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                    sampleSize,
+                                                    SamplingCEMethodEnum::kRandom,
+                                                    numChunks,
+                                                    makeCardinalityEstimate(card));
+    singleElemEstimator.generateSample(ce::NoProjection{});
+    auto ndvSingleElem = singleElemEstimator.estimateNDVMultiKey({{.path = "a"}});
+    ASSERT_EQ(ndvScalar, ndvSingleElem);
+
+    // Multi-element same-value array {a: [v, v, v, v]}: totalSampleKeys grows to 4*sampleSize but
+    // uniqueKeys stays at uniqueValueCount.  NR receives a larger sampleSize so the result
+    // differs numerically from the scalar case, but must still converge to ~= uniqueValueCount.
+    SamplingEstimatorForTesting multiElemEstimator(operationContext(),
+                                                   multiElemColls,
+                                                   multiElemNss,
+                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                   sampleSize,
+                                                   SamplingCEMethodEnum::kRandom,
+                                                   numChunks,
+                                                   makeCardinalityEstimate(card));
+    multiElemEstimator.generateSample(ce::NoProjection{});
+    auto ndvMultiElem = multiElemEstimator.estimateNDVMultiKey({{.path = "a"}});
+    assertBetween(ndvMultiElem, n * 0.5, n * 2.0 + 1.0);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    NDVMultiKeyTestCases,
+    EstimateNDVMultiKeyTest,
+    ::testing::Values(NDVMultiKeyTestParams{.card = 100, .sampleSize = 20, .uniqueValueCount = 1},
+                      NDVMultiKeyTestParams{.card = 100, .sampleSize = 20, .uniqueValueCount = 5},
+                      NDVMultiKeyTestParams{.card = 1000, .sampleSize = 50, .uniqueValueCount = 1},
+                      NDVMultiKeyTestParams{
+                          .card = 1000, .sampleSize = 100, .uniqueValueCount = 10}));
+
 DEATH_TEST_F(SamplingEstimatorTestDeathTest,
              EstimateNDVFailsWhenTopLevelFieldIsExcluded,
              "Sample must include the NDV fieldName as a top-level field") {

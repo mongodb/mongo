@@ -921,7 +921,8 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
 SamplingEstimatorImpl::~SamplingEstimatorImpl() {}
 
 CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
-    const std::vector<FieldPathAndEqSemantics>& fields) const {
+    const std::vector<FieldPathAndEqSemantics>& fields,
+    boost::optional<std::span<const OrderedIntervalList>> bounds) const {
     tassert(11158504, "Sample must be generated before calling estimateNDV()", _isSampleGenerated);
 
     if (!_topLevelSampleFieldNames.empty()) {
@@ -935,7 +936,7 @@ CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
     // Obtain the NDV for the sample. If this is equal to the sample size, don't bother with NR
     // iteration, since it is likely to diverge. The best guess is that each element in the
     // collection is unique.
-    size_t sampleNDV = countNDV(fields, _sample);
+    size_t sampleNDV = countNDV(fields, _sample, bounds);
     if (sampleNDV == _sampleSize) {
         LOGV2_DEBUG(11228302,
                     5,
@@ -944,6 +945,13 @@ CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
                     "sampleNDV"_attr = sampleNDV,
                     "collectionCard"_attr = _collectionCard);
         return _collectionCard;
+    }
+
+    tassert(12237901,
+            "Non-bounded NDV count should never be zero",
+            bounds.has_value() || sampleNDV != 0);
+    if (bounds.has_value() && sampleNDV == 0) {
+        return cost_based_ranker::zeroCE;
     }
 
     CardinalityEstimate estimate = newtonRaphsonNDV(sampleNDV, _sampleSize);
@@ -963,6 +971,62 @@ CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
                     "estimate"_attr = estimate,
                     "collectionCard"_attr = _collectionCard);
         estimate = _collectionCard;
+    }
+    return estimate;
+}
+
+CardinalityEstimate SamplingEstimatorImpl::estimateNDVMultiKey(
+    const std::vector<FieldPathAndEqSemantics>& fields,
+    boost::optional<std::span<const OrderedIntervalList>> bounds) const {
+    tassert(10061103, "Sample must be generated before calling estimateNDV()", _isSampleGenerated);
+
+    if (!_topLevelSampleFieldNames.empty()) {
+        for (const auto& field : fields) {
+            tassert(10061104,
+                    "Sample must include the NDV fieldName as a top-level field.",
+                    _topLevelSampleFieldNames.contains(field.path.front()));
+        }
+    }
+
+    // Obtain the NDV for the sample. If this is equal to the sample size, don't bother with NR
+    // iteration, since it is likely to diverge. The best guess is that each element in the
+    // collection is unique.
+    const auto [totalSampleKeys, totalMatchingKeys, totalUniqueKeys] =
+        countNDVMultiKey(fields, _sample, bounds);
+
+    if (bounds.has_value() && !totalMatchingKeys) {
+        return cost_based_ranker::zeroCE;
+    }
+
+    const auto avgKeysPerDoc = (double(totalSampleKeys) / _sample.size());
+    const auto estimatedIndexKeys = _collectionCard * avgKeysPerDoc;
+    if (totalUniqueKeys == totalMatchingKeys) {
+        LOGV2_DEBUG(10061105,
+                    5,
+                    "SamplingCE NDV is equal to the sample size, outputting estimated index size",
+                    "fields"_attr = fields,
+                    "sampleNDV"_attr = totalUniqueKeys,
+                    "estimatedIndexKeys"_attr = estimatedIndexKeys);
+        return estimatedIndexKeys;
+    }
+
+    CardinalityEstimate estimate = newtonRaphsonNDV(totalUniqueKeys, totalSampleKeys);
+    LOGV2_DEBUG(10061106,
+                5,
+                "SamplingCE ndv (# unique values) for field",
+                "fields"_attr = fields,
+                "sampleNDV"_attr = totalUniqueKeys,
+                "estimate"_attr = estimate);
+
+    if (estimate > estimatedIndexKeys) {
+        LOGV2_DEBUG(10061107,
+                    5,
+                    "SamplingCE ndv exceeds estimated index size, rounding down",
+                    "fields"_attr = fields,
+                    "sampleNDV"_attr = totalUniqueKeys,
+                    "estimate"_attr = estimate,
+                    "estimatedIndexKeys"_attr = estimatedIndexKeys);
+        estimate = estimatedIndexKeys;
     }
     return estimate;
 }

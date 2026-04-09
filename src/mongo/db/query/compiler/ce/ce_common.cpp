@@ -29,8 +29,14 @@
 
 #include "mongo/db/query/compiler/ce/ce_common.h"
 
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/matcher/path.h"
+
+#include <concepts>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::ce {
 
@@ -56,17 +62,33 @@ BSONObj FieldPathAndEqSemantics::toBSON() const {
     return BSON("path" << path.fullPath() << "isExprEq" << isExprEq);
 }
 
-// TODO SERVER-112198: Compute all NDVs in a single pass over the sample.
-size_t countNDV(const std::vector<FieldPathAndEqSemantics>& fields,
-                const std::vector<BSONObj>& docs) {
-    tassert(11214700, "Field names cannot be empty", !fields.empty());
-    std::set<std::vector<BSONElement>, SameSizeVectorBSONElementCmp> distinctValues;
 
-    std::vector<BSONElement> fieldsInDoc;
-    fieldsInDoc.reserve(fields.size());
+static const BSONObj kNullObj = BSON("" << BSONNULL);
+static const BSONElement kNullElt = kNullObj.firstElement();
 
-    for (auto&& doc : docs) {
-        fieldsInDoc.clear();
+static const BSONObj kUndefinedObj = BSON("" << BSONUndefined);
+static const BSONElement kUndefinedElt = kUndefinedObj.firstElement();
+
+/**
+ * Helper for transforming BSONObj instances by projecting down to a set of fields.
+ * Provided callback is invoked exactly once, with a vector of projected BSONElements
+ * corresponding to the provided fields.
+ *
+ * Does not traverse arrays.
+ */
+class NonArrayProjector {
+public:
+    NonArrayProjector(const std::vector<FieldPathAndEqSemantics>& fields) : fields(fields) {
+        projectedFieldValues.reserve(fields.size());
+    }
+
+    /**
+     * Invoke the callback with the projected version of the BSONObj.
+     *
+     * As arrays are not traversed, the callback will be invoked with a single vector of fields.
+     */
+    void operator()(const BSONObj& doc, std::invocable<std::vector<BSONElement>> auto&& callback) {
+        projectedFieldValues.clear();
         for (const auto& field : fields) {
             // These "array behavior" settings ensure we stop and return any arrays we encounter.
             const ElementPath eltPath(field.path.fullPath(),
@@ -80,22 +102,210 @@ size_t countNDV(const std::vector<FieldPathAndEqSemantics>& fields,
             tassert(11158502,
                     "Encountered unexpected array in NDV computation",
                     elt.element().type() != BSONType::array);
-            if (elt.element().isNull() && !field.isExprEq) {
-                // Use $eq equality semantics, which consider null & missing to be equal. We don't
-                // set this field in the doc when it is null, which results in us treating missing &
-                // null the same.
-                fieldsInDoc.push_back(BSONElement());
+            if (elt.element().eoo() && !field.isExprEq) {
+                // Use $eq equality semantics, which consider null & missing to be equal.
+                projectedFieldValues.push_back(kNullElt);
+            } else {
+                // Use $expr equality semantics.
+                projectedFieldValues.push_back(elt.element());
+            }
+        }
+
+        tassert(11214701,
+                "Unexpected number of fields in tuple",
+                projectedFieldValues.size() == fields.size());
+        callback(projectedFieldValues);
+    }
+
+    const std::vector<FieldPathAndEqSemantics>& fields;
+
+    std::vector<BSONElement> projectedFieldValues;
+};
+
+/**
+ * Helper for transforming BSONObj instances by projecting down to a set of fields, and
+ * invoking a provided callback.
+ *
+ * Unwinds arrays. When an array-valued field is encountered, an instance per element
+ * will be emitted.
+ *
+ * {a: 1, b:[1, 2, 3, 4, 5]} -> (1, 1), (1, 2), (1, 3), (1, 4), (1, 5)
+ *
+ * This is used to approximate the transformation a multikey index would apply.
+ *
+ * As multikey indexes only permit a single array-valued index key component for a given document,
+ * it is asserted that any provided document meets this expectation.
+ *
+ * {a:1, b:[1, 2]} -> (1, 1), (1, 2) // Ok
+ * {a:[1, 2], b:1} -> (1, 1), (2, 1) // Ok
+ * {a:[1, 2], b:[1, 2]} -> XXX // Assertion failure
+ */
+class ArrayUnwindProjector {
+public:
+    ArrayUnwindProjector(const std::vector<FieldPathAndEqSemantics>& fields) : fields(fields) {
+        fieldsInDoc.reserve(fields.size());
+        iterators.reserve(fields.size());
+        for (const auto& field : fields) {
+            iterators.emplace_back(ElementPath{field.path.fullPath(),
+                                               ElementPath::LeafArrayBehavior::kTraverseOmitArray,
+                                               ElementPath::NonLeafArrayBehavior::kTraverse},
+                                   BSONElementIterator());
+        }
+    }
+
+    void operator()(const BSONObj& doc, std::invocable<std::vector<BSONElement>> auto&& callback) {
+        fieldsInDoc.clear();
+
+        for (auto& [path, iter] : iterators) {
+            iter.reset(&path, doc);
+        }
+
+        // Exactly zero or one path may include an array if there is a multikey index over the
+        // provided fields.
+        // If an array is encountered, retain the index of the field/iterator required to "flatten"
+        // the array into multiple keys.
+        boost::optional<size_t> multiKeyFieldIndex;
+
+        for (size_t idx = 0; idx < fields.size(); ++idx) {
+            const auto& field = fields[idx];
+
+            auto& it = iterators[idx].second;
+
+            if (!it.more()) {
+                // This document has an empty array at this path, so this iteration mode
+                // (traversing arrays) reports no values. A multikey index represents this as an
+                // undefined key.
+                fieldsInDoc.push_back(kUndefinedElt);
+                continue;
+            }
+            const auto elt = it.next();
+            if (elt.element().eoo() && !field.isExprEq) {
+                // Use $eq equality semantics, which consider null & missing to be equal.
+                fieldsInDoc.push_back(kNullElt);
             } else {
                 // Use $expr equality semantics.
                 fieldsInDoc.push_back(elt.element());
             }
+
+            if (it.more()) {
+                // This element of the index is multikey. There can be only one for a given doc
+                // in a given index.
+                tassert(10061113,
+                        "Parallel arrays are not supported; at most one index field may be "
+                        "array-valued per document",
+                        !multiKeyFieldIndex);
+                multiKeyFieldIndex = idx;
+            }
         }
 
         tassert(
-            11214701, "Unexpected number of fields in tuple", fieldsInDoc.size() == fields.size());
-        distinctValues.insert(fieldsInDoc);
+            10061112, "Unexpected number of fields in tuple", fieldsInDoc.size() == fields.size());
+
+        callback(fieldsInDoc);
+
+        if (multiKeyFieldIndex) {
+            auto idx = *multiKeyFieldIndex;
+            auto& iter = iterators[idx].second;
+            while (iter.more()) {
+                fieldsInDoc[idx] = iter.next().element();
+                callback(fieldsInDoc);
+            }
+        }
     }
-    return distinctValues.size();
+
+    const std::vector<FieldPathAndEqSemantics>& fields;
+
+    // Scratch space for accumulating projected fields, avoids reallocating this vector for each
+    // document.
+    std::vector<BSONElement> fieldsInDoc;
+    // Pre-constructed iterators (and referenced paths) to avoid constructing for every document.
+    std::vector<std::pair<ElementPath, BSONElementIterator>> iterators;
+};
+
+namespace filter {
+/**
+ * Check if the provided BSONElement fields fall within `bounds`.
+ *
+ * Caller must ensure order and number of fields/bounds match.
+ *
+ * e.g.,
+ *
+ *  auto filter = forBounds(oil);
+ *  if (filter(fields)) {
+ *      ...
+ *  }
+ */
+auto forBounds(std::span<const OrderedIntervalList> bounds) {
+    return [bounds](const std::vector<BSONElement>& fields) {
+        for (size_t i = 0; i < fields.size(); ++i) {
+            if (!matchesInterval(bounds[i], fields[i])) {
+                return false;
+            }
+        }
+        return true;
+    };
+}
+
+/**
+ * Filter accepting all provided values.
+ */
+bool any(const std::vector<BSONElement>&) {
+    return true;
+}
+}  // namespace filter
+
+// TODO SERVER-112198: Compute all NDVs in a single pass over the sample.
+KeyCountResult countNDVInner(const std::vector<FieldPathAndEqSemantics>& fields,
+                             const std::vector<BSONObj>& docs,
+                             auto&& projector,
+                             auto&& filter) {
+    tassert(11214700, "Field names cannot be empty", !fields.empty());
+    std::set<std::vector<BSONElement>, SameSizeVectorBSONElementCmp> distinctValues;
+    size_t totalSampleKeys = 0;
+    size_t uniqueMatchingKeys = 0;
+
+    for (auto&& doc : docs) {
+        projector(doc, [&](const std::vector<BSONElement>& projectedDoc) {
+            // When array fields are encountered (if permitted by the projector)
+            // each document may produce [1,N] keys, as with a multikey index.
+            ++totalSampleKeys;
+            if (filter(projectedDoc)) {
+                ++uniqueMatchingKeys;
+                distinctValues.insert(projectedDoc);
+            }
+        });
+    }
+    return {.totalSampleKeys = totalSampleKeys,
+            .uniqueMatchingKeys = uniqueMatchingKeys,
+            .sampleUniqueKeys = distinctValues.size()};
+}
+
+size_t countNDV(const std::vector<FieldPathAndEqSemantics>& fields,
+                const std::vector<BSONObj>& docs,
+                boost::optional<std::span<const OrderedIntervalList>> bounds) {
+    if (bounds) {
+        tassert(10061114,
+                "Should have the same number of bounds as fields",
+                fields.size() == bounds->size());
+        return countNDVInner(fields, docs, NonArrayProjector(fields), filter::forBounds(*bounds))
+            .sampleUniqueKeys;
+    } else {
+        return countNDVInner(fields, docs, NonArrayProjector(fields), filter::any).sampleUniqueKeys;
+    }
+}
+
+KeyCountResult countNDVMultiKey(const std::vector<FieldPathAndEqSemantics>& fields,
+                                const std::vector<BSONObj>& docs,
+                                boost::optional<std::span<const OrderedIntervalList>> bounds) {
+    if (bounds) {
+        tassert(10061115,
+                "Should have the same number of bounds as fields",
+                fields.size() == bounds->size());
+        return countNDVInner(
+            fields, docs, ArrayUnwindProjector(fields), filter::forBounds(*bounds));
+    } else {
+        return countNDVInner(fields, docs, ArrayUnwindProjector(fields), filter::any);
+    }
 }
 
 bool matchesInterval(const Interval& interval, BSONElement val) {

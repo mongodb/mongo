@@ -43,5 +43,6 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_fifth_group"],
     deps = [
         ":ce_common",
+        "//src/mongo/db/query/compiler/physical_model/index_bounds",
     ],
 )

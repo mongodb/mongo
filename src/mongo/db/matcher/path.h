@@ -205,6 +205,12 @@ class BSONElementIterator : public ElementIterator {
 public:
     BSONElementIterator();
 
+    BSONElementIterator(BSONElementIterator&& other) noexcept = default;
+    BSONElementIterator(const BSONElementIterator& other) = delete;
+
+    BSONElementIterator& operator=(BSONElementIterator&& other) noexcept = default;
+    BSONElementIterator& operator=(const BSONElementIterator& other) = delete;
+
     /**
      * Constructs an iterator over 'elementToIterate', where the desired element(s) is/are at the
      * end of the suffix of 'path' starting at 'suffixIndex'. For example, constructing a

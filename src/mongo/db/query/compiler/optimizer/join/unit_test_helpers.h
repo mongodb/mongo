@@ -40,6 +40,8 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry_mock.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_mock.h"
 #include "mongo/unittest/golden_test_base.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::join_ordering {
@@ -184,12 +186,21 @@ public:
      * 'fieldNames' is not set, this function will throw an exception.
      */
     CardinalityEstimate estimateNDV(
-        const std::vector<ce::FieldPathAndEqSemantics>& fields) const override {
+        const std::vector<ce::FieldPathAndEqSemantics>& fields,
+        boost::optional<std::span<const OrderedIntervalList>> bounds) const override {
+        ASSERT_FALSE(bounds.has_value()) << "FakeNdvEstimator doesn't handle bounds";
         std::vector<FieldPath> fieldPaths;
         for (auto&& field : fields) {
             fieldPaths.push_back(field.path);
         }
         return _fakeEstimates.at(fieldPaths);
+    }
+
+    CardinalityEstimate estimateNDVMultiKey(
+        const std::vector<ce::FieldPathAndEqSemantics>& fields,
+        boost::optional<std::span<const OrderedIntervalList>> bounds) const override {
+        // Not yet required in these tests.
+        MONGO_UNIMPLEMENTED;
     }
 
     double getCollCard() const override {
