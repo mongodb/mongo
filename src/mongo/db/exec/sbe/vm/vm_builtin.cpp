@@ -79,8 +79,6 @@ std::string builtinToString(Builtin b) {
             return "newObj";
         case Builtin::newBsonObj:
             return "newBsonObj";
-        case Builtin::ksToString:
-            return "ksToString";
         case Builtin::newKs:
             return "newKs";
         case Builtin::collNewKs:
@@ -684,12 +682,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinNewObj(arity);
         case Builtin::newBsonObj:
             return builtinNewBsonObj(arity);
-        case Builtin::ksToString:
-            return builtinKeyStringToString(arity);
         case Builtin::newKs:
-            return builtinNewKeyString(arity);
+            return builtinNewKeyString(arity).releaseToRaw();
         case Builtin::collNewKs:
-            return builtinCollNewKeyString(arity);
+            return builtinCollNewKeyString(arity).releaseToRaw();
         case Builtin::abs:
             return builtinAbs(arity).releaseToRaw();
         case Builtin::ceil:

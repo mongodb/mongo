@@ -69,7 +69,6 @@ enum class Builtin : uint16_t {
     newArrayFromRange,
     newObj,      // create a new object from 'arity' alternating field names and values on the stack
     newBsonObj,  // same as 'newObj', except it creates a BSON object
-    ksToString,  // KeyString to string
     newKs,       // new KeyString
     collNewKs,   // new KeyString (with collation)
     abs,         // absolute value

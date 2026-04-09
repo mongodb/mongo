@@ -754,8 +754,8 @@ private:
                                                                   value::Value dateValue,
                                                                   value::TypeTags timezoneTag,
                                                                   value::Value timezoneValue);
-    FastTuple<bool, value::TypeTags, value::Value> genericNewKeyString(
-        ArityType arity, CollatorInterface* collator = nullptr);
+    value::TagValueMaybeOwned genericNewKeyString(ArityType arity,
+                                                  CollatorInterface* collator = nullptr);
     FastTuple<bool, value::TypeTags, value::Value> dateTrunc(value::TypeTags dateTag,
                                                              value::Value dateValue,
                                                              TimeUnit unit,
@@ -800,9 +800,8 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinNewArrayFromRange(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinNewObj(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinNewBsonObj(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinKeyStringToString(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinNewKeyString(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinCollNewKeyString(ArityType arity);
+    value::TagValueMaybeOwned builtinNewKeyString(ArityType arity);
+    value::TagValueMaybeOwned builtinCollNewKeyString(ArityType arity);
     value::TagValueMaybeOwned builtinAbs(ArityType arity);
     value::TagValueMaybeOwned builtinCeil(ArityType arity);
     value::TagValueMaybeOwned builtinFloor(ArityType arity);

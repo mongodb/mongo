@@ -135,4 +135,45 @@ TEST_F(SBEBuiltinKsTest, NumericTests) {
         runAndAssertExpression(argTag, argVal, expectedTag, expectedVal);
     }
 }
+
+TEST_F(SBEBuiltinKsTest, BooleanTests) {
+    for (bool boolValue : {true, false}) {
+        auto argTag = value::TypeTags::Boolean;
+        auto argVal = value::bitcastFrom<bool>(boolValue);
+
+        key_string::Builder kb(key_string::Version::V1, key_string::ALL_ASCENDING);
+        kb.appendBool(boolValue);
+        auto [expectedTag, expectedVal] = value::makeKeyString(kb.getValueCopy());
+        value::ValueGuard expectedGuard(expectedTag, expectedVal);
+
+        runAndAssertExpression(argTag, argVal, expectedTag, expectedVal);
+    }
+}
+
+TEST_F(SBEBuiltinKsTest, StringTests) {
+    for (std::string str : {"", "hello", "world"}) {
+        auto [argTag, argVal] = value::makeNewString(str);
+        value::ValueGuard argGuard(argTag, argVal);
+
+        key_string::Builder kb(key_string::Version::V1, key_string::ALL_ASCENDING);
+        kb.appendString(str);
+        auto [expectedTag, expectedVal] = value::makeKeyString(kb.getValueCopy());
+        value::ValueGuard expectedGuard(expectedTag, expectedVal);
+
+        runAndAssertExpression(argTag, argVal, expectedTag, expectedVal);
+    }
+}
+
+TEST_F(SBEBuiltinKsTest, NullTests) {
+    auto argTag = value::TypeTags::Null;
+    auto argVal = value::Value{0};
+
+    key_string::Builder kb(key_string::Version::V1, key_string::ALL_ASCENDING);
+    kb.appendNull();
+    auto [expectedTag, expectedVal] = value::makeKeyString(kb.getValueCopy());
+    value::ValueGuard expectedGuard(expectedTag, expectedVal);
+
+    runAndAssertExpression(argTag, argVal, expectedTag, expectedVal);
+}
+
 }  // namespace mongo::sbe
