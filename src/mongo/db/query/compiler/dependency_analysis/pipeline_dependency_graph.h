@@ -94,4 +94,29 @@ private:
     std::unique_ptr<Impl> _impl;
 };
 
+/**
+ * Constructs the DependencyGraph and allows it to be invalidated and recomputed.
+ */
+class DependencyGraphContext {
+public:
+    DependencyGraphContext(ExpressionContext& expCtx, DocumentSourceContainer& container);
+
+    /**
+     * Get a dependency graph which is valid up to the given element.
+     */
+    const DependencyGraph& getGraph(
+        boost::optional<DocumentSourceContainer::const_iterator> maxStageIt = {}) const;
+
+private:
+    ExpressionContext& _expCtx;
+    DocumentSourceContainer& _container;
+
+    /**
+     * The dependency graph is constructed lazily. In order to be able to hide the implementation
+     * details of invalidation and recomputation, we declare the field as mutable and initialise and
+     * recompute in the getGraph const accessor.
+     */
+    mutable boost::optional<DependencyGraph> _graph;
+};
+
 }  // namespace mongo::pipeline::dependency_graph

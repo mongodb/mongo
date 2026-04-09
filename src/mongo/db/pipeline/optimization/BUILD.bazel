@@ -22,6 +22,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db/pipeline",
+        "//src/mongo/db/query/compiler/dependency_analysis:pipeline_dependency_graph",
         "//src/mongo/db/query/compiler/metadata:path_arrayness",
     ],
 )

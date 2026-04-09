@@ -198,6 +198,9 @@ protected:
         ctx->setResolvedNamespace(lookupCollNs, {lookupCollNs, std::vector<BSONObj>{}});
         ctx->setResolvedNamespace(unionCollNs, {unionCollNs, std::vector<BSONObj>{}});
 
+        // Query settings needed for some tests.
+        ctx->setQuerySettingsIfNotPresent(query_settings::QuerySettings());
+
         auto outputPipe = pipeline_factory::makePipeline(
             request.getPipeline(), ctx, pipeline_factory::kOptionsMinimal);
         pipeline_optimization::optimizePipeline(*outputPipe);
@@ -4377,6 +4380,112 @@ TEST_F(PipelineOptimizationTest, MatchNotPushedBeforeMultipleReplaceWithsSamePre
         " {$match: {$or: [{'subDocument.x.a': {$eq: 2}},"
         " {'subDocument': {$type: [4]}}, {'subDocument': {$not: {$type: [3]}}}]}},"
         " {$replaceRoot: {newRoot: '$subDocument'}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+auto enablePipelineOptimizationAdditionalTestingRules() {
+    bool previousQueryKnobValue =
+        internalEnablePipelineOptimizationAdditionalTestingRules.swap(true);
+    return mongo::ScopeGuard([=] {
+        internalEnablePipelineOptimizationAdditionalTestingRules.store(previousQueryKnobValue);
+    });
+}
+
+// 'a' is unset, therefore it cannot have type array.
+TEST_F(PipelineOptimizationTest, MatchTypeArrayWhenNonArray) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagImprovedDepsAnalysis", true};
+    auto cleanup = enablePipelineOptimizationAdditionalTestingRules();
+    std::string inputPipe =
+        "["
+        " {$unset: 'a'},"
+        " {$match: {a: {$type: 'array'}}}"
+        "]";
+    std::string outputPipe =
+        "["
+        " {$match: {$alwaysFalse: 1}},"
+        " {$project: {a: false, _id: true}}"
+        "]";
+    std::string serializedPipe =
+        "["
+        " {$match: {$alwaysFalse: 1}},"
+        " {$project: {a: false, _id: true}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+// 'a' is computed and could be array or null (if $b is null).
+TEST_F(PipelineOptimizationTest, MatchTypeArrayWhenCanBeArray) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagImprovedDepsAnalysis", true};
+    auto cleanup = enablePipelineOptimizationAdditionalTestingRules();
+    std::string inputPipe =
+        "["
+        " {$set: {a: {$objectToArray: ['$b']}}},"
+        " {$match: {a: {$type: 'array'}}}"
+        "]";
+    std::string outputPipe =
+        "["
+        " {$set: {a: {$objectToArray: ['$b']}}},"
+        " {$match: {a: {$type: [4]}}}"
+        "]";
+    std::string serializedPipe =
+        "["
+        " {$set: {a: {$objectToArray: ['$b']}}},"
+        " {$match: {a: {$type: 'array'}}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST_F(PipelineOptimizationTest, MatchTypeArrayWhenNonArrayMultiple) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagImprovedDepsAnalysis", true};
+    auto cleanup = enablePipelineOptimizationAdditionalTestingRules();
+    std::string inputPipe =
+        "["
+        " {$unset: 'a'},"
+        " {$match: {a: {$type: 'array'}}},"
+        " {$unset: 'b'},"
+        " {$match: {b: {$type: 'array'}}},"
+        " {$unset: 'c'},"
+        " {$match: {c: {$type: 'array'}}}"
+        "]";
+    std::string outputPipe =
+        "["
+        " {$match: {$alwaysFalse: 1}},"
+        " {$project: {a: false, b: false, c: false, _id: true}}"
+        "]";
+    std::string serializedPipe =
+        "["
+        " {$match: {$and: [{$alwaysFalse: 1}, {$alwaysFalse: 1}, {$alwaysFalse: 1}]}},"
+        " {$project: {a: false, b: false, c: false, _id: true}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST_F(PipelineOptimizationTest, MatchTypeArrayWhenMixedArray) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagImprovedDepsAnalysis", true};
+    auto cleanup = enablePipelineOptimizationAdditionalTestingRules();
+    std::string inputPipe =
+        "["
+        " {$set: {a: {$objectToArray: ['$d']}}},"
+        " {$match: {a: {$type: 'array'}}},"
+        " {$unset: 'b'},"
+        " {$match: {b: {$type: 'array'}}},"
+        " {$unset: 'c'},"
+        " {$match: {c: {$type: 'array'}}}"
+        "]";
+    std::string outputPipe =
+        "["
+        " {$match: {$alwaysFalse: 1}},"
+        " {$set: {a: {$objectToArray: ['$d']}}},"
+        " {$match: {a: {$type: [4]}}},"
+        " {$project: {b: false, c: false, _id: true}}"
+        "]";
+    std::string serializedPipe =
+        "["
+        " {$match: {$and: [{$alwaysFalse: 1}, {$alwaysFalse: 1}]}},"
+        " {$set: {a: {$objectToArray: ['$d']}}},"
+        " {$match: {a: {$type: [4]}}},"
+        " {$project: {b: false, c: false, _id: true}}"
         "]";
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }

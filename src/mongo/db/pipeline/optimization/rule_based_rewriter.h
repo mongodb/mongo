@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/compiler/dependency_analysis/pipeline_dependency_graph.h"
 #include "mongo/db/query/compiler/rewrites/rule_based_rewriter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
@@ -201,6 +202,8 @@ public:
         return _expCtx.getMainCollPathArrayness();
     }
 
+    const mongo::pipeline::dependency_graph::DependencyGraph& getDependencyGraph() const;
+
     ExpressionContext& getExpCtx() {
         return _expCtx;
     }
@@ -213,6 +216,8 @@ private:
 
     ExpressionContext& _expCtx;
     registration_detail::RuleRegistry& _registry;
+
+    mongo::pipeline::dependency_graph::DependencyGraphContext _depGraphCtx;
 
     friend struct Transforms;
 };

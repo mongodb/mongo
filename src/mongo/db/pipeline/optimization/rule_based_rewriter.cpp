@@ -124,7 +124,8 @@ PipelineRewriteContext::PipelineRewriteContext(
       _itr(startingPos.value_or(_container.begin())),
       _expCtx(expCtx),
       _registry(registration_detail::getPipelineRewriteRuleRegistry(
-          _expCtx.getOperationContext()->getServiceContext())) {}
+          _expCtx.getOperationContext()->getServiceContext())),
+      _depGraphCtx(expCtx, container) {}
 
 void PipelineRewriteContext::enqueueRules() {
     for (auto&& registration : _registry.getRules(current())) {
@@ -144,6 +145,12 @@ void PipelineRewriteContext::enqueueRules() {
 void PipelineRewriteContext::advance() {
     tassert(11010008, "Already at the end of the container", hasMore());
     _itr = std::next(_itr);
+}
+
+const mongo::pipeline::dependency_graph::DependencyGraph&
+PipelineRewriteContext::getDependencyGraph() const {
+    DocumentSourceContainer::const_iterator itr = atLastStage() ? _itr : std::next(_itr);
+    return _depGraphCtx.getGraph(itr);
 }
 
 std::string PipelineRewriteContext::debugString() const {

@@ -383,8 +383,8 @@ class DocumentSourceInfo {
 public:
     explicit DocumentSourceInfo(const DocumentSource& documentSource)
         : _documentSource(documentSource),
-          _isSingleDocumentTransformation(documentSource.getId() ==
-                                          DocumentSourceSingleDocumentTransformation::id) {
+          _isSingleDocumentTransformation(typeid(documentSource) ==
+                                          typeid(DocumentSourceSingleDocumentTransformation)) {
         if (documentSource.getDependencies(&_deps) == DepsTracker::State::NOT_SUPPORTED) {
             _deps.needWholeDocument = true;
         }
@@ -1475,4 +1475,19 @@ BSONObj DependencyGraph::Impl::toBSON() const {
     Serializer serializer{*this};
     return serializer.serializeToBson();
 }
+
+DependencyGraphContext::DependencyGraphContext(ExpressionContext& expCtx,
+                                               DocumentSourceContainer& container)
+    : _expCtx(expCtx), _container(container) {}
+
+const DependencyGraph& DependencyGraphContext::getGraph(
+    boost::optional<DocumentSourceContainer::const_iterator> maxStageIt) const {
+    CanPathBeArray canPathBeArray = [this](StringData path) -> bool {
+        const auto& pathArrayness = _expCtx.getMainCollPathArrayness();
+        return pathArrayness.canPathBeArray(FieldRef(path), &_expCtx);
+    };
+    _graph.emplace(_container, std::move(canPathBeArray));
+    return *_graph;
+}
+
 }  // namespace mongo::pipeline::dependency_graph

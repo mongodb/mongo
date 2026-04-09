@@ -75,7 +75,8 @@ mongo_cc_library(
         "pipeline_dependency_graph.cpp",
     ],
     deps = [
-        "//src/mongo/db/pipeline",
+        ":dependency_analysis",
+        "//src/mongo/db/query/compiler/metadata:path_arrayness",
     ],
 )
 

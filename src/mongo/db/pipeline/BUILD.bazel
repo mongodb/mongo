@@ -556,6 +556,7 @@ mongo_cc_library(
         "//src/mongo/db/query/collation:collator_factory_interface",
         "//src/mongo/db/query/collation:collator_interface",
         "//src/mongo/db/query/compiler/dependency_analysis:dependencies",
+        "//src/mongo/db/query/compiler/dependency_analysis:pipeline_dependency_graph",
         "//src/mongo/db/query/compiler/logical_model/projection:projection_ast",
         "//src/mongo/db/query/compiler/logical_model/sort_pattern",
         "//src/mongo/db/query/compiler/optimizer/join:join_hint",

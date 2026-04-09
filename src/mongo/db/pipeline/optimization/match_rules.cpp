@@ -287,6 +287,42 @@ bool introduceArrayTypeFilteringToMatch(PipelineRewriteContext& ctx) {
     return false;
 }
 
+/**
+ * Checks whether the $match uses the array type predicate on a path which is known to not contain
+ * arrays.
+ */
+bool matchOnArrayTypeIsAlwaysFalse(PipelineRewriteContext& ctx) {
+    if (!feature_flags::gFeatureFlagImprovedDepsAnalysis.checkEnabled()) {
+        return false;
+    }
+
+    auto& match = checked_cast<DocumentSourceMatch&>(ctx.current());
+    auto& expr = *match.getMatchExpression();
+
+    if (expr.matchType() == MatchExpression::MatchType::TYPE_OPERATOR) {
+        auto& typeExpr = checked_cast<TypeMatchExpression&>(expr);
+        const auto& typeSet = typeExpr.typeSet();
+        if (typeSet.isSingleType() && typeSet.hasType(BSONType::array)) {
+            const auto& graph = ctx.getDependencyGraph();
+            bool canBeArray = graph.canPathBeArray(&ctx.current(), typeExpr.path());
+            if (!canBeArray) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Replace the current stage with a $match which never matches any documents.
+ */
+bool replaceWithAlwaysFalseMatch(PipelineRewriteContext& ctx) {
+    auto eofMatch = DocumentSourceMatch::create(BSON("$alwaysFalse" << 1), &ctx.getExpCtx());
+    Transforms::replaceCurrentStage(ctx, eofMatch);
+    return true;
+}
+
 }  // namespace
 
 REGISTER_RULES(DocumentSourceMatch,
@@ -323,6 +359,17 @@ REGISTER_RULES(DocumentSourceInternalUnpackBucket,
                    .tags = PipelineRewriteContext::Tags::Reordering,
                });
 
+// Rewrite $match with $type: "array" predicate to $alwaysFalse when the path cannot be array.
+// This is currently a Tags::Testing rule, therefore it is only used when the knob is enabled.
+REGISTER_RULES(DocumentSourceMatch,
+               {
+                   "MATCH_ARRAY_TYPE_PREDICATE_ALWAYS_FALSE",
+                   matchOnArrayTypeIsAlwaysFalse,
+                   replaceWithAlwaysFalseMatch,
+                   kDefaultPushdownPriority,
+                   PipelineRewriteContext::Tags::Testing,
+               });
+
 // Testing rule hidden behind i. the feature flag and ii. Testing tag failpoint.
 // Tests whether Aggregation pipelines are accessing correctly the PathArrayness datastructure.
 REGISTER_RULES_WITH_FEATURE_FLAG(DocumentSourceMatch,
@@ -332,4 +379,5 @@ REGISTER_RULES_WITH_FEATURE_FLAG(DocumentSourceMatch,
                                   introduceArrayTypeFilteringToMatch,
                                   1.0,
                                   PipelineRewriteContext::Tags::Testing});
+
 }  // namespace mongo::rule_based_rewrites::pipeline
