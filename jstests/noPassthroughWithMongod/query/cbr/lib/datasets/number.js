@@ -77,8 +77,8 @@ export class NumberDataset {
             // TODO(SERVER-98094):  {a: null},
 
             // Exists
-            // TODO(SERVER-98494): {a: {$exists: true}},
-            // TODO(SERVER-98494): {a: {$exists: false}},
+            {a: {$exists: true}},
+            {a: {$exists: false}},
 
             // Negation with $nor
             {$nor: [{a: 50}]},
