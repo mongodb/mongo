@@ -10,11 +10,10 @@
  * incompatible_aubsan,
  * tsan_incompatible,
  * requires_persistence,
- * # TODO SERVER-110187 enable this test for viewless timeseres collection
- * featureFlagCreateViewlessTimeseriesCollections_incompatible,
  * ]
  */
 
+import {skipTestIfViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     checkWriteConcernBehaviorAdditionalCRUDOps,
@@ -34,6 +33,9 @@ const stOtherOptions = {
 };
 
 const st = new ShardingTest({mongos: 1, shards: 2, rs: {nodes: 3}, other: stOtherOptions});
+// TODO SERVER-110187 enable this test for viewless timeseries collection
+skipTestIfViewlessTimeseriesEnabled(st.s.getDB("admin"), () => st.stop());
+
 assert.commandWorked(st.s.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {"level": "local"}}));
 
 const precmdShardKeyTimeseriesSubFieldX = function (conn, cluster, dbName, collName) {

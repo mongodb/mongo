@@ -14,11 +14,14 @@
  *   # Running shardCollection instead of createCollection returns different error types which are
  *   # not expected by the test
  *   assumes_unsharded_collection,
- *   # This test directly creates system.buckets collections which is rejected with viewless
- *   # timeseries. The relevant scenarios are covered in timeseries_create_collection.js.
- *   featureFlagCreateViewlessTimeseriesCollections_incompatible,
  *  ]
  */
+
+import {skipTestIfViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+
+// This test directly creates system.buckets collections which is rejected with viewless
+// timeseries. The relevant scenarios are covered in timeseries_create_collection.js.
+skipTestIfViewlessTimeseriesEnabled(db);
 
 const tsOptions = {
     timeField: "timestamp",

@@ -1,7 +1,7 @@
 /**
  * Test several conditions when dropping timeseries collections.
  *
- * TODO SERVER-111517: remove completely this test once 9.0 becomes last LTS. By then we will only have viewless tiemeseries collections.
+ * TODO SERVER-111517: remove completely this test once 9.0 becomes last LTS. By then we will only have viewless timeseries collections.
  *
  * @tags: [
  *   requires_timeseries,
@@ -17,11 +17,13 @@
  *   #  - The command is retryed, but now the main collection doesn't exist, so the buckets
  *   #    collection is dropped instead.
  *   requires_non_retryable_commands,
- *   featureFlagCreateViewlessTimeseriesCollections_incompatible,
  * ]
  */
 
+import {skipTestIfViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
+skipTestIfViewlessTimeseriesEnabled(db);
 
 const timeseriesOptions = {
     timeseries: {timeField: "t"},

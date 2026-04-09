@@ -1,14 +1,10 @@
 /**
  * Tests renaming the system.buckets collection.
  * TODO SERVER-120014: Remove this test once 9.0 becomes last LTS and all timeseries collections are viewless.
- *
- * @tags: [
- *   # This test directly targets system.buckets namespaces which is rejected with viewless
- *   # timeseries.
- *   featureFlagCreateViewlessTimeseriesCollections_incompatible,
- * ]
  */
+import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -62,6 +58,21 @@ function runTest(conn) {
     // Create the admin user.
     adminDB.createUser({user: "admin", pwd: "admin", roles: ["root"]});
     assert.eq(1, adminDB.auth("admin", "admin"));
+
+    // This test directly targets system.buckets namespaces which is rejected with viewless
+    // timeseries.
+    let viewlessEnabled = false;
+    if (FixtureHelpers.isMongos(adminDB)) {
+        const cfgConn = new Mongo(FixtureHelpers.getConfigServerConnString(adminDB));
+        assert(cfgConn.getDB("admin").auth("admin", "admin"));
+        viewlessEnabled = areViewlessTimeseriesEnabled(cfgConn.getDB("admin"));
+    } else {
+        viewlessEnabled = areViewlessTimeseriesEnabled(adminDB);
+    }
+    if (viewlessEnabled) {
+        adminDB.logout();
+        return;
+    }
 
     // Create roles with ability to rename system.buckets collections.
     adminDB.createRole({

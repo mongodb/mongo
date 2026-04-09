@@ -10,9 +10,12 @@
  *   requires_non_retryable_commands,
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   featureFlagCreateViewlessTimeseriesCollections_incompatible
  * ]
  */
+
+import {skipTestIfViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+
+skipTestIfViewlessTimeseriesEnabled(db);
 
 const collName = jsTestName();
 const bucketsCollName = "system.buckets." + collName;

@@ -11,13 +11,17 @@
  *  # rename only works across databases with same primary shard
  *  # TODO SERVER-90096: change this tag with a more specific one
  *  assumes_balancer_off,
- *  featureFlagCreateViewlessTimeseriesCollections_incompatible,
  * ]
  */
 
+import {
+    getTimeseriesBucketsColl,
+    skipTestIfViewlessTimeseriesEnabled,
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getTimeseriesBucketsColl} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.js";
+
+skipTestIfViewlessTimeseriesEnabled(db);
 
 const dbName = db.getName();
 const otherDbName = `${dbName}_other`;

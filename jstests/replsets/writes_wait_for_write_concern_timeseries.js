@@ -6,11 +6,10 @@
  * multiversion_incompatible,
  * uses_transactions,
  * does_not_support_stepdowns,
- * # TODO SERVER-110187 re-enable this test in viewless timeseries suites
- * featureFlagCreateViewlessTimeseriesCollections_incompatible,
  * ]
  */
 
+import {skipTestIfViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     checkWriteConcernBehaviorAdditionalCRUDOps,
@@ -24,6 +23,9 @@ const replTest = new ReplSetTest({
 });
 replTest.startSet();
 replTest.initiate();
+
+// TODO SERVER-110187 re-enable this test in viewless timeseries suites
+skipTestIfViewlessTimeseriesEnabled(replTest.getPrimary().getDB("admin"), () => replTest.stopSet());
 
 const preSetupTimeseries = function (conn, cluster, dbName, collName) {
     let db = conn.getDB(dbName);

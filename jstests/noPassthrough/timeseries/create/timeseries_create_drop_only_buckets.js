@@ -7,12 +7,10 @@
  *     does_not_support_stepdowns,
  *     does_not_support_transactions,
  *     requires_replication,
- *     # Tests a state of partial creation (timeseries buckets exists, timeseries view does not)
- *     # which can't happen with viewless timeseries collections, since they are created atomically.
- *     featureFlagCreateViewlessTimeseriesCollections_incompatible,
  *     featureFlagMarkTimeseriesEventsInOplog_incompatible,
  * ]
  */
+import {skipTestIfViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({nodes: 2});
@@ -20,6 +18,10 @@ rst.startSet();
 rst.initiate();
 const primary = rst.getPrimary();
 const primaryDb = primary.getDB("test");
+
+// Tests a state of partial creation (timeseries buckets exists, timeseries view does not)
+// which can't happen with viewless timeseries collections, since they are created atomically.
+skipTestIfViewlessTimeseriesEnabled(primaryDb, () => rst.stopSet());
 const coll = primaryDb[jsTestName()];
 const viewName = coll.getName();
 const viewNs = coll.getFullName();

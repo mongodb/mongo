@@ -24,6 +24,15 @@ export function areViewlessTimeseriesEnabled(db) {
     return FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections");
 }
 
+// Skips the current test if viewless timeseries are enabled, optionally running a cleanup
+// function (e.g. stopping a ShardingTest or ReplSetTest) before quitting.
+export function skipTestIfViewlessTimeseriesEnabled(db, cleanupFn) {
+    if (areViewlessTimeseriesEnabled(db)) {
+        if (cleanupFn) cleanupFn();
+        quit();
+    }
+}
+
 // Returns true if the suite converts timeseries across viewful/viewless format in the background.
 export function runningWithViewlessTimeseriesUpgradeDowngrade(db) {
     if (isStableFCVSuite()) {

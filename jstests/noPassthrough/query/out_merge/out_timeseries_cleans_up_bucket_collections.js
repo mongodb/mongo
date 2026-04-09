@@ -7,18 +7,20 @@
  *   requires_timeseries,
  *   requires_persistence,
  *   requires_fcv_80,
- *   # This test is for the special cleanup behavior of $out for legacy timeseries collections,
- *   # in which both the main namespace and the system.buckets namespace need to be created.
- *   # Viewless timeseries collections have a single namespace and reuse the regular cleanup logic.
- *   featureFlagCreateViewlessTimeseriesCollections_incompatible,
  *   featureFlagMarkTimeseriesEventsInOplog_incompatible,
  * ]
  */
+import {skipTestIfViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2});
+
+// This test is for the special cleanup behavior of $out for legacy timeseries collections,
+// in which both the main namespace and the system.buckets namespace need to be created.
+// Viewless timeseries collections have a single namespace and reuse the regular cleanup logic.
+skipTestIfViewlessTimeseriesEnabled(st.s.getDB("admin"), () => st.stop());
 
 const kDbName = jsTestName();
 const kOutCollName = "out";
