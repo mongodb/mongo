@@ -62,10 +62,6 @@ INLJ only, all plans
 	]
 }
 ```
-WARNING: results did not match. Actual (0):
-```json
-
-```
 Num orders: 6
 ```json
 (INLJ _ = (INLJ _ = COLLSCAN [test.hint_md_c], bar = FETCH [test.hint_md_b]), foo = FETCH [test.hint_md_a])

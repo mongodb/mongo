@@ -71,19 +71,14 @@ function runTestForHints(coll, pipeline, hintTests) {
     subSection(`Total number of join orders: ${allOrders.size}`);
 
     for (const hintTest of hintTests) {
-        const {testCase, hint, skipValidation} = hintTest;
+        const {testCase, hint} = hintTest;
         line(testCase);
         code(tojson(hint));
 
         // Validate hinted results match!
         const hintedPipeline = [{$_internalJoinHint: hint}].concat(pipeline);
         const actual = coll.aggregate(hintedPipeline).toArray();
-        if (!skipValidation) {
-            assertArrayEq({expected, actual});
-        } else if (!arrayEq({expected, actual})) {
-            line(`WARNING: results did not match. Actual (${actual.length}):`);
-            code(normalizeArray(actual));
-        }
+        assertArrayEq({expected, actual});
 
         const hintedOrders = getAllOrders(coll, hintedPipeline, hint);
         hintedOrders.forEach((x) => assert(allOrders.has(x)));
@@ -107,7 +102,6 @@ joinTestWrapper(() => {
             {
                 testCase: "INLJ only, all plans",
                 hint: {perSubsetLevelMode: [{level: NumberInt(0), hint: {method: "INLJ"}, mode: "ALL"}]},
-                skipValidation: true, // TODO SERVER-121853
             },
             {
                 testCase: "HJ only, all plans",

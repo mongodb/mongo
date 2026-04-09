@@ -852,9 +852,12 @@ buildIndexSeekStage(StageBuilderState& state,
                             b.makeInt32Constant(indexOrdering.getBits()));
         for (size_t i = 0; i < valueForIndexBounds.size(); i++) {
             if (valueForIndexBounds[i].getId() == 0) {
-                args.push_back(discriminator == key_string::Discriminator::kExclusiveBefore
-                                   ? b.makeConstant(sbe::value::TypeTags::MinKey, 0)
-                                   : b.makeConstant(sbe::value::TypeTags::MaxKey, 0));
+                // Use proper lower/upper boundaries keeping into account the index order.
+                bool lowerBound = discriminator == key_string::Discriminator::kExclusiveBefore
+                    ? indexOrdering.get(i) > 0
+                    : indexOrdering.get(i) < 0;
+                args.push_back(b.makeConstant(
+                    lowerBound ? sbe::value::TypeTags::MinKey : sbe::value::TypeTags::MaxKey, 0));
             } else {
                 args.push_back(valueForIndexBounds[i]);
             }
@@ -2173,7 +2176,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildIndexedJoinEmbedd
         if (auto it = indexKeyPos.find(
                 indexedJoinEmbeddingNode->joinPredicates[predicateIndex].rightField.fullPath());
             it != indexKeyPos.end()) {
-            keyParts[it->second] = leftPrjOutputs[predicateIndex++];
+            keyParts[it->second] = leftPrjOutputs[predicateIndex];
         }
     }
 

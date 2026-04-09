@@ -34,11 +34,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
-#include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/slot.h"
@@ -49,13 +45,11 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution_test_util.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -932,9 +926,20 @@ protected:
     }
 
     void instantiateSecondaryCollection(const NamespaceString& collectionName,
-                                        const std::vector<BSONObj>& documents) {
+                                        const std::vector<BSONObj>& documents,
+                                        std::vector<BSONObj> indexKeyPatterns = {}) {
         ASSERT_OK(storageInterface()->createCollection(
             operationContext(), collectionName, CollectionOptions()));
+        if (!indexKeyPatterns.empty()) {
+            std::vector<BSONObj> indexDefinitions;
+            for (auto& indexKeyPattern : indexKeyPatterns) {
+                indexDefinitions.emplace_back(
+                    BSON("v" << 2 << "name" << DBClientBase::genIndexName(indexKeyPattern) << "key"
+                             << indexKeyPattern));
+            }
+            ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
+                operationContext(), collectionName, indexDefinitions));
+        }
 
         SbeStageBuilderTestFixture::insertDocuments(collectionName, documents);
     }
@@ -1841,6 +1846,82 @@ TEST_F(BinaryJoinStageBuilderTest, HashJoinWithCompoundPredicate) {
             fromjson("{_id: 0, lkey1: 0, lkey2: 0, embedding: {_id: 10, fkey1: 0, fkey2: 0}}"),
             fromjson("{_id: 3, lkey1: 3, lkey2: 3, embedding: {_id: 13, fkey1: 3, fkey2: 3}}"),
         });
+}
+
+// Test a simple join using INLJ strategy on a variety of index patterns.
+TEST_F(BinaryJoinStageBuilderTest, IndexJoinWithCompoundPredicate) {
+    instantiateMainCollection({
+        fromjson("{_id: 0, lkey1: 0, lkey2: 0}"),
+        fromjson("{_id: 1, lkey1: 1, lkey2: 0}"),
+        fromjson("{_id: 2, lkey1: 2, lkey2: 3}"),
+        fromjson("{_id: 3, lkey1: 3, lkey2: 3}"),
+    });
+
+    std::vector<BSONObj> indexKeyPatterns = {BSON("fkey1" << 1),
+                                             BSON("fkey1" << -1),
+                                             BSON("fkey1" << 1 << "fkey2" << 1),
+                                             BSON("fkey1" << -1 << "fkey2" << -1),
+                                             BSON("fkey1" << 1 << "fkey2" << -1),
+                                             BSON("fkey1" << -1 << "fkey2" << 1),
+                                             BSON("fkey2" << 1 << "fkey1" << 1),
+                                             BSON("fkey2" << -1 << "fkey1" << -1),
+                                             BSON("fkey2" << 1 << "fkey1" << -1),
+                                             BSON("fkey2" << -1 << "fkey1" << 1),
+                                             BSON("fkey1" << 1 << "fkey2" << 1 << "fkey3" << 1),
+                                             BSON("fkey1" << -1 << "fkey2" << -1 << "fkey3" << -1),
+                                             BSON("fkey1" << 1 << "fkey2" << -1 << "fkey3" << 1),
+                                             BSON("fkey1" << -1 << "fkey2" << 1 << "fkey3" << -1),
+                                             BSON("fkey3" << 1 << "fkey2" << 1 << "fkey1" << 1),
+                                             BSON("fkey3" << -1 << "fkey2" << -1 << "fkey1" << -1),
+                                             BSON("fkey3" << 1 << "fkey2" << -1 << "fkey1" << 1),
+                                             BSON("fkey3" << -1 << "fkey2" << 1 << "fkey1" << -1)};
+    NamespaceString foreignCollectionName =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign");
+    instantiateSecondaryCollection(foreignCollectionName,
+                                   {
+                                       fromjson("{_id: 10, fkey1: 0, fkey2: 0, fkey3: 10}"),
+                                       fromjson("{_id: 11, fkey1: 1, fkey2: 1, fkey3: 20}"),
+                                       fromjson("{_id: 12, fkey1: 2, fkey2: 2, fkey3: 30}"),
+                                       fromjson("{_id: 13, fkey1: 3, fkey2: 3, fkey3: 40}"),
+                                   },
+                                   indexKeyPatterns);
+
+    for (auto& indexKeyPattern : indexKeyPatterns) {
+        auto leftScanNode = std::make_unique<CollectionScanNode>(_nss);
+
+        std::vector<QSNJoinPredicate> predicateList{
+            QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
+                             .leftField = FieldPath("lkey1"),
+                             .rightField = FieldPath("fkey1")},
+            QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
+                             .leftField = FieldPath("lkey2"),
+                             .rightField = FieldPath("fkey2")}};
+
+        auto rightScanNode = std::make_unique<FetchNode>(
+            std::make_unique<IndexProbeNode>(
+                foreignCollectionName,
+                buildSimpleIndexEntry(indexKeyPattern,
+                                      DBClientBase::genIndexName(indexKeyPattern))),
+            foreignCollectionName);
+        auto solution = makeQuerySolution(
+            std::make_unique<IndexedNestedLoopJoinEmbeddingNode>(std::move(leftScanNode),
+                                                                 std::move(rightScanNode),
+                                                                 std::move(predicateList),
+                                                                 boost::none,
+                                                                 FieldPath("embedding")));
+
+        auto execPlan = makeExecutablePlan(_nss,
+                                           {foreignCollectionName},
+                                           std::move(solution),
+                                           new ExpressionContextForTest(operationContext(), _nss));
+
+        execPlan.expectReturnedDocumentsInAnyOrder({
+            fromjson("{_id: 0, lkey1: 0, lkey2: 0, embedding: {_id: 10, fkey1: 0, fkey2: 0, fkey3: "
+                     "10}}"),
+            fromjson("{_id: 3, lkey1: 3, lkey2: 3, embedding: {_id: 13, fkey1: 3, fkey2: 3, fkey3: "
+                     "40}}"),
+        });
+    }
 }
 
 TEST_F(BinaryJoinStageBuilderTest, ThreeWayJoin) {

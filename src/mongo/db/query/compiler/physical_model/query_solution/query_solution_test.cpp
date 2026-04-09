@@ -1954,8 +1954,9 @@ TEST(QuerySolutionTest, AssertDifferentHashesForProbesOnDifferentIndexes) {
     auto makeInlj = [&](const BSONObj& indexKey, std::string indexName) {
         auto root = std::make_unique<IndexedNestedLoopJoinEmbeddingNode>(
             std::make_unique<CollectionScanNode>(),
-            std::make_unique<IndexProbeNode>(foreignNss,
-                                             buildSimpleIndexEntry(indexKey, indexName)),
+            std::make_unique<FetchNode>(std::make_unique<IndexProbeNode>(
+                                            foreignNss, buildSimpleIndexEntry(indexKey, indexName)),
+                                        foreignNss),
             std::vector<QSNJoinPredicate>{
                 {QSNJoinPredicate::ComparisonOp::Eq, FieldPath("x"), FieldPath("y")}},
             boost::none,
