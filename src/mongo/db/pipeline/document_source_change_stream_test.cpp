@@ -483,7 +483,7 @@ TEST_F(ChangeStreamStageTest, CreatingChangeStreamSucceedsWithValidVersions) {
 
         bool found = false;
         for (auto& stage : pipeline) {
-            if (stage->getSourceName() == DocumentSourceChangeStreamTransform::kStageName) {
+            if (stage->isInstanceOf<DocumentSourceChangeStreamTransform>()) {
                 // Serialize the stage to BSON and read back the "version" field.
                 std::vector<Value> serialization;
                 stage->serializeToArray(serialization);
@@ -1199,7 +1199,7 @@ TEST_F(ChangeStreamStageTest, SetIgnoreRemovedShards) {
 
         bool found = false;
         for (auto& stage : pipeline) {
-            if (stage->getSourceName() == DocumentSourceChangeStreamTransform::kStageName) {
+            if (stage->isInstanceOf<DocumentSourceChangeStreamTransform>()) {
                 // Serialize the stage to BSON and read back the "version" field.
                 std::vector<Value> serialization;
                 stage->serializeToArray(serialization);

@@ -186,14 +186,14 @@ TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithPipeline) {
                  "coll" << nsToUnionWith.coll() << "pipeline"
                         << BSON_ARRAY(BSON("$addFields" << BSON("a" << BSON("$const" << 3))))));
     auto unionWith = DocumentSourceUnionWith::createFromBson(bson.firstElement(), expCtx);
-    ASSERT(unionWith->getSourceName() == DocumentSourceUnionWith::kStageName);
+    ASSERT(unionWith->isInstanceOf<DocumentSourceUnionWith>());
     std::vector<Value> serializedArray;
     unionWith->serializeToArray(serializedArray);
     auto serializedBson = serializedArray[0].getDocument().toBson();
     ASSERT_BSONOBJ_EQ(serializedBson, bson);
     unionWith = DocumentSourceUnionWith::createFromBson(serializedBson.firstElement(), expCtx);
     ASSERT(unionWith != nullptr);
-    ASSERT(unionWith->getSourceName() == DocumentSourceUnionWith::kStageName);
+    ASSERT(unionWith->isInstanceOf<DocumentSourceUnionWith>());
 }
 
 TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithForeignDB) {
@@ -206,14 +206,14 @@ TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithForeignDB) {
                                                << "coll" << nsToUnionWith.coll() << "pipeline"
                                                << BSONArray()));
     auto unionWith = DocumentSourceUnionWith::createFromBson(bson.firstElement(), expCtx);
-    ASSERT(unionWith->getSourceName() == DocumentSourceUnionWith::kStageName);
+    ASSERT(unionWith->isInstanceOf<DocumentSourceUnionWith>());
     std::vector<Value> serializedArray;
     unionWith->serializeToArray(serializedArray);
     auto serializedBson = serializedArray[0].getDocument().toBson();
     ASSERT_BSONOBJ_EQ(serializedBson, bson);
     unionWith = DocumentSourceUnionWith::createFromBson(serializedBson.firstElement(), expCtx);
     ASSERT(unionWith != nullptr);
-    ASSERT(unionWith->getSourceName() == DocumentSourceUnionWith::kStageName);
+    ASSERT(unionWith->isInstanceOf<DocumentSourceUnionWith>());
 }
 
 TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithForeignDBAndPipeline) {
@@ -228,14 +228,14 @@ TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithForeignDBAndPipeline) {
                       << "coll" << nsToUnionWith.coll() << "pipeline"
                       << BSON_ARRAY(BSON("$addFields" << BSON("a" << BSON("$const" << 3))))));
     auto unionWith = DocumentSourceUnionWith::createFromBson(bson.firstElement(), expCtx);
-    ASSERT(unionWith->getSourceName() == DocumentSourceUnionWith::kStageName);
+    ASSERT(unionWith->isInstanceOf<DocumentSourceUnionWith>());
     std::vector<Value> serializedArray;
     unionWith->serializeToArray(serializedArray);
     auto serializedBson = serializedArray[0].getDocument().toBson();
     ASSERT_BSONOBJ_EQ(serializedBson, bson);
     unionWith = DocumentSourceUnionWith::createFromBson(serializedBson.firstElement(), expCtx);
     ASSERT(unionWith != nullptr);
-    ASSERT(unionWith->getSourceName() == DocumentSourceUnionWith::kStageName);
+    ASSERT(unionWith->isInstanceOf<DocumentSourceUnionWith>());
 }
 
 TEST_F(DocumentSourceUnionWithTest, QueryStatsSerializeWithForeignDBIncludesDbField) {
@@ -300,14 +300,14 @@ TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithoutPipeline) {
     auto desugaredBson =
         BSON("$unionWith" << BSON("coll" << nsToUnionWith.coll() << "pipeline" << BSONArray()));
     auto unionWith = DocumentSourceUnionWith::createFromBson(bson.firstElement(), expCtx);
-    ASSERT(unionWith->getSourceName() == DocumentSourceUnionWith::kStageName);
+    ASSERT(unionWith->isInstanceOf<DocumentSourceUnionWith>());
     std::vector<Value> serializedArray;
     unionWith->serializeToArray(serializedArray);
     auto serializedBson = serializedArray[0].getDocument().toBson();
     ASSERT_BSONOBJ_EQ(serializedBson, desugaredBson);
     unionWith = DocumentSourceUnionWith::createFromBson(serializedBson.firstElement(), expCtx);
     ASSERT(unionWith != nullptr);
-    ASSERT(unionWith->getSourceName() == DocumentSourceUnionWith::kStageName);
+    ASSERT(unionWith->isInstanceOf<DocumentSourceUnionWith>());
 }
 
 TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithoutPipelineExtraSubobject) {
@@ -320,14 +320,14 @@ TEST_F(DocumentSourceUnionWithTest, SerializeAndParseWithoutPipelineExtraSubobje
     auto desugaredBson =
         BSON("$unionWith" << BSON("coll" << nsToUnionWith.coll() << "pipeline" << BSONArray()));
     auto unionWith = DocumentSourceUnionWith::createFromBson(bson.firstElement(), expCtx);
-    ASSERT(unionWith->getSourceName() == DocumentSourceUnionWith::kStageName);
+    ASSERT(unionWith->isInstanceOf<DocumentSourceUnionWith>());
     std::vector<Value> serializedArray;
     unionWith->serializeToArray(serializedArray);
     auto serializedBson = serializedArray[0].getDocument().toBson();
     ASSERT_BSONOBJ_EQ(serializedBson, desugaredBson);
     unionWith = DocumentSourceUnionWith::createFromBson(serializedBson.firstElement(), getExpCtx());
     ASSERT(unionWith != nullptr);
-    ASSERT(unionWith->getSourceName() == DocumentSourceUnionWith::kStageName);
+    ASSERT(unionWith->isInstanceOf<DocumentSourceUnionWith>());
 }
 
 TEST_F(DocumentSourceUnionWithTest, ParseErrors) {
@@ -1053,7 +1053,7 @@ TEST_F(DocumentSourceUnionWithTest, BuilderRoundTripMatchesCreateFromBson) {
             expCtx->getNamespaceString(), bson.firstElement(), LiteParserOptions{});
         auto docSources = buildDocumentSource(*liteParsed, expCtx);
         ASSERT_EQ(docSources.size(), 1U);
-        ASSERT(docSources.front()->getSourceName() == DocumentSourceUnionWith::kStageName);
+        ASSERT(docSources.front()->isInstanceOf<DocumentSourceUnionWith>());
 
         std::vector<Value> builderSerialized;
         docSources.front()->serializeToArray(builderSerialized);

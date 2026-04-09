@@ -56,10 +56,16 @@
 namespace mongo::hybrid_scoring_util {
 
 bool isScoreStage(const boost::intrusive_ptr<DocumentSource>& stage) {
-    if (stage->getSourceName() != DocumentSourceSetMetadata::kStageName) {
+    // $score is implemented as a DocumentSourceSingleDocumentTransformation wrapping a
+    // SetMetadataTransformation. Check for both to confirm this stage is a $score stage.
+    if (!stage->isInstanceOf<DocumentSourceSingleDocumentTransformation>()) {
         return false;
     }
     auto singleDocTransform = static_cast<DocumentSourceSingleDocumentTransformation*>(stage.get());
+    if (singleDocTransform->getTransformer().getType() !=
+        TransformerInterface::TransformerType::kSetMetadata) {
+        return false;
+    }
     auto setMetadataTransform =
         static_cast<SetMetadataTransformation*>(&singleDocTransform->getTransformer());
     return setMetadataTransform->getMetaType() == DocumentMetadataFields::MetaType::kScore;

@@ -72,7 +72,7 @@ TEST_F(DocumentSourceSetVariableFromSubPipelineTest, testParseAndSerialize) {
                      << BSON_ARRAY(BSON("$addFields" << BSON("a" << BSON("$const" << 3))))));
     auto setVariable =
         DocumentSourceSetVariableFromSubPipeline::createFromBson(testBson.firstElement(), expCtx);
-    ASSERT(setVariable->getSourceName() == DocumentSourceSetVariableFromSubPipeline::kStageName);
+    ASSERT(setVariable->isInstanceOf<DocumentSourceSetVariableFromSubPipeline>());
     std::vector<Value> serializedArray;
     setVariable->serializeToArray(serializedArray);
     auto serializedBson = serializedArray[0].getDocument().toBson();

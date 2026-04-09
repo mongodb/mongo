@@ -1593,7 +1593,7 @@ BSONObj finalizePipelineAndTargetShardsForExplain(
     tassert(11282913,
             "Expect no $mergeCursors stage at the beginning of the pipeline",
             pipeline->empty() ||
-                !dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
+                !pipeline->getSources().front()->isInstanceOf<DocumentSourceMergeCursors>());
     tassert(11282912,
             "ExpressionContext is missing explain verbosity when targeting shards for explain",
             expCtx->getExplain());
@@ -1745,7 +1745,7 @@ std::unique_ptr<Pipeline> targetShardsAndAddMergeCursorsWithRoutingCtx(
     tassert(9597602,
             "Pipeline should not start with $mergeCursors",
             pipeline->empty() ||
-                !dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
+                !pipeline->getSources().front()->isInstanceOf<DocumentSourceMergeCursors>());
 
     LiteParsedPipeline liteParsedPipeline(aggRequest);
     PipelineDataSource pipelineDataSource = getPipelineDataSource(liteParsedPipeline);

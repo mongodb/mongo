@@ -130,7 +130,7 @@ bool findAndRemoveSortStage(DocumentSourceContainer::iterator idLookupReplaceRoo
 }
 
 bool findIdLookupOrReplaceRootStage(DocumentSource* currStage) {
-    if (dynamic_cast<DocumentSourceInternalSearchIdLookUp*>(currStage)) {
+    if (currStage->isInstanceOf<DocumentSourceInternalSearchIdLookUp>()) {
         return true;
     }
     if (auto replaceRootStage =

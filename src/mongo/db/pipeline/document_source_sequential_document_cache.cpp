@@ -110,7 +110,7 @@ DocumentSourceContainer::iterator DocumentSourceSequentialDocumentCache::optimiz
     for (; prefixSplit != container->end(); ++prefixSplit) {
         (*prefixSplit)->addVariableRefs(&prefixVarRefs);
 
-        bool isNotSearch = ((*prefixSplit)->getSourceName() != DocumentSourceSearch::kStageName);
+        bool isNotSearch = !(*prefixSplit)->isInstanceOf<DocumentSourceSearch>();
         bool doesNotSupportDependencies =
             ((*prefixSplit)->getDependencies(&deps) == DepsTracker::State::NOT_SUPPORTED);
 

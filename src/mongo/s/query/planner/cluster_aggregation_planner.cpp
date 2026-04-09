@@ -775,9 +775,9 @@ ClusterClientCursorGuard convertPipelineToRouterStages(std::unique_ptr<Pipeline>
 }
 
 bool isMergeSkipOrLimit(const boost::intrusive_ptr<DocumentSource>& stage) {
-    return (dynamic_cast<DocumentSourceLimit*>(stage.get()) ||
-            dynamic_cast<DocumentSourceMergeCursors*>(stage.get()) ||
-            dynamic_cast<DocumentSourceSkip*>(stage.get()));
+    return (stage->isInstanceOf<DocumentSourceLimit>() ||
+            stage->isInstanceOf<DocumentSourceMergeCursors>() ||
+            stage->isInstanceOf<DocumentSourceSkip>());
 }
 
 bool isAllLimitsAndSkips(Pipeline* pipeline) {

@@ -246,7 +246,7 @@ std::unique_ptr<exec::agg::Pipeline> ChangeStreamStageTest::makeExecPipeline(
     // Check the oplog entry is transformed correctly.
     auto transform = std::next(result.begin(), 2)->get();
     ASSERT(transform);
-    ASSERT(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform));
+    ASSERT(transform->isInstanceOf<DocumentSourceChangeStreamTransform>());
 
     // Create mock stage and insert at the front of the stages.
     auto mock = DocumentSourceMock::createForTest(entries, getExpCtx());
@@ -254,7 +254,8 @@ std::unique_ptr<exec::agg::Pipeline> ChangeStreamStageTest::makeExecPipeline(
 
     if (removeEnsureResumeTokenStage) {
         auto newEnd = std::remove_if(result.begin(), result.end(), [](auto& stage) {
-            return dynamic_cast<DocumentSourceChangeStreamEnsureResumeTokenPresent*>(stage.get());
+            return stage
+                ->template isInstanceOf<DocumentSourceChangeStreamEnsureResumeTokenPresent>();
         });
         result.erase(newEnd, result.end());
     }

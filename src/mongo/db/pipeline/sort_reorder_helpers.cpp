@@ -77,8 +77,8 @@ DocumentSourceContainer::iterator tryReorderingWithSort(DocumentSourceContainer:
     auto docSource = itr->get();
     tassert(11282910,
             "Reordering with sort only works with $lookup and $graphLookup",
-            dynamic_cast<DocumentSourceLookUp*>(docSource) ||
-                dynamic_cast<DocumentSourceGraphLookUp*>(docSource));
+            docSource->isInstanceOf<DocumentSourceLookUp>() ||
+                docSource->isInstanceOf<DocumentSourceGraphLookUp>());
 
     // If we have $graphLookup or $lookup followed by $sort, and $sort does not use any fields
     // created by it, they can swap.

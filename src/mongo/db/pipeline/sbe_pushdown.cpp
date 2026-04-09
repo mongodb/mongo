@@ -331,7 +331,7 @@ bool pruneTrailingAddFields(std::vector<boost::intrusive_ptr<DocumentSource>>& s
  */
 bool pruneTrailingUnwind(std::vector<boost::intrusive_ptr<DocumentSource>>& stagesForPushdown) {
     if (!stagesForPushdown.empty() &&
-        dynamic_cast<DocumentSourceUnwind*>(stagesForPushdown.back().get())) {
+        stagesForPushdown.back()->isInstanceOf<DocumentSourceUnwind>()) {
         stagesForPushdown.pop_back();
         return true;
     }
@@ -351,7 +351,7 @@ void removeUnpackBucketFollowedByUnsupportedStages(
     std::vector<boost::intrusive_ptr<DocumentSource>>& stagesForPushdown) {
     auto itr =
         std::find_if(stagesForPushdown.begin(), stagesForPushdown.end(), [](const auto& stage) {
-            return dynamic_cast<DocumentSourceInternalUnpackBucket*>(stage.get());
+            return stage->template isInstanceOf<DocumentSourceInternalUnpackBucket>();
         });
     if (itr == stagesForPushdown.end()) {
         return;
@@ -392,7 +392,7 @@ void removeUnpackBucketFollowedByUnsupportedStages(
         stagesForPushdown[unpackStageIdx + 1].get());
     if (unpackStageIdx + 3 < stagesForPushdown.size() && internalProjectionStage &&
         internalProjectionStage->spec().getPolicies() == InternalProjectionPolicyEnum::kAddFields &&
-        dynamic_cast<DocumentSourceMatch*>(stagesForPushdown[unpackStageIdx + 2].get()) &&
+        stagesForPushdown[unpackStageIdx + 2]->isInstanceOf<DocumentSourceMatch>() &&
         dynamic_cast<DocumentSourceGroupBase*>(stagesForPushdown[unpackStageIdx + 3].get())) {
         trimFrom(unpackStageIdx + 4);
         return;
@@ -507,7 +507,7 @@ size_t getNumSbeCompatibleStagesForPushdown(
 
         // Waive the accumulator limit on $group if it will be processing time-series data. We
         // strongly prefer SBE for $group operations that may process block-based data.
-        if ((*itr)->getId() == DocumentSourceInternalUnpackBucket::id) {
+        if ((*itr)->isInstanceOf<DocumentSourceInternalUnpackBucket>()) {
             maxGroupAccumulators = std::numeric_limits<size_t>::max();
         }
     }
@@ -698,7 +698,7 @@ bool findSbeCompatibleStagesForPushdown(
 
     auto itr = sources.begin();
     for (size_t i = 0; i < numSbeCompatibleStagesForPushdown; i++) {
-        if ((*itr)->getId() == DocumentSourceSingleDocumentTransformation::id) {
+        if ((*itr)->isInstanceOf<DocumentSourceSingleDocumentTransformation>()) {
             if (auto replaceRoot = sbeCompatibleReplaceRootStage(
                     static_cast<DocumentSourceSingleDocumentTransformation*>(itr->get()),
                     minRequiredCompatibility)) {

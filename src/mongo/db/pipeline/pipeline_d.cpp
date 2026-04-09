@@ -711,9 +711,7 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutor(
 
     // If the first stage is $geoNear, prepare a special DocumentSourceGeoNearCursor stage;
     // otherwise, create a generic DocumentSourceCursor.
-    const auto geoNearStage =
-        pipeline->empty() ? nullptr : dynamic_cast<DocumentSourceGeoNear*>(pipeline->peekFront());
-    if (geoNearStage) {
+    if (!pipeline->empty() && pipeline->peekFront()->isInstanceOf<DocumentSourceGeoNear>()) {
         return buildInnerQueryExecutorGeoNear(collections, nss, aggRequest, pipeline);
     } else if (search_helpers::isSearchPipeline(pipeline) ||
                search_helpers::isSearchMetaPipeline(pipeline)) {
@@ -2097,7 +2095,7 @@ void PipelineD::performBoundedSortOptimization(PlanStage* rootStage,
             // Ensure we're erasing the sort source.
             tassert(6434901,
                     "we must erase a $sort stage and replace it with a bounded sort stage",
-                    (*iter)->getId() == DocumentSourceSort::id);
+                    (*iter)->isInstanceOf<DocumentSourceSort>());
             sources.erase(iter);
         }
     }

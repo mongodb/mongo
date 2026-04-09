@@ -1702,7 +1702,7 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(DocumentSourceContain
 
 bool findSequentialDocumentCache(DocumentSourceContainer::iterator start,
                                  DocumentSourceContainer::iterator end) {
-    while (start != end && !dynamic_cast<DocumentSourceSequentialDocumentCache*>(start->get())) {
+    while (start != end && !(*start)->isInstanceOf<DocumentSourceSequentialDocumentCache>()) {
         start = std::next(start);
     }
     return start != end;
@@ -2016,7 +2016,7 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::optimizeAt
         // Merge multiple following $match stages.
         auto itrToMatch = std::next(itr);
         while (std::next(itrToMatch) != container->end() &&
-               dynamic_cast<DocumentSourceMatch*>(std::next(itrToMatch)->get())) {
+               std::next(itrToMatch)->get()->isInstanceOf<DocumentSourceMatch>()) {
             nextMatch->optimizeAt(itrToMatch, container);
         }
 

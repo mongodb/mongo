@@ -316,6 +316,20 @@ public:
     virtual Id getId() const = 0;
 
     /**
+     * Returns true if this stage is an instance of the given DocumentSource subclass T.
+     * T must have a static `id` member allocated via ALLOCATE_DOCUMENT_SOURCE_ID.
+     * This is an O(1) integer comparison and does not require RTTI.
+     *
+     * Note: unlike dynamic_cast, this checks for exact type identity, not subtype inclusion.
+     */
+    template <typename T>
+    bool isInstanceOf() const {
+        static_assert(std::is_base_of_v<DocumentSource, T>, "T must be a DocumentSource subclass");
+        static_assert(!std::is_abstract_v<T>, "T must be a concrete DocumentSource subclass");
+        return getId() == T::id;
+    }
+
+    /**
      * In the default case, serializes the DocumentSource and adds it to the std::vector<Value>.
      *
      * A subclass may choose to overwrite this, rather than serialize, if it should output multiple

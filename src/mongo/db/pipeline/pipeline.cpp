@@ -414,7 +414,7 @@ void Pipeline::unparameterize() {
 bool Pipeline::canParameterize() const {
     if (!_sources.empty()) {
         // First stage must be a DocumentSourceMatch.
-        return _sources.begin()->get()->getSourceName() == DocumentSourceMatch::kStageName;
+        return _sources.begin()->get()->isInstanceOf<DocumentSourceMatch>();
     }
     return false;
 }

@@ -169,8 +169,7 @@ TEST_F(PipelineRewriteEngineTest, EraseNextStage) {
 
 TEST_F(PipelineRewriteEngineTest, InsertStageBeforeCurrent) {
     static auto prevIsNotMatch = [](PipelineRewriteContext& ctx) {
-        return ctx.atFirstStage() ||
-            ctx.prevStage()->getSourceName() != DocumentSourceMatch::kStageName;
+        return ctx.atFirstStage() || !ctx.prevStage()->isInstanceOf<DocumentSourceMatch>();
     };
     static auto insertMatchBefore = [](PipelineRewriteContext& ctx) {
         auto filter = ctx.currentAs<DocumentSourceSort>()
@@ -199,8 +198,7 @@ TEST_F(PipelineRewriteEngineTest, InsertStageBeforeCurrent) {
 
 TEST_F(PipelineRewriteEngineTest, PushStageToFront) {
     static auto prevIsNotSort = [](PipelineRewriteContext& ctx) {
-        return !ctx.atFirstStage() &&
-            ctx.prevStage()->getSourceName() != DocumentSourceSort::kStageName;
+        return !ctx.atFirstStage() && !ctx.prevStage()->isInstanceOf<DocumentSourceSort>();
     };
 
     REGISTER_TEST_RULES(DocumentSourceSort,
@@ -227,8 +225,7 @@ TEST_F(PipelineRewriteEngineTest, PushStageToFront) {
 
 TEST_F(PipelineRewriteEngineTest, PushStageToBack) {
     static auto nextIsNotSort = [](PipelineRewriteContext& ctx) {
-        return !ctx.atLastStage() &&
-            ctx.nextStage()->getSourceName() != DocumentSourceSort::kStageName;
+        return !ctx.atLastStage() && !ctx.nextStage()->isInstanceOf<DocumentSourceSort>();
     };
 
     REGISTER_TEST_RULES(DocumentSourceSort,
@@ -319,13 +316,12 @@ TEST_F(PipelineRewriteEngineTest, ApplyMultipleRulesDifferentTypesDifferentPrior
         return ctx.currentAs<DocumentSourceLimit>().getLimit() == 10;
     };
     static auto nextIsLimit = [](PipelineRewriteContext& ctx) {
-        return !ctx.atFirstStage() &&
-            ctx.nextStage()->getSourceName() == DocumentSourceLimit::kStageName;
+        return !ctx.atFirstStage() && ctx.nextStage()->isInstanceOf<DocumentSourceLimit>();
     };
     static auto betweenMatchAndSort = [](PipelineRewriteContext& ctx) {
         return !ctx.atFirstStage() && !ctx.atLastStage() &&
-            ctx.prevStage()->getSourceName() == DocumentSourceMatch::kStageName &&
-            ctx.nextStage()->getSourceName() == DocumentSourceSort::kStageName;
+            ctx.prevStage()->isInstanceOf<DocumentSourceMatch>() &&
+            ctx.nextStage()->isInstanceOf<DocumentSourceSort>();
     };
 
     // Transforms

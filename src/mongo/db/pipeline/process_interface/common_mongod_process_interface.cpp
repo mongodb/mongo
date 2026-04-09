@@ -332,11 +332,11 @@ bool requiresCollectionAcquisition(const Pipeline& pipeline) {
 
     tassert(10287400,
             "Pipeline must not yet have a DocumentSourceCursor as the first stage.",
-            !firstStage || !dynamic_cast<DocumentSourceCursor*>(*firstStage));
+            !firstStage || !(*firstStage)->isInstanceOf<DocumentSourceCursor>());
 
     const bool isMongotPipeline = search_helpers::isMongotPipeline(&pipeline);
     const bool hasIdLookup = std::any_of(sources.begin(), sources.end(), [](const auto& source) {
-        return source->getSourceName() == DocumentSourceInternalSearchIdLookUp::kStageName;
+        return source->template isInstanceOf<DocumentSourceInternalSearchIdLookUp>();
     });
 
     if (!hasIdLookup && !isMongotPipeline && firstStage &&

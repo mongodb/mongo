@@ -357,6 +357,10 @@ void assertSearchMetaAccessValid(const DocumentSourceContainer& pipeline,
     // for $mergeCursors because we could be on a shard doing the merge and only want to validate if
     // we have the whole pipeline.
     bool alreadyValidated = !expCtx->getInRouter() && expCtx->getNeedsMerge();
+    // NOTE: Cannot use isInstanceOf<DocumentSourceMergeCursors>() here because
+    // DocumentSourceMergeCursors::id is defined in //src/mongo/s/query/exec:router_exec_stage,
+    // which depends on //src/mongo/db/pipeline — adding the reverse dep would be circular.
+    // getSourceName() only needs the constexpr kStageName from the header, so it is safe.
     if (!alreadyValidated ||
         pipeline.front()->getSourceName() != DocumentSourceMergeCursors::kStageName) {
         assertSearchMetaAccessValidHelper({&pipeline});

@@ -167,7 +167,7 @@ DocumentSourceContainer::iterator DocumentSourceSingleDocumentTransformation::op
 
     if (std::next(itr) == container->end()) {
         return container->end();
-    } else if (dynamic_cast<DocumentSourceSkip*>(std::next(itr)->get())) {
+    } else if (std::next(itr)->get()->isInstanceOf<DocumentSourceSkip>()) {
         std::swap(*itr, *std::next(itr));
         return itr == container->begin() ? itr : std::prev(itr);
     } else if (auto nextSingleDocTransform =

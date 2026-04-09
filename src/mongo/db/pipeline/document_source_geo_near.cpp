@@ -157,7 +157,7 @@ DocumentSourceContainer::iterator DocumentSourceGeoNear::splitForTimeseries(
 
     // Only do this rewrite if we are immediately following an $_internalUnpackBucket stage.
     if (container->begin() == itr ||
-        !dynamic_cast<DocumentSourceInternalUnpackBucket*>(std::prev(itr)->get()))
+        !std::prev(itr)->get()->isInstanceOf<DocumentSourceInternalUnpackBucket>())
         return std::next(itr);
 
     // If _nearGeometry is not a constant, do nothing.

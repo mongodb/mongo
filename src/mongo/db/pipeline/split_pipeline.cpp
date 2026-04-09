@@ -315,8 +315,9 @@ private:
         tassert(5363800,
                 "Expected non-empty shardPipe consisting of at least a $sort stage",
                 !_splitPipeline.shardsPipeline->empty());
-        if (!dynamic_cast<DocumentSourceSort*>(
-                _splitPipeline.shardsPipeline->getSources().back().get())) {
+        if (!_splitPipeline.shardsPipeline->getSources()
+                 .back()
+                 ->isInstanceOf<DocumentSourceSort>()) {
             // Expected last stage on the shards to be a $sort.
             return;
         }
@@ -387,7 +388,7 @@ private:
         bool canPushDownIdLookup = true;
         auto& mergeSources = _splitPipeline.mergePipeline->getSources();
         for (auto it = mergeSources.begin(); it != mergeSources.end(); ++it) {
-            if (dynamic_cast<DocumentSourceLimit*>(it->get())) {
+            if ((*it)->isInstanceOf<DocumentSourceLimit>()) {
                 // Technically, swapping $idLookup and $limit can change query results. However,
                 // $vectorSearch will always put a $limit in the merging pipeline, and we are
                 // allowed to (and should, for correctness) swap with it. A non-$vectorSearch
@@ -396,7 +397,7 @@ private:
                 continue;
             }
 
-            if (dynamic_cast<DocumentSourceInternalSearchIdLookUp*>(it->get())) {
+            if ((*it)->isInstanceOf<DocumentSourceInternalSearchIdLookUp>()) {
                 uassert(
                     11027701,
                     "idLookup is not allowed to run in a merging pipeline but pushdown was blocked",
@@ -422,8 +423,9 @@ private:
      */
     void _moveFinalUnwindFromShardsToMerger() {
         while (!_splitPipeline.shardsPipeline->empty() &&
-               dynamic_cast<DocumentSourceUnwind*>(
-                   _splitPipeline.shardsPipeline->getSources().back().get())) {
+               _splitPipeline.shardsPipeline->getSources()
+                   .back()
+                   ->isInstanceOf<DocumentSourceUnwind>()) {
             _splitPipeline.mergePipeline->addInitialSource(
                 _splitPipeline.shardsPipeline->popBack());
         }
