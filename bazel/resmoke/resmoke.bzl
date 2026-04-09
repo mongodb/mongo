@@ -217,7 +217,6 @@ def resmoke_suite_test(
     deps_path = ":".join(["$(location %s)" % dep for dep in deps])
 
     default_data = [
-        config,
         generated_config,
         python_imports_target,
         "//bazel/resmoke:on_feature_flags",
