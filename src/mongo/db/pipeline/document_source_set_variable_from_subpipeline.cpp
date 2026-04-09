@@ -156,7 +156,9 @@ void DocumentSourceSetVariableFromSubPipeline::detachFromOperationContext() {
 }
 
 void DocumentSourceSetVariableFromSubPipeline::reattachToOperationContext(OperationContext* opCtx) {
-    _subPipeline->reattachToOperationContext(opCtx);
+    if (_subPipeline) {
+        _subPipeline->reattachToOperationContext(opCtx);
+    }
 }
 
 bool DocumentSourceSetVariableFromSubPipeline::validateOperationContext(
