@@ -1745,6 +1745,40 @@ tasks:
           resmoke_args: --excludeWithAnyTags=uses_snapshot_read_concern
 
   - <<: *gen_task_template
+    name: disagg_sharded_jscore_txns_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "default",
+        "large",
+        "clustered_collections",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: disagg_sharded_jscore_txns
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: disagg_sharded_jscore_txns_without_snapshot_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "default",
+        "wo_snapshot",
+        "large",
+        "clustered_collections",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: disagg_sharded_jscore_txns
+          resmoke_jobs_max: 1
+          resmoke_args: --excludeWithAnyTags=uses_snapshot_read_concern
+
+  - <<: *gen_task_template
     name: sharded_multi_stmt_txn_jscore_passthrough_gen
     tags:
       [
@@ -3194,6 +3228,56 @@ tasks:
       - func: "run tests"
         vars:
           suite: sharded_causally_consistent_jscore_txns_passthrough
+          resmoke_args: --excludeWithAnyTags=uses_snapshot_read_concern
+
+  - <<: *gen_task_template
+    name: disagg_sharded_causally_consistent_jscore_txns_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "large",
+        "clustered_collections",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: disagg_sharded_causally_consistent_jscore_txns_passthrough
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: disagg_sharded_causally_consistent_read_concern_snapshot_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "large",
+        "clustered_collections",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: disagg_sharded_causally_consistent_read_concern_snapshot_passthrough
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: disagg_sharded_causally_consistent_jscore_txns_passthrough_without_snapshot_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "wo_snapshot",
+        "large",
+        "clustered_collections",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: disagg_sharded_causally_consistent_jscore_txns_passthrough
+          resmoke_jobs_max: 1
           resmoke_args: --excludeWithAnyTags=uses_snapshot_read_concern
 
   - <<: *gen_task_template
