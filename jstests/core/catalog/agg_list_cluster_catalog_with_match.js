@@ -11,6 +11,8 @@
  * ]
  */
 
+import {runningWithViewlessTimeseriesUpgradeDowngrade} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+
 const kDb1 = jsTestName() + "1";
 const kDb2 = jsTestName() + "2";
 
@@ -115,6 +117,14 @@ function testMatchStage(matchStage, expectedResults) {
                     continue;
                 }
                 if (isTempNss(existingColl["ns"])) {
+                    continue;
+                }
+                // TODO SERVER-101609: Remove once 9.0 becomes lastLTS.
+                // system.buckets collections can disappear in viewless timeseries upgrade/downgrade suites.
+                if (
+                    existingColl["ns"].includes("system.buckets") &&
+                    runningWithViewlessTimeseriesUpgradeDowngrade(db)
+                ) {
                     continue;
                 }
 

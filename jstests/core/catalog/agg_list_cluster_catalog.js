@@ -13,7 +13,10 @@
  * ]
  */
 
-import {isViewlessTimeseriesOnlySuite} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {
+    isViewlessTimeseriesOnlySuite,
+    runningWithViewlessTimeseriesUpgradeDowngrade,
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const kDb1 = "db1_agg_list_cluster_catalog";
@@ -142,6 +145,14 @@ function isTempCollection(collectionName) {
 // Verifies that for every collection in the list collection result, there is a corresponding entry
 // in the stage result.
 function verifyAgainstListCollections(listCollectionResult, stageResult, specs) {
+    // TODO SERVER-101609: Remove once 9.0 becomes lastLTS.
+    if (runningWithViewlessTimeseriesUpgradeDowngrade(db)) {
+        // Skip timeseries collections in mixed viewful/viewless suites.
+        // $listCatalog may return inconsistent information for them due to SERVER-97061.
+        listCollectionResult = listCollectionResult.filter((e) => !e.options.timeseries);
+        stageResult = stageResult.filter((e) => !e.options.timeseries);
+    }
+
     listCollectionResult.forEach((listCollectionEntry) => {
         let nss = listCollectionEntry.db + "." + listCollectionEntry.name;
         let stageEntry = stageResult.find((entry) => entry.ns === nss);

@@ -107,6 +107,12 @@ TimeseriesTest.run((insert) => {
 
     // Check buckets.
     const bucketDocs = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
+
+    if (!TimeseriesTest.canAssumeCanonicalTimeseriesBucketsLayout()) {
+        assert.gte(bucketDocs.length, 1, bucketDocs);
+        return;
+    }
+
     assert.eq(1, bucketDocs.length, bucketDocs);
     const bucketDoc = bucketDocs[0];
     TimeseriesTest.decompressBucket(bucketDoc);

@@ -48,7 +48,7 @@ TimeseriesTest.run((insert) => {
 
     let stats = assert.commandWorked(coll.stats());
     assert(stats.timeseries);
-    const expectedNumBucketsReopened = stats.timeseries["numBucketsReopened"] + 1;
+    const prevNumBucketsReopened = stats.timeseries["numBucketsReopened"];
 
     assert.commandWorked(insert(coll, docs.slice(1)));
     assert.docEq(
@@ -59,19 +59,17 @@ TimeseriesTest.run((insert) => {
             .toArray(),
     );
 
-    assert.eq(
-        getTimeseriesCollForRawOps(coll).find().rawData().itcount(),
-        2,
-        getTimeseriesCollForRawOps(coll).find().rawData().toArray(),
-    );
+    const buckets = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
     stats = assert.commandWorked(coll.stats());
     assert(stats.timeseries);
-    assert.eq(stats.timeseries["bucketCount"], 2);
-    if (!TestData.runningWithBalancer) {
-        assert.eq(stats.timeseries["numBucketsReopened"], expectedNumBucketsReopened);
+    if (TimeseriesTest.canAssumeCanonicalTimeseriesBucketsLayout()) {
+        assert.eq(buckets.length, 2, buckets);
+        assert.eq(stats.timeseries["bucketCount"], 2);
+        assert.eq(stats.timeseries["numBucketsReopened"], prevNumBucketsReopened + 1);
     } else {
-        // Retries of ShardCannotRefreshDueToLocksHeld during resharding can cause the number of
-        // buckets that are reopened to be higher when the balancer is enabled.
-        assert.gte(stats.timeseries["numBucketsReopened"], expectedNumBucketsReopened);
+        assert.gte(buckets.length, 2, buckets);
+        assert.gte(stats.timeseries["bucketCount"], 2);
+        // TODO(SERVER-123053): Assert `>= prevNumBucketsReopened + 1` once we don't fail to find re-opening candidates due to viewless timeseries downgrade.
+        assert.gte(stats.timeseries["numBucketsReopened"], prevNumBucketsReopened);
     }
 });

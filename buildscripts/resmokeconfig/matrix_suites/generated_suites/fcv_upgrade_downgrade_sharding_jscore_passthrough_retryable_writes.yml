@@ -109,8 +109,6 @@ selector:
     - jstests/core/**/update_metrics.js
     - jstests/core/**/failcommand_failpoint.js
     - jstests/core/**/batch_write_command_w0.js
-    - jstests/core/timeseries/query/timeseries_lastpoint.js
-    - jstests/core/timeseries/query/timeseries_out_non_sharded.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos

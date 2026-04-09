@@ -3,16 +3,6 @@
 # TODO SERVER-120439 remove this overrides and their usages once 9.0 becomes last LTS and
 # we will not perform anymore timeseries transformation during FCV upgrade/downgrade
 
-- name: common_exclude_files
-  value:
-    exclude_files:
-      # This test assumes no buckets will be closed during insertion.
-      # In the FCV upgrade/downgrade suite this can actually happen when we upgrade/downgrade the timeseries collection.
-      - jstests/core/timeseries/query/timeseries_lastpoint.js
-
-      # TODO SERVER-112816 re-enable tests that uses out stage on timeseries collections
-      - jstests/core/timeseries/query/timeseries_out_non_sharded.js
-
 - name: exclude_tags
   value:
     exclude_with_any_tags:

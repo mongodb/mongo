@@ -2481,11 +2481,6 @@ tasks:
       ]
     commands:
       - func: "generate resmoke tasks"
-        vars:
-          # TODO(SERVER-109882): Enable viewless timeseries in upgrade/downgrade suites
-          resmoke_args: >-
-            --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
-            --disableFeatureFlags=featureFlagBlockDirectSystemBucketsAccess
 
   - <<: *gen_task_template
     name: fcv_upgrade_downgrade_retryable_writes_replica_sets_jscore_passthrough_gen
@@ -2787,10 +2782,6 @@ tasks:
       - func: "generate resmoke tasks"
         vars:
           use_large_distro: "true"
-          # TODO(SERVER-109882): Enable viewless timeseries in upgrade/downgrade suites
-          resmoke_args: >-
-            --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
-            --disableFeatureFlags=featureFlagBlockDirectSystemBucketsAccess
 
   - <<: *gen_task_template
     name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_retryable_writes_gen
@@ -2818,11 +2809,6 @@ tasks:
       ]
     commands:
       - func: "generate resmoke tasks"
-        vars:
-          # TODO(SERVER-109882): Enable viewless timeseries in upgrade/downgrade suites
-          resmoke_args: >-
-            --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
-            --disableFeatureFlags=featureFlagBlockDirectSystemBucketsAccess
 
   - <<: *gen_task_template
     name: fcv_upgrade_downgrade_sharding_jscore_passthrough_retryable_writes_gen

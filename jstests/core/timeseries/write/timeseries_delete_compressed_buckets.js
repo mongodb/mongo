@@ -17,7 +17,9 @@
  */
 
 import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {runningWithViewlessTimeseriesUpgradeDowngrade} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const timeFieldName = "time";
 const metaFieldName = "tag";
@@ -87,7 +89,15 @@ function prepareCompressedBucket() {
 // Delete many records. This will hit both the compressed and uncompressed buckets.
 prepareCompressedBucket();
 let result = assert.commandWorked(coll.deleteMany({str: "even"}));
-assert.eq(numDocs / 2, result.deletedCount);
+if (runningWithViewlessTimeseriesUpgradeDowngrade(db) && FixtureHelpers.isMongos(db)) {
+    // TODO(SERVER-66949): Assert again once the count of documents deleted by a targeted deleteMany is accurate
+    // During viewless timeseries upgrade/downgrade the reported count may be lower than expected due to StaleConfig retries (SERVER-122729)
+    jsTest.log(
+        "SERVER-66949: Skipping deletedCount assertion: viewless timeseries upgrade/downgrade on sharded cluster",
+    );
+} else {
+    assert.eq(numDocs / 2, result.deletedCount);
+}
 assert.eq(coll.countDocuments({str: "even"}), 0, "Expected records matching the filter to be deleted.");
 assert.eq(
     coll.countDocuments({str: "odd"}),

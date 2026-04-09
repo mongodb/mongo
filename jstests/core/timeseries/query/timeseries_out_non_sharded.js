@@ -21,9 +21,21 @@
  * ]
  */
 import {TimeseriesAggTests} from "jstests/core/timeseries/libs/timeseries_agg_helpers.js";
-import {isViewfulTimeseriesOnlySuite} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {
+    runningWithViewlessTimeseriesUpgradeDowngrade,
+    isViewfulTimeseriesOnlySuite,
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
+// TODO SERVER-112816: Remove this skip once $out over timeseries work properly
+// when executed concurrently with viewless timeseries FCV upgrade/downgrade.
+if (runningWithViewlessTimeseriesUpgradeDowngrade(db)) {
+    jsTest.log.info(
+        "Skipping test because it is not yet compatible with viewless timeseries FCV upgrade/downgrade (SERVER-112816)",
+    );
+    quit();
+}
 
 const numHosts = 10;
 const numIterations = 20;

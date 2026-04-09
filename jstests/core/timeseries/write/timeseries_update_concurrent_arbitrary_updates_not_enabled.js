@@ -28,9 +28,17 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {runningWithViewlessTimeseriesUpgradeDowngrade} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
+
+if (runningWithViewlessTimeseriesUpgradeDowngrade(db) && !db.getSession().getOptions().shouldRetryWrites()) {
+    jsTest.log.info(
+        "Skipping test using parallel shell & failpoints since in this suite it may get interrupted by viewless timeseries upgrade/downgrade (SERVER-122589).",
+    );
+    quit();
+}
 
 const timeFieldName = "time";
 const metaFieldName = "tag";

@@ -13,6 +13,7 @@
 
 import {
     isViewlessTimeseriesOnlySuite,
+    runningWithViewlessTimeseriesUpgradeDowngrade,
     getTimeseriesBucketsColl,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
@@ -151,6 +152,13 @@ function checkCollectionEntry(collName, expectedResult) {
 }
 
 for (const [collName, expectedResult] of Object.entries(expectedResults[serverType])) {
+    // TODO SERVER-120014: Remove this test once 9.0 becomes last LTS and all timeseries collections are viewless.
+    // TODO SERVER-97061: Remove once $listClusterCatalog returns a consistent state for the local and global catalog.
+    if (collName == kCollTimeseriesSharded && runningWithViewlessTimeseriesUpgradeDowngrade(dbTest)) {
+        // Skip since the values of global catalog based fields (e.g. 'shards') can be inconsistent due to SERVER-97061.
+        continue;
+    }
+
     // TODO SERVER-120014: Remove this test once 9.0 becomes last LTS and all timeseries collections are viewless.
     if (results.find((collEntry) => collEntry.ns == dbName + "." + getTimeseriesBucketsColl(collName))) {
         assert(collName == kCollTimeseries || collName == kCollTimeseriesSharded, tojson(results));

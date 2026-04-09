@@ -119,8 +119,6 @@ selector:
     - jstests/core/testing/mixed_version_replica_set.js
     - jstests/fle2/**/*.js
     - src/mongo/db/modules/*/jstests/fle2/**/*.js
-    - jstests/core/timeseries/query/timeseries_lastpoint.js
-    - jstests/core/timeseries/query/timeseries_out_non_sharded.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - requires_getmore

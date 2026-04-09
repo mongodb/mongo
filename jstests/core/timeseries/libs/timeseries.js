@@ -1,7 +1,11 @@
 // Helper functions for testing time-series collections.
 
 import {documentEq} from "jstests/aggregation/extras/utils.js";
-import {isShardedTimeseries, runTimeseriesChunkCommand} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {
+    runningWithViewlessTimeseriesUpgradeDowngrade,
+    isShardedTimeseries,
+    runTimeseriesChunkCommand,
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {isStableFCVSuite} from "jstests/libs/feature_compatibility_version.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
@@ -423,8 +427,16 @@ export var TimeseriesTest = class {
             TestData.sessionOptions.retryWrites
         ) {
             // TODO SERVER-119937 FCV upgrade/downgrade and retriable writes causes more buckets to be created
+            // (even in suites that do not perform viewful <-> viewless timeseries conversions)
             return false;
         }
+
+        if (runningWithViewlessTimeseriesUpgradeDowngrade(db)) {
+            // FCV transitions between viewful and viewless timeseries can cause retries that
+            // produce extra buckets, or cause buckets to not be re-opened (SERVER-122949).
+            return false;
+        }
+
         return true;
     }
 
