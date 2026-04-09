@@ -60,6 +60,7 @@
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/remote_command_response.h"
@@ -1021,53 +1022,77 @@ BSONObj forceReadConcernLocal(OperationContext* opCtx, BSONObj& cmd) {
 }
 
 StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(OperationContext* opCtx,
-                                                                   RoutingContext& routingCtx,
+                                                                   RoutingContext& unusedRoutingCtx,
                                                                    const NamespaceString& nss) {
-    const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
-    auto [indexShard, listIndexesCmd] = [&]() -> std::pair<std::shared_ptr<Shard>, BSONObj> {
-        ListIndexes listIndexesCmd(nss);
-        // For viewless timeseries collections, fetch the raw indexes instead of user-visible ones.
-        // (Note that for all other collection types, this parameter has no effect.)
-        // This is hardcoded, since all current callers of this function expect raw indexes.
-        if (gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
-                VersionContext::getDecoration(opCtx),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            listIndexesCmd.setRawData(true);
-        }
-        setReadWriteConcern(opCtx, listIndexesCmd, true, false);
-        auto cmdNoVersion = listIndexesCmd.toBSON();
+    // The CollectionRouter is not capable of implicitly translate the namespace to
+    // a timeseries buckets collection, which is required in this command. Hence,
+    // we'll use the CollectionRouter to handle StaleConfig errors but will ignore
+    // its RoutingContext. Instead, we'll use a CollectionRoutingInfoTargeter object
+    // to properly get the RoutingContext when the collection is timeseries.
+    // TODO (SERVER-117193) Use the RoutingContext provided by the CollectionRouter
+    // once all timeseries collections become viewless.
+    unusedRoutingCtx.skipValidation();
 
-        // force the read concern level to "local" as other values are not supported for listIndexes
-        cmdNoVersion = forceReadConcernLocal(opCtx, cmdNoVersion);
+    auto targeter = CollectionRoutingInfoTargeter(opCtx, nss);
+    return routing_context_utils::runAndValidate(
+        targeter.getRoutingCtx(), [&](RoutingContext& routingCtx) {
+            auto [indexShard,
+                  listIndexesCmd] = [&]() -> std::pair<std::shared_ptr<Shard>, BSONObj> {
+                ListIndexes listIndexesCmd(nss);
+                // For viewless timeseries collections, fetch the raw indexes instead of
+                // user-visible ones. (Note that for all other collection types, this parameter has
+                // no effect.) This is hardcoded, since all current callers of this function expect
+                // raw indexes.
+                if (gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
+                        VersionContext::getDecoration(opCtx),
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                    listIndexesCmd.setRawData(true);
+                }
+                setReadWriteConcern(opCtx, listIndexesCmd, true, false);
+                auto cmdNoVersion = listIndexesCmd.toBSON();
 
-        if (cri.hasRoutingTable()) {
-            // For a collection that has a routing table, we must load indexes from a shard with
-            // chunks. For consistency with cluster listIndexes, load from the shard that owns
-            // the minKey chunk.
-            const auto& cm = cri.getChunkManager();
-            const auto minKeyShardId = cm.getMinKeyShardIdWithSimpleCollation();
-            return {
-                uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, minKeyShardId)),
-                appendShardVersion(cmdNoVersion, cri.getShardVersion(minKeyShardId))};
-        } else {
-            // For a collection without routing table, the primary shard will have correct indexes.
-            // Attach dbVersion + shardVersion: UNTRACKED.
-            const auto cmdObjWithShardVersion = !cri.getDbVersion().isFixed()
-                ? appendShardVersion(cmdNoVersion, ShardVersion::UNTRACKED())
-                : cmdNoVersion;
-            return {uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(
-                        opCtx, cri.getDbPrimaryShardId())),
-                    appendDbVersionIfPresent(cmdObjWithShardVersion, cri.getDbVersion())};
-        }
-    }();
+                if (targeter.timeseriesNamespaceNeedsRewrite(nss)) {
+                    cmdNoVersion = timeseries::makeTimeseriesCommand(
+                        cmdNoVersion,
+                        nss,
+                        ListIndexes::kCommandName,
+                        ListIndexes::kIsTimeseriesNamespaceFieldName);
+                }
 
-    routingCtx.onRequestSentForNss(nss);
-    return indexShard->runExhaustiveCursorCommand(
-        opCtx,
-        ReadPreferenceSetting::get(opCtx),
-        nss.dbName(),
-        listIndexesCmd,
-        opCtx->hasDeadline() ? opCtx->getRemainingMaxTimeMillis() : Milliseconds(-1));
+                // force the read concern level to "local" as other values are not supported for
+                // listIndexes
+                cmdNoVersion = forceReadConcernLocal(opCtx, cmdNoVersion);
+
+                const auto& cri = routingCtx.getCollectionRoutingInfo(targeter.getNS());
+                if (cri.hasRoutingTable()) {
+                    // For a collection that has a routing table, we must load indexes from a shard
+                    // with chunks. For consistency with cluster listIndexes, load from the shard
+                    // that owns the minKey chunk.
+                    const auto& cm = cri.getChunkManager();
+                    const auto minKeyShardId = cm.getMinKeyShardIdWithSimpleCollation();
+                    return {uassertStatusOK(
+                                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, minKeyShardId)),
+                            appendShardVersion(cmdNoVersion, cri.getShardVersion(minKeyShardId))};
+                } else {
+                    // For a collection without routing table, the primary shard will have correct
+                    // indexes. Attach dbVersion + shardVersion: UNTRACKED.
+                    const auto cmdObjWithShardVersion = !cri.getDbVersion().isFixed()
+                        ? appendShardVersion(cmdNoVersion, ShardVersion::UNTRACKED())
+                        : cmdNoVersion;
+                    return {uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(
+                                opCtx, cri.getDbPrimaryShardId())),
+                            appendDbVersionIfPresent(cmdObjWithShardVersion, cri.getDbVersion())};
+                }
+            }();
+
+            routingCtx.onRequestSentForNss(targeter.getNS());
+            return indexShard->runExhaustiveCursorCommand(
+                opCtx,
+                ReadPreferenceSetting::get(opCtx),
+                nss.dbName(),
+                listIndexesCmd,
+                opCtx->hasDeadline() ? opCtx->getRemainingMaxTimeMillis() : Milliseconds(-1));
+        });
 }
 
 StatusWith<boost::optional<int64_t>> addLimitAndSkipForShards(boost::optional<int64_t> limit,

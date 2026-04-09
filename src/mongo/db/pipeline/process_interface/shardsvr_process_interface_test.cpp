@@ -147,6 +147,17 @@ TEST_F(ShardsvrProcessInterfaceTest, TestInsert) {
             .toBSON(CursorResponse::ResponseType::InitialResponse);
     });
 
+    // Mock the response to the catalog cache refresh for the system.buckets namespace, triggered
+    // by the CollectionRoutingInfoTargeter in loadIndexesFromAuthoritativeShard checking for
+    // timeseries routing.
+    onCommand([&](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQ("aggregate", request.cmdObj.firstElement().fieldNameStringData());
+        ASSERT_EQ("collections", request.cmdObj.firstElement().valueStringDataSafe());
+        // Response is empty since the collection is not a timeseries collection.
+        return CursorResponse(kTestAggregateNss, CursorId{0}, {})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
     // Mock the response to $out's "listIndexes" request.
     const BSONObj indexBSON = BSON("_id" << 1);
     const BSONObj listIndexesResponse =
