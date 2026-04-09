@@ -117,12 +117,14 @@ using QuerySamplingOptions = OperationContext::QuerySamplingOptions;
 const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOnly);
 const char kLegacyRuntimeConstantsField[] = "runtimeConstants";
 
-void appendLegacyRuntimeConstantsToRequest(OperationContext* opCtx,
-                                           write_ops::FindAndModifyCommandRequest& request) {
+BSONObj appendLegacyRuntimeConstantsToCommandObject(OperationContext* opCtx,
+                                                    const BSONObj& origCmdObj) {
     uassert(51196,
             "Cannot specify runtime constants option to a mongos",
-            !request.getLegacyRuntimeConstants().has_value());
-    request.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
+            !origCmdObj.getField(kLegacyRuntimeConstantsField));
+    auto rtcBSON =
+        BSON(kLegacyRuntimeConstantsField << Variables::generateRuntimeConstants(opCtx).toBSON());
+    return origCmdObj.addField(rtcBSON.getField(kLegacyRuntimeConstantsField));
 }
 
 BSONObj stripWriteConcern(const BSONObj& cmdObj) {
@@ -436,10 +438,12 @@ MONGO_REGISTER_COMMAND(FindAndModifyCmd).forRouter();
 
 }  // namespace
 
-void FindAndModifyCmd::Invocation::doCheckAuthorization(OperationContext* opCtx) const {
-    const bool update = request().getUpdate().has_value();
-    const bool upsert = request().getUpsert().value_or(false);
-    const bool remove = request().getRemove().value_or(false);
+Status FindAndModifyCmd::checkAuthForOperation(OperationContext* opCtx,
+                                               const DatabaseName& dbName,
+                                               const BSONObj& cmdObj) const {
+    const bool update = cmdObj["update"].trueValue();
+    const bool upsert = cmdObj["upsert"].trueValue();
+    const bool remove = cmdObj["remove"].trueValue();
 
     ActionSet actions;
     actions.addAction(ActionType::find);
@@ -452,48 +456,60 @@ void FindAndModifyCmd::Invocation::doCheckAuthorization(OperationContext* opCtx)
     if (remove) {
         actions.addAction(ActionType::remove);
     }
-    if (request().getBypassDocumentValidation().value_or(false)) {
+    if (shouldBypassDocumentValidationForCommand(cmdObj)) {
         actions.addAction(ActionType::bypassDocumentValidation);
     }
 
-    auto nss = ns();
+    auto nss = CommandHelpers::parseNsFromCommand(dbName, cmdObj);
     ResourcePattern resource(CommandHelpers::resourcePatternForNamespace(nss));
     uassert(17137,
             "Invalid target namespace " + resource.toString(),
             resource.isExactNamespacePattern());
 
     auto* as = AuthorizationSession::get(opCtx->getClient());
-    uassert(ErrorCodes::Unauthorized,
-            "unauthorized",
-            as->isAuthorizedForActionsOnResource(resource, actions));
+    if (!as->isAuthorizedForActionsOnResource(resource, actions)) {
+        return {ErrorCodes::Unauthorized, "unauthorized"};
+    }
+
+    return Status::OK();
 }
 
 namespace {
 /**
- * Replaces the target namespace in the request by 'bucketNss'. Also sets the
+ * Replaces the target namespace in the 'cmdObj' by 'bucketNss'. Also sets the
  * 'isTimeseriesNamespace' flag.
  */
-void replaceNamespaceByBucketNss(OperationContext* opCtx,
-                                 write_ops::FindAndModifyCommandRequest& request,
-                                 const NamespaceString& bucketNss) {
-    request.setNamespace(bucketNss);
+BSONObj replaceNamespaceByBucketNss(OperationContext* opCtx,
+                                    const BSONObj& cmdObj,
+                                    const NamespaceString& bucketNss) {
+    BSONObjBuilder bob;
+    for (const auto& elem : cmdObj) {
+        const auto name = elem.fieldNameStringData();
+        if (name == write_ops::FindAndModifyCommandRequest::kCommandName ||
+            name == write_ops::FindAndModifyCommandRequest::kCommandAlias) {
+            bob.append(write_ops::FindAndModifyCommandRequest::kCommandName, bucketNss.coll());
+        } else {
+            bob.append(elem);
+        }
+    }
 
     if (!isRawDataOperation(opCtx)) {
         // Set this flag so that shards can differentiate a request on a time-series view from a
         // request on a time-series buckets collection since we replace the target namespace in the
         // command with the buckets namespace.
-        request.setIsTimeseriesNamespace(true);
+        bob.append(write_ops::FindAndModifyCommandRequest::kIsTimeseriesNamespaceFieldName, true);
     }
+
+    return bob.obj();
 }
 
 /**
  * Returns CollectionRoutingInfo for 'maybeTsNss' namespace. If 'maybeTsNss' is a timeseries
  * collection, returns CollectionRoutingInfo for the corresponding timeseries buckets collection.
  */
-CollectionRoutingInfo getCollectionRoutingInfo(
-    OperationContext* opCtx,
-    const write_ops::FindAndModifyCommandRequest& request,
-    const NamespaceString& maybeTsNss) {
+CollectionRoutingInfo getCollectionRoutingInfo(OperationContext* opCtx,
+                                               const BSONObj& cmdObj,
+                                               const NamespaceString& maybeTsNss) {
     // Apparently, we should return the CollectionRoutingInfo for the original namespace if we're
     // not writing to a legacy timeseries collection.
     auto cri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd_DEPRECATED(opCtx, maybeTsNss));
@@ -501,8 +517,8 @@ CollectionRoutingInfo getCollectionRoutingInfo(
     if (cri.hasRoutingTable()) {
         uassert(ErrorCodes::InvalidOptions,
                 "Cannot perform findAndModify with sort on a timeseries collection",
-                !cri.getChunkManager().isNewTimeseriesWithoutView() ||
-                    !request.getSort().has_value() || isRawDataOperation(opCtx));
+                !cri.getChunkManager().isNewTimeseriesWithoutView() || !cmdObj.hasField("sort") ||
+                    isRawDataOperation(opCtx));
         return cri;
     }
 
@@ -534,7 +550,7 @@ CollectionRoutingInfo getCollectionRoutingInfo(
 
     uassert(ErrorCodes::InvalidOptions,
             "Cannot perform findAndModify with sort on a timeseries collection",
-            !request.getSort().has_value() || isRawDataOperation(opCtx));
+            !cmdObj.hasField("sort") || isRawDataOperation(opCtx));
 
     return bucketCollCri;
 }
@@ -592,25 +608,23 @@ ShardId targetSingleShard(boost::intrusive_ptr<ExpressionContext> expCtx,
 }
 
 BSONObj makeExplainCmd(OperationContext* opCtx,
-                       write_ops::FindAndModifyCommandRequest& request,
+                       const BSONObj& cmdObj,
                        ExplainOptions::Verbosity verbosity) {
-    appendLegacyRuntimeConstantsToRequest(opCtx, request);
-    return ClusterExplain::wrapAsExplain(request.toBSON(), verbosity);
+    return ClusterExplain::wrapAsExplain(appendLegacyRuntimeConstantsToCommandObject(opCtx, cmdObj),
+                                         verbosity);
 }
 
 /**
  * If this command has 'let' parameters, then evaluate them once and stash them back on
- * the request. Note that this isn't necessary outside of the case where we have a routing
- * table because this is intended to prevent evaluating let parameters multiple times (which
- * can only happen when executing against a sharded cluster).
+ * the original command object. Note that this isn't necessary outside of the case where
+ * we have a routing table because this is intended to prevent evaluating let parameters
+ * multiple times (which can only happen when executing against a sharded cluster).
  */
-void expandLetParams(OperationContext* opCtx,
-                     const NamespaceString& nss,
-                     write_ops::FindAndModifyCommandRequest& request) {
-    auto letParams = request.getLet();
+BSONObj expandLetParams(OperationContext* opCtx, const NamespaceString& nss, BSONObj cmdObj) {
+    auto letParams = getLet(cmdObj);
     if (letParams) {
-        auto runtimeConstants = request.getLegacyRuntimeConstants();
-        BSONObj collation = request.getCollation().value_or(BSONObj{});
+        auto runtimeConstants = getLegacyRuntimeConstants(cmdObj);
+        BSONObj collation = getCollation(cmdObj);
 
         const auto noCollationSpecified = collation.isEmpty();
         auto&& cif = [&]() {
@@ -636,43 +650,49 @@ void expandLetParams(OperationContext* opCtx,
                           .letParameters(letParams)
                           .build();
 
+        // Serialize variables before moving 'cmdObj' to avoid invalid access.
         expCtx->variables.seedVariablesWithLetParameters(
             expCtx.get(), *letParams, [](const Expression* expr) {
                 return expression::getDependencies(expr).hasNoRequirements();
             });
-        request.setLet(expCtx->variables.toBSON(expCtx->variablesParseState, *letParams));
+        auto letVars = Value(expCtx->variables.toBSON(expCtx->variablesParseState, *letParams));
+
+        MutableDocument cmdDoc(Document(std::move(cmdObj)));
+        cmdDoc[write_ops::FindAndModifyCommandRequest::kLetFieldName] = letVars;
+        cmdObj = cmdDoc.freeze().toBson();
     }
+
+    return cmdObj;
 }
 }  // namespace
 
-void FindAndModifyCmd::Invocation::explain(OperationContext* opCtx,
-                                           ExplainOptions::Verbosity verbosity,
-                                           rpc::ReplyBuilderInterface* result) {
+Status FindAndModifyCmd::explain(OperationContext* opCtx,
+                                 const OpMsgRequest& request,
+                                 ExplainOptions::Verbosity verbosity,
+                                 rpc::ReplyBuilderInterface* result) const {
+    const DatabaseName dbName = request.parseDbName();
     auto bodyBuilder = result->getBodyBuilder();
-
-    // In the FLE path, processFLEFindAndModifyExplainMongos returns a pair whose .first has
-    // non-owned BSONObj fields pointing into .second's buffer. We must keep .second alive at
-    // least as long as originalRequest to prevent dangling pointers.
-    boost::optional<OpMsgRequest> fleBackingStore;
-
-    const auto originalRequest = [&]() -> write_ops::FindAndModifyCommandRequest {
+    const BSONObj originalCmdObj = [&]() {
         // Check whether the query portion needs to be rewritten for FLE.
-        if (prepareForFLERewrite(opCtx, request().getEncryptionInformation())) {
-            auto newRequest = processFLEFindAndModifyExplainMongos(opCtx, request());
-            fleBackingStore = std::move(newRequest.second);
-            return std::move(newRequest.first);
+        auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
+            request.body, IDLParserContext("ClusterFindAndModify"));
+        if (prepareForFLERewrite(opCtx, findAndModifyRequest.getEncryptionInformation())) {
+            auto newRequest = processFLEFindAndModifyExplainMongos(opCtx, findAndModifyRequest);
+            return newRequest.first.toBSON();
         } else {
-            return request();
+            return request.body;
         }
     }();
-    const auto originalNss = ns();
+    const NamespaceString originalNss(
+        CommandHelpers::parseNsCollectionRequired(dbName, originalCmdObj));
 
-    if (originalRequest.getRawData().has_value() || originalNss.isTimeseriesBucketsCollection()) {
+    if (OptionalBool::parseFromBSON(originalCmdObj[kRawDataFieldName]) ||
+        originalNss.isTimeseriesBucketsCollection()) {
         isRawDataOperation(opCtx) = true;
     }
 
     sharding::router::CollectionRouter router(opCtx, originalNss);
-    auto explainStatus = router.routeWithRoutingContext(
+    return router.routeWithRoutingContext(
         "findAndModify explain", [&](OperationContext* opCtx, RoutingContext& unusedRoutingCtx) {
             // Clear the BSONObjBuilder since this lambda function may be retried if the router
             // cache is
@@ -689,9 +709,9 @@ void FindAndModifyCmd::Invocation::explain(OperationContext* opCtx,
             unusedRoutingCtx.skipValidation();
 
             auto nss = originalNss;
-            auto cmdRequest = originalRequest;
+            auto cmdObj = originalCmdObj;
 
-            const auto cri = getCollectionRoutingInfo(opCtx, cmdRequest, nss);
+            const auto cri = getCollectionRoutingInfo(opCtx, cmdObj, nss);
             const auto& cm = cri.getChunkManager();
             auto isTrackedTimeseries = cm.hasRoutingTable() && cm.getTimeseriesFields();
             auto isTimeseriesLogicalRequest = false;
@@ -704,19 +724,17 @@ void FindAndModifyCmd::Invocation::explain(OperationContext* opCtx,
                 // collection
                 const auto& translatedNss = cm.getNss();
                 nss = translatedNss;
-
-                replaceNamespaceByBucketNss(opCtx, cmdRequest, translatedNss);
+                cmdObj = replaceNamespaceByBucketNss(opCtx, cmdObj, translatedNss);
             }
             // Note: at this point, 'nss' should be the timeseries buckets collection namespace if
             // we're writing to a tracked timeseries collection.
 
             boost::optional<ShardId> shardId;
-            const auto query = cmdRequest.getQuery();
-            const auto collation = cmdRequest.getCollation().value_or(BSONObj{});
-            const auto isUpsert = cmdRequest.getUpsert().value_or(false);
-            const auto let = cmdRequest.getLet();
-            const auto rc = cmdRequest.getLegacyRuntimeConstants();
-
+            const BSONObj query = cmdObj.getObjectField("query");
+            const BSONObj collation = getCollation(cmdObj);
+            const auto isUpsert = cmdObj.getBoolField("upsert");
+            const auto let = getLet(cmdObj);
+            const auto rc = getLegacyRuntimeConstants(cmdObj);
             if (cri.hasRoutingTable()) {
                 auto expCtx = makeExpressionContextWithDefaultsForTargeter(
                     opCtx, nss, cri, collation, boost::none /* verbosity */, let, rc);
@@ -744,7 +762,7 @@ void FindAndModifyCmd::Invocation::explain(OperationContext* opCtx,
             BSONObjBuilder bob;
             if (!shardId) {
                 _runExplainWithoutShardKey(
-                    opCtx, nss, makeExplainCmd(opCtx, cmdRequest, verbosity), verbosity, &bob);
+                    opCtx, nss, makeExplainCmd(opCtx, cmdObj, verbosity), verbosity, &bob);
                 bodyBuilder.appendElementsUnique(bob.obj());
                 return Status::OK();
             }
@@ -754,7 +772,7 @@ void FindAndModifyCmd::Invocation::explain(OperationContext* opCtx,
                         cri,
                         nss,
                         applyReadWriteConcern(
-                            opCtx, false, false, makeExplainCmd(opCtx, cmdRequest, verbosity)),
+                            opCtx, false, false, makeExplainCmd(opCtx, cmdObj, verbosity)),
                         boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
                         isTimeseriesLogicalRequest,
                         &bob,
@@ -775,27 +793,32 @@ void FindAndModifyCmd::Invocation::explain(OperationContext* opCtx,
                                                       {arsResponse},
                                                       ClusterExplain::kSingleShard,
                                                       millisElapsed,
-                                                      cmdRequest.toBSON(),
+                                                      cmdObj,
                                                       &bodyBuilder);
         });
-    uassertStatusOK(explainStatus);
 }
 
-void FindAndModifyCmd::Invocation::run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) {
-    auto result = reply->getBodyBuilder();
-    const auto originalNss = ns();
-    const auto& originalCmdObj = unparsedRequest().body;
-    const auto& originalRequest = request();
+bool FindAndModifyCmd::run(OperationContext* opCtx,
+                           const DatabaseName& dbName,
+                           const BSONObj& originalCmdObj,
+                           BSONObjBuilder& result) {
+    const NamespaceString originalNss(
+        CommandHelpers::parseNsCollectionRequired(dbName, originalCmdObj));
 
-    if (originalRequest.getRawData().has_value() || originalNss.isTimeseriesBucketsCollection()) {
+    if (OptionalBool::parseFromBSON(originalCmdObj[kRawDataFieldName]) ||
+        originalNss.isTimeseriesBucketsCollection()) {
         isRawDataOperation(opCtx) = true;
     }
 
     // Collect metrics.
-    static_cast<const FindAndModifyCmd*>(definition())->_updateMetrics->collectMetrics(request());
+    _updateMetrics->collectMetrics(originalCmdObj);
 
     if (unified_write_executor::isEnabled(opCtx)) {
         auto cmdObjForShard = CommandHelpers::filterCommandRequestForPassthrough(originalCmdObj);
+
+        // Evaluate let parameters once before forwarding to the shards for non-deterministic
+        // operators like $rand.
+        cmdObjForShard = expandLetParams(opCtx, originalNss, cmdObjForShard);
 
         // Manually appending the required "$db" field name so that we can pass the parsed command
         // request to further processing.
@@ -804,19 +827,15 @@ void FindAndModifyCmd::Invocation::run(OperationContext* opCtx, rpc::ReplyBuilde
                    DatabaseNameUtil::serialize(originalNss.dbName(), SerializationContext{}));
         cmdObjForShard = bob.obj();
 
-        auto wueRequest = write_ops::FindAndModifyCommandRequest::parse(
+        auto request = write_ops::FindAndModifyCommandRequest::parse(
             cmdObjForShard, IDLParserContext("ClusterFindAndModify"));
 
-        // Evaluate let parameters once before forwarding to the shards for non-deterministic
-        // operators like $rand.
-        expandLetParams(opCtx, originalNss, wueRequest);
-
         // Perform common command request validation. Uasserts on invalid requests.
-        FindAndModifyOp::validateCommandRequest(wueRequest);
+        FindAndModifyOp::validateCommandRequest(request);
 
-        wueRequest.setNamespace(originalNss);
+        request.setNamespace(originalNss);
 
-        auto response = unified_write_executor::findAndModify(opCtx, wueRequest, originalCmdObj);
+        auto response = unified_write_executor::findAndModify(opCtx, request, originalCmdObj);
         if (response.swReply.isOK()) {
             auto& reply = response.swReply.getValue();
             if (response.wce) {
@@ -825,7 +844,7 @@ void FindAndModifyCmd::Invocation::run(OperationContext* opCtx, rpc::ReplyBuilde
             reply.serialize(&result);
         } else {
             if (response.swReply.getStatus().code() == ErrorCodes::WouldChangeOwningShard) {
-                auto cri = getCollectionRoutingInfo(opCtx, originalRequest, originalNss);
+                auto cri = getCollectionRoutingInfo(opCtx, originalCmdObj, originalNss);
                 const auto& cm = cri.getChunkManager();
                 auto isTrackedTimeseries = cri.hasRoutingTable() && cm.getTimeseriesFields();
                 bool isTimeseriesViewRequest = false;
@@ -845,7 +864,7 @@ void FindAndModifyCmd::Invocation::run(OperationContext* opCtx, rpc::ReplyBuilde
                                                   cmdObjForShard,
                                                   isTimeseriesViewRequest,
                                                   &result);
-                return;
+                return true;
             }
 
             if (response.wce && !result.hasField("writeConcernError")) {
@@ -854,15 +873,14 @@ void FindAndModifyCmd::Invocation::run(OperationContext* opCtx, rpc::ReplyBuilde
             uassertStatusOK(response.swReply.getStatus());
         }
 
-        return;
+        return true;
     }
 
-    if (processFLEFindAndModify(opCtx, originalRequest, result) == FLEBatchResult::kProcessed) {
-        return;
+    if (processFLEFindAndModify(opCtx, originalCmdObj, result) == FLEBatchResult::kProcessed) {
+        return true;
     }
 
     auto findAndModifyBody = [&](OperationContext* opCtx, RoutingContext& unusedRoutingCtx) {
-        auto cmdRequest = originalRequest;
         // Clear the BSONObjBuilder since this lambda function may be retried if the router cache is
         // stale.
         result.resetToEmpty();
@@ -876,10 +894,11 @@ void FindAndModifyCmd::Invocation::run(OperationContext* opCtx, rpc::ReplyBuilde
         // all timeseries collections become viewless.
         unusedRoutingCtx.skipValidation();
 
-        auto cri = getCollectionRoutingInfo(opCtx, cmdRequest, originalNss);
+        auto cri = getCollectionRoutingInfo(opCtx, originalCmdObj, originalNss);
         const auto& cm = cri.getChunkManager();
 
         auto nss = originalNss;
+        auto cmdObjForShard = originalCmdObj;
 
         auto isTrackedTimeseries = cri.hasRoutingTable() && cm.getTimeseriesFields();
         auto isTimeseriesLogicalRequest = false;
@@ -893,7 +912,7 @@ void FindAndModifyCmd::Invocation::run(OperationContext* opCtx, rpc::ReplyBuilde
             // collection
             const auto& translatedNss = cm.getNss();
             nss = translatedNss;
-            replaceNamespaceByBucketNss(opCtx, cmdRequest, translatedNss);
+            cmdObjForShard = replaceNamespaceByBucketNss(opCtx, cmdObjForShard, translatedNss);
         }
         // Note: at this point, 'nss' should be the timeseries buckets collection namespace if we're
         // writing to a sharded timeseries collection.
@@ -905,19 +924,19 @@ void FindAndModifyCmd::Invocation::run(OperationContext* opCtx, rpc::ReplyBuilde
             diagnostic_printers::ShardKeyDiagnosticPrinter{
                 cm.isSharded() ? cm.getShardKeyPattern().toBSON() : BSONObj()});
 
-        // Append mongoS' runtime constants to the request before forwarding it to the shard.
-        appendLegacyRuntimeConstantsToRequest(opCtx, cmdRequest);
+        // Append mongoS' runtime constants to the command object before forwarding it to the shard.
+        cmdObjForShard = appendLegacyRuntimeConstantsToCommandObject(opCtx, cmdObjForShard);
 
         if (cri.hasRoutingTable()) {
             // Evaluate let parameters once before forwarding to the shards for non-deterministic
             // operators like $rand.
-            expandLetParams(opCtx, nss, cmdRequest);
+            cmdObjForShard = expandLetParams(opCtx, nss, cmdObjForShard);
 
-            const auto query = cmdRequest.getQuery();
-            const bool isUpsert = cmdRequest.getUpsert().value_or(false);
-            const auto letParams = cmdRequest.getLet();
-            const auto runtimeConstants = cmdRequest.getLegacyRuntimeConstants();
-            const auto collation = cmdRequest.getCollation().value_or(BSONObj{});
+            BSONObj query = cmdObjForShard.getObjectField("query");
+            const bool isUpsert = cmdObjForShard.getBoolField("upsert");
+            auto letParams = getLet(cmdObjForShard);
+            auto runtimeConstants = getLegacyRuntimeConstants(cmdObjForShard);
+            BSONObj collation = getCollation(cmdObjForShard);
             auto expCtx = makeExpressionContextWithDefaultsForTargeter(opCtx,
                                                                        nss,
                                                                        cri,
@@ -925,8 +944,6 @@ void FindAndModifyCmd::Invocation::run(OperationContext* opCtx, rpc::ReplyBuilde
                                                                        boost::none /* verbosity */,
                                                                        letParams,
                                                                        runtimeConstants);
-
-            setReadWriteConcern(opCtx, cmdRequest, true, true);
 
             if (write_without_shard_key::useTwoPhaseProtocol(opCtx,
                                                              nss,
@@ -949,13 +966,17 @@ void FindAndModifyCmd::Invocation::run(OperationContext* opCtx, rpc::ReplyBuilde
                                 *shardId,
                                 cri,
                                 nss,
-                                cmdRequest.toBSON(),
+                                applyReadWriteConcern(opCtx, this, cmdObjForShard),
                                 allowShardKeyUpdatesWithoutFullShardKeyInQuery,
                                 isTimeseriesLogicalRequest,
                                 &result);
                 } else {
-                    _runCommandWithoutShardKey(
-                        opCtx, cri, nss, cmdRequest.toBSON(), isTimeseriesLogicalRequest, &result);
+                    _runCommandWithoutShardKey(opCtx,
+                                               cri,
+                                               nss,
+                                               applyReadWriteConcern(opCtx, this, cmdObjForShard),
+                                               isTimeseriesLogicalRequest,
+                                               &result);
                 }
             } else {
                 if (cm.isSharded()) {
@@ -971,7 +992,7 @@ void FindAndModifyCmd::Invocation::run(OperationContext* opCtx, rpc::ReplyBuilde
                             shardId,
                             cri,
                             nss,
-                            cmdRequest.toBSON(),
+                            applyReadWriteConcern(opCtx, this, cmdObjForShard),
                             boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
                             isTimeseriesLogicalRequest,
                             &result);
@@ -979,12 +1000,11 @@ void FindAndModifyCmd::Invocation::run(OperationContext* opCtx, rpc::ReplyBuilde
         } else {
             getQueryCounters(opCtx).findAndModifyUnshardedCount.increment(1);
 
-            setReadWriteConcern(opCtx, cmdRequest, true, true);
             _runCommand(opCtx,
                         cri.getDbPrimaryShardId(),
                         cri,
                         nss,
-                        cmdRequest.toBSON(),
+                        applyReadWriteConcern(opCtx, this, cmdObjForShard),
                         boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
                         isTimeseriesLogicalRequest,
                         &result);
@@ -997,7 +1017,9 @@ void FindAndModifyCmd::Invocation::run(OperationContext* opCtx, rpc::ReplyBuilde
     // this would require that the parsing be pulled into this function.
     // TODO (SERVER-114203) - Implicitly create a database only when upsert is true.
     router.createDbImplicitlyOnRoute();
-    router.routeWithRoutingContext(definition()->getName(), findAndModifyBody);
+    router.routeWithRoutingContext(getName(), findAndModifyBody);
+
+    return true;
 }
 
 bool FindAndModifyCmd::getCrudProcessedFromCmd(const BSONObj& cmdObj) {
