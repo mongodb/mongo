@@ -1,4 +1,5 @@
 load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test", "windows_rc")
+load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -816,5 +817,16 @@ mongo_cc_unit_test(
         "//src/mongo/db/sharding_environment:shard_server_test_fixture",
         "//src/mongo/db/sharding_environment:sharding_mongos_test_fixture",
         "//src/mongo/s/commands:cluster_commands",
+    ],
+)
+
+resmoke_suite_test(
+    name = "mongos_test",
+    config = "//buildscripts/resmokeconfig:suites/mongos_test.yml",
+    tags = [
+        "ci-release-critical",
+    ],
+    deps = [
+        "//src/mongo/s:mongos",
     ],
 )

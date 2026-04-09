@@ -161,6 +161,7 @@ tasks:
         "misc_js",
         "non_read_maj",
         "non_live_record",
+        "has_bazel_target",
       ]
     commands:
       - func: "do setup"
