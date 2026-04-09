@@ -16,8 +16,16 @@ const coll = db.getCollection("coll");
 const bucketsColl = db.getCollection("system.buckets.coll");
 
 // Create both 'coll' and 'system.buckets.coll' as regular collections
+// Use applyOps to create 'coll' directly on the shard since the
+// cross-namespace timeseries conflict check prevents creating 'coll' when
+// 'system.buckets.coll' already exists through normal commands.
 assert.commandWorked(db.createCollection(bucketsColl.getName(), {timeseries: {timeField: "t"}}));
-assert.commandWorked(db.createCollection(coll.getName()));
+const primaryShard = st.getPrimaryShard(db.getName());
+assert.commandWorked(
+    primaryShard.getDB(db.getName()).runCommand({
+        applyOps: [{op: "c", ns: db.getName() + ".$cmd", o: {create: coll.getName()}}],
+    }),
+);
 
 // Validate that we can't track them in the global catalog
 assert.commandFailedWithCode(

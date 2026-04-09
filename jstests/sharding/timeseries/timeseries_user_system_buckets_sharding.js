@@ -7,6 +7,9 @@
  * As this tests code path relevant to time series, the requires_tiemseries flag is set to avoid
  * incompatible behavior related to multi statement transactions.
  *
+ * TODO SERVER-123059: Extract test cases for viewless timeseries and rename this
+ * test to not mention system.buckets anymore once 9.0 is last LTS.
+ *
  * @tags: [
  *   # We need a timeseries collection.
  *   requires_timeseries,
@@ -16,7 +19,6 @@
  */
 
 import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let st = new ShardingTest({shards: 2});
@@ -177,16 +179,12 @@ if (!areViewlessTimeseriesEnabled(db)) {
             const isMultiversionSuite =
                 Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
                 Boolean(TestData.multiversionBinVersion);
-            // TODO SERVER-121290 always assert that the bucket creation fails once 8.3 becomes last continuous.
-            if (
-                FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections", true /* ignoreFCV */) &&
-                !isMultiversionSuite
-            ) {
+            if (!isMultiversionSuite) {
                 createFailed(kBucket, tsOptions, ErrorCodes.NamespaceExists);
             } else {
-                // TODO SERVER-85855 creating a bucket timeseries when the main namespace already exists
-                // and is not timeseries should fail
-                // In multiversion scenario a new binary (with new create checks) could correctly reject the creation.
+                // Creating a bucket timeseries when the main namespace already exists
+                // and is not timeseries should fail.
+                // In multiversion scenario an old binary could accept the creation.
                 assert.commandWorkedOrFailedWithCode(
                     db.createCollection(kBucket, {timeseries: tsOptions}),
                     ErrorCodes.NamespaceExists,

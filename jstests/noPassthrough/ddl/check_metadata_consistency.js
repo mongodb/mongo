@@ -1266,7 +1266,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
 })();
 
 (function testBucketCollectionWithoutValidView() {
-    // TODO SERVER-xyz to be blocked on the backport: do not ignore
+    // TODO (SERVER-122979) to be blocked on the backport: do not ignore
     // MalformedTimeseriesBucketsCollection in multiversion suites
     const isMultiVersion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
     if (isMultiVersion) {
@@ -1312,8 +1312,37 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
         tojson(inconsistencies),
     );
 
+    // create system.views
+    assert.commandWorked(
+        st.rs0
+            .getPrimary()
+            .getDB(db.getName())
+            .runCommand({
+                applyOps: [
+                    {
+                        op: "c",
+                        ns: db.getName() + ".$cmd",
+                        o: {create: "system.views"},
+                    },
+                ],
+            }),
+    );
+
     // Test view in invalid format
-    assert.commandWorked(db.createView(collName, bucketsCollName, []));
+    assert.commandWorked(
+        st.rs0
+            .getPrimary()
+            .getDB(db.getName())
+            .runCommand({
+                applyOps: [
+                    {
+                        op: "i",
+                        ns: db.getName() + ".system.views",
+                        o: {_id: db.getName() + "." + collName, viewOn: bucketsCollName, pipeline: []},
+                    },
+                ],
+            }),
+    );
 
     inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
     assert.eq(1, inconsistencies.length, tojson(inconsistencies));
@@ -1340,7 +1369,20 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
                 ],
             }),
     );
-    assert.commandWorked(db.createCollection(collName));
+    assert.commandWorked(
+        st.rs0
+            .getPrimary()
+            .getDB(db.getName())
+            .runCommand({
+                applyOps: [
+                    {
+                        op: "c",
+                        ns: db.getName() + ".$cmd",
+                        o: {create: collName},
+                    },
+                ],
+            }),
+    );
 
     inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
     assert.eq(1, inconsistencies.length, tojson(inconsistencies));
@@ -1355,7 +1397,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
 })();
 
 (function testBucketCollectionWithoutTimeseriesOptions() {
-    // TODO SERVER-xyz to be blocked on the backport: do not ignore
+    // TODO (SERVER-122979) to be blocked on the backport: do not ignore
     // MalformedTimeseriesBucketsCollection in multiversion suites
     const isMultiVersion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
     if (isMultiVersion) {
@@ -1387,7 +1429,20 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
         tojson(inconsistencies),
     );
 
-    assert.commandWorked(db.createView(collName, bucketsCollName, []));
+    assert.commandWorked(
+        st.rs0
+            .getPrimary()
+            .getDB(db.getName())
+            .runCommand({
+                applyOps: [
+                    {
+                        op: "c",
+                        ns: db.getName() + ".$cmd",
+                        o: {create: collName, viewOn: bucketsCollName, pipeline: []},
+                    },
+                ],
+            }),
+    );
 
     inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
     assert.eq(1, inconsistencies.length, tojson(inconsistencies));

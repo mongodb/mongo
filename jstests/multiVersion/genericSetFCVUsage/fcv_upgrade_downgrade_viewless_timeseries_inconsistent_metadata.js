@@ -8,7 +8,6 @@
  *   featureFlagCreateViewlessTimeseriesCollections,
  * ]
  */
-import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -71,11 +70,7 @@ const createBucketsOp = {
         },
     },
 };
-const fp = configureFailPoint(primaryShard, "skipCheckConflictingTimeseriesNamespace", {
-    namespace: dbName + "." + inconsistentCollName,
-});
 assert.commandWorked(shardDB.runCommand({applyOps: [createBucketsOp]}));
-fp.off();
 
 jsTest.log.info("Attempting FCV upgrade, this should succeed despite the metadata inconsistency");
 assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));

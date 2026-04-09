@@ -272,7 +272,9 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradeWithoutView) {
 
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradeSkippedOnConflictingCollection) {
     auto uuid1 = createViewfulTimeseriesCollection(nss1.makeTimeseriesBucketsNamespace());
+    operationContext()->setEnforceConstraints(false);
     ASSERT_OK(createCollection(operationContext(), CreateCommand(nss1)));
+    operationContext()->setEnforceConstraints(true);
 
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
@@ -285,10 +287,12 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradeSkippedOnConflictingCollec
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradeSkippedOnConflictingView) {
     auto uuid1 = createViewfulTimeseriesCollection(nss1.makeTimeseriesBucketsNamespace());
 
+    operationContext()->setEnforceConstraints(false);
     CreateCommand createViewCmd(nss1);
     createViewCmd.setViewOn(nss2.coll());
     createViewCmd.setPipeline({{}});
     ASSERT_OK(createCollection(operationContext(), createViewCmd));
+    operationContext()->setEnforceConstraints(true);
 
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
@@ -385,7 +389,9 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanUpgradeFailsWhenBucketsNotFoun
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanUpgradeFailsOnConflictingCollection) {
     // Conflicting collection at main namespace
     createViewfulTimeseriesCollection(nss1.makeTimeseriesBucketsNamespace());
+    operationContext()->setEnforceConstraints(false);
     ASSERT_OK(createCollection(operationContext(), CreateCommand(nss1)));
+    operationContext()->setEnforceConstraints(true);
 
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
@@ -398,10 +404,12 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanUpgradeFailsOnConflictingView)
     // Conflicting view at main namespace
     createViewfulTimeseriesCollection(nss1.makeTimeseriesBucketsNamespace());
 
+    operationContext()->setEnforceConstraints(false);
     CreateCommand createViewCmd(nss1);
     createViewCmd.setViewOn(nss2.coll());
     createViewCmd.setPipeline({{}});
     ASSERT_OK(createCollection(operationContext(), createViewCmd));
+    operationContext()->setEnforceConstraints(true);
 
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);

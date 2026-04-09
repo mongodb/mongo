@@ -17,8 +17,6 @@
 
 import {handleRandomSetFCVErrors} from "jstests/concurrency/fsm_workload_helpers/fcv/handle_setFCV_errors.js";
 import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-
 const timeFieldName = "t_field";
 const metaFieldName = "m_field";
 const maxNumCollections = 1;
@@ -61,21 +59,6 @@ export const $config = (function () {
         },
     };
 
-    let setup = function (db, collName, cluster) {
-        // Skip the test if not running on a sharded cluster AND createViewlessTimeseriesCollections is disabled
-        // TODO SERVER-121290 execute this test in all cluster configuration once 8.3 becomes last continuous.
-        // Once 8.3 branches out we can enable the new replicaset create with serialization and idempotency for viewful and viewless timeseries.
-        if (
-            !cluster.isSharded() &&
-            !FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections", true /* ignoreFCV */)
-        ) {
-            jsTest.log(
-                "Skipping test because create timeseries collection on replicasets without viewless timeseries is racy",
-            );
-            quit();
-        }
-    };
-
     let teardown = function (db, collName) {
         assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     };
@@ -86,7 +69,6 @@ export const $config = (function () {
         iterations: 300,
         states: states,
         teardown: teardown,
-        setup: setup,
         transitions: uniformDistTransitions(states),
     };
 })();
