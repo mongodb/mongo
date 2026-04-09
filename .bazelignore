@@ -31,3 +31,6 @@ venv
 
 # This is not run by bazel at the moment
 monguard
+
+# Nested worktrees should be ignored
+.claude/worktrees

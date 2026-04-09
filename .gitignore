@@ -361,4 +361,5 @@ src/mongo/shell/*_gen.d.ts
 # Claude Code local files
 .claude/settings.local.json
 .claude/agent-memory-local/
+.claude/worktrees/
 CLAUDE.local.md
