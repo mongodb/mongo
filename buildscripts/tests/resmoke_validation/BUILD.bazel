@@ -51,3 +51,12 @@ py_test(
         "//buildscripts/resmokelib/logging",
     ],
 )
+
+py_test(
+    name = "test_derive_suite_selectors",
+    srcs = ["test_derive_suite_selectors.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//bazel/resmoke:derive_suite_selectors",
+    ],
+)

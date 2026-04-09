@@ -155,6 +155,20 @@ py_binary(
     ],
 )
 
+py_binary(
+    name = "derive_suite_selectors",
+    srcs = [
+        "derive_suite_selectors.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
 exports_files([
     "resmoke_shim.py",
 ])
