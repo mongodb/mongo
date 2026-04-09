@@ -96,18 +96,17 @@ describe("MoveChunk System Events (v2)", function () {
         this.st.stop();
     });
 
-    // MoveChunkCommand inserts 4 initial docs, moves chunks (system events interleaved),
-    // then inserts 2 interleaved docs after the first move. UnshardCollectionCommand follows.
-    // System events (moveChunk, migrateLastChunkFromShard, reshardBlockingWrites) are
-    // interleaved with DML events, so we provide the full expected sequence.
+    // MoveChunkCommand inserts 4 initial docs (max(shards+1, numDocs)), moves chunks
+    // (system events interleaved), then inserts 1 interleaved doc after the first move.
+    // UnshardCollectionCommand follows.
     //
     // Range and hashed non-empty share the same event pattern; only the collection setup
-    // prefix differs (empty starts with create+shardCollection; non-empty adds 2 inserts
+    // prefix differs (empty starts with create+shardCollection; non-empty adds 1 insert
     // before shardCollection).
     // Hashed empty is different because pre-splitting distributes chunks at creation,
     // leaving the donor with fewer chunks to drain.
     const emptyPrefix = ["create", "shardCollection"];
-    const nonEmptyPrefix = ["create", "insert", "insert", "shardCollection"];
+    const nonEmptyPrefix = ["create", "insert", "shardCollection"];
 
     const defaultMoveAndUnshard = [
         "insert",
@@ -115,7 +114,6 @@ describe("MoveChunk System Events (v2)", function () {
         "insert",
         "insert",
         "moveChunk",
-        "insert",
         "insert",
         "moveChunk",
         "migrateLastChunkFromShard",
@@ -132,7 +130,6 @@ describe("MoveChunk System Events (v2)", function () {
         "insert",
         "migrateLastChunkFromShard",
         "moveChunk",
-        "insert",
         "insert",
         "reshardBlockingWrites",
         "reshardBlockingWrites",

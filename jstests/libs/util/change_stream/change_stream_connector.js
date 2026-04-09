@@ -142,6 +142,15 @@ class Connector {
         // Remove the notification document.
         db.getCollection(Connector.notificationsCollection).deleteOne({_id: instanceName});
     }
+
+    /**
+     * Drop the entire control database. Faster than per-instance cleanup
+     * when many inline readers (e.g. PrefixReadTestCase) created collections.
+     * @param {Mongo} conn - MongoDB connection.
+     */
+    static cleanupAll(conn) {
+        conn.getDB(Connector.controlDatabase).dropDatabase();
+    }
 }
 
 export {Connector};

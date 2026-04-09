@@ -135,7 +135,7 @@ class Command {
  * to override (e.g. for targeted shard-key placement tests).
  */
 class InsertDocCommand extends Command {
-    static numDocs = 2;
+    static numDocs = 1;
 
     /**
      * Insert documents in order, skipping any that already exist (from a

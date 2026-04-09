@@ -23,7 +23,7 @@ function tryCleanUp(cst, instanceName) {
     try {
         cst.cleanUp();
     } catch (e) {
-        jsTest.log.info("ChangeStreamReader cleanUp failed (benign)", {
+        jsTest.log.debug("ChangeStreamReader cleanUp failed (benign)", {
             instanceName,
             error: e.message,
         });
@@ -252,7 +252,7 @@ class ChangeStreamReader {
                 if (!TestData.enableBgMutator || !ChangeStreamReader.kFCVRetryableErrors.includes(e.code)) {
                     throw e;
                 }
-                jsTest.log.info("ChangeStreamReader FCV error, will retry", {
+                jsTest.log.debug("ChangeStreamReader FCV error, will retry", {
                     instanceName: cfg.instanceName,
                     code: e.code,
                     error: e.message,
@@ -276,7 +276,7 @@ class ChangeStreamReader {
         const isInvalidate = isInvalidated(changeEvent);
         readEventTypes.push(changeEvent.operationType);
 
-        jsTest.log.info("ChangeStreamReader Read event", {
+        jsTest.log.debug("ChangeStreamReader Read event", {
             instanceName: cfg.instanceName,
             eventIndex: count + 1,
             total: cfg.numberOfEventsToRead,
@@ -298,7 +298,7 @@ class ChangeStreamReader {
      * @private
      */
     static _readContinuous(conn, cfg) {
-        jsTest.log.info("ChangeStreamReader Starting continuous read", cfg);
+        jsTest.log.debug("ChangeStreamReader Starting continuous read", cfg);
         let cst = null;
         let cursor = null;
         const readEventTypes = [];
@@ -321,7 +321,7 @@ class ChangeStreamReader {
             }
         }
 
-        jsTest.log.info("ChangeStreamReader Read events", {instanceName: cfg.instanceName, readEventTypes});
+        jsTest.log.debug("ChangeStreamReader Read events", {instanceName: cfg.instanceName, readEventTypes});
         tryCleanUp(cst, cfg.instanceName);
     }
 
@@ -332,7 +332,7 @@ class ChangeStreamReader {
      * @private
      */
     static _readFetchOneAndResume(conn, cfg) {
-        jsTest.log.info("ChangeStreamReader Starting fetch-one-and-resume", cfg);
+        jsTest.log.debug("ChangeStreamReader Starting fetch-one-and-resume", cfg);
         let resumeToken = null;
         let useStartAfter = false;
         const readEventTypes = [];
@@ -347,7 +347,7 @@ class ChangeStreamReader {
             tryCleanUp(result.cst, cfg.instanceName);
         }
 
-        jsTest.log.info("ChangeStreamReader Read events", {instanceName: cfg.instanceName, readEventTypes});
+        jsTest.log.debug("ChangeStreamReader Read events", {instanceName: cfg.instanceName, readEventTypes});
     }
 }
 

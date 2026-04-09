@@ -12,6 +12,7 @@
  * - Verifier: Driver that runs one or more test cases with a given context
  *
  * Test Cases:
+ * - SingleReaderVerificationTestCase: Validates a single reader's events against a matcher
  * - SequentialPairwiseFetchingTestCase: Compares two fetching strategies (e.g., v1 vs v2,
  *   or continuous vs fetch-one-and-resume)
  * - PrefixReadTestCase: Verifies resume-from-clusterTime and prefix correctness
@@ -83,12 +84,20 @@ class VerifierContext {
      * @returns {Array} Array of change event records
      */
     readChangeEventsFromClusterTime(conn, instanceName, clusterTime, limit) {
+        const readerInstanceName = this.launchReaderFromClusterTime(conn, instanceName, clusterTime, limit);
+        return this.getChangeEvents(conn, readerInstanceName);
+    }
+
+    /**
+     * Launch a reader from a specific cluster time without waiting for completion.
+     * @returns {string} The instance name of the launched reader (use with getChangeEvents to collect).
+     */
+    launchReaderFromClusterTime(conn, instanceName, clusterTime, limit) {
         const baseCfg = this.changeStreamReaderConfigs[instanceName];
         assert(baseCfg, `No reader config for instanceName=${instanceName}`);
         assert(limit > 0, `limit must be a positive number, got ${limit}`);
 
         const cfg = Object.assign({}, baseCfg, {
-            // Do NOT reuse instanceName here, this is an inline verifier read.
             instanceName: `${instanceName}.resumeFromClusterTime.${clusterTime.t}_${clusterTime.i}`,
             numberOfEventsToRead: limit,
             readingMode: ChangeStreamReadingMode.kContinuous,
@@ -96,7 +105,7 @@ class VerifierContext {
         });
 
         ChangeStreamReader.run(conn, cfg);
-        return this.getChangeEvents(conn, cfg.instanceName);
+        return cfg.instanceName;
     }
 
     /**
@@ -118,7 +127,9 @@ class VerifierContext {
     }
 
     /**
-     * Get all unique cluster times from the oplog across all shards.
+     * Get unique cluster times from the oplog across all shards.
+     * Excludes config/admin/connector entries and empty-namespace entries
+     * which dominate the oplog and are irrelevant for resume testing.
      * @private
      * @param {Timestamp} startTime - Only include cluster times >= this timestamp
      * @param {Timestamp} endTime - Only include cluster times <= this timestamp
@@ -130,21 +141,18 @@ class VerifierContext {
             "No shard connections provided. Pass shardConnections in verifier config.",
         );
 
-        // Use Map with string keys instead of Set because JavaScript Set uses reference equality
-        // for objects. Two Timestamp objects with identical {t, i} values would be considered
-        // distinct in a Set since they're different object instances. The string key format
-        // "t,i" provides value-based deduplication.
         const clusterTimesMap = new Map();
 
         for (const shardConn of this.shardConnections) {
-            // Build query filter for oplog entries.
-            const filter = {ts: {$gte: startTime}};
+            const filter = {
+                ts: {$gte: startTime},
+                ns: {$not: /^(config|admin|change_stream_test_control)\./, $ne: ""},
+            };
             if (endTime) {
                 filter.ts.$lte = endTime;
             }
 
-            // Read oplog entries from this shard.
-            const oplogCursor = shardConn.getDB("local").oplog.rs.find(filter).sort({ts: 1});
+            const oplogCursor = shardConn.getDB("local").oplog.rs.find(filter, {ts: 1}).sort({ts: 1});
 
             while (oplogCursor.hasNext()) {
                 const entry = oplogCursor.next();
@@ -301,106 +309,92 @@ class SingleReaderVerificationTestCase {
  * Test case that verifies prefix/resume correctness.
  *
  * Per spec: "Starting of a change stream from any cluster time test case"
- * 1. Compute a set of cluster times used by the cluster during mutation execution
+ * 1. Compute cluster times from the test-DB oplog entries across all shards
  * 2. Fetch change events continuously with the default reader
- * 3. Start a change stream from every used cluster time and verify that 3 fetched
- *    events match corresponding events from step 2
+ * 3. Start a change stream from each cluster time and verify that `limit`
+ *    fetched events match corresponding events from step 2
  * 4. Verify the full event sequence matches expectations
  *
- * IMPORTANT: We stop testing at the first invalidate event because:
- * - Collection-level change streams cannot be opened on a dropped collection
- * - startAtOperationTime only works if the collection still exists
- * - After a drop/rename (invalidate), we cannot resume a collection-level stream
+ * Uses a sliding window of kParallelReadersCount readers to keep throughput
+ * high without overwhelming mongos with connections.
  */
 class PrefixReadTestCase {
-    /**
-     * Create a prefix read test case.
-     * @param {string} readerInstanceName - Instance name for the reader
-     * @param {number} limit - Number of events to read for each prefix test
-     */
+    static kParallelReadersCount = 8;
+
     constructor(readerInstanceName, limit) {
         assert(limit > 0, `limit must be a positive number, got ${limit}`);
         this._readerInstanceName = readerInstanceName;
         this._limit = limit;
     }
 
-    /**
-     * Run the prefix read test.
-     * @param {Mongo} conn - MongoDB connection
-     * @param {VerifierContext} ctx - Verifier context
-     */
+    static _extractComparable(rec) {
+        return {changeEvent: rec.changeEvent, cursorClosed: rec.cursorClosed};
+    }
+
+    _buildWorkItems(events, clusterTimes) {
+        const items = [];
+        for (const ts of clusterTimes) {
+            const startIdx = events.findIndex((rec) => bsonWoCompare(rec.changeEvent.clusterTime, ts) >= 0);
+            assert(startIdx >= 0, `No event found with clusterTime >= ${tojson(ts)}, but ts is within event range`);
+
+            const expected = events.slice(startIdx, startIdx + this._limit).map(PrefixReadTestCase._extractComparable);
+            if (expected.length > 0) {
+                items.push({ts, expected});
+            }
+        }
+        return items;
+    }
+
+    _launchReader(conn, ctx, item) {
+        return {
+            ...item,
+            readerInstanceName: ctx.launchReaderFromClusterTime(
+                conn,
+                this._readerInstanceName,
+                item.ts,
+                item.expected.length,
+            ),
+        };
+    }
+
+    _verifyReader(conn, ctx, item) {
+        const actual = ctx.getChangeEvents(conn, item.readerInstanceName).map(PrefixReadTestCase._extractComparable);
+        const expected = item.expected.slice(0, actual.length);
+        assert(
+            bsonUnorderedFieldsCompare(expected, actual) === 0,
+            `mismatch when resuming from clusterTime ${tojson(item.ts)}`,
+            {clusterTime: item.ts, expected, actual},
+        );
+    }
+
     run(conn, ctx) {
         const events = ctx.getChangeEvents(conn, this._readerInstanceName);
-
-        // Find the cluster time of the first invalidate event (if any).
-        // We must stop testing BEFORE this point because:
-        // - An invalidate signals that the collection was dropped/renamed
-        // - After this, we cannot open a new collection-level change stream
-        //   using startAtOperationTime (the collection no longer exists)
-        let invalidateClusterTime = null;
-        for (const rec of events) {
-            if (rec.changeEvent && rec.changeEvent.operationType === "invalidate") {
-                invalidateClusterTime = rec.changeEvent.clusterTime;
-                break;
-            }
-        }
-
-        // Get cluster times for resume testing from the oplog.
         const startTime = events[0]?.changeEvent?.clusterTime;
-        const endTime = invalidateClusterTime || events[events.length - 1]?.changeEvent?.clusterTime;
+        const endTime = events[events.length - 1]?.changeEvent?.clusterTime;
+
         const clusterTimes = ctx.getClusterTimesForResumeTesting(startTime, endTime);
+        const workItems = this._buildWorkItems(events, clusterTimes);
 
-        // Filter cluster times to only those BEFORE the invalidate.
-        const validClusterTimes = invalidateClusterTime
-            ? clusterTimes.filter((ts) => bsonWoCompare(ts, invalidateClusterTime) < 0)
-            : clusterTimes;
+        jsTest.log.info("PrefixReadTestCase: starting resume verification", {
+            clusterTimes: clusterTimes.length,
+            workItems: workItems.length,
+            parallelReaders: PrefixReadTestCase.kParallelReadersCount,
+        });
 
-        // Extract just the changeEvent and cursorClosed from each record for comparison.
-        const extractComparable = (rec) => ({changeEvent: rec.changeEvent, cursorClosed: rec.cursorClosed});
-
-        // For each valid cluster time, start a change stream and verify events match.
-        for (let i = 0; i < validClusterTimes.length; i++) {
-            const ts = validClusterTimes[i];
-
-            // Find events with clusterTime >= ts (what we expect to see).
-            // When using oplog-based cluster times, some timestamps may not have corresponding
-            // change events (they represent operations that don't produce change events).
-            const expectedStartIdx = events.findIndex((rec) => bsonWoCompare(rec.changeEvent.clusterTime, ts) >= 0);
-            assert(
-                expectedStartIdx >= 0,
-                `No event found with clusterTime >= ${tojson(ts)}, but ts is within event range`,
-            );
-
-            // Get up to 'limit' events, but stop before invalidate.
-            let endIdx = expectedStartIdx + this._limit;
-            const invalidateIdx = events.findIndex((rec) => rec.changeEvent.operationType === "invalidate");
-            if (invalidateIdx >= 0 && endIdx > invalidateIdx) {
-                endIdx = invalidateIdx; // Don't include invalidate or beyond.
+        // Sliding window: always keep kParallelReadersCount readers in flight.
+        // As each reader completes verification, the next one is launched.
+        const inflight = [];
+        let next = 0;
+        while (next < workItems.length && inflight.length < PrefixReadTestCase.kParallelReadersCount) {
+            inflight.push(this._launchReader(conn, ctx, workItems[next++]));
+        }
+        while (inflight.length > 0) {
+            this._verifyReader(conn, ctx, inflight.shift());
+            if (next < workItems.length) {
+                inflight.push(this._launchReader(conn, ctx, workItems[next++]));
             }
-
-            const expected = events.slice(expectedStartIdx, endIdx).map(extractComparable);
-            if (expected.length === 0) {
-                continue;
-            }
-
-            // readChangeEventsFromClusterTime inherits excludeOperationTypes from base config,
-            // so excluded events are filtered at the pipeline level.
-            const actual = ctx
-                .readChangeEventsFromClusterTime(conn, this._readerInstanceName, ts, expected.length)
-                .map(extractComparable);
-
-            // Use bsonUnorderedFieldsCompare to ignore field order differences.
-            assert(
-                bsonUnorderedFieldsCompare(expected, actual) === 0,
-                `mismatch when resuming from clusterTime ${tojson(ts)}`,
-                {clusterTime: ts, expected, actual},
-            );
         }
 
-        // Verify that change event sequence produced by '_readerInstanceName' matches
-        // the expectations defined by mutation generator.
-        // every() short-circuits on the first mismatch (matches() returns false), so
-        // the matcher stops advancing and records the failure point.
         const matcher = ctx.getChangeStreamMatcher(this._readerInstanceName);
         events.every((rec) => matcher.matches(rec.changeEvent, rec.cursorClosed));
         assertMatcherDone(matcher, events, ctx, this._readerInstanceName);

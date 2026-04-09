@@ -110,18 +110,18 @@ class BackgroundMutator {
             const opType = ops[Random.randInt(ops.length)];
             const delay = minDelayMs + Random.randInt(maxDelayMs - minDelayMs);
 
-            jsTest.log.info(`BackgroundMutator [${config.instanceName}]: sleeping ${delay}ms before ${opType}`);
+            jsTest.log.debug(`BackgroundMutator [${config.instanceName}]: sleeping ${delay}ms before ${opType}`);
             sleep(delay);
 
             if (Connector.isDone(conn, stopFlag)) {
                 break;
             }
 
-            jsTest.log.info(`BackgroundMutator [${config.instanceName}]: running ${opType}`);
+            jsTest.log.debug(`BackgroundMutator [${config.instanceName}]: running ${opType}`);
             BackgroundMutator._runOp(conn, opType, config);
         }
 
-        jsTest.log.info(`BackgroundMutator [${config.instanceName}]: stop requested, exiting`);
+        jsTest.log.debug(`BackgroundMutator [${config.instanceName}]: stop requested, exiting`);
     }
 
     /**
@@ -159,7 +159,7 @@ class BackgroundMutator {
             // resetPlacementHistory requires latestFCV. If FCV is downgraded or mid-transition
             // (e.g. because _flipFCV just ran), skip this iteration; the loop will retry later.
             if (e.code === ErrorCodes.CommandNotSupported) {
-                jsTest.log.info("BackgroundMutator: resetPlacementHistory skipped (FCV not at latest)", {
+                jsTest.log.debug("BackgroundMutator: resetPlacementHistory skipped (FCV not at latest)", {
                     errmsg: e.message,
                 });
                 return;

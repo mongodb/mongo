@@ -20,7 +20,7 @@ import {
     PrefixReadTestCase,
     SequentialPairwiseFetchingTestCase,
 } from "jstests/libs/util/change_stream/change_stream_verifier.js";
-import {ChangeStreamWatchMode} from "jstests/libs/query/change_stream_util.js";
+import {ChangeStreamWatchMode, getClusterTime} from "jstests/libs/query/change_stream_util.js";
 import {
     BackgroundMutator,
     BackgroundMutatorOpType,
@@ -46,20 +46,13 @@ const TEST_SEED = Date.now();
 const kExcludedOperationTypes = ["createIndexes", "dropIndexes", "modify"];
 
 /**
- * Get a fresh cluster time by doing a no-op write.
- * This ensures we get a timestamp that corresponds to an actual oplog entry,
- * which is required for reliable change stream resume tokens.
+ * Get the current cluster time without writing to the oplog.
  * @param {Mongo} conn - MongoDB connection
  * @param {string} [dbName] - Database name (unused, kept for API compatibility)
  * @returns {Timestamp} The cluster time
  */
 function getCurrentClusterTime(conn, dbName) {
-    const result = conn.adminCommand({
-        appendOplogNote: 1,
-        data: {msg: "getCurrentClusterTime barrier"},
-    });
-    assert.commandWorked(result);
-    return result.$clusterTime.clusterTime;
+    return getClusterTime(conn.getDB("admin"));
 }
 
 /**
@@ -328,7 +321,7 @@ function runWithFsmCluster(testName, testFn, options = {}) {
             () => Writer.joinAll(),
             () => BackgroundMutator.join(),
             () => ChangeStreamReader.joinAll(),
-            ...instancesToCleanup.map((name) => () => Connector.cleanup(fsmSt.s, name)),
+            () => Connector.cleanupAll(fsmSt.s),
             () => fsmSt.stop(),
         );
     }

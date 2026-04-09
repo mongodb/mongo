@@ -73,7 +73,7 @@ class Writer {
         for (let i = 0; i < config.commandSpecs.length; i++) {
             const spec = config.commandSpecs[i];
             const cmd = Command.fromSpec(spec);
-            jsTest.log.info(`Writer [${config.instanceName}]: cmd[${i}] ${spec.type}`);
+            jsTest.log.debug(`Writer [${config.instanceName}]: cmd[${i}] ${spec.type}`);
             try {
                 cmd.execute(conn);
             } catch (e) {

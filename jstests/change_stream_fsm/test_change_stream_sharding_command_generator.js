@@ -117,7 +117,7 @@ describe("ShardingCommandGenerator", function () {
         const params = new ShardingCommandGeneratorParams(dbName, collName, this.shards);
         const commands = generateCommands(TEST_SEED, params);
 
-        jsTest.log.info(`Executing ${commands.length} commands using Writer...`);
+        jsTest.log.debug(`Executing ${commands.length} commands using Writer...`);
         Writer.run(this.st.s, instanceName, commands, TEST_SEED);
         Connector.waitForDone(this.st.s, instanceName);
         jsTest.log.info(`✓ Writer completed successfully`);
@@ -170,12 +170,12 @@ describe("ShardingCommandGenerator", function () {
         const generator = new ShardingCommandGenerator(TEST_SEED);
         const commands = generator.generateCommands(model, params);
 
-        jsTest.log.info(`\n========== Graph mutator - Full FSM traversal ==========`);
+        jsTest.log.debug(`\n========== Graph mutator - Full FSM traversal ==========`);
         jsTest.log.info(`Seed: ${TEST_SEED}, DB: ${dbName}, Coll: ${collName}`);
-        jsTest.log.info(`Total commands: ${commands.length}`);
-        jsTest.log.info(`Command list:`);
+        jsTest.log.debug(`Total commands: ${commands.length}`);
+        jsTest.log.debug(`Command list:`);
         commands.forEach((cmd, idx) => {
-            jsTest.log.info(`  [${idx}] ${cmd.toString()}`);
+            jsTest.log.debug(`  [${idx}] ${cmd.toString()}`);
         });
 
         // Build set of command strings present in the generated sequence.
@@ -190,7 +190,7 @@ describe("ShardingCommandGenerator", function () {
         }
 
         // Derive expected command patterns from the Action enum (single source of truth).
-        jsTest.log.info(`\n--- Command coverage verification ---`);
+        jsTest.log.debug(`\n--- Command coverage verification ---`);
         const missingCommands = [];
         for (const actionId of allActionsInFsm) {
             const commandClass = ShardingCommandGenerator.actionToCommandClass[actionId];
@@ -198,7 +198,7 @@ describe("ShardingCommandGenerator", function () {
             const commandClassName = commandClass.name;
             const actionName = Action.getName(actionId);
             const found = commandStrings.some((s) => s.includes(commandClassName));
-            jsTest.log.info(`  ${actionName}: ${found ? "✓" : "✗"}`);
+            jsTest.log.debug(`  ${actionName}: ${found ? "✓" : "✗"}`);
             if (!found) {
                 missingCommands.push(actionName);
             }
@@ -211,14 +211,14 @@ describe("ShardingCommandGenerator", function () {
             `Missing command types: ${missingCommands.join(", ")}. All FSM actions must be covered.`,
         );
 
-        jsTest.log.info(`  Total FSM actions: ${allActionsInFsm.size}`);
-        jsTest.log.info(`  Commands generated: ${commands.length}`);
+        jsTest.log.debug(`  Total FSM actions: ${allActionsInFsm.size}`);
+        jsTest.log.debug(`  Commands generated: ${commands.length}`);
         jsTest.log.info(`✓ All FSM actions produced expected commands`);
 
-        jsTest.log.info(`\n========== Executing commands ==========`);
+        jsTest.log.debug(`\n========== Executing commands ==========`);
 
         commands.forEach((cmd, cmdIdx) => {
-            jsTest.log.info(`Executing [${cmdIdx}]: ${cmd.toString()}`);
+            jsTest.log.debug(`Executing [${cmdIdx}]: ${cmd.toString()}`);
             cmd.execute(this.st.s);
         });
 
@@ -428,10 +428,10 @@ describe("ChangeStreamReader integration", function () {
         this.instanceNamesToCleanup.push(readerInstanceName);
         this.databasesToCleanup.add(dbName);
 
-        jsTest.log.info(`\n========== ChangeStreamReader Invalidate Test ==========`);
+        jsTest.log.debug(`\n========== ChangeStreamReader Invalidate Test ==========`);
 
-        // Expected events: 3 InsertDocCommands (2 inserts each) + drop (which triggers invalidate).
-        const expectedEventTypes = ["insert", "insert", "insert", "insert", "insert", "insert", "drop", "invalidate"];
+        // Expected events: 3 InsertDocCommands (1 insert each) + drop (which triggers invalidate).
+        const expectedEventTypes = ["insert", "insert", "insert", "drop", "invalidate"];
 
         // Build commands: 3 InsertDocCommands + drop.
         const collectionCtx = {exists: true, nonEmpty: false};
@@ -457,9 +457,9 @@ describe("ChangeStreamReader integration", function () {
         };
 
         const verifyEvents = (events) => {
-            jsTest.log.info(`Verifying ${events.length} events`);
+            jsTest.log.debug(`Verifying ${events.length} events`);
             events.forEach((event, idx) => {
-                jsTest.log.info(`  [${idx}] ${event.operationType}`);
+                jsTest.log.debug(`  [${idx}] ${event.operationType}`);
             });
 
             assert.eq(
@@ -482,7 +482,7 @@ describe("ChangeStreamReader integration", function () {
 
         // Get cluster time strictly AFTER setup.
         const startTime = getCurrentClusterTime(this.st.s, dbName);
-        jsTest.log.info(`Start time: ${tojson(startTime)}`);
+        jsTest.log.debug(`Start time: ${tojson(startTime)}`);
 
         executeCommands();
 
@@ -500,7 +500,7 @@ describe("ChangeStreamReader integration", function () {
             showExpandedEvents: false,
         };
 
-        jsTest.log.info(`Running ChangeStreamReader.run()...`);
+        jsTest.log.debug(`Running ChangeStreamReader.run()...`);
         ChangeStreamReader.run(this.st.s, readerConfig);
         Connector.waitForDone(this.st.s, readerInstanceName);
 
@@ -527,10 +527,10 @@ describe("ChangeStreamReader integration", function () {
         this.instanceNamesToCleanup.push(readerInstanceName);
         this.databasesToCleanup.add(dbName);
 
-        jsTest.log.info(`\n========== ChangeStreamReader FetchOneAndResume + Invalidate ==========`);
+        jsTest.log.debug(`\n========== ChangeStreamReader FetchOneAndResume + Invalidate ==========`);
 
-        // Expected events: 2 InsertDocCommands (2 inserts each) + drop + invalidate.
-        const expectedEventTypes = ["insert", "insert", "insert", "insert", "drop", "invalidate"];
+        // Expected events: 2 InsertDocCommands (1 insert each) + drop + invalidate.
+        const expectedEventTypes = ["insert", "insert", "drop", "invalidate"];
 
         // Build commands: 2 InsertDocCommands + drop.
         const collectionCtx = {exists: true, nonEmpty: false};
@@ -551,9 +551,9 @@ describe("ChangeStreamReader integration", function () {
         };
 
         const verifyEvents = (events, testName) => {
-            jsTest.log.info(`${testName}: Verifying ${events.length} events`);
+            jsTest.log.debug(`${testName}: Verifying ${events.length} events`);
             events.forEach((event, idx) => {
-                jsTest.log.info(`  [${idx}] ${event.operationType}`);
+                jsTest.log.debug(`  [${idx}] ${event.operationType}`);
             });
 
             assert.eq(
@@ -570,7 +570,7 @@ describe("ChangeStreamReader integration", function () {
                 );
             }
 
-            jsTest.log.info(`${testName}: ✓ All events verified`);
+            jsTest.log.info(`✓ ${testName}: All events verified`);
         };
 
         // Test with ChangeStreamReader in FetchOneAndResume mode.
@@ -595,7 +595,7 @@ describe("ChangeStreamReader integration", function () {
             showExpandedEvents: false,
         };
 
-        jsTest.log.info(`Running ChangeStreamReader in FetchOneAndResume mode...`);
+        jsTest.log.debug(`Running ChangeStreamReader in FetchOneAndResume mode...`);
         ChangeStreamReader.run(this.st.s, readerConfig);
         Connector.waitForDone(this.st.s, readerInstanceName);
 
@@ -621,10 +621,10 @@ describe("ChangeStreamReader integration", function () {
         this.instanceNamesToCleanup.push(readerInstanceName);
         this.databasesToCleanup.add(dbName);
 
-        jsTest.log.info(`\n========== ChangeStreamReader Database Watch ==========`);
+        jsTest.log.debug(`\n========== ChangeStreamReader Database Watch ==========`);
 
-        // Expected: 4 InsertDocCommands (2 inserts each) into both collections.
-        const expectedEventTypes = ["insert", "insert", "insert", "insert", "insert", "insert", "insert", "insert"];
+        // Expected: 4 InsertDocCommands (1 insert each) into both collections.
+        const expectedEventTypes = ["insert", "insert", "insert", "insert"];
 
         // Build commands: 2 InsertDocCommands into each collection (interleaved).
         const collectionCtx = {exists: true, nonEmpty: false};
@@ -658,16 +658,16 @@ describe("ChangeStreamReader integration", function () {
             showExpandedEvents: false,
         };
 
-        jsTest.log.info(`Running ChangeStreamReader with database-level watch...`);
+        jsTest.log.debug(`Running ChangeStreamReader with database-level watch...`);
         ChangeStreamReader.run(this.st.s, readerConfig);
         Connector.waitForDone(this.st.s, readerInstanceName);
 
         const capturedRecords = Connector.readAllChangeEvents(this.st.s, readerInstanceName);
 
-        jsTest.log.info(`Captured ${capturedRecords.length} events from database watch:`);
+        jsTest.log.debug(`Captured ${capturedRecords.length} events from database watch:`);
         capturedRecords.forEach((record, idx) => {
             const event = record.changeEvent;
-            jsTest.log.info(`  [${idx}] ${event.operationType} on ${event.ns.coll}`);
+            jsTest.log.debug(`  [${idx}] ${event.operationType} on ${event.ns.coll}`);
         });
 
         assert.eq(
