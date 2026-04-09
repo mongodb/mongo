@@ -249,7 +249,7 @@ filters:
   - "analyze_shard_key_jscore_passthrough.yml":
     approvers:
       - 10gen/server-cluster-scalability
-  - "timeseries_write_pbt.yml":
+  - "timeseries_write_pbt*":
     approvers:
       - 10gen/server-timeseries-testing
   - "sharding_csrs_continuous_config_stepdown.yml":
