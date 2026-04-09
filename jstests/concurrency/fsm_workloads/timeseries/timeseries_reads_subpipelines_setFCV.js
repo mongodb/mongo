@@ -14,6 +14,9 @@
  *   # Runs setFCV, which can interfere with other tests.
  *   incompatible_with_concurrency_simultaneous,
  *   runs_set_fcv,
+ *   # This test relies on certain values of 'hangBeforePublishingCatalogUpdates', which the config
+ *   # fuzzer can change and cause the test to hang.
+ *   does_not_support_config_fuzzer,
  * ]
  */
 
