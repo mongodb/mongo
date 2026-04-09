@@ -308,8 +308,10 @@ bool acquireCollectionsForPipeline(const boost::intrusive_ptr<ExpressionContext>
 
         if (!primaryAcq.collectionExists() && primaryNss.isTimeseriesBucketsCollection()) {
             const auto& mainTimeseriesNss = primaryNss.getTimeseriesViewNamespace();
+            auto readTimestamp =
+                shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
             auto mainTimeseriesColl = CollectionCatalog::get(opCtx)->establishConsistentCollection(
-                opCtx, mainTimeseriesNss, boost::none /* readTimestamp */);
+                opCtx, mainTimeseriesNss, readTimestamp);
             if (mainTimeseriesColl && mainTimeseriesColl->isTimeseriesCollection()) {
                 uasserted(
                     ErrorCodes::CollectionBecameView,

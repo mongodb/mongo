@@ -342,8 +342,10 @@ private:
             // In scenarios like (2) or (3), preserve the existing (v8.0) behavior of returning
             // empty results on queries over dropped or incomplete viewful timeseries collections.
             auto timeseriesMainNss = executionNss.getTimeseriesViewNamespace();
+            auto readTimestamp =
+                shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
             auto coll = CollectionCatalog::get(opCtx)->establishConsistentCollection(
-                opCtx, timeseriesMainNss, boost::none /* readTimestamp */);
+                opCtx, timeseriesMainNss, readTimestamp);
             if (coll && coll->isTimeseriesCollection()) {
                 if (_aggExState.isView()) {
                     uasserted(
