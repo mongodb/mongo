@@ -504,3 +504,7 @@ IGNORE_REMOVED_PARAMETERS_LIST:
 
   # We no longer suppport this error path and no atlas clusters have this parameter enabled
   - "startLsnTruncatedMaxFailovers"
+
+  # TODO(SERVER-123792): Remove this relaxation.
+  # internalQuery* knobs may be freely removed; they are internal tuning parameters
+  - "internalQuery.*Test.*"

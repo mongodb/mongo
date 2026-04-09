@@ -39,6 +39,7 @@ directories containing the old IDL files from previous releases.
 
 import argparse
 import os
+import re
 import sys
 from dataclasses import dataclass
 from enum import Enum
@@ -1868,10 +1869,11 @@ def check_compatibility(
                         old_parameters[name] = old_param
 
                         if name not in new_parameters:
-                            # Can't remove a parameter unless it's in the ignore list
-                            if (
-                                not IGNORE_REMOVED_PARAMETERS_LIST
-                                or name not in IGNORE_REMOVED_PARAMETERS_LIST
+                            # Can't remove a parameter unless it's in the ignore list.
+                            # Entries in the list may be exact names or regex patterns.
+                            if not IGNORE_REMOVED_PARAMETERS_LIST or not any(
+                                re.fullmatch(pattern, name)
+                                for pattern in IGNORE_REMOVED_PARAMETERS_LIST
                             ):
                                 ctxt.add_parameter_removed_error(name, old_idl_file_path)
 
