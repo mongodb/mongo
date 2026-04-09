@@ -202,6 +202,21 @@ st.stopConfigServer(0);
 st.stopConfigServer(1);
 st.configRS.awaitNoPrimary();
 
+// awaitNoPrimary() waits for the config RS members themselves to agree there is no primary,
+// but the mongos maintains its own RSM state that is updated asynchronously. If we issue writes
+// before the mongos RSM transitions to ReplicaSetNoPrimary, it will try to connect to the cached
+// primary and return HostUnreachable (code 6) instead of FailedToSatisfyReadPreference (code 133).
+// Poll connPoolStats until the mongos RSM shows no primary for the config RS.
+assert.soon(
+    () => {
+        const stats = assert.commandWorked(st.s.adminCommand({connPoolStats: 1}));
+        const configRSHosts = (stats.replicaSets[st.configRS.name] || {hosts: []}).hosts;
+        return configRSHosts.every((h) => !h.ismaster);
+    },
+    "Timed out waiting for mongos RSM to detect no primary in config RS",
+    60 * 1000,
+);
+
 printjson(
     (request = {
         insert: configColl.getName(),
