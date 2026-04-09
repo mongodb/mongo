@@ -46,7 +46,6 @@
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/viewless_timeseries_collection_creation_helpers.h"
-#include "mongo/util/log_and_backoff.h"
 #include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -71,52 +70,25 @@ UpgradeDowngradeTimeseriesLocks acquireLocksForTimeseriesUpgradeDowngrade(
             "Expected 'mainNs' to not be a system.buckets namespace",
             !mainNs.isTimeseriesBucketsCollection());
 
-    for (size_t numAttempts = 0;; numAttempts++) {
-        try {
-            // Maximum time to acquire the locks over all affected entities. We do this since:
-            // - Upgrade/downgrade is a low priority task, so guard against it holding locks for
-            //   too long.
-            // - Ensure that by locking all affected namespaces (buckets NS + main NS +
-            //   system.views) we do not cause a deadlock.
-            static const auto LOCK_TIMEOUT = Seconds(30);
-            auto lockDeadline = Date_t::now() + LOCK_TIMEOUT;
+    // Acquire locks over the affected namespaces.
+    auto bucketsNs = mainNs.makeTimeseriesBucketsNamespace();
+    auto systemViewsNs = NamespaceString::makeSystemDotViewsNamespace(mainNs.dbName());
+    auto operationType = isSharedLockMode(lockMode) ? AcquisitionPrerequisites::kRead
+                                                    : AcquisitionPrerequisites::kWrite;
+    CollectionOrViewAcquisitionRequests requests{
+        CollectionOrViewAcquisitionRequest::fromOpCtx(opCtx, mainNs, operationType),
+        CollectionOrViewAcquisitionRequest::fromOpCtx(opCtx, bucketsNs, operationType),
+        CollectionOrViewAcquisitionRequest::fromOpCtx(opCtx, systemViewsNs, operationType)};
+    auto acquisitions = makeAcquisitionMap(acquireCollectionsOrViews(opCtx, requests, lockMode));
+    auto& bucketsAcq = acquisitions.at(bucketsNs);
+    auto& mainAcq = acquisitions.at(mainNs);
+    auto& systemViewsAcq = acquisitions.at(systemViewsNs);
 
-            // Acquire locks over the affected namespaces.
-            auto bucketsNs = mainNs.makeTimeseriesBucketsNamespace();
-            auto systemViewsNs = NamespaceString::makeSystemDotViewsNamespace(mainNs.dbName());
-            auto operationType = isSharedLockMode(lockMode) ? AcquisitionPrerequisites::kRead
-                                                            : AcquisitionPrerequisites::kWrite;
-            CollectionOrViewAcquisitionRequests requests{
-                CollectionOrViewAcquisitionRequest::fromOpCtx(opCtx, mainNs, operationType),
-                CollectionOrViewAcquisitionRequest::fromOpCtx(opCtx, bucketsNs, operationType),
-                CollectionOrViewAcquisitionRequest::fromOpCtx(opCtx, systemViewsNs, operationType)};
-            for (auto& req : requests) {
-                req.lockAcquisitionDeadline = lockDeadline;
-            }
-            auto acquisitions =
-                makeAcquisitionMap(acquireCollectionsOrViews(opCtx, requests, lockMode));
-            auto& bucketsAcq = acquisitions.at(bucketsNs);
-            auto& mainAcq = acquisitions.at(mainNs);
-            auto& systemViewsAcq = acquisitions.at(systemViewsNs);
-
-            return UpgradeDowngradeTimeseriesLocks{
-                .mainAcq = std::move(mainAcq),
-                .bucketsAcq = std::move(bucketsAcq),
-                .systemViewsAcq = std::move(systemViewsAcq),
-            };
-        } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
-            // This may happen while long running operations (e.g. dbHash) hold a collection
-            // lock, preventing the acquisition for upgrade/downgrade.
-            // Back off and retry it (instead of propagating the error to consumers like oplog
-            // application, which would trigger in a fatal assertion).
-            // TODO(SERVER-115831): Review the lock with deadline + indefinite retry strategy.
-            logAndBackoff(11450503,
-                          MONGO_LOGV2_DEFAULT_COMPONENT,
-                          logv2::LogSeverity::Info(),
-                          numAttempts,
-                          "Timed out acquiring locks for timeseries upgrade/downgrade, retrying");
-        }
-    }
+    return UpgradeDowngradeTimeseriesLocks{
+        .mainAcq = std::move(mainAcq),
+        .bucketsAcq = std::move(bucketsAcq),
+        .systemViewsAcq = std::move(systemViewsAcq),
+    };
 }
 
 Status canUpgradeToViewlessTimeseries(OperationContext* opCtx,
