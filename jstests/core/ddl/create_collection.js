@@ -313,7 +313,8 @@ if (
         db.createCollection(getCollectionName(), {storageTier: {collection: "hot", indexes: {defaultTier: "lol"}}}),
     );
 } else if (!TestData.isRunningFCVUpgradeDowngradeSuite && !isMultiversion) {
-    // TODO (SERVER-122853): Enable this test case on multiversion suites once SERVER-122853 gets merged.
+    // TODO (SERVER-94154): Enable this test case when `isMultiversion` is true once v9.0 becomes LTS.
+    // Due to SERVER-122853 this command succeeds on v8.3 binaries when the feature flag is disabled.
     assert.commandFailedWithCode(db.createCollection(getCollectionName(), {storageTier: {collection: "cold"}}), [
         // We expect InvalidOptions when the we storageTier options is known but the feature flag is disabled
         ErrorCodes.InvalidOptions,
