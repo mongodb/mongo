@@ -5,6 +5,9 @@ selector:
     - src/mongo/db/modules/*/jstests/streams/aspio/pubsub/pubsub.js
     - src/mongo/db/modules/*/jstests/streams/aspio/pubsub/pubsub_errors.js
     - src/mongo/db/modules/*/jstests/streams/aspio/pubsub/pubsub_checkpoint.js
+  exclude_files:
+    # TODO(SERVER-117494): Re-enable once evg configuration is resolved.
+    - src/mongo/db/modules/*/jstests/streams/aspio/pubsub/pubsub_gwproxy.js
 
 executor:
   fixture:

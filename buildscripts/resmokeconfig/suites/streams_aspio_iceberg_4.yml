@@ -6,7 +6,7 @@ selector:
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_snapshot_lineage.js
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_stats.js
   exclude_files:
-    # TODO(SERVER-117494): Re-enable once flakiness is resolved.
+    # TODO(SERVER-117494): Re-enable once evg configuration is resolved.
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/gwproxy/iceberg_gwproxy.js
 
 executor:
