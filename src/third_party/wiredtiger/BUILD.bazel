@@ -151,7 +151,8 @@ mongo_cc_library(
     local_defines = WT_DEFINES,
     srcs_select = [
         {
-            "//bazel/config:posix": WT_FILELIST_POSIX_HOST,
+            "@platforms//os:linux": WT_FILELIST_POSIX_HOST + WT_FILELIST_LINUX_HOST,
+            "@platforms//os:macos": WT_FILELIST_POSIX_HOST + WT_FILELIST_DARWIN_HOST,
             "@platforms//os:windows": [file for file in WT_FILELIST_WINDOWS_HOST if file != "src/os_win/os_futex.c"],
         },
     ],
