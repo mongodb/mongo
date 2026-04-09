@@ -972,7 +972,13 @@ void normalizeNumericElements(const BSONElement& el, BSONObjBuilder& bob) {
         case BSONType::numberLong:
         case BSONType::numberDouble:
         case BSONType::numberDecimal: {
-            bob.append(el.fieldName(), el.numberDecimal().normalize());
+            Decimal128 value = el.numberDecimal();
+            if (value.isNaN()) {
+                value = Decimal128::kPositiveNaN;
+            } else {
+                value = value.normalize();
+            }
+            bob.append(el.fieldName(), value);
             break;
         }
         case BSONType::array: {

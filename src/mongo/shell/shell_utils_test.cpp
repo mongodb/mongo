@@ -334,6 +334,23 @@ TEST(NormalizationOpts, NormalizeNumerics) {
     ASSERT_EQ(normalizeBSONObj(bson, opts).toString(), expected);
 }
 
+TEST(NormalizationOpts, NormalizedNansAreBinaryEqual) {
+    const BSONObj kPositiveNanBson = BSON(
+        "nan" << Decimal128::kPositiveNaN << "positiveInfinity" << Decimal128::kPositiveInfinity
+              << "negativeInfinity" << Decimal128::kNegativeInfinity);
+    const BSONObj kNegativeNanBson = BSON(
+        "nan" << Decimal128::kNegativeNaN << "positiveInfinity" << Decimal128::kPositiveInfinity
+              << "negativeInfinity" << Decimal128::kNegativeInfinity);
+
+    const NormalizationOptsSet opts = NormalizationOpts::kNormalizeNumerics;
+    const auto normalizedPositive = normalizeBSONObj(kPositiveNanBson, opts);
+    const auto normalizedNegative = normalizeBSONObj(kNegativeNanBson, opts);
+
+    ASSERT_TRUE(normalizedPositive.binaryEqual(normalizedNegative))
+        << "positiveNaN normalized: " << normalizedPositive.toString()
+        << ", negativeNaN normalized: " << normalizedNegative.toString();
+}
+
 TEST(NormalizationOpts, SortBSON) {
     BSONObj bson = fromjson("{a: {c: 1, b: [2, 1]}}");
     NormalizationOptsSet opts = NormalizationOpts::kSortBSON;

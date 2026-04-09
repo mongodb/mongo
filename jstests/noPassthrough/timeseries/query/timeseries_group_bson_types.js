@@ -19,7 +19,7 @@ if (
     assert.commandWorked(scalarDb.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}))
         .internalQueryFrameworkControl == "forceClassicEngine"
 ) {
-    jsTestLog("Skipping test due to forceClassicEngine");
+    jsTest.log.info("Skipping test due to forceClassicEngine");
     MongoRunner.stopMongod(scalarConn);
     MongoRunner.stopMongod(bpConn);
     quit();
@@ -136,7 +136,15 @@ function compareScalarAndBlockProcessing(test, allowDiskUse) {
 
     // `_resultSetsEqualNormalized` normalizes number types (included NaN), sorts between documents
     // and within documents, and then returns true or false if the result sets are equal.
-    assert(_resultSetsEqualNormalized(scalarResults, bpResults), {test, scalarResults, bpResults});
+    assert(_resultSetsEqualNormalized(scalarResults, bpResults), () => {
+        return {
+            test,
+            scalarResults: scalarResults.sort((lhs, rhs) => bsonWoCompare(lhs._id, rhs._id)),
+            bpResults: bpResults.sort((lhs, rhs) => bsonWoCompare(lhs._id, rhs._id)),
+            scalarExplain: scalarColl.explain("executionStats").aggregate(test.pipeline, {allowDiskUse}),
+            bpExplain: bpColl.explain("executionStats").aggregate(test.pipeline, {allowDiskUse}),
+        };
+    });
 }
 
 function runTestCases(allowDiskUse, forceSpilling) {
@@ -152,8 +160,9 @@ function runTestCases(allowDiskUse, forceSpilling) {
         false,
         false,
     );
-    // Filter out tests with known accepted differences between SBE and Classic.
+
     for (const test of testcases) {
+        jsTest.log.info("Running test", {allowDiskUse, forceSpilling, test});
         compareScalarAndBlockProcessing(test, allowDiskUse);
     }
 }

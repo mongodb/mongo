@@ -15,9 +15,6 @@ selector:
   exclude_files:
     - jstests/noPassthrough/libs/**/*.js
 
-    # TODO SERVER-122318 Investigate failure when deferred engine selection flag is enabled.
-    - jstests/noPassthrough/timeseries/query/timeseries_group_bson_types.js
-
     # TODO SERVER-119773 implement SBE plan cache in new get executor
     - jstests/noPassthrough/query/plan_cache/sbe_plan_cache_clear_on_param_change.js
     - jstests/noPassthrough/query/plan_cache/plan_cache_group_lookup.js
