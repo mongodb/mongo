@@ -631,6 +631,9 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                                 !fromNss.isTimeseriesBucketsCollection() ||
                                     !coll->getTimeseriesOptions() ||
                                     toNss.isTimeseriesBucketsCollection());
+
+                        uassertCannotRenameViewlessTimeseriesAcrossDBsDuringDowngrade(
+                            opCtx, *coll, toNss);
                     }
 
                     // Make sure the source collection exists

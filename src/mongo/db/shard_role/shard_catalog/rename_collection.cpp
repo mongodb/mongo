@@ -85,6 +85,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
@@ -784,6 +785,8 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
                                        const NamespaceString& source,
                                        const NamespaceString& target,
                                        const RenameCollectionOptions& options) {
+    VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx);
+
     invariant(
         !source.isEqualDb(target),
         str::stream()
@@ -889,6 +892,8 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
     if (!sourceColl.get()) {
         return Status(ErrorCodes::NamespaceNotFound, "source namespace does not exist");
     }
+
+    uassertCannotRenameViewlessTimeseriesAcrossDBsDuringDowngrade(opCtx, *sourceColl.get(), target);
 
     // TODO SERVER-89089 move this check up in the rename stack execution once we have the guarante
     // that all bucket collection have timeseries options.
@@ -1194,7 +1199,7 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
     NamespaceString targetNss{NamespaceStringUtil::deserialize(
         tid, targetNsElt.valueStringData(), SerializationContext::stateDefault())};
 
-    // TODO: not needed once we are no longer parsing for prefixed tenantIds
+    // TODO(SERVER-123312): Remove handling of tenantId here
     uassert(ErrorCodes::IllegalOperation,
             "moving a collection between tenants is not allowed",
             sourceNss.tenantId() == targetNss.tenantId());
@@ -1297,6 +1302,19 @@ Status renameCollectionForRollback(OperationContext* opCtx,
           "target"_attr = target);
 
     return renameCollectionWithinDB(opCtx, *source, target, {});
+}
+
+void uassertCannotRenameViewlessTimeseriesAcrossDBsDuringDowngrade(OperationContext* opCtx,
+                                                                   const CollectionPtr& sourceColl,
+                                                                   const NamespaceString& target) {
+    uassert(ErrorCodes::IllegalOperation,
+            str::stream() << "Cannot rename timeseries collection '"
+                          << sourceColl->ns().toStringForErrorMsg()
+                          << "' across databases while downgrading",
+            !sourceColl || !sourceColl->isNewTimeseriesWithoutView() ||
+                sourceColl->ns().isEqualDb(target) ||
+                gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
+                    VersionContext::getDecoration(opCtx)));
 }
 
 }  // namespace mongo

@@ -35,6 +35,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/server_parameter.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/modules.h"
@@ -145,5 +146,13 @@ MONGO_MOD_NEEDS_REPLACEMENT void validateAndRunRenameCollection(
     const NamespaceString& source,
     const NamespaceString& target,
     const RenameCollectionOptions& options);
+
+/**
+ * Disallow cross-DB rename of viewless timeseries collections during FCV downgrade, as it may cause
+ * them to be missed by the viewless-to-viewful conversion (see SERVER-123066).
+ * TODO(SERVER-123292): Remove once 9.0 becomes last LTS.
+ */
+MONGO_MOD_PARENT_PRIVATE void uassertCannotRenameViewlessTimeseriesAcrossDBsDuringDowngrade(
+    OperationContext* opCtx, const CollectionPtr& sourceColl, const NamespaceString& target);
 
 }  // namespace mongo
