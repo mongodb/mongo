@@ -42,6 +42,6 @@ const slowLogLine = checkLog.containsLog(secondary, "sloth");
 jsTestLog(slowLogLine);
 
 // Make sure we've logged a storage statistic as well.
-assert(slowLogLine.includes("bytesRead"));
+assert.includes(slowLogLine, "bytesRead");
 
 rst.stopSet();

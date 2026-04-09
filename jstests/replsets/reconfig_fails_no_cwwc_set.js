@@ -26,12 +26,12 @@ const reconfigErrorMsg = "Reconfig attempted to install a config that would chan
 // {w:1}, so we fail the reconfig.
 let res = assert.commandFailed(primary.adminCommand({replSetReconfig: config}));
 assert.eq(res.code, ErrorCodes.NewReplicaSetConfigurationIncompatible);
-assert(res.errmsg.includes(reconfigErrorMsg));
+assert.includes(res.errmsg, reconfigErrorMsg);
 
 // A force reconfig should also fail.
 res = assert.commandFailed(primary.adminCommand({replSetReconfig: config, force: true}));
 assert.eq(res.code, ErrorCodes.NewReplicaSetConfigurationIncompatible);
-assert(res.errmsg.includes(reconfigErrorMsg));
+assert.includes(res.errmsg, reconfigErrorMsg);
 
 assert.commandWorked(
     primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),

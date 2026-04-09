@@ -57,14 +57,14 @@ let testDDLOps = () => {
     assert.throws(function () {
         testDB.getCollection(collToDrop).drop();
     });
-    assert(testDB.getCollectionNames().includes(collToDrop));
+    assert.includes(testDB.getCollectionNames(), collToDrop);
 
     // Same goes for trying to rename it.
     assert.commandFailedWithCode(
         testDB.getCollection(collToRenameFrom).renameCollection(collToRenameTo),
         ErrorCodes.LockTimeout,
     );
-    assert(testDB.getCollectionNames().includes(collToRenameFrom));
+    assert.includes(testDB.getCollectionNames(), collToRenameFrom);
     assert(!testDB.getCollectionNames().includes(collToRenameTo));
 
     assert.commandFailedWithCode(

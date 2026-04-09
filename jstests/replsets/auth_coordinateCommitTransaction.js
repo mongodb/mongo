@@ -114,7 +114,7 @@ function testCoordinateCommitTransactionFails(userConnection, directConnection) 
         }),
         ErrorCodes.Unauthorized,
     );
-    assert(res.errmsg.includes("Unauthorized to set user digest"), res);
+    assert.includes(res.errmsg, "Unauthorized to set user digest", res);
 }
 
 jsTestLog("Running test on replica set.");

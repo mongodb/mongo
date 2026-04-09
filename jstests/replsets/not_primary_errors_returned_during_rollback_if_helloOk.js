@@ -58,7 +58,7 @@ let res = assert.commandFailedWithCode(
 
 // Since we did not send "helloOk: true", the error message should include "not master or
 // secondary".
-assert(res.errmsg.includes("not master or secondary"), res);
+assert.includes(res.errmsg, "not master or secondary", res);
 
 // An isMaster response will not contain "helloOk: true" if the client does not send
 // helloOk in the request.
@@ -78,7 +78,7 @@ res = assert.commandFailedWithCode(
     "find did not fail with NotPrimaryOrSecondary",
 );
 // Since we sent "helloOk: true", the error message should include "not primary or secondary".
-assert(res.errmsg.includes("not primary or secondary"), res);
+assert.includes(res.errmsg, "not primary or secondary", res);
 assert(!res.errmsg.includes("not master"), res);
 
 failPointAfterTransition.off();

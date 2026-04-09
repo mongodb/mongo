@@ -27,7 +27,7 @@ let res = assert.commandFailedWithCode(
 );
 // Since the shell opens connections without using "helloOk: true", the error message
 // should include "not master".
-assert(res.errmsg.includes("not master"), res);
+assert.includes(res.errmsg, "not master", res);
 
 // Set secondaryOk to false, disallowing reads on secondaries.
 secondary.getDB(dbName).getMongo().setSecondaryOk(false);
@@ -38,7 +38,7 @@ res = assert.commandFailedWithCode(
     "find did not fail with NotPrimaryNoSecondaryOk",
 );
 // Since we did not send "helloOk: true", the error message should include "not master".
-assert(res.errmsg.includes("not master"), res);
+assert.includes(res.errmsg, "not master", res);
 
 // An isMaster response will not contain "helloOk: true" if the client does not send
 // helloOk in the request.
@@ -65,7 +65,7 @@ res = assert.commandFailedWithCode(
     "insert did not fail with NotWritablePrimary",
 );
 // Since we sent "helloOk: true", the error message should include "not primary".
-assert(res.errmsg.includes("not primary"), res);
+assert.includes(res.errmsg, "not primary", res);
 assert(!res.errmsg.includes("not master"), res);
 
 // secondaryOk was already set to false, so the following read should still fail with
@@ -77,7 +77,7 @@ res = assert.commandFailedWithCode(
     "find did not fail with NotPrimaryNoSecondaryOk",
 );
 // Since we sent "helloOk: true", the error message should include "not primary".
-assert(res.errmsg.includes("not primary"), res);
+assert.includes(res.errmsg, "not primary", res);
 assert(!res.errmsg.includes("not master"), res);
 
 rst.stopSet();

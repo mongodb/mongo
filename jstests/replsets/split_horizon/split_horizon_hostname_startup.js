@@ -64,6 +64,6 @@ assert.soon(() => mongod.adminCommand({isMaster: 1}).ismaster, "Node failed to b
 output = mongod.adminCommand({replSetReconfig: rsConfig1.config});
 jsTestLog("replSetReconfig output: " + tojson(output));
 assert.commandFailed(output);
-assert(output.errmsg.includes("Found split horizon configuration using IP"));
+assert.includes(output.errmsg, "Found split horizon configuration using IP");
 
 MongoRunner.stopMongod(mongod);

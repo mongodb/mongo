@@ -260,7 +260,7 @@ function reconfigWithRetry(primary, config, force, shouldFail = false, errCode, 
             }
 
             if (errMsg) {
-                assert(res.errmsg.includes(errMsg));
+                assert.includes(res.errmsg, errMsg);
             }
         }
 
