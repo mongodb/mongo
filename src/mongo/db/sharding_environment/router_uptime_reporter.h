@@ -59,6 +59,11 @@ public:
      */
     void startPeriodicThread(ServiceContext* serviceContext);
 
+    /**
+     * Signals the uptime reporter thread to stop and joins it. Safe to call multiple times.
+     */
+    void shutdown();
+
 private:
     // The background uptime reporter thread (if started)
     stdx::thread _thread;

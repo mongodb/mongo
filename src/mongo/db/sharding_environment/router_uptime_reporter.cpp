@@ -141,8 +141,13 @@ void reportStatus(OperationContext* opCtx,
 }  // namespace
 
 RouterUptimeReporter::~RouterUptimeReporter() {
+    shutdown();
+}
+
+void RouterUptimeReporter::shutdown() {
     destructionInitiated.notifyAll();
     if (_thread.joinable()) {
+        LOGV2(12368300, "Shutting down the RouterUptimeReporter");
         _thread.join();
     }
 }

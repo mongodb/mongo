@@ -174,6 +174,7 @@ private:
     X(updateShardingMetadata)                   \
     X(upsertAutomationCredentials)              \
     X(shutDownAndJoinReadWriteConcernDefaults)  \
+    X(shutDownRouterUptimeReporter)             \
     /* */
 
 enum class TimedSectionId {
