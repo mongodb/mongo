@@ -1,5 +1,5 @@
 load("@poetry//:dependencies.bzl", "dependency")
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_binary", "mongo_cc_fuzzer_test_deprecated", "mongo_cc_integration_test", "mongo_cc_library", "mongo_cc_unit_test", "mongo_idl_library", "windows_rc")
+load("//bazel:mongo_src_rules.bzl", "TCMALLOC_DEPS", "idl_generator", "mongo_cc_benchmark", "mongo_cc_binary", "mongo_cc_fuzzer_test_deprecated", "mongo_cc_integration_test", "mongo_cc_library", "mongo_cc_unit_test", "mongo_idl_library", "windows_rc")
 load("//bazel/config:render_template.bzl", "render_template")
 
 package(default_visibility = ["//visibility:public"])
@@ -55,12 +55,7 @@ mongo_cc_library(
     hdrs = ["startup_check_rseq.h"],
     deps = [
         "//src/mongo:base",
-    ] + select({
-        "//bazel/config:tcmalloc_google_enabled": [
-            "//src/third_party/tcmalloc:tcmalloc_internal_percpu",
-        ],
-        "//conditions:default": [],
-    }),
+    ] + TCMALLOC_DEPS,
 )
 
 mongo_cc_unit_test(
