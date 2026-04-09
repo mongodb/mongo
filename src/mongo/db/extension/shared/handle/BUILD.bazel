@@ -10,7 +10,6 @@ exports_files(
 
 mongo_cc_library(
     name = "handle",
-    srcs = [],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/extension/public:api",

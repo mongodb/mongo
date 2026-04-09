@@ -18,9 +18,6 @@ mongo_cc_library(
         "parse_node.cpp",
         "stage_descriptor.cpp",
     ],
-    hdrs = [
-        "pipeline_rewrite_context.h",
-    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:server_base",

@@ -30,8 +30,8 @@
 
 #include "mongo/db/extension/host/document_source_extension_optimizable.h"
 #include "mongo/db/extension/host_connector/adapter/host_portal_adapter.h"
-#include "mongo/db/extension/shared/handle/aggregation_stage/pipeline_rewrite_context.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
+#include "mongo/db/extension/shared/handle/pipeline_rewrite_context_handle.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 

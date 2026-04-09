@@ -386,12 +386,153 @@ TEST_F(PipelineRewriteEngineTest, DontRunFeatureFlagGatedRuleWhenFlagDisabled) {
     runTest(getExpCtx(), {"{$match: {a: 1}}"}, {"{$match: {a: 1}}"});
 }
 
+TEST_F(PipelineRewriteEngineTest, GetNthNextStageGetsFirstNextStage) {
+    static auto firstNextIsLimit = [](PipelineRewriteContext& ctx) {
+        return ctx.hasAtLeastNNextStages(1) &&
+            ctx.nthNextStage(1)->getSourceName() == DocumentSourceLimit::kStageName;
+    };
+    REGISTER_TEST_RULES(
+        DocumentSourceMatch,
+        {"REMOVE_MATCH_BEFORE_LIMIT", firstNextIsLimit, Transforms::eraseCurrent, 1.0});
+    runTest(getExpCtx(), {"{$match: {a: 1}}", "{$limit: 5}"}, {"{$limit: 5}"});
+}
+
+TEST_F(PipelineRewriteEngineTest, GetNthNextStageGetsSecondNextStage) {
+    static auto secondNextIsLimit = [](PipelineRewriteContext& ctx) {
+        return ctx.hasAtLeastNNextStages(2) &&
+            ctx.nthNextStage(2)->getSourceName() == DocumentSourceLimit::kStageName;
+    };
+    REGISTER_TEST_RULES(
+        DocumentSourceMatch,
+        {"REMOVE_MATCH_BEFORE_SKIP_LIMIT", secondNextIsLimit, Transforms::eraseCurrent, 1.0});
+    runTest(getExpCtx(),
+            {"{$match: {a: 1}}", "{$skip: 5}", "{$limit: 10}"},
+            {"{$skip: 5}", "{$limit: 10}"});
+}
+
+TEST_F(PipelineRewriteEngineTest, HasAtLeastNNextStagesReturnsTrueWithinBounds) {
+    // Pipeline: [$match, $skip, $limit] — 2 next stages after $match.
+    // hasAtLeastNNextStages(2) must be true; rule erases $match only if so.
+    static auto hasTwoNext = [](PipelineRewriteContext& ctx) {
+        return ctx.hasAtLeastNNextStages(2);
+    };
+    REGISTER_TEST_RULES(DocumentSourceMatch,
+                        {"ERASE_IF_TWO_NEXT", hasTwoNext, Transforms::eraseCurrent, 1.0});
+    runTest(getExpCtx(),
+            {"{$match: {a: 1}}", "{$skip: 5}", "{$limit: 10}"},
+            {"{$skip: 5}", "{$limit: 10}"});
+}
+
+TEST_F(PipelineRewriteEngineTest, HasAtLeastNNextStagesReturnsFalseAtBoundary) {
+    // Pipeline: [$match, $skip, $limit] — only 2 next stages after $match.
+    // hasAtLeastNNextStages(3) must be false; $match should NOT be erased.
+    // This also catches the off-by-one bug (<= N vs > N).
+    static auto hasThreeNext = [](PipelineRewriteContext& ctx) {
+        return ctx.hasAtLeastNNextStages(3);
+    };
+    REGISTER_TEST_RULES(DocumentSourceMatch,
+                        {"ERASE_IF_THREE_NEXT", hasThreeNext, Transforms::eraseCurrent, 1.0});
+    runTest(getExpCtx(),
+            {"{$match: {a: 1}}", "{$skip: 5}", "{$limit: 10}"},
+            {"{$match: {a: 1}}", "{$skip: 5}", "{$limit: 10}"});
+}
+
+TEST_F(PipelineRewriteEngineTest, HasAtLeastNNextStagesReturnsTrueForZeroAtLastStage) {
+    // hasAtLeastNNextStages(0) is trivially satisfied — there are always >= 0 next stages.
+    // Even at the last stage, it must return true.
+    static auto hasZeroNext = [](PipelineRewriteContext& ctx) {
+        return ctx.hasAtLeastNNextStages(0);
+    };
+    REGISTER_TEST_RULES(DocumentSourceLimit,
+                        {"ERASE_IF_ZERO_NEXT", hasZeroNext, Transforms::eraseCurrent, 1.0});
+    runTest(getExpCtx(), {"{$limit: 5}"}, {});
+}
+
+TEST_F(PipelineRewriteEngineTest, HasAtLeastNNextStagesReturnsFalseAtLastStage) {
+    static auto hasOneNext = [](PipelineRewriteContext& ctx) {
+        return ctx.hasAtLeastNNextStages(1);
+    };
+    REGISTER_TEST_RULES(DocumentSourceLimit,
+                        {"ERASE_IF_HAS_NEXT", hasOneNext, Transforms::eraseCurrent, 1.0});
+    // $limit is the last stage — hasAtLeastNNextStages(1) must be false; not erased.
+    runTest(getExpCtx(), {"{$match: {a: 1}}", "{$limit: 5}"}, {"{$match: {a: 1}}", "{$limit: 5}"});
+}
+
+TEST_F(PipelineRewriteEngineTest, GetNthNextStageZeroReturnsCurrent) {
+    // nthNextStage(0) advances by 0, so it returns the current stage itself.
+    static auto inspectZero = [](PipelineRewriteContext& ctx) {
+        ASSERT_EQ(ctx.nthNextStage(0)->getSourceName(), DocumentSourceMatch::kStageName);
+        return false;
+    };
+    REGISTER_TEST_RULES(DocumentSourceMatch, {"INSPECT_ZERO", alwaysTrue, inspectZero, 1.0});
+    runTest(getExpCtx(), {"{$match: {a: 1}}", "{$limit: 5}"}, {"{$match: {a: 1}}", "{$limit: 5}"});
+}
+
+TEST_F(PipelineRewriteEngineTest, EraseStageAtZero) {
+    static auto eraseCurrent = [](PipelineRewriteContext& ctx) {
+        Transforms::eraseNthNext(ctx, 0);
+        return false;
+    };
+    REGISTER_TEST_RULES(DocumentSourceMatch,
+                        {"ERASE_STAGE_AT_ZERO", alwaysTrue, eraseCurrent, 1.0});
+    runTest(getExpCtx(),
+            {"{$match: {a: 1}}", "{$skip: 5}", "{$limit: 10}"},
+            {"{$skip: 5}", "{$limit: 10}"});
+}
+
+TEST_F(PipelineRewriteEngineTest, EraseSecondNextStage) {
+    static auto eraseSecondNext = [](PipelineRewriteContext& ctx) {
+        Transforms::eraseNthNext(ctx, 2);
+        return false;
+    };
+    REGISTER_TEST_RULES(DocumentSourceMatch,
+                        {"ERASE_SECOND_NEXT", alwaysTrue, eraseSecondNext, 1.0});
+    runTest(getExpCtx(),
+            {"{$match: {a: 1}}", "{$skip: 5}", "{$limit: 10}", "{$sort: {a: 1}}"},
+            {"{$match: {a: 1}}", "{$skip: 5}", "{$sort: {a: 1}}"});
+}
+
+TEST_F(PipelineRewriteEngineTest, EraseNthNextStageIteratorRemainsValid) {
+    // After erasing the 1st next stage, getNthNextStage(1) should return what was the 2nd.
+    static auto eraseAndInspect = [](PipelineRewriteContext& ctx) {
+        Transforms::eraseNthNext(ctx, 1);  // removes $skip
+        ASSERT_EQ(ctx.nthNextStage(1)->getSourceName(), DocumentSourceLimit::kStageName);
+        return false;
+    };
+    REGISTER_TEST_RULES(DocumentSourceMatch,
+                        {"ERASE_AND_INSPECT", alwaysTrue, eraseAndInspect, 1.0});
+    runTest(getExpCtx(),
+            {"{$match: {a: 1}}", "{$skip: 5}", "{$limit: 10}"},
+            {"{$match: {a: 1}}", "{$limit: 10}"});
+}
+
 using PipelineRewriteEngineTestDeathTest = PipelineRewriteEngineTest;
 DEATH_TEST_F(PipelineRewriteEngineTestDeathTest, FailsOnDuplicateRuleNames, "11010016") {
     REGISTER_TEST_RULES(DocumentSourceMatch,
                         {"DUPLICATE_RULE_NAME", alwaysTrue, Transforms::noop, 1.0});
     REGISTER_TEST_RULES(DocumentSourceSort,
                         {"DUPLICATE_RULE_NAME", alwaysTrue, Transforms::noop, 1.0});
+}
+
+DEATH_TEST_F(PipelineRewriteEngineTestDeathTest,
+             GetNthNextStageOutOfBoundsExceedsAvailable,
+             "Expected to have") {
+    static auto getSecondNextOob = [](PipelineRewriteContext& ctx) {
+        [[maybe_unused]] auto s = ctx.nthNextStage(2);
+        return false;
+    };
+    REGISTER_TEST_RULES(DocumentSourceMatch,
+                        {"GET_SECOND_NEXT_OOB", alwaysTrue, getSecondNextOob, 1.0});
+    runTest(getExpCtx(), {"{$match: {a: 1}}", "{$limit: 5}"}, {});
+}
+
+DEATH_TEST_F(PipelineRewriteEngineTestDeathTest, EraseNthNextStageOutOfBounds, "Expected to have") {
+    static auto eraseOob = [](PipelineRewriteContext& ctx) {
+        Transforms::eraseNthNext(ctx, 2);
+        return false;
+    };
+    REGISTER_TEST_RULES(DocumentSourceMatch, {"ERASE_OOB", alwaysTrue, eraseOob, 1.0});
+    runTest(getExpCtx(), {"{$match: {a: 1}}", "{$limit: 5}"}, {});
 }
 
 }  // namespace

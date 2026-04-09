@@ -32,7 +32,7 @@
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/assert_util.h"
 #include "mongo/db/extension/shared/extension_status.h"
-#include "mongo/db/extension/shared/handle/aggregation_stage/pipeline_rewrite_context.h"
+#include "mongo/db/extension/shared/handle/pipeline_rewrite_context_handle.h"
 #include "mongo/util/modules.h"
 
 #include <yaml-cpp/yaml.h>

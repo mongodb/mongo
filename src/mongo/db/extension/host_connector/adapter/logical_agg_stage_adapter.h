@@ -163,6 +163,7 @@ private:
     static ::MongoExtensionStatus* _hostEvaluateRulePrecondition(
         const ::MongoExtensionLogicalAggStage* logicalStage,
         ::MongoExtensionByteView ruleName,
+        const ::MongoExtensionPipelineRewriteContext* ctx,
         bool* result) noexcept {
         return wrapCXXAndConvertExceptionToStatus([]() {
             tasserted(12303707,
@@ -174,6 +175,7 @@ private:
     static ::MongoExtensionStatus* _hostEvaluateRuleTransform(
         ::MongoExtensionLogicalAggStage* logicalStage,
         ::MongoExtensionByteView ruleName,
+        ::MongoExtensionPipelineRewriteContext* ctx,
         bool* result) noexcept {
         return wrapCXXAndConvertExceptionToStatus([]() {
             tasserted(12303708,

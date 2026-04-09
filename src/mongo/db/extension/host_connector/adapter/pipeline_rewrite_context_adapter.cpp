@@ -29,15 +29,52 @@
 
 #include "mongo/db/extension/host_connector/adapter/pipeline_rewrite_context_adapter.h"
 
+#include "mongo/db/extension/host/pipeline_rewrite_context.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/logical.h"
 
 namespace mongo::extension::host_connector {
+MongoExtensionStatus* PipelineRewriteContextAdapter::_hostGetNthNextStage(
+    const MongoExtensionPipelineRewriteContext* ctx,
+    size_t index,
+    MongoExtensionLogicalAggStage** out) {
+    return wrapCXXAndConvertExceptionToStatus([&]() {
+        *out = nullptr;
+
+        const PipelineRewriteContextAdapter* pipelineRewriteContextAdapter =
+            static_cast<const PipelineRewriteContextAdapter*>(ctx);
+        const auto& pipelineRewriteCtx = pipelineRewriteContextAdapter->getCtxImpl();
+
+        boost::intrusive_ptr<DocumentSource> ds = pipelineRewriteCtx.getNthNextStage(index);
+
+        pipelineRewriteContextAdapter->cachedNextStageResult =
+            std::make_unique<HostLogicalAggStageAdapter>(host::LogicalAggStage::make(ds.get()));
+        *out = static_cast<MongoExtensionLogicalAggStage*>(
+            pipelineRewriteContextAdapter->cachedNextStageResult.get());
+    });
+}
+
+MongoExtensionStatus* PipelineRewriteContextAdapter::_hostEraseNthNextStage(
+    MongoExtensionPipelineRewriteContext* ctx, size_t index, bool* out) {
+    return wrapCXXAndConvertExceptionToStatus([&]() {
+        auto& pipelineRewriteCtx = static_cast<PipelineRewriteContextAdapter*>(ctx)->getCtxImpl();
+        *out = pipelineRewriteCtx.eraseNthNext(index);
+    });
+}
+
+MongoExtensionStatus* PipelineRewriteContextAdapter::_hostHasAtLeastNNextStages(
+    const MongoExtensionPipelineRewriteContext* ctx, size_t n, bool* out) {
+    return wrapCXXAndConvertExceptionToStatus([&]() {
+        const auto& pipelineRewriteCtx =
+            static_cast<const PipelineRewriteContextAdapter*>(ctx)->getCtxImpl();
+        *out = pipelineRewriteCtx.hasAtLeastNNextStages(n);
+    });
+}
 
 using PipelineRewriteContext = rule_based_rewrites::pipeline::PipelineRewriteContext;
 using HostPipelineRewriteRule = rule_based_rewrites::pipeline::PipelineRewriteRule;
 
 HostPipelineRewriteRule wrapExtensionRule(const extension::PipelineRewriteRule& extRule,
-                                          MongoExtensionLogicalAggStage* extensionStage) {
+                                          UnownedLogicalAggStageHandle extensionStage) {
     using namespace rule_based_rewrites::pipeline;
     rule_based_rewrites::TagSet tags = 0;
     if (extRule.tags & kPipelineRewriteRuleTagReordering) {
@@ -48,14 +85,21 @@ HostPipelineRewriteRule wrapExtensionRule(const extension::PipelineRewriteRule& 
     }
 
     const auto& ruleName = extRule.name;
-    extension::LogicalAggStageAPI stageApi(extensionStage);
     return HostPipelineRewriteRule{
         .name = ruleName,
-        .precondition = [stageApi, ruleName](PipelineRewriteContext& c) -> bool {
-            return stageApi.evaluateRulePrecondition(StringData(ruleName.data(), ruleName.size()));
+        .precondition = [extensionStage, ruleName](PipelineRewriteContext& ctx) -> bool {
+            auto hostCtx = host::PipelineRewriteContext::make(&ctx);
+            auto hostAdapter =
+                std::make_unique<host_connector::PipelineRewriteContextAdapter>(std::move(hostCtx));
+            return extensionStage->evaluateRulePrecondition(
+                StringData(ruleName.data(), ruleName.size()), hostAdapter.get());
         },
-        .transform = [stageApi, ruleName](PipelineRewriteContext& c) mutable -> bool {
-            return stageApi.evaluateRuleTransform(StringData(ruleName.data(), ruleName.size()));
+        .transform = [extensionStage, ruleName](PipelineRewriteContext& ctx) mutable -> bool {
+            auto hostCtx = host::PipelineRewriteContext::make(&ctx);
+            auto hostAdapter =
+                std::make_unique<host_connector::PipelineRewriteContextAdapter>(std::move(hostCtx));
+            return extensionStage->evaluateRuleTransform(
+                StringData(ruleName.data(), ruleName.size()), hostAdapter.get());
         },
         .tags = tags,
     };

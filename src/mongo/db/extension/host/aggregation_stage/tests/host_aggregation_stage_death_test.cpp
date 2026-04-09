@@ -27,14 +27,19 @@
  *    it in the license file.
  */
 
+#include "mongo/db/extension/host/pipeline_rewrite_context.h"
 #include "mongo/db/extension/host/query_execution_context.h"
 #include "mongo/db/extension/host_connector/adapter/logical_agg_stage_adapter.h"
+#include "mongo/db/extension/host_connector/adapter/pipeline_rewrite_context_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/query_execution_context_adapter.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/distributed_plan_logic.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/logical.h"
+#include "mongo/db/extension/shared/handle/pipeline_rewrite_context_handle.h"
+#include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/unittest/death_test.h"
 
@@ -116,7 +121,7 @@ DEATH_TEST(HostLogicalAggStageAdapterDeathTest,
            "12303707") {
     auto [mock, adapter] = makeAdapterWithMock();
     LogicalAggStageAPI api(adapter.get());
-    [[maybe_unused]] auto result = api.evaluateRulePrecondition("rule"_sd);
+    [[maybe_unused]] auto result = api.evaluateRulePrecondition("rule"_sd, nullptr);
 }
 
 DEATH_TEST(HostLogicalAggStageAdapterDeathTest,
@@ -124,7 +129,89 @@ DEATH_TEST(HostLogicalAggStageAdapterDeathTest,
            "12303708") {
     auto [mock, adapter] = makeAdapterWithMock();
     LogicalAggStageAPI api(adapter.get());
-    [[maybe_unused]] auto result = api.evaluateRuleTransform("rule"_sd);
+    [[maybe_unused]] auto result = api.evaluateRuleTransform("rule"_sd, nullptr);
+}
+
+// ---- PipelineRewriteContextAPI vtable constraint death tests ----
+
+DEATH_TEST(PipelineRewriteContextAPIDeathTest, NullGetNthNextStageTasserts, "12200600") {
+    static MongoExtensionPipelineRewriteContextVTable kVTable = {
+        .get_nth_next_stage = nullptr,
+        .erase_nth_next_stage = [](MongoExtensionPipelineRewriteContext*,
+                                   size_t,
+                                   bool*) -> MongoExtensionStatus* { return nullptr; },
+        .has_at_least_n_next_stages = [](const MongoExtensionPipelineRewriteContext*,
+                                         size_t,
+                                         bool*) -> MongoExtensionStatus* { return nullptr; },
+    };
+    MongoExtensionPipelineRewriteContext ctx{&kVTable};
+    [[maybe_unused]] PipelineRewriteContextAPI api(&ctx);
+}
+
+DEATH_TEST(PipelineRewriteContextAPIDeathTest, NullEraseNthNextStageTasserts, "12200601") {
+    static MongoExtensionPipelineRewriteContextVTable kVTable = {
+        .get_nth_next_stage = [](const MongoExtensionPipelineRewriteContext*,
+                                 size_t,
+                                 MongoExtensionLogicalAggStage**) -> MongoExtensionStatus* {
+            return nullptr;
+        },
+        .erase_nth_next_stage = nullptr,
+        .has_at_least_n_next_stages = [](const MongoExtensionPipelineRewriteContext*,
+                                         size_t,
+                                         bool*) -> MongoExtensionStatus* { return nullptr; },
+    };
+    MongoExtensionPipelineRewriteContext ctx{&kVTable};
+    [[maybe_unused]] PipelineRewriteContextAPI api(&ctx);
+}
+
+DEATH_TEST(PipelineRewriteContextAPIDeathTest, NullHasAtLeastNNextStagesTasserts, "12200607") {
+    static MongoExtensionPipelineRewriteContextVTable kVTable = {
+        .get_nth_next_stage = [](const MongoExtensionPipelineRewriteContext*,
+                                 size_t,
+                                 MongoExtensionLogicalAggStage**) -> MongoExtensionStatus* {
+            return nullptr;
+        },
+        .erase_nth_next_stage = [](MongoExtensionPipelineRewriteContext*,
+                                   size_t,
+                                   bool*) -> MongoExtensionStatus* { return nullptr; },
+        .has_at_least_n_next_stages = nullptr,
+    };
+    MongoExtensionPipelineRewriteContext ctx{&kVTable};
+    [[maybe_unused]] PipelineRewriteContextAPI api(&ctx);
+}
+
+// ---- PipelineRewriteContextAdapter death tests ----
+
+DEATH_TEST(PipelineRewriteContextAdapterDeathTest, NullCtxAtConstructionTasserts, "12200604") {
+    [[maybe_unused]] host_connector::PipelineRewriteContextAdapter adapter(nullptr);
+}
+
+DEATH_TEST(PipelineRewriteContextAdapterDeathTest, GetNthNextStageOutOfBoundsTasserts, "12200602") {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    DocumentSourceContainer container;
+    container.push_back(DocumentSourceLimit::create(expCtx, 10));
+
+    // Context is positioned at the only stage — no next stages exist.
+    rule_based_rewrites::pipeline::PipelineRewriteContext rbrCtx(*expCtx, container);
+    host_connector::PipelineRewriteContextAdapter adapter(
+        host::PipelineRewriteContext::make(&rbrCtx));
+
+    [[maybe_unused]] auto stage = PipelineRewriteContextAPI(&adapter).getNthNextStage(1);
+}
+
+DEATH_TEST(PipelineRewriteContextAdapterDeathTest,
+           EraseNthNextStageOutOfBoundsTasserts,
+           "12200603") {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    DocumentSourceContainer container;
+    container.push_back(DocumentSourceLimit::create(expCtx, 10));
+
+    // Context is positioned at the only stage — no next stages exist.
+    rule_based_rewrites::pipeline::PipelineRewriteContext rbrCtx(*expCtx, container);
+    host_connector::PipelineRewriteContextAdapter adapter(
+        host::PipelineRewriteContext::make(&rbrCtx));
+
+    PipelineRewriteContextAPI(&adapter).eraseNthNext(1);
 }
 
 }  // namespace

@@ -36,7 +36,7 @@
 #include "mongo/db/extension/sdk/host_services.h"
 #include "mongo/db/extension/sdk/versioned_extension.h"
 #include "mongo/db/extension/shared/extension_status.h"
-#include "mongo/db/extension/shared/handle/aggregation_stage/pipeline_rewrite_context.h"
+#include "mongo/db/extension/shared/handle/pipeline_rewrite_context_handle.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/modules.h"
 

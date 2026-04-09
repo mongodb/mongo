@@ -1,5 +1,7 @@
 /**
- * Tests the $testVectorSearchOptimization stage extension in aggregation pipelines. This is used to confirm that the optimizations in document_source_extension_optimizable.cpp achieve parity between a native vectorSearch stage and a vectorSearch stage implemented as an extension.
+ * Tests the $testVectorSearchOptimization stage extension in aggregation pipelines. This is used to
+ * confirm that the optimizations in document_source_extension_optimizable.cpp achieve parity
+ * between a native vectorSearch stage and a vectorSearch stage implemented as an extension.
  *
  * @tags: [
  *   featureFlagExtensionsAPI,
@@ -204,18 +206,125 @@ testLimitExtraction(desugarFalseStage);
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // vectorSearch Rewrite Rule Optimization Tests
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// Verify the in-place rule fired: $testVectorSearch explain output should contain
-// inPlaceRuleApplied: true (set unconditionally by the new serialize() implementation).
+
+// Returns true if a stage with the given name exists anywhere in the explain output, including
+// splitPipeline.shardsPart. Note that getAggPlanStages does not check the splitPipeline and can
+// only handle non-sharded topologies.
+const stageExistsInExplain = (explainOutput, stageName) => {
+    return (
+        getStageFromSplitPipeline(explainOutput, stageName) != null ||
+        getAggPlanStages(explainOutput, stageName).length > 0
+    );
+};
+
+// Returns the inner spec of the $testVectorSearch stage from explain, handling both sharded
+// (splitPipeline) and non-sharded topologies.
+const getTestVectorSearchSpecFromExplain = (explainOutput) => {
+    const inSplit = getStageFromSplitPipeline(explainOutput, "$testVectorSearch");
+    if (inSplit && inSplit.$testVectorSearch) {
+        return inSplit.$testVectorSearch;
+    }
+    const stages = getAggPlanStages(explainOutput, "$testVectorSearch");
+    if (stages.length > 0 && stages[0].$testVectorSearch) {
+        return stages[0].$testVectorSearch;
+    }
+    return undefined;
+};
+
+// Verify the in-place rule fired for desugarFalse: $testVectorSearch explain output should contain
+// inPlaceRuleApplied: true.
 {
     const explain = coll.explain("queryPlanner").aggregate([desugarFalseStage]);
-    const stages = getAggPlanStages(explain, "$testVectorSearch");
-    assert.gt(stages.length, 0, "Expected $testVectorSearch in explain output: " + tojson(explain));
-
-    const stageSpec = stages[0]["$testVectorSearch"];
-    assert(stageSpec !== undefined, "Expected $testVectorSearch spec in explain stage: " + tojson(stages[0]));
+    const stageSpec = getTestVectorSearchSpecFromExplain(explain);
+    assert(stageSpec !== undefined, "Expected $testVectorSearch spec in explain: " + tojson(explain));
     assert.eq(
         stageSpec.inPlaceRuleApplied,
         true,
         "Expected inPlaceRuleApplied:true in explain, got: " + tojson(stageSpec),
+    );
+}
+
+// Verify the in-place rule fires when the stage desugars (storedSource: true).
+{
+    const explain = coll.explain("queryPlanner").aggregate([buildTestVectorSearchOptStage({storedSource: true})]);
+    const stageSpec = getTestVectorSearchSpecFromExplain(explain);
+    assert(stageSpec !== undefined, "Expected $testVectorSearch spec in explain: " + tojson(explain));
+    assert.eq(
+        stageSpec.inPlaceRuleApplied,
+        true,
+        "Expected inPlaceRuleApplied:true for desugared (storedSource:true), got: " + tojson(stageSpec),
+    );
+}
+
+// Verify the eraseStage rule fires: $project immediately following $testVectorSearch is removed.
+{
+    const pipeline = [desugarFalseStage, {$project: {_id: 1}}];
+    const explain = coll.explain("queryPlanner").aggregate(pipeline);
+    assert(
+        !stageExistsInExplain(explain, "$project"),
+        "Expected $project to be erased by eraseStage rule, but found it in: " + tojson(explain),
+    );
+}
+
+// Verify the eraseStage rule does NOT fire when the desugared stages intervene between
+// $testVectorSearch and $project. With storedSource:false the pipeline after desugaring is
+// [$testVectorSearch, $_internalSearchIdLookup, $project], so $project is not at nthNextStage(1).
+{
+    const pipeline = [buildTestVectorSearchOptStage({storedSource: false}), {$project: {_id: 1}}];
+    const explain = coll.explain("queryPlanner").aggregate(pipeline);
+    assert(
+        stageExistsInExplain(explain, "$project"),
+        "Expected $project to remain since eraseStage should not fire with an intervening desugared " +
+            "stage, but got: " +
+            tojson(explain),
+    );
+}
+
+// Verify the eraseStage rule successfully requeues and erases consecutive stages.
+{
+    const pipeline = [desugarFalseStage, {$project: {_id: 1}}, {$project: {_id: 1}}];
+    const explain = coll.explain("queryPlanner").aggregate(pipeline);
+    assert(
+        !stageExistsInExplain(explain, "$project"),
+        "Expected $project to be erased by eraseStage rule, but found it in: " + tojson(explain),
+    );
+}
+
+// Verify the eraseExtensionLimit rule fires: $extensionLimit two stages after $testVectorSearch is
+// removed while the intervening $addFields stage is preserved.
+{
+    const pipeline = [desugarFalseStage, {$addFields: {a: 1}}, {$extensionLimit: 3}];
+    const explain = coll.explain("queryPlanner").aggregate(pipeline);
+    assert(
+        !stageExistsInExplain(explain, "$extensionLimit"),
+        "Expected $extensionLimit to be erased by eraseExtensionLimit rule, but found it in: " + tojson(explain),
+    );
+    assert(
+        stageExistsInExplain(explain, "$addFields"),
+        "Expected $addFields to remain after eraseExtensionLimit, but got: " + tojson(explain),
+    );
+}
+
+// Verify eraseExtensionLimit fires for a desugared pipeline (storedSource:true). After desugaring,
+// the pipeline is [$testVectorSearch, $replaceRoot, $extensionLimit], so $extensionLimit is at
+// nthNextStage(2) and should be erased.
+{
+    const pipeline = [buildTestVectorSearchOptStage({storedSource: true}), {$extensionLimit: 3}];
+    const explain = coll.explain("queryPlanner").aggregate(pipeline);
+    assert(
+        !stageExistsInExplain(explain, "$extensionLimit"),
+        "Expected $extensionLimit to be erased for desugared pipeline (storedSource:true), but " +
+            "found it in: " +
+            tojson(explain),
+    );
+}
+
+// Verify the eraseExtensionLimit rule does NOT fire when stage two is not $extensionLimit.
+{
+    const pipeline = [desugarFalseStage, {$addFields: {a: 1}}, {$skip: 3}];
+    const explain = coll.explain("queryPlanner").aggregate(pipeline);
+    assert(
+        stageExistsInExplain(explain, "$skip"),
+        "Expected $skip to remain since eraseExtensionLimit should not fire, but got: " + tojson(explain),
     );
 }

@@ -41,6 +41,7 @@
 #include "mongo/db/extension/shared/get_next_result.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/executable_agg_stage.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
+#include "mongo/db/extension/shared/handle/pipeline_rewrite_context_handle.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -112,7 +113,8 @@ public:
     /**
      * Evaluates the precondition of the rule identified by name. Extensions override this.
      */
-    virtual bool evaluateRulePrecondition(std::string_view ruleName) const {
+    virtual bool evaluateRulePrecondition(
+        std::string_view ruleNam, ConstPipelineRewriteContextHandle pipelineRewriteContext) const {
         return false;
     }
 
@@ -120,7 +122,8 @@ public:
      * Applies the transform of the rule identified by name. Extensions override this.
      * Returns true if the pipeline was modified.
      */
-    virtual bool evaluateRuleTransform(std::string_view ruleName) {
+    virtual bool evaluateRuleTransform(std::string_view ruleName,
+                                       PipelineRewriteContextHandle pipelineRewriteContext) {
         return false;
     }
 
@@ -260,22 +263,28 @@ private:
     static ::MongoExtensionStatus* _extEvaluateRulePrecondition(
         const ::MongoExtensionLogicalAggStage* extLogicalStage,
         ::MongoExtensionByteView ruleName,
+        const ::MongoExtensionPipelineRewriteContext* ctx,
         bool* result) noexcept {
         return wrapCXXAndConvertExceptionToStatus([&]() {
             *result = false;
             auto& adapter = *static_cast<const ExtensionLogicalAggStageAdapter*>(extLogicalStage);
-            *result = adapter.getImpl().evaluateRulePrecondition(byteViewAsStringView(ruleName));
+            ConstPipelineRewriteContextHandle rewriteContext{ctx};
+            *result = adapter.getImpl().evaluateRulePrecondition(byteViewAsStringView(ruleName),
+                                                                 rewriteContext);
         });
     }
 
     static ::MongoExtensionStatus* _extEvaluateRuleTransform(
         ::MongoExtensionLogicalAggStage* extLogicalStage,
         ::MongoExtensionByteView ruleName,
+        ::MongoExtensionPipelineRewriteContext* ctx,
         bool* result) noexcept {
         return wrapCXXAndConvertExceptionToStatus([&]() {
             *result = false;
             auto& adapter = *static_cast<ExtensionLogicalAggStageAdapter*>(extLogicalStage);
-            *result = adapter.getImpl().evaluateRuleTransform(byteViewAsStringView(ruleName));
+            PipelineRewriteContextHandle rewriteContext{ctx};
+            *result = adapter.getImpl().evaluateRuleTransform(byteViewAsStringView(ruleName),
+                                                              rewriteContext);
         });
     }
 

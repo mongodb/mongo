@@ -86,14 +86,33 @@ public:
         return serialize();
     }
 
-    bool evaluateRulePrecondition(std::string_view ruleName) const override {
-        return ruleName == "noopReorder" || ruleName == "noopInPlace";
+    bool evaluateRulePrecondition(
+        std::string_view ruleName,
+        mongo::extension::ConstPipelineRewriteContextHandle ctx) const override {
+        if (ruleName == "eraseStage") {
+            return ctx->hasAtLeastNNextStages(1) &&
+                ctx->getNthNextStage(1)->getName() == "$project";
+        }
+        if (ruleName == "eraseExtensionLimit") {
+            return ctx->hasAtLeastNNextStages(2) &&
+                ctx->getNthNextStage(2)->getName() == "$extensionLimit";
+        }
+        return ruleName == "noopInPlace";
     }
 
-    bool evaluateRuleTransform(std::string_view ruleName) override {
+    bool evaluateRuleTransform(std::string_view ruleName,
+                               mongo::extension::PipelineRewriteContextHandle ctx) override {
+        // Reorder Rule Transforms
+        if (ruleName == "eraseStage") {
+            return ctx->eraseNthNext(1);
+        }
+        if (ruleName == "eraseExtensionLimit") {
+            return ctx->eraseNthNext(2);
+        }
+
+        // In-Place Rule Transforms
         if (ruleName == "noopInPlace") {
             _inPlaceRuleApplied = true;
-            return true;
         }
         return false;
     }
@@ -239,10 +258,11 @@ public:
         _registerStage<TestVectorSearchOptStageDescriptor>(portal);
         _registerStage<TestVectorSearchStageDescriptor>(portal);
         std::vector<PipelineRewriteRule> rules{
-            {"noopReorder", kPipelineRewriteRuleTagReordering},
+            {"eraseStage", kPipelineRewriteRuleTagReordering},
+            {"eraseExtensionLimit", kPipelineRewriteRuleTagReordering},
             {"noopInPlace", kPipelineRewriteRuleTagInPlace},
         };
-        _registerStageRules<TestVectorSearchOptStageDescriptor>(portal, rules);
+        _registerStageRules<TestVectorSearchStageDescriptor>(portal, rules);
     }
 };
 

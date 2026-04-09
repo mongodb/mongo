@@ -457,43 +457,6 @@ typedef struct MongoExtensionCatalogContext {
 ////////////////////////////////////////////////////////////////
 //
 //
-//       OPTIMIZATIONS
-//
-//
-////////////////////////////////////////////////////////////////
-/**
- * Tags that control when and how a pipeline rewrite rule is evaluated.
- *
- * Each rule must have exactly one tag. The tag determines which optimization pass the rule
- * participates in:
- *
- *   kPipelineRewriteRuleTagInPlace    - The rule modifies only the internals of this stage and
- *                                       never touches adjacent stages in the pipeline.
- *
- *   kPipelineRewriteRuleTagReordering - The rule may modify adjacent stages, for example by
- *                                       reordering, merging, absorbing, or removing stages relative
- *                                       to this one.
- *
- */
-typedef enum MongoExtensionPipelineRewriteRuleTags : uint32_t {
-    kPipelineRewriteRuleTagInPlace = 1 << 0,
-    kPipelineRewriteRuleTagReordering = 1 << 1,
-} MongoExtensionPipelineRewriteRuleTags;
-
-/**
- * A pipeline optimization rule provided by an extension. Pipeline rules must be registered on a
- * per-stage-name basis at startup via MongoExtensionHostPortal. For each rule that the stage
- * registers, it must implement the rule's corresponding precondition/transform logic via the
- * evaluatePrecondition and evaluateTransform functions on the LogicalAggStage.
- */
-typedef struct MongoExtensionPipelineRewriteRule {
-    MongoExtensionByteView name;
-    MongoExtensionPipelineRewriteRuleTags tags;
-} MongoExtensionPipelineRewriteRule;
-
-////////////////////////////////////////////////////////////////
-//
-//
 //       AGGREGATION STAGE NODES
 //
 //
@@ -753,6 +716,9 @@ typedef struct MongoExtensionLogicalAggStage {
     const struct MongoExtensionLogicalAggStageVTable* const vtable;
 } MongoExtensionLogicalAggStage;
 
+// Forward declare.
+struct MongoExtensionPipelineRewriteContext;
+
 /**
  * Virtual function table for MongoExtensionLogicalAggStage.
  */
@@ -845,6 +811,7 @@ typedef struct MongoExtensionLogicalAggStageVTable {
     MongoExtensionStatus* (*evaluate_rule_precondition)(
         const MongoExtensionLogicalAggStage* logicalStage,
         MongoExtensionByteView ruleName,
+        const MongoExtensionPipelineRewriteContext* ctx,
         bool* result);
 
     /**
@@ -861,6 +828,7 @@ typedef struct MongoExtensionLogicalAggStageVTable {
      */
     MongoExtensionStatus* (*evaluate_rule_transform)(MongoExtensionLogicalAggStage* logicalStage,
                                                      MongoExtensionByteView ruleName,
+                                                     MongoExtensionPipelineRewriteContext* ctx,
                                                      bool* result);
 
     /**
@@ -1040,6 +1008,78 @@ typedef struct MongoExtensionQueryExecutionContextVTable {
     MongoExtensionStatus* (*get_deadline_timestamp_ms)(
         const MongoExtensionQueryExecutionContext* ctx, int64_t* deadlineTimestampMs);
 } MongoExtensionQueryExecutionContextVTable;
+
+////////////////////////////////////////////////////////////////
+//
+//
+//       OPTIMIZATIONS
+//
+//
+////////////////////////////////////////////////////////////////
+/**
+ * Tags that control when and how a pipeline rewrite rule is evaluated.
+ *
+ * Each rule must have exactly one tag. The tag determines which optimization pass the rule
+ * participates in:
+ *
+ *   kPipelineRewriteRuleTagInPlace    - The rule modifies only the internals of this stage and
+ *                                       never touches adjacent stages in the pipeline.
+ *
+ *   kPipelineRewriteRuleTagReordering - The rule may modify adjacent stages, for example by
+ *                                       reordering, merging, absorbing, or removing stages relative
+ *                                       to this one.
+ *
+ */
+typedef enum MongoExtensionPipelineRewriteRuleTags : uint32_t {
+    kPipelineRewriteRuleTagInPlace = 1 << 0,
+    kPipelineRewriteRuleTagReordering = 1 << 1,
+} MongoExtensionPipelineRewriteRuleTags;
+
+/**
+ * A pipeline optimization rule provided by an extension. Pipeline rules must be registered on a
+ * per-stage-name basis at startup via MongoExtensionHostPortal. For each rule that the stage
+ * registers, it must implement the rule's corresponding precondition/transform logic via the
+ * evaluatePrecondition and evaluateTransform functions on the LogicalAggStage.
+ */
+typedef struct MongoExtensionPipelineRewriteRule {
+    MongoExtensionByteView name;
+    MongoExtensionPipelineRewriteRuleTags tags;
+} MongoExtensionPipelineRewriteRule;
+
+/**
+ * Provides extension optimization rules with the ability to inspect and modify the
+ * pipeline during rule-based rewriting.
+ */
+typedef struct MongoExtensionPipelineRewriteContext {
+    const struct MongoExtensionPipelineRewriteContextVTable* const vtable;
+} MongoExtensionPipelineRewriteContext;
+
+typedef struct MongoExtensionPipelineRewriteContextVTable {
+    /**
+     * Returns the nth next stage stored in the underlying pipeline wrapped by
+     * MongoExtensionPipelineRewriteContext at the given index as a MongoExtensionLogicalAggStage.
+     */
+    MongoExtensionStatus* (*get_nth_next_stage)(const MongoExtensionPipelineRewriteContext* ctx,
+                                                size_t index,
+                                                MongoExtensionLogicalAggStage** out);
+
+    /**
+     * Erases the nth next stage stored in the underlying pipeline wrapped by
+     * MongoExtensionPipelineRewriteContext at the given index. Populates out with true if a stage
+     * was erased.
+     */
+    MongoExtensionStatus* (*erase_nth_next_stage)(MongoExtensionPipelineRewriteContext* ctx,
+                                                  size_t index,
+                                                  bool* out);
+
+    /**
+     * Populates out with true if the underlying pipeline wrapped by
+     * MongoExtensionPipelineRewriteContext has a stage at the given index. Populates out with false
+     * otw.
+     */
+    MongoExtensionStatus* (*has_at_least_n_next_stages)(
+        const MongoExtensionPipelineRewriteContext* ctx, size_t n, bool* out);
+} MongoExtensionPipelineRewriteContextVTable;
 
 ////////////////////////////////////////////////////////////////
 //

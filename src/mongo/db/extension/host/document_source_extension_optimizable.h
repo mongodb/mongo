@@ -39,8 +39,8 @@
 #include "mongo/db/extension/shared/handle/aggregation_stage/distributed_plan_logic.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/logical.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
-#include "mongo/db/extension/shared/handle/aggregation_stage/pipeline_rewrite_context.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
+#include "mongo/db/extension/shared/handle/pipeline_rewrite_context_handle.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/lite_parsed_desugarer.h"
 #include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
@@ -505,7 +505,8 @@ protected:
               auto catalogContext = CatalogContext(*expCtx);
               return astNode->bind(catalogContext.getAsBoundaryType());
           }()),
-          _ownedRewriteRules(_buildOwnedRewriteRules(_stageName, _logicalStage->get())) {}
+          _ownedRewriteRules(_buildOwnedRewriteRules(
+              _stageName, UnownedLogicalAggStageHandle(_logicalStage.get()))) {}
 
     DocumentSourceExtensionOptimizable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        LogicalAggStageHandle logicalStage,
@@ -514,7 +515,8 @@ protected:
           _stageName(std::string(logicalStage->getName())),
           _properties(properties),
           _logicalStage(std::move(logicalStage)),
-          _ownedRewriteRules(_buildOwnedRewriteRules(_stageName, _logicalStage->get())) {}
+          _ownedRewriteRules(_buildOwnedRewriteRules(
+              _stageName, UnownedLogicalAggStageHandle(_logicalStage.get()))) {}
 
 private:
     // Do not support copy or move.
@@ -539,7 +541,7 @@ private:
     // Builds the wrapped host-side rules for this stage from the extension rule registry.
     // Called once during construction.
     static std::vector<rule_based_rewrites::pipeline::PipelineRewriteRule> _buildOwnedRewriteRules(
-        const std::string& stageName, MongoExtensionLogicalAggStage* logicalStage);
+        const std::string& stageName, UnownedLogicalAggStageHandle logicalStage);
 
     // Owns the dynamically-created extension rules so that the ctx holds stable pointers into this
     // vector for the lifetime of the optimization pass. This is necessary because the

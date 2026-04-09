@@ -212,6 +212,16 @@ bool Transforms::eraseNext(PipelineRewriteContext& ctx) {
     return false;
 }
 
+bool Transforms::eraseNthNext(PipelineRewriteContext& ctx, size_t n) {
+    if (n == 0)
+        return eraseCurrent(ctx);
+    tassert(12200603,
+            str::stream() << "Expected to have " << n << " next stages",
+            ctx.hasAtLeastNNextStages(n));
+    ctx._container.erase(std::next(ctx._itr, n));
+    return true;
+}
+
 bool Transforms::partialPushdown(PipelineRewriteContext& ctx,
                                  boost::intrusive_ptr<DocumentSource> pushdownPart,
                                  boost::intrusive_ptr<DocumentSource> remainingPart) {

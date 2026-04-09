@@ -187,10 +187,24 @@ public:
         return nthPrevStage<1>();
     }
 
-    boost::intrusive_ptr<DocumentSource> nextStage() const {
-        tassert(11010005, "Already at last stage", !atLastStage());
-        return *std::next(_itr);
+    bool hasAtLeastNNextStages(size_t n) const {
+        return std::distance(_itr, _container.end()) > static_cast<std::ptrdiff_t>(n);
     }
+
+    boost::intrusive_ptr<DocumentSource> nthNextStage(size_t n) const {
+        tassert(12200602,
+                str::stream() << "Expected to have " << n << " next stages",
+                hasAtLeastNNextStages(n));
+
+        auto itr = _itr;
+        std::advance(itr, n);
+        return *itr;
+    }
+
+    boost::intrusive_ptr<DocumentSource> nextStage() const {
+        return nthNextStage(1);
+    }
+
 
     bool atFirstStage() const {
         return _itr == _container.begin();
@@ -240,6 +254,7 @@ struct Transforms {
     static bool insertAfter(PipelineRewriteContext& ctx, DocumentSource& d);
     static bool eraseCurrent(PipelineRewriteContext& ctx);
     static bool eraseNext(PipelineRewriteContext& ctx);
+    static bool eraseNthNext(PipelineRewriteContext& ctx, size_t n);
 
     /**
      * Pushes 'pushdownPart' before the previous stage. Assumes that 'ctx.current()' is the match

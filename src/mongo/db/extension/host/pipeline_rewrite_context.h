@@ -28,31 +28,44 @@
  */
 #pragma once
 
-#include "mongo/db/extension/public/api.h"
-#include "mongo/db/extension/shared/handle/handle.h"
+#include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
 #include "mongo/util/modules.h"
 
-#include <vector>
+namespace mongo::extension::host {
 
-namespace mongo::extension {
-enum PipelineRewriteRuleTags : uint32_t {
-    // Rules that optimize the internals of a stage in place but never touch adjacent stages.
-    kInPlace = 1 << 0,
-    // Rules that may e.g. reorder, combine or remove stages.
-    kReordering = 1 << 1,
-};
-
-class PipelineRewriteRule {
+/**
+ * Wraps a rule_based_rewrites::pipeline::PipelineRewriteContext for use by the host extension
+ * layer, providing access to adjacent pipeline stages without exposing internal rewriter types.
+ */
+class PipelineRewriteContext {
 public:
-    PipelineRewriteRule(std::string name, uint32_t tags) : name(std::move(name)), tags(tags) {};
+    ~PipelineRewriteContext() = default;
 
-    ::MongoExtensionPipelineRewriteRule convertToCRule() const {
-        return {.name = {reinterpret_cast<const uint8_t*>(name.c_str()), name.size()},
-                .tags = static_cast<::MongoExtensionPipelineRewriteRuleTags>(tags)};
+    boost::intrusive_ptr<DocumentSource> getNthNextStage(size_t index) const {
+        return _ctx->nthNextStage(index);
     }
 
-    std::string name;
-    uint32_t tags;
+    bool eraseNthNext(size_t index) {
+        return rule_based_rewrites::pipeline::Transforms::eraseNthNext(*_ctx, index);
+    }
+
+    bool hasAtLeastNNextStages(size_t n) const {
+        return _ctx->hasAtLeastNNextStages(n);
+    }
+
+    static inline std::unique_ptr<PipelineRewriteContext> make(
+        rule_based_rewrites::pipeline::PipelineRewriteContext* ctx) {
+        return std::unique_ptr<PipelineRewriteContext>(new PipelineRewriteContext(ctx));
+    }
+
+protected:
+    PipelineRewriteContext(absl::Nonnull<rule_based_rewrites::pipeline::PipelineRewriteContext*>
+                               pipelineRewriteContext)
+        : _ctx(pipelineRewriteContext) {}
+
+
+private:
+    rule_based_rewrites::pipeline::PipelineRewriteContext* _ctx;
 };
 
-}  // namespace mongo::extension
+}  // namespace mongo::extension::host

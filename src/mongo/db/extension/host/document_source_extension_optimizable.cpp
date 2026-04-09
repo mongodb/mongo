@@ -39,6 +39,7 @@
 #include "mongo/db/extension/host_connector/adapter/view_info_adapter.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
+#include "mongo/db/extension/shared/handle/pipeline_rewrite_context_handle.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
 #include "mongo/db/pipeline/search/search_helper.h"
@@ -599,7 +600,7 @@ const std::vector<PipelineRewriteRule>* DocumentSourceExtensionOptimizable::getS
 // static
 std::vector<rule_based_rewrites::pipeline::PipelineRewriteRule>
 DocumentSourceExtensionOptimizable::_buildOwnedRewriteRules(
-    const std::string& stageName, MongoExtensionLogicalAggStage* logicalStage) {
+    const std::string& stageName, UnownedLogicalAggStageHandle logicalStage) {
     auto it = _extensionRuleRegistry.find(stageName);
     if (it == _extensionRuleRegistry.end()) {
         return {};
@@ -612,10 +613,8 @@ DocumentSourceExtensionOptimizable::_buildOwnedRewriteRules(
     return rules;
 }
 
-using PipelineRewriteContext = rule_based_rewrites::pipeline::PipelineRewriteContext;
-
-bool DocumentSourceExtensionOptimizable::dispatchExtensionRules(PipelineRewriteContext& ctx,
-                                                                PipelineRewriteRuleTags tagFilter) {
+bool DocumentSourceExtensionOptimizable::dispatchExtensionRules(
+    rule_based_rewrites::pipeline::PipelineRewriteContext& ctx, PipelineRewriteRuleTags tagFilter) {
     for (const auto& rule : _ownedRewriteRules) {
         if (rule.tags & tagFilter) {
             ctx.addRule(rule);
@@ -624,12 +623,14 @@ bool DocumentSourceExtensionOptimizable::dispatchExtensionRules(PipelineRewriteC
     return false;
 }
 
-bool extensionDispatcherReorderingPrecondition(PipelineRewriteContext& ctx) {
+bool extensionDispatcherReorderingPrecondition(
+    rule_based_rewrites::pipeline::PipelineRewriteContext& ctx) {
     auto* stage = dynamic_cast<DocumentSourceExtensionOptimizable*>(&ctx.current());
     return stage && stage->dispatchExtensionRules(ctx, kReordering);
 }
 
-bool extensionDispatcherInPlacePrecondition(PipelineRewriteContext& ctx) {
+bool extensionDispatcherInPlacePrecondition(
+    rule_based_rewrites::pipeline::PipelineRewriteContext& ctx) {
     auto* stage = dynamic_cast<DocumentSourceExtensionOptimizable*>(&ctx.current());
     return stage && stage->dispatchExtensionRules(ctx, kInPlace);
 }
