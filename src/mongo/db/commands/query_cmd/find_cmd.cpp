@@ -263,30 +263,12 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
 /**
  * A command for running .find() queries.
  */
-class FindCmd final : public Command {
+class FindCmd final : public TypedCommand<FindCmd> {
 public:
-    FindCmd() : Command("find") {}
+    using Request = FindCommandRequest;
 
     const std::set<std::string>& apiVersions() const override {
         return kApiVersions1;
-    }
-
-    std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
-                                             const OpMsgRequest& opMsgRequest) override {
-        auto cmdRequest = _parseCmdObjectToFindCommandRequest(opCtx, opMsgRequest);
-        return std::make_unique<Invocation>(this, opMsgRequest, std::move(cmdRequest));
-    }
-
-    std::unique_ptr<CommandInvocation> parseForExplain(
-        OperationContext* opCtx,
-        const OpMsgRequest& request,
-        boost::optional<ExplainOptions::Verbosity> explainVerbosity) override {
-        auto cmdRequest = _parseCmdObjectToFindCommandRequest(opCtx, request);
-        // Providing collection UUID for explain is forbidden, see SERVER-38821 and SERVER-38275
-        uassert(ErrorCodes::InvalidNamespace,
-                "Providing collection UUID for explain is forbidden",
-                !cmdRequest->getNamespaceOrUUID().isUUID());
-        return std::make_unique<Invocation>(this, request, std::move(cmdRequest));
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext* context) const override {
@@ -348,26 +330,31 @@ public:
         return true;
     }
 
-    class Invocation final : public CommandInvocation {
-    public:
-        Invocation(const FindCmd* definition,
-                   const OpMsgRequest& request,
-                   std::unique_ptr<FindCommandRequest> cmdRequest)
-            : CommandInvocation(definition),
-              _request(request),
-              _ns(cmdRequest->getNamespaceOrUUID().isNamespaceString()
-                      ? cmdRequest->getNamespaceOrUUID().nss()
-                      : NamespaceString(cmdRequest->getNamespaceOrUUID().dbName())),
-              _genericArgs(cmdRequest->getGenericArguments()),
-              _cmdRequest(std::move(cmdRequest)) {
-            invariant(_request.body.isOwned());
+    class Invocation final : public MinimalInvocationBase {
+        using MinimalInvocationBase::request;
+        using MinimalInvocationBase::unparsedRequest;
 
-            if (_cmdRequest->getMirrored().value_or(false)) {
+    public:
+        Invocation(OperationContext* opCtx,
+                   const Command* command,
+                   const OpMsgRequest& opMsgRequest)
+            : MinimalInvocationBase(opCtx, command, opMsgRequest),
+              _ns(request().getNamespaceOrUUID().isNamespaceString()
+                      ? request().getNamespaceOrUUID().nss()
+                      : NamespaceString(request().getNamespaceOrUUID().dbName())) {
+            if (request().getNamespaceOrUUID().isNamespaceString()) {
+                CommandHelpers::ensureValidCollectionName(request().getNamespaceOrUUID().nss());
+            }
+            assertInternalParamsAreSetByInternalClients(opCtx->getClient(), request());
+            uassert(ErrorCodes::FailedToParse,
+                    "Use of forcedPlanSolutionHash not permitted.",
+                    !request().getForcedPlanSolutionHash() ||
+                        internalQueryAllowForcedPlanByHash.load());
+            if (request().getMirrored().value_or(false)) {
                 markMirrored();
             }
         }
 
-    private:
         bool supportsWriteConcern() const override {
             return false;
         }
@@ -382,7 +369,7 @@ public:
         }
 
         bool isSubjectToIngressAdmissionControl() const override {
-            return !_cmdRequest->getTerm().has_value();
+            return !request().getTerm().has_value();
         }
 
         bool supportsReadMirroring() const override {
@@ -404,21 +391,16 @@ public:
             return _ns;
         }
 
-        const GenericArguments& getGenericArguments() const override {
-            // TODO SERVER-88444: retrieve this directly from _request rather than making a separate
-            // copy.
-            return _genericArgs;
-        }
-
-        const DatabaseName& db() const override {
-            return _ns.dbName();
-        }
-
         void doCheckAuthorization(OperationContext* opCtx) const final {
             AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
 
-            const auto hasTerm = _cmdRequest->getTerm().has_value();
-            const NamespaceStringOrUUID& nsOrUUID = _cmdRequest->getNamespaceOrUUID();
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    authSession->isAuthorizedToParseNamespaceElement(
+                        unparsedRequest().body.firstElement()));
+
+            const auto hasTerm = request().getTerm().has_value();
+            const NamespaceStringOrUUID& nsOrUUID = request().getNamespaceOrUUID();
             if (nsOrUUID.isNamespaceString()) {
                 uassert(ErrorCodes::InvalidNamespace,
                         str::stream() << "Namespace " << nsOrUUID.toStringForErrorMsg()
@@ -438,13 +420,16 @@ public:
         void explain(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
                      rpc::ReplyBuilderInterface* replyBuilder) override {
+            // Providing collection UUID for explain is forbidden, see SERVER-38821 and SERVER-38275
+            uassert(ErrorCodes::InvalidNamespace,
+                    "Providing collection UUID for explain is forbidden",
+                    !request().getNamespaceOrUUID().isUUID());
+
             // We want to start the query planning timer right after parsing. In the explain code
             // path, we have already parsed the FindCommandRequest, so start timing here.
             CurOp::get(opCtx)->beginQueryPlanningTimer();
 
-            if (!_cmdRequest) {
-                _cmdRequest = _parseCmdObjectToFindCommandRequest(opCtx, _request);
-            }
+            auto cmdRequest = query_request_helper::makeFromFindCommand(request());
 
             // Acquire locks. The RAII object is optional, because in the case of a view, the locks
             // need to be released.
@@ -467,9 +452,9 @@ public:
             auto ns = [&] {
                 if (isRawDataOperation(opCtx)) {
                     auto [isTimeseriesViewRequest, translatedNs] =
-                        timeseries::isTimeseriesViewRequest(opCtx, *_cmdRequest);
+                        timeseries::isTimeseriesViewRequest(opCtx, *cmdRequest);
                     if (isTimeseriesViewRequest) {
-                        _cmdRequest->setNss(translatedNs);
+                        cmdRequest->setNss(translatedNs);
                         collectionOrView = acquireCollectionOrViewMaybeLockFree(
                             opCtx,
                             CollectionOrViewAcquisitionRequest::fromOpCtx(
@@ -489,9 +474,9 @@ public:
             // ignoring interrupt.
             InterruptibleLockGuard interruptibleLockAcquisition(opCtx);
 
-            _rewriteFLEPayloads(opCtx);
+            _rewriteFLEPayloads(opCtx, *cmdRequest);
             auto respSc =
-                SerializationContext::stateCommandReply(_cmdRequest->getSerializationContext());
+                SerializationContext::stateCommandReply(cmdRequest->getSerializationContext());
 
             // The collection may be NULL. If so, getExecutor() should handle it by returning an
             // execution tree with an EOFStage.
@@ -500,14 +485,14 @@ public:
                 const bool isClusteredCollection = collectionPtr && collectionPtr->isClustered();
                 uassertStatusOK(
                     query_request_helper::validateResumeInput(opCtx,
-                                                              _cmdRequest->getResumeAfter(),
-                                                              _cmdRequest->getStartAt(),
+                                                              cmdRequest->getResumeAfter(),
+                                                              cmdRequest->getStartAt(),
                                                               isClusteredCollection));
             }
             const auto* collator = collectionPtr ? collectionPtr->getDefaultCollator() : nullptr;
             auto expCtx =
                 ExpressionContextBuilder{}
-                    .fromRequest(opCtx, *_cmdRequest, collator, allowDiskUseByDefault.load())
+                    .fromRequest(opCtx, *cmdRequest, collator, allowDiskUseByDefault.load())
                     .explain(verbosity)
                     .tmpDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp")
                     .build();
@@ -520,7 +505,7 @@ public:
 
             auto parsedRequest = uassertStatusOK(parsed_find_command::parse(
                 expCtx,
-                {.findCommand = std::move(_cmdRequest),
+                {.findCommand = std::move(cmdRequest),
                  .extensionsCallback = ExtensionsCallbackReal(opCtx, &ns),
                  .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}));
 
@@ -579,8 +564,13 @@ public:
             ScopedDebugInfo explainDiagnostics(
                 "explainDiagnostics", diagnostic_printers::ExplainDiagnosticPrinter{exec.get()});
             // Got the execution tree. Explain it.
-            Explain::explainStages(
-                exec.get(), collection, verbosity, BSONObj(), respSc, _request.body, &bodyBuilder);
+            Explain::explainStages(exec.get(),
+                                   collection,
+                                   verbosity,
+                                   BSONObj(),
+                                   respSc,
+                                   unparsedRequest().body,
+                                   &bodyBuilder);
         }
 
         /**
@@ -635,48 +625,44 @@ public:
                 systemCriticalTaskType.emplace(opCtx);
             }
 
-            const BSONObj& cmdObj = _request.body;
+            const BSONObj& cmdObj = unparsedRequest().body;
 
-            // Parse the command BSON to a FindCommandRequest. Pass in the parsedNss in case cmdObj
-            // does not have a UUID.
             const bool isOplogNss = (_ns == NamespaceString::kRsOplogNamespace);
 
-            if (!_cmdRequest) {
-                // We're rerunning the same invocation, so we have to parse again
-                _cmdRequest = _parseCmdObjectToFindCommandRequest(opCtx, _request);
-            }
+            auto cmdRequest = query_request_helper::makeFromFindCommand(request());
+
             // Start the query planning timer right after parsing.
             CurOp::get(opCtx)->beginQueryPlanningTimer();
 
-            _rewriteFLEPayloads(opCtx);
+            _rewriteFLEPayloads(opCtx, *cmdRequest);
             auto respSc =
-                SerializationContext::stateCommandReply(_cmdRequest->getSerializationContext());
+                SerializationContext::stateCommandReply(cmdRequest->getSerializationContext());
 
-            const bool isFindByUUID = _cmdRequest->getNamespaceOrUUID().isUUID();
+            const bool isFindByUUID = cmdRequest->getNamespaceOrUUID().isUUID();
             uassert(ErrorCodes::InvalidOptions,
                     "When using the find command by UUID, the collectionUUID parameter cannot also "
                     "be specified",
-                    !isFindByUUID || !_cmdRequest->getCollectionUUID());
+                    !isFindByUUID || !cmdRequest->getCollectionUUID());
 
             auto replCoord = repl::ReplicationCoordinator::get(opCtx);
             const auto txnParticipant = TransactionParticipant::get(opCtx);
             uassert(ErrorCodes::InvalidOptions,
                     "It is illegal to open a tailable cursor in a transaction",
-                    !(opCtx->inMultiDocumentTransaction() && _cmdRequest->getTailable()));
+                    !(opCtx->inMultiDocumentTransaction() && cmdRequest->getTailable()));
 
             uassert(ErrorCodes::OperationNotSupportedInTransaction,
                     "The 'readOnce' option is not supported within a transaction.",
                     !txnParticipant || !opCtx->inMultiDocumentTransaction() ||
-                        !_cmdRequest->getReadOnce());
+                        !cmdRequest->getReadOnce());
 
             // Validate term before acquiring locks, if provided.
-            auto term = _cmdRequest->getTerm();
+            auto term = cmdRequest->getTerm();
             if (term) {
                 // Note: updateTerm returns ok if term stayed the same.
                 uassertStatusOK(replCoord->updateTerm(opCtx, *term));
             }
 
-            const bool includeMetrics = _cmdRequest->getIncludeQueryStatsMetrics();
+            const bool includeMetrics = cmdRequest->getIncludeQueryStatsMetrics();
 
             // The presence of a term in the request indicates that this is an internal replication
             // oplog read request.
@@ -707,7 +693,7 @@ public:
             if (isOplogNss) {
                 auto reverseScan = false;
 
-                auto cmdSort = _cmdRequest->getSort();
+                auto cmdSort = cmdRequest->getSort();
                 if (!cmdSort.isEmpty()) {
                     BSONElement natural = cmdSort[query_request_helper::kNaturalSortField];
                     if (natural) {
@@ -743,7 +729,7 @@ public:
                                 DatabaseProfileSettings::get(opCtx->getServiceContext())
                                     .getDatabaseProfileLevel(nss.dbName()));
             };
-            auto const nssOrUUID = _cmdRequest->getNamespaceOrUUID();
+            auto const nssOrUUID = cmdRequest->getNamespaceOrUUID();
             if (nssOrUUID.isNamespaceString()) {
                 CommandHelpers::ensureValidCollectionName(nssOrUUID.nss());
                 initializeTracker(nssOrUUID.nss());
@@ -752,7 +738,7 @@ public:
                 auto req = CollectionOrViewAcquisitionRequest::fromOpCtx(
                     opCtx, nssOrUUID, AcquisitionPrerequisites::kRead);
 
-                req.expectedUUID = _cmdRequest->getCollectionUUID();
+                req.expectedUUID = cmdRequest->getCollectionUUID();
                 return req;
             }();
 
@@ -763,9 +749,9 @@ public:
             // translation once 9.0 becomes last LTS
             if (isRawDataOperation(opCtx)) {
                 auto [isTimeseriesViewRequest, translatedNs] =
-                    timeseries::isTimeseriesViewRequest(opCtx, *_cmdRequest);
+                    timeseries::isTimeseriesViewRequest(opCtx, *cmdRequest);
                 if (isTimeseriesViewRequest) {
-                    _cmdRequest->setNss(translatedNs);
+                    cmdRequest->setNss(translatedNs);
                     collectionOrView = acquireCollectionOrViewMaybeLockFree(
                         opCtx,
                         CollectionOrViewAcquisitionRequest::fromOpCtx(
@@ -778,18 +764,18 @@ public:
                 initializeTracker(nss);
             }
 
-            if (!_cmdRequest->getMirrored()) {
+            if (!cmdRequest->getMirrored()) {
                 if (auto sampleId = analyze_shard_key::getOrGenerateSampleId(
                         opCtx,
                         ns(),
                         analyze_shard_key::SampledCommandNameEnum::kFind,
-                        *_cmdRequest)) {
+                        *cmdRequest)) {
                     analyze_shard_key::QueryAnalysisWriter::get(opCtx)
                         ->addFindQuery(*sampleId,
                                        nss,
-                                       _cmdRequest->getFilter(),
-                                       _cmdRequest->getCollation(),
-                                       _cmdRequest->getLet())
+                                       cmdRequest->getFilter(),
+                                       cmdRequest->getCollation(),
+                                       cmdRequest->getLet())
                         .getAsync([](auto) {});
                 }
             }
@@ -806,7 +792,7 @@ public:
             const auto& collectionPtr = collectionOrView->getCollectionPtr();
 
             uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << "UUID " << _cmdRequest->getNamespaceOrUUID().uuid()
+                    str::stream() << "UUID " << cmdRequest->getNamespaceOrUUID().uuid()
                                   << " specified in query request not found",
                     collectionOrView->collectionExists() || !isFindByUUID);
 
@@ -815,11 +801,11 @@ public:
                 if (isFindByUUID) {
                     // Replace the UUID in the find command with the fully qualified namespace of
                     // the looked up Collection.
-                    _cmdRequest->setNss(nss);
+                    cmdRequest->setNss(nss);
                 }
 
                 // Tailing a replicated capped clustered collection requires majority read concern.
-                const bool isTailable = _cmdRequest->getTailable();
+                const bool isTailable = cmdRequest->getTailable();
                 const bool isMajorityReadConcern = repl::ReadConcernArgs::get(opCtx).getLevel() ==
                     repl::ReadConcernLevel::kMajorityReadConcern;
                 isClusteredCollection = collectionPtr->isClustered();
@@ -839,13 +825,13 @@ public:
             if (!collectionOrView->isView()) {
                 uassertStatusOK(
                     query_request_helper::validateResumeInput(opCtx,
-                                                              _cmdRequest->getResumeAfter(),
-                                                              _cmdRequest->getStartAt(),
+                                                              cmdRequest->getResumeAfter(),
+                                                              cmdRequest->getStartAt(),
                                                               isClusteredCollection));
             }
 
             auto cq = parseQueryAndBeginOperation(
-                opCtx, *collectionOrView, nss, _request.body, std::move(_cmdRequest));
+                opCtx, *collectionOrView, nss, unparsedRequest().body, std::move(cmdRequest));
             const auto& findCommandReq = cq->getFindCommandRequest();
 
             // Create an RAII object that prints useful information about the ExpressionContext in
@@ -976,7 +962,7 @@ public:
                      opCtx->getWriteConcern(),
                      repl::ReadConcernArgs::get(opCtx),
                      ReadPreferenceSetting::get(opCtx),
-                     _request.body,
+                     unparsedRequest().body,
                      {Privilege(ResourcePattern::forExactNamespace(origNss), ActionType::find)}});
                 ScopeGuard deleteCursorOnError([&] {
                     // In case of an error while creating and stashing the cursor we have to delete
@@ -1061,7 +1047,7 @@ public:
             const auto status = runAggregate(opCtx,
                                              aggRequest,
                                              {aggRequest},
-                                             _request.body,
+                                             unparsedRequest().body,
                                              privileges,
                                              verbosity,
                                              replyBuilder);
@@ -1093,7 +1079,7 @@ public:
                 return keyBob.obj();
             }();
 
-            _request.body.filterFieldsUndotted(bob, kMirrorableKeys, true);
+            unparsedRequest().body.filterFieldsUndotted(bob, kMirrorableKeys, true);
 
             // Tell the find to only return a single batch
             bob->append("batchSize", 1);
@@ -1101,58 +1087,18 @@ public:
         }
 
     private:
-        const OpMsgRequest _request;
-        const DatabaseName _dbName;
         const NamespaceString _ns;
-        const GenericArguments _genericArgs;
-        std::unique_ptr<FindCommandRequest> _cmdRequest;
 
-        void _rewriteFLEPayloads(OperationContext* opCtx) {
+        void _rewriteFLEPayloads(OperationContext* opCtx, FindCommandRequest& cmdRequest) {
             // Rewrite any FLE find payloads that exist in the query if this is a FLE 2 query.
-            if (prepareForFLERewrite(opCtx, _cmdRequest->getEncryptionInformation())) {
+            if (prepareForFLERewrite(opCtx, cmdRequest.getEncryptionInformation())) {
                 tassert(9483400,
                         "Expecting a namespace string for find_cmd",
-                        _cmdRequest->getNamespaceOrUUID().isNamespaceString());
-                processFLEFindD(opCtx, _cmdRequest->getNamespaceOrUUID().nss(), _cmdRequest.get());
+                        cmdRequest.getNamespaceOrUUID().isNamespaceString());
+                processFLEFindD(opCtx, cmdRequest.getNamespaceOrUUID().nss(), &cmdRequest);
             }
         }
     };
-
-private:
-    // Parses the command object to a FindCommandRequest. If the client request did not specify
-    // any runtime constants, make them available to the query here.
-    static std::unique_ptr<FindCommandRequest> _parseCmdObjectToFindCommandRequest(
-        OperationContext* opCtx, const OpMsgRequest& request) {
-        AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
-
-        uassert(ErrorCodes::Unauthorized,
-                "Unauthorized",
-                authSession->isAuthorizedToParseNamespaceElement(request.body.firstElement()));
-
-        // check validated tenantId and set the flag on the serialization context object
-        auto reqSc = request.getSerializationContext();
-        const boost::optional<auth::ValidatedTenancyScope>& vts =
-            auth::ValidatedTenancyScope::get(opCtx);
-
-        auto findCommand = query_request_helper::makeFromFindCommand(
-            request.body,
-            vts,
-            vts.has_value() ? boost::make_optional(vts->tenantId()) : boost::none,
-            reqSc);
-
-        if (auto& nss = findCommand->getNamespaceOrUUID(); nss.isNamespaceString()) {
-            CommandHelpers::ensureValidCollectionName(nss.nss());
-        }
-
-        assertInternalParamsAreSetByInternalClients(opCtx->getClient(), *findCommand);
-
-        uassert(ErrorCodes::FailedToParse,
-                "Use of forcedPlanSolutionHash not permitted.",
-                !findCommand->getForcedPlanSolutionHash() ||
-                    internalQueryAllowForcedPlanByHash.load());
-
-        return findCommand;
-    }
 };
 MONGO_REGISTER_COMMAND(FindCmd).forShard();
 
