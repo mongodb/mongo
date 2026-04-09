@@ -64,6 +64,21 @@ public:
         return object;
     }
 
+    // The TypedCommand framework requires a parse(OpMsgRequest, ...) method visible on
+    // the Request type. The find command IDL defines cpp_name as FindCommandRequestBase,
+    // and this class extends it to add custom namespace override behavior. We must
+    // explicitly provide this overload for two reasons: (1) the BSONObj parse() above
+    // hides all base class parse() overloads due to C++ name hiding, and (2) the base
+    // class overloads return FindCommandRequestBase, not FindCommandRequest.
+    static FindCommandRequest parse(const OpMsgRequest& request,
+                                    const IDLParserContext& ctxt,
+                                    DeserializationContext* dctx = nullptr) {
+        NamespaceString localNS;
+        FindCommandRequest object(localNS);
+        object.parseProtected(request, ctxt, dctx);
+        return object;
+    }
+
 private:
     // This value is never serialized, instead we will serialize out the NamespaceStringOrUUID we
     // parsed when building the FindCommandRequest.

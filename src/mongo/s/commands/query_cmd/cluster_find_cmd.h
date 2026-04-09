@@ -42,6 +42,7 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_stats/find_key.h"
@@ -67,65 +68,26 @@
 #include <boost/optional.hpp>
 
 namespace mongo {
-/**
- * Parses the command object to a FindCommandRequest and validates that no runtime
- * constants were supplied and that querySettings was not passed into the command.
- */
-inline std::unique_ptr<FindCommandRequest> parseCmdObjectToFindCommandRequest(
-    OperationContext* opCtx, const OpMsgRequest& request) {
-    const auto& vts = auth::ValidatedTenancyScope::get(opCtx);
-    auto findCommand = query_request_helper::makeFromFindCommand(
-        request.body,
-        vts,
-        vts.has_value() ? boost::make_optional(vts->tenantId()) : boost::none,
-        SerializationContext::stateDefault());
-
-    uassert(51202,
-            "Cannot specify runtime constants option to a mongos",
-            !findCommand->getLegacyRuntimeConstants());
-
-    // Forbid users from passing 'querySettings' explicitly.
-    uassert(7746900,
-            "BSON field 'querySettings' is an unknown field",
-            !findCommand->getQuerySettings().has_value());
-
-    uassert(10742703,
-            "BSON field 'originalQueryShapeHash' is an unknown field",
-            !findCommand->getOriginalQueryShapeHash().has_value());
-
-    uassert(ErrorCodes::InvalidNamespace,
-            "Cannot specify UUID to a mongos.",
-            !findCommand->getNamespaceOrUUID().isUUID());
-
-    uassert(ErrorCodes::InvalidNamespace,
-            "Cannot specify find without a real namespace",
-            !findCommand->getNamespaceOrUUID().nss().isCollectionlessAggregateNS());
-
-    return findCommand;
-}
 
 /**
  * Implements the find command for a router.
  */
 template <typename Impl>
-class ClusterFindCmdBase final : public Command {
+class ClusterFindCmdBase final : public TypedCommand<ClusterFindCmdBase<Impl>> {
 public:
+    using TC = TypedCommand<ClusterFindCmdBase<Impl>>;
+    using Request = typename Impl::Request;
+
     static constexpr StringData kTermField = "term"_sd;
 
-    ClusterFindCmdBase() : Command(Impl::kName) {}
+    ClusterFindCmdBase() : TC(Impl::kCommandName) {}
 
     const std::set<std::string>& apiVersions() const override {
         return Impl::getApiVersions();
     }
 
-    std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
-                                             const OpMsgRequest& opMsgRequest) override {
-        auto cmdRequest = parseCmdObjectToFindCommandRequest(opCtx, opMsgRequest);
-        return std::make_unique<Invocation>(this, opMsgRequest, std::move(cmdRequest));
-    }
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext* context) const override {
-        return AllowedOnSecondary::kOptIn;
+    typename TC::AllowedOnSecondary secondaryAllowed(ServiceContext* context) const override {
+        return TC::AllowedOnSecondary::kOptIn;
     }
 
     bool maintenanceOk() const final {
@@ -136,8 +98,8 @@ public:
         return false;
     }
 
-    ReadWriteType getReadWriteType() const final {
-        return ReadWriteType::kRead;
+    typename TC::ReadWriteType getReadWriteType() const final {
+        return TC::ReadWriteType::kRead;
     }
 
     /**
@@ -164,18 +126,37 @@ public:
         return true;
     }
 
-    class Invocation final : public CommandInvocation {
-    public:
-        Invocation(const ClusterFindCmdBase* definition,
-                   const OpMsgRequest& request,
-                   std::unique_ptr<FindCommandRequest> cmdRequest)
-            : CommandInvocation(definition),
-              _request(request),
-              _ns(cmdRequest->getNamespaceOrUUID().nss()),
-              _genericArgs(cmdRequest->getGenericArguments()),
-              _cmdRequest(std::move(cmdRequest)) {}
+    class Invocation final : public TC::MinimalInvocationBase {
+        using TC::MinimalInvocationBase::request;
+        using TC::MinimalInvocationBase::unparsedRequest;
 
-    private:
+    public:
+        Invocation(OperationContext* opCtx,
+                   const Command* command,
+                   const OpMsgRequest& opMsgRequest)
+            : TC::MinimalInvocationBase(opCtx, command, opMsgRequest) {
+            uassert(51202,
+                    "Cannot specify runtime constants option to a mongos",
+                    !request().getLegacyRuntimeConstants());
+
+            // Forbid users from passing 'querySettings' explicitly.
+            uassert(7746900,
+                    "BSON field 'querySettings' is an unknown field",
+                    !request().getQuerySettings().has_value());
+
+            uassert(10742703,
+                    "BSON field 'originalQueryShapeHash' is an unknown field",
+                    !request().getOriginalQueryShapeHash().has_value());
+
+            uassert(ErrorCodes::InvalidNamespace,
+                    "Cannot specify UUID to a mongos.",
+                    !request().getNamespaceOrUUID().isUUID());
+
+            uassert(ErrorCodes::InvalidNamespace,
+                    "Cannot specify find without a real namespace",
+                    !request().getNamespaceOrUUID().nss().isCollectionlessAggregateNS());
+        }
+
         bool supportsWriteConcern() const override {
             return false;
         }
@@ -190,11 +171,7 @@ public:
         }
 
         NamespaceString ns() const override {
-            return _ns;
-        }
-
-        const DatabaseName& db() const override {
-            return _ns.dbName();
+            return request().getNamespaceOrUUID().nss();
         }
 
         /**
@@ -202,7 +179,7 @@ public:
          * type on the collection.
          */
         void doCheckAuthorization(OperationContext* opCtx) const final {
-            auto hasTerm = _request.body.hasField(kTermField);
+            auto hasTerm = unparsedRequest().body.hasField(kTermField);
             Impl::doCheckAuthorization(opCtx, hasTerm, ns());
         }
 
@@ -214,9 +191,6 @@ public:
             auto curOp = CurOp::get(opCtx);
             curOp->debug().getQueryStatsInfo().disableForSubqueryExecution = true;
 
-            setReadConcern(opCtx);
-            doFLERewriteIfNeeded(opCtx);
-
             auto findBodyFn = [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
                 // Clear the bodyBuilder since this lambda function may be retried if the
                 // router cache is stale.
@@ -225,7 +199,13 @@ public:
                 // Transform the nss, routingCtx and cmdObj if the 'rawData' field is enabled and
                 // the collection is timeseries.
                 auto nss = ns();
-                auto cmdRequest = std::make_unique<FindCommandRequest>(*_cmdRequest);
+                // We create a mutable copy and apply mutations inside the lambda rather
+                // than before it to avoid an extra copy, since this lambda may be retried
+                // on stale router cache. Setting readConcern and applying FLE rewrite are
+                // idempotent operations so it is safe to do in a loop.
+                auto cmdRequest = query_request_helper::makeFromFindCommand(request());
+                setReadConcern(opCtx, *cmdRequest);
+                doFLERewriteIfNeeded(opCtx, *cmdRequest);
                 bool cmdShouldBeTranslatedForRawData = false;
                 const auto targeter = CollectionRoutingInfoTargeter(opCtx, ns());
                 auto& routingCtx = performTimeseriesTranslationAccordingToRoutingInfo(
@@ -284,20 +264,22 @@ public:
                 // adjusting query parameters such as limits and sorts.
                 auto userLimit = query->getFindCommandRequest().getLimit();
                 auto userSkip = query->getFindCommandRequest().getSkip();
+                std::unique_ptr<FindCommandRequest> cmdRequestForShards;
                 if (numShards > 1) {
-                    cmdRequest = uassertStatusOK(ClusterFind::transformQueryForShards(*query));
+                    cmdRequestForShards =
+                        uassertStatusOK(ClusterFind::transformQueryForShards(*query));
                 } else {
                     // Forwards the FindCommandRequest as is to a single shard so that limit and
                     // skip can be applied on mongod.
-                    cmdRequest =
+                    cmdRequestForShards =
                         std::make_unique<FindCommandRequest>(query->getFindCommandRequest());
                 }
 
                 const auto explainCmd = ClusterExplain::wrapAsExplain(
                     cmdShouldBeTranslatedForRawData
                         ? rewriteCommandForRawDataOperation<FindCommandRequest>(
-                              cmdRequest->toBSON(), nss.coll())
-                        : cmdRequest->toBSON(),
+                              cmdRequestForShards->toBSON(), nss.coll())
+                        : cmdRequestForShards->toBSON(),
                     verbosity,
                     query->getExpCtx()->getQuerySettings().toBSON());
 
@@ -309,22 +291,22 @@ public:
                         explainCmd,
                         ReadPreferenceSetting::get(opCtx),
                         Shard::RetryPolicy::kIdempotent,
-                        cmdRequest->getFilter(),
-                        cmdRequest->getCollation(),
-                        cmdRequest->getLet(),
-                        cmdRequest->getLegacyRuntimeConstants());
+                        cmdRequestForShards->getFilter(),
+                        cmdRequestForShards->getCollation(),
+                        cmdRequestForShards->getLet(),
+                        cmdRequestForShards->getLegacyRuntimeConstants());
 
                     long long millisElapsed = timer.millis();
 
-                    const char* mongosStageName =
-                        ClusterExplain::getStageNameForReadOp(shardResponses.size(), _request.body);
+                    const char* mongosStageName = ClusterExplain::getStageNameForReadOp(
+                        shardResponses.size(), unparsedRequest().body);
 
                     auto bodyBuilder = result->getBodyBuilder();
                     uassertStatusOK(ClusterExplain::buildExplainResult(query->getExpCtx(),
                                                                        shardResponses,
                                                                        mongosStageName,
                                                                        millisElapsed,
-                                                                       _request.body,
+                                                                       unparsedRequest().body,
                                                                        &bodyBuilder,
                                                                        userLimit,
                                                                        userSkip));
@@ -333,7 +315,7 @@ public:
                     retryOnViewError(
                         opCtx,
                         result,
-                        *cmdRequest,
+                        *cmdRequestForShards,
                         query->getExpCtx()->getQuerySettings(),
                         *ex.extraInfo<ResolvedView>(),
                         // An empty PrivilegeVector is acceptable because these privileges
@@ -350,7 +332,7 @@ public:
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 auto bodyBuilder = result->getBodyBuilder();
 
-                auto findRequest = parseCmdObjectToFindCommandRequest(opCtx, _request);
+                auto findRequest = query_request_helper::makeFromFindCommand(request());
                 auto query = ClusterFind::generateAndValidateCanonicalQuery(
                     opCtx,
                     ns(),
@@ -360,7 +342,7 @@ public:
                     false /* mustRegisterRequestToQueryStats */);
 
                 ClusterExplain::buildEOFExplainResult(
-                    opCtx, query.get(), _request.body, &bodyBuilder);
+                    opCtx, query.get(), unparsedRequest().body, &bodyBuilder);
             }
         }
 
@@ -368,11 +350,12 @@ public:
             Impl::checkCanRunHere(opCtx);
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
-            setReadConcern(opCtx);
-            doFLERewriteIfNeeded(opCtx);
+            auto cmdRequest = query_request_helper::makeFromFindCommand(request());
+            setReadConcern(opCtx, *cmdRequest);
+            doFLERewriteIfNeeded(opCtx, *cmdRequest);
 
             ClusterFind::runQuery(opCtx,
-                                  std::move(_cmdRequest),
+                                  std::move(cmdRequest),
                                   ns(),
                                   ReadPreferenceSetting::get(opCtx),
                                   MatchExpressionParser::kAllowAllSpecialFeatures,
@@ -380,10 +363,7 @@ public:
                                   _didDoFLERewrite);
         }
 
-        const GenericArguments& getGenericArguments() const override {
-            return _genericArgs;
-        }
-
+    private:
         void retryOnViewError(
             OperationContext* opCtx,
             rpc::ReplyBuilderInterface* result,
@@ -406,8 +386,8 @@ public:
                 opCtx, aggRequestOnView, resolvedView, ns(), privileges, verbosity, &bodyBuilder));
         }
 
-        void setReadConcern(OperationContext* opCtx) {
-            if (_cmdRequest->getReadConcern() ||
+        void setReadConcern(OperationContext* opCtx, FindCommandRequest& cmdRequest) {
+            if (cmdRequest.getReadConcern() ||
                 (opCtx->inMultiDocumentTransaction() &&
                  !opCtx->isStartingMultiDocumentTransaction())) {
                 return;
@@ -415,24 +395,20 @@ public:
 
             // Use the readConcern from the opCtx (which may be a cluster-wide default).
             const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-            _cmdRequest->setReadConcern(readConcernArgs);
+            cmdRequest.setReadConcern(readConcernArgs);
         }
 
-        void doFLERewriteIfNeeded(OperationContext* opCtx) {
-            if (prepareForFLERewrite(opCtx, _cmdRequest->getEncryptionInformation())) {
+        void doFLERewriteIfNeeded(OperationContext* opCtx, FindCommandRequest& cmdRequest) {
+            if (prepareForFLERewrite(opCtx, cmdRequest.getEncryptionInformation())) {
                 tassert(9483401,
                         "Expecting namespace string for find command",
-                        _cmdRequest->getNamespaceOrUUID().isNamespaceString());
-                processFLEFindS(opCtx, _cmdRequest->getNamespaceOrUUID().nss(), _cmdRequest.get());
+                        cmdRequest.getNamespaceOrUUID().isNamespaceString());
+                processFLEFindS(opCtx, cmdRequest.getNamespaceOrUUID().nss(), &cmdRequest);
                 _didDoFLERewrite = true;
             }
         }
 
-        const OpMsgRequest& _request;
-        const NamespaceString _ns;
         bool _didDoFLERewrite{false};
-        const GenericArguments _genericArgs;
-        std::unique_ptr<FindCommandRequest> _cmdRequest;
     };
 };
 

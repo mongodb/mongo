@@ -51,7 +51,8 @@ namespace {
  * Implements the cluster find command on mongos.
  */
 struct ClusterFindCmdS {
-    static constexpr StringData kName = "find"_sd;
+    using Request = FindCommandRequest;
+    static constexpr StringData kCommandName = "find"_sd;
 
     static const std::set<std::string>& getApiVersions() {
         return kApiVersions1;

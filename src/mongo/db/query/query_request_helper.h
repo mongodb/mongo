@@ -101,6 +101,13 @@ MONGO_MOD_PUBLIC std::unique_ptr<FindCommandRequest> makeFromFindCommand(
     const boost::optional<TenantId>& tenantId,
     const SerializationContext& sc);
 
+/**
+ * Copies an already-parsed FindCommandRequest and applies post-parse normalization and
+ * validation (meta projection, skip/limit normalization, option validation).
+ */
+MONGO_MOD_PUBLIC std::unique_ptr<FindCommandRequest> makeFromFindCommand(
+    const FindCommandRequest& findCommand);
+
 MONGO_MOD_PUBLIC std::unique_ptr<FindCommandRequest> makeFromFindCommandForTests(
     const BSONObj& cmdObj, boost::optional<NamespaceString> nss = boost::none);
 

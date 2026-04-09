@@ -53,10 +53,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
-#include <cstdint>
-#include <memory>
-#include <string>
-
 #include <boost/cstdint.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -70,9 +66,9 @@ namespace {
 /**
  * Add the meta projection to this object if needed.
  */
-void addMetaProjection(FindCommandRequest* findCommand) {
-    if (findCommand->getShowRecordId()) {
-        addShowRecordIdMetaProj(findCommand);
+void addMetaProjection(FindCommandRequest& findCommand) {
+    if (findCommand.getShowRecordId()) {
+        addShowRecordIdMetaProj(&findCommand);
     }
 }
 
@@ -223,6 +219,17 @@ Status validateFindCommandRequest(const FindCommandRequest& findCommand) {
     return Status::OK();
 }
 
+void validateAndNormalize(FindCommandRequest& findCommand) {
+    addMetaProjection(findCommand);
+    if (findCommand.getSkip() && *findCommand.getSkip() == 0) {
+        findCommand.setSkip(boost::none);
+    }
+    if (findCommand.getLimit() && *findCommand.getLimit() == 0) {
+        findCommand.setLimit(boost::none);
+    }
+    uassertStatusOK(validateFindCommandRequest(findCommand));
+}
+
 std::unique_ptr<FindCommandRequest> makeFromFindCommand(
     const BSONObj& cmdObj,
     const boost::optional<auth::ValidatedTenancyScope>& vts,
@@ -234,17 +241,15 @@ std::unique_ptr<FindCommandRequest> makeFromFindCommand(
             cmdObj,
             IDLParserContext("FindCommandRequest", vts, tenantId ? tenantId : boost::none, sc)));
 
-    addMetaProjection(findCommand.get());
-
-    if (findCommand->getSkip() && *findCommand->getSkip() == 0) {
-        findCommand->setSkip(boost::none);
-    }
-    if (findCommand->getLimit() && *findCommand->getLimit() == 0) {
-        findCommand->setLimit(boost::none);
-    }
-    uassertStatusOK(validateFindCommandRequest(*findCommand));
+    validateAndNormalize(*findCommand);
 
     return findCommand;
+}
+
+std::unique_ptr<FindCommandRequest> makeFromFindCommand(const FindCommandRequest& findCommand) {
+    auto copy = std::make_unique<FindCommandRequest>(findCommand);
+    validateAndNormalize(*copy);
+    return copy;
 }
 
 std::unique_ptr<FindCommandRequest> makeFromFindCommandForTests(
