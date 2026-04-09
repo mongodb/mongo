@@ -366,8 +366,6 @@ class test_cursor13_drops(test_cursor13_base):
         confirm_does_not_exist(self, uri)
 
         # Same test for indices, but with cursor held by another session.
-        # TODO: try with session that DOES have cache_cursors and another
-        # that does not.
         session2 = self.conn.open_session(None)
         ds = ComplexDataSet(self, uri, 100)
         ds.create()

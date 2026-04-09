@@ -36,9 +36,6 @@ from wtscenario import make_scenarios
 #
 # The required value should be fetched from the history store and then passed straight
 # back to the user without putting together an update chain.
-#
-# TODO: Uncomment the checks after the main portion of the relevant history
-# project work is complete.
 class test_hs06(wttest.WiredTigerTestCase):
     # Force a small cache.
     conn_config = 'cache_size=50MB,statistics=(fast)'
@@ -143,9 +140,7 @@ class test_hs06(wttest.WiredTigerTestCase):
         #
         # This check could be more aggressive but to avoid potential flakiness,
         # lets just ensure that it hasn't doubled.
-        #
-        # TODO: Uncomment this once the project work is done.
-        # self.assertLessEqual(end_usage, (start_usage * 2))
+        self.assertLessEqual(end_usage, (start_usage * 2))
 
     # WT-5336 causing the read at timestamp 4 returning the value committed at timestamp 5 or 3
     def test_hs_modify_reads(self):

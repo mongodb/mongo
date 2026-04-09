@@ -2492,7 +2492,7 @@ __evict_try_queue_page(WT_SESSION_IMPL *session, WTI_EVICT_QUEUE *queue, WT_REF 
     WT_CONNECTION_IMPL *conn;
     WT_EVICT *evict;
     WT_PAGE *page;
-    bool modified, want_page;
+    bool evict_clean, evict_dirty, evict_updates, modified, should_evict_page;
 
     btree = S2BT(session);
     conn = S2C(session);
@@ -2556,12 +2556,13 @@ __evict_try_queue_page(WT_SESSION_IMPL *session, WTI_EVICT_QUEUE *queue, WT_REF 
     if (__wt_page_is_empty(page) || F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
         goto fast;
 
+    evict_clean =
+      F_ISSET(evict, WT_EVICT_CACHE_CLEAN) && !F_ISSET(btree, WT_BTREE_IN_MEMORY) && !modified;
+    evict_dirty = F_ISSET(evict, WT_EVICT_CACHE_DIRTY) && modified;
+    evict_updates = F_ISSET(evict, WT_EVICT_CACHE_UPDATES) && page->modify != NULL;
+    should_evict_page = evict_clean || evict_dirty || evict_updates;
     /* Skip pages we don't want. */
-    want_page =
-      (F_ISSET(evict, WT_EVICT_CACHE_CLEAN) && !F_ISSET(btree, WT_BTREE_IN_MEMORY) && !modified) ||
-      (F_ISSET(evict, WT_EVICT_CACHE_DIRTY) && modified) ||
-      (F_ISSET(evict, WT_EVICT_CACHE_UPDATES) && page->modify != NULL);
-    if (!want_page) {
+    if (!should_evict_page) {
         WT_STAT_CONN_INCR(session, eviction_server_skip_unwanted_pages);
         return;
     }

@@ -490,7 +490,7 @@ class DisaggPlatformAPI(wthooks.WiredTigerHookPlatformAPI):
         # We also allow a set of uris that we never want to be layered.
         # Tests can add to this list.
         #
-        # TODO: When there are multiple connections on multiple home directories,
+        # FIXME-WT-16920: When there are multiple connections on multiple home directories,
         # this may break down.  If we want a more precise accounting, we can associate the
         # uris with the home directory used.
         testcase.layered_uris = set()
@@ -501,11 +501,11 @@ class DisaggPlatformAPI(wthooks.WiredTigerHookPlatformAPI):
             testcase.pr(f'>>>>layered tables: {testcase.layered_uris}<<<<<')
 
     def tableExists(self, name):
-        # TODO: for PALite will need to rummage in kv_home files.
+        # FIXME-WT-16918: for PALite will need to rummage in kv_home files.
         return False
 
     def initialFileName(self, uri):
-        # TODO: there really isn't an equivalent
+        # FIXME-WT-15064: there really isn't an equivalent
         # return 'kv_home/data.mdb'
         return None
 

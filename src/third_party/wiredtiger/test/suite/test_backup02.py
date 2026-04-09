@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import queue, threading, time, wttest
-from wtthread import backup_thread, op_thread
+from wtthread import backup_thread, checkpoint_thread, op_thread
 
 # test_backup02.py
 #   Run background checkpoints and backups repeatedly while doing inserts
@@ -49,10 +49,8 @@ class test_backup02(wttest.WiredTigerTestCase):
         for this_uri in uris:
             self.session.create(this_uri,
                 "key_format=" + self.fmt + ",value_format=S")
-        # TODO: Ideally we'd like a checkpoint thread, separate to the backup
-        # thread. Need a way to stop checkpoints while doing backups.
-#        ckpt = checkpoint_thread(self.conn, done)
-#        ckpt.start()
+        ckpt = checkpoint_thread(self.conn, done)
+        ckpt.start()
         bkp = backup_thread(self.conn, 'backup.dir', done)
         work_queue = queue.Queue()
         opthreads = []
@@ -86,7 +84,7 @@ class test_backup02(wttest.WiredTigerTestCase):
             work_queue.join()
             done.set()
             # Wait for checkpoint thread to notice status change.
-            # ckpt.join()
+            ckpt.join()
             for t in opthreads:
                 t.join()
             bkp.join()

@@ -34,6 +34,7 @@ int
 __wt_curconfig_open(
   WT_SESSION_IMPL *session, const char *uri, const char *cfg[], WT_CURSOR **cursorp)
 {
+    /* FIXME-WT-16977: Finish implementing the config cursor API. */
     WT_CURSOR_STATIC_INIT(iface, __wt_cursor_get_key, /* get-key */
       __wt_cursor_get_value,                          /* get-value */
       __wt_cursor_get_raw_key_value,                  /* get-raw-key-value */

@@ -37,9 +37,6 @@ class test_tiered03(wttest.WiredTigerTestCase, TieredConfigMixin):
     K = 1024
     M = 1024 * K
     G = 1024 * M
-    # TODO: tiered: change this to a table: URI, otherwise we are
-    # not using tiered files.  The use of a second directory for
-    # sharing would probably need to be reworked.
     uri = 'file:test_tiered03'
 
     storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), 'test_tiered03', tiered_only=True)

@@ -48,11 +48,6 @@ class test_layered09(wttest.WiredTigerTestCase):
         ('snappy', dict(block_compress='snappy')),
     ]
 
-    ts = [
-        ('ts', dict(ts=True)),
-        ('non-ts', dict(ts=False)),
-    ]
-
     # The delta percentage of 100 is an arbitrary large value, intended to produce
     # deltas a lot of the time.
     conn_base_config = 'transaction_sync=(enabled,method=fsync),statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
@@ -61,7 +56,7 @@ class test_layered09(wttest.WiredTigerTestCase):
     uri='layered:test_layered09'
 
     # Make scenarios for different cloud service providers
-    scenarios = make_scenarios(encrypt, compress, disagg_storages, ts)
+    scenarios = make_scenarios(encrypt, compress, disagg_storages)
 
     nitems = 100
 
@@ -92,10 +87,7 @@ class test_layered09(wttest.WiredTigerTestCase):
         for i in range(self.nitems):
             self.session.begin_transaction()
             cursor[str(i)] = value1
-            if self.ts:
-                self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(5))
-            else:
-                self.session.commit_transaction()
+            self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(5))
 
         self.session.checkpoint()
 
@@ -103,11 +95,7 @@ class test_layered09(wttest.WiredTigerTestCase):
             if i % 10 == 0:
                 self.session.begin_transaction()
                 cursor[str(i)] = value2
-                if self.ts:
-                    self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(10))
-                else:
-                    self.session.commit_transaction()
-
+                self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(10))
         self.session.checkpoint()
 
         stat_cursor = self.session.open_cursor('statistics:')
@@ -120,21 +108,18 @@ class test_layered09(wttest.WiredTigerTestCase):
 
         cursor = self.session.open_cursor(self.uri, None, None)
 
-        if self.ts:
-            self.session.begin_transaction("read_timestamp=" + self.timestamp_str(5))
-            for i in range(self.nitems):
-                self.assertEqual(cursor[str(i)], value1)
-            self.session.rollback_transaction()
+        self.session.begin_transaction("read_timestamp=" + self.timestamp_str(5))
+        for i in range(self.nitems):
+            self.assertEqual(cursor[str(i)], value1)
+        self.session.rollback_transaction()
 
-        if self.ts:
-            self.session.begin_transaction("read_timestamp=" + self.timestamp_str(10))
+        self.session.begin_transaction("read_timestamp=" + self.timestamp_str(10))
         for i in range(self.nitems):
             if i % 10 == 0:
                 self.assertEqual(cursor[str(i)], value2)
             else:
                 self.assertEqual(cursor[str(i)], value1)
-        if self.ts:
-            self.session.rollback_transaction()
+        self.session.rollback_transaction()
 
     def test_layered_read_modify(self):
         if sys.platform.startswith('darwin'):
@@ -150,11 +135,7 @@ class test_layered09(wttest.WiredTigerTestCase):
         for i in range(self.nitems):
             self.session.begin_transaction()
             cursor[str(i)] = value1
-            if self.ts:
-                self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(5))
-            else:
-                self.session.commit_transaction()
-
+            self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(5))
         self.session.checkpoint()
 
         for i in range(self.nitems):
@@ -163,10 +144,7 @@ class test_layered09(wttest.WiredTigerTestCase):
                 cursor.set_key(str(i))
                 mods = [wiredtiger.Modify('b', 1, 1)]
                 self.assertEqual(cursor.modify(mods), 0)
-                if self.ts:
-                    self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(10))
-                else:
-                    self.session.commit_transaction()
+                self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(10))
 
         self.session.checkpoint()
 
@@ -180,21 +158,18 @@ class test_layered09(wttest.WiredTigerTestCase):
 
         cursor = self.session.open_cursor(self.uri, None, None)
 
-        if self.ts:
-            self.session.begin_transaction("read_timestamp=" + self.timestamp_str(5))
-            for i in range(self.nitems):
-                self.assertEqual(cursor[str(i)], value1)
-            self.session.rollback_transaction()
+        self.session.begin_transaction("read_timestamp=" + self.timestamp_str(5))
+        for i in range(self.nitems):
+            self.assertEqual(cursor[str(i)], value1)
+        self.session.rollback_transaction()
 
-        if self.ts:
-            self.session.begin_transaction("read_timestamp=" + self.timestamp_str(10))
+        self.session.begin_transaction("read_timestamp=" + self.timestamp_str(10))
         for i in range(self.nitems):
             if i % 10 == 0:
                 self.assertEqual(cursor[str(i)], value2)
             else:
                 self.assertEqual(cursor[str(i)], value1)
-        if self.ts:
-            self.session.rollback_transaction()
+        self.session.rollback_transaction()
 
     def test_layered_read_delete(self):
         if sys.platform.startswith('darwin'):
@@ -209,10 +184,7 @@ class test_layered09(wttest.WiredTigerTestCase):
         for i in range(self.nitems):
             self.session.begin_transaction()
             cursor[str(i)] = value1
-            if self.ts:
-                self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(5))
-            else:
-                self.session.commit_transaction()
+            self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(5))
 
         self.session.checkpoint()
 
@@ -221,18 +193,13 @@ class test_layered09(wttest.WiredTigerTestCase):
                 self.session.begin_transaction()
                 cursor.set_key(str(i))
                 self.assertEqual(cursor.remove(), 0)
-                if self.ts:
-                    self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(10))
-                else:
-                    self.session.commit_transaction()
+                self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(10))
 
         self.session.checkpoint()
 
-        # TODO: In the non ts version, checkpoint splits the page and thus no delta is generated. Not sure how to tune this.
-        if self.ts:
-            stat_cursor = self.session.open_cursor('statistics:')
-            self.assertGreater(stat_cursor[stat.conn.rec_page_delta_leaf][2], 0)
-            stat_cursor.close()
+        stat_cursor = self.session.open_cursor('statistics:')
+        self.assertGreater(stat_cursor[stat.conn.rec_page_delta_leaf][2], 0)
+        stat_cursor.close()
 
         follower_config = self.conn_base_config + 'disaggregated=(role="follower",' +\
             f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")'
@@ -240,22 +207,19 @@ class test_layered09(wttest.WiredTigerTestCase):
 
         cursor = self.session.open_cursor(self.uri, None, None)
 
-        if self.ts:
-            self.session.begin_transaction("read_timestamp=" + self.timestamp_str(5))
-            for i in range(self.nitems):
-                self.assertEqual(cursor[str(i)], value1)
-            self.session.rollback_transaction()
+        self.session.begin_transaction("read_timestamp=" + self.timestamp_str(5))
+        for i in range(self.nitems):
+            self.assertEqual(cursor[str(i)], value1)
+        self.session.rollback_transaction()
 
-        if self.ts:
-            self.session.begin_transaction("read_timestamp=" + self.timestamp_str(10))
+        self.session.begin_transaction("read_timestamp=" + self.timestamp_str(10))
         for i in range(self.nitems):
             if i % 10 == 0:
                 cursor.set_key(str(i))
                 self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
             else:
                 self.assertEqual(cursor[str(i)], value1)
-        if self.ts:
-            self.session.rollback_transaction()
+        self.session.rollback_transaction()
 
     def test_layered_read_insert(self):
         if sys.platform.startswith('darwin'):
@@ -270,20 +234,14 @@ class test_layered09(wttest.WiredTigerTestCase):
         for i in range(self.nitems):
             self.session.begin_transaction()
             cursor[str(i)] = value1
-            if self.ts:
-                self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(5))
-            else:
-                self.session.commit_transaction()
+            self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(5))
 
         self.session.checkpoint()
 
         for i in range(self.nitems, self.nitems + 5):
             self.session.begin_transaction()
             cursor[str(i)] = value1
-            if self.ts:
-                self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(10))
-            else:
-                self.session.commit_transaction()
+            self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(10))
 
         self.session.checkpoint()
 
@@ -297,22 +255,19 @@ class test_layered09(wttest.WiredTigerTestCase):
 
         cursor = self.session.open_cursor(self.uri, None, None)
 
-        if self.ts:
-            self.session.begin_transaction("read_timestamp=" + self.timestamp_str(5))
-            for i in range(self.nitems):
-                self.assertEqual(cursor[str(i)], value1)
+        self.session.begin_transaction("read_timestamp=" + self.timestamp_str(5))
+        for i in range(self.nitems):
+            self.assertEqual(cursor[str(i)], value1)
 
-            for i in range(self.nitems, self.nitems + 5):
-                cursor.set_key(str(i))
-                self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
-            self.session.rollback_transaction()
+        for i in range(self.nitems, self.nitems + 5):
+            cursor.set_key(str(i))
+            self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
+        self.session.rollback_transaction()
 
-        if self.ts:
-            self.session.begin_transaction("read_timestamp=" + self.timestamp_str(10))
+        self.session.begin_transaction("read_timestamp=" + self.timestamp_str(10))
         for i in range(self.nitems + 5):
             self.assertEqual(cursor[str(i)], value1)
-        if self.ts:
-            self.session.rollback_transaction()
+        self.session.rollback_transaction()
 
     def test_layered_read_multiple_delta(self):
         if sys.platform.startswith('darwin'):
@@ -329,10 +284,7 @@ class test_layered09(wttest.WiredTigerTestCase):
         for i in range(self.nitems):
             self.session.begin_transaction()
             cursor[str(i)] = value1
-            if self.ts:
-                self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(5))
-            else:
-                self.session.commit_transaction()
+            self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(5))
 
         self.session.checkpoint()
 
@@ -340,10 +292,7 @@ class test_layered09(wttest.WiredTigerTestCase):
             if i % 10 == 0:
                 self.session.begin_transaction()
                 cursor[str(i)] = value2
-                if self.ts:
-                    self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(10))
-                else:
-                    self.session.commit_transaction()
+                self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(10))
 
         self.session.checkpoint()
 
@@ -351,10 +300,7 @@ class test_layered09(wttest.WiredTigerTestCase):
             if i % 20 == 0:
                 self.session.begin_transaction()
                 cursor[str(i)] = value3
-                if self.ts:
-                    self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(15))
-                else:
-                    self.session.commit_transaction()
+                self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(15))
 
         self.session.checkpoint()
 
@@ -368,22 +314,20 @@ class test_layered09(wttest.WiredTigerTestCase):
 
         cursor = self.session.open_cursor(self.uri, None, None)
 
-        if self.ts:
-            self.session.begin_transaction("read_timestamp=" + self.timestamp_str(5))
-            for i in range(self.nitems):
+        self.session.begin_transaction("read_timestamp=" + self.timestamp_str(5))
+        for i in range(self.nitems):
+            self.assertEqual(cursor[str(i)], value1)
+        self.session.rollback_transaction()
+
+        self.session.begin_transaction("read_timestamp=" + self.timestamp_str(10))
+        for i in range(self.nitems):
+            if i % 10 == 0:
+                self.assertEqual(cursor[str(i)], value2)
+            else:
                 self.assertEqual(cursor[str(i)], value1)
-            self.session.rollback_transaction()
+        self.session.rollback_transaction()
 
-            self.session.begin_transaction("read_timestamp=" + self.timestamp_str(10))
-            for i in range(self.nitems):
-                if i % 10 == 0:
-                    self.assertEqual(cursor[str(i)], value2)
-                else:
-                    self.assertEqual(cursor[str(i)], value1)
-            self.session.rollback_transaction()
-
-        if self.ts:
-            self.session.begin_transaction("read_timestamp=" + self.timestamp_str(15))
+        self.session.begin_transaction("read_timestamp=" + self.timestamp_str(15))
         for i in range(self.nitems):
             if i % 20 == 0:
                 self.assertEqual(cursor[str(i)], value3)
@@ -391,8 +335,7 @@ class test_layered09(wttest.WiredTigerTestCase):
                 self.assertEqual(cursor[str(i)], value2)
             else:
                 self.assertEqual(cursor[str(i)], value1)
-        if self.ts:
-            self.session.rollback_transaction()
+        self.session.rollback_transaction()
 
     def test_layered_read_delete_insert(self):
         if sys.platform.startswith('darwin'):
@@ -408,10 +351,7 @@ class test_layered09(wttest.WiredTigerTestCase):
         for i in range(self.nitems):
             self.session.begin_transaction()
             cursor[str(i)] = value1
-            if self.ts:
-                self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(5))
-            else:
-                self.session.commit_transaction()
+            self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(5))
 
         self.session.checkpoint()
 
@@ -420,10 +360,7 @@ class test_layered09(wttest.WiredTigerTestCase):
                 self.session.begin_transaction()
                 cursor.set_key(str(i))
                 self.assertEqual(cursor.remove(), 0)
-                if self.ts:
-                    self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(10))
-                else:
-                    self.session.commit_transaction()
+                self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(10))
 
         self.session.checkpoint()
 
@@ -431,18 +368,13 @@ class test_layered09(wttest.WiredTigerTestCase):
             if i % 20 == 0:
                 self.session.begin_transaction()
                 cursor[str(i)] = value2
-                if self.ts:
-                    self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(15))
-                else:
-                    self.session.commit_transaction()
+                self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(15))
 
         self.session.checkpoint()
 
-        # TODO: In the non ts version, checkpoint splits the page and thus no delta is generated. Not sure how to tune this.
-        if self.ts:
-            stat_cursor = self.session.open_cursor('statistics:')
-            self.assertGreater(stat_cursor[stat.conn.rec_page_delta_leaf][2], 0)
-            stat_cursor.close()
+        stat_cursor = self.session.open_cursor('statistics:')
+        self.assertGreater(stat_cursor[stat.conn.rec_page_delta_leaf][2], 0)
+        stat_cursor.close()
 
         follower_config = self.conn_base_config + 'disaggregated=(role="follower",' +\
             f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")'
@@ -450,23 +382,21 @@ class test_layered09(wttest.WiredTigerTestCase):
 
         cursor = self.session.open_cursor(self.uri, None, None)
 
-        if self.ts:
-            self.session.begin_transaction("read_timestamp=" + self.timestamp_str(5))
-            for i in range(self.nitems):
+        self.session.begin_transaction("read_timestamp=" + self.timestamp_str(5))
+        for i in range(self.nitems):
+            self.assertEqual(cursor[str(i)], value1)
+        self.session.rollback_transaction()
+
+        self.session.begin_transaction("read_timestamp=" + self.timestamp_str(10))
+        for i in range(self.nitems):
+            if i % 10 == 0:
+                cursor.set_key(str(i))
+                self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
+            else:
                 self.assertEqual(cursor[str(i)], value1)
-            self.session.rollback_transaction()
+        self.session.rollback_transaction()
 
-            self.session.begin_transaction("read_timestamp=" + self.timestamp_str(10))
-            for i in range(self.nitems):
-                if i % 10 == 0:
-                    cursor.set_key(str(i))
-                    self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
-                else:
-                    self.assertEqual(cursor[str(i)], value1)
-            self.session.rollback_transaction()
-
-        if self.ts:
-            self.session.begin_transaction("read_timestamp=" + self.timestamp_str(15))
+        self.session.begin_transaction("read_timestamp=" + self.timestamp_str(15))
         for i in range(self.nitems):
             if i % 20 == 0:
                 self.assertEqual(cursor[str(i)], value2)
@@ -475,5 +405,4 @@ class test_layered09(wttest.WiredTigerTestCase):
                 self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
             else:
                 self.assertEqual(cursor[str(i)], value1)
-        if self.ts:
-            self.session.rollback_transaction()
+        self.session.rollback_transaction()

@@ -65,13 +65,6 @@
 #       structures, and result in incrementing the version number.
 #       Thus, the key remains unchanged, but the associated value
 #       changes (the size of the value may be altered as well).
-#
-#       TODO: we need to separate the cursor tracking information
-#       (the current position where we believe we are) from
-#       the database information (what we think is in the data storage).
-#       Once that's done, we can have multiple cursor tests
-#       (though simulating transactions would probably be beyond what
-#       we want to do here).
 
 import hashlib
 import wiredtiger, wttest
@@ -287,8 +280,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
         if bits not in self.vers:
             self.bitlist.append(bits)
             if self.isrow:
-                #TODO: why doesn't self.bitlist.sort() work?
-                self.bitlist = sorted(self.bitlist)
+                self.bitlist.sort()
             self.vers[bits] = 0
         else:
             raise Exception('cur_insert: key already exists: ' + str(major) + ',' + str(minor))
@@ -300,7 +292,6 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
         cursor[wtkey] = wtval
 
     def cur_remove_here(self, cursor):
-        # TODO: handle the exception case
         if self.nopos:
             expectException = True
         else:

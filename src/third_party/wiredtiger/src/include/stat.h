@@ -366,6 +366,10 @@ __wt_stats_clear_dsrc(void *stats_arg, int slot)
             WT_STAT_CONN_INCR(session, stat##_lt500);           \
         else if (usecs < WT_THOUSAND)                           \
             WT_STAT_CONN_INCR(session, stat##_lt1000);          \
+        else if (usecs < 2500)                                  \
+            WT_STAT_CONN_INCR(session, stat##_lt2500);          \
+        else if (usecs < 5 * WT_THOUSAND)                       \
+            WT_STAT_CONN_INCR(session, stat##_lt5000);          \
         else if (usecs < 10 * WT_THOUSAND)                      \
             WT_STAT_CONN_INCR(session, stat##_lt10000);         \
         else                                                    \

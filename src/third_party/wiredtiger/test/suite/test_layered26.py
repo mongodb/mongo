@@ -101,12 +101,45 @@ class test_layered26(wttest.WiredTigerTestCase):
         cursor_follow.close()
         self.assertEqual(item_count, self.nitems)
 
-        # TODO: once we start really thinking about failover, extend this test
-        # to step up the secondary and make sure it can do "normal" things like
-        # inserts and checkpoints:
-        #
-        # conn_follow.reconfigure('disaggregated=(role="leader")')
-        #
-        # It's broken right now because the table-draining code needs to do some
-        # stuff like using internal sessions to open cursors, and that's being done
-        # in SLS-1226.
+        # Step up the secondary, step down the primary
+        conn_follow.reconfigure('disaggregated=(role="leader")')
+        self.conn.reconfigure('disaggregated=(role="follower")')
+
+        # Avoid checkpoint error with precise checkpoint
+        conn_follow.set_timestamp('stable_timestamp=1')
+
+        # Put data into the new primary (old secondary)
+        value_prefix2 = 'bbb'
+        cursor = session_follow.open_cursor(self.uri)
+        for i in range(self.nitems, 2 * self.nitems):
+            cursor[str(i)] = value_prefix2 + str(i)
+        cursor.close()
+
+        # Create a checkpoint
+        session_follow.checkpoint()
+
+        # New primary should see the data, secondary (old primary) should not.
+        cursor = session_follow.open_cursor(self.uri)
+        item_count = 0
+        while cursor.next() == 0:
+            item_count += 1
+        cursor.close()
+        self.assertEqual(item_count, 2 * self.nitems)
+
+        cursor_follow = self.session.open_cursor(self.uri)
+        item_count = 0
+        while cursor_follow.next() == 0:
+            item_count += 1
+        cursor_follow.close()
+        self.assertEqual(item_count, self.nitems)
+
+        # Notify the secondary of the new checkpoint
+        self.disagg_advance_checkpoint(self.conn)
+
+        # Now, the data should be visible on the secondary.
+        cursor_follow = self.session.open_cursor(self.uri)
+        item_count = 0
+        while cursor_follow.next() == 0:
+            item_count += 1
+        cursor_follow.close()
+        self.assertEqual(item_count, 2 * self.nitems)

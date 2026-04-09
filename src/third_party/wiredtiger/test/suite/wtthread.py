@@ -130,7 +130,6 @@ class backup_thread(threading.Thread):
         while not self.done.is_set():
             # Sleep for 2 seconds.
             time.sleep(2)
-            sess.checkpoint()
             shutil.rmtree(self.backup_dir, ignore_errors=True)
             os.mkdir(self.backup_dir)
             cursor = sess.open_cursor('backup:', None, None)
@@ -157,14 +156,13 @@ class backup_thread(threading.Thread):
                     uris.append(uri)
 
                 # Add an assert to stop running the test if any difference in table contents
-                # is found. We would have liked to use self.assertTrue instead, but are unable
-                # to because backup_thread does not support this method unless it is a wttest.
+                # is found.
                 wttest.WiredTigerTestCase.printVerbose(3, "Testing if checkpoint tables match:")
-                assert compare_tables(self, sess, uris) == True
+                self.testcase.assertTrue(compare_tables(self, sess, uris))
                 wttest.WiredTigerTestCase.printVerbose(3, "Checkpoint tables match")
 
                 wttest.WiredTigerTestCase.printVerbose(3, "Testing if backup tables match:")
-                assert compare_tables(self, bkp_session, uris) == True
+                self.testcase.assertTrue(compare_tables(self, bkp_session, uris))
                 wttest.WiredTigerTestCase.printVerbose(3, "Backup tables match")
             finally:
                 if bkp_conn != None:
