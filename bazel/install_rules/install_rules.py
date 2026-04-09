@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import shutil
+import time
 
 parser = argparse.ArgumentParser()
 
@@ -64,6 +65,13 @@ def install(src, install_type):
                         pass
                     else:
                         raise exc
+                except OSError as exc:
+                    if exc.strerror == "Directory not empty":
+                        print("Encountered OSError: Directory not empty. Retrying...")
+                        time.sleep(1)
+                        shutil.rmtree(dst)
+                    else:
+                        raise exc
             if not os.path.exists(dst):
                 try:
                     if os.path.isdir(src):
@@ -74,10 +82,21 @@ def install(src, install_type):
                                 ).replace(src, dst)
                                 if not os.path.exists(dest_dir):
                                     os.makedirs(dest_dir)
-                                os.link(
-                                    os.path.join(root, name),
-                                    os.path.join(dest_dir, name),
-                                )
+                                try:
+                                    os.link(
+                                        os.path.join(root, name),
+                                        os.path.join(dest_dir, name),
+                                    )
+                                except OSError as exc:
+                                    if exc.strerror == "Invalid argument":
+                                        print(
+                                            "Encountered OSError: Invalid argument. Retrying..."
+                                        )
+                                        time.sleep(1)
+                                        os.link(
+                                            os.path.join(root, name),
+                                            os.path.join(dest_dir, name),
+                                        )
                     else:
                         try:
                             os.link(src, dst)
