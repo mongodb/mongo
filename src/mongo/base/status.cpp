@@ -118,7 +118,10 @@ boost::intrusive_ptr<const Status::ErrorInfo> Status::_parseErrorInfo(ErrorCodes
 }
 
 std::ostream& Status::_streamTo(std::ostream& os) const {
-    return os << codeString() << " " << reason();
+    os << codeString();
+    if (!isOK())
+        os << " " << reason();
+    return os;
 }
 
 StringBuilder& Status::_streamTo(StringBuilder& sb) const {

@@ -163,6 +163,36 @@ TEST(Status, WithContext) {
     ASSERT_EQ(orig.reason(), "error");
 }
 
+TEST(Status, Format) {
+    struct Spec {
+        Status status;
+        std::string ostream;
+        std::string stringBuilder;
+        SourceLocation loc = MONGO_SOURCE_LOCATION();
+    };
+    for (const auto& t : {
+             Spec{Status::OK(), "OK", "OK"},
+             Spec{{ErrorCodes::InternalError, "foo"}, "InternalError foo", "InternalError: foo"},
+             Spec{{ErrorCodes::Error{11720400}, "foo"},
+                  "Location11720400 foo",
+                  "Location11720400: foo"},
+             Spec{{ErrorExtraInfoExample(123), "foo"},
+                  "ForTestingErrorExtraInfo foo",
+                  "ForTestingErrorExtraInfo{ data: 123 }: foo"},
+         }) {
+        SCOPED_TRACE(fmt::format("{}", t.loc));
+
+        std::ostringstream oss;
+        oss << t.status;
+        EXPECT_EQ(oss.str(), t.ostream);
+
+        StringBuilder sb;
+        sb << t.status;
+        sb.str();
+        EXPECT_EQ(sb.str(), t.stringBuilder);
+    }
+}
+
 TEST(Status, CloningCopy) {
     Status orig(ErrorCodes::MaxError, "error");
     Status dest(orig);
