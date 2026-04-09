@@ -7,9 +7,6 @@ selector:
     - jstests/noPassthroughWithMongod/**/*.js
 
   exclude_files:
-    # TODO SERVER-121812 Investigate multiplan backup test failure in deferred get executor
-    - jstests/noPassthroughWithMongod/query/explain/explain_with_backup_plans.js
-
     # TODO SERVER-119773 implement SBE plan cache in new get executors
     - jstests/noPassthroughWithMongod/query/sbe/sbe_index_count_scan_cache.js
 

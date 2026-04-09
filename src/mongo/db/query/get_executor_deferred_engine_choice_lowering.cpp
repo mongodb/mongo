@@ -30,6 +30,7 @@
 #include "mongo/db/query/get_executor_deferred_engine_choice_lowering.h"
 
 #include "mongo/db/exec/classic/count.h"
+#include "mongo/db/exec/classic/multi_plan.h"
 #include "mongo/db/exec/runtime_planners/planner_types.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/sbe_pushdown.h"
@@ -122,6 +123,10 @@ public:
 private:
     QueryPlannerParams* plannerParams() {
         return _rankingResult.plannerParams.get();
+    }
+
+    MultiPlanStage* peekMps() {
+        return const_cast<MultiPlanStage*>(std::as_const(*this).peekMps());
     }
 
     const MultiPlanStage* peekMps() const {
@@ -266,6 +271,11 @@ private:
         std::unique_ptr<WorkingSet> workingSet;
         std::unique_ptr<PlanStage> planStage;
         if (_rankingResult.execState) {
+            // If the QuerySolution was extracted from a multiplan stage, restore it so the MPS
+            // won't have a null QuerySolution when explain is run.
+            if (auto mps = peekMps(); mps && mps->bestSolution() == nullptr) {
+                mps->restoreBestSolution(std::move(solution));
+            }
             auto execState = _rankingResult.execState->extractExecState<ClassicExecState>();
             workingSet = std::move(execState.workingSet);
             planStage = std::move(execState.root);
@@ -283,11 +293,18 @@ private:
                 &_rankingResult.maybeExplainData->planStageQsnMap);
         }
 
+        const auto* solutionPtr = [&]() -> const QuerySolution* {
+            if (auto* mps = peekMps()) {
+                return mps->bestSolution();
+            }
+            return solution.get();
+        }();
+
         if (const auto* countStage = dynamic_cast<const CountStage*>(planStage.get())) {
             buildRejectedExecutableTreesForExplain(
-                solution.get(), true, countStage->getLimit(), countStage->getSkip());
+                solutionPtr, true, countStage->getLimit(), countStage->getSkip());
         } else {
-            buildRejectedExecutableTreesForExplain(solution.get(), false /*isCountQuery*/);
+            buildRejectedExecutableTreesForExplain(solutionPtr, false /*isCountQuery*/);
         }
 
         return uassertStatusOK(plan_executor_factory::make(

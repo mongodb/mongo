@@ -683,6 +683,13 @@ std::unique_ptr<QuerySolution> MultiPlanStage::extractBestSolution() {
     return std::move(_candidates[_bestPlanIdx].solution);
 }
 
+void MultiPlanStage::restoreBestSolution(std::unique_ptr<QuerySolution> solution) {
+    tassert(12181200,
+            "Restored plan must be non-null, and best plan must be chosen already.",
+            solution != nullptr && bestPlanChosen());
+    _candidates[_bestPlanIdx].solution = std::move(solution);
+}
+
 bool MultiPlanStage::bestSolutionEof() const {
     tassert(8523500, "The best plan is not chosen by the multi-planner", bestPlanChosen());
     auto& bestPlan = _candidates[_bestPlanIdx];

@@ -182,6 +182,11 @@ public:
     std::unique_ptr<QuerySolution> extractBestSolution();
 
     /**
+     * Restores a previously extracted best solution back into the MultiPlanStage.
+     */
+    void restoreBestSolution(std::unique_ptr<QuerySolution> solution);
+
+    /**
      * Returns true if the winning plan reached EOF during its trial period and false otherwise.
      * Illegal to call if the best plan has not yet been selected.
      */
