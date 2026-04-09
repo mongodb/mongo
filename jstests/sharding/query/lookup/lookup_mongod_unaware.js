@@ -11,10 +11,11 @@
  * ]
  *
  */
+import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Restarts the primary shard and ensures that it believes both collections are unsharded.
-function restartPrimaryShard(rs, ...expectedCollections) {
+function restartPrimaryShard(st, rs, ...expectedCollections) {
     // Returns true if the shard is aware that the collection is sharded.
     function hasRoutingInfoForNs(shardConn, coll) {
         const res = shardConn.adminCommand({getShardVersion: coll, fullMetadata: true});
@@ -25,12 +26,15 @@ function restartPrimaryShard(rs, ...expectedCollections) {
     rs.restart(0);
     rs.awaitSecondaryNodes();
 
+    const primary = rs.getPrimary();
+
     expectedCollections.forEach(function (coll) {
-        assert(
-            !hasRoutingInfoForNs(rs.getPrimary(), coll.getFullName()),
-            "Shard role not cleared for " + coll.getFullName(),
-        );
+        assert(!hasRoutingInfoForNs(primary, coll.getFullName()), "Shard role not cleared for " + coll.getFullName());
     });
+
+    for (let i = 0; i < st._mongos.length; i++) {
+        awaitRSClientHosts(st._mongos[i], primary, {ok: true, ismaster: true});
+    }
 }
 
 // Disable checking for index consistency to ensure that the config server doesn't trigger a
@@ -104,13 +108,13 @@ assert.commandWorked(
 );
 
 // Verify $lookup results through the fresh mongos.
-restartPrimaryShard(st.rs0, mongos0LocalColl, mongos0ForeignColl);
+restartPrimaryShard(st, st.rs0, mongos0LocalColl, mongos0ForeignColl);
 assert.eq(mongos0LocalColl.aggregate(pipeline).toArray(), expectedResults);
 
 // Verify $lookup results through mongos1, which is not aware that the foreign collection is
 // sharded. In this case the results will be correct since the entire pipeline will be run on a
 // shard, which will do a refresh before executing the foreign pipeline.
-restartPrimaryShard(st.rs0, mongos0LocalColl, mongos0ForeignColl);
+restartPrimaryShard(st, st.rs0, mongos0LocalColl, mongos0ForeignColl);
 assert.eq(mongos1LocalColl.aggregate(pipeline).toArray(), expectedResults);
 
 //
@@ -135,11 +139,11 @@ assert.commandWorked(
 );
 
 // Verify $lookup results through the fresh mongos.
-restartPrimaryShard(st.rs0, mongos0LocalColl, mongos0ForeignColl);
+restartPrimaryShard(st, st.rs0, mongos0LocalColl, mongos0ForeignColl);
 assert.eq(mongos0LocalColl.aggregate(pipeline).toArray(), expectedResults);
 
 // Verify $lookup results through the stale mongos.
-restartPrimaryShard(st.rs0, mongos0LocalColl, mongos0ForeignColl);
+restartPrimaryShard(st, st.rs0, mongos0LocalColl, mongos0ForeignColl);
 assert.eq(mongos1LocalColl.aggregate(pipeline).toArray(), expectedResults);
 
 //
@@ -154,11 +158,11 @@ assert.commandWorked(mongos0ForeignColl.insert({_id: 1, b: null}));
 assert.commandWorked(mongos0ForeignColl.insert({_id: 2}));
 
 // Verify $lookup results through the fresh mongos.
-restartPrimaryShard(st.rs0, mongos0LocalColl, mongos0ForeignColl);
+restartPrimaryShard(st, st.rs0, mongos0LocalColl, mongos0ForeignColl);
 assert.eq(mongos0LocalColl.aggregate(pipeline).toArray(), expectedResults);
 
 // Verify $lookup results through the stale mongos.
-restartPrimaryShard(st.rs0, mongos0LocalColl, mongos0ForeignColl);
+restartPrimaryShard(st, st.rs0, mongos0LocalColl, mongos0ForeignColl);
 assert.eq(mongos1LocalColl.aggregate(pipeline).toArray(), expectedResults);
 
 //
@@ -207,7 +211,7 @@ const aggPipeline = [
 const resultBefore = D.A.aggregate(aggPipeline).toArray();
 
 // Restarting the shard primary in order for the shard role's cache to be cleared
-restartPrimaryShard(st.rs0, D.A, D.B, D.C, D.D);
+restartPrimaryShard(st, st.rs0, D.A, D.B, D.C, D.D);
 
 const resultAfter = D.A.aggregate(aggPipeline).toArray();
 assert.eq(resultBefore, resultAfter, "Before and after results do not match");
