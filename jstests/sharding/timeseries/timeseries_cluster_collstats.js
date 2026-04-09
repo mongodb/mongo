@@ -166,11 +166,12 @@ function checkAllFieldsAreInResult(result) {
 }
 
 function assertTimeseriesAggregationCorrectness(total, shards) {
-    // TODO SERVER-106617: review if checking for the bucketsNs should be re-enabled for viewless
-    // timeseries.
-    if (!areViewlessTimeseriesEnabled(mongosDB)) {
-        assert(shards.every((x) => x.bucketsNs === total.bucketsNs));
-    }
+    // The bucketsNs is collection metadata (not a per-shard quantity), so all shards must agree.
+    assert(
+        shards.every((x) => x.bucketsNs === total.bucketsNs),
+        `Expected all shards to report bucketsNs '${total.bucketsNs}', ` +
+            `got: ${tojson(shards.map((x) => x.bucketsNs))}`,
+    );
     assert.eq(
         total.bucketCount,
         shards.map((x) => x.bucketCount).reduce((x, y) => x + y, 0 /* initial value */),
