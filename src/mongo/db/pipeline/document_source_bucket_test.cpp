@@ -373,7 +373,7 @@ TEST_F(InvalidBucketSpec, SwitchFailsForBucketWhenNoDefaultSpecified) {
     auto doc = Document{{"x", 4}};
     auto stage = exec::agg::MockStage::createForTest(doc, getExpCtx());
 
-    groupStage->setSource(stage.get());
+    exec::agg::MockStage::setSource_forTest(groupStage, stage.get());
     ASSERT_THROWS_CODE(groupStage->getNext(), AssertionException, 40066);
 }
 }  // namespace

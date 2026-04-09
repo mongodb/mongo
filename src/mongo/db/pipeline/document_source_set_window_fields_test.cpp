@@ -151,9 +151,8 @@ TEST_F(DocumentSourceSetWindowFieldsTest, HandlesEmptyInputCorrectly) {
         {$sum: '$pop', window: {documents: ["unbounded", 0]}}}}})");
     auto parsedStage =
         DocumentSourceInternalSetWindowFields::createFromBson(spec.firstElement(), getExpCtx());
-    auto stage = exec::agg::buildStage(parsedStage);
     const auto mock = exec::agg::MockStage::createForTest({}, getExpCtx());
-    stage->setSource(mock.get());
+    auto stage = exec::agg::buildStageAndStitch(parsedStage, mock);
     ASSERT_EQ((int)DocumentSource::GetNextResult::ReturnStatus::kEOF,
               (int)stage->getNext().getStatus());
 }
@@ -306,7 +305,7 @@ TEST_F(DocumentSourceSetWindowFieldsTest, PartitionOutputIsCorrect) {
     docs.push_back(DOC("num" << 2 << "val" << 1 << "part" << 2));
     docs.push_back(DOC("num" << 4 << "val" << 3 << "part" << 2));
     auto mockStage = exec::agg::MockStage::createForTest(docs, getExpCtx());
-    stage->setSource(mockStage.get());
+    exec::agg::MockStage::setSource_forTest(stage, mockStage.get());
 
     auto next = stage->getNext();
     ASSERT(next.isAdvanced());
@@ -497,11 +496,9 @@ TEST_F(DocumentSourceSetWindowFieldsTest, outputFieldsIsDeterministic) {
         })");
     auto parsedStage =
         DocumentSourceInternalSetWindowFields::createFromBson(spec.firstElement(), getExpCtx());
-    auto stage = exec::agg::buildStage(parsedStage);
-    const auto mock = DocumentSourceMock::createForTest({}, getExpCtx());
     auto mockedStage = exec::agg::MockStage::createForTest(
         {"{b: 6}", "{b: 5000}", "{b: 50}", "{b: 88}", "{b: 100}"}, getExpCtx());
-    stage->setSource(mockedStage.get());
+    auto stage = exec::agg::buildStageAndStitch(parsedStage, mockedStage);
 
     auto next = stage->getNext();
     ASSERT(next.isAdvanced());

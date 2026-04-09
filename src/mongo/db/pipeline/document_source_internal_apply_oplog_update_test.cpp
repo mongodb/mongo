@@ -153,13 +153,12 @@ TEST_F(DocumentSourceInternalApplyOplogUpdateTest, UpdateMultipleDocuments) {
 
     auto source =
         DocumentSourceInternalApplyOplogUpdate::createFromBson(spec.firstElement(), getExpCtx());
-    auto stage = exec::agg::buildStage(source);
     auto mock = exec::agg::MockStage::createForTest({Document{{"a", 0}},
                                                      Document{{"a", 1}, {"b", 1}},
                                                      Document{{"a", 2}, {"b", Document{{"c", 1}}}},
                                                      Document{{"a", 3}, {"b", Document{{"d", 2}}}}},
                                                     getExpCtx());
-    stage->setSource(mock.get());
+    auto stage = exec::agg::buildStageAndStitch(source, mock);
 
     auto next = stage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -194,9 +193,8 @@ TEST_F(DocumentSourceInternalApplyOplogUpdateTest, ShouldErrorOnInvalidDiffs) {
                }})");
         auto source = DocumentSourceInternalApplyOplogUpdate::createFromBson(spec.firstElement(),
                                                                              getExpCtx());
-        auto stage = exec::agg::buildStage(source);
         auto mock = exec::agg::MockStage::createForTest({Document{{"a", 0}}}, getExpCtx());
-        stage->setSource(mock.get());
+        auto stage = exec::agg::buildStageAndStitch(source, mock);
         ASSERT_THROWS_CODE(stage->getNext(), DBException, 4770500);
     }
 
@@ -207,9 +205,8 @@ TEST_F(DocumentSourceInternalApplyOplogUpdateTest, ShouldErrorOnInvalidDiffs) {
                }})");
         auto source = DocumentSourceInternalApplyOplogUpdate::createFromBson(spec.firstElement(),
                                                                              getExpCtx());
-        auto stage = exec::agg::buildStage(source);
         auto mock = exec::agg::MockStage::createForTest({Document{{"a", 0}}}, getExpCtx());
-        stage->setSource(mock.get());
+        auto stage = exec::agg::buildStageAndStitch(source, mock);
         ASSERT_THROWS_CODE(stage->getNext(), DBException, 4770503);
     }
 
@@ -220,9 +217,8 @@ TEST_F(DocumentSourceInternalApplyOplogUpdateTest, ShouldErrorOnInvalidDiffs) {
                }})");
         auto source = DocumentSourceInternalApplyOplogUpdate::createFromBson(spec.firstElement(),
                                                                              getExpCtx());
-        auto stage = exec::agg::buildStage(source);
         auto mock = exec::agg::MockStage::createForTest({Document{{"a", 0}}}, getExpCtx());
-        stage->setSource(mock.get());
+        auto stage = exec::agg::buildStageAndStitch(source, mock);
         ASSERT_THROWS_CODE(stage->getNext(), DBException, 4770505);
     }
 
@@ -233,9 +229,8 @@ TEST_F(DocumentSourceInternalApplyOplogUpdateTest, ShouldErrorOnInvalidDiffs) {
                }})");
         auto source = DocumentSourceInternalApplyOplogUpdate::createFromBson(spec.firstElement(),
                                                                              getExpCtx());
-        auto stage = exec::agg::buildStage(source);
         auto mock = exec::agg::MockStage::createForTest({Document{{"a", 0}}}, getExpCtx());
-        stage->setSource(mock.get());
+        auto stage = exec::agg::buildStageAndStitch(source, mock);
         ASSERT_THROWS_CODE(stage->getNext(), DBException, 4770507);
     }
 }

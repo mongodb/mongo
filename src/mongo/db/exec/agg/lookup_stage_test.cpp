@@ -103,8 +103,7 @@ TEST_F(LookupStageTest, ShouldPropagatePauses) {
                                          {"as", "foreignDocs"_sd}}}}
                           .toBson();
     auto lookup = makeLookUpFromBson(lookupSpec.firstElement(), expCtx);
-    auto lookupStage = exec::agg::buildStage(lookup);
-    lookupStage->setSource(mockLocalStage.get());
+    auto lookupStage = exec::agg::buildStageAndStitch(lookup, mockLocalStage);
 
     auto next = lookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -158,8 +157,7 @@ TEST_F(LookupStageTest, ShouldPropagatePausesWhileUnwinding) {
     lookup->setUnwindStage_forTest(DocumentSourceUnwind::create(
         expCtx, "foreignDoc", preserveNullAndEmptyArrays, includeArrayIndex));
 
-    auto lookupStage = exec::agg::buildStage(lookup.get());
-    lookupStage->setSource(mockLocalStage.get());
+    auto lookupStage = exec::agg::buildStageAndStitch(lookup.get(), mockLocalStage);
 
     auto next = lookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -202,7 +200,7 @@ TEST_F(LookupStageTest, ShouldReplaceNonCorrelatedPrefixWithCacheAfterFirstSubPi
         {Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}}, expCtx);
 
     auto lookupStage = buildLookUpStage(lookupDS);
-    lookupStage->setSource(mockLocalStage.get());
+    exec::agg::MockStage::setSource_forTest(lookupStage, mockLocalStage.get());
 
     // Confirm that the empty 'kBuilding' cache is placed just before the correlated $addFields.
     auto subPipeline =
@@ -274,7 +272,7 @@ TEST_F(LookupStageTest, ShouldAbandonCacheIfMaxSizeIsExceededAfterFirstSubPipeli
         exec::agg::MockStage::createForTest({Document{{"_id", 0}}, Document{{"_id", 1}}}, expCtx);
 
     auto lookupStage = buildLookUpStage(lookupDS);
-    lookupStage->setSource(mockLocalStage.get());
+    exec::agg::MockStage::setSource_forTest(lookupStage, mockLocalStage.get());
 
     // Ensure the cache is abandoned after the first iteration by setting its max size to 0.
     size_t maxCacheSizeBytes = 0;
@@ -360,7 +358,7 @@ TEST_F(LookupStageTest, AddingCacheStageWorksWithDisablePipelineRewrites) {
                                                                Document{{"_id", 3}, {"x", 3}}},
                                                               expCtx);
 
-    lookupStage->setSource(mockLocalStage.get());
+    exec::agg::MockStage::setSource_forTest(lookupStage, mockLocalStage.get());
 
     // buildPipeline adds the cache stage.
     auto subPipeline =

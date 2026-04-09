@@ -94,7 +94,7 @@ void DocumentSourceGroupBMFixture::runDocumentSourceGroup(int numGroups,
             BSONObj obj = BSON("a" << i << "b" << i + 1 << "c" << 10 << "x" << i << "y" << i * 10);
             mock->push_back(Document{obj}, countPerGroup);
         }
-        groupStage->setSource(mock.get());
+        exec::agg::MockStage::setSource_forTest(groupStage, mock.get());
         state.ResumeTiming();
         // Call getNext() only once to ready all the groups. We do not read all the output documents
         // since we only want to benchmark the code that prepares all the groups.

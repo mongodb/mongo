@@ -54,12 +54,10 @@ TEST_F(DocumentSourceSequentialDocumentCacheTest, ReturnsEOFOnSubsequentCallsAft
     auto cache = std::make_shared<SequentialDocumentCache>(kDefaultMaxCacheSize);
     auto documentSourceSequentialDocumentCache =
         DocumentSourceSequentialDocumentCache::create(getExpCtx(), cache);
-    auto sequentialDocumentCacheStage =
-        exec::agg::buildStage(documentSourceSequentialDocumentCache);
-
     auto mockStage =
         exec::agg::MockStage::createForTest({"{a: 1, b: 2}", "{a: 3, b: 4}"}, getExpCtx());
-    sequentialDocumentCacheStage->setSource(mockStage.get());
+    auto sequentialDocumentCacheStage =
+        exec::agg::buildStageAndStitch(documentSourceSequentialDocumentCache, mockStage);
 
     ASSERT(sequentialDocumentCacheStage->getNext().isAdvanced());
     ASSERT(sequentialDocumentCacheStage->getNext().isAdvanced());

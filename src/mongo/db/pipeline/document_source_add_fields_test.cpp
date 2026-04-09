@@ -69,8 +69,7 @@ TEST_F(AddFieldsTest, ShouldKeepUnspecifiedFieldsReplaceExistingFieldsAndAddNewF
         DocumentSourceAddFields::create(BSON("e" << 2 << "b" << BSON("c" << 3)), getExpCtx());
     auto mock = exec::agg::MockStage::createForTest(
         Document{{"a", 1}, {"b", Document{{"c", 1}}}, {"d", 1}}, getExpCtx());
-    auto addFieldsStage = exec::agg::buildStage(addFields);
-    addFieldsStage->setSource(mock.get());
+    auto addFieldsStage = exec::agg::buildStageAndStitch(addFields, mock);
 
     auto next = addFieldsStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -141,8 +140,7 @@ TEST_F(AddFieldsTest, ShouldBeAbleToProcessMultipleDocuments) {
     auto addFields = DocumentSourceAddFields::create(BSON("a" << 10), getExpCtx());
     auto mock = exec::agg::MockStage::createForTest(
         {Document{{"a", 1}, {"b", 2}}, Document{{"c", 3}, {"d", 4}}}, getExpCtx());
-    auto addFieldsStage = exec::agg::buildStage(addFields);
-    addFieldsStage->setSource(mock.get());
+    auto addFieldsStage = exec::agg::buildStageAndStitch(addFields, mock);
 
     auto next = addFieldsStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -191,8 +189,7 @@ TEST_F(AddFieldsTest, ShouldPropagatePauses) {
                                              Document(),
                                              DocumentSource::GetNextResult::makePauseExecution()},
                                             getExpCtx());
-    auto addFieldsStage = exec::agg::buildStage(addFields);
-    addFieldsStage->setSource(mock.get());
+    auto addFieldsStage = exec::agg::buildStageAndStitch(addFields, mock);
 
     ASSERT_TRUE(addFieldsStage->getNext().isAdvanced());
     ASSERT_TRUE(addFieldsStage->getNext().isPaused());
@@ -207,8 +204,7 @@ TEST_F(AddFieldsTest, ShouldPropagatePauses) {
 TEST_F(AddFieldsTest, AddFieldsWithRemoveSystemVariableDoesNotAddField) {
     auto addFields = DocumentSourceAddFields::create(BSON("fieldToAdd" << "$$REMOVE"), getExpCtx());
     auto mock = exec::agg::MockStage::createForTest(Document{{"existingField", 1}}, getExpCtx());
-    auto addFieldsStage = exec::agg::buildStage(addFields);
-    addFieldsStage->setSource(mock.get());
+    auto addFieldsStage = exec::agg::buildStageAndStitch(addFields, mock);
 
     auto next = addFieldsStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -220,8 +216,7 @@ TEST_F(AddFieldsTest, AddFieldsWithRemoveSystemVariableDoesNotAddField) {
 TEST_F(AddFieldsTest, AddFieldsWithRootSystemVariableAddsRootAsSubDoc) {
     auto addFields = DocumentSourceAddFields::create(BSON("b" << "$$ROOT"), getExpCtx());
     auto mock = exec::agg::MockStage::createForTest(Document{{"a", 1}}, getExpCtx());
-    auto addFieldsStage = exec::agg::buildStage(addFields);
-    addFieldsStage->setSource(mock.get());
+    auto addFieldsStage = exec::agg::buildStageAndStitch(addFields, mock);
 
     auto next = addFieldsStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -233,8 +228,7 @@ TEST_F(AddFieldsTest, AddFieldsWithRootSystemVariableAddsRootAsSubDoc) {
 TEST_F(AddFieldsTest, AddFieldsWithCurrentSystemVariableAddsRootAsSubDoc) {
     auto addFields = DocumentSourceAddFields::create(BSON("b" << "$$CURRENT"), getExpCtx());
     auto mock = exec::agg::MockStage::createForTest(Document{{"a", 1}}, getExpCtx());
-    auto addFieldsStage = exec::agg::buildStage(addFields);
-    addFieldsStage->setSource(mock.get());
+    auto addFieldsStage = exec::agg::buildStageAndStitch(addFields, mock);
 
     auto next = addFieldsStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -261,8 +255,7 @@ TEST_F(AddFieldsTest, CanAddNestedDocumentExactlyAtDepthLimit) {
     auto addFields = DocumentSourceAddFields::create(
         makeAddFieldsForNestedDocument(BSONDepth::getMaxAllowableDepth()), getExpCtx());
     auto mock = exec::agg::MockStage::createForTest(Document{{"_id", 1}}, getExpCtx());
-    auto addFieldsStage = exec::agg::buildStage(addFields);
-    addFieldsStage->setSource(mock.get());
+    auto addFieldsStage = exec::agg::buildStageAndStitch(addFields, mock);
 
     auto next = addFieldsStage->getNext();
     ASSERT_TRUE(next.isAdvanced());

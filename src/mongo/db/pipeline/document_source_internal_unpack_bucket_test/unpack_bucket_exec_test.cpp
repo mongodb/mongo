@@ -81,7 +81,7 @@ TEST_F(InternalUnpackBucketExecTest, UnpackBasicIncludeAllMeasurementFields) {
          "time: {'0':Date(3), '1':Date(4)}, "
          "a:{'0':1, '1':2}, b:{'1':1}}}"},
         expCtx);
-    unpackStage->setSource(mockStage.get());
+    exec::agg::MockStage::setSource_forTest(unpackStage, mockStage.get());
     // The first result exists and is as expected.
     auto next = unpackStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -122,8 +122,6 @@ TEST_F(InternalUnpackBucketExecTest, UnpackExcludeASingleField) {
 
     auto unpack =
         DocumentSourceInternalUnpackBucket::createFromBsonInternal(spec.firstElement(), expCtx);
-    auto unpackStage = exec::agg::buildStage(unpack);
-
     auto mockStage = exec::agg::MockStage::createForTest(
         {"{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, "
          "time: {'0':Date(1), '1':Date(2)}, "
@@ -132,7 +130,7 @@ TEST_F(InternalUnpackBucketExecTest, UnpackExcludeASingleField) {
          "{'0':Date(3), '1':Date(4)}, "
          "a:{'0':1, '1':2}, b:{'1':1}}}"},
         expCtx);
-    unpackStage->setSource(mockStage.get());
+    auto unpackStage = exec::agg::buildStageAndStitch(unpack, mockStage);
     // The first result exists and is as expected.
     auto next = unpackStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -172,8 +170,6 @@ TEST_F(InternalUnpackBucketExecTest, UnpackEmptyInclude) {
                              << DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds << 3600));
     auto unpack =
         DocumentSourceInternalUnpackBucket::createFromBsonInternal(spec.firstElement(), expCtx);
-    auto unpackStage = exec::agg::buildStage(unpack);
-
     auto mockStage = exec::agg::MockStage::createForTest(
         {"{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, "
          "time: {'0':Date(1), '1':Date(2)}, "
@@ -182,7 +178,7 @@ TEST_F(InternalUnpackBucketExecTest, UnpackEmptyInclude) {
          "{'0':Date(3), '1':Date(4)}, "
          "a:{'0':1, '1':2}, b:{'1':1}}}"},
         expCtx);
-    unpackStage->setSource(mockStage.get());
+    auto unpackStage = exec::agg::buildStageAndStitch(unpack, mockStage);
 
     // We should produce empty documents, one per measurement in the bucket.
     for (auto idx = 0; idx < 2; ++idx) {
@@ -210,8 +206,6 @@ TEST_F(InternalUnpackBucketExecTest, UnpackEmptyExclude) {
                              << DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds << 3600));
     auto unpack =
         DocumentSourceInternalUnpackBucket::createFromBsonInternal(spec.firstElement(), expCtx);
-    auto unpackStage = exec::agg::buildStage(unpack);
-
     auto mockStage = exec::agg::MockStage::createForTest(
         {"{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, "
          "time: {'0':Date(1), '1':Date(2)}, "
@@ -220,7 +214,7 @@ TEST_F(InternalUnpackBucketExecTest, UnpackEmptyExclude) {
          "{'0':Date(3), '1':Date(4)}, "
          "a:{'0':1, '1':2}, b:{'1':1}}}"},
         expCtx);
-    unpackStage->setSource(mockStage.get());
+    auto unpackStage = exec::agg::buildStageAndStitch(unpack, mockStage);
 
     auto next = unpackStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -260,8 +254,6 @@ TEST_F(InternalUnpackBucketExecTest, UnpackNeitherIncludeNorExcludeDefaultsToEmp
                      << DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds << 3600));
     auto unpack =
         DocumentSourceInternalUnpackBucket::createFromBsonInternal(spec.firstElement(), expCtx);
-    auto unpackStage = exec::agg::buildStage(unpack);
-
     auto mockStage = exec::agg::MockStage::createForTest(
         {
             R"({
@@ -285,7 +277,7 @@ TEST_F(InternalUnpackBucketExecTest, UnpackNeitherIncludeNorExcludeDefaultsToEmp
       }
   })"},
         expCtx);
-    unpackStage->setSource(mockStage.get());
+    auto unpackStage = exec::agg::buildStageAndStitch(unpack, mockStage);
 
     auto next = unpackStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -325,14 +317,12 @@ TEST_F(InternalUnpackBucketExecTest, SparseColumnsWhereOneColumnIsExhaustedBefor
                              << DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds << 3600));
     auto unpack =
         DocumentSourceInternalUnpackBucket::createFromBsonInternal(spec.firstElement(), expCtx);
-    auto unpackStage = exec::agg::buildStage(unpack);
-
     auto mockStage = exec::agg::MockStage::createForTest(
         {"{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, "
          "time: {'0':Date(1), '1':Date(2)}, "
          "a:{'0':1}, b:{'1':1}}}"},
         expCtx);
-    unpackStage->setSource(mockStage.get());
+    auto unpackStage = exec::agg::buildStageAndStitch(unpack, mockStage);
 
     auto next = unpackStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -372,7 +362,7 @@ TEST_F(InternalUnpackBucketExecTest, UnpackBasicIncludeWithDollarPrefix) {
          "{'0':Date(3), '1':Date(4)}, "
          "$a:{'0':1, '1':2}, b:{'1':1}}}"},
         expCtx);
-    unpackStage->setSource(mockStage.get());
+    exec::agg::MockStage::setSource_forTest(unpackStage, mockStage.get());
     // The first result exists and is as expected.
     auto next = unpackStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -412,15 +402,13 @@ TEST_F(InternalUnpackBucketExecTest, UnpackMetadataOnly) {
                              << DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds << 3600));
     auto unpack =
         DocumentSourceInternalUnpackBucket::createFromBsonInternal(spec.firstElement(), expCtx);
-    auto unpackStage = exec::agg::buildStage(unpack);
-
     auto mockStage = exec::agg::MockStage::createForTest(
         {"{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, "
          "time: {'0':Date(1), '1':Date(2)}}}",
          "{control: {'version': 1}, meta: {m1: 9, m2: 9, m3: 9}, data: {_id: {'0':3, '1':4}, time: "
          "{'0':Date(3), '1':Date(4)}}}"},
         expCtx);
-    unpackStage->setSource(mockStage.get());
+    auto unpackStage = exec::agg::buildStageAndStitch(unpack, mockStage);
 
     auto next = unpackStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -458,15 +446,13 @@ TEST_F(InternalUnpackBucketExecTest, UnpackWithStrangeTimestampOrdering) {
                              << DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds << 3600));
     auto unpack =
         DocumentSourceInternalUnpackBucket::createFromBsonInternal(spec.firstElement(), expCtx);
-    auto unpackStage = exec::agg::buildStage(unpack);
-
     auto mockStage = exec::agg::MockStage::createForTest(
         {"{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'1':1, "
          "'0':2, '2': 3}, time: {'1':Date(1), '0': Date(2), '2': Date(3)}}}",
          "{control: {'version': 1}, meta: {'m1': 9, 'm2': 9, 'm3': 9}, data: {_id: {'1':4, "
          "'0':5, '2':6}, time: {'1':Date(4), '0': Date(5), '2': Date(6)}}}"},
         expCtx);
-    unpackStage->setSource(mockStage.get());
+    auto unpackStage = exec::agg::buildStageAndStitch(unpack, mockStage);
 
     auto next = unpackStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -522,7 +508,7 @@ TEST_F(InternalUnpackBucketExecTest, BucketUnpackerHandlesMissingMetadataWhenMet
          "'0':5, '2':6}, time: {'1':Date(4), '0': Date(5), '2': Date(6)}}}"},
         expCtx);
 
-    unpackStage->setSource(mockStage.get());
+    exec::agg::MockStage::setSource_forTest(unpackStage, mockStage.get());
 
     auto next = unpackStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -571,7 +557,7 @@ TEST_F(InternalUnpackBucketExecTest, BucketUnpackerHandlesExcludedMetadataWhenBu
          "'0':5, '2':6}, time: {'1':Date(4), '0': Date(5), '2': Date(6)}}}"},
         expCtx);
 
-    unpackStage->setSource(mockStage.get());
+    exec::agg::MockStage::setSource_forTest(unpackStage, mockStage.get());
 
     auto next = unpackStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -611,13 +597,11 @@ TEST_F(InternalUnpackBucketExecTest, BucketUnpackerThrowsOnUndefinedMetadata) {
                              << DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds << 3600));
     auto unpack =
         DocumentSourceInternalUnpackBucket::createFromBsonInternal(spec.firstElement(), expCtx);
-    auto unpackStage = exec::agg::buildStage(unpack);
-
     auto mockStage = exec::agg::MockStage::createForTest(
         {"{control: {'version': 1}, meta: undefined, data: {_id: {'1':1, "
          "'0':2, '2': 3}, time: {'1':Date(1), '0': Date(2), '2': Date(3)}}}"},
         expCtx);
-    unpackStage->setSource(mockStage.get());
+    auto unpackStage = exec::agg::buildStageAndStitch(unpack, mockStage);
     ASSERT_THROWS_CODE(unpackStage->getNext(), AssertionException, 5369600);
 }
 
@@ -629,15 +613,13 @@ TEST_F(InternalUnpackBucketExecTest, BucketUnpackerThrowsWhenMetadataIsPresentUn
                              << DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds << 3600));
     auto unpack =
         DocumentSourceInternalUnpackBucket::createFromBsonInternal(spec.firstElement(), expCtx);
-    auto unpackStage = exec::agg::buildStage(unpack);
-
     auto mockStage = exec::agg::MockStage::createForTest(
         {"{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'1':1, "
          "'0':2, '2': 3}, time: {'1':Date(1), '0': Date(2), '2': Date(3)}}}",
          "{control: {'version': 1}, meta: null, data: {_id: {'1':4, "
          "'0':5, '2':6}, time: {'1':Date(4), '0': Date(5), '2': Date(6)}}}"},
         expCtx);
-    unpackStage->setSource(mockStage.get());
+    auto unpackStage = exec::agg::buildStageAndStitch(unpack, mockStage);
 
     ASSERT_THROWS_CODE(unpackStage->getNext(), AssertionException, 5369601);
 }
@@ -651,15 +633,13 @@ TEST_F(InternalUnpackBucketExecTest, BucketUnpackerHandlesNullMetadata) {
                              << DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds << 3600));
     auto unpack =
         DocumentSourceInternalUnpackBucket::createFromBsonInternal(spec.firstElement(), expCtx);
-    auto unpackStage = exec::agg::buildStage(unpack);
-
     auto mockStage = exec::agg::MockStage::createForTest(
         {"{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'1':1, "
          "'0':2, '2': 3}, time: {'1':Date(1), '0': Date(2), '2': Date(3)}}}",
          "{control: {'version': 1}, meta: null, data: {_id: {'1':4, "
          "'0':5, '2':6}, time: {'1':Date(4), '0': Date(5), '2': Date(6)}}}"},
         expCtx);
-    unpackStage->setSource(mockStage.get());
+    auto unpackStage = exec::agg::buildStageAndStitch(unpack, mockStage);
 
     auto next = unpackStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -705,8 +685,6 @@ TEST_F(InternalUnpackBucketExecTest, BucketUnpackerHandlesMissingMetadata) {
                              << DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds << 3600));
     auto unpack =
         DocumentSourceInternalUnpackBucket::createFromBsonInternal(spec.firstElement(), expCtx);
-    auto unpackStage = exec::agg::buildStage(unpack);
-
     auto mockStage = exec::agg::MockStage::createForTest(
         {
             R"(
@@ -729,7 +707,7 @@ TEST_F(InternalUnpackBucketExecTest, BucketUnpackerHandlesMissingMetadata) {
       }
   })"},
         expCtx);
-    unpackStage->setSource(mockStage.get());
+    auto unpackStage = exec::agg::buildStageAndStitch(unpack, mockStage);
 
     auto next = unpackStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -772,12 +750,10 @@ TEST_F(InternalUnpackBucketExecTest, ThrowsOnEmptyDataValue) {
                              << DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds << 3600));
     auto unpack =
         DocumentSourceInternalUnpackBucket::createFromBsonInternal(spec.firstElement(), expCtx);
-    auto unpackStage = exec::agg::buildStage(unpack);
-
     auto mockStage = exec::agg::MockStage::createForTest(
         Document{{"_id", 1}, {"meta", Document{{"m1", 999}, {"m2", 9999}}}, {"data", Document{}}},
         expCtx);
-    unpackStage->setSource(mockStage.get());
+    auto unpackStage = exec::agg::buildStageAndStitch(unpack, mockStage);
     ASSERT_THROWS_CODE(unpackStage->getNext(), AssertionException, 5346509);
 }
 
@@ -790,10 +766,8 @@ TEST_F(InternalUnpackBucketExecTest, HandlesEmptyBucket) {
                              << DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds << 3600));
     auto unpack =
         DocumentSourceInternalUnpackBucket::createFromBsonInternal(spec.firstElement(), expCtx);
-    auto unpackStage = exec::agg::buildStage(unpack);
-
     auto mockStage = exec::agg::MockStage::createForTest(Document{}, expCtx);
-    unpackStage->setSource(mockStage.get());
+    auto unpackStage = exec::agg::buildStageAndStitch(unpack, mockStage);
     ASSERT_THROWS_CODE(unpackStage->getNext(), AssertionException, 5346510);
 }
 
@@ -1048,7 +1022,7 @@ TEST_F(InternalUnpackBucketExecTest, BucketExercisesPauseExecutionCorrectly) {
         Document(fromjson("{time: Date(5), myMeta: {m1: 999, m2: 9999}, _id: 5}")),
         Document(fromjson("{time: Date(6), myMeta: {m1: 999, m2: 9999}, _id: 6}"))};
 
-    bucketSourceStage->setSource(mock.get());
+    exec::agg::MockStage::setSource_forTest(bucketSourceStage, mock.get());
     auto next = bucketSourceStage->getNext();
     ASSERT_TRUE(next.isPaused());
     next = bucketSourceStage->getNext();

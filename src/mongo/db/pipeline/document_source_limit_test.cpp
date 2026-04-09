@@ -68,7 +68,7 @@ boost::intrusive_ptr<mongo::exec::agg::LimitStage> createForTests(
 TEST_F(DocumentSourceLimitTest, ShouldDisposeSourceWhenLimitIsReached) {
     auto stage = exec::agg::MockStage::createForTest({"{a: 1}", "{a: 2}"}, getExpCtx());
     auto limitStage = createForTests(getExpCtx(), 1);
-    limitStage->setSource(stage.get());
+    exec::agg::MockStage::setSource_forTest(limitStage, stage.get());
     // The limitStage's result is as expected.
     auto next = limitStage->getNext();
     ASSERT(next.isAdvanced());
@@ -133,11 +133,10 @@ TEST_F(DocumentSourceLimitTest, DisposeShouldCascadeAllTheWayToSource) {
     BSONObj spec = BSON("$match" << BSON("a" << 1));
     BSONElement specElement = spec.firstElement();
     auto match = DocumentSourceMatch::createFromBson(specElement, getExpCtx());
-    auto matchStage = exec::agg::buildStage(match);
-    matchStage->setSource(stage.get());
+    auto matchStage = exec::agg::buildStageAndStitch(match, stage);
 
     auto limitStage = createForTests(getExpCtx(), 1);
-    limitStage->setSource(matchStage.get());
+    exec::agg::MockStage::setSource_forTest(limitStage, matchStage.get());
     // The limitStage is not exhausted.
     auto next = limitStage->getNext();
     ASSERT(next.isAdvanced());
@@ -166,7 +165,7 @@ TEST_F(DocumentSourceLimitTest, ShouldPropagatePauses) {
                                              DocumentSource::GetNextResult::makePauseExecution(),
                                              Document()},
                                             getExpCtx());
-    limitStage->setSource(mock.get());
+    exec::agg::MockStage::setSource_forTest(limitStage, mock.get());
 
     ASSERT_TRUE(limitStage->getNext().isPaused());
     ASSERT_TRUE(limitStage->getNext().isAdvanced());

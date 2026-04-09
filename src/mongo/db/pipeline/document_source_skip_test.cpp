@@ -61,7 +61,7 @@ TEST_F(DocumentSourceSkipTest, ShouldPropagatePauses) {
                                              DocumentSource::GetNextResult::makePauseExecution(),
                                              DocumentSource::GetNextResult::makePauseExecution()},
                                             getExpCtx());
-    skipStage->setSource(mock.get());
+    exec::agg::MockStage::setSource_forTest(skipStage, mock.get());
 
     // Skip the first document.
     ASSERT_TRUE(skipStage->getNext().isPaused());

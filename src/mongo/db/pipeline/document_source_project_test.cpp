@@ -69,10 +69,9 @@ using UnsetTest = AggregationContextFixture;
 TEST_F(ProjectStageTest, InclusionProjectionShouldRemoveUnspecifiedFields) {
     auto project = DocumentSourceProject::create(
         BSON("a" << true << "c" << BSON("d" << true)), getExpCtx(), "$project"_sd);
-    auto projectStage = exec::agg::buildStage(project);
     auto mockStage =
         exec::agg::MockStage::createForTest("{_id: 0, a: 1, b: 1, c: {d: 1}}", getExpCtx());
-    projectStage->setSource(mockStage.get());
+    auto projectStage = exec::agg::buildStageAndStitch(project, mockStage);
     // The first result exists and is as expected.
     auto next = projectStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -110,10 +109,9 @@ TEST_F(ProjectStageTest, ShouldErrorOnNonObjectSpec) {
  */
 TEST_F(ProjectStageTest, InclusionShouldBeAbleToProcessMultipleDocuments) {
     auto project = DocumentSourceProject::create(BSON("a" << true), getExpCtx(), "$project"_sd);
-    auto projectStage = exec::agg::buildStage(project);
     auto mockStage =
         exec::agg::MockStage::createForTest({"{a: 1, b: 2}", "{a: 3, b: 4}"}, getExpCtx());
-    projectStage->setSource(mockStage.get());
+    auto projectStage = exec::agg::buildStageAndStitch(project, mockStage);
     auto next = projectStage->getNext();
     ASSERT(next.isAdvanced());
     ASSERT_EQUALS(1, next.getDocument().getField("a").getInt());
@@ -135,10 +133,9 @@ TEST_F(ProjectStageTest, InclusionShouldBeAbleToProcessMultipleDocuments) {
  */
 TEST_F(ProjectStageTest, ExclusionShouldBeAbleToProcessMultipleDocuments) {
     auto project = DocumentSourceProject::create(BSON("a" << false), getExpCtx(), "$project"_sd);
-    auto projectStage = exec::agg::buildStage(project);
     auto source =
         exec::agg::MockStage::createForTest({"{a: 1, b: 2}", "{a: 3, b: 4}"}, getExpCtx());
-    projectStage->setSource(source.get());
+    auto projectStage = exec::agg::buildStageAndStitch(project, source);
     auto next = projectStage->getNext();
     ASSERT(next.isAdvanced());
     ASSERT(next.getDocument().getField("a").missing());
@@ -156,7 +153,6 @@ TEST_F(ProjectStageTest, ExclusionShouldBeAbleToProcessMultipleDocuments) {
 
 TEST_F(ProjectStageTest, ShouldPropagatePauses) {
     auto project = DocumentSourceProject::create(BSON("a" << false), getExpCtx(), "$project"_sd);
-    auto projectStage = exec::agg::buildStage(project);
     auto mockStage =
         exec::agg::MockStage::createForTest({Document(),
                                              DocumentSource::GetNextResult::makePauseExecution(),
@@ -165,7 +161,7 @@ TEST_F(ProjectStageTest, ShouldPropagatePauses) {
                                              Document(),
                                              DocumentSource::GetNextResult::makePauseExecution()},
                                             getExpCtx());
-    projectStage->setSource(mockStage.get());
+    auto projectStage = exec::agg::buildStageAndStitch(project, mockStage);
 
     ASSERT_TRUE(projectStage->getNext().isAdvanced());
     ASSERT_TRUE(projectStage->getNext().isPaused());
@@ -275,10 +271,9 @@ TEST_F(ProjectStageTest, CanUseRemoveSystemVariableToConditionallyExcludeProject
         fromjson("{a: 1, b: {$cond: [{$eq: ['$b', 4]}, '$$REMOVE', '$b']}}"),
         getExpCtx(),
         "$project"_sd);
-    auto projectStage = exec::agg::buildStage(project);
     auto source =
         exec::agg::MockStage::createForTest({"{a: 2, b: 2}", "{a: 3, b: 4}"}, getExpCtx());
-    projectStage->setSource(source.get());
+    auto projectStage = exec::agg::buildStageAndStitch(project, source);
     auto next = projectStage->getNext();
     ASSERT(next.isAdvanced());
     Document expected{{"a", 2}, {"b", 2}};
@@ -366,9 +361,8 @@ TEST_F(ProjectStageTest, CanAddNestedDocumentExactlyAtDepthLimit) {
         makeProjectForNestedDocument(BSONDepth::getMaxAllowableDepth()),
         getExpCtx(),
         "$project"_sd);
-    auto projectStage = exec::agg::buildStage(project);
     auto mock = exec::agg::MockStage::createForTest(Document{{"_id", 1}}, getExpCtx());
-    projectStage->setSource(mock.get());
+    auto projectStage = exec::agg::buildStageAndStitch(project, mock);
 
     auto next = projectStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -462,9 +456,8 @@ TEST_F(UnsetTest, RejectsUnsetSpecWithArrayContainingAnyNonStringValue) {
 TEST_F(UnsetTest, UnsetSingleField) {
     auto updateDoc = BSON("$unset" << BSON_ARRAY("a"));
     auto unsetSource = DocumentSourceProject::createFromBson(updateDoc.firstElement(), getExpCtx());
-    auto unsetStage = exec::agg::buildStage(unsetSource);
     auto mockStage = exec::agg::MockStage::createForTest({"{a: 10, b: 20}"}, getExpCtx());
-    unsetStage->setSource(mockStage.get());
+    auto unsetStage = exec::agg::buildStageAndStitch(unsetSource, mockStage);
     auto next = unsetStage->getNext();
     ASSERT(next.isAdvanced());
     ASSERT(next.getDocument().getField("a").missing());
@@ -477,10 +470,9 @@ TEST_F(UnsetTest, UnsetMultipleFields) {
     auto updateDoc = BSON("$unset" << BSON_ARRAY("a" << "b.c"
                                                      << "d.e"));
     auto unsetSource = DocumentSourceProject::createFromBson(updateDoc.firstElement(), getExpCtx());
-    auto unsetStage = exec::agg::buildStage(unsetSource);
     auto source = exec::agg::MockStage::createForTest({"{a: 10, b: {c: 20}, d: [{e: 30, f: 40}]}"},
                                                       getExpCtx());
-    unsetStage->setSource(source.get());
+    auto unsetStage = exec::agg::buildStageAndStitch(unsetSource, source);
     auto next = unsetStage->getNext();
     ASSERT(next.isAdvanced());
     ASSERT_BSONOBJ_EQ(next.getDocument().toBson(),
@@ -492,10 +484,9 @@ TEST_F(UnsetTest, UnsetMultipleFields) {
 TEST_F(UnsetTest, UnsetShouldBeAbleToProcessMultipleDocuments) {
     auto updateDoc = BSON("$unset" << BSON_ARRAY("a"));
     auto unsetSource = DocumentSourceProject::createFromBson(updateDoc.firstElement(), getExpCtx());
-    auto unsetStage = exec::agg::buildStage(unsetSource);
     auto mockStage =
         exec::agg::MockStage::createForTest({"{a: 1, b: 2}", "{a: 3, b: 4}"}, getExpCtx());
-    unsetStage->setSource(mockStage.get());
+    auto unsetStage = exec::agg::buildStageAndStitch(unsetSource, mockStage);
     auto next = unsetStage->getNext();
     ASSERT(next.isAdvanced());
     ASSERT(next.getDocument().getField("a").missing());

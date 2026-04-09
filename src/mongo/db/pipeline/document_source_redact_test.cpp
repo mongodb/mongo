@@ -68,14 +68,13 @@ TEST_F(DocumentSourceRedactTest, ShouldCopyRedactSafePartOfMatchBeforeItself) {
 TEST_F(DocumentSourceRedactTest, ShouldPropagatePauses) {
     auto redactSpec = BSON("$redact" << "$$KEEP");
     auto redact = DocumentSourceRedact::createFromBson(redactSpec.firstElement(), getExpCtx());
-    auto redactStage = exec::agg::buildStage(redact);
     auto mock =
         exec::agg::MockStage::createForTest({Document{{"_id", 0}},
                                              DocumentSource::GetNextResult::makePauseExecution(),
                                              Document{{"_id", 1}},
                                              DocumentSource::GetNextResult::makePauseExecution()},
                                             getExpCtx());
-    redactStage->setSource(mock.get());
+    auto redactStage = exec::agg::buildStageAndStitch(redact, mock);
 
     // The $redact is keeping everything, so we should see everything from the mock, then EOF.
     ASSERT_TRUE(redactStage->getNext().isAdvanced());

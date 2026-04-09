@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/host/host_portal.h"
@@ -1328,7 +1329,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
 
     // The document sources are stitched in this order: queue -> project -> unwind -> replaceRoot.
     for (size_t i = 1; i < stages.size(); ++i) {
-        stages[i]->setSource(stages[i - 1].get());
+        exec::agg::MockStage::setSource_forTest(stages[i], stages[i - 1].get());
     }
 
     // Tests that exec::agg::ExtensionStage::setSource() correctly overrides
@@ -1397,7 +1398,7 @@ TEST_F(
 
     // The document sources are stitched in this order: queue -> project -> unwind ->replaceRoot.
     for (size_t i = 1; i < stages.size(); ++i) {
-        stages[i]->setSource(stages[i - 1].get());
+        exec::agg::MockStage::setSource_forTest(stages[i], stages[i - 1].get());
     }
 
     // Tests that exec::agg::ExtensionStage::setSource() correctly overrides
@@ -1520,7 +1521,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest, ShouldEofWhenSourceStageEofsEarly
 
     // The document sources are stitched in this order: queue -> project -> unwind -> replaceRoot.
     for (size_t i = 1; i < stages.size(); ++i) {
-        stages[i]->setSource(stages[i - 1].get());
+        exec::agg::MockStage::setSource_forTest(stages[i], stages[i - 1].get());
     }
 
     // Tests that exec::agg::ExtensionStage::setSource() correctly overrides
@@ -1581,7 +1582,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
 
     // The document sources are stitched in this order: queue -> project -> unwind ->replaceRoot.
     for (size_t i = 1; i < stages.size(); ++i) {
-        stages[i]->setSource(stages[i - 1].get());
+        exec::agg::MockStage::setSource_forTest(stages[i], stages[i - 1].get());
     }
 
     // Tests that exec::agg::ExtensionStage::setSource() correctly overrides

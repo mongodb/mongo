@@ -308,7 +308,7 @@ public:
                       string expectedResultSetString) {
         auto mockStage = exec::agg::MockStage::createForTest(std::move(inputDocs), getExpCtx());
         createSortStage();
-        _sortStage->setSource(mockStage.get());
+        exec::agg::MockStage::setSource_forTest(_sortStage, mockStage.get());
 
         // Load the results from the DocumentSourceUnwind.
         vector<Document> resultSet;
@@ -503,7 +503,7 @@ TEST_F(DocumentSourceSortExecutionLargeChunkTest, CurOpStatsAreNotUpdatedIfWithi
                                                           Document{{"_id", 2}, {"a", 3}}},
                                                          getExpCtx());
     createSortStage();
-    _sortStage->setSource(mockStage.get());
+    exec::agg::MockStage::setSource_forTest(_sortStage, mockStage.get());
 
     // The chunk size is set very large, so CurOp should only be updated once.
     int64_t chunkSize = internalQueryMaxWriteToCurOpMemoryUsageBytes.loadRelaxed();
@@ -538,7 +538,7 @@ TEST_F(DocumentSourceSortExecutionZeroChunkTest, CurOpStatsDoNotChunk) {
                                                           Document{{"_id", 2}, {"a", 3}}},
                                                          getExpCtx());
     createSortStage();
-    _sortStage->setSource(mockStage.get());
+    exec::agg::MockStage::setSource_forTest(_sortStage, mockStage.get());
 
     int64_t chunkSize = internalQueryMaxWriteToCurOpMemoryUsageBytes.loadRelaxed();
     ASSERT_EQ(chunkSize, 0);
@@ -578,7 +578,7 @@ DEATH_TEST_REGEX_F(DocumentSourceSortExecutionTestDeathTest,
     createSort(BSON("_id" << 1));
     createSortStage();
     auto mockStage = exec::agg::MockStage::createForTest({doc.freeze()}, getExpCtx());
-    _sortStage->setSource(mockStage.get());
+    exec::agg::MockStage::setSource_forTest(_sortStage, mockStage.get());
     ASSERT_THROWS_CODE(_sortStage->getNext(), AssertionException, 10358905);
 }
 
@@ -647,8 +647,8 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldPauseWhenAskedTo) {
                                              Document{{"a", 0}},
                                              DocumentSource::GetNextResult::makePauseExecution()},
                                             getExpCtx());
-    auto sortStage = boost::dynamic_pointer_cast<exec::agg::SortStage>(exec::agg::buildStage(sort));
-    sortStage->setSource(mock.get());
+    auto sortStage = boost::dynamic_pointer_cast<exec::agg::SortStage>(
+        exec::agg::buildStageAndStitch(sort, mock));
 
     // Should propagate the first pause.
     ASSERT_TRUE(sortStage->getNext().isPaused());
@@ -671,8 +671,8 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldResumePopulationBetweenPauses) {
                                              DocumentSource::GetNextResult::makePauseExecution(),
                                              Document{{"a", 0}}},
                                             getExpCtx());
-    auto sortStage = boost::dynamic_pointer_cast<exec::agg::SortStage>(exec::agg::buildStage(sort));
-    sortStage->setSource(mock.get());
+    auto sortStage = boost::dynamic_pointer_cast<exec::agg::SortStage>(
+        exec::agg::buildStageAndStitch(sort, mock));
 
     // Should load the first document, then propagate the pause.
     ASSERT_TRUE(sortStage->getNext().isPaused());
@@ -712,8 +712,8 @@ initSpillingTest(boost::intrusive_ptr<ExpressionContext> expCtx,
                                              DocumentSource::GetNextResult::makePauseExecution(),
                                              Document{{"_id", 2}, {"largeStr", largeStr}}},
                                             expCtx);
-    auto sortStage = boost::dynamic_pointer_cast<exec::agg::SortStage>(exec::agg::buildStage(sort));
-    sortStage->setSource(mock.get());
+    auto sortStage = boost::dynamic_pointer_cast<exec::agg::SortStage>(
+        exec::agg::buildStageAndStitch(sort, mock));
 
     return {std::move(mock), std::move(sort), std::move(sortStage)};
 }
@@ -761,8 +761,8 @@ initSpillingTestForBoundedSort(boost::intrusive_ptr<ExpressionContext> expCtx,
     }
     auto mock = exec::agg::MockStage::createForTest(std::move(data), expCtx);
 
-    auto sortStage = boost::dynamic_pointer_cast<exec::agg::SortStage>(exec::agg::buildStage(sort));
-    sortStage->setSource(mock.get());
+    auto sortStage = boost::dynamic_pointer_cast<exec::agg::SortStage>(
+        exec::agg::buildStageAndStitch(sort, mock));
 
     return {std::move(mock), std::move(sort), std::move(sortStage)};
 }
@@ -930,8 +930,7 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToReportSpillingStatsInBound
     }
 
     auto mock = exec::agg::MockStage::createForTest(std::move(data), expCtx);
-    auto sortStage = exec::agg::buildStage(sort);
-    sortStage->setSource(mock.get());
+    auto sortStage = exec::agg::buildStageAndStitch(sort, mock);
 
     auto next = sortStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -991,8 +990,8 @@ TEST_F(DocumentSourceSortExecutionTest,
     }
 
     auto mock = exec::agg::MockStage::createForTest(std::move(data), expCtx);
-    auto sortStage = boost::dynamic_pointer_cast<exec::agg::SortStage>(exec::agg::buildStage(sort));
-    sortStage->setSource(mock.get());
+    auto sortStage = boost::dynamic_pointer_cast<exec::agg::SortStage>(
+        exec::agg::buildStageAndStitch(sort, mock));
 
     auto next = sortStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -1037,8 +1036,7 @@ TEST_F(DocumentSourceSortExecutionTest,
     auto mock = exec::agg::MockStage::createForTest({Document{{"_id", 0}, {"largeStr", largeStr}},
                                                      Document{{"_id", 1}, {"largeStr", largeStr}}},
                                                     expCtx);
-    auto sortStage = exec::agg::buildStage(sort);
-    sortStage->setSource(mock.get());
+    auto sortStage = exec::agg::buildStageAndStitch(sort, mock);
 
     ASSERT_THROWS_CODE(sortStage->getNext(),
                        AssertionException,
@@ -1061,8 +1059,8 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldCorrectlyTrackMemoryUsageBetweenPa
                                              Document{{"_id", 1}, {"largeStr", largeStr}},
                                              Document{{"_id", 2}, {"largeStr", largeStr}}},
                                             expCtx);
-    auto sortStage = boost::dynamic_pointer_cast<exec::agg::SortStage>(exec::agg::buildStage(sort));
-    sortStage->setSource(mock.get());
+    auto sortStage = boost::dynamic_pointer_cast<exec::agg::SortStage>(
+        exec::agg::buildStageAndStitch(sort, mock));
 
     // The first getNext() should pause.
     ASSERT_TRUE(sortStage->getNext().isPaused());
@@ -1341,8 +1339,8 @@ TEST_F(DocumentSourceSortTest, RedactionWithMemoryTracking) {
 void assertProducesSortKeyMetadata(auto expCtx, auto sort) {
     const auto mock =
         exec::agg::MockStage::createForTest({Document{{"_id", 0}}, Document{{"_id", 1}}}, expCtx);
-    auto sortStage = boost::dynamic_pointer_cast<exec::agg::SortStage>(exec::agg::buildStage(sort));
-    sortStage->setSource(mock.get());
+    auto sortStage = boost::dynamic_pointer_cast<exec::agg::SortStage>(
+        exec::agg::buildStageAndStitch(sort, mock));
     const auto output1 = sortStage->getNext();
     ASSERT(output1.isAdvanced());
     ASSERT(output1.getDocument().metadata().hasSortKey());

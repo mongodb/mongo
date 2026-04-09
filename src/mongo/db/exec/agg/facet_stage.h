@@ -63,11 +63,6 @@ public:
                const std::shared_ptr<DSFacetExecStatsWrapper>& execStatsWrapper);
     ~FacetStage() final;
 
-    /**
-     * Sets 'source' as the source of '_teeBuffer'.
-     */
-    void setSource(Stage* source) final;
-
     bool usedDisk() const final;
 
     const SpecificStats* getSpecificStats() const final {
@@ -79,6 +74,11 @@ public:
     bool validateOperationContext(const OperationContext* opCtx) const final;
 
 private:
+    /**
+     * Sets 'source' as the source of '_teeBuffer'.
+     */
+    void setSource(Stage* source) final;
+
     /**
      * Blocking call. Will consume all input and produces one output document.
      */

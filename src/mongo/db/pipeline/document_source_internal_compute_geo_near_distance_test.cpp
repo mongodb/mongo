@@ -60,14 +60,11 @@ TEST_F(DocumentSourceInternalGeoNearDistanceTest, DistanceBetweenOverlappingPoin
         }})");
     auto geoDist = DocumentSourceInternalGeoNearDistance::createFromBson(
         computeGeoSpec.firstElement(), getExpCtx());
-    auto geoDistStage = exec::agg::buildStage(geoDist);
-
     auto mock = exec::agg::MockStage::createForTest(
         {DOC("loc" << DOC("type" << "Point"_sd
                                  << "coordinates" << DOC_ARRAY(1 << 1)))},
         getExpCtx());
-
-    geoDistStage->setSource(mock.get());
+    auto geoDistStage = exec::agg::buildStageAndStitch(geoDist, mock);
     auto next = geoDistStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     auto doc = next.getDocument();
@@ -88,14 +85,11 @@ TEST_F(DocumentSourceInternalGeoNearDistanceTest, SphericalDistanceBetweenTwoPoi
         }})");
     auto geoDist = DocumentSourceInternalGeoNearDistance::createFromBson(
         computeGeoSpec.firstElement(), getExpCtx());
-    auto geoDistStage = exec::agg::buildStage(geoDist);
-
     auto mock = exec::agg::MockStage::createForTest(
         {DOC("loc" << DOC("type" << "Point"_sd
                                  << "coordinates" << DOC_ARRAY(0 << 0)))},
         getExpCtx());
-
-    geoDistStage->setSource(mock.get());
+    auto geoDistStage = exec::agg::buildStageAndStitch(geoDist, mock);
     auto next = geoDistStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     auto doc = next.getDocument();
@@ -114,11 +108,8 @@ TEST_F(DocumentSourceInternalGeoNearDistanceTest, DistanceBetweenTwoLegacyPoints
         }})");
     auto geoDist = DocumentSourceInternalGeoNearDistance::createFromBson(
         computeGeoSpec.firstElement(), getExpCtx());
-    auto geoDistStage = exec::agg::buildStage(geoDist);
-
     auto mock = exec::agg::MockStage::createForTest({DOC("loc" << DOC_ARRAY(0 << 0))}, getExpCtx());
-
-    geoDistStage->setSource(mock.get());
+    auto geoDistStage = exec::agg::buildStageAndStitch(geoDist, mock);
     auto next = geoDistStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     auto doc = next.getDocument();
@@ -139,11 +130,8 @@ TEST_F(DocumentSourceInternalGeoNearDistanceTest, DistanceBetweenTwoMixedPointsS
         }})");
     auto geoDist = DocumentSourceInternalGeoNearDistance::createFromBson(
         computeGeoSpec.firstElement(), getExpCtx());
-    auto geoDistStage = exec::agg::buildStage(geoDist);
-
     auto mock = exec::agg::MockStage::createForTest({DOC("loc" << DOC_ARRAY(0 << 0))}, getExpCtx());
-
-    geoDistStage->setSource(mock.get());
+    auto geoDistStage = exec::agg::buildStageAndStitch(geoDist, mock);
     auto next = geoDistStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     auto doc = next.getDocument();

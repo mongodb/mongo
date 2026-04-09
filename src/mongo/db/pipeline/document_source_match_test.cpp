@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -534,10 +535,8 @@ TEST_F(DocumentSourceMatchTest, ShouldPropagatePauses) {
                                            Document{{"a", 1}}},
                                           getExpCtx());
 
-    auto matchStage = exec::agg::buildStage(match);
     auto mockStage = exec::agg::buildStage(mock);
-
-    matchStage->setSource(mockStage.get());
+    auto matchStage = exec::agg::buildStageAndStitch(match, mockStage);
 
     ASSERT_TRUE(matchStage->getNext().isPaused());
     ASSERT_TRUE(matchStage->getNext().isAdvanced());
@@ -563,10 +562,8 @@ TEST_F(DocumentSourceMatchTest, ShouldCorrectlyJoinWithSubsequentMatch) {
                                                          Document{{"a", 2}, {"b", 2}}},
                                                         getExpCtx());
 
-    auto matchStage = exec::agg::buildStage(match);
     auto mockStage = exec::agg::buildStage(mock);
-
-    matchStage->setSource(mockStage.get());
+    auto matchStage = exec::agg::buildStageAndStitch(match, mockStage);
 
     // The first result should match.
     auto next = matchStage->getNext();
@@ -657,10 +654,8 @@ TEST_F(DocumentSourceMatchTest, ShouldMatchCorrectlyAfterDescendingMatch) {
          Document{{"a", Document{{"b", 1}}}, {"a", Document{{"c", 1}}}, {"a", Document{{"d", 1}}}}},
         getExpCtx());
 
-    auto descendedMatchStage = exec::agg::buildStage(descendedMatch);
     auto mockStage = exec::agg::buildStage(mock);
-
-    descendedMatchStage->setSource(mockStage.get());
+    auto descendedMatchStage = exec::agg::buildStageAndStitch(descendedMatch, mockStage);
 
     auto next = descendedMatchStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -681,10 +676,8 @@ TEST_F(DocumentSourceMatchTest, ShouldCorrectlyEvaluateElemMatchPredicate) {
         {Document{{"a", matchingVector}}, Document{{"a", nonMatchingVector}}, Document{{"a", 1}}},
         getExpCtx());
 
-    auto matchStage = exec::agg::buildStage(match);
     auto mockStage = exec::agg::buildStage(mock);
-
-    matchStage->setSource(mockStage.get());
+    auto matchStage = exec::agg::buildStageAndStitch(match, mockStage);
 
     // The first result should match.
     auto next = matchStage->getNext();
@@ -705,10 +698,8 @@ TEST_F(DocumentSourceMatchTest, ShouldCorrectlyEvaluateJSONSchemaPredicate) {
         {Document{{"a", 1}}, Document{{"a", "str"_sd}}, Document{{"a", {Document{{{}, 1}}}}}},
         getExpCtx());
 
-    auto matchStage = exec::agg::buildStage(match);
     auto mockStage = exec::agg::buildStage(mock);
-
-    matchStage->setSource(mockStage.get());
+    auto matchStage = exec::agg::buildStageAndStitch(match, mockStage);
 
     // The first result should match.
     auto next = matchStage->getNext();

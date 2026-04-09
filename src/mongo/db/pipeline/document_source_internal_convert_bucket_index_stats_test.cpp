@@ -116,7 +116,7 @@ TEST_F(InternalConvertBucketIndexStatsTest, TestGetNextWithoutMetaField) {
         {"{spec: {name: 'twoFieldIndex', key: {'control.min.t': 1, 'control.max.t': 1, "
          "'control.min.metric': 1, 'control.max.metric': 1}}}"},
         expCtx);
-    convertIndexStatsStage->setSource(stage.get());
+    exec::agg::MockStage::setSource_forTest(convertIndexStatsStage.get(), stage.get());
     auto next = convertIndexStatsStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(
@@ -136,7 +136,7 @@ TEST_F(InternalConvertBucketIndexStatsTest, TestGetNextWithMetaField) {
         {"{spec: {name: 'threeFieldIndex', key: {'meta': 1, 'control.min.t': 1, 'control.max.t': "
          "1, 'control.min.metric': 1, 'control.max.metric': 1}}}"},
         expCtx);
-    convertIndexStatsStage->setSource(stage.get());
+    exec::agg::MockStage::setSource_forTest(convertIndexStatsStage.get(), stage.get());
     auto next = convertIndexStatsStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_DOCUMENT_EQ(next.getDocument(),

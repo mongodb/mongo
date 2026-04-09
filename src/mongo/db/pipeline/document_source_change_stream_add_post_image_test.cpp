@@ -150,8 +150,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingDocumentK
                            {"coll", expCtx->getNamespaceString().coll()}}}},
         expCtx);
 
-    auto lookupChangeStage = exec::agg::buildStage(lookupChangeDS);
-    lookupChangeStage->setSource(mockLocalStage.get());
+    auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
 
     // Mock out the foreign collection.
     getExpCtx()->setMongoProcessInterface(
@@ -176,8 +175,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingOperation
                            {"coll", expCtx->getNamespaceString().coll()}}}},
         expCtx);
 
-    auto lookupChangeStage = exec::agg::buildStage(lookupChangeDS);
-    lookupChangeStage->setSource(mockLocalStage.get());
+    auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
 
     // Mock out the foreign collection.
     getExpCtx()->setMongoProcessInterface(
@@ -201,8 +199,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfMissingNamespace
         },
         expCtx);
 
-    auto lookupChangeStage = exec::agg::buildStage(lookupChangeDS);
-    lookupChangeStage->setSource(mockLocalStage.get());
+    auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
 
     // Mock out the foreign collection.
     getExpCtx()->setMongoProcessInterface(
@@ -225,8 +222,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfNsFieldHasWrongT
                                                      {"ns", 4}},
                                             expCtx);
 
-    auto lookupChangeStage = exec::agg::buildStage(lookupChangeDS);
-    lookupChangeStage->setSource(mockLocalStage.get());
+    auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
 
     // Mock out the foreign collection.
     getExpCtx()->setMongoProcessInterface(
@@ -250,8 +246,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfNsFieldDoesNotMa
                   Document{{"db", "DIFFERENT"_sd}, {"coll", expCtx->getNamespaceString().coll()}}}},
         expCtx);
 
-    auto lookupChangeStage = exec::agg::buildStage(lookupChangeDS);
-    lookupChangeStage->setSource(mockLocalStage.get());
+    auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
 
     // Mock out the foreign collection.
     getExpCtx()->setMongoProcessInterface(
@@ -278,8 +273,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest,
                  {"ns", Document{{"db", "DIFFERENT"_sd}, {"coll", "irrelevant"_sd}}}},
         expCtx);
 
-    auto lookupChangeStage = exec::agg::buildStage(lookupChangeDS);
-    lookupChangeStage->setSource(mockLocalStage.get());
+    auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
 
     // Mock out the foreign collection.
     std::deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}}};
@@ -310,8 +304,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPassIfDatabaseMatchesOn
                            {"coll", "irrelevant"_sd}}}},
         expCtx);
 
-    auto lookupChangeStage = exec::agg::buildStage(lookupChangeDS);
-    lookupChangeStage->setSource(mockLocalStage.get());
+    auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
 
     auto next = lookupChangeStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -341,8 +334,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldErrorIfDocumentKeyIsNot
                            {"coll", expCtx->getNamespaceString().coll()}}}},
         expCtx);
 
-    auto lookupChangeStage = exec::agg::buildStage(lookupChangeDS);
-    lookupChangeStage->setSource(mockLocalStage.get());
+    auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
 
     // Mock out the foreign collection to have two documents with the same document key.
     std::deque<DocumentSource::GetNextResult> foreignCollection = {Document{{"_id", 0}},
@@ -379,8 +371,7 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, ShouldPropagatePauses) {
          DocumentSource::GetNextResult::makePauseExecution()},
         expCtx);
 
-    auto lookupChangeStage = exec::agg::buildStage(lookupChangeDS);
-    lookupChangeStage->setSource(mockLocalStage.get());
+    auto lookupChangeStage = exec::agg::buildStageAndStitch(lookupChangeDS, mockLocalStage);
 
     // Mock out the foreign collection.
     std::deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}},

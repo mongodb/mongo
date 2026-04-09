@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/agg/change_stream_handle_topology_change_v2_stage.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -432,7 +433,7 @@ TEST_F(ChangeStreamStageTest, DSV2HandleInputs) {
     getDataToShardsAllocationQueryServiceMock(params)->bufferResponses(mockResponses);
 
     auto handleTopologyChangeStage = make_intrusive<V2Stage>(getExpCtx(), params);
-    handleTopologyChangeStage->setSource(stage.get());
+    exec::agg::MockStage::setSource_forTest(handleTopologyChangeStage, stage.get());
 
     auto next = handleTopologyChangeStage->getNext();
     ASSERT_TRUE(next.isPaused());
@@ -1272,7 +1273,7 @@ TEST_F(DSV2StageTest, StateFetchingInitializationStrictModeGettingChangeEventNon
                                          source);
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
-    docSource->setSource(source.get());
+    exec::agg::MockStage::setSource_forTest(docSource, source.get());
 
     docSource->setState_forTest(V2Stage::State::kFetchingGettingChangeEvent,
                                 false /* validateStateTransition */);
@@ -1347,7 +1348,7 @@ TEST_F(DSV2StageTest, StateFetchingInitializationStrictModeGettingChangeEventWit
                                          source);
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
-    docSource->setSource(source.get());
+    exec::agg::MockStage::setSource_forTest(docSource, source.get());
 
     docSource->setState_forTest(V2Stage::State::kFetchingGettingChangeEvent,
                                 false /* validateStateTransition */);
@@ -1743,7 +1744,7 @@ TEST_F(DSV2StageTest,
                                          source);
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
-    docSource->setSource(source.get());
+    exec::agg::MockStage::setSource_forTest(docSource, source.get());
     docSource->setState_forTest(V2Stage::State::kFetchingStartingChangeStreamSegment,
                                 false /* validateStateTransition */);
     docSource->setSegmentStartTimestamp_forTest(Timestamp(23, 0));
@@ -1807,7 +1808,7 @@ TEST_F(DSV2StageTest, StateFetchingNormalGettingChangeEventNonControlEvents) {
                                          source);
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
-    docSource->setSource(source.get());
+    exec::agg::MockStage::setSource_forTest(docSource, source.get());
 
     docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
                                 false /* validateStateTransition */);
@@ -1883,7 +1884,7 @@ TEST_F(DSV2StageTest, StateFetchingNormalGettingChangeEventControlEvent) {
                                          source);
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
-    docSource->setSource(source.get());
+    exec::agg::MockStage::setSource_forTest(docSource, source.get());
 
     docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
                                 false /* validateStateTransition */);
@@ -1950,7 +1951,7 @@ TEST_F(
                                          source);
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
-    docSource->setSource(source.get());
+    exec::agg::MockStage::setSource_forTest(docSource, source.get());
     docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
                                 false /* validateStateTransition */);
 
@@ -2051,7 +2052,7 @@ TEST_F(
         getExpCtx(), getOpCtx(), Timestamp(23, 0));
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
-    docSource->setSource(source.get());
+    exec::agg::MockStage::setSource_forTest(docSource, source.get());
     docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
                                 false /* validateStateTransition */);
 
@@ -2117,7 +2118,7 @@ TEST_F(DSV2StageTest, StateFetchingNormalGettingChangeEventShardTargeterReturnsD
                                          source);
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
-    docSource->setSource(source.get());
+    exec::agg::MockStage::setSource_forTest(docSource, source.get());
 
     docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
                                 false /* validateStateTransition */);
@@ -2193,7 +2194,7 @@ TEST_F(DSV2StageTest, StateFetchingDegradedGettingChangeEventNonControlEvents) {
                                          source);
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
-    docSource->setSource(source.get());
+    exec::agg::MockStage::setSource_forTest(docSource, source.get());
 
     docSource->setState_forTest(V2Stage::State::kFetchingDegradedGettingChangeEvent,
                                 false /* validateStateTransition */);
@@ -2316,7 +2317,7 @@ TEST_F(DSV2StageTest, StateFetchingDegradedGettingChangeEventPauseAndEOFEvents) 
                                          source);
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
-    docSource->setSource(source.get());
+    exec::agg::MockStage::setSource_forTest(docSource, source.get());
 
     // Must enable undo mode when entering the degraded fetching mode.
     getCursorManagerMock(params)->enableUndoNextMode();
@@ -2460,7 +2461,7 @@ TEST_F(DSV2StageTest, StateFetchingDegradedGettingChangeEventControlEvent) {
                                          source);
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
-    docSource->setSource(source.get());
+    exec::agg::MockStage::setSource_forTest(docSource, source.get());
 
     docSource->setState_forTest(V2Stage::State::kFetchingDegradedGettingChangeEvent,
                                 false /* validateStateTransition */);
@@ -2550,7 +2551,7 @@ DEATH_TEST_REGEX_F(DSV2StageTestDeathTest,
                                          source);
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
-    docSource->setSource(source.get());
+    exec::agg::MockStage::setSource_forTest(docSource, source.get());
 
     docSource->setState_forTest(V2Stage::State::kFetchingDegradedGettingChangeEvent,
                                 false /* validateStateTransition */);
@@ -2636,7 +2637,7 @@ TEST_F(DSV2StageTest, OpenCursorOnConfigServer) {
     getDataToShardsAllocationQueryServiceMock(params)->bufferResponses(mockResponses);
 
     auto handleTopologyChangeStage = make_intrusive<V2Stage>(getExpCtx(), params);
-    handleTopologyChangeStage->setSource(source.get());
+    exec::agg::MockStage::setSource_forTest(handleTopologyChangeStage, source.get());
 
     ASSERT_FALSE(getCursorManagerMock(params)->cursorOpenedOnConfigServer());
     ASSERT_EQ(kNoShards, getCursorManagerMock(params)->getCurrentlyTargetedDataShards());
@@ -2697,7 +2698,7 @@ TEST_F(DSV2StageTest, CloseCursorOnConfigServerWhenReenteringFetchingStartingCha
     auto handleTopologyChangeStage = make_intrusive<V2Stage>(getExpCtx(), params);
     handleTopologyChangeStage->setState_forTest(
         V2Stage::State::kFetchingStartingChangeStreamSegment, false /* validateStateTransition */);
-    handleTopologyChangeStage->setSource(source.get());
+    exec::agg::MockStage::setSource_forTest(handleTopologyChangeStage, source.get());
     handleTopologyChangeStage->setSegmentStartTimestamp_forTest(ts);
 
     getCursorManagerMock(params)->openCursorOnConfigServer(getExpCtx(), getOpCtx(), ts);
@@ -2759,7 +2760,7 @@ TEST_F(DSV2StageTest, OpenCursorsOnDataShards) {
     getDataToShardsAllocationQueryServiceMock(params)->bufferResponses(mockResponses);
 
     auto handleTopologyChangeStage = make_intrusive<V2Stage>(getExpCtx(), params);
-    handleTopologyChangeStage->setSource(source.get());
+    exec::agg::MockStage::setSource_forTest(handleTopologyChangeStage, source.get());
 
     ASSERT_FALSE(getCursorManagerMock(params)->cursorOpenedOnConfigServer());
     ASSERT_EQ(kNoShards, getCursorManagerMock(params)->getCurrentlyTargetedDataShards());
@@ -2821,7 +2822,7 @@ TEST_F(DSV2StageTest, CloseCursorsOnDataShardsWhenReenteringStartingChangeStream
     auto handleTopologyChangeStage = make_intrusive<V2Stage>(getExpCtx(), params);
     handleTopologyChangeStage->setState_forTest(
         V2Stage::State::kFetchingStartingChangeStreamSegment, false /* validateStateTransition */);
-    handleTopologyChangeStage->setSource(source.get());
+    exec::agg::MockStage::setSource_forTest(handleTopologyChangeStage, source.get());
     handleTopologyChangeStage->setSegmentStartTimestamp_forTest(ts);
 
     getCursorManagerMock(params)->openCursorsOnDataShards(getExpCtx(), getOpCtx(), ts, shardSet);
@@ -2882,7 +2883,7 @@ TEST_F(DSV2StageTest, ShardNotFoundErrorIsConvertedToShardRemovedErrorInStrictMo
     getDataToShardsAllocationQueryServiceMock(params)->bufferResponses(mockResponses);
 
     auto handleTopologyChangeStage = make_intrusive<V2Stage>(getExpCtx(), params);
-    handleTopologyChangeStage->setSource(source.get());
+    exec::agg::MockStage::setSource_forTest(handleTopologyChangeStage, source.get());
 
     // 'ShardNotFound' error must be translated into 'ShardRemovedError'.
     ASSERT_THROWS_CODE(
@@ -2942,7 +2943,7 @@ TEST_F(DSV2StageTest, ShardNotFoundErrorIsConvertedToRetryChangeStreamInIgnoreRe
     getDataToShardsAllocationQueryServiceMock(params)->bufferResponses(mockResponses);
 
     auto handleTopologyChangeStage = make_intrusive<V2Stage>(getExpCtx(), params);
-    handleTopologyChangeStage->setSource(source.get());
+    exec::agg::MockStage::setSource_forTest(handleTopologyChangeStage, source.get());
 
     // 'ShardNotFound' error must be translated into 'RetryChangeStream' error.
     ASSERT_THROWS_CODE(
@@ -3000,7 +3001,7 @@ TEST_F(DSV2StageTest, ErrorOtherThanShardNotFoundErrorIsRethrownInStrictMode) {
     getDataToShardsAllocationQueryServiceMock(params)->bufferResponses(mockResponses);
 
     auto handleTopologyChangeStage = make_intrusive<V2Stage>(getExpCtx(), params);
-    handleTopologyChangeStage->setSource(source.get());
+    exec::agg::MockStage::setSource_forTest(handleTopologyChangeStage, source.get());
 
     // The expect error code should be returned as-is.
     ASSERT_THROWS_CODE(handleTopologyChangeStage->getNext(), AssertionException, errorCode);
@@ -3057,7 +3058,7 @@ TEST_F(DSV2StageTest, ErrorOtherThanShardNotFoundErrorIsRethrownInIgnoreRemovedS
     getDataToShardsAllocationQueryServiceMock(params)->bufferResponses(mockResponses);
 
     auto handleTopologyChangeStage = make_intrusive<V2Stage>(getExpCtx(), params);
-    handleTopologyChangeStage->setSource(source.get());
+    exec::agg::MockStage::setSource_forTest(handleTopologyChangeStage, source.get());
 
     // The expect error code should be returned as-is.
     ASSERT_THROWS_CODE(handleTopologyChangeStage->getNext(), AssertionException, errorCode);

@@ -367,8 +367,7 @@ TEST_F(DocumentSourceFacetTest, SingleFacetShouldReceiveAllDocuments) {
     std::vector<DocumentSourceFacet::FacetPipeline> facets;
     facets.emplace_back("results", std::move(pipeline));
     auto facetSource = DocumentSourceFacet::create(std::move(facets), ctx);
-    auto facetStage = exec::agg::buildStage(facetSource);
-    facetStage->setSource(mock.get());
+    auto facetStage = exec::agg::buildStageAndStitch(facetSource, mock);
 
     auto output = facetStage->getNext();
     ASSERT(output.isAdvanced());
@@ -398,9 +397,7 @@ TEST_F(DocumentSourceFacetTest, MultipleFacetsShouldSeeTheSameDocuments) {
     facets.emplace_back("first", std::move(firstPipeline));
     facets.emplace_back("second", std::move(secondPipeline));
     auto facetSource = DocumentSourceFacet::create(std::move(facets), ctx);
-    auto facetStage = exec::agg::buildStage(facetSource);
-
-    facetStage->setSource(mock.get());
+    auto facetStage = exec::agg::buildStageAndStitch(facetSource, mock);
 
     auto output = facetStage->getNext();
 
@@ -429,8 +426,7 @@ TEST_F(DocumentSourceFacetTest, ShouldAcceptEmptyPipelines) {
     auto mock = exec::agg::MockStage::createForTest(inputs, ctx);
 
     auto facetSource = DocumentSourceFacet::createFromBson(spec.firstElement(), ctx);
-    auto facetStage = exec::agg::buildStage(facetSource);
-    facetStage->setSource(mock.get());
+    auto facetStage = exec::agg::buildStageAndStitch(facetSource, mock);
 
     auto output = facetStage->getNext();
 
@@ -468,9 +464,7 @@ TEST_F(DocumentSourceFacetTest,
     facets.emplace_back("all", std::move(passthroughPipe));
     facets.emplace_back("first", std::move(limitedPipe));
     auto facetSource = DocumentSourceFacet::create(std::move(facets), ctx);
-    auto facetStage = exec::agg::buildStage(facetSource);
-
-    facetStage->setSource(mock.get());
+    auto facetStage = exec::agg::buildStageAndStitch(facetSource, mock);
 
     vector<Value> expectedPassthroughOutput;
     for (auto&& input : inputs) {
@@ -521,9 +515,7 @@ TEST_F(DocumentSourceFacetTest, ShouldBeAbleToEvaluateMultipleStagesWithinOneSub
     std::vector<DocumentSourceFacet::FacetPipeline> facets;
     facets.emplace_back("subPipe", std::move(pipeline));
     auto facetSource = DocumentSourceFacet::create(std::move(facets), ctx);
-    auto facetStage = exec::agg::buildStage(facetSource);
-
-    facetStage->setSource(mock.get());
+    auto facetStage = exec::agg::buildStageAndStitch(facetSource, mock);
 
     auto output = facetStage->getNext();
     ASSERT(output.isAdvanced());
@@ -544,15 +536,14 @@ TEST_F(DocumentSourceFacetTest, ShouldPropagateDisposeThroughToSource) {
     facets.emplace_back("firstPipe", std::move(firstPipe));
     facets.emplace_back("secondPipe", std::move(secondPipe));
     auto facetSource = DocumentSourceFacet::create(std::move(facets), ctx);
-    auto facetStage = exec::agg::buildStage(facetSource);
-
-    facetStage->setSource(mockSource.get());
+    auto facetStage = exec::agg::buildStageAndStitch(facetSource, mockSource);
 
     facetStage->dispose();
     ASSERT_TRUE(mockSource->isDisposed);
 }
 
-// TODO: DocumentSourceFacet will have to propagate pauses if we ever allow nested $facets.
+// TODO(SERVER-122403): DocumentSourceFacet will have to propagate pauses if we ever allow nested
+// $facets.
 using DocumentSourceFacetTestDeathTest = DocumentSourceFacetTest;
 DEATH_TEST_REGEX_F(DocumentSourceFacetTestDeathTest,
                    ShouldFailIfGivenPausedInput,
@@ -567,9 +558,7 @@ DEATH_TEST_REGEX_F(DocumentSourceFacetTestDeathTest,
     std::vector<DocumentSourceFacet::FacetPipeline> facets;
     facets.emplace_back("subPipe", std::move(pipeline));
     auto facetSource = DocumentSourceFacet::create(std::move(facets), ctx);
-    auto facetStage = exec::agg::buildStage(facetSource);
-
-    facetStage->setSource(mock.get());
+    auto facetStage = exec::agg::buildStageAndStitch(facetSource, mock);
 
     facetStage->getNext();  // This should cause a crash.
 }

@@ -194,7 +194,7 @@ private:
      */
     void assertResultsMatch(BSONObj expectedResults) {
         auto stage = exec::agg::MockStage::createForTest(inputData(), ctx());
-        _unwindStage->setSource(stage.get());
+        exec::agg::MockStage::setSource_forTest(_unwindStage, stage.get());
         // Load the results from the DocumentSourceUnwind.
         vector<Document> resultSet;
         for (auto output = _unwindStage->getNext(); output.isAdvanced();
@@ -709,9 +709,7 @@ TEST_F(UnwindStageTest, ShouldPropagatePauses) {
          DocumentSource::GetNextResult::makePauseExecution(),
          Document{{"array", vector<Value>{Value(1), Value(2)}}}},
         getExpCtx());
-    auto unwindStage = exec::agg::buildStage(unwind);
-
-    unwindStage->setSource(source.get());
+    auto unwindStage = exec::agg::buildStageAndStitch(unwind, source);
 
     ASSERT_TRUE(unwindStage->getNext().isAdvanced());
     ASSERT_TRUE(unwindStage->getNext().isAdvanced());
@@ -779,9 +777,7 @@ TEST_F(UnwindStageTest, UnwindIndexPathIsSamePathAsArrayPath) {
         {Document{{"array", vector<Value>{Value(10), Value(20)}}},
          Document{{"array", vector<Value>{Value(30), Value(40)}}}},
         getExpCtx());
-    auto unwindStage = exec::agg::buildStage(unwind);
-
-    unwindStage->setSource(stage.get());
+    auto unwindStage = exec::agg::buildStageAndStitch(unwind, stage);
 
     ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["array"], Value(0));
     ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["array"], Value(1));
@@ -798,9 +794,7 @@ TEST_F(UnwindStageTest, UnwindIndexPathIsParentOfArrayPath) {
         {Document{{"obj", Document{{"array", vector<Value>{Value(10), Value(20)}}}}},
          Document{{"obj", Document{{"array", vector<Value>{Value(30), Value(40)}}}}}},
         getExpCtx());
-    auto unwindStage = exec::agg::buildStage(unwind);
-
-    unwindStage->setSource(stage.get());
+    auto unwindStage = exec::agg::buildStageAndStitch(unwind, stage);
 
     Document res;
     ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["obj"], Value(0));
@@ -818,9 +812,7 @@ TEST_F(UnwindStageTest, UnwindIndexPathIsChildOfArrayPath) {
         {Document{{"array", vector<Value>{Value(10), Value(20)}}},
          Document{{"array", vector<Value>{Value(30), Value(40)}}}},
         getExpCtx());
-    auto unwindStage = exec::agg::buildStage(unwind);
-
-    unwindStage->setSource(stage.get());
+    auto unwindStage = exec::agg::buildStageAndStitch(unwind, stage);
 
     ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["array"], Value(BSON("index" << 0)));
     ASSERT_VALUE_EQ(unwindStage->getNext().getDocument()["array"], Value(BSON("index" << 1)));

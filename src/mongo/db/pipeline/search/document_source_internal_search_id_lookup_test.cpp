@@ -234,7 +234,7 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, BasicSearchTest) {
     // Mock its input.
     auto mockLocalStage = exec::agg::MockStage::createForTest(
         {Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}}, expCtx);
-    idLookupStage->setSource(mockLocalStage.get());
+    exec::agg::MockStage::setSource_forTest(idLookupStage, mockLocalStage.get());
 
     // We should find one document here with _id = 0.
     auto next = idLookupStage->getNext();
@@ -264,7 +264,7 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, ShouldSkipResultsWhenIdNotFound) {
     // Mock input to stage.
     auto mockLocalStage =
         exec::agg::MockStage::createForTest({Document{{"_id", 0}}, Document{{"_id", 1}}}, expCtx);
-    idLookupStage->setSource(mockLocalStage.get());
+    exec::agg::MockStage::setSource_forTest(idLookupStage, mockLocalStage.get());
 
     // We should find one document here with _id = 0.
     auto next = idLookupStage->getNext();
@@ -294,7 +294,7 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, ShouldNotRemoveMetadata) {
     auto mockLocalStage = exec::agg::MockStage::createForTest({docOne.freeze()}, expCtx);
 
     auto [idLookup, idLookupStage, collections] = createIdLookup();
-    idLookupStage->setSource(mockLocalStage.get());
+    exec::agg::MockStage::setSource_forTest(idLookupStage, mockLocalStage.get());
 
     // Set up a project stage that asks for metadata.
     auto projectSpec = fromjson(
@@ -302,8 +302,7 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, ShouldNotRemoveMetadata) {
         "scoreInfo: {$meta: \"searchScoreDetails\"},"
         " _id: 1, color: 1}}");
     auto project = DocumentSourceProject::createFromBson(projectSpec.firstElement(), expCtx);
-    auto projectStage = exec::agg::buildStage(project);
-    projectStage->setSource(idLookupStage.get());
+    auto projectStage = exec::agg::buildStageAndStitch(project, idLookupStage);
 
     // We should find one document here with _id = 0.
     auto next = projectStage->getNext();
@@ -337,7 +336,7 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, ShouldAllowStringOrObjectIdValues)
         expCtx);
 
     auto [idLookup, idLookupStage, collections] = createIdLookup();
-    idLookupStage->setSource(mockLocalStage.get());
+    exec::agg::MockStage::setSource_forTest(idLookupStage, mockLocalStage.get());
 
     // Find documents when _id is a string or document.
     auto next = idLookupStage->getNext();
@@ -369,7 +368,7 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, ShouldNotErrorOnEmptyResult) {
 
     // Mock its input.
     auto mockLocalStage = exec::agg::MockStage::createForTest({}, expCtx);
-    idLookupStage->setSource(mockLocalStage.get());
+    exec::agg::MockStage::setSource_forTest(idLookupStage, mockLocalStage.get());
 
     // Should return EOF since the input is empty.
     ASSERT_TRUE(idLookupStage->getNext().isEOF());
@@ -531,7 +530,7 @@ TEST_F(InternalSearchIdLookupOrphanFilteringTest, ShouldFilterOrphanDocuments) {
                                                                Document{{"_id", 3}},
                                                                Document{{"_id", 4}}},
                                                               _expCtx);
-    idLookupStage->setSource(mockLocalStage.get());
+    exec::agg::MockStage::setSource_forTest(idLookupStage, mockLocalStage.get());
 
     // We should only get the 3 non-orphan documents (skey < 10).
     // Document with _id = 0, skey = 0 (owned)

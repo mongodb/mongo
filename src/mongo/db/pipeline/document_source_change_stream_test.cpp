@@ -3297,8 +3297,7 @@ TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformTransformSingle
         exec::agg::MockStage::createForTest({Document{entry.getEntry().toBSON()}}, getExpCtx());
     auto transformDS =
         DocumentSourceChangeStreamTransform::createFromBson(spec.firstElement(), getExpCtx());
-    auto transformStage = exec::agg::buildStage(transformDS);
-    transformStage->setSource(stage.get());
+    auto transformStage = exec::agg::buildStageAndStitch(transformDS, stage);
 
     auto next = transformStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -3369,9 +3368,7 @@ TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformTransformMultip
     auto stage = exec::agg::MockStage::createForTest(std::move(docs), getExpCtx());
     auto transformDS =
         DocumentSourceChangeStreamTransform::createFromBson(spec.firstElement(), getExpCtx());
-    auto transformStage = exec::agg::buildStage(transformDS);
-
-    transformStage->setSource(stage.get());
+    auto transformStage = exec::agg::buildStageAndStitch(transformDS, stage);
 
     auto next = transformStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -3454,9 +3451,7 @@ TEST_F(ChangeStreamStageTest,
     auto stage = exec::agg::MockStage::createForTest(std::move(docs), getExpCtx());
     auto transformDS =
         DocumentSourceChangeStreamTransform::createFromBson(spec.firstElement(), getExpCtx());
-    auto transformStage = exec::agg::buildStage(transformDS);
-
-    transformStage->setSource(stage.get());
+    auto transformStage = exec::agg::buildStageAndStitch(transformDS, stage);
 
     auto next = transformStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -3495,8 +3490,7 @@ DEATH_TEST_REGEX_F(ChangeStreamStageTestDeathTest,
         exec::agg::MockStage::createForTest({Document{entry.getEntry().toBSON()}}, getExpCtx());
     auto transformDS =
         DocumentSourceChangeStreamTransform::createFromBson(spec.firstElement(), getExpCtx());
-    auto transformStage = exec::agg::buildStage(transformDS);
-    transformStage->setSource(stage.get());
+    auto transformStage = exec::agg::buildStageAndStitch(transformDS, stage);
 
     ASSERT_THROWS_CODE(transformStage->getNext(), AssertionException, 5052201);
 }
@@ -3763,8 +3757,7 @@ TEST_F(ChangeStreamStageTest, InjectControlEventsHandlesNonMatchingInputsCorrect
         };
 
         auto stage = exec::agg::MockStage::createForTest(inputDocs, expCtx);
-        auto injectControlEventsStage = exec::agg::buildStage(injectControlEvents);
-        injectControlEventsStage->setSource(stage.get());
+        auto injectControlEventsStage = exec::agg::buildStageAndStitch(injectControlEvents, stage);
 
         auto next = injectControlEventsStage->getNext();
         ASSERT_TRUE(next.isPaused());
@@ -3826,8 +3819,7 @@ TEST_F(ChangeStreamStageTest, InjectControlEventsHandlesMatchingInputsCorrectly)
     };
 
     auto stage = exec::agg::MockStage::createForTest(inputDocs, expCtx);
-    auto injectControlEventsStage = exec::agg::buildStage(injectControlEvents);
-    injectControlEventsStage->setSource(stage.get());
+    auto injectControlEventsStage = exec::agg::buildStageAndStitch(injectControlEvents, stage);
 
     auto next = injectControlEventsStage->getNext();
     ASSERT_TRUE(next.isPaused());
@@ -3892,8 +3884,7 @@ TEST_F(ChangeStreamStageTest, ControlEventsAreReturnedByMatchStageUnmodified) {
     auto stage = exec::agg::MockStage::createForTest(inputDocs, expCtx);
 
     auto match = DocumentSourceMatch::create(BSON("foo" << "bar"), expCtx);
-    auto matchStage = exec::agg::buildStage(match);
-    matchStage->setSource(stage.get());
+    auto matchStage = exec::agg::buildStageAndStitch(match, stage);
 
     auto result = matchStage->getNext();
     ASSERT_TRUE(result.isAdvancedControlDocument());
@@ -3922,8 +3913,7 @@ TEST_F(ChangeStreamStageTest, ControlEventsAreReturnedByProjectStageUnmodified) 
 
         auto project =
             DocumentSourceProject::create(BSON("foo" << projectType), expCtx, "$project"_sd);
-        auto projectStage = exec::agg::buildStage(project);
-        projectStage->setSource(stage.get());
+        auto projectStage = exec::agg::buildStageAndStitch(project, stage);
 
         auto result = projectStage->getNext();
         ASSERT_TRUE(result.isAdvancedControlDocument());
@@ -4118,8 +4108,7 @@ TEST_F(ChangeStreamStageTest, CloseCursorEvenIfInvalidateEntriesGetFilteredOut) 
     // Add a match stage after change stream to filter out the invalidate entries.
     auto match = DocumentSourceMatch::create(fromjson("{operationType: 'insert'}"), getExpCtx());
 
-    auto matchStage = exec::agg::buildStage(match);
-    matchStage->setSource(lastStage.get());
+    auto matchStage = exec::agg::buildStageAndStitch(match, lastStage);
 
     // Throw an exception on the call of getNext().
     ASSERT_THROWS(matchStage->getNext(), ExceptionFor<ErrorCodes::ChangeStreamInvalidated>);

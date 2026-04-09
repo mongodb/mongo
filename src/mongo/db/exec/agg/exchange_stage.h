@@ -292,9 +292,8 @@ public:
                   size_t consumerId,
                   const std::shared_ptr<ResourceYielder>& resourceYielder);
 
-    void setSource(Stage* source) final;
-
 private:
+    void setSource(Stage* source) final;
     void doDispose() final;
     GetNextResult doGetNext() final;
 

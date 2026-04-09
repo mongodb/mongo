@@ -63,7 +63,7 @@ protected:
         BSONElement specElement = spec.firstElement();
         _sampleDocumentSource = DocumentSourceSample::createFromBson(specElement, getExpCtx());
         _sampleStage = exec::agg::buildStage(_sampleDocumentSource);
-        sampleStage()->setSource(source());
+        exec::agg::MockStage::setSource_forTest(sampleStage(), source());
         checkBsonRepresentation(spec);
     }
 
@@ -280,7 +280,7 @@ public:
         _sampleDocumentSource =
             DocumentSourceSampleFromRandomCursor::create(getExpCtx(), size, "_id", 100);
         _sampleStage = exec::agg::buildStage(_sampleDocumentSource);
-        sampleStage()->setSource(_mock.get());
+        exec::agg::MockStage::setSource_forTest(sampleStage(), _mock.get());
     }
 };
 
@@ -406,7 +406,7 @@ TEST_F(SampleFromRandomCursorBasics, MimicNonOptimized) {
         auto documentSourceSampleFromRandomCursor =
             DocumentSourceSampleFromRandomCursor::create(getExpCtx(), 2, "_id", 3);
         _sampleStage = exec::agg::buildStage(documentSourceSampleFromRandomCursor);
-        sampleStage()->setSource(_mock.get());
+        exec::agg::MockStage::setSource_forTest(sampleStage(), _mock.get());
 
         source()->push_back(DOC("_id" << 1));
         source()->push_back(DOC("_id" << 2));

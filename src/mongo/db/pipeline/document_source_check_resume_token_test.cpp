@@ -403,7 +403,7 @@ protected:
         auto checkResumeTokenStage =
             boost::dynamic_pointer_cast<exec::agg::ChangeStreamEnsureResumeTokenPresentStage>(
                 exec::agg::buildStage(checkResumeTokenDS));
-        checkResumeTokenStage->setSource(_mock.get());
+        exec::agg::MockStage::setSource_forTest(checkResumeTokenStage, _mock.get());
         return checkResumeTokenStage;
     }
 
@@ -458,12 +458,12 @@ protected:
         auto projectDS =
             DocumentSourceProject::create(BSON("_id" << 0), getExpCtx(), "$project"_sd);
         _projectStage = exec::agg::buildStage(projectDS);
-        _projectStage->setSource(_mock.get());
+        exec::agg::MockStage::setSource_forTest(_projectStage, _mock.get());
 
         auto checkResumeTokenStage =
             boost::dynamic_pointer_cast<exec::agg::ChangeStreamEnsureResumeTokenPresentStage>(
                 exec::agg::buildStage(checkResumeTokenDS));
-        checkResumeTokenStage->setSource(_projectStage.get());
+        exec::agg::MockStage::setSource_forTest(checkResumeTokenStage, _projectStage.get());
         return checkResumeTokenStage;
     }
 
@@ -503,7 +503,7 @@ protected:
         auto checkResumabilityStage =
             boost::dynamic_pointer_cast<exec::agg::ChangeStreamCheckResumabilityStage>(
                 exec::agg::buildStage(dsCheckResumability));
-        checkResumabilityStage->setSource(_mock.get());
+        exec::agg::MockStage::setSource_forTest(checkResumabilityStage, _mock.get());
         return checkResumabilityStage;
     }
     intrusive_ptr<exec::agg::ChangeStreamCheckResumabilityStage> createCheckResumabilityStage(

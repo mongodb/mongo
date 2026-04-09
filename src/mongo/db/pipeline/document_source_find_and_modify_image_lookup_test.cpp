@@ -210,7 +210,7 @@ TEST_F(FindAndModifyImageLookupTest, NoopWhenEntryDoesNotHaveNeedsRetryImageFiel
             .getEntry()
             .toBSON();
     auto mock = exec::agg::MockStage::createForTest(Document(oplogEntryBson), getExpCtx());
-    imageLookupStage->setSource(mock.get());
+    exec::agg::MockStage::setSource_forTest(imageLookupStage, mock.get());
     // Mock out the foreign collection.
     getExpCtx()->setMongoProcessInterface(
         std::make_unique<MockMongoInterface>(std::vector<Document>{}));
@@ -271,7 +271,7 @@ TEST_F(FindAndModifyImageLookupTest,
                                                 .getEntry()
                                                 .toBSON());
         auto mock = exec::agg::MockStage::createForTest(oplogEntryDoc, getExpCtx());
-        imageLookupStage->setSource(mock.get());
+        exec::agg::MockStage::setSource_forTest(imageLookupStage, mock.get());
 
         // Mock out the foreign collection.
         getExpCtx()->setMongoProcessInterface(
@@ -321,7 +321,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldNotForgeImageEntryWhenImageDocHasDiff
                      .getEntry()
                      .toBSON());
     auto mock = exec::agg::MockStage::createForTest(oplogEntryDoc, getExpCtx());
-    imageLookupStage->setSource(mock.get());
+    exec::agg::MockStage::setSource_forTest(imageLookupStage, mock.get());
 
     // Create an 'ImageEntry' with a higher 'txnNumber'.
     const auto preImage = BSON("a" << 2);
@@ -378,7 +378,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
         const auto oplogEntryBson = oplogEntry.toBSON();
 
         auto mock = exec::agg::MockStage::createForTest(Document(oplogEntryBson), getExpCtx());
-        imageLookupStage->setSource(mock.get());
+        exec::agg::MockStage::setSource_forTest(imageLookupStage, mock.get());
 
         const auto prePostImage = BSON("a" << 2);
         mockImageDocument(sessionId, txnNum, ts, imageType, prePostImage);
@@ -470,7 +470,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
                                   .addFields(BSON(commitTxnTsFieldName << commitTxnTs));
 
         auto mock = exec::agg::MockStage::createForTest(Document(oplogEntryBson), getExpCtx());
-        imageLookupStage->setSource(mock.get());
+        exec::agg::MockStage::setSource_forTest(imageLookupStage, mock.get());
 
         const auto prePostImage = BSON("_id" << 1);
         mockImageDocument(sessionId, txnNum, applyOpsTs, imageType, prePostImage);
@@ -592,7 +592,7 @@ TEST_F(FindAndModifyImageLookupTest,
                                   .addFields(BSON(commitTxnTsFieldName << commitTxnTs));
 
         auto mock = exec::agg::MockStage::createForTest(Document(oplogEntryBson), getExpCtx());
-        imageLookupStage->setSource(mock.get());
+        exec::agg::MockStage::setSource_forTest(imageLookupStage, mock.get());
 
         if (disallowImageCollection) {
             // Mock the oplog document since fetching the image from the snapshot involves

@@ -48,11 +48,6 @@ public:
         const boost::optional<SortPattern>& sortBy,
         const std::vector<WindowFunctionStatement>& outputFields);
 
-    void setSource(Stage* source) final {
-        pSource = source;
-        _iterator.setSource(source);
-    }
-
     bool usedDisk() const final {
         return _iterator.usedDisk();
     };
@@ -65,6 +60,11 @@ public:
         const SerializationOptions& opts = SerializationOptions{}) const final;
 
 private:
+    void setSource(Stage* source) final {
+        pSource = source;
+        _iterator.setSource(source);
+    }
+
     void initialize();
 
     GetNextResult doGetNext() final;

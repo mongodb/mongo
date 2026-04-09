@@ -92,9 +92,8 @@ TEST_F(DocumentSourceSetMetadataTest, SetFromFieldPath) {
 
     Document inputDoc = Document{{"dist", 0.4}};
     auto source = DocumentSourceSetMetadata::createFromBson(spec.firstElement(), getExpCtx());
-    auto stage = exec::agg::buildStage(source);
     auto mock = exec::agg::MockStage::createForTest(inputDoc, getExpCtx());
-    stage->setSource(mock.get());
+    auto stage = exec::agg::buildStageAndStitch(source, mock);
 
     auto next = stage->getNext();
     ASSERT(next.isAdvanced());
@@ -115,9 +114,8 @@ TEST_F(DocumentSourceSetMetadataTest, SetFromExpression) {
 
     Document inputDoc = Document{{"foo", 1.6}};
     auto source = DocumentSourceSetMetadata::createFromBson(spec.firstElement(), getExpCtx());
-    auto stage = exec::agg::buildStage(source);
     auto mock = exec::agg::MockStage::createForTest(inputDoc, getExpCtx());
-    stage->setSource(mock.get());
+    auto stage = exec::agg::buildStageAndStitch(source, mock);
 
     auto next = stage->getNext();
     ASSERT(next.isAdvanced());
@@ -137,9 +135,8 @@ TEST_F(DocumentSourceSetMetadataTest, ErrorsIfExpressionDoesntMatchDateTypeMetaF
 
     Document inputDoc = Document{{"foo", 1.6}};
     auto source = DocumentSourceSetMetadata::createFromBson(spec.firstElement(), getExpCtx());
-    auto stage = exec::agg::buildStage(source);
     auto mock = exec::agg::MockStage::createForTest(inputDoc, getExpCtx());
-    stage->setSource(mock.get());
+    auto stage = exec::agg::buildStageAndStitch(source, mock);
 
     ASSERT_THROWS_CODE(stage->getNext(), AssertionException, ErrorCodes::TypeMismatch);
 }
@@ -155,9 +152,8 @@ TEST_F(DocumentSourceSetMetadataTest, ErrorsIfExpressionDoesntMatchNumericMetaFi
                                   BSON_ARRAY("a" << "b"
                                                  << "c")}};
     auto source = DocumentSourceSetMetadata::createFromBson(spec.firstElement(), getExpCtx());
-    auto stage = exec::agg::buildStage(source);
     auto mock = exec::agg::MockStage::createForTest(inputDoc, getExpCtx());
-    stage->setSource(mock.get());
+    auto stage = exec::agg::buildStageAndStitch(source, mock);
 
     ASSERT_THROWS_CODE(stage->getNext(), AssertionException, ErrorCodes::TypeMismatch);
 }
@@ -171,9 +167,8 @@ TEST_F(DocumentSourceSetMetadataTest, ErrorsIfExpressionDoesntMatchBSONObjMetaFi
 
     Document inputDoc = Document{{"grade", 5}};
     auto source = DocumentSourceSetMetadata::createFromBson(spec.firstElement(), getExpCtx());
-    auto stage = exec::agg::buildStage(source);
     auto mock = exec::agg::MockStage::createForTest(inputDoc, getExpCtx());
-    stage->setSource(mock.get());
+    auto stage = exec::agg::buildStageAndStitch(source, mock);
 
     ASSERT_THROWS_CODE(stage->getNext(), AssertionException, ErrorCodes::TypeMismatch);
 }
@@ -187,9 +182,8 @@ TEST_F(DocumentSourceSetMetadataTest, SetMetadataBSONObj) {
 
     Document inputDoc = Document{{"dist", 0.4}};
     auto source = DocumentSourceSetMetadata::createFromBson(spec.firstElement(), getExpCtx());
-    auto stage = exec::agg::buildStage(source);
     auto mock = exec::agg::MockStage::createForTest(inputDoc, getExpCtx());
-    stage->setSource(mock.get());
+    auto stage = exec::agg::buildStageAndStitch(source, mock);
 
     auto next = stage->getNext();
     ASSERT(next.isAdvanced());
@@ -217,8 +211,7 @@ TEST_F(DocumentSourceSetMetadataTest, SetMetadataMultipleDocuments) {
                                                          Document{{"dist", 0.8}, {"bar", 10}}};
     auto mock = exec::agg::MockStage::createForTest(std::move(results), getExpCtx());
     auto source = DocumentSourceSetMetadata::createFromBson(spec.firstElement(), getExpCtx());
-    auto stage = exec::agg::buildStage(source);
-    stage->setSource(mock.get());
+    auto stage = exec::agg::buildStageAndStitch(source, mock);
 
     auto next = stage->getNext();
     ASSERT(next.isAdvanced());

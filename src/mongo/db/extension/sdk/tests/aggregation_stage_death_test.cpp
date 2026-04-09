@@ -29,6 +29,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/extension/host/document_source_extension_optimizable.h"
 #include "mongo/db/extension/host/query_execution_context.h"
 #include "mongo/db/extension/host_connector/adapter/executable_agg_stage_adapter.h"
@@ -489,7 +490,7 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest,
 
     // Stitch stages returned from DocumentSourceDocuments::createFromBson(...) together.
     for (size_t i = 1; i < stages.size(); ++i) {
-        stages[i]->setSource(stages[i - 1].get());
+        exec::agg::MockStage::setSource_forTest(stages[i], stages[i - 1].get());
     }
 
     // Set the last stage as source for the extension stage.
@@ -500,7 +501,7 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest,
     auto result = extensionStage->getNext();
     ASSERT_TRUE(result.isAdvanced());
 
-    extensionStage->setSource(nullptr);
+    exec::agg::MockStage::setSource_forTest(extensionStage, nullptr);
     // Hits tassert because the stage provided was null, clearing out our predecessor.
     result = extensionStage->getNext();
 };

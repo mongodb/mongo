@@ -160,9 +160,7 @@ TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoading) {
                                              DocumentSource::GetNextResult::makePauseExecution(),
                                              Document()},
                                             expCtx);
-    auto groupStage = exec::agg::buildStage(group);
-
-    groupStage->setSource(mock.get());
+    auto groupStage = exec::agg::buildStageAndStitch(group, mock);
 
     // There were 3 pauses, so we should expect 3 paused results before any results can be returned.
     ASSERT_TRUE(groupStage->getNext().isPaused());
@@ -201,9 +199,7 @@ TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoadingWhileSpilled) {
                                              DocumentSource::GetNextResult::makePauseExecution(),
                                              Document{{"_id", 2}, {"largeStr", largeStr}}},
                                             expCtx);
-    auto groupStage = exec::agg::buildStage(group);
-
-    groupStage->setSource(mock.get());
+    auto groupStage = exec::agg::buildStageAndStitch(group, mock);
 
     // There were 2 pauses, so we should expect 2 paused results before any results can be returned.
     ASSERT_TRUE(groupStage->getNext().isPaused());
@@ -241,8 +237,7 @@ TEST_F(DocumentSourceGroupTest, ShouldErrorIfNotAllowedToSpillToDiskAndResultSet
     auto mock = exec::agg::MockStage::createForTest({Document{{"_id", 0}, {"largeStr", largeStr}},
                                                      Document{{"_id", 1}, {"largeStr", largeStr}}},
                                                     expCtx);
-    auto groupStage = exec::agg::buildStage(group);
-    groupStage->setSource(mock.get());
+    auto groupStage = exec::agg::buildStageAndStitch(group, mock);
 
     ASSERT_THROWS_CODE(groupStage->getNext(),
                        AssertionException,
@@ -271,8 +266,7 @@ TEST_F(DocumentSourceGroupTest, ShouldBeAbleToForceSpillAfterReturningResults) {
                                                      Document{{"_id", 1}, {"largeStr", largeStr}},
                                                      Document{{"_id", 2}, {"largeStr", largeStr}}},
                                                     expCtx);
-    auto groupStage = exec::agg::buildStage(group);
-    groupStage->setSource(mock.get());
+    auto groupStage = exec::agg::buildStageAndStitch(group, mock);
 
     auto next = groupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -320,8 +314,7 @@ TEST_F(DocumentSourceGroupTest, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
                                              Document{{"_id", 1}, {"largeStr", largeStr}},
                                              Document{{"_id", 2}, {"largeStr", largeStr}}},
                                             expCtx);
-    auto groupStage = exec::agg::buildStage(group);
-    groupStage->setSource(mock.get());
+    auto groupStage = exec::agg::buildStageAndStitch(group, mock);
 
     // The first getNext() should pause.
     ASSERT_TRUE(groupStage->getNext().isPaused());
@@ -350,9 +343,7 @@ DEATH_TEST_REGEX_F(DocumentSourceGroupTestDeathTest,
     MutableDocument doc(Document{{"_id", 0}});
     doc.metadata().setChangeStreamControlEvent();
     auto mock = exec::agg::MockStage::createForTest({doc.freeze()}, expCtx);
-    auto groupStage = exec::agg::buildStage(group);
-
-    groupStage->setSource(mock.get());
+    auto groupStage = exec::agg::buildStageAndStitch(group, mock);
 
     ASSERT_THROWS_CODE(groupStage->getNext(), AssertionException, 10358900);
 }
@@ -384,7 +375,7 @@ DEATH_TEST_REGEX_F(DocumentSourceGroupTestDeathTest,
     doc.metadata().setChangeStreamControlEvent();
 
     auto mock = exec::agg::MockStage::createForTest({doc.freeze()}, expCtx);
-    stage->setSource(mock.get());
+    exec::agg::MockStage::setSource_forTest(stage, mock.get());
 
     ASSERT_THROWS_CODE(stage->getNext(), AssertionException, 10358903);
 }
@@ -536,9 +527,7 @@ TEST_F(DocumentSourceGroupTest, CanHandleEmptyExpressionObject) {
     auto group =
         DocumentSourceGroup::create(getExpCtx(), idExpression, accumulationStatements, false);
     auto mock = exec::agg::MockStage::createForTest({Document{{"_id"_sd, 0}}}, getExpCtx());
-    auto groupStage = exec::agg::buildStage(group);
-
-    groupStage->setSource(mock.get());
+    auto groupStage = exec::agg::buildStageAndStitch(group, mock);
     auto next = groupStage->getNext();
     ASSERT(next.isAdvanced());
     // The constant _id value from the $group spec is passed through.
@@ -748,8 +737,7 @@ TEST_F(DocumentSourceGroupTest, ShouldUpdateMemoryUsageTrackerDuringGroup) {
         const MemoryUsageTracker& memTracker = groupProcessor->getMemoryTracker();
         ASSERT_EQUALS(memTracker.inUseTrackedMemoryBytes(), 0);
 
-        auto groupStage = exec::agg::buildStage(group);
-        groupStage->setSource(mock.get());
+        auto groupStage = exec::agg::buildStageAndStitch(group, mock);
 
         // Tracked memory increases as rows are processed. Different platforms have different
         // amounts of memory here, so just show that the amount is increasing.
@@ -835,8 +823,7 @@ TEST_F(DocumentSourceGroupTest, ShouldUpdateCurOpStatsDuringGroup) {
         return group;
     }();
 
-    auto groupStage = exec::agg::buildStage(group);
-    groupStage->setSource(mock.get());
+    auto groupStage = exec::agg::buildStageAndStitch(group, mock);
 
     int64_t inUseTrackedMemoryBytes, peakTrackedMemoryBytes;
     std::tie(inUseTrackedMemoryBytes, peakTrackedMemoryBytes) = getCurOpMemoryStats();
@@ -937,8 +924,7 @@ TEST_F(DocumentSourceGroupTest, CurOpStatsAreNotUpdatedIfFeatureFlagOff) {
         return group;
     }();
 
-    auto groupStage = exec::agg::buildStage(group);
-    groupStage->setSource(mock.get());
+    auto groupStage = exec::agg::buildStageAndStitch(group, mock);
 
     int64_t inUseTrackedMemoryBytes, peakTrackedMemoryBytes;
     std::tie(inUseTrackedMemoryBytes, peakTrackedMemoryBytes) = getCurOpMemoryStats();
@@ -1130,7 +1116,7 @@ public:
     void TestBody() final {
         createGroup(spec());
         auto mockStage = exec::agg::MockStage::createForTest(Document(doc()), ctx());
-        groupStage()->setSource(mockStage.get());
+        exec::agg::MockStage::setSource_forTest(groupStage(), mockStage.get());
         // A group result is available.
         auto next = groupStage()->getNext();
         ASSERT(next.isAdvanced());
@@ -1389,15 +1375,15 @@ public:
     void runSharded(bool sharded) {
         createGroup(groupSpec());
         auto mockStage = exec::agg::MockStage::createForTest(inputData(), ctx());
-        groupStage()->setSource(mockStage.get());
+        exec::agg::MockStage::setSource_forTest(groupStage(), mockStage.get());
 
         boost::intrusive_ptr<exec::agg::Stage> sink = groupStage();
         if (sharded) {
             sink = createMerger();
             // Serialize and re-parse the shard stage.
             createGroup(toBson(group())[group()->getSourceName()].Obj(), true);
-            groupStage()->setSource(mockStage.get());
-            sink->setSource(groupStage().get());
+            exec::agg::MockStage::setSource_forTest(groupStage(), mockStage.get());
+            exec::agg::MockStage::setSource_forTest(sink, groupStage().get());
         }
 
         checkResultSet(sink);
@@ -1604,7 +1590,7 @@ public:
         // Create a merger version of the stage.
         boost::intrusive_ptr<exec::agg::Stage> group = createMerger();
         // Attach the merger to the synthetic shard results.
-        group->setSource(mockStage.get());
+        exec::agg::MockStage::setSource_forTest(group, mockStage.get());
         // Check the merger's output.
         checkResultSet(group);
     }

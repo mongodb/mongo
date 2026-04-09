@@ -86,8 +86,7 @@ TEST_F(DocumentSourceScoreTest, CheckNoOptionalArgsIncluded) {
     // Default normalization is none.
     ASSERT_EQ(desugaredList.size(), 4);
     boost::intrusive_ptr<DocumentSource> ds = *desugaredList.begin();
-    auto stage = exec::agg::buildStage(ds);
-    ASSERT_DOES_NOT_THROW(stage->setSource(mock.get()));
+    ASSERT_DOES_NOT_THROW(exec::agg::buildStageAndStitch(ds, mock));
 }
 
 TEST_F(DocumentSourceScoreTest, CheckAllOptionalArgsIncluded) {
@@ -129,8 +128,7 @@ TEST_F(DocumentSourceScoreTest, CheckOnlyWeightSpecified) {
     // Default normalization is none.
     ASSERT_EQ(desugaredList.size(), 4);
     boost::intrusive_ptr<DocumentSource> ds = *desugaredList.begin();
-    auto stage = exec::agg::buildStage(ds);
-    ASSERT_DOES_NOT_THROW(stage->setSource(mock.get()));
+    ASSERT_DOES_NOT_THROW(exec::agg::buildStageAndStitch(ds, mock));
 }
 
 TEST_F(DocumentSourceScoreTest, ErrorsIfWrongnormalizationType) {
@@ -173,9 +171,8 @@ TEST_F(DocumentSourceScoreTest, CheckIntScoreMetadataUpdated) {
         DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
     ASSERT_EQ(desugaredList.size(), 4);
     boost::intrusive_ptr<DocumentSource> docSourceScore = *desugaredList.begin();
-    auto stage = exec::agg::buildStage(docSourceScore);
     auto mock = exec::agg::MockStage::createForTest(inputDoc, getExpCtx());
-    stage->setSource(mock.get());
+    auto stage = exec::agg::buildStageAndStitch(docSourceScore, mock);
 
     auto next = stage->getNext();
     ASSERT(next.isAdvanced());
@@ -198,9 +195,8 @@ TEST_F(DocumentSourceScoreTest, CheckDoubleScoreMetadataUpdated) {
         DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
     ASSERT_EQ(desugaredList.size(), 4);
     boost::intrusive_ptr<DocumentSource> docSourceScore = *desugaredList.begin();
-    auto stage = exec::agg::buildStage(docSourceScore);
     auto mock = exec::agg::MockStage::createForTest(inputDoc, getExpCtx());
-    stage->setSource(mock.get());
+    auto stage = exec::agg::buildStageAndStitch(docSourceScore, mock);
 
     auto next = stage->getNext();
     ASSERT(next.isAdvanced());
@@ -223,9 +219,8 @@ TEST_F(DocumentSourceScoreTest, CheckLengthyDocScoreMetadataUpdated) {
         DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
     ASSERT_EQ(desugaredList.size(), 4);
     boost::intrusive_ptr<DocumentSource> docSourceScore = *desugaredList.begin();
-    auto stage = exec::agg::buildStage(docSourceScore);
     auto mock = exec::agg::MockStage::createForTest(inputDoc, getExpCtx());
-    stage->setSource(mock.get());
+    auto stage = exec::agg::buildStageAndStitch(docSourceScore, mock);
 
     auto next = stage->getNext();
     ASSERT(next.isAdvanced());
@@ -248,9 +243,8 @@ TEST_F(DocumentSourceScoreTest, ErrorsIfScoreNotDouble) {
         DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
     ASSERT_EQ(desugaredList.size(), 4);
     boost::intrusive_ptr<DocumentSource> docSourceScore = *desugaredList.begin();
-    auto stage = exec::agg::buildStage(docSourceScore);
     auto mock = exec::agg::MockStage::createForTest(inputDoc, getExpCtx());
-    stage->setSource(mock.get());
+    auto stage = exec::agg::buildStageAndStitch(docSourceScore, mock);
 
     // Assert cannot evaluate expression into double
     ASSERT_THROWS_CODE(stage->getNext(), AssertionException, ErrorCodes::TypeMismatch);
@@ -269,9 +263,8 @@ TEST_F(DocumentSourceScoreTest, ErrorsIfExpressionFieldPathDoesNotExist) {
         DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
     ASSERT_EQ(desugaredList.size(), 4);
     boost::intrusive_ptr<DocumentSource> docSourceScore = *desugaredList.begin();
-    auto stage = exec::agg::buildStage(docSourceScore);
     auto mock = exec::agg::MockStage::createForTest(inputDoc, getExpCtx());
-    stage->setSource(mock.get());
+    auto stage = exec::agg::buildStageAndStitch(docSourceScore, mock);
 
     // Assert cannot evaluate expression into double
     ASSERT_THROWS_CODE(stage->getNext(), AssertionException, ErrorCodes::TypeMismatch);

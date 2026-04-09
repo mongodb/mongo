@@ -90,8 +90,7 @@ TEST_F(GraphLookUpTest, ShouldErrorWhenDoingInitialMatchIfDocumentInFromCollecti
         boost::none,
         boost::none,
         boost::none);
-    auto graphLookupStage = exec::agg::buildStage(graphLookupDS);
-    graphLookupStage->setSource(inputMock.get());
+    auto graphLookupStage = exec::agg::buildStageAndStitch(graphLookupDS, inputMock);
     ASSERT_THROWS_CODE(graphLookupStage->getNext(), AssertionException, 40271);
 }
 
@@ -120,8 +119,7 @@ TEST_F(GraphLookUpTest, ShouldErrorWhenExploringGraphIfDocumentInFromCollectionI
         boost::none,
         boost::none,
         boost::none);
-    auto graphLookupStage = exec::agg::buildStage(graphLookupDS);
-    graphLookupStage->setSource(inputMock.get());
+    auto graphLookupStage = exec::agg::buildStageAndStitch(graphLookupDS, inputMock);
 
     ASSERT_THROWS_CODE(graphLookupStage->getNext(), AssertionException, 40271);
 }
@@ -151,8 +149,7 @@ TEST_F(GraphLookUpTest, ShouldErrorWhenHandlingUnwindIfDocumentInFromCollectionI
         boost::none,
         boost::none,
         unwindStage);
-    auto graphLookupStage = exec::agg::buildStage(graphLookupDS);
-    graphLookupStage->setSource(inputMock.get());
+    auto graphLookupStage = exec::agg::buildStageAndStitch(graphLookupDS, inputMock);
 
     ASSERT_THROWS_CODE(graphLookupStage->getNext(), AssertionException, 40271);
 }
@@ -195,9 +192,7 @@ TEST_F(GraphLookUpTest, ShouldTraverseSubgraphIfIdOfDocumentsInFromCollectionAre
         boost::none,
         boost::none,
         boost::none);
-    auto graphLookupStage = exec::agg::buildStage(graphLookupDS);
-    graphLookupStage->setSource(inputMock.get());
-    graphLookupStage->setSource(inputMock.get());
+    auto graphLookupStage = exec::agg::buildStageAndStitch(graphLookupDS, inputMock);
 
     auto next = graphLookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -261,9 +256,7 @@ TEST_F(GraphLookUpTest, ShouldPropagatePauses) {
         boost::none,
         boost::none,
         boost::none);
-    auto graphLookupStage = exec::agg::buildStage(graphLookupDS);
-
-    graphLookupStage->setSource(inputMock.get());
+    auto graphLookupStage = exec::agg::buildStageAndStitch(graphLookupDS, inputMock);
 
     auto next = graphLookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -338,9 +331,7 @@ TEST_F(GraphLookUpTest, ShouldPropagatePausesWhileUnwinding) {
         boost::none,
         boost::none,
         unwindStage);
-    auto graphLookupStage = exec::agg::buildStage(graphLookupDS);
-
-    graphLookupStage->setSource(inputMock.get());
+    auto graphLookupStage = exec::agg::buildStageAndStitch(graphLookupDS, inputMock);
 
     // Assert it has the expected results. Note the results can be in either order.
     auto expectedA =
@@ -420,9 +411,7 @@ TEST_F(DocumentSourceGraphLookUpSpillingTest, ShouldSpillVisitedDocuments) {
         boost::none,
         boost::none,
         boost::none);
-    auto graphLookupStage = exec::agg::buildStage(graphLookupDS);
-
-    graphLookupStage->setSource(inputMock.get());
+    auto graphLookupStage = exec::agg::buildStageAndStitch(graphLookupDS, inputMock);
 
     auto next = graphLookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -483,9 +472,7 @@ TEST_F(DocumentSourceGraphLookUpSpillingTest, ShouldSpillSeveralStructures) {
         boost::none,
         boost::none,
         boost::none);
-    auto graphLookupStage = exec::agg::buildStage(graphLookupDS);
-
-    graphLookupStage->setSource(inputMock.get());
+    auto graphLookupStage = exec::agg::buildStageAndStitch(graphLookupDS, inputMock);
 
     auto next = graphLookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -540,9 +527,7 @@ TEST_F(DocumentSourceGraphLookUpSpillingTest, CanForceSpill) {
         boost::none,
         boost::none,
         unwindStage);
-    auto graphLookupStage = exec::agg::buildStage(graphLookupDS);
-
-    graphLookupStage->setSource(inputMock.get());
+    auto graphLookupStage = exec::agg::buildStageAndStitch(graphLookupDS, inputMock);
 
     std::vector<Value> results;
     results.reserve(kResultCount);
@@ -601,9 +586,7 @@ TEST_F(GraphLookUpTest, GraphLookupWithComparisonExpressionForStartWith) {
         boost::none,
         boost::none,
         boost::none);
-    auto graphLookupStage = exec::agg::buildStage(graphLookupDS);
-
-    graphLookupStage->setSource(inputMock.get());
+    auto graphLookupStage = exec::agg::buildStageAndStitch(graphLookupDS, inputMock);
 
     auto next = graphLookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -662,9 +645,7 @@ TEST_F(GraphLookUpTest, ShouldExpandArraysAtEndOfConnectFromField) {
         boost::none,
         boost::none,
         boost::none);
-    auto graphLookupStage = exec::agg::buildStage(graphLookupDS);
-
-    graphLookupStage->setSource(inputMock.get());
+    auto graphLookupStage = exec::agg::buildStageAndStitch(graphLookupDS, inputMock);
 
     auto next = graphLookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -737,10 +718,7 @@ TEST_F(GraphLookUpTest, ShouldNotExpandArraysWithinArraysAtEndOfConnectFromField
         boost::none,
         boost::none,
         boost::none);
-    auto graphLookupStage = exec::agg::buildStage(graphLookupDS);
-
-    graphLookupStage->setSource(inputMock.get());
-    graphLookupStage->setSource(inputMock.get());
+    auto graphLookupStage = exec::agg::buildStageAndStitch(graphLookupDS, inputMock);
 
     auto next = graphLookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
