@@ -2483,6 +2483,16 @@ tasks:
           suite: v1index_jscore_passthrough
 
   - <<: *task_template
+    name: timeseries_write_pbt_fixed_seed
+    tags: ["assigned_to_jira_team_server_execution", "default"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: timeseries_write_pbt
+          resmoke_args: --fastCheckParameters='{"numRuns":25,"seed":42}'
+
+  - <<: *task_template
     name: timeseries_write_pbt
     tags:
       [
