@@ -326,7 +326,7 @@ use_repo(setup_mongo_windows_toolchains_extension, "mongo_windows_toolchain")
 register_toolchains("@mongo_windows_toolchain//...")
 
 ###################### RUST DEPS ######################
-bazel_dep(name = "rules_rust", version = "0.68.1")
+bazel_dep(name = "rules_rust", version = "0.69.0")
 
 # Right now we dont build rust on ppc, when we do unsupported_host_skip_crates.patch
 # should be removed
@@ -338,20 +338,23 @@ single_version_override(
         "//bazel/rules_rust:ppc64le_crates.patch",
         "//bazel/rules_rust:ppc64le_cargo_bazel_url.patch",
     ],
-    version = "0.68.1",
+    version = "0.69.0",
 )
 
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
+
+# The known_shas.bzl in rules_rust has a list of hashes for nightly tools
+# Make sure this version is set to one of those, or specify the hashes yourself
 rust.toolchain(
     edition = "2024",
-    versions = ["nightly/2025-12-11"],
+    versions = ["nightly/2026-02-12"],
 )
 
 rust_host = use_extension("@rules_rust//rust:extensions.bzl", "rust_host_tools")
 rust_host.host_tools(
     name = "rust_host_tools_nightly",
     edition = "2024",
-    version = "nightly/2025-12-11",
+    version = "nightly/2026-02-12",
 )
 use_repo(rust_host, "rust_host_tools_nightly")
 
@@ -427,38 +430,16 @@ crate.annotation(
 )
 crate.spec(
     package = "zstd-sys",
-    version = "=2.0.16+zstd.1.5.7",
+    version = "=2.0.9+zstd.1.5.5",
 )
 
-# Bindgen uses libclang to parse code so it needs to know the path to libclang
-crate.annotation_select(
-    build_script_data = [
-        "@@mongo_toolchain_v5//:libclang",
-    ],
-    build_script_env = {
-        "LIBCLANG_PATH": "$(execpath @@mongo_toolchain_v5//:libclang)",
-        "BINDGEN_EXTRA_CLANG_ARGS": "-isystem$${pwd}/external/mongo_toolchain_v5/stow/llvm-v5/lib/clang/19/include",
-    },
+# Disable zstd-sys's build script to prevent it from compiling its own copy of zstd.
+# With LTO we can only have one set of zstd symbols, so we link against our vendored copy.
+# The crate falls back to pre-generated bindings when the build script is disabled.
+crate.annotation(
     crate = "zstd-sys",
-    repositories = ["crates"],
-    triples = [
-        "aarch64-unknown-linux-gnu",
-        "x86_64-unknown-linux-gnu",
-        "s390x-unknown-linux-gnu",
-    ],
-)
-crate.annotation_select(
-    build_script_data = [
-        "@@windows_libclang//file",
-    ],
-    build_script_env = {
-        "LIBCLANG_PATH": "$(execpath @@windows_libclang//file)",
-    },
-    crate = "zstd-sys",
-    repositories = ["crates"],
-    triples = [
-        "x86_64-pc-windows-msvc",
-    ],
+    gen_build_script = "off",
+    deps = ["@@//src/third_party/zstandard:zstd"],
 )
 
 # Update the lock file using "CARGO_BAZEL_REPIN=1 bazel sync --only=crates"

@@ -18,8 +18,10 @@ def _aot_compile_wasm_impl(ctx):
     toolchain = ctx.toolchains["@rules_rust//rust:toolchain_type"]
     triple_str = toolchain.target_triple.str
 
+    tool_inputs = ctx.attr.tool[DefaultInfo].default_runfiles.files
+
     ctx.actions.run(
-        inputs = [input_file],
+        inputs = depset([input_file], transitive = [tool_inputs]),
         outputs = [output_file],
         executable = tool,
         arguments = [
