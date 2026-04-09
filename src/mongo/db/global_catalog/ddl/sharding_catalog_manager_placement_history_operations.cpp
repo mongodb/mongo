@@ -63,6 +63,18 @@ namespace mongo {
 namespace {
 MONGO_FAIL_POINT_DEFINE(initializePlacementHistoryHangAfterSettingSnapshotReadConcern);
 
+// Index hint that is used for timestamp-based queries. This is necessary because the placement
+// history collection has multiple indexes and the optimizer can select a sub-optimal index for some
+// queries.
+const BSONObj kIndexHintForTimestampQuery =
+    BSON(NamespacePlacementType::kTimestampFieldName << -1 << NamespacePlacementType::kNssFieldName
+                                                     << 1);
+
+// Index hint that is used for queries on a specific namespace.
+const BSONObj kIndexHintForNssQuery =
+    BSON(NamespacePlacementType::kNssFieldName << 1 << NamespacePlacementType::kTimestampFieldName
+                                               << -1);
+
 class PipelineBuilder {
 
 public:
@@ -737,9 +749,13 @@ private:
 
     // Executes the specified query pipeline against the local 'config.placementHistory' collection,
     // using a snapshot read and the initially set config time value.
-    std::vector<BSONObj> _runLocalCatalogSnapshotQuery(const Pipeline& pipeline) const {
+    std::vector<BSONObj> _runLocalCatalogSnapshotQuery(const Pipeline& pipeline,
+                                                       const BSONObj& hint = BSONObj()) const {
         auto aggRequest = AggregateCommandRequest(
             NamespaceString::kConfigsvrPlacementHistoryNamespace, pipeline.serializeToBson());
+        if (!hint.isEmpty()) {
+            aggRequest.setHint(hint);
+        }
 
         // Use a snapshot read at the latest majority committed time to retrieve the most recent
         // results.
@@ -752,6 +768,7 @@ private:
                     3,
                     "querying placement history in _configsvrGetHistoricalPlacement",
                     "pipeline"_attr = pipeline.serializeToBson(),
+                    "hint"_attr = hint,
                     "nss"_attr = _nss ? _nss->toStringForErrorMsg() : "whole cluster",
                     "result"_attr = aggResult);
 
@@ -784,13 +801,10 @@ private:
         // ]
         // with <ts> being an arbitrary timestamp, and <matchExpression> being one of the following:
         // - {$ne: ""}                             for whole-cluster placement queries
-        // - {$regex: "^<dbName>(\..*")?$}         for database-level placement queries
-        // - {$regex: "^<dbName>(\.<collName>)?$}  for collection-level placement queries
+        // - {$regex: "^<dbName>(\..*)?$"}         for database-level placement queries
+        // - {$regex: "^<dbName>(\.<collName>)?$"} for collection-level placement queries
         DocumentSourceContainer pipelineStages;
 
-        // The index on 'config.placementHistory' is 'nss_1_timestamp_-1' and may not serve this
-        // pipeline very well.
-        // TODO SERVER-115207: investigate alternative pipelines or indexes to improve this query.
         pipelineStages.push_back(DocumentSourceMatch::create(
             BSON("timestamp" << BSON("$gt" << ts) << "nss" << matchNssExpression), _expCtx));
         pipelineStages.push_back(DocumentSourceSort::create(_expCtx, BSON("timestamp" << 1)));
@@ -800,7 +814,7 @@ private:
 
         auto pipeline = Pipeline::create(std::move(pipelineStages), _expCtx);
 
-        auto aggResult = _runLocalCatalogSnapshotQuery(*pipeline);
+        auto aggResult = _runLocalCatalogSnapshotQuery(*pipeline, kIndexHintForTimestampQuery);
         if (!aggResult.empty()) {
             return aggResult.front().getField("timestamp"_sd).timestamp();
         }
@@ -1044,7 +1058,7 @@ private:
 
         auto pipeline = Pipeline::create(std::move(pipelineStages), _expCtx);
 
-        auto aggResult = _runLocalCatalogSnapshotQuery(*pipeline);
+        auto aggResult = _runLocalCatalogSnapshotQuery(*pipeline, kIndexHintForNssQuery);
         tassert(11314301,
                 "expecting placement history initialization point to be present",
                 aggResult.size() == 1);
@@ -1071,13 +1085,31 @@ private:
 
 }  // namespace
 
-Status ShardingCatalogManager::createIndexForConfigPlacementHistory(OperationContext* opCtx) {
-    return createIndexOnConfigCollection(opCtx,
-                                         NamespaceString::kConfigsvrPlacementHistoryNamespace,
-                                         BSON(NamespacePlacementType::kNssFieldName
-                                              << 1 << NamespacePlacementType::kTimestampFieldName
-                                              << -1),
-                                         true /*unique*/);
+Status ShardingCatalogManager::createIndexesForConfigPlacementHistory(OperationContext* opCtx) {
+    // Create a combined index on 'nss' (sorted ascending) and 'timestamp' (sorted descending).
+    // This is an idempotent operation and it won't fail if the index already exists.
+    Status status = createIndexOnConfigCollection(
+        opCtx,
+        NamespaceString::kConfigsvrPlacementHistoryNamespace,
+        BSON(NamespacePlacementType::kNssFieldName
+             << 1 << NamespacePlacementType::kTimestampFieldName << -1),
+        true /*unique*/);
+    if (status.isOK()) {
+        // Create another index with 'timestamp' first (sorted descending), then 'nss' (sorted
+        // ascending). This is necessary to cover queries to the placement history that are querying
+        // by time range. Note that this index does not need to be unique, as the uniqueness of
+        // every {timestamp, nss} combination is already ensured by the first index.
+        // If the creation of the second index fails, we leave the first index in place, as it is
+        // required for uniqueness and thus correctness of the placement history. The index creation
+        // failure will still be reported to the caller, who can retry index creation.
+        status =
+            createIndexOnConfigCollection(opCtx,
+                                          NamespaceString::kConfigsvrPlacementHistoryNamespace,
+                                          BSON(NamespacePlacementType::kTimestampFieldName
+                                               << -1 << NamespacePlacementType::kNssFieldName << 1),
+                                          false /*unique*/);
+    }
+    return status;
 }
 
 write_ops::InsertCommandRequest
@@ -1154,8 +1186,8 @@ HistoricalPlacement ShardingCatalogManager::getHistoricalPlacement(
     //    placement atClusterTime plus the sequence of later events produced on each shard is
     //    actually consistent.
     //
-    // TODO (SERVER-98118): This step once featureFlagChangeStreamPreciseShardTargeting reaches
-    // last-lts.
+    // TODO (SERVER-98118): Remove this step once featureFlagChangeStreamPreciseShardTargeting
+    // reaches last-lts.
     {
         FixedFCVRegion fcvRegion(opCtx);
         if (const auto fcvSnapshot = fcvRegion->acquireFCVSnapshot();

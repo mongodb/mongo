@@ -65,6 +65,15 @@ const targetingResponse = assert.commandWorked(
     }),
 );
 
+// The above targeting request should have created the necessary indexes for the placement history collection, too.
+const indexes = configDB.placementHistory.getIndexes();
+assert.eq(indexes.length, 3, "Expecting 3 indexes to be present for placementHistory collection");
+assert.sameMembers(
+    indexes.map((idx) => idx.key),
+    [{_id: 1}, {nss: 1, timestamp: -1}, {timestamp: -1, nss: 1}],
+    "Found unexpected indexes for placementHistory collection",
+);
+
 const initializationMetadataDocsAfterFirstTargetingRequest = configDB.placementHistory
     .find({nss: initializationMetadataIdentifier})
     .sort({timestamp: 1})

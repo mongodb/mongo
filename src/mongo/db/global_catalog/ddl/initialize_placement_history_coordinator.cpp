@@ -230,7 +230,7 @@ ExecutorFuture<void> InitializePlacementHistoryCoordinator::_runImpl(
                 // Recreate the collection and its supporting index, following the drop performed
                 // within Phase::kDefineInitializationTime.
                 uassertStatusOK(
-                    shardingCatalogManager->createIndexForConfigPlacementHistory(opCtx));
+                    shardingCatalogManager->createIndexesForConfigPlacementHistory(opCtx));
                 try {
                     shardingCatalogManager->initializePlacementHistory(opCtx, initTimeRef);
                 } catch (const ExceptionFor<ErrorCodes::SnapshotTooOld>& e) {

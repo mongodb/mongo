@@ -93,9 +93,9 @@ namespace mongo {
 /**
  * Implements modifications to the sharding catalog metadata.
  *
- * TODO: Currently the code responsible for writing the sharding catalog metadata is split between
- * this class and ShardingCatalogClient. Eventually all methods that write catalog data should be
- * moved out of ShardingCatalogClient and into this class.
+ * TODO (SERVER-123626): Currently the code responsible for writing the sharding catalog metadata is
+ * split between this class and ShardingCatalogClient. Eventually all methods that write catalog
+ * data should be moved out of ShardingCatalogClient and into this class.
  */
 // TODO (SERVER-105531): Untag inner symbol declarations exceptionally tagged as
 // MONGO_MOD_UNFORTUNATELY_OPEN.
@@ -690,7 +690,7 @@ public:
      * Creates the indexes on config.placementHistory supporting the getHistoricalPlacement()
      * method.
      */
-    Status createIndexForConfigPlacementHistory(OperationContext* opCtx);
+    Status createIndexesForConfigPlacementHistory(OperationContext* opCtx);
 
     /**
      * (Re)builds the content config.placementHistory based on a snapshot read of the global catalog

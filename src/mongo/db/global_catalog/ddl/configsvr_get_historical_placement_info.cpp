@@ -47,7 +47,7 @@ HistoricalPlacement initializePlacementHistoryAndRetry(
     auto configShard = catalogManager->localConfigShard();
 
     // 1. Create the supporting indexes if needed.
-    uassertStatusOK(catalogManager->createIndexForConfigPlacementHistory(opCtx));
+    uassertStatusOK(catalogManager->createIndexesForConfigPlacementHistory(opCtx));
 
     // 2. Re-generate its content.
     ConfigsvrResetPlacementHistory configsvrRequest;

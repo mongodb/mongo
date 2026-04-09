@@ -40,6 +40,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 
 #include <algorithm>
@@ -217,6 +218,8 @@ public:
             ASSERT_OK(insertToConfigCollection(
                 opCtx, NamespaceString::kConfigsvrPlacementHistoryNamespace, initialDoc.toBSON()));
         }
+
+        ASSERT_OK(shardingCatalogManager().createIndexesForConfigPlacementHistory(opCtx));
     }
 
     ShardingCatalogManager& shardingCatalogManager() {
@@ -808,6 +811,150 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_WithMarkers) {
         false /* ignoreRemovedShards */);
     assertPlacementsEqual(ExpectedResponseBuilder{}.setShards({"shard1"}).value,
                           historicalPlacement);
+}
+
+// Test that 'ignoreRemovedShards' mode runs queries on the placement history collection with the
+// expected index hints.
+TEST_F(GetHistoricalPlacementTestFixture,
+       getHistoricalPlacement_RemovedShards_QueriesUseExpectedIndexHints) {
+    auto opCtx = operationContext();
+
+    PlacementDescriptor oldestClusterTimeSupportedMarker = {
+        Timestamp(0, 5),
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.toString_forTest(),
+        {}};
+
+    setupConfigPlacementHistory(opCtx,
+                                {
+                                    oldestClusterTimeSupportedMarker,
+                                    {Timestamp(1, 0), "db", {"shard1"}},
+                                    {Timestamp(2, 0), "db.collection1", {"shard1", "shard2"}},
+                                    {Timestamp(3, 0), "db.collection1", {}},
+                                    {Timestamp(4, 0), "db", {}},
+                                },
+                                true);
+
+    setupConfigShard(opCtx, 2 /*nShards*/);
+
+    setShardIdsInShardRegistry(opCtx, {"shard1"});
+
+    // Execute the specified callback function while capturing logs, and validate all query-related
+    // log messages for the expected output.
+    auto runWithLogCaptureAndValidateLogMessages = [&](const std::function<void()>& callback,
+                                                       StringData expectedNss,
+                                                       const BSONObj& expectedNssMatch) {
+        auto severityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kSharding,
+                                                                  logv2::LogSeverity::Debug(3)};
+        unittest::LogCaptureGuard logs;
+
+        callback();
+
+        const auto logLines = [&]() {
+            std::vector<BSONObj> result;
+            for (const auto& line : logs.getBSON()) {
+                constexpr long long kLogId = 11314300;
+                if (line["id"].numberLong() == kLogId) {
+                    result.push_back(line["attr"].Obj());
+                }
+            }
+            return result;
+        }();
+        ASSERT_EQUALS(3, logLines.size());
+
+        // The original placementHistory query, using $facet.
+        {
+            const auto& logLine = logLines[0];
+            const auto& pipeline = logLine["pipeline"].Array();
+            ASSERT_EQUALS("$facet"_sd, pipeline[0].Obj().firstElementFieldNameStringData());
+        }
+
+        // The query issued in ignoreRemovedShards mode by
+        // '_findPlacementHistoryInitializationPoint()'.
+        {
+            const auto& logLine = logLines[1];
+            const auto& pipeline = logLine["pipeline"].Array();
+            ASSERT_EQUALS(3, pipeline.size());
+            ASSERT_BSONOBJ_EQ(
+                BSON("$match" << BSON("timestamp" << BSON("$gt" << Timestamp(0, 1)) << "nss" << ""
+                                                  << "shards" << BSON("$eq" << BSONArray()))),
+                pipeline[0].Obj());
+            ASSERT_BSONOBJ_EQ(BSON("$limit" << 1), pipeline[1].Obj());
+            ASSERT_BSONOBJ_EQ(BSON("$project" << BSON("_id" << true << "timestamp" << true)),
+                              pipeline[2].Obj());
+
+            // Expect index on {nss: 1, timestamp: -1}.
+            ASSERT_BSONOBJ_EQ(BSON("nss" << 1 << "timestamp" << -1), logLine["hint"].Obj());
+            ASSERT_EQUALS(expectedNss, logLine["nss"].valueStringData());
+        }
+
+        // The query issued in ignoreRemovedShardsMode by
+        // '_findNextPlacementHistoryEntryTimestamp()'.
+        {
+            const auto& logLine = logLines[2];
+            const auto& pipeline = logLine["pipeline"].Array();
+            ASSERT_EQUALS(4, pipeline.size());
+            ASSERT_BSONOBJ_EQ(BSON("$match" << BSON("timestamp" << BSON("$gt" << Timestamp(2, 0))
+                                                                << "nss" << expectedNssMatch)),
+                              pipeline[0].Obj());
+            ASSERT_BSONOBJ_EQ(BSON("$sort" << BSON("timestamp" << 1)), pipeline[1].Obj());
+            ASSERT_BSONOBJ_EQ(BSON("$limit" << 1), pipeline[2].Obj());
+            ASSERT_BSONOBJ_EQ(BSON("$project" << BSON("_id" << true << "timestamp" << true)),
+                              pipeline[3].Obj());
+
+            // Expect index on {timestamp: -1, nss: 1}.
+            ASSERT_BSONOBJ_EQ(BSON("timestamp" << -1 << "nss" << 1), logLine["hint"].Obj());
+            ASSERT_EQUALS(expectedNss, logLine["nss"].valueStringData());
+        }
+    };
+
+    // Run placementHistory query for a collection-level placement.
+    runWithLogCaptureAndValidateLogMessages(
+        [this]() {
+            HistoricalPlacement historicalPlacement =
+                getHistoricalPlacementIgnoreRemovedShards("db.collection1", Timestamp(2, 0));
+            assertPlacementsEqual(ExpectedResponseBuilder{}
+                                      .setAnyRemovedShardDetected(true)
+                                      .setShards({"shard1"})
+                                      .setOpenCursorAt(Timestamp(2, 0))
+                                      .setNextPlacementChangedAt(Timestamp(3, 0))
+                                      .value,
+                                  historicalPlacement);
+        },
+        "db.collection1"_sd,
+        BSON("$regex" << "^db(\\.collection1)?$"));
+
+
+    // Run placementHistory query for a database-level placement.
+    runWithLogCaptureAndValidateLogMessages(
+        [this]() {
+            HistoricalPlacement historicalPlacement =
+                getHistoricalPlacementIgnoreRemovedShards("db", Timestamp(2, 0));
+            assertPlacementsEqual(ExpectedResponseBuilder{}
+                                      .setAnyRemovedShardDetected(true)
+                                      .setShards({"shard1"})
+                                      .setOpenCursorAt(Timestamp(2, 0))
+                                      .setNextPlacementChangedAt(Timestamp(3, 0))
+                                      .value,
+                                  historicalPlacement);
+        },
+        "db"_sd,
+        BSON("$regex" << "^db(\\..*)?$"));
+
+    // Run placementHistory query for an all-databases placement.
+    runWithLogCaptureAndValidateLogMessages(
+        [this]() {
+            HistoricalPlacement historicalPlacement =
+                getHistoricalPlacementIgnoreRemovedShards("", Timestamp(2, 0));
+            assertPlacementsEqual(ExpectedResponseBuilder{}
+                                      .setAnyRemovedShardDetected(true)
+                                      .setShards({"shard1"})
+                                      .setOpenCursorAt(Timestamp(2, 0))
+                                      .setNextPlacementChangedAt(Timestamp(3, 0))
+                                      .value,
+                                  historicalPlacement);
+        },
+        "whole cluster",
+        BSON("$ne" << ""));
 }
 
 // Test 'ignoreRemovedShards' mode for a non-existing database.
@@ -2205,7 +2352,8 @@ TEST_F(GetHistoricalPlacementTestFixture,
                                     {Timestamp(4, 0), "db", {"shard2"}},
                                     {Timestamp(5, 0), "db.collection", {}},
                                     {Timestamp(6, 0), "db", {}},
-                                });
+                                },
+                                false);
 
     setupConfigShard(opCtx, 2 /*nShards*/);
 
@@ -2339,7 +2487,8 @@ TEST_F(GetHistoricalPlacementTestFixture,
                                     {Timestamp(4, 0), "db", {"shard2"}},
                                     {Timestamp(5, 0), "db.collection", {}},
                                     {Timestamp(6, 0), "db", {}},
-                                });
+                                },
+                                false);
 
     setupConfigShard(opCtx, 2 /*nShards*/);
 
@@ -2765,7 +2914,8 @@ TEST_F(GetHistoricalPlacementTestFixture,
                                     {Timestamp(7, 0), "db.collection2", {"shard2"}},
                                     {Timestamp(8, 0), "db.collection2", {}},
                                     {Timestamp(9, 0), "db", {}},
-                                });
+                                },
+                                false);
 
     setupConfigShard(opCtx, 2 /*nShards*/);
 
@@ -3398,7 +3548,8 @@ TEST_F(GetHistoricalPlacementTestFixture,
                                     {Timestamp(10, 0), "db1", {}},
                                     {Timestamp(11, 0), "db2.collection3", {}},
                                     {Timestamp(12, 0), "db2", {}},
-                                });
+                                },
+                                false);
 
     setupConfigShard(opCtx, 2 /*nShards*/);
 
@@ -3938,14 +4089,16 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_WithMarkers_rep
          {Timestamp(2, 0), "db.collection1", {"shard1", "shard2", "shard3"}},
          {Timestamp(2, 0), "db", {"shard4"}},
          {Timestamp(2, 0), "db.collection2", {"shard1", "shard2", "shard3"}},
-         _endFcvMarker});
+         _endFcvMarker},
+        true);
 
     // after initialization-
     setupConfigPlacementHistory(
         opCtx,
         {{Timestamp(4, 0), "db", {"shard1"}},
          {Timestamp(5, 0), "db.collection1", {"shard1", "shard2", "shard3"}},
-         {Timestamp(6, 0), "db.collection1", {}}});
+         {Timestamp(6, 0), "db.collection1", {}}},
+        false);
 
     setupConfigShard(opCtx, 4 /*nShards*/);
 
@@ -4227,13 +4380,15 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_With
          {Timestamp(2, 0), "db.collection1", {"shard1", "shard2", "shard3"}},
          {Timestamp(2, 0), "db", {"shard1"}},
          {Timestamp(2, 0), "db.collection2", {"shard2"}},
-         _endFcvMarker});
+         _endFcvMarker},
+        true);
 
     // after initialization-
     setupConfigPlacementHistory(
         opCtx,
         {{Timestamp(4, 0), "db", {"shard2"}},
-         {Timestamp(5, 0), "db.collection2", {"shard1", "shard2", "shard3"}}});
+         {Timestamp(5, 0), "db.collection2", {"shard1", "shard2", "shard3"}}},
+        false);
 
     setupConfigShard(opCtx, 3 /*nShards*/);
 

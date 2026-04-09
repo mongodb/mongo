@@ -515,11 +515,10 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
         return result.withContext("couldn't create collUuid_1 index on config.queryAnalyzers");
     }
 
-    result = createIndexForConfigPlacementHistory(opCtx);
+    result = createIndexesForConfigPlacementHistory(opCtx);
 
     if (!result.isOK()) {
-        return result.withContext(
-            "couldn't create nss_1_timestamp_-1 index on config.placementHistory");
+        return result.withContext("couldn't create required indexes on config.placementHistory");
     }
 
     return Status::OK();

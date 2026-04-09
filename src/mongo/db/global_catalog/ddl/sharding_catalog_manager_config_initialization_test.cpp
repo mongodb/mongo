@@ -361,18 +361,19 @@ TEST_F(ConfigInitializationTest, BuildsNecessaryIndexes) {
     auto foundTagsIndexes = assertGet(getIndexes(operationContext(), TagsType::ConfigNS));
     assertBSONObjsSame(expectedTagsIndexes, foundTagsIndexes);
 
-
     auto expectedPlacementHistoryIndexes = std::vector<BSONObj>{
         BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName),
         BSON("v" << 2 << "unique" << true << "key" << BSON("nss" << 1 << "timestamp" << -1)
                  << "name"
-                 << "nss_1_timestamp_-1")};
-    auto foundlacementHistoryIndexes = assertGet(
+                 << "nss_1_timestamp_-1"),
+        BSON("v" << 2 << "key" << BSON("timestamp" << -1 << "nss" << 1) << "name"
+                 << "timestamp_-1_nss_1")};
+    auto foundPlacementHistoryIndexes = assertGet(
         getIndexes(operationContext(), NamespaceString::kConfigsvrPlacementHistoryNamespace));
-    assertBSONObjsSame(expectedPlacementHistoryIndexes, foundlacementHistoryIndexes);
+    assertBSONObjsSame(expectedPlacementHistoryIndexes, foundPlacementHistoryIndexes);
 }
 
-TEST_F(ConfigInitializationTest, InizializePlacementHistory) {
+TEST_F(ConfigInitializationTest, InitializePlacementHistory) {
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->initializeConfigDatabaseIfNeeded(operationContext()));
 
