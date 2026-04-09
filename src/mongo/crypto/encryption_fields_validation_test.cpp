@@ -384,45 +384,61 @@ TEST(FLEValidationUtils, parseQueryTypeConfig) {
 
     // Prefix
     BSONObj tooLowStrMinQueryLengthPrefix =
-        BSON("queryType" << "prefixPreview" << "strMinQueryLength" << -1 << "strMaxQueryLength"
-                         << 10 << "caseSensitive" << true << "diacriticSensitive" << false);
+        BSON("queryType" << "prefix" << "strMinQueryLength" << -1 << "strMaxQueryLength" << 10
+                         << "caseSensitive" << true << "diacriticSensitive" << false);
     ASSERT_THROWS_CODE(QueryTypeConfig::parse(tooLowStrMinQueryLengthPrefix,
                                               IDLParserContext{"parseQueryTypeConfigTest"}),
                        DBException,
                        ErrorCodes::BadValue);
     BSONObj tooLowStrMaxQueryLengthPrefix =
-        BSON("queryType" << "prefixPreview" << "strMinQueryLength" << 2 << "strMaxQueryLength" << -1
+        BSON("queryType" << "prefix" << "strMinQueryLength" << 2 << "strMaxQueryLength" << -1
                          << "caseSensitive" << true << "diacriticSensitive" << false);
     ASSERT_THROWS_CODE(QueryTypeConfig::parse(tooLowStrMaxQueryLengthPrefix,
                                               IDLParserContext{"parseQueryTypeConfigTest"}),
                        DBException,
                        ErrorCodes::BadValue);
     BSONObj validPrefixConfig =
-        BSON("queryType" << "prefixPreview" << "strMinQueryLength" << 2 << "strMaxQueryLength" << 10
+        BSON("queryType" << "prefix" << "strMinQueryLength" << 2 << "strMaxQueryLength" << 10
                          << "caseSensitive" << true << "diacriticSensitive" << false);
     ASSERT_DOES_NOT_THROW(
         QueryTypeConfig::parse(validPrefixConfig, IDLParserContext{"parseQueryTypeConfigTest"}));
 
     // Suffix
     BSONObj tooLowStrMinQueryLengthSuffix =
-        BSON("queryType" << "suffixPreview" << "strMinQueryLength" << -1 << "strMaxQueryLength"
-                         << 10 << "caseSensitive" << true << "diacriticSensitive" << false);
+        BSON("queryType" << "suffix" << "strMinQueryLength" << -1 << "strMaxQueryLength" << 10
+                         << "caseSensitive" << true << "diacriticSensitive" << false);
     ASSERT_THROWS_CODE(QueryTypeConfig::parse(tooLowStrMinQueryLengthSuffix,
                                               IDLParserContext{"parseQueryTypeConfigTest"}),
                        DBException,
                        ErrorCodes::BadValue);
     BSONObj tooLowStrMaxQueryLengthSuffix =
-        BSON("queryType" << "suffixPreview" << "strMinQueryLength" << 2 << "strMaxQueryLength" << -1
+        BSON("queryType" << "suffix" << "strMinQueryLength" << 2 << "strMaxQueryLength" << -1
                          << "caseSensitive" << true << "diacriticSensitive" << false);
     ASSERT_THROWS_CODE(QueryTypeConfig::parse(tooLowStrMaxQueryLengthSuffix,
                                               IDLParserContext{"parseQueryTypeConfigTest"}),
                        DBException,
                        ErrorCodes::BadValue);
     BSONObj validSuffixConfig =
-        BSON("queryType" << "suffixPreview" << "strMinQueryLength" << 2 << "strMaxQueryLength" << 10
+        BSON("queryType" << "suffix" << "strMinQueryLength" << 2 << "strMaxQueryLength" << 10
                          << "caseSensitive" << true << "diacriticSensitive" << false);
     ASSERT_DOES_NOT_THROW(
         QueryTypeConfig::parse(validSuffixConfig, IDLParserContext{"parseQueryTypeConfigTest"}));
+
+    // Deprecated "suffixPreview" and "prefixPreview" strings should still parse for backwards
+    // compatibility with existing collections.
+    BSONObj deprecatedSuffixConfig =
+        BSON("queryType" << "suffixPreview" << "strMinQueryLength" << 2 << "strMaxQueryLength" << 10
+                         << "caseSensitive" << true << "diacriticSensitive" << false);
+    auto parsedSuffix = QueryTypeConfig::parse(deprecatedSuffixConfig,
+                                               IDLParserContext{"parseQueryTypeConfigTest"});
+    ASSERT_EQ(parsedSuffix.getQueryType(), QueryTypeEnum::SuffixPreviewDeprecated);
+
+    BSONObj deprecatedPrefixConfig =
+        BSON("queryType" << "prefixPreview" << "strMinQueryLength" << 2 << "strMaxQueryLength" << 10
+                         << "caseSensitive" << true << "diacriticSensitive" << false);
+    auto parsedPrefix = QueryTypeConfig::parse(deprecatedPrefixConfig,
+                                               IDLParserContext{"parseQueryTypeConfigTest"});
+    ASSERT_EQ(parsedPrefix.getQueryType(), QueryTypeEnum::PrefixPreviewDeprecated);
 }
 
 QueryTypeConfig validateTextSearchIndexCommonTests(QueryTypeEnum qtype) {
@@ -546,7 +562,7 @@ TEST(FLEValidationUtils, ValidateTextSearchIndexSubstring) {
 }
 
 TEST(FLEValidationUtils, ValidateTextSearchIndexSuffix) {
-    QueryTypeConfig qtc = validateTextSearchIndexCommonTests(QueryTypeEnum::SuffixPreview);
+    QueryTypeConfig qtc = validateTextSearchIndexCommonTests(QueryTypeEnum::Suffix);
 
     // strMinQueryLength can go down to 1 for prefix/suffix.
     qtc.setStrMinQueryLength(1);
@@ -562,7 +578,7 @@ TEST(FLEValidationUtils, ValidateTextSearchIndexSuffix) {
 }
 
 TEST(FLEValidationUtils, ValidateTextSearchIndexPrefix) {
-    QueryTypeConfig qtc = validateTextSearchIndexCommonTests(QueryTypeEnum::PrefixPreview);
+    QueryTypeConfig qtc = validateTextSearchIndexCommonTests(QueryTypeEnum::Prefix);
 
     // strMinQueryLength can go down to 1 for prefix/suffix.
     qtc.setStrMinQueryLength(1);

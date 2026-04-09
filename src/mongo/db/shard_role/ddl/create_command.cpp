@@ -224,12 +224,12 @@ public:
                             "Cannot create a collection with an encrypted field with query type "
                             "suffixPreview unless featureFlagQETextSearchPreview is enabled",
                             !hasQueryType(cmd.getEncryptedFields().get(),
-                                          QueryTypeEnum::SuffixPreview));
+                                          QueryTypeEnum::SuffixPreviewDeprecated));
                     uassert(9783417,
                             "Cannot create a collection with an encrypted field with query type "
                             "prefixPreview unless featureFlagQETextSearchPreview is enabled",
                             !hasQueryType(cmd.getEncryptedFields().get(),
-                                          QueryTypeEnum::PrefixPreview));
+                                          QueryTypeEnum::PrefixPreviewDeprecated));
                     uassert(10075600,
                             "Cannot create a collection with a strEncodeVersion set unless "
                             "featureFlagQETextSearchPreview is enabled",
@@ -239,6 +239,19 @@ public:
                         cmd.getEncryptedFields().get());
                     EncryptionInformationHelpers::checkSubstringPreviewParameterLimitsNotExceeded(
                         cmd.getEncryptedFields().get());
+                }
+
+                if (!gFeatureFlagQEPrefixSuffixSearch.isEnabledUseLastLTSFCVWhenUninitialized(
+                        VersionContext::getDecoration(opCtx),
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                    uassert(11632900,
+                            "Cannot create a collection with an encrypted field with query type "
+                            "prefix unless featureFlagQEPrefixSuffixSearch is enabled",
+                            !hasQueryType(cmd.getEncryptedFields().get(), QueryTypeEnum::Prefix));
+                    uassert(11632901,
+                            "Cannot create a collection with an encrypted field with query type "
+                            "suffix unless featureFlagQEPrefixSuffixSearch is enabled",
+                            !hasQueryType(cmd.getEncryptedFields().get(), QueryTypeEnum::Suffix));
                 }
             }
 

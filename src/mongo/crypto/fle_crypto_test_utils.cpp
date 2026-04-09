@@ -51,8 +51,10 @@ EncryptedFieldHelper::EncryptedFieldHelper(EncryptedField fieldSchema) {
                 _algorithm = Fle2AlgorithmInt::kRange;
                 break;
             case QueryTypeEnum::SubstringPreview:
-            case QueryTypeEnum::SuffixPreview:
-            case QueryTypeEnum::PrefixPreview:
+            case QueryTypeEnum::SuffixPreviewDeprecated:
+            case QueryTypeEnum::Suffix:
+            case QueryTypeEnum::PrefixPreviewDeprecated:
+            case QueryTypeEnum::Prefix:
                 _algorithm = Fle2AlgorithmInt::kTextSearch;
                 break;
             default:
@@ -131,11 +133,13 @@ std::vector<char> EncryptedFieldHelper::generatePlaceholder(BSONElement value,
                     spec.setSubstringSpec(FLE2SubstringInsertSpec(mlen, ub, lb));
                     break;
                 }
-                case QueryTypeEnum::SuffixPreview: {
+                case QueryTypeEnum::SuffixPreviewDeprecated:
+                case QueryTypeEnum::Suffix: {
                     spec.setSuffixSpec(FLE2SuffixInsertSpec(ub, lb));
                     break;
                 }
-                case QueryTypeEnum::PrefixPreview: {
+                case QueryTypeEnum::PrefixPreviewDeprecated:
+                case QueryTypeEnum::Prefix: {
                     spec.setPrefixSpec(FLE2PrefixInsertSpec(ub, lb));
                     break;
                 }
@@ -215,7 +219,7 @@ EncryptedFieldHelper EncryptedFieldHelper::makeSuffix(StringData path,
                                                       bool diacriticSensitive,
                                                       boost::optional<int64_t> contention) {
     EncryptedFieldHelper res(Fle2AlgorithmInt::kTextSearch, path, indexKeyId, type);
-    res._queries.emplace_back(QueryTypeEnum::SuffixPreview);
+    res._queries.emplace_back(QueryTypeEnum::Suffix);
     auto& qtc = res._queries.back();
     res._contentionMax = contention.value_or(qtc.getContention());
     qtc.setContention(res._contentionMax);
@@ -238,7 +242,7 @@ EncryptedFieldHelper EncryptedFieldHelper::makePrefix(StringData path,
                                                       boost::optional<int64_t> contention) {
     auto res =
         makeSuffix(path, type, indexKeyId, lb, ub, caseSensitive, diacriticSensitive, contention);
-    res._queries.back().setQueryType(QueryTypeEnum::PrefixPreview);
+    res._queries.back().setQueryType(QueryTypeEnum::Prefix);
     res._ef.setQueries(std::variant<std::vector<QueryTypeConfig>, QueryTypeConfig>{res._queries});
     return res;
 }

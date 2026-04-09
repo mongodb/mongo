@@ -1966,7 +1966,7 @@ static void generateTextTokenSetsForIUPV2(FLE2InsertUpdatePayloadV2& iupayload,
                                         boost::none,
                                         0 /* msize */)
                     .encrypt(ecocToken));
-        } else if (type == QueryTypeEnum::SuffixPreview) {
+        } else if (type == QueryTypeEnum::Suffix) {
             tsts.getSuffixTokenSets().push_back({});
             auto& ts = tsts.getSuffixTokenSets().back();
             auto edcDataDerivedToken = EDCTextSuffixDerivedFromDataToken::deriveFrom(
@@ -1988,7 +1988,7 @@ static void generateTextTokenSetsForIUPV2(FLE2InsertUpdatePayloadV2& iupayload,
                                         boost::none,
                                         0 /* msize */)
                     .encrypt(ecocToken));
-        } else if (type == QueryTypeEnum::PrefixPreview) {
+        } else if (type == QueryTypeEnum::Prefix) {
             tsts.getPrefixTokenSets().push_back({});
             auto& ts = tsts.getPrefixTokenSets().back();
             auto edcDataDerivedToken = EDCTextPrefixDerivedFromDataToken::deriveFrom(
@@ -2057,8 +2057,8 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads) {
     const size_t tagCount = 1 + substrs.size() + suffixes.size() + prefixes.size();
 
     generateTextTokenSetsForIUPV2(iupayload, substrs, QueryTypeEnum::SubstringPreview);
-    generateTextTokenSetsForIUPV2(iupayload, suffixes, QueryTypeEnum::SuffixPreview);
-    generateTextTokenSetsForIUPV2(iupayload, prefixes, QueryTypeEnum::PrefixPreview);
+    generateTextTokenSetsForIUPV2(iupayload, suffixes, QueryTypeEnum::Suffix);
+    generateTextTokenSetsForIUPV2(iupayload, prefixes, QueryTypeEnum::Prefix);
 
     payload.counts = std::vector<uint64_t>(tagCount);
     std::iota(payload.counts.begin(), payload.counts.end(), 1);  // fill with values 1...tagCount
@@ -2230,9 +2230,8 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads_InvalidArgs) {
         generateTextTokenSetsForIUPV2(tmpPayload.payload,
                                       std::vector<StringData>(42000, "s"_sd),
                                       QueryTypeEnum::SubstringPreview);
-        generateTextTokenSetsForIUPV2(tmpPayload.payload,
-                                      std::vector<StringData>(42000, "s"_sd),
-                                      QueryTypeEnum::SuffixPreview);
+        generateTextTokenSetsForIUPV2(
+            tmpPayload.payload, std::vector<StringData>(42000, "s"_sd), QueryTypeEnum::Suffix);
         tmpPayload.counts = std::vector<uint64_t>(84001);
         auto tmpTags = EDCServerCollection::generateTagsForTextSearch(tmpPayload);
         ASSERT_THROWS_CODE(FLE2IndexedTextEncryptedValue::fromUnencrypted(
@@ -2247,12 +2246,10 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads_InvalidArgs) {
         generateTextTokenSetsForIUPV2(tmpPayload.payload,
                                       std::vector<StringData>(28000, "s"_sd),
                                       QueryTypeEnum::SubstringPreview);
-        generateTextTokenSetsForIUPV2(tmpPayload.payload,
-                                      std::vector<StringData>(28000, "s"_sd),
-                                      QueryTypeEnum::SuffixPreview);
-        generateTextTokenSetsForIUPV2(tmpPayload.payload,
-                                      std::vector<StringData>(28000, "s"_sd),
-                                      QueryTypeEnum::PrefixPreview);
+        generateTextTokenSetsForIUPV2(
+            tmpPayload.payload, std::vector<StringData>(28000, "s"_sd), QueryTypeEnum::Suffix);
+        generateTextTokenSetsForIUPV2(
+            tmpPayload.payload, std::vector<StringData>(28000, "s"_sd), QueryTypeEnum::Prefix);
         tmpPayload.counts = std::vector<uint64_t>(84001);
         auto tmpTags = EDCServerCollection::generateTagsForTextSearch(tmpPayload);
         ASSERT_THROWS_CODE(FLE2IndexedTextEncryptedValue::fromUnencrypted(
@@ -2517,7 +2514,7 @@ TEST_F(ServiceContextTest, EncryptionInformation_TestTagLimitsForTextSearch) {
     qtc.front() = makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 1, INT32_MAX, INT32_MAX);
     doOneFieldTest(qtc, 10384601);
 
-    for (auto qtype : {QueryTypeEnum::SuffixPreview, QueryTypeEnum::PrefixPreview}) {
+    for (auto qtype : {QueryTypeEnum::Suffix, QueryTypeEnum::Prefix}) {
         // suffix/prefix field under limit
         qtc.front() = makeTextQueryTypeConfig(qtype, 9, 109, {});
         assertExpectedMaxTags(qtc, 102);
@@ -2535,20 +2532,20 @@ TEST_F(ServiceContextTest, EncryptionInformation_TestTagLimitsForTextSearch) {
     }
 
     // suffix+prefix field under limit
-    qtc = {makeTextQueryTypeConfig(QueryTypeEnum::SuffixPreview, 9, 109, {}),
-           makeTextQueryTypeConfig(QueryTypeEnum::PrefixPreview, 90, 900, {})};
+    qtc = {makeTextQueryTypeConfig(QueryTypeEnum::Suffix, 9, 109, {}),
+           makeTextQueryTypeConfig(QueryTypeEnum::Prefix, 90, 900, {})};
     assertExpectedMaxTags(qtc, 101 + 811 + 1);
     doOneFieldTest(qtc, {});
 
     // suffix+prefix field at limit
-    qtc = {makeTextQueryTypeConfig(QueryTypeEnum::SuffixPreview, 101, 42100, {}),
-           makeTextQueryTypeConfig(QueryTypeEnum::PrefixPreview, 1001, 42999, {})};
+    qtc = {makeTextQueryTypeConfig(QueryTypeEnum::Suffix, 101, 42100, {}),
+           makeTextQueryTypeConfig(QueryTypeEnum::Prefix, 1001, 42999, {})};
     assertExpectedMaxTags(qtc, 84'000);
     doOneFieldTest(qtc, {});
 
     // suffix+prefix field over limit
-    qtc = {makeTextQueryTypeConfig(QueryTypeEnum::SuffixPreview, 101, 42100, {}),
-           makeTextQueryTypeConfig(QueryTypeEnum::PrefixPreview, 1001, 43000, {})};
+    qtc = {makeTextQueryTypeConfig(QueryTypeEnum::Suffix, 101, 42100, {}),
+           makeTextQueryTypeConfig(QueryTypeEnum::Prefix, 1001, 43000, {})};
     assertExpectedMaxTags(qtc, 84'001);
     doOneFieldTest(qtc, 10384602);
 }
@@ -2650,38 +2647,38 @@ TEST_F(ServiceContextTest, EncryptionInformation_TestTagStorageLimits) {
 
     // prefix above total tag storage limit
     efc.setFields(makeEncryptedFields(
-        1286, "string"_sd, {makeTextQueryTypeConfig(QueryTypeEnum::PrefixPreview, 9, 109, {})}));
+        1286, "string"_sd, {makeTextQueryTypeConfig(QueryTypeEnum::Prefix, 9, 109, {})}));
     doMultipleFieldsTest(efc, 10431800);
 
     // prefix within total tag storage limit
     efc.setFields(makeEncryptedFields(
-        1285, "string"_sd, {makeTextQueryTypeConfig(QueryTypeEnum::PrefixPreview, 9, 109, {})}));
+        1285, "string"_sd, {makeTextQueryTypeConfig(QueryTypeEnum::Prefix, 9, 109, {})}));
     doMultipleFieldsTest(efc, {});
 
     // suffix above total tag storage limit
     efc.setFields(makeEncryptedFields(
-        1286, "string"_sd, {makeTextQueryTypeConfig(QueryTypeEnum::SuffixPreview, 9, 109, {})}));
+        1286, "string"_sd, {makeTextQueryTypeConfig(QueryTypeEnum::Suffix, 9, 109, {})}));
     doMultipleFieldsTest(efc, 10431800);
 
     // suffix within total tag storage limit
     efc.setFields(makeEncryptedFields(
-        1285, "string"_sd, {makeTextQueryTypeConfig(QueryTypeEnum::SuffixPreview, 9, 109, {})}));
+        1285, "string"_sd, {makeTextQueryTypeConfig(QueryTypeEnum::Suffix, 9, 109, {})}));
     doMultipleFieldsTest(efc, {});
 
     // suffix+prefix above total tag storage limit
     efc.setFields(
         makeEncryptedFields(144,
                             "string"_sd,
-                            {makeTextQueryTypeConfig(QueryTypeEnum::PrefixPreview, 9, 109, {}),
-                             makeTextQueryTypeConfig(QueryTypeEnum::SuffixPreview, 90, 900, {})}));
+                            {makeTextQueryTypeConfig(QueryTypeEnum::Prefix, 9, 109, {}),
+                             makeTextQueryTypeConfig(QueryTypeEnum::Suffix, 90, 900, {})}));
     doMultipleFieldsTest(efc, 10431800);
 
     // suffix+prefix within total tag storage limit
     efc.setFields(
         makeEncryptedFields(143,
                             "string"_sd,
-                            {makeTextQueryTypeConfig(QueryTypeEnum::PrefixPreview, 9, 109, {}),
-                             makeTextQueryTypeConfig(QueryTypeEnum::SuffixPreview, 90, 900, {})}));
+                            {makeTextQueryTypeConfig(QueryTypeEnum::Prefix, 9, 109, {}),
+                             makeTextQueryTypeConfig(QueryTypeEnum::Suffix, 90, 900, {})}));
     doMultipleFieldsTest(efc, {});
 
     // mixture of substring, suffix, and prefix above total tag storage limit
@@ -2689,9 +2686,9 @@ TEST_F(ServiceContextTest, EncryptionInformation_TestTagStorageLimits) {
     auto substringFields = makeEncryptedFields(
         36, "string"_sd, {makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 2, 10, 400)});
     auto prefixFields = makeEncryptedFields(
-        15, "string"_sd, {makeTextQueryTypeConfig(QueryTypeEnum::PrefixPreview, 9, 109, {})});
+        15, "string"_sd, {makeTextQueryTypeConfig(QueryTypeEnum::Prefix, 9, 109, {})});
     auto suffixFields = makeEncryptedFields(
-        15, "string"_sd, {makeTextQueryTypeConfig(QueryTypeEnum::SuffixPreview, 9, 109, {})});
+        15, "string"_sd, {makeTextQueryTypeConfig(QueryTypeEnum::Suffix, 9, 109, {})});
     fields.insert(fields.end(), substringFields.begin(), substringFields.end());
     fields.insert(fields.end(), prefixFields.begin(), prefixFields.end());
     fields.insert(fields.end(), suffixFields.begin(), suffixFields.end());
@@ -2700,7 +2697,7 @@ TEST_F(ServiceContextTest, EncryptionInformation_TestTagStorageLimits) {
 
     // mixture of substring, suffix, and prefix within total tag storage limit
     suffixFields = makeEncryptedFields(
-        14, "string"_sd, {makeTextQueryTypeConfig(QueryTypeEnum::SuffixPreview, 9, 109, {})});
+        14, "string"_sd, {makeTextQueryTypeConfig(QueryTypeEnum::Suffix, 9, 109, {})});
     fields.clear();
     fields.insert(fields.end(), substringFields.begin(), substringFields.end());
     fields.insert(fields.end(), prefixFields.begin(), prefixFields.end());

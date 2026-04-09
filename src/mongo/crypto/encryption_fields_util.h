@@ -193,11 +193,21 @@ inline bool isFLE2SupportedType(EncryptedBinDataType fleType, BSONType bsonType)
 }
 
 /**
- * Returns whether the query type is for substring, suffix, or prefix indexed encryption.
+ * Returns whether the query type is a deprecated preview type for substring, suffix, or prefix
+ * indexed encryption.
+ */
+inline bool isFLE2TextPreviewQueryType(QueryTypeEnum qt) {
+    return qt == QueryTypeEnum::SubstringPreview || qt == QueryTypeEnum::SuffixPreviewDeprecated ||
+        qt == QueryTypeEnum::PrefixPreviewDeprecated;
+}
+
+/**
+ * Returns whether the query type is for substring, suffix, or prefix indexed encryption,
+ * including deprecated preview types.
  */
 inline bool isFLE2TextQueryType(QueryTypeEnum qt) {
-    return qt == QueryTypeEnum::SubstringPreview || qt == QueryTypeEnum::SuffixPreview ||
-        qt == QueryTypeEnum::PrefixPreview;
+    return qt == QueryTypeEnum::Suffix || qt == QueryTypeEnum::Prefix ||
+        isFLE2TextPreviewQueryType(qt);
 }
 
 struct EncryptedFieldMatchResult {
