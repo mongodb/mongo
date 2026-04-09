@@ -40,7 +40,10 @@ const experimentName = "match_pbt_experiment";
 const controlColl = db[controlName];
 const experimentColl = db[experimentName];
 
-const correctnessProperty = createCorrectnessProperty(controlColl, experimentColl, {jsTestLogExplain});
+const correctnessProperty = createCorrectnessProperty(controlColl, experimentColl, {
+    jsTestLogExplain,
+    sortArraysComparator: true,
+});
 
 // Lower the hash join threshold to increase the likelihood of hash joins being used.
 runWithParamsAllNonConfigNodes(db, {internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin: 100}, () => {
@@ -54,8 +57,6 @@ runWithParamsAllNonConfigNodes(db, {internalQueryCollectionMaxNoOfDocumentsToCho
             numQueriesPerRun,
         }),
         numRuns,
-        undefined /*examples*/,
-        true /*sortArrays*/,
     );
 
     testProperty(
@@ -68,7 +69,5 @@ runWithParamsAllNonConfigNodes(db, {internalQueryCollectionMaxNoOfDocumentsToCho
             numQueriesPerRun,
         }),
         numRuns,
-        undefined /*examples*/,
-        true /*sortArrays*/,
     );
 });

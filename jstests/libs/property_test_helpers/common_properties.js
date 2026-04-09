@@ -43,7 +43,7 @@ function getAllVariationsOfQueryShape(shapeIx, getQuery, testHelpers) {
 export function createCorrectnessProperty(
     controlColl,
     experimentColl,
-    {statsCollectorFn, jsTestLogExplain, modifyExperimentQueryFn} = {},
+    {statsCollectorFn, jsTestLogExplain, modifyExperimentQueryFn, sortArraysComparator} = {},
 ) {
     return function queryHasSameResultsAsControlCollScan(getQuery, testHelpers) {
         const queries = getDifferentlyShapedQueries(getQuery, testHelpers);
@@ -65,7 +65,8 @@ export function createCorrectnessProperty(
                 statsCollectorFn(experimentColl.explain().aggregate(pipeline, options));
             }
 
-            if (!testHelpers.comp(controlResults, experimentResults)) {
+            const cmpFn = sortArraysComparator ? testHelpers.compSortArrays : testHelpers.comp;
+            if (!cmpFn(controlResults, experimentResults)) {
                 return {
                     passed: false,
                     message: "Query results from experiment collection did not match plain collection using collscan.",

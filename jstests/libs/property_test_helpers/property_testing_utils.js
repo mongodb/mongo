@@ -143,7 +143,10 @@ function runProperty(propertyFn, namespaces, workload, sortArrays) {
     }
 
     const testHelpers = {
-        comp: sortArrays === true ? _resultSetsEqualUnorderedWithUnorderedArrays : _resultSetsEqualUnordered,
+        // Default comparator. Sorts documents but doesn't change arrays within the documents.
+        comp: _resultSetsEqualUnordered,
+        // Comparator that sorts arrays within documents before comparing results.
+        compSortArrays: _resultSetsEqualUnorderedWithUnorderedArrays,
         numQueryShapes: queries.length,
         leafParametersPerFamily,
     };
@@ -186,7 +189,7 @@ function reporter(propertyFn, namespaces) {
  * failure, `runProperty` is called again in the reporter, and prints out more details about the
  * failed property.
  */
-export function testProperty(propertyFn, namespaces, workloadModel, numRuns, examples, sortArrays) {
+export function testProperty(propertyFn, namespaces, workloadModel, numRuns, examples) {
     assert.eq(typeof propertyFn, "function");
     assert.eq(typeof numRuns, "number");
 
