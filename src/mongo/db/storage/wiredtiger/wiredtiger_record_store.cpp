@@ -610,6 +610,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngineBase* kvEngine,
       _isLogged(params.isLogged),
       _forceUpdateWithFullDocument(params.forceUpdateWithFullDocument),
       _inMemory(params.inMemory),
+      _isColdCollection(params.isColdCollection),
       _sizeStorer(params.sizeStorer),
       _tracksSizeAdjustments(params.tracksSizeAdjustments),
       _kvEngine(kvEngine) {
@@ -665,6 +666,10 @@ WiredTigerRecordStore::~WiredTigerRecordStore() {
                     "~WiredTigerRecordStore for temporary ident: {getIdent}",
                     "getIdent"_attr = getIdent());
     }
+}
+
+bool WiredTigerRecordStore::isColdCollection() const {
+    return _isColdCollection;
 }
 
 RecordStore::RecordStoreContainer WiredTigerRecordStore::getContainer() {
@@ -1451,7 +1456,8 @@ WiredTigerRecordStore::Oplog::Oplog(WiredTigerKVEngine* engine,
               .forceUpdateWithFullDocument = oplogParams.forceUpdateWithFullDocument,
               .inMemory = oplogParams.inMemory,
               .sizeStorer = oplogParams.sizeStorer,
-              .tracksSizeAdjustments = oplogParams.tracksSizeAdjustments}),
+              .tracksSizeAdjustments = oplogParams.tracksSizeAdjustments,
+              .isColdCollection = false}),
       _maxSize(oplogParams.oplogMaxSize) {
     invariant(WiredTigerRecordStore::keyFormat() == KeyFormat::Long);
     invariant(oplogParams.oplogMaxSize);

@@ -86,6 +86,10 @@ public:
         return ident;
     }
 
+    bool isColdCollection() const final {
+        return false;
+    }
+
     void setIdent(std::shared_ptr<Ident>) final {
         unimplementedTasserted();
     }

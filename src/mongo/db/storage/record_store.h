@@ -383,6 +383,8 @@ public:
 
     virtual StringData getIdent() const = 0;
 
+    virtual bool isColdCollection() const = 0;
+
     virtual void setIdent(std::shared_ptr<Ident>) = 0;
 
     /**

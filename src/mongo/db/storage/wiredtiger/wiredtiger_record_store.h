@@ -135,6 +135,7 @@ public:
         bool inMemory;
         WiredTigerSizeStorer* sizeStorer;
         bool tracksSizeAdjustments;
+        bool isColdCollection = false;
     };
 
     typedef std::variant<int64_t, WiredTigerItem> CursorKey;
@@ -175,6 +176,8 @@ public:
                               }),
                           _container);
     }
+
+    bool isColdCollection() const override;
 
     StringData getURI() const {
         return std::visit([](const auto& v) -> StringData { return v.uri(); }, _container);
@@ -389,6 +392,7 @@ protected:
     const bool _isLogged;
     const bool _forceUpdateWithFullDocument;
     const bool _inMemory;
+    const bool _isColdCollection;
 
     // Protects initialization of the _nextIdNum.
     mutable stdx::mutex _initNextIdMutex;

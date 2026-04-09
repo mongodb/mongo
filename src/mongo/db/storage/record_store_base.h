@@ -61,6 +61,10 @@ public:
 
     StringData getIdent() const final;
 
+    bool isColdCollection() const override {
+        return false;
+    }
+
     void setIdent(std::shared_ptr<Ident>) final;
 
     RecordData dataFor(OperationContext* opCtx, RecoveryUnit&, const RecordId& loc) const final;

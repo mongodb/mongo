@@ -1485,5 +1485,57 @@ TEST_F(WiredTigerKVEngineTest, PinAllDurableTimestamp) {
     ASSERT_GTE(engine->getAllDurableTimestamp(), Timestamp(300, 0));
 }
 
+TEST_F(WiredTigerKVEngineTest, SetStorageTierCold) {
+    auto* engine = _helper->getWiredTigerKVEngine();
+    auto result = engine->setStorageTierToStorageOptions(BSONObj(), "cold");
+    // Verify the returned storage options contain the cold tier WT config.
+    auto wtObj = result.getObjectField("wiredTiger");
+    auto configString = wtObj.getStringField("configString");
+    ASSERT_STRING_CONTAINS(configString, "storage_tier=cold");
+    ASSERT_STRING_CONTAINS(configString, "leaf_page_max=128KB");
+}
+
+TEST_F(WiredTigerKVEngineTest, IsColdCollectionRecordStore) {
+    auto opCtxPtr = _makeOperationContext();
+    auto* engine = _helper->getWiredTigerKVEngine();
+    auto& provider = rss::ReplicatedStorageService::get(opCtxPtr.get()).getPersistenceProvider();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtxPtr.get());
+
+    // Create a normal (non-cold) collection and verify isColdCollection is false.
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.hot");
+    std::string ident = "collection-hot";
+    RecordStore::Options options;
+    {
+        StorageWriteTransaction swt(ru);
+        ASSERT_OK(engine->createRecordStore(provider, ru, nss, ident, options));
+        swt.commit();
+    }
+
+    auto hotRs = engine->getRecordStore(opCtxPtr.get(), nss, ident, options, UUID::gen());
+    ASSERT(hotRs);
+    ASSERT_FALSE(hotRs->isColdCollection());
+
+    // Verify that constructing a WiredTigerRecordStore with isColdCollection=true in Params
+    // results in isColdCollection() returning true.
+    WiredTigerRecordStore::Params params;
+    params.uuid = UUID::gen();
+    params.ident = ident;
+    params.engineName = std::string{kWiredTigerEngineName};
+    params.keyFormat = KeyFormat::Long;
+    params.overwrite = true;
+    params.isLogged = false;
+    params.forceUpdateWithFullDocument = false;
+    params.inMemory = false;
+    params.sizeStorer = nullptr;
+    params.tracksSizeAdjustments = false;
+    params.isColdCollection = true;
+
+    auto coldRs = std::make_unique<WiredTigerRecordStore>(
+        engine,
+        WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtxPtr.get())),
+        params);
+    ASSERT_TRUE(coldRs->isColdCollection());
+}
+
 }  // namespace
 }  // namespace mongo

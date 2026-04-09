@@ -1833,6 +1833,10 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
             fassert(8423353, ident::isInternalIdent(ident));
             return !_isReplSet && !_shouldRecoverFromOplogAsStandalone;
         }();
+        // Check the storage options to determine if this is a cold collection.
+        auto storageTier = getStorageTierFromStorageOptions(options.storageEngineCollectionOptions);
+        bool isColdCollection = storageTier && *storageTier == "cold";
+
         WiredTigerRecordStore::Params params{
             .uuid = uuid,
             .ident = std::string{ident},
@@ -1846,6 +1850,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
             .inMemory = _wtConfig.inMemory,
             .sizeStorer = _sizeStorer.get(),
             .tracksSizeAdjustments = true,
+            .isColdCollection = isColdCollection,
         };
 
         ret = options.isCapped
