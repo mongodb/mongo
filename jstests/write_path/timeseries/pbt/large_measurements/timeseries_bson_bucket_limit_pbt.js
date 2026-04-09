@@ -48,7 +48,12 @@ const programArb = makeTimeseriesCommandSequenceArb(
     /* maxFields     */ 0,
     /* minDocs       */ 10,
     /* maxDocs       */ 1000, // 125 documents will hit the 16MB BSON limit
-    /* options       */ {explicitArbitraries: {data: largeStringArbFactory}, dateRange: {min: minDate, max: maxDate}},
+    /* options       */ {
+        explicitArbitraries: {data: largeStringArbFactory},
+        dateRange: {min: minDate, max: maxDate},
+        mixedSchemaChance: 0.0,
+        newFieldFrequency: 0.0,
+    },
     /* fieldNameArb  */ undefined, // use default short-string field names
     /* replayPath    */ fcParams.replayPath, // replace this value with the replay path to replicate a failure
 );

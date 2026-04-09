@@ -2,6 +2,7 @@
  * Arbitraries for generating timeseries metrics.
  */
 
+import {oneof} from "jstests/libs/property_test_helpers/models/model_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-4.6.0.js";
 
 export const defaultDateMin = new Date("1970-01-01T00:00:00.000Z");
@@ -420,17 +421,108 @@ export function makeMetricTypeStreamArb(type, minLength = 0, maxLength = 20, ran
  * Callers can override which implementations to oneof between via `streamFactories`.
  */
 export function makeMetricStreamArb(minLength = 0, maxLength = 20, options = {}, streamFactories) {
+    let baseStreamArb;
     if (Array.isArray(streamFactories) && streamFactories.length > 0) {
         const streamArbs = streamFactories.map((fn) => fn(minLength, maxLength, options.ranges));
-        return fc.oneof(...streamArbs);
+        baseStreamArb = fc.oneof(...streamArbs);
+    } else {
+        // Default: build a stream arb per type.
+        const arbs = [];
+        for (const t of options.types ?? allBsonMetricTypes) {
+            arbs.push(makeMetricTypeStreamArb(t, minLength, maxLength, options.ranges));
+        }
+        baseStreamArb = fc.oneof(...arbs);
     }
 
-    // Default: build a stream arb per type.
-    const arbs = [];
-    for (const t of options.types ?? allBsonMetricTypes) {
-        arbs.push(makeMetricTypeStreamArb(t, minLength, maxLength, options.ranges));
+    if (options.extendControlFrequency <= 0) {
+        return baseStreamArb;
     }
-    return fc.oneof(...arbs);
+
+    // Post-process: for each element (after the first), with probability extendControlFrequency,
+    // replace it with a value that extends the stream's running min or max.
+    return baseStreamArb.chain((stream) => {
+        if (stream.length < 2) return fc.constant(stream);
+
+        // One decision tuple per element: [chance, goBelow, delta].
+        // This is used to control whether to attempt to modify the control block, which is done by
+        // extending the min or max.
+        // chance (double) is compared to extendControlFrequency to decide whether to modify this control.
+        // goBelow (boolean) decides whether to extend the min (true) or max (false).
+        // delta (integer) is how much to extend by (if at all), and is added to the current min/max.
+
+        return fc
+            .array(fc.tuple(fc.double({min: 0, max: 1, noNaN: true}), fc.boolean(), fc.integer({min: 1, max: 100})), {
+                minLength: stream.length,
+                maxLength: stream.length,
+            })
+            .map((decisions) => {
+                // Convert a stream value to a number for min/max tracking.
+                function toNum(v) {
+                    if (typeof v === "number") return v;
+                    if (v instanceof Date) return v.getTime();
+                    if (typeof NumberLong === "function" && v instanceof NumberLong)
+                        return typeof v.toNumber === "function" ? v.toNumber() : Number(v);
+                    if (typeof NumberDecimal === "function" && v instanceof NumberDecimal) return Number(v.toString());
+                    return null;
+                }
+
+                // Convert a number back to the same type as a template value.
+                function fromNum(n, template) {
+                    if (template instanceof Date) return new Date(Math.trunc(n));
+                    if (typeof NumberLong === "function" && template instanceof NumberLong)
+                        return NumberLong(String(Math.trunc(n)));
+                    if (typeof NumberDecimal === "function" && template instanceof NumberDecimal)
+                        return NumberDecimal(String(n));
+                    return n; // double / int
+                }
+
+                const result = [...stream];
+                let runMinN = null,
+                    runMinV = null;
+                let runMaxN = null,
+                    runMaxV = null;
+
+                for (let i = 0; i < result.length; i++) {
+                    const n = toNum(result[i]);
+
+                    // Update running bounds with the current (unmodified) value.
+                    if (n !== null) {
+                        if (runMinN === null || n < runMinN) {
+                            runMinN = n;
+                            runMinV = result[i];
+                        }
+                        if (runMaxN === null || n > runMaxN) {
+                            runMaxN = n;
+                            runMaxV = result[i];
+                        }
+                    }
+
+                    // Possibly replace this element (only after the first, and only for numeric types).
+                    const [chance, goBelow, delta] = decisions[i];
+                    if (i > 0 && chance < options.extendControlFrequency && runMinN !== null) {
+                        let newN, templateV;
+                        if (goBelow) {
+                            newN = runMinN - delta;
+                            templateV = runMinV;
+                        } else {
+                            newN = runMaxN + delta;
+                            templateV = runMaxV;
+                        }
+                        const newV = fromNum(newN, templateV);
+                        result[i] = newV;
+                        if (goBelow) {
+                            runMinN = newN;
+                            runMinV = newV;
+                        } else {
+                            runMaxN = newN;
+                            runMaxV = newV;
+                        }
+                    }
+                }
+
+                return result;
+            });
+    });
 }
 
 /**
