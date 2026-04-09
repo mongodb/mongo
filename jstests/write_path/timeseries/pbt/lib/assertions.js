@@ -2,6 +2,7 @@
  * Assertions PBT
  */
 
+import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 /**
@@ -16,18 +17,33 @@ export function assertCollectionValid(tsColl) {
 }
 
 /**
- * Compare the results of a query against a timeseries collection and standard collection which should be identical.
+ * Compare the results of an aggregation pipeline against a timeseries collection and standard
+ * collection which should be identical. An empty pipeline selects all documents, equivalent to
+ * find({}). Pipelines beginning with $geoNear are also supported.
  *
  * @param {DBCollection} tsColl timeseries collection representing "actual" state
  * @param {DBCollection} ctrlColl standard collection uses as control representing "expected" state
- * @param {DBCollection} bucketColl raw timeseries bucket collection
- * @param {Object} [query] query specification
+ * @param {Array} [pipeline] aggregation pipeline to run against both collections
+ * @param {boolean} [verbose] enable verbose output of the query results and query spec for both collections, useful for debugging
  */
-export function assertCollectionsMatch(tsColl, ctrlColl, query = {}) {
+export function assertCollectionsMatch(tsColl, ctrlColl, pipeline = [], verbose = false) {
     const timeField = tsColl.getMetadata().options.timeseries.timeField;
     const metaField = tsColl.getMetadata().options.timeseries.metaField;
-    const tsDocs = tsColl.find(query).sort({_id: 1}).toArray();
-    const ctrlDocs = ctrlColl.find(query).sort({_id: 1}).toArray();
+    const sorted = [...pipeline, {$sort: {_id: 1}}];
+    const tsDocs = tsColl.aggregate(sorted).toArray();
+    const ctrlDocs = ctrlColl.aggregate(sorted).toArray();
+
+    if (verbose) {
+        const tsExplain = tsColl.explain().aggregate(pipeline);
+        const ctrlExplain = ctrlColl.explain().aggregate(pipeline);
+        jsTest.log.info("Collection comparison aggregation results", {
+            tsDocs,
+            ctrlDocs,
+            pipeline,
+            tsWinningPlan: getWinningPlanFromExplain(tsExplain),
+            ctrlWinningPlan: getWinningPlanFromExplain(ctrlExplain),
+        });
+    }
 
     if (tsDocs.length != ctrlDocs.length) {
         jsTest.log.warning("The tsColl and ctrlColl size differs", {
