@@ -191,3 +191,51 @@ try {
     // Ensure that query knob doesn't leak into other testcases in the suite.
     assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
 }
+
+// CBR must not treat $_internalBucketGeoWithin as a sargable leaf.
+try {
+    coll.drop();
+    histogramColl.drop();
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: "t", metaField: "meta"},
+        }),
+    );
+    assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
+    assert.commandWorked(coll.insert({t: new Date(), meta: {s: 1}, loc: {type: "Point", coordinates: [0, 0]}}));
+
+    assert.commandWorked(
+        db.adminCommand({
+            setParameter: 1,
+            featureFlagCostBasedRanker: true,
+            internalQueryCBRCEMode: "automaticCE",
+            automaticCEPlanRankingStrategy: "HistogramCEWithHeuristicFallback",
+        }),
+    );
+
+    const polygon = {
+        type: "Polygon",
+        coordinates: [
+            [
+                [-1, -1],
+                [1, -1],
+                [1, 1],
+                [-1, 1],
+                [-1, -1],
+            ],
+        ],
+    };
+
+    const result = coll
+        .aggregate([
+            {
+                $match: {
+                    $and: [{loc: {$geoWithin: {$geometry: polygon}}}, {meta: {s: 1}}],
+                },
+            },
+        ])
+        .toArray();
+    assert.eq(result.length, 1);
+} finally {
+    assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
+}
