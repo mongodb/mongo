@@ -44,8 +44,10 @@
 #include "mongo/db/query/query_stats/key.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/str.h"
 
 #include <vector>
 
@@ -304,7 +306,20 @@ public:
                                   bool omitCommand,
                                   BSONObjBuilder& builder) const;
 
-    MONGO_MOD_PRIVATE static std::function<BSONObj(ProfileFilter::Args args)> appendStaged(
+    /**
+     * Bundles the three objects needed to build a profile/slow-query log document from a snapshot
+     * of the current operation. Passed into the function returned by appendStaged().
+     */
+    struct AppendArgs {
+        AppendArgs(OperationContext* opCtx, const OpDebug& op, const CurOp& curop)
+            : opCtx(opCtx), op(op), curop(curop) {}
+
+        OperationContext* opCtx;
+        const OpDebug& op;
+        const CurOp& curop;
+    };
+
+    MONGO_MOD_PRIVATE static std::function<BSONObj(AppendArgs args)> appendStaged(
         OperationContext* opCtx, StringSet requestedFields, bool needWholeDocument);
     MONGO_MOD_PRIVATE static void appendUserInfo(const CurOp&,
                                                  BSONObjBuilder&,
@@ -403,6 +418,82 @@ public:
         double numCandidatesLimitRatio = 0.0;
     };
     boost::optional<VectorSearchMetrics> vectorSearchMetrics = boost::none;
+
+    /**
+     * Tracks the number of documents seen and returned by the $_internalSearchIdLookup
+     * stage. Used for batch size tuning.
+     *
+     * These metrics are stored on OpDebug so that they can be made accessible to extensions, but
+     * their lifetime is managed by $_internalSearchIdLookup, so that the values will be aggregated
+     * across all getMore's for a given query.
+     */
+    class SearchIdLookupMetrics {
+    public:
+        SearchIdLookupMetrics() {}
+
+        long long getDocsReturnedByIdLookup() const {
+            return _docsReturnedByIdLookup;
+        }
+
+        long long getDocsSeenByIdLookup() const {
+            return _docsSeenByIdLookup;
+        }
+
+        void incrementDocsSeenByIdLookup() {
+            _docsSeenByIdLookup++;
+        }
+
+        void incrementDocsReturnedByIdLookup() {
+            _docsReturnedByIdLookup++;
+        }
+
+        /**
+         * Sets the value of _docsSeenByIdLookup & _docsReturnedByLookup to 0.
+         */
+        void resetIdLookupMetrics() {
+            _docsSeenByIdLookup = 0;
+            _docsReturnedByIdLookup = 0;
+        }
+
+        /**
+         * Returns the "success rate" of finding docs by id in the idLookup phase as
+         * a floating point number between 0 and 1, where 0 is 0% and 1 is 100%.
+         * For example, if idLookup has seen 6 documents and 3 were found,
+         * this function would return 0.5 = 50%.
+         */
+        double getIdLookupSuccessRate() const {
+            // Ensure division by zero never occurs if no docs have been seen yet.
+            if (_docsSeenByIdLookup == 0) {
+                return 0;
+            }
+
+            tassert(9074400,
+                    str::stream() << "_docsReturnedByIdLookup must not be greater than "
+                                  << "_docsSeenByIdLookup in SearchIdLookupMetrics, but "
+                                     "_docsReturnedByIdLookup = '"
+                                  << _docsReturnedByIdLookup << "' and _docsSeenByIdLookup = '"
+                                  << _docsSeenByIdLookup << "'.",
+                    !(_docsSeenByIdLookup < _docsReturnedByIdLookup));
+
+            return double(_docsReturnedByIdLookup) / double(_docsSeenByIdLookup);
+        }
+
+    private:
+        // Number of documents that have been passed through the idLookup phase
+        // (regardless of whether they were found or not).
+        long long _docsSeenByIdLookup = 0;
+
+        // When there is an extractable limit in the query, DocumentInternalSearchMongotRemote sends
+        // a getMore to mongot that specifies how many more documents it needs to fulfill that
+        // limit, and it incorporates the amount of documents returned by the
+        // DocumentInternalSearchIdLookup stage into that value.
+        long long _docsReturnedByIdLookup = 0;
+    };
+
+    // Pointer to the operation's SearchIdLookupMetrics, if applicable. These metrics are owned by
+    // the $_internalSearchIdLookup execution stage so that the values can be aggregated across the
+    // entire query.
+    std::shared_ptr<SearchIdLookupMetrics> searchIdLookupMetrics = nullptr;
 
     // The accumulated spilling statistics per stage type.
     absl::flat_hash_map<PlanSummaryStats::SpillingStage, SpillingStats> spillingStatsPerStage;

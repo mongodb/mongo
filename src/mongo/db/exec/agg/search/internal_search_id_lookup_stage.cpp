@@ -29,6 +29,7 @@
 
 #include "mongo/db/exec/agg/search/internal_search_id_lookup_stage.h"
 
+#include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
@@ -90,6 +91,13 @@ Document InternalSearchIdLookUpStage::getExplainOutput(const SerializationOption
 }
 
 GetNextResult InternalSearchIdLookUpStage::doGetNext() {
+    // Register the IdLookup's metrics on OpDebug. It's important that we check this on each
+    // doGetNext(), since the OpDebug metrics will get reset on each new getMore.
+    auto& opDebug = CurOp::get(pExpCtx->getOperationContext())->debug();
+    if (!opDebug.searchIdLookupMetrics) {
+        opDebug.searchIdLookupMetrics = _searchIdLookupMetrics;
+    }
+
     boost::optional<Document> result;
     Document inputDoc;
     if (auto limit = _spec.getLimit();

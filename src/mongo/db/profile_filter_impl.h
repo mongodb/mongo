@@ -67,7 +67,7 @@ private:
     bool _needWholeDocument = false;
 
     Matcher _matcher;
-    std::function<BSONObj(ProfileFilter::Args)> _makeBSON;
+    std::function<BSONObj(OpDebug::AppendArgs)> _makeBSON;
 };
 
 }  // namespace mongo

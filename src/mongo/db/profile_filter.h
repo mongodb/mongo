@@ -44,15 +44,6 @@ class OperationContext;
 
 class ProfileFilter {
 public:
-    struct Args {
-        Args(OperationContext* opCtx, const OpDebug& op, const CurOp& curop)
-            : opCtx(opCtx), op(op), curop(curop) {}
-
-        OperationContext* opCtx;
-        const OpDebug& op;
-        const CurOp& curop;
-    };
-
     virtual ~ProfileFilter() = default;
 
     virtual bool matches(OperationContext*, const OpDebug&, const CurOp&) const = 0;

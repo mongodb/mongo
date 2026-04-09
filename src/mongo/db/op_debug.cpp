@@ -857,7 +857,7 @@ void OpDebug::appendDelinquentInfo(OperationContext* opCtx,
     }
 }
 
-std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(OperationContext* opCtx,
+std::function<BSONObj(OpDebug::AppendArgs)> OpDebug::appendStaged(OperationContext* opCtx,
                                                                   StringSet requestedFields,
                                                                   bool needWholeDocument) {
     // This function is analogous to OpDebug::append. The main difference is that append() does
@@ -870,11 +870,11 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(OperationConte
 
     // Each piece of the result is a function that appends to a BSONObjBuilder.
     // Before returning, we encapsulate the result in a simpler function that returns a BSONObj.
-    using Piece = std::function<void(ProfileFilter::Args, BSONObjBuilder&)>;
+    using Piece = std::function<void(OpDebug::AppendArgs, BSONObjBuilder&)>;
     std::vector<Piece> pieces;
 
     // For convenience, the callback that handles each field gets the fieldName as an extra arg.
-    using Callback = std::function<void(const char*, ProfileFilter::Args, BSONObjBuilder&)>;
+    using Callback = std::function<void(const char*, OpDebug::AppendArgs, BSONObjBuilder&)>;
 
     // Helper to check for the presence of a field in the StringSet, and remove it.
     // At the end of this method, anything left in the StringSet is a field we don't know
@@ -955,6 +955,21 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(OperationConte
     addIfNeeded("mongot", [](auto field, auto args, auto& b) {
         if (args.op.mongotCursorId) {
             b.append(field, args.op.makeMongotDebugStatsObject());
+        }
+    });
+    addIfNeeded("idLookupSuccessRate", [](auto field, auto args, auto& b) {
+        if (args.op.searchIdLookupMetrics) {
+            b.append(field, args.op.searchIdLookupMetrics->getIdLookupSuccessRate());
+        }
+    });
+    addIfNeeded("docsSeenByIdLookup", [](auto field, auto args, auto& b) {
+        if (args.op.searchIdLookupMetrics) {
+            b.append(field, args.op.searchIdLookupMetrics->getDocsSeenByIdLookup());
+        }
+    });
+    addIfNeeded("docsReturnedByIdLookup", [](auto field, auto args, auto& b) {
+        if (args.op.searchIdLookupMetrics) {
+            b.append(field, args.op.searchIdLookupMetrics->getDocsReturnedByIdLookup());
         }
     });
     addIfNeeded("extensionMetrics", [](auto field, auto args, auto& b) {
@@ -1250,7 +1265,7 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(OperationConte
         uasserted(4910200, ss.str());
     }
 
-    return [pieces = std::move(pieces)](ProfileFilter::Args args) {
+    return [pieces = std::move(pieces)](OpDebug::AppendArgs args) {
         BSONObjBuilder bob;
         for (const auto& piece : pieces) {
             piece(args, bob);
