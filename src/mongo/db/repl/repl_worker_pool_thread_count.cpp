@@ -51,7 +51,7 @@ size_t getMinThreadCountForReplWorkerPool() {
 
 size_t getThreadCountForReplWorkerPool() {
     return std::min(static_cast<size_t>(replWriterThreadCount),
-                    static_cast<size_t>(2 * ProcessInfo::getNumAvailableCores()));
+                    static_cast<size_t>(4 * ProcessInfo::getNumAvailableCores()));
 }
 
 
@@ -92,12 +92,12 @@ Status validateUpdateReplWriterThreadCount(const int count, const boost::optiona
 
     size_t newCount = static_cast<size_t>(count);
     size_t numCores = ProcessInfo::getNumAvailableCores();
-    size_t maxThreads = 2 * numCores;
+    size_t maxThreads = 4 * numCores;
     if (newCount > maxThreads) {
         LOGV2_WARNING(11280003,
                       "replWriterThreadCount is set to higher than the max number of threads for "
-                      "the writer pool, which is 2 * the number of cores available. The pool size "
-                      "will be capped at 2 * the number of cores.",
+                      "the writer pool, which is 4 * the number of cores available. The pool size "
+                      "will be capped at 4 * the number of cores.",
                       "replWriterThreadCount"_attr = std::to_string(newCount),
                       "maxThreads"_attr = std::to_string(maxThreads),
                       "numCores"_attr = std::to_string(numCores));

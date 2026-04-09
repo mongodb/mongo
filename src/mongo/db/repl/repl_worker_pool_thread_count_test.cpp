@@ -44,7 +44,7 @@ class ReplWorkerPoolThreadCountParamsTest : public unittest::Test {
 public:
     ReplWorkerPoolThreadCountParamsTest()
         : _threadCountCap(
-              std::min(static_cast<int>(2 * ProcessInfo::getNumAvailableCores()), 256)) {}
+              std::min(static_cast<int>(4 * ProcessInfo::getNumAvailableCores()), 256)) {}
 
     void setUp() override {
         ASSERT_GTE(_threadCountCap, 2);
