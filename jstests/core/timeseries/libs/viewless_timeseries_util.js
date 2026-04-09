@@ -14,17 +14,30 @@ import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js
 // Do not use this function in passthrough tests, because the feature flag may get enabled or
 // disabled at any time by the background FCV upgrade/downgrade hook.
 export function areViewlessTimeseriesEnabled(db) {
-    // TODO(SERVER-121092): Remove this workaround.
-    if (
-        !isStableFCVSuite() &&
-        FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections", true /* ignoreFCV */)
-    ) {
-        jsTest.log(
-            "Skipping test execution because it is calling areViewlessTimeseriesEnabled() in a suite with unstable FCV, where timeseries collections are constantly converted between viewless (new) and viewfull (legacy)",
+    if (runningWithViewlessTimeseriesUpgradeDowngrade(db)) {
+        throw new Error(
+            "Checking the viewless timeseries feature flag is racy in a suite where timeseries collections are being converted between viewless (new) and viewful (legacy). " +
+                "Use isViewlessTimeseriesOnlySuite, isViewfulTimeseriesOnlySuite or runningWithViewlessTimeseriesUpgradeDowngrade to decide if the test can run and what can be asserted.",
         );
-        quit();
     }
+
     return FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections");
+}
+
+// Returns true if the suite converts timeseries across viewful/viewless format in the background.
+export function runningWithViewlessTimeseriesUpgradeDowngrade(db) {
+    if (isStableFCVSuite()) {
+        return false;
+    }
+
+    const flagDoc = FeatureFlagUtil.getFeatureFlagDoc(db.getMongo(), "CreateViewlessTimeseriesCollections");
+    if (!flagDoc.value) {
+        // The feature flag is disabled (in all FCVs).
+        return false;
+    }
+
+    // Until lastLTSFCV >= flagDoc.version, the flag is disabled on lastLTSFCV and enabled on latestFCV.
+    return MongoRunner.compareBinVersions(lastLTSFCV, flagDoc.version) < 0;
 }
 
 // Returns true if the suite creates all timeseries collections in viewless format.
@@ -231,47 +244,51 @@ export function assertExplainTargetsExpectedTimeseriesNamespace(
     commandName,
     {mayConcurrentlyTrackOrUntrack = false} = {},
 ) {
-    let targetColl = (() => {
+    let targetColl = getTimeseriesCollForRawOps(db, coll);
+
+    if (commandResult.command.findAndModify && !isViewlessTimeseriesOnlySuite(db)) {
         if (
-            commandResult.command.findAndModify &&
-            FixtureHelpers.isTracked(getTimeseriesCollForDDLOps(db, coll)) &&
-            !areViewlessTimeseriesEnabled(db)
+            mayConcurrentlyTrackOrUntrack ||
+            (TestData.runningWithBalancer && isTrackedTimeseries(coll) && !isShardedTimeseries(coll))
         ) {
+            // If the collection is tracked or untracked findAndModify explain returns either the buckets or main timeseries namespace
+            // In suites with enabled balancer the collection could randomly became tracked.
+            jsTest.log(
+                "Skipping namespace check for findAndModify explain output since we don't know if the collection was tracked or not when the command was executed",
+            );
+            return;
+        }
+
+        if (isTrackedTimeseries(coll)) {
+            if (isFCVlt(db.getMongo(), "8.3")) {
+                // In versions 8.2 findAndModify explain return the main namespace instead of the system.buckets
+                // TODO SERVER-114161 enable the check once the fix have been backported to previous versions
+                jsTest.log(
+                    "Skipping namespace check for findAndModify explain output since FCV is less then 8.3 (BACKPORT-26389)",
+                );
+                return;
+            }
+
             // In sharded clusters for findAndModify over legacy tracked timeseries we convert the namespace on the router and we send the command
             // with translated namespace to the shard,
             // thus we expect explain to report the command targeting system.buckets internal namespace.
-            return getTimeseriesCollForDDLOps(db, coll);
-        }
-        return getTimeseriesCollForRawOps(db, coll);
-    })();
+            if (runningWithViewlessTimeseriesUpgradeDowngrade(db)) {
+                jsTest.log(
+                    "Skipping namespace check for findAndModify explain output since we don't know if the collection was viewful or not when the command was executed",
+                );
+                return;
+            }
 
-    if (commandResult.command.findAndModify && isFCVlt(db.getMongo(), "8.3")) {
-        // In versions 8.2 findAndModify explain return the main namespace instead of the system.buckets
-        // TODO SERVER-114161 enable the check once the fix have been backported to previous versions
-        jsTest.log(
-            "Skipping namespace check for findAndModify explain output since FCV is less then 8.3 (BACKPORT-26389)",
-        );
-    } else if (
-        commandResult.command.findAndModify &&
-        !areViewlessTimeseriesEnabled(db) &&
-        (mayConcurrentlyTrackOrUntrack ||
-            (TestData.runningWithBalancer &&
-                FixtureHelpers.isTracked(getTimeseriesCollForDDLOps(db, coll)) &&
-                !FixtureHelpers.isSharded(getTimeseriesCollForDDLOps(db, coll))))
-    ) {
-        // If the collection is tracked or untracked findAndModify explain returns either the buckets or main timeseries namespace
-        // In suites with enabled balancer the collection could randomly became tracked.
-        jsTest.log(
-            "Skipping namespace check for findAndModify explain output since we don't know if the collection was tracked or not when the command was executed",
-        );
-    } else {
-        jsTest.log(`commandRes = ${tojson(commandResult)}`);
-        assert.eq(
-            commandResult.command[commandName],
-            targetColl.getName(),
-            `Expected command namespace to be ${tojson(targetColl.getName())} but got ${tojson(
-                commandResult.command[commandName],
-            )}`,
-        );
+            targetColl = getTimeseriesBucketsColl(coll);
+        }
     }
+
+    jsTest.log(`commandRes = ${tojson(commandResult)}`);
+    assert.eq(
+        commandResult.command[commandName],
+        targetColl.getName(),
+        `Expected command namespace to be ${tojson(targetColl.getName())} but got ${tojson(
+            commandResult.command[commandName],
+        )}`,
+    );
 }

@@ -10,7 +10,7 @@
  */
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {isViewlessTimeseriesOnlySuite} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const sourceColl = jsTestName() + "_inColl";
 const targetColl = jsTestName() + "_timeseries";
@@ -41,7 +41,7 @@ assert.throwsWithCode(
 );
 
 // TODO SERVER-108560: Remove this if statement once 9.0 becomes last LTS and there are only viewless timeseries.
-if (areViewlessTimeseriesEnabled(db) || !FixtureHelpers.isMongos(db)) {
+if (isViewlessTimeseriesOnlySuite(db) || !FixtureHelpers.isMongos(db)) {
     assert.throwsWithCode(
         () =>
             db.sourceColl.aggregate([
@@ -66,7 +66,7 @@ assert.commandWorked(db.targetColl.createIndex({[timeFieldName]: 1}));
 assert.commandWorked(db.targetColl.insert({[timeFieldName]: ISODate(), a: 1}));
 
 // TODO SERVER-108560: Remove this if statement once 9.0 becomes last LTS and there are only viewless timeseries.
-if (areViewlessTimeseriesEnabled(db) || !FixtureHelpers.isMongos(db)) {
+if (isViewlessTimeseriesOnlySuite(db) || !FixtureHelpers.isMongos(db)) {
     assert.throwsWithCode(
         () =>
             db.sourceColl.aggregate([

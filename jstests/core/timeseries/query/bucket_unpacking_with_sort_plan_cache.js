@@ -23,9 +23,19 @@
  *     examines_sbe_cache
  * ]
  */
-import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {
+    getTimeseriesCollForDDLOps,
+    runningWithViewlessTimeseriesUpgradeDowngrade,
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 import {getAggPlanStage, getAggPlanStages, getPlanCacheKeyFromExplain} from "jstests/libs/query/analyze_plan.js";
+
+if (runningWithViewlessTimeseriesUpgradeDowngrade(db)) {
+    jsTest.log.info(
+        "Skipping test because the timeseries collection format is not stable and $planCacheStats needs to be targeted to the physical collection",
+    );
+    quit();
+}
 
 const fields = ["a", "b", "i"];
 

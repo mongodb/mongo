@@ -15,8 +15,8 @@
 
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 import {
-    areViewlessTimeseriesEnabled,
     getTimeseriesBucketsColl,
+    isViewfulTimeseriesOnlySuite,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const dbName = "test_db";
@@ -66,7 +66,7 @@ assert.eq(profileObj.command.aggregate, tsCollName);
 assert.eq(profileObj.command.comment, commentObj);
 assert.eq(profileObj.docsExamined, 2);
 
-if (!areViewlessTimeseriesEnabled(db)) {
+if (isViewfulTimeseriesOnlySuite(db)) {
     // For view-ful timeseries, there is extra info about the resolved view.
     assert.eq(profileObj.resolvedViews.length, 1);
     let tsResolvedViewObj = profileObj.resolvedViews[0];

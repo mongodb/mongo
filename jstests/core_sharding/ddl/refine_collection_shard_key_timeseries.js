@@ -11,10 +11,7 @@
  * ]
  */
 
-import {
-    areViewlessTimeseriesEnabled,
-    getTimeseriesCollForDDLOps,
-} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {findTimeseriesConfigCollectionsDocument} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const mongos = db.getMongo();
 const dbName = db.getName();
@@ -49,19 +46,17 @@ function createShardedTimeseriesCollection(collName) {
 function testAcceptsLogicalFields() {
     const coll = createShardedTimeseriesCollection(collName);
 
-    const timeseriesNs = getTimeseriesCollForDDLOps(db, coll).getFullName();
-
-    // Verify initial shard key using $listClusterCatalog
+    // Verify initial shard key.
     let expectedBucketKey = {[bucketMetaField]: 1};
-    let catalogEntry = db.aggregate([{$listClusterCatalog: {}}, {$match: {ns: timeseriesNs}}]).toArray();
-    assert.docEq(expectedBucketKey, catalogEntry[0].shardKey, "Initial shard key mismatch");
+    let configEntry = findTimeseriesConfigCollectionsDocument(coll);
+    assert.docEq(expectedBucketKey, configEntry.key, "Initial shard key mismatch");
 
     assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: coll.getFullName(), key: refinedKey}));
 
-    // Verify refined shard key using $listClusterCatalog
+    // Verify refined shard key.
     expectedBucketKey = {[bucketMetaField]: 1, [controlTimeField]: 1};
-    catalogEntry = db.aggregate([{$listClusterCatalog: {}}, {$match: {ns: timeseriesNs}}]).toArray();
-    assert.docEq(expectedBucketKey, catalogEntry[0].shardKey, "Refined shard key mismatch");
+    configEntry = findTimeseriesConfigCollectionsDocument(coll);
+    assert.docEq(expectedBucketKey, configEntry.key, "Refined shard key mismatch");
 
     assert.commandWorked(coll.insert({[metaField]: "after", [timeField]: ISODate()}));
     assert.eq(docsPerTest + 1, coll.countDocuments({}));

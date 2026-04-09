@@ -13,7 +13,11 @@ import {
     kIsRawOperationSupported,
     kRawOperationSpec,
 } from "jstests/core/libs/raw_operation_utils.js";
-import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {
+    getTimeseriesBucketsColl,
+    isViewfulTimeseriesOnlySuite,
+    isViewlessTimeseriesOnlySuite,
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {getPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
@@ -34,32 +38,34 @@ assert.commandWorked(
 );
 
 const assertQueryPlannerNamespace = function (explain) {
+    // TODO SERVER-101609 simplify once 9.0 becomes last LTS.
+    // The physical namespace depends on whether the suite uses viewless or viewful timeseries.
+    let timeseriesNss;
+    if (isViewlessTimeseriesOnlySuite(db)) {
+        timeseriesNss = [coll.getFullName()];
+    } else if (isViewfulTimeseriesOnlySuite(db)) {
+        timeseriesNss = [getTimeseriesBucketsColl(coll).getFullName()];
+    } else {
+        timeseriesNss = [coll.getFullName(), getTimeseriesBucketsColl(coll).getFullName()];
+    }
+
     if (explain.shards) {
         for (const shardExplain of Object.values(explain.shards)) {
-            assert.eq(
-                shardExplain.queryPlanner.namespace,
-                getTimeseriesCollForDDLOps(db, coll).getFullName(),
-                `Expected shard plan query planner namespace to be ${tojson(
-                    getTimeseriesCollForDDLOps(db, coll).getFullName(),
-                )} but got ${tojson(shardExplain)}`,
+            assert(
+                timeseriesNss.includes(shardExplain.queryPlanner.namespace),
+                `Expected shard plan query planner namespace to be ${tojson(timeseriesNss)}} but got ${tojson(shardExplain)}`,
             );
         }
     } else if (explain.queryPlanner.namespace) {
-        assert.eq(
-            explain.queryPlanner.namespace,
-            getTimeseriesCollForDDLOps(db, coll).getFullName(),
-            `Expected query planner namespace to be ${tojson(
-                getTimeseriesCollForDDLOps(db, coll).getFullName(),
-            )} but got ${tojson(explain)}`,
+        assert(
+            timeseriesNss.includes(explain.queryPlanner.namespace),
+            `Expected query planner namespace to be ${tojson(timeseriesNss)} but got ${tojson(explain)}`,
         );
     } else {
         for (const shardPlan of explain.queryPlanner.winningPlan.shards) {
-            assert.eq(
-                shardPlan.namespace,
-                getTimeseriesCollForDDLOps(db, coll).getFullName(),
-                `Expected winning shard plan query planner namespace to be ${tojson(
-                    getTimeseriesCollForDDLOps(db, coll),
-                )} but got ${tojson(shardPlan)}`,
+            assert(
+                timeseriesNss.includes(shardPlan.namespace),
+                `Expected winning shard plan query planner namespace to be ${tojson(timeseriesNss)} but got ${tojson(shardPlan)}`,
             );
         }
     }

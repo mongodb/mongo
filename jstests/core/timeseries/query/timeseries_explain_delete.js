@@ -9,8 +9,7 @@
  * ]
  */
 
-import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {isViewlessTimeseriesOnlySuite} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getExecutionStages, getPlanStage} from "jstests/libs/query/analyze_plan.js";
 
@@ -261,7 +260,7 @@ function testDeleteExplain({
 })();
 
 (function testDeleteOneWithBucketFilterAndIndexHint() {
-    if (!areViewlessTimeseriesEnabled(db) && FixtureHelpers.isMongos(db)) {
+    if (!isViewlessTimeseriesOnlySuite(db) && FixtureHelpers.isMongos(db)) {
         // TODO SERVER-114442 re-enable this test case once hint on explain is properly handle for
         // timeseries collections
         jsTest.log("Skipping test case that uses an hint on timeseries collectin in sharded cluster");
