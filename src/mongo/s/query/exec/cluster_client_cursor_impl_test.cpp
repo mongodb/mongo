@@ -36,8 +36,11 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/s/query/exec/router_stage_mock.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
 
 #include <utility>
 
@@ -47,10 +50,14 @@
 namespace mongo {
 namespace {
 
-class ClusterClientCursorImplTest : public ServiceContextTest {
+class ClusterClientCursorImplTest : public ClockSourceMockServiceContextTest {
 protected:
     ClusterClientCursorImplTest() {
         _opCtx = makeOperationContext();
+    }
+
+    ClockSourceMock* useClock() {
+        return static_cast<ClockSourceMock*>(getServiceContext()->getPreciseClockSource());
     }
 
     ServiceContext::UniqueOperationContext _opCtx;
@@ -440,6 +447,74 @@ TEST_F(ClusterClientCursorImplTest, IsEOF) {
     ASSERT_OK(result.getStatus());
     ASSERT_BSONOBJ_EQ(*result.getValue().getResult(), BSON("a" << 3));
     ASSERT_TRUE(cursor.isEOF());
+}
+
+TEST_F(ClusterClientCursorImplTest, CheckChangeStreamServerStatusCursorMetrics) {
+
+    otel::metrics::OtelMetricsCapturer capturer;
+    using otel::metrics::MetricNames;
+
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    // total_opened starts at zero.
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsTotalOpened), 0);
+
+    auto makeChangeStreamCursor = [&]() {
+        return ClusterClientCursorImpl(
+            _opCtx.get(),
+            std::make_unique<RouterStageMock>(_opCtx.get()),
+            ClusterClientCursorParams(NamespaceString::createNamespaceString_forTest("unused"),
+                                      APIParameters(),
+                                      boost::none /* ReadPreferenceSetting */,
+                                      boost::none /* repl::ReadConcernArgs */,
+                                      OperationSessionInfoFromClient()),
+            boost::none);
+    };
+
+    CurOp::get(_opCtx.get())->debug().isChangeStreamQuery = true;
+
+    auto cursor = makeChangeStreamCursor();
+
+    // Opening the cursor increments the total opened count to 1, but does not update the lifespan.
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsTotalOpened), 1);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsOpenTotal), 1);
+
+    // Advance the mock clock so the cursor has a measurable lifespan.
+    const Milliseconds lifespanMs{200};
+    useClock()->advance(lifespanMs);
+
+    // Killing the cursor records its lifespan in the histogram; total_opened remains at 1.
+    cursor.kill(_opCtx.get());
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsTotalOpened), 1);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsOpenTotal), 0);
+
+    auto histogram1 = capturer.readInt64Histogram(MetricNames::kChangeStreamCursorsLifespan);
+    ASSERT_EQ(histogram1.count, 1);
+    ASSERT_EQ(histogram1.sum, durationCount<Milliseconds>(lifespanMs) * 1000);
+
+    // Open a second cursor and check that the total cursor count has been incremented to 2.
+    auto cursor2 = makeChangeStreamCursor();
+
+    // Opening the cursor increments the total opened count to 1, but does not update the lifespan.
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsTotalOpened), 2);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsOpenTotal), 1);
+    histogram1 = capturer.readInt64Histogram(MetricNames::kChangeStreamCursorsLifespan);
+    ASSERT_EQ(histogram1.count, 1);
+
+    // Kill second cursor and check the metrics are correctly updated.
+    const Milliseconds lifespan2Ms{400};
+    useClock()->advance(lifespan2Ms);
+
+    cursor2.kill(_opCtx.get());
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsTotalOpened), 2);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsOpenTotal), 0);
+
+    auto histogram2 = capturer.readInt64Histogram(MetricNames::kChangeStreamCursorsLifespan);
+    ASSERT_EQ(histogram2.count, 2);
+    // 200 ms + 400 ms = 600 000 µs cumulative.
+    ASSERT_EQ(histogram2.sum, 600'000);
 }
 
 }  // namespace

@@ -44,8 +44,12 @@ namespace mongo {
 
 ClusterClientCursorMock::ClusterClientCursorMock(boost::optional<LogicalSessionId> lsid,
                                                  boost::optional<TxnNumber> txnNumber,
-                                                 std::function<void(void)> killCallback)
-    : _killCallback(std::move(killCallback)), _lsid(lsid), _txnNumber(txnNumber) {}
+                                                 std::function<void(void)> killCallback,
+                                                 bool isChangeStreamCursor)
+    : _killCallback(std::move(killCallback)),
+      _lsid(lsid),
+      _txnNumber(txnNumber),
+      _isChangeStreamCursor(isChangeStreamCursor) {}
 
 ClusterClientCursorMock::~ClusterClientCursorMock() {
     invariant(_remotesExhausted || _killed);
@@ -100,6 +104,10 @@ Date_t ClusterClientCursorMock::getCreatedDate() const {
 
 Date_t ClusterClientCursorMock::getLastUseDate() const {
     return _lastUseDate;
+}
+
+bool ClusterClientCursorMock::isChangeStreamCursor() const {
+    return _isChangeStreamCursor;
 }
 
 void ClusterClientCursorMock::setLastUseDate(Date_t now) {

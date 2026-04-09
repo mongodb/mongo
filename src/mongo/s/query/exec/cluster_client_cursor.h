@@ -227,6 +227,11 @@ public:
     virtual Date_t getLastUseDate() const = 0;
 
     /**
+     * Returns whether this is a change stream cursor.
+     */
+    virtual bool isChangeStreamCursor() const = 0;
+
+    /**
      * Set the last use date to the provided time.
      */
     virtual void setLastUseDate(Date_t now) = 0;

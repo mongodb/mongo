@@ -37,6 +37,8 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/s/query/exec/cluster_client_cursor_mock.h"
 #include "mongo/s/query/exec/cluster_query_result.h"
 #include "mongo/unittest/unittest.h"
@@ -99,7 +101,8 @@ protected:
      */
     std::unique_ptr<ClusterClientCursorMock> allocateMockCursor(
         boost::optional<LogicalSessionId> lsid = boost::none,
-        boost::optional<TxnNumber> txnNumber = boost::none) {
+        boost::optional<TxnNumber> txnNumber = boost::none,
+        bool isChangeStreamCursor = false) {
         // Allocate a new boolean to our list to track when this cursor is killed.
         _cursorKilledFlags.push_back(false);
 
@@ -109,7 +112,10 @@ protected:
         // manager).
         bool& killedFlag = _cursorKilledFlags.back();
         return std::make_unique<ClusterClientCursorMock>(
-            std::move(lsid), std::move(txnNumber), [&killedFlag]() { killedFlag = true; });
+            std::move(lsid),
+            std::move(txnNumber),
+            [&killedFlag]() { killedFlag = true; },
+            isChangeStreamCursor);
     }
 
     /**
@@ -1423,6 +1429,36 @@ TEST_F(ClusterCursorManagerTest, PinnedCursorReturnsUnderlyingCursorTxnNumber) {
     ASSERT(pinnedCursor.getValue()->getTxnNumber());
     ASSERT_EQ(txnNumber, *pinnedCursor.getValue()->getTxnNumber());
 }
+
+TEST_F(ClusterCursorManagerTest, ChangeStreamCursorMetricsTrackPinned) {
+
+    otel::metrics::OtelMetricsCapturer capturer;
+    using otel::metrics::MetricNames;
+
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    // total_pinned starts at zero.
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsOpenPinned), 0);
+
+    auto cursorId =
+        assertGet(getManager()->registerCursor(getOperationContext(),
+                                               allocateMockCursor(boost::none, boost::none, true),
+                                               nss,
+                                               ClusterCursorManager::CursorType::SingleTarget,
+                                               ClusterCursorManager::CursorLifetime::Mortal,
+                                               boost::none));
+    auto pinnedCursor =
+        getManager()->checkOutCursor(cursorId, getOperationContext(), successAuthChecker);
+    ASSERT_OK(pinnedCursor.getStatus());
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsOpenPinned), 1);
+
+    // Returning a cursor should decrement the pinned cursors counter.
+    pinnedCursor.getValue().returnCursor(ClusterCursorManager::CursorState::NotExhausted);
+    ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsOpenPinned), 0);
+}
+
 
 }  // namespace
 

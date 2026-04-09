@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/client_cursor/clientcursor.h"
 
+#include "mongo/db/change_stream_metrics_util.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
@@ -39,8 +40,6 @@
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/shard_role/shard_catalog/external_data_source_scope_guard.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/otel/metrics/metric_names.h"
-#include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/util/background.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
@@ -60,88 +59,24 @@ namespace {
 
 auto& gCursorStats = *new CursorStats{};
 
-namespace ChangeStreamMetrics {
+namespace change_stream_metrics {
 
-// The total number of change stream cursors opened since the start of the process. This counter
-// corresponds to the OTEL metric "change_streams.cursor.total_opened".
-const otel::metrics::CounterOptions kCursorsTotalOpenedOpts = [] {
-    otel::metrics::CounterOptions opts{};
-    opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
-        .dottedPath = "changeStreams.cursor.totalOpened",
-        .role = ::mongo::ClusterRole{::mongo::ClusterRole::None},
-    };
-    return opts;
-}();
-auto& gCursorsTotalOpened = otel::metrics::MetricsService::instance().createInt64Counter(
-    otel::metrics::MetricNames::kChangeStreamCursorsTotalOpened,
-    "Total number of change stream cursors opened (on router or shard).",
-    otel::metrics::MetricUnit::kCursors,
-    kCursorsTotalOpenedOpts);
+// The total number of change stream cursors opened since the start of the mongoD process. This
+// counter corresponds to the OTEL metric "change_streams.cursor.total_opened".
+auto& gCursorsTotalOpened = change_stream::createCurorsTotalOpened();
 
-// The change stream lifespan histogram is updated after a change stream cursor is closed. A
-// histogram provides accurate and thread-safe average for every bucket. This is achieved by locks,
-// so there might be some overhead.
-const otel::metrics::HistogramOptions kLifespanOpts = [] {
-    otel::metrics::HistogramOptions opts{};
-    opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
-        .dottedPath = "changeStreams.cursor.lifespan",
-        .role = ::mongo::ClusterRole{::mongo::ClusterRole::None},
-    };
-    // Using the same histogram buckets as 'metrics.cursor.lifespan'. For change stream cursors we
-    // expect that most of the cursors will land in (10min, +inf) bucket.
-    opts.explicitBucketBoundaries = std::vector<double>({
-        1 * 1e6,        // lifespan <= 1 second will probably capture one-fetch or no-fetch cursors,
-                        // unless the query is slow for some reason
-        10 * 1e6,       // lifespan <= 10 seconds will probably capture other 'short-lived' change
-                        // stream cursors
-        10 * 60 * 1e6,  // lifespan <= 10 minutes will probably capture not 'short-lived', but
-                        // before the default cursor timeout
-        20 * 60 * 1e6,  // lifespan <= 20 minutes will probably capture increased probability for
-                        // cursor timeouts
-        60 * 60 * 1e6,  // lifespan <= 1 hour will probably capture some hourly patterns
-        24 * 60 * 60 * 1e6,     // lifetime <= 1 day will probably capture some daily patterns
-        7 * 24 * 60 * 60 * 1e6  // lifetime <= 1 week will probably capture some weekly patterns
-    });
-    return opts;
-}();
-auto& gLifespan = otel::metrics::MetricsService::instance().createInt64Histogram(
-    otel::metrics::MetricNames::kChangeStreamCursorsLifespan,
-    "Lifespan of closed change stream cursors in microseconds.",
-    otel::metrics::MetricUnit::kMicroseconds,
-    kLifespanOpts);
+// The OTEL metric "change_streams.cursor.lifespan" in the mongoD process.
+auto& gLifespan = change_stream::createCursorsLifespan();
 
-// The number of currently open change stream cursors (idle or pinned). This counter corresponds to
-// the OTEL metric "change_streams.cursor.open.total".
-const otel::metrics::UpDownCounterOptions kCursorsOpenTotalOpts = [] {
-    otel::metrics::UpDownCounterOptions opts{};
-    opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
-        .dottedPath = "changeStreams.cursor.open.total",
-        .role = ::mongo::ClusterRole{::mongo::ClusterRole::None},
-    };
-    return opts;
-}();
-auto& gCursorsOpenTotal = otel::metrics::MetricsService::instance().createInt64UpDownCounter(
-    otel::metrics::MetricNames::kChangeStreamCursorsOpenTotal,
-    "Current number of open change stream cursors.",
-    otel::metrics::MetricUnit::kCursors,
-    kCursorsOpenTotalOpts);
+// The OTEL metric "change_streams.cursor.open.total" for the currently open cursors in the mongoD
+// process.
+auto& gCursorsOpenTotal = change_stream::createCursorsOpenTotal();
 
-// The number of currently pinned (active) change stream cursors. This counter corresponds to the
-// OTEL metric "change_streams.cursor.open.pinned".
-const otel::metrics::UpDownCounterOptions kCursorsOpenPinnedOpts = [] {
-    otel::metrics::UpDownCounterOptions opts{};
-    opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
-        .dottedPath = "changeStreams.cursor.open.pinned",
-        .role = ::mongo::ClusterRole{::mongo::ClusterRole::None},
-    };
-    return opts;
-}();
-auto& gCursorsOpenPinned = otel::metrics::MetricsService::instance().createInt64UpDownCounter(
-    otel::metrics::MetricNames::kChangeStreamCursorsOpenPinned,
-    "Current number of pinned (active) change stream cursors.",
-    otel::metrics::MetricUnit::kCursors,
-    kCursorsOpenPinnedOpts);
-}  // namespace ChangeStreamMetrics
+// The OTEL metric "change_streams.cursor.open.pinned" for the currently active cursors in the
+// mongoD process.
+auto& gCursorsOpenPinned = change_stream::createCursorsOpenPinned();
+
+}  // namespace change_stream_metrics
 }  // namespace
 
 Counter64& CursorStats::_makeStat(StringData name) {
@@ -221,8 +156,8 @@ ClientCursor::ClientCursor(ClientCursorParams params,
     cursorStats().totalOpened.increment();
 
     if (_isChangeStreamQuery) {
-        ChangeStreamMetrics::gCursorsTotalOpened.add(1);
-        ChangeStreamMetrics::gCursorsOpenTotal.add(1);
+        change_stream_metrics::gCursorsTotalOpened.add(1);
+        change_stream_metrics::gCursorsOpenTotal.add(1);
     }
 
     if (isNoTimeout()) {
@@ -256,13 +191,13 @@ void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now)
 
         if (_isChangeStreamQuery) {
             const int64_t lifespanUs = (*now - _createdDate).count() * 1000;
-            ChangeStreamMetrics::gLifespan.record(lifespanUs);
+            change_stream_metrics::gLifespan.record(lifespanUs);
         }
     }
 
     cursorStats().open.decrement();
     if (_isChangeStreamQuery) {
-        ChangeStreamMetrics::gCursorsOpenTotal.add(-1);
+        change_stream_metrics::gCursorsOpenTotal.add(-1);
     }
     if (isNoTimeout()) {
         cursorStats().openNoTimeout.decrement();
@@ -337,7 +272,7 @@ ClientCursorPin::ClientCursorPin(OperationContext* opCtx,
     // it is still considered pinned.
     cursorStats().openPinned.increment();
     if (_cursor->_isChangeStreamQuery) {
-        ChangeStreamMetrics::gCursorsOpenPinned.add(1);
+        change_stream_metrics::gCursorsOpenPinned.add(1);
     }
     OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx,
                                                         std::move(_cursor->_memoryUsageTracker));
@@ -408,7 +343,7 @@ void ClientCursorPin::release() {
     _cursorManager->unpin(_opCtx, std::unique_ptr<ClientCursor, ClientCursor::Deleter>(_cursor));
     cursorStats().openPinned.decrement();
     if (isChangeStream) {
-        ChangeStreamMetrics::gCursorsOpenPinned.add(-1);
+        change_stream_metrics::gCursorsOpenPinned.add(-1);
     }
 
     _cursor = nullptr;
@@ -426,7 +361,7 @@ void ClientCursorPin::deleteUnderlying() {
 
     cursorStats().openPinned.decrement();
     if (isChangeStreamQuery) {
-        ChangeStreamMetrics::gCursorsOpenPinned.add(-1);
+        change_stream_metrics::gCursorsOpenPinned.add(-1);
     }
 }
 

@@ -31,11 +31,14 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/change_stream_metrics_util.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/tailable_mode_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/s/query/exec/async_results_merger.h"
 #include "mongo/s/query/exec/router_stage_limit.h"
 #include "mongo/s/query/exec/router_stage_merge.h"
@@ -54,6 +57,22 @@
 
 namespace mongo {
 namespace {
+namespace change_stream_metrics {
+
+
+// The total number of change stream cursors opened since the start of the mongoS process. This
+// counter corresponds to the OTEL metric "change_streams.cursor.total_opened".
+auto& gCursorsTotalOpened = change_stream::createCurorsTotalOpened();
+
+// The OTEL metric "change_streams.cursor.lifespan" in the mongoS process.
+auto& gLifespan = change_stream::createCursorsLifespan();
+
+// The OTEL metric "change_streams.cursor.open.total" for the currently open cursors in the mongoS
+// process.
+auto& gCursorsOpenTotal = change_stream::createCursorsOpenTotal();
+
+}  // namespace change_stream_metrics
+
 auto& mongosCursorStatsTotalOpened = *MetricBuilder<Counter64>("mongos.cursor.totalOpened");
 auto& mongosCursorStatsMoreThanOneBatch =
     *MetricBuilder<Counter64>("mongos.cursor.moreThanOneBatch");
@@ -99,6 +118,11 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sortToApplyOnRouter == AsyncResultsMerger::kWholeSortKeySortPattern));
     mongosCursorStatsTotalOpened.increment();
+
+    if (_isChangeStreamQuery) {
+        change_stream_metrics::gCursorsTotalOpened.add(1);
+        change_stream_metrics::gCursorsOpenTotal.add(1);
+    }
 }
 
 ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
@@ -122,6 +146,11 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sortToApplyOnRouter == AsyncResultsMerger::kWholeSortKeySortPattern));
     mongosCursorStatsTotalOpened.increment();
+
+    if (_isChangeStreamQuery) {
+        change_stream_metrics::gCursorsTotalOpened.add(1);
+        change_stream_metrics::gCursorsOpenTotal.add(1);
+    }
 }
 
 ClusterClientCursorImpl::~ClusterClientCursorImpl() {
@@ -170,6 +199,7 @@ void ClusterClientCursorImpl::kill(OperationContext* opCtx) {
             "Cannot kill a cluster client cursor that has already been killed",
             !_hasBeenKilled);
 
+
     query_stats::writeQueryStatsOnCursorDisposeOrKill(opCtx,
                                                       _queryStatsKeyHash,
                                                       std::move(_queryStatsKey),
@@ -177,6 +207,12 @@ void ClusterClientCursorImpl::kill(OperationContext* opCtx) {
                                                       _firstResponseExecutionTime,
                                                       _metrics);
 
+    if (_isChangeStreamQuery) {
+        const auto now = opCtx->getServiceContext()->getPreciseClockSource()->now();
+        const int64_t lifespanUs = (now - _createdDate).count() * 1000;
+        change_stream_metrics::gLifespan.record(lifespanUs);
+        change_stream_metrics::gCursorsOpenTotal.add(-1);
+    }
     _root->kill(opCtx);
     _hasBeenKilled = true;
 }
@@ -266,6 +302,10 @@ Date_t ClusterClientCursorImpl::getCreatedDate() const {
 
 Date_t ClusterClientCursorImpl::getLastUseDate() const {
     return _lastUseDate;
+}
+
+bool ClusterClientCursorImpl::isChangeStreamCursor() const {
+    return _isChangeStreamQuery;
 }
 
 void ClusterClientCursorImpl::setLastUseDate(Date_t now) {

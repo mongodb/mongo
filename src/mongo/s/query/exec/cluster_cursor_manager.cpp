@@ -33,6 +33,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/change_stream_metrics_util.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_in_use_info.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
@@ -56,12 +57,19 @@
 #include <boost/cstdint.hpp>
 #include <boost/optional/optional.hpp>
 
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 
 namespace mongo {
 
 namespace {
+
+namespace change_stream_metrics {
+// The OTEL metric "change_streams.cursor.open.pinned" for the currently active cursors in the
+// mongoS process.
+auto& gCursorsOpenPinned = change_stream::createCursorsOpenPinned();
+}  // namespace change_stream_metrics
 
 //
 // Helpers to construct a user-friendly error Status from a cursorId.
@@ -315,6 +323,10 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
 
     OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx,
                                                         cursorGuard->releaseMemoryUsageTracker());
+
+    if (cursorGuard->isChangeStreamCursor()) {
+        change_stream_metrics::gCursorsOpenPinned.add(1);
+    }
     return PinnedCursor(this, std::move(cursorGuard), entry->getNamespace(), cursorId);
 }
 
@@ -374,6 +386,10 @@ void ClusterCursorManager::checkInCursor(std::unique_ptr<ClusterClientCursor> cu
 
     if (cursorState == CursorState::NotExhausted && !killPending) {
         cursor->setMemoryUsageTracker(OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx));
+    }
+
+    if (cursor->isChangeStreamCursor()) {
+        change_stream_metrics::gCursorsOpenPinned.add(-1);
     }
 
     entry->returnCursor(std::move(cursor));

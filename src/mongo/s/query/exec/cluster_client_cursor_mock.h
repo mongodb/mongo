@@ -67,7 +67,8 @@ class ClusterClientCursorMock final : public ClusterClientCursor {
 public:
     ClusterClientCursorMock(boost::optional<LogicalSessionId> lsid,
                             boost::optional<TxnNumber> txnNumber,
-                            std::function<void(void)> killCallback = {});
+                            std::function<void(void)> killCallback = {},
+                            bool isChangeStreamCursor = false);
 
     ~ClusterClientCursorMock() override;
 
@@ -126,6 +127,8 @@ public:
 
     Date_t getLastUseDate() const final;
 
+    bool isChangeStreamCursor() const final;
+
     void setLastUseDate(Date_t now) final;
 
     boost::optional<uint32_t> getPlanCacheShapeHash() const final;
@@ -183,6 +186,8 @@ private:
     Date_t _createdDate;
 
     Date_t _lastUseDate;
+
+    bool _isChangeStreamCursor;
 
     std::uint64_t _nBatchesReturned = 0;
 
