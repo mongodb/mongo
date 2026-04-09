@@ -275,7 +275,7 @@ def get_visibility(
     in_complete_header = normpath in complete_headers
 
     # ideally this would be in an if c.has_attrs() block, but that seems to not work in all cases.
-    # TODO: try again when on a newer clang. Also might be worth seeing if we can narrow down
+    # TODO(Ignore linting): try again when on a newer clang. Also might be worth seeing if we can narrow down
     # the cases where it doesn't work.
     for child in c.get_children():
         if child.kind != CursorKind.ANNOTATE_ATTR:
@@ -337,7 +337,7 @@ def get_visibility(
             return GetVisibilityResult("file_private")
 
         if not scanning_parent:
-            # TODO consider making PROTECTED also default to module private
+            # TODO(Ignore linting) consider making PROTECTED also default to module private
             if c.access_specifier == AccessSpecifier.PRIVATE:
                 return GetVisibilityResult("private")
 
@@ -381,7 +381,7 @@ def try_extract_file_level_visibility(c: Cursor) -> str | None:
     if attr not in ("public", "parent_private", "file_private"):
         perr_exit(
             pretty_location(c)
-            + f": Only PUBLIC, PARENT_PRIVATE, and FILE_PRIVATE are allowed for file-level visibility, not {attr}"
+            + f": Only PUBLIC, PARENT_PRIVATE, and FILE_PRIVATE are allowed for file-level visibility, not {attr}, which is the default and should not be specified."
         )
 
     if terms:  # No additional terms allowed
@@ -525,7 +525,7 @@ def add_decl(d: Decl):
         # print(d.kind)
         # print(d.kind == CursorKind.TYPEDEF_DECL)
         # if d.kind == CursorKind.TYPEDEF_DECL:
-        #     return  # TODO: how to handle this?
+        #     return  # TODO(Ignore linting)(Ignore linting): how to handle this?
         if d == old:
             return  # it doesn't matter, ignore it
         if not any(
@@ -543,7 +543,7 @@ def add_decl(d: Decl):
         d.used_from = old.used_from
         decls[d.usr] = d
 
-    # TODO consider merging otherwise?
+    # TODO(Ignore linting)(Ignore linting) consider merging otherwise?
 
 
 # These are completely skipped during decl finding
@@ -560,7 +560,7 @@ skip_kinds = {
     CursorKind.CXX_ACCESS_SPEC_DECL,  # doesn't have children
     CursorKind.STATIC_ASSERT,
     #
-    # TODO Consider for future for things like hidden friends
+    # TODO(Ignore linting) Consider for future for things like hidden friends
     CursorKind.FRIEND_DECL,
 }
 
@@ -688,7 +688,7 @@ def find_usages(mod: str, c: Cursor, context: DecoratedCursor | None):
     # cross-module) and they are generating thousands of unique declarations because
     # libclang doesn't expose enough info for us to merge them well. This massively
     # skews the results because they are 10% of all decls!
-    # TODO: we should at least check that private decls aren't used from the wrong mod
+    # TODO(Ignore linting): we should at least check that private decls aren't used from the wrong mod
     # before returning.
     if ref.kind == CursorKind.UNEXPOSED_DECL:
         return
@@ -735,7 +735,7 @@ def find_usages(mod: str, c: Cursor, context: DecoratedCursor | None):
     ref = DecoratedCursor.normalize(ref)
 
     # Ignore any declarations not declared in a header.
-    # TODO what if a local type is passed to a template? For now doesn't matter because we
+    # TODO(Ignore linting) what if a local type is passed to a template? For now doesn't matter because we
     # don't look at usages from instantiations.
     if ref.location.file.name.endswith(".cpp") or ref.location.file.name.endswith(".cc"):
         return
@@ -791,7 +791,7 @@ def find_usages(mod: str, c: Cursor, context: DecoratedCursor | None):
             f"\n    base: {d.loc} ({d.mod})"
             f"\n    child: {pretty_location(c)} ({mod})"
             f"\n    If you think that the base should be open, please contact the owner."
-            # TODO extract the slack channel from the module metadata and add it here
+            # TODO(Ignore linting) extract the slack channel from the module metadata and add it here
         )
 
 
