@@ -519,9 +519,10 @@ bool defaultCanPathBeArray(StringData path) {
 class DependencyGraph::Impl {
 public:
     explicit Impl(const DocumentSourceContainer& container,
+                  DocumentSourceContainer::const_iterator endIt,
                   CanPathBeArray canMainCollPathBeArray = defaultCanPathBeArray)
-        : _canMainCollPathBeArray(std::move(canMainCollPathBeArray)) {
-        recompute(container);
+        : _container(container), _canMainCollPathBeArray(std::move(canMainCollPathBeArray)) {
+        grow(endIt);
     }
 
     boost::intrusive_ptr<mongo::DocumentSource> getDeclaringStage(DocumentSource* ds,
@@ -576,14 +577,23 @@ public:
         MONGO_UNREACHABLE_TASSERT(12266805);
     }
 
-    void recompute(const DocumentSourceContainer& container,
-                   boost::optional<DocumentSourceContainer::const_iterator> stageIt = {}) {
-        auto recomputeFrom = stageIt ? *stageIt : container.begin();
-        invalidate(container, recomputeFrom);
-        for (auto it = recomputeFrom; it != container.end(); it++) {
-            DocumentSourceInfo dsInfo{**it};
-            processStage(*it, dsInfo);
+    void recompute(boost::optional<DocumentSourceContainer::const_iterator> stageIt = {}) {
+        // Recomputing is equivalent to truncating to just before stageIt and then expanding back to
+        // cover the complete pipeline.
+        resize(stageIt.value_or(_container.begin()));
+        resize(_container.end());
+    }
+
+    void resize(DocumentSourceContainer::const_iterator newEndIt) {
+        if (newEndIt == _container.begin()) {
+            invalidate(StageId{0});
+            return;
         }
+
+        if (!_stages.empty() && truncateIfValid(newEndIt)) {
+            return;
+        }
+        grow(newEndIt);
     }
 
     BSONObj toBSON() const;
@@ -905,10 +915,27 @@ private:
         if (!ds) {
             return _stages.getLastId();
         }
-        if (auto it = _dsToStageId.find(ds); it != _dsToStageId.end()) {
+        if (auto it = _dsToStageId.find(ds);
+            it != _dsToStageId.end() && it->second < _stages.getNextId()) {
             return it->second;
         }
-        tasserted(11937307, "Unknown DocumentSource");
+        tasserted(11937307,
+                  fmt::format("Unknown DocumentSource {}", getUnknownDocumentSourceString(ds)));
+    }
+
+    /**
+     * Prints information about the DocumentSource 'ds'.
+     * Handles the cases where 'ds' is not in the DocumentSourceContainer or not covered by the
+     * graph.
+     */
+    std::string getUnknownDocumentSourceString(const DocumentSource* ds) const {
+        int i = 0;
+        for (auto it = _container.begin(); it != _container.end(); ++it, ++i) {
+            if (it->get() == ds) {
+                return fmt::format("{}:{}", ds->getSourceName(), i);
+            }
+        }
+        return fmt::format("{} (not in container)", fmt::ptr(ds));
     }
 
     /**
@@ -1145,20 +1172,115 @@ private:
     }
 
     /**
-     * Find the lowest ID stage, scope and field nodes corresponding to the given stage. These IDs
-     * can be used to determine the valid portion of a graph. If the range [container.begin(),
-     * stageIt) is valid, then so are [0, minId) for all node types.
+     * Truncates the graph so that it covers stages up to (excluding) 'newEndIt'.
+     * Returns true if this was a valid truncation operation and 'newEndIt' points to a stage
+     * covered in the graph already (or the first stage past the end).
+     * If this function returns false, this should actually be a grow operation.
      */
-    std::tuple<StageId, ScopeId, FieldId> earliestDescendants(
-        const DocumentSourceContainer& container,
-        DocumentSourceContainer::const_iterator stageIt) const {
-        // Compute the StageId of the first stage to invalidate. Stages before stageIt are
-        // unchanged, so their map entries and StageIds remain valid.
-        if (stageIt == container.begin()) {
-            return {StageId{0}, ScopeId{0}, FieldId{0}};
+    bool truncateIfValid(DocumentSourceContainer::const_iterator newEndIt) {
+        if (!_stages.empty()) {
+            auto lastStageIt = std::prev(newEndIt);
+            if (*lastStageIt == _stages[_stages.getLastId()].documentSource) {
+                // No-op if already the last stage.
+                return true;
+            }
+            // Check if this is a truncation operation (if the stage is within the graph).
+            if (auto it = _dsToStageId.find(lastStageIt->get());
+                it != _dsToStageId.end() && it->second < _stages.getLastId()) {
+                truncate(it->second);
+                if constexpr (kDebugBuild) {
+                    verifyExactRange(_container.begin(), newEndIt);
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
+
+    /**
+     * Truncates the graph so that it covers stages up to (excluding) 'newEndIt'.
+     */
+    void truncate(StageId lastStage) {
+        StageId invalidStage{lastStage.value + 1};
+        invalidate(invalidStage);
+    }
+
+    /**
+     * Grow the graph starting at the current last stage in the graph and processing stages up to
+     * (excluding) 'newEndIt'.
+     */
+    void grow(DocumentSourceContainer::const_iterator newEndIt) {
+        // Iterator to the next stage to process.
+        DocumentSourceContainer::const_iterator it = [&]() {
+            if (_stages.empty()) {
+                return _container.begin();
+            }
+            // The last stage in the graph, after which we will be appending.
+            const DocumentSource* lastStage = _stages[_stages.getLastId()].documentSource.get();
+            // Walk back from maxStageIt to find the lastStage.
+            auto it = std::prev(newEndIt);
+            while (true) {
+                if (*it == lastStage) {
+                    // We need to start processing after this point.
+                    return std::next(it);
+                }
+                if (it == _container.begin()) {
+                    tasserted(12299003,
+                              fmt::format("Cannot find intersection between current graph and the "
+                                          "desired end stage {}",
+                                          getUnknownDocumentSourceString(it->get())));
+                }
+                --it;
+            }
+        }();
+
+        for (; it != newEndIt; ++it) {
+            tassert(12299004, "Did not expect to reach the end", it != _container.end());
+            DocumentSourceInfo dsInfo{**it};
+            processStage(*it, dsInfo);
         }
 
-        StageId stageId = {getStageId(std::prev(stageIt)->get()).value + 1};
+        if constexpr (kDebugBuild) {
+            verifyExactRange(_container.begin(), newEndIt);
+        }
+    }
+
+    /**
+     * Verify the graph precisely covers the given range [startIt, endIt).
+     */
+    void verifyExactRange(DocumentSourceContainer::const_iterator startIt,
+                          DocumentSourceContainer::const_iterator endIt) const {
+        int stageId = 0;
+        for (auto it = startIt; it != endIt; ++it, ++stageId) {
+            const auto* actualPtr = _stages[StageId(stageId)].documentSource.get();
+            const auto* expectedPtr = it->get();
+            tassert(12299001,
+                    fmt::format("Invalid graph post recompute() at index {} ({} {} != {} {})",
+                                stageId,
+                                actualPtr->getSourceName(),
+                                fmt::ptr(actualPtr),
+                                expectedPtr->getSourceName(),
+                                fmt::ptr(expectedPtr)),
+                    actualPtr == expectedPtr);
+        }
+        tassert(12299002,
+                fmt::format("Expected to have reached the end of the graph ({} != {})",
+                            stageId,
+                            _stages.getNextId().value),
+                stageId == _stages.getNextId().value);
+    }
+
+    /**
+     * Find the lowest ID stage, scope and field nodes corresponding to the given stage.
+     * These IDs can be used to determine the valid portion of a graph
+     */
+    std::tuple<ScopeId, FieldId> earliestDescendants(StageId stageId) const {
+        tassert(12299005, "Expected a valid stage ID", stageId);
+        if (stageId == StageId{0}) {
+            return {ScopeId{0}, FieldId{0}};
+        }
+
         ScopeId scopeId = _stages[stageId].nextNewScope;
         FieldId fieldId = scopeId == _scopes.getNextId()
             // No scope to invalidate so no fields to invalidate.
@@ -1166,16 +1288,20 @@ private:
             // Invalidate every field declared by or after the scope.
             : _scopes[scopeId].missingField;
 
-        return {stageId, scopeId, fieldId};
+        return {scopeId, fieldId};
     }
 
     /**
-     * Invalidate the portion of the graph corresponding to [stageIt, container.end()).
+     * Invalidate the portion of the graph starting at invalidStage.
      */
-    void invalidate(const DocumentSourceContainer& container,
-                    DocumentSourceContainer::const_iterator stageIt) {
+    void invalidate(StageId invalidStage) {
+        if (invalidStage == StageId{0} && _stages.empty()) {
+            // Noop case.
+            return;
+        }
+
         // Invalidate all nodes originating from the given stage.
-        auto [invalidStage, invalidScope, invalidField] = earliestDescendants(container, stageIt);
+        auto [invalidScope, invalidField] = earliestDescendants(invalidStage);
 
         // Clean up aliases for invalidated fields.
         absl::erase_if(_aliases,
@@ -1245,13 +1371,20 @@ private:
     // (directly or transitively through other aliases).
     absl::flat_hash_map<FieldId, ParsedPath> _aliases;
 
+    // Reference to the complete pipeline.
+    const DocumentSourceContainer& _container;
     // Callback to query the Path Arrayness API for the main collection.
     const CanPathBeArray _canMainCollPathBeArray;
 };
 
 DependencyGraph::DependencyGraph(const DocumentSourceContainer& container,
                                  CanPathBeArray canMainCollPathBeArray)
-    : _impl(std::make_unique<Impl>(container, std::move(canMainCollPathBeArray))) {}
+    : DependencyGraph(container, container.end(), std::move(canMainCollPathBeArray)) {}
+
+DependencyGraph::DependencyGraph(const DocumentSourceContainer& container,
+                                 DocumentSourceContainer::const_iterator endIt,
+                                 CanPathBeArray canMainCollPathBeArray)
+    : _impl(std::make_unique<Impl>(container, endIt, std::move(canMainCollPathBeArray))) {}
 
 DependencyGraph::~DependencyGraph() = default;
 DependencyGraph::DependencyGraph(DependencyGraph&&) noexcept = default;
@@ -1266,9 +1399,12 @@ bool DependencyGraph::canPathBeArray(DocumentSource* ds, PathRef path) const {
     return _impl->canPathBeArray(ds, path);
 }
 
-void DependencyGraph::recompute(const DocumentSourceContainer& container,
-                                boost::optional<DocumentSourceContainer::const_iterator> stageIt) {
-    _impl->recompute(container, stageIt);
+void DependencyGraph::recompute(boost::optional<DocumentSourceContainer::const_iterator> stageIt) {
+    _impl->recompute(stageIt);
+}
+
+void DependencyGraph::resize(DocumentSourceContainer::const_iterator newEndIt) {
+    _impl->resize(newEndIt);
 }
 
 BSONObj DependencyGraph::toBSON() const {
@@ -1480,14 +1616,44 @@ DependencyGraphContext::DependencyGraphContext(ExpressionContext& expCtx,
                                                DocumentSourceContainer& container)
     : _expCtx(expCtx), _container(container) {}
 
+namespace {
+/// Wrapper for the PathArrayness API passed into the graph as CanPathBeArray.
+struct CanMainCollPathBeArray {
+    bool operator()(StringData path) const {
+        const auto& pathArrayness = expCtx.getMainCollPathArrayness();
+        return pathArrayness.canPathBeArray(FieldRef(path), &expCtx);
+    }
+    ExpressionContext& expCtx;
+};
+}  // namespace
+
+std::unique_ptr<DependencyGraph> DependencyGraphContext::createGraph(
+    DocumentSourceContainer::const_iterator endIt) const {
+    return std::make_unique<DependencyGraph>(_container, endIt, CanMainCollPathBeArray{_expCtx});
+}
+
 const DependencyGraph& DependencyGraphContext::getGraph(
     boost::optional<DocumentSourceContainer::const_iterator> maxStageIt) const {
-    CanPathBeArray canPathBeArray = [this](StringData path) -> bool {
-        const auto& pathArrayness = _expCtx.getMainCollPathArrayness();
-        return pathArrayness.canPathBeArray(FieldRef(path), &_expCtx);
-    };
-    _graph.emplace(_container, std::move(canPathBeArray));
+    // Convert inclusive maxStageIt to an exclusive end iterator.
+    auto endIt = maxStageIt.value_or(_container.end());
+    if (endIt != _container.end()) {
+        ++endIt;
+    }
+    if (!_graph) {
+        _graph = createGraph(endIt);
+    } else {
+        _graph->resize(endIt);
+    }
     return *_graph;
+}
+
+void DependencyGraphContext::invalidateFrom(DocumentSourceContainer::const_iterator startIt) {
+    if (!_graph) {
+        return;
+    }
+    // Invalidation is implemented as a resize. Since startIt is the earliest affected stage,
+    // it is sufficient to truncate the graph just before it.
+    _graph->resize(startIt);
 }
 
 }  // namespace mongo::pipeline::dependency_graph

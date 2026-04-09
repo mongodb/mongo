@@ -147,6 +147,14 @@ void PipelineRewriteContext::advance() {
     _itr = std::next(_itr);
 }
 
+void PipelineRewriteContext::postTransform() {
+    // The transformation rules in Transforms modify the list at the current, next or previous
+    // position. The conservative approach with graph invalidation is to invalidate from the
+    // previous position onwards. This could potentially be improved if we keep track of this
+    // iterator.
+    _depGraphCtx.invalidateFrom(_itr == _container.begin() ? _container.begin() : std::prev(_itr));
+}
+
 const mongo::pipeline::dependency_graph::DependencyGraph&
 PipelineRewriteContext::getDependencyGraph() const {
     DocumentSourceContainer::const_iterator itr = atLastStage() ? _itr : std::next(_itr);

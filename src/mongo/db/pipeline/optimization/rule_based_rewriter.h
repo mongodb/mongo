@@ -165,6 +165,8 @@ public:
     void advance() final;
     void enqueueRules() final;
 
+    void postTransform() final;
+
     template <size_t N>
     bool hasAtLeastNPrevStages() const {
         return std::distance(_container.begin(), _itr) >= static_cast<std::ptrdiff_t>(N);

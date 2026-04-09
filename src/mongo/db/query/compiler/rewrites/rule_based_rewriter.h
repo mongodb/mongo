@@ -118,6 +118,11 @@ public:
     virtual void enqueueRules() = 0;
 
     /**
+     * Called immediately after a rule transformation is applied.
+     */
+    virtual void postTransform() {}
+
+    /**
      * Enqueues given rules to be applied to the current element.
      */
     void addRules(const std::vector<Rule<SubClass>>& rules) {
@@ -290,6 +295,7 @@ private:
 
             const bool shouldRequeueRules = rule.transform(_context);
             _rewritesApplied++;
+            _context.postTransform();
 
             LOGV2_DEBUG(11206202, 5, "Applied rule", "rule"_attr = rule.name);
 
