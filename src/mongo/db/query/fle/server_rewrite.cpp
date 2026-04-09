@@ -73,7 +73,6 @@
 
 namespace mongo::fle {
 
-// TODO: This is a generally useful helper function that should probably go in some other namespace.
 std::unique_ptr<CollatorInterface> collatorFromBSON(OperationContext* opCtx,
                                                     const BSONObj& collation) {
     std::unique_ptr<CollatorInterface> collator;
@@ -200,7 +199,7 @@ void doFLERewriteInTxn(OperationContext* opCtx,
     // stashing locks doesn't directly release them but signals the locker it can destroy them if
     // necessary.
     auto stashHandle = StashTransactionResourcesForMultiDocumentTransaction(opCtx);
-    auto txn = getTxn(opCtx);
+    auto txn = getTxn(opCtx, boost::none);
     auto service = opCtx->getService();
     auto swCommitResult = txn->runNoThrow(
         opCtx, [service, sharedBlock](const txn_api::TransactionClient& txnClient, auto txnExec) {

@@ -53,6 +53,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/executor/inline_executor.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -72,8 +73,8 @@ class OperationContext;
 /**
  * Callback function to get a SyncTransactionWithRetries with the appropiate Executor
  */
-using GetTxnCallback =
-    std::function<std::shared_ptr<txn_api::SyncTransactionWithRetries>(OperationContext*)>;
+using GetTxnCallback = std::function<std::shared_ptr<txn_api::SyncTransactionWithRetries>(
+    OperationContext*, const boost::optional<CancellationToken>&)>;
 }  // namespace MONGO_MOD_PUB mongo
 
 namespace mongo {
@@ -402,13 +403,18 @@ private:
  * sharding fixed task executor.
  */
 std::shared_ptr<txn_api::SyncTransactionWithRetries> getTransactionWithRetriesForMongoS(
-    OperationContext* opCtx);
+    OperationContext* opCtx, const boost::optional<CancellationToken>& cancelToken);
 
 /**
  * Creates a new SyncTransactionWithRetries object that runs a transaction on a
  * thread pool local to mongod.
  */
 std::shared_ptr<txn_api::SyncTransactionWithRetries> getTransactionWithRetriesForMongoD(
+    OperationContext* opCtx, const boost::optional<CancellationToken>& cancelToken);
+
+const std::shared_ptr<executor::TaskExecutor>& getFLE2TaskExecutorForMongoD(
+    OperationContext* opCtx);
+const std::shared_ptr<executor::TaskExecutor>& getFLE2TaskExecutorForMongoS(
     OperationContext* opCtx);
 
 /**

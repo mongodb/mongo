@@ -99,7 +99,7 @@
 namespace mongo {
 namespace {
 
-std::shared_ptr<executor::ThreadPoolTaskExecutor> _fleCrudExecutor;
+std::shared_ptr<executor::TaskExecutor> _fleCrudExecutor;
 
 ThreadPool::Options getThreadPoolOptions() {
     ThreadPool::Options tpOptions;
@@ -345,7 +345,7 @@ private:
 }  // namespace
 
 std::shared_ptr<txn_api::SyncTransactionWithRetries> getTransactionWithRetriesForMongoD(
-    OperationContext* opCtx) {
+    OperationContext* opCtx, const boost::optional<CancellationToken>& cancelToken) {
 
     auto fleInlineCrudExecutor = std::make_shared<executor::InlineExecutor>();
 
@@ -353,7 +353,14 @@ std::shared_ptr<txn_api::SyncTransactionWithRetries> getTransactionWithRetriesFo
         opCtx,
         _fleCrudExecutor,
         std::make_unique<FLEMongoDResourceYielder>(),
-        fleInlineCrudExecutor);
+        fleInlineCrudExecutor,
+        nullptr,
+        cancelToken);
+}
+
+const std::shared_ptr<executor::TaskExecutor>& getFLE2TaskExecutorForMongoD(
+    OperationContext* opCtx) {
+    return _fleCrudExecutor;
 }
 
 void startFLECrud(ServiceContext* serviceContext) {

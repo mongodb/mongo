@@ -312,7 +312,7 @@ std::vector<std::vector<FLEEdgeCountInfo>> toEdgeCounts(
 }  // namespace
 
 std::shared_ptr<txn_api::SyncTransactionWithRetries> getTransactionWithRetriesForMongoS(
-    OperationContext* opCtx) {
+    OperationContext* opCtx, const boost::optional<CancellationToken>& cancelToken) {
 
     auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto fleInlineCrudExecutor = std::make_shared<executor::InlineExecutor>();
@@ -321,7 +321,14 @@ std::shared_ptr<txn_api::SyncTransactionWithRetries> getTransactionWithRetriesFo
         opCtx,
         executor,
         TransactionRouterResourceYielder::makeForLocalHandoff(),
-        fleInlineCrudExecutor);
+        fleInlineCrudExecutor,
+        nullptr,
+        cancelToken);
+}
+
+const std::shared_ptr<executor::TaskExecutor>& getFLE2TaskExecutorForMongoS(
+    OperationContext* opCtx) {
+    return Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
 }
 
 namespace {
@@ -425,7 +432,7 @@ insertSingleDocument(OperationContext* opCtx,
 
     validateInsertUpdatePayloads(opCtx, efc.getFields(), *serverPayload);
 
-    std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx);
+    std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx, boost::none);
 
     // The function that handles the transaction may outlive this function so we need to use
     // shared_ptrs since it runs on another thread
@@ -590,7 +597,7 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
         CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
     }
 
-    std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx);
+    std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx, boost::none);
 
     auto reply = std::make_shared<write_ops::DeleteCommandReply>();
 
@@ -708,7 +715,7 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
         CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(lk, true);
     }
 
-    std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx);
+    std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx, boost::none);
 
     // The function that handles the transaction may outlive this function so we need to use
     // shared_ptrs
@@ -1048,7 +1055,7 @@ StatusWith<std::pair<ReplyType, OpMsgRequest>> processFindAndModifyRequest(
 
     validateFindAndModifyRequest(opCtx, findAndModifyRequest);
 
-    std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx);
+    std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx, boost::none);
 
     // The function that handles the transaction may outlive this function so we need to use
     // shared_ptrs

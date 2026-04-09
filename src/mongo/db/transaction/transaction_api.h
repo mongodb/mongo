@@ -238,7 +238,9 @@ public:
                                std::shared_ptr<executor::TaskExecutor> sleepAndCleanupExecutor,
                                std::unique_ptr<ResourceYielder> resourceYielder,
                                std::shared_ptr<executor::InlineExecutor> executor,
-                               std::unique_ptr<TransactionClient> txnClient = nullptr);
+                               std::unique_ptr<TransactionClient> txnClient = nullptr,
+                               const boost::optional<CancellationToken>& cancelToken = boost::none);
+
     /**
      * Returns a bundle with the transaction command status and write concern error, if any. Note
      * that abort errors are not returned because an abort will only happen implicitly when another

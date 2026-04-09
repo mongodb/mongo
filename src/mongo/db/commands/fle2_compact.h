@@ -80,6 +80,7 @@ void processFLECompactV2(OperationContext* opCtx,
                          const CompactStructuredEncryptionData& request,
                          GetTxnCallback getTxn,
                          const EncryptedStateCollectionsNamespaces& namespaces,
+                         const std::shared_ptr<executor::TaskExecutor>& cancelExecutor,
                          ECStats* escStats,
                          ECOCStats* ecocStats);
 

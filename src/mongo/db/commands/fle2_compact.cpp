@@ -251,7 +251,7 @@ std::shared_ptr<stdx::unordered_set<ECOCCompactionDocumentV2>> readUniqueECOCEnt
         uasserted(7293605, "Failed due to fleCompactOrCleanupFailBeforeECOCRead fail point");
     }
 
-    std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxn(opCtx);
+    std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxn(opCtx, boost::none);
 
     // The function that handles the transaction may outlive this function so we need to use
     // shared_ptrs
@@ -275,6 +275,11 @@ std::shared_ptr<stdx::unordered_set<ECOCCompactionDocumentV2>> readUniqueECOCEnt
 
             return SemiFuture<void>::makeReady();
         });
+
+    LOGV2_DEBUG(12060500,
+                1,
+                "Queryable Encryption compaction finished reading unique ECOC entries",
+                "size"_attr = uniqueEcocEntries->size());
     uassertStatusOK(swResult);
     uassertStatusOK(swResult.getValue().getEffectiveStatus());
 
@@ -737,10 +742,57 @@ std::vector<PrfBlock> cleanupOneFieldValuePair(FLEQueryInterface* queryImpl,
     }
 }
 
+class AlternateCancellationSource {
+public:
+    AlternateCancellationSource(OperationContext* opCtx)
+        : _altCancelSource{std::make_unique<CancellationSource>()}, _opCtx(opCtx) {}
+
+    static std::shared_ptr<AlternateCancellationSource>
+    attachAlternateCancellationSourceToOperationContext(
+        OperationContext* opCtx, const std::shared_ptr<executor::TaskExecutor>& cancelExecutor) {
+        auto altCancelSource = std::make_shared<AlternateCancellationSource>(opCtx);
+
+        // Cancel the current alt cancel source when the OperationContext cancel source
+        // is cancelled.
+        opCtx->getCancellationToken()
+            .onCancel()
+            .thenRunOn(cancelExecutor)
+            .then([altCancelSource] { altCancelSource->cancel(); })
+            .getAsync([](auto) {});
+        return altCancelSource;
+    }
+
+    CancellationToken token() {
+        auto token = _opCtx->getCancellationToken();
+        if (token.isCanceled()) {
+            return token;
+        }
+        std::lock_guard<std::mutex> lg(_cancelSourceLock);
+        return _altCancelSource->token();
+    }
+
+    void cancel() {
+        std::lock_guard<std::mutex> lg(_cancelSourceLock);
+        _altCancelSource->cancel();
+    }
+
+    // Replaces the current alt cancel source with a fresh one.
+    void renew() {
+        std::lock_guard<std::mutex> lg(_cancelSourceLock);
+        _altCancelSource = std::make_unique<CancellationSource>();
+    }
+
+private:
+    std::unique_ptr<CancellationSource> _altCancelSource;
+    OperationContext* _opCtx;
+    std::mutex _cancelSourceLock;
+};
+
 void processFLECompactV2(OperationContext* opCtx,
                          const CompactStructuredEncryptionData& request,
                          GetTxnCallback getTxn,
                          const EncryptedStateCollectionsNamespaces& namespaces,
+                         const std::shared_ptr<executor::TaskExecutor>& cancelExecutor,
                          ECStats* escStats,
                          ECOCStats* ecocStats) {
     ECStats innerEscStats;
@@ -840,9 +892,16 @@ void processFLECompactV2(OperationContext* opCtx,
 
     // Each entry in 'C_f' represents a unique field/value pair. For each field/value pair,
     // compact the ESC entries for that field/value pair in one transaction.
+    auto altCancelSource =
+        AlternateCancellationSource::attachAlternateCancellationSourceToOperationContext(
+            opCtx, cancelExecutor);
+
     for (auto& ecocDoc : *uniqueEcocEntries) {
+        altCancelSource->renew();
+
         // start a new transaction
-        std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxn(opCtx);
+        std::shared_ptr<txn_api::SyncTransactionWithRetries> trun =
+            getTxn(opCtx, altCancelSource->token());
 
         // The function that handles the transaction may outlive this function so we need to use
         // shared_ptrs
@@ -879,6 +938,11 @@ void processFLECompactV2(OperationContext* opCtx,
         }
     }
 
+    LOGV2_DEBUG(12060501,
+                1,
+                "Queryable Encryption compaction finished anchoring unique ECOC entries",
+                "size"_attr = uniqueEcocEntries->size());
+
     // Compact Range fields.
     if (!rangeFields.empty()) {
         // Compact 4.e - 4.i, Compact range padding anchors
@@ -889,6 +953,8 @@ void processFLECompactV2(OperationContext* opCtx,
                 .getCompactAnchorPaddingFactor()
                 .get_value_or(kDefaultAnchorPaddingFactor));
         for (const auto& [fieldPath, rangeField] : rangeFields) {
+            altCancelSource->renew();
+
             // The function that handles the transaction may outlive this function so we need to
             // use shared_ptrs
             auto argsBlock = std::make_tuple(
@@ -896,7 +962,8 @@ void processFLECompactV2(OperationContext* opCtx,
             auto sharedBlock = std::make_shared<decltype(argsBlock)>(argsBlock);
             auto service = opCtx->getService();
 
-            std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxn(opCtx);
+            std::shared_ptr<txn_api::SyncTransactionWithRetries> trun =
+                getTxn(opCtx, altCancelSource->token());
             auto txnEscStats = std::make_shared<ECStats>();
             uassertStatusOK(
                 uassertStatusOK(
@@ -932,13 +999,16 @@ void processFLECompactV2(OperationContext* opCtx,
     }
 
     for (const auto& [fieldPath, tsField] : textSearchFields) {
+        altCancelSource->renew();
+
         // The function that handles the transaction may outlive this function so we need to use
         // shared_ptrs
         auto argsBlock = std::make_tuple(namespaces.escNss, tsField, std::string{fieldPath});
         auto sharedBlock = std::make_shared<decltype(argsBlock)>(argsBlock);
         auto service = opCtx->getService();
 
-        std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxn(opCtx);
+        std::shared_ptr<txn_api::SyncTransactionWithRetries> trun =
+            getTxn(opCtx, altCancelSource->token());
         auto txnEscStats = std::make_shared<ECStats>();
         uassertStatusOK(
             uassertStatusOK(
@@ -999,7 +1069,7 @@ FLECleanupESCDeleteQueue processFLECleanup(OperationContext* opCtx,
     auto paddedFieldsToCleanup = std::make_shared<std::map<StringData, AnchorPaddingRootToken>>();
     for (auto& ecocDoc : *uniqueEcocEntries) {
         // start a new transaction
-        std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxn(opCtx);
+        std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxn(opCtx, boost::none);
 
         // The function that handles the transaction may outlive this function so we need to use
         // shared_ptrs
@@ -1056,7 +1126,7 @@ FLECleanupESCDeleteQueue processFLECleanup(OperationContext* opCtx,
 
     // Cleanup padding for each padded (range/text search) field.
     for (const auto& paddedFieldIt : *paddedFieldsToCleanup) {
-        std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxn(opCtx);
+        std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxn(opCtx, boost::none);
         auto argsBlock = std::make_tuple(namespaces.escNss,
                                          pqMaxEntries - pq.size(),
                                          std::string{paddedFieldIt.first},

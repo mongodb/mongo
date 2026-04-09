@@ -56,7 +56,8 @@ SyncTransactionWithRetries::SyncTransactionWithRetries(
     std::shared_ptr<executor::TaskExecutor> sleepAndCleanupExecutor,
     std::unique_ptr<ResourceYielder> resourceYielder,
     std::shared_ptr<executor::InlineExecutor> inlineExecutor,
-    std::unique_ptr<TransactionClient> txnClient)
+    std::unique_ptr<TransactionClient> txnClient,
+    const boost::optional<CancellationToken>& cancelToken)
     : _resourceYielder(std::move(resourceYielder)),
       _inlineExecutor(std::move(inlineExecutor)),
       _sleepExec(_inlineExecutor->getSleepableExecutor(sleepAndCleanupExecutor)),
@@ -64,7 +65,7 @@ SyncTransactionWithRetries::SyncTransactionWithRetries(
       _txn(std::make_shared<details::TransactionWithRetries>(
           opCtx,
           _sleepExec,
-          opCtx->getCancellationToken(),
+          cancelToken.value_or(opCtx->getCancellationToken()),
           txnClient ? std::move(txnClient)
                     : std::make_unique<details::SEPTransactionClient>(
                           opCtx,

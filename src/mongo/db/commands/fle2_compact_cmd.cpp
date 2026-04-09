@@ -235,6 +235,7 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
                             request,
                             &getTransactionWithRetriesForMongoD,
                             namespaces,
+                            getFLE2TaskExecutorForMongoD(opCtx),
                             &stats.getEsc(),
                             &stats.getEcoc());
     }
