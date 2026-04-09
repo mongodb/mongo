@@ -40,7 +40,8 @@
 namespace mongo::extension::host::rnp {
 namespace {
 static inline const std::string kTestFooLibExtensionName = "libfoo_mongo_extension.so";
-static inline const std::string kTestMongotHostLibExtensionName = "libmongothost_extension.so";
+static inline const std::string kTestReadNDocumentsLibExtensionName =
+    "libread_n_documents_mongo_extension.so";
 
 class TestWithTempDirectory : public unittest::Test {
 public:
@@ -170,18 +171,18 @@ TEST_F(RnpContextTest, VerifyTestExtensionWithNoKeyImportedFails) {
 }
 
 /**
- * VerifyFooExtensionWithMongotHostSignatureFails: This test tries to verify the signature of the
- * MongotHostLibExtension against the Foo extension. This is expected to fail, since the detached
- * signature does not correspond to the Foo extension's binary.
+ * VerifyFooExtensionWithReadNDocumentsSignatureFails: This test tries to verify the signature of
+ * the ReadNDocumentsLibExtension against the Foo extension. This is expected to fail, since the
+ * detached signature does not correspond to the Foo extension's binary.
  */
-TEST_F(RnpContextTest, VerifyFooExtensionWithMongotHostSignatureFails) {
+TEST_F(RnpContextTest, VerifyFooExtensionWithReadNDocumentsSignatureFails) {
     RnpContext ctx;
     ctx.initialize();
     ctx.importKey(RnpInput::createFromPath(mongo::extension::host::test_util::getPublicKeyPath()));
 
     const std::string fooExtensionPath = test_util::getExtensionPath(kTestFooLibExtensionName);
     const std::string mongotExtensionSignaturePath =
-        test_util::getExtensionPath(kTestMongotHostLibExtensionName) + ".sig";
+        test_util::getExtensionPath(kTestReadNDocumentsLibExtensionName) + ".sig";
     ASSERT_THROWS_CODE(ctx.verifyDetachedSignature(fooExtensionPath, mongotExtensionSignaturePath),
                        AssertionException,
                        11528917);

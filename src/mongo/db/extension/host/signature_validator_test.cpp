@@ -44,7 +44,8 @@
 namespace mongo::extension::host {
 namespace {
 static inline const std::string kTestFooLibExtensionName = "libfoo_mongo_extension.so";
-static inline const std::string kTestMongotHostLibExtensionName = "libmongothost_extension.so";
+static inline const std::string kTestReadNDocumentsLibExtensionName =
+    "libread_n_documents_mongo_extension.so";
 
 class TestWithTempDirectory : public unittest::Test {
 public:
@@ -212,9 +213,9 @@ TEST_F(SignatureValidatorTest, InsecureModeNonEmptyPublicKeyValidateTestExtensio
 /**
  * InsecureModeNonEmptyPublicKeyValidateMultipleTestExtensionsSucceeds: tests that initializing a
  * SignatureValidator in insecure mode with a non-empty public key is able to validate the signature
- * for both extension libfoo_mongo_extension.so and libmongothost_extension.so which are signed with
- * the same key. This simulates loading multiple extensions in a loop and validating their signature
- * with the same signature validator, as is done at server start-up time.
+ * for both extension libfoo_mongo_extension.so and libread_n_documents_mongo_extension.so which are
+ * signed with the same key. This simulates loading multiple extensions in a loop and validating
+ * their signature with the same signature validator, as is done at server start-up time.
  */
 TEST_F(SignatureValidatorTest,
        InsecureModeNonEmptyPublicKeyValidateMultipleTestExtensionsSucceeds) {
@@ -224,7 +225,7 @@ TEST_F(SignatureValidatorTest,
     signatureValidator.validateExtensionSignature(
         kTestFooLibExtensionName, test_util::getExtensionPath(kTestFooLibExtensionName));
     signatureValidator.validateExtensionSignature(
-        kTestFooLibExtensionName, test_util::getExtensionPath(kTestMongotHostLibExtensionName));
+        kTestFooLibExtensionName, test_util::getExtensionPath(kTestReadNDocumentsLibExtensionName));
 }
 #endif
 
@@ -282,11 +283,11 @@ TEST_F(SignatureValidatorTest, ValidatingNonExistentExtensionPathFails) {
 
 #ifndef MONGO_CONFIG_EXT_SIG_SECURE
 /**
- * InsecureModeValidatingFooExtensionWithMongotHostSignatureFails: tests that validating the foo
+ * InsecureModeValidatingFooExtensionWithReadNDocumentsSignatureFails: tests that validating the foo
  * extension with the mongot signing key fails. This is expected, since the test foo extension is
  * signed with a different key than the mongot-extension signing key.
  */
-TEST_F(SignatureValidatorTest, InsecureModeValidatingFooExtensionWithMongotHostSignatureFails) {
+TEST_F(SignatureValidatorTest, InsecureModeValidatingFooExtensionWithReadNDocumentsSignatureFails) {
     const std::string extensionName = "foo_extension_copy.so";
     const std::filesystem::path extensionPath = getTempDirPath() / extensionName;
 
@@ -309,7 +310,7 @@ TEST_F(SignatureValidatorTest, InsecureModeValidatingFooExtensionWithMongotHostS
     // 4) Swap out the signature file with the contents of a different extension's signature
     // file.
     std::filesystem::remove(kExtensionSignaturePath);
-    std::filesystem::copy_file(test_util::getExtensionPath(kTestMongotHostLibExtensionName) +
+    std::filesystem::copy_file(test_util::getExtensionPath(kTestReadNDocumentsLibExtensionName) +
                                    ".sig",
                                kExtensionSignaturePath,
                                std::filesystem::copy_options::overwrite_existing);

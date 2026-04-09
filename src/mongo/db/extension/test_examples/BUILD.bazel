@@ -94,7 +94,6 @@ extensions_with_config(
         ":major_version_too_low_bad_extension_signed_lib",
         ":match_topN_mongo_extension_signed_lib",
         ":minor_version_too_high_bad_extension_signed_lib",
-        ":mongothost_extension_signed_lib",
         ":native_vector_search_mongo_extension_signed_lib",
         ":no_compatible_version_bad_extension_signed_lib",
         ":no_symbol_bad_extension_signed_lib",
@@ -305,9 +304,4 @@ signed_mongo_cc_extension_shared_library(
 signed_mongo_cc_extension_shared_library(
     name = "assert_deadline_increased_after_batch_extension",
     srcs = ["assert_deadline_increased_after_batch.cpp"],
-)
-
-signed_mongo_cc_extension_shared_library(
-    name = "mongothost_extension",
-    srcs = [pkg_name + "extension_options:mongothost.cpp"],
 )
