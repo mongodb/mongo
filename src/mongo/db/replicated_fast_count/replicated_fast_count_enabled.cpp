@@ -49,7 +49,8 @@ bool isReplicatedFastCountEnabled(OperationContext* opCtx) {
 
 bool isReplicatedFastCountEligible(const NamespaceString& nss) {
     // TODO(SERVER-120741): Allow if the local DB is the oplog.
-    if (nss.isLocalDB() || nss.isImplicitlyReplicated() || nss.isServerConfigurationCollection()) {
+    if (nss.isLocalDB() || nss.isImplicitlyReplicated() || nss.isServerConfigurationCollection() ||
+        nss.isSystemDotProfile()) {
         return false;
     }
     // Exclude the fast count store collections themselves to avoid circular tracking.
