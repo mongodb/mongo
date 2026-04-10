@@ -23,11 +23,25 @@ The ticketing system supports two main concurrency adjustment algorithms:
 
 The ticketing system supports operation prioritization through two mechanisms:
 
-- **Heuristic deprioritization**: Automatically deprioritizes long-running operations that have yielded frequently (exceeded the admission threshold).
+- **Heuristic deprioritization**: Automatically deprioritizes long-running operations that have yielded frequently (exceeded the admission threshold). Operations with the `NonDeprioritizable` task type are immune to this mechanism.
 
 - **Background tasks deprioritization**: Automatically assigns background operations (index builds, TTL deletions, range deletions) to the low-priority pool.
 
 When prioritization is enabled, operations can be assigned to either the normal priority or low priority ticket pool. Deprioritized operations will acquire tickets from the low-priority pool, allowing higher-priority work to proceed with less contention.
+
+### Task Types
+
+The deprioritization mechanisms above are governed by task types, classified via
+`ExecutionAdmissionContext::TaskType`. Task types control how the two deprioritization mechanisms
+(heuristic and background) apply to an operation. They are set via RAII guards
+(`ScopedTaskTypeNonDeprioritizable`, `ScopedTaskTypeBackground`) or directly via `setTaskType()`.
+
+- `Default` - The standard task type. Subject to heuristic deprioritization when the operation
+  exceeds the admission threshold due to frequent yielding.
+- `NonDeprioritizable` - Making an operation immune to heuristic deprioritization. The operation
+  still acquires a ticket and participates in execution control — it simply cannot be moved to the
+  low-priority pool. Used for internal operations that must not be starved during system overload.
+- `Background` - Always routed to the low-priority pool when background task deprioritization is enabled. Used for index builds, TTL deletions, and range deletions.
 
 #### Compatibility with Concurrency Adjustment Algorithms
 
@@ -46,6 +60,16 @@ Some operation may need to be exempt from execution control. In the cases where 
 ```cpp
 ScopedAdmissionPriority<ExecutionAdmissionContext> priority(opCtx, AdmissionContext::Priority::kExempt);
 ```
+
+#### How to Mark an Operation Non-Deprioritizable
+
+Internal operations that must not be starved by heuristic deprioritization can be marked with the `NonDeprioritizable` task type. Unlike `kExempt`, the operation still acquires a ticket and waits if none are available — it is only protected from being moved to the low-priority pool.
+
+```cpp
+ScopedTaskTypeNonDeprioritizable guard(opCtx);
+```
+
+This should be used sparingly for operations where deprioritization would cause correctness or availability issues (e.g., replication-critical collection operations). Prefer `kExempt` priority for operations that must bypass ticket acquisition entirely.
 
 #### How to Lower the Priority of an Operation
 
