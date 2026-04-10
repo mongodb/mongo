@@ -37,6 +37,11 @@
 #include "mongo/db/index_builds/index_builds_manager.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metric_unit.h"
+#include "mongo/otel/metrics/metrics_counter.h"
+#include "mongo/otel/metrics/metrics_gauge.h"
+#include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
@@ -50,6 +55,42 @@
 
 
 namespace mongo {
+
+namespace {
+
+auto& activeIndexBuildsGauge = otel::metrics::MetricsService::instance().createInt64Gauge(
+    otel::metrics::MetricNames::kIndexBuildsActive,
+    "Number of index builds currently in progress",
+    otel::metrics::MetricUnit::kOperations);
+
+auto& succeededIndexBuildsCounter = otel::metrics::MetricsService::instance().createInt64Counter(
+    otel::metrics::MetricNames::kIndexBuildsSucceeded,
+    "Number of index builds that completed successfully, including no-op completions",
+    otel::metrics::MetricUnit::kOperations);
+
+auto& failedIndexBuildsCounter = otel::metrics::MetricsService::instance().createInt64Counter(
+    otel::metrics::MetricNames::kIndexBuildsFailed,
+    "Number of index builds that did not complete successfully",
+    otel::metrics::MetricUnit::kOperations);
+
+auto& startedIndexBuildsCounter = otel::metrics::MetricsService::instance().createInt64Counter(
+    otel::metrics::MetricNames::kIndexBuildsStarted,
+    "Number of index builds started",
+    otel::metrics::MetricUnit::kOperations);
+
+void recordIndexBuildOutcome(IndexBuildOutcome outcome) {
+    switch (outcome) {
+        case IndexBuildOutcome::kSuccess:
+            succeededIndexBuildsCounter.add(1);
+            return;
+        case IndexBuildOutcome::kFailure:
+            failedIndexBuildsCounter.add(1);
+            return;
+    }
+    MONGO_UNREACHABLE;
+}
+
+}  // namespace
 
 ActiveIndexBuilds::~ActiveIndexBuilds() {
     invariant(_allIndexBuilds.empty());
@@ -157,7 +198,8 @@ std::vector<std::shared_ptr<ReplIndexBuildState>> ActiveIndexBuilds::getAllIndex
 
 void ActiveIndexBuilds::unregisterIndexBuild(
     IndexBuildsManager* indexBuildsManager,
-    std::shared_ptr<ReplIndexBuildState> replIndexBuildState) {
+    std::shared_ptr<ReplIndexBuildState> replIndexBuildState,
+    IndexBuildOutcome outcome) {
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
@@ -169,6 +211,8 @@ void ActiveIndexBuilds::unregisterIndexBuild(
                 "buildUUID"_attr = replIndexBuildState->buildUUID,
                 "collectionUUID"_attr = replIndexBuildState->collectionUUID);
 
+    recordIndexBuildOutcome(outcome);
+    activeIndexBuildsGauge.set(_allIndexBuilds.size());
     indexBuildsManager->tearDownAndUnregisterIndexBuild(replIndexBuildState->buildUUID);
     _indexBuildsCompletedGen++;
     _indexBuildsCondVar.notify_all();
@@ -229,6 +273,8 @@ Status ActiveIndexBuilds::registerIndexBuild(
 
     invariant(_allIndexBuilds.emplace(replIndexBuildState->buildUUID, replIndexBuildState).second);
 
+    activeIndexBuildsGauge.set(_allIndexBuilds.size());
+    startedIndexBuildsCounter.add(1);
     _indexBuildsCondVar.notify_all();
 
     return Status::OK();

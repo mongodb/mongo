@@ -261,7 +261,8 @@ void IndexBuildsCoordinatorMongod::shutdown(OperationContext* opCtx) {
             return replState.isAwaitingPrimaryAbort();
         };
         for (const auto& replState : activeIndexBuilds.filterIndexBuilds(indexBuildFilter)) {
-            activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
+            activeIndexBuilds.unregisterIndexBuild(
+                &_indexBuildsManager, replState, IndexBuildOutcome::kFailure);
         }
     }
 
@@ -393,7 +394,8 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         if (replIndexBuildState.isOK()) {
             auto replState = invariant(replIndexBuildState);
             if (replState->isSettingUp()) {
-                activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
+                activeIndexBuilds.unregisterIndexBuild(
+                    &_indexBuildsManager, replState, IndexBuildOutcome::kFailure);
             }
         }
     });
@@ -501,7 +503,8 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
 
         // Clean up if we failed to schedule the task.
         if (!status.isOK()) {
-            activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
+            activeIndexBuilds.unregisterIndexBuild(
+                &_indexBuildsManager, replState, IndexBuildOutcome::kFailure);
             startPromise.setError(status);
             return;
         }

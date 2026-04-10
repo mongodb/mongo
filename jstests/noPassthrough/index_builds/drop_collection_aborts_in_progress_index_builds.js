@@ -1,9 +1,16 @@
 /**
  * Tests that the "drop" command can abort in-progress index builds.
+ *
+ * @tags: [requires_otel_build]
  */
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
+import {otelFileExportParams} from "jstests/noPassthrough/observability/libs/otel_file_export_helpers.js";
+import {waitForIndexStatusMetrics} from "jstests/noPassthrough/index_builds/libs/index_build_otel_utils.js";
 
-const mongodOptions = {};
+const {metricsDir, otelParams} = otelFileExportParams(jsTestName());
+const mongodOptions = {
+    setParameter: {...otelParams},
+};
 const conn = MongoRunner.runMongod(mongodOptions);
 
 const dbName = jsTestName();
@@ -22,6 +29,14 @@ assert.commandWorked(coll.insert({a: 1}));
 assert.commandWorked(coll.insert({b: 1}));
 
 assert.commandWorked(coll.createIndex({a: 1}));
+
+const baselineStart = new Date();
+const baselineMetrics = waitForIndexStatusMetrics(
+    metricsDir,
+    baselineStart,
+    (metrics) => metrics.active === 0,
+    "Expected no in-progress index builds before drop scenario starts",
+);
 
 jsTest.log("Starting two index builds and freezing them.");
 IndexBuildTest.pauseIndexBuilds(testDB.getMongo());
@@ -51,5 +66,16 @@ try {
 awaitFirstIndexBuild();
 awaitSecondIndexBuild();
 awaitDrop();
+
+waitForIndexStatusMetrics(
+    metricsDir,
+    baselineStart,
+    (metrics) =>
+        metrics.active === baselineMetrics.active &&
+        metrics.started === baselineMetrics.started + 2 &&
+        metrics.succeeded === baselineMetrics.succeeded &&
+        metrics.failed === baselineMetrics.failed + 2,
+    "Expected drop to count both aborted index builds as failed",
+);
 
 MongoRunner.stopMongod(conn);

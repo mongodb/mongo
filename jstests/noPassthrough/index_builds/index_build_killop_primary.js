@@ -1,6 +1,7 @@
 /**
  * Confirms that background index builds on a primary can be aborted using killop.
  * @tags: [
+ *   requires_otel_build,
  *   requires_replication,
  * ]
  */
@@ -8,13 +9,23 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
+import {otelFileExportParams} from "jstests/noPassthrough/observability/libs/otel_file_export_helpers.js";
+import {waitForIndexStatusMetrics} from "jstests/noPassthrough/index_builds/libs/index_build_otel_utils.js";
 
-function killopOnFailpoint(rst, failpointName, collName) {
+function killopOnFailpoint(rst, metricsDir, failpointName, collName) {
     const primary = rst.getPrimary();
     const testDB = primary.getDB("test");
     const coll = testDB.getCollection(collName);
 
     assert.commandWorked(coll.insert({a: 1}));
+
+    const baselineStart = new Date();
+    const baselineMetrics = waitForIndexStatusMetrics(
+        metricsDir,
+        baselineStart,
+        (metrics) => metrics.active === 0,
+        `Expected no in-progress index builds before killOp scenario ${collName} starts`,
+    );
 
     const fp = configureFailPoint(testDB, failpointName);
     // Pausing is only required to obtain the opId, as the target failpoint will block the build at
@@ -78,11 +89,25 @@ function killopOnFailpoint(rst, failpointName, collName) {
     assert.soon(() => {
         return primary.getCollection("config.system.indexBuilds").findOne({_id: indexBuildUUID}) == null;
     });
+
+    waitForIndexStatusMetrics(
+        metricsDir,
+        baselineStart,
+        (metrics) =>
+            metrics.active === baselineMetrics.active &&
+            metrics.started === baselineMetrics.started + 1 &&
+            metrics.succeeded === baselineMetrics.succeeded &&
+            metrics.failed === baselineMetrics.failed + 1,
+        `Expected killOp to count the aborted index build as failed for ${collName}`,
+    );
 }
 
+const {metricsDir, otelParams} = otelFileExportParams(jsTestName());
 const rst = new ReplSetTest({
     nodes: [
-        {},
+        {
+            setParameter: {...otelParams},
+        },
         {
             // Disallow elections on secondary.
             rsConfig: {
@@ -97,10 +122,10 @@ rst.initiate();
 
 // Kill the build before it has voted for commit.
 jsTestLog("killOp index build on primary before vote for commit readiness");
-killopOnFailpoint(rst, "hangAfterIndexBuildFirstDrain", "beforeVoteCommit");
+killopOnFailpoint(rst, metricsDir, "hangAfterIndexBuildFirstDrain", "beforeVoteCommit");
 
 // Kill the build after it has voted for commit.
 jsTestLog("killOp index build on primary after vote for commit readiness");
-killopOnFailpoint(rst, "hangIndexBuildAfterSignalPrimaryForCommitReadiness", "afterVoteCommit");
+killopOnFailpoint(rst, metricsDir, "hangIndexBuildAfterSignalPrimaryForCommitReadiness", "afterVoteCommit");
 
 rst.stopSet();

@@ -41,6 +41,8 @@
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
@@ -55,6 +57,49 @@ namespace mongo {
 using unittest::assertGet;
 
 namespace {
+// TODO SERVER-121249: Replace these local helpers if SERVER-121249 introduces an OTel histogram
+// test helper that supports empty histograms.
+int64_t readInt64CounterOrZero(otel::metrics::OtelMetricsCapturer& capturer,
+                               otel::metrics::MetricName name) {
+    try {
+        return capturer.readInt64Counter(name);
+    } catch (const DBException& ex) {
+        if (ex.code() == ErrorCodes::KeyNotFound) {
+            return 0;
+        }
+        throw;
+    }
+}
+
+int64_t readInt64GaugeOrZero(otel::metrics::OtelMetricsCapturer& capturer,
+                             otel::metrics::MetricName name) {
+    try {
+        return capturer.readInt64Gauge(name);
+    } catch (const DBException& ex) {
+        if (ex.code() == ErrorCodes::KeyNotFound) {
+            return 0;
+        }
+        throw;
+    }
+}
+
+struct IndexBuildMetricsSnapshot {
+    int64_t active = 0;
+    int64_t started = 0;
+    int64_t succeeded = 0;
+    int64_t failed = 0;
+};
+
+IndexBuildMetricsSnapshot readIndexBuildMetrics(otel::metrics::OtelMetricsCapturer& capturer) {
+    return {
+        .active = readInt64GaugeOrZero(capturer, otel::metrics::MetricNames::kIndexBuildsActive),
+        .started =
+            readInt64CounterOrZero(capturer, otel::metrics::MetricNames::kIndexBuildsStarted),
+        .succeeded =
+            readInt64CounterOrZero(capturer, otel::metrics::MetricNames::kIndexBuildsSucceeded),
+        .failed = readInt64CounterOrZero(capturer, otel::metrics::MetricNames::kIndexBuildsFailed),
+    };
+}
 
 class IndexBuildsCoordinatorMongodTest : public CatalogTestFixture {
 private:
@@ -66,6 +111,8 @@ public:
      * Creates a collection with a default CollectionsOptions and the given UUID.
      */
     void createCollection(const NamespaceString& nss, UUID uuid);
+
+    void createEmptyCollection(const NamespaceString& nss, UUID uuid);
 
     CollectionAcquisition getCollectionExclusive(OperationContext* opCtx,
                                                  const NamespaceString& nss);
@@ -113,9 +160,7 @@ void IndexBuildsCoordinatorMongodTest::tearDown() {
 }
 
 void IndexBuildsCoordinatorMongodTest::createCollection(const NamespaceString& nss, UUID uuid) {
-    CollectionOptions options;
-    options.uuid = uuid;
-    ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
+    createEmptyCollection(nss, uuid);
 
     // Insert document into collection to avoid optimization for index creation on an empty
     // collection. This allows us to pause index builds on the collection using the test function
@@ -124,6 +169,13 @@ void IndexBuildsCoordinatorMongodTest::createCollection(const NamespaceString& n
                                                  nss,
                                                  {BSON("_id" << 0), Timestamp()},
                                                  repl::OpTime::kUninitializedTerm));
+}
+
+void IndexBuildsCoordinatorMongodTest::createEmptyCollection(const NamespaceString& nss,
+                                                             UUID uuid) {
+    CollectionOptions options;
+    options.uuid = uuid;
+    ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
 }
 
 CollectionAcquisition IndexBuildsCoordinatorMongodTest::getCollectionExclusive(
@@ -369,6 +421,120 @@ TEST_F(IndexBuildsCoordinatorMongodTest, SetCommitQuorumWithBadArguments) {
 
     _indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
     unittest::assertGet(testFoo1Future.getNoThrow());
+}
+
+TEST_F(IndexBuildsCoordinatorMongodTest, OtelMetricsTrackSuccessfulBuilds) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "Skipping test due to OTel metrics being unavailable in this build";
+        return;
+    }
+    const auto metricsBeforeBuild = readIndexBuildMetrics(capturer);
+
+    const auto buildUUID = UUID::gen();
+    _indexBuildsCoord->sleepIndexBuilds_forTestOnly(true);
+    auto buildFuture = assertGet(_indexBuildsCoord->startIndexBuild(operationContext(),
+                                                                    _testFooNss.dbName(),
+                                                                    _testFooUUID,
+                                                                    makeSpecs({"a"}, {1}),
+                                                                    buildUUID,
+                                                                    _indexBuildOptions));
+
+    const auto metricsDuringBuild = readIndexBuildMetrics(capturer);
+    EXPECT_EQ(metricsDuringBuild.active, metricsBeforeBuild.active + 1);
+    EXPECT_EQ(metricsDuringBuild.started, metricsBeforeBuild.started + 1);
+    EXPECT_EQ(metricsDuringBuild.succeeded, metricsBeforeBuild.succeeded);
+
+    ASSERT_OK(_indexBuildsCoord->voteCommitIndexBuild(
+        operationContext(),
+        buildUUID,
+        repl::ReplicationCoordinator::get(operationContext())->getMyHostAndPort()));
+
+    _indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
+    unittest::assertGet(buildFuture.getNoThrow());
+
+    const auto metricsAfterBuild = readIndexBuildMetrics(capturer);
+    EXPECT_EQ(metricsAfterBuild.active, metricsBeforeBuild.active);
+    EXPECT_EQ(metricsAfterBuild.started, metricsBeforeBuild.started + 1);
+    EXPECT_EQ(metricsAfterBuild.succeeded, metricsBeforeBuild.succeeded + 1);
+}
+
+TEST_F(IndexBuildsCoordinatorMongodTest, OtelMetricsTrackFailedBuilds) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "Skipping test due to OTel metrics being unavailable in this build";
+        return;
+    }
+    const auto metricsBeforeBuild = readIndexBuildMetrics(capturer);
+    const auto buildUUID = UUID::gen();
+
+    ASSERT_OK(storageInterface()->insertDocument(operationContext(),
+                                                 _testBarNss,
+                                                 {BSON("_id" << 1 << "a" << 1), Timestamp()},
+                                                 repl::OpTime::kUninitializedTerm));
+    ASSERT_OK(storageInterface()->insertDocument(operationContext(),
+                                                 _testBarNss,
+                                                 {BSON("_id" << 2 << "a" << 1), Timestamp()},
+                                                 repl::OpTime::kUninitializedTerm));
+
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    std::vector<IndexBuildInfo> uniqueIndex;
+    uniqueIndex.emplace_back(BSON("v" << 2 << "key" << BSON("a" << 1) << "name"
+                                      << "a_1"
+                                      << "unique" << true),
+                             "index-1",
+                             *storageEngine);
+
+    auto failedBuildFuture = assertGet(_indexBuildsCoord->startIndexBuild(operationContext(),
+                                                                          _testBarNss.dbName(),
+                                                                          _testBarUUID,
+                                                                          uniqueIndex,
+                                                                          buildUUID,
+                                                                          _indexBuildOptions));
+
+    ASSERT_OK(_indexBuildsCoord->voteCommitIndexBuild(
+        operationContext(),
+        buildUUID,
+        repl::ReplicationCoordinator::get(operationContext())->getMyHostAndPort()));
+    auto buildStatus = failedBuildFuture.getNoThrow();
+    ASSERT_EQ(buildStatus.getStatus(), ErrorCodes::DuplicateKey);
+    _indexBuildsCoord->awaitNoIndexBuildInProgressForCollection(
+        operationContext(), _testBarUUID, IndexBuildProtocol::kTwoPhase);
+
+    const auto metricsAfterFailure = readIndexBuildMetrics(capturer);
+    EXPECT_EQ(metricsAfterFailure.active, metricsBeforeBuild.active);
+    EXPECT_EQ(metricsAfterFailure.started, metricsBeforeBuild.started + 1);
+    EXPECT_EQ(metricsAfterFailure.failed, metricsBeforeBuild.failed + 1);
+}
+
+TEST_F(IndexBuildsCoordinatorMongodTest, OtelMetricsTrackAbortedBuildsAsFailures) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "Skipping test due to OTel metrics being unavailable in this build";
+        return;
+    }
+    const auto metricsBeforeBuild = readIndexBuildMetrics(capturer);
+
+    const auto buildUUID = UUID::gen();
+    auto buildFuture = assertGet(_indexBuildsCoord->startIndexBuild(operationContext(),
+                                                                    _testFooNss.dbName(),
+                                                                    _testFooUUID,
+                                                                    makeSpecs({"a"}, {1}),
+                                                                    buildUUID,
+                                                                    _indexBuildOptions));
+
+    ASSERT_TRUE(_indexBuildsCoord->abortIndexBuildByBuildUUID(
+        operationContext(),
+        buildUUID,
+        IndexBuildAction::kPrimaryAbort,
+        Status{ErrorCodes::IndexBuildAborted, "test abort"}));
+    auto buildStatus = buildFuture.getNoThrow();
+    ASSERT_EQ(buildStatus.getStatus(), ErrorCodes::IndexBuildAborted);
+
+    const auto metricsAfterAbort = readIndexBuildMetrics(capturer);
+    EXPECT_EQ(metricsAfterAbort.active, metricsBeforeBuild.active);
+    EXPECT_EQ(metricsAfterAbort.started, metricsBeforeBuild.started + 1);
+    EXPECT_EQ(metricsAfterAbort.failed, metricsBeforeBuild.failed + 1);
 }
 
 }  // namespace

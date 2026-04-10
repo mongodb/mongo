@@ -164,7 +164,9 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:suites/no_passthrough.yml",
     data = [
         "//jstests/core/txns/libs:all_javascript_files",
+        "//jstests/noPassthrough/index_builds/libs:all_javascript_files",
         "//jstests/noPassthrough/libs:all_subpackage_javascript_files",
+        "//jstests/noPassthrough/observability/libs:all_javascript_files",
         "//jstests/replsets:rslib.js",
         "//jstests/replsets/libs:all_javascript_files",
     ],

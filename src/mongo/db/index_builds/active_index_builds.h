@@ -53,6 +53,11 @@
 
 namespace mongo {
 
+enum class IndexBuildOutcome {
+    kSuccess,
+    kFailure,
+};
+
 /**
  * This is a helper class used by IndexBuildsCoordinator to safely manage the data structures
  * that keep track of active index builds. It is owned by IndexBuildsCoordinator, and should
@@ -108,7 +113,8 @@ public:
      * Unregisters the index build.
      */
     void unregisterIndexBuild(IndexBuildsManager* indexBuildsManager,
-                              std::shared_ptr<ReplIndexBuildState> replIndexBuildState);
+                              std::shared_ptr<ReplIndexBuildState> replIndexBuildState,
+                              IndexBuildOutcome outcome);
 
     /**
      * Returns a list of index builds matching the criteria 'indexBuildFilter'.

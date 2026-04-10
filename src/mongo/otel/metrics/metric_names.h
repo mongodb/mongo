@@ -106,6 +106,10 @@ public:
         "change_streams.cursor.open.pinned"};
 
     // Storage Execution Team Metrics
+    static constexpr MetricName kIndexBuildsActive = {"index_builds.active"};
+    static constexpr MetricName kIndexBuildsStarted = {"index_builds.started"};
+    static constexpr MetricName kIndexBuildsSucceeded = {"index_builds.succeeded"};
+    static constexpr MetricName kIndexBuildsFailed = {"index_builds.failed"};
     static constexpr MetricName kIndexBuildSideWritesInserted = {
         "index_builds.side_writes.inserted"};
     static constexpr MetricName kIndexBuildSideWritesDeleted = {"index_builds.side_writes.deleted"};

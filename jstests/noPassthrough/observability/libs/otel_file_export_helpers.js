@@ -212,3 +212,21 @@ export function createMetricsDirectory(testName) {
     assert(mkdir(metricsDir), `Failed to create metrics directory: ${metricsDir}`);
     return metricsDir;
 }
+
+/**
+ * Creates a metrics directory and returns the setParameter entries needed to enable OTEL file export for testing.
+ *
+ * @param {string} testName - The name of the test.
+ * @returns {{metricsDir: string, otelParams: Object}} An object with:
+ *   - metricsDir: The path to the created metrics directory, for use when reading metrics.
+ *   - otelParams: The setParameter entries to spread into a node's setParameter config.
+ */
+export function otelFileExportParams(testName) {
+    const metricsDir = createMetricsDirectory(testName);
+    return {
+        metricsDir,
+        otelParams: {
+            openTelemetryMetricsDirectory: metricsDir,
+        },
+    };
+}

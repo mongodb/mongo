@@ -4,14 +4,17 @@
  *
  * @tags: [
  *   requires_fcv_71,
+ *   requires_otel_build,
  *   requires_replication,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
+import {otelFileExportParams} from "jstests/noPassthrough/observability/libs/otel_file_export_helpers.js";
+import {waitForIndexStatusMetrics} from "jstests/noPassthrough/index_builds/libs/index_build_otel_utils.js";
 
-function killBeforeVoteCommitSucceeds(rst) {
+function killBeforeVoteCommitSucceeds(rst, metricsDir) {
     const primary = rst.getPrimary();
     const primaryDB = primary.getDB("test");
     const primaryColl = primaryDB.getCollection("test");
@@ -24,6 +27,13 @@ function killBeforeVoteCommitSucceeds(rst) {
     let serverStatus = primaryDB.serverStatus();
     const tookActionCountBefore = serverStatus.metrics.diskSpaceMonitor.tookAction;
     const killedDueToInsufficientDiskSpaceBefore = serverStatus.indexBuilds.killedDueToInsufficientDiskSpace;
+    const baselineStart = new Date();
+    const baselineMetrics = waitForIndexStatusMetrics(
+        metricsDir,
+        baselineStart,
+        (metrics) => metrics.active === 0,
+        "Expected no in-progress index builds before insufficient-disk-space kill starts",
+    );
 
     jsTestLog("Waiting for index build to start");
     const createIdx = IndexBuildTest.startIndexBuild(primary, primaryColl.getFullName(), {a: 1}, null, [
@@ -65,9 +75,20 @@ function killBeforeVoteCommitSucceeds(rst) {
 
     const secondaryColl = rst.getSecondary().getCollection(primaryColl.getFullName());
     IndexBuildTest.assertIndexes(secondaryColl, 1, ["_id_"]);
+
+    waitForIndexStatusMetrics(
+        metricsDir,
+        baselineStart,
+        (metrics) =>
+            metrics.active === baselineMetrics.active &&
+            metrics.started === baselineMetrics.started + 1 &&
+            metrics.succeeded === baselineMetrics.succeeded &&
+            metrics.failed === baselineMetrics.failed + 1,
+        "Expected insufficient disk space kill to count as a failed index build",
+    );
 }
 
-function killAfterVoteCommitFails(rst) {
+function killAfterVoteCommitFails(rst, metricsDir) {
     const primary = rst.getPrimary();
     const primaryDB = primary.getDB("test");
     const primaryColl = primaryDB.getCollection("test");
@@ -80,6 +101,13 @@ function killAfterVoteCommitFails(rst) {
     let serverStatus = primaryDB.serverStatus();
     const tookActionCountBefore = serverStatus.metrics.diskSpaceMonitor.tookAction;
     const killedDueToInsufficientDiskSpaceBefore = serverStatus.indexBuilds.killedDueToInsufficientDiskSpace;
+    const baselineStart = new Date();
+    const baselineMetrics = waitForIndexStatusMetrics(
+        metricsDir,
+        baselineStart,
+        (metrics) => metrics.active === 0,
+        "Expected no in-progress index builds before post-vote disk-space scenario starts",
+    );
 
     jsTestLog("Waiting for index build to start");
     const createIdx = IndexBuildTest.startIndexBuild(primary, primaryColl.getFullName(), {a: 1});
@@ -117,11 +145,25 @@ function killAfterVoteCommitFails(rst) {
 
     const secondaryColl = rst.getSecondary().getCollection(primaryColl.getFullName());
     IndexBuildTest.assertIndexes(secondaryColl, 2, ["_id_", "a_1"]);
+
+    waitForIndexStatusMetrics(
+        metricsDir,
+        baselineStart,
+        (metrics) =>
+            metrics.active === baselineMetrics.active &&
+            metrics.started === baselineMetrics.started + 1 &&
+            metrics.succeeded === baselineMetrics.succeeded + 1 &&
+            metrics.failed === baselineMetrics.failed,
+        "Expected post-vote disk-space scenario to still complete successfully",
+    );
 }
 
+const {metricsDir, otelParams} = otelFileExportParams(jsTestName());
 const rst = new ReplSetTest({
     nodes: [
-        {},
+        {
+            setParameter: {...otelParams},
+        },
         {
             // Disallow elections on secondary.
             rsConfig: {
@@ -133,7 +175,7 @@ const rst = new ReplSetTest({
 rst.startSet();
 rst.initiate();
 
-killBeforeVoteCommitSucceeds(rst);
-killAfterVoteCommitFails(rst);
+killBeforeVoteCommitSucceeds(rst, metricsDir);
+killAfterVoteCommitFails(rst, metricsDir);
 
 rst.stopSet();

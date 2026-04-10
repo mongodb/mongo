@@ -7,16 +7,22 @@
  *   # TODO(SERVER-109702): Evaluate if a primary-driven index build compatible test should be created.
  *   requires_commit_quorum,
  *   requires_fcv_71,
+ *   requires_otel_build,
  *   requires_replication,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
+import {otelFileExportParams} from "jstests/noPassthrough/observability/libs/otel_file_export_helpers.js";
+import {waitForIndexStatusMetrics} from "jstests/noPassthrough/index_builds/libs/index_build_otel_utils.js";
 
+const {metricsDir, otelParams} = otelFileExportParams(jsTestName());
 const rst = new ReplSetTest({
     nodes: [
-        {},
+        {
+            setParameter: {...otelParams},
+        },
         {
             // Disallow elections on secondary.
             rsConfig: {
@@ -53,6 +59,14 @@ assert.commandWorked(
             ],
         },
     }),
+);
+
+const baselineStart = new Date();
+const baselineMetrics = waitForIndexStatusMetrics(
+    metricsDir,
+    baselineStart,
+    (metrics) => metrics.active === 0,
+    "Expected no in-progress index builds before key-generation failure scenario starts",
 );
 
 // Set the failpoint after the collection scan phase. It is expected that we never hit this
@@ -96,5 +110,16 @@ checkLog.checkContainsOnceJsonStringMatch(testDB, 4656003, "error", reasonString
 // thread.
 IndexBuildTest.assertIndexesSoon(coll, 1, ["_id_"], []);
 IndexBuildTest.assertIndexesSoon(secondaryColl, 1, ["_id_"], []);
+
+waitForIndexStatusMetrics(
+    metricsDir,
+    baselineStart,
+    (metrics) =>
+        metrics.active === baselineMetrics.active &&
+        metrics.started === baselineMetrics.started + 1 &&
+        metrics.succeeded === baselineMetrics.succeeded &&
+        metrics.failed === baselineMetrics.failed + 1,
+    "Expected key-generation error to count as a failed index build",
+);
 
 rst.stopSet();

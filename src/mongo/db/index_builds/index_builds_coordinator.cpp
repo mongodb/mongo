@@ -1018,7 +1018,8 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
                                                  options,
                                                  resumeInfo);
     if (!status.isOK()) {
-        activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replIndexBuildState);
+        activeIndexBuilds.unregisterIndexBuild(
+            &_indexBuildsManager, replIndexBuildState, IndexBuildOutcome::kFailure);
     }
 
     // Mark the index build setup as complete, from now on cleanup is required on failure/abort.
@@ -1873,7 +1874,8 @@ void IndexBuildsCoordinator::_completeExternalAbort(OperationContext* opCtx,
     }
 
     replState->completeAbort(opCtx);
-    activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
+    activeIndexBuilds.unregisterIndexBuild(
+        &_indexBuildsManager, replState, IndexBuildOutcome::kFailure);
 }
 
 void IndexBuildsCoordinator::_completeSelfAbort(OperationContext* opCtx,
@@ -1882,7 +1884,8 @@ void IndexBuildsCoordinator::_completeSelfAbort(OperationContext* opCtx,
     _completeAbort(opCtx, replState, indexBuildEntryCollection, IndexBuildAction::kPrimaryAbort);
     replState->completeAbort(opCtx);
 
-    activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
+    activeIndexBuilds.unregisterIndexBuild(
+        &_indexBuildsManager, replState, IndexBuildOutcome::kFailure);
 }
 
 void IndexBuildsCoordinator::_completeAbortForShutdown(
@@ -1898,8 +1901,8 @@ void IndexBuildsCoordinator::_completeAbortForShutdown(
                 opCtx, collection, replState->buildUUID, replState->isResumable());
 
             replState->abortForShutdown(opCtx);
-
-            activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
+            activeIndexBuilds.unregisterIndexBuild(
+                &_indexBuildsManager, replState, IndexBuildOutcome::kFailure);
             return;
         } catch (const ExceptionFor<ErrorCodes::InterruptedAtShutdown>&) {
             ++retryAttempts;
@@ -3005,7 +3008,9 @@ Status IndexBuildsCoordinator::_setUpIndexBuild(OperationContext* opCtx,
     }
 
     // Unregister the index build before setting the promise, so callers do not see the build again.
-    activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
+    // This request completed as a no-op because the requested indexes were already satisfied.
+    activeIndexBuilds.unregisterIndexBuild(
+        &_indexBuildsManager, replState, IndexBuildOutcome::kSuccess);
 
     // The requested index (specs) are already built or are being built. Return success
     // early (this is v4.0 behavior compatible).
@@ -3066,7 +3071,8 @@ void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
     if (status.isOK()) {
         hangBeforeUnregisteringAfterCommit.pauseWhileSet();
         // Unregister first so that when we fulfill the future, the build is not observed as active.
-        activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
+        activeIndexBuilds.unregisterIndexBuild(
+            &_indexBuildsManager, replState, IndexBuildOutcome::kSuccess);
         replState->sharedPromise.emplaceValue(replState->stats);
         return;
     }
@@ -3108,7 +3114,8 @@ void IndexBuildsCoordinator::_cleanUpAfterFailure(OperationContext* opCtx,
               "Index build: unregistering without cleanup",
               "buildUUD"_attr = replState->buildUUID,
               "error"_attr = status);
-        activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
+        activeIndexBuilds.unregisterIndexBuild(
+            &_indexBuildsManager, replState, IndexBuildOutcome::kFailure);
         return;
     }
 
@@ -3220,7 +3227,8 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
                     replState->resetNextActionPromise();
                     // Unregister the build here since primary-driven index builds should not be
                     // registered on secondaries.
-                    activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
+                    activeIndexBuilds.unregisterIndexBuild(
+                        &_indexBuildsManager, replState, IndexBuildOutcome::kFailure);
                 };
                 try {
                     // Take RSTL to observe and prevent replication state from changing.
@@ -4012,7 +4020,8 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
     // as 'numIndexesAfter', since we're going to be building any unfinished indexes too.
     invariant(indexCatalogStats.numIndexesBefore == indexCatalogStats.numIndexesAfter);
 
-    activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
+    activeIndexBuilds.unregisterIndexBuild(
+        &_indexBuildsManager, replState, IndexBuildOutcome::kSuccess);
 
     if (status.isOK()) {
         return std::make_pair(numRecords, dataSize);

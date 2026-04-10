@@ -2,16 +2,22 @@
  * Confirms that background index builds on a primary are aborted when the node steps down between
  * scheduling on the thread pool and initialization.
  * @tags: [
+ *   requires_otel_build,
  *   requires_replication,
  * ]
  */
 import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {waitForIndexStatusMetrics} from "jstests/noPassthrough/index_builds/libs/index_build_otel_utils.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
+import {otelFileExportParams} from "jstests/noPassthrough/observability/libs/otel_file_export_helpers.js";
 
+const {metricsDir, otelParams} = otelFileExportParams(jsTestName());
 const rst = new ReplSetTest({
     nodes: [
-        {},
+        {
+            setParameter: {...otelParams},
+        },
         {
             // Disallow elections on secondary.
             rsConfig: {
@@ -30,6 +36,14 @@ const coll = testDB.getCollection("test");
 
 assert.commandWorked(coll.insert({a: 1}));
 
+const baselineStart = new Date();
+const baselineMetrics = waitForIndexStatusMetrics(
+    metricsDir,
+    baselineStart,
+    (metrics) => metrics.active === 0,
+    "Expected no in-progress index builds before the stepdown-before-init scenario starts",
+);
+
 const res = assert.commandWorked(
     primary.adminCommand({configureFailPoint: "hangBeforeInitializingIndexBuild", mode: "alwaysOn"}),
 );
@@ -44,6 +58,17 @@ try {
             timesEntered: failpointTimesEntered + 1,
             maxTimeMS: kDefaultWaitForFailPointTimeout,
         }),
+    );
+
+    waitForIndexStatusMetrics(
+        metricsDir,
+        baselineStart,
+        (metrics) =>
+            metrics.active === baselineMetrics.active + 1 &&
+            metrics.started === baselineMetrics.started + 1 &&
+            metrics.succeeded === baselineMetrics.succeeded &&
+            metrics.failed === baselineMetrics.failed,
+        "Expected the active gauge to reflect the build while it is hung before initialization",
     );
 
     // Step down the primary.
@@ -62,6 +87,17 @@ assert.neq(0, exitCode, "expected shell to exit abnormally due to index build be
 // build because the builder thread cannot generate an optime. Wait for the command thread, not the
 // IndexBuildsCoordinator, to report the index build as failed.
 checkLog.containsJson(primary, 20449);
+
+waitForIndexStatusMetrics(
+    metricsDir,
+    baselineStart,
+    (metrics) =>
+        metrics.active === baselineMetrics.active &&
+        metrics.started === baselineMetrics.started + 1 &&
+        metrics.succeeded === baselineMetrics.succeeded &&
+        metrics.failed === baselineMetrics.failed + 1,
+    "Expected stepping down before initialization to count as a failed index build",
+);
 
 // Check that no new index has been created.  This verifies that the index build was aborted
 // rather than successfully completed.
