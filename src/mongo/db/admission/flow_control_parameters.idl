@@ -127,3 +127,12 @@ server_parameters:
         default: 10
         validator: {gte: 0}
         redact: false
+
+    flowControlPollIntervalMs:
+        description: "Interval in milliseconds between FlowControl refresh cycles. Lower values provide faster response to lag changes but increase CPU usage."
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<int>"
+        cpp_varname: "gFlowControlPollIntervalMs"
+        default: 1000
+        validator: {gte: 100, lte: 5000}
+        redact: false

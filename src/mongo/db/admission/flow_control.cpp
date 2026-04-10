@@ -40,6 +40,8 @@
 #include "mongo/db/repl/member_data.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/server_parameter_with_storage.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/lock_manager/lock_stats.h"
 #include "mongo/logv2/log.h"
@@ -239,9 +241,18 @@ FlowControl::FlowControl(ServiceContext* service,
          [this](Client* client) {
              FlowControlTicketholder::get(client->getServiceContext())->refreshTo(getNumTickets());
          },
-         Seconds(1),
+         Milliseconds(gFlowControlPollIntervalMs.load()),
          true /*isKillableByStepdown*/});
     _jobAnchor.start();
+
+    using ParamT =
+        IDLServerParameterWithStorage<ServerParameterType::kStartupAndRuntime, AtomicWord<int>>;
+    ServerParameterSet::getNodeParameterSet()
+        ->get<ParamT>("flowControlPollIntervalMs")
+        ->setOnUpdate([this](const int newValue) -> Status {
+            _jobAnchor.setPeriod(Milliseconds(newValue));
+            return Status::OK();
+        });
 }
 
 FlowControl* FlowControl::get(ServiceContext* service) {
@@ -511,6 +522,10 @@ int FlowControl::getNumTickets(Date_t now) {
         std::min(lastTargetTime.timestamp, _timestampProvider->getPrevSustainerTimestamp()));
 
     return ret;
+}
+
+std::int64_t FlowControl::approximateOpsBetween(Timestamp prevTs, Timestamp currTs) {
+    return _approximateOpsBetween(prevTs, currTs);
 }
 
 std::int64_t FlowControl::_approximateOpsBetween(Timestamp prevTs, Timestamp currTs) {

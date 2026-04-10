@@ -182,6 +182,12 @@ public:
     void disableUntil(Date_t deadline);
 
     /**
+     * Returns an estimate of the number of oplog operations between two timestamps by querying
+     * the internal samples table.
+     */
+    std::int64_t approximateOpsBetween(Timestamp prevTs, Timestamp currTs);
+
+    /**
      * Underscore methods are public for testing.
      */
     MONGO_MOD_PRIVATE std::int64_t _getLocksUsedLastPeriod();
