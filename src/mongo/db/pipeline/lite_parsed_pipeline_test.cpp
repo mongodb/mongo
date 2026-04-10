@@ -238,6 +238,37 @@ TEST(LiteParsedPipelineTest, ClonedPipelineWithViewStagesPreservesOwnership) {
     ASSERT_EQ(clonedStages[2]->getParseTimeName(), "$sort");
 }
 
+TEST(LiteParsedPipelineTest, GetParseNssMatchesConstructorNss) {
+    std::vector<BSONObj> stages = {BSON("$match" << BSON("x" << 1))};
+    LiteParsedPipeline pipeline(kTestNss, stages);
+    ASSERT_EQ(pipeline.getOriginalParseNss(), kTestNss);
+}
+
+TEST(LiteParsedPipelineTest, NestedLookupSubpipelineGetParseNssIsForeignCollection) {
+    std::vector<BSONObj> pipelineStages = {
+        BSON("$lookup" << BSON("from" << "otherCollection"
+                                      << "let" << BSONObj() << "pipeline"
+                                      << BSON_ARRAY(BSON("$match" << BSON("a" << 1))) << "as"
+                                      << "joined")),
+    };
+    LiteParsedPipeline pipeline(kTestNss, pipelineStages);
+    const NamespaceString kForeignNss =
+        NamespaceString::createNamespaceString_forTest(kTestNss.dbName(), "otherCollection");
+
+    ASSERT_EQ(pipeline.getOriginalParseNss(), kTestNss);
+
+    const auto& subPipelines = pipeline.getStages()[0]->getSubPipelines();
+    ASSERT_EQ(subPipelines.size(), 1U);
+    ASSERT_EQ(subPipelines[0].getOriginalParseNss(), kForeignNss);
+}
+
+TEST(LiteParsedPipelineTest, HandleViewPreservesParseNss) {
+    std::vector<BSONObj> userStages = {BSON("$match" << BSON("x" << 1))};
+    LiteParsedPipeline pipeline(kTestNss, userStages);
+    pipeline.handleView(createTestViewInfo({BSON("$limit" << 1)}), {});
+    ASSERT_EQ(pipeline.getOriginalParseNss(), kTestNss);
+}
+
 }  // namespace
 
 std::unique_ptr<LiteParsedDocumentSource> createViewPolicyDefaultParser(

@@ -85,7 +85,8 @@ public:
                        const std::vector<BSONObj>& pipelineStages,
                        const bool isRunningAgainstView_ForHybridSearch = false,
                        const LiteParserOptions& options = LiteParserOptions{})
-        : _isRunningAgainstView_ForHybridSearch(isRunningAgainstView_ForHybridSearch) {
+        : _originalParseNss(nss),
+          _isRunningAgainstView_ForHybridSearch(isRunningAgainstView_ForHybridSearch) {
         _stageSpecs.reserve(pipelineStages.size());
         for (auto&& rawStage : pipelineStages) {
             auto stageCopy = rawStage;
@@ -104,7 +105,8 @@ public:
      * member variables.
      */
     LiteParsedPipeline(const LiteParsedPipeline& other)
-        : _isRunningAgainstView_ForHybridSearch(other._isRunningAgainstView_ForHybridSearch),
+        : _originalParseNss(other._originalParseNss),
+          _isRunningAgainstView_ForHybridSearch(other._isRunningAgainstView_ForHybridSearch),
           _hasChangeStream(&computeHasChangeStream),
           _involvedNamespaces(&computeInvolvedNamespaces) {
 
@@ -118,6 +120,7 @@ public:
 
     LiteParsedPipeline& operator=(LiteParsedPipeline other) {
         std::swap(_stageSpecs, other._stageSpecs);
+        std::swap(_originalParseNss, other._originalParseNss);
         std::swap(_isRunningAgainstView_ForHybridSearch,
                   other._isRunningAgainstView_ForHybridSearch);
         // _hasChangeStream and _involvedNamespaces are Deferred and will be recomputed on demand,
@@ -137,6 +140,21 @@ public:
      */
     const stdx::unordered_set<NamespaceString>& getInvolvedNamespaces() const {
         return _involvedNamespaces.get(_stageSpecs);
+    }
+
+    /**
+     * Namespace used as the parse-time primary context for this pipeline's top-level stages (the
+     * same `nss` passed to `LiteParsedDocumentSource::parse` when this object was constructed).
+     *
+     * For nested pipelines (e.g. inside $lookup), this is the namespace those stages were parsed
+     * against, such as the foreign collection.
+     *
+     * Note that this is not a substitute for `getInvolvedNamespaces()` or
+     * `getForeignExecutionNamespaces()` because this only returns the namespace this pipeline
+     * runs against, and not any namespaces its subpipelines may run against.
+     */
+    const NamespaceString& getOriginalParseNss() const {
+        return _originalParseNss;
     }
 
     /**
@@ -445,6 +463,8 @@ private:
     // This is logically const - any changes to _stageSpecs will invalidate cached copies of
     // "_hasChangeStream" and "_involvedNamespaces" below.
     StageSpecs _stageSpecs;
+
+    NamespaceString _originalParseNss;
 
     // This variable specifies whether the pipeline is running on a view's namespace. This is
     // currently needed for $rankFusion/$scoreFusion positional validation.
