@@ -37,7 +37,9 @@ namespace {
 // Returns true if multiplanning reached EOF and the query is fully answered, so we can
 // skip engine selection and use classic directly. This avoids unnecessarily lowering to
 // SBE when the query has already been completed during multiplanning.
-bool useEofOptimization(const PlanRankingResult& result, const CanonicalQuery* cq) {
+bool useEofOptimization(const PlanRankingResult& result,
+                        const CanonicalQuery* cq,
+                        const Pipeline* pipeline) {
     if (!result.execState) {
         return false;
     }
@@ -56,7 +58,8 @@ bool useEofOptimization(const PlanRankingResult& result, const CanonicalQuery* c
         !cq->getExpCtxRaw()->getExplain() &&
         // We can't use EOF optimization if pipeline is present. Because we may need to execute
         // the pipeline part in SBE, we have to rebuild and rerun the whole query.
-        cq->cqPipeline().empty() &&
+        // Use `pipeline` since the CQ pipeline won't be populated at this point.
+        (!pipeline || pipeline->empty()) &&
         // We want more coverage for engine selection in debug builds.
         !kDebugBuild;
 }
@@ -83,7 +86,7 @@ EngineSelectionPlanner::EngineSelectionPlanner(std::unique_ptr<PlannerInterface>
     //       has been fully answered and there's no more execution that needs to
     //       happen. In this case we return a classic executor so that we don't
     //       have to restart work using SBE.
-    if (solution->root()->getType() == STAGE_EOF || useEofOptimization(_result, cq)) {
+    if (solution->root()->getType() == STAGE_EOF || useEofOptimization(_result, cq, pipeline)) {
         _result.engineSelection = EngineChoice::kClassic;
         return;
     }

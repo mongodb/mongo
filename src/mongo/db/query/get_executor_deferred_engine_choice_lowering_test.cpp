@@ -46,6 +46,9 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/logv2/log.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo::exec_deferred_engine_choice {
 namespace {
@@ -250,46 +253,54 @@ TEST_F(DeferredEngineChoiceLoweringTest, GroupQueryUsesSbe) {
 // is because the query was already fully answered during multiplanning, and lowering to
 // SBE and restarting the query would be unnecessary.
 TEST_F(DeferredEngineChoiceLoweringTest, MultiplanningUsesEof) {
-    if (kDebugBuild) {
-        // EOF optimization is not used in debug builds.
-        return;
-    }
-
-    auto testNumDocs = [&](size_t numDocs) {
-        // Depending on the number of documents, a plan may reach EOF.
-        bool shouldUseSbe = numDocs > 100;
-
+    auto testExpectedEngine = [&](size_t numDocs, bool hasGroupPipeline, bool shouldUseSbe) {
         auto [cq, plannerData] = createPlannerData(kFindFilter);
         auto solutions = createVirtualScanQuerySolutionsForDefaultFilter(
             numDocs /*resultDocCount*/, cq->getPrimaryMatchExpression());
-        auto multiPlanner = std::make_unique<exec_deferred_engine_choice::MultiPlanner>(
-            std::move(plannerData), std::move(solutions));
         // Include the SBE-eligible pipeline, so that if multiplanning hits EOF we see classic used,
         // and if EOF is not reached we see SBE used.
         auto pipeline = makeSbeEligiblePipeline();
-        // EngineSelectionPlanner applies the EOF optimization: if multiplanning already
-        // reached EOF, it selects classic instead of lowering to SBE unnecessarily.
-        exec_deferred_engine_choice::EngineSelectionPlanner planner{
-            std::move(multiPlanner), operationContext(), cq.get(), pipeline.get(), collections()};
+        auto pipelinePtr = hasGroupPipeline ? pipeline.get() : nullptr;
+        auto multiplanner = std::make_unique<exec_deferred_engine_choice::MultiPlanner>(
+            std::move(plannerData), std::move(solutions));
+        EngineSelectionPlanner planner(
+            std::move(multiplanner), operationContext(), cq.get(), pipelinePtr, collections());
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec =
             lowerPlanRankingResult(std::move(cq),
                                    planner.extractPlanRankingResult(),
                                    operationContext(),
                                    collections(),
                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                   pipeline.get());
+                                   pipelinePtr);
 
         if (shouldUseSbe) {
-            ASSERT(dynamic_cast<PlanExecutorSBE*>(exec.get()));
+            ASSERT(dynamic_cast<PlanExecutorSBE*>(exec.get()))
+                << " numDocs: " << numDocs << " hasGroupPipeline: " << hasGroupPipeline
+                << " shouldUseSbe: " << shouldUseSbe << " found: SBE";
         } else {
-            ASSERT(dynamic_cast<PlanExecutorImpl*>(exec.get()));
+            ASSERT(dynamic_cast<PlanExecutorImpl*>(exec.get()))
+                << " numDocs: " << numDocs << " hasGroupPipeline: " << hasGroupPipeline
+                << " shouldUseSbe: " << shouldUseSbe << " found: classic";
         }
     };
 
-    testNumDocs(1);
-    testNumDocs(50);
-    testNumDocs(150);
-    testNumDocs(200);
+    std::vector<int> numDocsCases = {1, 50, 150, 200};
+    for (int numDocs : numDocsCases) {
+        // With default flags, if there is a $group stage, SBE should always be used.
+        testExpectedEngine(numDocs, true /*hasGroupPipeline*/, true /*shouldUseSbe*/);
+        // If there is no pipeline, classic will always be used.
+        testExpectedEngine(numDocs, false /*hasGroupPipeline*/, false /*shouldUseSbe*/);
+    }
+
+    RAIIServerParameterControllerForTest sbeFullController{"featureFlagSbeFull", true};
+    for (int numDocs : numDocsCases) {
+        bool hitEof = numDocs < 100;
+        // With SBE full enabled, we can use SBE even when there is no pipeline. We should use the
+        // EOF optimization (classic) if it's not a debug build and we hit EOF.
+        testExpectedEngine(numDocs, false /*hasGroupPipeline*/, kDebugBuild || !hitEof);
+        // If there is a pipeline, SBE is always used.
+        testExpectedEngine(numDocs, true /*hasGroupPipeline*/, true /*shouldUseSbe*/);
+    }
 }
 }  // namespace
 }  // namespace mongo::exec_deferred_engine_choice
