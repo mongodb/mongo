@@ -1945,7 +1945,7 @@ WriteResult performUpdates(
             }
         }
 
-        // TODO: don't create nested CurOp for legacy writes.
+        // TODO (SERVER-123862): don't create nested CurOp for legacy writes.
         // Add Command pointer to the nested CurOp.
         auto& parentCurOp = *CurOp::get(opCtx);
         const Command* cmd = parentCurOp.getCommand();
@@ -2264,7 +2264,7 @@ WriteResult performDeletes(
             continue;
         }
 
-        // TODO: don't create nested CurOp for legacy writes.
+        // TODO (SERVER-123862): don't create nested CurOp for legacy writes.
         // Add Command pointer to the nested CurOp.
         auto& parentCurOp = *CurOp::get(opCtx);
         const Command* cmd = parentCurOp.getCommand();
