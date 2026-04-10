@@ -424,7 +424,7 @@ buildvariants:
       large_distro_name: rhel8.8-large
     tasks:
       - name: compile_and_archive_dist_test_TG
-      - name: .concurrency !.requires_extra_system_deps !.no_txns !.kill_terminate
+      - name: .concurrency .multiversion !.requires_extra_system_deps !.no_txns !.kill_terminate
       - name: disk_wiredtiger
       - name: generate_buildid_to_debug_symbols_mapping
 
@@ -460,13 +460,11 @@ buildvariants:
         --excludeWithAnyTags=requires_increased_memlock_limits,all_feature_flags_incompatible
         --runAllFeatureFlagTests
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"
-      multiversion_platform: rhel8
-      multiversion_edition: enterprise
       resmoke_jobs_factor: 0.3 # Avoid starting too many mongod's under UBSAN build.
       large_distro_name: rhel8.8-arm64-m8g-8xlarge
     tasks:
       - name: compile_and_archive_dist_test_TG
-      - name: .concurrency !.requires_extra_system_deps !.no_txns !.kill_terminate
+      - name: .concurrency !.multiversion !.requires_extra_system_deps !.no_txns !.kill_terminate
       - name: disk_wiredtiger
       - name: generate_buildid_to_debug_symbols_mapping
 
