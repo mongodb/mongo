@@ -34,6 +34,7 @@
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
@@ -72,7 +73,7 @@ inline bool isIdHackEligibleQueryWithoutCollator(const FindCommandRequest& findC
 
 /**
  * Returns 'true' if 'query' on the given 'collection' can be answered using a special IDHACK plan.
- * TODO: remove this method in favor of ExpCtx::isIdHackQuery() checks.
+ * TODO SERVER-123100: Remove isIdHackEligibleQuery() in favor of ExpCtx::isIdHackQuery() checks.
  */
 inline bool isIdHackEligibleQuery(const CollectionPtr& collection, const CanonicalQuery& cq) {
     return isIdHackEligibleQueryWithoutCollator(cq.getFindCommandRequest(),
@@ -174,7 +175,8 @@ void assertInternalParamsAreSetByInternalClients(Client* client, T& req) {
     if constexpr (hasQuerySettings<T>) {
         uassert(7923000,
                 "BSON field 'querySettings' is an unknown field",
-                isInternalOrDirect || !req.getQuerySettings().has_value());
+                isInternalOrDirect || !req.getQuerySettings().has_value() ||
+                    feature_flags::gFeatureFlagAllowUserFacingQuerySettings.isEnabled());
     }
 
     uassert(10742702,

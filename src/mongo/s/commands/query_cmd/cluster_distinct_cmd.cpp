@@ -62,6 +62,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find_command.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/query/query_shape/distinct_cmd_shape.h"
 #include "mongo/db/query/query_shape/query_shape.h"
@@ -123,10 +124,11 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
     const ExtensionsCallback& extensionsCallback,
     const CollatorInterface* defaultCollator,
     boost::optional<ExplainOptions::Verbosity> verbosity) {
-    // Forbid users from passing 'querySettings' explicitly.
+    // Forbid users from passing 'querySettings' explicitly unless the feature flag is on.
     uassert(7923001,
             "BSON field 'querySettings' is an unknown field",
-            !distinctCommandRequest.getQuerySettings().has_value());
+            !distinctCommandRequest.getQuerySettings().has_value() ||
+                feature_flags::gFeatureFlagAllowUserFacingQuerySettings.isEnabled());
 
     // Forbid users from passing 'originalQueryShapeHash' explicitly.
     uassert(10742700,
@@ -155,8 +157,8 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
 
     // Perform the query settings lookup and attach it to 'expCtx'.
     auto& querySettingsService = query_settings::QuerySettingsService::get(opCtx);
-    auto querySettings =
-        querySettingsService.lookupQuerySettingsWithRejectionCheck(expCtx, queryShapeHash, nss);
+    auto querySettings = querySettingsService.lookupQuerySettingsWithRejectionCheck(
+        expCtx, queryShapeHash, nss, distinctCommandRequest.getQuerySettings());
     expCtx->setQuerySettingsIfNotPresent(std::move(querySettings));
 
     // We do not collect queryStats on explain for distinct.
@@ -190,7 +192,7 @@ BSONObj prepareDistinctForPassthrough(
         if (requestQueryStats) {
             bob.append(DistinctCommandRequest::kIncludeQueryStatsMetricsFieldName, true);
         }
-        if (!qsBson.isEmpty()) {
+        if (!qsBson.isEmpty() && !cmd.hasField(DistinctCommandRequest::kQuerySettingsFieldName)) {
             bob.append(DistinctCommandRequest::kQuerySettingsFieldName, qsBson);
         }
 

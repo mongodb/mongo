@@ -41,6 +41,7 @@
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/parsed_find_command.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
@@ -139,10 +140,10 @@ public:
                     "Cannot specify runtime constants option to a mongos",
                     !request().getLegacyRuntimeConstants());
 
-            // Forbid users from passing 'querySettings' explicitly.
             uassert(7746900,
                     "BSON field 'querySettings' is an unknown field",
-                    !request().getQuerySettings().has_value());
+                    !request().getQuerySettings().has_value() ||
+                        feature_flags::gFeatureFlagAllowUserFacingQuerySettings.isEnabled());
 
             uassert(10742703,
                     "BSON field 'originalQueryShapeHash' is an unknown field",

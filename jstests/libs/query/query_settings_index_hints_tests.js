@@ -1,4 +1,5 @@
 import {anyEq} from "jstests/aggregation/extras/utils.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getCollectionName, getExplainCommand, isTimeSeriesCollection} from "jstests/libs/cmd_object_utils.js";
 import {
     everyWinningPlan,
@@ -578,6 +579,11 @@ export class QuerySettingsIndexHintsTests {
      * Ensure that users can not pass query settings to the commands explicitly.
      */
     assertQuerySettingsCommandValidation(querySettingsQuery, ns) {
+        // When "featureFlagAllowUserFacingQuerySettings" is enabled, users are allowed to pass
+        // 'querySettings' directly in commands, so skip the rejection validation.
+        if (FeatureFlagUtil.isPresentAndEnabled(this._db.getMongo(), "AllowUserFacingQuerySettings")) {
+            return;
+        }
         const query = this._qsutils.withoutDollarDB(querySettingsQuery);
         const settings = {indexHints: {ns, allowedIndexes: [this.indexAB]}};
         const expectedErrorCodes = [7746900, 7746901, 7923000, 7923001, 7708000, 7708001];

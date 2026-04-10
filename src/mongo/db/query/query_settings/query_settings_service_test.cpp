@@ -280,7 +280,7 @@ public:
 
         // Ensure empty settings are returned if no settings are present in the system.
         ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
-                      expCtx(), hashForShape(deferredShape), nss),
+                      expCtx(), hashForShape(deferredShape), nss, boost::none),
                   QuerySettings());
 
         // Set { queryFramework: 'classic' } settings to 'cmdForSettingsBSON'.
@@ -290,7 +290,7 @@ public:
         // Ensure that 'forceClassicEngineSettings' are returned during the lookup, after query
         // settings have been populated.
         ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
-                      expCtx(), hashForShape(deferredShape), nss),
+                      expCtx(), hashForShape(deferredShape), nss, boost::none),
                   forceClassicEngineSettings);
     }
 
@@ -370,10 +370,10 @@ public:
         // throwing an exception with QueryRejectedBySettings error code.
         if (isExplain) {
             ASSERT_DOES_NOT_THROW(service().lookupQuerySettingsWithRejectionCheck(
-                expCtx(), hashForShape(deferredShape), nss));
+                expCtx(), hashForShape(deferredShape), nss, boost::none));
         } else {
             ASSERT_THROWS_CODE(service().lookupQuerySettingsWithRejectionCheck(
-                                   expCtx(), hashForShape(deferredShape), nss),
+                                   expCtx(), hashForShape(deferredShape), nss, boost::none),
                                DBException,
                                ErrorCodes::QueryRejectedBySettings);
         }
@@ -567,6 +567,71 @@ TEST_F(QuerySettingsServiceTest, InvalidKeyPatternIndexesAreRemovedAfterSanitiza
                                                })};
     IndexHintSpecs expectedHintSpec;
     assertSanitizeInvalidIndexHints(indexHintSpec, expectedHintSpec);
+}
+
+/**
+ * Tests that cluster PQS wins over user-supplied querySettings on conflict, and that user settings
+ * fill gaps where cluster has no opinion. Tests both router and shard service.
+ */
+TEST_F(QuerySettingsServiceTest, MergeClusterAndUserQuerySettingsOnRouter) {
+    QuerySettingsService::initializeForRouter(getServiceContext());
+
+    auto findCmdBSON = fromjson("{find: 'exampleColl', '$db': 'foo'}");
+    auto findCmd = query_request_helper::makeFromFindCommandForTests(findCmdBSON, nss());
+    auto parsedRequest =
+        uassertStatusOK(parsed_find_command::parse(expCtx(), {.findCommand = std::move(findCmd)}));
+    query_shape::DeferredQueryShape deferredShape{[&]() {
+        return shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedRequest, expCtx());
+    }};
+
+    // Set cluster PQS to force classic engine.
+    QuerySettings forceClassicEngineSettings;
+    forceClassicEngineSettings.setQueryFramework(QueryFrameworkControlEnum::kForceClassicEngine);
+    QuerySettingsScope classicScope(
+        opCtx(), {makeQueryShapeConfiguration(findCmdBSON, forceClassicEngineSettings)});
+
+    // Conflict: user requests SBE, cluster requests classic -> cluster wins.
+    QuerySettings useSbeEngineSettings;
+    useSbeEngineSettings.setQueryFramework(QueryFrameworkControlEnum::kTrySbeEngine);
+    ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
+                  expCtx(), hashForShape(deferredShape), nss(), useSbeEngineSettings),
+              forceClassicEngineSettings);
+
+    // With boost::none, cluster settings should be returned as-is.
+    ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
+                  expCtx(), hashForShape(deferredShape), nss(), boost::none),
+              forceClassicEngineSettings);
+}
+
+TEST_F(QuerySettingsServiceTest, MergeClusterAndUserQuerySettingsOnShard) {
+    QuerySettingsService::initializeForShard(getServiceContext(),
+                                             nullptr /* setClusterParameterImplFn */);
+
+    auto findCmdBSON = fromjson("{find: 'exampleColl', '$db': 'foo'}");
+    auto findCmd = query_request_helper::makeFromFindCommandForTests(findCmdBSON, nss());
+    auto parsedRequest =
+        uassertStatusOK(parsed_find_command::parse(expCtx(), {.findCommand = std::move(findCmd)}));
+    query_shape::DeferredQueryShape deferredShape{[&]() {
+        return shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedRequest, expCtx());
+    }};
+
+    // Set cluster PQS to force classic engine.
+    QuerySettings forceClassicEngineSettings;
+    forceClassicEngineSettings.setQueryFramework(QueryFrameworkControlEnum::kForceClassicEngine);
+    QuerySettingsScope classicScope(
+        opCtx(), {makeQueryShapeConfiguration(findCmdBSON, forceClassicEngineSettings)});
+
+    // Conflict: user requests SBE, cluster requests classic -> cluster wins (standalone shard).
+    QuerySettings useSbeEngineSettings;
+    useSbeEngineSettings.setQueryFramework(QueryFrameworkControlEnum::kTrySbeEngine);
+    ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
+                  expCtx(), hashForShape(deferredShape), nss(), useSbeEngineSettings),
+              forceClassicEngineSettings);
+
+    // With boost::none, cluster settings should be returned (standalone shard fallback).
+    ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
+                  expCtx(), hashForShape(deferredShape), nss(), boost::none),
+              forceClassicEngineSettings);
 }
 }  // namespace
 }  // namespace mongo::query_settings

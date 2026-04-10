@@ -694,8 +694,8 @@ std::unique_ptr<CanonicalQuery> ClusterFind::generateAndValidateCanonicalQuery(
 
     // Perform the query settings lookup and attach it to 'expCtx'.
     auto& querySettingsService = query_settings::QuerySettingsService::get(opCtx);
-    auto querySettings =
-        querySettingsService.lookupQuerySettingsWithRejectionCheck(expCtx, queryShapeHash, origNss);
+    auto querySettings = querySettingsService.lookupQuerySettingsWithRejectionCheck(
+        expCtx, queryShapeHash, origNss, parsedFind->findCommandRequest->getQuerySettings());
     expCtx->setQuerySettingsIfNotPresent(std::move(querySettings));
 
     if (mustRegisterRequestToQueryStats) {

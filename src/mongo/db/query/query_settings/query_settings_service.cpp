@@ -457,40 +457,17 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const query_shape::QueryShapeHash& queryShapeHash,
         const NamespaceString& nss,
-        const boost::optional<QuerySettings>& querySettingsFromOriginalCommand =
-            boost::none) const override {
-        QuerySettings settings = [&]() {
-            try {
-                if (!isEligbleForQuerySettings(expCtx, nss)) {
-                    return QuerySettings();
-                }
+        const boost::optional<QuerySettings>& querySettingsFromOriginalCommand) const override {
+        if (expCtx->isIdHackQuery()) {
+            return QuerySettings();
+        }
 
-                // Return the found query settings or an empty one.
-                auto result =
-                    _manager.getQuerySettingsForQueryShapeHash(queryShapeHash, nss.tenantId());
-                if (!result.has_value()) {
-                    return QuerySettings();
-                }
-
-                // Backfill the representative query if needed.
-                auto* opCtx = expCtx->getOperationContext();
-                if (BackfillCoordinator::shouldBackfill(expCtx, result->hasRepresentativeQuery)) {
-                    _backfillCoordinator->markForBackfillAndScheduleIfNeeded(
-                        opCtx, queryShapeHash, CurOp::get(opCtx)->opDescription().getOwned());
-                }
-                return std::move(result->querySettings);
-            } catch (const DBException& ex) {
-                LOGV2_WARNING_OPTIONS(10153400,
-                                      {logv2::LogComponent::kQuery},
-                                      "Failed to perform query settings lookup",
-                                      "error"_attr = ex.toString());
-                return QuerySettings();
-            }
-        }();
-
-        // Fail the current command, if 'reject: true' flag is present.
-        failIfRejectedBySettings(expCtx, settings);
-
+        // Always perform cluster lookup (includes rejection check for cluster PQS).
+        auto settings = lookupQuerySettingsFromInternalStorage(expCtx, queryShapeHash, nss);
+        if (querySettingsFromOriginalCommand.has_value()) {
+            // Merge: user settings as base, cluster settings override on conflict.
+            settings = mergeQuerySettings(*querySettingsFromOriginalCommand, settings);
+        }
         return settings;
     }
 
@@ -532,6 +509,50 @@ public:
         MONGO_UNIMPLEMENTED_TASSERT(10445105);
     }
 
+protected:
+    /**
+     * Looks up query settings from the internal cluster parameter storage and runs the rejection
+     * check. Does NOT consider command-level settings.
+     */
+    QuerySettings lookupQuerySettingsFromInternalStorage(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const query_shape::QueryShapeHash& queryShapeHash,
+        const NamespaceString& nss) const {
+        QuerySettings settings = [&]() {
+            try {
+                if (!isEligbleForQuerySettings(expCtx, nss)) {
+                    return QuerySettings();
+                }
+
+                // Return the found query settings or an empty one.
+                auto result =
+                    _manager.getQuerySettingsForQueryShapeHash(queryShapeHash, nss.tenantId());
+                if (!result.has_value()) {
+                    return QuerySettings();
+                }
+
+                // Backfill the representative query if needed.
+                auto* opCtx = expCtx->getOperationContext();
+                if (BackfillCoordinator::shouldBackfill(expCtx, result->hasRepresentativeQuery)) {
+                    _backfillCoordinator->markForBackfillAndScheduleIfNeeded(
+                        opCtx, queryShapeHash, CurOp::get(opCtx)->opDescription().getOwned());
+                }
+                return std::move(result->querySettings);
+            } catch (const DBException& ex) {
+                LOGV2_WARNING_OPTIONS(10153400,
+                                      {logv2::LogComponent::kQuery},
+                                      "Failed to perform query settings lookup",
+                                      "error"_attr = ex.toString());
+                return QuerySettings();
+            }
+        }();
+
+        // Fail the current command, if 'reject: true' flag is present.
+        failIfRejectedBySettings(expCtx, settings);
+
+        return settings;
+    }
+
 private:
     QuerySettingsManager _manager;
     std::unique_ptr<BackfillCoordinator> _backfillCoordinator;
@@ -546,23 +567,24 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const query_shape::QueryShapeHash& queryShapeHash,
         const NamespaceString& nss,
-        const boost::optional<QuerySettings>& querySettingsFromOriginalCommand =
-            boost::none) const override {
-        // No query settings lookup for IDHACK queries.
+        const boost::optional<QuerySettings>& querySettingsFromOriginalCommand) const override {
         if (expCtx->isIdHackQuery()) {
             return QuerySettings();
         }
 
         auto* opCtx = expCtx->getOperationContext();
-        if (isInternalOrDirectClient(opCtx->getClient()) ||
-            querySettingsFromOriginalCommand.has_value()) {
+        if (isInternalOrDirectClient(opCtx->getClient())) {
+            // Mongos already looked up and merged - return forwarded settings as-is.
             return querySettingsFromOriginalCommand.get_value_or(QuerySettings());
         }
 
-        // The underlying shard does not belong to a sharded cluster, therefore proceed by
-        // performing the lookup as a router.
-        return QuerySettingsRouterService::lookupQuerySettingsWithRejectionCheck(
-            expCtx, queryShapeHash, nss);
+        // Replica set: perform cluster lookup (includes rejection check) and merge with user
+        // settings.
+        auto settings = lookupQuerySettingsFromInternalStorage(expCtx, queryShapeHash, nss);
+        if (querySettingsFromOriginalCommand.has_value()) {
+            settings = mergeQuerySettings(*querySettingsFromOriginalCommand, settings);
+        }
+        return settings;
     }
 
     void setQuerySettingsClusterParameter(
@@ -836,11 +858,14 @@ bool canPipelineBeRejected(const std::vector<BSONObj>& pipeline) {
 }
 
 bool allowQuerySettingsFromClient(Client* client) {
-    // Query settings are allowed to be part of the request only in cases when request:
-    // - comes from router (internal client), which has already performed the query settings lookup
-    // or
-    // - has been created interally and is executed via DBDirectClient.
-    return isInternalOrDirectClient(client);
+    // Query settings are allowed to be part of the request when:
+    // - the request comes from router (internal client), which has already performed the query
+    //   settings lookup, or
+    // - has been created internally and is executed via DBDirectClient, or
+    // - the featureFlagAllowUserFacingQuerySettings is enabled, allowing external clients to pass
+    //   querySettings directly as runtime hints.
+    return isInternalOrDirectClient(client) ||
+        feature_flags::gFeatureFlagAllowUserFacingQuerySettings.isEnabled();
 }
 
 bool isDefault(const QuerySettings& settings) {
@@ -852,6 +877,34 @@ bool isDefault(const QuerySettings& settings) {
     // For the 'reject' field of type OptionalBool, consider both 'false' and missing value as
     // default.
     return !(settings.getQueryFramework() || settings.getIndexHints() || settings.getReject());
+}
+
+QuerySettings mergeQuerySettings(const QuerySettings& lhs, const QuerySettings& rhs) {
+    static_assert(
+        QuerySettings::fieldNames.size() == 5,
+        "A new field has been added to the QuerySettings structure, mergeQuerySettings() should be "
+        "updated appropriately.");
+
+    QuerySettings querySettings = lhs;
+
+    if (rhs.getQueryFramework()) {
+        querySettings.setQueryFramework(rhs.getQueryFramework());
+    }
+
+    if (rhs.getIndexHints()) {
+        querySettings.setIndexHints(rhs.getIndexHints());
+    }
+
+    // Note: update if reject has a value in the rhs, not just if that value is true.
+    if (rhs.getReject().has_value()) {
+        querySettings.setReject(rhs.getReject());
+    }
+
+    if (auto comment = rhs.getComment()) {
+        querySettings.setComment(comment);
+    }
+
+    return querySettings;
 }
 
 void QuerySettingsService::validateQuerySettings(const QuerySettings& querySettings) const {

@@ -71,37 +71,7 @@ auto findQueryShapeConfigurationByQueryShapeHash(
                         });
 }
 
-/**
- * Merges the query settings 'lhs' with query settings 'rhs', by replacing all attributes in 'lhs'
- * with the existing attributes in 'rhs'.
- */
-QuerySettings mergeQuerySettings(const QuerySettings& lhs, const QuerySettings& rhs) {
-    static_assert(
-        QuerySettings::fieldNames.size() == 5,
-        "A new field has been added to the QuerySettings structure, mergeQuerySettings() should be "
-        "updated appropriately.");
-
-    QuerySettings querySettings = lhs;
-
-    if (rhs.getQueryFramework()) {
-        querySettings.setQueryFramework(rhs.getQueryFramework());
-    }
-
-    if (rhs.getIndexHints()) {
-        querySettings.setIndexHints(rhs.getIndexHints());
-    }
-
-    // Note: update if reject has a value in the rhs, not just if that value is true.
-    if (rhs.getReject().has_value()) {
-        querySettings.setReject(rhs.getReject());
-    }
-
-    if (auto comment = rhs.getComment()) {
-        querySettings.setComment(comment);
-    }
-
-    return querySettings;
-}
+using query_settings::mergeQuerySettings;
 
 bool isUpgradingToVersionThatHasDedicatedRepresentativeQueriesCollection(OperationContext* opCtx) {
     // (Generic FCV reference): Check if the server is in the process of upgrading the FCV to the
@@ -230,8 +200,7 @@ void readModifyWriteQuerySettingsConfigOption(
 }
 
 void assertNoStandalone(OperationContext* opCtx, const std::string& cmdName) {
-    // TODO: replace the code checking for standalone mode with a call to the utility provided by
-    // SERVER-104560.
+    // TODO SERVER-104560: replace the code checking for standalone mode with a call to the utility.
     auto* repl = repl::ReplicationCoordinator::get(opCtx);
     bool isStandalone = repl && !repl->getSettings().isReplSet() &&
         serverGlobalParams.clusterRole.has(ClusterRole::None);

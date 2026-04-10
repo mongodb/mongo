@@ -580,13 +580,12 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     });
 
     // Perform the query settings lookup and attach it to 'expCtx'.
-    // In case query settings have already been looked up (in case the agg request is
-    // running over a view) we avoid performing query settings lookup.
-    expCtx->setQuerySettingsIfNotPresent(std::move(request.getQuerySettings()).value_or_eval([&] {
+    {
         auto& service = query_settings::QuerySettingsService::get(opCtx);
-        return service.lookupQuerySettingsWithRejectionCheck(
-            expCtx, queryShapeHash, nsStruct.executionNss);
-    }));
+        auto querySettings = service.lookupQuerySettingsWithRejectionCheck(
+            expCtx, queryShapeHash, nsStruct.executionNss, request.getQuerySettings());
+        expCtx->setQuerySettingsIfNotPresent(std::move(querySettings));
+    }
 
     // Skip query stats recording for queryable encryption queries.
     if (!shouldDoFLERewrite) {

@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/util/modules.h"
 
@@ -195,10 +196,11 @@ public:
         // TODO SERVER-119513: Remove once aggregation_request_helper::validate() handles this
         // check.
         void uassertNoQuerySettings() const {
-            // Forbid users from passing 'querySettings' explicitly.
+            // Forbid users from passing 'querySettings' explicitly unless the feature flag is on.
             uassert(7708000,
                     "BSON field 'querySettings' is an unknown field",
-                    !request().getQuerySettings().has_value());
+                    !request().getQuerySettings().has_value() ||
+                        feature_flags::gFeatureFlagAllowUserFacingQuerySettings.isEnabled());
         }
 
         NamespaceString ns() const override {

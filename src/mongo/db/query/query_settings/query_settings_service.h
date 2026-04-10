@@ -164,8 +164,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const query_shape::QueryShapeHash& queryShapeHash,
         const NamespaceString& nss,
-        const boost::optional<QuerySettings>& querySettingsFromOriginalCommand =
-            boost::none) const = 0;
+        const boost::optional<QuerySettings>& querySettingsFromOriginalCommand) const = 0;
 
     /**
      * Convenience overload that skips settings lookup if 'queryShapeHash' is boost::none, returning
@@ -176,8 +175,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const boost::optional<query_shape::QueryShapeHash>& queryShapeHash,
         const NamespaceString& nss,
-        const boost::optional<QuerySettings>& querySettingsFromOriginalCommand =
-            boost::none) const {
+        const boost::optional<QuerySettings>& querySettingsFromOriginalCommand) const {
         if (!queryShapeHash) {
             return querySettingsFromOriginalCommand.value_or(QuerySettings());
         }
@@ -332,5 +330,11 @@ bool allowQuerySettingsFromClient(Client* client);
  * Returns true if given QuerySettings instance contains only default values.
  */
 bool isDefault(const QuerySettings& querySettings);
+
+/**
+ * Merges the query settings 'lhs' with query settings 'rhs', by replacing all attributes in 'lhs'
+ * with the existing attributes in 'rhs'.
+ */
+QuerySettings mergeQuerySettings(const QuerySettings& lhs, const QuerySettings& rhs);
 }  // namespace query_settings
 }  // namespace mongo
