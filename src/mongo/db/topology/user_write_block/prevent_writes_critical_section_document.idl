@@ -1,0 +1,33 @@
+# This file defines the format of documents stored in config.prevent_writes_for_insufficient_disk_space_critical_sections.
+# Each document is used to represent that the block on writes is enabled, for a particular collection or
+# globally.
+
+global:
+    mod_visibility: private
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/db/topology/user_write_block/prevent_writes_reason.idl"
+
+structs:
+    preventWritesCriticalSectionDocument:
+        description: "Represents an ongoing prevent writes for insufficient disk space critical section."
+        generate_comparison_operators: false
+        strict: false
+        fields:
+            _id:
+                type: namespacestring
+                description:
+                    "The namespace of the collection that is under the collection critical
+                    section. Empty namespacestring indicates global prevent writes to all collections."
+                cpp_name: nss
+            enabled:
+                type: bool
+                default: false
+            allowDeletions:
+                type: bool
+                default: false
+            preventWritesReason:
+                type: PreventWritesReason
+                default: kInsufficientDiskSpace

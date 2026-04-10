@@ -6,6 +6,7 @@
 //   uses_parallel_shell,
 //   does_not_support_stepdowns,
 //   assumes_against_mongod_not_mongos,
+//   assumes_read_concern_unchanged,
 //   featureFlagPreventWritesForInsufficientDiskSpace
 // ]
 
@@ -87,6 +88,42 @@ describe("Test preventWritesForInsufficientDiskSpace command on shard node", fun
                 reason: "InsufficientDiskSpace",
             }),
             ErrorCodes.InvalidOptions,
+        );
+    });
+
+    it("Test that the prevent-writes critical section document is persisted correctly", function () {
+        assert.commandWorked(
+            this.shardPrimaryAdminDB.runCommand({
+                preventWritesForInsufficientDiskSpace: 1,
+                enabled: true,
+                allowDeletions: false,
+                reason: "InsufficientDiskSpace",
+            }),
+        );
+
+        const doc = this.shardPrimaryConfigDB.prevent_writes_critical_sections.findOne();
+        assert.eq(true, doc.enabled, "Expected enabled to be true");
+        assert.eq(false, doc.allowDeletions, "Expected allowDeletions to be false");
+        assert.eq(
+            "InsufficientDiskSpace",
+            doc.preventWritesReason,
+            "Expected preventWritesReason to be InsufficientDiskSpace",
+        );
+
+        assert.commandWorked(
+            this.shardPrimaryAdminDB.runCommand({
+                preventWritesForInsufficientDiskSpace: 1,
+                enabled: false,
+                allowDeletions: false,
+                reason: "InsufficientDiskSpace",
+            }),
+        );
+
+        const docsAfterRelease = this.shardPrimaryConfigDB.prevent_writes_critical_sections.find().toArray();
+        assert.eq(
+            0,
+            docsAfterRelease.length,
+            "Expected no prevent-writes critical section documents after releasing critical section",
         );
     });
 });

@@ -33,6 +33,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/topology/user_write_block/prevent_writes_reason_gen.h"
 #include "mongo/db/topology/user_write_block/user_writes_block_reason_gen.h"
 #include "mongo/util/modules.h"
 
@@ -45,10 +46,15 @@ namespace mongo {
  * on disk and it's in-memory representation is kept in sync with the persisted state through an
  * OpObserver that reacts to the inserts/updates/deletes on the persisted document.
  *
+ * User write blocking can occur at two levels: cluster level or shard level. At the cluster level,
+ * user writes are blocked globally across the entire cluster, whereas at the shard level, user
+ * writes are blocked only locally on the affected shard.
+ *
  * On replicaSets, enable blocking is depicted by transition (1); and disable blocking is depicted
  * by transition (2):
  *
- *             (1) acquireRecoverableCriticalSectionBlockingUserWrites()
+ *             (1) acquireRecoverableCriticalSectionBlockingUserWrites() /
+ *                   acquireRecoverableCriticalSectionPreventingWrites()
  *             ---------------------------------------------------------
  *            |                                                         |
  *            |                                                         v
@@ -58,7 +64,8 @@ namespace mongo {
  *            ^                                                         ^
  *            |                                                         |
  *             ---------------------------------------------------------
- *                      (2) releaseRecoverableCriticalSection()
+ *             (2) releaseRecoverableCriticalSectionBlockingUserWrites() /
+ *                   releaseRecoverableCriticalSectionPreventingWrites()
  *
  * On sharded clusters, blocking/unblocking happens as a two-phase protocol. Enable blocking is
  * depicted by transitions (1) and (2); and disable blocking is depicted by (3) and (4):
@@ -77,7 +84,7 @@ namespace mongo {
  *             ^                                         ^                             |
  *             |                                |        |                             |
  *              --------------------------------         |                             |
- *          (4) releaseRecoverableCriticalSection()      |                             |
+ *  (4) releaseRecoverableCriticalSectionBlockingUserWrites()                          |
  *                                                       |                             |
  *                                                        -----------------------------
  *                                   (3) demoteRecoverableCriticalSectionToNoLongerBlockUserWrites()
@@ -137,7 +144,7 @@ public:
      * before this method is called all shards must have first demoted their critical sections to no
      * longer block user writes.
      */
-    void releaseRecoverableCriticalSection(
+    void releaseRecoverableCriticalSectionBlockingUserWrites(
         OperationContext* opCtx,
         const NamespaceString& nss,
         boost::optional<UserWritesBlockReasonEnum> reason = boost::none);
@@ -147,6 +154,22 @@ public:
      * section to memory (on startUp or on rollback).
      */
     void recoverRecoverableCriticalSections(OperationContext* opCtx);
+
+    /**
+     * Acquires the user writes critical section preventing per-shard writes.
+     */
+    void acquireRecoverableCriticalSectionPreventingWrites(OperationContext* opCtx,
+                                                           const NamespaceString& nss,
+                                                           bool allowDeletions,
+                                                           PreventWritesReasonEnum reason);
+
+    /**
+     * Releases the prevent writes critical section, allowing per-shard writes again.
+     */
+    void releaseRecoverableCriticalSectionPreventingWrites(OperationContext* opCtx,
+                                                           const NamespaceString& nss,
+                                                           PreventWritesReasonEnum reason);
+
 
 private:
     void onConsistentDataAvailable(OperationContext* opCtx,

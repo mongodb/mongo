@@ -28,6 +28,15 @@ idl_generator(
 )
 
 idl_generator(
+    name = "prevent_writes_critical_section_document_gen",
+    src = "prevent_writes_critical_section_document.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/topology/user_write_block:prevent_writes_reason_gen",
+    ],
+)
+
+idl_generator(
     name = "set_user_write_block_mode_gen",
     src = "set_user_write_block_mode.idl",
     deps = [
@@ -106,9 +115,11 @@ mongo_cc_library(
     name = "user_writes_recoverable_critical_section",
     srcs = [
         "user_writes_recoverable_critical_section_service.cpp",
+        ":prevent_writes_critical_section_document_gen",
         ":user_writes_critical_section_document_gen",
     ],
     deps = [
+        ":prevent_writes_reason_idl",
         "//src/mongo/db:dbdirectclient",
         "//src/mongo/db:rw_concern_d",
         "//src/mongo/db:shard_role_api",

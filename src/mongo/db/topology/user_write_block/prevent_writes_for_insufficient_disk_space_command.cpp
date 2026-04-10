@@ -91,10 +91,30 @@ public:
                           "hangInPreventWritesForInsufficientDiskSpaceCommand failpoint enabled");
                     hangInPreventWritesForInsufficientDiskSpaceCommand.pauseWhileSet(opCtx);
                 }
+
                 uassert(ErrorCodes::InvalidOptions,
                         str::stream() << Request::kCommandName
                                       << " cannot be run with allowDeletions option set to true.",
                         !request().getAllowDeletions());
+            }
+            if (request().getEnabled()) {
+                // Enable write blocking
+                UserWritesRecoverableCriticalSectionService::get(opCtx)
+                    ->acquireRecoverableCriticalSectionPreventingWrites(
+                        opCtx,
+                        UserWritesRecoverableCriticalSectionService::
+                            kPreventWritesForInsufficientDiskSpaceNamespace,
+                        request().getAllowDeletions(),
+                        request().getReason());
+
+            } else {
+                // Disable write blocking
+                UserWritesRecoverableCriticalSectionService::get(opCtx)
+                    ->releaseRecoverableCriticalSectionPreventingWrites(
+                        opCtx,
+                        UserWritesRecoverableCriticalSectionService::
+                            kPreventWritesForInsufficientDiskSpaceNamespace,
+                        request().getReason());
             }
         }
 

@@ -172,7 +172,7 @@ public:
                         break;
                     case ShardsvrSetUserWriteBlockModePhaseEnum::kComplete:
                         UserWritesRecoverableCriticalSectionService::get(opCtx)
-                            ->releaseRecoverableCriticalSection(
+                            ->releaseRecoverableCriticalSectionBlockingUserWrites(
                                 opCtx,
                                 UserWritesRecoverableCriticalSectionService::
                                     kGlobalUserWritesNamespace);

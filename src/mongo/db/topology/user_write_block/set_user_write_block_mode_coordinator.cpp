@@ -207,7 +207,7 @@ ExecutorFuture<void> SetUserWriteBlockModeCoordinator::_runImpl(
                                 kGlobalUserWritesNamespace);
                 } else {
                     UserWritesRecoverableCriticalSectionService::get(opCtx)
-                        ->releaseRecoverableCriticalSection(
+                        ->releaseRecoverableCriticalSectionBlockingUserWrites(
                             opCtx,
                             UserWritesRecoverableCriticalSectionService::
                                 kGlobalUserWritesNamespace);

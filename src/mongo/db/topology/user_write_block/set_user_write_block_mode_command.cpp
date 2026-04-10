@@ -115,7 +115,7 @@ public:
                             request().getReason());
                 } else {
                     UserWritesRecoverableCriticalSectionService::get(opCtx)
-                        ->releaseRecoverableCriticalSection(
+                        ->releaseRecoverableCriticalSectionBlockingUserWrites(
                             opCtx,
                             UserWritesRecoverableCriticalSectionService::kGlobalUserWritesNamespace,
                             request().getReason());

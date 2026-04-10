@@ -50,6 +50,7 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/user_write_block/global_user_write_block_state.h"
+#include "mongo/db/topology/user_write_block/prevent_writes_critical_section_document_gen.h"
 #include "mongo/db/topology/user_write_block/user_writes_critical_section_document_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -81,13 +82,18 @@ inline StringData reasonText(const boost::optional<UserWritesBlockReasonEnum>& r
     return idl::serialize(reason.value_or(UserWritesBlockReasonEnum::kUnspecified));
 }
 
-BSONObj findRecoverableCriticalSectionDoc(OperationContext* opCtx, const NamespaceString& nss) {
+inline StringData reasonText(const PreventWritesReasonEnum& reason) {
+    return idl::serialize(reason);
+}
+
+BSONObj findRecoverableCriticalSectionDoc(OperationContext* opCtx,
+                                          const NamespaceString& collectionNss,
+                                          const NamespaceString& nss) {
     DBDirectClient dbClient(opCtx);
 
     const auto queryNss =
-        BSON(UserWriteBlockingCriticalSectionDocument::kNssFieldName
-             << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
-    FindCommandRequest findRequest{NamespaceString::kUserWritesCriticalSectionsNamespace};
+        BSON("_id" << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
+    FindCommandRequest findRequest{collectionNss};
     findRequest.setFilter(queryNss);
     return dbClient.findOne(std::move(findRequest));
 }
@@ -106,82 +112,75 @@ void setBlockUserWritesDocumentField(OperationContext* opCtx,
         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 }
 
-void acquireRecoverableCriticalSection(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    bool blockShardedDDL,
-    bool blockUserWrites,
-    boost::optional<UserWritesBlockReasonEnum> reason = boost::none) {
-    LOGV2_DEBUG(6351900,
-                3,
-                "Acquiring user writes recoverable critical section",
-                logAttrs(nss),
-                "blockShardedDDL"_attr = blockShardedDDL,
-                "blockUserWrites"_attr = blockUserWrites,
-                "reason"_attr = reasonText(reason));
-
-    invariant(nss == UserWritesRecoverableCriticalSectionService::kGlobalUserWritesNamespace);
+template <typename DocType, typename CheckExistingFn, typename BuildNewDocFn>
+void acquireCriticalSection(OperationContext* opCtx,
+                            const NamespaceString& collectionNss,
+                            const NamespaceString& nss,
+                            LockMode lockMode,
+                            StringData logContext,
+                            CheckExistingFn&& checkExistingDoc,
+                            BuildNewDocFn&& buildNewDoc) {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
     {
-        // If we intend to start blocking user writes, take the GlobalLock in MODE_X in order to
-        // ensure that any ongoing writes have completed.
-        Lock::GlobalLock globalLock(opCtx, blockUserWrites ? MODE_X : MODE_IX);
+        Lock::GlobalLock globalLock(opCtx, lockMode);
 
-        const auto bsonObj = findRecoverableCriticalSectionDoc(opCtx, nss);
+        const auto bsonObj = findRecoverableCriticalSectionDoc(opCtx, collectionNss, nss);
         if (!bsonObj.isEmpty()) {
-            const auto collCSDoc = UserWriteBlockingCriticalSectionDocument::parse(
-                bsonObj, IDLParserContext("AcquireUserWritesCS"));
-
-            uassert(ErrorCodes::IllegalOperation,
-                    str::stream() << "Cannot acquire user writes critical section with different "
-                                     "options than the already existing one. blockShardedDDL: "
-                                  << blockShardedDDL
-                                  << ", current: " << collCSDoc.getBlockNewUserShardedDDL(),
-                    !blockShardedDDL || collCSDoc.getBlockNewUserShardedDDL() == blockShardedDDL);
-
-            uassert(ErrorCodes::IllegalOperation,
-                    str::stream() << "Cannot acquire user writes critical section with different "
-                                     "options than the already existing one. blockUserWrites: "
-                                  << blockUserWrites
-                                  << ", current: " << collCSDoc.getBlockNewUserShardedDDL(),
-                    !blockUserWrites || collCSDoc.getBlockUserWrites() == blockUserWrites);
-
-            uassert(ErrorCodes::IllegalOperation,
-                    str::stream() << "Cannot acquire user writes critical section with different "
-                                     "options than the already existing one. reason: "
-                                  << reasonText(reason) << ", current: "
-                                  << reasonText(collCSDoc.getBlockUserWritesReason()),
-                    collCSDoc.getBlockUserWritesReason() == reason);
-
-            LOGV2_DEBUG(6351914,
-                        3,
-                        "The user writes recoverable critical section was already acquired",
-                        logAttrs(nss));
+            const auto existingDoc = DocType::parse(bsonObj, IDLParserContext(logContext));
+            checkExistingDoc(existingDoc);
 
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
-
             return;
         }
 
-        // Acquire the critical section by inserting the critical section document. The OpObserver
-        // will take the in-memory CS when reacting to the insert event.
-        UserWriteBlockingCriticalSectionDocument newDoc(nss);
-        newDoc.setBlockNewUserShardedDDL(blockShardedDDL);
-        newDoc.setBlockUserWrites(blockUserWrites);
-        newDoc.setBlockUserWritesReason(reason);
-
-        PersistentTaskStore<UserWriteBlockingCriticalSectionDocument> store(
-            NamespaceString::kUserWritesCriticalSectionsNamespace);
+        auto newDoc = buildNewDoc();
+        PersistentTaskStore<DocType> store(collectionNss);
         store.add(opCtx, newDoc, ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
     }
+}
 
-    LOGV2_DEBUG(6351901,
-                2,
-                "Acquired user writes recoverable critical section",
-                logAttrs(nss),
-                "blockShardedDDL"_attr = blockShardedDDL,
-                "blockUserWrites"_attr = blockUserWrites);
+template <typename DocType, typename CheckExistingFn>
+void releaseCriticalSection(OperationContext* opCtx,
+                            const NamespaceString& collectionNss,
+                            const NamespaceString& nss,
+                            StringData logContext,
+                            CheckExistingFn&& checkExistingDoc) {
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+
+    {
+        Lock::GlobalLock globalLock(opCtx, MODE_IX);
+
+        const auto bsonObj = findRecoverableCriticalSectionDoc(opCtx, collectionNss, nss);
+        if (bsonObj.isEmpty()) {
+            LOGV2_DEBUG(
+                6351910,
+                3,
+                "The user writes recoverable critical section was already released, do nothing",
+                logAttrs(nss));
+            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+            return;
+        }
+
+        const auto existingDoc = DocType::parse(bsonObj, IDLParserContext(logContext));
+        checkExistingDoc(existingDoc);
+
+        DBDirectClient dbClient(opCtx);
+        const auto cmdResponse = dbClient.runCommand([&] {
+            write_ops::DeleteCommandRequest deleteOp(collectionNss);
+            deleteOp.setDeletes({[&] {
+                write_ops::DeleteOpEntry entry;
+                entry.setQ(BSON("_id" << NamespaceStringUtil::serialize(
+                                    nss, SerializationContext::stateDefault())));
+                entry.setMulti(false);
+                return entry;
+            }()});
+            return deleteOp.serialize();
+        }());
+
+        const auto commandReply = cmdResponse->getCommandReply();
+        uassertStatusOK(getStatusFromWriteCommandReply(commandReply));
+    }
 }
 }  // namespace
 
@@ -216,20 +215,123 @@ void UserWritesRecoverableCriticalSectionService::
         OperationContext* opCtx,
         const NamespaceString& nss,
         boost::optional<UserWritesBlockReasonEnum> reason) {
-    acquireRecoverableCriticalSection(
-        opCtx, nss, false /* blockShardedDDL */, true /* blockUserWrites */, reason);
+
+    const auto blockShardedDDL = false;
+    const auto blockUserWrites = true;
+
+    LOGV2_DEBUG(12096700,
+                3,
+                "Acquiring user writes recoverable critical section",
+                logAttrs(nss),
+                "blockShardedDDL"_attr = blockShardedDDL,
+                "blockUserWrites"_attr = blockUserWrites,
+                "reason"_attr = reasonText(reason));
+
+    invariant(nss == kGlobalUserWritesNamespace);
+
+    acquireCriticalSection<UserWriteBlockingCriticalSectionDocument>(
+        opCtx,
+        NamespaceString::kUserWritesCriticalSectionsNamespace,
+        nss,
+        MODE_X,
+        "AcquireUserWritesCS"_sd,
+        [&](const UserWriteBlockingCriticalSectionDocument& collCSDoc) {
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << "Cannot acquire user writes critical section with different "
+                                     "options than the already existing one. blockShardedDDL: "
+                                  << blockShardedDDL
+                                  << ", current: " << collCSDoc.getBlockNewUserShardedDDL(),
+                    !blockShardedDDL || collCSDoc.getBlockNewUserShardedDDL() == blockShardedDDL);
+
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << "Cannot acquire user writes critical section with different "
+                                     "options than the already existing one. blockUserWrites: "
+                                  << blockUserWrites
+                                  << ", current: " << collCSDoc.getBlockUserWrites(),
+                    !blockUserWrites || collCSDoc.getBlockUserWrites() == blockUserWrites);
+
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << "Cannot acquire user writes critical section with different "
+                                     "options than the already existing one. reason: "
+                                  << reasonText(reason) << ", current: "
+                                  << reasonText(collCSDoc.getBlockUserWritesReason()),
+                    collCSDoc.getBlockUserWritesReason() == reason);
+        },
+        [&]() {
+            UserWriteBlockingCriticalSectionDocument newDoc(nss);
+            newDoc.setBlockNewUserShardedDDL(blockShardedDDL);
+            newDoc.setBlockUserWrites(blockUserWrites);
+            newDoc.setBlockUserWritesReason(reason);
+            return newDoc;
+        });
+
+    LOGV2_DEBUG(12096701,
+                2,
+                "Acquired user writes recoverable critical section",
+                logAttrs(nss),
+                "blockShardedDDL"_attr = "false",
+                "blockUserWrites"_attr = "true");
 }
 
 void UserWritesRecoverableCriticalSectionService::
     acquireRecoverableCriticalSectionBlockNewShardedDDL(OperationContext* opCtx,
                                                         const NamespaceString& nss) {
+
+    const auto blockShardedDDL = true;
+    const auto blockUserWrites = false;
+
     invariant(!serverGlobalParams.clusterRole.has(ClusterRole::None),
               "Acquiring the user writes recoverable critical section blocking only sharded DDL is "
               "only allowed on sharded clusters");
 
-    // Take the user writes critical section blocking only ShardingDDLCoordinators.
-    acquireRecoverableCriticalSection(
-        opCtx, nss, true /* blockShardedDDL */, false /* blockUserWrites */);
+    invariant(nss == kGlobalUserWritesNamespace);
+
+    LOGV2_DEBUG(12096702,
+                3,
+                "Acquiring user writes recoverable critical section",
+                logAttrs(nss),
+                "blockShardedDDL"_attr = blockShardedDDL,
+                "blockUserWrites"_attr = blockUserWrites);
+
+    acquireCriticalSection<UserWriteBlockingCriticalSectionDocument>(
+        opCtx,
+        NamespaceString::kUserWritesCriticalSectionsNamespace,
+        nss,
+        MODE_IX,
+        "AcquireUserWritesCS"_sd,
+        [&](const UserWriteBlockingCriticalSectionDocument& collCSDoc) {
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << "Cannot acquire user writes critical section with different "
+                                     "options than the already existing one. blockShardedDDL: "
+                                  << blockShardedDDL
+                                  << ", current: " << collCSDoc.getBlockNewUserShardedDDL(),
+                    !blockShardedDDL || collCSDoc.getBlockNewUserShardedDDL() == blockShardedDDL);
+
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << "Cannot acquire user writes critical section with different "
+                                     "options than the already existing one. blockUserWrites: "
+                                  << blockUserWrites
+                                  << ", current: " << collCSDoc.getBlockUserWrites(),
+                    !blockUserWrites || collCSDoc.getBlockUserWrites() == blockUserWrites);
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << "Cannot acquire user writes critical section with different "
+                                     "options than the already existing one. reason: "
+                                  << reasonText(boost::none) << ", current: "
+                                  << reasonText(collCSDoc.getBlockUserWritesReason()),
+                    collCSDoc.getBlockUserWritesReason() == boost::none);
+        },
+        [&]() {
+            UserWriteBlockingCriticalSectionDocument newDoc(nss);
+            newDoc.setBlockNewUserShardedDDL(blockShardedDDL);
+            newDoc.setBlockUserWrites(blockUserWrites);
+            return newDoc;
+        });
+    LOGV2_DEBUG(12096703,
+                2,
+                "Acquired user writes recoverable critical section",
+                logAttrs(nss),
+                "blockShardedDDL"_attr = blockShardedDDL,
+                "blockUserWrites"_attr = blockUserWrites);
 }
 
 void UserWritesRecoverableCriticalSectionService::
@@ -252,7 +354,8 @@ void UserWritesRecoverableCriticalSectionService::
         // before starting to block new writes.
         Lock::GlobalLock globalLock(opCtx, MODE_X);
 
-        const auto bsonObj = findRecoverableCriticalSectionDoc(opCtx, nss);
+        const auto bsonObj = findRecoverableCriticalSectionDoc(
+            opCtx, NamespaceString::kUserWritesCriticalSectionsNamespace, nss);
         uassert(ErrorCodes::IllegalOperation,
                 "Cannot promote user writes critical section to block user writes if critical "
                 "section document not persisted first.",
@@ -309,7 +412,8 @@ void UserWritesRecoverableCriticalSectionService::
     {
         Lock::GlobalLock globalLock(opCtx, MODE_IX);
 
-        const auto bsonObj = findRecoverableCriticalSectionDoc(opCtx, nss);
+        const auto bsonObj = findRecoverableCriticalSectionDoc(
+            opCtx, NamespaceString::kUserWritesCriticalSectionsNamespace, nss);
         // If the critical section is not taken, then we are done.
         if (bsonObj.isEmpty()) {
             LOGV2_DEBUG(
@@ -351,70 +455,36 @@ void UserWritesRecoverableCriticalSectionService::
 }
 
 
-void UserWritesRecoverableCriticalSectionService::releaseRecoverableCriticalSection(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    boost::optional<UserWritesBlockReasonEnum> reason) {
+void UserWritesRecoverableCriticalSectionService::
+    releaseRecoverableCriticalSectionBlockingUserWrites(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        boost::optional<UserWritesBlockReasonEnum> reason) {
     LOGV2_DEBUG(6351909,
                 3,
                 "Releasing user writes recoverable critical section",
                 logAttrs(nss),
                 "reason"_attr = reasonText(reason));
 
-    invariant(nss == UserWritesRecoverableCriticalSectionService::kGlobalUserWritesNamespace);
+    invariant(nss == UserWritesRecoverableCriticalSectionService::kGlobalUserWritesNamespace ||
+              nss ==
+                  UserWritesRecoverableCriticalSectionService::
+                      kPreventWritesForInsufficientDiskSpaceNamespace);
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
-    {
-        Lock::GlobalLock globalLock(opCtx, MODE_IX);
-
-        const auto bsonObj = findRecoverableCriticalSectionDoc(opCtx, nss);
-
-        // If there is no persisted document, then we are done.
-        if (bsonObj.isEmpty()) {
-            LOGV2_DEBUG(
-                6351910,
-                3,
-                "The user writes recoverable critical section was already released, do nothing",
-                logAttrs(nss));
-
-            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
-
-            return;
-        }
-
-        const auto collCSDoc = UserWriteBlockingCriticalSectionDocument::parse(
-            bsonObj, IDLParserContext("ReleaseUserWritesCS"));
-
-        uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "Cannot release user writes critical section with different "
-                                 "reason than the already existing one. reason: "
-                              << reasonText(reason)
-                              << ", current: " << reasonText(collCSDoc.getBlockUserWritesReason()),
-                collCSDoc.getBlockUserWritesReason() == reason);
-
-        // Release the critical section by deleting the critical section document. The OpObserver
-        // will release the in-memory CS when reacting to the delete event.
-        DBDirectClient dbClient(opCtx);
-        const auto cmdResponse = dbClient.runCommand([&] {
-            write_ops::DeleteCommandRequest deleteOp(
-                NamespaceString::kUserWritesCriticalSectionsNamespace);
-
-            deleteOp.setDeletes({[&] {
-                write_ops::DeleteOpEntry entry;
-                entry.setQ(BSON(
-                    UserWriteBlockingCriticalSectionDocument::kNssFieldName
-                    << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())));
-                // At most one doc can possibly match the above query.
-                entry.setMulti(false);
-                return entry;
-            }()});
-
-            return deleteOp.serialize();
-        }());
-
-        const auto commandReply = cmdResponse->getCommandReply();
-        uassertStatusOK(getStatusFromWriteCommandReply(commandReply));
-    }
+    releaseCriticalSection<UserWriteBlockingCriticalSectionDocument>(
+        opCtx,
+        NamespaceString::kUserWritesCriticalSectionsNamespace,
+        nss,
+        "ReleaseUserWritesCS"_sd,
+        [&](const UserWriteBlockingCriticalSectionDocument& collCSDoc) {
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << "Cannot release user writes critical section with different "
+                                     "reason than the already existing one. reason: "
+                                  << reasonText(reason) << ", current: "
+                                  << reasonText(collCSDoc.getBlockUserWritesReason()),
+                    collCSDoc.getBlockUserWritesReason() == reason);
+        });
 
     LOGV2_DEBUG(6351911, 2, "Released user writes recoverable critical section", logAttrs(nss));
 }
@@ -449,7 +519,102 @@ void UserWritesRecoverableCriticalSectionService::recoverRecoverableCriticalSect
         return true;
     });
 
-    LOGV2_DEBUG(6351913, 2, "Recovered all user writes recoverable critical sections");
+    // Recover the persisted prevent-writes critical section documents and restore the state into
+    // memory
+    PersistentTaskStore<PreventWritesCriticalSectionDocument> preventWritesStore(
+        NamespaceString::kPreventWritesCriticalSectionsNamespace);
+    preventWritesStore.forEach(
+        opCtx, BSONObj{}, [&opCtx](const PreventWritesCriticalSectionDocument& doc) {
+            invariant(doc.getNss().isEmpty());
+            // TODO(SERVER-120970): restore the state into memory
+            return true;
+        });
+
+    LOGV2_DEBUG(
+        6351913, 2, "Recovered both user writes and prevent-writes recoverable critical sections");
 }
 
+void UserWritesRecoverableCriticalSectionService::acquireRecoverableCriticalSectionPreventingWrites(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    bool allowDeletions,
+    PreventWritesReasonEnum reason) {
+
+    LOGV2_DEBUG(12096704,
+                3,
+                "Acquiring prevent-writes recoverable critical section",
+                logAttrs(nss),
+                "enabled"_attr = "true",
+                "allowDeletions"_attr = "false",
+                "reason"_attr = reasonText(reason));
+
+    invariant(nss == kPreventWritesForInsufficientDiskSpaceNamespace);
+
+    acquireCriticalSection<PreventWritesCriticalSectionDocument>(
+        opCtx,
+        NamespaceString::kPreventWritesCriticalSectionsNamespace,
+        nss,
+        MODE_X,
+        "AcquirePreventWritesCS"_sd,
+        [&](const PreventWritesCriticalSectionDocument& collCSDoc) {
+            uassert(
+                ErrorCodes::IllegalOperation,
+                str::stream() << "Cannot acquire prevent-writes critical section with different "
+                                 "options than the already existing one. enabled: true, current: "
+                              << collCSDoc.getEnabled(),
+                collCSDoc.getEnabled());
+
+            uassert(
+                ErrorCodes::IllegalOperation,
+                str::stream() << "Cannot acquire prevent-writes critical section with different "
+                                 "options than the already existing one. allowDeletions: "
+                              << allowDeletions << ", current: " << collCSDoc.getAllowDeletions(),
+                collCSDoc.getAllowDeletions() == allowDeletions);
+
+            uassert(
+                ErrorCodes::IllegalOperation,
+                str::stream() << "Cannot acquire prevent-writes critical section with different "
+                                 "options than the already existing one. reason: "
+                              << reasonText(reason)
+                              << ", current: " << reasonText(collCSDoc.getPreventWritesReason()),
+                collCSDoc.getPreventWritesReason() == reason);
+        },
+        [&]() {
+            PreventWritesCriticalSectionDocument newDoc(nss);
+            newDoc.setEnabled(true);
+            newDoc.setAllowDeletions(allowDeletions);
+            newDoc.setPreventWritesReason(reason);
+            return newDoc;
+        });
+
+    LOGV2_DEBUG(12096705,
+                2,
+                "Acquired prevent-writes recoverable critical section",
+                logAttrs(nss),
+                "enabled"_attr = "true",
+                "allowDeletions"_attr = allowDeletions,
+                "reason"_attr = reasonText(reason));
+}
+
+void UserWritesRecoverableCriticalSectionService::releaseRecoverableCriticalSectionPreventingWrites(
+    OperationContext* opCtx, const NamespaceString& nss, PreventWritesReasonEnum reason) {
+
+    LOGV2_DEBUG(
+        12096406, 3, "Releasing prevent-writes recoverable critical section", logAttrs(nss));
+
+    invariant(nss == kPreventWritesForInsufficientDiskSpaceNamespace);
+
+    releaseCriticalSection<PreventWritesCriticalSectionDocument>(
+        opCtx,
+        NamespaceString::kPreventWritesCriticalSectionsNamespace,
+        nss,
+        "ReleasePreventWritesCS"_sd,
+        [&](const PreventWritesCriticalSectionDocument& doc) {
+            uassert(ErrorCodes::IllegalOperation,
+                    "Cannot release with different reason",
+                    doc.getPreventWritesReason() == reason);
+        });
+
+    LOGV2_DEBUG(12096407, 2, "Released prevent-writes recoverable critical section", logAttrs(nss));
+}
 }  // namespace mongo

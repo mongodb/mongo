@@ -308,6 +308,11 @@
     /*  Namespace for storing feature compatibility version changes block documents */             \
     X(kBlockFCVChangesNamespace, DatabaseName::kConfig, "system.block_fcv_changes"_sd)             \
                                                                                                    \
+    /*  Namespace for storing per-shard prevent writes critical section documents */               \
+    X(kPreventWritesCriticalSectionsNamespace,                                                     \
+      DatabaseName::kConfig,                                                                       \
+      "prevent_writes_critical_sections"_sd)                                                       \
+                                                                                                   \
     /*  Namespace used for container oplog entries. */                                             \
     X(kContainerNamespace, DatabaseName::kAdmin, "$container"_sd)                                  \
     /**/
