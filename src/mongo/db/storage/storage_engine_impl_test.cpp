@@ -33,10 +33,13 @@
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_helper.h"
-#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/util/periodic_runner_factory.h"
+
+#include <algorithm>
+#include <functional>
 
 namespace mongo {
 namespace {
@@ -52,28 +55,31 @@ public:
 
     // Increment the timestamps each time they are called for testing purposes.
     Timestamp getCheckpointTimestamp() const override {
-        checkpointTimestamp = std::make_unique<Timestamp>(checkpointTimestamp->getInc() + 1);
+        checkpointTimestamp = std::make_unique<Timestamp>(checkpointTimestamp->getSecs(),
+                                                          checkpointTimestamp->getInc() + 1);
         return *checkpointTimestamp;
     }
     Timestamp getOldestTimestamp() const override {
-        oldestTimestamp = std::make_unique<Timestamp>(oldestTimestamp->getInc() + 1);
+        oldestTimestamp =
+            std::make_unique<Timestamp>(oldestTimestamp->getSecs(), oldestTimestamp->getInc() + 1);
         return *oldestTimestamp;
     }
     Timestamp getStableTimestamp() const override {
-        stableTimestamp = std::make_unique<Timestamp>(stableTimestamp->getInc() + 1);
+        stableTimestamp =
+            std::make_unique<Timestamp>(stableTimestamp->getSecs(), stableTimestamp->getInc() + 1);
         return *stableTimestamp;
     }
 
     // Mutable for testing purposes to increment the timestamp.
-    mutable std::unique_ptr<Timestamp> checkpointTimestamp = std::make_unique<Timestamp>();
-    mutable std::unique_ptr<Timestamp> oldestTimestamp = std::make_unique<Timestamp>();
-    mutable std::unique_ptr<Timestamp> stableTimestamp = std::make_unique<Timestamp>();
+    mutable std::unique_ptr<Timestamp> checkpointTimestamp = std::make_unique<Timestamp>(1, 0);
+    mutable std::unique_ptr<Timestamp> oldestTimestamp = std::make_unique<Timestamp>(1, 0);
+    mutable std::unique_ptr<Timestamp> stableTimestamp = std::make_unique<Timestamp>(1, 0);
 };
 
 class TimestampKVEngineTest : public ServiceContextTest {
 public:
-    using TimestampType = StorageEngine::TimestampMonitor::TimestampType;
     using TimestampListener = StorageEngine::TimestampMonitor::TimestampListener;
+    using Timestamps = StorageEngine::TimestampMonitor::Timestamps;
 
     /**
      * Create an instance of the KV Storage Engine so that we have a timestamp monitor operating.
@@ -112,10 +118,6 @@ public:
     }
 
     std::unique_ptr<StorageEngine> _storageEngine;
-
-    TimestampType checkpoint = TimestampType::kCheckpoint;
-    TimestampType oldest = TimestampType::kOldest;
-    TimestampType stable = TimestampType::kStable;
 };
 
 }  // namespace
@@ -129,9 +131,9 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorRunning) {
 }
 
 TEST_F(TimestampKVEngineTest, TimestampListeners) {
-    TimestampListener first(stable, [](OperationContext* opCtx, Timestamp timestamp) {});
-    TimestampListener second(oldest, [](OperationContext* opCtx, Timestamp timestamp) {});
-    TimestampListener third(stable, [](OperationContext* opCtx, Timestamp timestamp) {});
+    TimestampListener first([](OperationContext* opCtx, auto) {});
+    TimestampListener second([](OperationContext* opCtx, auto) {});
+    TimestampListener third([](OperationContext* opCtx, auto) {});
 
     // Can only register the listener once.
     _storageEngine->getTimestampMonitor()->addListener(&first);
@@ -152,36 +154,28 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
     stdx::mutex mutex;
     stdx::condition_variable cv;
 
-    bool changes[4] = {false, false, false, false};
+    bool changes[] = {false, false, false};
 
-    TimestampListener first(checkpoint, [&](OperationContext* opCtx, Timestamp timestamp) {
+    TimestampListener first([&](OperationContext* opCtx, auto& timestamps) {
         stdx::lock_guard<stdx::mutex> lock(mutex);
-        if (!changes[0]) {
+        if (!timestamps.checkpoint.isNull() && !changes[0]) {
             changes[0] = true;
             cv.notify_all();
         }
     });
 
-    TimestampListener second(oldest, [&](OperationContext* opCtx, Timestamp timestamp) {
+    TimestampListener second([&](OperationContext* opCtx, auto& timestamps) {
         stdx::lock_guard<stdx::mutex> lock(mutex);
-        if (!changes[1]) {
+        if (!timestamps.oldest.isNull() && !changes[1]) {
             changes[1] = true;
             cv.notify_all();
         }
     });
 
-    TimestampListener third(stable, [&](OperationContext* opCtx, Timestamp timestamp) {
+    TimestampListener third([&](OperationContext* opCtx, auto& timestamps) {
         stdx::lock_guard<stdx::mutex> lock(mutex);
-        if (!changes[2]) {
+        if (!timestamps.stable.isNull() && !changes[2]) {
             changes[2] = true;
-            cv.notify_all();
-        }
-    });
-
-    TimestampListener fourth(stable, [&](OperationContext* opCtx, Timestamp timestamp) {
-        stdx::lock_guard<stdx::mutex> lock(mutex);
-        if (!changes[3]) {
-            changes[3] = true;
             cv.notify_all();
         }
     });
@@ -189,18 +183,12 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
     _storageEngine->getTimestampMonitor()->addListener(&first);
     _storageEngine->getTimestampMonitor()->addListener(&second);
     _storageEngine->getTimestampMonitor()->addListener(&third);
-    _storageEngine->getTimestampMonitor()->addListener(&fourth);
 
-    // Wait until all 4 listeners get notified at least once.
+    // Wait until all 3 listeners get notified at least once.
     {
         stdx::unique_lock<stdx::mutex> lk(mutex);
         cv.wait(lk, [&] {
-            for (auto const& change : changes) {
-                if (!change) {
-                    return false;
-                }
-            }
-            return true;
+            return std::all_of(std::begin(changes), std::end(changes), std::identity());
         });
     };
 
@@ -208,16 +196,15 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
     _storageEngine->getTimestampMonitor()->removeListener(&first);
     _storageEngine->getTimestampMonitor()->removeListener(&second);
     _storageEngine->getTimestampMonitor()->removeListener(&third);
-    _storageEngine->getTimestampMonitor()->removeListener(&fourth);
 }
 
 TEST_F(TimestampKVEngineTest, TimestampAdvancesOnNotification) {
     Timestamp previous = Timestamp();
     AtomicWord<int> timesNotified{0};
 
-    TimestampListener listener(stable, [&](OperationContext* opCtx, Timestamp timestamp) {
-        ASSERT_TRUE(previous < timestamp);
-        previous = timestamp;
+    TimestampListener listener([&](OperationContext* opCtx, const Timestamps& timestamps) {
+        ASSERT_TRUE(previous < timestamps.stable);
+        previous = timestamps.stable;
         timesNotified.fetchAndAdd(1);
     });
     _storageEngine->getTimestampMonitor()->addListener(&listener);

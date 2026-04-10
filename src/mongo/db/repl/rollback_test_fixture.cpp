@@ -85,9 +85,8 @@ ReplSettings createReplSettings() {
     return settings;
 }
 
-StorageEngine::TimestampMonitor::TimestampListener mockTimestampListener(
-    StorageEngine::TimestampMonitor::TimestampType::kOldest,
-    [](OperationContext* opCtx, Timestamp timestamp) {});
+StorageEngine::TimestampMonitor::TimestampListener mockTimestampListener([](OperationContext* opCtx,
+                                                                            auto&) {});
 
 class RollbackTestOpObserver : public OpObserverNoop {
 public:

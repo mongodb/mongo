@@ -112,9 +112,6 @@ public:
      */
     boost::optional<Timestamp> getEarliestDropTimestamp() const;
 
-    // Returns whether there are expired idents
-    bool hasExpiredIdents(const Timestamp& ts) const;
-
     /**
      * Returns a list of ident names currently tracked by the reaper.
      */
@@ -131,7 +128,8 @@ public:
      * unreferenced idents with Timestamp::min() drop timestamps (untimestamped on standalones) as
      * long as the changes have been checkpointed.
      */
-    void dropIdentsOlderThan(OperationContext* opCtx, const Timestamp& ts);
+    void dropIdentsOlderThan(OperationContext* opCtx,
+                             const StorageEngine::TimestampMonitor::Timestamps& timestamps);
 
     /**
      * Clears maps of drop pending idents for drops with timestamps greater than or equal to the

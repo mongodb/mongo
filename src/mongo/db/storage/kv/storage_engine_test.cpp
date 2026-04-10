@@ -791,12 +791,10 @@ public:
 
     void waitForTimestampMonitorPass() {
         auto timestampMonitor = _storageEngine->getTimestampMonitor();
-        using TimestampType = StorageEngine::TimestampMonitor::TimestampType;
         using TimestampListener = StorageEngine::TimestampMonitor::TimestampListener;
         auto pf = makePromiseFuture<void>();
-        auto listener = TimestampListener(
-            TimestampType::kOldest,
-            [promise = &pf.promise](OperationContext* opCtx, Timestamp t) mutable {
+        auto listener =
+            TimestampListener([promise = &pf.promise](OperationContext* opCtx, auto) mutable {
                 promise->emplaceValue();
             });
         timestampMonitor->addListener(&listener);

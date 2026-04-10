@@ -376,74 +376,14 @@ public:
         /**
          * Timestamps that can be listened to for changes.
          */
-        enum class TimestampType { kCheckpoint, kOldest, kStable, kMinOfCheckpointAndOldest };
-
-        /**
-         * A TimestampListener is used to listen for changes in a given timestamp and to execute the
-         * user-provided callback to the change with a custom user-provided callback.
-         *
-         * The TimestampListener must be registered in the TimestampMonitor in order to be notified
-         * of timestamp changes and react to changes for the duration it's part of the monitor.
-         *
-         * Listeners expected to run in standalone mode should handle Timestamp::min() notifications
-         * appropriately.
-         */
-        class TimestampListener {
-        public:
-            // Caller must ensure that the lifetime of the variables used in the callback are valid.
-            using Callback = std::function<void(OperationContext* opCtx, Timestamp timestamp)>;
-
-            /**
-             * A TimestampListener saves a 'callback' that will be executed whenever the specified
-             * 'type' timestamp changes. The 'callback' function will be passed the new 'type'
-             * timestamp.
-             */
-            TimestampListener(TimestampType type, Callback callback)
-                : _type(type), _callback(std::move(callback)) {}
-
-            /**
-             * Executes the appropriate function with the callback of the listener with the new
-             * timestamp.
-             */
-            void notify(OperationContext* opCtx, Timestamp newTimestamp) {
-                if (_type == TimestampType::kCheckpoint)
-                    _onCheckpointTimestampChanged(opCtx, newTimestamp);
-                else if (_type == TimestampType::kOldest)
-                    _onOldestTimestampChanged(opCtx, newTimestamp);
-                else if (_type == TimestampType::kStable)
-                    _onStableTimestampChanged(opCtx, newTimestamp);
-                else if (_type == TimestampType::kMinOfCheckpointAndOldest)
-                    _onMinOfCheckpointAndOldestTimestampChanged(opCtx, newTimestamp);
-            }
-
-            TimestampType getType() const {
-                return _type;
-            }
-
-        private:
-            void _onCheckpointTimestampChanged(OperationContext* opCtx, Timestamp newTimestamp) {
-                _callback(opCtx, newTimestamp);
-            }
-
-            void _onOldestTimestampChanged(OperationContext* opCtx, Timestamp newTimestamp) {
-                _callback(opCtx, newTimestamp);
-            }
-
-            void _onStableTimestampChanged(OperationContext* opCtx, Timestamp newTimestamp) {
-                _callback(opCtx, newTimestamp);
-            }
-
-            void _onMinOfCheckpointAndOldestTimestampChanged(OperationContext* opCtx,
-                                                             Timestamp newTimestamp) {
-                _callback(opCtx, newTimestamp);
-            }
-
-            // Timestamp type this listener monitors.
-            TimestampType _type;
-
-            // Function to execute when the timestamp changes.
-            Callback _callback;
+        struct Timestamps {
+            Timestamp checkpoint;
+            Timestamp oldest;
+            Timestamp stable;
         };
+
+        using TimestampListener =
+            std::function<void(OperationContext* opCtx, const Timestamps& timestamps)>;
 
         /**
          * Starts monitoring timestamp changes in the background with an initial listener.
@@ -453,8 +393,7 @@ public:
         ~TimestampMonitor();
 
         /**
-         * Adds a new listener to the monitor if it isn't already registered. A listener can only be
-         * bound to one type of timestamp at a time.
+         * Adds a new listener to the monitor if it isn't already registered.
          */
         void addListener(TimestampListener* listener);
 
@@ -474,8 +413,7 @@ public:
 
     private:
         /**
-         * Monitor changes in timestamps and to notify the listeners on change. Notifies all
-         * listeners on Timestamp::min() in order to support standalone mode that is untimestamped.
+         * Monitor changes in timestamps and to notify the listeners on change.
          */
         void _startup();
 

@@ -167,17 +167,6 @@ std::shared_ptr<Ident> KVDropPendingIdentReaper::markIdentInUse(StringData ident
     return newIdent;
 }
 
-bool KVDropPendingIdentReaper::hasExpiredIdents(const Timestamp& ts) const {
-    stdx::lock_guard lock(_mutex);
-    for (auto& info : _timestampOrderedIdents) {
-        if (info->isExpired(_engine, ts))
-            return true;
-        if (info->dropTime > ts)
-            return false;
-    }
-    return false;
-}
-
 boost::optional<Timestamp> KVDropPendingIdentReaper::getEarliestDropTimestamp() const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     auto it = _timestampOrderedIdents.cbegin();
@@ -205,7 +194,12 @@ size_t KVDropPendingIdentReaper::getNumIdents() const {
     return _timestampOrderedIdents.size();
 };
 
-void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, const Timestamp& ts) {
+void KVDropPendingIdentReaper::dropIdentsOlderThan(
+    OperationContext* opCtx, const StorageEngine::TimestampMonitor::Timestamps& timestamps) {
+    auto ts = (timestamps.checkpoint.isNull() || (timestamps.checkpoint > timestamps.oldest))
+        ? timestamps.oldest
+        : timestamps.checkpoint;
+
     const bool usesSchemaEpochs =
         rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider().usesSchemaEpochs();
     boost::optional<rss::consensus::IntentGuard> writeIntentGuard;
@@ -253,8 +247,18 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
     }
 
     if (toDrop.empty()) {
+        LOGV2_DEBUG(8097401,
+                    1,
+                    "No drop-pending idents have expired",
+                    "timestamp"_attr = ts,
+                    "pendingIdentsCount"_attr = _timestampOrderedIdents.size());
         return;
     }
+
+    LOGV2(22260,
+          "Removing drop-pending idents with drop timestamps before timestamp",
+          "timestamp"_attr = ts,
+          "count"_attr = toDrop.size());
 
     for (auto& toDropElem : toDrop) {
         auto& identInfo = toDropElem.identInfo;

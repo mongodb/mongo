@@ -35,11 +35,11 @@ namespace mongo::catalog_helper {
 MONGO_FAIL_POINT_DEFINE(setAutoGetCollectionWait);
 
 StorageEngine::TimestampMonitor::TimestampListener kCollectionCatalogCleanupTimestampListener(
-    StorageEngine::TimestampMonitor::TimestampType::kOldest,
-    [](OperationContext* opCtx, Timestamp timestamp) {
-        if (CollectionCatalog::latest(opCtx)->catalogIdTracker().dirty(timestamp)) {
-            CollectionCatalog::write(opCtx, [timestamp](CollectionCatalog& catalog) {
-                catalog.catalogIdTracker().cleanup(timestamp);
+    [](OperationContext* opCtx, const StorageEngine::TimestampMonitor::Timestamps& timestamp) {
+        auto oldest = timestamp.oldest;
+        if (CollectionCatalog::latest(opCtx)->catalogIdTracker().dirty(oldest)) {
+            CollectionCatalog::write(opCtx, [oldest](CollectionCatalog& catalog) {
+                catalog.catalogIdTracker().cleanup(oldest);
             });
         }
     });
