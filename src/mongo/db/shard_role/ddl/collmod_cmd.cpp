@@ -135,7 +135,7 @@ public:
             const auto& nss = request().getNamespace();
 
             ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(
-                opCtx, {nss}, "collMod", {.acquireDDLLocks = true});
+                opCtx, {nss}, definition()->getName(), {.acquireDDLLocks = true});
 
             staticValidateCollMod(opCtx, nss, cmd.getCollModRequest());
 

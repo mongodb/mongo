@@ -100,7 +100,7 @@ public:
         }
         Reply typedRun(OperationContext* opCtx) final {
             ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(
-                opCtx, std::vector<NamespaceString>{ns()});
+                opCtx, {ns()}, definition()->getName(), {.acquireDDLLocks = true});
 
             auto dbName = request().getDbName();
             // disallow dropping the config database

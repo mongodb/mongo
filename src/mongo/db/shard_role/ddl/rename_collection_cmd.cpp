@@ -101,7 +101,7 @@ public:
             const auto& toNss = request().getTo();
 
             ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(
-                opCtx, std::vector<NamespaceString>{fromNss, toNss});
+                opCtx, {fromNss, toNss}, definition()->getName(), {.acquireDDLLocks = true});
 
             uassert(ErrorCodes::IllegalOperation,
                     "Can't rename a collection to itself",

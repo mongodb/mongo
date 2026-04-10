@@ -120,8 +120,7 @@ Status processCollModCommandWithTimeSeriesTranslation(OperationContext* opCtx,
                                                       const CollMod& cmd,
                                                       bool performViewChange,
                                                       BSONObjBuilder* result) {
-    auto [timeseriesOptions,
-          isLegacyTimeseries] = [&]() -> std::pair<boost::optional<TimeseriesOptions>, bool> {
+    auto [namespaceExists, timeseriesOptions, isLegacyTimeseries] = [&]() -> auto {
         // TODO SERVER-105548 switch back to acquireCollection once 9.0 becomes last LTS
         auto [collAcq, wasNssTranslatedToBucket] =
             timeseries::acquireCollectionOrViewWithBucketsLookup(
@@ -133,12 +132,20 @@ Status processCollModCommandWithTimeSeriesTranslation(OperationContext* opCtx,
                     AcquisitionPrerequisites::OperationType::kRead),
                 LockMode::MODE_IS);
 
+        auto namespaceExists = collAcq.collectionExists() || collAcq.isView();
         auto tsOptions = collAcq.collectionExists()
             ? collAcq.getCollectionPtr()->getTimeseriesOptions()
             : boost::none;
-        return {tsOptions, wasNssTranslatedToBucket};
+        return std::make_tuple(namespaceExists, tsOptions, wasNssTranslatedToBucket);
     }();
 
+    // Fail early if the collection does not exist: We do not take the DDL lock on createCollection,
+    // so the collection may get later created either as a regular collection or timeseries.
+    // Therefore, we can not decide whether to apply timeseries translation or not.
+    if (!namespaceExists) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "namespace does not exist: " << nss.toStringForErrorMsg());
+    }
 
     if (!timeseriesOptions) {
         return processCollModCommand(opCtx, cmd.getNamespace(), cmd, nullptr, result);

@@ -16,6 +16,9 @@ filters:
   - "timeseries_collmod_granularity_update.js":
     approvers:
       - 10gen/server-catalog-and-routing-ddl
+  - "timeseries_collmod_index_translation_atomic.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
   - "timeseries_create_drop_setFCV.js":
     approvers:
       - 10gen/server-catalog-and-routing-ddl

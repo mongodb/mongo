@@ -770,7 +770,7 @@ StatusWith<const IndexDescriptor*> _setUpCollModIndexUnique(
     if (!collection) {
         checkCollectionUUIDMismatch(opCtx, nss, CollectionPtr(), cmd.getCollectionUUID());
         return Status(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "ns does not exist for unique index conversion: "
+                      str::stream() << "namespace does not exist for unique index conversion: "
                                     << nss.toStringForErrorMsg());
     }
 
@@ -882,7 +882,8 @@ Status _collModInternal(OperationContext* opCtx,
                 ->checkShardVersionOrThrow(opCtx);
         }
         checkCollectionUUIDMismatch(opCtx, nss, CollectionPtr(), cmd.getCollectionUUID());
-        return Status(ErrorCodes::NamespaceNotFound, "ns does not exist");
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "namespace does not exist: " << nss.toStringForErrorMsg());
     }
 
     // This is necessary to set up CurOp and update the Top stats.
