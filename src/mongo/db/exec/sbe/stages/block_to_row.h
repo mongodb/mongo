@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
@@ -58,7 +59,7 @@ public:
                     value::SlotVector valsOut,
                     value::SlotId bitmapSlotId,
                     PlanNodeId nodeId,
-                    PlanYieldPolicy* yieldPolicy = nullptr,
+                    PlanYieldPolicySBE* yieldPolicy = nullptr,
                     bool participateInTrialRunTracking = true);
     ~BlockToRowStage() override;
 

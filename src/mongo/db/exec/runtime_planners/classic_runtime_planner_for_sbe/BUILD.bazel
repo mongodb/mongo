@@ -18,6 +18,7 @@ mongo_cc_library(
         "//src/mongo/db:sbe_values",
         "//src/mongo/db/exec:scoped_timer",
         "//src/mongo/db/exec/sbe:query_sbe",
+        "//src/mongo/db/query:plan_yield_policy_sbe",
     ],
 )
 

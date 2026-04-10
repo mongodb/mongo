@@ -47,7 +47,7 @@ AndHashStage::AndHashStage(std::unique_ptr<PlanStage> outer,
                            value::SlotVector innerCond,
                            value::SlotVector innerProjects,
                            boost::optional<value::SlotId> collatorSlot,
-                           PlanYieldPolicy* yieldPolicy,
+                           PlanYieldPolicySBE* yieldPolicy,
                            PlanNodeId planNodeId,
                            bool participateInTrialRunTracking)
     : PlanStage("and_hash"_sd, yieldPolicy, planNodeId, participateInTrialRunTracking),

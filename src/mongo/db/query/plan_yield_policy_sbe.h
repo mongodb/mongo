@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy.h"
@@ -39,6 +38,10 @@
 
 #include <memory>
 #include <vector>
+
+namespace mongo::sbe {
+class PlanStage;
+}  // namespace mongo::sbe
 
 namespace mongo {
 

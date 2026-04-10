@@ -37,7 +37,7 @@ namespace mongo::sbe {
 class BaseMockStage : public PlanStage {
 public:
     explicit BaseMockStage(PlanNodeId planNodeId,
-                           PlanYieldPolicy* yieldPolicy = nullptr,
+                           PlanYieldPolicySBE* yieldPolicy = nullptr,
                            bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const override;

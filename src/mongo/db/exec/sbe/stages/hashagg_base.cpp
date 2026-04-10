@@ -48,7 +48,7 @@ namespace sbe {
 
 template <class Derived>
 HashAggBaseStage<Derived>::HashAggBaseStage(StringData stageName,
-                                            PlanYieldPolicy* yieldPolicy,
+                                            PlanYieldPolicySBE* yieldPolicy,
                                             PlanNodeId planNodeId,
                                             value::SlotAccessor* collatorAccessor,
                                             bool participateInTrialRunTracking,

@@ -41,7 +41,7 @@ BlockToRowStage::BlockToRowStage(std::unique_ptr<PlanStage> input,
                                  value::SlotVector valsOut,
                                  value::SlotId bitmapSlotId,
                                  PlanNodeId nodeId,
-                                 PlanYieldPolicy* yieldPolicy,
+                                 PlanYieldPolicySBE* yieldPolicy,
                                  bool participateInTrialRunTracking)
     : PlanStage("block_to_row"_sd, yieldPolicy, nodeId, participateInTrialRunTracking),
       _blockSlotIds(std::move(blocks)),

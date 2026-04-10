@@ -54,7 +54,7 @@ RandomScanStage::RandomScanStage(UUID collUuid,
                                  boost::optional<value::SlotId> indexKeyPatternSlot,
                                  std::vector<std::string> scanFieldNames,
                                  value::SlotVector scanFieldSlots,
-                                 PlanYieldPolicy* yieldPolicy,
+                                 PlanYieldPolicySBE* yieldPolicy,
                                  PlanNodeId nodeId,
                                  // Optional arguments:
                                  bool participateInTrialRunTracking)
@@ -79,7 +79,7 @@ RandomScanStage::RandomScanStage(UUID collUuid,
  * Constructor for clone(). Copies '_state' shared_ptr.
  */
 RandomScanStage::RandomScanStage(std::shared_ptr<ScanStageBaseState> state,
-                                 PlanYieldPolicy* yieldPolicy,
+                                 PlanYieldPolicySBE* yieldPolicy,
                                  PlanNodeId nodeId,
                                  bool participateInTrialRunTracking)
     : ScanStageBaseImpl<RandomScanStage>(

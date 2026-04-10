@@ -48,7 +48,7 @@ HashJoinStage::HashJoinStage(std::unique_ptr<PlanStage> outer,
                              value::SlotVector innerKey,
                              value::SlotVector innerProjects,
                              boost::optional<value::SlotId> collatorSlot,
-                             PlanYieldPolicy* yieldPolicy,
+                             PlanYieldPolicySBE* yieldPolicy,
                              PlanNodeId planNodeId,
                              boost::optional<size_t> estimatedBuildCardinality,
                              bool participateInTrialRunTracking)

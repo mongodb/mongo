@@ -94,7 +94,7 @@ BlockHashAggStage::BlockHashAggStage(std::unique_ptr<PlanStage> input,
                                      BlockAggExprTupleVector aggs,
                                      bool allowDiskUse,
                                      SlotExprPairVector mergingExprs,
-                                     PlanYieldPolicy* yieldPolicy,
+                                     PlanYieldPolicySBE* yieldPolicy,
                                      PlanNodeId planNodeId,
                                      bool participateInTrialRunTracking,
                                      bool forceIncreasedSpilling)

@@ -49,7 +49,7 @@ UnwindStage::UnwindStage(std::unique_ptr<PlanStage> input,
                          value::SlotId outIndex,
                          bool preserveNullAndEmptyArrays,
                          PlanNodeId planNodeId,
-                         PlanYieldPolicy* yieldPolicy,
+                         PlanYieldPolicySBE* yieldPolicy,
                          bool participateInTrialRunTracking)
     : PlanStage("unwind"_sd, yieldPolicy, planNodeId, participateInTrialRunTracking),
       _inField(inField),

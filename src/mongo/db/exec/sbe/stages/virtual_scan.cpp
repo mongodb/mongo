@@ -37,7 +37,7 @@ VirtualScanStage::VirtualScanStage(PlanNodeId planNodeId,
                                    value::SlotId out,
                                    value::TypeTags arrTag,
                                    value::Value arrVal,
-                                   PlanYieldPolicy* yieldPolicy,
+                                   PlanYieldPolicySBE* yieldPolicy,
                                    bool participateInTrialRunTracking,
                                    bool owned /*=true*/)
     : PlanStage("virtualscan"_sd, yieldPolicy, planNodeId, participateInTrialRunTracking),

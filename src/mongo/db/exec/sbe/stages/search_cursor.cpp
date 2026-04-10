@@ -53,7 +53,7 @@ std::unique_ptr<SearchCursorStage> SearchCursorStage::createForStoredSource(
     boost::optional<value::SlotId> limitSlot,
     boost::optional<value::SlotId> sortKeySlot,
     boost::optional<value::SlotId> collatorSlot,
-    PlanYieldPolicy* yieldPolicy,
+    PlanYieldPolicySBE* yieldPolicy,
     PlanNodeId planNodeId) {
     return std::unique_ptr<SearchCursorStage>(new SearchCursorStage(nss,
                                                                     collUuid,
@@ -84,7 +84,7 @@ std::unique_ptr<SearchCursorStage> SearchCursorStage::createForNonStoredSource(
     boost::optional<value::SlotId> limitSlot,
     boost::optional<value::SlotId> sortKeySlot,
     boost::optional<value::SlotId> collatorSlot,
-    PlanYieldPolicy* yieldPolicy,
+    PlanYieldPolicySBE* yieldPolicy,
     PlanNodeId planNodeId) {
     return std::unique_ptr<SearchCursorStage>(
         new SearchCursorStage(nss,
@@ -110,7 +110,7 @@ std::unique_ptr<SearchCursorStage> SearchCursorStage::createForMetadata(
     boost::optional<UUID> collUuid,
     boost::optional<value::SlotId> resultSlot,
     size_t remoteCursorId,
-    PlanYieldPolicy* yieldPolicy,
+    PlanYieldPolicySBE* yieldPolicy,
     PlanNodeId planNodeId) {
     return std::unique_ptr<SearchCursorStage>(
         new SearchCursorStage(nss,
@@ -145,7 +145,7 @@ SearchCursorStage::SearchCursorStage(NamespaceString nss,
                                      boost::optional<value::SlotId> limitSlot,
                                      boost::optional<value::SlotId> sortKeySlot,
                                      boost::optional<value::SlotId> collatorSlot,
-                                     PlanYieldPolicy* yieldPolicy,
+                                     PlanYieldPolicySBE* yieldPolicy,
                                      PlanNodeId planNodeId)
     : PlanStage("search_cursor"_sd, yieldPolicy, planNodeId, false),
       _namespace(nss),

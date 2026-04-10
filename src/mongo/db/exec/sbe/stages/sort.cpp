@@ -46,7 +46,7 @@ SortStage::SortStage(std::unique_ptr<PlanStage> input,
                      std::unique_ptr<EExpression> limit,
                      size_t memoryLimit,
                      bool allowDiskUse,
-                     PlanYieldPolicy* yieldPolicy,
+                     PlanYieldPolicySBE* yieldPolicy,
                      PlanNodeId planNodeId,
                      bool participateInTrialRunTracking)
     : PlanStage("sort"_sd, yieldPolicy, planNodeId, participateInTrialRunTracking),

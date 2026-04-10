@@ -34,7 +34,7 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
-#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
@@ -52,7 +52,7 @@ namespace mongo::sbe {
 class CoScanStage final : public PlanStage {
 public:
     explicit CoScanStage(PlanNodeId,
-                         PlanYieldPolicy* yieldPolicy = nullptr,
+                         PlanYieldPolicySBE* yieldPolicy = nullptr,
                          bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;

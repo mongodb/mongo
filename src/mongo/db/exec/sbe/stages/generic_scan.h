@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/stages/scan.h"
+#include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
@@ -56,7 +57,7 @@ public:
                      std::vector<std::string> scanFieldNames,
                      value::SlotVector scanFieldSlots,
                      bool forward,
-                     PlanYieldPolicy* yieldPolicy,
+                     PlanYieldPolicySBE* yieldPolicy,
                      PlanNodeId nodeId,
                      ScanOpenCallback scanOpenCallback,
                      // Optional arguments:
@@ -65,7 +66,7 @@ public:
      * Constructor for clone(). Copies '_state' shared_ptr.
      */
     GenericScanStage(std::shared_ptr<ScanStageBaseState> state,
-                     PlanYieldPolicy* yieldPolicy,
+                     PlanYieldPolicySBE* yieldPolicy,
                      PlanNodeId nodeId,
                      bool participateInTrialRunTracking);
 

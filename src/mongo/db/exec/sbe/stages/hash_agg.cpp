@@ -58,7 +58,7 @@ HashAggStage::HashAggStage(std::unique_ptr<PlanStage> input,
                            bool optimizedClose,
                            boost::optional<value::SlotId> collatorSlot,
                            bool allowDiskUse,
-                           PlanYieldPolicy* yieldPolicy,
+                           PlanYieldPolicySBE* yieldPolicy,
                            PlanNodeId planNodeId,
                            bool participateInTrialRunTracking,
                            bool forceIncreasedSpilling)

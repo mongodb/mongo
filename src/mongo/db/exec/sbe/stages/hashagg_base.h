@@ -34,6 +34,7 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/util/spilling.h"
 #include "mongo/db/exec/sbe/values/row.h"
+#include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
@@ -62,7 +63,7 @@ template <class Derived>
 class HashAggBaseStage : public PlanStage {
 protected:
     HashAggBaseStage(StringData stageName,
-                     PlanYieldPolicy* yieldPolicy,
+                     PlanYieldPolicySBE* yieldPolicy,
                      PlanNodeId planNodeId,
                      value::SlotAccessor* _collatorAccessor,
                      bool participateInTrialRunTracking,

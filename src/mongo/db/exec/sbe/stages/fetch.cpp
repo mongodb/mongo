@@ -57,7 +57,7 @@ FetchStage::FetchStage(std::unique_ptr<PlanStage> child,
                        UUID collectionUuid,
                        DatabaseName dbName,
                        std::shared_ptr<FetchStageState> state,
-                       PlanYieldPolicy* yieldPolicy,
+                       PlanYieldPolicySBE* yieldPolicy,
                        PlanNodeId nodeId,
                        bool participateInTrialRunTracking)
     : PlanStage("fetch"_sd,

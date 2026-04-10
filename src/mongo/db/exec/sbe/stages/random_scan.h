@@ -42,7 +42,7 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
-#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
@@ -79,7 +79,7 @@ public:
                     boost::optional<value::SlotId> indexKeyPatternSlot,
                     std::vector<std::string> scanFieldNames,
                     value::SlotVector scanFieldSlots,
-                    PlanYieldPolicy* yieldPolicy,
+                    PlanYieldPolicySBE* yieldPolicy,
                     PlanNodeId nodeId,
                     // Optional arguments:
                     bool participateInTrialRunTracking = true);
@@ -87,7 +87,7 @@ public:
      * Constructor for clone(). Copies '_state' shared_ptr.
      */
     RandomScanStage(std::shared_ptr<ScanStageBaseState> state,
-                    PlanYieldPolicy* yieldPolicy,
+                    PlanYieldPolicySBE* yieldPolicy,
                     PlanNodeId nodeId,
                     bool participateInTrialRunTracking);
 

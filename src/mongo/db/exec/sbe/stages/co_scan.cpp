@@ -34,7 +34,7 @@
 
 namespace mongo::sbe {
 CoScanStage::CoScanStage(PlanNodeId planNodeId,
-                         PlanYieldPolicy* yieldPolicy,
+                         PlanYieldPolicySBE* yieldPolicy,
                          bool participateInTrialRunTracking)
     : PlanStage("coscan"_sd, yieldPolicy, planNodeId, participateInTrialRunTracking) {}
 

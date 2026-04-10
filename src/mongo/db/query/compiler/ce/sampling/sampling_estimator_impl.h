@@ -324,13 +324,13 @@ private:
      * '_sampleSize' of the documents for the sample.
      */
     std::pair<std::unique_ptr<sbe::PlanStage>, mongo::stage_builder::PlanStageData>
-    generateRandomSamplingPlan(PlanYieldPolicy* sbeYieldPolicy);
+    generateRandomSamplingPlan(PlanYieldPolicySBE* sbeYieldPolicy);
 
     /**
      * Constructs a sampling SBE plan using the chunk-based method.
      */
     std::pair<std::unique_ptr<sbe::PlanStage>, mongo::stage_builder::PlanStageData>
-    generateChunkSamplingPlan(PlanYieldPolicy* sbeYieldPolicy);
+    generateChunkSamplingPlan(PlanYieldPolicySBE* sbeYieldPolicy);
 
     /**
      * Generates a sample by doing a full "CollScan" against the target collection. This sample is

@@ -42,7 +42,7 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
-#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/util/modules.h"
@@ -114,7 +114,7 @@ public:
                UUID collectionUuid,
                DatabaseName dbName,
                std::shared_ptr<FetchStageState> state,
-               PlanYieldPolicy* yieldPolicy,
+               PlanYieldPolicySBE* yieldPolicy,
                PlanNodeId nodeId,
                bool participateInTrialRunTracking);
 

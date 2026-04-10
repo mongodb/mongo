@@ -34,7 +34,7 @@
 namespace mongo::sbe {
 
 BaseMockStage::BaseMockStage(PlanNodeId planNodeId,
-                             PlanYieldPolicy* yieldPolicy,
+                             PlanYieldPolicySBE* yieldPolicy,
                              bool participateInTrialRunTracking)
     : PlanStage("mock"_sd,
                 yieldPolicy,

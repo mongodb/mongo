@@ -35,7 +35,7 @@
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
-#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
@@ -56,7 +56,7 @@ public:
                               value::SlotId out,
                               value::TypeTags arrTag,
                               value::Value arrVal,
-                              PlanYieldPolicy* yieldPolicy = nullptr,
+                              PlanYieldPolicySBE* yieldPolicy = nullptr,
                               bool participateInTrialRunTracking = true,
                               bool owned = true);
 

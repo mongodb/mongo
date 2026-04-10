@@ -47,7 +47,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
-#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/key_string/key_string.h"
@@ -100,7 +100,7 @@ public:
                        boost::optional<value::SlotId> indexIdentSlot,
                        IndexKeysInclusionSet indexKeysToInclude,
                        value::SlotVector vars,
-                       PlanYieldPolicy* yieldPolicy,
+                       PlanYieldPolicySBE* yieldPolicy,
                        PlanNodeId planNodeId,
                        bool participateInTrialRunTracking = true);
 
@@ -218,7 +218,7 @@ public:
                            boost::optional<value::SlotId> indexIdentSlot,
                            IndexKeysInclusionSet indexKeysToInclude,
                            value::SlotVector vars,
-                           PlanYieldPolicy* yieldPolicy,
+                           PlanYieldPolicySBE* yieldPolicy,
                            PlanNodeId planNodeId,
                            bool participateInTrialRunTracking = true);
 
@@ -263,7 +263,7 @@ public:
                          value::SlotVector vars,
                          std::unique_ptr<EExpression> seekKeyLow,
                          std::unique_ptr<EExpression> seekKeyHigh,
-                         PlanYieldPolicy* yieldPolicy,
+                         PlanYieldPolicySBE* yieldPolicy,
                          PlanNodeId planNodeId,
                          bool participateInTrialRunTracking = true);
 
@@ -376,7 +376,7 @@ public:
                           boost::optional<value::SlotId> indexIdentSlot,
                           IndexKeysInclusionSet indexKeysToInclude,
                           value::SlotVector vars,
-                          PlanYieldPolicy* yieldPolicy,
+                          PlanYieldPolicySBE* yieldPolicy,
                           PlanNodeId planNodeId,
                           bool participateInTrialRunTracking = true);
 

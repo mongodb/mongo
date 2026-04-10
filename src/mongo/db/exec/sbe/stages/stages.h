@@ -40,7 +40,7 @@
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
-#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
@@ -48,6 +48,7 @@
 #include "mongo/util/str.h"
 
 namespace mongo {
+
 namespace sbe {
 
 struct CompileCtx;
@@ -645,9 +646,9 @@ public:
     /**
      * This object will always be responsible for interrupt checking, but it can also optionally be
      * responsible for yielding. In order to enable yielding, the caller should pass a non-null
-     * 'PlanYieldPolicy' pointer. Yielding may be disabled by providing a nullptr.
+     * 'PlanYieldPolicySBE' pointer. Yielding may be disabled by providing a nullptr.
      */
-    explicit CanInterrupt(PlanYieldPolicy* yieldPolicy) : _yieldPolicy(yieldPolicy) {}
+    explicit CanInterrupt(PlanYieldPolicySBE* yieldPolicy) : _yieldPolicy(yieldPolicy) {}
 
     /**
      * Checks for interrupt if necessary. If yielding has been enabled for this object, then also
@@ -680,7 +681,7 @@ public:
         }
     }
 
-    void attachNewYieldPolicy(PlanYieldPolicy* yieldPolicy) {
+    void attachNewYieldPolicy(PlanYieldPolicySBE* yieldPolicy) {
         auto stage = static_cast<T*>(this);
         for (auto&& child : stage->_children) {
             child->attachNewYieldPolicy(yieldPolicy);
@@ -692,7 +693,7 @@ public:
     }
 
 protected:
-    PlanYieldPolicy* _yieldPolicy{nullptr};
+    PlanYieldPolicySBE* _yieldPolicy{nullptr};
 
 private:
     static const int kInterruptCheckPeriod = 128;
@@ -710,7 +711,7 @@ public:
     using Vector = absl::InlinedVector<std::unique_ptr<PlanStage>, 2>;
 
     PlanStage(StringData stageType,
-              PlanYieldPolicy* yieldPolicy,
+              PlanYieldPolicySBE* yieldPolicy,
               PlanNodeId nodeId,
               bool participateInTrialRunTracking,
               TrialRunTrackingType trackingType = TrialRunTrackingType::NoTracking)

@@ -73,7 +73,7 @@ ScanStageBase::ScanStageBase(UUID collUuid,
                              boost::optional<value::SlotId> indexKeyPatternSlot,
                              std::vector<std::string> scanFieldNames,
                              value::SlotVector scanFieldSlots,
-                             PlanYieldPolicy* yieldPolicy,
+                             PlanYieldPolicySBE* yieldPolicy,
                              PlanNodeId nodeId,
                              ScanOpenCallback scanOpenCallback,
                              bool forward,
@@ -101,7 +101,7 @@ ScanStageBase::ScanStageBase(UUID collUuid,
  * Constructor for clone(). Copies '_state' shared_ptr.
  */
 ScanStageBase::ScanStageBase(std::shared_ptr<ScanStageBaseState> state,
-                             PlanYieldPolicy* yieldPolicy,
+                             PlanYieldPolicySBE* yieldPolicy,
                              PlanNodeId nodeId,
                              bool participateInTrialRunTracking)
     : PlanStage("scan"_sd,
@@ -451,7 +451,7 @@ ScanStageBaseImpl<Derived>::ScanStageBaseImpl(UUID collUuid,
                                               boost::optional<value::SlotId> indexKeyPatternSlot,
                                               std::vector<std::string> scanFieldNames,
                                               value::SlotVector scanFieldSlots,
-                                              PlanYieldPolicy* yieldPolicy,
+                                              PlanYieldPolicySBE* yieldPolicy,
                                               PlanNodeId nodeId,
                                               ScanOpenCallback scanOpenCallback,
                                               bool forward,
@@ -477,7 +477,7 @@ ScanStageBaseImpl<Derived>::ScanStageBaseImpl(UUID collUuid,
 
 template <typename Derived>
 ScanStageBaseImpl<Derived>::ScanStageBaseImpl(std::shared_ptr<ScanStageBaseState> state,
-                                              PlanYieldPolicy* yieldPolicy,
+                                              PlanYieldPolicySBE* yieldPolicy,
                                               PlanNodeId nodeId,
                                               bool participateInTrialRunTracking)
     : ScanStageBase(std::move(state), yieldPolicy, nodeId, participateInTrialRunTracking){};
@@ -495,7 +495,7 @@ ScanStage::ScanStage(UUID collUuid,
                      boost::optional<value::SlotId> minRecordIdSlot,
                      boost::optional<value::SlotId> maxRecordIdSlot,
                      bool forward,
-                     PlanYieldPolicy* yieldPolicy,
+                     PlanYieldPolicySBE* yieldPolicy,
                      PlanNodeId nodeId,
                      ScanOpenCallback scanOpenCallback,
                      // Optional arguments:
@@ -526,7 +526,7 @@ ScanStage::ScanStage(UUID collUuid,
  * Constructor for clone(). Copies '_state' shared_ptr.
  */
 ScanStage::ScanStage(std::shared_ptr<ScanStageBaseState> state,
-                     PlanYieldPolicy* yieldPolicy,
+                     PlanYieldPolicySBE* yieldPolicy,
                      PlanNodeId nodeId,
                      boost::optional<value::SlotId> minRecordIdSlot,
                      boost::optional<value::SlotId> maxRecordIdSlot,

@@ -42,6 +42,7 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/util/modules.h"
 
@@ -106,7 +107,7 @@ public:
                  bool optimizedClose,
                  boost::optional<value::SlotId> collatorSlot,
                  bool allowDiskUse,
-                 PlanYieldPolicy* yieldPolicy,
+                 PlanYieldPolicySBE* yieldPolicy,
                  PlanNodeId planNodeId,
                  bool participateInTrialRunTracking = true,
                  bool forceIncreasedSpilling = false);

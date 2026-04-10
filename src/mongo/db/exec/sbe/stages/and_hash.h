@@ -36,6 +36,7 @@
 #include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
@@ -77,7 +78,7 @@ public:
                  value::SlotVector innerCond,
                  value::SlotVector innerProjects,
                  boost::optional<value::SlotId> collatorSlot,
-                 PlanYieldPolicy* yieldPolicy,
+                 PlanYieldPolicySBE* yieldPolicy,
                  PlanNodeId planNodeId,
                  bool participateInTrialRunTracking = true);
 

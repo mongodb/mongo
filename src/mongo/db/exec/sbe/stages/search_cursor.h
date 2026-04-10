@@ -36,6 +36,7 @@
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/executor/task_executor_cursor.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/string_listset.h"
@@ -70,7 +71,7 @@ public:
         boost::optional<value::SlotId> limitSlot,
         boost::optional<value::SlotId> sortKeySlot,
         boost::optional<value::SlotId> collatorSlot,
-        PlanYieldPolicy* yieldPolicy,
+        PlanYieldPolicySBE* yieldPolicy,
         PlanNodeId planNodeId);
 
     static std::unique_ptr<SearchCursorStage> createForNonStoredSource(
@@ -84,7 +85,7 @@ public:
         boost::optional<value::SlotId> limitSlot,
         boost::optional<value::SlotId> sortKeySlot,
         boost::optional<value::SlotId> collatorSlot,
-        PlanYieldPolicy* yieldPolicy,
+        PlanYieldPolicySBE* yieldPolicy,
         PlanNodeId planNodeId);
 
     static std::unique_ptr<SearchCursorStage> createForMetadata(
@@ -92,7 +93,7 @@ public:
         boost::optional<UUID> collUuid,
         boost::optional<value::SlotId> resultSlot,
         size_t remoteCursorId,
-        PlanYieldPolicy* yieldPolicy,
+        PlanYieldPolicySBE* yieldPolicy,
         PlanNodeId planNodeId);
 
     std::unique_ptr<PlanStage> clone() const final;
@@ -135,7 +136,7 @@ private:
                       boost::optional<value::SlotId> limitSlot,
                       boost::optional<value::SlotId> sortKeySlot,
                       boost::optional<value::SlotId> collatorSlot,
-                      PlanYieldPolicy* yieldPolicy,
+                      PlanYieldPolicySBE* yieldPolicy,
                       PlanNodeId planNodeId);
 
     PlanState doGetNext();

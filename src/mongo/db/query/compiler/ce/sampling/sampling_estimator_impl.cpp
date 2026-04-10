@@ -164,7 +164,7 @@ std::unique_ptr<sbe::PlanStage> makeScanStage(const CollectionPtr& collection,
                                               boost::optional<sbe::value::SlotId> recordIdSlot,
                                               boost::optional<sbe::value::SlotId> minRecordIdSlot,
                                               bool useRandomCursor,
-                                              PlanYieldPolicy* sbeYieldPolicy) {
+                                              PlanYieldPolicySBE* sbeYieldPolicy) {
     sbe::value::SlotVector scanFieldSlots;
     std::vector<std::string> scanFieldNames;
     sbe::ScanOpenCallback scanOpenCallback{};
@@ -312,7 +312,7 @@ size_t SamplingEstimatorImpl::calculateSampleSize(SamplingConfidenceIntervalEnum
 }
 
 std::pair<std::unique_ptr<sbe::PlanStage>, mongo::stage_builder::PlanStageData>
-SamplingEstimatorImpl::generateRandomSamplingPlan(PlanYieldPolicy* sbeYieldPolicy) {
+SamplingEstimatorImpl::generateRandomSamplingPlan(PlanYieldPolicySBE* sbeYieldPolicy) {
     auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
     sbe::value::SlotIdGenerator ids;
     staticData->resultSlot = ids.generate();
@@ -345,7 +345,7 @@ SamplingEstimatorImpl::generateRandomSamplingPlan(PlanYieldPolicy* sbeYieldPolic
 }
 
 std::pair<std::unique_ptr<sbe::PlanStage>, mongo::stage_builder::PlanStageData>
-SamplingEstimatorImpl::generateChunkSamplingPlan(PlanYieldPolicy* sbeYieldPolicy) {
+SamplingEstimatorImpl::generateChunkSamplingPlan(PlanYieldPolicySBE* sbeYieldPolicy) {
     auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
     sbe::value::SlotIdGenerator ids;
     staticData->resultSlot = ids.generate();

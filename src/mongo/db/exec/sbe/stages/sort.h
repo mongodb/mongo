@@ -37,6 +37,7 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
@@ -75,7 +76,7 @@ public:
               std::unique_ptr<EExpression> limit,
               size_t memoryLimit,
               bool allowDiskUse,
-              PlanYieldPolicy* yieldPolicy,
+              PlanYieldPolicySBE* yieldPolicy,
               PlanNodeId planNodeId,
               bool participateInTrialRunTracking = true);
 

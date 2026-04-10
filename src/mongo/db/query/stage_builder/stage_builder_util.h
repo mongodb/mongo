@@ -37,7 +37,7 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 #include "mongo/util/modules.h"
@@ -74,7 +74,7 @@ buildSlotBasedExecutableTree(OperationContext* opCtx,
                              const MultipleCollectionAccessor& collections,
                              const CanonicalQuery& cq,
                              const QuerySolution& solution,
-                             PlanYieldPolicy* yieldPolicy,
+                             PlanYieldPolicySBE* yieldPolicy,
                              const cost_based_ranker::EstimateMap* estimates = nullptr);
 
 }  // namespace mongo::stage_builder

@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 
+#include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/query/yield_policy_callbacks_impl.h"
 
 namespace mongo {

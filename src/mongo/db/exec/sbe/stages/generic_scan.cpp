@@ -62,7 +62,7 @@ GenericScanStage::GenericScanStage(UUID collUuid,
                                    std::vector<std::string> scanFieldNames,
                                    value::SlotVector scanFieldSlots,
                                    bool forward,
-                                   PlanYieldPolicy* yieldPolicy,
+                                   PlanYieldPolicySBE* yieldPolicy,
                                    PlanNodeId nodeId,
                                    ScanOpenCallback scanOpenCallback,
                                    // Optional arguments:
@@ -88,7 +88,7 @@ GenericScanStage::GenericScanStage(UUID collUuid,
  * Constructor for clone(). Copies '_state' shared_ptr.
  */
 GenericScanStage::GenericScanStage(std::shared_ptr<ScanStageBaseState> state,
-                                   PlanYieldPolicy* yieldPolicy,
+                                   PlanYieldPolicySBE* yieldPolicy,
                                    PlanNodeId nodeId,
                                    bool participateInTrialRunTracking)
     : ScanStageBaseImpl(std::move(state), yieldPolicy, nodeId, participateInTrialRunTracking) {
