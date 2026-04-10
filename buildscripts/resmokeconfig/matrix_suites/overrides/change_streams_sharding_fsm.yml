@@ -44,6 +44,35 @@
             TestData:
               watchMode: "cluster"
 
+- name: irs
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              ignoreRemovedShards: true
+              skipCheckOrphans: true
+    selector:
+      exclude_files:
+        - jstests/change_stream_fsm/test_change_stream_sharding_fsm_comparison.js
+        - jstests/change_stream_fsm/test_change_stream_sharding_command_generator.js
+
+- name: pairwise_irs
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              pairwiseIrs: true
+    selector:
+      exclude_files:
+        - jstests/change_stream_fsm/test_change_stream_sharding_fsm_continuous.js
+        - jstests/change_stream_fsm/test_change_stream_sharding_fsm_fetch_and_resume.js
+        - jstests/change_stream_fsm/test_change_stream_sharding_fsm_resume.js
+        - jstests/change_stream_fsm/test_change_stream_sharding_command_generator.js
+
 - name: bg_mutator
   value:
     executor:

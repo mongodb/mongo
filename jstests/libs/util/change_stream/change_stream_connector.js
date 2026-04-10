@@ -30,7 +30,7 @@ class Connector {
     static readAllChangeEvents(conn, instanceName) {
         const db = conn.getDB(Connector.controlDatabase);
         const coll = db.getCollection(instanceName);
-        return coll.find().sort({"changeEvent._id": 1}).toArray();
+        return coll.find({}, {_id: 0}).sort({"changeEvent._id": 1}).toArray();
     }
 
     /**

@@ -14,6 +14,7 @@ class SingleChangeStreamMatcher {
         this.matchers = eventMatchers;
         this.index = 0;
         this.mismatch = null;
+        this.skipped = [];
     }
 
     matches(event, cursorClosed) {
@@ -34,6 +35,28 @@ class SingleChangeStreamMatcher {
             expected: this.matchers[this.index].event.operationType,
             actual: event.operationType,
         };
+        return false;
+    }
+
+    /**
+     * Match event against expected, skipping unmatched expected events.
+     * Only modifies state on success — safe to call speculatively from
+     * MultipleChangeStreamMatcher without save/restore.
+     */
+    matchesOrSkip(event, cursorClosed) {
+        for (let i = this.index; i < this.matchers.length; i++) {
+            if (this.matchers[i].matches(event, cursorClosed)) {
+                while (this.index < i) {
+                    this.skipped.push({
+                        index: this.index,
+                        type: this.matchers[this.index].event.operationType,
+                    });
+                    this.index++;
+                }
+                this.index = i + 1;
+                return true;
+            }
+        }
         return false;
     }
 
@@ -83,6 +106,10 @@ class MultipleChangeStreamMatcher {
      */
     matches(event, cursorClosed) {
         return this.matchers.some((matcher) => matcher.matches(event, cursorClosed));
+    }
+
+    matchesOrSkip(event, cursorClosed) {
+        return this.matchers.some((matcher) => matcher.matchesOrSkip(event, cursorClosed));
     }
 
     /**

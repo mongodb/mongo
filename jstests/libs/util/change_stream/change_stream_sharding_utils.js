@@ -28,6 +28,7 @@ import {
     BackgroundMutator,
     BackgroundMutatorOpType,
 } from "jstests/libs/util/change_stream/change_stream_background_mutator.js";
+import {removeShard, moveOutSessionChunks} from "jstests/sharding/libs/remove_shard_util.js";
 
 // Default test database and collection names.
 const TEST_DB = "test_cs";
@@ -375,11 +376,15 @@ function setupFsmCluster(testName, options = {}) {
     const ctx = {fsmSt, fsmShards, fsmInstancesToCleanup: instancesToCleanup};
     const {commandsByWriter, startTime, createInstanceName} = setupFsmTest(ctx, testName, options);
 
+    const writerInstanceName = instancesToCleanup.find((n) => n.startsWith("writer_"));
+
     return {
         fsmSt,
+        fsmShards,
         commandsByWriter,
         startTime,
         createInstanceName,
+        writerInstanceName,
         teardown() {
             runTeardownSteps(
                 () => Writer.joinAll(),
@@ -457,6 +462,9 @@ function verifyForMode(env, watchMode, verifyOpts) {
 }
 
 function verifyContinuous(env, watchMode) {
+    if (TestData.ignoreRemovedShards) {
+        return verifyIgnoreRemovedShards(env, watchMode, "continuous");
+    }
     verifyForMode(env, watchMode, {
         readers: [{suffix: "cont", configOverrides: {}}],
         createTestCases: (m) => [new SingleReaderVerificationTestCase(m.cont)],
@@ -464,6 +472,9 @@ function verifyContinuous(env, watchMode) {
 }
 
 function verifyResume(env, watchMode, startState) {
+    if (TestData.ignoreRemovedShards) {
+        return verifyIgnoreRemovedShards(env, watchMode, "resume");
+    }
     const shardConnections = getShardConnections(env.fsmSt);
 
     // For db_absent the noise writer targets a separate database (TEST_DB_2).
@@ -494,12 +505,121 @@ function verifyV1V2(env, watchMode) {
 }
 
 function verifyFetchAndResume(env, watchMode) {
+    if (TestData.ignoreRemovedShards) {
+        return verifyIgnoreRemovedShards(env, watchMode, "foar");
+    }
     verifyForMode(env, watchMode, {
         readers: [
             {suffix: "cont", configOverrides: {readingMode: ChangeStreamReadingMode.kContinuous}},
             {suffix: "foar", configOverrides: {readingMode: ChangeStreamReadingMode.kFetchOneAndResume}},
         ],
         createTestCases: (m) => [new SequentialPairwiseFetchingTestCase(m.cont, m.foar)],
+    });
+}
+
+function verifyComparison(env, watchMode) {
+    if (TestData.pairwiseIrs) {
+        return verifyStrictVsIgnoreRemovedShards(env, watchMode);
+    }
+    return verifyV1V2(env, watchMode);
+}
+
+function verifyStrictVsIgnoreRemovedShards(env, watchMode) {
+    verifyForMode(env, watchMode, {
+        readers: [
+            {suffix: "strict", configOverrides: {version: "v2"}},
+            {suffix: "irs", configOverrides: {version: "v2", ignoreRemovedShards: true}},
+        ],
+        createTestCases: (m) => [new SequentialPairwiseFetchingTestCase(m.strict, m.irs)],
+    });
+}
+
+function removeRandomShardFromSet(st, shardSet) {
+    assert.gte(shardSet.length, 2, "Need at least 2 shards to remove one");
+    const idx = Random.randInt(shardSet.length);
+    const shardToRemove = shardSet[idx];
+
+    jsTest.log.debug("removeRandomShardFromSet", {
+        shardId: shardToRemove._id,
+        totalShards: shardSet.length,
+    });
+
+    // Move ALL databases whose primary is on the shard being removed, not just
+    // the test DB — the Connector control database may also live there.
+    const otherShards = shardSet.filter((s) => s._id !== shardToRemove._id);
+    const dbsOnShard = st.s.getDB("config").databases.find({primary: shardToRemove._id}).toArray();
+    for (const dbDoc of dbsOnShard) {
+        const newPrimary = otherShards[Random.randInt(otherShards.length)];
+        assert.commandWorked(st.s.adminCommand({movePrimary: dbDoc._id, to: newPrimary._id}));
+    }
+
+    // Move all sharded chunks off the shard. The balancer is off
+    // (assumes_balancer_off) so removeShard's automatic draining won't work.
+    const configDb = st.s.getDB("config");
+    const shardedColls = configDb.collections.find({}).toArray();
+    for (const coll of shardedColls) {
+        const chunksToMove = configDb.chunks.find({uuid: coll.uuid, shard: shardToRemove._id}).toArray();
+        for (const chunk of chunksToMove) {
+            const dest = otherShards[Random.randInt(otherShards.length)];
+            assert.commandWorked(
+                st.s.adminCommand({
+                    moveChunk: coll._id,
+                    find: chunk.min,
+                    to: dest._id,
+                }),
+            );
+        }
+    }
+
+    moveOutSessionChunks(st, shardToRemove._id, otherShards[0]._id);
+    removeShard(st, shardToRemove._id);
+    return shardToRemove;
+}
+
+function verifyIgnoreRemovedShards(env, watchMode, readingMode = "continuous") {
+    // Writers must finish before removing a shard so all expected events are generated.
+    Connector.waitForDone(env.fsmSt.s, env.writerInstanceName);
+    Writer.joinAll();
+
+    const removedShard = removeRandomShardFromSet(env.fsmSt, env.fsmShards);
+
+    const irsBase = {
+        version: "v2",
+        ignoreRemovedShards: true,
+    };
+
+    const modeMap = {
+        "continuous": {
+            suffix: "irs_cont",
+            readingMode: ChangeStreamReadingMode.kReadUntilDone,
+        },
+        "foar": {
+            suffix: "irs_foar",
+            readingMode: ChangeStreamReadingMode.kFetchOneAndResumeUntilDone,
+        },
+        "resume": {
+            suffix: "irs_resume",
+            readingMode: ChangeStreamReadingMode.kReadUntilDone,
+        },
+    };
+    const selected = modeMap[readingMode];
+    assert(selected, `Unknown readingMode: ${readingMode}`);
+
+    const isResume = readingMode === "resume";
+    const shardConnections = isResume ? getShardConnections(env.fsmSt) : [];
+
+    verifyForMode(env, watchMode, {
+        readers: [{suffix: selected.suffix, configOverrides: {...irsBase, readingMode: selected.readingMode}}],
+        createTestCases: isResume
+            ? (m) => [new PrefixReadTestCase(m[selected.suffix], 3, {allowSkips: true})]
+            : (m) => [new SingleReaderVerificationTestCase(m[selected.suffix], {allowSkips: true})],
+        extraVerifierConfig: isResume ? {shardConnections} : {},
+    });
+
+    jsTest.log.info("FSM ignoreRemovedShards: PASSED", {
+        watchMode,
+        readingMode,
+        removedShardId: removedShard._id,
     });
 }
 
@@ -545,6 +665,6 @@ export {
     BackgroundMutatorOpType,
     verifyContinuous,
     verifyResume,
-    verifyV1V2,
     verifyFetchAndResume,
+    verifyComparison,
 };

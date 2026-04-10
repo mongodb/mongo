@@ -4,7 +4,8 @@
  * Responsibilities:
  * - Opens a change stream (collection, database, or cluster scope) according to config.
  * - Reads events in either v1 or v2 format.
- * - Reads events either continuously or in fetch-one-and-resume mode.
+ * - Supports four reading modes: continuous, fetch-one-and-resume, and drain
+ *   variants of each (read until no more events are available).
  * - Writes each event via the Connector interface into a dedicated collection.
  * - Signals completion via Connector.notifyDone(instanceName).
  */
@@ -36,6 +37,8 @@ function tryCleanUp(cst, instanceName) {
 const ChangeStreamReadingMode = {
     kContinuous: "continuous",
     kFetchOneAndResume: "fetchOneAndResume",
+    kReadUntilDone: "readUntilDone",
+    kFetchOneAndResumeUntilDone: "fetchOneAndResumeUntilDone",
 };
 
 /**
@@ -137,13 +140,18 @@ class ChangeStreamReader {
             const ts = config.startAtClusterTime;
             config.startAtClusterTime = new Timestamp(ts.t, ts.i);
         }
-
         switch (config.readingMode) {
             case ChangeStreamReadingMode.kContinuous:
                 ChangeStreamReader._readContinuous(conn, config);
                 break;
             case ChangeStreamReadingMode.kFetchOneAndResume:
                 ChangeStreamReader._readFetchOneAndResume(conn, config);
+                break;
+            case ChangeStreamReadingMode.kReadUntilDone:
+                ChangeStreamReader._drainEvents(conn, config, false);
+                break;
+            case ChangeStreamReadingMode.kFetchOneAndResumeUntilDone:
+                ChangeStreamReader._drainEvents(conn, config, true);
                 break;
             default:
                 throw new Error(`Unknown change stream reading mode: ${config.readingMode}`);
@@ -172,6 +180,9 @@ class ChangeStreamReader {
         };
         if (config.version) {
             changeStreamSpec.version = config.version;
+        }
+        if (config.ignoreRemovedShards) {
+            changeStreamSpec.ignoreRemovedShards = true;
         }
         if (config.watchMode === ChangeStreamWatchMode.kCluster) {
             changeStreamSpec.allChangesForCluster = true;
@@ -323,6 +334,45 @@ class ChangeStreamReader {
 
         jsTest.log.debug("ChangeStreamReader Read events", {instanceName: cfg.instanceName, readEventTypes});
         tryCleanUp(cst, cfg.instanceName);
+    }
+
+    /**
+     * Read all available events until a getMore returns no events (awaitData
+     * timeout). Writers must be finished before calling this method.
+     *
+     * @param {boolean} reopenPerEvent - If true, reopen the cursor after every
+     *   event (FOAR semantics). If false, keep it open and only reopen after
+     *   invalidates (continuous semantics).
+     * @private
+     */
+    static _drainEvents(conn, cfg, reopenPerEvent) {
+        jsTest.log.debug(`ChangeStreamReader Starting drain (reopenPerEvent=${reopenPerEvent})`, cfg);
+
+        let lastResumeToken = null;
+        const readEventTypes = [];
+        let count = 0;
+
+        let {cst, cursor} = ChangeStreamReader._openChangeStream(conn, cfg, null, false);
+
+        while (true) {
+            cursor = cst.getNextBatch(cursor);
+            const batch = cursor.nextBatch || [];
+            if (batch.length === 0) {
+                break;
+            }
+
+            const event = batch[0];
+            const isInvalidate = ChangeStreamReader._processEvent(conn, cfg, event, count++, readEventTypes);
+            lastResumeToken = event._id;
+
+            if (reopenPerEvent || isInvalidate) {
+                tryCleanUp(cst, cfg.instanceName);
+                ({cst, cursor} = ChangeStreamReader._openChangeStream(conn, cfg, lastResumeToken, isInvalidate));
+            }
+        }
+
+        tryCleanUp(cst, cfg.instanceName);
+        jsTest.log.debug("ChangeStreamReader Read events", {instanceName: cfg.instanceName, readEventTypes});
     }
 
     /**
