@@ -175,6 +175,28 @@ std::shared_ptr<ShardingCoordinator> constructShardingCoordinatorInstance(
 }
 
 
+size_t countCoordinatorDocs(OperationContext* opCtx, const NamespaceString& nss) {
+    constexpr auto kNumCoordLabel = "numCoordinators"_sd;
+    static const auto countStage = BSON("$count" << kNumCoordLabel);
+
+    AggregateCommandRequest aggRequest{nss, {countStage}};
+
+    DBDirectClient client(opCtx);
+    auto cursor = uassertStatusOKWithContext(
+        DBClientCursor::fromAggregationRequest(
+            &client, std::move(aggRequest), false /* secondaryOk */, true /* useExhaust */),
+        "Failed to establish a cursor for aggregation");
+
+    if (!cursor->more()) {
+        return 0;
+    }
+
+    auto res = cursor->nextSafe();
+    auto numCoordField = res.getField(kNumCoordLabel);
+    invariant(numCoordField);
+    return numCoordField.numberLong();
+}
+
 }  // namespace
 
 ShardingCoordinatorService* ShardingCoordinatorService::getService(OperationContext* opCtx) {
@@ -313,28 +335,6 @@ size_t ShardingCoordinatorService::_countActiveCoordinators(
     return cnt;
 }
 
-size_t ShardingCoordinatorService::_countCoordinatorDocs(OperationContext* opCtx) const {
-    constexpr auto kNumCoordLabel = "numCoordinators"_sd;
-    static const auto countStage = BSON("$count" << kNumCoordLabel);
-
-    AggregateCommandRequest aggRequest{getStateDocumentsNS(), {countStage}};
-
-    DBDirectClient client(opCtx);
-    auto cursor = uassertStatusOKWithContext(
-        DBClientCursor::fromAggregationRequest(
-            &client, std::move(aggRequest), false /* secondaryOk */, true /* useExhaust */),
-        "Failed to establish a cursor for aggregation");
-
-    if (!cursor->more()) {
-        return 0;
-    }
-
-    auto res = cursor->nextSafe();
-    auto numCoordField = res.getField(kNumCoordLabel);
-    invariant(numCoordField);
-    return numCoordField.numberLong();
-}
-
 void ShardingCoordinatorService::_waitForRecovery(OperationContext* opCtx,
                                                   std::unique_lock<stdx::mutex>& lock) const {
     opCtx->waitForConditionOrInterrupt(_recoveredOrCoordinatorCompletedCV, lock, [this]() {
@@ -371,10 +371,10 @@ bool ShardingCoordinatorService::areAllCoordinatorsOfTypeFinished(
 ExecutorFuture<void> ShardingCoordinatorService::_rebuildService(
     std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
     return ExecutorFuture<void>(**executor)
-        .then([this] {
+        .then([this, stateDocNss = getStateDocumentsNS()] {
             AllowOpCtxWhenServiceRebuildingBlock allowOpCtxBlock(Client::getCurrent());
             auto opCtx = cc().makeOperationContext();
-            const auto numCoordinators = _countCoordinatorDocs(opCtx.get());
+            const auto numCoordinators = countCoordinatorDocs(opCtx.get(), stateDocNss);
             if (numCoordinators > 0) {
                 LOGV2(5622500,
                       "Found Sharding Coordinators to rebuild",

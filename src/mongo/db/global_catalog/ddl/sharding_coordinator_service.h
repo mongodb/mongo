@@ -153,7 +153,6 @@ private:
 
     size_t _countActiveCoordinators(
         std::function<bool(CoordinatorTypeEnum, boost::optional<FCV>)> pred) const;
-    size_t _countCoordinatorDocs(OperationContext* opCtx) const;
 
     void _transitionToRecovered(WithLock lk, OperationContext* opCtx);
 
