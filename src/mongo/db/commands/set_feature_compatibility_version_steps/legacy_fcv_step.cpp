@@ -42,6 +42,8 @@
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/type_shard_identity.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -138,6 +140,14 @@ private:
         }
 
         _cleanUpIndexCatalogMetadataOnUpgrade(opCtx);
+
+        // Create the replicated size and count stores and start the background metadata checkpoint
+        // thread when upgrading to an FCV that enables the feature. This handles the case where a
+        // shard starts at lastLTS FCV and is upgraded by the config server during addShard.
+        if (gFeatureFlagReplicatedFastCount.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
+                requestedVersion, originalVersion)) {
+            setUpReplicatedFastCount(opCtx);
+        }
     }
 
     // TODO SERVER-116437 Remove once 9.0 becomes last lts.
@@ -515,6 +525,13 @@ private:
             } else if (!role) {
                 timeseries::downgradeAllTimeseriesFromViewless(opCtx);
             }
+        }
+
+        // Stop the background metadata checkpoint thread when downgrading to an FCV that disables
+        // the replicated size and count feature.
+        if (gFeatureFlagReplicatedFastCount.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
+                requestedVersion, originalVersion)) {
+            ReplicatedFastCountManager::get(opCtx->getServiceContext()).shutdown(opCtx);
         }
 
         _cleanUpClusterParameters(opCtx, originalVersion, requestedVersion);
