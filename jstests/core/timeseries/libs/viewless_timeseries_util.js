@@ -27,7 +27,7 @@ export function areViewlessTimeseriesEnabled(db) {
 // Skips the current test if viewless timeseries are enabled, optionally running a cleanup
 // function (e.g. stopping a ShardingTest or ReplSetTest) before quitting.
 export function skipTestIfViewlessTimeseriesEnabled(db, cleanupFn) {
-    if (areViewlessTimeseriesEnabled(db)) {
+    if (!isViewfulTimeseriesOnlySuite(db)) {
         if (cleanupFn) cleanupFn();
         quit();
     }
