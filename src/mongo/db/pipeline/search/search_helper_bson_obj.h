@@ -59,28 +59,6 @@ inline bool hasMongotExtension(const auto& extensionNames) {
            }) != extensionNames.end();
 }
 
-/**
- * Returns true if the given $vectorSearch inner spec has returnStoredSource: true.
- * TODO SERVER-121764: Remove this function when the extension supports returnStoredSource.
- */
-inline bool isReturnStoredSource(const BSONObj& vectorSearchSpec) {
-    auto returnStoredSourceElem =
-        vectorSearchSpec[DocumentSourceVectorSearch::kReturnStoredSourceFieldName];
-    return returnStoredSourceElem.isBoolean() && returnStoredSourceElem.boolean();
-}
-
-/**
- * Returns true if the given stage BSONObj is a $vectorSearch stage with returnStoredSource: true.
- * TODO SERVER-121764: Remove this function when the extension supports returnStoredSource.
- */
-inline bool isVectorSearchReturnStoredSource(const BSONObj& stageBson) {
-    auto vectorSearchElem = stageBson[DocumentSourceVectorSearch::kStageName];
-    if (!vectorSearchElem || vectorSearchElem.type() != BSONType::object) {
-        return false;
-    }
-    return isReturnStoredSource(vectorSearchElem.Obj());
-}
-
 }  // namespace detail
 
 /**
@@ -102,12 +80,8 @@ inline bool isExtensionMongotPipeline(
     // this is enough, and we don't need to understand what context this BSON appears in (w.r.t.
     // views or sub-pipelines).
     if (is<DocumentSourceVectorSearch>(firstStageBson)) {
-        // TODO SERVER-121764: Remove the returnStoredSource check when the extension supports it.
-        // Fall back to legacy execution when returnStoredSource is true, as the extension does
-        // not support this option.
         return ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagVectorSearchExtension) &&
-            detail::hasMongotExtension(serverGlobalParams.extensions) &&
-            !detail::isVectorSearchReturnStoredSource(firstStageBson);
+            detail::hasMongotExtension(serverGlobalParams.extensions);
     } else if (is<DocumentSourceSearch>(firstStageBson) ||
                is<DocumentSourceSearchMeta>(firstStageBson)) {
         return ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagSearchExtension) &&
@@ -141,12 +115,8 @@ inline bool isMongotPipeline(const std::shared_ptr<IncrementalFeatureRolloutCont
         // this behavior by toggling 'gFeatureFlagVectorSearchExtension' and retrying, so thankfully
         // this is enough, and we don't need to understand what context this BSON appears in (w.r.t.
         // views or sub-pipelines).
-        // TODO SERVER-121764: Remove the returnStoredSource check when the extension supports it.
-        // Also fall back to legacy when returnStoredSource is true, as the extension does not
-        // support this option.
         return !detail::hasMongotExtension(serverGlobalParams.extensions) ||
-            !ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagVectorSearchExtension) ||
-            detail::isVectorSearchReturnStoredSource(firstStageBson);
+            !ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagVectorSearchExtension);
     } else if (is<DocumentSourceSearch>(firstStageBson) ||
                is<DocumentSourceSearchMeta>(firstStageBson)) {
         // Return true if the $search/$searchMeta implementation would be the legacy

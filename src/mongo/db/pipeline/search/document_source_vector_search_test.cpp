@@ -329,37 +329,8 @@ DEATH_TEST_F(DocumentSourceVectorSearchDeathTest,
         nss, spec, LiteParserOptions{.ifrContext = ifrContext, .opCtx = opCtx});
 }
 
-// TODO SERVER-121764: Remove the returnStoredSource tests when the extension supports it.
-TEST_F(DocumentSourceVectorSearchTest, DoesNotTassertWhenReturnStoredSourceTrueWithExtensionFlag) {
-    auto opCtx = getExpCtx()->getOperationContext();
-
-    // Set shard role to simulate request coming from mongos.
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
-    ScopedSetShardRole scopedSetShardRole{
-        opCtx, nss, ShardVersion::UNTRACKED(), boost::none /* databaseVersion */};
-
-    // Simulate router sending featureFlagVectorSearchExtension=true.
-    auto& flag = feature_flags::gFeatureFlagVectorSearchExtension;
-    std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << true)};
-    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
-
-    auto spec = fromjson(R"({
-        $vectorSearch: {
-            queryVector: [1.0, 2.0],
-            path: "x",
-            numCandidates: 100,
-            limit: 10,
-            returnStoredSource: true
-        }
-    })");
-
-    // Should NOT tassert because returnStoredSource: true forces legacy fallback.
-    ASSERT_DOES_NOT_THROW(LiteParsedDocumentSource::parse(
-        nss, spec, LiteParserOptions{.ifrContext = ifrContext, .opCtx = opCtx}));
-}
-
 TEST_F(DocumentSourceVectorSearchTest,
-       IsExtensionMongotPipelineReturnsFalseForVectorSearchWithReturnStoredSource) {
+       IsExtensionMongotPipelineReturnsTrueForVectorSearchWithReturnStoredSource) {
     auto& flag = feature_flags::gFeatureFlagVectorSearchExtension;
     std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << true)};
     auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
@@ -379,10 +350,12 @@ TEST_F(DocumentSourceVectorSearchTest,
         }
     })")};
 
-    // With returnStoredSource: true, should NOT be treated as an extension pipeline.
-    ASSERT_FALSE(search_helper_bson_obj::isExtensionMongotPipeline(ifrContext, pipeline));
-    // Should be treated as a legacy mongot pipeline instead.
-    ASSERT_TRUE(search_helper_bson_obj::isMongotPipeline(ifrContext, pipeline));
+    // With returnStoredSource: true, should still be treated as an extension pipeline.
+    ASSERT_TRUE(search_helper_bson_obj::isExtensionMongotPipeline(ifrContext, pipeline));
+    // Should NOT be treated as a legacy mongot pipeline.
+    ASSERT_FALSE(search_helper_bson_obj::isMongotPipeline(ifrContext, pipeline));
+
+    serverGlobalParams.extensions = origExtensions;
 }
 
 TEST_F(DocumentSourceVectorSearchTest,

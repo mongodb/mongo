@@ -30,8 +30,6 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
-// TODO SERVER-121764: Remove this include when the extension supports returnStoredSource.
-#include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/string_map.h"
@@ -198,13 +196,6 @@ std::unique_ptr<LiteParsedDocumentSource> LiteParsedDocumentSource::parse(
     uassert(40324,
             str::stream() << "Unrecognized pipeline stage name: '" << stageName << "'",
             it != parserMap.end());
-
-    // TODO SERVER-121764: Remove the forceFallback logic when the extension supports
-    // returnStoredSource.
-    if (options.ifrContext &&
-        search_helper_bson_obj::detail::isVectorSearchReturnStoredSource(spec)) {
-        options.ifrContext->disableFlag(feature_flags::gFeatureFlagVectorSearchExtension);
-    }
 
     auto lpInfo = it->second.getParserInfo(options);
     if (options.extensionMetrics && lpInfo.fromExtension) {
