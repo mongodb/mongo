@@ -373,7 +373,7 @@ def generate_tasks(
             # Set an explicitly depends_on in the task group's reference to override it. Remove with SERVER-119809.
             if task["name"] in result_tasks:
                 task["depends_on"] = {
-                    "name": f"resmoke_tests_burn_in_{variant["name"]}",
+                    "name": f"resmoke_tests_burn_in_{variant['name']}",
                 }
             else:
                 task["depends_on"] = {
