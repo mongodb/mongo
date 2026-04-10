@@ -55,15 +55,12 @@ enums:
         type: string
         values:
             Equality: "equality"
+            # TODO SERVER-87670 Remove once 8.0 is lastLTS.
+            RangePreviewDeprecated: "rangePreview"
             Range: "range"
             SubstringPreview: "substringPreview"
-            Suffix: "suffix"
-            Prefix: "prefix"
-            # Deprecated preview types cannot be removed because collections that use them would
-            # break on upgrade.
-            RangePreviewDeprecated: "rangePreview"
-            SuffixPreviewDeprecated: "suffixPreview"
-            PrefixPreviewDeprecated: "prefixPreview"
+            SuffixPreview: "suffixPreview"
+            PrefixPreview: "prefixPreview"
 
 structs:
     QueryTypeConfig:

@@ -19,8 +19,6 @@ class TextFieldBase {
 
 export class SuffixField extends TextFieldBase {
     createQueryTypeDescriptor() {
-        // Use the deprecated "suffixPreview" name for mongocrypt compatibility.
-        // TODO SERVER-123416 Change to "suffix" once libmongocrypt supports the new name.
         return Object.assign({"queryType": "suffixPreview"}, super.createQueryTypeDescriptor());
     }
 
@@ -63,8 +61,6 @@ export class SuffixField extends TextFieldBase {
 export class PrefixField extends SuffixField {
     createQueryTypeDescriptor() {
         let spec = super.createQueryTypeDescriptor();
-        // Use the deprecated "prefixPreview" name for mongocrypt compatibility.
-        // TODO SERVER-123416 Change to "prefix" once libmongocrypt supports the new name.
         spec.queryType = "prefixPreview";
         return spec;
     }

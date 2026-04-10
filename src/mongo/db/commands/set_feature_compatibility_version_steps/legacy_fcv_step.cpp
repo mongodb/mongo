@@ -382,7 +382,7 @@ private:
                 const auto& encryptedFields =
                     collection->getCollectionOptions().encryptedFieldConfig;
                 if (encryptedFields &&
-                    hasQueryTypeMatching(encryptedFields.get(), isFLE2TextPreviewQueryType)) {
+                    hasQueryTypeMatching(encryptedFields.get(), isFLE2TextQueryType)) {
                     uasserted(ErrorCodes::CannotDowngrade,
                               fmt::format(
                                   "Collection {} (UUID: {}) has an encrypted field with query type "
@@ -395,29 +395,6 @@ private:
                 return true;
             };
             catalog::forEachCollectionFromAllDbs(opCtx, MODE_IS, checkForStringSearchQueryType);
-        }
-
-        if (gFeatureFlagQEPrefixSuffixSearch.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
-                requestedVersion, originalVersion)) {
-            auto checkForPrefixSuffixQueryType = [](const Collection* collection) {
-                const auto& encryptedFields =
-                    collection->getCollectionOptions().encryptedFieldConfig;
-                if (encryptedFields &&
-                    (hasQueryTypeMatching(encryptedFields.get(), [](QueryTypeEnum qt) {
-                        return qt == QueryTypeEnum::Suffix || qt == QueryTypeEnum::Prefix;
-                    }))) {
-                    uasserted(ErrorCodes::CannotDowngrade,
-                              fmt::format(
-                                  "Collection {} (UUID: {}) has an encrypted field with query type "
-                                  "suffix or prefix, which "
-                                  "are not compatible with the target FCV. Please drop this "
-                                  "collection before trying to downgrade FCV.",
-                                  collection->ns().toStringForErrorMsg(),
-                                  collection->uuid().toString()));
-                }
-                return true;
-            };
-            catalog::forEachCollectionFromAllDbs(opCtx, MODE_IS, checkForPrefixSuffixQueryType);
         }
 
         if (feature_flags::gFeatureFlagEnableReplicasetTransitionToCSRS

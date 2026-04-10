@@ -256,6 +256,17 @@ void validateRangeBoundsInt(T typeInfo, uint32_t sparsity, uint32_t trimFactor) 
     validateRangeBoundsBase(domainSizeLog2, sparsity, trimFactor);
 }
 
+bool isTextSearchQueryType(QueryTypeEnum e) {
+    switch (e) {
+        case QueryTypeEnum::SubstringPreview:
+        case QueryTypeEnum::SuffixPreview:
+        case QueryTypeEnum::PrefixPreview:
+            return true;
+        default:
+            return false;
+    }
+}
+
 }  // namespace
 
 uint32_t getNumberOfBitsInDomain(BSONType fieldType,
@@ -471,7 +482,7 @@ void validateTextSearchIndex(BSONType fieldType,
 
     uassert(9783401,
             "Query type is not a text search query type",
-            isFLE2TextQueryType(query.getQueryType()));
+            isTextSearchQueryType(query.getQueryType()));
 
     uassert(9783402,
             fmt::format("strMinQueryLength parameter is required for {} query type of field {}",
@@ -558,18 +569,14 @@ void validateEncryptedField(const EncryptedField* field) {
                     queryTypeConfigs.size() == 2);
             auto qtype1 = queryTypeConfigs.front().getQueryType();
             auto qtype2 = queryTypeConfigs.back().getQueryType();
-            auto isSuffixType = [](QueryTypeEnum q) {
-                return q == QueryTypeEnum::Suffix || q == QueryTypeEnum::SuffixPreviewDeprecated;
-            };
-            auto isPrefixType = [](QueryTypeEnum q) {
-                return q == QueryTypeEnum::Prefix || q == QueryTypeEnum::PrefixPreviewDeprecated;
-            };
             uassert(9783414,
                     fmt::format("Multiple query types may only include the {} and {} query types",
-                                idl::serialize(QueryTypeEnum::Suffix),
-                                idl::serialize(QueryTypeEnum::Prefix)),
-                    (isSuffixType(qtype1) && isPrefixType(qtype2)) ||
-                        (isPrefixType(qtype1) && isSuffixType(qtype2)));
+                                idl::serialize(QueryTypeEnum::SuffixPreview),
+                                idl::serialize(QueryTypeEnum::PrefixPreview)),
+                    (qtype1 == QueryTypeEnum::SuffixPreview &&
+                     qtype2 == QueryTypeEnum::PrefixPreview) ||
+                        (qtype2 == QueryTypeEnum::SuffixPreview &&
+                         qtype1 == QueryTypeEnum::PrefixPreview));
             validateTextSearchIndex(fieldType,
                                     field->getPath(),
                                     queryTypeConfigs.front(),
@@ -635,10 +642,8 @@ void validateEncryptedField(const EncryptedField* field) {
                 break;
             }
             case QueryTypeEnum::SubstringPreview:
-            case QueryTypeEnum::SuffixPreviewDeprecated:
-            case QueryTypeEnum::Suffix:
-            case QueryTypeEnum::PrefixPreviewDeprecated:
-            case QueryTypeEnum::Prefix: {
+            case QueryTypeEnum::SuffixPreview:
+            case QueryTypeEnum::PrefixPreview: {
                 validateTextSearchIndex(fieldType,
                                         field->getPath(),
                                         encryptedIndex,
