@@ -7,7 +7,7 @@
 import "jstests/multiVersion/libs/verify_versions.js";
 
 import {getUriForColl, getUriForIndex, runWiredTigerTool} from "jstests/disk/libs/wt_file_helper.js";
-import {allLtsVersions} from "jstests/multiVersion/libs/lts_versions.js";
+import {allSupportedVersions} from "jstests/multiVersion/libs/supported_versions.js";
 
 // Setup the dbpath for this test.
 const dbpath = MongoRunner.dataPath + "validate_cross_version";
@@ -212,10 +212,10 @@ function testVersion(binVersion, fcv, shouldCorrupt) {
     checkCommon(validateLogs, shouldCorrupt);
 }
 
-for (let i = 0; i < allLtsVersions.length; i++) {
-    testVersion(allLtsVersions[i].binVersion, allLtsVersions[i].featureCompatibilityVersion, false);
+for (let i = 0; i < allSupportedVersions.length; i++) {
+    testVersion(allSupportedVersions[i].binVersion, allSupportedVersions[i].featureCompatibilityVersion, false);
 }
 
-for (let i = 0; i < allLtsVersions.length; i++) {
-    testVersion(allLtsVersions[i].binVersion, allLtsVersions[i].featureCompatibilityVersion, true);
+for (let i = 0; i < allSupportedVersions.length; i++) {
+    testVersion(allSupportedVersions[i].binVersion, allSupportedVersions[i].featureCompatibilityVersion, true);
 }

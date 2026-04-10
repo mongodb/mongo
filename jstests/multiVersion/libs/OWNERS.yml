@@ -16,3 +16,6 @@ filters:
   - "mixed_version_sharded_fixture_test.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "supported_versions.js":
+    approvers:
+      - 10gen/server-replication-reviewers

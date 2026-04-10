@@ -6,3 +6,6 @@ filters:
   - "rs_endpoint*":
     approvers:
       - 10gen/server-cluster-scalability
+  - "validate_cross_version.js":
+    approvers:
+      - 10gen/server-validate

@@ -1,7 +1,7 @@
 // This lists all supported releases and needs to be kept up to date as versions are added and
 // dropped.
-// TODO SERVER-76166: Programmatically generate list of LTS versions.
-export const allLtsVersions = [
+// TODO SERVER-76166: Programmatically generate list of all supported versions.
+export const allSupportedVersions = [
     {binVersion: "7.0", featureCompatibilityVersion: "7.0", testCollection: "seven_zero"},
     {binVersion: "8.0", featureCompatibilityVersion: "8.0", testCollection: "eight_zero"},
     {binVersion: "last-lts", featureCompatibilityVersion: lastLTSFCV, testCollection: "last_lts"},

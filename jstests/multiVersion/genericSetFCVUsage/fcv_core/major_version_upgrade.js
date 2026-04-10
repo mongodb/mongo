@@ -14,7 +14,7 @@
 import "jstests/multiVersion/libs/multi_rs.js";
 import "jstests/multiVersion/libs/verify_versions.js";
 
-import {allLtsVersions} from "jstests/multiVersion/libs/lts_versions.js";
+import {allSupportedVersions} from "jstests/multiVersion/libs/supported_versions.js";
 import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
@@ -28,7 +28,7 @@ const defaultOptions = {
     noCleanData: true,
 };
 
-const versions = allLtsVersions;
+const versions = allSupportedVersions;
 
 // Standalone
 // Iterate from earliest to latest versions specified in the versions list, and follow the steps
