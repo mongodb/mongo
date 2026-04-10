@@ -3,12 +3,12 @@
 # IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
 # AND REGENERATE THE MATRIX SUITES.
 #
-# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_sharding_fsm_bg_mutator_batch_size_1.yml
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_sharding_fsm_bg_mutator_embedded_watch_db.yml
 # regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
 ##########################################################
 description:
   Runs the change stream sharding FSM tests with a concurrent BackgroundMutator
-  and batchSize=1.
+  and an embedded config server in database watch mode.
 executor:
   archive:
     tests:
@@ -22,7 +22,7 @@ executor:
         await import('jstests/libs/override_methods/implicitly_retry_on_fcv_upgrade_downgrade.js');
       global_vars:
         TestData:
-          batchSize: 1
+          configShard: true
           enableBgMutator: true
           migrationRetryExtraDDLCommands:
             - drop
@@ -41,6 +41,7 @@ executor:
           threadOverrides:
             - jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js
             - jstests/libs/override_methods/implicitly_retry_on_fcv_upgrade_downgrade.js
+          watchMode: database
       nodb: ""
 matrix_suite: true
 selector:

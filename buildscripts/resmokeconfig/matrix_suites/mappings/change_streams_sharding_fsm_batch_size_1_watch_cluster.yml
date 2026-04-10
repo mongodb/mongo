@@ -1,0 +1,6 @@
+base_suite: change_streams_sharding_fsm
+description: >-
+  Runs the change stream sharding FSM tests with batchSize=1 in cluster watch mode.
+overrides:
+  - "change_streams_sharding_fsm.batch_size_1"
+  - "change_streams_sharding_fsm.watch_cluster"

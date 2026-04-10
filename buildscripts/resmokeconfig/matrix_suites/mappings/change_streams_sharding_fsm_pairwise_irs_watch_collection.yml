@@ -3,3 +3,4 @@ description: >-
   Runs the continuous FSM test comparing strict vs ignoreRemovedShards on an intact cluster.
 overrides:
   - "change_streams_sharding_fsm.pairwise_irs"
+  - "change_streams_sharding_fsm.watch_collection"

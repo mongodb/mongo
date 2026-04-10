@@ -1,0 +1,8 @@
+base_suite: change_streams_sharding_fsm
+description: >-
+  Runs the change stream sharding FSM tests with a concurrent BackgroundMutator
+  and an embedded config server (config shard).
+overrides:
+  - "change_streams_sharding_fsm.bg_mutator"
+  - "change_streams_sharding_fsm.embedded"
+  - "change_streams_sharding_fsm.watch_collection"

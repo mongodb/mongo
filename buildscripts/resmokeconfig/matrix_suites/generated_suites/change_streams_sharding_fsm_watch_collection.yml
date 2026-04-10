@@ -3,12 +3,10 @@
 # IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
 # AND REGENERATE THE MATRIX SUITES.
 #
-# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_sharding_fsm_bg_mutator.yml
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_sharding_fsm_watch_collection.yml
 # regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
 ##########################################################
-description:
-  Runs the change stream sharding FSM tests with a concurrent BackgroundMutator
-  performing FCV flips and placement history resets.
+description: Runs the change stream sharding FSM tests in collection watch mode.
 executor:
   archive:
     tests:
@@ -19,10 +17,8 @@ executor:
       eval:
         await import('jstests/libs/override_methods/implicit_change_stream_v2.js');
         await import('jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js');
-        await import('jstests/libs/override_methods/implicitly_retry_on_fcv_upgrade_downgrade.js');
       global_vars:
         TestData:
-          enableBgMutator: true
           migrationRetryExtraDDLCommands:
             - drop
             - dropDatabase
@@ -39,7 +35,7 @@ executor:
           migrationRetryMatchFCVErrors: true
           threadOverrides:
             - jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js
-            - jstests/libs/override_methods/implicitly_retry_on_fcv_upgrade_downgrade.js
+          watchMode: collection
       nodb: ""
 matrix_suite: true
 selector:

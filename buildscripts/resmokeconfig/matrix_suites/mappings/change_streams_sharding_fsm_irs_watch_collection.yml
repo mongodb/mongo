@@ -3,3 +3,4 @@ description: >-
   Runs the change stream sharding FSM tests with ignoreRemovedShards enabled.
 overrides:
   - "change_streams_sharding_fsm.irs"
+  - "change_streams_sharding_fsm.watch_collection"

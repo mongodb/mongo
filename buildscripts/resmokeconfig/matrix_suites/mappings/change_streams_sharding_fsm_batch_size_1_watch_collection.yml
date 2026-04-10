@@ -4,3 +4,4 @@ description: >-
   server default batch size.
 overrides:
   - "change_streams_sharding_fsm.batch_size_1"
+  - "change_streams_sharding_fsm.watch_collection"

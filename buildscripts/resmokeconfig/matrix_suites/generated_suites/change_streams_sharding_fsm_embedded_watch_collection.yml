@@ -3,12 +3,12 @@
 # IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
 # AND REGENERATE THE MATRIX SUITES.
 #
-# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_sharding_fsm_batch_size_1_embedded.yml
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_sharding_fsm_embedded_watch_collection.yml
 # regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
 ##########################################################
 description:
-  Runs the change stream sharding FSM tests with batchSize=1 and an embedded
-  config server (config shard).
+  Runs the change stream sharding FSM tests with an embedded config server
+  (config shard) instead of a dedicated config server.
 executor:
   archive:
     tests:
@@ -21,7 +21,6 @@ executor:
         await import('jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js');
       global_vars:
         TestData:
-          batchSize: 1
           configShard: true
           migrationRetryExtraDDLCommands:
             - drop
@@ -39,6 +38,7 @@ executor:
           migrationRetryMatchFCVErrors: true
           threadOverrides:
             - jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js
+          watchMode: collection
       nodb: ""
 matrix_suite: true
 selector:
