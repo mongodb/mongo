@@ -301,6 +301,13 @@ feature_flags:
         cpp_varname: gFeatureFlagIncludeDeltaHeaderForPhylog
         default: false
         fcv_gated: false
+    # TODO (SERVER-122847): remove this feature flag
+    featureFlagExecutionControlRemoteSpecification:
+        description: "Feature flag for enabling remote specification of execution control priority"
+        cpp_varname: gExecutionControlRemoteSpecification
+        default: true
+        fcv_gated: true
+        version: 9.0
 
 server_parameters:
     allowDirectSystemBucketsAccess:

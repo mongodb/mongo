@@ -177,8 +177,10 @@ Fetcher::Fetcher(executor::TaskExecutor* executor,
                  Milliseconds findNetworkTimeout,
                  Milliseconds getMoreNetworkTimeout,
                  std::unique_ptr<mongo::RetryStrategy> firstCommandRetryStrategy,
-                 transport::ConnectSSLMode sslMode)
+                 transport::ConnectSSLMode sslMode,
+                 OperationContext* opCtx)
     : _executor(executor),
+      _opCtx(opCtx),
       _source(source),
       _dbname(dbname),
       _cmdObj(findCmdObj.getOwned()),
@@ -190,7 +192,7 @@ Fetcher::Fetcher(executor::TaskExecutor* executor,
           _executor,
           [&] {
               RemoteCommandRequest request(
-                  _source, _dbname, _cmdObj, _metadata, nullptr, _findNetworkTimeout);
+                  _source, _dbname, _cmdObj, _metadata, _opCtx, _findNetworkTimeout);
               request.sslMode = sslMode;
               request.timeoutCode = ErrorCodes::MaxTimeMSExpired;
               return request;
@@ -342,7 +344,7 @@ Status Fetcher::_scheduleGetMore(const BSONObj& cmdObj) {
     }
 
     RemoteCommandRequest request(
-        _source, _dbname, cmdObj, _metadata, nullptr, _getMoreNetworkTimeout);
+        _source, _dbname, cmdObj, _metadata, _opCtx, _getMoreNetworkTimeout);
     request.sslMode = _sslMode;
     request.timeoutCode = ErrorCodes::MaxTimeMSExpired;
 
@@ -453,7 +455,7 @@ void Fetcher::_sendKillCursors(const CursorId id, const NamespaceString& nss) {
         };
 
         auto cmdObj = BSON("killCursors" << nss.coll() << "cursors" << BSON_ARRAY(id));
-        RemoteCommandRequest request(_source, _dbname, cmdObj, nullptr);
+        RemoteCommandRequest request(_source, _dbname, cmdObj, _opCtx);
         request.sslMode = _sslMode;
 
         auto scheduleResult = _executor->scheduleRemoteCommand(request, logKillCursorsResult);

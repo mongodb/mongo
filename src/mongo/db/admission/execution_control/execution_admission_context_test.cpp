@@ -29,16 +29,25 @@
 
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/admission/execution_control/execution_admission_type_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/ensure_fcv.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/admission_context.h"
 
 #include <memory>
 #include <variant>
 
+#include <boost/optional/optional.hpp>
+
 namespace mongo::admission::execution_control {
 namespace {
+
+constexpr StringData kFieldName = "executionAdmissionContextType"_sd;
 
 using TaskType = ExecutionAdmissionContext::TaskType;
 using ScopedTaskTypeVariant =
@@ -261,6 +270,148 @@ TEST_F(TaskTypeTest, SequentialDifferentTypes) {
         ASSERT_EQ(getAdmCtx(opCtx.get()).getTaskType(), TaskType::NonDeprioritizable);
     }
     ASSERT_EQ(getAdmCtx(opCtx.get()).getTaskType(), TaskType::Default);
+}
+
+// TODO (SERVER-122847): Remove this test.
+TEST_F(TaskTypeTest, WriteMetadataNoFieldWhenFeatureFlagDisabled) {
+    RAIIServerParameterControllerForTest featureFlagDisabled(
+        "featureFlagExecutionControlRemoteSpecification", false);
+
+    auto opCtx = makeOperationContext();
+    ScopedAdmissionPriority<ExecutionAdmissionContext> lowPriority(
+        opCtx.get(), AdmissionContext::Priority::kLow);
+
+    BSONObjBuilder builder;
+    getAdmCtx(opCtx.get()).writeAsMetadata(opCtx.get(), &builder);
+
+    ASSERT_FALSE(builder.asTempObj().hasField(kFieldName));
+}
+
+// TODO (SERVER-122847): Remove the feature flag controller from the following tests.
+TEST_F(TaskTypeTest, WriteMetadataNoFieldForNormalPriorityDefaultTaskType) {
+    RAIIServerParameterControllerForTest featureFlagDisabled(
+        "featureFlagExecutionControlRemoteSpecification", true);
+    auto opCtx = makeOperationContext();
+
+    BSONObjBuilder builder;
+    getAdmCtx(opCtx.get()).writeAsMetadata(opCtx.get(), &builder);
+
+    ASSERT_FALSE(builder.asTempObj().hasField(kFieldName));
+}
+
+TEST_F(TaskTypeTest, WriteMetadataLowPriority) {
+    RAIIServerParameterControllerForTest featureFlagDisabled(
+        "featureFlagExecutionControlRemoteSpecification", true);
+    auto opCtx = makeOperationContext();
+    ScopedAdmissionPriority<ExecutionAdmissionContext> lowPriority(
+        opCtx.get(), AdmissionContext::Priority::kLow);
+
+    BSONObjBuilder builder;
+    getAdmCtx(opCtx.get()).writeAsMetadata(opCtx.get(), &builder);
+
+    auto obj = builder.obj();
+    ASSERT_TRUE(obj.hasField(kFieldName));
+    ASSERT_EQ(obj[kFieldName].str(), "Low");
+}
+
+TEST_F(TaskTypeTest, WriteMetadataExemptPriority) {
+    RAIIServerParameterControllerForTest featureFlagDisabled(
+        "featureFlagExecutionControlRemoteSpecification", true);
+    auto opCtx = makeOperationContext();
+    ScopedAdmissionPriority<ExecutionAdmissionContext> exemptPriority(
+        opCtx.get(), AdmissionContext::Priority::kExempt);
+
+    BSONObjBuilder builder;
+    getAdmCtx(opCtx.get()).writeAsMetadata(opCtx.get(), &builder);
+
+    auto obj = builder.obj();
+    ASSERT_TRUE(obj.hasField(kFieldName));
+    ASSERT_EQ(obj[kFieldName].str(), "Exempt");
+}
+
+TEST_F(TaskTypeTest, WriteMetadataBackgroundTaskType) {
+    RAIIServerParameterControllerForTest featureFlagDisabled(
+        "featureFlagExecutionControlRemoteSpecification", true);
+    auto opCtx = makeOperationContext();
+    ScopedTaskTypeBackground bg(opCtx.get());
+
+    BSONObjBuilder builder;
+    getAdmCtx(opCtx.get()).writeAsMetadata(opCtx.get(), &builder);
+
+    auto obj = builder.obj();
+    ASSERT_TRUE(obj.hasField(kFieldName));
+    ASSERT_EQ(obj[kFieldName].str(), "Background");
+}
+
+TEST_F(TaskTypeTest, WriteMetadataNonDeprioritizableTaskType) {
+    RAIIServerParameterControllerForTest featureFlagDisabled(
+        "featureFlagExecutionControlRemoteSpecification", true);
+    auto opCtx = makeOperationContext();
+    ScopedTaskTypeNonDeprioritizable nd(opCtx.get());
+
+    BSONObjBuilder builder;
+    getAdmCtx(opCtx.get()).writeAsMetadata(opCtx.get(), &builder);
+
+    auto obj = builder.obj();
+    ASSERT_TRUE(obj.hasField(kFieldName));
+    ASSERT_EQ(obj[kFieldName].str(), "NonDeprioritizable");
+}
+
+TEST_F(TaskTypeTest, WriteMetadataExemptPriorityTakesPrecedenceOverTaskType) {
+    RAIIServerParameterControllerForTest featureFlagDisabled(
+        "featureFlagExecutionControlRemoteSpecification", true);
+    auto opCtx = makeOperationContext();
+    ScopedAdmissionPriority<ExecutionAdmissionContext> exemptPriority(
+        opCtx.get(), AdmissionContext::Priority::kExempt);
+    ScopedTaskTypeBackground bg(opCtx.get());
+
+    BSONObjBuilder builder;
+    getAdmCtx(opCtx.get()).writeAsMetadata(opCtx.get(), &builder);
+
+    auto obj = builder.obj();
+    ASSERT_TRUE(obj.hasField(kFieldName));
+    ASSERT_EQ(obj[kFieldName].str(), "Exempt");
+}
+
+TEST_F(TaskTypeTest, SetFromMetadataDoesNothingOnNullopt) {
+    auto opCtx = makeOperationContext();
+    getAdmCtx(opCtx.get()).setFromMetadata(opCtx.get(), boost::none);
+
+    ASSERT_EQ(getAdmCtx(opCtx.get()).getPriority(), AdmissionContext::Priority::kNormal);
+    ASSERT_EQ(getAdmCtx(opCtx.get()).getTaskType(), TaskType::Default);
+}
+
+TEST_F(TaskTypeTest, SetFromMetadataSetsLowPriority) {
+    auto opCtx = makeOperationContext();
+    getAdmCtx(opCtx.get()).setFromMetadata(opCtx.get(), ExecutionAdmissionTypeEnum::kLow);
+
+    ASSERT_EQ(getAdmCtx(opCtx.get()).getPriority(), AdmissionContext::Priority::kLow);
+    ASSERT_EQ(getAdmCtx(opCtx.get()).getTaskType(), TaskType::Default);
+}
+
+TEST_F(TaskTypeTest, SetFromMetadataSetsExemptPriority) {
+    auto opCtx = makeOperationContext();
+    getAdmCtx(opCtx.get()).setFromMetadata(opCtx.get(), ExecutionAdmissionTypeEnum::kExempt);
+
+    ASSERT_EQ(getAdmCtx(opCtx.get()).getPriority(), AdmissionContext::Priority::kExempt);
+    ASSERT_EQ(getAdmCtx(opCtx.get()).getTaskType(), TaskType::Default);
+}
+
+TEST_F(TaskTypeTest, SetFromMetadataSetsBackgroundTaskType) {
+    auto opCtx = makeOperationContext();
+    getAdmCtx(opCtx.get()).setFromMetadata(opCtx.get(), ExecutionAdmissionTypeEnum::kBackground);
+
+    ASSERT_EQ(getAdmCtx(opCtx.get()).getPriority(), AdmissionContext::Priority::kNormal);
+    ASSERT_EQ(getAdmCtx(opCtx.get()).getTaskType(), TaskType::Background);
+}
+
+TEST_F(TaskTypeTest, SetFromMetadataSetsNonDeprioritizableTaskType) {
+    auto opCtx = makeOperationContext();
+    getAdmCtx(opCtx.get())
+        .setFromMetadata(opCtx.get(), ExecutionAdmissionTypeEnum::kNonDeprioritizable);
+
+    ASSERT_EQ(getAdmCtx(opCtx.get()).getPriority(), AdmissionContext::Priority::kNormal);
+    ASSERT_EQ(getAdmCtx(opCtx.get()).getTaskType(), TaskType::NonDeprioritizable);
 }
 
 #ifdef MONGO_CONFIG_DEBUG_BUILD

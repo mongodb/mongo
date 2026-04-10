@@ -131,6 +131,12 @@ void readPrivilegedRequestMetadata(OperationContext* opCtx, const GenericArgumen
         VersionContext::setFromMetadata(
             lg, opCtx, requestArgs.getVersionContext()->withPropagationAcrossShards_UNSAFE());
     }
+
+    uassert(12137303,
+            "Client is not properly authorized to propagate executionAdmissionContextType",
+            !requestArgs.getExecutionAdmissionContextType() || hasInternalAuthorization());
+    ExecutionAdmissionContext::get(opCtx).setFromMetadata(
+        opCtx, requestArgs.getExecutionAdmissionContextType());
 }
 }  // namespace
 

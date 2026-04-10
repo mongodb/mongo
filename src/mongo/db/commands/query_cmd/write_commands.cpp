@@ -493,14 +493,17 @@ public:
 
             doTransactionValidationForWrites(opCtx, ns());
 
-            // TODO: SERVER-121373 remove this and provide a more generic way of marking remote
-            // operations as non-deprioritizable. Writes to system-critical collections issued
-            // remotely by internal clients should not be deprioritized:
+            // Writes to system-critical collections issued remotely by internal clients should not
+            // be deprioritized:
             // - Session collection upsert for LogicalSessionCacheRefresh.
+            // TODO (SERVER-122847): Remove this code.
             const bool isSystemCriticalNss = (ns() == NamespaceString::kLogicalSessionsNamespace);
             boost::optional<admission::execution_control::ScopedTaskTypeNonDeprioritizable>
                 systemCriticalTaskType;
-            if (isSystemCriticalNss && opCtx->getClient()->isInternalClient()) {
+            if (!gExecutionControlRemoteSpecification.isEnabledUseLastLTSFCVWhenUninitialized(
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+                isSystemCriticalNss && opCtx->getClient()->isInternalClient()) {
                 systemCriticalTaskType.emplace(opCtx);
             }
 
@@ -752,14 +755,17 @@ public:
             doTransactionValidationForWrites(opCtx, ns());
             write_ops::DeleteCommandReply deleteReply;
 
-            // TODO: SERVER-121373 remove this and provide a more generic way of marking remote
-            // operations as non-deprioritizable. Writes to system-critical collections issued
-            // remotely by internal clients should not be deprioritized:
+            // Writes to system-critical collections issued remotely by internal clients should not
+            // be deprioritized:
             // - Session collection deletes in removeRecords.
+            // TODO (SERVER-122847): Remove this code.
             const bool isSystemCriticalNss = (ns() == NamespaceString::kLogicalSessionsNamespace);
             boost::optional<admission::execution_control::ScopedTaskTypeNonDeprioritizable>
                 systemCriticalTaskType;
-            if (isSystemCriticalNss && opCtx->getClient()->isInternalClient()) {
+            if (!gExecutionControlRemoteSpecification.isEnabledUseLastLTSFCVWhenUninitialized(
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+                isSystemCriticalNss && opCtx->getClient()->isInternalClient()) {
                 systemCriticalTaskType.emplace(opCtx);
             }
 

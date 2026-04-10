@@ -266,14 +266,16 @@ public:
                 verbosity = ExplainOptions::Verbosity::kQueryPlanner;
             }
 
-            // TODO: SERVER-121373 remove this and provide a more generic way of marking remote
-            // query as non-deprioritizable. We disallow deprioritization of the applying phase of
-            // resharding to ensure that the operation does not time out during the critical
-            // section.
+            // We disallow deprioritization of the applying phase of resharding to ensure that the
+            // operation does not time out during the critical section.
+            // TODO (SERVER-122847): Remove this code.
             const bool isOplogNss = (ns() == NamespaceString::kRsOplogNamespace);
             boost::optional<admission::execution_control::ScopedTaskTypeNonDeprioritizable>
                 reshardingApplyPhaseAggregateTaskType;
-            if (isOplogNss && opCtx->getClient()->isInternalClient()) {
+            if (!gExecutionControlRemoteSpecification.isEnabledUseLastLTSFCVWhenUninitialized(
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+                isOplogNss && opCtx->getClient()->isInternalClient()) {
                 reshardingApplyPhaseAggregateTaskType.emplace(opCtx);
             }
 

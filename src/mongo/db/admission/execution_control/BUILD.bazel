@@ -24,6 +24,14 @@ idl_generator(
     src = "execution_control_heuristic_parameters.idl",
 )
 
+idl_generator(
+    name = "execution_admission_type_gen",
+    src = "execution_admission_type.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
 mongo_cc_library(
     name = "execution_control_stats",
     srcs = [
@@ -64,6 +72,7 @@ mongo_cc_library(
     deps = [
         ":execution_control_stats",
         "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
         "//src/mongo/util/concurrency:admission_context",
     ],
 )

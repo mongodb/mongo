@@ -19,6 +19,7 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db:version_context_gen",
         "//src/mongo/db:write_concern_options_gen",
+        "//src/mongo/db/admission/execution_control:execution_admission_type_gen",
         "//src/mongo/db/repl:read_concern_args_gen",
         "//src/mongo/db/repl:read_concern_gen",
         "//src/mongo/db/router_role:gossiped_routing_cache_gen",

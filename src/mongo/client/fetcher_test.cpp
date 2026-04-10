@@ -34,7 +34,10 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/client.h"
 #include "mongo/db/error_labels.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor_test_fixture.h"
@@ -1322,4 +1325,164 @@ TEST_F(FetcherTest, FetcherResetsInternalFinishCallbackFunctionPointerAfterLastC
     ASSERT_TRUE(sharedCallbackStateDestroyed);
 }
 
+class FetcherOpCtxTest : public FetcherTest {
+protected:
+    void setUp() override {
+        _serviceCtxHolder = std::make_unique<ScopedGlobalServiceContextForTest>();
+        FetcherTest::setUp();
+        _threadClient.emplace("FetcherOpCtxTest",
+                              _serviceCtxHolder->getServiceContext()->getService());
+    }
+
+    void tearDown() override {
+        _opCtx.reset();
+        _threadClient.reset();
+        FetcherTest::tearDown();
+        _serviceCtxHolder.reset();
+    }
+
+    OperationContext* makeOpCtx() {
+        _opCtx = Client::getCurrent()->makeOperationContext();
+        return _opCtx.get();
+    }
+
+private:
+    std::unique_ptr<ScopedGlobalServiceContextForTest> _serviceCtxHolder;
+    boost::optional<ThreadClient> _threadClient;
+    ServiceContext::UniqueOperationContext _opCtx;
+};
+
+TEST_F(FetcherOpCtxTest, OpCtxCommentPropagatedToFindRequest) {
+    auto* opCtx = makeOpCtx();
+    opCtx->setComment(BSON("comment" << "test comment"));
+
+    fetcher = std::make_unique<Fetcher>(&getExecutor(),
+                                        source,
+                                        DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+                                        findCmdObj,
+                                        makeCallback(),
+                                        rpc::makeEmptyMetadata(),
+                                        RemoteCommandRequest::kNoTimeout,
+                                        RemoteCommandRequest::kNoTimeout,
+                                        std::make_unique<NoRetryStrategy>(),
+                                        transport::kGlobalSSLMode,
+                                        opCtx);
+
+    ASSERT_OK(fetcher->schedule());
+
+    auto net = getNet();
+    executor::RemoteCommandRequest request;
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        ASSERT_TRUE(net->hasReadyRequests());
+        auto noi = net->getFrontOfReadyQueue();
+        request = noi->getRequest();
+    }
+
+    ASSERT_TRUE(request.cmdObj.hasField("comment"));
+    ASSERT_EQUALS("test comment", request.cmdObj["comment"].String());
+
+    processNetworkResponse(BSON("cursor" << BSON("id" << 0LL << "ns"
+                                                      << "db.coll"
+                                                      << "firstBatch" << BSONArray())
+                                         << "ok" << 1),
+                           ReadyQueueState::kEmpty,
+                           FetcherState::kInactive);
+    ASSERT_OK(status);
+}
+
+TEST_F(FetcherOpCtxTest, OpCtxCommentPropagatedToGetMoreRequest) {
+    auto* opCtx = makeOpCtx();
+    opCtx->setComment(BSON("comment" << "getMore comment"));
+
+    callbackHook = appendGetMoreRequest;
+
+    fetcher = std::make_unique<Fetcher>(&getExecutor(),
+                                        source,
+                                        DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+                                        findCmdObj,
+                                        makeCallback(),
+                                        rpc::makeEmptyMetadata(),
+                                        RemoteCommandRequest::kNoTimeout,
+                                        RemoteCommandRequest::kNoTimeout,
+                                        std::make_unique<NoRetryStrategy>(),
+                                        transport::kGlobalSSLMode,
+                                        opCtx);
+
+    ASSERT_OK(fetcher->schedule());
+
+    const BSONObj doc = BSON("_id" << 1);
+    processNetworkResponse(BSON("cursor" << BSON("id" << 1LL << "ns"
+                                                      << "db.coll"
+                                                      << "firstBatch" << BSON_ARRAY(doc))
+                                         << "ok" << 1),
+                           ReadyQueueState::kHasReadyRequests,
+                           FetcherState::kActive);
+    ASSERT_OK(status);
+
+    auto net = getNet();
+    executor::RemoteCommandRequest request;
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        ASSERT_TRUE(net->hasReadyRequests());
+        auto noi = net->getFrontOfReadyQueue();
+        request = noi->getRequest();
+    }
+
+    ASSERT_TRUE(request.cmdObj.hasField("comment"));
+    ASSERT_EQUALS("getMore comment", request.cmdObj["comment"].String());
+
+    processNetworkResponse(BSON("cursor" << BSON("id" << 0LL << "ns"
+                                                      << "db.coll"
+                                                      << "nextBatch" << BSONArray())
+                                         << "ok" << 1),
+                           ReadyQueueState::kEmpty,
+                           FetcherState::kInactive);
+    ASSERT_OK(status);
+}
+
+TEST_F(FetcherOpCtxTest, OpCtxDeadlineConstrainsFindRequestTimeout) {
+    auto* opCtx = makeOpCtx();
+    opCtx->setDeadlineAfterNowBy(Seconds(5), ErrorCodes::MaxTimeMSExpired);
+
+    Milliseconds findTimeout(30000);
+
+    fetcher = std::make_unique<Fetcher>(&getExecutor(),
+                                        source,
+                                        DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+                                        findCmdObj,
+                                        makeCallback(),
+                                        rpc::makeEmptyMetadata(),
+                                        findTimeout,
+                                        RemoteCommandRequest::kNoTimeout,
+                                        std::make_unique<NoRetryStrategy>(),
+                                        transport::kGlobalSSLMode,
+                                        opCtx);
+
+    ASSERT_OK(fetcher->schedule());
+
+    auto net = getNet();
+    executor::RemoteCommandRequest request;
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        ASSERT_TRUE(net->hasReadyRequests());
+        auto noi = net->getFrontOfReadyQueue();
+        request = noi->getRequest();
+    }
+
+    // The opCtx deadline of ~5s should constrain the request timeout well below the 30s find
+    // timeout. Allow a small tolerance for clock granularity.
+    ASSERT_GREATER_THAN(request.timeout, Milliseconds(0));
+    ASSERT_LESS_THAN(request.timeout, findTimeout);
+    ASSERT_LESS_THAN_OR_EQUALS(request.timeout, Seconds(6));
+    ASSERT_EQUALS(ErrorCodes::MaxTimeMSExpired, *request.timeoutCode);
+
+    processNetworkResponse(BSON("cursor" << BSON("id" << 0LL << "ns"
+                                                      << "db.coll"
+                                                      << "firstBatch" << BSONArray())
+                                         << "ok" << 1),
+                           ReadyQueueState::kEmpty,
+                           FetcherState::kInactive);
+    ASSERT_OK(status);
+}
 }  // namespace

@@ -35,6 +35,7 @@ global:
 
 imports:
     - "mongo/client/read_preference_setting.idl"
+    - "mongo/db/admission/execution_control/execution_admission_type.idl"
     - "mongo/db/basic_types.idl"
     - "mongo/db/repl/read_concern.idl"
     - "mongo/db/repl/read_concern_args.idl"
@@ -416,6 +417,13 @@ structs:
             ifrFlags:
                 type: array<object_owned>
                 forward_to_shards: true
+                optional: true
+                stability: "internal"
+            # Requests a specific priority or task type for execution control for the command.
+            # Authorization: This field can only be set if the client possesses action type `internal` on the `cluster` resource.
+            executionAdmissionContextType:
+                type: ExecutionAdmissionType
+                forward_to_shards: false
                 optional: true
                 stability: "internal"
 

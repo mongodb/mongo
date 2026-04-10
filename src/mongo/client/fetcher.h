@@ -155,7 +155,8 @@ public:
             Milliseconds getMoreNetworkTimeout = RemoteCommandRequest::kNoTimeout,
             std::unique_ptr<mongo::RetryStrategy> firstCommandRetryStrategy =
                 std::make_unique<NoRetryStrategy>(),
-            transport::ConnectSSLMode sslMode = transport::kGlobalSSLMode);
+            transport::ConnectSSLMode sslMode = transport::kGlobalSSLMode,
+            OperationContext* opCtx = nullptr);
 
     virtual ~Fetcher();
 
@@ -271,6 +272,9 @@ private:
 
     // Not owned by us.
     executor::TaskExecutor* _executor;
+
+    // Not owned by us. May be nullptr.
+    OperationContext* _opCtx;
 
     HostAndPort _source;
     DatabaseName _dbname;

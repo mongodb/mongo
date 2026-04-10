@@ -1370,6 +1370,7 @@ mongo_cc_library(
         "//src/mongo/client:read_preference_validators.cpp",
         "//src/mongo/db:database_name.cpp",
         "//src/mongo/db:namespace_string.cpp",
+        "//src/mongo/db/admission/execution_control:execution_admission_type_gen",
         "//src/mongo/db/auth:auth_name.cpp",
         "//src/mongo/db/auth:auth_types_gen",
         "//src/mongo/db/auth:validated_tenancy_scope.cpp",

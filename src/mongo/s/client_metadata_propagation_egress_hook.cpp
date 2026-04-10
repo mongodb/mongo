@@ -63,6 +63,8 @@ Status ClientMetadataPropagationEgressHook::writeRequestMetadata(OperationContex
 
         WriteBlockBypass::get(opCtx).writeAsMetadata(metadataBob);
 
+        ExecutionAdmissionContext::get(opCtx).writeAsMetadata(opCtx, metadataBob);
+
         if (isRawDataOperation(opCtx)) {
             metadataBob->append(kRawDataFieldName, true);
         }

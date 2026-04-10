@@ -28,6 +28,7 @@
  */
 #pragma once
 
+#include "mongo/db/admission/execution_control/execution_admission_type_gen.h"
 #include "mongo/db/admission/execution_control/execution_control_stats.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/modules.h"
@@ -76,6 +77,20 @@ public:
      * the number of ticket acquisitions.
      */
     static bool shouldDeprioritize(std::int32_t admissions);
+
+    /**
+     * Append the `executionAdmissionContextType` field to the request if there is some non-normal
+     * priority or task type in the given execution admission context.
+     */
+    void writeAsMetadata(OperationContext* opCtx, BSONObjBuilder* builder);
+
+    /**
+     * Set the priority or task type based on the `executionAdmissionContextType` from a remote
+     * request.
+     */
+    void setFromMetadata(
+        OperationContext* opCtx,
+        const boost::optional<admission::execution_control::ExecutionAdmissionTypeEnum>& type);
 
     /**
      * Returns the total count of delinquent acquisitions across both read and write operations.

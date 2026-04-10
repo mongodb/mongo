@@ -612,16 +612,19 @@ public:
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* replyBuilder) override {
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
-            // TODO: SERVER-121373 remove this and provide a more generic way of marking remote
-            // operations as non-deprioritizable. Reads to system-critical collections issued
-            // remotely by internal clients should not be deprioritized:
+            // Reads to system-critical collections issued remotely by internal clients should not
+            // be deprioritized:
             // - Session collection reads in findRemovedSessions.
             // - Key collection refresh.
+            // TODO (SERVER-122847): Remove this code.
             const bool isSystemCriticalNss = (_ns == NamespaceString::kLogicalSessionsNamespace ||
                                               _ns == NamespaceString::kKeysCollectionNamespace);
             boost::optional<admission::execution_control::ScopedTaskTypeNonDeprioritizable>
                 systemCriticalTaskType;
-            if (isSystemCriticalNss && opCtx->getClient()->isInternalClient()) {
+            if (!gExecutionControlRemoteSpecification.isEnabledUseLastLTSFCVWhenUninitialized(
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+                isSystemCriticalNss && opCtx->getClient()->isInternalClient()) {
                 systemCriticalTaskType.emplace(opCtx);
             }
 

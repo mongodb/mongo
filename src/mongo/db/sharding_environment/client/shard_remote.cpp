@@ -504,7 +504,10 @@ RetryStrategy::Result<std::monostate> ShardRemote::_runAggregation(
                     fetcherCallback,
                     readPrefMetadata,
                     requestTimeout, /* command network timeout */
-                    requestTimeout /* getMore network timeout */);
+                    requestTimeout, /* getMore network timeout */
+                    std::make_unique<NoRetryStrategy>(),
+                    transport::kGlobalSSLMode,
+                    opCtx);
 
     Status scheduleStatus = fetcher.schedule();
     if (!scheduleStatus.isOK()) {

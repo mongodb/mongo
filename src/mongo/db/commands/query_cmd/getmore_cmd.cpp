@@ -757,12 +757,12 @@ public:
             auto curOp = CurOp::get(opCtx);
             NamespaceString nss = ns();
 
-            // TODO: SERVER-121373 remove this and provide a more generic way of marking remote
-            // operations as non-deprioritizable. Reads to system-critical collections issued
-            // remotely by internal clients should not be deprioritized:
+            // Reads to system-critical collections issued remotely by internal clients should not
+            // be deprioritized:
             // - Session collection reads in findRemovedSessions.
             // - Key collection refresh.
             // - Resharding application phase
+            // TODO (SERVER-122847): Remove this code.
             const bool isSystemCriticalNss = (nss == NamespaceString::kLogicalSessionsNamespace ||
                                               nss == NamespaceString::kKeysCollectionNamespace ||
                                               nss == NamespaceString::kRsOplogNamespace);
@@ -772,7 +772,10 @@ public:
             // fetcher which is marked exempt below. Since exempt + non-deprioritizable = exempt,
             // skipping this would be fine but it messes with our metrics by hugely inflating the
             // number of non-deprioritized ops.
-            if (!cmd.getTerm() && isSystemCriticalNss && opCtx->getClient()->isInternalClient()) {
+            if (!gExecutionControlRemoteSpecification.isEnabledUseLastLTSFCVWhenUninitialized(
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+                !cmd.getTerm() && isSystemCriticalNss && opCtx->getClient()->isInternalClient()) {
                 systemCriticalTaskType.emplace(opCtx);
             }
 
