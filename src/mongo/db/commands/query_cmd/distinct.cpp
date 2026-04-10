@@ -459,8 +459,6 @@ public:
                 "ExpCtxDiagnostics",
                 diagnostic_printers::ExpressionContextPrinter{canonicalQuery->getExpCtx()});
 
-            CurOp::get(opCtx)->debug().collectionType = collectionOrView->getCollectionType();
-
             if (collectionOrView->isView() ||
                 timeseries::requiresViewlessTimeseriesTranslation(opCtx, *collectionOrView)) {
                 // Relinquish locks. The aggregation command will re-acquire them.
@@ -468,6 +466,11 @@ public:
                 runDistinctAsAgg(opCtx, std::move(canonicalQuery), verbosity, reply);
                 return;
             }
+            // For the purposes of OpDebug's reporting, we only need 'collectionType' to distinguish
+            // between view/timeseries/collection. For view/timeseries, 'collectionType' will be set
+            // on the agg path taken above. In the normal path (i.e. here), we bypass the
+            // getCollectionType() call and hardcode "kCollection" for performance reasons.
+            CurOp::get(opCtx)->debug().collectionType = query_shape::CollectionType::kCollection;
 
             // Create an RAII object that prints the collection's shard key in the case of a tassert
             // or crash.

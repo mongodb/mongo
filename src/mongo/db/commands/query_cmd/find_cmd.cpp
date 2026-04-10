@@ -847,8 +847,6 @@ public:
                     "CanonicalQuery namespace should match catalog namespace",
                     cq->nss() == nss);
 
-            CurOp::get(opCtx)->debug().collectionType = collectionOrView->getCollectionType();
-
             // If we are running a query against a view or a timeseries collection, redirect this
             // query through the aggregation system.
             if (collectionOrView->isView() ||
@@ -857,6 +855,11 @@ public:
                 collectionOrView.reset();
                 return runFindAsAgg(opCtx, *cq, boost::none /* verbosity */, replyBuilder);
             }
+            // For the purposes of OpDebug's reporting, we only need 'collectionType' to distinguish
+            // between view/timeseries/collection. For view/timeseries, 'collectionType' will be set
+            // on the agg path taken above. In the normal path (i.e. here), we bypass the
+            // getCollectionType() call and hardcode "kCollection" for performance reasons.
+            CurOp::get(opCtx)->debug().collectionType = query_shape::CollectionType::kCollection;
 
             // Create an RAII object that prints the collection's shard key in the case of a tassert
             // or crash.

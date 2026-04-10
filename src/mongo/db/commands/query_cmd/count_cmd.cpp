@@ -383,8 +383,6 @@ public:
                 opCtx, expCtx, curOp, *collOrViewAcquisition, request(), *parsedFind, ns);
 
             if (collOrViewAcquisition) {
-                curOp->debug().collectionType = collOrViewAcquisition->getCollectionType();
-
                 if (collOrViewAcquisition->isView() ||
                     timeseries::requiresViewlessTimeseriesTranslation(opCtx,
                                                                       *collOrViewAcquisition)) {
@@ -394,6 +392,11 @@ public:
                     return runCountAsAgg(opCtx, request());
                 }
             }
+            // For the purposes of OpDebug's reporting, we only need 'collectionType' to distinguish
+            // between view/timeseries/collection. For view/timeseries, 'collectionType' will be set
+            // on the agg path taken above. In the normal path (i.e. here), we bypass the
+            // getCollectionType() call and hardcode "kCollection" for performance reasons.
+            curOp->debug().collectionType = query_shape::CollectionType::kCollection;
 
             tassert(10168301,
                     "Expected ShardRole acquisition to be of type collection",
