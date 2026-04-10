@@ -194,12 +194,12 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    [[nodiscard]] BSONObj setStorageTierToStorageOptions(
-        const BSONObj& storageEngineOptions, StorageTierLevelEnum value) const override {
+    [[nodiscard]] BSONObj setStorageTierToStorageOptions(const BSONObj& storageEngineOptions,
+                                                         StringData value) const override {
         MONGO_UNREACHABLE;
     }
 
-    boost::optional<StorageTierLevelEnum> getStorageTierFromStorageOptions(
+    boost::optional<std::string> getStorageTierFromStorageOptions(
         const BSONObj& storageEngineOptions) const override {
         MONGO_UNREACHABLE;
     }

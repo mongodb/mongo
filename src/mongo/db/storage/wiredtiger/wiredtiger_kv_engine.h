@@ -791,9 +791,9 @@ public:
                                                     StringData flagName) const override;
 
     [[nodiscard]] BSONObj setStorageTierToStorageOptions(const BSONObj& storageEngineOptions,
-                                                         StorageTierLevelEnum value) const override;
+                                                         StringData value) const override;
 
-    boost::optional<StorageTierLevelEnum> getStorageTierFromStorageOptions(
+    boost::optional<std::string> getStorageTierFromStorageOptions(
         const BSONObj& storageEngineOptions) const override;
 
     // TODO SERVER-81069: Remove this since it's intrinsically tied to encryption options only.

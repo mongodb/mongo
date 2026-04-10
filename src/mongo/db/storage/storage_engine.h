@@ -38,7 +38,6 @@
 #include "mongo/db/storage/compact_options.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/storage_tier_gen.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/str.h"
@@ -1044,13 +1043,13 @@ public:
      * index. Returns the updated storage engine options BSON object with the new value set.
      */
     [[nodiscard]] virtual BSONObj setStorageTierToStorageOptions(
-        const BSONObj& storageEngineOptions, StorageTierLevelEnum value) const = 0;
+        const BSONObj& storageEngineOptions, StringData value) const = 0;
 
     /**
      * Returns the value of `disaggregated.storage_tier` from the storage engine BSON object of a
      * collection / index, or boost::none if not set.
      */
-    virtual boost::optional<StorageTierLevelEnum> getStorageTierFromStorageOptions(
+    virtual boost::optional<std::string> getStorageTierFromStorageOptions(
         const BSONObj& storageEngineOptions) const = 0;
 
     /**

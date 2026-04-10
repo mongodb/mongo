@@ -369,7 +369,7 @@ private:
                                         collection->ns().toStringForErrorMsg(),
                                         collection->uuid().toString()),
                             !storageTier.has_value() ||
-                                storageTier.value() != StorageTierLevelEnum::cold);
+                                storageTier.value() != idlSerialize(StorageTierLevelEnum::cold));
                     }
 
                     return true;

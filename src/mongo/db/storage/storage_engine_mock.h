@@ -297,12 +297,12 @@ public:
         return boost::none;
     }
 
-    [[nodiscard]] BSONObj setStorageTierToStorageOptions(
-        const BSONObj& storageEngineOptions, StorageTierLevelEnum value) const override {
+    [[nodiscard]] BSONObj setStorageTierToStorageOptions(const BSONObj& storageEngineOptions,
+                                                         StringData value) const override {
         return storageEngineOptions;
     }
 
-    boost::optional<StorageTierLevelEnum> getStorageTierFromStorageOptions(
+    boost::optional<std::string> getStorageTierFromStorageOptions(
         const BSONObj& storageEngineOptions) const override {
         return boost::none;
     }

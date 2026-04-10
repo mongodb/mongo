@@ -1204,11 +1204,11 @@ BSONObj StorageEngineImpl::setFlagToStorageOptions(const BSONObj& storageEngineO
 }
 
 BSONObj StorageEngineImpl::setStorageTierToStorageOptions(const BSONObj& storageEngineOptions,
-                                                          StorageTierLevelEnum value) const {
+                                                          StringData value) const {
     return _engine->setStorageTierToStorageOptions(storageEngineOptions, value);
 }
 
-boost::optional<StorageTierLevelEnum> StorageEngineImpl::getStorageTierFromStorageOptions(
+boost::optional<std::string> StorageEngineImpl::getStorageTierFromStorageOptions(
     const BSONObj& storageEngineOptions) const {
     return _engine->getStorageTierFromStorageOptions(storageEngineOptions);
 }
