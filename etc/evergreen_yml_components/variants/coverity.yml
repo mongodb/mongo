@@ -81,4 +81,4 @@ tasks:
         vars:
           module_prefix: ${workdir}/devprodCoveritySrc
           module_name: devprod_coverity
-          timeout_secs: 18000 # Idle timeout of 5 hours
+        timeout_secs: 18000 # Idle timeout of 5 hours
