@@ -704,7 +704,7 @@ buildvariants:
         --excludeWithAnyTags=resource_intensive,featureFlagSbeFull,requires_sbe
     tasks:
       - name: .aggfuzzer
-      - name: .change_stream_fuzzer
+      - name: .change_stream_fuzzer !.requires_extra_system_deps
       - name: .query_fuzzer
       - name: .updatefuzzer
       - name: .jstestfuzz
