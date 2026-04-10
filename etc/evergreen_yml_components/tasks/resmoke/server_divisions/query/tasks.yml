@@ -673,6 +673,18 @@ tasks:
       - func: "run tests"
 
   - <<: *task_template
+    name: change_streams_multi_stmt_txn_passthrough_v2
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "change_streams",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+
+  - <<: *task_template
     name: change_streams_multi_stmt_txn_sharded_collections_passthrough
     tags:
       [
