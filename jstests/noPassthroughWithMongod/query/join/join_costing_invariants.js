@@ -16,7 +16,7 @@ if (!joinOptimizationStatus) {
 }
 
 function populate() {
-    const collSize = 1000;
+    const collSize = 10000;
     const str_filler = "a".repeat(1000);
 
     const documents = [];
@@ -79,6 +79,7 @@ function getCost(command, path) {
     const explain = assert.commandWorked(
         db.runCommand({
             explain: command,
+            verbosity: "queryPlanner",
         }),
     );
 
