@@ -1,0 +1,22 @@
+modules:
+  - name: dsi
+    owner: 10gen
+    repo: dsi
+    prefix: ${workdir}/src
+    branch: master
+
+include:
+  ### lint_yaml trim start ###
+  #
+  # The lines below are trimmed by yamllinters.sh so that `evergreen evaluate` works on this file.
+  # This allows us to test that non-dsi imports continue to work.
+  #
+  - filename: evergreen/pebt/base.yml
+    module: dsi
+  - filename: evergreen/pebt/compiles.yml
+    module: dsi
+  - filename: evergreen/pebt/variants.yml
+    module: dsi
+  - filename: evergreen/pebt/tasks.yml
+    module: dsi
+  ### lint_yaml trim end ###
