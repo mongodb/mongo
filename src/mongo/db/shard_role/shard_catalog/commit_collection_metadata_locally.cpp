@@ -126,17 +126,42 @@ void writeCollectionMetadataLocally(OperationContext* opCtx,
     tassert(
         10281500, "Expected to find at least one chunk for a tracked collection", !chunks.empty());
 
-    // TODO (SERVER-121708): Investigate doing the following writes when they exceed 16MB.
+    // Persist Chunk Metadata, we do this in batches because of the 16MB BSON limit.
+    for (auto it = chunks.begin(); it != chunks.end();) {
+        size_t updateSize = 0;
+        std::vector<write_ops::UpdateOpEntry> chunkUpdates;
 
-    // Persist Chunk Metadata
-    std::vector<write_ops::UpdateOpEntry> chunkUpdates;
-    chunkUpdates.reserve(chunks.size());
-    for (const auto& chunk : chunks) {
-        chunkUpdates.push_back(
-            makeUpsertEntry(BSON(ChunkType::name() << chunk.getName()), chunk.toConfigBSON()));
+        while (it != chunks.end()) {
+            const auto& chunk = *it;
+
+            auto q = BSON(ChunkType::name() << chunk.getName());
+            updateSize += q.objsize();
+            auto u = chunk.toConfigBSON();
+            updateSize += u.objsize();
+
+            write_ops::UpdateOpEntry entry;
+            entry.setQ(std::move(q));
+            entry.setU(std::move(u));
+            entry.setUpsert(true);
+            entry.setMulti(false);
+            chunkUpdates.push_back(std::move(entry));
+
+            it++;
+
+            // In principle we could do a better approximation of the update request size in order
+            // to be closer to the 16MB limit. However, after a certain batch size the speedup
+            // improvement reaches a limit as can be seen with batched deletes. 10MB is a reasonable
+            // limit that will accommodate all batched update requests comfortably under the 16MB
+            // limit while offering the same advantages.
+            static constexpr auto k10MbLimit = 10 * 1024 * 1024;
+            if (updateSize >= k10MbLimit || chunkUpdates.size() >= write_ops::kMaxWriteBatchSize) {
+                break;
+            }
+        }
+
+        executeLocalUpdates(
+            dbClient, NamespaceString::kConfigShardCatalogChunksNamespace, std::move(chunkUpdates));
     }
-    executeLocalUpdates(
-        dbClient, NamespaceString::kConfigShardCatalogChunksNamespace, std::move(chunkUpdates));
 }
 
 void deleteCollectionMetadataLocally(OperationContext* opCtx,
