@@ -125,6 +125,10 @@ protected:
                                       const CancellationToken& token) noexcept override {
             return ExecutorFuture<void>(**executor);
         }
+
+        bool isInCriticalSection(Phase phase) const {
+            return false;
+        }
     };
 };
 

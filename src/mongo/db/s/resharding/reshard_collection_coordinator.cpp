@@ -249,4 +249,10 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
         }));
 }
 
+bool ReshardCollectionCoordinator::isInCriticalSection(Phase phase) const {
+    // The resharding critical section is handled by the ReshardingCoordinator, donor, and recipient
+    // services directly
+    return false;
+}
+
 }  // namespace mongo

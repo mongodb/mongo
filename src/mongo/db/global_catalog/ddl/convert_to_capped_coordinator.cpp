@@ -482,6 +482,11 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
             });
 }
 
+bool ConvertToCappedCoordinator::isInCriticalSection(Phase phase) const {
+    return phase >= Phase::kAcquireCriticalSectionOnCoordinator &&
+        phase <= Phase::kReleaseCriticalSectionOnCoordinator;
+}
+
 bool ConvertToCappedCoordinator::_mustAlwaysMakeProgress() {
     // If the collection was originally tracked on the sharding catalog, the coodinator must always
     // make forward progress after converting the collection to capped in order to align local and
@@ -570,6 +575,5 @@ std::vector<ShardId> ConvertToCappedCoordinator::_getParticipantShards(Operation
     }
     return participants;
 }
-
 
 }  // namespace mongo

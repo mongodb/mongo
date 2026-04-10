@@ -512,9 +512,7 @@ protected:
      * These phases should finish as soon as possible in order to release the critical section, so
      * the opCtxs made under them automatically marked as non-deprioritizable.
      */
-    virtual bool isInCriticalSection(Phase phase) const {
-        return false;
-    }
+    virtual bool isInCriticalSection(Phase phase) const = 0;
 
     explicit NonRecoverableTypedDocMixin(const BSONObj& coorDoc)
         : _docWrapper(

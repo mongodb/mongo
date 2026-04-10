@@ -113,6 +113,11 @@ ExecutorFuture<void> MigrationBlockingOperationCoordinator::_runImpl(
         .thenRunOn(**executor);
 }
 
+bool MigrationBlockingOperationCoordinator::isInCriticalSection(Phase phase) const {
+    // No critical section is taken
+    return false;
+}
+
 MigrationBlockingOperationCoordinatorPhaseEnum
 MigrationBlockingOperationCoordinator::_getCurrentPhase() const {
     stdx::unique_lock lock(_docMutex);

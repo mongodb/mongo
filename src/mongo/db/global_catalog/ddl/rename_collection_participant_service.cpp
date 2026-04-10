@@ -218,7 +218,7 @@ void RenameParticipantInstance::_enterPhase(Phase newPhase) {
                 "newPhase"_attr = idl::serialize(newDoc.getPhase()),
                 "oldPhase"_attr = idl::serialize(_doc.getPhase()));
 
-    auto opCtx = makeOperationContext();
+    auto opCtx = makeOperationContext(/*deprioritizable=*/false);
     PersistentTaskStore<StateDoc> store(NamespaceString::kShardingRenameParticipantsNamespace);
 
     if (_doc.getPhase() == Phase::kUnset) {
@@ -300,7 +300,7 @@ SemiFuture<void> RenameParticipantInstance::run(
             }
 
             try {
-                auto opCtxHolder = makeOperationContext();
+                auto opCtxHolder = makeOperationContext(/*deprioritizable=*/false);
                 auto* opCtx = opCtxHolder.get();
                 _removeStateDocument(opCtx);
             } catch (DBException& ex) {
@@ -479,6 +479,10 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
             return status;
         })
         .semi();
+}
+
+bool RenameParticipantInstance::_isInCriticalSection(Phase phase) const {
+    return phase >= Phase::kBlockCRUDAndSnapshotRangeDeletions && phase <= Phase::kUnblockCRUD;
 }
 
 void RenameParticipantInstance::interrupt(Status status) noexcept {

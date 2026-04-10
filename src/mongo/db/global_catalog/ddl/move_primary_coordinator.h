@@ -71,6 +71,8 @@ public:
 protected:
     logv2::DynamicAttributes getCoordinatorLogAttrs() const override;
 
+    bool isInCriticalSection(Phase phase) const override;
+
 private:
     void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const override;
     bool _mustAlwaysMakeProgress() override;

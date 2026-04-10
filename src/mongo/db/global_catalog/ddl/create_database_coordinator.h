@@ -51,6 +51,9 @@ public:
 
     ConfigsvrCreateDatabaseResponse getResult(OperationContext* opCtx);
 
+protected:
+    bool isInCriticalSection(Phase phase) const override;
+
 private:
     bool _mustAlwaysMakeProgress() override {
         return _doc.getPhase() >= Phase::kEnterCriticalSectionOnPrimary;

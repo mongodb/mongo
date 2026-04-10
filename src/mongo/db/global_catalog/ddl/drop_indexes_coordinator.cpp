@@ -181,4 +181,9 @@ ExecutorFuture<void> mongo::DropIndexesCoordinator::_runImpl(
         });
 }
 
+bool DropIndexesCoordinator::isInCriticalSection(Phase phase) const {
+    // No critical section is taken
+    return false;
+}
+
 }  // namespace mongo

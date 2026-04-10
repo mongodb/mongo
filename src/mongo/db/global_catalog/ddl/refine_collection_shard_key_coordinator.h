@@ -63,6 +63,9 @@ public:
 
     void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const override;
 
+protected:
+    bool isInCriticalSection(Phase phase) const override;
+
 private:
     bool _mustAlwaysMakeProgress() override;
 

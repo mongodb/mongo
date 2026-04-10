@@ -63,6 +63,8 @@ protected:
                                  const BSONObj& initialState,
                                  bool persistCoordinatorDocument);
 
+    bool isInCriticalSection(Phase phase) const override;
+
 private:
     BSONObj _computeFinalShardKey(const CurrentChunkManager& cmOld);
 

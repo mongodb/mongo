@@ -55,6 +55,9 @@ public:
 
     void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const override;
 
+protected:
+    bool isInCriticalSection(Phase phase) const override;
+
 private:
     const BSONObj _critSecReason;
 

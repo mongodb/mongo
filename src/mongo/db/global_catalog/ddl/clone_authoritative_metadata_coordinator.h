@@ -46,6 +46,9 @@ public:
 
     void checkIfOptionsConflict(const BSONObj& stateDoc) const final {}
 
+protected:
+    bool isInCriticalSection(Phase phase) const override;
+
 private:
     bool _mustAlwaysMakeProgress() override {
         return _doc.getPhase() >= Phase::kGetDatabasesToClone;

@@ -438,6 +438,10 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
         });
 }
 
+bool RefineCollectionShardKeyCoordinator::isInCriticalSection(Phase phase) const {
+    return phase >= Phase::kBlockCrud && phase <= Phase::kReleaseCritSec;
+}
+
 ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_cleanupOnAbort(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token,
@@ -489,4 +493,5 @@ void RefineCollectionShardKeyCoordinator::_exitCriticalSection(
     sharding_ddl_util::sendAuthenticatedCommandToShards(
         opCtx, opts, getShardsWithDataForCollection(opCtx, nss()));
 }
+
 }  // namespace mongo

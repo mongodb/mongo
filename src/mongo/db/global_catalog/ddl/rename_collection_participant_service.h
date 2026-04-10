@@ -182,8 +182,10 @@ private:
                 _enterPhase(newPhase);
             }
 
-            auto opCtxHolder = makeOperationContext();
+            const auto inCritSec = _isInCriticalSection(newPhase);
+            auto opCtxHolder = makeOperationContext(!inCritSec);
             auto* opCtx = opCtxHolder.get();
+
             return handlerFn(opCtx);
         };
     }
@@ -192,15 +194,27 @@ private:
      * Create an `OperationContext` with the `ForwardableOperationMetadata` from the participant
      * document set on it. Use this instead of `cc().makeOperationContext()`.
      */
-    ServiceContext::UniqueOperationContext makeOperationContext() {
+    ServiceContext::UniqueOperationContext makeOperationContext(bool deprioritizable) {
         auto opCtxHolder = cc().makeOperationContext();
         _doc.getForwardableOpMetadata().setOn(opCtxHolder.get());
+        if (!deprioritizable) {
+            ExecutionAdmissionContext::get(opCtxHolder.get())
+                .setTaskType(opCtxHolder.get(),
+                             ExecutionAdmissionContext::TaskType::NonDeprioritizable);
+        }
         return opCtxHolder;
+    }
+
+    ServiceContext::UniqueOperationContext makeOperationContext() {
+        const auto inCritSec = _isInCriticalSection(_doc.getPhase());
+        return makeOperationContext(!inCritSec);
     }
 
     void _removeStateDocument(OperationContext* opCtx);
     void _enterPhase(Phase newPhase);
     void _invalidateFutures(const Status& errStatus, WithLock);
+
+    bool _isInCriticalSection(Phase phase) const;
 
     // Protects the state of the service object (the recovery doc and the promise fields).
     stdx::mutex _stateMutex;

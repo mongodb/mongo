@@ -66,6 +66,9 @@ public:
         return true;
     }
 
+protected:
+    bool isInCriticalSection(Phase phase) const override;
+
 private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;

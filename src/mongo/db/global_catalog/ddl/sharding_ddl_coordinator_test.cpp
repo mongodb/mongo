@@ -143,6 +143,10 @@ protected:
             _completionPromise.emplaceValue();
         }
 
+        bool isInCriticalSection(Phase) const override {
+            return false;
+        }
+
         using ShardingCoordinator::_acquireLocksAsync;
         using NonRecoverableShardingDDLCoordinator<CoordinatorStateDocTest>::_locker;
 

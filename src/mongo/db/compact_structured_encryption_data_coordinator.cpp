@@ -403,4 +403,9 @@ ExecutorFuture<void> CompactStructuredEncryptionDataCoordinator::_runImpl(
             }));
 }
 
+bool CompactStructuredEncryptionDataCoordinator::isInCriticalSection(Phase phase) const {
+    // No critical section is taken
+    return false;
+}
+
 }  // namespace mongo

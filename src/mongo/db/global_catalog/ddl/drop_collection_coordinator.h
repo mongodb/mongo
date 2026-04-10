@@ -96,6 +96,9 @@ public:
                                       bool requireCollectionEmpty = false,
                                       bool forceLegacyRefresh = true);
 
+protected:
+    bool isInCriticalSection(Phase phase) const override;
+
 private:
     const BSONObj _critSecReason;
 

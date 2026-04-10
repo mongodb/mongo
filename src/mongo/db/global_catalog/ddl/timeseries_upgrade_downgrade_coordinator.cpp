@@ -569,6 +569,10 @@ ExecutorFuture<void> TimeseriesUpgradeDowngradeCoordinator::_runImpl(
         });
 }
 
+bool TimeseriesUpgradeDowngradeCoordinator::isInCriticalSection(Phase phase) const {
+    return phase >= Phase::kAcquireCriticalSection && phase <= Phase::kReleaseCriticalSection;
+}
+
 ExecutorFuture<void> TimeseriesUpgradeDowngradeCoordinator::_cleanupOnAbort(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token,

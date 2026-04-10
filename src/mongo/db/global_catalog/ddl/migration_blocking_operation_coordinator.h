@@ -55,6 +55,9 @@ public:
     void beginOperation(OperationContext* opCtx, const UUID& operationUUID);
     void endOperation(OperationContext* opCtx, const UUID& operationUUID);
 
+protected:
+    bool isInCriticalSection(Phase phase) const override;
+
 private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;

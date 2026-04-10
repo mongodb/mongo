@@ -496,4 +496,9 @@ ExecutorFuture<void> CleanupStructuredEncryptionDataCoordinator::_runImpl(
             }));
 }
 
+bool CleanupStructuredEncryptionDataCoordinator::isInCriticalSection(Phase phase) const {
+    // No critical section is taken
+    return false;
+}
+
 }  // namespace mongo

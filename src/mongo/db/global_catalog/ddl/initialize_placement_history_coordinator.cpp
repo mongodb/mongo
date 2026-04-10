@@ -274,4 +274,9 @@ ExecutorFuture<void> InitializePlacementHistoryCoordinator::_runImpl(
         });
 }
 
+bool InitializePlacementHistoryCoordinator::isInCriticalSection(Phase phase) const {
+    // No critical section is taken
+    return false;
+}
+
 }  // namespace mongo

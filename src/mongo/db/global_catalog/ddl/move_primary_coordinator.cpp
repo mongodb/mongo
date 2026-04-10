@@ -373,6 +373,10 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
         });
 }
 
+bool MovePrimaryCoordinator::isInCriticalSection(Phase phase) const {
+    return phase >= Phase::kClone && phase <= Phase::kExitCriticalSection;
+}
+
 void MovePrimaryCoordinator::cloneData(OperationContext* opCtx) {
     const auto& collectionsToClone = getCollectionsToClone(opCtx);
     assertNoOrphanedDataOnRecipient(opCtx, collectionsToClone);

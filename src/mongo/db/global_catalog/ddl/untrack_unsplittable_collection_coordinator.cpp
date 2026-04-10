@@ -221,4 +221,9 @@ ExecutorFuture<void> UntrackUnsplittableCollectionCoordinator::_runImpl(
             return status;
         });
 }
+
+bool UntrackUnsplittableCollectionCoordinator::isInCriticalSection(Phase phase) const {
+    return phase >= Phase::kEnterCriticalSection && phase <= Phase::kReleaseCriticalSection;
+}
+
 }  // namespace mongo

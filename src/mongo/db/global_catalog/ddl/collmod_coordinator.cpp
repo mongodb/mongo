@@ -492,4 +492,15 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
             }));
 }
 
+bool CollModCoordinator::isInCriticalSection(Phase phase) const {
+    if (!_collInfo) {
+        // If the _collInfo is missing, then we can't say confidently enough that we are not in a
+        // critical section. Since the ShardingCoordinator infrastructure's approach in these
+        // situations is to be cautious and act as being in a critical section, we follow that
+        // approach here too for consistency.
+        return true;
+    }
+    return phase >= Phase::kBlockShards && _collInfo->isTracked && _collInfo->timeSeriesOptions &&
+        hasTimeseriesOptions(_request);
+}
 }  // namespace mongo

@@ -79,6 +79,9 @@ public:
         return *_result;
     }
 
+protected:
+    bool isInCriticalSection(Phase phase) const override;
+
 private:
     struct CollectionInfo {
         bool isTracked;

@@ -293,4 +293,8 @@ RemoveShardProgress RemoveShardCommitCoordinator::getResult(OperationContext* op
     return *_result;
 }
 
+bool RemoveShardCommitCoordinator::isInCriticalSection(Phase phase) const {
+    // No critical section is taken
+    return false;
+}
 }  // namespace mongo

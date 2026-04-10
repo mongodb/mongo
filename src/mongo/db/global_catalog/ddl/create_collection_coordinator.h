@@ -131,6 +131,8 @@ public:
 protected:
     const NamespaceString& nss() const override;
 
+    bool isInCriticalSection(Phase phase) const override;
+
 private:
     bool _mustAlwaysMakeProgress() override;
 

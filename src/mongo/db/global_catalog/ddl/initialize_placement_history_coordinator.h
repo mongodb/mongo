@@ -47,6 +47,9 @@ public:
 
     void checkIfOptionsConflict(const BSONObj& doc) const final {}
 
+protected:
+    bool isInCriticalSection(Phase phase) const override;
+
 private:
     std::set<NamespaceString> _getAdditionalLocksToAcquire(OperationContext* opCtx) override;
 

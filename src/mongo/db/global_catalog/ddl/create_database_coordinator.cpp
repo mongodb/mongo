@@ -267,6 +267,11 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
         });
 }
 
+bool CreateDatabaseCoordinator::isInCriticalSection(Phase phase) const {
+    return phase >= Phase::kEnterCriticalSectionOnPrimary &&
+        phase <= Phase::kExitCriticalSectionOnPrimary;
+}
+
 ConfigsvrCreateDatabaseResponse CreateDatabaseCoordinator::getResult(OperationContext* opCtx) {
     getCompletionFuture().get(opCtx);
     tassert(10644532, "Expected _result to be initialized", _result.is_initialized());

@@ -154,4 +154,9 @@ void CloneAuthoritativeMetadataCoordinator::_removeDbFromCloningList(OperationCo
     _updateStateDocument(opCtx, StateDoc(_doc));
 }
 
+bool CloneAuthoritativeMetadataCoordinator::isInCriticalSection(Phase phase) const {
+    // No critical section is taken
+    return false;
+}
+
 }  // namespace mongo

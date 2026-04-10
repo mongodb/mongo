@@ -777,4 +777,8 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
         });
 }
 
+bool DropDatabaseCoordinator::isInCriticalSection(Phase phase) const {
+    return phase == Phase::kDrop;
+}
+
 }  // namespace mongo

@@ -1681,6 +1681,11 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
         });
 }
 
+bool CreateCollectionCoordinator::isInCriticalSection(Phase phase) const {
+    return phase >= Phase::kEnterWriteCriticalSectionOnCoordinator &&
+        phase <= Phase::kExitCriticalSection;
+}
+
 void CreateCollectionCoordinator::_checkPreconditions(OperationContext* opCtx) {
     checkCommandArguments(opCtx, _request, originalNss());
 

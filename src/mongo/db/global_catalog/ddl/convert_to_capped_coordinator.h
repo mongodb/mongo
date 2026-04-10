@@ -69,6 +69,8 @@ public:
 protected:
     logv2::DynamicAttributes getCoordinatorLogAttrs() const override;
 
+    bool isInCriticalSection(Phase phase) const override;
+
 private:
     bool _mustAlwaysMakeProgress() override;
 

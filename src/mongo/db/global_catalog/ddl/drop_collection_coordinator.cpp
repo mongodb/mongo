@@ -221,6 +221,10 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                                    auto* opCtx) { _exitCriticalSection(opCtx, executor, token); }));
 }
 
+bool DropCollectionCoordinator::isInCriticalSection(Phase phase) const {
+    return phase >= Phase::kEnterCriticalSection && phase <= Phase::kReleaseCriticalSection;
+}
+
 void DropCollectionCoordinator::_checkPreconditionsAndSaveArgumentsOnDoc() {
     auto opCtxHolder = makeOperationContext();
     auto* opCtx = opCtxHolder.get();

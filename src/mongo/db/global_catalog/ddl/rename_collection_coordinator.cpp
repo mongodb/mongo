@@ -1117,4 +1117,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
             }));
 }
 
+bool RenameCollectionCoordinator::isInCriticalSection(Phase phase) const {
+    return phase >= Phase::kSetupChangeStreamsPreconditions && phase <= Phase::kUnblockCRUD;
+}
+
 }  // namespace mongo
