@@ -66,7 +66,7 @@ const pipeline = [{$_internalInhibitOptimization: {}}, {$sort: {time: -1}}];
             allowDiskUse: false,
         },
         stageName: "$sort",
-        expectedNumGetMores: 5,
+        expectedNumGetMores: 4,
     });
 }
 
@@ -84,7 +84,7 @@ const pipeline = [{$_internalInhibitOptimization: {}}, {$sort: {time: -1}}];
             allowDiskUse: false,
         },
         stageName: "$sort",
-        expectedNumGetMores: 5,
+        expectedNumGetMores: 4,
     });
 }
 
@@ -104,7 +104,7 @@ const pipeline = [{$_internalInhibitOptimization: {}}, {$sort: {time: -1}}];
             allowDiskUse: true,
         },
         stageName: "$sort",
-        expectedNumGetMores: 5,
+        expectedNumGetMores: 4,
         skipInUseTrackedMemBytesCheck: true,
     });
 }

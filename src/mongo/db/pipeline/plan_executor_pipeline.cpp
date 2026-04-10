@@ -115,7 +115,7 @@ PlanExecutor::ExecState PlanExecutorPipeline::getNextDocument(Document& docOut) 
 }
 
 bool PlanExecutorPipeline::isEOF() const {
-    return _stash.empty() && _pipelineIsEof;
+    return _stash.empty() && (_pipelineIsEof || _execPipeline->isEOF());
 }
 
 boost::optional<Document> PlanExecutorPipeline::_getNext() {

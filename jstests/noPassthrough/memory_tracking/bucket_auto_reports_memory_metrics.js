@@ -48,7 +48,6 @@ assert.commandWorked(coll.insertMany(docs));
         },
     ];
     jsTest.log.info("Running basic pipeline test : " + tojson(pipeline));
-
     runMemoryStatsTest({
         db: db,
         collName: collName,
@@ -60,7 +59,7 @@ assert.commandWorked(coll.insertMany(docs));
             allowDiskUse: false,
         },
         stageName,
-        expectedNumGetMores: 5,
+        expectedNumGetMores: 4,
     });
 }
 
@@ -92,7 +91,7 @@ assert.commandWorked(coll.insertMany(docs));
             allowDiskUse: false,
         },
         stageName,
-        expectedNumGetMores: 1,
+        expectedNumGetMores: 0,
         skipInUseTrackedMemBytesCheck: true, // $limit will force execution to stop early, so
         // inUseTrackedMemBytes may not appear in CurOp.
     });
@@ -128,7 +127,7 @@ assert.commandWorked(coll.insertMany(docs));
             allowDiskUse: true,
         },
         stageName,
-        expectedNumGetMores: 5,
+        expectedNumGetMores: 4,
     });
 }
 

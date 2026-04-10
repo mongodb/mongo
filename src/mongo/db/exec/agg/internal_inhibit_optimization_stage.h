@@ -39,6 +39,10 @@ public:
     InternalInhibitOptimizationStage(StringData stageName,
                                      const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
+    bool isEOF() const final {
+        return pSource && pSource->isEOF();
+    }
+
 private:
     GetNextResult doGetNext() final;
 };

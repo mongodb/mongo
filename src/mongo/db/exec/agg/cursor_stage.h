@@ -87,6 +87,10 @@ public:
         return _sharedState->stats.planSummaryStats;
     }
 
+    bool isEOF() const final {
+        return _currentBatch.isEmpty() && (!_sharedState->exec || _sharedState->exec->isDisposed());
+    }
+
     bool usedDisk() const final {
         return _sharedState->stats.planSummaryStats.usedDisk;
     }

@@ -535,8 +535,14 @@ TEST_F(RunAggregateTest, TransferOperationMemoryUsageTracker) {
         docs = res["cursor"].Obj()["nextBatch"].Array();
     }
 
+    // The cursor may close on the same batch as the last document if isEOF() detects
+    // exhaustion eagerly. Process any remaining docs in the final batch.
+    for (const auto& doc : docs) {
+        ASSERT_BSONOBJ_EQ(doc.Obj(), expectedIt->Obj());
+        ++expectedIt;
+    }
+
     ASSERT_EQ(expectedIt, expectedDocs.end());
-    ASSERT_EQ(docs.size(), 0);
 }
 
 TEST_F(RunAggregateTest, MemoryTrackerWithinSubpipelineIsProperlyDestroyedOnKillCursor) {

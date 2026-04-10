@@ -89,6 +89,17 @@ public:
     }
 
     /**
+     * Returns true if there are more aggregated result documents to return via getNext().
+     * Must be called after readyGroups().
+     */
+    bool hasNext() const {
+        if (_spilled) {
+            return _sorterIterator != nullptr;
+        }
+        return _groupsIterator != _groups.end();
+    }
+
+    /**
      * Spills the GroupsMap to a new file and empties the map so that subsequent groups can be added
      * to it. Later when the groups need to be returned back to the caller, all groups in all the
      * spilled files are read, merged and returned to the caller.

@@ -255,6 +255,16 @@ public:
         return false;
     }
 
+    /**
+     * Returns true if the stage is known to be exhausted. Can be a false-negative (returns
+     * false when actually at EOF) but must never be a false-positive (returns true when there
+     * is more data). The default implementation conservatively returns false. Stages that can
+     * cheaply detect EOF should override this.
+     */
+    virtual bool isEOF() const {
+        return false;
+    }
+
     virtual Document getExplainOutput(
         const SerializationOptions& opts = SerializationOptions{}) const;
 

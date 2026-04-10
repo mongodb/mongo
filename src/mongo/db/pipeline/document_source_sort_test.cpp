@@ -59,6 +59,7 @@
 #include <cstddef>
 #include <deque>
 #include <iterator>
+#include <limits>
 #include <list>
 #include <string>
 #include <vector>
@@ -306,11 +307,13 @@ public:
     void checkResults(deque<DocumentSource::GetNextResult> inputDocs,
                       DocumentSourceSort* sort,
                       string expectedResultSetString) {
+        const size_t sortLimit = sort->getLimit().value_or(std::numeric_limits<long long>::max());
+        const size_t expectedResultSize = std::min(inputDocs.size(), sortLimit);
+
         auto mockStage = exec::agg::MockStage::createForTest(std::move(inputDocs), getExpCtx());
         createSortStage();
         exec::agg::MockStage::setSource_forTest(_sortStage, mockStage.get());
 
-        // Load the results from the DocumentSourceUnwind.
         vector<Document> resultSet;
         auto* curop = CurOp::get(*getOpCtx());
 
@@ -320,7 +323,13 @@ public:
             resultSet.push_back(output.releaseDocument());
 
             int64_t actualUsage = _sortStage->getMemoryTracker_forTest().inUseTrackedMemoryBytes();
-            ASSERT_GT(actualUsage, 0);
+            if (resultSet.size() < expectedResultSize) {
+                ASSERT_GT(actualUsage, 0);
+            } else if (expectedResultSize == sortLimit) {
+                // If sort has a limit, the stage should eagerly set EOF upon reaching it.
+                ASSERT_TRUE(_sortStage->isEOF());
+                ASSERT_EQ(actualUsage, 0);
+            }
             ASSERT_GT(_sortStage->getMemoryTracker_forTest().peakTrackedMemoryBytes(), 0);
 
             // To avoid perf regressions, sort chunks its writes to CurOp. CurOp's reported value <=
@@ -332,7 +341,6 @@ public:
                 << "Actual usage (" << actualUsage << ") should be < reported (" << curopUsage
                 << ") + chunk size (" << chunkSize << ")";
         }
-        // Verify the DocumentSourceUnwind is exhausted.
         assertEOF();
 
         // Convert results to BSON once they all have been retrieved (to detect any errors

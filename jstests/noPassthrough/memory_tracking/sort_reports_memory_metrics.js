@@ -110,7 +110,7 @@ for (const config of configs) {
                     allowDiskUse: false,
                 },
                 stageName: config.stageName,
-                expectedNumGetMores: 5,
+                expectedNumGetMores: 4,
             });
         });
 
@@ -126,7 +126,7 @@ for (const config of configs) {
                     allowDiskUse: false,
                 },
                 stageName: config.stageName,
-                expectedNumGetMores: 5,
+                expectedNumGetMores: 4,
             });
         });
 
@@ -150,7 +150,7 @@ for (const config of configs) {
                     allowDiskUse: true,
                 },
                 stageName: config.stageName,
-                expectedNumGetMores: 5,
+                expectedNumGetMores: 4,
                 // Since we spill to disk when adding to the sorter, we don't expect to see
                 // inUseTrackedMemBytes populated as it should be 0 on each operation.
                 skipInUseTrackedMemBytesCheck: true,

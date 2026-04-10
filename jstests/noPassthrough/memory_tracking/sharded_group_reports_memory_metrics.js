@@ -46,7 +46,7 @@ runShardedMemoryStatsTest({
         allowDiskUse: false,
     },
     stageName: "$group",
-    expectedNumGetMores: 2,
+    expectedNumGetMores: 1,
     numShards: 2,
 });
 st.stop();

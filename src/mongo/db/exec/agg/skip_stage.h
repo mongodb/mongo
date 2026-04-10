@@ -51,6 +51,10 @@ public:
         _nToSkip = newSkip;
     }
 
+    bool isEOF() const final {
+        return pSource && pSource->isEOF();
+    }
+
 private:
     GetNextResult doGetNext() final;
 

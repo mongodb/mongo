@@ -55,6 +55,10 @@ public:
                 const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                 std::unique_ptr<UnwindProcessor> unwindProcessor);
 
+    bool isEOF() const final {
+        return !_unwindProcessor->haveNext() && pSource && pSource->isEOF();
+    }
+
 private:
     GetNextResult doGetNext() final;
 

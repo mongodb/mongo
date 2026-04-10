@@ -140,6 +140,7 @@ GetNextResult SortStage::doGetNext() {
 
         if (_timeSorter->getState() == DocumentSourceSort::TimeSorterInterface::State::kDone) {
             updateTimeSorterStats();
+            _eof = true;
             return GetNextResult::makeEOF();
         }
 
@@ -149,6 +150,15 @@ GetNextResult SortStage::doGetNext() {
         Document nextDocument = _timeSorter->next().second;
         auto currMemUsage = _timeSorter->stats().memUsage();
         _memoryTracker.add(currMemUsage - prevMemUsage);
+
+        // Ensure isEOF flag is up-to-date if this stage has a limit.
+        if (_timeSorter->limit() > 0 &&
+            _timeSorter->getState() == DocumentSourceSort::TimeSorterInterface::State::kDone &&
+            !_timeSorterNextDoc && _timeSorterInputEOF) {
+            updateTimeSorterStats();
+            _eof = true;
+        }
+
         return nextDocument;
     }
 
@@ -165,13 +175,22 @@ GetNextResult SortStage::doGetNext() {
 
     if (!_sortExecutor->hasNext()) {
         _memoryTracker.set(0);
+        _eof = true;
         return GetNextResult::makeEOF();
     }
 
-    // In the general case (without _timeSorter), memory is not released incrementally while
-    // returning sorted results. Memory is ultimately cleared in bulk once EOF is reached via
-    // _sortExecutor's call to clearSortTable() during hasNext().
-    return GetNextResult{_sortExecutor->getNext().second};
+    auto result = GetNextResult{_sortExecutor->getNext().second};
+
+    // Ensure isEOF flag is up-to-date if this stage has a limit. Only check eagerly with a limit
+    // to avoid the overhead of calling hasNext() on every document in an unlimited sort. If the
+    // sort has spilled to disk, hasNext() can have a side effect of loading a batch of data into
+    // memory.
+    if (_sortExecutor->hasLimit() && !_sortExecutor->hasNext()) {
+        _memoryTracker.set(0);
+        _eof = true;
+    }
+
+    return result;
 }
 
 void SortStage::doForceSpill() {

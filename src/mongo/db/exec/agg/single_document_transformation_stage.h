@@ -49,6 +49,10 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         const std::shared_ptr<SingleDocumentTransformationProcessor>& transformationProcessor);
 
+    bool isEOF() const final {
+        return pSource && pSource->isEOF();
+    }
+
 private:
     GetNextResult doGetNext() final;
 

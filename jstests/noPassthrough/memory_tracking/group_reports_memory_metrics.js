@@ -85,7 +85,7 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkCon
             allowDiskUse: false,
         },
         stageName: config.stageName,
-        expectedNumGetMores: 2,
+        expectedNumGetMores: 1,
     });
 }
 
@@ -122,7 +122,7 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkCon
             allowDiskUse: true,
         },
         stageName: config.stageName,
-        expectedNumGetMores: 2,
+        expectedNumGetMores: 1,
         // Since we spill, we don't expect to see inUseTrackedMemBytes populated as it should be
         // 0 on each operation.
         skipInUseTrackedMemBytesCheck: true,

@@ -42,6 +42,10 @@ public:
                const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                const std::shared_ptr<GroupProcessor>& groupProcessor);
 
+    bool isEOF() const final {
+        return _groupsReady && !_groupProcessor->hasNext();
+    }
+
 private:
     GetNextResult doGetNext() final;
 

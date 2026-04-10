@@ -45,6 +45,10 @@ public:
                const std::shared_ptr<MatchProcessor>& matchProcessor,
                bool isTextQuery);
 
+    bool isEOF() const final {
+        return pSource && pSource->isEOF();
+    }
+
 private:
     GetNextResult doGetNext() override;
 

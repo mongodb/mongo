@@ -75,6 +75,15 @@ public:
     }
 
     /**
+     * Returns true if the last stage in the pipeline reports EOF. This is a conservative
+     * check: it may return false even when the pipeline is actually exhausted, but will
+     * never return true when there is more data available.
+     */
+    bool isEOF() const {
+        return _stages.back()->isEOF();
+    }
+
+    /**
      * Method to accumulate the plan summary stats from all stages of the pipeline into the given
      * `planSummaryStats` object.
      */

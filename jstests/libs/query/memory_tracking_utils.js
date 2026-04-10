@@ -44,6 +44,9 @@ function assertNoMatchInLog(logLine, regex) {
  * corresponding to this aggregation.
  */
 export function runPipelineAndGetDiagnostics({db, collName, commandObj, source}) {
+    const uniqueComment = commandObj.comment + "_" + ObjectId().str;
+    commandObj = Object.assign({}, commandObj, {comment: uniqueComment});
+
     // Retrieve the cursor.
     const aggregateCommandResult = db.runCommand(commandObj);
     const cursorId = aggregateCommandResult.cursor.id;
@@ -55,25 +58,41 @@ export function runPipelineAndGetDiagnostics({db, collName, commandObj, source})
             getMore: currentCursorId,
             collection: collName,
             batchSize: commandObj.cursor.batchSize,
-            comment: commandObj.comment,
+            comment: uniqueComment,
         });
         currentCursorId = getMoreResult.cursor.id;
     }
 
+    // Build filters that always match on comment, and optionally on cursorid. When the cursor
+    // is exhausted in the initial batch, cursorId is 0 and there is no cursorid field in the
+    // log/profiler entries, so we fall back to matching by comment only.
+    const logMatchFilter = {msg: "Slow query", comment: uniqueComment};
+    const profilerFilter = {"command.comment": uniqueComment};
+    if (cursorId.toString() !== "NumberLong(0)") {
+        logMatchFilter.cursorid = cursorId;
+        profilerFilter.cursorid = cursorId;
+    }
+
     if (source === "log") {
         let logLines = [];
-        assert.soon(() => {
-            const globalLog = assert.commandWorked(db.adminCommand({getLog: "global"}));
-            logLines = [...iterateMatchingLogLines(globalLog.log, {msg: "Slow query", cursorid: cursorId})];
-            return logLines.length >= 1;
-        }, "Failed to find a log line for cursorid: " + cursorId.toString());
+        assert.soon(
+            () => {
+                const globalLog = assert.commandWorked(db.adminCommand({getLog: "global"}));
+                logLines = [...iterateMatchingLogLines(globalLog.log, logMatchFilter)];
+                return logLines.length >= 1;
+            },
+            "Failed to find a log line for filter: " + tojson(logMatchFilter),
+        );
         return logLines;
     } else if (source === "profiler") {
         let profilerEntries = [];
-        assert.soon(() => {
-            profilerEntries = db.system.profile.find({"cursorid": cursorId}).toArray();
-            return profilerEntries.length >= 1;
-        }, "Failed to find a profiler entry for cursorid: " + cursorId.toString());
+        assert.soon(
+            () => {
+                profilerEntries = db.system.profile.find(profilerFilter).toArray();
+                return profilerEntries.length >= 1;
+            },
+            "Failed to find a profiler entry for filter: " + tojson(profilerFilter),
+        );
         return profilerEntries;
     }
 }

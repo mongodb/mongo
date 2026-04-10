@@ -51,6 +51,10 @@ public:
         _limit = newLimit;
     }
 
+    bool isEOF() const final {
+        return _nReturned >= _limit || (pSource && pSource->isEOF());
+    }
+
 private:
     GetNextResult doGetNext() final;
 

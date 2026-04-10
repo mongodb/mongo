@@ -80,6 +80,10 @@ public:
 
     BSONObj getPostBatchResumeToken() final;
 
+    bool isEOF() const final {
+        return _mergeExecPipeline->isEOF();
+    }
+
     boost::optional<query_stats::DataBearingNodeMetrics> takeRemoteMetrics() final {
         if (_mergeCursorsStage) {
             return _mergeCursorsStage->takeRemoteMetrics();

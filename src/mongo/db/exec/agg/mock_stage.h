@@ -136,6 +136,10 @@ public:
         _queue.push_back(QueueItem{std::move(result), count});
     }
 
+    bool isEOF() const final {
+        return _queue.empty();
+    }
+
     void reattachToOperationContext(OperationContext* opCtx) override {
         isDetachedFromOpCtx = false;
     }

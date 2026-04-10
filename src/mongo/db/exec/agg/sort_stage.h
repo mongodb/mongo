@@ -63,6 +63,10 @@ public:
               const std::shared_ptr<SortKeyGenerator>& timeSorterPartitionKeyGen,
               bool outputSortKeyMetadata);
 
+    bool isEOF() const final {
+        return _eof;
+    }
+
     bool usedDisk() const final;
 
     const SpecificStats* getSpecificStats() const final {
@@ -195,5 +199,6 @@ private:
     bool _timeSorterInputEOF = false;
 
     bool _populated = false;
+    bool _eof = false;
 };
 }  // namespace mongo::exec::agg

@@ -287,13 +287,16 @@ for (let pipelineIndex = 0; pipelineIndex < pipelines.length; pipelineIndex++) {
             assert.eq(newSpillCount, initialSpillCount);
             initialSpillCount = newSpillCount;
 
-            // Release memory (i.e., spill)
-            const releaseMemoryCmd = {releaseMemory: [cursorId]};
-            jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
-            const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
-            assert.commandWorked(releaseMemoryRes);
-            assert.eq(releaseMemoryRes.cursorsReleased, [cursorId], releaseMemoryRes);
-            assert.eq(initialSpillCount, getSpillCounter());
+            // In some configurations, $group may eagerly check for EOF and close the cursor.
+            if (cursorId != 0) {
+                // Release memory (i.e., spill)
+                const releaseMemoryCmd = {releaseMemory: [cursorId]};
+                jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
+                const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
+                assert.commandWorked(releaseMemoryRes);
+                assert.eq(releaseMemoryRes.cursorsReleased, [cursorId], releaseMemoryRes);
+                assert.eq(initialSpillCount, getSpillCounter());
+            }
 
             jsTest.log.info("Running getMore");
             const results = cursor.toArray();

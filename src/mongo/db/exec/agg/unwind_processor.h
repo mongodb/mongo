@@ -55,6 +55,11 @@ public:
     // Returns boost::none if the array is exhausted.
     boost::optional<Document> getNext();
 
+    // Returns true if the processor may have more results from the current array.
+    bool haveNext() const {
+        return _haveNext;
+    }
+
 private:
     const FieldPath _unwindPath;
     // Documents that have a nullish value, or an empty array for the field '_unwindPath', will pass
