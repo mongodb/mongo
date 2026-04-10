@@ -56,7 +56,7 @@ def acquire_s3_lock(bucket, key, content="locked"):
         raise
 
 
-app = typer.Typer()
+app = typer.Typer(pretty_exceptions_show_locals=False)
 
 
 @app.command()

@@ -121,5 +121,8 @@ def main(build_events: str = "build_events.json"):
     _copy_bins_to_upload(upload_bin_dir, upload_lib_dir)
 
 
+app = typer.Typer(pretty_exceptions_show_locals=False)
+app.command()(main)
+
 if __name__ == "__main__":
-    typer.run(main)
+    app()

@@ -76,5 +76,8 @@ def main(testlog_dir: str):
         print(f"No test.xml found within {testlog_dir}. Not creating a report.")
 
 
+app = typer.Typer(pretty_exceptions_show_locals=False)
+app.command()(main)
+
 if __name__ == "__main__":
-    typer.run(main)
+    app()

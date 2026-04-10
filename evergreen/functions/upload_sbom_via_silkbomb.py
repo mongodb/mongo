@@ -10,6 +10,7 @@ from typing_extensions import Annotated
 app = typer.Typer(
     help="Checks for SBOM file changes in a PR and uploads it to Kondukto if changed.",
     add_completion=False,
+    pretty_exceptions_show_locals=False,
 )
 
 

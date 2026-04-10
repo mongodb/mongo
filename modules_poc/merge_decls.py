@@ -95,7 +95,7 @@ def merge_decl(decl: Decl):
         or (decl["kind"] == "CLASS_DECL" and old["kind"] == "CLASS_TEMPLATE")
         or (decl["kind"] == "CLASS_TEMPLATE" and old["kind"] == "CLASS_DECL")
     )
-    # assert decl["display_name"] == old["display_name"]  # TODO ugh sometimes mongo:: screws it up
+    # assert decl["display_name"] == old["display_name"]  # ugh sometimes mongo:: screws it up
 
 
 class Timer:
@@ -295,5 +295,8 @@ def main(
     sys.exit(found_violations)  # bools are ints, so False(0) is success and True(1) is failure
 
 
+app = typer.Typer(pretty_exceptions_show_locals=False)
+app.command()(main)
+
 if __name__ == "__main__":
-    typer.run(main)
+    app()

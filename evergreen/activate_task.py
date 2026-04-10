@@ -60,5 +60,8 @@ def main(
         )
 
 
+app = typer.Typer(pretty_exceptions_show_locals=False)
+app.command()(main)
+
 if __name__ == "__main__":
-    typer.run(main)
+    app()

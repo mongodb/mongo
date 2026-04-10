@@ -12,9 +12,11 @@ SCRIPT_PATH = Path(__file__).resolve().parents[2] / "evergreen" / "activate_task
 
 
 def load_under_test():
+    fake_app = MagicMock()
     fake_typer = types.ModuleType("typer")
     fake_typer.Argument = lambda *args, **kwargs: None
     fake_typer.run = lambda *args, **kwargs: None
+    fake_typer.Typer = lambda *args, **kwargs: fake_app
 
     fake_typing_extensions = types.ModuleType("typing_extensions")
     fake_typing_extensions.Annotated = Annotated

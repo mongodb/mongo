@@ -7,7 +7,7 @@ import typer
 
 from tools.flag_sync import util
 
-app = typer.Typer()
+app = typer.Typer(pretty_exceptions_show_locals=False)
 
 
 @app.command()

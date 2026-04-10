@@ -202,7 +202,7 @@ if __name__ == "__main__":
     import typer
     from typing_extensions import Annotated
 
-    _app = typer.Typer(add_completion=False)
+    _app = typer.Typer(add_completion=False, pretty_exceptions_show_locals=False)
 
     @_app.command()
     def main(

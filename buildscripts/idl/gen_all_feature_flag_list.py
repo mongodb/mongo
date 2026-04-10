@@ -94,7 +94,7 @@ def write_feature_flags_to_file(flags: list[str], filename: str):
         print(f"Generated: {os.path.realpath(output_file.name)}")
 
 
-cli = typer.Typer()
+cli = typer.Typer(pretty_exceptions_show_locals=False)
 
 
 @cli.command("turned-off-by-default")

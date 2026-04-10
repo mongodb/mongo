@@ -86,5 +86,8 @@ def main(local_source_directory: str, s3_destination_directory: str) -> None:
     )
 
 
+app = typer.Typer(pretty_exceptions_show_locals=False)
+app.command()(main)
+
 if __name__ == "__main__":
-    typer.run(main)
+    app()
