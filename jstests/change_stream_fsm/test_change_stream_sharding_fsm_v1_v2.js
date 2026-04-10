@@ -2,8 +2,8 @@
  * FSM test: V1 vs V2 change stream version comparison.
  * Verifies that both change stream versions produce identical events.
  *
- * When run via a bg_mutator matrix suite variant, a concurrent BackgroundMutator
- * performs FCV flips and placement history resets alongside the Writer.
+ * The watch mode (collection, database, cluster) is controlled by TestData.watchMode,
+ * set via matrix suite overrides for parallel execution across Evergreen tasks.
  *
  * @tags: [
  *   assumes_balancer_off,
@@ -14,42 +14,28 @@
  * ]
  */
 import {
-    runWithFsmCluster,
+    setupFsmCluster,
     verifyV1V2,
-    TEST_DB,
-    TEST_COLL,
-    TEST_COLL_2,
+    resolveWatchConfig,
 } from "jstests/libs/util/change_stream/change_stream_sharding_utils.js";
 import {State} from "jstests/libs/util/change_stream/change_stream_state.js";
-import {describe, it} from "jstests/libs/mochalite.js";
+import {describe, it, afterEach} from "jstests/libs/mochalite.js";
 
-describe("FSM V1 vs V2", function () {
-    it("db absent", function () {
-        runWithFsmCluster(
-            "v1_v2_db_absent",
-            (fsmSt, setupResult) => {
-                verifyV1V2(fsmSt, setupResult);
-                jsTest.log.info(`✓ V1 vs V2 (db absent): verified via Verifier`);
-            },
-            {
-                writers: [{dbName: TEST_DB, collName: TEST_COLL, startState: State.DATABASE_ABSENT}],
-            },
-        );
+describe("Change Stream Sharding FSM V1 vs V2", function () {
+    let env;
+    afterEach(function () {
+        env?.teardown();
     });
 
-    it("db present, no drops", function () {
-        runWithFsmCluster(
-            "v1_v2_db_present_no_drops",
-            (fsmSt, setupResult) => {
-                verifyV1V2(fsmSt, setupResult);
-                jsTest.log.info(`✓ V1 vs V2 (db present, no drops): verified via Verifier`);
-            },
-            {
-                writers: [
-                    {dbName: TEST_DB, collName: TEST_COLL, startState: State.DATABASE_PRESENT_COLLECTION_ABSENT},
-                    {dbName: TEST_DB, collName: TEST_COLL_2, startState: State.DATABASE_PRESENT_COLLECTION_ABSENT},
-                ],
-            },
-        );
+    it("db absent", function () {
+        const {watchMode, writers} = resolveWatchConfig(State.DATABASE_ABSENT);
+        env = setupFsmCluster("v1_v2_db_absent", {writers});
+        verifyV1V2(env, watchMode);
+    });
+
+    it("db present", function () {
+        const {watchMode, writers} = resolveWatchConfig(State.DATABASE_PRESENT_COLLECTION_ABSENT);
+        env = setupFsmCluster("v1_v2_db_present", {writers});
+        verifyV1V2(env, watchMode);
     });
 });

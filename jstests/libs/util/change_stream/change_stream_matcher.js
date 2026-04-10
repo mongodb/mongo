@@ -51,7 +51,7 @@ class SingleChangeStreamMatcher {
         );
     }
 
-    getMismatch() {
+    getFirstMismatch() {
         return this.mismatch;
     }
 
@@ -60,7 +60,7 @@ class SingleChangeStreamMatcher {
     }
 
     getExpectedOperationTypes() {
-        return this.matchers.map((m) => m.event.operationType);
+        return [this.matchers.map((m) => m.event.operationType)];
     }
 }
 
@@ -100,6 +100,24 @@ class MultipleChangeStreamMatcher {
         this.matchers.forEach((matcher, idx) => {
             assert(matcher.isDone(), `Stream ${idx} not done. Matched ${matcher.index} of ${matcher.matchers.length}`);
         });
+    }
+
+    getFirstMismatch() {
+        for (const matcher of this.matchers) {
+            const m = matcher.getFirstMismatch();
+            if (m) {
+                return m;
+            }
+        }
+        return null;
+    }
+
+    getMatchedCount() {
+        return this.matchers.reduce((sum, m) => sum + m.getMatchedCount(), 0);
+    }
+
+    getExpectedOperationTypes() {
+        return this.matchers.flatMap((m) => m.getExpectedOperationTypes());
     }
 }
 

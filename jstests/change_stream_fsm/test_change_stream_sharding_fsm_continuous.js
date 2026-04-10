@@ -2,8 +2,8 @@
  * FSM test: Continuous reading mode verification.
  * Verifies that continuous reading mode captures all expected events.
  *
- * When run via a bg_mutator matrix suite variant, a concurrent BackgroundMutator
- * performs FCV flips and placement history resets alongside the Writer.
+ * The watch mode (collection, database, cluster) is controlled by TestData.watchMode,
+ * set via matrix suite overrides for parallel execution across Evergreen tasks.
  *
  * @tags: [
  *   assumes_balancer_off,
@@ -13,42 +13,28 @@
  * ]
  */
 import {
-    runWithFsmCluster,
+    setupFsmCluster,
     verifyContinuous,
-    TEST_DB,
-    TEST_COLL,
-    TEST_COLL_2,
+    resolveWatchConfig,
 } from "jstests/libs/util/change_stream/change_stream_sharding_utils.js";
 import {State} from "jstests/libs/util/change_stream/change_stream_state.js";
-import {describe, it} from "jstests/libs/mochalite.js";
+import {describe, it, afterEach} from "jstests/libs/mochalite.js";
 
-describe("FSM Continuous", function () {
-    it("db absent", function () {
-        runWithFsmCluster(
-            "continuous_db_absent",
-            (fsmSt, setupResult) => {
-                verifyContinuous(fsmSt, setupResult);
-                jsTest.log.info(`✓ CONTINUOUS (db absent): verified via Verifier`);
-            },
-            {
-                writers: [{dbName: TEST_DB, collName: TEST_COLL, startState: State.DATABASE_ABSENT}],
-            },
-        );
+describe("Change Stream Sharding FSM Continuous", function () {
+    let env;
+    afterEach(function () {
+        env?.teardown();
     });
 
-    it("db present, no drops", function () {
-        runWithFsmCluster(
-            "continuous_db_present_no_drops",
-            (fsmSt, setupResult) => {
-                verifyContinuous(fsmSt, setupResult);
-                jsTest.log.info(`✓ CONTINUOUS (db present, no drops): verified via Verifier`);
-            },
-            {
-                writers: [
-                    {dbName: TEST_DB, collName: TEST_COLL, startState: State.DATABASE_PRESENT_COLLECTION_ABSENT},
-                    {dbName: TEST_DB, collName: TEST_COLL_2, startState: State.DATABASE_PRESENT_COLLECTION_ABSENT},
-                ],
-            },
-        );
+    it("db absent", function () {
+        const {watchMode, writers} = resolveWatchConfig(State.DATABASE_ABSENT);
+        env = setupFsmCluster("continuous_db_absent", {writers});
+        verifyContinuous(env, watchMode);
+    });
+
+    it("db present", function () {
+        const {watchMode, writers} = resolveWatchConfig(State.DATABASE_PRESENT_COLLECTION_ABSENT);
+        env = setupFsmCluster("continuous_db_present", {writers});
+        verifyContinuous(env, watchMode);
     });
 });

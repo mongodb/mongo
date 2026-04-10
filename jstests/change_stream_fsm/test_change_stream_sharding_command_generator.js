@@ -25,14 +25,9 @@ import {
     MultipleChangeStreamMatcher,
 } from "jstests/libs/util/change_stream/change_stream_matcher.js";
 import {ChangeStreamReader, ChangeStreamReadingMode} from "jstests/libs/util/change_stream/change_stream_reader.js";
-import {ChangeStreamWatchMode} from "jstests/libs/query/change_stream_util.js";
+import {ChangeStreamWatchMode, getClusterTime} from "jstests/libs/query/change_stream_util.js";
 import {InsertDocCommand, DropCollectionCommand} from "jstests/libs/util/change_stream/change_stream_commands.js";
-import {
-    TEST_DB,
-    TEST_SEED,
-    getCurrentClusterTime,
-    createShardingTest,
-} from "jstests/libs/util/change_stream/change_stream_sharding_utils.js";
+import {TEST_DB, TEST_SEED, createShardingTest} from "jstests/libs/util/change_stream/change_stream_sharding_utils.js";
 import {after, afterEach, before, describe, it} from "jstests/libs/mochalite.js";
 
 jsTest.log.info(
@@ -365,7 +360,7 @@ describe("ChangeStreamReader integration", function () {
         assert.commandWorked(db.createCollection(collName));
 
         // Get cluster time strictly AFTER the create event.
-        const clusterTime = getCurrentClusterTime(ctx.st.s, dbName);
+        const clusterTime = getClusterTime(ctx.st.s.getDB("admin"));
 
         // Execute inserts using Writer. Each InsertDocCommand inserts numDocs documents.
         const numCommands = 3;
@@ -481,7 +476,7 @@ describe("ChangeStreamReader integration", function () {
         const db = this.st.s.getDB(dbName);
 
         // Get cluster time strictly AFTER setup.
-        const startTime = getCurrentClusterTime(this.st.s, dbName);
+        const startTime = getClusterTime(this.st.s.getDB("admin"));
         jsTest.log.debug(`Start time: ${tojson(startTime)}`);
 
         executeCommands();
@@ -578,7 +573,7 @@ describe("ChangeStreamReader integration", function () {
         const db = this.st.s.getDB(dbName);
 
         // Get cluster time strictly AFTER setup.
-        const startTime = getCurrentClusterTime(this.st.s, dbName);
+        const startTime = getClusterTime(this.st.s.getDB("admin"));
 
         executeCommands();
 
@@ -642,7 +637,7 @@ describe("ChangeStreamReader integration", function () {
         assert.commandWorked(db.createCollection(collName2));
 
         // Get cluster time strictly AFTER setup.
-        const startTime = getCurrentClusterTime(this.st.s, dbName);
+        const startTime = getClusterTime(this.st.s.getDB("admin"));
 
         Writer.run(this.st.s, writerInstanceName, commands, TEST_SEED);
 

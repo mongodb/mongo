@@ -11,7 +11,10 @@ import {CreateDatabaseCommand} from "jstests/libs/util/change_stream/change_stre
 import {Writer} from "jstests/libs/util/change_stream/change_stream_writer.js";
 import {Connector} from "jstests/libs/util/change_stream/change_stream_connector.js";
 import {ChangeEventMatcher} from "jstests/libs/util/change_stream/change_stream_event.js";
-import {SingleChangeStreamMatcher} from "jstests/libs/util/change_stream/change_stream_matcher.js";
+import {
+    SingleChangeStreamMatcher,
+    MultipleChangeStreamMatcher,
+} from "jstests/libs/util/change_stream/change_stream_matcher.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ChangeStreamReader, ChangeStreamReadingMode} from "jstests/libs/util/change_stream/change_stream_reader.js";
 import {
@@ -87,8 +90,6 @@ function createShardingTest(mongos = 1, shards = 3, rsNodes = 1, configShard = f
             },
         },
     };
-    // With a dedicated config server (non-configShard), use a single-member RS
-    // instead of the default 3: these tests don't exercise config server failover.
     if (!configShard) {
         stOptions.config = 1;
     }
@@ -102,6 +103,19 @@ function createShardingTest(mongos = 1, shards = 3, rsNodes = 1, configShard = f
  */
 function createMatcher(expectedEvents) {
     return new SingleChangeStreamMatcher(expectedEvents.map((e) => new ChangeEventMatcher(e.event, e.cursorClosed)));
+}
+
+/**
+ * Create a MultipleChangeStreamMatcher from per-collection expected event lists.
+ * Each sub-list is matched independently; events from different collections can interleave.
+ * @param {Array<Array<{event: Object, cursorClosed: boolean}>>} perCollectionEvents
+ * @returns {MultipleChangeStreamMatcher}
+ */
+function createCompositeMatcher(perCollectionEvents) {
+    const subMatchers = perCollectionEvents.map(
+        (events) => new SingleChangeStreamMatcher(events.map((e) => new ChangeEventMatcher(e.event, e.cursorClosed))),
+    );
+    return new MultipleChangeStreamMatcher(subMatchers);
 }
 
 /**
@@ -129,39 +143,92 @@ function buildCommandTrace(commands) {
 }
 
 /**
- * Build reader specs for each writer's collection.
- * Each spec bundles expected events, reader config, label, and a createMatcher() factory.
+ * Build reader specs for the given watch mode.
+ *
+ * Returns one spec per scope entity:
+ * - kCollection: one spec per writer (each watches its own namespace).
+ * - kDb: one spec per database (aggregating writers that share a db).
+ * - kCluster: always a single spec aggregating all writers.
+ *
+ * For collection-level: createMatcher() returns a SingleChangeStreamMatcher.
+ * For db/cluster-level: createMatcher() returns a MultipleChangeStreamMatcher with one
+ *   sub-matcher per collection, since events from different collections can interleave.
  *
  * @param {Array<{dbName: string, collName: string, commands: Array}>} commandsByWriter
  * @param {Timestamp} startTime - Cluster time to start reading from.
  * @param {number} [batchSize] - Optional cursor batch size (undefined = server default).
- * @returns {Array<Object>} Reader specs with label, expectedEvents, createMatcher, config.
+ * @param {number} watchMode - ChangeStreamWatchMode (kCollection, kDb, kCluster).
+ * @returns {Array<Object>} Reader specs with label, createMatcher, config.
  */
-function buildReaderSpecs(commandsByWriter, startTime, batchSize) {
-    const specs = [];
+function buildReaderSpecs(commandsByWriter, startTime, batchSize, watchMode) {
+    const baseConfig = {
+        readingMode: ChangeStreamReadingMode.kContinuous,
+        startAtClusterTime: startTime,
+        excludeOperationTypes: kExcludedOperationTypes,
+        batchSize,
+    };
 
-    for (const w of commandsByWriter) {
-        const expectedEvents = computeExpectedEvents(w.commands, ChangeStreamWatchMode.kCollection);
-        const commandTrace = buildCommandTrace(w.commands);
-        specs.push({
-            label: `coll_${w.dbName}_${w.collName}`,
-            expectedEvents,
-            createMatcher: () => createMatcher(expectedEvents),
-            config: {
-                watchMode: ChangeStreamWatchMode.kCollection,
-                dbName: w.dbName,
-                collName: w.collName,
-                readingMode: ChangeStreamReadingMode.kContinuous,
-                startAtClusterTime: startTime,
-                numberOfEventsToRead: expectedEvents.length,
-                excludeOperationTypes: kExcludedOperationTypes,
-                batchSize,
-                debugCommandTrace: commandTrace,
-            },
-        });
+    switch (watchMode) {
+        case ChangeStreamWatchMode.kCollection:
+            return commandsByWriter.map((w) => {
+                const events = computeExpectedEvents(w.commands, watchMode);
+                return {
+                    label: `coll_${w.dbName}_${w.collName}`,
+                    createMatcher: () => createMatcher(events),
+                    config: {
+                        ...baseConfig,
+                        watchMode,
+                        dbName: w.dbName,
+                        collName: w.collName,
+                        numberOfEventsToRead: events.length,
+                        debugCommandTrace: buildCommandTrace(w.commands),
+                    },
+                };
+            });
+
+        case ChangeStreamWatchMode.kDb: {
+            const writersByDb = {};
+            for (const w of commandsByWriter) {
+                (writersByDb[w.dbName] ??= []).push(w);
+            }
+            return Object.entries(writersByDb).map(([dbName, writers]) => {
+                const perCollEvents = writers.map((w) => computeExpectedEvents(w.commands, watchMode));
+                const eventCount = perCollEvents.reduce((s, g) => s + g.length, 0);
+                return {
+                    label: `db_${dbName}`,
+                    createMatcher: () => createCompositeMatcher(perCollEvents),
+                    config: {
+                        ...baseConfig,
+                        watchMode,
+                        dbName,
+                        collName: writers[0].collName,
+                        numberOfEventsToRead: eventCount,
+                    },
+                };
+            });
+        }
+
+        case ChangeStreamWatchMode.kCluster: {
+            const perCollEvents = commandsByWriter.map((w) => computeExpectedEvents(w.commands, watchMode));
+            const eventCount = perCollEvents.reduce((s, g) => s + g.length, 0);
+            return [
+                {
+                    label: "cluster",
+                    createMatcher: () => createCompositeMatcher(perCollEvents),
+                    config: {
+                        ...baseConfig,
+                        watchMode,
+                        dbName: "admin",
+                        collName: null,
+                        numberOfEventsToRead: eventCount,
+                    },
+                },
+            ];
+        }
+
+        default:
+            throw new Error(`Unknown watchMode: ${watchMode}`);
     }
-
-    return specs;
 }
 
 /**
@@ -227,7 +294,8 @@ function startBackgroundMutator(ctx, testName, ts, bgMutatorOpts, writerInstance
 }
 
 /**
- * Set up an FSM test with one or more parallel writers and reader specs.
+ * Set up an FSM test: run writers (and optional background mutator), capture the
+ * cluster time boundary. Mode-agnostic -- reader specs are built later at verify time.
  *
  * @param {Object} ctx - Test context with fsmSt, fsmShards, fsmInstancesToCleanup
  * @param {string} testName - Unique test name for logging and instance naming
@@ -236,7 +304,7 @@ function startBackgroundMutator(ctx, testName, ts, bgMutatorOpts, writerInstance
  *   Writer definitions.  Each entry specifies the database, collection, and FSM start state.
  *   Writers sharing a database should use DB_PRESENT_COLLECTION_ABSENT to avoid
  *   one writer's DROP_DATABASE destroying another's collections.
- * @returns {Object} { readerSpecs, createInstanceName }
+ * @returns {Object} { commandsByWriter, startTime, createInstanceName }
  */
 function setupFsmTest(ctx, testName, options = {}) {
     jsTest.log.info(`FSM ${testName}: using seed ${TEST_SEED}`);
@@ -248,21 +316,17 @@ function setupFsmTest(ctx, testName, options = {}) {
     ensureDatabasesExist(writerDefs, ctx.fsmSt.s, ctx.fsmShards);
 
     const commandsByWriter = generateCommandsForWriters(writerDefs, ctx.fsmShards);
-    const startTime = getCurrentClusterTime(ctx.fsmSt.s);
+    const startTime = getClusterTime(ctx.fsmSt.s.getDB("admin"));
     const writerInstanceNames = runWriters(ctx, testName, ts, commandsByWriter);
 
     if (options.bgMutator) {
         startBackgroundMutator(ctx, testName, ts, options.bgMutator, writerInstanceNames);
     }
 
-    const batchSize = TestData.batchSize || undefined;
-    const readerSpecs = buildReaderSpecs(commandsByWriter, startTime, batchSize);
-
     jsTest.log.info("FSM setup complete", {
         testName,
         shards: ctx.fsmShards.length,
         writers: writerDefs.length,
-        readerLabels: readerSpecs.map((r) => `${r.label}(${r.expectedEvents.length})`),
     });
 
     const createInstanceName = (prefix) => {
@@ -271,7 +335,7 @@ function setupFsmTest(ctx, testName, options = {}) {
         return name;
     };
 
-    return {readerSpecs, createInstanceName};
+    return {commandsByWriter, startTime, createInstanceName};
 }
 
 /**
@@ -295,124 +359,177 @@ function runTeardownSteps(...steps) {
 }
 
 /**
- * Run an FSM test with automatic cluster setup and teardown.
- * Creates a ShardingTest, sets up the FSM test, runs the test function, and cleans up.
- * @param {string} testName - Unique test name
- * @param {Function} testFn - Test function receiving (fsmSt, setupResult)
- * @param {Object} [options] - Optional configuration
- * @param {number} [options.mongos=1] - Number of mongos instances
- * @param {number} [options.shards=3] - Number of shards
- * @param {number} [options.rsNodes=1] - Number of replica set nodes per shard
- * @param {Array} [options.writers] - Writer definitions (passed to setupFsmTest)
+ * Set up an FSM cluster and return everything needed for test hooks.
+ * Mode-agnostic: runs writers and captures cluster state. Reader specs are
+ * built later by the verify functions when watchMode is known.
+ * @param {string} testName - Unique test name for instance naming.
+ * @param {Object} [options] - Passed to setupFsmTest (writers, bgMutator, etc.).
+ * @returns {Object} { fsmSt, commandsByWriter, startTime, createInstanceName, teardown() }
  */
-function runWithFsmCluster(testName, testFn, options = {}) {
+function setupFsmCluster(testName, options = {}) {
     const {mongos = 1, shards = 3, rsNodes = 1} = options;
     const configShard = TestData.configShard || false;
     const fsmSt = createShardingTest(mongos, shards, rsNodes, configShard);
     const fsmShards = assert.commandWorked(fsmSt.s.adminCommand({listShards: 1})).shards;
     const instancesToCleanup = [];
+    const ctx = {fsmSt, fsmShards, fsmInstancesToCleanup: instancesToCleanup};
+    const {commandsByWriter, startTime, createInstanceName} = setupFsmTest(ctx, testName, options);
 
-    try {
-        const ctx = {fsmSt, fsmShards, fsmInstancesToCleanup: instancesToCleanup};
-        const setupResult = setupFsmTest(ctx, testName, options);
-        testFn(fsmSt, setupResult);
-    } finally {
-        runTeardownSteps(
-            () => Writer.joinAll(),
-            () => BackgroundMutator.join(),
-            () => ChangeStreamReader.joinAll(),
-            () => Connector.cleanupAll(fsmSt.s),
-            () => fsmSt.stop(),
+    return {
+        fsmSt,
+        commandsByWriter,
+        startTime,
+        createInstanceName,
+        teardown() {
+            runTeardownSteps(
+                () => Writer.joinAll(),
+                () => BackgroundMutator.join(),
+                () => ChangeStreamReader.joinAll(),
+                () => Connector.cleanupAll(fsmSt.s),
+                () => fsmSt.stop(),
+            );
+        },
+    };
+}
+
+function getShardConnections(fsmSt) {
+    const conns = [];
+    for (let i = 0; fsmSt[`rs${i}`]; i++) {
+        conns.push(fsmSt[`rs${i}`].getPrimary());
+    }
+    return conns;
+}
+
+/**
+ * Build reader specs from the env for the given watchMode, then run
+ * verification. Readers for all specs are launched in parallel before
+ * any verification begins, so multiple collections/databases read
+ * concurrently.
+ */
+function verifyForMode(env, watchMode, verifyOpts) {
+    const batchSize = TestData.batchSize || undefined;
+    let writers = env.commandsByWriter;
+    if (verifyOpts.primaryWriterOnly) {
+        // Set by verifyResume for db_absent in collection/database mode.
+        // See verifyResume for rationale.
+        writers = [writers[0]];
+    }
+    const specs = buildReaderSpecs(writers, env.startTime, batchSize, watchMode);
+
+    // Phase 1: launch all readers across all specs in parallel.
+    const scopeContexts = specs.map((spec) => {
+        const {readers, extraVerifierConfig = {}} = verifyOpts;
+        const readerNamesBySuffix = {};
+        const readerConfigs = {};
+        const matcherSpecsByInstance = {};
+
+        for (const {suffix, configOverrides} of readers) {
+            const name = env.createInstanceName(`reader_${suffix}_${spec.label}`);
+            const config = {...spec.config, ...configOverrides, instanceName: name};
+            readerNamesBySuffix[suffix] = name;
+            readerConfigs[name] = config;
+            ChangeStreamReader.run(env.fsmSt.s, config);
+            matcherSpecsByInstance[name] = spec.createMatcher();
+        }
+
+        return {spec, readerNamesBySuffix, readerConfigs, matcherSpecsByInstance, extraVerifierConfig};
+    });
+
+    // Phase 2: verify each spec (readers are already running / finished).
+    for (const {
+        spec,
+        readerNamesBySuffix,
+        readerConfigs,
+        matcherSpecsByInstance,
+        extraVerifierConfig,
+    } of scopeContexts) {
+        new Verifier().run(
+            env.fsmSt.s,
+            {
+                changeStreamReaderConfigs: readerConfigs,
+                matcherSpecsByInstance,
+                instanceName: env.createInstanceName(`verifier_${spec.label}`),
+                ...extraVerifierConfig,
+            },
+            verifyOpts.createTestCases(readerNamesBySuffix),
         );
     }
 }
 
+function verifyContinuous(env, watchMode) {
+    verifyForMode(env, watchMode, {
+        readers: [{suffix: "cont", configOverrides: {}}],
+        createTestCases: (m) => [new SingleReaderVerificationTestCase(m.cont)],
+    });
+}
+
+function verifyResume(env, watchMode, startState) {
+    const shardConnections = getShardConnections(env.fsmSt);
+
+    // For db_absent the noise writer targets a separate database (TEST_DB_2).
+    // In collection/database mode those events are invisible to the scoped
+    // stream, so we skip that writer to avoid doubling shard-level drains
+    // (3 resume points × N shards × 2 writers) and inflating the oplog
+    // cluster time pool — risking timeouts in long suites like bg_mutator.
+    // In cluster mode the stream sees all databases, so we must include both
+    // writers in the matcher.
+    const skipNoiseWriter = startState === State.DATABASE_ABSENT && watchMode !== ChangeStreamWatchMode.kCluster;
+
+    verifyForMode(env, watchMode, {
+        readers: [{suffix: "resume", configOverrides: {}}],
+        createTestCases: (m) => [new PrefixReadTestCase(m.resume, 3)],
+        extraVerifierConfig: {shardConnections},
+        primaryWriterOnly: skipNoiseWriter,
+    });
+}
+
+function verifyV1V2(env, watchMode) {
+    verifyForMode(env, watchMode, {
+        readers: [
+            {suffix: "v1", configOverrides: {version: "v1"}},
+            {suffix: "v2", configOverrides: {version: "v2"}},
+        ],
+        createTestCases: (m) => [new SequentialPairwiseFetchingTestCase(m.v1, m.v2)],
+    });
+}
+
+function verifyFetchAndResume(env, watchMode) {
+    verifyForMode(env, watchMode, {
+        readers: [
+            {suffix: "cont", configOverrides: {readingMode: ChangeStreamReadingMode.kContinuous}},
+            {suffix: "foar", configOverrides: {readingMode: ChangeStreamReadingMode.kFetchOneAndResume}},
+        ],
+        createTestCases: (m) => [new SequentialPairwiseFetchingTestCase(m.cont, m.foar)],
+    });
+}
+
 /**
- * Generic scope-level verification: spin up readers, build matchers, and run a Verifier.
- *
- * @param {ShardingTest} fsmSt - The sharding test fixture.
- * @param {Object} spec - Reader spec from buildReaderSpecs (label, config, createMatcher).
- * @param {Function} createInstanceName - Factory returned by setupFsmTest.
- * @param {Object} opts
- * @param {Array<{suffix: string, configOverrides: Object}>} opts.readers -
- *   One entry per reader to create.  Each gets an instance name derived from
- *   `spec.label` and the suffix, and a config that merges spec.config with
- *   the overrides.
- * @param {Function} opts.createTestCases - (readerNamesBySuffix) => TestCase[].
- * @param {Object} [opts.extraVerifierConfig] - Extra fields merged into the
- *   Verifier config (e.g. shardConnections).
+ * Resolve the watch mode and writer configuration from TestData.watchMode.
+ * @param {string} startState - Initial FSM state (e.g. State.DATABASE_ABSENT).
+ * @returns {Object} { watchMode, writers } ready to pass to setupFsmCluster / verify*.
  */
-function verifyScope(fsmSt, spec, createInstanceName, {readers, createTestCases, extraVerifierConfig = {}}) {
-    const readerNamesBySuffix = {};
-    const readerConfigs = {};
-    const matcherSpecsByInstance = {};
+function resolveWatchConfig(startState) {
+    const mode = TestData.watchMode || "collection";
+    const watchModeMap = {
+        "collection": ChangeStreamWatchMode.kCollection,
+        "database": ChangeStreamWatchMode.kDb,
+        "cluster": ChangeStreamWatchMode.kCluster,
+    };
+    const watchMode = watchModeMap[mode];
+    assert(watchMode !== undefined, `Unknown TestData.watchMode: ${mode}`);
 
-    for (const {suffix, configOverrides} of readers) {
-        const name = createInstanceName(`reader_${suffix}_${spec.label}`);
-        const config = {...spec.config, ...configOverrides, instanceName: name};
-        readerNamesBySuffix[suffix] = name;
-        readerConfigs[name] = config;
-        ChangeStreamReader.run(fsmSt.s, config);
-        matcherSpecsByInstance[name] = spec.createMatcher();
+    const writers = [{dbName: TEST_DB, collName: TEST_COLL, startState}];
+
+    if (startState === State.DATABASE_ABSENT || mode === "cluster") {
+        // Cross-db writer: tests isolation for collection/database readers,
+        // and interleaving for cluster readers.
+        writers.push({dbName: TEST_DB_2, collName: TEST_COLL, startState});
+    } else {
+        // Same-db, different collection: tests interleaving within a database.
+        writers.push({dbName: TEST_DB, collName: TEST_COLL_2, startState});
     }
 
-    new Verifier().run(
-        fsmSt.s,
-        {
-            changeStreamReaderConfigs: readerConfigs,
-            matcherSpecsByInstance,
-            instanceName: createInstanceName(`verifier_${spec.label}`),
-            ...extraVerifierConfig,
-        },
-        createTestCases(readerNamesBySuffix),
-    );
-}
-
-function verifyContinuous(fsmSt, {readerSpecs, createInstanceName}) {
-    for (const spec of readerSpecs) {
-        verifyScope(fsmSt, spec, createInstanceName, {
-            readers: [{suffix: "cont", configOverrides: {}}],
-            createTestCases: (m) => [new SingleReaderVerificationTestCase(m.cont)],
-        });
-    }
-}
-
-function verifyResume(fsmSt, {readerSpecs, createInstanceName}) {
-    const shardConnections = [];
-    for (let i = 0; fsmSt[`rs${i}`]; i++) {
-        shardConnections.push(fsmSt[`rs${i}`].getPrimary());
-    }
-    for (const spec of readerSpecs) {
-        verifyScope(fsmSt, spec, createInstanceName, {
-            readers: [{suffix: "resume", configOverrides: {}}],
-            createTestCases: (m) => [new PrefixReadTestCase(m.resume, 3)],
-            extraVerifierConfig: {shardConnections},
-        });
-    }
-}
-
-function verifyV1V2(fsmSt, {readerSpecs, createInstanceName}) {
-    for (const spec of readerSpecs) {
-        verifyScope(fsmSt, spec, createInstanceName, {
-            readers: [
-                {suffix: "v1", configOverrides: {version: "v1"}},
-                {suffix: "v2", configOverrides: {version: "v2"}},
-            ],
-            createTestCases: (m) => [new SequentialPairwiseFetchingTestCase(m.v1, m.v2)],
-        });
-    }
-}
-
-function verifyFetchAndResume(fsmSt, {readerSpecs, createInstanceName}) {
-    for (const spec of readerSpecs) {
-        verifyScope(fsmSt, spec, createInstanceName, {
-            readers: [
-                {suffix: "cont", configOverrides: {readingMode: ChangeStreamReadingMode.kContinuous}},
-                {suffix: "foar", configOverrides: {readingMode: ChangeStreamReadingMode.kFetchOneAndResume}},
-            ],
-            createTestCases: (m) => [new SequentialPairwiseFetchingTestCase(m.cont, m.foar)],
-        });
-    }
+    return {watchMode, writers};
 }
 
 export {
@@ -422,14 +539,10 @@ export {
     TEST_COLL_2,
     TEST_SEED,
     kExcludedOperationTypes,
-    getCurrentClusterTime,
     createShardingTest,
-    createMatcher,
-    computeExpectedEvents,
-    setupFsmTest,
-    runWithFsmCluster,
+    setupFsmCluster,
+    resolveWatchConfig,
     BackgroundMutatorOpType,
-    verifyScope,
     verifyContinuous,
     verifyResume,
     verifyV1V2,

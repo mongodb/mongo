@@ -1994,6 +1994,7 @@ tasks:
       - func: "do setup"
       - func: "run tests"
 
+  # --- change_streams_sharding_fsm: base (collection watch mode) ---
   - <<: *gen_task_template
     name: change_streams_sharding_fsm_gen
     tags:
@@ -2010,7 +2011,68 @@ tasks:
           use_large_distro: "true"
 
   - <<: *gen_task_template
+    name: change_streams_sharding_fsm_watch_db_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "change_streams",
+        "requires_all_feature_flags",
+        "sharding",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: change_streams_sharding_fsm_watch_cluster_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "change_streams",
+        "requires_all_feature_flags",
+        "sharding",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  # --- change_streams_sharding_fsm: bg_mutator ---
+  - <<: *gen_task_template
     name: change_streams_sharding_fsm_bg_mutator_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "change_streams",
+        "requires_all_feature_flags",
+        "sharding",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: change_streams_sharding_fsm_bg_mutator_watch_db_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "change_streams",
+        "requires_all_feature_flags",
+        "sharding",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
+    name: change_streams_sharding_fsm_bg_mutator_watch_cluster_gen
     tags:
       [
         "assigned_to_jira_team_server_query_execution",

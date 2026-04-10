@@ -17,6 +17,33 @@
             TestData:
               configShard: true
 
+- name: watch_collection
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              watchMode: "collection"
+
+- name: watch_db
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              watchMode: "database"
+
+- name: watch_cluster
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              watchMode: "cluster"
+
 - name: bg_mutator
   value:
     executor:

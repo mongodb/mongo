@@ -205,11 +205,13 @@ function assertMatcherDone(matcher, events, ctx, readerInstanceName) {
         return;
     }
 
-    const mismatch = matcher.getMismatch();
+    const mismatch = matcher.getFirstMismatch();
     const commandTrace = ctx.getCommandTrace(readerInstanceName);
     const actualTypes = events.map((rec) => rec.changeEvent.operationType);
-    const expectedTypes = matcher.getExpectedOperationTypes();
-    const expectedInline = `[${expectedTypes.join(", ")}]`;
+    const expectedGroups = matcher.getExpectedOperationTypes();
+
+    const totalExpected = expectedGroups.reduce((s, g) => s + g.length, 0);
+    const expectedLines = expectedGroups.map((g, i) => `  stream ${i}(${g.length}): [${g.join(", ")}]`).join("\n");
     const actualInline = `[${actualTypes.join(", ")}]`;
 
     jsTest.log.info("FSM command trace (on mismatch)", {
@@ -222,8 +224,8 @@ function assertMatcherDone(matcher, events, ctx, readerInstanceName) {
         false,
         (mismatch
             ? `Event mismatch at index ${mismatch.index}: expected '${mismatch.expected}', got '${mismatch.actual}'`
-            : `Matched ${matcher.getMatchedCount()} of ${expectedTypes.length}`) +
-            `\nexpected(${expectedTypes.length}): ${expectedInline}` +
+            : `Matched ${matcher.getMatchedCount()} of ${totalExpected}`) +
+            `\nexpected(${totalExpected}):\n${expectedLines}` +
             `\nactual(${actualTypes.length}): ${actualInline}` +
             `\nGrep logs for "FSM command trace (on mismatch)" to see the full command sequence.`,
     );
