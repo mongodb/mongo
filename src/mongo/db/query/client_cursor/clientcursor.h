@@ -190,6 +190,10 @@ public:
         return _queryStatsWillNeverExhaust;
     }
 
+    bool isChangeStreamQuery() const {
+        return _isChangeStreamQuery;
+    }
+
     std::unique_ptr<query_stats::Key> takeKey() {
         return std::move(_queryStatsKey);
     }
