@@ -792,7 +792,8 @@ BSONObj removeNestedField(const BSONObj& bson, std::span<const StringData> neste
 class TimeseriesCollectionValidationTest : public CatalogTestFixture {
 public:
     TimeseriesCollectionValidationTest(Options options = {})
-        : CatalogTestFixture(std::move(options)) {
+        : CatalogTestFixture(std::move(options)),
+          _allowCorruptTimeseriesBuckets("timeseriesDisableStrictBucketValidator", true) {
         _nss = NamespaceString::createNamespaceString_forTest("test.system.buckets.ts");
     }
 
@@ -979,6 +980,7 @@ public:
     CollectionOptions _options;
     CollectionValidation::ValidateMode _validateMode{
         CollectionValidation::ValidateMode::kForeground};
+    RAIIServerParameterControllerForTest _allowCorruptTimeseriesBuckets;
 
 protected:
     void setUp() override {

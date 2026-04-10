@@ -76,7 +76,7 @@ assert.commandWorked(
 assert.commandWorked(
     getTimeseriesCollForRawOps(tsColl).update(
         {[metaFieldName]: 65},
-        {$set: {"control": bogusBucket.control, "data": bogusBucket.data}},
+        {$set: {_id: incrementOID(bogusBucket._id), "control": bogusBucket.control, "data": bogusBucket.data}},
         {upsert: true, ...kRawOperationSpec},
     ),
 );

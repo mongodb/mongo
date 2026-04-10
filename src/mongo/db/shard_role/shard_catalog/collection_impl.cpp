@@ -99,6 +99,7 @@
 #include "mongo/db/storage/oplog_truncate_markers.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/timeseries/timeseries_bucket_validation.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
@@ -599,32 +600,51 @@ std::pair<Collection::SchemaValidationResult, Status> CollectionImpl::checkValid
         return {SchemaValidationResult::kError, status};
     }
 
-    try {
-        if (exec::matcher::matchesBSON(validatorMatchExpr, document))
-            return {SchemaValidationResult::kPass, Status::OK()};
-    } catch (DBException&) {
-    };
-
-    BSONObj generatedError = doc_validation_error::generateError(*validatorMatchExpr, document);
-
-    static constexpr auto kValidationFailureErrorStr = "Document failed validation"_sd;
-    status = Status(doc_validation_error::DocumentValidationFailureInfo(generatedError),
-                    kValidationFailureErrorStr);
-
-    switch (validationActionOrDefault(_metadata->options.validationAction)) {
-        case ValidationActionEnum::warn:
-            if (validationLevelOrDefault(_metadata->options.validationLevel) ==
-                ValidationLevelEnum::constraint) {
-                // Warn is prohibited for constraint validationLevel.
-                return {SchemaValidationResult::kError, status};
+    // Regular schema validation for everything except timeseries collections which uses a stricter
+    // validation for bucket documents.
+    if (!isTimeseriesCollection() || gTimeseriesDisableStrictBucketValidator.load()) {
+        try {
+            if (exec::matcher::matchesBSON(validatorMatchExpr, document)) {
+                return {SchemaValidationResult::kPass, Status::OK()};
             }
-            return {SchemaValidationResult::kWarn, status};
-        case ValidationActionEnum::error:
-            return {SchemaValidationResult::kError, status};
-        case ValidationActionEnum::errorAndLog:
-            return {SchemaValidationResult::kErrorAndLog, status};
+        } catch (DBException&) {
+        };
+
+        BSONObj generatedError = doc_validation_error::generateError(*validatorMatchExpr, document);
+
+        static constexpr auto kValidationFailureErrorStr = "Document failed validation"_sd;
+        status = Status(doc_validation_error::DocumentValidationFailureInfo(generatedError),
+                        kValidationFailureErrorStr);
+
+        switch (validationActionOrDefault(_metadata->options.validationAction)) {
+            case ValidationActionEnum::warn:
+                if (validationLevelOrDefault(_metadata->options.validationLevel) ==
+                    ValidationLevelEnum::constraint) {
+                    // Warn is prohibited for constraint validationLevel.
+                    return {SchemaValidationResult::kError, status};
+                }
+                return {SchemaValidationResult::kWarn, status};
+            case ValidationActionEnum::error:
+                return {SchemaValidationResult::kError, status};
+            case ValidationActionEnum::errorAndLog:
+                return {SchemaValidationResult::kErrorAndLog, status};
+        }
+        MONGO_UNREACHABLE_TASSERT(7488702);
     }
-    MONGO_UNREACHABLE_TASSERT(7488702);
+
+    // Strict validation for bucket documents in timeseries collections
+    try {
+        timeseries::validateBucketConsistency(this, document);
+        return {SchemaValidationResult::kPass, Status::OK()};
+    } catch (DBException& ex) {
+        // For strict timeseries validation we ensure that we only return kError or kErrorAndLog.
+        return {validationActionOrDefault(_metadata->options.validationAction) ==
+                        ValidationActionEnum::errorAndLog
+                    ? SchemaValidationResult::kErrorAndLog
+                    : SchemaValidationResult::kError,
+                Status(doc_validation_error::DocumentValidationFailureInfo(document),
+                       ex.toStatus().toString())};
+    };
 }
 
 Status CollectionImpl::checkValidationAndParseResult(OperationContext* opCtx,

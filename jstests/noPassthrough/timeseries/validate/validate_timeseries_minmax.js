@@ -184,6 +184,11 @@ describe("Test 'control.min' and 'control.max' match the uncompressed documents 
     before(function () {
         this.conn = MongoRunner.runMongod();
         this.db = this.conn.getDB(jsTestName());
+
+        // Allow setting an inconsistent state to the bucket so we can test that validate can detect it
+        assert.commandWorked(
+            this.conn.getDB("admin").runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}),
+        );
     });
 
     it("Updates 'control' min temperature with corresponding update in recorded temperature, testing that valid updates do not return warnings.", function () {

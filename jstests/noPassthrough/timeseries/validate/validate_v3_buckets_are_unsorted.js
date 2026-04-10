@@ -49,6 +49,9 @@ assert(res.valid);
 // Compressed bucket with the compressed time field in-order and version set to 3. This should fail,
 // since this bucket's measurements are in-order on time field, meaning this bucket shouldn't have
 // been promoted to v3.
+// Allow setting an inconsistent state to the bucket so we can test that validate can detect it
+assert.commandWorked(conn.getDB("admin").runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}));
+
 const invalidVersion3Doc = {
     _id: ObjectId("65a6eb806ffc9fa4280ecac4"),
     control: {

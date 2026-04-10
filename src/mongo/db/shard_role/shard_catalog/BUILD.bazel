@@ -363,6 +363,7 @@ mongo_cc_library(
         "//src/mongo/db/storage:storage_engine_impl",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/storage/key_string",
+        "//src/mongo/db/timeseries:timeseries_bucket_validation",
         "//src/mongo/db/timeseries:timeseries_conversion_util",
         "//src/mongo/db/timeseries:timeseries_extended_range",
         "//src/mongo/db/timeseries:viewless_timeseries_collection_creation_helpers",

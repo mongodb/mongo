@@ -1801,6 +1801,9 @@ TEST_F(BucketCatalogTest, SchemaChanges) {
 }
 
 TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
+    RAIIServerParameterControllerForTest allowCorruptBucket(
+        "timeseriesDisableStrictBucketValidator", true);
+
     BSONObj bucketDoc = ::mongo::fromjson(
         R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
             "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
@@ -1925,7 +1928,7 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
 
 TEST_F(BucketCatalogTest, ReopenMixedSchemaDataBucket) {
     BSONObj bucketDoc = ::mongo::fromjson(
-        R"({"_id":{"$oid":"02091c2c050b7495eaef4581"},
+        R"({"_id":{"$oid":"63091ca4050b7495eaef4581"},
             "control":{"version":1,
                        "min":{"_id":{"$oid":"63091c30138e9261fd70a903"},
                               "time":{"$date":"2022-08-26T19:19:00Z"},
@@ -2193,7 +2196,7 @@ TEST_F(BucketCatalogTest, RehydrateMalformedBucket) {
 
 TEST_F(BucketCatalogTest, RehydrateMixedSchemaDataBucket) {
     BSONObj bucketDoc = ::mongo::fromjson(
-        R"({"_id":{"$oid":"02091c2c050b7495eaef4581"},
+        R"({"_id":{"$oid":"63091ca4050b7495eaef4581"},
             "control":{"version":1,
                        "min":{"_id":{"$oid":"63091c30138e9261fd70a903"},
                               "time":{"$date":"2022-08-26T19:19:00Z"},
@@ -2377,7 +2380,7 @@ TEST_F(BucketCatalogTest, ReopeningFailedDueToMinMaxCalculation) {
 }
 
 using BucketCatalogTestDeathTest = BucketCatalogTest;
-DEATH_TEST_F(BucketCatalogTestDeathTest, ReopeningFailedDueToCompression, "invariant") {
+TEST_F(BucketCatalogTest, ReopeningFailedDueToCompression) {
     BSONObj bucketDoc = ::mongo::fromjson(
         R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
             "control":{"version":2,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
@@ -2389,7 +2392,7 @@ DEATH_TEST_F(BucketCatalogTestDeathTest, ReopeningFailedDueToCompression, "invar
     AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_ns1), MODE_IX);
     BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
 
-    std::ignore = _reopenBucket(*autoColl, bucketDoc);
+    ASSERT_NOT_OK(_reopenBucket(*autoColl, bucketDoc));
 }
 
 TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressure) {

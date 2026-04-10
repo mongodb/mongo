@@ -44,6 +44,9 @@ assert.eq(res.warnings.length, 0);
 
 // Inserts documents into another bucket but manually changes the min timestamp. Expects
 // warnings from validation.
+// Allow setting an inconsistent state to the bucket so we can test that validate can detect it
+assert.commandWorked(conn.getDB("admin").runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}));
+
 testCount += 1;
 collName = collNamePrefix + testCount;
 db.getCollection(collName).drop();
