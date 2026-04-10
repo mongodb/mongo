@@ -1374,7 +1374,6 @@ void IndexBuildsCoordinator::applyCommitIndexBuild(OperationContext* opCtx,
         restartingPausedIndexInStandaloneOrRestore = true;
     }
     auto replState = uassertStatusOK(swReplState);
-    replState->setMultikey(std::move(oplogEntry.multikey));
     replState->setReceivedCommitIndexBuildEntryTime(Date_t::now());
     hangIndexBuildAfterReceivingCommitIndexBuildOplogEntry.pauseWhileSet(opCtx);
     // Retry until we are able to put the index build in the kApplyCommitOplogEntry state. None of
@@ -3849,11 +3848,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
                     }
                 }
 
-                if (IndexBuildAction::kOplogCommit == action) {
-                    if (auto& m = replState->getMultikey()[i]) {
-                        entry.setMultikey(opCtx, collection.get(), {}, *m);
-                    }
-                } else {
+                if (IndexBuildAction::kOplogCommit != action) {
                     multikeys.push_back(std::move(multikey));
                 }
                 ++i;

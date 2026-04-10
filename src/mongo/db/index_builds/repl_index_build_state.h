@@ -285,20 +285,6 @@ public:
                   boost::optional<Timestamp> timestamp = boost::none,
                   boost::optional<Status> abortStatus = boost::none);
 
-    /**
-     * Sets the multikey information for this index build.
-     *
-     * TODO (SERVER-111304): Remove this function.
-     */
-    void setMultikey(std::vector<boost::optional<MultikeyPaths>> multikey);
-
-    /**
-     * Returns the multikey information for this index build.
-     *
-     * TODO (SERVER-111304): Remove this function.
-     */
-    const std::vector<boost::optional<MultikeyPaths>>& getMultikey() const;
-
     bool isApplyingCommitOplogEntry() const {
         return _state == kApplyCommitOplogEntry;
     }
@@ -396,8 +382,6 @@ private:
     boost::optional<Timestamp> _timestamp;
     // Reason for abort, if any.
     Status _abortStatus = Status::OK();
-    // TODO (SERVER-111304): Remove multikey information from IndexBuildState.
-    std::vector<boost::optional<MultikeyPaths>> _multikey;
 };
 }  // namespace index_build_internal
 
@@ -666,20 +650,6 @@ public:
      * Returns the metrics for this index build.
      */
     IndexBuildMetrics getIndexBuildMetrics() const;
-
-    /**
-     * Sets the multikey information for this index build.
-     *
-     * TODO (SERVER-111304): Remove this function.
-     */
-    void setMultikey(std::vector<boost::optional<MultikeyPaths>> multikey);
-
-    /**
-     * Returns the multikey information for this index build.
-     *
-     * TODO (SERVER-111304): Remove this function.
-     */
-    const std::vector<boost::optional<MultikeyPaths>>& getMultikey() const;
 
     /**
      * Stores the time at which which we voted to commit an index build.
