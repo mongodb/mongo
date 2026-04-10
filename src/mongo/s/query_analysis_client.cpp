@@ -153,6 +153,11 @@ BSONObj QueryAnalysisClient::executeCommandOnPrimary(
     const DatabaseName& dbName,
     const BSONObj& cmdObj,
     const std::function<void(const BSONObj&)>& uassertCmdStatusFn) {
+    // The query analysis client is used for analyze shard key. This is not mission critical, and
+    // therefore should always be deprioritized when the server is overloaded.
+    ScopedAdmissionPriority<ExecutionAdmissionContext> skipAdmissionControl(
+        opCtx, AdmissionContext::Priority::kLow);
+
     auto numRetries = 0;
 
     while (true) {

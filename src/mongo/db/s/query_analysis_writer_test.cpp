@@ -29,6 +29,10 @@
 
 #include "mongo/db/s/query_analysis_writer.h"
 
+#include "mongo/db/admission/execution_control/execution_control_parameters_gen.h"
+#include "mongo/db/admission/execution_control/ticketing_system.h"
+#include "mongo/db/admission/ticketing/ticketholder.h"
+
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -2053,6 +2057,97 @@ TEST_F(QueryAnalysisWriterTest, DiscardSamplesIfCollectionIsDroppedAndRecreated)
     client.dropCollection(nss0);
     client.createCollection(nss0);
     assertNoSampling(nss0, collUuid0BeforeDrop);
+}
+
+/**
+ * Tests that the QueryAnalysisWriter flush paths acquire low priority tickets when execution
+ * control prioritization is enabled.
+ */
+struct QueryAnalysisWriterLowPriorityTest : public QueryAnalysisWriterTest {
+protected:
+    QueryAnalysisWriterLowPriorityTest() : QueryAnalysisWriterTest(false /* useMockClock */) {}
+
+    void setUp() override {
+        QueryAnalysisWriterTest::setUp();
+        _installTicketingSystem();
+        ASSERT_OK(admission::execution_control::TicketingSystem::get(getServiceContext())
+                      ->setDeprioritizationGate(true));
+    }
+
+    void tearDown() override {
+        QueryAnalysisWriterTest::tearDown();
+    }
+
+    int64_t getLowPriorityWriteNewAdmissions() const {
+        BSONObjBuilder bob;
+        _lowWrite->appendHolderStats(bob);
+        return bob.obj().getIntField("newAdmissions");
+    }
+
+private:
+    void _installTicketingSystem() {
+        using namespace admission::execution_control;
+        constexpr int kTickets = 7;
+        constexpr auto maxQueueDepth = TicketHolder::kDefaultMaxQueueDepth;
+        auto* svcCtx = getServiceContext();
+
+        auto normalRead = std::make_unique<TicketHolder>(
+            svcCtx, kTickets, false /* trackPeakUsed */, maxQueueDepth);
+        auto normalWrite = std::make_unique<TicketHolder>(
+            svcCtx, kTickets, false /* trackPeakUsed */, maxQueueDepth);
+        auto lowRead = std::make_unique<TicketHolder>(
+            svcCtx, kTickets, false /* trackPeakUsed */, maxQueueDepth);
+        auto lowWrite = std::make_unique<TicketHolder>(
+            svcCtx, kTickets, false /* trackPeakUsed */, maxQueueDepth);
+
+        _lowWrite = lowWrite.get();
+
+        TicketingSystem::use(
+            svcCtx,
+            std::make_unique<TicketingSystem>(
+                svcCtx,
+                TicketingSystem::RWTicketHolder{std::move(normalRead), std::move(normalWrite)},
+                TicketingSystem::RWTicketHolder{std::move(lowRead), std::move(lowWrite)},
+                ExecutionControlConcurrencyAdjustmentAlgorithmEnum::kFixedConcurrentTransactions));
+    }
+
+    TicketHolder* _lowWrite = nullptr;
+};
+
+TEST_F(QueryAnalysisWriterLowPriorityTest, FlushQueriesUsesLowPriorityTickets) {
+    auto newClient = getServiceContext()->getService()->makeClient("AlternateClient");
+    AlternativeClientRegion acr(newClient);
+    auto newOpCtx = acr->makeOperationContext();
+
+    auto& writer = *QueryAnalysisWriter::get(newOpCtx.get());
+    writer
+        .addFindQuery(UUID::gen(), nss0, makeNonEmptyFilter(), makeNonEmptyCollation(), boost::none)
+        .get();
+    ASSERT_EQ(writer.getQueriesCountForTest(), 1);
+
+    auto before = getLowPriorityWriteNewAdmissions();
+    writer.flushQueriesForTest(newOpCtx.get());
+    ASSERT_EQ(writer.getQueriesCountForTest(), 0);
+
+    ASSERT_EQ(getLowPriorityWriteNewAdmissions(), before + 1);
+}
+
+TEST_F(QueryAnalysisWriterLowPriorityTest, FlushDiffsUsesLowPriorityTickets) {
+    auto newClient = getServiceContext()->getService()->makeClient("AlternateClient");
+    AlternativeClientRegion acr(newClient);
+    auto newOpCtx = acr->makeOperationContext();
+
+    auto& writer = *QueryAnalysisWriter::get(newOpCtx.get());
+
+    auto collUuid = getCollectionUUID(nss0);
+    writer.addDiff(UUID::gen(), nss0, collUuid, BSON("a" << 0), BSON("a" << 1)).get();
+    ASSERT_EQ(writer.getDiffsCountForTest(), 1);
+
+    auto before = getLowPriorityWriteNewAdmissions();
+    writer.flushDiffsForTest(newOpCtx.get());
+    ASSERT_EQ(writer.getDiffsCountForTest(), 0);
+
+    ASSERT_EQ(getLowPriorityWriteNewAdmissions(), before + 1);
 }
 
 }  // namespace
