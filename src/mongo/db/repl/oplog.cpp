@@ -68,6 +68,7 @@
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/repl/always_allow_non_local_writes.h"
 #include "mongo/db/repl/apply_ops.h"
+#include "mongo/db/repl/container_oplog_entry_gen.h"
 #include "mongo/db/repl/create_oplog_entry_gen.h"
 #include "mongo/db/repl/dbcheck/dbcheck.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
@@ -1523,21 +1524,6 @@ void writeChangeStreamPreImage(OperationContext* opCtx,
     ChangeStreamPreImagesCollectionManager::get(opCtx).insertPreImage(opCtx, preImageDocument);
 }
 
-Status withKey(const BSONElement& k, auto&& f) {
-    switch (k.type()) {
-        case BSONType::binData: {
-            int len = 0;
-            auto p = k.binData(len);
-            return f(std::span<const char>{p, static_cast<size_t>(len)});
-        }
-        case BSONType::numberLong: {
-            return f(k.Long());
-        }
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-
 // Throws with the error message including the information of the oplog entry, the document found by
 // the _id field, and its record id.
 void assertOnInconsistentDocuments(OperationContext* opCtx,
@@ -2922,7 +2908,6 @@ Status applyContainerOperation(OperationContext* opCtx,
                           << redact(op->toBSONForLogging()),
             !assignOperationTimestamp || !timestamp.isNull());
     const BSONObj o = op->getObject();
-    const BSONElement k = o["k"];
 
     WriteUnitOfWork wuow{opCtx};
     if (assignOperationTimestamp && !timestamp.isNull()) {
@@ -2942,25 +2927,27 @@ Status applyContainerOperation(OperationContext* opCtx,
 
     switch (op->getOpType()) {
         case repl::OpTypeEnum::kContainerInsert: {
-            int vlen = 0;
-            const char* v = o["v"].binData(vlen);
-            const std::span<const char> val{v, static_cast<size_t>(vlen)};
-            s = withKey(k, [&](auto key) {
-                return storage_engine_direct_crud::insert(*engine, *ru, *ident, key, val);
+            auto parsed = repl::ContainerInsertOplogEntryO::parse(
+                o, IDLParserContext("ContainerInsertOplogEntryO"));
+            auto valSpan = parsed.getValue().data();
+            s = parsed.getKey().visit([&](auto key) {
+                return storage_engine_direct_crud::insert(*engine, *ru, *ident, key, valSpan);
             });
             break;
         }
         case repl::OpTypeEnum::kContainerUpdate: {
-            int vlen = 0;
-            const char* v = o["v"].binData(vlen);
-            const std::span<const char> val{v, static_cast<size_t>(vlen)};
-            s = withKey(k, [&](auto key) {
-                return storage_engine_direct_crud::update(*engine, *ru, *ident, key, val);
+            auto parsed = repl::ContainerUpdateOplogEntryO::parse(
+                o, IDLParserContext("ContainerUpdateOplogEntryO"));
+            auto valSpan = parsed.getValue().data();
+            s = parsed.getKey().visit([&](auto key) {
+                return storage_engine_direct_crud::update(*engine, *ru, *ident, key, valSpan);
             });
             break;
         }
         case repl::OpTypeEnum::kContainerDelete: {
-            s = withKey(k, [&](auto key) {
+            auto parsed = repl::ContainerDeleteOplogEntryO::parse(
+                o, IDLParserContext("ContainerDeleteOplogEntryO"));
+            s = parsed.getKey().visit([&](auto key) {
                 return storage_engine_direct_crud::remove(*engine, *ru, *ident, key);
             });
             break;

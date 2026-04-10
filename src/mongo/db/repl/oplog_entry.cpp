@@ -36,6 +36,7 @@
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
+#include "mongo/db/repl/container_oplog_entry_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/logv2/redaction.h"
@@ -343,50 +344,22 @@ DurableOplogEntry::DurableOplogEntry(BSONObj rawInput) : _raw(std::move(rawInput
         uassert(10704701, "container ops must specify a container field", getContainer());
 
         const BSONObj& o = getObject();
-        const BSONElement k = o["k"];
-        uassert(10704702, str::stream() << "missing key element in oplog entry: " << redact(o), k);
-
-        uassert(10704706,
-                str::stream() << "invalid key type for container operation: " << typeName(k.type()),
-                k.type() == BSONType::binData || k.type() == BSONType::numberLong);
-
         switch (opType) {
-            case OpTypeEnum::kContainerInsert: {
-                const BSONElement vBSON = o["v"];
-                uassert(10704703,
-                        str::stream() << "missing value element for insert: " << redact(o),
-                        vBSON);
-                uassert(10704707,
-                        str::stream()
-                            << "value must be type binData, got " << typeName(vBSON.type()),
-                        vBSON.type() == BSONType::binData);
+            case OpTypeEnum::kContainerInsert:
+                ContainerInsertOplogEntryO::parse(o,
+                                                  IDLParserContext("ContainerInsertOplogEntryO"));
                 break;
-            }
-            case OpTypeEnum::kContainerUpdate: {
-                const BSONElement updateVersion = o["$v"];
-                uassert(12178904,
-                        str::stream() << "missing $v element for update: " << redact(o),
-                        updateVersion);
-                uassert(12178903,
-                        str::stream()
-                            << "$v must be numeric, got " << typeName(updateVersion.type()),
-                        updateVersion.isNumber());
-                const BSONElement vBSON = o["v"];
-                uassert(12178902,
-                        str::stream() << "missing value element for update: " << redact(o),
-                        vBSON);
-                uassert(12178901,
-                        str::stream()
-                            << "value must be type binData, got " << typeName(vBSON.type()),
-                        vBSON.type() == BSONType::binData);
+            case OpTypeEnum::kContainerUpdate:
+                ContainerUpdateOplogEntryO::parse(o,
+                                                  IDLParserContext("ContainerUpdateOplogEntryO"));
                 break;
-            }
-            case OpTypeEnum::kContainerDelete: {
+            case OpTypeEnum::kContainerDelete:
+                ContainerDeleteOplogEntryO::parse(o,
+                                                  IDLParserContext("ContainerDeleteOplogEntryO"));
                 uassert(10704704,
                         str::stream() << "delete should not contain value: " << redact(o),
                         !o["v"]);
                 break;
-            }
             default:
                 MONGO_UNREACHABLE;
         }

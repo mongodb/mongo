@@ -33,6 +33,7 @@
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/index_builds/index_builds_common.h"
+#include "mongo/db/repl/container_oplog_entry_gen.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/storage/container.h"
@@ -114,16 +115,31 @@ OplogEntry makeUpdateDocumentOplogEntry(OpTime opTime,
                                                       .wallClockTime = Date_t::now()}}};
 }
 
+namespace {
+ContainerKey toContainerKey(BSONBinData binData) {
+    return ContainerKey(std::span<const char>{static_cast<const char*>(binData.data),
+                                              static_cast<size_t>(binData.length)});
+}
+
+ContainerVal toContainerVal(BSONBinData binData) {
+    return ContainerVal(std::span<const char>{static_cast<const char*>(binData.data),
+                                              static_cast<size_t>(binData.length)});
+}
+}  // namespace
+
 OplogEntry makeContainerInsertOplogEntry(OpTime opTime,
                                          StringData containerIdent,
                                          int64_t key,
                                          BSONBinData value) {
+    ContainerInsertOplogEntryO insertO;
+    insertO.setKey(ContainerKey(key));
+    insertO.setValue(toContainerVal(value));
     return {DurableOplogEntry{DurableOplogEntryParams{
         .opTime = opTime,
         .opType = OpTypeEnum::kContainerInsert,
         .nss = NamespaceString::kContainerNamespace,
         .container = containerIdent,
-        .oField = BSON("k" << key << "v" << value),
+        .oField = insertO.toBSON(),
         .wallClockTime = Date_t::now(),
     }}};
 }
@@ -132,12 +148,15 @@ OplogEntry makeContainerInsertOplogEntry(OpTime opTime,
                                          StringData containerIdent,
                                          BSONBinData key,
                                          BSONBinData value) {
+    ContainerInsertOplogEntryO insertO;
+    insertO.setKey(toContainerKey(key));
+    insertO.setValue(toContainerVal(value));
     return {DurableOplogEntry{DurableOplogEntryParams{
         .opTime = opTime,
         .opType = OpTypeEnum::kContainerInsert,
         .nss = NamespaceString::kContainerNamespace,
         .container = containerIdent,
-        .oField = BSON("k" << key << "v" << value),
+        .oField = insertO.toBSON(),
         .wallClockTime = Date_t::now(),
     }}};
 }
@@ -146,14 +165,17 @@ OplogEntry makeContainerUpdateOplogEntry(OpTime opTime,
                                          StringData containerIdent,
                                          int64_t key,
                                          BSONBinData value) {
+    ContainerUpdateOplogEntryO updateO;
+    updateO.setKey(ContainerKey(key));
+    updateO.setValue(toContainerVal(value));
+    updateO.setVersion(
+        static_cast<int64_t>(container::UpdateOplogEntryVersion::kFullReplacementV1));
     return {DurableOplogEntry{DurableOplogEntryParams{
         .opTime = opTime,
         .opType = OpTypeEnum::kContainerUpdate,
         .nss = NamespaceString::kContainerNamespace,
         .container = containerIdent,
-        .oField = BSON(
-            "k" << key << "v" << value << "$v"
-                << static_cast<int64_t>(container::UpdateOplogEntryVersion::kFullReplacementV1)),
+        .oField = updateO.toBSON(),
         .wallClockTime = Date_t::now(),
     }}};
 }
@@ -162,25 +184,30 @@ OplogEntry makeContainerUpdateOplogEntry(OpTime opTime,
                                          StringData containerIdent,
                                          BSONBinData key,
                                          BSONBinData value) {
+    ContainerUpdateOplogEntryO updateO;
+    updateO.setKey(toContainerKey(key));
+    updateO.setValue(toContainerVal(value));
+    updateO.setVersion(
+        static_cast<int64_t>(container::UpdateOplogEntryVersion::kFullReplacementV1));
     return {DurableOplogEntry{DurableOplogEntryParams{
         .opTime = opTime,
         .opType = OpTypeEnum::kContainerUpdate,
         .nss = NamespaceString::kContainerNamespace,
         .container = containerIdent,
-        .oField = BSON(
-            "k" << key << "v" << value << "$v"
-                << static_cast<int64_t>(container::UpdateOplogEntryVersion::kFullReplacementV1)),
+        .oField = updateO.toBSON(),
         .wallClockTime = Date_t::now(),
     }}};
 }
 
 OplogEntry makeContainerDeleteOplogEntry(OpTime opTime, StringData containerIdent, int64_t key) {
+    ContainerDeleteOplogEntryO deleteO;
+    deleteO.setKey(ContainerKey(key));
     return {DurableOplogEntry{DurableOplogEntryParams{
         .opTime = opTime,
         .opType = OpTypeEnum::kContainerDelete,
         .nss = NamespaceString::kContainerNamespace,
         .container = containerIdent,
-        .oField = BSON("k" << key),
+        .oField = deleteO.toBSON(),
         .wallClockTime = Date_t::now(),
     }}};
 }
@@ -188,12 +215,14 @@ OplogEntry makeContainerDeleteOplogEntry(OpTime opTime, StringData containerIden
 OplogEntry makeContainerDeleteOplogEntry(OpTime opTime,
                                          StringData containerIdent,
                                          BSONBinData key) {
+    ContainerDeleteOplogEntryO deleteO;
+    deleteO.setKey(toContainerKey(key));
     return {DurableOplogEntry{DurableOplogEntryParams{
         .opTime = opTime,
         .opType = OpTypeEnum::kContainerDelete,
         .nss = NamespaceString::kContainerNamespace,
         .container = containerIdent,
-        .oField = BSON("k" << key),
+        .oField = deleteO.toBSON(),
         .wallClockTime = Date_t::now(),
     }}};
 }

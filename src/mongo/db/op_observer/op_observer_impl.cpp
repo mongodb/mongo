@@ -49,6 +49,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/repl/container_oplog_entry_gen.h"
 #include "mongo/db/repl/create_oplog_entry_gen.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -1304,24 +1305,8 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
 
 namespace {
 
-BSONObj buildContainerOpObject(
-    std::variant<int64_t, std::span<const char>> key,
-    boost::optional<std::span<const char>> value = boost::none,
-    boost::optional<container::UpdateOplogEntryVersion> version = boost::none) {
-    BSONObjBuilder builder;
-    std::visit(OverloadedVisitor{[&builder](int64_t key) { builder.append("k", key); },
-                                 [&builder](std::span<const char> key) {
-                                     builder.appendBinData(
-                                         "k", key.size(), BinDataType::BinDataGeneral, key.data());
-                                 }},
-               key);
-    if (value) {
-        builder.appendBinData("v", value->size(), BinDataType::BinDataGeneral, value->data());
-    }
-    if (version) {
-        builder.append("$v", static_cast<int64_t>(*version));
-    }
-    return builder.obj();
+repl::ContainerKey toContainerKey(std::variant<int64_t, std::span<const char>> key) {
+    return std::visit([](auto k) { return repl::ContainerKey(k); }, key);
 }
 
 OpTimeBundle logContainerInsert(OperationContext* opCtx,
@@ -1335,7 +1320,10 @@ OpTimeBundle logContainerInsert(OperationContext* opCtx,
     entry.setNss(ns);
     entry.setContainer(container);
     entry.setOpType(repl::OpTypeEnum::kContainerInsert);
-    entry.setObject(buildContainerOpObject(key, value));
+    repl::ContainerInsertOplogEntryO insertO;
+    insertO.setKey(toContainerKey(key));
+    insertO.setValue(repl::ContainerVal(value));
+    entry.setObject(insertO.toBSON());
 
     OpTimeBundle opTime;
     opTime.writeOpTime = logOperation(opCtx, &entry, true /*assignCommonFields*/, &logger);
@@ -1363,7 +1351,10 @@ void _onContainerInsert(OperationContext* opCtx,
         op.setTid(ns.tenantId());
         op.setNss(ns);
         op.setContainer(ident);
-        op.setObject(buildContainerOpObject(key, value));
+        repl::ContainerInsertOplogEntryO insertO;
+        insertO.setKey(toContainerKey(key));
+        insertO.setValue(repl::ContainerVal(value));
+        op.setObject(insertO.toBSON());
         return op;
     };
 
@@ -1403,7 +1394,9 @@ OpTimeBundle logContainerDelete(OperationContext* opCtx,
     entry.setNss(ns);
     entry.setContainer(container);
     entry.setOpType(repl::OpTypeEnum::kContainerDelete);
-    entry.setObject(buildContainerOpObject(key));
+    repl::ContainerDeleteOplogEntryO deleteO;
+    deleteO.setKey(toContainerKey(key));
+    entry.setObject(deleteO.toBSON());
 
     OpTimeBundle opTime;
     opTime.writeOpTime = logOperation(opCtx, &entry, true /*assignCommonFields*/, &logger);
@@ -1430,7 +1423,9 @@ void _onContainerDelete(OperationContext* opCtx,
         op.setTid(ns.tenantId());
         op.setNss(ns);
         op.setContainer(ident);
-        op.setObject(buildContainerOpObject(key));
+        repl::ContainerDeleteOplogEntryO deleteO;
+        deleteO.setKey(toContainerKey(key));
+        op.setObject(deleteO.toBSON());
         return op;
     };
 
@@ -1471,8 +1466,12 @@ OpTimeBundle logContainerUpdate(OperationContext* opCtx,
     entry.setNss(ns);
     entry.setContainer(container);
     entry.setOpType(repl::OpTypeEnum::kContainerUpdate);
-    entry.setObject(
-        buildContainerOpObject(key, value, container::UpdateOplogEntryVersion::kFullReplacementV1));
+    repl::ContainerUpdateOplogEntryO updateO;
+    updateO.setKey(toContainerKey(key));
+    updateO.setValue(repl::ContainerVal(value));
+    updateO.setVersion(
+        static_cast<int64_t>(container::UpdateOplogEntryVersion::kFullReplacementV1));
+    entry.setObject(updateO.toBSON());
 
     OpTimeBundle opTime;
     opTime.writeOpTime = logOperation(opCtx, &entry, true /*assignCommonFields*/, &logger);
@@ -1500,8 +1499,12 @@ void _onContainerUpdate(OperationContext* opCtx,
         op.setTid(ns.tenantId());
         op.setNss(ns);
         op.setContainer(ident);
-        op.setObject(buildContainerOpObject(
-            key, value, container::UpdateOplogEntryVersion::kFullReplacementV1));
+        repl::ContainerUpdateOplogEntryO updateO;
+        updateO.setKey(toContainerKey(key));
+        updateO.setValue(repl::ContainerVal(value));
+        updateO.setVersion(
+            static_cast<int64_t>(container::UpdateOplogEntryVersion::kFullReplacementV1));
+        op.setObject(updateO.toBSON());
         return op;
     };
 

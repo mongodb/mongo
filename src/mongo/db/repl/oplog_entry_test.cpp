@@ -40,6 +40,7 @@
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/index_builds/index_build_oplog_entry.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/container_oplog_entry_gen.h"
 #include "mongo/db/repl/create_oplog_entry_gen.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
@@ -496,6 +497,91 @@ TEST_F(OplogEntryTest, ContainerOpMissingContainer) {
 
     auto result = DurableOplogEntry::parse(oplogBson);
     ASSERT_EQ(result.getStatus().code(), 10704701);
+}
+
+TEST_F(OplogEntryTest, ContainerInsertORoundTripIntKey) {
+    const auto rawO = BSON("k" << 42LL << "v" << BSONBinData("hello", 5, BinDataGeneral));
+
+    const auto parsed =
+        ContainerInsertOplogEntryO::parse(rawO, IDLParserContext("ContainerInsertOplogEntryO"));
+    ASSERT_TRUE(parsed.getKey().isIntKey());
+    ASSERT_EQ(parsed.getKey().getIntKey(), 42);
+    ASSERT_EQ(parsed.getValue().data().size(), 5);
+
+    const auto serialized = parsed.toBSON();
+    ASSERT_BSONOBJ_EQ(rawO, serialized);
+}
+
+TEST_F(OplogEntryTest, ContainerInsertORoundTripByteKey) {
+    const auto rawO = BSON("k" << BSONBinData("abc", 3, BinDataGeneral) << "v"
+                               << BSONBinData("val", 3, BinDataGeneral));
+
+    const auto parsed =
+        ContainerInsertOplogEntryO::parse(rawO, IDLParserContext("ContainerInsertOplogEntryO"));
+    ASSERT_FALSE(parsed.getKey().isIntKey());
+    auto keySpan = parsed.getKey().getBytesKey();
+    ASSERT_EQ(keySpan.size(), 3);
+    ASSERT_EQ(0, std::memcmp(keySpan.data(), "abc", 3));
+
+    const auto serialized = parsed.toBSON();
+    ASSERT_BSONOBJ_EQ(rawO, serialized);
+}
+
+TEST_F(OplogEntryTest, ContainerUpdateORoundTripIntKey) {
+    const auto rawO =
+        BSON("k" << 7LL << "v" << BSONBinData("data", 4, BinDataGeneral) << "$v" << 1LL);
+
+    const auto parsed =
+        ContainerUpdateOplogEntryO::parse(rawO, IDLParserContext("ContainerUpdateOplogEntryO"));
+    ASSERT_TRUE(parsed.getKey().isIntKey());
+    ASSERT_EQ(parsed.getKey().getIntKey(), 7);
+    ASSERT_EQ(parsed.getValue().data().size(), 4);
+    ASSERT_EQ(parsed.getVersion(), 1);
+
+    const auto serialized = parsed.toBSON();
+    ASSERT_BSONOBJ_EQ(rawO, serialized);
+}
+
+TEST_F(OplogEntryTest, ContainerUpdateORoundTripByteKey) {
+    const auto rawO = BSON("k" << BSONBinData("abc", 3, BinDataGeneral) << "v"
+                               << BSONBinData("data", 4, BinDataGeneral) << "$v" << 1LL);
+
+    const auto parsed =
+        ContainerUpdateOplogEntryO::parse(rawO, IDLParserContext("ContainerUpdateOplogEntryO"));
+    ASSERT_FALSE(parsed.getKey().isIntKey());
+    auto keySpan = parsed.getKey().getBytesKey();
+    ASSERT_EQ(keySpan.size(), 3);
+    ASSERT_EQ(0, std::memcmp(keySpan.data(), "abc", 3));
+    ASSERT_EQ(parsed.getVersion(), 1);
+
+    const auto serialized = parsed.toBSON();
+    ASSERT_BSONOBJ_EQ(rawO, serialized);
+}
+
+TEST_F(OplogEntryTest, ContainerDeleteORoundTripIntKey) {
+    const auto rawO = BSON("k" << 99LL);
+
+    const auto parsed =
+        ContainerDeleteOplogEntryO::parse(rawO, IDLParserContext("ContainerDeleteOplogEntryO"));
+    ASSERT_TRUE(parsed.getKey().isIntKey());
+    ASSERT_EQ(parsed.getKey().getIntKey(), 99);
+
+    const auto serialized = parsed.toBSON();
+    ASSERT_BSONOBJ_EQ(rawO, serialized);
+}
+
+TEST_F(OplogEntryTest, ContainerDeleteORoundTripByteKey) {
+    const auto rawO = BSON("k" << BSONBinData("xyz", 3, BinDataGeneral));
+
+    const auto parsed =
+        ContainerDeleteOplogEntryO::parse(rawO, IDLParserContext("ContainerDeleteOplogEntryO"));
+    ASSERT_FALSE(parsed.getKey().isIntKey());
+    auto keySpan = parsed.getKey().getBytesKey();
+    ASSERT_EQ(keySpan.size(), 3);
+    ASSERT_EQ(0, std::memcmp(keySpan.data(), "xyz", 3));
+
+    const auto serialized = parsed.toBSON();
+    ASSERT_BSONOBJ_EQ(rawO, serialized);
 }
 
 TEST_F(OplogEntryTest, ApplyOpsNotInSession) {
