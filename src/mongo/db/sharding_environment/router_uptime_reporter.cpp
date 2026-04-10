@@ -162,11 +162,7 @@ void RouterUptimeReporter::startPeriodicThread(ServiceContext* serviceContext) {
     Date_t created = Date_t::now();
 
     _thread = stdx::thread([serviceContext, created] {
-        // TODO(SERVER-111753): Please revisit if this thread could be made killable.
-        Client::initThread("Uptime-reporter",
-                           serviceContext->getService(),
-                           Client::noSession(),
-                           ClientOperationKillableByStepdown{false});
+        Client::initThread("Uptime-reporter", serviceContext->getService(), Client::noSession());
 
         auto opCtx = cc().makeOperationContext();
         const std::string hostName(getHostNameCached());
