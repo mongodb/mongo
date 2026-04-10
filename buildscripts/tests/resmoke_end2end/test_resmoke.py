@@ -821,6 +821,14 @@ class TestEvergreenYML(unittest.TestCase):
     def setUpClass(cls):
         cls.evg_conf = parse_evergreen_file("etc/evergreen.yml")
         config.CONFIG_DIR = "buildscripts/resmokeconfig"
+        cls._orig_module_suite_dirs = config.MODULE_SUITE_DIRS
+        config.MODULE_SUITE_DIRS = ["buildscripts/modules/atlas/suites"]
+        suitesconfig.ExplicitSuiteConfig._named_suites = {}
+
+    @classmethod
+    def tearDownClass(cls):
+        config.MODULE_SUITE_DIRS = cls._orig_module_suite_dirs
+        suitesconfig.ExplicitSuiteConfig._named_suites = {}
 
     def validate_jstestfuzz_selector(self, suite_names):
         for suite_name in suite_names:
