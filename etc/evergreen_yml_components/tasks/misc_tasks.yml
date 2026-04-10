@@ -226,11 +226,8 @@ tasks:
       - func: "antithesis image build and push"
         vars:
           suite: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough
-          # TODO(SERVER-109882): Enable viewless timeseries in upgrade/downgrade suites
           resmoke_args: >-
             --runAllFeatureFlagTests
-            --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
-            --disableFeatureFlags=featureFlagBlockDirectSystemBucketsAccess
 
   - <<: *antithesis_task_template
     name: antithesis_jstestfuzz_replication_continuous_stepdown
