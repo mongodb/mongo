@@ -101,6 +101,7 @@ mongo_cc_unit_test(
         ":shard_role",
         "//src/mongo/db:query_exec",
         "//src/mongo/db/admission/execution_control:ticketing_system",
+        "//src/mongo/db/admission/ticketing:ticketholder",
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/query/client_cursor",
         "//src/mongo/db/s:sharding_runtime_d",
@@ -112,7 +113,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/shard_role/shard_catalog:database_holder_mock",
         "//src/mongo/db/sharding_environment:shard_server_test_fixture",
         "//src/mongo/util:progress_meter",
-        "//src/mongo/util/concurrency:ticketholder",
     ],
 )
 

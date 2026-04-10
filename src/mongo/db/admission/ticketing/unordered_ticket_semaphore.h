@@ -29,28 +29,30 @@
 
 #pragma once
 
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/concurrency/admission_context.h"
-#include "mongo/util/concurrency/ticket_semaphore.h"
+#include "mongo/db/admission/ticketing/admission_context.h"
+#include "mongo/db/admission/ticketing/ticket_semaphore.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/waitable_atomic.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
-#include <memory>
+
 
 namespace mongo {
 
 /**
- * A Semaphore implementation where waiters are dispatched depending on the number of admissions.
+ * A Semaphore implementation where waiters compete for permits using a futex-based wait on an
+ * atomic permit counter.
  *
- * On each release, the waiter with less admissions is woken to take a ticket. This class guarantees
- * order of execution based on number of admissions.
+ * On each release, one sleeping waiter is woken to compete again against concurrent tryAcquire()
+ * callers. There is no fairness guarantee in this implementation; a newly arrived operation can
+ * claim a permit ahead of existing waiters.
  */
-class OrderedTicketSemaphore : public TicketSemaphore {
+class UnorderedTicketSemaphore : public TicketSemaphore {
 public:
-    OrderedTicketSemaphore(int numTickets, int maxQueueDepth)
-        : _permits(numTickets), _maxWaiters(maxQueueDepth) {}
+    UnorderedTicketSemaphore(int numPermits, int maxWaiters)
+        : _permits(numPermits), _maxWaiters(maxWaiters) {}
 
     bool tryAcquire() override;
 
@@ -70,30 +72,9 @@ public:
     int waiters() const override;
 
 private:
-    struct Waiter {
-        int admissions;
-        stdx::condition_variable cv;
-        bool awake{false};
-        bool permitted{false};
-    };
-
-    struct WaiterCompare {
-        bool operator()(const std::shared_ptr<Waiter>& a, const std::shared_ptr<Waiter>& b) const {
-            // Lower admission count = higher priority (should be at top of queue).
-            return a->admissions < b->admissions;
-        }
-    };
-
-    void _wakeUpWaiters(WithLock, int count);
-    bool _tryAcquireWithoutQueuing(WithLock);
-    mutable stdx::mutex _mutex;
-    Atomic<int> _permits;
+    BasicWaitableAtomic<int> _permits;
+    Atomic<int> _waiters{0};
     Atomic<int> _maxWaiters;
-    // Only used to prevent contention with observability threads. In other places to ensure
-    // correctness we check the state of _waitQueue directly.
-    Atomic<int> _numWaiters;
-
-    std::multiset<std::shared_ptr<Waiter>, WaiterCompare> _waitQueue;
 };
 
 }  // namespace mongo

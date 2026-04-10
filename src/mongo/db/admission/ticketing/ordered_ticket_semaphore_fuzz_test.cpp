@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
+#include "mongo/db/admission/ticketing/admission_context.h"
+#include "mongo/db/admission/ticketing/ordered_ticket_semaphore.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/util/concurrency/admission_context.h"
-#include "mongo/util/concurrency/ordered_ticket_semaphore.h"
 
 #include <algorithm>
 #include <cstdint>

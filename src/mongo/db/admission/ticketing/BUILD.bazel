@@ -1,0 +1,155 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_fuzztest", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob(["*.h"]) + glob(["*.cpp"]),
+)
+
+mongo_cc_library(
+    name = "admission_context",
+    srcs = [
+        "admission_context.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
+idl_generator(
+    name = "ticketholder_parameters_gen",
+    src = "ticketholder_parameters.idl",
+)
+
+mongo_cc_library(
+    name = "ticket_semaphore",
+    srcs = [
+        "ordered_ticket_semaphore.cpp",
+        "unordered_ticket_semaphore.cpp",
+    ],
+    hdrs = [
+        "ticket_semaphore.h",
+    ],
+    deps = [
+        ":admission_context",
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "ticketholder",
+    srcs = [
+        "ticketholder.cpp",
+        ":ticketholder_parameters_gen",
+    ],
+    deps = [
+        ":admission_context",
+        ":ticket_semaphore",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db/admission/execution_control:execution_control_stats",
+        "//src/third_party/boost:boost_filesystem",
+        "//src/third_party/boost:boost_iostreams",
+        "//src/third_party/boost:boost_log",
+        "//src/third_party/boost:boost_program_options",
+    ],
+)
+
+mongo_cc_library(
+    name = "ticketholder_queue_stats",
+    srcs = [
+        "ticketholder_queue_stats.cpp",
+    ],
+    deps = [
+        ":admission_context",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/admission:ingress_admission_control",
+        "//src/mongo/db/admission/execution_control:execution_admission_context",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "ticketholder_bm",
+    srcs = ["ticketholder_bm.cpp"],
+    tags = [
+        "second_half_bm",
+    ],
+    deps = [
+        ":ticketholder",
+        "//src/mongo/db/admission/execution_control:execution_admission_context",
+        "//src/mongo/db/shard_role:service_context_non_d",
+        "//src/mongo/db/shard_role/lock_manager",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "ticketholder_test",
+    srcs = [
+        "ticketholder_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":ticketholder",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/shard_role:service_context_non_d",
+        "//src/mongo/util:packaged_task",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "ticket_semaphore_test",
+    srcs = [
+        "ticket_semaphore_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":ticket_semaphore",
+        "//src/mongo/db:server_options",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/shard_role:service_context_non_d",
+        "//src/mongo/unittest",
+        "//src/mongo/util:packaged_task",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "ordered_ticket_semaphore_test",
+    srcs = [
+        "ordered_ticket_semaphore_test.cpp",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":ticketholder",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/shard_role:service_context_non_d",
+        "//src/mongo/unittest",
+        "//src/mongo/util:packaged_task",
+    ],
+)
+
+mongo_cc_fuzztest(
+    name = "ticket_semaphore_fuzz_test",
+    srcs = [
+        "ticket_semaphore_fuzz_test.cpp",
+    ],
+    deps = [
+        ":ticket_semaphore",
+    ],
+)
+
+mongo_cc_fuzztest(
+    name = "ordered_ticket_semaphore_fuzz_test",
+    srcs = [
+        "ordered_ticket_semaphore_fuzz_test.cpp",
+    ],
+    deps = [
+        ":ticket_semaphore",
+        "//src/mongo/util:packaged_task",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
+)

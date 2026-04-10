@@ -32,10 +32,10 @@
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/admission/execution_control/execution_control_heuristic_parameters_gen.h"
 #include "mongo/db/admission/execution_control/execution_control_parameters_gen.h"
+#include "mongo/db/admission/ticketing/admission_context.h"
+#include "mongo/db/admission/ticketing/ticketholder.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/concurrency/admission_context.h"
-#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/mock_periodic_runner.h"
 #include "mongo/util/tick_source_mock.h"
 

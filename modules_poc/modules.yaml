@@ -421,9 +421,6 @@ admission:
   files:
     - src/mongo/db/admission/
     - src/mongo/db/flow_control_ticketholder*
-    - src/mongo/util/concurrency/admission_context*
-    - src/mongo/util/concurrency/*ticket_semaphore*
-    - src/mongo/util/concurrency/ticketholder*
 
 workload_simulation:
   meta:

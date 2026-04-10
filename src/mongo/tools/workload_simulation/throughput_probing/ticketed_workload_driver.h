@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include "mongo/db/admission/ticketing/ticketholder.h"
 #include "mongo/db/service_context.h"
 #include "mongo/tools/workload_simulation/event_queue.h"
 #include "mongo/tools/workload_simulation/workload_characteristics.h"
-#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/modules.h"
 
 #include <thread>

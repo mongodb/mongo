@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/util/concurrency/admission_context.h"
+#include "mongo/db/admission/ticketing/admission_context.h"
 
 #include "mongo/db/operation_context.h"
 #include "mongo/util/assert_util.h"

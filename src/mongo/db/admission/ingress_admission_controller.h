@@ -31,8 +31,8 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/admission/ticketing/ticketholder.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/modules.h"
 
 #include <memory>

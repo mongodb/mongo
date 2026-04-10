@@ -94,7 +94,7 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:service_context",
-        "//src/mongo/util/concurrency:ticketholder",
+        "//src/mongo/db/admission/ticketing:ticketholder",
     ],
 )
 
@@ -121,7 +121,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:service_context",
-        "//src/mongo/util/concurrency:admission_context",
+        "//src/mongo/db/admission/ticketing:admission_context",
     ],
 )
 

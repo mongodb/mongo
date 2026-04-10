@@ -27,8 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/util/concurrency/ordered_ticket_semaphore.h"
-#include "mongo/util/concurrency/unordered_ticket_semaphore.h"
+#include "mongo/db/admission/ticketing/ordered_ticket_semaphore.h"
+#include "mongo/db/admission/ticketing/unordered_ticket_semaphore.h"
 #include "mongo/util/duration.h"
 
 #include <algorithm>

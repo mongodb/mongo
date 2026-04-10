@@ -32,8 +32,8 @@
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/admission/execution_control/execution_control_parameters_gen.h"
 #include "mongo/db/admission/execution_control/ticketing_system.h"
+#include "mongo/db/admission/ticketing/ticketholder.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
-#include "mongo/util/concurrency/ticketholder.h"  // IWYU pragma: keep
 
 #include <string>
 

@@ -37,7 +37,6 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/ensure_fcv.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/concurrency/admission_context.h"
 
 #include <memory>
 #include <variant>

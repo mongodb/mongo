@@ -27,18 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/util/concurrency/ticket_semaphore.h"
+#include "mongo/db/admission/ticketing/ticket_semaphore.h"
 
+#include "mongo/db/admission/ticketing/admission_context.h"
+#include "mongo/db/admission/ticketing/ordered_ticket_semaphore.h"
+#include "mongo/db/admission/ticketing/unordered_ticket_semaphore.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/admission_context.h"
-#include "mongo/util/concurrency/ordered_ticket_semaphore.h"
 #include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/concurrency/unordered_ticket_semaphore.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/packaged_task.h"
 

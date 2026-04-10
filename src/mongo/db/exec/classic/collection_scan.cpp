@@ -33,6 +33,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/exec/classic/filter.h"
 #include "mongo/db/exec/classic/working_set.h"
@@ -52,7 +53,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/resharding/resume_token_gen.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>

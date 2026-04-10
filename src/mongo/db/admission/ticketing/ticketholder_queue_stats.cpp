@@ -27,15 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/util/concurrency/ticketholder_queue_stats.h"
+#include "mongo/db/admission/ticketing/ticketholder_queue_stats.h"
 
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/admission/ingress_admission_context.h"
+#include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/duration.h"
 
 #include <utility>

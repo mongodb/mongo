@@ -36,12 +36,12 @@
 #include "mongo/db/admission/execution_control/execution_control_heuristic_parameters_gen.h"
 #include "mongo/db/admission/execution_control/execution_control_parameters_gen.h"
 #include "mongo/db/admission/execution_control/throughput_probing_gen.h"
+#include "mongo/db/admission/ticketing/ticketholder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/processinfo.h"
 

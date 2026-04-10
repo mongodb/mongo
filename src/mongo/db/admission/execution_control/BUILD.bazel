@@ -57,9 +57,9 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db/admission:app_name_exemption_matcher",
+        "//src/mongo/db/admission/ticketing:ticketholder",
         "//src/mongo/db/commands:test_commands_enabled",
         "//src/mongo/util:processinfo",
-        "//src/mongo/util/concurrency:ticketholder",
     ],
 )
 
@@ -73,7 +73,7 @@ mongo_cc_library(
         ":execution_control_stats",
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
-        "//src/mongo/util/concurrency:admission_context",
+        "//src/mongo/db/admission/ticketing:admission_context",
     ],
 )
 
@@ -112,9 +112,9 @@ mongo_cc_unit_test(
         ":execution_admission_context",
         ":ticketing_system",
         "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/admission/ticketing:ticketholder",
         "//src/mongo/unittest",
         "//src/mongo/util:mock_periodic_runner",
-        "//src/mongo/util/concurrency:ticketholder",
     ],
 )
 
@@ -129,11 +129,11 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/admission/ticketing:ticketholder",
         "//src/mongo/db/shard_role/lock_manager",
         "//src/mongo/transport:transport_layer_common",
         "//src/mongo/unittest",
         "//src/mongo/util:mock_periodic_runner",
-        "//src/mongo/util/concurrency:ticketholder",
     ],
 )
 

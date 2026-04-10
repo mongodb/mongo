@@ -30,6 +30,8 @@
 #pragma once
 
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
+#include "mongo/db/admission/ticketing/admission_context.h"
+#include "mongo/db/admission/ticketing/ticketholder.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/flow_control_ticketholder.h"
 #include "mongo/db/namespace_string.h"
@@ -40,9 +42,7 @@
 #include "mongo/db/shard_role/lock_manager/lock_stats.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/spin_lock.h"
-#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
@@ -822,8 +822,8 @@ private:
 
 /**
  *
- * NOTE FOR DEVELOPERS: ANY NEW USAGE OF THIS CLASS SHOULD BE ACCOMPANIED BY A TODO AND A
- * SERVER-XXXXX TICKET TO INVESTIGATE ITS SAFETY.
+ * NOTE FOR DEVELOPERS: ANY NEW USAGE OF THIS CLASS SHOULD BE ACCOMPANIED BY A TODO (Ignore linting)
+ * AND A SERVER-XXXXX TICKET TO INVESTIGATE ITS SAFETY.
  *
  * An RAII class that disables runtime lock ordering checks. Users of this class should be
  * incredibly conservative in using this. The presence of this class implies that a deadlock may

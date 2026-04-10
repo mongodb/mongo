@@ -29,10 +29,7 @@
 
 #pragma once
 
-#include "mongo/platform/atomic_word.h"
-#include "mongo/platform/waitable_atomic.h"
-#include "mongo/util/concurrency/admission_context.h"
-#include "mongo/util/concurrency/ticket_semaphore.h"
+#include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
@@ -42,39 +39,56 @@
 namespace mongo {
 
 /**
- * A Semaphore implementation where waiters compete for permits using a futex-based wait on an
- * atomic permit counter.
+ * Controls concurrent access to a finite pool of permits.
  *
- * On each release, one sleeping waiter is woken to compete again against concurrent tryAcquire()
- * callers. There is no fairness guarantee in this implementation; a newly arrived operation can
- * claim a permit ahead of existing waiters.
+ * Callers acquire a permit before proceeding with a unit of work, and release it when done. If no
+ * permits are available, callers either fail immediately (tryAcquire) or block until one becomes
+ * available (acquire).
  */
-class UnorderedTicketSemaphore : public TicketSemaphore {
+class TicketSemaphore {
 public:
-    UnorderedTicketSemaphore(int numPermits, int maxWaiters)
-        : _permits(numPermits), _maxWaiters(maxWaiters) {}
+    virtual ~TicketSemaphore() = default;
 
-    bool tryAcquire() override;
+    /**
+     * Non-blocking acquire. Returns true if a permit was consumed.
+     */
+    virtual bool tryAcquire() = 0;
 
-    bool acquire(OperationContext* opCtx,
-                 AdmissionContext* admCtx,
-                 Date_t until,
-                 bool interruptible) override;
+    /**
+     * Blocks until a permit is acquired, 'until' expires, or the operation is interrupted.
+     * Returns true if acquired.
+     *
+     * Throws 'AdmissionQueueOverflow' if the wait queue is full.
+     */
+    virtual bool acquire(OperationContext* opCtx,
+                         AdmissionContext* admCtx,
+                         Date_t until,
+                         bool interruptible) = 0;
 
-    void release() override;
+    /**
+     * Returns one permit to the sempahore, waking a queued waiter.
+     */
+    virtual void release() = 0;
 
-    void resize(int delta) override;
+    /**
+     * Adjusts the number of total permit count by 'delta'.
+     */
+    virtual void resize(int delta) = 0;
 
-    int available() const override;
+    /**
+     * Returns the instantaneous number of un-acquired permits (not checked out by an operation).
+     */
+    virtual int available() const = 0;
 
-    void setMaxWaiters(int waiters) override;
+    /**
+     * Adjusts the maximum number of threads waiting.
+     */
+    virtual void setMaxWaiters(int waiters) = 0;
 
-    int waiters() const override;
-
-private:
-    BasicWaitableAtomic<int> _permits;
-    Atomic<int> _waiters{0};
-    Atomic<int> _maxWaiters;
+    /**
+     * Returns the instantaneous number of threads blocked in 'acquire'.
+     */
+    virtual int waiters() const = 0;
 };
 
 }  // namespace mongo

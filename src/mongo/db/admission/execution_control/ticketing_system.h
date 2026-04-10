@@ -34,10 +34,10 @@
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/admission/execution_control/execution_control_stats.h"
 #include "mongo/db/admission/execution_control/throughput_probing.h"
+#include "mongo/db/admission/ticketing/ticketholder.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>

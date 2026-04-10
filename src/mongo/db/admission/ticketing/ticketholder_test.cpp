@@ -26,15 +26,15 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/db/admission/ticketing/ticketholder.h"
 
+#include "mongo/db/admission/ticketing/ticketholder_parameters_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/concurrency/ticketholder_parameters_gen.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/packaged_task.h"

@@ -27,14 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/db/admission/ticketing/ticketholder.h"
 
+#include "mongo/db/admission/ticketing/ordered_ticket_semaphore.h"
+#include "mongo/db/admission/ticketing/ticketholder_parameters_gen.h"
+#include "mongo/db/admission/ticketing/unordered_ticket_semaphore.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/ordered_ticket_semaphore.h"
-#include "mongo/util/concurrency/ticketholder_parameters_gen.h"
-#include "mongo/util/concurrency/unordered_ticket_semaphore.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/tick_source.h"

@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
+#include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/client_strand.h"
 #include "mongo/db/ftdc/collection_metrics.h"
@@ -45,7 +46,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
-#include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/ctype.h"
@@ -253,7 +253,7 @@ void AsyncFTDCCollectorCollection::_collect(
 }
 
 void SyncFTDCCollectorCollection::add(std::unique_ptr<FTDCCollectorInterface> collector) {
-    // TODO: ensure the collectors all have unique names.
+    // TODO SERVER-123480: ensure the collectors all have unique names.
     _collectors.emplace_back(std::move(collector));
 }
 

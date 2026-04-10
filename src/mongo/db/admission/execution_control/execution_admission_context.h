@@ -30,7 +30,7 @@
 
 #include "mongo/db/admission/execution_control/execution_admission_type_gen.h"
 #include "mongo/db/admission/execution_control/execution_control_stats.h"
-#include "mongo/util/concurrency/admission_context.h"
+#include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/util/modules.h"
 
 #include <boost/optional.hpp>

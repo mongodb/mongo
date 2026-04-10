@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/admission/ticketing/ticketholder_queue_stats.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_bson_helpers.h"
@@ -46,7 +47,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/ticketholder_queue_stats.h"
 #include "mongo/util/duration.h"
 
 #include <string>

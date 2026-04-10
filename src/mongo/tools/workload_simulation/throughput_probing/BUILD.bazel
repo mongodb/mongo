@@ -22,9 +22,9 @@ mongo_cc_binary(
         "//src/mongo/db:service_context",
         "//src/mongo/db/admission/execution_control:execution_admission_context",
         "//src/mongo/db/admission/execution_control:ticketing_system",
+        "//src/mongo/db/admission/ticketing:ticketholder",
         "//src/mongo/tools/workload_simulation:simulator_main",
         "//src/mongo/tools/workload_simulation:workload_characteristics",
         "//src/mongo/util:mock_periodic_runner",
-        "//src/mongo/util/concurrency:ticketholder",
     ],
 )

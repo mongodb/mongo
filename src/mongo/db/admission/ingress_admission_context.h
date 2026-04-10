@@ -28,7 +28,7 @@
  */
 #pragma once
 
-#include "mongo/util/concurrency/admission_context.h"
+#include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {

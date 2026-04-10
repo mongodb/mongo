@@ -287,6 +287,7 @@ mongo_cc_library(
         "//src/mongo/db:rs_local_client",
         "//src/mongo/db:rw_concern_d",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/admission/ticketing:ticketholder",
         "//src/mongo/db/auth:user_cache_invalidator",
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/commands:mongod_fcv",
@@ -334,7 +335,6 @@ mongo_cc_library(
         "//src/mongo/s/query/planner:cluster_aggregate",
         "//src/mongo/util:future_util",
         "//src/mongo/util:log_and_backoff",
-        "//src/mongo/util/concurrency:ticketholder",
     ],
 )
 
@@ -490,6 +490,7 @@ mongo_cc_library(
         "//src/mongo/db:rs_local_client",
         "//src/mongo/db:rw_concern_d",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/admission/ticketing:ticketholder",
         "//src/mongo/db/auth:user_cache_invalidator",
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/commands:mongod_fcv",
@@ -538,7 +539,6 @@ mongo_cc_library(
         "//src/mongo/s/query/planner:cluster_aggregate",
         "//src/mongo/util:future_util",
         "//src/mongo/util:log_and_backoff",
-        "//src/mongo/util/concurrency:ticketholder",
     ],
 )
 
