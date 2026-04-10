@@ -954,7 +954,7 @@ TEST_F(GetHistoricalPlacementTestFixture,
                                   historicalPlacement);
         },
         "whole cluster",
-        BSON("$ne" << ""));
+        BSON("$nin" << BSON_ARRAY("" << "config.system.sessions")));
 }
 
 // Test 'ignoreRemovedShards' mode for a non-existing database.

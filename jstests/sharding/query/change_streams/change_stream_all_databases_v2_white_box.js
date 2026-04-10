@@ -11,7 +11,7 @@
  * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {describe, it, before, afterEach, after} from "jstests/libs/mochalite.js";
+import {describe, it, beforeEach, before, afterEach, after} from "jstests/libs/mochalite.js";
 import {assertCreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {
     ChangeStreamTest,
@@ -56,16 +56,16 @@ describe("$changeStream v2", function () {
         db = st.s.getDB(jsTestName());
         coll = db.test;
         adminDB = st.s.getDB("admin");
+    });
 
+    beforeEach(function () {
         // Enable sharding on the the test database and ensure that the primary is shard0.
         assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
     });
 
     afterEach(function () {
         csTest.cleanUp();
-        assertDropCollection(db, coll.getName());
-        db.dropDatabase();
-        assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+        assert.commandWorked(db.dropDatabase());
     });
 
     after(function () {
@@ -135,8 +135,7 @@ describe("$changeStream v2", function () {
         let commentFilter = {
             "cursor.originatingCommand.comment": jsTestName(),
         };
-        // TODO: SERVER-122863: no data shard cursors should be open yet as there is no data: fix expected shards to [] after the bug is fixed.
-        assertOpenCursors(st, [st.shard0.shardName], true, commentFilter);
+        assertOpenCursors(st, [], true, commentFilter);
 
         // Create a collection and test events are handled properly.
         assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
@@ -216,12 +215,10 @@ describe("$changeStream v2", function () {
         csTest.getNextChanges(csCursor, 2);
         csTest.assertNoChange(csCursor);
 
-        assert.soonNoExcept(() => {
-            assertOpenCursors(st, [st.shard0.shardName, st.shard1.shardName], true, commentFilter);
-            return true;
-        });
+        assertOpenCursors(st, [st.shard0.shardName, st.shard1.shardName], true, commentFilter);
 
         assertDropCollection(db2, coll2.getName());
+        db2.dropDatabase();
     });
 
     it("test open cursors in an all databases change stream after moveChunk", function () {
@@ -254,6 +251,13 @@ describe("$changeStream v2", function () {
                 _waitForDelete: true,
             }),
         );
+
+        awaitLogMessageCodes(st.s, [kPlacementRefresh], () => {
+            csTest.assertNoChange(csCursor);
+        });
+
+        assertOpenCursors(st, [st.shard0.shardName, st.shard1.shardName], true, commentFilter);
+
         assert.commandWorked(
             db.adminCommand({
                 moveChunk: coll.getFullName(),
@@ -270,11 +274,7 @@ describe("$changeStream v2", function () {
         coll.insert([{_id: 2, a: 2}]);
         assert.soon(() => csTest.getOneChange(csCursor), "expected change event for {_id: 2} ");
 
-        // TODO: SERVER-122863: all chunks have been moved to shard1: fix expected shards to [st.shard1.shardName] after the bug is fixed.
-        assert.soonNoExcept(() => {
-            assertOpenCursors(st, [st.shard0.shardName, st.shard1.shardName], true, commentFilter);
-            return true;
-        });
+        assertOpenCursors(st, [st.shard1.shardName], true, commentFilter);
     });
 
     it("test open cursors in an all databases change stream after movePrimary", function () {
@@ -308,11 +308,11 @@ describe("$changeStream v2", function () {
             csTest.assertNoChange(csCursor);
         });
 
-        // TODO: SERVER-122863: fix expected shards to [st.shard1.shardName] after the bug is fixed.
-        assertOpenCursors(st, [st.shard0.shardName, st.shard1.shardName], true, commentFilter);
+        assertOpenCursors(st, [st.shard1.shardName], true, commentFilter);
 
         coll.insert([{_id: 2, a: 2}]);
         assert.soon(() => csTest.getOneChange(csCursor), "expected change event for {_id: 2} ");
+        assertOpenCursors(st, [st.shard1.shardName], true, commentFilter);
     });
 
     it("test open cursors in an all databases change stream after reshard", function () {
@@ -320,7 +320,6 @@ describe("$changeStream v2", function () {
         assertCreateCollection(db, coll.getName());
         assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
 
-        let configConn = st.configRS.getPrimary();
         let commentFilter = {
             "cursor.originatingCommand.comment": jsTestName(),
         };
@@ -362,8 +361,6 @@ describe("$changeStream v2", function () {
             }),
         );
 
-        // TODO SERVER-122851: this test is flaky seems to have timing issue related to reshard
-        // which causes the log message to sometimes be sent later.
         awaitLogMessageCodes(st.s, [kPlacementRefresh], () => {
             csTest.assertNoChange(csCursor);
         });

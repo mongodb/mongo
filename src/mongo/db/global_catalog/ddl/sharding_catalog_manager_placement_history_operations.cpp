@@ -738,12 +738,19 @@ private:
         return fmt::format("^{}(\\..*)?$", pcre_util::quoteMeta(_nss->db_forSharding()));
     }
 
-    // Builds the NamespaceString value for an empty namespace, which can be used to match the
-    // special placement history initialization markers.
-    static std::string _buildInitDocumentLabel() {
+    // Getter for the serialized version of the namespace identifying initialization metadata
+    // documents within config.placementHistory.
+    static const std::string& _initializationMetadataNs() {
         static std::string namespaceString = NamespaceStringUtil::serialize(
             ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker,
             SerializationContext::stateDefault());
+        return namespaceString;
+    }
+
+    // Getter for the serialized version of the config.system.sessions.
+    static const std::string& _logicalSessionsCollectionNs() {
+        static std::string namespaceString = NamespaceStringUtil::serialize(
+            NamespaceString::kLogicalSessionsNamespace, SerializationContext::stateDefault());
         return namespaceString;
     }
 
@@ -828,7 +835,7 @@ private:
         // a. Get the most recent initialization doc that satisfies <= 'atClusterTime'.
         auto matchStage =
             DocumentSourceMatch::create(BSON("timestamp" << BSON("$lte" << atClusterTime) << "nss"
-                                                         << _buildInitDocumentLabel()),
+                                                         << _initializationMetadataNs()),
                                         _expCtx);
         auto sortStage = DocumentSourceSort::create(_expCtx, BSON("timestamp" << -1));
         auto limitStage = DocumentSourceLimit::create(_expCtx, 1);
@@ -915,9 +922,12 @@ private:
         // within the search criteria.
         const auto matchNssExpression = [&] {
             if (scope == PlacementHistoryQueryScope::kClusterLevelScope) {
-                // Only discard documents containing 'config.placementHistory' initialization
-                // metadata.
-                return BSON("$ne" << _buildInitDocumentLabel());
+                // Discard documents about:
+                // - initialization metadata internal to config.placementHistory
+                // - the logical sessions collection (which has to be transparent to change
+                // streams).
+                return BSON("$nin" << BSON_ARRAY(_initializationMetadataNs()
+                                                 << _logicalSessionsCollectionNs()));
             }
 
             // Capture documents about the database itself and any tracked collection under it.
@@ -1024,9 +1034,12 @@ private:
     BSONObj _buildMatchNssExpressionForIgnoreRemovedShardsMode() const {
         switch (_getPlacementHistoryQueryScope()) {
             case PlacementHistoryQueryScope::kClusterLevelScope:
-                // Only discard documents containing 'config.placementHistory' initialization
-                // metadata.
-                return BSON("$ne" << _buildInitDocumentLabel());
+                // Discard documents about:
+                // - initialization metadata internal to config.placementHistory
+                // - the logical sessions collection (which has to be transparent to change
+                // streams).
+                return BSON("$nin" << BSON_ARRAY(_initializationMetadataNs()
+                                                 << _logicalSessionsCollectionNs()));
             case PlacementHistoryQueryScope::kDatabaseLevelScope:
                 // Capture documents about the database itself and any tracked collection under it.
                 return BSON("$regex" << _buildRegexForDatabaseLevelSearch());
@@ -1048,10 +1061,11 @@ private:
     Timestamp _findPlacementHistoryInitializationPoint() {
         DocumentSourceContainer pipelineStages;
 
-        pipelineStages.push_back(DocumentSourceMatch::create(
-            BSON("timestamp" << BSON("$gt" << Timestamp(0, 1)) << "nss" << _buildInitDocumentLabel()
-                             << "shards" << BSON("$eq" << BSONArray())),
-            _expCtx));
+        pipelineStages.push_back(
+            DocumentSourceMatch::create(BSON("timestamp" << BSON("$gt" << Timestamp(0, 1)) << "nss"
+                                                         << _initializationMetadataNs() << "shards"
+                                                         << BSON("$eq" << BSONArray())),
+                                        _expCtx));
         pipelineStages.push_back(DocumentSourceLimit::create(_expCtx, 1));
         pipelineStages.push_back(DocumentSourceProject::create(
             BSON("timestamp" << 1), _expCtx, DocumentSourceProject::kStageName));
