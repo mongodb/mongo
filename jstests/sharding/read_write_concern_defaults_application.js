@@ -684,6 +684,7 @@ let testCases = {
     planCacheListFilters: {skip: "does not accept read or write concern"},
     planCacheSetFilter: {skip: "does not accept read or write concern"},
     prepareTransaction: {skip: "internal command"},
+    preventWritesForInsufficientDiskSpace: {skip: "does not accept read or write concern"},
     profile: {skip: "does not accept read or write concern"},
     reIndex: {skip: "does not accept read or write concern"},
     reapLogicalSessionCacheNow: {skip: "does not accept read or write concern"},

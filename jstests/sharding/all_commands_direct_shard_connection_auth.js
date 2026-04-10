@@ -982,6 +982,25 @@ const allCommands = {
         },
     },
     prepareTransaction: {skip: isAnInternalCommand},
+    preventWritesForInsufficientDiskSpace: {
+        checkFeatureFlag: "PreventWritesForInsufficientDiskSpace",
+        isAdminCommand: true,
+        command: {
+            preventWritesForInsufficientDiskSpace: 1,
+            enabled: true,
+            allowDeletions: false,
+            reason: "InsufficientDiskSpace",
+        },
+        shouldFail: false,
+        teardown: function (conn) {
+            conn.getDB("admin").runCommand({
+                preventWritesForInsufficientDiskSpace: 1,
+                enabled: false,
+                allowDeletions: false,
+                reason: "InsufficientDiskSpace",
+            });
+        },
+    },
     profile: {
         isAdminCommand: true,
         command: {profile: 2},

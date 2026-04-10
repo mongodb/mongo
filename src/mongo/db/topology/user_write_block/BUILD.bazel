@@ -10,6 +10,24 @@ exports_files(
 )
 
 idl_generator(
+    name = "prevent_writes_for_insufficient_disk_space_gen",
+    src = "prevent_writes_for_insufficient_disk_space.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/topology/user_write_block:prevent_writes_reason_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "prevent_writes_reason_gen",
+    src = "prevent_writes_reason.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
     name = "set_user_write_block_mode_gen",
     src = "set_user_write_block_mode.idl",
     deps = [
@@ -43,6 +61,25 @@ idl_generator(
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/topology/user_write_block:user_writes_block_reason_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "prevent_writes_for_insufficient_disk_space_idl",
+    srcs = [
+        ":prevent_writes_for_insufficient_disk_space_gen",
+    ],
+    deps = [
+        ":prevent_writes_reason_idl",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "prevent_writes_reason_idl",
+    srcs = ["prevent_writes_reason_gen"],
+    deps = [
+        "//src/mongo/db:server_base",
     ],
 )
 

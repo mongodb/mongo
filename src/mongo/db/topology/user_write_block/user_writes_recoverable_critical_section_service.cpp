@@ -188,6 +188,10 @@ void acquireRecoverableCriticalSection(
 const NamespaceString UserWritesRecoverableCriticalSectionService::kGlobalUserWritesNamespace =
     NamespaceString::kEmpty;
 
+const NamespaceString
+    UserWritesRecoverableCriticalSectionService::kPreventWritesForInsufficientDiskSpaceNamespace =
+        NamespaceString::kEmpty;
+
 UserWritesRecoverableCriticalSectionService* UserWritesRecoverableCriticalSectionService::get(
     ServiceContext* serviceContext) {
     return &serviceDecorator(serviceContext);

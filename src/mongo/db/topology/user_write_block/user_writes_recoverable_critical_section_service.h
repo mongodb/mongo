@@ -87,6 +87,7 @@ class UserWritesRecoverableCriticalSectionService
     : public ReplicaSetAwareService<UserWritesRecoverableCriticalSectionService> {
 public:
     static const NamespaceString kGlobalUserWritesNamespace;
+    static const NamespaceString kPreventWritesForInsufficientDiskSpaceNamespace;
 
     UserWritesRecoverableCriticalSectionService() = default;
 

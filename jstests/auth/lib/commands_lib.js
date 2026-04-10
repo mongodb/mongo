@@ -6468,6 +6468,28 @@ export const authCommandsLib = {
             ],
         },
         {
+            testname: "preventWritesForInsufficientDiskSpace",
+            command: {
+                preventWritesForInsufficientDiskSpace: 1,
+                enabled: false,
+                allowDeletions: false,
+                reason: "InsufficientDiskSpace",
+            },
+            skipTest: (conn) => {
+                return (
+                    !FixtureHelpers.isReplSet(conn.getDB(adminDbName)) ||
+                    !isFeatureEnabled(conn, "featureFlagPreventWritesForInsufficientDiskSpace")
+                );
+            },
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: roles_clusterManager,
+                    privileges: [{resource: {cluster: true}, actions: ["preventWritesForInsufficientDiskSpace"]}],
+                },
+            ],
+        },
+        {
             testname: "profileGetLevel",
             command: {profile: -1},
             skipSharded: true,

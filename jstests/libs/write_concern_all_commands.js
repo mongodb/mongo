@@ -2155,6 +2155,7 @@ const wcCommandsTests = {
     planCacheListFilters: {skip: "does not accept write concern"},
     planCacheSetFilter: {skip: "does not accept write concern"},
     prepareTransaction: {skip: "internal command"},
+    preventWritesForInsufficientDiskSpace: {skip: "does not accept write concern"},
     profile: {skip: "does not accept write concern"},
     reIndex: {skip: "does not accept write concern"},
     reapLogicalSessionCacheNow: {skip: "does not accept write concern"},

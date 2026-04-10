@@ -51,6 +51,7 @@ selector:
     - jstests/sharding/cluster_time_across_add_shard.js
     - jstests/sharding/set_user_write_block_mode.js
     - jstests/sharding/drop_config_db.js
+    - jstests/sharding/prevent_writes_for_insufficient_disk_space.js
   roots:
     - jstests/sharding/**/*.js
 test_kind: js_test

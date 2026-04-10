@@ -14,6 +14,8 @@ selector:
     - jstests/core/query/queryable_encryption/**/*.js
     # Query settings are not supported on standalone.
     - jstests/core/query/query_settings/**/*.js
+    # Per-shard write block is not supported on standalone.
+    - jstests/core/administrative/prevent_writes_for_insufficient_disk_space.js
 
 executor:
   archive:

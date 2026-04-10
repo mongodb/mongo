@@ -14,6 +14,8 @@ selector:
     - jstests/core/query/queryable_encryption/**/*.js
     # Query settings are not supported on standalone.
     - jstests/core/query/query_settings/**/*.js
+    # Per-shard write block is not supported on standalone.
+    - jstests/core/administrative/prevent_writes_for_insufficient_disk_space.js
 
     # TODO SERVER-119773 implement SBE plan cache
     - jstests/core/query/sbe/sbe_plan_cache_duplicate_or_clauses.js

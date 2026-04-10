@@ -370,6 +370,7 @@ roles:
           - flushRouterConfig # hostManager gets this also
           - cleanupOrphaned
           - getDefaultRWConcern # clusterMonitor gets this also
+          - preventWritesForInsufficientDiskSpace
           - setDefaultRWConcern
           - setFeatureCompatibilityVersion
           - setClusterParameter
