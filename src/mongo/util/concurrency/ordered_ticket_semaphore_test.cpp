@@ -47,6 +47,8 @@
 namespace mongo {
 
 // Generous timeout so tests fail with a useful diagnostic instead of hanging.
+constexpr auto kTestWaitTimeout = Seconds{60};
+// General timeout for acquires.
 constexpr auto kWaitTimeout = Milliseconds{500};
 
 Date_t getDeadline() {
@@ -95,8 +97,10 @@ public:
 
     template <typename Condition>
     void waitWhile(Condition&& condition) {
+        auto deadline = Date_t::now() + kTestWaitTimeout;
         while (condition()) {
-            sleepFor(Milliseconds{10});  // Give threads time to queue up.
+            ASSERT_LT(Date_t::now(), deadline) << "Timed out waiting for condition";
+            stdx::this_thread::yield();
         }
     }
 
@@ -303,9 +307,11 @@ TEST_F(OrderedTicketSemaphoreTest, PriorityOrderingStillWorksAfterResize) {
     waitForQueuedThreads(sem, 3);
 
     // Release one at a time to verify priority ordering.
+    auto expectedWaiters = sem->waiters();
     for (int i = 0; i < 3; ++i) {
         sem->resize(1);
-        sleepFor(Milliseconds{10});
+        expectedWaiters--;
+        waitForQueuedThreads(sem, expectedWaiters);
     }
 
     for (auto& future : finalFutures) {
