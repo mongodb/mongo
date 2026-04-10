@@ -262,8 +262,9 @@ protected:
         return std::make_tuple(pool, std::move(inUseConnsToReturn));
     };
 
-private:
     std::shared_ptr<OutOfLineExecutor> _executor = InlineQueuedCountingExecutor::make();
+
+private:
     std::shared_ptr<ConnectionPool> _pool;
     unittest::MinimumLoggedSeverityGuard logSeverityGuardNetwork{
         logv2::LogComponent::kConnectionPool, logv2::LogSeverity::Debug(5)};
@@ -3117,6 +3118,62 @@ TEST_F(ConnectionPoolTest, FailedExpiredPoolDoesNotRetryWithoutBackoff) {
     // allowing spawnConnections() to spawn a new connection.
     PoolImpl::setNow(now + Milliseconds(6) + ConnectionPool::kHostRetryTimeout);
     ASSERT_EQ(1u, ConnectionImpl::setupQueueDepth());
+}
+
+// Reproduces a use-after-free where the cancellation callback registered in
+// SpecificPool::getConnection captures a raw `this` pointer without a shared_from_this() anchor.
+// The sequence is:
+//   1. getConnection() registers an onCancel callback capturing raw `this`
+//   2. The caller's CancellationToken is cancelled, which queues the callback on the executor
+//   3. pool->shutdown() runs, which destroys the SpecificPool (all shared_from_this anchors are
+//      released when connections and timers are cleaned up)
+//   4. The queued callback fires, dereferencing the dangling `this` to access _parent->_mutex
+//
+// The InlineQueuedCountingExecutor serializes tasks: when a task is already running, newly
+// scheduled tasks are queued. By cancelling the token and shutting down the pool inside one
+// executor task, we guarantee the onCancel callback is deferred until after the SpecificPool
+// is destroyed.
+TEST_F(ConnectionPoolTest, CancellationCallbackSurvivesPoolDestruction) {
+    CancellationSource source;
+    auto pool = makePool();
+
+    // Request a leased connection with a cancellation token. Don't push setup so the request
+    // stays pending. Using lease() avoids the .tap() callback in the non-lease path that would
+    // otherwise prevent the SpecificPool from being destroyed (it captures a shared_ptr to it).
+    auto connFuture =
+        ExecutorFuture(_executor)
+            .then([pool, token = source.token()]() {
+                return pool->lease(HostAndPort(), transport::kGlobalSSLMode, Seconds(1), token);
+            })
+            .semi();
+    ASSERT_FALSE(connFuture.isReady());
+
+    // Run cancel + shutdown inside a single executor task. Because InlineQueuedCountingExecutor
+    // defers tasks scheduled while another task is running:
+    //   - source.cancel() triggers the onCancel future chain, which calls
+    //     executor->schedule() for the callback → it is QUEUED, not run yet.
+    //   - pool->shutdown() then runs synchronously: processFailure() fulfils all pending
+    //     requests with an error, connections and timers are torn down (releasing all
+    //     shared_from_this anchors), and the SpecificPool is destroyed when shutdown()'s
+    //     local `pools` vector goes out of scope.
+    //   - pool.reset() / dropPool() release the ConnectionPool itself.
+    //
+    // After this task finishes the executor drains its queue. The onCancel callback runs with
+    // Status::OK (the child token was cancelled, not dismissed) and dereferences the now-dangling
+    // `this` pointer → use-after-free.
+    //
+    // The fix is to capture `anchor = shared_from_this()` in the onCancel callback, matching
+    // every other async callback in SpecificPool (guardCallback, makeHandle deleter, etc.).
+    _executor->schedule([&](Status) {
+        source.cancel();
+        pool->shutdown();
+        pool.reset();
+        dropPool();
+    });
+
+    // connFuture was resolved (by processFailure during shutdown or by the cancel callback).
+    ASSERT_TRUE(connFuture.isReady());
+    ASSERT_NOT_OK(std::move(connFuture).getNoThrow());
 }
 
 }  // namespace connection_pool_test_details

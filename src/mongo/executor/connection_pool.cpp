@@ -1124,7 +1124,7 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnec
     it->second.source.token()
         .onCancel()
         .thenRunOn(_parent->_factory->getExecutor())
-        .getAsync([this, requestId](Status s) {
+        .getAsync([this, anchor = shared_from_this(), requestId](Status s) {
             if (!s.isOK()) {
                 return;
             }
