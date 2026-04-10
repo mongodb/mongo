@@ -36,11 +36,26 @@ const doc = {
 };
 assert.commandWorked(coll.insert(doc));
 
-let dbStats = testDB.runCommand({dbStats: 1, freeStorage: 1});
-assert.commandWorked(dbStats);
-
-assert.eq(1, dbStats.objects, tojson(dbStats)); // Includes testColl only
+let dbStats;
 const dataSize = Object.bsonsize(doc);
+
+if (isMongoS) {
+    // On a sharded cluster, a mongos may have a stale ShardRegistry that doesn't include all
+    // shards, causing scatterGatherUnversionedTargetAllShards to miss one. Retry until the
+    // registry refreshes and dbStats returns correct results.
+    assert.soon(
+        () => {
+            dbStats = testDB.runCommand({dbStats: 1, freeStorage: 1});
+            return dbStats.ok && dbStats.objects === 1;
+        },
+        () => "dbStats should eventually see the inserted object: " + tojson(dbStats),
+    );
+} else {
+    dbStats = testDB.runCommand({dbStats: 1, freeStorage: 1});
+    assert.commandWorked(dbStats);
+}
+
+assert.eq(1, dbStats.objects, tojson(dbStats));
 assert.eq(dataSize, dbStats.avgObjSize, tojson(dbStats));
 assert.eq(dataSize, dbStats.dataSize, tojson(dbStats));
 
