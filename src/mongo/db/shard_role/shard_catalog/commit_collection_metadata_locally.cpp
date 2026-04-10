@@ -249,7 +249,10 @@ void updateShardCatalogCache(OperationContext* opCtx,
     CollectionMetadata ownedMetadata(CurrentChunkManager(std::move(rtHandle)), thisShardId);
 
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-    scopedCsr->setFilteringMetadata_authoritative(opCtx, std::move(ownedMetadata));
+
+    // TODO (SERVER-123844): Switch to authoritative set once the untracked version doesn't need
+    // to wait for configTime.
+    scopedCsr->setFilteringMetadata_nonAuthoritative(opCtx, std::move(ownedMetadata));
 }
 
 void clearShardCatalogCacheForDroppedCollection(OperationContext* opCtx,
@@ -257,7 +260,7 @@ void clearShardCatalogCacheForDroppedCollection(OperationContext* opCtx,
                                                 const UUID& uuid) {
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
 
-    // TODO (SERVER-123079): Switch to authoritative clear once the untracked version doesn't need
+    // TODO (SERVER-123844): Switch to authoritative clear once the untracked version doesn't need
     // to wait for configTime.
     scopedCsr->clearFilteringMetadataForDroppedCollection_nonAuthoritative(opCtx);
 }

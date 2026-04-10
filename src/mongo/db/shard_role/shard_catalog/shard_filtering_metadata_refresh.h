@@ -213,6 +213,53 @@ private:
                                            const DatabaseName& dbName,
                                            const DatabaseVersion& receivedDbVersion);
 
+    /**
+     * Creates a CollectionCacheRecoverer and drives a full metadata recovery from disk to
+     * completion. Retries if a critical section, concurrent refresh, or cancellation is
+     * encountered.
+     *
+     * This is the first step of the authoritative shard versioning protocol: unconditionally
+     * recover the shard's current state from the durable catalog so that subsequent version
+     * comparisons operate on up-to-date metadata.
+     */
+    void _recoverCollectionMetadataFromDisk(OperationContext* opCtx, const NamespaceString& nss);
+
+    /**
+     * Joins any ongoing placement version operations and checks whether the shard's current shard
+     * version (wantedShardVersion) already satisfies the router's shard version
+     * (receivedShardVersion). Waits for any ongoing critical sections or refreshes before
+     * comparing.
+     *
+     * When both versions are comparable (both tracked or both untracked), the partial ordering
+     * determines whether the shard is up to date or the router is stale. Returns true in either
+     * case since the caller can return to the retry loop. Returns false when the versions are not
+     * comparable (one tracked, one untracked) or no metadata is known.
+     */
+    bool _isRecoveredShardVersionSufficient(OperationContext* opCtx,
+                                            const NamespaceString& nss,
+                                            const ChunkVersion& receivedShardVersion);
+
+    /**
+     * Sends a best-effort noop write to the primary to advance the majority commit point.
+     */
+    void _tryNoopWriteToAdvanceMajorityCommitPoint(OperationContext* opCtx);
+
+    /**
+     * Handles the case where router's shard version (receivedShardVersion) and shard's shard
+     * version (wantedShardVersion) are not directly comparable (e.g. one tracked, one untracked).
+     * Blocks until one of:
+     *   1. The shard version on the shard matches the router's version (via oplog application).
+     *   2. The node has replicated up to the router's configTime with majority read concern.
+     *
+     * configTime serves as an upper bound: if the shard reaches configTime without the version
+     * matching, the router is guaranteed to be stale since all DDL critical sections that could
+     * have changed the version have already been applied. On a primary this wait is an instant
+     * no-op since it has already applied all oplog entries.
+     */
+    void _waitForConfigTimeOrChunkVersionChange(OperationContext* opCtx,
+                                                const NamespaceString& nss,
+                                                const ChunkVersion& chunkVersion);
+
     SharedSemiFuture<void> _recoverRefreshCollectionPlacementVersion(
         ServiceContext* serviceContext,
         const NamespaceString& nss,
@@ -226,7 +273,7 @@ private:
     void _onCollectionPlacementVersionMismatchAuthoritative(
         OperationContext* opCtx,
         const NamespaceString& nss,
-        boost::optional<ChunkVersion> chunkVersionReceived);
+        boost::optional<ChunkVersion> receivedShardVersion);
 
     // TODO (SERVER-97261): remove the Grid's CatalogCache usages once 9.0 becomes last LTS.
     // If _cache is set, it will be used only for filtering; otherwise, the Grid's CatalogCache will

@@ -907,12 +907,12 @@ void ShardServerOpObserver::onInvalidateCollectionMetadata(OperationContext* opC
     if (auto recoverer = scopedCsr->getCollectionCacheRecoverer()) {
         recoverer->onOplogEntry(opCtx, op.getTimestamp(), entry);
     } else {
+        // TODO (SERVER-123844): Switch to authoritative clear once the untracked version doesn't
+        // need to wait for configTime.
         if (entry.getForDroppedCollection()) {
-            // TODO (SERVER-123079): Switch to authoritative clear once the untracked version
-            // doesn't need to wait for configTime.
             scopedCsr->clearFilteringMetadataForDroppedCollection_nonAuthoritative(opCtx);
         } else {
-            scopedCsr->clearFilteringMetadata_authoritative(opCtx, *op.getUuid());
+            scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
         }
     }
 }

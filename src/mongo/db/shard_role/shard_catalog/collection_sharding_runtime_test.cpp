@@ -1310,8 +1310,9 @@ TEST_F(CollectionShardingRuntimeTest, OnInvalidateCollectionMetadataClearsCSRWit
     {
         auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
         ASSERT_FALSE(csr->getCurrentMetadataIfKnown());
+        // TODO (SERVER-123844): Switch to authoritative state.
         ASSERT_EQ(csr->getAuthoritativeState(),
-                  CollectionShardingRuntime::AuthoritativeState::kAuthoritative);
+                  CollectionShardingRuntime::AuthoritativeState::kNonAuthoritative);
     }
 }
 

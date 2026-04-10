@@ -275,34 +275,6 @@ TEST_F(CommitCollectionMetadataLocallyTest, DropCollectionIsNoOpOnEmptyCatalog) 
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace), 0);
 }
 
-// TODO (SERVER-123079): Re-enable this test once dropCollection and dropDatabase clear
-// authoritatively. Currently they do not commit an authoritative clear to the CSS because doing so
-// enables the CRUD authoritative path, whose recovery depends on waiting for the configTime to be
-// reached. Tests fail because they do not set up a noop writer, causing a liveness problem where
-// shards cannot replicate and achieve that configTime. SERVER-123079 must first decouple recovery
-// from waiting on an unrelated configTime before we can make drops authoritative.
-// TEST_F(CommitCollectionMetadataLocallyTest, DropCollectionWithMismatchedUuidTriggersTassert) {
-//     auto [collType, chunks] = makeCollectionMetadata(2);
-//    mockCatalogClient()->setCollectionMetadata(collType, chunks);
-//    shard_catalog_commit::commitRefineShardKeyLocally(operationContext(), kTestNss);
-//
-//    {
-//        auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
-//        auto metadata = scopedCsr->getCurrentMetadataIfKnown();
-//        ASSERT_TRUE(metadata);
-//        ASSERT_EQ(metadata->getChunkManager()->getUUID(), collType.getUuid());
-//    }
-//
-//    auto differentUuid = UUID::gen();
-//    ASSERT_THROWS_WITH_CHECK(shard_catalog_commit::commitDropCollectionLocally(
-//                                 operationContext(), kTestNss, differentUuid),
-//                             DBException,
-//                             [](const DBException& ex) {
-//                                 ASSERT_EQ(ex.code(), 12220902);
-//                                 assertionCount.tripwire.subtractAndFetch(1);
-//                             });
-// }
-
 TEST_F(CommitCollectionMetadataLocallyTest, DropCollectionOnlyDeletesTargetCollection) {
     auto [collType1, chunks1] = makeCollectionMetadata(2);
     mockCatalogClient()->setCollectionMetadata(collType1, chunks1);

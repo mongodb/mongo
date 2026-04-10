@@ -39,26 +39,47 @@ namespace mongo {
 class MONGO_MOD_PARENT_PRIVATE AuthoritativeCollectionMetadataStatistics {
 public:
     void report(BSONObjBuilder& builder) const {
-        builder.append("diskRecoveriesPerformed", _numberOfDiskRecoveries.get());
         builder.append("recoverersCreated", _numberOfRecoverersCreated.get());
-        builder.append("shardVersionWaits", _numberOfShardVersionWaits.get());
-    }
-
-    void registerDiskRecovery() {
-        _numberOfDiskRecoveries.incrementRelaxed();
+        builder.append("diskRecoveriesPerformed", _numberOfDiskRecoveries.get());
+        builder.append("versionResolvedBeforeRecovery",
+                       _numberOfVersionResolvedBeforeRecovery.get());
+        builder.append("versionResolvedAfterRecovery", _numberOfVersionResolvedAfterRecovery.get());
+        builder.append("postRecoveryWaitResolvedByConfigTime",
+                       _numberOfPostRecoveryWaitResolvedByConfigTime.get());
+        builder.append("postRecoveryWaitResolvedByVersionChange",
+                       _numberOfPostRecoveryWaitResolvedByVersionChange.get());
     }
 
     void registerCreationOfRecoverer() {
         _numberOfRecoverersCreated.incrementRelaxed();
     }
 
-    void registerSuccessfulShardVersionWait() {
-        _numberOfShardVersionWaits.incrementRelaxed();
+    void registerDiskRecovery() {
+        _numberOfDiskRecoveries.incrementRelaxed();
+    }
+
+    void registerVersionResolvedBeforeRecovery() {
+        _numberOfVersionResolvedBeforeRecovery.incrementRelaxed();
+    }
+
+    void registerVersionResolvedAfterRecovery() {
+        _numberOfVersionResolvedAfterRecovery.incrementRelaxed();
+    }
+
+    void registerPostRecoveryWaitResolvedByConfigTime() {
+        _numberOfPostRecoveryWaitResolvedByConfigTime.incrementRelaxed();
+    }
+
+    void registerPostRecoveryWaitResolvedByVersionChange() {
+        _numberOfPostRecoveryWaitResolvedByVersionChange.incrementRelaxed();
     }
 
 private:
-    Counter64 _numberOfDiskRecoveries;
     Counter64 _numberOfRecoverersCreated;
-    Counter64 _numberOfShardVersionWaits;
+    Counter64 _numberOfDiskRecoveries;
+    Counter64 _numberOfVersionResolvedBeforeRecovery;
+    Counter64 _numberOfVersionResolvedAfterRecovery;
+    Counter64 _numberOfPostRecoveryWaitResolvedByConfigTime;
+    Counter64 _numberOfPostRecoveryWaitResolvedByVersionChange;
 };
 }  // namespace mongo
