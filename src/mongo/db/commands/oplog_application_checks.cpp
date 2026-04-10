@@ -54,6 +54,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 
 #include <memory>
 #include <string>
@@ -111,6 +112,21 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
         StringData commandName = o.firstElement().fieldNameStringData();
         Command* commandInOplogEntry = CommandHelpers::findCommand(opCtx, commandName);
         if (!commandInOplogEntry) {
+            // Some oplog entries are internal-only and not registered in the global command
+            // registry. Allow them through if the user has ActionType::internal (e.g. __system).
+            // TODO(SERVER-114573): Remove upgradeDowngradeViewlessTimeseries from this list once
+            // 9.0 becomes last-lts, as the oplog entry will no longer exist.
+            static const StringDataSet kInternalOplogCommands{
+                "upgradeDowngradeViewlessTimeseries"_sd,
+            };
+            if (kInternalOplogCommands.contains(commandName)) {
+                if (!authSession->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(dbName.tenantId()),
+                        ActionType::internal)) {
+                    return Status(ErrorCodes::Unauthorized, "Unauthorized");
+                }
+                return Status::OK();
+            }
             return Status(ErrorCodes::FailedToParse, "Unrecognized command in op");
         }
 
@@ -123,8 +139,8 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
                 nss.tenantId(), "admin", SerializationContext::stateDefault());
         }
 
-        // TODO reuse the parse result for when we run() later. Note that when running,
-        // we must use a potentially different dbname.
+        // TODO SERVER-123371 reuse the parse result for when we run() later. Note that when
+        // running, we must use a potentially different dbname.
         return [&] {
             try {
                 boost::optional<auth::ValidatedTenancyScope> vts;

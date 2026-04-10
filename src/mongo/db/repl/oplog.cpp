@@ -1368,6 +1368,8 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           return Status::OK();
       },
       {ErrorCodes::NamespaceNotFound}}},
+    // TODO(SERVER-114573): Remove once 9.0 becomes last-lts, as this oplog entry won't be
+    // supported anymore.
     {"upgradeDowngradeViewlessTimeseries",
      {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
           -> Status {

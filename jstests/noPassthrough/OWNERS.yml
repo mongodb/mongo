@@ -24,3 +24,6 @@ filters:
   - "delinquent*":
     approvers:
       - 10gen/server-workload-resilience
+  - "timeseries_upgrade_downgrade_apply_ops.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
