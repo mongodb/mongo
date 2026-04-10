@@ -325,6 +325,14 @@ size_t getEstimatedBytesToMoveForShard(OperationContext* opCtx,
                         1,
                         "Namespace not found while trying to report the remainingSizeBytes.",
                         logAttrs(nss));
+        } catch (const ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
+            // we might have dropped the collection and created a view with the same name since the
+            // collection of namespaces
+            LOGV2_DEBUG(
+                12344100,
+                1,
+                "Command not supported on view while trying to report the remainingSizeBytes.",
+                logAttrs(nss));
         }
     }
     return remainingSizeBytes;
