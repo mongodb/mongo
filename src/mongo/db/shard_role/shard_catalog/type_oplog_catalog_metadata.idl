@@ -70,6 +70,10 @@ structs:
             invalidateCollectionMetadata:
                 type: string
                 description: "Collection name for which we are triggering the recovery"
+            forDroppedCollection:
+                type: bool
+                description: "If true, indicates the invalidation precedes a collection drop"
+                default: false
 
     CollectionShardingStateDeltaOplogEntry:
         description: "Oplog entry format for delta changes to apply to the overall CSS"

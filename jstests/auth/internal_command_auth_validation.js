@@ -801,6 +801,10 @@ const internalCommandsMap = {
             _shardsvrCommitRefineCollectionShardKey: "test.x",
         },
     },
+    _shardsvrCommitDropCollectionMetadata: {
+        testname: "_shardsvrCommitDropCollectionMetadata",
+        command: {_shardsvrCommitDropCollectionMetadata: "test.x", collectionUUID: UUID()},
+    },
     _shardsvrSetAllowMigrations: {
         testname: "_shardsvrSetAllowMigrations",
         command: {_shardsvrSetAllowMigrations: "db.collection", allowMigrations: true},

@@ -210,7 +210,8 @@ public:
      * Calls to clearFilteringMetadata + clears the _metadataManager object.
      */
     void clearFilteringMetadataForDroppedCollection_nonAuthoritative(OperationContext* opCtx);
-    void clearFilteringMetadataForDroppedCollection_authoritative(OperationContext* opCtx);
+    void clearFilteringMetadataForDroppedCollection_authoritative(OperationContext* opCtx,
+                                                                  const UUID& collectionUuid);
 
     /**
      * Methods to control the collection's critical section. Methods listed below must be called

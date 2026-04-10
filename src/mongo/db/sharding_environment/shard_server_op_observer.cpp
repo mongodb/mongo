@@ -886,14 +886,18 @@ void ShardServerOpObserver::onInvalidateCollectionMetadata(OperationContext* opC
         return;
     }
 
-    const auto nss =
-        CommandHelpers::parseNsCollectionRequired(op.getNss().dbName(), op.getObject());
-
     tassert(11995201,
             "invalidateCollectionMetadata oplog entry is missing the collection UUID",
             op.getUuid());
 
+    const auto nss =
+        CommandHelpers::parseNsCollectionRequired(op.getNss().dbName(), op.getObject());
+
+    const auto entry = InvalidateCollectionMetadataOplogEntry::parse(
+        op.getObject(), IDLParserContext("InvalidateCollectionMetadataOplogEntryContext"));
+
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+
     // We have to consider concurrent recovery threads reading the durable state. As the drain and
     // install is an atomic operation the presence of a recoverer means that we still haven't
     // drained and applied the changes. The invalidate has to be communicated to the recovery
@@ -901,9 +905,15 @@ void ShardServerOpObserver::onInvalidateCollectionMetadata(OperationContext* opC
     //
     // The lack of this means we're free to proceed with a clear of the metadata.
     if (auto recoverer = scopedCsr->getCollectionCacheRecoverer()) {
-        recoverer->onOplogEntry(opCtx, op.getTimestamp(), InvalidateCollectionMetadataOplogEntry{});
+        recoverer->onOplogEntry(opCtx, op.getTimestamp(), entry);
     } else {
-        scopedCsr->clearFilteringMetadata_authoritative(opCtx, *op.getUuid());
+        if (entry.getForDroppedCollection()) {
+            // TODO (SERVER-123079): Switch to authoritative clear once the untracked version
+            // doesn't need to wait for configTime.
+            scopedCsr->clearFilteringMetadataForDroppedCollection_nonAuthoritative(opCtx);
+        } else {
+            scopedCsr->clearFilteringMetadata_authoritative(opCtx, *op.getUuid());
+        }
     }
 }
 

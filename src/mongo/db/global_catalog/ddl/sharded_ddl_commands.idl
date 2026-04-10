@@ -592,7 +592,9 @@ commands:
             requireCollectionEmpty:
                 type: optionalBool
                 description: "If true, the drop operation will only proceed if the collection has no documents."
-
+            forceLegacyRefresh:
+                type: optionalBool
+                description: "If true, the drop operation will force a legacy refresh of the filtering metadata."
         reply_type: OkReply
 
     _shardsvrRenameCollection:
@@ -1063,4 +1065,18 @@ commands:
         namespace: type
         type: namespacestring
         api_version: ""
+        reply_type: OkReply
+
+    _shardsvrCommitDropCollectionMetadata:
+        command_name: _shardsvrCommitDropCollectionMetadata
+        cpp_name: ShardsvrCommitDropCollectionMetadata
+        description: "Internal command to drop collection metadata from the shard catalog."
+        strict: false
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        fields:
+            collectionUUID:
+                type: uuid
+                description: "UUID of the collection being dropped"
         reply_type: OkReply

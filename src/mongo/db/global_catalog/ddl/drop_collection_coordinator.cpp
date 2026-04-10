@@ -49,6 +49,7 @@
 #include "mongo/db/shard_role/shard_catalog/participant_block_gen.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
@@ -77,7 +78,8 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
                                                       bool fromMigrate,
                                                       bool dropSystemCollections,
                                                       const boost::optional<UUID>& expectedUUID,
-                                                      bool requireCollectionEmpty) {
+                                                      bool requireCollectionEmpty,
+                                                      bool forceLegacyRefresh) {
 
     boost::optional<UUID> collectionUUID;
     {
@@ -180,11 +182,13 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
                     logAttrs(nss));
     }
 
-    // Force the refresh of the filtering metadata cache to purge outdated information.
-    // The logic below will cause config.cache.collections.<nss> to be dropped and secondary nodes
-    // to clean their filtering metadata (once the flushed data get replicated).
-    FilteringMetadataCache::get(opCtx)->forceCollectionPlacementRefresh(opCtx, nss);
-    FilteringMetadataCache::get(opCtx)->waitForCollectionFlush(opCtx, nss);
+    if (forceLegacyRefresh) {
+        // Force the refresh of the filtering metadata cache to purge outdated information.
+        // The logic below will cause config.cache.collections.<nss> to be dropped and secondary
+        // nodes to clean their filtering metadata (once the flushed data get replicated).
+        FilteringMetadataCache::get(opCtx)->forceCollectionPlacementRefresh(opCtx, nss);
+        FilteringMetadataCache::get(opCtx)->waitForCollectionFlush(opCtx, nss);
+    }
 
     // Ensures that the removal of filtering metadata and range deletions will be waited
     // for majority at the end of the command.
@@ -275,11 +279,25 @@ void DropCollectionCoordinator::_enterCriticalSection(
     OperationContext* opCtx,
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) {
+    // TODO (SERVER-113003): Drop metadata for untracked collections.
+    const auto collIsTracked = bool(_doc.getCollInfo());
+
     LOGV2_DEBUG(7038100, 2, "Acquiring critical section", logAttrs(nss()));
 
     ShardsvrParticipantBlock blockCRUDOperationsRequest(nss());
     blockCRUDOperationsRequest.setBlockType(mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites);
     blockCRUDOperationsRequest.setReason(_critSecReason);
+
+    // When shards are authoritative, there is no need to clear the filtering metadata upon
+    // releasing the critical section; the commit phase is responsible for updating the shard
+    // catalog with current information. This flag is evaluated at insertion time because on
+    // secondaries, metadata is cleared during the onDelete of the critical section document.
+    if (collIsTracked &&
+        feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        blockCRUDOperationsRequest.setClearCollMetadata(false);
+    }
 
     generic_argument_util::setMajorityWriteConcern(blockCRUDOperationsRequest);
     generic_argument_util::setOperationSessionInfo(blockCRUDOperationsRequest,
@@ -296,7 +314,7 @@ void DropCollectionCoordinator::_commitDropCollection(
     OperationContext* opCtx,
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) {
-    const auto collIsSharded = bool(_doc.getCollInfo());
+    const auto collIsTracked = bool(_doc.getCollInfo());
 
     // Define the identity of the shard that will be in charge of notifying change streams.
     // The value needs to be persisted once retrieved: tracked collections require a data-bearing
@@ -309,7 +327,7 @@ void DropCollectionCoordinator::_commitDropCollection(
         if (!feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting.isEnabled(
                 VersionContext::getDecoration(opCtx),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
-            !collIsSharded) {
+            !collIsTracked) {
             return primaryShardId;
         }
 
@@ -338,7 +356,7 @@ void DropCollectionCoordinator::_commitDropCollection(
                 2,
                 "Dropping collection",
                 logAttrs(nss()),
-                "sharded"_attr = collIsSharded,
+                "tracked"_attr = collIsTracked,
                 "changeStreamsNotifierId"_attr = changeStreamsNotifierShardId);
 
     // The correctness of the commit sequence depends on the execution order of the following
@@ -350,7 +368,11 @@ void DropCollectionCoordinator::_commitDropCollection(
         sharding_ddl_util::removeQueryAnalyzerMetadata(opCtx, nss(), session);
     }
 
-    if (collIsSharded) {
+    bool isAuthoritative = feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
+        VersionContext::getDecoration(opCtx),
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
+    if (collIsTracked) {
         tassert(10644514,
                 "Expected collInfo to be set on the coordinator document",
                 _doc.getCollInfo());
@@ -365,6 +387,18 @@ void DropCollectionCoordinator::_commitDropCollection(
             getNewSession(opCtx),
             **executor,
             false /*logCommitOnConfigPlacementHistory*/);
+
+        if (isAuthoritative) {
+            const auto session = getNewSession(opCtx);
+            sharding_ddl_util::commitDropCollectionMetadataToShardCatalog(
+                opCtx,
+                nss(),
+                _doc.getCollInfo()->getUuid(),
+                Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
+                session,
+                executor,
+                token);
+        }
     }
 
     {
@@ -387,7 +421,17 @@ void DropCollectionCoordinator::_commitDropCollection(
                                             bool fromMigrate) {
         const auto session = getNewSession(opCtx);
         sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-            opCtx, nss(), recipients, **executor, token, session, fromMigrate, false);
+            opCtx,
+            nss(),
+            recipients,
+            **executor,
+            token,
+            session,
+            fromMigrate,
+            false /* dropSystemCollections */,
+            boost::none /* collectionUUID */,
+            false /* requireCollectionEmpty */,
+            !isAuthoritative /* forceLegacyRefresh */);
     };
 
     auto otherParticipants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
@@ -399,7 +443,7 @@ void DropCollectionCoordinator::_commitDropCollection(
     sendParticipantCommand(otherParticipants, true /*fromMigrateParam*/);
     sendParticipantCommand({changeStreamsNotifierShardId}, false /*fromMigrateParam*/);
 
-    if (collIsSharded) {
+    if (collIsTracked) {
         // 3. Insert the effects of the commit into config.placementHistory, if not already present.
         const auto commitTime = [&]() {
             const auto currentTime = VectorClock::get(opCtx)->getTime();
@@ -432,11 +476,25 @@ void DropCollectionCoordinator::_exitCriticalSection(
     OperationContext* opCtx,
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) {
+    // TODO (SERVER-113003): Drop metadata for untracked collections.
+    const auto collIsTracked = bool(_doc.getCollInfo());
+
     LOGV2_DEBUG(7038102, 2, "Releasing critical section", logAttrs(nss()));
 
     ShardsvrParticipantBlock unblockCRUDOperationsRequest(nss());
     unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
     unblockCRUDOperationsRequest.setReason(_critSecReason);
+
+    // When shards are authoritative, there is no need to clear the filtering metadata upon
+    // releasing the critical section; the commit phase is responsible for updating the shard
+    // catalog (both durable and in-memory) with current information on both primary and secondary
+    // nodes.
+    if (collIsTracked &&
+        feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        unblockCRUDOperationsRequest.setClearCollMetadata(false);
+    }
 
     generic_argument_util::setMajorityWriteConcern(unblockCRUDOperationsRequest);
     generic_argument_util::setOperationSessionInfo(unblockCRUDOperationsRequest,

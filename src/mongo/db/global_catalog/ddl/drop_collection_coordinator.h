@@ -85,13 +85,16 @@ public:
      * this is a no-op. If expectedUUID is not set, no UUID check will be performed.
      *
      * If requireCollectionEmpty is set to true and the collection has records, this is a no-op.
+     *
+     * TODO (SERVER-123314): Investigate `forceLegacyRefresh` on all callers.
      */
     static void dropCollectionLocally(OperationContext* opCtx,
                                       const NamespaceString& nss,
                                       bool fromMigrate,
                                       bool dropSystemCollections,
                                       const boost::optional<UUID>& expectedUUID = boost::none,
-                                      bool requireCollectionEmpty = false);
+                                      bool requireCollectionEmpty = false,
+                                      bool forceLegacyRefresh = true);
 
 private:
     const BSONObj _critSecReason;

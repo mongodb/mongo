@@ -37,7 +37,24 @@
 namespace mongo {
 namespace shard_catalog_commit {
 
+/**
+ * Fetches the latest collection metadata and owned chunks from the global catalog, persists them
+ * to the shard catalog (config.shard.catalog.collections and config.shard.catalog.chunks), removes
+ * any stale chunks whose shard key bounds don't match the refined key pattern, writes an oplog
+ * entry to invalidate collection metadata on secondaries, and updates the in-memory
+ * CollectionShardingRuntime (CSR) with the new routing information.
+ */
 void commitRefineShardKeyLocally(OperationContext* opCtx, const NamespaceString& nss);
+
+/**
+ * Deletes the collection and chunk metadata from the shard catalog
+ * (config.shard.catalog.collections and config.shard.catalog.chunks), writes an oplog entry to
+ * invalidate collection metadata on secondaries, and clears the in-memory CollectionShardingRuntime
+ * (CSR) for the dropped collection.
+ */
+void commitDropCollectionLocally(OperationContext* opCtx,
+                                 const NamespaceString& nss,
+                                 const UUID& uuid);
 
 }  // namespace shard_catalog_commit
 }  // namespace mongo

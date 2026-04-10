@@ -1,7 +1,8 @@
 /*
  * Validates that DDLs which update collection metadata also update the shard catalog
- * (config.shard.catalog.collections and config.shard.catalog.chunks) and that
- * checkMetadataConsistency reports no inconsistencies after each DDL.
+ * (config.shard.catalog.collections and config.shard.catalog.chunks), that in-memory filtering
+ * metadata on shard nodes is consistent after each DDL, and that checkMetadataConsistency reports
+ * no inconsistencies after each DDL.
  *
  * @tags: [
  *   featureFlagShardAuthoritativeCollMetadata,
@@ -27,8 +28,11 @@ describe("Authoritative collection metadata vs DDLs", function () {
     }
 
     function getGlobalCatalogChunks(uuid, shardId) {
-        const query = {uuid: uuid, shard: shardId};
-        return st.s.getDB("config").chunks.find(query).sort({min: 1}).toArray();
+        return st.s.getDB("config").chunks.find({uuid: uuid, shard: shardId}).sort({min: 1}).toArray();
+    }
+
+    function getAllGlobalCatalogChunks(uuid) {
+        return st.s.getDB("config").chunks.find({uuid: uuid}).sort({min: 1}).toArray();
     }
 
     function getShardCatalogCollMetadata(node, ns) {
@@ -39,8 +43,12 @@ describe("Authoritative collection metadata vs DDLs", function () {
         return node.getDB("config").getCollection(kShardCatalogChunksNs).find({uuid: uuid}).sort({min: 1}).toArray();
     }
 
-    function getAllGlobalCatalogChunks(uuid) {
-        return st.s.getDB("config").chunks.find({uuid: uuid}).sort({min: 1}).toArray();
+    function getInMemoryCollectionMetadata(node, ns) {
+        return assert.commandWorked(node.adminCommand({getShardVersion: ns, fullMetadata: true}));
+    }
+
+    function forEachNodeOnAllShards(fn) {
+        [st.rs0, st.rs1].forEach((rs) => rs.nodes.forEach(fn));
     }
 
     function assertShardCatalogOnNode(node, ns, {expectedUuid, expectedKey, expectedChunks}) {
@@ -67,8 +75,63 @@ describe("Authoritative collection metadata vs DDLs", function () {
         }
     }
 
-    function getInMemoryCollectionMetadata(node, ns) {
-        return assert.commandWorked(node.adminCommand({getShardVersion: ns, fullMetadata: true}));
+    function assertShardCatalogAbsentOnNode(node, ns, uuid) {
+        const label = node.host;
+        assert.eq(
+            null,
+            getShardCatalogCollMetadata(node, ns),
+            `${label}: unexpected collection metadata in shard catalog`,
+        );
+        assert.eq(0, getShardCatalogChunks(node, uuid).length, `${label}: unexpected chunks in shard catalog`);
+    }
+
+    // We assert the in-memory metadata is not sharded rather than completely absent because a
+    // non-existent collection is considered untracked by the server, so it is valid for the CSS
+    // to retain an UNTRACKED token after the drop. The important invariant is that the CSS does
+    // not report the collection as sharded (no shard key pattern).
+    function assertInMemoryMetadataNotSharded(node, ns) {
+        const label = node.host;
+        const res = getInMemoryCollectionMetadata(node, ns);
+        if (res.metadata) {
+            assert.eq(
+                undefined,
+                res.metadata.keyPattern,
+                `${label}: in-memory metadata still shows collection as sharded after drop`,
+            );
+        }
+    }
+
+    function assertInMemoryMetadataSharded(node, ns, expectedKey) {
+        const label = node.host;
+        const res = getInMemoryCollectionMetadata(node, ns);
+        assert(res.metadata, `${label}: expected in-memory metadata to be present`);
+        assert.eq(tojson(expectedKey), tojson(res.metadata.keyPattern), `${label}: in-memory shard key mismatch`);
+    }
+
+    function dropCollectionAndAssertCleanup(db, collName) {
+        const ns = `${db.getName()}.${collName}`;
+
+        const globalMeta = getGlobalCatalogCollMetadata(ns);
+        assert.neq(null, globalMeta, `${ns}: expected in global catalog before drop`);
+        const uuid = globalMeta.uuid;
+
+        assert.commandWorked(db.runCommand({drop: collName}));
+
+        assert.eq(null, getGlobalCatalogCollMetadata(ns), `${ns}: still in global catalog after drop`);
+        assert.eq(0, getAllGlobalCatalogChunks(uuid).length, `${ns}: chunks still in global catalog after drop`);
+
+        st.awaitReplicationOnShards();
+        forEachNodeOnAllShards((node) => {
+            assertShardCatalogAbsentOnNode(node, ns, uuid);
+            assertInMemoryMetadataNotSharded(node, ns);
+        });
+    }
+
+    function setupDb(suffix) {
+        const dbName = uniqueDbName(suffix);
+        const db = st.s.getDB(dbName);
+        assert.commandWorked(db.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+        return db;
     }
 
     before(function () {
@@ -85,14 +148,11 @@ describe("Authoritative collection metadata vs DDLs", function () {
     });
 
     describe("refineCollectionShardKey", function () {
-        const dbName = uniqueDbName("refine");
-        const ns = `${dbName}.coll`;
-
         it("updates shard catalog on both shards with refined key and correct chunk boundaries", function () {
-            const db = st.s.getDB(dbName);
-            assert.commandWorked(db.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
-            assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
+            const db = setupDb("refine");
+            const ns = `${db.getName()}.coll`;
 
+            assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
             assert.commandWorked(db.adminCommand({split: ns, middle: {x: 0}}));
             assert.commandWorked(
                 db.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
@@ -127,13 +187,7 @@ describe("Authoritative collection metadata vs DDLs", function () {
                 assert.gt(shardGlobalChunks.length, 0, `Expected at least one chunk on ${shardName}`);
 
                 // Validate in-memory metadata on each shard's primary.
-                const primaryNode = rs.getPrimary();
-                const inMemoryMeta = getInMemoryCollectionMetadata(primaryNode, ns);
-                assert.eq(
-                    tojson(refinedKey),
-                    tojson(inMemoryMeta.metadata.keyPattern),
-                    `${shardName}: in-memory shard key mismatch`,
-                );
+                assertInMemoryMetadataSharded(rs.getPrimary(), ns, refinedKey);
 
                 // Validate durable shard catalog on every node (primary + secondaries).
                 rs.nodes.forEach((node) => {
@@ -227,6 +281,70 @@ describe("Authoritative collection metadata vs DDLs", function () {
                     });
                 });
             }
+        });
+    });
+
+    describe("dropCollection", function () {
+        it("cleans up shard catalog on all nodes for a multi-shard sharded collection", function () {
+            const db = setupDb("drop_multi");
+            const ns = `${db.getName()}.coll`;
+
+            assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
+            assert.commandWorked(db.adminCommand({split: ns, middle: {x: 0}}));
+            assert.commandWorked(
+                db.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+            );
+            assert.commandWorked(db.coll.insert([{x: -1}, {x: 1}]));
+
+            dropCollectionAndAssertCleanup(db, "coll");
+        });
+
+        it("cleans up shard catalog for a single-shard sharded collection", function () {
+            const db = setupDb("drop_single");
+            const ns = `${db.getName()}.coll`;
+
+            assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
+            assert.commandWorked(db.coll.insert([{x: 1}, {x: 2}]));
+
+            dropCollectionAndAssertCleanup(db, "coll");
+        });
+
+        it("cleans up shard catalog for an unsharded tracked collection after moveCollection", function () {
+            const db = setupDb("drop_tracked");
+            const ns = `${db.getName()}.coll`;
+
+            assert.commandWorked(db.coll.insert([{x: 1}, {x: 2}]));
+            assert.commandWorked(db.adminCommand({moveCollection: ns, toShard: st.shard1.shardName}));
+
+            dropCollectionAndAssertCleanup(db, "coll");
+        });
+    });
+
+    describe("dropDatabase", function () {
+        it("cleans up shard catalog for all tracked collections in the database", function () {
+            const db = setupDb("dropdb");
+            const dbName = db.getName();
+            const ns1 = `${dbName}.coll1`;
+            const ns2 = `${dbName}.coll2`;
+
+            assert.commandWorked(db.adminCommand({shardCollection: ns1, key: {a: 1}}));
+            assert.commandWorked(db.adminCommand({shardCollection: ns2, key: {b: 1}}));
+            assert.commandWorked(db.coll1.insert([{a: 1}]));
+            assert.commandWorked(db.coll2.insert([{b: 1}]));
+
+            const uuid1 = getGlobalCatalogCollMetadata(ns1).uuid;
+            const uuid2 = getGlobalCatalogCollMetadata(ns2).uuid;
+
+            assert.commandWorked(db.dropDatabase());
+
+            st.awaitReplicationOnShards();
+
+            forEachNodeOnAllShards((node) => {
+                assertShardCatalogAbsentOnNode(node, ns1, uuid1);
+                assertShardCatalogAbsentOnNode(node, ns2, uuid2);
+                assertInMemoryMetadataNotSharded(node, ns1);
+                assertInMemoryMetadataNotSharded(node, ns2);
+            });
         });
     });
 });

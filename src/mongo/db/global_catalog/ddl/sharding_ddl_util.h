@@ -267,7 +267,8 @@ MONGO_MOD_NEEDS_REPLACEMENT void sendDropCollectionParticipantCommandToShards(
     bool fromMigrate,
     bool dropSystemCollections,
     const boost::optional<UUID>& collectionUUID = boost::none,
-    bool requireCollectionEmpty = false);
+    bool requireCollectionEmpty = false,
+    bool forceLegacyRefresh = true);
 
 MONGO_MOD_NEEDS_REPLACEMENT BSONObj getCriticalSectionReasonForRename(const NamespaceString& from,
                                                                       const NamespaceString& to);
@@ -386,6 +387,19 @@ MONGO_MOD_NEEDS_REPLACEMENT void sendFetchCollMetadataToShards(
 MONGO_MOD_PRIVATE void commitRefineCollectionShardKeyToShardCatalog(
     OperationContext* opCtx,
     const NamespaceString& nss,
+    const std::vector<ShardId>& shardIds,
+    const OperationSessionInfo& osi,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token);
+
+/**
+ *  Commits a dropCollection operation to the shard catalog by sending the command
+ * `_shardsvrCommitDropCollectionMetadata` to all given shards.
+ */
+MONGO_MOD_PRIVATE void commitDropCollectionMetadataToShardCatalog(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const UUID& uuid,
     const std::vector<ShardId>& shardIds,
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,

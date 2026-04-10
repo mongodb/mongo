@@ -62,6 +62,7 @@
 #include "mongo/db/shard_role/shard_catalog/participant_block_gen.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/shard_registry.h"
@@ -301,6 +302,17 @@ void DropDatabaseCoordinator::_dropTrackedCollection(
         blockCRUDOperationsRequest.setBlockType(
             mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites);
         blockCRUDOperationsRequest.setReason(getReasonForDropCollection(nss));
+
+        // When shards are authoritative, there is no need to clear the filtering metadata upon
+        // releasing the critical section; the commit phase is responsible for updating the shard
+        // catalog with current information. This flag is evaluated at insertion time because on
+        // secondaries, metadata is cleared during the onDelete of the critical section document.
+        if (feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            blockCRUDOperationsRequest.setClearCollMetadata(false);
+        }
+
         generic_argument_util::setMajorityWriteConcern(blockCRUDOperationsRequest);
         generic_argument_util::setOperationSessionInfo(blockCRUDOperationsRequest,
                                                        getNewSession(opCtx));
@@ -325,6 +337,22 @@ void DropDatabaseCoordinator::_dropTrackedCollection(
         sharding_ddl_util::removeTagsMetadataFromConfig(opCtx, nss, session);
     }
 
+    bool isAuthoritative = feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
+        VersionContext::getDecoration(opCtx),
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
+    if (isAuthoritative) {
+        const auto session = getNewSession(opCtx);
+        sharding_ddl_util::commitDropCollectionMetadataToShardCatalog(
+            opCtx,
+            nss,
+            coll.getUuid(),
+            Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
+            session,
+            executor,
+            token);
+    }
+
     // Remove the query sampling configuration documents for the collection, if it exists.
     sharding_ddl_util::removeQueryAnalyzerMetadata(opCtx, {coll.getUuid()});
 
@@ -342,7 +370,10 @@ void DropDatabaseCoordinator::_dropTrackedCollection(
             token,
             getNewSession(opCtx),
             fromMigrate,
-            false /* dropSystemCollections */);
+            false /* dropSystemCollections */,
+            boost::none /* collectionUUID */,
+            false /* requireCollectionEmpty */,
+            !isAuthoritative /* forceLegacyRefresh */);
     };
     auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
     // Remove primary shard from participants
@@ -389,6 +420,17 @@ void DropDatabaseCoordinator::_dropTrackedCollection(
         ShardsvrParticipantBlock unblockCRUDOperationsRequest(nss);
         unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
         unblockCRUDOperationsRequest.setReason(getReasonForDropCollection(nss));
+
+        // When shards are authoritative, there is no need to clear the filtering metadata upon
+        // releasing the critical section; the commit phase is responsible for updating the shard
+        // catalog (both durable and in-memory) with current information on both primary and
+        // secondary nodes.
+        if (feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            unblockCRUDOperationsRequest.setClearCollMetadata(false);
+        }
+
         generic_argument_util::setMajorityWriteConcern(unblockCRUDOperationsRequest);
         generic_argument_util::setOperationSessionInfo(unblockCRUDOperationsRequest,
                                                        getNewSession(opCtx));

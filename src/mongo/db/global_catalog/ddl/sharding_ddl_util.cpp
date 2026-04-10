@@ -581,12 +581,14 @@ void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
                                                   bool fromMigrate,
                                                   bool dropSystemCollections,
                                                   const boost::optional<UUID>& collectionUUID,
-                                                  bool requireCollectionEmpty) {
+                                                  bool requireCollectionEmpty,
+                                                  bool forceLegacyRefresh) {
     ShardsvrDropCollectionParticipant dropCollectionParticipant(nss);
     dropCollectionParticipant.setFromMigrate(fromMigrate);
     dropCollectionParticipant.setDropSystemCollections(dropSystemCollections);
     dropCollectionParticipant.setCollectionUUID(collectionUUID);
     dropCollectionParticipant.setRequireCollectionEmpty(requireCollectionEmpty);
+    dropCollectionParticipant.setForceLegacyRefresh(forceLegacyRefresh);
     generic_argument_util::setOperationSessionInfo(dropCollectionParticipant, osi);
     generic_argument_util::setMajorityWriteConcern(dropCollectionParticipant);
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrDropCollectionParticipant>>(
@@ -899,6 +901,27 @@ void commitRefineCollectionShardKeyToShardCatalog(
     auto opts =
         std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrCommitRefineCollectionShardKey>>(
             **executor, token, std::move(request));
+
+    sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
+}
+
+void commitDropCollectionMetadataToShardCatalog(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const UUID& uuid,
+    const std::vector<ShardId>& shardIds,
+    const OperationSessionInfo& osi,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
+    ShardsvrCommitDropCollectionMetadata request(nss);
+    request.setDbName(DatabaseName::kAdmin);
+    request.setCollectionUUID(uuid);
+
+    generic_argument_util::setMajorityWriteConcern(request);
+    generic_argument_util::setOperationSessionInfo(request, osi);
+
+    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrCommitDropCollectionMetadata>>(
+        **executor, token, std::move(request));
 
     sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
