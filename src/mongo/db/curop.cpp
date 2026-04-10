@@ -293,7 +293,8 @@ CurOp* CurOp::get(const OperationContext& opCtx) {
     return _curopStack(opCtx).top();
 }
 
-void CurOp::reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+void CurOp::reportCurrentOpForClient(WithLock,
+                                     const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                      Client* client,
                                      bool truncateOps,
                                      BSONObjBuilder* infoBuilder) {
@@ -381,7 +382,7 @@ void CurOp::reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContex
     }
 }
 
-bool CurOp::currentOpBelongsToTenant(Client* client, TenantId tenantId) {
+bool CurOp::currentOpBelongsToTenant(WithLock, Client* client, TenantId tenantId) {
     invariant(client);
 
     OperationContext* clientOpCtx = client->getOperationContext();
@@ -616,7 +617,7 @@ ProgressMeter& CurOp::setProgress(WithLock lk,
     return _progressMeter.value();
 }
 
-void CurOp::updateStatsOnTransactionUnstash(ClientLock&) {
+void CurOp::updateStatsOnTransactionUnstash(WithLock) {
     // Store lock stats and storage metrics from the locker and recovery unit after unstashing.
     // These stats have accrued outside of this CurOp instance so we will ignore/subtract them when
     // reporting on this operation.
@@ -624,7 +625,7 @@ void CurOp::updateStatsOnTransactionUnstash(ClientLock&) {
     _resourceStatsBase->addForUnstash(getAdditiveResourceStats(boost::none));
 }
 
-void CurOp::updateStatsOnTransactionStash(ClientLock&) {
+void CurOp::updateStatsOnTransactionStash(WithLock) {
     // Store lock stats and storage metrics that happened during this operation before the locker
     // and recovery unit are stashed. We take the delta of the stats before stashing and the base
     // stats which includes the snapshot of stats when it was unstashed. This stats delta on

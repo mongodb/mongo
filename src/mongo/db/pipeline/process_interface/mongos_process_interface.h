@@ -435,7 +435,8 @@ public:
                                             bool addPrimaryShard) final;
 
 protected:
-    BSONObj _reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    BSONObj _reportCurrentOpForClient(WithLock,
+                                      const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       Client* client,
                                       CurrentOpTruncateMode truncateOps) const final;
 

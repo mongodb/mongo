@@ -106,7 +106,7 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
                     if ((userName && userName->tenantId() &&
                          userName->tenantId() != expCtxTenantId) ||
                         (userName && !userName->tenantId() &&
-                         !CurOp::currentOpBelongsToTenant(client, *expCtxTenantId))) {
+                         !CurOp::currentOpBelongsToTenant(lc, client, *expCtxTenantId))) {
                         continue;
                     }
                 }
@@ -136,7 +136,7 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
             //
             // Delegate to the mongoD- or mongoS-specific implementation of
             // _reportCurrentOpForClient.
-            BSONObj candidateOpBSON = _reportCurrentOpForClient(expCtx, client, truncateMode);
+            BSONObj candidateOpBSON = _reportCurrentOpForClient(lc, expCtx, client, truncateMode);
             if (connMode == CurrentOpConnectionsMode::kExcludeIdle &&
                 !candidateOpBSON["active"].Bool()) {
                 continue;

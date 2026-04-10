@@ -128,12 +128,13 @@ public:
      * supply lock stats. The client must be locked before calling this method.
      */
     MONGO_MOD_NEEDS_REPLACEMENT static void reportCurrentOpForClient(
+        WithLock,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         Client* client,
         bool truncateOps,
         BSONObjBuilder* infoBuilder);
 
-    static bool currentOpBelongsToTenant(Client* client, TenantId tenantId);
+    static bool currentOpBelongsToTenant(WithLock, Client* client, TenantId tenantId);
 
     /**
      * Serializes the fields of a GenericCursor which do not appear elsewhere in the currentOp
@@ -591,7 +592,7 @@ public:
      * Assumes that operation will only unstash transaction resources once. Requires holding the
      * client lock.
      */
-    void updateStatsOnTransactionUnstash(ClientLock&);
+    void updateStatsOnTransactionUnstash(WithLock);
 
     /**
      * Captures stats on the locker and recovery unit that happened during this CurOp instance
@@ -599,7 +600,7 @@ public:
      * resources were unstashed. Assumes that operation will only stash transaction resources once.
      * Requires holding the client lock.
      */
-    void updateStatsOnTransactionStash(ClientLock&);
+    void updateStatsOnTransactionStash(WithLock);
 
     /**
      * Sets the current and max used memory for this CurOp instance.
@@ -641,7 +642,7 @@ public:
         return parent() == nullptr;
     }
 
-    boost::optional<GenericCursor> getGenericCursor(ClientLock) const {
+    boost::optional<GenericCursor> getGenericCursor(WithLock) const {
         return _genericCursor;
     }
 

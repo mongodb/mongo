@@ -1037,8 +1037,8 @@ TEST(CurOpTest, ShouldReportIsFromUserConnection) {
                                        SerializationContext::Prefix::ExcludePrefix);
         auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get(), nss, sc);
 
-        curop->reportCurrentOpForClient(expCtx, client, false, &curOpObj);
-        curop->reportCurrentOpForClient(expCtx, clientUserConn.get(), false, &curOpObjUserConn);
+        curop->reportCurrentOpForClient(lk, expCtx, client, false, &curOpObj);
+        curop->reportCurrentOpForClient(lk, expCtx, clientUserConn.get(), false, &curOpObjUserConn);
     }
     auto bsonObj = curOpObj.done();
     auto bsonObjUserConn = curOpObjUserConn.done();
@@ -1079,9 +1079,9 @@ TEST(CurOpTest, ShouldNotReportIsFromPriorityPortConnectionWhenFFDisabled) {
                                        SerializationContext::Prefix::ExcludePrefix);
         auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get(), nss, sc);
 
-        curop->reportCurrentOpForClient(expCtx, client, false, &curOpObj);
+        curop->reportCurrentOpForClient(lk, expCtx, client, false, &curOpObj);
         curop->reportCurrentOpForClient(
-            expCtx, clientPriorityConn.get(), false, &curOpObjPriorityConn);
+            lk, expCtx, clientPriorityConn.get(), false, &curOpObjPriorityConn);
     }
     auto bsonObj = curOpObj.done();
     auto bsonObjPriorityConn = curOpObjPriorityConn.done();
@@ -1120,9 +1120,9 @@ TEST(CurOpTest, ShouldReportIsFromPriorityPortConnection) {
                                        SerializationContext::Prefix::ExcludePrefix);
         auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get(), nss, sc);
 
-        curop->reportCurrentOpForClient(expCtx, client, false, &curOpObj);
+        curop->reportCurrentOpForClient(lk, expCtx, client, false, &curOpObj);
         curop->reportCurrentOpForClient(
-            expCtx, clientPriorityConn.get(), false, &curOpObjPriorityConn);
+            lk, expCtx, clientPriorityConn.get(), false, &curOpObjPriorityConn);
     }
     auto bsonObj = curOpObj.done();
     auto bsonObjPriorityConn = curOpObjPriorityConn.done();

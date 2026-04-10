@@ -1142,14 +1142,15 @@ TEST_F(OperationContextTest, CurrentOpExcludesKilledOperations) {
             auto threadClient = getService()->makeClient("ThreadClient");
 
             // Generate report in absence of any opCtx
-            CurOp::reportCurrentOpForClient(expCtx, threadClient.get(), truncateOps, &bobNoOpCtx);
+            CurOp::reportCurrentOpForClient(
+                lk, expCtx, threadClient.get(), truncateOps, &bobNoOpCtx);
 
             auto threadOpCtx = threadClient->makeOperationContext();
             getServiceContext()->killAndDelistOperation(threadOpCtx.get());
 
             // Generate report in presence of a killed opCtx
             CurOp::reportCurrentOpForClient(
-                expCtx, threadClient.get(), truncateOps, &bobKilledOpCtx);
+                lk, expCtx, threadClient.get(), truncateOps, &bobKilledOpCtx);
         });
 
         thread.join();
