@@ -299,6 +299,51 @@ export const testClusteredCollectionBoundedScan = function (coll, clusterKey, ch
         testRange("$_internalExprGte", 20, "$_internalExprLte", 40, 21, 22);
     }
 
+    // Verifies that a backward (descending) bounded scan returns the same results as a forward
+    // (ascending) scan, just in reverse order. This catches bugs where ScanBoundInclusion bits
+    // are not correctly mapped for backward scans (see SERVER-121822).
+    function assertForwardBackwardConsistency(filter, comment) {
+        const forward = coll
+            .find(filter)
+            .sort({[clusterKeyFieldName]: 1})
+            .toArray();
+        const backward = coll
+            .find(filter)
+            .sort({[clusterKeyFieldName]: -1})
+            .toArray();
+
+        assert.docEq(
+            forward,
+            backward.reverse(),
+            comment + ": backward scan results do not match forward scan results (reversed)",
+        );
+    }
+
+    function testBackwardBoundedScans() {
+        initAndPopulate(coll, clusterKey);
+
+        // Equality.
+        assertForwardBackwardConsistency({[clusterKeyFieldName]: {$eq: 50}}, "backward $eq");
+
+        // Single exclusive bound.
+        assertForwardBackwardConsistency({[clusterKeyFieldName]: {$lt: 10}}, "backward $lt");
+        assertForwardBackwardConsistency({[clusterKeyFieldName]: {$gt: 89}}, "backward $gt");
+
+        // Single inclusive bound.
+        assertForwardBackwardConsistency({[clusterKeyFieldName]: {$lte: 10}}, "backward $lte");
+        assertForwardBackwardConsistency({[clusterKeyFieldName]: {$gte: 89}}, "backward $gte");
+
+        // Both bounds exclusive.
+        assertForwardBackwardConsistency({[clusterKeyFieldName]: {$gt: 20, $lt: 40}}, "backward $gt/$lt");
+
+        // Both bounds inclusive.
+        assertForwardBackwardConsistency({[clusterKeyFieldName]: {$gte: 20, $lte: 40}}, "backward $gte/$lte");
+
+        // Mixed bounds.
+        assertForwardBackwardConsistency({[clusterKeyFieldName]: {$gte: 20, $lt: 40}}, "backward $gte/$lt");
+        assertForwardBackwardConsistency({[clusterKeyFieldName]: {$gt: 20, $lte: 40}}, "backward $gt/$lte");
+    }
+
     function testBoundedScans(coll, clusterKey) {
         testEq();
 
@@ -335,6 +380,7 @@ export const testClusteredCollectionBoundedScan = function (coll, clusterKey, ch
 
         testNonClusterKeyScan();
         testInternalExprBoundedScans(coll, clusterKey);
+        testBackwardBoundedScans();
     }
 
     return testBoundedScans(coll, clusterKey);
