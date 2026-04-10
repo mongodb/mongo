@@ -1242,5 +1242,33 @@ TEST_F(ReshardingDonorRecipientCommonTest,
                                RecipientFieldsValidator{});
 }
 
+TEST_F(ReshardingDonorRecipientCommonTest,
+       CreateReshardingStateMachine_PropagatesNotPrimaryWhenFlagTrue) {
+    OperationContext* opCtx = operationContext();
+    ReshardingRecipientDocument recipDoc = makeRecipientStateDoc();
+    ReshardingRecipientService::RecipientStateMachine::insertStateDocument(opCtx, recipDoc);
+    _primaryOnlyServiceRegistry->onStepDown();
+    ASSERT_THROWS_CODE(
+        (resharding::createReshardingStateMachine<ReshardingRecipientService,
+                                                  ReshardingRecipientService::RecipientStateMachine,
+                                                  ReshardingRecipientDocument>(
+            opCtx, recipDoc, true)),
+        DBException,
+        ErrorCodes::NotWritablePrimary);
+}
+
+TEST_F(ReshardingDonorRecipientCommonTest,
+       CreateReshardingStateMachine_SwallowsNotPrimaryWhenFlagFalse) {
+    OperationContext* opCtx = operationContext();
+    ReshardingRecipientDocument recipDoc = makeRecipientStateDoc();
+    ReshardingRecipientService::RecipientStateMachine::insertStateDocument(opCtx, recipDoc);
+    _primaryOnlyServiceRegistry->onStepDown();
+    ASSERT_DOES_NOT_THROW(
+        (resharding::createReshardingStateMachine<ReshardingRecipientService,
+                                                  ReshardingRecipientService::RecipientStateMachine,
+                                                  ReshardingRecipientDocument>(
+            opCtx, recipDoc, false)));
+}
+
 }  // namespace
 }  // namespace mongo
