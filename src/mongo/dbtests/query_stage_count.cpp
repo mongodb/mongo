@@ -89,7 +89,6 @@ const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest(
 
 class CountStageTest {
 public:
-    // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
     CountStageTest()
         : _autodb(&_opCtx, nss().dbName(), MODE_X),
           _expCtx(ExpressionContextBuilder{}.opCtx(&_opCtx).ns(kTestNss).build()) {}

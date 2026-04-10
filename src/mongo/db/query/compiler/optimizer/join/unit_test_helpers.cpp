@@ -141,7 +141,7 @@ void JoinOrderingTestFixture::createIndex(UUID collUUID, BSONObj spec, std::stri
 
 std::unique_ptr<ce::SamplingEstimator> JoinOrderingTestFixture::samplingEstimator(
     const MultipleCollectionAccessor& mca, NamespaceString nss, double sampleProportion) {
-    auto collPtr = mca.lookupCollection(nss);
+    const auto& collPtr = mca.lookupCollection(nss);
     auto size = collPtr->getRecordStore()->numRecords();
     auto sampleSize = static_cast<long>(size * sampleProportion);
     auto samplingEstimator = std::make_unique<ce::SamplingEstimatorImpl>(

@@ -214,10 +214,10 @@ bool pipelineStageIsCompatible(const OperationContext* opCtx,
             return false;
         }
 
-        const auto& secondaryCollections = collections.getSecondaryCollections();
-        if (const auto& coll = secondaryCollections.find(lookupStage->getFromNs());
-            coll != secondaryCollections.end() && coll->second &&
-            coll->second->isTimeseriesCollection()) {
+        const auto& secondaryAcq = collections.getSecondaryCollectionAcquisitions();
+        if (const auto it = secondaryAcq.find(lookupStage->getFromNs()); it != secondaryAcq.end() &&
+            it->second.getCollectionPtr() &&
+            it->second.getCollectionPtr()->isTimeseriesCollection()) {
             return false;
         }
 

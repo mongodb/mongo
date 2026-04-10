@@ -248,10 +248,12 @@ TEST_F(MultipleCollectionAccessorTest, secondaryCollectionsViaAcquisition) {
               accessor.getMainCollectionAcquisition().uuid());
 
     // Check the secondary collections are correctly returned.
-    auto secondaryCollectionMap = accessor.getSecondaryCollections();
-    ASSERT_EQ(2, secondaryCollectionMap.size());
-    ASSERT_EQ(acquisitionSecondary1.getCollectionPtr(), secondaryCollectionMap[secondaryNss1]);
-    ASSERT_EQ(acquisitionSecondary2.getCollectionPtr(), secondaryCollectionMap[secondaryNss2]);
+    const auto& secondaryAcqMap = accessor.getSecondaryCollectionAcquisitions();
+    ASSERT_EQ(2, secondaryAcqMap.size());
+    ASSERT_EQ(acquisitionSecondary1.getCollectionPtr(),
+              secondaryAcqMap.at(secondaryNss1).getCollectionPtr());
+    ASSERT_EQ(acquisitionSecondary2.getCollectionPtr(),
+              secondaryAcqMap.at(secondaryNss2).getCollectionPtr());
 
     // Check the lookup returns the correct acquisition by namespace.
     ASSERT_EQ(acquisitionSecondary1.getCollectionPtr(), accessor.lookupCollection(secondaryNss1));
@@ -291,10 +293,10 @@ TEST_F(MultipleCollectionAccessorTest, secondaryViewsViaAcquisition) {
         acquisitionMain, makeAcquisitionMap({acquisitionSecondary1, acquisitionSecondary2}), false);
 
     // Views return a null CollectionPtr.
-    auto secondaryCollectionMap = accessor.getSecondaryCollections();
-    ASSERT_EQ(2, secondaryCollectionMap.size());
-    ASSERT_FALSE(secondaryCollectionMap[secondaryView1]);
-    ASSERT_FALSE(secondaryCollectionMap[secondaryView2]);
+    const auto& secondaryAcqMap = accessor.getSecondaryCollectionAcquisitions();
+    ASSERT_EQ(2, secondaryAcqMap.size());
+    ASSERT_FALSE(secondaryAcqMap.at(secondaryView1).getCollectionPtr());
+    ASSERT_FALSE(secondaryAcqMap.at(secondaryView2).getCollectionPtr());
 
     // Views return a null CollectionPtr.
     ASSERT_FALSE(accessor.lookupCollection(secondaryView1));

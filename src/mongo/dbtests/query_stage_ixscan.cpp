@@ -103,7 +103,6 @@ public:
 
     void insert(const BSONObj& doc) {
         WriteUnitOfWork wunit(&_opCtx);
-        // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
         ASSERT_OK(Helpers::insert(&_opCtx, _collection->getCollectionPtr(), doc));
         wunit.commit();
     }

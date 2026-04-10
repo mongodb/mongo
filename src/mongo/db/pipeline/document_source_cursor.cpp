@@ -162,7 +162,8 @@ void DocumentSourceCursor::bindCatalogInfo(
             _sharedState->stats.planSummaryStats.collectionScansNonTailable,
             _sharedState->stats.planSummaryStats.indexesUsed);
     }
-    for (auto& [nss, coll] : collections.getSecondaryCollections()) {
+    for (const auto& [nss, acq] : collections.getSecondaryCollectionAcquisitions()) {
+        const auto& coll = acq.getCollectionPtr();
         if (coll) {
             PlanSummaryStats stats;
             explainer.getSecondarySummaryStats(nss, &stats);

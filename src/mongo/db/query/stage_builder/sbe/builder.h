@@ -1183,7 +1183,7 @@ private:
      * Returns a CollectionPtr for the requested collection, which must exist in the '_collections'
      * set.
      */
-    CollectionPtr getCollection(const NamespaceString& nss) const;
+    const CollectionPtr& getCollection(const NamespaceString& nss) const;
 
     std::pair<std::vector<std::string>, sbe::value::SlotVector> buildSearchMetadataSlots();
 

@@ -1127,7 +1127,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildCountScan(
 
     auto csn = static_cast<const CountScanNode*>(root);
 
-    auto collection = getCollection(csn->nss);
+    const auto& collection = getCollection(csn->nss);
     auto indexName = csn->index.identifier.catalogName;
     const auto indexEntry = collection->getIndexCatalog()->findIndexByName(_state.opCtx, indexName);
     const auto indexDescriptor = indexEntry->descriptor();
@@ -1855,7 +1855,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSortMerge(
     if (mergeSortNode->dedup) {
         // TODO: SERVER-114436 This assumes that all results for merging come from the main
         // collection.
-        auto collection = getCollection(_mainNss);
+        const auto& collection = getCollection(_mainNss);
         if (collection->isClustered()) {
             stage = b.makeUnique(std::move(stage), outputs.get(kRecordId));
         } else {
@@ -3074,7 +3074,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildOr(const QuerySol
     if (orn->dedup) {
         // TODO: SERVER-114436 This assumes that all results for merging come from the main
         // collection.
-        auto collection = getCollection(_mainNss);
+        const auto& collection = getCollection(_mainNss);
         if (collection->isClustered()) {
             stage = b.makeUnique(std::move(stage), outputs.get(kRecordId));
         } else {
@@ -3104,7 +3104,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildTextMatch(
     SbBuilder b(_state, root->nodeId());
 
     auto textNode = static_cast<const TextMatchNode*>(root);
-    auto coll = getCollection(textNode->nss);
+    const auto& coll = getCollection(textNode->nss);
     tassert(5432212, "no collection object", coll);
     tassert(6023410, "buildTextMatch() does not support kSortKey", !reqs.hasSortKeys());
     tassert(5432215,
@@ -4684,7 +4684,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSearch(const Quer
         return buildSearchMeta(sn, _state, _cq, &_slotIdGenerator, _env, _yieldPolicy);
     }
 
-    auto collection = getCollection(sn->nss);
+    const auto& collection = getCollection(sn->nss);
     auto expCtx = _cq.getExpCtxRaw();
 
     // Register search query parameter slots.
@@ -4927,14 +4927,13 @@ std::pair<SbStage, bool> SlotBasedStageBuilder::buildVectorizedFilterExpr(
     }
 }
 
-CollectionPtr SlotBasedStageBuilder::getCollection(const NamespaceString& nss) const {
-    const auto coll = _collections.lookupCollection(nss);
+const CollectionPtr& SlotBasedStageBuilder::getCollection(const NamespaceString& nss) const {
+    const auto& coll = _collections.lookupCollection(nss);
     tassert(7922500,
             str::stream() << "No collection found that matches namespace '"
                           << nss.toStringForErrorMsg() << "'",
             coll != CollectionPtr::null);
-    // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-    return CollectionPtr::CollectionPtr_UNSAFE(coll.get());
+    return coll;
 }
 
 // Returns a non-null pointer to the root of a plan tree, or a non-OK status if the PlanStage tree

@@ -412,9 +412,10 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateWithSecondaryC
 
     // Verify secondary collections
     {
-        auto secondaryColls = aggCatalogState->getCollections().getSecondaryCollections();
-        ASSERT_EQ(1, secondaryColls.size());
-        ASSERT_TRUE(secondaryColls.contains(secondaryNssColl));
+        const auto& secondaryAcq =
+            aggCatalogState->getCollections().getSecondaryCollectionAcquisitions();
+        ASSERT_EQ(1, secondaryAcq.size());
+        ASSERT_TRUE(secondaryAcq.contains(secondaryNssColl));
     }
 
     // Verify MultipleCollectionAccessor
@@ -452,9 +453,10 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateWithSecondaryS
 
     // Verify secondary collections
     {
-        auto secondaryColls = aggCatalogState->getCollections().getSecondaryCollections();
-        ASSERT_EQ(1, secondaryColls.size());
-        ASSERT_TRUE(secondaryColls.contains(secondaryNssColl));
+        const auto& secondaryAcq =
+            aggCatalogState->getCollections().getSecondaryCollectionAcquisitions();
+        ASSERT_EQ(1, secondaryAcq.size());
+        ASSERT_TRUE(secondaryAcq.contains(secondaryNssColl));
     }
 
     // Verify MultipleCollectionAccessor
@@ -491,9 +493,10 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateWithSecondaryV
 
     // Verify secondary collections
     {
-        auto secondaryColls = aggCatalogState->getCollections().getSecondaryCollections();
-        ASSERT_EQ(1, secondaryColls.size());
-        ASSERT_TRUE(secondaryColls.contains(secondaryNssView));
+        const auto& secondaryAcq =
+            aggCatalogState->getCollections().getSecondaryCollectionAcquisitions();
+        ASSERT_EQ(1, secondaryAcq.size());
+        ASSERT_TRUE(secondaryAcq.contains(secondaryNssView));
     }
 
     // Verify MultipleCollectionAccessor

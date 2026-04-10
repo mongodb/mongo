@@ -458,8 +458,8 @@ void QueryPlannerParams::fillOutSecondaryCollectionsInfo(
         }
         secondaryCollectionsInfo.emplace(nss, std::move(secondaryInfo));
     };
-    for (auto& [collName, secondaryColl] : collections.getSecondaryCollections()) {
-        fillOutSecondaryInfo(collName, secondaryColl);
+    for (const auto& [collName, acq] : collections.getSecondaryCollectionAcquisitions()) {
+        fillOutSecondaryInfo(collName, acq.getCollectionPtr());
     }
 
     // In the event of a self $lookup, we must have an entry for the main collection in the map
@@ -475,7 +475,8 @@ void QueryPlannerParams::fillOutSecondaryCollectionsInfo(
         return;
     }
 
-    for (const auto& [name, coll] : collections.getSecondaryCollections()) {
+    for (const auto& [name, acq] : collections.getSecondaryCollectionAcquisitions()) {
+        const auto& coll = acq.getCollectionPtr();
         if (coll) {
             auto& collInfo = secondaryCollectionsInfo[name];
             applyQuerySettingsForCollection(canonicalQuery,

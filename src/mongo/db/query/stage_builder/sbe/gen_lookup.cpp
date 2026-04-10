@@ -1402,7 +1402,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildEqLookup(
     auto [localStage, localOutputs] = build(eqLookupNode->children[0].get(), childReqs);
 
     NamespaceString foreignNss(eqLookupNode->foreignCollection);
-    auto foreignColl = _collections.lookupCollection(foreignNss);
+    const auto& foreignColl = _collections.lookupCollection(foreignNss);
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Collection " << eqLookupNode->foreignCollection.toStringForErrorMsg()
                           << " either dropped or renamed",
@@ -2114,7 +2114,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildIndexedJoinEmbedd
             "Right grandchild in buildIndexedJoinEmbeddingNode() must be an IndexProbeNode",
             indexProbe != nullptr);
 
-    const auto foreignColl = _collections.lookupCollection(indexProbe->nss);
+    const auto& foreignColl = _collections.lookupCollection(indexProbe->nss);
     tassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Collection " << indexProbe->nss.toStringForErrorMsg()
                           << " has been dropped",

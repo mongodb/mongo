@@ -80,7 +80,9 @@ SbeStageBuilderTestFixture::buildPlanStage(std::unique_ptr<QuerySolution> queryS
     }
 
     CollectionMock coll(_nss);
-    // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    // CollectionPtr_UNSAFE is intentional here: 'coll' is a stack-allocated mock with no catalog
+    // entry, so establishConsistentCollection cannot be used. This code path is test-only and
+    // never yields, so the Collection* cannot go stale within this scope.
     CollectionPtr collPtr = CollectionPtr::CollectionPtr_UNSAFE(&coll);
     if (param.shardFilterInterface) {
         auto shardFilterer = param.shardFilterInterface->makeShardFilterer(operationContext());

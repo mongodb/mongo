@@ -44,8 +44,8 @@ namespace mongo {
 AllIndicesRequiredChecker::AllIndicesRequiredChecker(
     const MultipleCollectionAccessor& collections) {
     saveIndicesForCollection(collections.getMainCollection());
-    for (auto& [_, collection] : collections.getSecondaryCollections()) {
-        saveIndicesForCollection(collection);
+    for (const auto& [_, acq] : collections.getSecondaryCollectionAcquisitions()) {
+        saveIndicesForCollection(acq.getCollectionPtr());
     }
 }
 
@@ -84,7 +84,8 @@ void AllIndicesRequiredChecker::checkIndicesForCollection(OperationContext* opCt
 void AllIndicesRequiredChecker::check(OperationContext* opCtx,
                                       const MultipleCollectionAccessor& collections) const {
     checkIndicesForCollection(opCtx, collections.getMainCollection());
-    for (auto& [_, collection] : collections.getSecondaryCollections()) {
+    for (const auto& [_, acq] : collections.getSecondaryCollectionAcquisitions()) {
+        const auto& collection = acq.getCollectionPtr();
         if (collection) {
             checkIndicesForCollection(opCtx, collection);
         }

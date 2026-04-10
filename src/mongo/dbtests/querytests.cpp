@@ -149,11 +149,7 @@ public:
         {
             _database = getDbOrCreate(&_opCtx, nss());
             WriteUnitOfWork wunit(&_opCtx);
-            // TODO(SERVER-103403): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
-            CollectionPtr collection = CollectionPtr::CollectionPtr_UNSAFE(
-                CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
-            if (collection) {
+            if (CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss())) {
                 _database->dropCollection(&_opCtx, nss()).transitional_ignore();
             }
             _database->createCollection(&_opCtx, nss());

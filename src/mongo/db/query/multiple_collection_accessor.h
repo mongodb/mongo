@@ -78,10 +78,6 @@ public:
         return _mainAcq ? _mainAcq->getCollectionPtr() : CollectionPtr::null;
     }
 
-    std::map<NamespaceString, CollectionPtr> getSecondaryCollections() const {
-        return _getSecondaryCollections();
-    }
-
     const CollectionOrViewAcquisitionMap& getSecondaryCollectionAcquisitions() const {
         return _secondaryAcq;
     }
@@ -98,7 +94,7 @@ public:
         return CollectionAcquisition(_mainAcq->getCollection());
     }
 
-    CollectionPtr lookupCollection(const NamespaceString& nss) const {
+    const CollectionPtr& lookupCollection(const NamespaceString& nss) const {
         return _lookupCollectionAcquisitionAndGetCollPtr(nss);
     }
 
@@ -122,7 +118,8 @@ public:
         if (hasMainCollection()) {
             func(getMainCollection());
         }
-        for (const auto& [name, coll] : getSecondaryCollections()) {
+        for (const auto& [name, acq] : _secondaryAcq) {
+            const auto& coll = acq.getCollectionPtr();
             if (coll) {
                 func(coll);
             }
@@ -130,26 +127,12 @@ public:
     }
 
 private:
-    inline std::map<NamespaceString, CollectionPtr> _getSecondaryCollections() const {
-        std::map<NamespaceString, CollectionPtr> collMap;
-        for (const auto& [nss, acq] : _secondaryAcq) {
-            // TODO(SERVER-103403): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
-            collMap.emplace(nss, CollectionPtr::CollectionPtr_UNSAFE(acq.getCollectionPtr().get()));
-        }
-        return collMap;
-    }
-
-    inline CollectionPtr _lookupCollectionAcquisitionAndGetCollPtr(
+    inline const CollectionPtr& _lookupCollectionAcquisitionAndGetCollPtr(
         const NamespaceString& nss) const {
         if (nss == _mainAcq->nss()) {
-            // TODO(SERVER-103403): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
-            return CollectionPtr::CollectionPtr_UNSAFE(_mainAcq->getCollectionPtr().get());
+            return _mainAcq->getCollectionPtr();
         } else if (auto itr = _secondaryAcq.find(nss); itr != _secondaryAcq.end()) {
-            // TODO(SERVER-103403): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
-            return CollectionPtr::CollectionPtr_UNSAFE(itr->second.getCollectionPtr().get());
+            return itr->second.getCollectionPtr();
         }
         tasserted(
             10096102,

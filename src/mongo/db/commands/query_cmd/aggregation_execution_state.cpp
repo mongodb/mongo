@@ -822,12 +822,13 @@ boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext
         // Get the mainCollection and all secondary collections so that we can access the
         // PathArrayness info in each.
         const auto& mainColl = getCollections().getMainCollection();
-        const auto& secondaryColls = getCollections().getSecondaryCollections();
+        const auto& secondaryAcq = getCollections().getSecondaryCollectionAcquisitions();
 
         // Fetch the PathArrayness map for any secondary collections.
         stdx::unordered_map<NamespaceString, std::shared_ptr<const PathArrayness>>
             secondaryCollsPathArrayness;
-        for (const auto& [nss, coll] : secondaryColls) {
+        for (const auto& [nss, acq] : secondaryAcq) {
+            const auto& coll = acq.getCollectionPtr();
             if (!coll) {
                 continue;
             }
