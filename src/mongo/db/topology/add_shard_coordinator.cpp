@@ -108,25 +108,16 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
             Phase::kCheckShardPreconditions,
             [this, &token, _ = shared_from_this(), executor](auto* opCtx) {
                 auto& targeter = _getTargeter(opCtx);
-                try {
-                    _runWithRetries(
-                        [&]() {
-                            topology_change_helpers::validateHostAsShard(opCtx,
-                                                                         targeter,
-                                                                         _doc.getConnectionString(),
-                                                                         _doc.getIsConfigShard(),
-                                                                         _executorWithoutGossip);
-                        },
-                        executor,
-                        token);
-                } catch (const DBException&) {
-                    // If we are not able to validate the host as a shard after multiple tries, we
-                    // don't want to continue, so we remove the replicaset monitor and give up.
-                    topology_change_helpers::removeReplicaSetMonitor(opCtx,
-                                                                     _doc.getConnectionString());
-                    _completeOnError = true;
-                    throw;
-                }
+                uassertStatusOK(_runWithRetries(
+                    [&]() {
+                        topology_change_helpers::validateHostAsShard(opCtx,
+                                                                     targeter,
+                                                                     _doc.getConnectionString(),
+                                                                     _doc.getIsConfigShard(),
+                                                                     _executorWithoutGossip);
+                    },
+                    executor,
+                    token));
 
                 std::string shardName =
                     topology_change_helpers::createShardName(opCtx,
@@ -168,29 +159,20 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                     Grid::get(opCtx)->shardRegistry()->getConfigShard()->getTargeter()->findHost(
                         opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, {}));
 
-                try {
-                    _runWithRetries(
-                        [&]() {
-                            ShardsvrCheckCanConnectToConfigServer cmd(host);
-                            cmd.setDbName(DatabaseName::kAdmin);
-                            uassertStatusOK(topology_change_helpers::runCommandForAddShard(
-                                                opCtx,
-                                                _getTargeter(opCtx),
-                                                DatabaseName::kAdmin,
-                                                cmd.toBSON(),
-                                                _executorWithoutGossip)
-                                                .commandStatus);
-                        },
-                        executor,
-                        token);
-                } catch (const DBException&) {
-                    // If the replica set is not able to contact us after multiple tries, we don't
-                    // want to continue, so we remove the replicaset monitor and give up.
-                    topology_change_helpers::removeReplicaSetMonitor(opCtx,
-                                                                     _doc.getConnectionString());
-                    _completeOnError = true;
-                    throw;
-                }
+                uassertStatusOK(_runWithRetries(
+                    [&]() {
+                        ShardsvrCheckCanConnectToConfigServer cmd(host);
+                        cmd.setDbName(DatabaseName::kAdmin);
+                        uassertStatusOK(
+                            topology_change_helpers::runCommandForAddShard(opCtx,
+                                                                           _getTargeter(opCtx),
+                                                                           DatabaseName::kAdmin,
+                                                                           cmd.toBSON(),
+                                                                           _executorWithoutGossip)
+                                .commandStatus);
+                    },
+                    executor,
+                    token));
             }))
         .then(_buildPhaseHandler(
             Phase::kPrepareNewShard,
@@ -432,7 +414,9 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                                      _result = std::string{_doc.getChosenName().value()};
                                  }))
         .onError([this, _ = shared_from_this()](const Status& status) {
-            if (!_mustAlwaysMakeProgress() && !_isRetriableErrorForDDLCoordinator(status)) {
+            if ((!_mustAlwaysMakeProgress() ||
+                 _doc.getPhase() == Phase::kCheckShardPreconditions) &&
+                (!_isRetriableErrorForDDLCoordinator(status) || _giveUpTrying)) {
                 auto opCtxHolder = makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 triggerCleanup(opCtx, status);
@@ -486,18 +470,32 @@ ExecutorFuture<void> AddShardCoordinator::_cleanupOnAbort(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token,
     const Status& status) noexcept {
-    return ExecutorFuture<void>(**executor).then([this, token, status, _ = shared_from_this()] {
-        const auto opCtxHolder = makeOperationContext();
-        auto* opCtx = opCtxHolder.get();
+    return ExecutorFuture<void>(**executor)
+        .then([this, token, status, executor, _ = shared_from_this()] {
+            // The replicaset might not be reachable (might be the reason why we are here), so
+            // try to restore it a couple of times, then give up and keep the configserver
+            // consistent.
+            std::ignore = _runWithRetries(
+                [this, _ = shared_from_this()]() {
+                    const auto opCtxHolder = makeOperationContext();
+                    auto* opCtx = opCtxHolder.get();
 
-        if (!_doc.getIsConfigShard() && _doc.getOriginalUserWriteBlockingLevel().has_value()) {
-            _restoreUserWrites(opCtx);
-        }
-        _dropBlockFCVChangesCollection(opCtx, _executorWithoutGossip);
-        topology_change_helpers::unblockDDLCoordinators(opCtx,
-                                                        /*removeRecoveryDocument*/ false);
-        topology_change_helpers::removeReplicaSetMonitor(opCtx, _doc.getConnectionString());
-    });
+                    if (!_doc.getIsConfigShard() &&
+                        _doc.getOriginalUserWriteBlockingLevel().has_value()) {
+                        _restoreUserWrites(opCtx);
+                    }
+                    _dropBlockFCVChangesCollection(opCtx, _executorWithoutGossip);
+                },
+                executor,
+                token);
+
+            const auto opCtxHolder = makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+
+            topology_change_helpers::unblockDDLCoordinators(opCtx,
+                                                            /*removeRecoveryDocument*/ false);
+            topology_change_helpers::removeReplicaSetMonitor(opCtx, _doc.getConnectionString());
+        });
 }
 
 bool AddShardCoordinator::isInCriticalSection(Phase phase) const {
@@ -574,7 +572,7 @@ std::shared_ptr<AddShardCoordinator> AddShardCoordinator::create(
 }
 
 bool AddShardCoordinator::_mustAlwaysMakeProgress() {
-    return _doc.getPhase() >= Phase::kPrepareNewShard;
+    return _doc.getPhase() >= Phase::kCheckShardPreconditions;
 }
 
 // TODO (SPM-4017): these changes should be done on the cluster command level.
@@ -681,35 +679,41 @@ bool AddShardCoordinator::_hasShardingDataOnReplicaSet(OperationContext* opCtx) 
     return false;
 }
 
-void AddShardCoordinator::_runWithRetries(std::function<void()>&& function,
-                                          std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                                          const CancellationToken& token) {
+Status AddShardCoordinator::_runWithRetries(std::function<void()>&& function,
+                                            std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                            const CancellationToken& token) {
     size_t failCounter = 0;
 
-    AsyncTry([&]() {
-        try {
-            function();
-        } catch (const DBException& ex) {
-            return ex.toStatus();
-        }
-        return Status::OK();
-    })
-        .until([&](const Status& status) {
-            if (status.isOK()) {
-                return true;
-            }
-            if (!_isRetriableErrorForDDLCoordinator(status)) {
-                return true;
-            }
-            failCounter++;
-            if (failCounter >= kMaxFailedRetryCount) {
-                return true;
-            }
-            return false;
-        })
-        .withBackoffBetweenIterations(kExponentialBackoff)
-        .on(**executor, token)
-        .get();
+    const auto retVal = AsyncTry([&]() {
+                            try {
+                                function();
+                            } catch (const DBException& ex) {
+                                return ex.toStatus();
+                            }
+                            return Status::OK();
+                        })
+                            .until([&](const Status& status) {
+                                if (status.isOK()) {
+                                    return true;
+                                }
+                                if (!_isRetriableErrorForDDLCoordinator(status)) {
+                                    return true;
+                                }
+                                failCounter++;
+                                if (failCounter >= kMaxFailedRetryCount) {
+                                    return true;
+                                }
+                                return false;
+                            })
+                            .withBackoffBetweenIterations(kExponentialBackoff)
+                            .on(**executor, token)
+                            .getNoThrow();
+
+    if (retVal != Status::OK()) {
+        _giveUpTrying = true;
+    }
+
+    return retVal;
 }
 
 boost::optional<std::function<OperationSessionInfo(OperationContext*)>>

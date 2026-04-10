@@ -82,9 +82,9 @@ private:
 
     bool _hasShardingDataOnReplicaSet(OperationContext* opCtx);
 
-    void _runWithRetries(std::function<void()>&& function,
-                         std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                         const CancellationToken& token);
+    Status _runWithRetries(std::function<void()>&& function,
+                           std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                           const CancellationToken& token);
 
     boost::optional<std::function<OperationSessionInfo(OperationContext*)>> _osiGenerator();
 
@@ -139,6 +139,8 @@ private:
     std::shared_ptr<executor::ShardingTaskExecutor> _executorWithoutGossip;
 
     const BSONObj _critSecReason;
+
+    bool _giveUpTrying{false};
 };
 
 }  // namespace mongo
