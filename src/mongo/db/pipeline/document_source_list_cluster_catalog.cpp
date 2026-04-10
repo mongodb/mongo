@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/util/assert_util.h"
@@ -168,16 +169,86 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceListClusterCatalog::createFrom
                 "tracked": { $ne: ["$trackedCollectionInfo", []] }
         }})");
 
-    pipeline.addStage<DocumentSourceAddFields>(R"({ 
-        $addFields: {
+    // For time-series collections, config.collections stores the shard key in raw buckets format
+    // (e.g. {meta: 1}, {control.min.time: 1}) rather than the user-facing logical format
+    // (e.g. {myMeta: 1, {time: 1}). When rawData is false (the default), we convert the shard key
+    // field names back to the logical format using the `timeseriesFields` read from
+    // config.collections.
+    // Requests on system.buckets namespaces are considered "raw" and always return the untranslated
+    // shard key.
+    if (isRawDataOperation(expCtx->getOperationContext())) {
+        // rawData mode: return the shard key exactly as stored in config.collections.
+        pipeline.addStage<DocumentSourceAddFields>(R"({
+            $addFields: {
                 "shardKey": {
-                        $cond: {
-                                if: "$sharded",
-                                then: "$firstTrackedCollectionInfo.key",
-                                else: "$$REMOVE"
-                        }
+                    $cond: {
+                        if: "$sharded",
+                        then: "$firstTrackedCollectionInfo.key",
+                        else: "$$REMOVE"
+                    }
                 }
-        } })");
+            }
+        })");
+    } else {
+        pipeline.addStage<DocumentSourceAddFields>(
+            // Only sharded collections have a shard key; remove the field otherwise.
+            R"({ $addFields: { "shardKey": { $cond: { if: "$sharded", then: { $cond: {)"
+
+            // For non-timeseries collections the raw key is already in logical format, so the
+            // conversion is only needed when timeseriesFields is present and the namespace is not
+            // '*.system.buckets.*'.
+            //
+            // TODO (SERVER-122770) Remove the system.buckets check once all timeseries collections
+            // are viewless.
+            R"( if: { $and: ["$firstTrackedCollectionInfo.timeseriesFields",)"
+            R"( { $lt: [{ $indexOfBytes: ["$ns", ".system.buckets."] }, 0] }] }, then: {)"
+
+            // The aggregation framework has no operator to rename keys inside an object, so we
+            // decompose the shard key into an array of {k, v} pairs with $objectToArray, then remap
+            // each field name from raw to logical via $map + $switch, and finally then reassemble
+            // the object with $arrayToObject.
+            R"( $arrayToObject: { $map: {
+                input: { $objectToArray: "$firstTrackedCollectionInfo.key" },
+                as: "field",
+                in: { k: { $switch: { branches: [)"
+
+            // Branch 1 - "meta" or "meta.<path>": the buckets collection stores the metaField under
+            // the fixed name "meta". Replace the 4-char prefix with the actual metaField name.
+            R"( {
+                case: { $or: [
+                    { $eq: ["$$field.k", "meta"] },
+                    { $eq: [{ $substrBytes: ["$$field.k", 0, 5] }, "meta."] }
+                ]},
+                then: { $concat: [
+                    "$firstTrackedCollectionInfo.timeseriesFields.metaField",
+                    { $substrBytes: [
+                        "$$field.k", 4,
+                        { $subtract: [{ $strLenBytes: "$$field.k" }, 4] }
+                    ]}
+                ]}
+            },)"
+
+            // Branch 2 - Prefix "control.min.": the buckets collection stores the timeField as
+            // "control.min.<timeField>". Strip the 12-char prefix to recover the original timeField
+            // name.
+            R"( {
+                case: { $eq: [{ $substrBytes: ["$$field.k", 0, 12] }, "control.min."] },
+                then: { $substrBytes: [
+                    "$$field.k", 12,
+                    { $subtract: [{ $strLenBytes: "$$field.k" }, 12] }
+                ]}
+            })"
+
+            // Default: keep the field name unchanged (should not be reached for valid timeseries
+            // shard keys, but acts as a safe fallback).
+            R"( ], default: "$$field.k" } }, v: "$$field.v" } } } },)"
+
+            // Non-timeseries sharded collections: use the raw key directly.
+            R"( else: "$firstTrackedCollectionInfo.key" } },)"
+
+            // Non-sharded collections: omit the shardKey field entirely.
+            R"( else: "$$REMOVE" } } } })");
+    }
 
 
     auto specs = mongo::DocumentSourceListClusterCatalogSpec::parse(elem.embeddedObject(),

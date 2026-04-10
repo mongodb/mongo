@@ -16,6 +16,7 @@ import {
     runningWithViewlessTimeseriesUpgradeDowngrade,
     getTimeseriesBucketsColl,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {getRawOperationSpec} from "jstests/libs/raw_operation_utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const SHARDED_CLUSTER = 0;
@@ -34,6 +35,18 @@ const kCollTimeseries = "collTimeseries";
 const kView = "view";
 const kCollSharded = "collSharded";
 const kCollTimeseriesSharded = "collTimeseriesSharded";
+const kCollTimeseriesShardedByMeta = "collTimeseriesShardedByMeta";
+const kCollTimeseriesShardedByMetaSubfield = "collTimeseriesShardedByMetaSubfield";
+const kTimeseriesCollections = new Set([
+    kCollTimeseries,
+    kCollTimeseriesSharded,
+    kCollTimeseriesShardedByMeta,
+    kCollTimeseriesShardedByMetaSubfield,
+    getTimeseriesBucketsColl(kCollTimeseries),
+    getTimeseriesBucketsColl(kCollTimeseriesSharded),
+    getTimeseriesBucketsColl(kCollTimeseriesShardedByMeta),
+    getTimeseriesBucketsColl(kCollTimeseriesShardedByMetaSubfield),
+]);
 
 assert.commandWorked(dbTest.dropDatabase());
 
@@ -117,7 +130,39 @@ if (FixtureHelpers.isMongos(dbTest)) {
     });
     expectedResults[SHARDED_CLUSTER][kCollTimeseriesSharded] = {
         sharded: true,
-        shardKey: {"control.min.time": 1},
+        shardKey: {time: 1},
+        shards: [primaryShard],
+        tracked: true,
+        balancingEnabled: true,
+        balancingEnabledReason: {enableBalancing: true, allowMigrations: true},
+    };
+
+    // Sharded timeseries collection with metaField-only shard key: verifies that the "meta" ->
+    // "<metaField>" conversion works when the shard key is just the metaField.
+    dbTest.adminCommand({
+        shardCollection: dbName + "." + kCollTimeseriesShardedByMeta,
+        timeseries: {timeField: "time", metaField: "myMeta"},
+        key: {myMeta: 1},
+    });
+    expectedResults[SHARDED_CLUSTER][kCollTimeseriesShardedByMeta] = {
+        sharded: true,
+        shardKey: {myMeta: 1},
+        shards: [primaryShard],
+        tracked: true,
+        balancingEnabled: true,
+        balancingEnabledReason: {enableBalancing: true, allowMigrations: true},
+    };
+
+    // Sharded timeseries collection with metaField sub-path shard key: verifies that the
+    // "meta.<path>" -> "<metaField>.<path>" conversion works.
+    dbTest.adminCommand({
+        shardCollection: dbName + "." + kCollTimeseriesShardedByMetaSubfield,
+        timeseries: {timeField: "time", metaField: "myMeta"},
+        key: {"myMeta.sensorId": 1},
+    });
+    expectedResults[SHARDED_CLUSTER][kCollTimeseriesShardedByMetaSubfield] = {
+        sharded: true,
+        shardKey: {"myMeta.sensorId": 1},
         shards: [primaryShard],
         tracked: true,
         balancingEnabled: true,
@@ -140,7 +185,6 @@ function checkCollectionEntry(collName, expectedResult) {
 
     for (const [field, value] of Object.entries(expectedResult)) {
         if (collectionPlacementIsUnstable && (field === "shards" || field === "tracked")) {
-            // Can't check the 'shards' field if the collection placement isn't deterministic.
             continue;
         }
         assert.eq(
@@ -150,6 +194,14 @@ function checkCollectionEntry(collName, expectedResult) {
         );
     }
 }
+
+// Raw (buckets-format) shard keys for timeseries collections. system.buckets namespaces are
+// treated as "raw" and always show the untranslated shard key.
+const rawShardKeys = {
+    [kCollTimeseriesSharded]: {"control.min.time": 1},
+    [kCollTimeseriesShardedByMeta]: {meta: 1},
+    [kCollTimeseriesShardedByMetaSubfield]: {"meta.sensorId": 1},
+};
 
 for (const [collName, expectedResult] of Object.entries(expectedResults[serverType])) {
     // TODO SERVER-120014: Remove this test once 9.0 becomes last LTS and all timeseries collections are viewless.
@@ -161,7 +213,13 @@ for (const [collName, expectedResult] of Object.entries(expectedResults[serverTy
 
     // TODO SERVER-120014: Remove this test once 9.0 becomes last LTS and all timeseries collections are viewless.
     if (results.find((collEntry) => collEntry.ns == dbName + "." + getTimeseriesBucketsColl(collName))) {
-        assert(collName == kCollTimeseries || collName == kCollTimeseriesSharded, tojson(results));
+        assert(
+            collName == kCollTimeseries ||
+                collName == kCollTimeseriesSharded ||
+                collName == kCollTimeseriesShardedByMeta ||
+                collName == kCollTimeseriesShardedByMetaSubfield,
+            tojson(results),
+        );
         assert(!isViewlessTimeseriesOnlySuite(dbTest), tojson(results));
 
         // Check timeseries view
@@ -174,15 +232,65 @@ for (const [collName, expectedResult] of Object.entries(expectedResults[serverTy
             balancingEnabledReason: undefined,
         });
 
-        // Check timeseries collection in buckets namespace
-        checkCollectionEntry(getTimeseriesBucketsColl(collName), expectedResult);
+        // For system.buckets namespaces the shard key is returned in raw (buckets) format,
+        // consistent with listCollections and listIndexes.
+        const bucketsExpected = Object.assign({}, expectedResult);
+        if (collName in rawShardKeys) {
+            bucketsExpected.shardKey = rawShardKeys[collName];
+        }
+        checkCollectionEntry(getTimeseriesBucketsColl(collName), bucketsExpected);
         continue;
     }
 
     checkCollectionEntry(collName, expectedResult);
 }
 
-// 3. Test balancingEnabled and balancingEnabledReason flags with all the possible configurations.
+// 3. Verify that rawData=true returns the raw (buckets) shard key for timeseries collections,
+//    while rawData=false (default) returns the logical (user-facing) format.
+if (FixtureHelpers.isMongos(dbTest)) {
+    const rawResult = assert.commandWorked(
+        dbTest.runCommand({
+            aggregate: 1,
+            pipeline: [{$listClusterCatalog: {}}, {$match: {sharded: true}}],
+            cursor: {},
+            ...getRawOperationSpec(dbTest),
+        }),
+    );
+    const rawEntries = rawResult.cursor.firstBatch;
+
+    const tsRawEntry = rawEntries.find((e) => e.ns.endsWith("." + kCollTimeseriesSharded));
+    assert(tsRawEntry, "Sharded timeseries collection not found in rawData=true results: " + tojson(rawEntries));
+    assert.docEq(
+        {"control.min.time": 1},
+        tsRawEntry.shardKey,
+        "rawData=true should return the raw buckets shard key for timeseries collections",
+    );
+
+    const regularRawEntry = rawEntries.find((e) => e.ns === dbName + "." + kCollSharded);
+    assert(regularRawEntry, "Sharded collection not found in rawData=true results: " + tojson(rawEntries));
+    assert.docEq({x: 1}, regularRawEntry.shardKey, "rawData should not affect non-timeseries shard keys");
+
+    const tsMetaRawEntry = rawEntries.find((e) => e.ns.endsWith("." + kCollTimeseriesShardedByMeta));
+    assert(tsMetaRawEntry, kCollTimeseriesShardedByMeta + " not found in rawData=true results: " + tojson(rawEntries));
+    assert.docEq(
+        {meta: 1},
+        tsMetaRawEntry.shardKey,
+        "rawData=true should return {meta: 1} for metaField-only timeseries shard key",
+    );
+
+    const tsSubfieldRawEntry = rawEntries.find((e) => e.ns.endsWith("." + kCollTimeseriesShardedByMetaSubfield));
+    assert(
+        tsSubfieldRawEntry,
+        kCollTimeseriesShardedByMetaSubfield + " not found in rawData=true results: " + tojson(rawEntries),
+    );
+    assert.docEq(
+        {"meta.sensorId": 1},
+        tsSubfieldRawEntry.shardKey,
+        "rawData=true should return {meta.sensorId: 1} for metaField sub-path timeseries shard key",
+    );
+}
+
+// 4. Test balancingEnabled and balancingEnabledReason flags with all the possible configurations.
 //    This is only necessary when the cluster is sharded.
 //
 if (FixtureHelpers.isMongos(dbTest)) {
