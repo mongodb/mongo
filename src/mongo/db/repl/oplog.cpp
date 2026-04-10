@@ -3026,15 +3026,16 @@ Status applyCommand_inlock(OperationContext* opCtx,
     // for each collection dropped. 'applyOps' and 'commitTransaction' will try to apply each
     // individual operation, and those will be caught then if they are a problem. 'abortTransaction'
     // won't ever change the server configuration collection.
-    constexpr std::array<StringData, 9> allowlistedOps{"dropDatabase",
-                                                       "applyOps",
-                                                       "dbCheck",
-                                                       "commitTransaction",
-                                                       "abortTransaction",
-                                                       "startIndexBuild",
-                                                       "commitIndexBuild",
-                                                       "abortIndexBuild",
-                                                       "initReplicatedFastCount"};
+    constexpr std::array<StringData, 10> allowlistedOps{"dropDatabase",
+                                                        "applyOps",
+                                                        "dbCheck",
+                                                        "commitTransaction",
+                                                        "abortTransaction",
+                                                        "startIndexBuild",
+                                                        "commitIndexBuild",
+                                                        "abortIndexBuild",
+                                                        "initReplicatedFastCount",
+                                                        "dropIdent"};
     if ((mode == OplogApplication::Mode::kInitialSync) &&
         (std::find(allowlistedOps.begin(), allowlistedOps.end(), o.firstElementFieldName()) ==
          allowlistedOps.end()) &&

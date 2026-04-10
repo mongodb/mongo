@@ -2366,6 +2366,20 @@ TEST_F(RollbackImplObserverInfoTest,
 }
 
 TEST_F(RollbackImplObserverInfoTest,
+       NamespacesAndUUIDsForOpsIgnoresNamespaceAndUUIDOfDropIdentOplogEntry) {
+    auto cmdObj = BSON("dropIdent" << "collection-5-7028918543793957371");
+    auto cmdOp = makeCommandOp(
+        Timestamp(2, 2), boost::none, NamespaceString::kAdminCommandNamespace, cmdObj, 2);
+
+    std::set<NamespaceString> expectedNamespaces = {};
+    std::set<UUID> expectedUUIDs = {};
+    auto [namespaces, uuids] =
+        unittest::assertGet(_rollback->_namespacesAndUUIDsForOp_forTest(OplogEntry(cmdOp.first)));
+    ASSERT(expectedNamespaces == namespaces);
+    ASSERT(expectedUUIDs == uuids);
+}
+
+TEST_F(RollbackImplObserverInfoTest,
        NamespacesAndUUIDsForOpsExtractsNamespacesAndUUIDOfCollModOplogEntry) {
     auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     auto uuid = UUID::gen();
