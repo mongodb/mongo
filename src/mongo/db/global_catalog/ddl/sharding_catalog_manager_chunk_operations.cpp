@@ -211,8 +211,8 @@ BSONObj buildCountChunksInRangeCommand(const UUID& collectionUUID,
     BSONObjBuilder queryBuilder;
     queryBuilder << ChunkType::collectionUUID << collectionUUID;
     queryBuilder << ChunkType::shard(shardId.toString());
-    queryBuilder << ChunkType::min(BSON("$gte" << chunkRange.getMin()));
-    queryBuilder << ChunkType::min(BSON("$lt" << chunkRange.getMax()));
+    queryBuilder << ChunkType::min(
+        BSON("$gte" << chunkRange.getMin() << "$lt" << chunkRange.getMax()));
 
     std::vector<BSONObj> pipeline;
     pipeline.push_back(BSON("$match" << queryBuilder.obj()));
@@ -516,8 +516,8 @@ void mergeAllChunksOnShardInTransaction(OperationContext* opCtx,
             BSONObjBuilder queryBuilder;
             queryBuilder << ChunkType::collectionUUID << collectionUUID;
             queryBuilder << ChunkType::shard(shardId.toString());
-            queryBuilder << ChunkType::min(BSON("$gte" << chunk.getMin()));
-            queryBuilder << ChunkType::min(BSON("$lt" << chunk.getMax()));
+            queryBuilder << ChunkType::min(
+                BSON("$gte" << chunk.getMin() << "$lt" << chunk.getMax()));
 
             write_ops::DeleteCommandRequest deleteOp(NamespaceString::kConfigsvrChunksNamespace);
             deleteOp.setDeletes([&] {
@@ -1034,8 +1034,9 @@ void ShardingCatalogManager::_mergeChunksInTransaction(
                     BSONObjBuilder queryBuilder;
                     queryBuilder << ChunkType::collectionUUID << collectionUUID;
                     queryBuilder << ChunkType::shard(shardId.toString());
-                    queryBuilder << ChunkType::min(BSON("$gte" << chunkRangeToDelete.getMin()));
-                    queryBuilder << ChunkType::min(BSON("$lt" << chunkRangeToDelete.getMax()));
+                    queryBuilder << ChunkType::min(BSON("$gte" << chunkRangeToDelete.getMin()
+                                                               << "$lt"
+                                                               << chunkRangeToDelete.getMax()));
 
                     write_ops::DeleteCommandRequest deleteOp(
                         NamespaceString::kConfigsvrChunksNamespace);
@@ -1103,8 +1104,8 @@ ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
         BSONObjBuilder queryBuilder;
         queryBuilder << ChunkType::collectionUUID << collUuid;
         queryBuilder << ChunkType::shard(shardId.toString());
-        queryBuilder << ChunkType::min(BSON("$gte" << chunkRange.getMin()));
-        queryBuilder << ChunkType::min(BSON("$lt" << chunkRange.getMax()));
+        queryBuilder << ChunkType::min(
+            BSON("$gte" << chunkRange.getMin() << "$lt" << chunkRange.getMax()));
         return queryBuilder.obj();
     }();
 
