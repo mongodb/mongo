@@ -882,6 +882,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/runtime_planners/classic_runtime_planner_for_sbe:planner_interface.cpp",
         "//src/mongo/db/exec/runtime_planners/classic_runtime_planner_for_sbe:single_solution_passthrough_planner.cpp",
         "//src/mongo/db/exec/runtime_planners/classic_runtime_planner_for_sbe:sub_planner.cpp",
+        "//src/mongo/db/exec/runtime_planners/exec_deferred_engine_choice_runtime_planner:engine_selection_planner.cpp",
         "//src/mongo/db/exec/runtime_planners/exec_deferred_engine_choice_runtime_planner:multi_planner.cpp",
         "//src/mongo/db/exec/runtime_planners/exec_deferred_engine_choice_runtime_planner:planner_interface.cpp",
         "//src/mongo/db/exec/runtime_planners/exec_deferred_engine_choice_runtime_planner:single_solution_passthrough_planner.cpp",

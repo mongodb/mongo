@@ -344,13 +344,16 @@ PlanRankingResult planRanking(OperationContext* opCtx,
     tassert(11974306, "Expected planner params to be initialized.", expressResult.plannerParams);
     auto paramsForSingleCollectionQuery = std::move(expressResult.plannerParams);
 
-    auto makePlannerHelper = [&](std::unique_ptr<QueryPlannerParams> plannerParams) {
-        return uassertStatusOK(preparePlanner(opCtx,
-                                              canonicalQuery.get(),
-                                              std::move(plannerParams),
-                                              yieldPolicy,
-                                              collections,
-                                              pipeline));
+    auto makePlannerHelper = [&](std::unique_ptr<QueryPlannerParams> plannerParams)
+        -> std::unique_ptr<PlannerInterface> {
+        auto innerPlanner = uassertStatusOK(preparePlanner(opCtx,
+                                                           canonicalQuery.get(),
+                                                           std::move(plannerParams),
+                                                           yieldPolicy,
+                                                           collections,
+                                                           pipeline));
+        return std::make_unique<EngineSelectionPlanner>(
+            std::move(innerPlanner), opCtx, canonicalQuery.get(), pipeline, collections);
     };
     canonicalQuery->setUsingSbePlanCache(false);
     return retryMakePlanner(std::move(paramsForSingleCollectionQuery),

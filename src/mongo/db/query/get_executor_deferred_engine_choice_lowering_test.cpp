@@ -208,10 +208,15 @@ TEST_F(DeferredEngineChoiceLoweringTest, IdhackUsesClassic) {
 TEST_F(DeferredEngineChoiceLoweringTest, BasicScanUsesClassic) {
     auto [cq, plannerData] = createPlannerData();
     PlanRankingResult rankingResult{.solutions = makeEmptyVirtualScan(),
-                                    .plannerParams = std::move(plannerData.plannerParams)};
+                                    .plannerParams = plannerData.plannerParams};
+    auto preComputed =
+        std::make_unique<exec_deferred_engine_choice::PreComputedRankingResultPlanner>(
+            std::move(plannerData), std::move(rankingResult));
+    exec_deferred_engine_choice::EngineSelectionPlanner planner{
+        std::move(preComputed), operationContext(), cq.get(), nullptr /*pipeline*/, collections()};
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec =
         lowerPlanRankingResult(std::move(cq),
-                               std::move(rankingResult),
+                               planner.extractPlanRankingResult(),
                                operationContext(),
                                collections(),
                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
@@ -223,11 +228,16 @@ TEST_F(DeferredEngineChoiceLoweringTest, BasicScanUsesClassic) {
 TEST_F(DeferredEngineChoiceLoweringTest, GroupQueryUsesSbe) {
     auto [cq, plannerData] = createPlannerData();
     PlanRankingResult rankingResult{.solutions = makeEmptyVirtualScan(),
-                                    .plannerParams = std::move(plannerData.plannerParams)};
+                                    .plannerParams = plannerData.plannerParams};
     auto pipeline = makeSbeEligiblePipeline();
+    auto preComputed =
+        std::make_unique<exec_deferred_engine_choice::PreComputedRankingResultPlanner>(
+            std::move(plannerData), std::move(rankingResult));
+    exec_deferred_engine_choice::EngineSelectionPlanner planner{
+        std::move(preComputed), operationContext(), cq.get(), pipeline.get(), collections()};
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec =
         lowerPlanRankingResult(std::move(cq),
-                               std::move(rankingResult),
+                               planner.extractPlanRankingResult(),
                                operationContext(),
                                collections(),
                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
@@ -252,11 +262,15 @@ TEST_F(DeferredEngineChoiceLoweringTest, MultiplanningUsesEof) {
         auto [cq, plannerData] = createPlannerData(kFindFilter);
         auto solutions = createVirtualScanQuerySolutionsForDefaultFilter(
             numDocs /*resultDocCount*/, cq->getPrimaryMatchExpression());
-        exec_deferred_engine_choice::MultiPlanner planner{std::move(plannerData),
-                                                          std::move(solutions)};
+        auto multiPlanner = std::make_unique<exec_deferred_engine_choice::MultiPlanner>(
+            std::move(plannerData), std::move(solutions));
         // Include the SBE-eligible pipeline, so that if multiplanning hits EOF we see classic used,
         // and if EOF is not reached we see SBE used.
         auto pipeline = makeSbeEligiblePipeline();
+        // EngineSelectionPlanner applies the EOF optimization: if multiplanning already
+        // reached EOF, it selects classic instead of lowering to SBE unnecessarily.
+        exec_deferred_engine_choice::EngineSelectionPlanner planner{
+            std::move(multiPlanner), operationContext(), cq.get(), pipeline.get(), collections()};
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec =
             lowerPlanRankingResult(std::move(cq),
                                    planner.extractPlanRankingResult(),

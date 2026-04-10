@@ -84,40 +84,15 @@ public:
 
         auto solution = std::move(_rankingResult.solutions[0]);
 
-        // There are two EOF-related optimizations:
-        //     - If a non-existent collection is queried, we may create an EOF plan.
-        //     - If multiplanning was used and a plan reached an EOF state, the query
-        //       has been fully answered and there's no more execution that needs to
-        //       happen. In this case we return a classic executor so that we don't
-        //       have to restart work using SBE.
-        if (solution->root()->getType() == STAGE_EOF || useEofOptimization()) {
-            return makeClassicExecutor(std::move(solution));
-        }
-
-        // If the engine has already been selected, it means a plan was retrieved from the cache
-        // and trialed. The pipeline stages are attached to the QSN and we have a partially executed
-        // plan stage that can be continued.
-        if (_rankingResult.engineSelection) {
-            const auto engine = *_rankingResult.engineSelection;
-            return engine == EngineChoice::kClassic
-                ? makeClassicExecutor(std::move(solution))
-                : makeSbePlanExecutor(std::move(solution), true /*fromCandidate*/);
-        }
-
-        // If this ranking result is from replanning, the canonical query already has the SBE
-        // eligible stages attached.
-        const bool needToAttachStagesToCq =
-            !_rankingResult.plannerParams->replanningData.has_value();
-        const auto engine = extendSolutionAndSelectEngine(solution,
-                                                          _opCtx,
-                                                          _cq.get(),
-                                                          _pipeline,
-                                                          _collections,
-                                                          *plannerParams(),
-                                                          needToAttachStagesToCq);
+        tassert(9735001,
+                "Expected engine selection to be performed during planning",
+                _rankingResult.engineSelection.has_value());
+        const auto engine = *_rankingResult.engineSelection;
+        const bool fromSbeCandidate = _rankingResult.execState &&
+            _rankingResult.execState->peekExecState<SbeExecState>() != nullptr;
         return engine == EngineChoice::kClassic
             ? makeClassicExecutor(std::move(solution))
-            : makeSbePlanExecutor(std::move(solution), false /*fromCandidate*/);
+            : makeSbePlanExecutor(std::move(solution), fromSbeCandidate);
     }
 
 private:
@@ -157,24 +132,6 @@ private:
             return nullptr;
         }
         return std::unique_ptr<MultiPlanStage>(static_cast<MultiPlanStage*>(planStage.release()));
-    }
-
-    /*
-     * Analyzes the multiplan stage (if present) to see if the query is eligible for an
-     * optimization where a plan that reaches EOF can skip engine selection since the
-     * query is effectively answered already by classic.
-     */
-    bool useEofOptimization() const {
-        auto mps = peekMps();
-        return mps && mps->bestSolutionEof() &&
-            // If explain is used, go through regular engine selection to display which engine is
-            // targeted if EOF is not reached during multiplanning.
-            !_cq->getExpCtxRaw()->getExplain() &&
-            // We can't use EOF optimization if pipeline is present. Because we may need to execute
-            // the pipeline part in SBE, we have to rebuild and rerun the whole query.
-            _cq->cqPipeline().empty() &&
-            // We want more coverage for SBE in debug builds.
-            !kDebugBuild;
     }
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeSbePlanExecutor(

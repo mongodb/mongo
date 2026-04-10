@@ -173,4 +173,24 @@ private:
     std::unique_ptr<SubplanStage> _subPlanStage;
 };
 
+/**
+ * Wrapper planner that performs engine selection after extracting the planning result from an
+ * inner planner. This ensures engine selection happens in the planning phase, so that errors (e.g.
+ * NoQueryExecutionPlans from invalid query settings on secondary collections) are caught by
+ * retryMakePlanner's fallback mechanism.
+ */
+class EngineSelectionPlanner final : public PlannerInterface {
+public:
+    EngineSelectionPlanner(std::unique_ptr<PlannerInterface> innerPlanner,
+                           OperationContext* opCtx,
+                           CanonicalQuery* cq,
+                           Pipeline* pipeline,
+                           const MultipleCollectionAccessor& collections);
+
+    PlanRankingResult extractPlanRankingResult() override;
+
+private:
+    PlanRankingResult _result;
+};
+
 }  // namespace mongo::exec_deferred_engine_choice

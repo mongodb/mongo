@@ -138,8 +138,13 @@ function testAggregateQuerySettingsApplicationWithLookupEquiJoin(
     qstests.assertQuerySettingsIgnoreCursorHints(aggregateCmd, mainNs);
     if (checkSbeRestrictedOrFullyEnabled(db) && !isSecondaryCollAView) {
         // The aggregation stage will get pushed down to SBE, and index hints will get applied to
-        // secondary collections. This prevents cursor hints from also being applied.
-        qstests.assertQuerySettingsIgnoreCursorHints(aggregateCmd, secondaryNs);
+        // secondary collections. Verify that query settings on the secondary namespace apply the
+        // correct index even when a cursor hint is provided.
+        const queryWithHint = {...qsutils.withoutDollarDB(aggregateCmd), hint: qstests.indexA};
+        const settings = {indexHints: {ns: secondaryNs, allowedIndexes: [qstests.indexAB]}};
+        qsutils.withQuerySettings(aggregateCmd, settings, () => {
+            qstests.assertLookupJoinStage(queryWithHint, qstests.indexAB, isSecondaryCollAView);
+        });
     } else {
         // No SBE push down happens. The $lookup will get executed as a separate pipeline, so we
         // expect cursor hints to be applied on the main collection, while query settings will get
